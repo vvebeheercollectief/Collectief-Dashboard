@@ -19,6 +19,7 @@
   <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
   <style>
     :root{
@@ -298,6 +299,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
     </button>
     <div class="hdr-info"><h1 id="page-title">Nog Te Doen</h1><p id="page-sub">Openstaande taken</p></div>
+    <button class="ico-btn" id="notif-btn" title="Notificatie-instellingen" style="position:relative">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span id="notif-dot" style="display:none;position:absolute;top:6px;right:7px;width:8px;height:8px;background:var(--rd);border-radius:50%;border:2px solid var(--sur)"></span>
+    </button>
     <button class="ico-btn" id="theme-btn">
       <svg id="ico-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
       <svg id="ico-moon" style="display:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
@@ -562,6 +567,62 @@
   </div>
 </div>
 
+<!-- ═══════ NOTIFICATIE MODAL ═══════ -->
+<div class="modal-bg" id="notif-bg">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h2>🔔 Notificatie-instellingen</h2>
+      <button class="modal-close" id="notif-close">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="fld">
+        <label>Wie ben jij? *</label>
+        <select id="notif-who">
+          <option value="">-- Selecteer --</option>
+          <option value="Jer">Jer</option>
+          <option value="Cihad">Cihad</option>
+          <option value="Gabos">Gabos</option>
+          <option value="__other__">Anders (typ naam)</option>
+        </select>
+        <input type="text" id="notif-who-other" placeholder="Naam" style="display:none;margin-top:8px;width:100%;background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rs);padding:8px 11px"/>
+      </div>
+
+      <div id="notif-subscribe-section" class="fld" style="margin-top:18px">
+        <button class="btn btn-pri" id="notif-subscribe-btn" style="width:100%;justify-content:center">🔔 Notificaties aanzetten</button>
+        <p style="font-size:12px;color:var(--mut);margin-top:6px;line-height:1.4">Eenmalige toestemming nodig. Je browser vraagt om bevestiging.</p>
+      </div>
+
+      <div id="notif-settings-section" style="display:none">
+        <div style="background:var(--gn-l);border:1px solid var(--gn-b);border-radius:var(--rs);padding:10px 13px;color:var(--gn);font-size:13px;font-weight:500;margin-bottom:14px">
+          ✓ <strong>Notificaties staan aan</strong> voor dit apparaat.
+        </div>
+
+        <div style="font-size:11.5px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Soorten meldingen</div>
+        <div class="toggle-row"><div class="tog" id="tog-notif-newtask" onclick="this.classList.toggle('on');saveNotifPrefs()"></div><span>Nieuwe taak toegevoegd</span></div>
+        <div class="toggle-row"><div class="tog" id="tog-notif-assigned" onclick="this.classList.toggle('on');saveNotifPrefs()"></div><span>Taak aan mij toegewezen</span></div>
+        <div class="toggle-row"><div class="tog" id="tog-notif-deadline" onclick="this.classList.toggle('on');saveNotifPrefs()"></div><span>Deadline nadert</span></div>
+        <div class="fld" style="margin:4px 0 10px 46px">
+          <label style="text-transform:none;letter-spacing:normal;font-size:12px;color:var(--mut)">Hoe lang van tevoren?</label>
+          <select id="notif-deadline-hours" onchange="saveNotifPrefs()">
+            <option value="1">1 uur</option>
+            <option value="4">4 uur</option>
+            <option value="8">8 uur</option>
+            <option value="24">1 dag</option>
+            <option value="48">2 dagen</option>
+          </select>
+        </div>
+        <div class="toggle-row"><div class="tog" id="tog-notif-alv" onclick="this.classList.toggle('on');saveNotifPrefs()"></div><span>ALV-status verandert</span></div>
+        <div class="toggle-row"><div class="tog" id="tog-notif-daily" onclick="this.classList.toggle('on');saveNotifPrefs()"></div><span>Dagelijkse samenvatting (08:30)</span></div>
+
+        <div style="display:flex;gap:8px;margin-top:18px;flex-wrap:wrap">
+          <button class="btn btn-sec" id="notif-test-btn" style="flex:1;justify-content:center">🧪 Test melding</button>
+          <button class="btn btn-sec" id="notif-unsubscribe-btn" style="flex:1;justify-content:center;color:var(--rd);border-color:var(--rd-b)">Uitzetten</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 // ══════════════════════════════════════
 //  CONFIG
@@ -569,6 +630,7 @@
 const SID  = '1fnUsbwb4nDMNttWym9FWBw1CMMMAVTuZ3v88b35isUw';
 const AKEY = 'AIzaSyBo-Tf8o6L_VQoB29vv7L1q3NATIAgJc9E';
 const PG   = 25;
+const ONESIGNAL_APP_ID = 'c0e1301b-2cee-4646-8fab-99698e10e78c';
 
 const SECS = {
   OPPAKKEN:{label:'Oppakken',css:'--sec:var(--bl);--sec-l:var(--bl-l);--sec-b:var(--bl-b)',color:'#2563eb',
@@ -655,6 +717,16 @@ document.addEventListener('DOMContentLoaded',()=>{
   // Period buttons
   buildPeriodBtns('pb-vergader','vergader');
   buildPeriodBtns('pb-notulen','notulen');
+
+  // Notificatie-modal handlers
+  document.getElementById('notif-btn').onclick = openNotifModal;
+  document.getElementById('notif-close').onclick = closeNotifModal;
+  document.getElementById('notif-bg').onclick = e => { if (e.target.id === 'notif-bg') closeNotifModal(); };
+  document.getElementById('notif-who').onchange = () => { onWhoChange(); saveNotifPrefs(); };
+  document.getElementById('notif-who-other').oninput = () => saveNotifPrefs();
+  document.getElementById('notif-subscribe-btn').onclick = subscribeNotifs;
+  document.getElementById('notif-unsubscribe-btn').onclick = unsubscribeNotifs;
+  document.getElementById('notif-test-btn').onclick = () => sendTestNotif(getCurrentWho(), '🔔 Test melding', 'Notificaties werken op dit apparaat!');
 
   goTo('ntd');
 });
@@ -1530,6 +1602,176 @@ function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace
 function setupSearch(id,cb){
   const el=document.getElementById(id);if(!el)return;
   let t;el.addEventListener('input',()=>{clearTimeout(t);t=setTimeout(cb,200)});
+}
+
+// ══════════════════════════════════════
+//  ONESIGNAL — Push Notifications
+// ══════════════════════════════════════
+let oneSignalReady = false;
+let isSubscribed = false;
+
+// Init OneSignal zo snel mogelijk
+window.OneSignalDeferred = window.OneSignalDeferred || [];
+OneSignalDeferred.push(async function(OneSignal) {
+  try {
+    await OneSignal.init({
+      appId: ONESIGNAL_APP_ID,
+      serviceWorkerPath: 'sw.js',
+      serviceWorkerParam: { scope: './' },
+      notifyButton: { enable: false },
+      allowLocalhostAsSecureOrigin: true,
+    });
+    oneSignalReady = true;
+    isSubscribed = OneSignal.User.PushSubscription.optedIn === true;
+    refreshNotifUI();
+    // Luister naar veranderingen in subscription
+    OneSignal.User.PushSubscription.addEventListener('change', e => {
+      isSubscribed = e.current.optedIn === true;
+      refreshNotifUI();
+    });
+  } catch(e) { console.warn('OneSignal init faalde:', e); }
+});
+
+// Notificatie-modal openen / sluiten
+function openNotifModal() {
+  // Laad opgeslagen voorkeuren
+  const who = localStorage.getItem('notif_who') || '';
+  if (who === 'Jer' || who === 'Cihad' || who === 'Gabos' || who === '') {
+    document.getElementById('notif-who').value = who;
+    document.getElementById('notif-who-other').style.display = 'none';
+  } else {
+    document.getElementById('notif-who').value = '__other__';
+    document.getElementById('notif-who-other').style.display = '';
+    document.getElementById('notif-who-other').value = who;
+  }
+  // Voorkeur-toggles
+  ['newtask','assigned','deadline','alv','daily'].forEach(k => {
+    const v = localStorage.getItem('notif_'+k);
+    const el = document.getElementById('tog-notif-'+k);
+    if (el) el.classList.toggle('on', v === null ? true : v === 'true');
+  });
+  document.getElementById('notif-deadline-hours').value = localStorage.getItem('notif_deadline_hours') || '1';
+
+  refreshNotifUI();
+  document.getElementById('notif-bg').classList.add('open');
+}
+function closeNotifModal() { document.getElementById('notif-bg').classList.remove('open'); }
+
+// UI toont andere knoppen afhankelijk van subscription-status
+function refreshNotifUI() {
+  document.getElementById('notif-subscribe-section').style.display = isSubscribed ? 'none' : 'block';
+  document.getElementById('notif-settings-section').style.display = isSubscribed ? 'block' : 'none';
+  // Rode dot op belknop als nog niet aangezet
+  const dot = document.getElementById('notif-dot');
+  if (dot) dot.style.display = isSubscribed ? 'none' : 'block';
+}
+
+// "Wie ben jij?" — dropdown verandert
+function onWhoChange() {
+  const sel = document.getElementById('notif-who');
+  const other = document.getElementById('notif-who-other');
+  other.style.display = sel.value === '__other__' ? '' : 'none';
+}
+
+// Haal de huidige naam (uit dropdown of vrij veld)
+function getCurrentWho() {
+  const sel = document.getElementById('notif-who').value;
+  if (sel === '__other__') return document.getElementById('notif-who-other').value.trim();
+  return sel;
+}
+
+// Abonneer + sla voorkeuren op
+async function subscribeNotifs() {
+  const who = getCurrentWho();
+  if (!who) { alert('Selecteer of typ eerst je naam (Wie ben jij?).'); return; }
+  if (!oneSignalReady) { alert('Notificatiesysteem nog niet geladen. Probeer over enkele seconden opnieuw.'); return; }
+  try {
+    // Vraag toestemming + abonneer
+    await OneSignal.Notifications.requestPermission();
+    if (!OneSignal.Notifications.permission) {
+      alert('Je hebt geen toestemming gegeven. Zet notificaties aan in je browserinstellingen om dit alsnog te activeren.');
+      return;
+    }
+    await OneSignal.User.PushSubscription.optIn();
+    // Identity instellen
+    await OneSignal.login(who);
+    // Default voorkeuren (alles aan, deadline 1u)
+    ['newtask','assigned','deadline','alv','daily'].forEach(k => {
+      if (localStorage.getItem('notif_'+k) === null) localStorage.setItem('notif_'+k, 'true');
+    });
+    if (!localStorage.getItem('notif_deadline_hours')) localStorage.setItem('notif_deadline_hours', '1');
+    localStorage.setItem('notif_who', who);
+    await saveNotifPrefs(true);
+    isSubscribed = true;
+    refreshNotifUI();
+    // Welkomstmelding
+    await sendTestNotif(who, 'Notificaties zijn aan! 🔔', 'Je ontvangt voortaan meldingen op dit apparaat.');
+  } catch(e) {
+    console.error(e);
+    alert('Aanzetten mislukt: ' + e.message);
+  }
+}
+
+// Voorkeuren opslaan in OneSignal-tags en localStorage
+async function saveNotifPrefs(forceInit) {
+  const who = getCurrentWho();
+  if (!who && !forceInit) return;
+  if (who) localStorage.setItem('notif_who', who);
+
+  const prefs = {
+    newtask:  document.getElementById('tog-notif-newtask').classList.contains('on'),
+    assigned: document.getElementById('tog-notif-assigned').classList.contains('on'),
+    deadline: document.getElementById('tog-notif-deadline').classList.contains('on'),
+    alv:      document.getElementById('tog-notif-alv').classList.contains('on'),
+    daily:    document.getElementById('tog-notif-daily').classList.contains('on'),
+  };
+  const deadlineHours = document.getElementById('notif-deadline-hours').value || '1';
+  Object.entries(prefs).forEach(([k,v]) => localStorage.setItem('notif_'+k, v));
+  localStorage.setItem('notif_deadline_hours', deadlineHours);
+
+  // Sync met OneSignal tags (server-side)
+  if (oneSignalReady && isSubscribed) {
+    try {
+      await OneSignal.User.addTags({
+        behandelaar: who,
+        n_newtask:  prefs.newtask ? '1' : '0',
+        n_assigned: prefs.assigned ? '1' : '0',
+        n_deadline: prefs.deadline ? '1' : '0',
+        n_alv:      prefs.alv ? '1' : '0',
+        n_daily:    prefs.daily ? '1' : '0',
+        deadline_h: deadlineHours,
+      });
+      if (who) await OneSignal.login(who);
+    } catch(e) { console.warn('Tag sync faalde:', e); }
+  }
+}
+
+// Test-melding versturen via OneSignal (lokale notificatie, niet via server)
+async function sendTestNotif(who, title, body) {
+  try {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      const reg = await navigator.serviceWorker.ready;
+      reg.showNotification(title || 'Test melding', {
+        body: body || 'Dit is een test van het Collectief Dashboard.',
+        icon: 'icon-192.png',
+        badge: 'icon-192.png',
+        tag: 'cd-test'
+      });
+    }
+  } catch(e) { console.warn('Test melding faalde:', e); }
+}
+
+// Uitschrijven
+async function unsubscribeNotifs() {
+  if (!confirm('Notificaties helemaal uitzetten op dit apparaat?')) return;
+  try {
+    if (oneSignalReady) {
+      await OneSignal.User.PushSubscription.optOut();
+      await OneSignal.logout();
+    }
+    isSubscribed = false;
+    refreshNotifUI();
+  } catch(e) { alert('Uitzetten mislukt: ' + e.message); }
 }
 </script>
 </body>

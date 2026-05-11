@@ -1,6 +1,10 @@
 // Collectief Dashboard — Service Worker
 // Verhoog versie bij elke nieuwe deploy zodat clients de nieuwe cache pakken.
-const CACHE_VERSION = 'cd-v1';
+
+// OneSignal push-notificatie integratie
+try { importScripts('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js'); } catch (e) { console.warn('OneSignal SW import faalde:', e); }
+
+const CACHE_VERSION = 'cd-v2';
 const APP_SHELL = [
   './',
   './index.html',

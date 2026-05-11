@@ -1,0 +1,1516 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Collectief Dashboard 4.0</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <style>
+    :root{
+      --bg:#f0f4f8;--sur:#fff;--sur2:#f8fafc;--bor:#e2e8f0;
+      --txt:#0f172a;--mut:#64748b;--fnt:#94a3b8;
+      --r:12px;--rs:8px;--sh:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.05);
+      --shm:0 4px 16px rgba(0,0,0,.09);--shl:0 20px 60px rgba(0,0,0,.18);
+      --sb:240px;--hh:60px;--tr:.17s ease;
+      --bl:#2563eb;--bl-l:#dbeafe;--bl-b:#bfdbfe;
+      --am:#d97706;--am-l:#fef3c7;--am-b:#fde68a;
+      --pu:#7c3aed;--pu-l:#ede9fe;--pu-b:#ddd6fe;
+      --rd:#dc2626;--rd-l:#fee2e2;--rd-b:#fecaca;
+      --gn:#059669;--gn-l:#d1fae5;--gn-b:#a7f3d0;
+      --pk:#db2777;--pk-l:#fce7f3;--pk-b:#fbcfe8;
+    }
+    [data-theme=dark]{
+      --bg:#0f172a;--sur:#1e293b;--sur2:#162032;--bor:#334155;
+      --txt:#f1f5f9;--mut:#94a3b8;--fnt:#475569;
+      --bl-l:#1e3a8a;--am-l:#451a03;--pu-l:#2e1065;--rd-l:#450a0a;--gn-l:#064e3b;--pk-l:#500724;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%;font-family:'Inter',sans-serif;font-size:14px;background:var(--bg);color:var(--txt);line-height:1.5}
+    button{cursor:pointer;border:none;background:none;font:inherit;color:inherit}
+    input,select,textarea{font:inherit}
+    ul{list-style:none}
+
+    /* Layout */
+    #app{display:flex;height:100vh;overflow:hidden}
+    #overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100}
+    #overlay.on{display:block}
+
+    /* Sidebar */
+    #sb{width:var(--sb);background:var(--sur);border-right:1px solid var(--bor);display:flex;flex-direction:column;flex-shrink:0;z-index:200;transition:transform var(--tr)}
+    .sb-logo{padding:15px 16px;border-bottom:1px solid var(--bor);display:flex;align-items:center;gap:10px}
+    .sb-logo img{height:30px;width:auto;object-fit:contain}
+    .sb-logo-fb{width:30px;height:30px;background:linear-gradient(135deg,#2563eb,#7c3aed);border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:11px;flex-shrink:0}
+    .sb-brand{font-size:12.5px;font-weight:700;line-height:1.25}
+    .sb-brand span{display:block;font-size:11px;font-weight:400;color:var(--mut)}
+    .sb-nav{flex:1;padding:8px 8px;overflow-y:auto}
+    .sb-lbl{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--fnt);padding:13px 10px 5px}
+    .ni{display:flex;align-items:center;gap:9px;padding:8px 11px;border-radius:var(--rs);color:var(--mut);font-weight:500;font-size:13px;cursor:pointer;transition:background var(--tr),color var(--tr);user-select:none}
+    .ni:hover{background:var(--sur2);color:var(--txt)}
+    .ni.on{background:var(--bl-l);color:var(--bl)}
+    .ni svg{width:15px;height:15px;flex-shrink:0}
+    .ni-badge{margin-left:auto;padding:2px 7px;border-radius:20px;font-size:11px;font-weight:700;background:var(--bl);color:#fff}
+    .ni.on .ni-badge{background:var(--sec,var(--bl))}
+    .sb-foot{padding:12px 16px;border-top:1px solid var(--bor);display:flex;align-items:center;justify-content:space-between}
+    .sync-row{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--mut)}
+    .dot{width:7px;height:7px;border-radius:50%;background:var(--gn);animation:pulse 2s infinite;flex-shrink:0}
+    .dot.loading{background:var(--am)}
+    .dot.err{background:var(--rd);animation:none}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+    /* Header */
+    #main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+    #hdr{height:var(--hh);background:var(--sur);border-bottom:1px solid var(--bor);display:flex;align-items:center;padding:0 20px;gap:12px;flex-shrink:0}
+    .hdr-info{flex:1}
+    .hdr-info h1{font-size:15px;font-weight:700;line-height:1.2}
+    .hdr-info p{font-size:11px;color:var(--mut)}
+    .ico-btn{width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:var(--rs);border:1px solid var(--bor);color:var(--mut);background:var(--sur);transition:all var(--tr);flex-shrink:0}
+    .ico-btn:hover{background:var(--sur2);color:var(--txt)}
+    .ico-btn svg{width:15px;height:15px}
+    .btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--rs);font-size:13px;font-weight:600;transition:all var(--tr);white-space:nowrap;cursor:pointer}
+    .btn-pri{background:var(--bl);color:#fff;border:none}.btn-pri:hover{filter:brightness(1.1)}
+    .btn-sec{background:var(--sur);color:var(--mut);border:1px solid var(--bor)}.btn-sec:hover{background:var(--sur2);color:var(--txt)}
+    .btn-sm{padding:5px 10px;font-size:12px}
+    .btn-edit{width:28px;height:28px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid var(--bor);background:var(--sur2);color:var(--mut);transition:all var(--tr);flex-shrink:0}
+    .btn-edit:hover{background:var(--bl-l);color:var(--bl);border-color:var(--bl-b)}
+    .btn-del{padding:4px 10px;border-radius:6px;border:1px solid var(--rd-b);background:var(--rd-l);color:var(--rd);font-size:11px;font-weight:600;transition:all var(--tr)}
+    .btn-del:hover{background:var(--rd);color:#fff;border-color:var(--rd)}
+    .btn-done{width:28px;height:28px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid var(--gn-b);background:var(--gn-l);color:var(--gn);transition:all var(--tr);flex-shrink:0;margin-left:4px}
+    .btn-done:hover{background:var(--gn);color:#fff;border-color:var(--gn)}
+    tr.ib-row td{background:#eff6ff!important;border-color:#bfdbfe!important}
+    tr.ib-row .code{background:#dbeafe!important;color:#1d4ed8!important}
+    [data-theme=dark] tr.ib-row td{background:#1e3a8a!important;border-color:#1e40af!important}
+    .hamburger{display:none}
+
+    /* Content */
+    #content{flex:1;overflow-y:auto;padding:20px}
+    .page{display:none}.page.active{display:block}
+
+    /* Stats */
+    .stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:12px;margin-bottom:18px}
+    .stat{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);padding:16px 18px;box-shadow:var(--sh);border-top:3px solid var(--sec,var(--bl))}
+    .stat-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px}
+    .stat-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mut)}
+    .stat-ico{width:34px;height:34px;border-radius:9px;background:var(--sec-l,var(--bl-l));display:flex;align-items:center;justify-content:center;font-size:16px}
+    .stat-num{font-size:28px;font-weight:800;letter-spacing:-.04em;color:var(--sec,var(--bl))}
+    .stat-sub{font-size:11px;color:var(--mut);margin-top:3px}
+
+    /* Card */
+    .card{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;margin-bottom:18px}
+    .card-hdr{padding:13px 16px;border-bottom:1px solid var(--bor);display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-height:52px}
+    .card-hdr h2{font-size:14px;font-weight:700;flex:1;min-width:0}
+
+    /* Search & Filter bar */
+    .filter-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .search-box{display:flex;align-items:center;gap:7px;background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rs);padding:6px 11px}
+    .search-box svg{width:14px;height:14px;color:var(--fnt);flex-shrink:0}
+    .search-box input{background:none;border:none;outline:none;color:var(--txt);font-size:13px;width:155px}
+    .search-box input::placeholder{color:var(--fnt)}
+    .filter-select{background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rs);padding:6px 10px;color:var(--txt);font-size:13px;outline:none;cursor:pointer;transition:border var(--tr)}
+    .filter-select:focus{border-color:var(--sec,var(--bl))}
+
+    /* Tabs */
+    .tabs{display:flex;gap:1px;padding:0 16px;border-bottom:1px solid var(--bor);background:var(--sur);overflow-x:auto}
+    .tab{padding:9px 13px;font-size:13px;font-weight:500;color:var(--mut);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all var(--tr);display:flex;align-items:center;gap:5px;white-space:nowrap;flex-shrink:0}
+    .tab:hover{color:var(--txt)}
+    .tab.on{color:var(--sec,var(--bl));border-bottom-color:var(--sec,var(--bl))}
+    .tab .cnt{min-width:17px;height:17px;padding:0 4px;border-radius:20px;font-size:11px;font-weight:700;background:var(--sec-l,var(--bl-l));color:var(--sec,var(--bl));display:inline-flex;align-items:center;justify-content:center}
+
+    /* Table */
+    .tbl-wrap{overflow-x:auto}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    thead th{background:var(--sec-l,var(--sur2));padding:9px 13px;text-align:left;font-size:11px;font-weight:700;color:var(--sec,var(--mut));text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--sec-b,var(--bor));white-space:nowrap}
+    tbody tr{border-bottom:1px solid var(--bor);transition:background var(--tr)}
+    tbody tr:last-child{border-bottom:none}
+    tbody tr:hover{background:var(--sur2)}
+    td{padding:9px 13px;vertical-align:middle}
+    .code{font-family:'SF Mono','Fira Code',monospace;font-size:12px;font-weight:700;color:var(--sec,var(--bl));background:var(--sec-l,var(--bl-l));padding:3px 8px;border-radius:6px;white-space:nowrap}
+    .cell-name{font-weight:500;max-width:200px;line-height:1.4}
+    .cell-txt{color:var(--mut);max-width:240px;line-height:1.4;font-size:12.5px}
+    .cell-sm{font-size:12px;color:var(--mut);white-space:nowrap}
+
+    /* Badges */
+    .badge{display:inline-flex;align-items:center;gap:3px;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap}
+    .prio-hoog{background:var(--rd-l);color:var(--rd)}
+    .prio-mid{background:var(--am-l);color:var(--am)}
+    .prio-laag{background:var(--gn-l);color:var(--gn)}
+    .status-open{background:var(--rd-l);color:var(--rd)}
+    .status-gepland{background:var(--am-l);color:var(--am)}
+    .status-afgerond{background:var(--gn-l);color:var(--gn)}
+    .pers{padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;margin:1px 2px 1px 0;display:inline-flex;align-items:center}
+    .pers-jer{background:var(--bl-l);color:var(--bl)}
+    .pers-cihad{background:var(--pu-l);color:var(--pu)}
+    .pers-gabos{background:var(--pk-l);color:var(--pk)}
+    .pers-default{background:var(--sur2);color:var(--mut)}
+    .ib-yes{background:var(--am-l);color:var(--am);padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700}
+    .ib-no{color:var(--fnt);font-size:12px}
+    .check-yes{color:var(--gn);font-weight:700}
+    .check-no{color:var(--fnt)}
+
+    /* Progress */
+    .prog-wrap{display:flex;align-items:center;gap:7px}
+    .prog-bar{width:60px;height:5px;background:var(--bor);border-radius:3px;overflow:hidden;flex-shrink:0}
+    .prog-fill{height:100%;background:var(--sec,var(--bl));border-radius:3px}
+
+    /* Pagination */
+    .pag{display:flex;align-items:center;justify-content:space-between;padding:11px 16px;border-top:1px solid var(--bor)}
+    .pag-info{font-size:12px;color:var(--mut)}
+    .pag-btns{display:flex;gap:3px}
+    .pb{min-width:28px;height:28px;padding:0 5px;border-radius:6px;border:1px solid var(--bor);background:var(--sur);font-size:12px;color:var(--mut);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all var(--tr)}
+    .pb:hover:not([disabled]){background:var(--sec-l,var(--bl-l));color:var(--sec,var(--bl));border-color:var(--sec-b,var(--bl-b))}
+    .pb.on{background:var(--sec,var(--bl));color:#fff;border-color:var(--sec,var(--bl))}
+    .pb[disabled]{opacity:.35;cursor:default}
+
+    /* Charts */
+    .charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}
+    @media(max-width:800px){.charts-grid{grid-template-columns:1fr}}
+    .chart-card{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);padding:18px;box-shadow:var(--sh)}
+    .chart-card h3{font-size:13px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
+    .chart-wrap{position:relative;height:185px}
+    .period-btns{display:flex;gap:4px}
+    .period-btn{padding:3px 9px;border-radius:6px;border:1px solid var(--bor);background:var(--sur2);color:var(--mut);font-size:11px;font-weight:600;cursor:pointer;transition:all var(--tr)}
+    .period-btn.on{background:var(--bl);color:#fff;border-color:var(--bl)}
+
+    /* Empty */
+    .empty{padding:36px;text-align:center;color:var(--mut);font-size:13px}
+    .empty-ico{font-size:32px;margin-bottom:8px}
+
+    /* Modal */
+    .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;display:flex;align-items:flex-start;justify-content:center;padding:32px 16px;overflow-y:auto;opacity:0;pointer-events:none;transition:opacity .2s}
+    .modal-bg.open{opacity:1;pointer-events:all}
+    .modal{background:var(--sur);border-radius:var(--r);width:100%;max-width:600px;box-shadow:var(--shl);transform:translateY(-10px);transition:transform .2s}
+    .modal-bg.open .modal{transform:translateY(0)}
+    .modal-hdr{padding:16px 20px;border-bottom:1px solid var(--bor);display:flex;align-items:center;justify-content:space-between}
+    .modal-hdr h2{font-size:15px;font-weight:700}
+    .modal-close{font-size:20px;color:var(--mut);padding:3px 8px;border-radius:6px;line-height:1;transition:background var(--tr)}
+    .modal-close:hover{background:var(--sur2)}
+    .modal-body{padding:18px 20px;max-height:70vh;overflow-y:auto}
+    .modal-foot{padding:13px 20px;border-top:1px solid var(--bor);display:flex;justify-content:flex-end;gap:8px}
+
+    /* Form */
+    .fld{margin-bottom:13px}
+    .fld label{display:block;font-size:11.5px;font-weight:700;color:var(--mut);margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em}
+    .fld input,.fld select,.fld textarea{width:100%;background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rs);padding:8px 11px;color:var(--txt);font-size:13px;outline:none;transition:border var(--tr)}
+    .fld input:focus,.fld select:focus,.fld textarea:focus{border-color:var(--modal-sec,var(--bl));box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+    .fld textarea{resize:vertical;min-height:68px}
+    .fld-row{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+    @media(max-width:480px){.fld-row{grid-template-columns:1fr}}
+    .toggle-row{display:flex;align-items:center;gap:10px;padding:7px 0}
+    .tog{width:36px;height:20px;border-radius:10px;background:var(--bor);position:relative;cursor:pointer;transition:background var(--tr);flex-shrink:0}
+    .tog.on{background:var(--modal-sec,var(--bl))}
+    .tog::after{content:'';width:16px;height:16px;background:#fff;border-radius:50%;position:absolute;top:2px;left:2px;transition:left var(--tr);box-shadow:0 1px 2px rgba(0,0,0,.2)}
+    .tog.on::after{left:18px}
+    .auth-box{background:var(--am-l);border:1px solid var(--am-b);border-radius:var(--rs);padding:11px 13px;font-size:12.5px;color:var(--am);margin-bottom:13px;display:none}
+    .auth-box.show{display:block}
+    .auth-box a{color:var(--am);font-weight:700;text-decoration:underline}
+    code{background:var(--sur);border:1px solid var(--bor);border-radius:4px;padding:1px 5px;font-size:11px}
+
+    /* VvE autocomplete */
+    .vve-wrap{position:relative}
+    .vve-suggestions{position:absolute;top:100%;left:0;right:0;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rs);box-shadow:var(--shm);z-index:10;max-height:180px;overflow-y:auto;display:none}
+    .vve-sug-item{padding:8px 11px;cursor:pointer;font-size:13px;transition:background var(--tr);border-bottom:1px solid var(--bor)}
+    .vve-sug-item:last-child{border-bottom:none}
+    .vve-sug-item:hover{background:var(--bl-l);color:var(--bl)}
+    .vve-sug-code{font-weight:700;font-size:12px}
+    .vve-sug-naam{font-size:11px;color:var(--mut);margin-top:1px}
+
+    /* Scrollbar */
+    ::-webkit-scrollbar{width:5px;height:5px}
+    ::-webkit-scrollbar-thumb{background:var(--bor);border-radius:99px}
+
+    /* Mobile */
+    @media(max-width:680px){
+      #sb{position:fixed;top:0;left:0;height:100%;transform:translateX(-100%)}
+      #sb.open{transform:none;box-shadow:var(--shl)}
+      .hamburger{display:flex}
+      .stats-grid{grid-template-columns:1fr 1fr}
+      .charts-grid{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+<div id="overlay"></div>
+<div id="app">
+
+<!-- ═══════ SIDEBAR ═══════ -->
+<aside id="sb">
+  <div class="sb-logo">
+    <img id="logo" src="https://bestuurder.twinq.nl/apex/twinq/show/image?p_img=F158392282_logo_email.png"
+         alt="Logo" onerror="this.style.display='none';document.getElementById('logo-fb').style.display='flex'"/>
+    <div class="sb-logo-fb" id="logo-fb" style="display:none">VBC</div>
+    <div class="sb-brand">VvE Beheer<span>Collectief Dashboard 4.0</span></div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-lbl">Taken</div>
+    <div class="ni" data-page="ntd">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+      Nog Te Doen<span class="ni-badge" id="b-ntd">–</span>
+    </div>
+    <div class="ni" data-page="af">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+      Afgerond<span class="ni-badge" id="b-af">–</span>
+    </div>
+    <div class="sb-lbl">ALV's</div>
+    <div class="ni" data-page="alvo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+      ALV's Overzicht<span class="ni-badge" id="b-alvo">–</span>
+    </div>
+    <div class="ni" data-page="alfa">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      ALV's Afgerond<span class="ni-badge" id="b-alfa">–</span>
+    </div>
+    <div class="sb-lbl">Analyse</div>
+    <div class="ni" data-page="analytics">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Analytics
+    </div>
+    <div class="ni" data-page="dash">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Dashboard
+    </div>
+  </nav>
+  <div class="sb-foot">
+    <div class="sync-row"><div class="dot" id="dot"></div><span id="sync-lbl">–</span></div>
+    <button class="ico-btn" id="refresh-btn" title="Vernieuwen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0115-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 01-15 6.7L3 16"/></svg>
+    </button>
+  </div>
+</aside>
+
+<!-- ═══════ MAIN ═══════ -->
+<div id="main">
+  <header id="hdr">
+    <button class="ico-btn hamburger" id="hamburger">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    </button>
+    <div class="hdr-info"><h1 id="page-title">Nog Te Doen</h1><p id="page-sub">Openstaande taken</p></div>
+    <button class="ico-btn" id="theme-btn">
+      <svg id="ico-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+      <svg id="ico-moon" style="display:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+    </button>
+  </header>
+
+  <div id="content">
+
+    <!-- ══ NOG TE DOEN ══ -->
+    <div class="page" id="page-ntd">
+      <div class="stats-grid" id="ntd-stats"></div>
+      <div class="card" id="ntd-card">
+        <div class="card-hdr">
+          <h2 id="ntd-title">Nog Te Doen</h2>
+          <div class="filter-bar">
+            <div class="search-box">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              <input type="text" id="s-ntd" placeholder="Zoek…"/>
+            </div>
+            <div class="search-box" style="min-width:120px;max-width:150px">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 5.523-8 13-8 13S4 15.523 4 10a8 8 0 0116 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              <input type="text" id="f-code-ntd" placeholder="VvE Code…"/>
+            </div>
+            <select class="filter-select" id="f-beh-ntd"><option value="">Alle behandelaars</option><option>Jer</option><option>Cihad</option><option>Gabos</option></select>
+            <select class="filter-select" id="f-prio-ntd"><option value="">Alle prioriteiten</option><option>Hoog</option><option>Midden</option><option>Laag</option></select>
+            <button class="btn btn-pri btn-sm" id="btn-add"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Toevoegen</button>
+          </div>
+        </div>
+        <div class="tabs" id="ntd-tabs"></div>
+        <div class="tbl-wrap"><table><thead id="ntd-thead"></thead><tbody id="ntd-tbody"></tbody></table></div>
+        <div class="pag" id="ntd-pag"></div>
+      </div>
+    </div>
+
+    <!-- ══ AFGEROND ══ -->
+    <div class="page" id="page-af">
+      <div class="card">
+        <div class="card-hdr">
+          <h2>Afgerond</h2>
+          <div class="filter-bar">
+            <div class="search-box">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              <input type="text" id="s-af" placeholder="Zoek…"/>
+            </div>
+          </div>
+        </div>
+        <div class="tabs" id="af-tabs"></div>
+        <div class="tbl-wrap"><table><thead id="af-thead"></thead><tbody id="af-tbody"></tbody></table></div>
+        <div class="pag" id="af-pag"></div>
+      </div>
+    </div>
+
+    <!-- ══ ALV OVERZICHT ══ -->
+    <div class="page" id="page-alvo">
+      <div class="stats-grid" id="alvo-stats"></div>
+      <div class="card">
+        <div class="card-hdr">
+          <h2>ALV's Overzicht</h2>
+          <div class="filter-bar">
+            <div class="search-box">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              <input type="text" id="s-alvo" placeholder="Zoek VvE…"/>
+            </div>
+            <select class="filter-select" id="f-status-alvo"><option value="">Alle statussen</option><option>Open</option><option>Gepland</option><option>Afgerond</option></select>
+          </div>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr>
+              <th style="background:var(--bl-l);color:var(--bl);border-bottom:1px solid var(--bl-b)">VvE Code</th>
+              <th style="background:var(--bl-l);color:var(--bl);border-bottom:1px solid var(--bl-b)">VvE Naam</th>
+              <th style="background:var(--bl-l);color:var(--bl);border-bottom:1px solid var(--bl-b)">Uitnodiging</th>
+              <th style="background:var(--bl-l);color:var(--bl);border-bottom:1px solid var(--bl-b)">Notulen</th>
+              <th style="background:var(--bl-l);color:var(--bl);border-bottom:1px solid var(--bl-b)">Begroting</th>
+              <th style="background:var(--bl-l);color:var(--bl);border-bottom:1px solid var(--bl-b)">Status</th>
+            </tr></thead>
+            <tbody id="alvo-tbody"></tbody>
+          </table>
+        </div>
+        <div class="pag" id="alvo-pag"></div>
+      </div>
+    </div>
+
+    <!-- ══ ALV AFGEROND ══ -->
+    <div class="page" id="page-alfa">
+      <div class="card">
+        <div class="card-hdr">
+          <h2>ALV's Afgerond</h2>
+          <div class="search-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <input type="text" id="s-alfa" placeholder="Zoek…"/>
+          </div>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr>
+              <th style="background:var(--gn-l);color:var(--gn);border-bottom:1px solid var(--gn-b)">VvE Code</th>
+              <th style="background:var(--gn-l);color:var(--gn);border-bottom:1px solid var(--gn-b)">VvE Naam</th>
+              <th style="background:var(--gn-l);color:var(--gn);border-bottom:1px solid var(--gn-b)">Datum Afgerond</th>
+            </tr></thead>
+            <tbody id="alfa-tbody"></tbody>
+          </table>
+        </div>
+        <div class="pag" id="alfa-pag"></div>
+      </div>
+    </div>
+
+    <!-- ══ ANALYTICS ══ -->
+    <div class="page" id="page-analytics">
+      <div class="stats-grid" id="ana-stats"></div>
+      <div class="charts-grid">
+        <div class="chart-card">
+          <h3>Vergaderingen afgerond<div class="period-btns" id="pb-vergader"></div></h3>
+          <div class="chart-wrap"><canvas id="chart-vergader"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Notulen verstuurd<div class="period-btns" id="pb-notulen"></div></h3>
+          <div class="chart-wrap"><canvas id="chart-notulen"></canvas></div>
+        </div>
+      </div>
+      <div class="charts-grid">
+        <div class="chart-card">
+          <h3>Voortgang per status</h3>
+          <div class="chart-wrap"><canvas id="chart-status"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Begroting doorgezet</h3>
+          <div class="chart-wrap"><canvas id="chart-begroting"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ DASHBOARD ══ -->
+    <div class="page" id="page-dash">
+      <div class="stats-grid" id="dash-stats"></div>
+      <div class="charts-grid">
+        <div class="chart-card">
+          <h3>ALV Voortgang — Vergaderingen</h3>
+          <div class="chart-wrap"><canvas id="chart-alv-prog"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Open taken per categorie</h3>
+          <div class="chart-wrap"><canvas id="chart-taken-cat"></canvas></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-hdr"><h2>Recentelijk afgerond</h2></div>
+        <div class="tbl-wrap"><table>
+          <thead><tr>
+            <th style="background:var(--sur2);color:var(--mut)">Categorie</th>
+            <th style="background:var(--sur2);color:var(--mut)">VvE Code</th>
+            <th style="background:var(--sur2);color:var(--mut)">VvE Naam</th>
+            <th style="background:var(--sur2);color:var(--mut)">Actiepunt</th>
+            <th style="background:var(--sur2);color:var(--mut)">Behandelaar</th>
+            <th style="background:var(--sur2);color:var(--mut)">Datum</th>
+          </tr></thead>
+          <tbody id="recent-tbody"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<!-- ═══════ MODAL ═══════ -->
+<div class="modal-bg" id="modal-bg">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h2 id="m-title">Taak Toevoegen</h2>
+      <button class="modal-close" id="m-close">×</button>
+    </div>
+    <div class="modal-body">
+      <!-- VvE Code lookup -->
+      <div class="fld-row">
+        <div class="fld">
+          <label>VvE Code *</label>
+          <div class="vve-wrap">
+            <input type="text" id="m-code" placeholder="Typ code of naam…" autocomplete="off"/>
+            <div class="vve-suggestions" id="vve-sug"></div>
+          </div>
+        </div>
+        <div class="fld">
+          <label>VvE Naam</label>
+          <input type="text" id="m-naam" placeholder="Automatisch ingevuld" readonly style="opacity:.7"/>
+        </div>
+      </div>
+
+      <!-- OPPAKKEN -->
+      <div id="fg-opp">
+        <div class="fld"><label>Actiepunt *</label><textarea id="m-actie"></textarea></div>
+        <div class="fld-row">
+          <div class="fld"><label>Deadline</label><input type="date" id="m-dl"/></div>
+          <div class="fld"><label>Behandelaar</label>
+            <select id="m-beh"><option value="">Selecteer…</option><option>Jer</option><option>Cihad</option><option>Gabos</option><option>Cihad, Jer</option><option>Jer, Gabos</option><option>Cihad, Gabos</option></select>
+          </div>
+        </div>
+        <div class="fld-row">
+          <div class="fld"><label>Prioriteit</label>
+            <select id="m-prio"><option value="">Selecteer…</option><option>Hoog</option><option>Midden</option><option>Laag</option></select>
+          </div>
+          <div class="fld"><label>Opmerkingen</label><input type="text" id="m-opm"/></div>
+        </div>
+        <div class="toggle-row"><div class="tog" id="tog-ib" onclick="this.classList.toggle('on')"></div><span>In behandeling</span></div>
+      </div>
+
+      <!-- VERGADERVERZOEKEN -->
+      <div id="fg-verg" style="display:none">
+        <div class="fld-row">
+          <div class="fld"><label>Periode *</label><input type="text" id="m-per" placeholder="bv. Mei, Juni"/></div>
+          <div class="fld"><label>Behandelaar</label>
+            <select id="m-beh-v"><option value="">Selecteer…</option><option>Jer</option><option>Cihad</option><option>Gabos</option><option>Cihad, Jer</option></select>
+          </div>
+        </div>
+        <div class="fld"><label>Agendapunten</label><textarea id="m-agenda"></textarea></div>
+        <div class="fld-row">
+          <div class="fld"><label>Deadline uitschrijven</label><input type="date" id="m-dl-v"/></div>
+          <div class="fld"><label>Opmerkingen</label><input type="text" id="m-opm-v"/></div>
+        </div>
+        <div class="toggle-row"><div class="tog" id="tog-ib-v" onclick="this.classList.toggle('on')"></div><span>In behandeling</span></div>
+      </div>
+
+      <!-- OFFERTE-TRAJECTEN -->
+      <div id="fg-off" style="display:none">
+        <div class="fld-row">
+          <div class="fld"><label>Datum aangevraagd</label><input type="date" id="m-daang"/></div>
+          <div class="fld"><label>Behandelaar</label>
+            <select id="m-beh-o"><option value="">Selecteer…</option><option>Jer</option><option>Cihad</option><option>Gabos</option><option>Cihad, Jer</option></select>
+          </div>
+        </div>
+        <div class="fld-row">
+          <div class="fld"><label>Ontvangen / Aangevraagd</label><input type="text" id="m-off" placeholder="bv. 1/3"/></div>
+          <div class="fld"><label>Deadline</label><input type="date" id="m-dl-o"/></div>
+        </div>
+        <div class="fld"><label>Opmerkingen</label><textarea id="m-opm-o"></textarea></div>
+      </div>
+
+      <!-- LOD -->
+      <div id="fg-lod" style="display:none">
+        <div class="fld"><label>Actiepunt *</label><textarea id="m-actie-l"></textarea></div>
+        <div class="fld-row">
+          <div class="fld"><label>Status</label><input type="text" id="m-stat-l" placeholder="bv. Wachten op offertes"/></div>
+          <div class="fld"><label>Behandelaar</label>
+            <select id="m-beh-l"><option value="">Selecteer…</option><option>Jer</option><option>Cihad</option><option>Gabos</option><option>Cihad, Jer</option></select>
+          </div>
+        </div>
+        <div class="fld-row">
+          <div class="fld"><label>Deadline LOD</label><input type="date" id="m-dl-l"/></div>
+          <div class="fld"><label>Opmerkingen</label><input type="text" id="m-opm-l"/></div>
+        </div>
+        <div class="toggle-row"><div class="tog" id="tog-ib-l" onclick="this.classList.toggle('on')"></div><span>In behandeling</span></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-sec" id="m-cancel">Annuleren</button>
+      <button class="btn btn-del" id="m-del" style="display:none" onclick="deleteCurrentEditTask()">🗑️ Verwijder</button>
+      <button class="btn btn-pri" id="m-submit">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        <span id="m-submit-lbl">Toevoegen</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════
+//  CONFIG
+// ══════════════════════════════════════
+const SID  = '1fnUsbwb4nDMNttWym9FWBw1CMMMAVTuZ3v88b35isUw';
+const AKEY = 'AIzaSyBo-Tf8o6L_VQoB29vv7L1q3NATIAgJc9E';
+const PG   = 25;
+
+const SECS = {
+  OPPAKKEN:{label:'Oppakken',css:'--sec:var(--bl);--sec-l:var(--bl-l);--sec-b:var(--bl-b)',color:'#2563eb',
+    cols:['VvE Code','VvE','Actiepunt','Deadline','Behandelaar','Prioriteit','Opmerkingen','In beh.'],
+    keys:['code','naam','actiepunt','deadline','behandelaar','prioriteit','opmerkingen','inBehandeling']},
+  VERGADERVERZOEKEN:{label:'Vergaderverzoeken',css:'--sec:var(--am);--sec-l:var(--am-l);--sec-b:var(--am-b)',color:'#d97706',
+    cols:['VvE Code','VvE','Periode','Agendapunten','Behandelaar','Deadline uitschr.','Opmerkingen','In beh.'],
+    keys:['code','naam','periode','agendapunten','behandelaar','deadline','opmerkingen','inBehandeling']},
+  'OFFERTE-TRAJECTEN':{label:'Offerte-trajecten',css:'--sec:var(--pu);--sec-l:var(--pu-l);--sec-b:var(--pu-b)',color:'#7c3aed',
+    cols:['VvE Code','VvE','Datum aangevr.','Ontvangen/Aangevr.','Behandelaar','Deadline','Opmerkingen'],
+    keys:['code','naam','datumAangevraagd','offertes','behandelaar','deadline','opmerkingen']},
+  LOD:{label:'LOD',css:'--sec:var(--rd);--sec-l:var(--rd-l);--sec-b:var(--rd-b)',color:'#dc2626',
+    cols:['VvE Code','VvE','Actiepunt','Status','Behandelaar','Deadline LOD','Opmerkingen','In beh.'],
+    keys:['code','naam','actiepunt','status','behandelaar','deadline','opmerkingen','inBehandeling']},
+};
+const SKEYS = Object.keys(SECS);
+
+const PAGE_META = {
+  ntd:['Nog Te Doen','Openstaande taken en actiepunten'],
+  af:['Afgerond','Afgeronde taken per categorie'],
+  alvo:["ALV's Overzicht","Voortgang vergaderingen per VvE"],
+  alfa:["ALV's Afgerond","Afgeronde jaarvergaderingen"],
+  analytics:['Analytics','Statistieken en grafieken'],
+  dash:['Dashboard','Totaaloverzicht'],
+};
+
+// ══════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════
+let D = {ntd:{},af:{},alvo:[],alfa:[],ntdSecInfo:{},afSecInfo:{}};
+let pgs = {ntd:1,af:1,alvo:1,alfa:1};
+let activeNtd='OPPAKKEN', activeAf='OPPAKKEN';
+let charts = {};
+let oauthToken=null, clientId='560046984985-1371r4bbt28umi6uslims6mlkucn1278.apps.googleusercontent.com';
+let editMode=false, editRowData=null, editSec=null;
+let anaPeriod={vergader:'maand',notulen:'maand'};
+let _rowCache = [];
+
+// ══════════════════════════════════════
+//  BOOT
+// ══════════════════════════════════════
+document.addEventListener('DOMContentLoaded',()=>{
+  if(localStorage.getItem('theme')==='dark') applyTheme('dark');
+  loadAll();
+
+  document.querySelectorAll('.ni[data-page]').forEach(el=>
+    el.addEventListener('click',()=>goTo(el.dataset.page)));
+
+  setupSearch('s-ntd',()=>{pgs.ntd=1;renderNtd()});
+  setupSearch('s-af', ()=>{pgs.af=1; renderAf()});
+  setupSearch('s-alvo',()=>{pgs.alvo=1;renderAlvo()});
+  setupSearch('s-alfa',()=>{pgs.alfa=1;renderAlfa()});
+  setupSearch('f-code-ntd',()=>{pgs.ntd=1;renderNtd()});
+  document.getElementById('f-beh-ntd').onchange=()=>{pgs.ntd=1;renderNtd()};
+  document.getElementById('f-prio-ntd').onchange=()=>{pgs.ntd=1;renderNtd()};
+  document.getElementById('f-status-alvo').onchange=()=>{pgs.alvo=1;renderAlvo()};
+
+  document.getElementById('refresh-btn').onclick=loadAll;
+  document.getElementById('theme-btn').onclick=()=>applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
+  document.getElementById('hamburger').onclick=()=>{document.getElementById('sb').classList.toggle('open');document.getElementById('overlay').classList.toggle('on')};
+  document.getElementById('overlay').onclick=closeSb;
+
+  document.getElementById('btn-add').onclick=()=>openModal(false);
+  window.editRow=idx=>openModal(true,_rowCache[idx]);
+  window.deleteTask=idx=>deleteTask(idx);
+  window.completeTask=idx=>completeTask(idx);
+  document.getElementById('m-close').onclick=closeModal;
+  document.getElementById('m-cancel').onclick=closeModal;
+  document.getElementById('modal-bg').onclick=e=>{if(e.target.id==='modal-bg')closeModal()};
+  document.getElementById('m-submit').onclick=submitTask;
+
+  // VvE autocomplete
+  const codeInput = document.getElementById('m-code');
+  codeInput.addEventListener('input',onCodeInput);
+  codeInput.addEventListener('blur',()=>setTimeout(()=>{document.getElementById('vve-sug').style.display='none'},200));
+
+  // Period buttons
+  buildPeriodBtns('pb-vergader','vergader');
+  buildPeriodBtns('pb-notulen','notulen');
+
+  goTo('ntd');
+});
+
+// ══════════════════════════════════════
+//  NAV
+// ══════════════════════════════════════
+function goTo(page){
+  document.querySelectorAll('.ni[data-page]').forEach(el=>el.classList.toggle('on',el.dataset.page===page));
+  document.querySelectorAll('.page').forEach(el=>el.classList.toggle('active',el.id==='page-'+page));
+  const[t,s]=PAGE_META[page]||['',''];
+  document.getElementById('page-title').textContent=t;
+  document.getElementById('page-sub').textContent=s;
+  document.getElementById('btn-add').style.display=page==='ntd'?'inline-flex':'none';
+  closeSb();
+  if(page==='analytics') buildAnalytics();
+  if(page==='dash') buildDash();
+}
+function closeSb(){document.getElementById('sb').classList.remove('open');document.getElementById('overlay').classList.remove('on')}
+
+// ══════════════════════════════════════
+//  THEME
+// ══════════════════════════════════════
+function applyTheme(t){
+  document.documentElement.dataset.theme=t;
+  localStorage.setItem('theme',t);
+  document.getElementById('ico-sun').style.display=t==='dark'?'none':'';
+  document.getElementById('ico-moon').style.display=t==='dark'?'':'none';
+  Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});
+  charts={};
+  if(document.getElementById('page-analytics').classList.contains('active')) buildAnalytics();
+  if(document.getElementById('page-dash').classList.contains('active')) buildDash();
+}
+
+// ══════════════════════════════════════
+//  API
+// ══════════════════════════════════════
+async function fetchSheet(name){
+  const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values/${encodeURIComponent(name)}?key=${AKEY}`);
+  if(!r.ok) throw new Error((await r.json()).error?.message||'API fout');
+  return (await r.json()).values||[];
+}
+async function writeRange(range,values,method='PUT'){
+  if(!oauthToken) throw new Error('Niet ingelogd');
+  const url=`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`;
+  const opts={method,headers:{Authorization:`Bearer ${oauthToken}`,'Content-Type':'application/json'},body:JSON.stringify({values:[values]})};
+  const r=await fetch(url,opts);
+  if(!r.ok){const e=await r.json();throw new Error(e.error?.message||'Schrijffout')}
+  return r.json();
+}
+async function appendRange(range,values){
+  if(!oauthToken) throw new Error('Niet ingelogd');
+  const url=`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+  const r=await fetch(url,{method:'POST',headers:{Authorization:`Bearer ${oauthToken}`,'Content-Type':'application/json'},body:JSON.stringify({values:[values]})});
+  if(!r.ok){const e=await r.json();throw new Error(e.error?.message||'Schrijffout')}
+  return r.json();
+}
+
+function setSyncing(){dot('loading');document.getElementById('sync-lbl').textContent='Laden…'}
+function setSynced(){dot('');document.getElementById('sync-lbl').textContent='Live · '+new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'})}
+function setSyncErr(){dot('err');document.getElementById('sync-lbl').textContent='Fout'}
+function dot(cls){const d=document.getElementById('dot');d.className='dot'+(cls?' '+cls:'')}
+
+async function loadAll(){
+  setSyncing();
+  try{
+    const[ntdR,afR,alvoR,alfaR]=await Promise.all([
+      fetchSheet("Nog Te Doen"),fetchSheet("Afgerond"),
+      fetchSheet("ALV's overzicht"),fetchSheet("ALV's afgerond"),
+    ]);
+    const ntdP=parseSections(ntdR); D.ntd=ntdP.data; D.ntdSecInfo=ntdP.secInfo;
+    const afP=parseSections(afR); D.af=afP.data; D.afSecInfo=afP.secInfo;
+    D.alvo=parseAlvo(alvoR);
+    D.alfa=parseAlfa(alfaR);
+    setSynced();
+    renderAll();
+  }catch(e){setSyncErr();console.error(e)}
+}
+
+// ══════════════════════════════════════
+//  PARSE
+// ══════════════════════════════════════
+function parseSections(rows){
+  const out={};
+  const secInfo={};
+  SKEYS.forEach(s=>{out[s]=[];secInfo[s]={colHeaderRow:null}});
+  let cur=null, skip=false;
+  for(let i=0;i<rows.length;i++){
+    const row=rows[i];
+    if(!row||!row.length) continue;
+    const first=(row[0]||'').trim();
+    const upper=first.toUpperCase();
+    if(SKEYS.includes(upper)){cur=upper;skip=true;continue}
+    if(!cur) continue;
+    if(skip){skip=false;secInfo[cur].colHeaderRow=i+1;continue}
+    if(!first) continue;
+    if(first==='VvE-Code'||first==='VvE Code'||SKEYS.includes(upper)) continue;
+    const keys=SECS[cur].keys;
+    const entry={_row:i+1,_sec:cur};
+    keys.forEach((k,j)=>{entry[k]=(row[j]||'').trim()});
+    if(entry.code) out[cur].push(entry);
+  }
+  return {data:out,secInfo};
+}
+
+function parseAlvo(rows){
+  return rows.slice(2).map((r,i)=>{
+    const code=(r[0]||'').trim();
+    if(!code||code.length>20) return null;
+    // Skip stat rows
+    if(['Totaal','Uitnodigingen','Notulen','Nog'].some(p=>code.startsWith(p))) return null;
+    const uitn=(r[2]||'').trim()==='TRUE';
+    const notu=(r[3]||'').trim()==='TRUE';
+    const begr=(r[4]||'').trim()==='TRUE';
+    const status=notu?'Afgerond':uitn?'Gepland':'Open';
+    return{code,naam:(r[1]||'').trim(),uitnodiging:uitn,notulen:notu,begroting:begr,opmerkingen:(r[5]||'').trim(),status,_row:i+3};
+  }).filter(Boolean);
+}
+
+function parseAlfa(rows){
+  return rows.slice(1).map(r=>({
+    code:(r[0]||'').trim(),naam:(r[1]||'').trim(),datum:(r[2]||'').trim()
+  })).filter(r=>r.code);
+}
+
+// ══════════════════════════════════════
+//  RENDER ALL
+// ══════════════════════════════════════
+function renderAll(){
+  _rowCache=[];
+  const ntdTotal=SKEYS.reduce((s,k)=>s+(D.ntd[k]?.length||0),0);
+  document.getElementById('b-ntd').textContent=ntdTotal;
+  document.getElementById('b-af').textContent=SKEYS.reduce((s,k)=>s+(D.af[k]?.length||0),0);
+  document.getElementById('b-alvo').textContent=D.alvo.length;
+  document.getElementById('b-alfa').textContent=D.alfa.length;
+  renderNtdStats();
+  renderNtd();
+  renderAf();
+  renderAlvo();
+  renderAlfa();
+}
+
+// ══════════════════════════════════════
+//  NTD STATS
+// ══════════════════════════════════════
+const SEC_ICONS={OPPAKKEN:'📋',VERGADERVERZOEKEN:'📅','OFFERTE-TRAJECTEN':'📄',LOD:'⚠️'};
+const SEC_THEMES={
+  OPPAKKEN:'--sec:var(--bl);--sec-l:var(--bl-l)',
+  VERGADERVERZOEKEN:'--sec:var(--am);--sec-l:var(--am-l)',
+  'OFFERTE-TRAJECTEN':'--sec:var(--pu);--sec-l:var(--pu-l)',
+  LOD:'--sec:var(--rd);--sec-l:var(--rd-l)',
+};
+function renderNtdStats(){
+  document.getElementById('ntd-stats').innerHTML=SKEYS.map(s=>`
+    <div class="stat" style="${SEC_THEMES[s]}">
+      <div class="stat-top"><div class="stat-lbl">${SECS[s].label}</div><div class="stat-ico">${SEC_ICONS[s]}</div></div>
+      <div class="stat-num">${D.ntd[s]?.length||0}</div>
+      <div class="stat-sub">open ${s==='OFFERTE-TRAJECTEN'?'trajecten':s==='LOD'?'dossiers':'taken'}</div>
+    </div>`).join('');
+}
+
+// ══════════════════════════════════════
+//  NOG TE DOEN
+// ══════════════════════════════════════
+function renderNtd(){
+  const q=document.getElementById('s-ntd').value.toLowerCase();
+  const fCode=document.getElementById('f-code-ntd').value.toLowerCase();
+  const fBeh=document.getElementById('f-beh-ntd').value;
+  const fPrio=document.getElementById('f-prio-ntd').value;
+
+  // Tabs
+  document.getElementById('ntd-tabs').innerHTML=SKEYS.map(s=>{
+    const rows=filterNtd(D.ntd[s]||[],q,fCode,fBeh,fPrio,s);
+    return`<div class="tab ${s===activeNtd?'on':''}" style="${s===activeNtd?SECS[s].css:''}" onclick="setNtd('${s}')">${SECS[s].label}<span class="cnt">${rows.length}</span></div>`;
+  }).join('');
+
+  document.getElementById('ntd-title').textContent=SECS[activeNtd].label;
+  // Apply card theme
+  const card=document.getElementById('ntd-card');
+  SECS[activeNtd].css.split(';').forEach(p=>{const[k,v]=p.split(':');if(k&&v)card.style.setProperty(k.trim(),v.trim())});
+
+  const rows=filterNtd(D.ntd[activeNtd]||[],q,fCode,fBeh,fPrio,activeNtd);
+  renderThead('ntd-thead',[...SECS[activeNtd].cols,''],SECS[activeNtd].css);
+  renderTbody('ntd-tbody',rows,activeNtd,pgs.ntd,false);
+  renderPag('ntd-pag',rows.length,pgs.ntd,p=>{pgs.ntd=p;renderNtd()});
+}
+function setNtd(s){activeNtd=s;pgs.ntd=1;renderNtd()}
+function filterNtd(rows,q,fCode,beh,prio,sec){
+  return rows.filter(r=>{
+    if(q&&!SECS[sec].keys.some(k=>(r[k]||'').toLowerCase().includes(q))) return false;
+    if(fCode&&!(r.code||'').toLowerCase().includes(fCode)) return false;
+    if(beh&&!(r.behandelaar||'').toLowerCase().includes(beh.toLowerCase())) return false;
+    if(prio&&sec==='OPPAKKEN'&&r.prioriteit!==prio) return false;
+    return true;
+  }).sort((a,b)=>(a.inBehandeling==='TRUE'?1:0)-(b.inBehandeling==='TRUE'?1:0));
+}
+
+// ══════════════════════════════════════
+//  AFGEROND
+// ══════════════════════════════════════
+function renderAf(){
+  const q=document.getElementById('s-af').value.toLowerCase();
+  document.getElementById('af-tabs').innerHTML=SKEYS.map(s=>{
+    const rows=filt(D.af[s]||[],q);
+    return`<div class="tab ${s===activeAf?'on':''}" style="${s===activeAf?SECS[s].css:''}" onclick="setAf('${s}')">${SECS[s].label}<span class="cnt">${rows.length}</span></div>`;
+  }).join('');
+  const cols=['VvE Code','VvE','Actiepunt','Behandelaar','Afgerond op'];
+  renderThead('af-thead',cols,SECS[activeAf].css);
+  const rows=filt(D.af[activeAf]||[],q);
+  renderTbody('af-tbody',rows,activeAf,pgs.af,true);
+  renderPag('af-pag',rows.length,pgs.af,p=>{pgs.af=p;renderAf()});
+}
+function setAf(s){activeAf=s;pgs.af=1;renderAf()}
+
+// ══════════════════════════════════════
+//  ALV OVERZICHT
+// ══════════════════════════════════════
+function renderAlvo(){
+  // Stats
+  const tot=D.alvo.length;
+  const afd=D.alvo.filter(r=>r.status==='Afgerond').length;
+  const gep=D.alvo.filter(r=>r.status==='Gepland').length;
+  const opn=D.alvo.filter(r=>r.status==='Open').length;
+  document.getElementById('alvo-stats').innerHTML=`
+    <div class="stat" style="--sec:var(--bl);--sec-l:var(--bl-l)"><div class="stat-top"><div class="stat-lbl">Totaal VvE's</div><div class="stat-ico">🏢</div></div><div class="stat-num">${tot}</div><div class="stat-sub">in beheer</div></div>
+    <div class="stat" style="--sec:var(--gn);--sec-l:var(--gn-l)"><div class="stat-top"><div class="stat-lbl">Afgerond</div><div class="stat-ico">✅</div></div><div class="stat-num">${afd}</div><div class="stat-sub">notulen verstuurd</div></div>
+    <div class="stat" style="--sec:var(--am);--sec-l:var(--am-l)"><div class="stat-top"><div class="stat-lbl">Gepland</div><div class="stat-ico">📅</div></div><div class="stat-num">${gep}</div><div class="stat-sub">uitnodiging verstuurd</div></div>
+    <div class="stat" style="--sec:var(--rd);--sec-l:var(--rd-l)"><div class="stat-top"><div class="stat-lbl">Open</div><div class="stat-ico">⏳</div></div><div class="stat-num">${opn}</div><div class="stat-sub">nog te plannen</div></div>`;
+
+  const q=document.getElementById('s-alvo').value.toLowerCase();
+  const fs=document.getElementById('f-status-alvo').value;
+  const rows=D.alvo.filter(r=>{
+    if(q&&!`${r.code} ${r.naam}`.toLowerCase().includes(q)) return false;
+    if(fs&&r.status!==fs) return false;
+    return true;
+  });
+  const sl=rows.slice((pgs.alvo-1)*PG,pgs.alvo*PG);
+  document.getElementById('alvo-tbody').innerHTML=sl.length
+    ?sl.map(r=>`<tr>
+        <td><span class="code" style="--sec:var(--bl);--sec-l:var(--bl-l)">${esc(r.code)}</span></td>
+        <td class="cell-name">${esc(r.naam)}</td>
+        <td>${r.uitnodiging?'<span class="check-yes">✓ Ja</span>':'<span class="check-no">–</span>'}</td>
+        <td>${r.notulen?'<span class="check-yes">✓ Ja</span>':'<span class="check-no">–</span>'}</td>
+        <td>${r.begroting?'<span class="check-yes">✓ Ja</span>':'<span class="check-no">–</span>'}</td>
+        <td><span class="badge status-${r.status.toLowerCase()}">${statusIco(r.status)} ${r.status}</span></td>
+      </tr>`).join('')
+    :emptyRow(6);
+  renderPag('alvo-pag',rows.length,pgs.alvo,p=>{pgs.alvo=p;renderAlvo()});
+}
+function statusIco(s){return{Open:'⏳',Gepland:'📅',Afgerond:'✅'}[s]||''}
+
+// ══════════════════════════════════════
+//  ALV AFGEROND
+// ══════════════════════════════════════
+function renderAlfa(){
+  const q=document.getElementById('s-alfa').value.toLowerCase();
+  const rows=D.alfa.filter(r=>`${r.code} ${r.naam} ${r.datum}`.toLowerCase().includes(q));
+  const sl=rows.slice((pgs.alfa-1)*PG,pgs.alfa*PG);
+  document.getElementById('alfa-tbody').innerHTML=sl.length
+    ?sl.map(r=>`<tr>
+        <td><span class="code" style="--sec:var(--gn);--sec-l:var(--gn-l)">${esc(r.code)}</span></td>
+        <td class="cell-name">${esc(r.naam)}</td>
+        <td class="cell-sm">${esc(r.datum)}</td>
+      </tr>`).join('')
+    :emptyRow(3);
+  renderPag('alfa-pag',rows.length,pgs.alfa,p=>{pgs.alfa=p;renderAlfa()});
+}
+
+// ══════════════════════════════════════
+//  ANALYTICS
+// ══════════════════════════════════════
+function buildPeriodBtns(id, key){
+  const el=document.getElementById(id);
+  ['week','maand','kwartaal'].forEach(p=>{
+    const b=document.createElement('button');
+    b.className='period-btn'+(p==='maand'?' on':'');
+    b.textContent=p.charAt(0).toUpperCase()+p.slice(1);
+    b.onclick=()=>{
+      anaPeriod[key]=p;
+      el.querySelectorAll('.period-btn').forEach(btn=>btn.classList.toggle('on',btn.textContent.toLowerCase()===p));
+      buildAnalytics();
+    };
+    el.appendChild(b);
+  });
+}
+
+function buildAnalytics(){
+  const dark=document.documentElement.dataset.theme==='dark';
+  const tc=dark?'#94a3b8':'#64748b';
+  const gc=dark?'#1e293b':'#f1f5f9';
+
+  // Stats
+  const tot=D.alvo.length;
+  const afd=D.alvo.filter(r=>r.notulen).length;
+  const uitn=D.alvo.filter(r=>r.uitnodiging).length;
+  const begr=D.alvo.filter(r=>r.begroting).length;
+  document.getElementById('ana-stats').innerHTML=`
+    <div class="stat" style="--sec:var(--bl);--sec-l:var(--bl-l)"><div class="stat-top"><div class="stat-lbl">Totaal VvE's</div><div class="stat-ico">🏢</div></div><div class="stat-num">${tot}</div><div class="stat-sub">in beheer</div></div>
+    <div class="stat" style="--sec:var(--am);--sec-l:var(--am-l)"><div class="stat-top"><div class="stat-lbl">Uitnodigingen</div><div class="stat-ico">📬</div></div><div class="stat-num">${uitn}</div><div class="stat-sub">${Math.round(uitn/tot*100)}% van totaal</div></div>
+    <div class="stat" style="--sec:var(--gn);--sec-l:var(--gn-l)"><div class="stat-top"><div class="stat-lbl">Notulen</div><div class="stat-ico">📝</div></div><div class="stat-num">${afd}</div><div class="stat-sub">${Math.round(afd/tot*100)}% van totaal</div></div>
+    <div class="stat" style="--sec:var(--pu);--sec-l:var(--pu-l)"><div class="stat-top"><div class="stat-lbl">Begroting</div><div class="stat-ico">💰</div></div><div class="stat-num">${begr}</div><div class="stat-sub">${Math.round(begr/tot*100)}% doorgezet</div></div>`;
+
+  // Group alfa by period
+  const vLabels=getPeriodLabels(anaPeriod.vergader);
+  const vData=groupByPeriod(D.alfa,anaPeriod.vergader);
+  const nLabels=getPeriodLabels(anaPeriod.notulen);
+  const nData=groupByPeriod(D.alfa,anaPeriod.notulen); // same source for now
+
+  buildBarChart('chart-vergader',vLabels,vLabels.map(l=>vData[l]||0),'#2563eb',tc,gc);
+  buildBarChart('chart-notulen',nLabels,nLabels.map(l=>nData[l]||0),'#059669',tc,gc);
+
+  // Status donut — Uitnodiging verstuurd = "afgerond" (fix 4), getallen (fix 3)
+  buildDonut('chart-status',['Uitgeschreven','Nog uitschrijven'],[uitn,tot-uitn],['#2563eb','#ef4444'],tc,`${uitn}/${tot}`,'Uitgeschreven');
+
+  // Begroting donut — getallen
+  buildDonut('chart-begroting',['Doorgezet','Niet doorgezet'],[begr,tot-begr],['#7c3aed','#e2e8f0'],tc,`${begr}/${tot}`,'Doorgezet');
+}
+
+function groupByPeriod(rows,period){
+  const map={};
+  rows.forEach(r=>{
+    const lbl=periodLabel(r.datum,period);
+    if(lbl) map[lbl]=(map[lbl]||0)+1;
+  });
+  return map;
+}
+
+function periodLabel(dateStr,period){
+  if(!dateStr) return null;
+  const parts=dateStr.split('-');
+  if(parts.length<3) return null;
+  const d=new Date(parts[2],parts[1]-1,parts[0]);
+  if(isNaN(d)) return null;
+  if(period==='week'){
+    const wk=getWeekNum(d);
+    return`W${wk} '${String(d.getFullYear()).slice(2)}`;
+  }
+  if(period==='maand'){
+    const mn=['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'][d.getMonth()];
+    return`${mn} '${String(d.getFullYear()).slice(2)}`;
+  }
+  if(period==='kwartaal'){
+    const q=Math.floor(d.getMonth()/3)+1;
+    return`Q${q} '${String(d.getFullYear()).slice(2)}`;
+  }
+  return null;
+}
+
+function getPeriodLabels(period){
+  const seen=new Set();
+  D.alfa.forEach(r=>{ const l=periodLabel(r.datum,period); if(l)seen.add(l); });
+  return [...seen].sort((a,b)=>sortPeriod(a,b,period));
+}
+
+function sortPeriod(a,b){
+  // Convert label back to comparable string
+  const toNum=s=>{ const m=s.match(/(\d+)/g); return m?m.map(Number):[]};
+  const an=toNum(a), bn=toNum(b);
+  const ay=an[an.length-1], by=bn[bn.length-1];
+  if(ay!==by) return ay-by;
+  return an[0]-bn[0];
+}
+
+function getWeekNum(d){
+  const d2=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+  const dayNum=d2.getUTCDay()||7;
+  d2.setUTCDate(d2.getUTCDate()+4-dayNum);
+  const yearStart=new Date(Date.UTC(d2.getUTCFullYear(),0,1));
+  return Math.ceil((((d2-yearStart)/86400000)+1)/7);
+}
+
+function buildBarChart(id,labels,data,color,tc,gc){
+  if(charts[id]) charts[id].destroy();
+  charts[id]=new Chart(document.getElementById(id),{
+    type:'bar',
+    data:{labels,datasets:[{label:'Aantal',data,backgroundColor:color,borderRadius:6,borderSkipped:false}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{x:{grid:{display:false},ticks:{color:tc,font:{size:11}}},
+              y:{grid:{color:gc},ticks:{color:tc,precision:0},beginAtZero:true}}}
+  });
+}
+
+function buildDonut(id,labels,data,colors,tc,centerVal,centerLbl){
+  if(charts[id]) charts[id].destroy();
+  const centerPlugin={
+    id:'center',
+    afterDraw(chart){
+      if(!centerVal) return;
+      const {ctx,chartArea}=chart;
+      const cx=(chartArea.left+chartArea.right)/2;
+      const cy=(chartArea.top+chartArea.bottom)/2;
+      ctx.save();
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      const fSize=centerVal&&centerVal.includes('/')?'18px':'24px';
+      ctx.font=`bold ${fSize} Inter,sans-serif`;
+      ctx.fillStyle=colors[0];
+      ctx.fillText(centerVal,cx,cy-10);
+      ctx.font='500 11px Inter,sans-serif';
+      ctx.fillStyle=tc;
+      ctx.fillText(centerLbl||'',cx,cy+14);
+      ctx.restore();
+    }
+  };
+  charts[id]=new Chart(document.getElementById(id),{
+    type:'doughnut',
+    data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:3,borderColor:'var(--sur)',hoverOffset:6,hoverBorderWidth:3}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'70%',
+      plugins:{legend:{position:'right',labels:{color:tc,padding:16,font:{size:12},
+        usePointStyle:true,pointStyle:'circle'}}}},
+    plugins:[centerPlugin]
+  });
+}
+
+// ══════════════════════════════════════
+//  DASHBOARD
+// ══════════════════════════════════════
+function buildDash(){
+  const dark=document.documentElement.dataset.theme==='dark';
+  const tc=dark?'#94a3b8':'#64748b';
+  const gc=dark?'#1e293b':'#f1f5f9';
+
+  const uitnD=D.alvo.filter(r=>r.uitnodiging).length;
+  const notulenD=D.alvo.filter(r=>r.notulen).length;
+  const totD=D.alvo.length;
+  const ntdTotal=SKEYS.reduce((s,k)=>s+(D.ntd[k]?.length||0),0);
+  const afTotal=SKEYS.reduce((s,k)=>s+(D.af[k]?.length||0),0);
+
+  document.getElementById('dash-stats').innerHTML=`
+    <div class="stat" style="--sec:var(--bl);--sec-l:var(--bl-l)"><div class="stat-top"><div class="stat-lbl">Open taken</div><div class="stat-ico">📋</div></div><div class="stat-num">${ntdTotal}</div><div class="stat-sub">nog op te pakken</div></div>
+    <div class="stat" style="--sec:var(--gn);--sec-l:var(--gn-l)"><div class="stat-top"><div class="stat-lbl">Taken afgerond</div><div class="stat-ico">✅</div></div><div class="stat-num">${afTotal}</div><div class="stat-sub">afgeronde taken</div></div>
+    <div class="stat" style="--sec:var(--am);--sec-l:var(--am-l)"><div class="stat-top"><div class="stat-lbl">ALV's uitgeschreven</div><div class="stat-ico">📬</div></div><div class="stat-num">${uitnD}</div><div class="stat-sub">uitnodiging verstuurd</div></div>
+    <div class="stat" style="--sec:var(--gn);--sec-l:var(--gn-l)"><div class="stat-top"><div class="stat-lbl">Notulen verstuurd</div><div class="stat-ico">📝</div></div><div class="stat-num">${notulenD}</div><div class="stat-sub">van ${uitnD} uitgeschreven</div></div>`;
+
+  // ALV progress donut — uitnodiging=afgerond (fix 4), getallen (fix 3)
+  buildDonut('chart-alv-prog',['Uitgeschreven','Nog uitschrijven'],[uitnD,totD-uitnD],['#2563eb','#ef4444'],tc,`${uitnD}/${totD}`,'Uitgeschreven');
+
+  // Taken per categorie
+  const catTotal=SKEYS.reduce((s,k)=>s+(D.ntd[k]?.length||0),0);
+  buildDonut('chart-taken-cat',SKEYS.map(s=>SECS[s].label),SKEYS.map(s=>D.ntd[s]?.length||0),
+    ['#2563eb','#d97706','#7c3aed','#dc2626'],tc,`${catTotal}`,'open taken');
+
+  // Recent afgerond
+  const secPill={
+    OPPAKKEN:`<span style="background:var(--bl-l);color:var(--bl)" class="badge">Oppakken</span>`,
+    VERGADERVERZOEKEN:`<span style="background:var(--am-l);color:var(--am)" class="badge">Vergadering</span>`,
+    'OFFERTE-TRAJECTEN':`<span style="background:var(--pu-l);color:var(--pu)" class="badge">Offerte</span>`,
+    LOD:`<span style="background:var(--rd-l);color:var(--rd)" class="badge">LOD</span>`,
+  };
+  const all=SKEYS.flatMap(s=>(D.af[s]||[]).map(r=>({...r,_sec:s})));
+  all.sort((a,b)=>parseDt(b.datum)-parseDt(a.datum));
+  document.getElementById('recent-tbody').innerHTML=all.slice(0,10).map(r=>`<tr>
+    <td>${secPill[r._sec]||''}</td>
+    <td><span class="code" style="${SECS[r._sec].css}">${esc(r.code)}</span></td>
+    <td class="cell-name">${esc(r.naam)}</td>
+    <td class="cell-txt">${esc(r.actiepunt||r.periode||'')}</td>
+    <td>${persBadges(r.behandelaar)}</td>
+    <td class="cell-sm">${esc(r.datum||'')}</td>
+  </tr>`).join('')||`<tr><td colspan="6">${emptyRow(6,true)}</td></tr>`;
+}
+
+// ══════════════════════════════════════
+//  TABLE HELPERS
+// ══════════════════════════════════════
+function renderThead(id,cols,css){
+  document.getElementById(id).innerHTML=`<tr>${cols.map(c=>`<th style="${css}">${c}</th>`).join('')}</tr>`;
+}
+
+function renderTbody(tbodyId,rows,sec,page,isAf){
+  const sl=rows.slice((page-1)*PG,page*PG);
+  const el=document.getElementById(tbodyId);
+  if(!sl.length){el.innerHTML=`<tr><td colspan="10">${emptyRow(10,true)}</td></tr>`;return}
+  el.innerHTML=sl.map(r=>isAf?rowAf(r,sec):rowNtd(r,sec)).join('');
+}
+
+function rowNtd(r,sec){
+  const css=SECS[sec].css;
+  const rid=_rowCache.length; _rowCache.push(r);
+  const editBtn=`<button class="btn-edit" onclick="editRow(${rid})" title="Bewerken"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><button class="btn-done" onclick="completeTask(${rid})" title="Afgehandeld"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></button>`;
+  let cells='';
+  switch(sec){
+    case'OPPAKKEN':
+      cells=`<td><span class="code" style="${css}">${esc(r.code)}</span></td>
+        <td class="cell-name">${esc(r.naam)}</td>
+        <td class="cell-txt">${esc(r.actiepunt)}</td>
+        <td class="cell-sm">${r.deadline?esc(r.deadline):'<span style="color:var(--fnt)">–</span>'}</td>
+        <td>${persBadges(r.behandelaar)}</td>
+        <td>${prioBadge(r.prioriteit)}</td>
+        <td class="cell-txt">${r.opmerkingen?`<span style="font-size:12px">${esc(r.opmerkingen)}</span>`:''}</td>
+        <td>${ibBadge(r.inBehandeling)}</td>
+        <td>${editBtn}</td>`;
+      break;
+    case'VERGADERVERZOEKEN':
+      cells=`<td><span class="code" style="${css}">${esc(r.code)}</span></td>
+        <td class="cell-name">${esc(r.naam)}</td>
+        <td><span class="badge" style="background:var(--am-l);color:var(--am)">${esc(r.periode||r.agendapunten||'')}</span></td>
+        <td class="cell-txt">${esc(r.agendapunten||r.actiepunt||'')}</td>
+        <td>${persBadges(r.behandelaar)}</td>
+        <td class="cell-sm">${r.deadline?esc(r.deadline):'<span style="color:var(--fnt)">–</span>'}</td>
+        <td class="cell-txt">${r.opmerkingen?`<span style="font-size:12px">${esc(r.opmerkingen)}</span>`:''}</td>
+        <td>${ibBadge(r.inBehandeling)}</td>
+        <td>${editBtn}</td>`;
+      break;
+    case'OFFERTE-TRAJECTEN':
+      cells=`<td><span class="code" style="${css}">${esc(r.code)}</span></td>
+        <td class="cell-name">${esc(r.naam)}</td>
+        <td class="cell-sm">${esc(r.datumAangevraagd||'')}</td>
+        <td>${offProg(r.offertes)}</td>
+        <td>${persBadges(r.behandelaar)}</td>
+        <td class="cell-sm">${r.deadline?esc(r.deadline):'<span style="color:var(--fnt)">–</span>'}</td>
+        <td class="cell-txt">${r.opmerkingen?`<span style="font-size:12px">${esc(r.opmerkingen)}</span>`:''}</td>
+        <td>${editBtn}</td>`;
+      break;
+    case'LOD':
+      cells=`<td><span class="code" style="${css}">${esc(r.code)}</span></td>
+        <td class="cell-name">${esc(r.naam)}</td>
+        <td class="cell-txt">${esc(r.actiepunt||'')}</td>
+        <td class="cell-txt" style="font-style:italic;font-size:12px">${esc(r.status||'')}</td>
+        <td>${persBadges(r.behandelaar)}</td>
+        <td class="cell-sm">${r.deadline?esc(r.deadline):'<span style="color:var(--fnt)">–</span>'}</td>
+        <td class="cell-txt">${r.opmerkingen?`<span style="font-size:12px">${esc(r.opmerkingen)}</span>`:''}</td>
+        <td>${ibBadge(r.inBehandeling)}</td>
+        <td>${editBtn}</td>`;
+      break;
+  }
+  return`<tr class="${r.inBehandeling==='TRUE'?'ib-row':''}">${cells}</tr>`;
+}
+
+function rowAf(r,sec){
+  const css=SECS[sec].css;
+  return`<tr>
+    <td><span class="code" style="${css}">${esc(r.code)}</span></td>
+    <td class="cell-name">${esc(r.naam)}</td>
+    <td class="cell-txt">${esc(r.actiepunt||r.periode||r.agendapunten||'')}</td>
+    <td>${persBadges(r.behandelaar)}</td>
+    <td class="cell-sm">${esc(r.datum||r['afgerond op']||'')}</td>
+  </tr>`;
+}
+
+// ══════════════════════════════════════
+//  PAGINATION
+// ══════════════════════════════════════
+function renderPag(id,total,cur,cb){
+  const el=document.getElementById(id);if(!el)return;
+  const tp=Math.ceil(total/PG);
+  if(tp<=1){el.innerHTML='';return}
+  const s=(cur-1)*PG+1,e=Math.min(cur*PG,total);
+  const rng=tp<=7?[...Array(tp).keys()].map(i=>i+1)
+    :cur<=4?[1,2,3,4,5,'…',tp]
+    :cur>=tp-3?[1,'…',tp-4,tp-3,tp-2,tp-1,tp]
+    :[1,'…',cur-1,cur,cur+1,'…',tp];
+  el.innerHTML=`<div class="pag-info">Toont ${s}–${e} van ${total}</div>
+    <div class="pag-btns">
+      <button class="pb" onclick="(${cb})(${cur-1})" ${cur<=1?'disabled':''}>‹</button>
+      ${rng.map(p=>p==='…'?`<span class="pb" style="border:none;cursor:default">…</span>`
+        :`<button class="pb ${p===cur?'on':''}" onclick="(${cb})(${p})">${p}</button>`).join('')}
+      <button class="pb" onclick="(${cb})(${cur+1})" ${cur>=tp?'disabled':''}>›</button>
+    </div>`;
+}
+
+// ══════════════════════════════════════
+//  MODAL — Open / Close
+// ══════════════════════════════════════
+function openModal(isEdit,rowData){
+  editMode=!!isEdit;
+  const sec=isEdit?rowData._sec:activeNtd;
+  editSec=sec; editRowData=rowData||null;
+
+  document.getElementById('m-title').textContent=(isEdit?'Taak bewerken — ':'Taak toevoegen — ')+SECS[sec].label;
+  document.getElementById('m-submit-lbl').textContent=isEdit?'Opslaan':'Toevoegen';
+  document.getElementById('m-del').style.display=isEdit?'inline-flex':'none';
+
+  // Section colour for focus rings
+  document.documentElement.style.setProperty('--modal-sec',SECS[sec].color);
+
+  // Show correct field group
+  document.getElementById('fg-opp').style.display='none';
+  document.getElementById('fg-verg').style.display='none';
+  document.getElementById('fg-off').style.display='none';
+  document.getElementById('fg-lod').style.display='none';
+  const fg={OPPAKKEN:'fg-opp',VERGADERVERZOEKEN:'fg-verg','OFFERTE-TRAJECTEN':'fg-off',LOD:'fg-lod'}[sec];
+  if(fg) document.getElementById(fg).style.display='';
+
+  if(isEdit&&editRowData){
+    document.getElementById('m-code').value=editRowData.code||'';
+    document.getElementById('m-naam').value=editRowData.naam||'';
+    fillModalFields(sec,editRowData);
+  } else {
+    clearModal();
+  }
+
+  document.getElementById('modal-bg').classList.add('open');
+}
+
+function editRow(r){ openModal(true,r); }
+
+function closeModal(){document.getElementById('modal-bg').classList.remove('open')}
+
+function fillModalFields(sec,r){
+  switch(sec){
+    case'OPPAKKEN':
+      setv('m-actie',r.actiepunt);setv('m-dl',r.deadline);setv('m-beh',r.behandelaar);
+      setv('m-prio',r.prioriteit);setv('m-opm',r.opmerkingen);
+      document.getElementById('tog-ib').classList.toggle('on',r.inBehandeling==='TRUE');break;
+    case'VERGADERVERZOEKEN':
+      setv('m-per',r.periode);setv('m-beh-v',r.behandelaar);setv('m-agenda',r.agendapunten||r.actiepunt);
+      setv('m-dl-v',r.deadline);setv('m-opm-v',r.opmerkingen);
+      document.getElementById('tog-ib-v').classList.toggle('on',r.inBehandeling==='TRUE');break;
+    case'OFFERTE-TRAJECTEN':
+      setv('m-daang',r.datumAangevraagd);setv('m-beh-o',r.behandelaar);
+      setv('m-off',r.offertes);setv('m-dl-o',r.deadline);setv('m-opm-o',r.opmerkingen);break;
+    case'LOD':
+      setv('m-actie-l',r.actiepunt);setv('m-stat-l',r.status);setv('m-beh-l',r.behandelaar);
+      setv('m-dl-l',r.deadline);setv('m-opm-l',r.opmerkingen);
+      document.getElementById('tog-ib-l').classList.toggle('on',r.inBehandeling==='TRUE');break;
+  }
+}
+function setv(id,v){const el=document.getElementById(id);if(el)el.value=v||''}
+
+function clearModal(){
+  document.querySelectorAll('.modal-body input,.modal-body select,.modal-body textarea').forEach(el=>{if(!el.readOnly)el.value=''});
+  ['tog-ib','tog-ib-v','tog-ib-l'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('on')});
+}
+
+// ══════════════════════════════════════
+//  VvE CODE AUTOCOMPLETE
+// ══════════════════════════════════════
+function onCodeInput(){
+  const q=document.getElementById('m-code').value.trim().toLowerCase();
+  const sug=document.getElementById('vve-sug');
+  if(q.length<2){sug.style.display='none';return}
+  const matches=D.alvo.filter(r=>r.code.toLowerCase().includes(q)||r.naam.toLowerCase().includes(q)).slice(0,8);
+  if(!matches.length){sug.style.display='none';return}
+  sug.style.display='block';
+  sug.innerHTML=matches.map(r=>`
+    <div class="vve-sug-item" onclick="selectVvE('${esc(r.code)}','${esc(r.naam).replace(/'/g,"\\'")}')">
+      <div class="vve-sug-code">${esc(r.code)}</div>
+      <div class="vve-sug-naam">${esc(r.naam)}</div>
+    </div>`).join('');
+}
+
+function selectVvE(code,naam){
+  document.getElementById('m-code').value=code;
+  document.getElementById('m-naam').value=naam;
+  document.getElementById('vve-sug').style.display='none';
+}
+
+// ══════════════════════════════════════
+//  SHEET HELPERS (insert / delete rows)
+// ══════════════════════════════════════
+let _sheetIds=null;
+async function getSheetIds(){
+  if(_sheetIds) return _sheetIds;
+  const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}?key=${AKEY}`);
+  const d=await r.json();
+  _sheetIds={};
+  (d.sheets||[]).forEach(s=>{_sheetIds[s.properties.title]=s.properties.sheetId});
+  return _sheetIds;
+}
+
+function getInsertRow(sec){
+  const entries=D.ntd[sec]||[];
+  if(entries.length>0) return entries[entries.length-1]._row;
+  const info=D.ntdSecInfo[sec];
+  return info?.colHeaderRow||2;
+}
+
+async function insertAndWriteRow(sheetName,afterRow,values){
+  if(!oauthToken) throw new Error('Niet ingelogd');
+  const ids=await getSheetIds();
+  const sheetId=ids[sheetName];
+  if(sheetId==null) throw new Error('Sheet niet gevonden: '+sheetName);
+  const insResp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+    method:'POST',
+    headers:{Authorization:`Bearer ${oauthToken}`,'Content-Type':'application/json'},
+    body:JSON.stringify({requests:[{insertDimension:{range:{sheetId,dimension:'ROWS',startIndex:afterRow,endIndex:afterRow+1},inheritFromBefore:true}}]})
+  });
+  if(!insResp.ok){const e=await insResp.json();throw new Error(e.error?.message||'Invoegfout')}
+  await writeRange(`'${sheetName}'!A${afterRow+1}:I${afterRow+1}`,values);
+}
+
+async function deleteTask(idx){
+  const r=_rowCache[idx];
+  if(!r) return;
+  await deleteTaskRow(r);
+}
+
+async function deleteCurrentEditTask(){
+  if(!editRowData) return;
+  const r=editRowData;
+  closeModal();
+  await deleteTaskRow(r);
+}
+
+async function deleteTaskRow(r){
+  const omschrijving=r.actiepunt||r.periode||r.code||'deze taak';
+  if(!confirm(`Weet je zeker dat je deze taak wilt verwijderen?\n\n"${omschrijving}"`)) return;
+  if(!oauthToken){
+    await doOAuth();
+    if(!oauthToken){alert('Inloggen mislukt. Probeer het opnieuw.');return}
+  }
+  try{
+    const ids=await getSheetIds();
+    const sheetId=ids['Nog Te Doen'];
+    if(sheetId==null) throw new Error('Sheet "Nog Te Doen" niet gevonden');
+    const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+      method:'POST',
+      headers:{Authorization:`Bearer ${oauthToken}`,'Content-Type':'application/json'},
+      body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:r._row-1,endIndex:r._row}}}]})
+    });
+    if(!resp.ok){const e=await resp.json();throw new Error(e.error?.message||'Verwijderfout')}
+    await loadAll();
+  }catch(e){alert('Fout bij verwijderen: '+e.message)}
+}
+
+function getAfInsertRow(sec){
+  const entries=D.af[sec]||[];
+  if(entries.length>0) return entries[entries.length-1]._row;
+  const info=D.afSecInfo[sec];
+  return info?.colHeaderRow||2;
+}
+
+async function completeTask(idx){
+  const r=_rowCache[idx];
+  if(!r){alert('Taak niet gevonden. Vernieuw de pagina en probeer opnieuw.');return}
+  const omschrijving=r.actiepunt||r.periode||r.code||'deze taak';
+  if(!confirm(`Taak afhandelen?\n\n"${omschrijving}"\n\nDe taak wordt verplaatst naar "Afgerond".`)) return;
+  if(!oauthToken){
+    await doOAuth();
+    if(!oauthToken){alert('Inloggen mislukt. Probeer het opnieuw.');return}
+  }
+  try{
+    const sec=r._sec;
+    const d=new Date();
+    const today=`${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;
+    let values;
+    switch(sec){
+      case'OPPAKKEN':
+        values=[r.code,r.naam,r.actiepunt||'',r.deadline||'',r.behandelaar||'',r.prioriteit||'',r.opmerkingen||'',r.inBehandeling||'',today];break;
+      case'VERGADERVERZOEKEN':
+        values=[r.code,r.naam,r.periode||'',r.agendapunten||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'',r.inBehandeling||'',today];break;
+      case'OFFERTE-TRAJECTEN':
+        values=[r.code,r.naam,r.datumAangevraagd||'',r.offertes||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'','',today];break;
+      case'LOD':
+        values=[r.code,r.naam,r.actiepunt||'',r.status||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'',r.inBehandeling||'',today];break;
+      default: throw new Error('Onbekende sectie: '+sec);
+    }
+    // Voeg toe aan Afgerond
+    const afAfterRow=getAfInsertRow(sec);
+    await insertAndWriteRow('Afgerond',afAfterRow,values);
+    // Verwijder uit Nog Te Doen
+    const ids=await getSheetIds();
+    const sheetId=ids['Nog Te Doen'];
+    if(sheetId==null) throw new Error('Sheet "Nog Te Doen" niet gevonden');
+    const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+      method:'POST',
+      headers:{Authorization:`Bearer ${oauthToken}`,'Content-Type':'application/json'},
+      body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:r._row-1,endIndex:r._row}}}]})
+    });
+    if(!resp.ok){const e=await resp.json();throw new Error(e.error?.message||'Fout bij verwijderen uit Nog Te Doen')}
+    await loadAll();
+  }catch(e){alert('Fout bij afhandelen: '+e.message)}
+}
+
+// ══════════════════════════════════════
+//  SUBMIT TASK (Add + Edit)
+// ══════════════════════════════════════
+async function submitTask(){
+  if(!oauthToken){
+    await doOAuth();
+    if(!oauthToken){alert('Inloggen mislukt. Probeer het opnieuw.');return}
+  }
+  const code=document.getElementById('m-code').value.trim();
+  const naam=document.getElementById('m-naam').value.trim();
+  if(!code){alert('VvE Code is verplicht.');return}
+
+  const sec=editSec||activeNtd;
+  let values;
+
+  try{
+    switch(sec){
+      case'OPPAKKEN':
+        values=[code,naam,gv('m-actie'),gv('m-dl'),gv('m-beh'),gv('m-prio'),gv('m-opm'),
+          document.getElementById('tog-ib').classList.contains('on'),false];break;
+      case'VERGADERVERZOEKEN':
+        values=[code,naam,gv('m-per'),gv('m-agenda'),gv('m-beh-v'),gv('m-dl-v'),gv('m-opm-v'),
+          document.getElementById('tog-ib-v').classList.contains('on'),false];break;
+      case'OFFERTE-TRAJECTEN':
+        values=[code,naam,gv('m-daang'),gv('m-off'),gv('m-beh-o'),gv('m-dl-o'),gv('m-opm-o'),'',false];break;
+      case'LOD':
+        values=[code,naam,gv('m-actie-l'),gv('m-stat-l'),gv('m-beh-l'),gv('m-dl-l'),gv('m-opm-l'),
+          document.getElementById('tog-ib-l').classList.contains('on'),false];break;
+    }
+
+    if(editMode&&editRowData?._row){
+      await writeRange(`'Nog Te Doen'!A${editRowData._row}:I${editRowData._row}`,values);
+    } else {
+      const afterRow=getInsertRow(sec);
+      await insertAndWriteRow('Nog Te Doen',afterRow,values);
+    }
+
+    closeModal();clearModal();
+    await loadAll();
+  }catch(e){alert('Fout: '+e.message)}
+}
+function gv(id){const el=document.getElementById(id);return el?el.value.trim():''}
+
+// ══════════════════════════════════════
+//  OAUTH
+// ══════════════════════════════════════
+function doOAuth(){
+  return new Promise(resolve=>{
+    if(!clientId){resolve(null);return}
+    try{
+      google.accounts.oauth2.initTokenClient({
+        client_id:clientId,
+        scope:'https://www.googleapis.com/auth/spreadsheets',
+        callback:resp=>{oauthToken=resp.access_token;resolve(oauthToken)}
+      }).requestAccessToken();
+    }catch(e){console.error('OAuth:',e);resolve(null)}
+  });
+}
+
+// ══════════════════════════════════════
+//  SHARED HELPERS
+// ══════════════════════════════════════
+function filt(rows,q){
+  if(!q)return rows;
+  return rows.filter(r=>Object.values(r).some(v=>(v||'').toLowerCase().includes(q)));
+}
+
+function prioBadge(v){
+  if(!v)return'';
+  const cls={Hoog:'prio-hoog',Midden:'prio-mid',Laag:'prio-laag'}[v]||'prio-mid';
+  const ico={Hoog:'↑',Midden:'→',Laag:'↓'}[v]||'';
+  return`<span class="badge ${cls}">${ico} ${esc(v)}</span>`;
+}
+
+function persBadges(v){
+  if(!v)return'<span style="color:var(--fnt);font-size:12px">–</span>';
+  const colors={'jer':'pers-jer','cihad':'pers-cihad','gabos':'pers-gabos'};
+  return v.split(/[,\/]/).map(n=>n.trim()).filter(Boolean).map(n=>{
+    const cls=colors[n.toLowerCase()]||'pers-default';
+    return`<span class="pers ${cls}">${esc(n)}</span>`;
+  }).join('');
+}
+
+function ibBadge(v){
+  return(v==='TRUE'||v===true)?'<span class="ib-yes">⟳ Loopt</span>':'<span class="ib-no">–</span>';
+}
+
+function offProg(v){
+  if(!v)return'';
+  const[recv,req]=(v+'').split('/').map(s=>parseInt(s)||0);
+  const pct=req>0?Math.min(100,Math.round(recv/req*100)):0;
+  return`<div class="prog-wrap"><span style="font-size:12px;font-weight:700;color:var(--pu)">${esc(v)}</span>
+    <div class="prog-bar"><div class="prog-fill" style="width:${pct}%;background:var(--pu)"></div></div></div>`;
+}
+
+function parseDt(s){
+  if(!s)return 0;
+  const p=s.split('-');
+  return p.length===3?new Date(parseInt(p[2]),parseInt(p[1])-1,parseInt(p[0])).getTime():0;
+}
+
+function emptyRow(cols,inline){
+  if(inline)return`<div class="empty"><div class="empty-ico">📭</div>Geen resultaten</div>`;
+  return`<tr><td colspan="${cols}"><div class="empty"><div class="empty-ico">📭</div>Geen resultaten</div></td></tr>`;
+}
+
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+
+function setupSearch(id,cb){
+  const el=document.getElementById(id);if(!el)return;
+  let t;el.addEventListener('input',()=>{clearTimeout(t);t=setTimeout(cb,200)});
+}
+</script>
+</body>
+</html>

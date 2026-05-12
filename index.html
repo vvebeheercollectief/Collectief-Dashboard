@@ -1645,6 +1645,7 @@ let isSubscribed = false;
 // Init OneSignal zo snel mogelijk
 window.OneSignalDeferred = window.OneSignalDeferred || [];
 OneSignalDeferred.push(async function(OneSignal) {
+  console.log('[Notif] OneSignal SDK loaded, initializing…');
   try {
     await OneSignal.init({
       appId: ONESIGNAL_APP_ID,
@@ -1655,13 +1656,18 @@ OneSignalDeferred.push(async function(OneSignal) {
     });
     oneSignalReady = true;
     isSubscribed = OneSignal.User.PushSubscription.optedIn === true;
+    console.log('[Notif] OneSignal ready. Subscribed:', isSubscribed);
     refreshNotifUI();
     // Luister naar veranderingen in subscription
     OneSignal.User.PushSubscription.addEventListener('change', e => {
       isSubscribed = e.current.optedIn === true;
+      console.log('[Notif] Subscription changed:', isSubscribed);
       refreshNotifUI();
     });
-  } catch(e) { console.warn('OneSignal init faalde:', e); }
+  } catch(e) {
+    console.error('[Notif] OneSignal init faalde:', e);
+    alert('OneSignal kon niet initialiseren: ' + (e && e.message ? e.message : e) + '\n\nVeel voorkomende oorzaak: Site URL in OneSignal-dashboard komt niet overeen met:\nhttps://vvebeheercollectief.github.io/Collectief-Dashboard/');
+  }
 });
 
 // Notificatie-modal openen / sluiten
@@ -1712,11 +1718,31 @@ function getCurrentWho() {
   return sel;
 }
 
+// Wacht tot OneSignal klaar is (max 10 sec)
+async function waitForOneSignal(timeoutMs) {
+  timeoutMs = timeoutMs || 10000;
+  const start = Date.now();
+  while (!oneSignalReady && (Date.now() - start) < timeoutMs) {
+    await new Promise(r => setTimeout(r, 150));
+  }
+  return oneSignalReady;
+}
+
 // Abonneer + sla voorkeuren op
 async function subscribeNotifs() {
   const who = getCurrentWho();
   if (!who) { alert('Selecteer of typ eerst je naam (Wie ben jij?).'); return; }
-  if (!oneSignalReady) { alert('Notificatiesysteem nog niet geladen. Probeer over enkele seconden opnieuw.'); return; }
+
+  const btn = document.getElementById('notif-subscribe-btn');
+  const orig = btn.innerHTML;
+  btn.disabled = true; btn.innerHTML = '⏳ Bezig met laden…';
+
+  const ready = await waitForOneSignal();
+  if (!ready) {
+    btn.disabled = false; btn.innerHTML = orig;
+    alert('Notificatiesysteem kon niet worden geladen. Mogelijke oorzaken:\n• Geen internet\n• Ad-blocker blokkeert OneSignal\n• Pagina nog niet up-to-date — probeer Cmd+Shift+R\n\nOpen Browser-console (Cmd+Option+J) om de exacte foutmelding te zien.');
+    return;
+  }
   try {
     // Vraag toestemming + abonneer
     await OneSignal.Notifications.requestPermission();
@@ -1739,8 +1765,10 @@ async function subscribeNotifs() {
     // Welkomstmelding
     await sendTestNotif(who, 'Notificaties zijn aan! 🔔', 'Je ontvangt voortaan meldingen op dit apparaat.');
   } catch(e) {
-    console.error(e);
-    alert('Aanzetten mislukt: ' + e.message);
+    console.error('subscribeNotifs error:', e);
+    alert('Aanzetten mislukt: ' + (e.message || e));
+  } finally {
+    btn.disabled = false; btn.innerHTML = orig;
   }
 }
 

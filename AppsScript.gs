@@ -10,7 +10,12 @@
  *   1. Vul je OneSignal REST API key in via Script Properties: *
  *      Extensions → Apps Script → ⚙ Project Settings →         *
  *      Script Properties → Add: ONESIGNAL_REST_API_KEY = ...   *
- *   2. Run: setupTriggers()  (van de menubalk)                 *
+ *   2. Run: setupNotificationTriggers()  (van de menubalk)     *
+ *                                                              *
+ *  VEILIG NAAST BESTAANDE CODE:                                *
+ *   - Alle functienamen hebben prefix om conflicten te         *
+ *     voorkomen (bv. cd_onEditChange ipv onEdit)               *
+ *   - Trigger-setup raakt ALLEEN onze eigen triggers aan       *
  ****************************************************************/
 
 const ONESIGNAL_APP_ID = 'c0e1301b-2cee-4646-8fab-99698e10e78c';
@@ -26,28 +31,42 @@ const DEADLINE_TOLERANCE_HOURS = 1;
 // ════════════════════════════════════════════════════════════
 //  SETUP
 // ════════════════════════════════════════════════════════════
-function setupTriggers() {
-  // Verwijder bestaande triggers (idempotent)
-  ScriptApp.getProjectTriggers().forEach(t => ScriptApp.deleteTrigger(t));
+const CD_TRIGGER_FUNCS = ['cd_onEditChange', 'cd_checkDeadlines', 'cd_dailySummary'];
+
+function setupNotificationTriggers() {
+  // Verwijder ALLEEN onze eigen triggers (laat andere triggers met rust!)
+  ScriptApp.getProjectTriggers()
+    .filter(t => CD_TRIGGER_FUNCS.indexOf(t.getHandlerFunction()) !== -1)
+    .forEach(t => ScriptApp.deleteTrigger(t));
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  // Bij elke wijziging in de spreadsheet
-  ScriptApp.newTrigger('onEditChange').forSpreadsheet(ss).onEdit().create();
+  // Bij elke wijziging in de spreadsheet (nieuwe taak / toewijzing / ALV-update)
+  ScriptApp.newTrigger('cd_onEditChange').forSpreadsheet(ss).onEdit().create();
 
   // Elk uur: deadline-checks
-  ScriptApp.newTrigger('checkDeadlines').timeBased().everyHours(1).create();
+  ScriptApp.newTrigger('cd_checkDeadlines').timeBased().everyHours(1).create();
 
   // Dagelijks om 08:30: samenvattingen
-  ScriptApp.newTrigger('dailySummary').timeBased().atHour(8).nearMinute(30).everyDays(1).create();
+  ScriptApp.newTrigger('cd_dailySummary').timeBased().atHour(8).nearMinute(30).everyDays(1).create();
 
-  SpreadsheetApp.getUi().alert('✓ Triggers ingesteld!\n\n• onEdit (nieuwe taken / wijzigingen)\n• Elk uur (deadline-checks)\n• Dagelijks 08:30 (samenvatting)');
+  SpreadsheetApp.getUi().alert('✓ Notificatie-triggers ingesteld!\n\n• cd_onEditChange (nieuwe taken / wijzigingen)\n• cd_checkDeadlines (elk uur)\n• cd_dailySummary (dagelijks 08:30)\n\nJe bestaande triggers zijn ongemoeid gebleven.');
+}
+
+function removeNotificationTriggers() {
+  // Handig om alles in één klap weer weg te halen indien gewenst
+  const before = ScriptApp.getProjectTriggers().length;
+  ScriptApp.getProjectTriggers()
+    .filter(t => CD_TRIGGER_FUNCS.indexOf(t.getHandlerFunction()) !== -1)
+    .forEach(t => ScriptApp.deleteTrigger(t));
+  const after = ScriptApp.getProjectTriggers().length;
+  SpreadsheetApp.getUi().alert('Verwijderd: ' + (before - after) + ' notificatie-triggers.');
 }
 
 // ════════════════════════════════════════════════════════════
 //  TRIGGER 1: onEdit — nieuwe taak / toewijzing / ALV update
 // ════════════════════════════════════════════════════════════
-function onEditChange(e) {
+function cd_onEditChange(e) {
   if (!e || !e.range) return;
   const sheet = e.range.getSheet();
   const name = sheet.getName();
@@ -55,18 +74,18 @@ function onEditChange(e) {
 
   try {
     if (name === NTD_SHEET) {
-      handleNtdEdit(sheet, row, e);
+      cd_handleNtdEdit(sheet, row, e);
     } else if (name === ALVO_SHEET) {
-      handleAlvoEdit(sheet, row, e);
+      cd_handleAlvoEdit(sheet, row, e);
     }
   } catch (err) {
     Logger.log('onEditChange error: ' + err);
   }
 }
 
-function handleNtdEdit(sheet, row, e) {
+function cd_handleNtdEdit(sheet, row, e) {
   // Vind de huidige sectie (OPPAKKEN/VERGADERVERZOEKEN/etc.) door omhoog te zoeken
-  const sec = findSection(sheet, row);
+  const sec = cd_findSection(sheet, row);
   if (!sec) return;
 
   const rowData = sheet.getRange(row, 1, 1, 9).getValues()[0];
@@ -89,15 +108,15 @@ function handleNtdEdit(sheet, row, e) {
 
   if (isNew && colChanged === 1) {
     // Heel nieuwe taak (eerste kolom ingevuld)
-    notifyByTag('n_newtask', '1', {
+    cd_notifyByTag('n_newtask', '1', {
       title: '📋 Nieuwe taak — ' + sec.toLowerCase(),
       body: code + (naam ? ' · ' + naam : '') + (beh ? ' → ' + beh : ''),
       url: APP_URL
     });
     if (beh) {
       // Ook gericht naar de behandelaar(s)
-      splitBehandelaar(beh).forEach(name => {
-        notifyByExternalId(name, 'n_assigned', '1', {
+      cd_splitBehandelaar(beh).forEach(name => {
+        cd_notifyByExternalId(name, 'n_assigned', '1', {
           title: '➕ Toegewezen aan jou',
           body: code + (naam ? ' · ' + naam : ''),
           url: APP_URL
@@ -106,8 +125,8 @@ function handleNtdEdit(sheet, row, e) {
     }
   } else if (colChanged === behandelaarColMap[sec] && beh && e.oldValue !== beh) {
     // Behandelaar veranderd → notify nieuwe behandelaar(s)
-    splitBehandelaar(beh).forEach(name => {
-      notifyByExternalId(name, 'n_assigned', '1', {
+    cd_splitBehandelaar(beh).forEach(name => {
+      cd_notifyByExternalId(name, 'n_assigned', '1', {
         title: '➕ Toegewezen aan jou',
         body: code + (naam ? ' · ' + naam : ''),
         url: APP_URL
@@ -116,7 +135,7 @@ function handleNtdEdit(sheet, row, e) {
   }
 }
 
-function handleAlvoEdit(sheet, row, e) {
+function cd_handleAlvoEdit(sheet, row, e) {
   if (row < 3) return;
   const rowData = sheet.getRange(row, 1, 1, 6).getValues()[0];
   const code = (rowData[0] || '').toString().trim();
@@ -135,7 +154,7 @@ function handleAlvoEdit(sheet, row, e) {
   else if (col === 5 && newVal === 'TRUE') label = '💰 Begroting doorgezet';
   if (!label) return;
 
-  notifyByTag('n_alv', '1', {
+  cd_notifyByTag('n_alv', '1', {
     title: label,
     body: code + (naam ? ' · ' + naam : ''),
     url: APP_URL
@@ -145,7 +164,7 @@ function handleAlvoEdit(sheet, row, e) {
 // ════════════════════════════════════════════════════════════
 //  TRIGGER 2: hourly deadline check
 // ════════════════════════════════════════════════════════════
-function checkDeadlines() {
+function cd_checkDeadlines() {
   const sheet = SpreadsheetApp.getActive().getSheetByName(NTD_SHEET);
   if (!sheet) return;
   const data = sheet.getDataRange().getValues();
@@ -170,7 +189,7 @@ function checkDeadlines() {
     const dlVal = data[i][DEADLINE_COL[curSec]];
     if (!code || !dlVal) continue;
 
-    const dl = parseDate(dlVal);
+    const dl = cd_parseDate(dlVal);
     if (!dl) continue;
 
     const hoursUntil = (dl.getTime() - now.getTime()) / 3600000;
@@ -183,8 +202,8 @@ function checkDeadlines() {
         const body = code + (naam ? ' · ' + naam : '') + ' — over ' + Math.round(hoursUntil) + ' uur';
         // Stuur naar iedereen met deadline_h = h EN n_deadline = 1 EN behandelaar matched
         if (beh) {
-          splitBehandelaar(beh).forEach(name => {
-            sendNotification({
+          cd_splitBehandelaar(beh).forEach(name => {
+            cd_sendNotification({
               filters: [
                 { field: 'tag', key: 'behandelaar', relation: '=', value: name },
                 { operator: 'AND' },
@@ -207,7 +226,7 @@ function checkDeadlines() {
 // ════════════════════════════════════════════════════════════
 //  TRIGGER 3: daily summary om 08:30
 // ════════════════════════════════════════════════════════════
-function dailySummary() {
+function cd_dailySummary() {
   const sheet = SpreadsheetApp.getActive().getSheetByName(NTD_SHEET);
   if (!sheet) return;
   const data = sheet.getDataRange().getValues();
@@ -224,7 +243,7 @@ function dailySummary() {
 
     const beh = (data[i][BEH_COL[curSec]] || '').toString().trim();
     if (!beh) continue;
-    splitBehandelaar(beh).forEach(name => {
+    cd_splitBehandelaar(beh).forEach(name => {
       if (!perPerson[name]) perPerson[name] = {};
       perPerson[name][curSec] = (perPerson[name][curSec] || 0) + 1;
     });
@@ -239,7 +258,7 @@ function dailySummary() {
     if (tots['OFFERTE-TRAJECTEN']) parts.push(tots['OFFERTE-TRAJECTEN'] + ' offerte-traject' + (tots['OFFERTE-TRAJECTEN']>1?'en':''));
     if (tots['LOD']) parts.push(tots['LOD'] + ' LOD');
 
-    notifyByExternalId(name, 'n_daily', '1', {
+    cd_notifyByExternalId(name, 'n_daily', '1', {
       title: '☀️ Goedemorgen — ' + total + ' open ' + (total===1?'taak':'taken'),
       body: parts.join(' · '),
       url: APP_URL
@@ -250,7 +269,7 @@ function dailySummary() {
 // ════════════════════════════════════════════════════════════
 //  HELPERS
 // ════════════════════════════════════════════════════════════
-function findSection(sheet, row) {
+function cd_findSection(sheet, row) {
   const SKEYS = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD'];
   const colA = sheet.getRange(1, 1, row, 1).getValues();
   for (let i = row - 1; i >= 0; i--) {
@@ -260,11 +279,11 @@ function findSection(sheet, row) {
   return null;
 }
 
-function splitBehandelaar(s) {
+function cd_splitBehandelaar(s) {
   return (s || '').split(/[,\/]/).map(p => p.trim()).filter(Boolean);
 }
 
-function parseDate(v) {
+function cd_parseDate(v) {
   if (!v) return null;
   if (v instanceof Date) return v;
   const s = v.toString().trim();
@@ -278,22 +297,22 @@ function parseDate(v) {
 // ════════════════════════════════════════════════════════════
 //  ONESIGNAL API
 // ════════════════════════════════════════════════════════════
-function getApiKey() {
+function cd_getApiKey() {
   const k = PropertiesService.getScriptProperties().getProperty('ONESIGNAL_REST_API_KEY');
   if (!k) throw new Error('ONESIGNAL_REST_API_KEY ontbreekt in Script Properties.');
   return k;
 }
 
-function notifyByTag(tagKey, tagValue, opts) {
-  return sendNotification({
+function cd_notifyByTag(tagKey, tagValue, opts) {
+  return cd_sendNotification({
     filters: [{ field: 'tag', key: tagKey, relation: '=', value: tagValue }],
     title: opts.title, body: opts.body, url: opts.url, dedupKey: opts.dedupKey
   });
 }
 
-function notifyByExternalId(extId, tagKey, tagValue, opts) {
+function cd_notifyByExternalId(extId, tagKey, tagValue, opts) {
   // External ID + tag-filter: stuur naar Jer EN met deze voorkeur aan
-  return sendNotification({
+  return cd_sendNotification({
     filters: [
       { field: 'tag', key: 'behandelaar', relation: '=', value: extId },
       { operator: 'AND' },
@@ -303,7 +322,7 @@ function notifyByExternalId(extId, tagKey, tagValue, opts) {
   });
 }
 
-function sendNotification(p) {
+function cd_sendNotification(p) {
   const payload = {
     app_id: ONESIGNAL_APP_ID,
     filters: p.filters,
@@ -319,7 +338,7 @@ function sendNotification(p) {
     const resp = UrlFetchApp.fetch('https://api.onesignal.com/notifications', {
       method: 'post',
       contentType: 'application/json',
-      headers: { 'Authorization': 'Key ' + getApiKey() },
+      headers: { 'Authorization': 'Key ' + cd_getApiKey() },
       payload: JSON.stringify(payload),
       muteHttpExceptions: true,
     });
@@ -334,8 +353,8 @@ function sendNotification(p) {
 // ════════════════════════════════════════════════════════════
 //  TEST FUNCTIES — kun je los runnen vanuit Apps Script editor
 // ════════════════════════════════════════════════════════════
-function testPushToAll() {
-  return sendNotification({
+function cd_testPushToAll() {
+  return cd_sendNotification({
     filters: [{ field: 'tag', key: 'n_newtask', relation: 'exists' }],
     title: '🧪 Test vanuit Apps Script',
     body: 'Als je dit ziet, dan werkt het einde-tot-einde!',
@@ -343,8 +362,8 @@ function testPushToAll() {
   });
 }
 
-function testPushToJer() {
-  return notifyByExternalId('Jer', 'n_newtask', '1', {
+function cd_testPushToJer() {
+  return cd_notifyByExternalId('Jer', 'n_newtask', '1', {
     title: '🧪 Test naar Jer',
     body: 'Alleen Jer ontvangt deze melding.',
     dedupKey: 'test-jer-' + Date.now()

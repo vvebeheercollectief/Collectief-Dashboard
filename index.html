@@ -19,6 +19,7 @@
   <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
   <style>
     :root{
@@ -165,36 +166,20 @@
     .prog-wrap{display:flex;align-items:center;gap:7px}
     .prog-bar{width:60px;height:5px;background:var(--bor);border-radius:3px;overflow:hidden;flex-shrink:0}
     .prog-fill{height:100%;background:var(--sec,var(--bl));border-radius:3px}
-    /* ── Meldingen paneel ── */
-    #notif-panel{position:fixed;top:62px;right:12px;width:320px;max-height:480px;background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);box-shadow:var(--shl);z-index:300;display:none;flex-direction:column;overflow:hidden}
-    #notif-panel.open{display:flex}
-    .np-hdr{display:flex;align-items:center;gap:8px;padding:12px 14px 10px;border-bottom:1px solid var(--bor);flex-shrink:0}
-    .np-title{font-weight:700;font-size:14px;flex:1}
-    .np-read-all{font-size:11px;color:var(--bl);background:none;border:none;cursor:pointer;padding:0;white-space:nowrap}
-    .np-read-all:hover{text-decoration:underline}
-    .np-close{background:none;border:none;font-size:20px;color:var(--mut);cursor:pointer;line-height:1;padding:0 2px}
-    #np-list{overflow-y:auto;flex:1}
-    .np-item{display:flex;gap:10px;padding:11px 14px;border-bottom:1px solid var(--bor);cursor:default;transition:background var(--tr)}
-    .np-item:last-child{border-bottom:none}
-    .np-item.unread{background:var(--bl-l)}
-    .np-item:hover{background:var(--sur2)}
-    .np-ico{font-size:18px;flex-shrink:0;margin-top:1px}
-    .np-body{flex:1;min-width:0}
-    .np-body strong{display:block;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .np-body span{display:block;font-size:12px;color:var(--mut);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .np-time{font-size:10px;color:var(--fnt);white-space:nowrap;margin-top:3px;flex-shrink:0}
-    .np-empty{padding:32px 14px;text-align:center;color:var(--mut);font-size:13px}
-    .np-foot{display:flex;align-items:center;gap:8px;padding:9px 14px;border-top:1px solid var(--bor);flex-shrink:0;background:var(--sur2)}
-    .off-counter{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:4px}
-    .off-lbl{font-size:12px;color:var(--mut);white-space:nowrap}
-    .off-sep{font-weight:700;font-size:16px;color:var(--mut)}
-    .off-spin{display:flex;align-items:center;gap:0}
-    .off-btn{width:28px;height:32px;border:1px solid var(--bor);background:var(--sur2);color:var(--txt);font-size:16px;cursor:pointer;line-height:1;transition:background var(--tr)}
-    .off-btn:first-child{border-radius:var(--rs) 0 0 var(--rs)}
-    .off-btn:last-child{border-radius:0 var(--rs) var(--rs) 0}
-    .off-btn:hover{background:var(--bor)}
-    .off-inp{width:46px;height:32px;border:1px solid var(--bor);border-left:none;border-right:none;text-align:center;font-size:14px;font-weight:600;background:var(--sur);color:var(--txt);-moz-appearance:textfield}
-    .off-inp::-webkit-inner-spin-button,.off-inp::-webkit-outer-spin-button{-webkit-appearance:none}
+    /* ── In-app toasts ── */
+    #toast-container{position:fixed;top:72px;right:16px;z-index:400;display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:340px}
+    .toast{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);box-shadow:var(--shl);padding:12px 14px;display:flex;gap:10px;align-items:flex-start;pointer-events:all;animation:toast-in .25s ease;border-left:4px solid var(--toast-clr,var(--bl))}
+    .toast.removing{animation:toast-out .25s ease forwards}
+    .toast-ico{font-size:18px;flex-shrink:0;line-height:1.3}
+    .toast-body{flex:1;min-width:0}
+    .toast-title{font-size:13px;font-weight:600;line-height:1.3}
+    .toast-msg{font-size:12px;color:var(--mut);margin-top:3px;line-height:1.4}
+    .toast-close{background:none;border:none;font-size:17px;color:var(--fnt);cursor:pointer;padding:0;line-height:1;flex-shrink:0;transition:color var(--tr)}
+    .toast-close:hover{color:var(--txt)}
+    .toast-bar{height:3px;background:var(--toast-clr,var(--bl));border-radius:0 0 2px 2px;position:absolute;bottom:0;left:0;animation:toast-bar linear forwards}
+    @keyframes toast-in{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:translateX(0)}}
+    @keyframes toast-out{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(24px)}}
+    @keyframes toast-bar{from{width:100%}to{width:0%}}
 
     /* Pagination */
     .pag{display:flex;align-items:center;justify-content:space-between;padding:11px 16px;border-top:1px solid var(--bor)}
@@ -330,7 +315,7 @@
     <div class="hdr-info"><h1 id="page-title">Nog Te Doen</h1><p id="page-sub">Openstaande taken</p></div>
     <button class="ico-btn" id="notif-btn" title="Meldingen" style="position:relative">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-      <span id="notif-dot" style="display:none;position:absolute;top:4px;right:4px;min-width:16px;height:16px;background:var(--rd);border-radius:8px;border:2px solid var(--sur);font-size:9px;font-weight:800;color:#fff;line-height:12px;text-align:center;padding:0 3px"></span>
+      <span id="notif-dot" style="display:none;position:absolute;top:6px;right:7px;width:8px;height:8px;background:var(--rd);border-radius:50%;border:2px solid var(--sur)"></span>
     </button>
     <button class="ico-btn" id="theme-btn">
       <svg id="ico-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
@@ -613,22 +598,65 @@
   </div>
 </div>
 
-<!-- ═══════ MELDINGEN PANEEL ═══════ -->
-<div id="notif-panel">
-  <div class="np-hdr">
-    <span class="np-title">Meldingen</span>
-    <button class="np-read-all" id="np-read-all">Alles gelezen</button>
-    <button class="np-close" id="np-close">×</button>
-  </div>
-  <div id="np-list"></div>
-  <div class="np-foot">
-    <span style="font-size:11px;color:var(--mut);white-space:nowrap">Wie ben jij?</span>
-    <select id="notif-who" style="flex:1;font-size:12px;padding:4px 7px;border:1px solid var(--bor);border-radius:var(--rs);background:var(--sur2);color:var(--txt)">
-      <option value="">-- Selecteer --</option>
-      <option value="Jer">Jer</option>
-      <option value="Cihad">Cihad</option>
-      <option value="Gabos">Gabos</option>
-    </select>
+<!-- ═══════ TOAST CONTAINER ═══════ -->
+<div id="toast-container"></div>
+
+<!-- ═══════ NOTIFICATIE INSTELLINGEN ═══════ -->
+<div class="modal-bg" id="notif-bg">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-hdr">
+      <h2>🔔 Notificatie-instellingen</h2>
+      <button class="modal-close" id="notif-close">×</button>
+    </div>
+    <div class="modal-body">
+
+      <div class="fld">
+        <label>Wie ben jij?</label>
+        <select id="notif-who">
+          <option value="">-- Selecteer --</option>
+          <option value="Jer">Jer</option>
+          <option value="Cihad">Cihad</option>
+          <option value="Gabos">Gabos</option>
+          <option value="__other__">Anders (typ naam)</option>
+        </select>
+        <input type="text" id="notif-who-other" placeholder="Typ je naam" style="display:none;margin-top:8px;width:100%;background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rs);padding:8px 11px;color:var(--txt);font-size:13px;outline:none"/>
+      </div>
+
+      <div style="font-size:11.5px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin:18px 0 6px">Soorten meldingen</div>
+      <div class="toggle-row"><div class="tog" id="tog-notif-newtask" onclick="this.classList.toggle('on');saveNotifPrefs()"></div><span>Nieuwe taak toegevoegd</span></div>
+      <div class="toggle-row"><div class="tog" id="tog-notif-assigned" onclick="this.classList.toggle('on');saveNotifPrefs()"></div><span>Taak aan mij toegewezen</span></div>
+      <div class="toggle-row"><div class="tog" id="tog-notif-deadline" onclick="this.classList.toggle('on');saveNotifPrefs()"></div><span>Deadline nadert</span></div>
+      <div class="fld" style="margin:2px 0 10px 46px">
+        <label style="text-transform:none;letter-spacing:normal;font-size:12px;color:var(--mut)">Hoe lang van tevoren?</label>
+        <select id="notif-deadline-hours" onchange="saveNotifPrefs()" style="width:auto;padding:5px 9px">
+          <option value="1">1 uur</option>
+          <option value="4">4 uur</option>
+          <option value="8">8 uur</option>
+          <option value="24">1 dag</option>
+          <option value="48">2 dagen</option>
+        </select>
+      </div>
+      <div class="toggle-row"><div class="tog" id="tog-notif-alv" onclick="this.classList.toggle('on');saveNotifPrefs()"></div><span>ALV-status verandert</span></div>
+      <div class="toggle-row"><div class="tog" id="tog-notif-daily" onclick="this.classList.toggle('on');saveNotifPrefs()"></div><span>Dagelijkse samenvatting (08:30)</span></div>
+
+      <div style="border-top:1px solid var(--bor);margin-top:20px;padding-top:16px">
+        <div style="font-size:11.5px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px">Push-meldingen</div>
+        <div id="notif-subscribe-section">
+          <button class="btn btn-pri" id="notif-subscribe-btn" style="width:100%;justify-content:center">🔔 Push-meldingen aanzetten</button>
+          <p style="font-size:12px;color:var(--mut);margin-top:8px;line-height:1.5">Eenmalige toestemming nodig — je browser vraagt om bevestiging.<br>In-app toasts werken altijd, ook zonder push.</p>
+        </div>
+        <div id="notif-settings-section" style="display:none">
+          <div style="background:var(--gn-l);border:1px solid var(--gn-b);border-radius:var(--rs);padding:10px 13px;color:var(--gn);font-size:13px;font-weight:500;margin-bottom:12px">
+            ✓ <strong>Push-meldingen staan aan</strong> op dit apparaat.
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-sec" id="notif-test-btn" style="flex:1;justify-content:center">🧪 Test melding</button>
+            <button class="btn btn-sec" id="notif-unsubscribe-btn" style="flex:1;justify-content:center;color:var(--rd);border-color:var(--rd-b)">Push uitzetten</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
   </div>
 </div>
 
@@ -640,8 +668,15 @@ const SID  = '1fnUsbwb4nDMNttWym9FWBw1CMMMAVTuZ3v88b35isUw';
 const AKEY = 'AIzaSyBo-Tf8o6L_VQoB29vv7L1q3NATIAgJc9E';
 const PG   = 25;
 // Webhook URL van het Apps Script (Deploy → Web app)
-const NOTIF_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbz_AC5YgAzUlcx9HrI4nv6jkoSung-T5WPHJPSSqwwBXcbv7NUUNKl1pzrd5qBf8so1WA/exec';
-const NOTIF_WEBHOOK_SECRET = ''; // optioneel, voor extra security
+const NOTIF_WEBHOOK_URL    = 'https://script.google.com/macros/s/AKfycbz_AC5YgAzUlcx9HrI4nv6jkoSung-T5WPHJPSSqwwBXcbv7NUUNKl1pzrd5qBf8so1WA/exec';
+const NOTIF_WEBHOOK_SECRET = '';
+const ONESIGNAL_APP_ID     = 'c0e1301b-2cee-4646-8fab-99698e10e78c';
+
+let oneSignalReady  = false;
+let isSubscribed    = false;
+let _lastNotifTs    = '';
+let _notifPollTimer = null;
+let _shownToasts    = new Set();
 
 const SECS = {
   OPPAKKEN:{label:'Oppakken',css:'--sec:var(--bl);--sec-l:var(--bl-l);--sec-b:var(--bl-b)',color:'#2563eb',
@@ -731,22 +766,15 @@ document.addEventListener('DOMContentLoaded',()=>{
   buildPeriodBtns('pb-notulen','notulen');
 
   // Notificatie-modal handlers
-  document.getElementById('notif-btn').onclick = toggleNotifPanel;
-  document.getElementById('np-close').onclick = closeNotifPanel;
-  document.getElementById('np-read-all').onclick = markAllRead;
-  document.getElementById('notif-who').value = localStorage.getItem('notif_who') || '';
-  document.getElementById('notif-who').onchange = () => {
-    localStorage.setItem('notif_who', getCurrentWho());
-    updateNotifBadge();
-    renderNotifPanel();
-  };
-  document.addEventListener('click', e => {
-    const panel = document.getElementById('notif-panel');
-    if (panel.classList.contains('open') && !panel.contains(e.target) && e.target.id !== 'notif-btn' && !e.target.closest('#notif-btn')) {
-      closeNotifPanel();
-    }
-  });
-  startNotifPolling();
+  document.getElementById('notif-btn').onclick = openNotifModal;
+  document.getElementById('notif-close').onclick = closeNotifModal;
+  document.getElementById('notif-bg').onclick = e => { if (e.target.id === 'notif-bg') closeNotifModal(); };
+  document.getElementById('notif-who').onchange = () => { onWhoChange(); saveNotifPrefs(); };
+  document.getElementById('notif-who-other').oninput = () => saveNotifPrefs();
+  document.getElementById('notif-subscribe-btn').onclick = subscribeNotifs;
+  document.getElementById('notif-unsubscribe-btn').onclick = unsubscribeNotifs;
+  document.getElementById('notif-test-btn').onclick = () => sendTestNotif(getCurrentWho(), '🔔 Test melding', 'Notificaties werken correct op dit apparaat!');
+  startNotifPoll();
 
   goTo('ntd');
 });
@@ -1654,144 +1682,297 @@ function setupSearch(id,cb){
 }
 
 // ══════════════════════════════════════
-//  NOTIF WEBHOOK — vuurt notificatie-event af naar Apps Script
+//  NOTIF WEBHOOK — vuurt event af én toont directe in-app toast
 // ══════════════════════════════════════
 async function fireNotifEvent(event, payload) {
-  if (!NOTIF_WEBHOOK_URL) return; // niet geconfigureerd: stille no-op
+  const who   = getCurrentWho();
+  const prefs = getNotifPrefs();
+  const code  = (payload.code  || '').toString();
+  const naam  = (payload.naam  || '').toString();
+  const beh   = (payload.behandelaar || '').toString();
+  const sec   = (payload.sec   || '').toString().toLowerCase();
+
+  if (event === 'newtask' && prefs.newtask) {
+    const msg = code + (naam ? ' · ' + naam : '') + (beh ? ' → ' + beh : '');
+    showToast('📋 Nieuwe taak — ' + sec, msg, 'var(--bl)');
+  } else if (event === 'assigned' && prefs.assigned && who) {
+    const behs = beh.split(/[,\/]/).map(s => s.trim());
+    if (behs.includes(who)) {
+      showToast('➕ Toegewezen aan jou', code + (naam ? ' · ' + naam : ''), 'var(--gn)');
+    }
+  }
+
+  if (!NOTIF_WEBHOOK_URL) return;
   try {
-    const body = Object.assign({}, payload || {}, {
-      event,
-      actor: localStorage.getItem('notif_who') || '',
-      secret: NOTIF_WEBHOOK_SECRET
-    });
-    // no-cors fetch: in no-cors modus is application/json niet toegestaan als Content-Type,
-    // dus geen header meesturen — Apps Script leest de body via e.postData.contents ongeacht type.
     await fetch(NOTIF_WEBHOOK_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      body: JSON.stringify(body)
+      method: 'POST', mode: 'no-cors',
+      body: JSON.stringify(Object.assign({}, payload, { event, actor: who, secret: NOTIF_WEBHOOK_SECRET }))
     });
-  } catch (e) { console.warn('Notif webhook faalde:', e); }
+  } catch(e) { console.warn('Notif webhook faalde:', e); }
 }
 
 // ══════════════════════════════════════
-//  IN-APP MELDINGEN
+//  IN-APP TOASTS
 // ══════════════════════════════════════
-let _notifs = [];        // alle geladen meldingen
-let _notifTimer = null;
+const TOAST_ICONS  = { n_newtask:'📋', n_assigned:'➕', n_deadline:'⏰', n_alv:'🏢', n_daily:'☀️', test:'🔔' };
+const TOAST_COLORS = { n_newtask:'var(--bl)', n_assigned:'var(--gn)', n_deadline:'var(--am)', n_alv:'var(--pu)', n_daily:'var(--am)', test:'var(--bl)' };
+const TOAST_DURATION = 5000;
 
-function getCurrentWho() {
-  return document.getElementById('notif-who').value || localStorage.getItem('notif_who') || '';
+function showToast(title, msg, color) {
+  const key = title + '|' + msg;
+  if (_shownToasts.has(key)) return;
+  _shownToasts.add(key);
+  setTimeout(() => _shownToasts.delete(key), 30000);
+
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.style.setProperty('--toast-clr', color || 'var(--bl)');
+  el.style.position = 'relative';
+  el.style.overflow = 'hidden';
+  el.innerHTML = `
+    <div class="toast-body">
+      <div class="toast-title">${esc(title)}</div>
+      ${msg ? `<div class="toast-msg">${esc(msg)}</div>` : ''}
+    </div>
+    <button class="toast-close" onclick="dismissToast(this.parentElement)">×</button>
+    <div class="toast-bar" style="animation-duration:${TOAST_DURATION}ms"></div>`;
+
+  const container = document.getElementById('toast-container');
+  container.appendChild(el);
+
+  // Systeemmelding als push-toestemming is verleend
+  if ('Notification' in window && Notification.permission === 'granted' && document.hidden) {
+    navigator.serviceWorker.ready.then(reg => reg.showNotification(title, {
+      body: msg, icon: 'icon-192.png', badge: 'icon-192.png', tag: 'cd-' + Date.now()
+    })).catch(() => {});
+  }
+
+  setTimeout(() => dismissToast(el), TOAST_DURATION);
 }
 
-function toggleNotifPanel() {
-  const panel = document.getElementById('notif-panel');
-  const isOpen = panel.classList.contains('open');
-  if (isOpen) { panel.classList.remove('open'); return; }
-  panel.classList.add('open');
-  renderNotifPanel();
+function dismissToast(el) {
+  if (!el || el.classList.contains('removing')) return;
+  el.classList.add('removing');
+  setTimeout(() => el.remove(), 260);
 }
 
-function closeNotifPanel() {
-  document.getElementById('notif-panel').classList.remove('open');
+// ══════════════════════════════════════
+//  POLLING — toont toasts voor andere gebruikers
+// ══════════════════════════════════════
+function getNotifPrefs() {
+  return {
+    newtask:  localStorage.getItem('notif_newtask')  !== 'false',
+    assigned: localStorage.getItem('notif_assigned') !== 'false',
+    deadline: localStorage.getItem('notif_deadline') !== 'false',
+    alv:      localStorage.getItem('notif_alv')      !== 'false',
+    daily:    localStorage.getItem('notif_daily')    !== 'false',
+  };
 }
 
-async function loadNotifs() {
+async function pollNotifsForToast() {
   try {
     const r = await fetchSheet('Meldingen');
-    if (!r || r.length < 2) { _notifs = []; }
-    else {
-      const h = r[0].map(c => (c||'').toString().toLowerCase().trim());
-      const iTs=h.indexOf('timestamp'), iTi=h.indexOf('titel'),
-            iIn=h.indexOf('inhoud'),    iVo=h.indexOf('voor'),
-            iTy=h.indexOf('type');
-      _notifs = r.slice(1).reverse().map(row => ({
-        ts:    (row[iTs]||'').toString(),
-        type:  (row[iTy]||'').toString(),
-        title: (row[iTi]||'').toString(),
-        body:  (row[iIn]||'').toString(),
-        voor:  (row[iVo]||'').toString(),
-      })).filter(n => n.ts && n.title);
+    if (!r || r.length < 2) return;
+    const h = r[0].map(c => (c||'').toString().toLowerCase().trim());
+    const iTs=h.indexOf('timestamp'), iTi=h.indexOf('titel'), iIn=h.indexOf('inhoud'), iVo=h.indexOf('voor'), iTy=h.indexOf('type');
+    const rows = r.slice(1).reverse()
+      .map(row => ({ ts:(row[iTs]||'').toString(), type:(row[iTy]||'').toString(), title:(row[iTi]||'').toString(), body:(row[iIn]||'').toString(), voor:(row[iVo]||'').toString() }))
+      .filter(n => n.ts && n.title);
+    if (!rows.length) return;
+
+    // Eerste keer: sla huidige stand op zonder toasts te tonen
+    if (!_lastNotifTs) { _lastNotifTs = rows[0].ts; return; }
+
+    const who   = getCurrentWho();
+    const prefs = getNotifPrefs();
+    const typeToPrefs = { n_newtask:'newtask', n_assigned:'assigned', n_deadline:'deadline', n_alv:'alv', n_daily:'daily' };
+
+    const newRows = rows.filter(n => n.ts > _lastNotifTs);
+    for (const n of newRows) {
+      if (n.voor !== 'allen' && n.voor && who && n.voor !== who) continue;
+      const prefKey = typeToPrefs[n.type];
+      if (prefKey && prefs[prefKey] === false) continue;
+      showToast(n.title, n.body, TOAST_COLORS[n.type] || 'var(--bl)');
     }
-  } catch(e) { /* sheet bestaat nog niet */ _notifs = []; }
-  updateNotifBadge();
-  if (document.getElementById('notif-panel').classList.contains('open')) renderNotifPanel();
+    if (newRows.length) _lastNotifTs = rows[0].ts;
+  } catch(e) { /* stil falen */ }
 }
 
-function notifLastRead() {
-  return localStorage.getItem('notif_last_read') || '';
+function startNotifPoll() {
+  pollNotifsForToast();
+  _notifPollTimer = setInterval(pollNotifsForToast, 15000);
 }
 
-function visibleNotifs() {
-  const who = getCurrentWho();
-  return _notifs.filter(n => n.voor === 'allen' || n.voor === who || !who);
-}
-
-function unreadCount() {
-  const lr = notifLastRead();
-  return visibleNotifs().filter(n => n.ts > lr).length;
-}
-
-function updateNotifBadge() {
-  const dot = document.getElementById('notif-dot');
-  const cnt = unreadCount();
-  if (cnt > 0) {
-    dot.style.display = 'block';
-    dot.textContent = cnt > 9 ? '9+' : cnt;
+// ══════════════════════════════════════
+//  NOTIFICATIE MODAL
+// ══════════════════════════════════════
+function openNotifModal() {
+  const who = localStorage.getItem('notif_who') || '';
+  const known = ['Jer','Cihad','Gabos',''];
+  if (known.includes(who)) {
+    document.getElementById('notif-who').value = who;
+    document.getElementById('notif-who-other').style.display = 'none';
   } else {
-    dot.style.display = 'none';
-    dot.textContent = '';
+    document.getElementById('notif-who').value = '__other__';
+    document.getElementById('notif-who-other').style.display = '';
+    document.getElementById('notif-who-other').value = who;
+  }
+  ['newtask','assigned','deadline','alv','daily'].forEach(k => {
+    const v  = localStorage.getItem('notif_' + k);
+    const el = document.getElementById('tog-notif-' + k);
+    if (el) el.classList.toggle('on', v === null ? true : v === 'true');
+  });
+  document.getElementById('notif-deadline-hours').value = localStorage.getItem('notif_deadline_hours') || '1';
+  refreshNotifUI();
+  document.getElementById('notif-bg').classList.add('open');
+}
+
+function closeNotifModal() {
+  document.getElementById('notif-bg').classList.remove('open');
+}
+
+function refreshNotifUI() {
+  document.getElementById('notif-subscribe-section').style.display = isSubscribed ? 'none' : 'block';
+  document.getElementById('notif-settings-section').style.display  = isSubscribed ? 'block' : 'none';
+  const dot = document.getElementById('notif-dot');
+  if (dot) dot.style.display = isSubscribed ? 'none' : 'block';
+}
+
+function onWhoChange() {
+  const sel = document.getElementById('notif-who');
+  document.getElementById('notif-who-other').style.display = sel.value === '__other__' ? '' : 'none';
+}
+
+function getCurrentWho() {
+  const sel = document.getElementById('notif-who');
+  if (!sel) return localStorage.getItem('notif_who') || '';
+  if (sel.value === '__other__') return (document.getElementById('notif-who-other').value || '').trim();
+  return sel.value;
+}
+
+async function saveNotifPrefs(forceInit) {
+  const who = getCurrentWho();
+  if (!who && !forceInit) return;
+  if (who) localStorage.setItem('notif_who', who);
+  const prefs = {
+    newtask:  document.getElementById('tog-notif-newtask').classList.contains('on'),
+    assigned: document.getElementById('tog-notif-assigned').classList.contains('on'),
+    deadline: document.getElementById('tog-notif-deadline').classList.contains('on'),
+    alv:      document.getElementById('tog-notif-alv').classList.contains('on'),
+    daily:    document.getElementById('tog-notif-daily').classList.contains('on'),
+  };
+  const deadlineHours = document.getElementById('notif-deadline-hours').value || '1';
+  Object.entries(prefs).forEach(([k, v]) => localStorage.setItem('notif_' + k, v));
+  localStorage.setItem('notif_deadline_hours', deadlineHours);
+  if (oneSignalReady && isSubscribed) {
+    try {
+      await OneSignal.User.addTags({
+        behandelaar: who,
+        n_newtask:  prefs.newtask  ? '1' : '0',
+        n_assigned: prefs.assigned ? '1' : '0',
+        n_deadline: prefs.deadline ? '1' : '0',
+        n_alv:      prefs.alv      ? '1' : '0',
+        n_daily:    prefs.daily    ? '1' : '0',
+        deadline_h: deadlineHours,
+      });
+      if (who) await OneSignal.login(who);
+    } catch(e) { console.warn('Tag sync faalde:', e); }
   }
 }
 
-function timeAgo(ts) {
-  if (!ts) return '';
-  const diff = Date.now() - new Date(ts).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 1)  return 'zojuist';
-  if (m < 60) return m + ' min geleden';
-  const h = Math.floor(m / 60);
-  if (h < 24) return h + ' uur geleden';
-  return Math.floor(h / 24) + ' dag' + (Math.floor(h/24)>1?'en':'') + ' geleden';
+async function waitForOneSignal(timeoutMs) {
+  timeoutMs = timeoutMs || 10000;
+  const start = Date.now();
+  while (!oneSignalReady && (Date.now() - start) < timeoutMs) {
+    await new Promise(r => setTimeout(r, 150));
+  }
+  return oneSignalReady;
 }
 
-const NOTIF_ICONS = {
-  newtask:'📋', assigned:'➕', deadline:'⏰', alv:'🏢', daily:'☀️', test:'🔔'
-};
-
-function renderNotifPanel() {
-  const lr = notifLastRead();
-  const items = visibleNotifs().slice(0, 40);
-  const list = document.getElementById('np-list');
-  if (!items.length) {
-    list.innerHTML = '<div class="np-empty">Geen meldingen</div>';
+async function subscribeNotifs() {
+  const who = getCurrentWho();
+  if (!who) { alert('Selecteer of typ eerst je naam.'); return; }
+  const btn = document.getElementById('notif-subscribe-btn');
+  const orig = btn.innerHTML;
+  btn.disabled = true; btn.innerHTML = '⏳ Bezig…';
+  const ready = await waitForOneSignal();
+  if (!ready) {
+    btn.disabled = false; btn.innerHTML = orig;
+    alert('Notificatiesysteem kon niet worden geladen.\n\nMogelijke oorzaken:\n• Geen internet\n• Ad-blocker blokkeert OneSignal\n• Probeer Cmd+Shift+R');
     return;
   }
-  list.innerHTML = items.map(n => {
-    const unread = n.ts > lr ? 'unread' : '';
-    const ico = NOTIF_ICONS[n.type] || '🔔';
-    return `<div class="np-item ${unread}">
-      <div class="np-ico">${ico}</div>
-      <div class="np-body">
-        <strong>${esc(n.title)}</strong>
-        <span>${esc(n.body)}</span>
-      </div>
-      <div class="np-time">${timeAgo(n.ts)}</div>
-    </div>`;
-  }).join('');
+  try {
+    await OneSignal.Notifications.requestPermission();
+    if (!OneSignal.Notifications.permission) {
+      alert('Geen toestemming gegeven. Zet notificaties aan in je browserinstellingen.');
+      return;
+    }
+    await OneSignal.User.PushSubscription.optIn();
+    await OneSignal.login(who);
+    ['newtask','assigned','deadline','alv','daily'].forEach(k => {
+      if (localStorage.getItem('notif_' + k) === null) localStorage.setItem('notif_' + k, 'true');
+    });
+    if (!localStorage.getItem('notif_deadline_hours')) localStorage.setItem('notif_deadline_hours', '1');
+    localStorage.setItem('notif_who', who);
+    await saveNotifPrefs(true);
+    isSubscribed = true;
+    refreshNotifUI();
+    sendTestNotif(who, 'Notificaties zijn aan! 🔔', 'Je ontvangt voortaan meldingen op dit apparaat.');
+  } catch(e) {
+    console.error('subscribeNotifs error:', e);
+    alert('Aanzetten mislukt: ' + (e.message || e));
+  } finally {
+    btn.disabled = false; btn.innerHTML = orig;
+  }
 }
 
-function markAllRead() {
-  if (!_notifs.length) return;
-  localStorage.setItem('notif_last_read', _notifs[0].ts);
-  updateNotifBadge();
-  renderNotifPanel();
+async function unsubscribeNotifs() {
+  if (!confirm('Push-meldingen uitzetten op dit apparaat?')) return;
+  try {
+    if (oneSignalReady) {
+      await OneSignal.User.PushSubscription.optOut();
+      await OneSignal.logout();
+    }
+    isSubscribed = false;
+    refreshNotifUI();
+  } catch(e) { alert('Uitzetten mislukt: ' + e.message); }
 }
 
-function startNotifPolling() {
-  loadNotifs();
-  _notifTimer = setInterval(loadNotifs, 60000);
+function sendTestNotif(who, title, body) {
+  showToast(title || '🧪 Test melding', body || 'Notificaties werken correct!', 'var(--bl)');
+  if (NOTIF_WEBHOOK_URL) {
+    fetch(NOTIF_WEBHOOK_URL, {
+      method: 'POST', mode: 'no-cors',
+      body: JSON.stringify({ event:'test', who, title, body, secret: NOTIF_WEBHOOK_SECRET })
+    }).catch(() => {});
+  }
 }
+
+// ══════════════════════════════════════
+//  ONESIGNAL INIT
+// ══════════════════════════════════════
+window.OneSignalDeferred = window.OneSignalDeferred || [];
+OneSignalDeferred.push(async function(OneSignal) {
+  try {
+    const swBase = location.pathname.replace(/\/[^/]*$/, '') || '';
+    await OneSignal.init({
+      appId: ONESIGNAL_APP_ID,
+      serviceWorkerPath: swBase + '/sw.js',
+      serviceWorkerParam: { scope: swBase + '/' },
+      notifyButton: { enable: false },
+      allowLocalhostAsSecureOrigin: true,
+    });
+    oneSignalReady = true;
+    isSubscribed   = OneSignal.User.PushSubscription.optedIn === true;
+    refreshNotifUI();
+    OneSignal.User.PushSubscription.addEventListener('change', e => {
+      isSubscribed = e.current.optedIn === true;
+      refreshNotifUI();
+    });
+  } catch(e) {
+    console.error('[Notif] OneSignal init faalde:', e);
+  }
+});
 </script>
 </body>
 </html>

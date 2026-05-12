@@ -181,6 +181,16 @@
     .prog-wrap{display:flex;align-items:center;gap:7px}
     .prog-bar{width:60px;height:5px;background:var(--bor);border-radius:3px;overflow:hidden;flex-shrink:0}
     .prog-fill{height:100%;background:var(--sec,var(--bl));border-radius:3px}
+    .off-counter{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:4px}
+    .off-lbl{font-size:12px;color:var(--mut);white-space:nowrap}
+    .off-sep{font-weight:700;font-size:16px;color:var(--mut)}
+    .off-spin{display:flex;align-items:center;gap:0}
+    .off-btn{width:28px;height:32px;border:1px solid var(--bor);background:var(--sur2);color:var(--txt);font-size:16px;cursor:pointer;line-height:1;transition:background var(--tr)}
+    .off-btn:first-child{border-radius:var(--rs) 0 0 var(--rs)}
+    .off-btn:last-child{border-radius:0 var(--rs) var(--rs) 0}
+    .off-btn:hover{background:var(--bor)}
+    .off-inp{width:46px;height:32px;border:1px solid var(--bor);border-left:none;border-right:none;text-align:center;font-size:14px;font-weight:600;background:var(--sur);color:var(--txt);-moz-appearance:textfield}
+    .off-inp::-webkit-inner-spin-button,.off-inp::-webkit-outer-spin-button{-webkit-appearance:none}
 
     /* Pagination */
     .pag{display:flex;align-items:center;justify-content:space-between;padding:11px 16px;border-top:1px solid var(--bor)}
@@ -549,7 +559,24 @@
           </div>
         </div>
         <div class="fld-row">
-          <div class="fld"><label>Ontvangen / Aangevraagd</label><input type="text" id="m-off" placeholder="bv. 1/3"/></div>
+          <div class="fld">
+            <label>Offertes ontvangen / aangevraagd</label>
+            <div class="off-counter">
+              <span class="off-lbl">Ontvangen</span>
+              <div class="off-spin">
+                <button type="button" class="off-btn" onclick="adjOff('m-off-recv',-1)">−</button>
+                <input type="number" id="m-off-recv" min="0" value="0" class="off-inp">
+                <button type="button" class="off-btn" onclick="adjOff('m-off-recv',1)">+</button>
+              </div>
+              <span class="off-sep">/</span>
+              <span class="off-lbl">Aangevraagd</span>
+              <div class="off-spin">
+                <button type="button" class="off-btn" onclick="adjOff('m-off-total',-1)">−</button>
+                <input type="number" id="m-off-total" min="0" value="0" class="off-inp">
+                <button type="button" class="off-btn" onclick="adjOff('m-off-total',1)">+</button>
+              </div>
+            </div>
+          </div>
           <div class="fld"><label>Deadline</label><input type="date" id="m-dl-o"/></div>
         </div>
         <div class="fld"><label>Opmerkingen</label><textarea id="m-opm-o"></textarea></div>
@@ -1356,7 +1383,9 @@ function fillModalFields(sec,r){
       document.getElementById('tog-ib-v').classList.toggle('on',r.inBehandeling==='TRUE');break;
     case'OFFERTE-TRAJECTEN':
       setv('m-daang',r.datumAangevraagd);setv('m-beh-o',r.behandelaar);
-      setv('m-off',r.offertes);setv('m-dl-o',r.deadline);setv('m-opm-o',r.opmerkingen);break;
+      {const[ор,от]=(r.offertes||'').split('/').map(s=>parseInt(s)||0);
+      setv('m-off-recv',ор||0);setv('m-off-total',от||0);}
+      setv('m-dl-o',r.deadline);setv('m-opm-o',r.opmerkingen);break;
     case'LOD':
       setv('m-actie-l',r.actiepunt);setv('m-stat-l',r.status);setv('m-beh-l',r.behandelaar);
       setv('m-dl-l',r.deadline);setv('m-opm-l',r.opmerkingen);
@@ -1367,6 +1396,7 @@ function setv(id,v){const el=document.getElementById(id);if(el)el.value=v||''}
 
 function clearModal(){
   document.querySelectorAll('.modal-body input,.modal-body select,.modal-body textarea').forEach(el=>{if(!el.readOnly)el.value=''});
+  ['m-off-recv','m-off-total'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='0'});
   ['tog-ib','tog-ib-v','tog-ib-l'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('on')});
 }
 
@@ -1524,8 +1554,11 @@ async function submitTask(){
       case'VERGADERVERZOEKEN':
         values=[code,naam,gv('m-per'),gv('m-agenda'),gv('m-beh-v'),gv('m-dl-v'),gv('m-opm-v'),
           document.getElementById('tog-ib-v').classList.contains('on'),false];break;
-      case'OFFERTE-TRAJECTEN':
-        values=[code,naam,gv('m-daang'),gv('m-off'),gv('m-beh-o'),gv('m-dl-o'),gv('m-opm-o'),'',false];break;
+      case'OFFERTE-TRAJECTEN':{
+        const recv=parseInt(gv('m-off-recv'))||0;
+        const total=parseInt(gv('m-off-total'))||0;
+        const offStr=total>0?`${recv}/${total}`:'';
+        values=[code,naam,gv('m-daang'),offStr,gv('m-beh-o'),gv('m-dl-o'),gv('m-opm-o'),'',false];break;}
       case'LOD':
         values=[code,naam,gv('m-actie-l'),gv('m-stat-l'),gv('m-beh-l'),gv('m-dl-l'),gv('m-opm-l'),
           document.getElementById('tog-ib-l').classList.contains('on'),false];break;
@@ -1612,6 +1645,12 @@ function persBadges(v){
 
 function ibBadge(v){
   return(v==='TRUE'||v===true)?'<span class="ib-yes">⟳ Loopt</span>':'<span class="ib-no">–</span>';
+}
+
+function adjOff(id,delta){
+  const el=document.getElementById(id);
+  if(!el)return;
+  el.value=Math.max(0,(parseInt(el.value)||0)+delta);
 }
 
 function offProg(v){

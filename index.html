@@ -1658,13 +1658,33 @@ OneSignalDeferred.push(async function(OneSignal) {
   console.log('[Notif] OneSignal SDK loaded, initializing…');
   try {
     const _swBase = location.pathname.replace(/\/[^/]*$/, '') || '';
-    await OneSignal.init({
+    // Registreer de SW zelf en geef de registratie aan OneSignal mee —
+    // dit omzeilt OneSignal's eigen padresolutie die altijd probeert
+    // OneSignalSDKWorker.js op de domein-root te zetten.
+    let swReg = null;
+    if ('serviceWorker' in navigator) {
+      try {
+        swReg = await navigator.serviceWorker.register(
+          _swBase + '/sw.js',
+          { scope: _swBase + '/' }
+        );
+        console.log('[Notif] SW geregistreerd:', swReg.scope);
+      } catch (swErr) {
+        console.warn('[Notif] SW pre-registratie mislukt:', swErr);
+      }
+    }
+    const initOpts = {
       appId: ONESIGNAL_APP_ID,
-      serviceWorkerPath: _swBase + '/sw.js',
-      serviceWorkerParam: { scope: _swBase + '/' },
       notifyButton: { enable: false },
       allowLocalhostAsSecureOrigin: true,
-    });
+    };
+    if (swReg) {
+      initOpts.serviceWorkerRegistration = swReg;
+    } else {
+      initOpts.serviceWorkerPath = _swBase + '/sw.js';
+      initOpts.serviceWorkerParam = { scope: _swBase + '/' };
+    }
+    await OneSignal.init(initOpts);
     oneSignalReady = true;
     isSubscribed = OneSignal.User.PushSubscription.optedIn === true;
     console.log('[Notif] OneSignal ready. Subscribed:', isSubscribed);

@@ -667,7 +667,7 @@ let D = {ntd:{},af:{},alvo:[],alfa:[],ntdSecInfo:{},afSecInfo:{}};
 let pgs = {ntd:1,af:1,alvo:1,alfa:1};
 let activeNtd='OPPAKKEN', activeAf='OPPAKKEN';
 let charts = {};
-let oauthToken=null, clientId='560046984985-1371r4bbt28umi6uslims6mlkucn1278.apps.googleusercontent.com';
+let oauthToken=null, oauthExpiry=0, clientId='560046984985-1371r4bbt28umi6uslims6mlkucn1278.apps.googleusercontent.com';
 let editMode=false, editRowData=null, editSec=null;
 let anaPeriod={vergader:'maand',notulen:'maand'};
 let _rowCache = [];
@@ -679,7 +679,8 @@ document.addEventListener('DOMContentLoaded',()=>{
   // Service worker registreren (PWA-ondersteuning)
   if('serviceWorker' in navigator){
     window.addEventListener('load',()=>{
-      navigator.serviceWorker.register('sw.js').catch(e=>console.warn('SW registratie mislukt:',e));
+      const _swBase=location.pathname.replace(/\/[^/]*$/,'')||'';
+      navigator.serviceWorker.register(_swBase+'/sw.js',{scope:_swBase+'/'}).catch(e=>console.warn('SW registratie mislukt:',e));
     });
   }
 
@@ -777,14 +778,14 @@ async function writeRange(range,values,method='PUT'){
   const url=`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`;
   const opts={method,headers:{Authorization:`Bearer ${oauthToken}`,'Content-Type':'application/json'},body:JSON.stringify({values:[values]})};
   const r=await fetch(url,opts);
-  if(!r.ok){const e=await r.json();throw new Error(e.error?.message||'Schrijffout')}
+  if(!r.ok){const e=await r.json();if(r.status===401){oauthToken=null;oauthExpiry=0}throw new Error(e.error?.message||'Schrijffout')}
   return r.json();
 }
 async function appendRange(range,values){
   if(!oauthToken) throw new Error('Niet ingelogd');
   const url=`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
   const r=await fetch(url,{method:'POST',headers:{Authorization:`Bearer ${oauthToken}`,'Content-Type':'application/json'},body:JSON.stringify({values:[values]})});
-  if(!r.ok){const e=await r.json();throw new Error(e.error?.message||'Schrijffout')}
+  if(!r.ok){const e=await r.json();if(r.status===401){oauthToken=null;oauthExpiry=0}throw new Error(e.error?.message||'Schrijffout')}
   return r.json();
 }
 
@@ -1407,7 +1408,7 @@ async function insertAndWriteRow(sheetName,afterRow,values){
     headers:{Authorization:`Bearer ${oauthToken}`,'Content-Type':'application/json'},
     body:JSON.stringify({requests:[{insertDimension:{range:{sheetId,dimension:'ROWS',startIndex:afterRow,endIndex:afterRow+1},inheritFromBefore:true}}]})
   });
-  if(!insResp.ok){const e=await insResp.json();throw new Error(e.error?.message||'Invoegfout')}
+  if(!insResp.ok){const e=await insResp.json();if(insResp.status===401){oauthToken=null;oauthExpiry=0}throw new Error(e.error?.message||'Invoegfout')}
   await writeRange(`'${sheetName}'!A${afterRow+1}:I${afterRow+1}`,values);
 }
 
@@ -1427,10 +1428,7 @@ async function deleteCurrentEditTask(){
 async function deleteTaskRow(r){
   const omschrijving=r.actiepunt||r.periode||r.code||'deze taak';
   if(!confirm(`Weet je zeker dat je deze taak wilt verwijderen?\n\n"${omschrijving}"`)) return;
-  if(!oauthToken){
-    await doOAuth();
-    if(!oauthToken){alert('Inloggen mislukt. Probeer het opnieuw.');return}
-  }
+  if(!await ensureToken()){alert('Inloggen mislukt. Probeer het opnieuw.');return}
   try{
     const ids=await getSheetIds();
     const sheetId=ids['Nog Te Doen'];
@@ -1440,7 +1438,7 @@ async function deleteTaskRow(r){
       headers:{Authorization:`Bearer ${oauthToken}`,'Content-Type':'application/json'},
       body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:r._row-1,endIndex:r._row}}}]})
     });
-    if(!resp.ok){const e=await resp.json();throw new Error(e.error?.message||'Verwijderfout')}
+    if(!resp.ok){const e=await resp.json();if(resp.status===401){oauthToken=null;oauthExpiry=0}throw new Error(e.error?.message||'Verwijderfout')}
     await loadAll();
   }catch(e){alert('Fout bij verwijderen: '+e.message)}
 }
@@ -1457,10 +1455,7 @@ async function completeTask(idx){
   if(!r){alert('Taak niet gevonden. Vernieuw de pagina en probeer opnieuw.');return}
   const omschrijving=r.actiepunt||r.periode||r.code||'deze taak';
   if(!confirm(`Taak afhandelen?\n\n"${omschrijving}"\n\nDe taak wordt verplaatst naar "Afgerond".`)) return;
-  if(!oauthToken){
-    await doOAuth();
-    if(!oauthToken){alert('Inloggen mislukt. Probeer het opnieuw.');return}
-  }
+  if(!await ensureToken()){alert('Inloggen mislukt. Probeer het opnieuw.');return}
   try{
     const sec=r._sec;
     const d=new Date();
@@ -1489,7 +1484,7 @@ async function completeTask(idx){
       headers:{Authorization:`Bearer ${oauthToken}`,'Content-Type':'application/json'},
       body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:r._row-1,endIndex:r._row}}}]})
     });
-    if(!resp.ok){const e=await resp.json();throw new Error(e.error?.message||'Fout bij verwijderen uit Nog Te Doen')}
+    if(!resp.ok){const e=await resp.json();if(resp.status===401){oauthToken=null;oauthExpiry=0}throw new Error(e.error?.message||'Fout bij verwijderen uit Nog Te Doen')}
     await loadAll();
   }catch(e){alert('Fout bij afhandelen: '+e.message)}
 }
@@ -1498,10 +1493,7 @@ async function completeTask(idx){
 //  SUBMIT TASK (Add + Edit)
 // ══════════════════════════════════════
 async function submitTask(){
-  if(!oauthToken){
-    await doOAuth();
-    if(!oauthToken){alert('Inloggen mislukt. Probeer het opnieuw.');return}
-  }
+  if(!await ensureToken()){alert('Inloggen mislukt. Probeer het opnieuw.');return}
   const code=document.getElementById('m-code').value.trim();
   const naam=document.getElementById('m-naam').value.trim();
   if(!code){alert('VvE Code is verplicht.');return}
@@ -1541,7 +1533,13 @@ async function submitTask(){
 
     closeModal();clearModal();
     await loadAll();
-  }catch(e){alert('Fout: '+e.message)}
+  }catch(e){
+    const msg=(e.message||'').toLowerCase();
+    if(msg.includes('invalid authentication')||msg.includes('unauthenticated')||msg.includes('unauthorized')){
+      oauthToken=null;oauthExpiry=0;
+      alert('Je sessie is verlopen. Klik nogmaals op Opslaan om opnieuw in te loggen.');
+    }else{alert('Fout: '+e.message)}
+  }
 }
 function gv(id){const el=document.getElementById(id);return el?el.value.trim():''}
 
@@ -1555,10 +1553,22 @@ function doOAuth(){
       google.accounts.oauth2.initTokenClient({
         client_id:clientId,
         scope:'https://www.googleapis.com/auth/spreadsheets',
-        callback:resp=>{oauthToken=resp.access_token;resolve(oauthToken)}
+        callback:resp=>{
+          if(resp.error){console.warn('OAuth fout:',resp.error);oauthToken=null;oauthExpiry=0;resolve(null);return}
+          oauthToken=resp.access_token;
+          oauthExpiry=Date.now()+((resp.expires_in||3600)-120)*1000;
+          resolve(oauthToken);
+        }
       }).requestAccessToken();
     }catch(e){console.error('OAuth:',e);resolve(null)}
   });
+}
+
+async function ensureToken(){
+  if(oauthToken && Date.now()<oauthExpiry) return true;
+  oauthToken=null; oauthExpiry=0;
+  await doOAuth();
+  return !!oauthToken;
 }
 
 // ══════════════════════════════════════
@@ -1626,11 +1636,11 @@ async function fireNotifEvent(event, payload) {
       actor: localStorage.getItem('notif_who') || '',
       secret: NOTIF_WEBHOOK_SECRET
     });
-    // no-cors fetch: Apps Script geeft geen CORS-headers, antwoord boeit ons niet
+    // no-cors fetch: in no-cors modus is application/json niet toegestaan als Content-Type,
+    // dus geen header meesturen — Apps Script leest de body via e.postData.contents ongeacht type.
     await fetch(NOTIF_WEBHOOK_URL, {
       method: 'POST',
       mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
   } catch (e) { console.warn('Notif webhook faalde:', e); }
@@ -1647,10 +1657,11 @@ window.OneSignalDeferred = window.OneSignalDeferred || [];
 OneSignalDeferred.push(async function(OneSignal) {
   console.log('[Notif] OneSignal SDK loaded, initializing…');
   try {
+    const _swBase = location.pathname.replace(/\/[^/]*$/, '') || '';
     await OneSignal.init({
       appId: ONESIGNAL_APP_ID,
-      serviceWorkerPath: 'sw.js',
-      serviceWorkerParam: { scope: './' },
+      serviceWorkerPath: _swBase + '/sw.js',
+      serviceWorkerParam: { scope: _swBase + '/' },
       notifyButton: { enable: false },
       allowLocalhostAsSecureOrigin: true,
     });
@@ -1666,7 +1677,6 @@ OneSignalDeferred.push(async function(OneSignal) {
     });
   } catch(e) {
     console.error('[Notif] OneSignal init faalde:', e);
-    alert('OneSignal kon niet initialiseren: ' + (e && e.message ? e.message : e) + '\n\nVeel voorkomende oorzaak: Site URL in OneSignal-dashboard komt niet overeen met:\nhttps://vvebeheercollectief.github.io/Collectief-Dashboard/');
   }
 });
 

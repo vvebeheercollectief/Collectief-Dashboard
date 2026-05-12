@@ -631,6 +631,10 @@ const SID  = '1fnUsbwb4nDMNttWym9FWBw1CMMMAVTuZ3v88b35isUw';
 const AKEY = 'AIzaSyBo-Tf8o6L_VQoB29vv7L1q3NATIAgJc9E';
 const PG   = 25;
 const ONESIGNAL_APP_ID = 'c0e1301b-2cee-4646-8fab-99698e10e78c';
+// Webhook URL van het Apps Script (deploy via Apps Script → Deploy → Web app)
+// Wordt straks ingevuld zodra het web app is gedeployed:
+const NOTIF_WEBHOOK_URL = '';
+const NOTIF_WEBHOOK_SECRET = ''; // optioneel, voor extra security
 
 const SECS = {
   OPPAKKEN:{label:'Oppakken',css:'--sec:var(--bl);--sec-l:var(--bl-l);--sec-b:var(--bl-b)',color:'#2563eb',
@@ -1523,9 +1527,17 @@ async function submitTask(){
 
     if(editMode&&editRowData?._row){
       await writeRange(`'Nog Te Doen'!A${editRowData._row}:I${editRowData._row}`,values);
+      // Check of behandelaar veranderd is → meld toewijzing
+      const newBeh = (sec==='OPPAKKEN'?gv('m-beh'):sec==='VERGADERVERZOEKEN'?gv('m-beh-v'):sec==='OFFERTE-TRAJECTEN'?gv('m-beh-o'):gv('m-beh-l'));
+      if (newBeh && newBeh !== (editRowData.behandelaar||'')) {
+        fireNotifEvent('assigned', { sec, code, naam, behandelaar: newBeh });
+      }
     } else {
       const afterRow=getInsertRow(sec);
       await insertAndWriteRow('Nog Te Doen',afterRow,values);
+      // Nieuwe taak — vuur webhook af
+      const newBeh = (sec==='OPPAKKEN'?gv('m-beh'):sec==='VERGADERVERZOEKEN'?gv('m-beh-v'):sec==='OFFERTE-TRAJECTEN'?gv('m-beh-o'):gv('m-beh-l'));
+      fireNotifEvent('newtask', { sec, code, naam, behandelaar: newBeh });
     }
 
     closeModal();clearModal();
@@ -1602,6 +1614,27 @@ function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace
 function setupSearch(id,cb){
   const el=document.getElementById(id);if(!el)return;
   let t;el.addEventListener('input',()=>{clearTimeout(t);t=setTimeout(cb,200)});
+}
+
+// ══════════════════════════════════════
+//  NOTIF WEBHOOK — vuurt notificatie-event af naar Apps Script
+// ══════════════════════════════════════
+async function fireNotifEvent(event, payload) {
+  if (!NOTIF_WEBHOOK_URL) return; // niet geconfigureerd: stille no-op
+  try {
+    const body = Object.assign({}, payload || {}, {
+      event,
+      actor: localStorage.getItem('notif_who') || '',
+      secret: NOTIF_WEBHOOK_SECRET
+    });
+    // no-cors fetch: Apps Script geeft geen CORS-headers, antwoord boeit ons niet
+    await fetch(NOTIF_WEBHOOK_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+  } catch (e) { console.warn('Notif webhook faalde:', e); }
 }
 
 // ══════════════════════════════════════

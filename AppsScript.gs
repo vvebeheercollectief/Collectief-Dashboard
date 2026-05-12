@@ -351,6 +351,76 @@ function cd_sendNotification(p) {
 }
 
 // ════════════════════════════════════════════════════════════
+//  WEBHOOK — wordt aangeroepen vanuit het dashboard
+//  (omdat API-edits geen onEdit-trigger vuren in Apps Script)
+// ════════════════════════════════════════════════════════════
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const secret = PropertiesService.getScriptProperties().getProperty('CD_WEBHOOK_SECRET');
+    if (secret && data.secret !== secret) {
+      return ContentService.createTextOutput(JSON.stringify({error:'forbidden'})).setMimeType(ContentService.MimeType.JSON);
+    }
+    const ev = data.event;
+    const code = (data.code || '').toString();
+    const naam = (data.naam || '').toString();
+    const beh  = (data.behandelaar || '').toString();
+    const sec  = (data.sec || '').toString();
+    const actor = (data.actor || '').toString(); // wie heeft de actie uitgevoerd
+
+    if (ev === 'newtask') {
+      cd_notifyByTag('n_newtask', '1', {
+        title: '📋 Nieuwe taak — ' + sec.toLowerCase(),
+        body: code + (naam ? ' · ' + naam : '') + (beh ? ' → ' + beh : ''),
+        url: APP_URL, dedupKey: 'new-' + code + '-' + Date.now()
+      });
+      if (beh) {
+        cd_splitBehandelaar(beh).forEach(name => {
+          if (name && name !== actor) {
+            cd_notifyByExternalId(name, 'n_assigned', '1', {
+              title: '➕ Toegewezen aan jou',
+              body: code + (naam ? ' · ' + naam : ''),
+              url: APP_URL, dedupKey: 'assign-' + code + '-' + name + '-' + Date.now()
+            });
+          }
+        });
+      }
+    } else if (ev === 'assigned') {
+      if (beh) {
+        cd_splitBehandelaar(beh).forEach(name => {
+          if (name && name !== actor) {
+            cd_notifyByExternalId(name, 'n_assigned', '1', {
+              title: '➕ Toegewezen aan jou',
+              body: code + (naam ? ' · ' + naam : ''),
+              url: APP_URL, dedupKey: 'reassign-' + code + '-' + name + '-' + Date.now()
+            });
+          }
+        });
+      }
+    } else if (ev === 'completed') {
+      // Niet pushen, alleen loggen — taakafronding levert geen notificatie
+    } else if (ev === 'alv_update') {
+      cd_notifyByTag('n_alv', '1', {
+        title: data.title || '🏢 ALV-status verandert',
+        body: code + (naam ? ' · ' + naam : ''),
+        url: APP_URL, dedupKey: 'alv-' + code + '-' + Date.now()
+      });
+    } else if (ev === 'ping') {
+      // Healthcheck
+      return ContentService.createTextOutput(JSON.stringify({pong: true})).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({ok:true,event:ev})).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({error: String(err)})).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function doGet(e) {
+  return ContentService.createTextOutput('Collectief Dashboard webhook. Use POST.').setMimeType(ContentService.MimeType.TEXT);
+}
+
+// ════════════════════════════════════════════════════════════
 //  TEST FUNCTIES — kun je los runnen vanuit Apps Script editor
 // ════════════════════════════════════════════════════════════
 function cd_testPushToAll() {

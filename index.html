@@ -19,6 +19,21 @@
   <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <!-- Onderschep OneSignal's SW-registratie vóór de SDK laadt en stuur naar het juiste subpad -->
+  <script>
+  (function(){
+    if(!('serviceWorker' in navigator)) return;
+    var _orig = navigator.serviceWorker.register.bind(navigator.serviceWorker);
+    navigator.serviceWorker.register = function(scriptURL, options){
+      if(typeof scriptURL === 'string' && scriptURL.toLowerCase().includes('onesignal')){
+        var base = location.pathname.replace(/\/[^/]*$/,'') || '';
+        console.log('[SW-intercept] OneSignal SW omgeleid naar', base+'/sw.js');
+        return _orig(base+'/sw.js', {scope: base+'/'});
+      }
+      return _orig(scriptURL, options);
+    };
+  })();
+  </script>
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
   <style>

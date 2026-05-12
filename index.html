@@ -674,7 +674,7 @@ const ONESIGNAL_APP_ID     = 'c0e1301b-2cee-4646-8fab-99698e10e78c';
 
 let oneSignalReady  = false;
 let isSubscribed    = false;
-let _lastNotifTs    = '';
+let _lastNotifTs    = new Date().toISOString();
 let _notifPollTimer = null;
 let _shownToasts    = new Set();
 
@@ -1740,11 +1740,15 @@ function showToast(title, msg, color) {
   const container = document.getElementById('toast-container');
   container.appendChild(el);
 
-  // Systeemmelding als push-toestemming is verleend
-  if ('Notification' in window && Notification.permission === 'granted' && document.hidden) {
-    navigator.serviceWorker.ready.then(reg => reg.showNotification(title, {
-      body: msg, icon: 'icon-192.png', badge: 'icon-192.png', tag: 'cd-' + Date.now()
-    })).catch(() => {});
+  // Systeemmelding wanneer pagina niet in focus (ander venster of tabblad)
+  if ('Notification' in window && Notification.permission === 'granted' && !document.hasFocus()) {
+    try {
+      new Notification(title, { body: msg, icon: 'icon-192.png', badge: 'icon-192.png', tag: 'cd-' + Date.now() });
+    } catch(e) {
+      navigator.serviceWorker?.ready.then(reg => reg.showNotification(title, {
+        body: msg, icon: 'icon-192.png', badge: 'icon-192.png', tag: 'cd-' + Date.now()
+      })).catch(() => {});
+    }
   }
 
   setTimeout(() => dismissToast(el), TOAST_DURATION);
@@ -1780,9 +1784,6 @@ async function pollNotifsForToast() {
       .filter(n => n.ts && n.title);
     if (!rows.length) return;
 
-    // Eerste keer: sla huidige stand op zonder toasts te tonen
-    if (!_lastNotifTs) { _lastNotifTs = rows[0].ts; return; }
-
     const who   = getCurrentWho();
     const prefs = getNotifPrefs();
     const typeToPrefs = { n_newtask:'newtask', n_assigned:'assigned', n_deadline:'deadline', n_alv:'alv', n_daily:'daily' };
@@ -1801,6 +1802,10 @@ async function pollNotifsForToast() {
 function startNotifPoll() {
   pollNotifsForToast();
   _notifPollTimer = setInterval(pollNotifsForToast, 15000);
+  // Poll direct bij terugkeer naar het tabblad (browser throttelt timers in achtergrond)
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) pollNotifsForToast();
+  });
 }
 
 // ══════════════════════════════════════

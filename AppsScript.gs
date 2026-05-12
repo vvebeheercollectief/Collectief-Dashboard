@@ -1,5 +1,5 @@
 /****************************************************************
- *  Collectief Dashboard — Push Notifications via ntfy.sh       *
+ *  Collectief Dashboard — In-app meldingen via Sheets           *
  *  ----------------------------------------------------------- *
  *  Triggers:                                                   *
  *   - onEdit:   nieuwe taak / toewijzing / ALV-status          *
@@ -8,19 +8,14 @@
  *                                                              *
  *  Eénmalige setup:                                            *
  *   1. Run: setupNotificationTriggers()  (van de menubalk)     *
- *   2. Geen API-keys nodig — ntfy.sh is gratis en open         *
+ *   2. Geen API-keys nodig — meldingen staan in de spreadsheet *
  ****************************************************************/
 
 const NTD_SHEET   = 'Nog Te Doen';
 const ALVO_SHEET  = "ALV's overzicht";
 
-// ntfy.sh topics — moeten overeenkomen met de topics in index.html
-const NTFY_TOPICS = {
-  algemeen: 'vvbc-cd-alg-9q7z',
-  Jer:      'vvbc-cd-jer-9q7z',
-  Cihad:    'vvbc-cd-chd-9q7z',
-  Gabos:    'vvbc-cd-gbs-9q7z',
-};
+const MELDING_SHEET = 'Meldingen';
+const MELDING_MAX   = 200;
 
 const APP_URL = 'https://vvebeheercollectief.github.io/Collectief-Dashboard/';
 const ICON_URL = APP_URL + 'icon-192.png';
@@ -295,47 +290,31 @@ function cd_parseDate(v) {
 }
 
 // ════════════════════════════════════════════════════════════
-//  NTFY.SH API
+//  IN-APP MELDINGEN — schrijf naar 'Meldingen' sheet
 // ════════════════════════════════════════════════════════════
 
-// Stuur naar het algemene topic (iedereen)
-function cd_notifyAlgemeen(opts) {
-  cd_ntfySend(NTFY_TOPICS.algemeen, opts.title, opts.body, opts.url);
-}
-
-// Stuur naar het persoonlijke topic van één behandelaar
-function cd_notifyPersoon(naam, opts) {
-  const topic = NTFY_TOPICS[naam];
-  if (!topic) { Logger.log('Geen ntfy topic voor: ' + naam); return; }
-  cd_ntfySend(topic, opts.title, opts.body, opts.url);
-}
-
-// Stuur naar meerdere behandelaars
-function cd_notifyByExternalId(naam, tagKey, tagValue, opts) {
-  cd_notifyPersoon(naam, opts);
-}
-
-// Stuur naar het algemene topic (vervangt de tag-filter aanpak)
-function cd_notifyByTag(tagKey, tagValue, opts) {
-  cd_notifyAlgemeen(opts);
-}
-
-function cd_ntfySend(topic, title, body, url) {
+function cd_schrijfMelding(type, titel, inhoud, voor) {
   try {
-    UrlFetchApp.fetch('https://ntfy.sh/' + topic, {
-      method: 'post',
-      headers: {
-        'Title':   title || '',
-        'Click':   url || APP_URL,
-        'Icon':    ICON_URL,
-        'Content-Type': 'text/plain',
-      },
-      payload: body || '',
-      muteHttpExceptions: true,
-    });
-  } catch(e) {
-    Logger.log('ntfy send faalde (' + topic + '): ' + e);
-  }
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName(MELDING_SHEET);
+    if (!sheet) {
+      sheet = ss.insertSheet(MELDING_SHEET);
+      sheet.appendRow(['Timestamp','Type','Titel','Inhoud','Voor']);
+      sheet.setFrozenRows(1);
+    }
+    sheet.appendRow([new Date().toISOString(), type || 'algemeen', titel || '', inhoud || '', voor || 'allen']);
+    // Houd max MELDING_MAX rijen bij (excl. header)
+    const last = sheet.getLastRow();
+    if (last > MELDING_MAX + 1) sheet.deleteRows(2, last - MELDING_MAX - 1);
+  } catch(e) { Logger.log('cd_schrijfMelding fout: ' + e); }
+}
+
+function cd_notifyByTag(tagKey, tagValue, opts) {
+  cd_schrijfMelding(opts.type || tagKey, opts.title, opts.body, 'allen');
+}
+
+function cd_notifyByExternalId(naam, tagKey, tagValue, opts) {
+  cd_schrijfMelding(opts.type || tagKey, opts.title, opts.body, naam);
 }
 
 // ════════════════════════════════════════════════════════════
@@ -397,10 +376,7 @@ function doPost(e) {
       const who   = (data.who   || '').toString();
       const title = (data.title || '🔔 Test melding').toString();
       const body  = (data.body  || 'Notificaties werken correct!').toString();
-      if (who && NTFY_TOPICS[who]) {
-        cd_ntfySend(NTFY_TOPICS[who], title, body, APP_URL);
-      }
-      cd_ntfySend(NTFY_TOPICS.algemeen, title, body, APP_URL);
+      cd_schrijfMelding('test', title, body, who || 'allen');
     } else if (ev === 'ping') {
       // Healthcheck
       return ContentService.createTextOutput(JSON.stringify({pong: true})).setMimeType(ContentService.MimeType.JSON);

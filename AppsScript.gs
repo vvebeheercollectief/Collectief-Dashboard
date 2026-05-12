@@ -1,26 +1,26 @@
 /****************************************************************
- *  Collectief Dashboard — Push Notifications via OneSignal     *
+ *  Collectief Dashboard — Push Notifications via ntfy.sh       *
  *  ----------------------------------------------------------- *
  *  Triggers:                                                   *
  *   - onEdit:   nieuwe taak / toewijzing / ALV-status          *
- *   - hourly:   deadline-checks (op basis van voorkeur uren)   *
+ *   - hourly:   deadline-checks                                *
  *   - 08:30:    dagelijkse samenvatting per behandelaar        *
  *                                                              *
  *  Eénmalige setup:                                            *
- *   1. Vul je OneSignal REST API key in via Script Properties: *
- *      Extensions → Apps Script → ⚙ Project Settings →         *
- *      Script Properties → Add: ONESIGNAL_REST_API_KEY = ...   *
- *   2. Run: setupNotificationTriggers()  (van de menubalk)     *
- *                                                              *
- *  VEILIG NAAST BESTAANDE CODE:                                *
- *   - Alle functienamen hebben prefix om conflicten te         *
- *     voorkomen (bv. cd_onEditChange ipv onEdit)               *
- *   - Trigger-setup raakt ALLEEN onze eigen triggers aan       *
+ *   1. Run: setupNotificationTriggers()  (van de menubalk)     *
+ *   2. Geen API-keys nodig — ntfy.sh is gratis en open         *
  ****************************************************************/
 
-const ONESIGNAL_APP_ID = 'c0e1301b-2cee-4646-8fab-99698e10e78c';
 const NTD_SHEET   = 'Nog Te Doen';
 const ALVO_SHEET  = "ALV's overzicht";
+
+// ntfy.sh topics — moeten overeenkomen met de topics in index.html
+const NTFY_TOPICS = {
+  algemeen: 'vvbc-cd-alg-9q7z',
+  Jer:      'vvbc-cd-jer-9q7z',
+  Cihad:    'vvbc-cd-chd-9q7z',
+  Gabos:    'vvbc-cd-gbs-9q7z',
+};
 
 const APP_URL = 'https://vvebeheercollectief.github.io/Collectief-Dashboard/';
 const ICON_URL = APP_URL + 'icon-192.png';
@@ -295,62 +295,46 @@ function cd_parseDate(v) {
 }
 
 // ════════════════════════════════════════════════════════════
-//  ONESIGNAL API
+//  NTFY.SH API
 // ════════════════════════════════════════════════════════════
-function cd_getApiKey() {
-  const k = PropertiesService.getScriptProperties().getProperty('ONESIGNAL_REST_API_KEY');
-  if (!k) throw new Error('ONESIGNAL_REST_API_KEY ontbreekt in Script Properties.');
-  return k;
+
+// Stuur naar het algemene topic (iedereen)
+function cd_notifyAlgemeen(opts) {
+  cd_ntfySend(NTFY_TOPICS.algemeen, opts.title, opts.body, opts.url);
 }
 
+// Stuur naar het persoonlijke topic van één behandelaar
+function cd_notifyPersoon(naam, opts) {
+  const topic = NTFY_TOPICS[naam];
+  if (!topic) { Logger.log('Geen ntfy topic voor: ' + naam); return; }
+  cd_ntfySend(topic, opts.title, opts.body, opts.url);
+}
+
+// Stuur naar meerdere behandelaars
+function cd_notifyByExternalId(naam, tagKey, tagValue, opts) {
+  cd_notifyPersoon(naam, opts);
+}
+
+// Stuur naar het algemene topic (vervangt de tag-filter aanpak)
 function cd_notifyByTag(tagKey, tagValue, opts) {
-  return cd_sendNotification({
-    filters: [{ field: 'tag', key: tagKey, relation: '=', value: tagValue }],
-    title: opts.title, body: opts.body, url: opts.url, dedupKey: opts.dedupKey
-  });
+  cd_notifyAlgemeen(opts);
 }
 
-function cd_notifyByExternalId(extId, tagKey, tagValue, opts) {
-  // External ID + tag-filter: stuur naar Jer EN met deze voorkeur aan
-  return cd_sendNotification({
-    filters: [
-      { field: 'tag', key: 'behandelaar', relation: '=', value: extId },
-      { operator: 'AND' },
-      { field: 'tag', key: tagKey, relation: '=', value: tagValue }
-    ],
-    title: opts.title, body: opts.body, url: opts.url, dedupKey: opts.dedupKey
-  });
-}
-
-function cd_sendNotification(p) {
-  const payload = {
-    app_id: ONESIGNAL_APP_ID,
-    headings: { en: p.title, nl: p.title },
-    contents: { en: p.body, nl: p.body },
-    chrome_web_icon: ICON_URL,
-    chrome_web_badge: ICON_URL,
-    url: p.url || APP_URL,
-  };
-  if (p.included_segments) {
-    payload.included_segments = p.included_segments;
-  } else {
-    payload.filters = p.filters;
-  }
-  if (p.dedupKey) payload.web_push_topic = p.dedupKey;
-
+function cd_ntfySend(topic, title, body, url) {
   try {
-    const resp = UrlFetchApp.fetch('https://api.onesignal.com/notifications', {
+    UrlFetchApp.fetch('https://ntfy.sh/' + topic, {
       method: 'post',
-      contentType: 'application/json',
-      headers: { 'Authorization': 'Key ' + cd_getApiKey() },
-      payload: JSON.stringify(payload),
+      headers: {
+        'Title':   title || '',
+        'Click':   url || APP_URL,
+        'Icon':    ICON_URL,
+        'Content-Type': 'text/plain',
+      },
+      payload: body || '',
       muteHttpExceptions: true,
     });
-    const code = resp.getResponseCode();
-    if (code >= 300) Logger.log('OneSignal error ' + code + ': ' + resp.getContentText());
-    return JSON.parse(resp.getContentText());
   } catch(e) {
-    Logger.log('OneSignal call faalde: ' + e);
+    Logger.log('ntfy send faalde (' + topic + '): ' + e);
   }
 }
 
@@ -410,21 +394,13 @@ function doPost(e) {
         url: APP_URL, dedupKey: 'alv-' + code + '-' + Date.now()
       });
     } else if (ev === 'test') {
-      const who = (data.who || '').toString();
+      const who   = (data.who   || '').toString();
       const title = (data.title || '🔔 Test melding').toString();
       const body  = (data.body  || 'Notificaties werken correct!').toString();
-      // Stuur naar specifieke gebruiker als wie bekend is, anders naar iedereen
-      if (who) {
-        cd_sendNotification({
-          filters: [{ field: 'tag', key: 'behandelaar', relation: '=', value: who }],
-          title: title, body: body, url: APP_URL
-        });
-      } else {
-        cd_sendNotification({
-          included_segments: ['All'],
-          title: title, body: body, url: APP_URL
-        });
+      if (who && NTFY_TOPICS[who]) {
+        cd_ntfySend(NTFY_TOPICS[who], title, body, APP_URL);
       }
+      cd_ntfySend(NTFY_TOPICS.algemeen, title, body, APP_URL);
     } else if (ev === 'ping') {
       // Healthcheck
       return ContentService.createTextOutput(JSON.stringify({pong: true})).setMimeType(ContentService.MimeType.JSON);

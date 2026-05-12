@@ -325,13 +325,17 @@ function cd_notifyByExternalId(extId, tagKey, tagValue, opts) {
 function cd_sendNotification(p) {
   const payload = {
     app_id: ONESIGNAL_APP_ID,
-    filters: p.filters,
     headings: { en: p.title, nl: p.title },
     contents: { en: p.body, nl: p.body },
     chrome_web_icon: ICON_URL,
     chrome_web_badge: ICON_URL,
     url: p.url || APP_URL,
   };
+  if (p.included_segments) {
+    payload.included_segments = p.included_segments;
+  } else {
+    payload.filters = p.filters;
+  }
   if (p.dedupKey) payload.web_push_topic = p.dedupKey;
 
   try {
@@ -405,6 +409,22 @@ function doPost(e) {
         body: code + (naam ? ' · ' + naam : ''),
         url: APP_URL, dedupKey: 'alv-' + code + '-' + Date.now()
       });
+    } else if (ev === 'test') {
+      const who = (data.who || '').toString();
+      const title = (data.title || '🔔 Test melding').toString();
+      const body  = (data.body  || 'Notificaties werken correct!').toString();
+      // Stuur naar specifieke gebruiker als wie bekend is, anders naar iedereen
+      if (who) {
+        cd_sendNotification({
+          filters: [{ field: 'tag', key: 'behandelaar', relation: '=', value: who }],
+          title: title, body: body, url: APP_URL
+        });
+      } else {
+        cd_sendNotification({
+          included_segments: ['All'],
+          title: title, body: body, url: APP_URL
+        });
+      }
     } else if (ev === 'ping') {
       // Healthcheck
       return ContentService.createTextOutput(JSON.stringify({pong: true})).setMimeType(ContentService.MimeType.JSON);

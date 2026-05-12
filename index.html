@@ -1804,8 +1804,8 @@ async function subscribeNotifs() {
     });
     if (!localStorage.getItem('notif_deadline_hours')) localStorage.setItem('notif_deadline_hours', '1');
     localStorage.setItem('notif_who', who);
+    isSubscribed = true; // zet vóór saveNotifPrefs zodat tags worden gestuurd
     await saveNotifPrefs(true);
-    isSubscribed = true;
     refreshNotifUI();
     // Welkomstmelding
     await sendTestNotif(who, 'Notificaties zijn aan! 🔔', 'Je ontvangt voortaan meldingen op dit apparaat.');
@@ -1851,18 +1851,15 @@ async function saveNotifPrefs(forceInit) {
   }
 }
 
-// Test-melding versturen via OneSignal (lokale notificatie, niet via server)
+// Test-melding versturen via Apps Script → OneSignal (echte push-keten)
 async function sendTestNotif(who, title, body) {
   try {
-    if ('Notification' in window && Notification.permission === 'granted') {
-      const reg = await navigator.serviceWorker.ready;
-      reg.showNotification(title || 'Test melding', {
-        body: body || 'Dit is een test van het Collectief Dashboard.',
-        icon: 'icon-192.png',
-        badge: 'icon-192.png',
-        tag: 'cd-test'
-      });
-    }
+    await fireNotifEvent('test', {
+      who: who || getCurrentWho(),
+      title: title || '🔔 Test melding',
+      body: body || 'Notificaties werken correct op dit apparaat!'
+    });
+    console.log('[Notif] Test-melding verstuurd via Apps Script.');
   } catch(e) { console.warn('Test melding faalde:', e); }
 }
 

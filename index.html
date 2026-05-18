@@ -180,6 +180,8 @@
     @keyframes toast-in{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:translateX(0)}}
     @keyframes toast-out{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(24px)}}
     @keyframes toast-bar{from{width:100%}to{width:0%}}
+    .toast-undo{background:var(--gn);color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:12px;font-weight:700;cursor:pointer;margin-top:4px;transition:filter var(--tr)}
+    .toast-undo:hover{filter:brightness(1.15)}
 
     /* Pagination */
     .pag{display:flex;align-items:center;justify-content:space-between;padding:11px 16px;border-top:1px solid var(--bor)}
@@ -277,16 +279,21 @@
     </div>
     <div class="ni" data-page="af">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
-      Afgerond<span class="ni-badge" id="b-af">–</span>
+      Afgerond
     </div>
     <div class="sb-lbl">ALV's</div>
     <div class="ni" data-page="alvo">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
-      ALV's Overzicht<span class="ni-badge" id="b-alvo">–</span>
+      ALV's Overzicht
     </div>
     <div class="ni" data-page="alfa">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-      ALV's Afgerond<span class="ni-badge" id="b-alfa">–</span>
+      ALV's Afgerond
+    </div>
+    <div class="sb-lbl">Intern</div>
+    <div class="ni" data-page="ontw">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+      Ontwikkeling
     </div>
     <div class="sb-lbl">Analyse</div>
     <div class="ni" data-page="analytics">
@@ -424,6 +431,60 @@
       </div>
     </div>
 
+    <!-- ══ ONTWIKKELING ══ -->
+    <div class="page" id="page-ontw">
+      <div class="card">
+        <div class="card-hdr" style="--sec:var(--pk);--sec-l:var(--pk-l);--sec-b:var(--pk-b)">
+          <h3 id="ontw-title">Ontwikkeling</h3>
+          <div class="tab-row" id="ontw-tabs"></div>
+          <div class="filter-row">
+            <input type="text" class="search" id="s-ontw" placeholder="Zoeken…"/>
+            <button class="btn btn-pri btn-sm" id="btn-add-ontw" style="background:var(--pk)">+ Nieuw item</button>
+          </div>
+        </div>
+        <div class="tbl-wrap">
+          <table><thead id="ontw-thead"></thead><tbody id="ontw-tbody"></tbody></table>
+        </div>
+        <div class="pag" id="ontw-pag"></div>
+      </div>
+    </div>
+
+    <!-- ══ ONTWIKKELING MODAL ══ -->
+    <div class="modal-bg" id="ontw-modal-bg">
+      <div class="modal" style="max-width:500px">
+        <div class="modal-hdr" style="--sec:var(--pk)">
+          <h2 id="ontw-m-title">Nieuw item</h2>
+          <button class="modal-close" id="ontw-m-close">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="fld"><label>Titel *</label><input type="text" id="ontw-m-titel" placeholder="Korte omschrijving"/></div>
+          <div class="fld"><label>Categorie *</label>
+            <select id="ontw-m-cat">
+              <option value="">Selecteer…</option>
+              <option>Opmerkingen</option>
+              <option>Verbeteringen</option>
+              <option>Vragen aan Cihan</option>
+              <option>Ideeën</option>
+            </select>
+          </div>
+          <div class="fld"><label>Inhoud</label><textarea id="ontw-m-inhoud" rows="4" placeholder="Details…"></textarea></div>
+          <div class="fld"><label>Status</label>
+            <select id="ontw-m-status">
+              <option value="Open">Open</option>
+              <option value="Afgerond">Afgerond</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-ft">
+          <button class="btn btn-sec" id="ontw-m-cancel">Annuleren</button>
+          <button class="btn btn-del" id="ontw-m-del" style="display:none">🗑️ Verwijder</button>
+          <button class="btn btn-pri" id="ontw-m-submit" style="background:var(--pk)">
+            <span id="ontw-m-submit-lbl">Toevoegen</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- ══ ANALYTICS ══ -->
     <div class="page" id="page-analytics">
       <div class="stats-grid" id="ana-stats"></div>
@@ -520,6 +581,7 @@
           </div>
           <div class="fld"><label>Opmerkingen</label><input type="text" id="m-opm"/></div>
         </div>
+        <div class="fld"><label>Subcategorie</label><input type="text" id="m-sub-opp" placeholder="Optioneel"/></div>
         <div class="toggle-row"><div class="tog" id="tog-ib" onclick="this.classList.toggle('on')"></div><span>In behandeling</span></div>
       </div>
 
@@ -536,6 +598,7 @@
           <div class="fld"><label>Deadline uitschrijven</label><input type="date" id="m-dl-v"/></div>
           <div class="fld"><label>Opmerkingen</label><input type="text" id="m-opm-v"/></div>
         </div>
+        <div class="fld"><label>Subcategorie</label><input type="text" id="m-sub-verg" placeholder="Optioneel"/></div>
         <div class="toggle-row"><div class="tog" id="tog-ib-v" onclick="this.classList.toggle('on')"></div><span>In behandeling</span></div>
       </div>
 
@@ -569,6 +632,7 @@
           <div class="fld"><label>Deadline</label><input type="date" id="m-dl-o"/></div>
         </div>
         <div class="fld"><label>Opmerkingen</label><textarea id="m-opm-o"></textarea></div>
+        <div class="fld"><label>Subcategorie</label><input type="text" id="m-sub-off" placeholder="Optioneel"/></div>
       </div>
 
       <!-- LOD -->
@@ -584,6 +648,7 @@
           <div class="fld"><label>Deadline LOD</label><input type="date" id="m-dl-l"/></div>
           <div class="fld"><label>Opmerkingen</label><input type="text" id="m-opm-l"/></div>
         </div>
+        <div class="fld"><label>Subcategorie</label><input type="text" id="m-sub-lod" placeholder="Optioneel"/></div>
         <div class="toggle-row"><div class="tog" id="tog-ib-l" onclick="this.classList.toggle('on')"></div><span>In behandeling</span></div>
       </div>
     </div>
@@ -599,6 +664,24 @@
 </div>
 
 <!-- ═══════ TOAST CONTAINER ═══════ -->
+<!-- ═══════ AFGEROND MODAL ═══════ -->
+<div class="modal-bg" id="complete-bg">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-hdr" style="--sec:var(--gn)">
+      <h2 id="complete-title">Taak afhandelen</h2>
+      <button class="modal-close" id="complete-close">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="fld"><label>Afgerond op</label><input type="date" id="complete-date"/></div>
+      <div class="fld"><label>Opmerking</label><textarea id="complete-comment" rows="3" placeholder="Optioneel — wat is er gedaan?"></textarea></div>
+    </div>
+    <div class="modal-ft">
+      <button class="btn btn-sec" id="complete-cancel">Annuleren</button>
+      <button class="btn btn-pri" id="complete-confirm" style="background:var(--gn)">✓ Afhandelen</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast-container"></div>
 
 <!-- ═══════ NOTIFICATIE INSTELLINGEN ═══════ -->
@@ -699,6 +782,7 @@ const PAGE_META = {
   af:['Afgerond','Afgeronde taken per categorie'],
   alvo:["ALV's Overzicht","Voortgang vergaderingen per VvE"],
   alfa:["ALV's Afgerond","Afgeronde jaarvergaderingen"],
+  ontw:['Ontwikkeling','Interne notities, verbeteringen en ideeën'],
   analytics:['Analytics','Statistieken en grafieken'],
   dash:['Dashboard','Totaaloverzicht'],
 };
@@ -706,14 +790,16 @@ const PAGE_META = {
 // ══════════════════════════════════════
 //  STATE
 // ══════════════════════════════════════
-let D = {ntd:{},af:{},alvo:[],alfa:[],ntdSecInfo:{},afSecInfo:{}};
-let pgs = {ntd:1,af:1,alvo:1,alfa:1};
+let D = {ntd:{},af:{},alvo:[],alfa:[],ontw:[],ntdSecInfo:{},afSecInfo:{}};
+let pgs = {ntd:1,af:1,alvo:1,alfa:1,ontw:1};
+let activeOntw='Alles';
 let activeNtd='OPPAKKEN', activeAf='OPPAKKEN';
 let charts = {};
 let oauthToken=null, oauthExpiry=0, clientId='560046984985-1371r4bbt28umi6uslims6mlkucn1278.apps.googleusercontent.com';
 let editMode=false, editRowData=null, editSec=null;
 let anaPeriod={vergader:'maand',notulen:'maand'};
 let _rowCache = [];
+let _undoStack = [];
 
 // ══════════════════════════════════════
 //  BOOT
@@ -753,8 +839,29 @@ document.addEventListener('DOMContentLoaded',()=>{
   window.completeTask=idx=>completeTask(idx);
   document.getElementById('m-close').onclick=closeModal;
   document.getElementById('m-cancel').onclick=closeModal;
-  document.getElementById('modal-bg').onclick=e=>{if(e.target.id==='modal-bg')closeModal()};
+  let _modalMouseDownTarget=null;
+  document.getElementById('modal-bg').addEventListener('mousedown',e=>{_modalMouseDownTarget=e.target});
+  document.getElementById('modal-bg').addEventListener('click',e=>{if(e.target.id==='modal-bg'&&_modalMouseDownTarget?.id==='modal-bg')closeModal()});
   document.getElementById('m-submit').onclick=submitTask;
+
+  // Ontwikkeling modal + search
+  document.getElementById('btn-add-ontw').onclick=()=>openOntwModal(false);
+  document.getElementById('ontw-m-close').onclick=closeOntwModal;
+  document.getElementById('ontw-m-cancel').onclick=closeOntwModal;
+  document.getElementById('ontw-m-submit').onclick=submitOntwItem;
+  document.getElementById('ontw-m-del').onclick=deleteOntwItem;
+  let _ontwMouseDown=null;
+  document.getElementById('ontw-modal-bg').addEventListener('mousedown',e=>{_ontwMouseDown=e.target});
+  document.getElementById('ontw-modal-bg').addEventListener('click',e=>{if(e.target.id==='ontw-modal-bg'&&_ontwMouseDown?.id==='ontw-modal-bg')closeOntwModal()});
+  setupSearch('s-ontw',()=>{pgs.ontw=1;renderOntw()});
+
+  // Afgerond modal
+  document.getElementById('complete-close').onclick=closeCompleteModal;
+  document.getElementById('complete-cancel').onclick=closeCompleteModal;
+  document.getElementById('complete-confirm').onclick=doCompleteTask;
+  let _compMouseDown=null;
+  document.getElementById('complete-bg').addEventListener('mousedown',e=>{_compMouseDown=e.target});
+  document.getElementById('complete-bg').addEventListener('click',e=>{if(e.target.id==='complete-bg'&&_compMouseDown?.id==='complete-bg')closeCompleteModal()});
 
   // VvE autocomplete
   const codeInput = document.getElementById('m-code');
@@ -776,6 +883,15 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('notif-test-btn').onclick = () => sendTestNotif(getCurrentWho(), '🔔 Test melding', 'Notificaties werken correct op dit apparaat!');
   startNotifPoll();
 
+  // Live updates — auto-refresh elke 45 seconden
+  setInterval(()=>{
+    if(document.getElementById('modal-bg').classList.contains('open')) return;
+    if(document.getElementById('complete-bg').classList.contains('open')) return;
+    if(document.getElementById('ontw-modal-bg').classList.contains('open')) return;
+    if(document.getElementById('dot').classList.contains('loading')) return;
+    loadAll();
+  },45000);
+
   goTo('ntd');
 });
 
@@ -789,6 +905,7 @@ function goTo(page){
   document.getElementById('page-title').textContent=t;
   document.getElementById('page-sub').textContent=s;
   document.getElementById('btn-add').style.display=page==='ntd'?'inline-flex':'none';
+  if(page==='ontw') renderOntw();
   closeSb();
   if(page==='analytics') buildAnalytics();
   if(page==='dash') buildDash();
@@ -813,7 +930,7 @@ function applyTheme(t){
 //  API
 // ══════════════════════════════════════
 async function fetchSheet(name){
-  const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values/${encodeURIComponent(name)}?key=${AKEY}`);
+  const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values/${encodeURIComponent(name)}?key=${AKEY}`,{cache:'no-store'});
   if(!r.ok) throw new Error((await r.json()).error?.message||'API fout');
   return (await r.json()).values||[];
 }
@@ -841,14 +958,16 @@ function dot(cls){const d=document.getElementById('dot');d.className='dot'+(cls?
 async function loadAll(){
   setSyncing();
   try{
-    const[ntdR,afR,alvoR,alfaR]=await Promise.all([
+    const[ntdR,afR,alvoR,alfaR,ontwR]=await Promise.all([
       fetchSheet("Nog Te Doen"),fetchSheet("Afgerond"),
       fetchSheet("ALV's overzicht"),fetchSheet("ALV's afgerond"),
+      fetchSheet("Ontwikkeling").catch(()=>[]),
     ]);
     const ntdP=parseSections(ntdR); D.ntd=ntdP.data; D.ntdSecInfo=ntdP.secInfo;
     const afP=parseSections(afR); D.af=afP.data; D.afSecInfo=afP.secInfo;
     D.alvo=parseAlvo(alvoR);
     D.alfa=parseAlfa(alfaR);
+    D.ontw=parseOntw(ontwR);
     setSynced();
     renderAll();
   }catch(e){setSyncErr();console.error(e)}
@@ -875,6 +994,9 @@ function parseSections(rows){
     const keys=SECS[cur].keys;
     const entry={_row:i+1,_sec:cur};
     keys.forEach((k,j)=>{entry[k]=(row[j]||'').trim()});
+    entry.datum=(row[keys.length]||'').trim();
+    entry.opmerking=(row[keys.length+1]||'').trim();
+    entry.subcategorie=(row[keys.length+2]||'').trim();
     if(entry.code) out[cur].push(entry);
   }
   return {data:out,secInfo};
@@ -907,14 +1029,12 @@ function renderAll(){
   _rowCache=[];
   const ntdTotal=SKEYS.reduce((s,k)=>s+(D.ntd[k]?.length||0),0);
   document.getElementById('b-ntd').textContent=ntdTotal;
-  document.getElementById('b-af').textContent=SKEYS.reduce((s,k)=>s+(D.af[k]?.length||0),0);
-  document.getElementById('b-alvo').textContent=D.alvo.length;
-  document.getElementById('b-alfa').textContent=D.alfa.length;
   renderNtdStats();
   renderNtd();
   renderAf();
   renderAlvo();
   renderAlfa();
+  renderOntw();
 }
 
 // ══════════════════════════════════════
@@ -981,7 +1101,7 @@ function renderAf(){
     const rows=filt(D.af[s]||[],q);
     return`<div class="tab ${s===activeAf?'on':''}" style="${s===activeAf?SECS[s].css:''}" onclick="setAf('${s}')">${SECS[s].label}<span class="cnt">${rows.length}</span></div>`;
   }).join('');
-  const cols=['VvE Code','VvE','Actiepunt','Behandelaar','Afgerond op'];
+  const cols=['VvE Code','VvE','Categorie','Subcategorie','Afgerond op','Opmerking'];
   renderThead('af-thead',cols,SECS[activeAf].css);
   const rows=filt(D.af[activeAf]||[],q);
   renderTbody('af-tbody',rows,activeAf,pgs.af,true);
@@ -1247,7 +1367,16 @@ function renderTbody(tbodyId,rows,sec,page,isAf){
   const sl=rows.slice((page-1)*PG,page*PG);
   const el=document.getElementById(tbodyId);
   if(!sl.length){el.innerHTML=`<tr><td colspan="10">${emptyRow(10,true)}</td></tr>`;return}
-  el.innerHTML=sl.map(r=>isAf?rowAf(r,sec):rowNtd(r,sec)).join('');
+  if(isAf){el.innerHTML=sl.map(r=>rowAf(r,sec)).join('');return}
+  const main=sl.filter(r=>r.inBehandeling!=='TRUE');
+  const ib=sl.filter(r=>r.inBehandeling==='TRUE');
+  let html=main.map(r=>rowNtd(r,sec)).join('');
+  if(ib.length){
+    const cols=SECS[sec].cols.length+1;
+    html+=`<tr><td colspan="${cols}" style="background:var(--bl-l);padding:8px 13px;font-size:11px;font-weight:700;color:var(--bl);text-transform:uppercase;letter-spacing:.05em;border:none">⟳ In behandeling (${ib.length})</td></tr>`;
+    html+=ib.map(r=>rowNtd(r,sec)).join('');
+  }
+  el.innerHTML=html;
 }
 
 function rowNtd(r,sec){
@@ -1258,7 +1387,7 @@ function rowNtd(r,sec){
   switch(sec){
     case'OPPAKKEN':
       cells=`<td><span class="code" style="${css}">${esc(r.code)}</span></td>
-        <td class="cell-name">${esc(r.naam)}</td>
+        <td class="cell-name">${esc(r.naam)}${subBadge(r.subcategorie)}</td>
         <td class="cell-txt">${esc(r.actiepunt)}</td>
         <td class="cell-sm">${r.deadline?esc(r.deadline):'<span style="color:var(--fnt)">–</span>'}</td>
         <td>${persBadges(r.behandelaar)}</td>
@@ -1269,7 +1398,7 @@ function rowNtd(r,sec){
       break;
     case'VERGADERVERZOEKEN':
       cells=`<td><span class="code" style="${css}">${esc(r.code)}</span></td>
-        <td class="cell-name">${esc(r.naam)}</td>
+        <td class="cell-name">${esc(r.naam)}${subBadge(r.subcategorie)}</td>
         <td><span class="badge" style="background:var(--am-l);color:var(--am)">${esc(r.periode||r.agendapunten||'')}</span></td>
         <td class="cell-txt">${esc(r.agendapunten||r.actiepunt||'')}</td>
         <td>${persBadges(r.behandelaar)}</td>
@@ -1280,7 +1409,7 @@ function rowNtd(r,sec){
       break;
     case'OFFERTE-TRAJECTEN':
       cells=`<td><span class="code" style="${css}">${esc(r.code)}</span></td>
-        <td class="cell-name">${esc(r.naam)}</td>
+        <td class="cell-name">${esc(r.naam)}${subBadge(r.subcategorie)}</td>
         <td class="cell-sm">${esc(r.datumAangevraagd||'')}</td>
         <td>${offProg(r.offertes)}</td>
         <td>${persBadges(r.behandelaar)}</td>
@@ -1290,7 +1419,7 @@ function rowNtd(r,sec){
       break;
     case'LOD':
       cells=`<td><span class="code" style="${css}">${esc(r.code)}</span></td>
-        <td class="cell-name">${esc(r.naam)}</td>
+        <td class="cell-name">${esc(r.naam)}${subBadge(r.subcategorie)}</td>
         <td class="cell-txt">${esc(r.actiepunt||'')}</td>
         <td class="cell-txt" style="font-style:italic;font-size:12px">${esc(r.status||'')}</td>
         <td>${persBadges(r.behandelaar)}</td>
@@ -1309,8 +1438,9 @@ function rowAf(r,sec){
     <td><span class="code" style="${css}">${esc(r.code)}</span></td>
     <td class="cell-name">${esc(r.naam)}</td>
     <td class="cell-txt">${esc(r.actiepunt||r.periode||r.agendapunten||'')}</td>
-    <td>${persBadges(r.behandelaar)}</td>
-    <td class="cell-sm">${esc(r.datum||r['afgerond op']||'')}</td>
+    <td class="cell-sm">${esc(r.subcategorie||'')}</td>
+    <td class="cell-sm">${esc(r.datum||'')}</td>
+    <td class="cell-txt">${r.opmerking?`<span style="font-size:12px">${esc(r.opmerking)}</span>`:''}</td>
   </tr>`;
 }
 
@@ -1377,20 +1507,20 @@ function fillModalFields(sec,r){
   switch(sec){
     case'OPPAKKEN':
       setv('m-actie',r.actiepunt);setv('m-dl',r.deadline);setv('m-beh',r.behandelaar);
-      setv('m-prio',r.prioriteit);setv('m-opm',r.opmerkingen);
+      setv('m-prio',r.prioriteit);setv('m-opm',r.opmerkingen);setv('m-sub-opp',r.subcategorie);
       document.getElementById('tog-ib').classList.toggle('on',r.inBehandeling==='TRUE');break;
     case'VERGADERVERZOEKEN':
       setv('m-per',r.periode);setv('m-beh-v',r.behandelaar);setv('m-agenda',r.agendapunten||r.actiepunt);
-      setv('m-dl-v',r.deadline);setv('m-opm-v',r.opmerkingen);
+      setv('m-dl-v',r.deadline);setv('m-opm-v',r.opmerkingen);setv('m-sub-verg',r.subcategorie);
       document.getElementById('tog-ib-v').classList.toggle('on',r.inBehandeling==='TRUE');break;
     case'OFFERTE-TRAJECTEN':
       setv('m-daang',r.datumAangevraagd);setv('m-beh-o',r.behandelaar);
       {const[ор,от]=(r.offertes||'').split('/').map(s=>parseInt(s)||0);
       setv('m-off-recv',ор||0);setv('m-off-total',от||0);}
-      setv('m-dl-o',r.deadline);setv('m-opm-o',r.opmerkingen);break;
+      setv('m-dl-o',r.deadline);setv('m-opm-o',r.opmerkingen);setv('m-sub-off',r.subcategorie);break;
     case'LOD':
       setv('m-actie-l',r.actiepunt);setv('m-stat-l',r.status);setv('m-beh-l',r.behandelaar);
-      setv('m-dl-l',r.deadline);setv('m-opm-l',r.opmerkingen);
+      setv('m-dl-l',r.deadline);setv('m-opm-l',r.opmerkingen);setv('m-sub-lod',r.subcategorie);
       document.getElementById('tog-ib-l').classList.toggle('on',r.inBehandeling==='TRUE');break;
   }
 }
@@ -1456,7 +1586,8 @@ async function insertAndWriteRow(sheetName,afterRow,values){
     body:JSON.stringify({requests:[{insertDimension:{range:{sheetId,dimension:'ROWS',startIndex:afterRow,endIndex:afterRow+1},inheritFromBefore:true}}]})
   });
   if(!insResp.ok){const e=await insResp.json();if(insResp.status===401){oauthToken=null;oauthExpiry=0}throw new Error(e.error?.message||'Invoegfout')}
-  await writeRange(`'${sheetName}'!A${afterRow+1}:I${afterRow+1}`,values);
+  const endCol=String.fromCharCode(64+Math.max(values.length,9));
+  await writeRange(`'${sheetName}'!A${afterRow+1}:${endCol}${afterRow+1}`,values);
 }
 
 async function deleteTask(idx){
@@ -1486,6 +1617,7 @@ async function deleteTaskRow(r){
       body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:r._row-1,endIndex:r._row}}}]})
     });
     if(!resp.ok){const e=await resp.json();if(resp.status===401){oauthToken=null;oauthExpiry=0}throw new Error(e.error?.message||'Verwijderfout')}
+    logEvent(r.code, r._sec, 'Verwijderd', '', r.actiepunt||r.periode||'', '');
     await loadAll();
   }catch(e){alert('Fout bij verwijderen: '+e.message)}
 }
@@ -1494,35 +1626,55 @@ function getAfInsertRow(sec){
   const entries=D.af[sec]||[];
   if(entries.length>0) return entries[entries.length-1]._row;
   const info=D.afSecInfo[sec];
-  return info?.colHeaderRow||2;
+  if(info?.colHeaderRow) return info.colHeaderRow;
+  const idx=SKEYS.indexOf(sec);
+  for(let i=idx-1;i>=0;i--){
+    const prev=D.af[SKEYS[i]]||[];
+    if(prev.length>0) return prev[prev.length-1]._row;
+    if(D.afSecInfo[SKEYS[i]]?.colHeaderRow) return D.afSecInfo[SKEYS[i]].colHeaderRow;
+  }
+  return 2;
 }
 
+let _completeIdx=null;
 async function completeTask(idx){
   const r=_rowCache[idx];
   if(!r){alert('Taak niet gevonden. Vernieuw de pagina en probeer opnieuw.');return}
-  const omschrijving=r.actiepunt||r.periode||r.code||'deze taak';
-  if(!confirm(`Taak afhandelen?\n\n"${omschrijving}"\n\nDe taak wordt verplaatst naar "Afgerond".`)) return;
+  _completeIdx=idx;
+  const d=new Date();
+  document.getElementById('complete-date').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  document.getElementById('complete-comment').value='';
+  document.getElementById('complete-title').textContent=`Taak afhandelen — ${r.actiepunt||r.periode||r.code||''}`;
+  document.getElementById('complete-bg').classList.add('open');
+}
+
+async function doCompleteTask(){
+  const idx=_completeIdx;
+  const r=_rowCache[idx];
+  if(!r){alert('Taak niet gevonden.');closeCompleteModal();return}
+  const dateVal=document.getElementById('complete-date').value;
+  const comment=document.getElementById('complete-comment').value.trim();
+  if(!dateVal){alert('Datum is verplicht.');return}
+  const dp=dateVal.split('-');
+  const today=`${dp[2]}-${dp[1]}-${dp[0]}`;
   if(!await ensureToken()){alert('Inloggen mislukt. Probeer het opnieuw.');return}
   try{
     const sec=r._sec;
-    const d=new Date();
-    const today=`${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;
     let values;
     switch(sec){
       case'OPPAKKEN':
-        values=[r.code,r.naam,r.actiepunt||'',r.deadline||'',r.behandelaar||'',r.prioriteit||'',r.opmerkingen||'',r.inBehandeling||'',today];break;
+        values=[r.code,r.naam,r.actiepunt||'',r.deadline||'',r.behandelaar||'',r.prioriteit||'',r.opmerkingen||'',r.inBehandeling||'',today,comment,r.subcategorie||''];break;
       case'VERGADERVERZOEKEN':
-        values=[r.code,r.naam,r.periode||'',r.agendapunten||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'',r.inBehandeling||'',today];break;
+        values=[r.code,r.naam,r.periode||'',r.agendapunten||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'',r.inBehandeling||'',today,comment,r.subcategorie||''];break;
       case'OFFERTE-TRAJECTEN':
-        values=[r.code,r.naam,r.datumAangevraagd||'',r.offertes||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'','',today];break;
+        values=[r.code,r.naam,r.datumAangevraagd||'',r.offertes||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'','',today,comment,r.subcategorie||''];break;
       case'LOD':
-        values=[r.code,r.naam,r.actiepunt||'',r.status||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'',r.inBehandeling||'',today];break;
+        values=[r.code,r.naam,r.actiepunt||'',r.status||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'',r.inBehandeling||'',today,comment,r.subcategorie||''];break;
       default: throw new Error('Onbekende sectie: '+sec);
     }
-    // Voeg toe aan Afgerond
     const afAfterRow=getAfInsertRow(sec);
     await insertAndWriteRow('Afgerond',afAfterRow,values);
-    // Verwijder uit Nog Te Doen
+    if(!await ensureToken()){alert('Sessie verlopen na toevoegen aan Afgerond. Verwijder de taak handmatig uit Nog Te Doen.');closeCompleteModal();return}
     const ids=await getSheetIds();
     const sheetId=ids['Nog Te Doen'];
     if(sheetId==null) throw new Error('Sheet "Nog Te Doen" niet gevonden');
@@ -1532,9 +1684,18 @@ async function completeTask(idx){
       body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:r._row-1,endIndex:r._row}}}]})
     });
     if(!resp.ok){const e=await resp.json();if(resp.status===401){oauthToken=null;oauthExpiry=0}throw new Error(e.error?.message||'Fout bij verwijderen uit Nog Te Doen')}
+    closeCompleteModal();
+    logEvent(r.code, sec, 'Afgerond', 'status', 'Nog Te Doen', 'Afgerond op ' + today + (comment ? ' — ' + comment : ''));
+    const ntdKeys=SECS[sec].keys;
+    const ntdValues=ntdKeys.map(k=>r[k]||'');
+    ntdValues.push(r.subcategorie||'');
+    const undoData={sec,code:r.code,ntdValues,ntdRow:r._row};
     await loadAll();
+    showUndoToast('✅ Taak afgerond',`${r.code} — ${r.actiepunt||r.naam||''}`,()=>undoComplete(undoData));
   }catch(e){alert('Fout bij afhandelen: '+e.message)}
 }
+
+function closeCompleteModal(){document.getElementById('complete-bg').classList.remove('open');_completeIdx=null}
 
 // ══════════════════════════════════════
 //  SUBMIT TASK (Add + Edit)
@@ -1549,36 +1710,40 @@ async function submitTask(){
   let values;
 
   try{
+    const subId={OPPAKKEN:'m-sub-opp',VERGADERVERZOEKEN:'m-sub-verg','OFFERTE-TRAJECTEN':'m-sub-off',LOD:'m-sub-lod'}[sec];
+    const sub=gv(subId);
     switch(sec){
       case'OPPAKKEN':
         values=[code,naam,gv('m-actie'),gv('m-dl'),gv('m-beh'),gv('m-prio'),gv('m-opm'),
-          document.getElementById('tog-ib').classList.contains('on'),false];break;
+          document.getElementById('tog-ib').classList.contains('on'),'',sub];break;
       case'VERGADERVERZOEKEN':
         values=[code,naam,gv('m-per'),gv('m-agenda'),gv('m-beh-v'),gv('m-dl-v'),gv('m-opm-v'),
-          document.getElementById('tog-ib-v').classList.contains('on'),false];break;
+          document.getElementById('tog-ib-v').classList.contains('on'),'',sub];break;
       case'OFFERTE-TRAJECTEN':{
         const recv=parseInt(gv('m-off-recv'))||0;
         const total=parseInt(gv('m-off-total'))||0;
         const offStr=total>0?`${recv}/${total}`:'';
-        values=[code,naam,gv('m-daang'),offStr,gv('m-beh-o'),gv('m-dl-o'),gv('m-opm-o'),'',false];break;}
+        values=[code,naam,gv('m-daang'),offStr,gv('m-beh-o'),gv('m-dl-o'),gv('m-opm-o'),'','',sub];break;}
       case'LOD':
         values=[code,naam,gv('m-actie-l'),gv('m-stat-l'),gv('m-beh-l'),gv('m-dl-l'),gv('m-opm-l'),
-          document.getElementById('tog-ib-l').classList.contains('on'),false];break;
+          document.getElementById('tog-ib-l').classList.contains('on'),'',sub];break;
     }
 
+    const endCol=String.fromCharCode(64+Math.max(values.length,9));
     if(editMode&&editRowData?._row){
-      await writeRange(`'Nog Te Doen'!A${editRowData._row}:I${editRowData._row}`,values);
-      // Check of behandelaar veranderd is → meld toewijzing
+      await writeRange(`'Nog Te Doen'!A${editRowData._row}:${endCol}${editRowData._row}`,values);
       const newBeh = (sec==='OPPAKKEN'?gv('m-beh'):sec==='VERGADERVERZOEKEN'?gv('m-beh-v'):sec==='OFFERTE-TRAJECTEN'?gv('m-beh-o'):gv('m-beh-l'));
       if (newBeh && newBeh !== (editRowData.behandelaar||'')) {
         fireNotifEvent('assigned', { sec, code, naam, behandelaar: newBeh });
+        logEvent(code, sec, 'Behandelaar gewijzigd', 'behandelaar', editRowData.behandelaar, newBeh);
       }
+      logEvent(code, sec, 'Bewerkt', '', '', '');
     } else {
       const afterRow=getInsertRow(sec);
       await insertAndWriteRow('Nog Te Doen',afterRow,values);
-      // Nieuwe taak — vuur webhook af
       const newBeh = (sec==='OPPAKKEN'?gv('m-beh'):sec==='VERGADERVERZOEKEN'?gv('m-beh-v'):sec==='OFFERTE-TRAJECTEN'?gv('m-beh-o'):gv('m-beh-l'));
       fireNotifEvent('newtask', { sec, code, naam, behandelaar: newBeh });
+      logEvent(code, sec, 'Aangemaakt', '', '', newBeh||'');
     }
 
     closeModal();clearModal();
@@ -1675,10 +1840,136 @@ function emptyRow(cols,inline){
 }
 
 function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function subBadge(v){return v?`<span class="badge" style="background:var(--sur2);color:var(--mut);font-size:10px;margin-left:4px">${esc(v)}</span>`:''}
 
 function setupSearch(id,cb){
   const el=document.getElementById(id);if(!el)return;
   let t;el.addEventListener('input',()=>{clearTimeout(t);t=setTimeout(cb,200)});
+}
+
+// ══════════════════════════════════════
+//  ONTWIKKELING
+// ══════════════════════════════════════
+const ONTW_CATS=['Opmerkingen','Verbeteringen','Vragen aan Cihan','Ideeën'];
+const ONTW_CAT_COLORS={'Opmerkingen':'var(--bl)','Verbeteringen':'var(--gn)','Vragen aan Cihan':'var(--am)','Ideeën':'var(--pu)'};
+
+function parseOntw(rows){
+  if(!rows||rows.length<2) return [];
+  return rows.slice(1).map((r,i)=>{
+    const titel=(r[0]||'').trim();
+    if(!titel) return null;
+    return{titel,categorie:(r[1]||'').trim(),inhoud:(r[2]||'').trim(),door:(r[3]||'').trim(),datum:(r[4]||'').trim(),status:(r[5]||'').trim()||'Open',_row:i+2};
+  }).filter(Boolean);
+}
+
+function renderOntw(){
+  const q=(document.getElementById('s-ontw')?.value||'').toLowerCase();
+  const cats=['Alles',...ONTW_CATS];
+  document.getElementById('ontw-tabs').innerHTML=cats.map(c=>{
+    const cnt=c==='Alles'?D.ontw.length:D.ontw.filter(r=>r.categorie===c).length;
+    return`<div class="tab ${c===activeOntw?'on':''}" style="${c===activeOntw?'--sec:var(--pk);--sec-l:var(--pk-l);--sec-b:var(--pk-b)':''}" onclick="setOntw('${c.replace(/'/g,"\\'")}')">${c}<span class="cnt">${cnt}</span></div>`;
+  }).join('');
+
+  let rows=D.ontw;
+  if(activeOntw!=='Alles') rows=rows.filter(r=>r.categorie===activeOntw);
+  if(q) rows=rows.filter(r=>`${r.titel} ${r.inhoud} ${r.categorie} ${r.door}`.toLowerCase().includes(q));
+
+  renderThead('ontw-thead',['Titel','Categorie','Inhoud','Door','Datum','Status',''],'--sec:var(--pk);--sec-l:var(--pk-l);--sec-b:var(--pk-b)');
+  const sl=rows.slice((pgs.ontw-1)*PG,pgs.ontw*PG);
+  const el=document.getElementById('ontw-tbody');
+  if(!sl.length){el.innerHTML=`<tr><td colspan="7">${emptyRow(7,true)}</td></tr>`;return}
+  el.innerHTML=sl.map(r=>{
+    const rid=_rowCache.length;_rowCache.push(Object.assign({},r,{_sec:'ONTW'}));
+    const clr=ONTW_CAT_COLORS[r.categorie]||'var(--mut)';
+    return`<tr>
+      <td class="cell-name">${esc(r.titel)}</td>
+      <td><span class="badge" style="background:color-mix(in srgb,${clr} 15%,transparent);color:${clr}">${esc(r.categorie)}</span></td>
+      <td class="cell-txt">${r.inhoud?`<span style="font-size:12px">${esc(r.inhoud.substring(0,80))}${r.inhoud.length>80?'…':''}</span>`:''}</td>
+      <td>${persBadges(r.door)}</td>
+      <td class="cell-sm">${esc(r.datum)}</td>
+      <td><span class="badge status-${r.status.toLowerCase()}">${r.status==='Afgerond'?'✅':'⏳'} ${r.status}</span></td>
+      <td><button class="btn-edit" onclick="editOntwItem(${rid})" title="Bewerken"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button></td>
+    </tr>`;
+  }).join('');
+  renderPag('ontw-pag',rows.length,pgs.ontw,p=>{pgs.ontw=p;renderOntw()});
+}
+function setOntw(c){activeOntw=c;pgs.ontw=1;renderOntw()}
+
+let ontwEditMode=false, ontwEditRow=null;
+function openOntwModal(isEdit, rowData){
+  ontwEditMode=!!isEdit;
+  ontwEditRow=rowData||null;
+  document.getElementById('ontw-m-title').textContent=isEdit?'Item bewerken':'Nieuw item';
+  document.getElementById('ontw-m-submit-lbl').textContent=isEdit?'Opslaan':'Toevoegen';
+  document.getElementById('ontw-m-del').style.display=isEdit?'inline-flex':'none';
+  if(isEdit&&rowData){
+    setv('ontw-m-titel',rowData.titel);
+    setv('ontw-m-cat',rowData.categorie);
+    setv('ontw-m-inhoud',rowData.inhoud);
+    setv('ontw-m-status',rowData.status||'Open');
+  } else {
+    setv('ontw-m-titel','');setv('ontw-m-cat','');setv('ontw-m-inhoud','');setv('ontw-m-status','Open');
+  }
+  document.getElementById('ontw-modal-bg').classList.add('open');
+}
+function closeOntwModal(){document.getElementById('ontw-modal-bg').classList.remove('open')}
+
+window.editOntwItem=function(idx){
+  const r=_rowCache[idx];
+  if(r) openOntwModal(true,r);
+};
+
+async function submitOntwItem(){
+  if(!await ensureToken()){alert('Inloggen mislukt.');return}
+  const titel=gv('ontw-m-titel');
+  const cat=gv('ontw-m-cat');
+  if(!titel){alert('Titel is verplicht.');return}
+  if(!cat){alert('Categorie is verplicht.');return}
+  const inhoud=gv('ontw-m-inhoud');
+  const status=gv('ontw-m-status')||'Open';
+  const who=getCurrentWho()||'?';
+  const d=new Date();
+  const today=`${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;
+  const values=[titel,cat,inhoud,who,today,status];
+  try{
+    if(ontwEditMode&&ontwEditRow?._row){
+      await writeRange(`'Ontwikkeling'!A${ontwEditRow._row}:F${ontwEditRow._row}`,values);
+    } else {
+      await appendRange("'Ontwikkeling'!A:F",values);
+    }
+    closeOntwModal();
+    await loadAll();
+  }catch(e){alert('Fout: '+e.message)}
+}
+
+async function deleteOntwItem(){
+  if(!ontwEditRow) return;
+  if(!confirm('Dit item verwijderen?')) return;
+  if(!await ensureToken()){alert('Inloggen mislukt.');return}
+  try{
+    const ids=await getSheetIds();
+    const sheetId=ids['Ontwikkeling'];
+    if(sheetId==null) throw new Error('Sheet "Ontwikkeling" niet gevonden');
+    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+      method:'POST',
+      headers:{Authorization:`Bearer ${oauthToken}`,'Content-Type':'application/json'},
+      body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:ontwEditRow._row-1,endIndex:ontwEditRow._row}}}]})
+    });
+    closeOntwModal();
+    await loadAll();
+  }catch(e){alert('Fout bij verwijderen: '+e.message)}
+}
+
+// ══════════════════════════════════════
+//  LOGBOEK — schrijft wijzigingen naar "Logboek" sheet
+// ══════════════════════════════════════
+async function logEvent(code, sec, actie, veld, oudeWaarde, nieuweWaarde) {
+  try {
+    if (!oauthToken) return;
+    const who = getCurrentWho() || '?';
+    const ts = new Date().toISOString();
+    await appendRange("'Logboek'!A:H", [ts, code||'', sec||'', actie||'', veld||'', oudeWaarde||'', nieuweWaarde||'', who]);
+  } catch(e) { console.warn('Logboek schrijffout:', e); }
 }
 
 // ══════════════════════════════════════
@@ -1704,10 +1995,12 @@ async function fireNotifEvent(event, payload) {
 
   if (!NOTIF_WEBHOOK_URL) return;
   try {
-    await fetch(NOTIF_WEBHOOK_URL, {
-      method: 'POST', mode: 'no-cors',
+    const resp = await fetch(NOTIF_WEBHOOK_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'text/plain'},
       body: JSON.stringify(Object.assign({}, payload, { event, actor: who, secret: NOTIF_WEBHOOK_SECRET }))
     });
+    if (resp.ok) { try { const j=await resp.json(); console.log('[Notif] webhook ok:', j); } catch(e){} }
   } catch(e) { console.warn('Notif webhook faalde:', e); }
 }
 
@@ -1760,6 +2053,64 @@ function dismissToast(el) {
   setTimeout(() => el.remove(), 260);
 }
 
+function showUndoToast(title, msg, undoFn) {
+  const UNDO_DURATION = 8000;
+  const key = 'undo|' + title + '|' + msg;
+  if (_shownToasts.has(key)) return;
+  _shownToasts.add(key);
+  setTimeout(() => _shownToasts.delete(key), 30000);
+
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.style.setProperty('--toast-clr', 'var(--gn)');
+  el.style.position = 'relative';
+  el.style.overflow = 'hidden';
+  el.innerHTML = `
+    <div class="toast-body">
+      <div class="toast-title">${esc(title)}</div>
+      ${msg ? `<div class="toast-msg">${esc(msg)}</div>` : ''}
+      <button class="toast-undo" id="undo-btn-${Date.now()}">↩ Ongedaan maken</button>
+    </div>
+    <button class="toast-close" onclick="dismissToast(this.parentElement)">×</button>
+    <div class="toast-bar" style="animation-duration:${UNDO_DURATION}ms"></div>`;
+
+  const container = document.getElementById('toast-container');
+  container.appendChild(el);
+
+  const undoBtn = el.querySelector('.toast-undo');
+  undoBtn.onclick = async () => {
+    undoBtn.disabled = true;
+    undoBtn.textContent = '⏳ Bezig…';
+    try { await undoFn(); } catch(e) { alert('Undo mislukt: ' + e.message); }
+    dismissToast(el);
+  };
+
+  setTimeout(() => dismissToast(el), UNDO_DURATION);
+}
+
+async function undoComplete(undoData) {
+  if (!await ensureToken()) { alert('Inloggen mislukt.'); return; }
+  const { sec, ntdValues, ntdRow } = undoData;
+  try {
+    const ids = await getSheetIds();
+    const afId = ids['Afgerond'];
+    const afEntries = D.af[sec] || [];
+    const lastAf = afEntries.length > 0 ? afEntries[afEntries.length - 1] : null;
+    if (lastAf && lastAf.code === undoData.code) {
+      await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${oauthToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requests: [{ deleteDimension: { range: { sheetId: afId, dimension: 'ROWS', startIndex: lastAf._row - 1, endIndex: lastAf._row } } }] })
+      });
+    }
+    const insertRow = getInsertRow(sec);
+    await insertAndWriteRow('Nog Te Doen', insertRow, ntdValues);
+    logEvent(undoData.code, sec, 'Teruggezet', 'status', 'Afgerond', 'Nog Te Doen');
+    showToast('↩ Ongedaan gemaakt', `${undoData.code} terug in Nog Te Doen`, 'var(--am)');
+    await loadAll();
+  } catch(e) { alert('Undo fout: ' + e.message); }
+}
+
 // ══════════════════════════════════════
 //  POLLING — toont toasts voor andere gebruikers
 // ══════════════════════════════════════
@@ -1801,10 +2152,9 @@ async function pollNotifsForToast() {
 
 function startNotifPoll() {
   pollNotifsForToast();
-  _notifPollTimer = setInterval(pollNotifsForToast, 15000);
-  // Poll direct bij terugkeer naar het tabblad (browser throttelt timers in achtergrond)
+  _notifPollTimer = setInterval(pollNotifsForToast, 10000);
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) pollNotifsForToast();
+    if (!document.hidden) { pollNotifsForToast(); loadAll(); }
   });
 }
 

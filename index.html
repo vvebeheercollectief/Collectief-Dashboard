@@ -295,6 +295,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
       Ontwikkeling
     </div>
+    <div class="ni" data-page="logboek">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Logboek
+    </div>
     <div class="sb-lbl">Analyse</div>
     <div class="ni" data-page="analytics">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
@@ -482,6 +486,42 @@
             <span id="ontw-m-submit-lbl">Toevoegen</span>
           </button>
         </div>
+      </div>
+    </div>
+
+    <!-- ══ LOGBOEK ══ -->
+    <div class="page" id="page-logboek">
+      <div class="card">
+        <div class="card-hdr">
+          <h2>Logboek</h2>
+          <div class="filter-bar">
+            <div class="search-box">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              <input type="text" id="s-logboek" placeholder="Zoek…"/>
+            </div>
+            <select class="filter-select" id="f-actie-logboek">
+              <option value="">Alle acties</option>
+              <option>Afgerond</option>
+              <option>Bewerkt</option>
+              <option>Aangemaakt</option>
+              <option>Verwijderd</option>
+              <option>Teruggezet</option>
+              <option>Behandelaar gewijzigd</option>
+            </select>
+          </div>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead id="logboek-thead">
+              <tr>
+                <th>Datum/tijd</th><th>VvE Code</th><th>Sectie</th><th>Actie</th>
+                <th>Veld</th><th>Oude waarde</th><th>Nieuwe waarde</th><th>Gebruiker</th>
+              </tr>
+            </thead>
+            <tbody id="logboek-tbody"></tbody>
+          </table>
+        </div>
+        <div class="pag" id="logboek-pag"></div>
       </div>
     </div>
 
@@ -783,6 +823,7 @@ const PAGE_META = {
   alvo:["ALV's Overzicht","Voortgang vergaderingen per VvE"],
   alfa:["ALV's Afgerond","Afgeronde jaarvergaderingen"],
   ontw:['Ontwikkeling','Interne notities, verbeteringen en ideeën'],
+  logboek:['Logboek','Wijzigingshistorie van alle taken'],
   analytics:['Analytics','Statistieken en grafieken'],
   dash:['Dashboard','Totaaloverzicht'],
 };
@@ -790,8 +831,8 @@ const PAGE_META = {
 // ══════════════════════════════════════
 //  STATE
 // ══════════════════════════════════════
-let D = {ntd:{},af:{},alvo:[],alfa:[],ontw:[],ntdSecInfo:{},afSecInfo:{}};
-let pgs = {ntd:1,af:1,alvo:1,alfa:1,ontw:1};
+let D = {ntd:{},af:{},alvo:[],alfa:[],ontw:[],logboek:[],ntdSecInfo:{},afSecInfo:{}};
+let pgs = {ntd:1,af:1,alvo:1,alfa:1,ontw:1,logboek:1};
 let activeOntw='Alles';
 let activeNtd='OPPAKKEN', activeAf='OPPAKKEN';
 let charts = {};
@@ -827,6 +868,8 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('f-beh-ntd').onchange=()=>{pgs.ntd=1;renderNtd()};
   document.getElementById('f-prio-ntd').onchange=()=>{pgs.ntd=1;renderNtd()};
   document.getElementById('f-status-alvo').onchange=()=>{pgs.alvo=1;renderAlvo()};
+  setupSearch('s-logboek',()=>{pgs.logboek=1;renderLogboek()});
+  document.getElementById('f-actie-logboek').onchange=()=>{pgs.logboek=1;renderLogboek()};
 
   document.getElementById('refresh-btn').onclick=loadAll;
   document.getElementById('theme-btn').onclick=()=>applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
@@ -835,8 +878,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 
   document.getElementById('btn-add').onclick=()=>openModal(false);
   window.editRow=idx=>openModal(true,_rowCache[idx]);
-  window.deleteTask=idx=>deleteTask(idx);
-  window.completeTask=idx=>completeTask(idx);
   document.getElementById('m-close').onclick=closeModal;
   document.getElementById('m-cancel').onclick=closeModal;
   let _modalMouseDownTarget=null;
@@ -906,6 +947,7 @@ function goTo(page){
   document.getElementById('page-sub').textContent=s;
   document.getElementById('btn-add').style.display=page==='ntd'?'inline-flex':'none';
   if(page==='ontw') renderOntw();
+  if(page==='logboek') renderLogboek();
   closeSb();
   if(page==='analytics') buildAnalytics();
   if(page==='dash') buildDash();
@@ -958,16 +1000,18 @@ function dot(cls){const d=document.getElementById('dot');d.className='dot'+(cls?
 async function loadAll(){
   setSyncing();
   try{
-    const[ntdR,afR,alvoR,alfaR,ontwR]=await Promise.all([
+    const[ntdR,afR,alvoR,alfaR,ontwR,logR]=await Promise.all([
       fetchSheet("Nog Te Doen"),fetchSheet("Afgerond"),
       fetchSheet("ALV's overzicht"),fetchSheet("ALV's afgerond"),
       fetchSheet("Ontwikkeling").catch(()=>[]),
+      fetchSheet("Logboek").catch(()=>[]),
     ]);
     const ntdP=parseSections(ntdR); D.ntd=ntdP.data; D.ntdSecInfo=ntdP.secInfo;
     const afP=parseSections(afR); D.af=afP.data; D.afSecInfo=afP.secInfo;
     D.alvo=parseAlvo(alvoR);
     D.alfa=parseAlfa(alfaR);
     D.ontw=parseOntw(ontwR);
+    D.logboek=parseLogboek(logR);
     setSynced();
     renderAll();
   }catch(e){setSyncErr();console.error(e)}
@@ -994,9 +1038,10 @@ function parseSections(rows){
     const keys=SECS[cur].keys;
     const entry={_row:i+1,_sec:cur};
     keys.forEach((k,j)=>{entry[k]=(row[j]||'').trim()});
-    entry.datum=(row[keys.length]||'').trim();
-    entry.opmerking=(row[keys.length+1]||'').trim();
-    entry.subcategorie=(row[keys.length+2]||'').trim();
+    const afOff=Math.max(keys.length,8);
+    entry.datum=(row[afOff]||'').trim();
+    entry.opmerking=(row[afOff+1]||'').trim();
+    entry.subcategorie=(row[afOff+2]||'').trim();
     if(entry.code) out[cur].push(entry);
   }
   return {data:out,secInfo};
@@ -1035,6 +1080,7 @@ function renderAll(){
   renderAlvo();
   renderAlfa();
   renderOntw();
+  renderLogboek();
 }
 
 // ══════════════════════════════════════
@@ -1961,8 +2007,71 @@ async function deleteOntwItem(){
 }
 
 // ══════════════════════════════════════
-//  LOGBOEK — schrijft wijzigingen naar "Logboek" sheet
+//  LOGBOEK — parse, render & schrijf
 // ══════════════════════════════════════
+function parseLogboek(rows){
+  if(!rows||rows.length<2) return [];
+  return rows.slice(1).filter(r=>r&&r.length&&(r[0]||'').trim()).map((r,i)=>({
+    _row:i+2,
+    timestamp:(r[0]||'').trim(),
+    code:(r[1]||'').trim(),
+    sectie:(r[2]||'').trim(),
+    actie:(r[3]||'').trim(),
+    veld:(r[4]||'').trim(),
+    oudeWaarde:(r[5]||'').trim(),
+    nieuweWaarde:(r[6]||'').trim(),
+    gebruiker:(r[7]||'').trim()
+  })).reverse();
+}
+
+function fmtLogTs(iso){
+  try{
+    const d=new Date(iso);
+    if(isNaN(d)) return iso;
+    return d.toLocaleDateString('nl-NL',{day:'numeric',month:'short',year:'numeric'})+', '+d.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
+  }catch(e){return iso}
+}
+
+function actieBadge(actie){
+  const map={
+    'Afgerond':['--sec:var(--gn);--sec-l:var(--gn-l)','✓'],
+    'Verwijderd':['--sec:var(--rd);--sec-l:var(--rd-l)','✕'],
+    'Bewerkt':['--sec:var(--bl);--sec-l:var(--bl-l)','✎'],
+    'Aangemaakt':['--sec:var(--pu);--sec-l:var(--pu-l)','+'],
+    'Teruggezet':['--sec:var(--am);--sec-l:var(--am-l)','↩'],
+    'Behandelaar gewijzigd':['--sec:var(--bl);--sec-l:var(--bl-l)','👤'],
+    'Aangemaakt (sheet)':['--sec:var(--pu);--sec-l:var(--pu-l)','+'],
+  };
+  const[css,ico]=map[actie]||['',''];
+  return css?`<span class="badge" style="background:var(--sec-l);color:var(--sec);${css}">${ico} ${esc(actie)}</span>`:`<span class="badge">${esc(actie)}</span>`;
+}
+
+function renderLogboek(){
+  const q=(document.getElementById('s-logboek')?.value||'').toLowerCase();
+  const fa=document.getElementById('f-actie-logboek')?.value||'';
+  const rows=D.logboek.filter(r=>{
+    if(fa&&r.actie!==fa) return false;
+    if(q&&!`${r.timestamp} ${r.code} ${r.sectie} ${r.actie} ${r.veld} ${r.oudeWaarde} ${r.nieuweWaarde} ${r.gebruiker}`.toLowerCase().includes(q)) return false;
+    return true;
+  });
+  const sl=rows.slice((pgs.logboek-1)*PG,pgs.logboek*PG);
+  const el=document.getElementById('logboek-tbody');
+  if(!el) return;
+  if(!sl.length){el.innerHTML=`<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--mut)">Geen logboek-items gevonden</td></tr>`;} else {
+    el.innerHTML=sl.map(r=>`<tr>
+      <td class="cell-sm" style="white-space:nowrap">${esc(fmtLogTs(r.timestamp))}</td>
+      <td><span class="code" style="--sec:var(--bl);--sec-l:var(--bl-l)">${esc(r.code)}</span></td>
+      <td class="cell-sm">${esc(r.sectie)}</td>
+      <td>${actieBadge(r.actie)}</td>
+      <td class="cell-sm">${esc(r.veld)}</td>
+      <td class="cell-txt" style="font-size:12px">${esc(r.oudeWaarde)}</td>
+      <td class="cell-txt" style="font-size:12px">${esc(r.nieuweWaarde)}</td>
+      <td class="cell-sm">${esc(r.gebruiker)}</td>
+    </tr>`).join('');
+  }
+  renderPag('logboek-pag',rows.length,pgs.logboek,p=>{pgs.logboek=p;renderLogboek()});
+}
+
 async function logEvent(code, sec, actie, veld, oudeWaarde, nieuweWaarde) {
   try {
     if (!oauthToken) return;

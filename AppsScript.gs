@@ -102,7 +102,7 @@ function cd_handleNtdEdit(sheet, row, e) {
   const colChanged = e.range.getColumn();
 
   if (isNew && colChanged === 1) {
-    // Heel nieuwe taak (eerste kolom ingevuld)
+    cd_schrijfLogboek(code, sec, 'Aangemaakt (sheet)', '', '', '', beh);
     cd_notifyByTag('n_newtask', '1', {
       title: '📋 Nieuwe taak — ' + sec.toLowerCase(),
       body: code + (naam ? ' · ' + naam : '') + (beh ? ' → ' + beh : ''),
@@ -318,6 +318,32 @@ function cd_notifyByExternalId(naam, tagKey, tagValue, opts) {
 }
 
 // ════════════════════════════════════════════════════════════
+//  LOGBOEK — schrijf naar 'Logboek' sheet (server-side)
+// ════════════════════════════════════════════════════════════
+
+function cd_schrijfLogboek(code, sectie, actie, veld, oudeWaarde, nieuweWaarde, gebruiker) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName('Logboek');
+    if (!sheet) {
+      sheet = ss.insertSheet('Logboek');
+      sheet.appendRow(['Timestamp','VvE Code','Sectie','Actie','Veld','Oude Waarde','Nieuwe Waarde','Gebruiker']);
+      sheet.setFrozenRows(1);
+    }
+    sheet.appendRow([
+      new Date().toISOString(),
+      code || '',
+      sectie || '',
+      actie || '',
+      veld || '',
+      oudeWaarde || '',
+      nieuweWaarde || '',
+      gebruiker || ''
+    ]);
+  } catch(e) { Logger.log('cd_schrijfLogboek fout: ' + e); }
+}
+
+// ════════════════════════════════════════════════════════════
 //  WEBHOOK — wordt aangeroepen vanuit het dashboard
 //  (omdat API-edits geen onEdit-trigger vuren in Apps Script)
 // ════════════════════════════════════════════════════════════
@@ -372,6 +398,8 @@ function doPost(e) {
         body: code + (naam ? ' · ' + naam : ''),
         url: APP_URL, dedupKey: 'alv-' + code + '-' + Date.now()
       });
+    } else if (ev === 'logboek') {
+      cd_schrijfLogboek(code, sec, data.actie, data.veld, data.oudeWaarde, data.nieuweWaarde, actor);
     } else if (ev === 'test') {
       const who   = (data.who   || '').toString();
       const title = (data.title || '🔔 Test melding').toString();

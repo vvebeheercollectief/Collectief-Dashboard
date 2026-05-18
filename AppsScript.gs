@@ -28,6 +28,11 @@ const DEADLINE_TOLERANCE_HOURS = 1;
 // ════════════════════════════════════════════════════════════
 const CD_TRIGGER_FUNCS = ['cd_onEditChange', 'cd_checkDeadlines', 'cd_dailySummary'];
 
+function setupWebhookSecret() {
+  PropertiesService.getScriptProperties().setProperty('CD_WEBHOOK_SECRET', '8e0642cbd3f44f44a4711d1ec5bae0a78d17e902b29a0ef7');
+  SpreadsheetApp.getUi().alert('Webhook secret is ingesteld.');
+}
+
 function setupNotificationTriggers() {
   // Verwijder ALLEEN onze eigen triggers (laat andere triggers met rust!)
   ScriptApp.getProjectTriggers()

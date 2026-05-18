@@ -8,6 +8,7 @@
   <!-- PWA manifest -->
   <link rel="manifest" href="manifest.json"/>
   <meta name="theme-color" content="#2563eb"/>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://accounts.google.com https://cdn.onesignal.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://sheets.googleapis.com https://www.googleapis.com https://script.google.com https://accounts.google.com https://onesignal.com https://*.onesignal.com; img-src 'self' data: https:; frame-src https://accounts.google.com;"/>
 
   <!-- iOS / Safari -->
   <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -783,17 +784,31 @@
   </div>
 </div>
 
+<div id="login-gate" style="position:fixed;inset:0;z-index:99999;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:20px">
+  <div style="background:var(--sur);border:1px solid var(--bor);border-radius:16px;padding:40px 36px;box-shadow:var(--shm);text-align:center;max-width:360px;width:90%">
+    <div style="font-size:36px;margin-bottom:12px">🏢</div>
+    <h1 style="font-size:20px;font-weight:800;margin:0 0 6px">Collectief Dashboard</h1>
+    <p style="font-size:13px;color:var(--mut);margin:0 0 24px">Log in met je VvE Beheer Collectief account</p>
+    <button id="login-btn" class="btn btn-pri" style="width:100%;justify-content:center;padding:11px 20px;font-size:14px" onclick="doLogin()">Inloggen met Google</button>
+    <p id="login-error" style="font-size:12px;color:var(--rd);margin:12px 0 0;display:none"></p>
+  </div>
+</div>
+
 <script>
 // ══════════════════════════════════════
 //  CONFIG
 // ══════════════════════════════════════
 const SID  = '1fnUsbwb4nDMNttWym9FWBw1CMMMAVTuZ3v88b35isUw';
-const AKEY = 'AIzaSyBo-Tf8o6L_VQoB29vv7L1q3NATIAgJc9E';
 const PG   = 25;
 // Webhook URL van het Apps Script (Deploy → Web app)
 const NOTIF_WEBHOOK_URL    = 'https://script.google.com/macros/s/AKfycbz_AC5YgAzUlcx9HrI4nv6jkoSung-T5WPHJPSSqwwBXcbv7NUUNKl1pzrd5qBf8so1WA/exec';
-const NOTIF_WEBHOOK_SECRET = '';
+const NOTIF_WEBHOOK_SECRET = '8e0642cbd3f44f44a4711d1ec5bae0a78d17e902b29a0ef7';
 const ONESIGNAL_APP_ID     = 'c0e1301b-2cee-4646-8fab-99698e10e78c';
+
+const ALLOWED_EMAILS = [
+  'info@vvebeheercollectief.nl',
+  'djiowchico@gmail.com',
+];
 
 let oneSignalReady  = false;
 let isSubscribed    = false;
@@ -836,7 +851,7 @@ let pgs = {ntd:1,af:1,alvo:1,alfa:1,ontw:1,logboek:1};
 let activeOntw='Alles';
 let activeNtd='OPPAKKEN', activeAf='OPPAKKEN';
 let charts = {};
-let oauthToken=null, oauthExpiry=0, clientId='560046984985-1371r4bbt28umi6uslims6mlkucn1278.apps.googleusercontent.com';
+let oauthToken=null, oauthExpiry=0, currentUserEmail=null, clientId='560046984985-1371r4bbt28umi6uslims6mlkucn1278.apps.googleusercontent.com';
 let editMode=false, editRowData=null, editSec=null;
 let anaPeriod={vergader:'maand',notulen:'maand'};
 let _rowCache = [];
@@ -855,7 +870,6 @@ document.addEventListener('DOMContentLoaded',()=>{
   }
 
   if(localStorage.getItem('theme')==='dark') applyTheme('dark');
-  loadAll();
 
   document.querySelectorAll('.ni[data-page]').forEach(el=>
     el.addEventListener('click',()=>goTo(el.dataset.page)));
@@ -972,8 +986,12 @@ function applyTheme(t){
 //  API
 // ══════════════════════════════════════
 async function fetchSheet(name){
-  const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values/${encodeURIComponent(name)}?key=${AKEY}`,{cache:'no-store'});
-  if(!r.ok) throw new Error((await r.json()).error?.message||'API fout');
+  if(!oauthToken) throw new Error('Niet ingelogd');
+  const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values/${encodeURIComponent(name)}`,{
+    cache:'no-store',
+    headers:{Authorization:`Bearer ${oauthToken}`}
+  });
+  if(!r.ok){const e=await r.json();if(r.status===401){oauthToken=null;oauthExpiry=0}throw new Error(e.error?.message||'API fout')}
   return (await r.json()).values||[];
 }
 async function writeRange(range,values,method='PUT'){
@@ -998,6 +1016,7 @@ function setSyncErr(){dot('err');document.getElementById('sync-lbl').textContent
 function dot(cls){const d=document.getElementById('dot');d.className='dot'+(cls?' '+cls:'')}
 
 async function loadAll(){
+  if(!oauthToken){setSyncErr();return}
   setSyncing();
   try{
     const[ntdR,afR,alvoR,alfaR,ontwR,logR]=await Promise.all([
@@ -1589,10 +1608,13 @@ function onCodeInput(){
   if(!matches.length){sug.style.display='none';return}
   sug.style.display='block';
   sug.innerHTML=matches.map(r=>`
-    <div class="vve-sug-item" onclick="selectVvE('${esc(r.code)}','${esc(r.naam).replace(/'/g,"\\'")}')">
+    <div class="vve-sug-item" data-code="${esc(r.code)}" data-naam="${esc(r.naam)}">
       <div class="vve-sug-code">${esc(r.code)}</div>
       <div class="vve-sug-naam">${esc(r.naam)}</div>
     </div>`).join('');
+  sug.querySelectorAll('.vve-sug-item').forEach(el=>{
+    el.onclick=()=>selectVvE(el.dataset.code,el.dataset.naam);
+  });
 }
 
 function selectVvE(code,naam){
@@ -1607,7 +1629,7 @@ function selectVvE(code,naam){
 let _sheetIds=null;
 async function getSheetIds(){
   if(_sheetIds) return _sheetIds;
-  const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}?key=${AKEY}`);
+  const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}`,{headers:{Authorization:`Bearer ${oauthToken}`}});
   const d=await r.json();
   _sheetIds={};
   (d.sheets||[]).forEach(s=>{_sheetIds[s.properties.title]=s.properties.sheetId});
@@ -1718,18 +1740,24 @@ async function doCompleteTask(){
         values=[r.code,r.naam,r.actiepunt||'',r.status||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'',r.inBehandeling||'',today,comment,r.subcategorie||''];break;
       default: throw new Error('Onbekende sectie: '+sec);
     }
-    const afAfterRow=getAfInsertRow(sec);
-    await insertAndWriteRow('Afgerond',afAfterRow,values);
-    if(!await ensureToken()){alert('Sessie verlopen na toevoegen aan Afgerond. Verwijder de taak handmatig uit Nog Te Doen.');closeCompleteModal();return}
     const ids=await getSheetIds();
-    const sheetId=ids['Nog Te Doen'];
-    if(sheetId==null) throw new Error('Sheet "Nog Te Doen" niet gevonden');
+    const afSheetId=ids['Afgerond'];
+    const ntdSheetId=ids['Nog Te Doen'];
+    if(afSheetId==null) throw new Error('Sheet "Afgerond" niet gevonden');
+    if(ntdSheetId==null) throw new Error('Sheet "Nog Te Doen" niet gevonden');
+    const afAfterRow=getAfInsertRow(sec);
+    const endCol=String.fromCharCode(64+Math.max(values.length,9));
     const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
       method:'POST',
       headers:{Authorization:`Bearer ${oauthToken}`,'Content-Type':'application/json'},
-      body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:r._row-1,endIndex:r._row}}}]})
+      body:JSON.stringify({requests:[
+        {insertDimension:{range:{sheetId:afSheetId,dimension:'ROWS',startIndex:afAfterRow,endIndex:afAfterRow+1},inheritFromBefore:true}},
+        {updateCells:{range:{sheetId:afSheetId,startRowIndex:afAfterRow,endRowIndex:afAfterRow+1,startColumnIndex:0,endColumnIndex:values.length},
+          rows:[{values:values.map(v=>({userEnteredValue:{stringValue:String(v)}}))}],fields:'userEnteredValue'}},
+        {deleteDimension:{range:{sheetId:ntdSheetId,dimension:'ROWS',startIndex:r._row-1,endIndex:r._row}}}
+      ]})
     });
-    if(!resp.ok){const e=await resp.json();if(resp.status===401){oauthToken=null;oauthExpiry=0}throw new Error(e.error?.message||'Fout bij verwijderen uit Nog Te Doen')}
+    if(!resp.ok){const e=await resp.json();if(resp.status===401){oauthToken=null;oauthExpiry=0}throw new Error(e.error?.message||'Fout bij afhandelen taak')}
     closeCompleteModal();
     logEvent(r.code, sec, 'Afgerond', 'status', 'Nog Te Doen', 'Afgerond op ' + today + (comment ? ' — ' + comment : ''));
     const ntdKeys=SECS[sec].keys;
@@ -1813,7 +1841,7 @@ function doOAuth(){
     try{
       google.accounts.oauth2.initTokenClient({
         client_id:clientId,
-        scope:'https://www.googleapis.com/auth/spreadsheets',
+        scope:'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.email',
         callback:resp=>{
           if(resp.error){console.warn('OAuth fout:',resp.error);oauthToken=null;oauthExpiry=0;resolve(null);return}
           oauthToken=resp.access_token;
@@ -1825,11 +1853,44 @@ function doOAuth(){
   });
 }
 
+async function fetchUserEmail(){
+  if(!oauthToken) return null;
+  try{
+    const r=await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:`Bearer ${oauthToken}`}});
+    if(!r.ok) return null;
+    const d=await r.json();
+    return d.email||null;
+  }catch(e){return null}
+}
+
+async function doLogin(){
+  const errEl=document.getElementById('login-error');
+  const btn=document.getElementById('login-btn');
+  errEl.style.display='none';
+  btn.textContent='Even geduld…';btn.disabled=true;
+  await doOAuth();
+  if(!oauthToken){errEl.textContent='Inloggen geannuleerd of mislukt.';errEl.style.display='block';btn.textContent='Inloggen met Google';btn.disabled=false;return}
+  const email=await fetchUserEmail();
+  if(!email){errEl.textContent='Kon e-mailadres niet ophalen.';errEl.style.display='block';btn.textContent='Inloggen met Google';btn.disabled=false;return}
+  if(!ALLOWED_EMAILS.includes(email.toLowerCase())){
+    oauthToken=null;oauthExpiry=0;
+    errEl.textContent='Geen toegang. Gebruik je VvE Beheer Collectief account.';errEl.style.display='block';btn.textContent='Inloggen met Google';btn.disabled=false;return;
+  }
+  currentUserEmail=email;
+  document.getElementById('login-gate').style.display='none';
+  loadAll();
+}
+
 async function ensureToken(){
   if(oauthToken && Date.now()<oauthExpiry) return true;
   oauthToken=null; oauthExpiry=0;
   await doOAuth();
-  return !!oauthToken;
+  if(!oauthToken) return false;
+  if(currentUserEmail) return true;
+  const email=await fetchUserEmail();
+  if(!email||!ALLOWED_EMAILS.includes(email.toLowerCase())){oauthToken=null;oauthExpiry=0;return false}
+  currentUserEmail=email;
+  return true;
 }
 
 // ══════════════════════════════════════

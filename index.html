@@ -258,6 +258,11 @@
       .stats-grid{grid-template-columns:1fr 1fr}
       .charts-grid{grid-template-columns:1fr}
     }
+    .hist-entry{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--bor);font-size:12px}
+    .hist-entry:last-child{border-bottom:none}
+    .hist-ts{color:var(--mut);white-space:nowrap;flex-shrink:0;min-width:110px}
+    .hist-detail{flex:1}
+    .hist-change{color:var(--fnt);font-size:11px;margin-top:2px}
   </style>
 </head>
 <body>
@@ -692,6 +697,16 @@
         <div class="fld"><label>Subcategorie</label><input type="text" id="m-sub-lod" placeholder="Optioneel"/></div>
         <div class="toggle-row"><div class="tog" id="tog-ib-l" onclick="this.classList.toggle('on')"></div><span>In behandeling</span></div>
       </div>
+      <!-- Geschiedenis per taak -->
+      <div id="fg-history" style="display:none;margin-top:16px;border-top:1px solid var(--bor);padding-top:14px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;cursor:pointer" onclick="toggleHistory()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--mut)" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span style="font-size:12px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.04em">Geschiedenis</span>
+          <span id="hist-count" style="font-size:11px;color:var(--fnt)"></span>
+          <svg id="hist-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--mut)" stroke-width="2.5" style="margin-left:auto;transition:transform .2s"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div id="hist-body" style="display:none;max-height:220px;overflow-y:auto"></div>
+      </div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-sec" id="m-cancel">Annuleren</button>
@@ -809,6 +824,10 @@ const ALLOWED_EMAILS = [
   'info@vvebeheercollectief.nl',
   'djiowchico@gmail.com',
 ];
+const EMAIL_NAMES = {
+  'info@vvebeheercollectief.nl':'Jer',
+  'djiowchico@gmail.com':'Cihad',
+};
 
 let oneSignalReady  = false;
 let isSubscribed    = false;
@@ -851,7 +870,7 @@ let pgs = {ntd:1,af:1,alvo:1,alfa:1,ontw:1,logboek:1};
 let activeOntw='Alles';
 let activeNtd='OPPAKKEN', activeAf='OPPAKKEN';
 let charts = {};
-let oauthToken=null, oauthExpiry=0, currentUserEmail=null, clientId='560046984985-1371r4bbt28umi6uslims6mlkucn1278.apps.googleusercontent.com';
+let oauthToken=null, oauthExpiry=0, currentUserEmail=null, _gsiTokenClient=null, clientId='560046984985-1371r4bbt28umi6uslims6mlkucn1278.apps.googleusercontent.com';
 let editMode=false, editRowData=null, editSec=null;
 let anaPeriod={vergader:'maand',notulen:'maand'};
 let _rowCache = [];
@@ -947,6 +966,16 @@ document.addEventListener('DOMContentLoaded',()=>{
     loadAll();
   },45000);
 
+  // Sessie herstellen uit sessionStorage
+  const _st=sessionStorage.getItem('oauthToken');
+  const _se=parseInt(sessionStorage.getItem('oauthExpiry')||'0');
+  const _sm=sessionStorage.getItem('currentUserEmail');
+  if(_st&&Date.now()<_se&&_sm&&ALLOWED_EMAILS.includes(_sm.toLowerCase())){
+    oauthToken=_st;oauthExpiry=_se;currentUserEmail=_sm;
+    document.getElementById('login-gate').style.display='none';
+    loadAll();
+  }
+
   goTo('ntd');
 });
 
@@ -1027,6 +1056,7 @@ async function loadAll(){
     ]);
     const ntdP=parseSections(ntdR); D.ntd=ntdP.data; D.ntdSecInfo=ntdP.secInfo;
     const afP=parseSections(afR); D.af=afP.data; D.afSecInfo=afP.secInfo;
+    SKEYS.forEach(s=>{if(D.af[s])D.af[s].sort((a,b)=>parseDt(b.datum)-parseDt(a.datum))});
     D.alvo=parseAlvo(alvoR);
     D.alfa=parseAlfa(alfaR);
     D.ontw=parseOntw(ontwR);
@@ -1557,8 +1587,10 @@ function openModal(isEdit,rowData){
     document.getElementById('m-code').value=editRowData.code||'';
     document.getElementById('m-naam').value=editRowData.naam||'';
     fillModalFields(sec,editRowData);
+    renderTaskHistory(editRowData.code,sec);
   } else {
     clearModal();
+    document.getElementById('fg-history').style.display='none';
   }
 
   document.getElementById('modal-bg').classList.add('open');
@@ -1571,21 +1603,21 @@ function closeModal(){document.getElementById('modal-bg').classList.remove('open
 function fillModalFields(sec,r){
   switch(sec){
     case'OPPAKKEN':
-      setv('m-actie',r.actiepunt);setv('m-dl',r.deadline);setv('m-beh',r.behandelaar);
+      setv('m-actie',r.actiepunt);setv('m-dl',toISODate(r.deadline));setv('m-beh',r.behandelaar);
       setv('m-prio',r.prioriteit);setv('m-opm',r.opmerkingen);setv('m-sub-opp',r.subcategorie);
       document.getElementById('tog-ib').classList.toggle('on',r.inBehandeling==='TRUE');break;
     case'VERGADERVERZOEKEN':
       setv('m-per',r.periode);setv('m-beh-v',r.behandelaar);setv('m-agenda',r.agendapunten||r.actiepunt);
-      setv('m-dl-v',r.deadline);setv('m-opm-v',r.opmerkingen);setv('m-sub-verg',r.subcategorie);
+      setv('m-dl-v',toISODate(r.deadline));setv('m-opm-v',r.opmerkingen);setv('m-sub-verg',r.subcategorie);
       document.getElementById('tog-ib-v').classList.toggle('on',r.inBehandeling==='TRUE');break;
     case'OFFERTE-TRAJECTEN':
-      setv('m-daang',r.datumAangevraagd);setv('m-beh-o',r.behandelaar);
+      setv('m-daang',toISODate(r.datumAangevraagd));setv('m-beh-o',r.behandelaar);
       {const[ор,от]=(r.offertes||'').split('/').map(s=>parseInt(s)||0);
       setv('m-off-recv',ор||0);setv('m-off-total',от||0);}
-      setv('m-dl-o',r.deadline);setv('m-opm-o',r.opmerkingen);setv('m-sub-off',r.subcategorie);break;
+      setv('m-dl-o',toISODate(r.deadline));setv('m-opm-o',r.opmerkingen);setv('m-sub-off',r.subcategorie);break;
     case'LOD':
       setv('m-actie-l',r.actiepunt);setv('m-stat-l',r.status);setv('m-beh-l',r.behandelaar);
-      setv('m-dl-l',r.deadline);setv('m-opm-l',r.opmerkingen);setv('m-sub-lod',r.subcategorie);
+      setv('m-dl-l',toISODate(r.deadline));setv('m-opm-l',r.opmerkingen);setv('m-sub-lod',r.subcategorie);
       document.getElementById('tog-ib-l').classList.toggle('on',r.inBehandeling==='TRUE');break;
   }
 }
@@ -1788,18 +1820,18 @@ async function submitTask(){
     const sub=gv(subId);
     switch(sec){
       case'OPPAKKEN':
-        values=[code,naam,gv('m-actie'),gv('m-dl'),gv('m-beh'),gv('m-prio'),gv('m-opm'),
+        values=[code,naam,gv('m-actie'),toDutchDate(gv('m-dl')),gv('m-beh'),gv('m-prio'),gv('m-opm'),
           document.getElementById('tog-ib').classList.contains('on'),'',sub];break;
       case'VERGADERVERZOEKEN':
-        values=[code,naam,gv('m-per'),gv('m-agenda'),gv('m-beh-v'),gv('m-dl-v'),gv('m-opm-v'),
+        values=[code,naam,gv('m-per'),gv('m-agenda'),gv('m-beh-v'),toDutchDate(gv('m-dl-v')),gv('m-opm-v'),
           document.getElementById('tog-ib-v').classList.contains('on'),'',sub];break;
       case'OFFERTE-TRAJECTEN':{
         const recv=parseInt(gv('m-off-recv'))||0;
         const total=parseInt(gv('m-off-total'))||0;
         const offStr=total>0?`${recv}/${total}`:'';
-        values=[code,naam,gv('m-daang'),offStr,gv('m-beh-o'),gv('m-dl-o'),gv('m-opm-o'),'','',sub];break;}
+        values=[code,naam,toDutchDate(gv('m-daang')),offStr,gv('m-beh-o'),toDutchDate(gv('m-dl-o')),gv('m-opm-o'),'','',sub];break;}
       case'LOD':
-        values=[code,naam,gv('m-actie-l'),gv('m-stat-l'),gv('m-beh-l'),gv('m-dl-l'),gv('m-opm-l'),
+        values=[code,naam,gv('m-actie-l'),gv('m-stat-l'),gv('m-beh-l'),toDutchDate(gv('m-dl-l')),gv('m-opm-l'),
           document.getElementById('tog-ib-l').classList.contains('on'),'',sub];break;
     }
 
@@ -1835,20 +1867,25 @@ function gv(id){const el=document.getElementById(id);return el?el.value.trim():'
 // ══════════════════════════════════════
 //  OAUTH
 // ══════════════════════════════════════
-function doOAuth(){
+function doOAuth(forcePrompt){
   return new Promise(resolve=>{
     if(!clientId){resolve(null);return}
     try{
-      google.accounts.oauth2.initTokenClient({
-        client_id:clientId,
-        scope:'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.email',
-        callback:resp=>{
-          if(resp.error){console.warn('OAuth fout:',resp.error);oauthToken=null;oauthExpiry=0;resolve(null);return}
-          oauthToken=resp.access_token;
-          oauthExpiry=Date.now()+((resp.expires_in||3600)-120)*1000;
-          resolve(oauthToken);
-        }
-      }).requestAccessToken();
+      if(!_gsiTokenClient){
+        _gsiTokenClient=google.accounts.oauth2.initTokenClient({
+          client_id:clientId,
+          scope:'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.email',
+          callback:resp=>{
+            if(resp.error){console.warn('OAuth fout:',resp.error);oauthToken=null;oauthExpiry=0;resolve(null);return}
+            oauthToken=resp.access_token;
+            oauthExpiry=Date.now()+((resp.expires_in||3600)-120)*1000;
+            sessionStorage.setItem('oauthToken',oauthToken);
+            sessionStorage.setItem('oauthExpiry',String(oauthExpiry));
+            resolve(oauthToken);
+          }
+        });
+      }
+      _gsiTokenClient.requestAccessToken(forcePrompt?{}:{prompt:''});
     }catch(e){console.error('OAuth:',e);resolve(null)}
   });
 }
@@ -1868,7 +1905,7 @@ async function doLogin(){
   const btn=document.getElementById('login-btn');
   errEl.style.display='none';
   btn.textContent='Even geduld…';btn.disabled=true;
-  await doOAuth();
+  await doOAuth(true);
   if(!oauthToken){errEl.textContent='Inloggen geannuleerd of mislukt.';errEl.style.display='block';btn.textContent='Inloggen met Google';btn.disabled=false;return}
   const email=await fetchUserEmail();
   if(!email){errEl.textContent='Kon e-mailadres niet ophalen.';errEl.style.display='block';btn.textContent='Inloggen met Google';btn.disabled=false;return}
@@ -1877,6 +1914,7 @@ async function doLogin(){
     errEl.textContent='Geen toegang. Gebruik je VvE Beheer Collectief account.';errEl.style.display='block';btn.textContent='Inloggen met Google';btn.disabled=false;return;
   }
   currentUserEmail=email;
+  sessionStorage.setItem('currentUserEmail',email);
   document.getElementById('login-gate').style.display='none';
   loadAll();
 }
@@ -1884,12 +1922,16 @@ async function doLogin(){
 async function ensureToken(){
   if(oauthToken && Date.now()<oauthExpiry) return true;
   oauthToken=null; oauthExpiry=0;
-  await doOAuth();
-  if(!oauthToken) return false;
+  await doOAuth(false);
+  if(!oauthToken){
+    await doOAuth(true);
+    if(!oauthToken) return false;
+  }
   if(currentUserEmail) return true;
   const email=await fetchUserEmail();
   if(!email||!ALLOWED_EMAILS.includes(email.toLowerCase())){oauthToken=null;oauthExpiry=0;return false}
   currentUserEmail=email;
+  sessionStorage.setItem('currentUserEmail',email);
   return true;
 }
 
@@ -1940,6 +1982,8 @@ function parseDt(s){
   const p=s.split('-');
   return p.length===3?new Date(parseInt(p[2]),parseInt(p[1])-1,parseInt(p[0])).getTime():0;
 }
+function toISODate(d){if(!d)return '';const p=d.split('-');return p.length===3?p[2]+'-'+p[1].padStart(2,'0')+'-'+p[0].padStart(2,'0'):''}
+function toDutchDate(d){if(!d)return '';const p=d.split('-');return p.length===3?p[2]+'-'+p[1]+'-'+p[0]:''}
 
 function emptyRow(cols,inline){
   if(inline)return`<div class="empty"><div class="empty-ico">📭</div>Geen resultaten</div>`;
@@ -2131,6 +2175,35 @@ function renderLogboek(){
     </tr>`).join('');
   }
   renderPag('logboek-pag',rows.length,pgs.logboek,p=>{pgs.logboek=p;renderLogboek()});
+}
+
+function toggleHistory(){
+  const body=document.getElementById('hist-body');
+  const chev=document.getElementById('hist-chevron');
+  const open=body.style.display==='none';
+  body.style.display=open?'':'none';
+  chev.style.transform=open?'rotate(180deg)':'';
+}
+
+function renderTaskHistory(code,sec){
+  const container=document.getElementById('fg-history');
+  const body=document.getElementById('hist-body');
+  const countEl=document.getElementById('hist-count');
+  if(!code||!D.logboek||!D.logboek.length){container.style.display='none';return}
+  const entries=D.logboek.filter(r=>r.code===code&&(!sec||r.sectie===sec||!r.sectie));
+  if(!entries.length){container.style.display='none';return}
+  container.style.display='';
+  countEl.textContent='('+entries.length+')';
+  body.innerHTML=entries.slice(0,50).map(r=>`<div class="hist-entry">
+    <div class="hist-ts">${esc(fmtLogTs(r.timestamp))}</div>
+    <div class="hist-detail">
+      ${actieBadge(r.actie)}
+      <span style="margin-left:6px;color:var(--mut)">${esc(r.gebruiker)}</span>
+      ${r.veld?`<div class="hist-change">${esc(r.veld)}: ${esc(r.oudeWaarde)} → ${esc(r.nieuweWaarde)}</div>`:''}
+    </div>
+  </div>`).join('');
+  body.style.display='none';
+  document.getElementById('hist-chevron').style.transform='';
 }
 
 async function logEvent(code, sec, actie, veld, oudeWaarde, nieuweWaarde) {
@@ -2370,9 +2443,16 @@ function onWhoChange() {
 
 function getCurrentWho() {
   const sel = document.getElementById('notif-who');
-  if (!sel) return localStorage.getItem('notif_who') || '';
-  if (sel.value === '__other__') return (document.getElementById('notif-who-other').value || '').trim();
-  return sel.value;
+  if (sel) {
+    if (sel.value === '__other__') {
+      const v = (document.getElementById('notif-who-other').value || '').trim();
+      if (v) return v;
+    } else if (sel.value) return sel.value;
+  }
+  const stored = localStorage.getItem('notif_who');
+  if (stored) return stored;
+  if (currentUserEmail) return EMAIL_NAMES[currentUserEmail.toLowerCase()] || currentUserEmail;
+  return '';
 }
 
 async function saveNotifPrefs(forceInit) {

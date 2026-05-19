@@ -627,7 +627,7 @@
           </div>
           <div class="fld"><label>Opmerkingen</label><input type="text" id="m-opm"/></div>
         </div>
-        <div class="fld"><label>Subcategorie</label><input type="text" id="m-sub-opp" placeholder="Optioneel"/></div>
+        <div class="fld"><label>Subcategorie</label><select id="m-sub-opp"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option></select></div>
         <div class="toggle-row"><div class="tog" id="tog-ib" onclick="this.classList.toggle('on')"></div><span>In behandeling</span></div>
       </div>
 
@@ -644,7 +644,7 @@
           <div class="fld"><label>Deadline uitschrijven</label><input type="date" id="m-dl-v"/></div>
           <div class="fld"><label>Opmerkingen</label><input type="text" id="m-opm-v"/></div>
         </div>
-        <div class="fld"><label>Subcategorie</label><input type="text" id="m-sub-verg" placeholder="Optioneel"/></div>
+        <div class="fld"><label>Subcategorie</label><select id="m-sub-verg"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option></select></div>
         <div class="toggle-row"><div class="tog" id="tog-ib-v" onclick="this.classList.toggle('on')"></div><span>In behandeling</span></div>
       </div>
 
@@ -678,7 +678,7 @@
           <div class="fld"><label>Deadline</label><input type="date" id="m-dl-o"/></div>
         </div>
         <div class="fld"><label>Opmerkingen</label><textarea id="m-opm-o"></textarea></div>
-        <div class="fld"><label>Subcategorie</label><input type="text" id="m-sub-off" placeholder="Optioneel"/></div>
+        <div class="fld"><label>Subcategorie</label><select id="m-sub-off"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option></select></div>
       </div>
 
       <!-- LOD -->
@@ -694,7 +694,7 @@
           <div class="fld"><label>Deadline LOD</label><input type="date" id="m-dl-l"/></div>
           <div class="fld"><label>Opmerkingen</label><input type="text" id="m-opm-l"/></div>
         </div>
-        <div class="fld"><label>Subcategorie</label><input type="text" id="m-sub-lod" placeholder="Optioneel"/></div>
+        <div class="fld"><label>Subcategorie</label><select id="m-sub-lod"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option></select></div>
         <div class="toggle-row"><div class="tog" id="tog-ib-l" onclick="this.classList.toggle('on')"></div><span>In behandeling</span></div>
       </div>
       <!-- Geschiedenis per taak -->
@@ -706,6 +706,10 @@
           <svg id="hist-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--mut)" stroke-width="2.5" style="margin-left:auto;transition:transform .2s"><polyline points="6 9 12 15 18 9"/></svg>
         </div>
         <div id="hist-body" style="display:none;max-height:220px;overflow-y:auto"></div>
+        <div id="hist-add" style="display:flex;gap:8px;margin-top:10px">
+          <input type="text" id="hist-note" placeholder="Opmerking toevoegen…" style="flex:1;font-size:12px"/>
+          <button class="btn btn-pri" onclick="addTaskNote()" style="padding:6px 14px;font-size:12px">Toevoegen</button>
+        </div>
       </div>
     </div>
     <div class="modal-foot">
@@ -1985,13 +1989,39 @@ function offProg(v){
     <div class="prog-bar"><div class="prog-fill" style="width:${pct}%;background:var(--pu)"></div></div></div>`;
 }
 
-function parseDt(s){
-  if(!s)return 0;
-  const p=s.split('-');
-  return p.length===3?new Date(parseInt(p[2]),parseInt(p[1])-1,parseInt(p[0])).getTime():0;
+const _MAANDEN={jan:1,feb:2,mrt:3,maa:3,apr:4,mei:5,jun:6,jul:7,aug:8,sep:9,okt:10,nov:11,dec:12,
+  januari:1,februari:2,maart:3,april:4,juni:6,juli:7,augustus:8,september:9,oktober:10,november:11,december:12};
+
+function _parseAnyDate(s){
+  if(!s)return null;
+  s=s.trim();
+  // yyyy-mm-dd (ISO)
+  let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if(m)return{y:+m[1],m:+m[2],d:+m[3]};
+  // dd-mm-yyyy
+  m=s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if(m)return{y:+m[3],m:+m[2],d:+m[1]};
+  // dd/mm/yyyy
+  m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(m)return{y:+m[3],m:+m[2],d:+m[1]};
+  // "21 mei 2026" / "3 januari 2025"
+  m=s.match(/^(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})$/);
+  if(m){const mn=_MAANDEN[m[2].toLowerCase()];if(mn)return{y:+m[3],m:mn,d:+m[1]}}
+  return null;
 }
-function toISODate(d){if(!d)return '';const p=d.split('-');return p.length===3?p[2]+'-'+p[1].padStart(2,'0')+'-'+p[0].padStart(2,'0'):''}
-function toDutchDate(d){if(!d)return '';const p=d.split('-');return p.length===3?p[2]+'-'+p[1]+'-'+p[0]:''}
+
+function parseDt(s){
+  const d=_parseAnyDate(s);
+  return d?new Date(d.y,d.m-1,d.d).getTime():0;
+}
+function toISODate(s){
+  const d=_parseAnyDate(s);
+  return d?`${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`:'';
+}
+function toDutchDate(s){
+  const d=_parseAnyDate(s);
+  return d?`${String(d.d).padStart(2,'0')}-${String(d.m).padStart(2,'0')}-${d.y}`:'';
+}
 
 function emptyRow(cols,inline){
   if(inline)return`<div class="empty"><div class="empty-ico">📭</div>Geen resultaten</div>`;
@@ -2154,6 +2184,7 @@ function actieBadge(actie){
     'Teruggezet':['--sec:var(--am);--sec-l:var(--am-l)','↩'],
     'Behandelaar gewijzigd':['--sec:var(--bl);--sec-l:var(--bl-l)','👤'],
     'Aangemaakt (sheet)':['--sec:var(--pu);--sec-l:var(--pu-l)','+'],
+    'Opmerking':['--sec:var(--am);--sec-l:var(--am-l)','💬'],
   };
   const[css,ico]=map[actie]||['',''];
   return css?`<span class="badge" style="background:var(--sec-l);color:var(--sec);${css}">${ico} ${esc(actie)}</span>`:`<span class="badge">${esc(actie)}</span>`;
@@ -2197,21 +2228,46 @@ function renderTaskHistory(code,sec){
   const container=document.getElementById('fg-history');
   const body=document.getElementById('hist-body');
   const countEl=document.getElementById('hist-count');
-  if(!code||!D.logboek||!D.logboek.length){container.style.display='none';return}
-  const entries=D.logboek.filter(r=>r.code===code&&(!sec||r.sectie===sec||!r.sectie));
-  if(!entries.length){container.style.display='none';return}
+  const noteInput=document.getElementById('hist-note');
+  if(noteInput)noteInput.value='';
+  if(!code){container.style.display='none';return}
   container.style.display='';
-  countEl.textContent='('+entries.length+')';
-  body.innerHTML=entries.slice(0,50).map(r=>`<div class="hist-entry">
-    <div class="hist-ts">${esc(fmtLogTs(r.timestamp))}</div>
-    <div class="hist-detail">
-      ${actieBadge(r.actie)}
-      <span style="margin-left:6px;color:var(--mut)">${esc(r.gebruiker)}</span>
-      ${r.veld?`<div class="hist-change">${esc(r.veld)}: ${esc(r.oudeWaarde)} → ${esc(r.nieuweWaarde)}</div>`:''}
-    </div>
-  </div>`).join('');
+  container.dataset.code=code;
+  container.dataset.sec=sec||'';
+  const entries=(D.logboek||[]).filter(r=>r.code===code&&(!sec||r.sectie===sec||!r.sectie));
+  countEl.textContent=entries.length?'('+entries.length+')':'';
+  if(!entries.length){
+    body.innerHTML='<div style="color:var(--mut);font-size:12px;padding:8px 0">Nog geen geschiedenis voor deze taak.</div>';
+  } else {
+    body.innerHTML=entries.slice(0,50).map(r=>`<div class="hist-entry">
+      <div class="hist-ts">${esc(fmtLogTs(r.timestamp))}</div>
+      <div class="hist-detail">
+        ${actieBadge(r.actie)}
+        <span style="margin-left:6px;color:var(--mut)">${esc(r.gebruiker)}</span>
+        ${r.veld?`<div class="hist-change">${esc(r.veld)}: ${esc(r.oudeWaarde)} → ${esc(r.nieuweWaarde)}</div>`:''}
+        ${r.actie==='Opmerking'&&r.nieuweWaarde?`<div class="hist-change">${esc(r.nieuweWaarde)}</div>`:''}
+      </div>
+    </div>`).join('');
+  }
   body.style.display='none';
   document.getElementById('hist-chevron').style.transform='';
+}
+
+async function addTaskNote(){
+  const note=(document.getElementById('hist-note').value||'').trim();
+  if(!note){alert('Typ eerst een opmerking.');return}
+  if(!await ensureToken()){alert('Inloggen mislukt.');return}
+  const container=document.getElementById('fg-history');
+  const code=container.dataset.code;
+  const sec=container.dataset.sec;
+  if(!code)return;
+  await logEvent(code,sec,'Opmerking','','',note);
+  document.getElementById('hist-note').value='';
+  D.logboek.unshift({_row:0,timestamp:new Date().toISOString(),code,sectie:sec,actie:'Opmerking',veld:'',oudeWaarde:'',nieuweWaarde:note,gebruiker:getCurrentWho()||'?'});
+  renderTaskHistory(code,sec);
+  const body=document.getElementById('hist-body');
+  body.style.display='';
+  document.getElementById('hist-chevron').style.transform='rotate(180deg)';
 }
 
 async function logEvent(code, sec, actie, veld, oudeWaarde, nieuweWaarde) {

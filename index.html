@@ -7,7 +7,7 @@
 
   <!-- PWA manifest -->
   <link rel="manifest" href="manifest.json"/>
-  <meta name="theme-color" content="#2B3544"/>
+  <meta name="theme-color" content="#243040"/>
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://accounts.google.com https://cdn.onesignal.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://sheets.googleapis.com https://www.googleapis.com https://script.google.com https://accounts.google.com https://onesignal.com https://*.onesignal.com; img-src 'self' data: https:; frame-src https://accounts.google.com;"/>
 
   <!-- iOS / Safari -->
@@ -25,24 +25,24 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
   <style>
     :root{
-      --bg:#f0f4f8;--sur:#fff;--sur2:#f8fafc;--bor:#e2e8f0;
+      --bg:#F0F2F5;--sur:#fff;--sur2:#F7F8FA;--bor:#e2e8f0;
       --txt:#0f172a;--mut:#64748b;--fnt:#94a3b8;
       --r:12px;--rs:8px;--sh:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.05);
       --shm:0 4px 16px rgba(0,0,0,.09);--shl:0 20px 60px rgba(0,0,0,.18);
       --sb:240px;--hh:60px;--tr:.17s ease;
-      --bl:#2563eb;--bl-l:#dbeafe;--bl-b:#bfdbfe;
-      --am:#d97706;--am-l:#fef3c7;--am-b:#fde68a;
-      --pu:#7c3aed;--pu-l:#ede9fe;--pu-b:#ddd6fe;
-      --rd:#dc2626;--rd-l:#fee2e2;--rd-b:#fecaca;
-      --gn:#059669;--gn-l:#d1fae5;--gn-b:#a7f3d0;
-      --pk:#db2777;--pk-l:#fce7f3;--pk-b:#fbcfe8;
+      --bl:#1D6AA5;--bl-l:#E0EEF9;--bl-b:#B8D4EC;
+      --am:#B45309;--am-l:#fef3c7;--am-b:#FCD34D;
+      --pu:#6D5BD0;--pu-l:#EEEAFD;--pu-b:#D4CCFA;
+      --rd:#B91C1C;--rd-l:#fee2e2;--rd-b:#fecaca;
+      --gn:#047857;--gn-l:#d1fae5;--gn-b:#a7f3d0;
+      --pk:#BE185D;--pk-l:#fce7f3;--pk-b:#fbcfe8;
       --ac:#0D7377;--ac-l:#CCFBF1;--ac-b:#5EEAD4;--ac-900:#064E50;--ac-500:#14B8A6;
       --nv:#2B3544;--nv-d:#1E2530;
     }
     [data-theme=dark]{
       --bg:#1E2530;--sur:#2B3544;--sur2:#232D3A;--bor:#3A4553;
       --txt:#f1f5f9;--mut:#94a3b8;--fnt:#475569;
-      --bl-l:#1e3a8a;--am-l:#451a03;--pu-l:#2e1065;--rd-l:#450a0a;--gn-l:#064e3b;--pk-l:#500724;
+      --bl-l:#1a3d6b;--am-l:#451a03;--pu-l:#2e1a5e;--rd-l:#450a0a;--gn-l:#064e3b;--pk-l:#500724;
       --ac-l:#064E50;--ac-b:#0D7377;
     }
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -57,19 +57,19 @@
     #overlay.on{display:block}
 
     /* Sidebar */
-    #sb{width:var(--sb);background:var(--nv);border-right:1px solid var(--bor);display:flex;flex-direction:column;flex-shrink:0;z-index:200;transition:transform var(--tr);color:#e2e8f0}
+    #sb{width:var(--sb);background:linear-gradient(180deg,#2B3544 0%,#243040 100%);border-right:1px solid var(--bor);display:flex;flex-direction:column;flex-shrink:0;z-index:200;transition:transform var(--tr);color:#e2e8f0}
     .sb-logo{padding:15px 16px;border-bottom:1px solid #3A4553;display:flex;align-items:center;gap:10px}
     .sb-logo img{height:30px;width:auto;object-fit:contain}
-    .sb-logo-fb{width:30px;height:30px;background:linear-gradient(135deg,#2B3544,#0D7377);border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:11px;flex-shrink:0}
+    .sb-logo-fb{width:30px;height:30px;background:linear-gradient(135deg,#0D7377,#14B8A6);border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:11px;flex-shrink:0}
     .sb-brand{font-size:12.5px;font-weight:700;line-height:1.25}
     .sb-brand span{display:block;font-size:11px;font-weight:400;color:#94a3b8}
     .sb-nav{flex:1;padding:8px 8px;overflow-y:auto}
     .sb-lbl{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#64748b;padding:13px 10px 5px}
-    .ni{display:flex;align-items:center;gap:9px;padding:8px 11px;border-radius:var(--rs);color:#94a3b8;font-weight:500;font-size:13px;cursor:pointer;transition:background var(--tr),color var(--tr);user-select:none}
+    .ni{display:flex;align-items:center;gap:9px;padding:8px 11px;border-radius:var(--rs);color:#94a3b8;font-weight:500;font-size:13px;cursor:pointer;transition:background var(--tr),color var(--tr),border var(--tr);user-select:none;border-left:3px solid transparent;margin-left:0}
     .ni:hover{background:rgba(255,255,255,.08);color:#f1f5f9}
-    .ni.on{background:rgba(13,115,119,.25);color:#5EEAD4}
+    .ni.on{background:linear-gradient(135deg,rgba(13,115,119,.35),rgba(20,184,166,.12));color:#5EEAD4;border-left:3px solid #14B8A6;font-weight:600}
     .ni svg{width:15px;height:15px;flex-shrink:0}
-    .ni-badge{margin-left:auto;padding:2px 7px;border-radius:20px;font-size:11px;font-weight:700;background:var(--ac);color:#fff}
+    .ni-badge{margin-left:auto;padding:2px 7px;border-radius:20px;font-size:11px;font-weight:700;background:linear-gradient(135deg,#0D7377,#14B8A6);color:#fff}
     .ni.on .ni-badge{background:var(--sec,var(--ac))}
     .sb-foot{padding:12px 16px;border-top:1px solid #3A4553;display:flex;align-items:center;justify-content:space-between}
     .sync-row{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--mut)}
@@ -108,7 +108,7 @@
 
     /* Stats */
     .stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:12px;margin-bottom:18px}
-    .stat{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);padding:16px 18px;box-shadow:var(--sh);border-top:3px solid var(--sec,var(--ac))}
+    .stat{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,.06),0 2px 8px color-mix(in srgb,var(--sec,var(--ac)) 12%,transparent);border-top:3px solid var(--sec,var(--ac))}
     .stat-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px}
     .stat-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mut)}
     .stat-ico{width:34px;height:34px;border-radius:9px;background:var(--sec-l,var(--ac-l));display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--sec,var(--ac))}
@@ -843,16 +843,16 @@ let _notifPollTimer = null;
 let _shownToasts    = new Set();
 
 const SECS = {
-  OPPAKKEN:{label:'Oppakken',css:'--sec:var(--bl);--sec-l:var(--bl-l);--sec-b:var(--bl-b)',color:'#2563eb',
+  OPPAKKEN:{label:'Oppakken',css:'--sec:var(--ac);--sec-l:var(--ac-l);--sec-b:var(--ac-b)',color:'#0D7377',
     cols:['VvE Code','VvE','Actiepunt','Deadline','Behandelaar','Prioriteit','Opmerkingen','In beh.'],
     keys:['code','naam','actiepunt','deadline','behandelaar','prioriteit','opmerkingen','inBehandeling']},
-  VERGADERVERZOEKEN:{label:'Vergaderverzoeken',css:'--sec:var(--am);--sec-l:var(--am-l);--sec-b:var(--am-b)',color:'#d97706',
+  VERGADERVERZOEKEN:{label:'Vergaderverzoeken',css:'--sec:var(--am);--sec-l:var(--am-l);--sec-b:var(--am-b)',color:'#B45309',
     cols:['VvE Code','VvE','Periode','Agendapunten','Behandelaar','Deadline uitschr.','Opmerkingen','In beh.'],
     keys:['code','naam','periode','agendapunten','behandelaar','deadline','opmerkingen','inBehandeling']},
-  'OFFERTE-TRAJECTEN':{label:'Offerte-trajecten',css:'--sec:var(--pu);--sec-l:var(--pu-l);--sec-b:var(--pu-b)',color:'#7c3aed',
+  'OFFERTE-TRAJECTEN':{label:'Offerte-trajecten',css:'--sec:var(--pu);--sec-l:var(--pu-l);--sec-b:var(--pu-b)',color:'#6D5BD0',
     cols:['VvE Code','VvE','Datum aangevr.','Ontvangen/Aangevr.','Behandelaar','Deadline','Opmerkingen'],
     keys:['code','naam','datumAangevraagd','offertes','behandelaar','deadline','opmerkingen']},
-  LOD:{label:'LOD',css:'--sec:var(--rd);--sec-l:var(--rd-l);--sec-b:var(--rd-b)',color:'#dc2626',
+  LOD:{label:'LOD',css:'--sec:var(--rd);--sec-l:var(--rd-l);--sec-b:var(--rd-b)',color:'#B91C1C',
     cols:['VvE Code','VvE','Actiepunt','Status','Behandelaar','Deadline LOD','Opmerkingen','In beh.'],
     keys:['code','naam','actiepunt','status','behandelaar','deadline','opmerkingen','inBehandeling']},
 };
@@ -1144,7 +1144,7 @@ function renderAll(){
 // ══════════════════════════════════════
 const SEC_ICONS={OPPAKKEN:'<i class="ph-duotone ph-clipboard-text"></i>',VERGADERVERZOEKEN:'<i class="ph-duotone ph-calendar-dots"></i>','OFFERTE-TRAJECTEN':'<i class="ph-duotone ph-file-text"></i>',LOD:'<i class="ph-duotone ph-warning"></i>'};
 const SEC_THEMES={
-  OPPAKKEN:'--sec:var(--bl);--sec-l:var(--bl-l)',
+  OPPAKKEN:'--sec:var(--ac);--sec-l:var(--ac-l)',
   VERGADERVERZOEKEN:'--sec:var(--am);--sec-l:var(--am-l)',
   'OFFERTE-TRAJECTEN':'--sec:var(--pu);--sec-l:var(--pu-l)',
   LOD:'--sec:var(--rd);--sec-l:var(--rd-l)',
@@ -1314,13 +1314,13 @@ function buildAnalytics(){
   const nData=groupByPeriod(D.alfa,anaPeriod.notulen); // same source for now
 
   buildBarChart('chart-vergader',vLabels,vLabels.map(l=>vData[l]||0),'#0D7377',tc,gc);
-  buildBarChart('chart-notulen',nLabels,nLabels.map(l=>nData[l]||0),'#059669',tc,gc);
+  buildBarChart('chart-notulen',nLabels,nLabels.map(l=>nData[l]||0),'#047857',tc,gc);
 
   // Status donut — Uitnodiging verstuurd = "afgerond" (fix 4), getallen (fix 3)
-  buildDonut('chart-status',['Uitgeschreven','Nog uitschrijven'],[uitn,tot-uitn],['#0D7377','#ef4444'],tc,`${uitn}/${tot}`,'Uitgeschreven');
+  buildDonut('chart-status',['Uitgeschreven','Nog uitschrijven'],[uitn,tot-uitn],['#0D7377','#B91C1C'],tc,`${uitn}/${tot}`,'Uitgeschreven');
 
   // Begroting donut — getallen
-  buildDonut('chart-begroting',['Doorgezet','Niet doorgezet'],[begr,tot-begr],['#7c3aed','#e2e8f0'],tc,`${begr}/${tot}`,'Doorgezet');
+  buildDonut('chart-begroting',['Doorgezet','Niet doorgezet'],[begr,tot-begr],['#6D5BD0','#e2e8f0'],tc,`${begr}/${tot}`,'Doorgezet');
 }
 
 function groupByPeriod(rows,period){
@@ -1440,12 +1440,12 @@ function buildDash(){
     <div class="stat" style="--sec:var(--gn);--sec-l:var(--gn-l)"><div class="stat-top"><div class="stat-lbl">Notulen verstuurd</div><div class="stat-ico"><i class="ph-duotone ph-note-pencil"></i></div></div><div class="stat-num">${notulenD}</div><div class="stat-sub">van ${uitnD} uitgeschreven</div></div>`;
 
   // ALV progress donut — uitnodiging=afgerond (fix 4), getallen (fix 3)
-  buildDonut('chart-alv-prog',['Uitgeschreven','Nog uitschrijven'],[uitnD,totD-uitnD],['#0D7377','#ef4444'],tc,`${uitnD}/${totD}`,'Uitgeschreven');
+  buildDonut('chart-alv-prog',['Uitgeschreven','Nog uitschrijven'],[uitnD,totD-uitnD],['#0D7377','#B91C1C'],tc,`${uitnD}/${totD}`,'Uitgeschreven');
 
   // Taken per categorie
   const catTotal=SKEYS.reduce((s,k)=>s+(D.ntd[k]?.length||0),0);
   buildDonut('chart-taken-cat',SKEYS.map(s=>SECS[s].label),SKEYS.map(s=>D.ntd[s]?.length||0),
-    ['#2563eb','#d97706','#7c3aed','#dc2626'],tc,`${catTotal}`,'open taken');
+    ['#0D7377','#B45309','#6D5BD0','#B91C1C'],tc,`${catTotal}`,'open taken');
 
   // Recent afgerond
   const secPill={

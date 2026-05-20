@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Logo-pakket — VvE Beheer Collectief</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #2B3544; }
+  .header { background: #2B3544; color: white; padding: 40px 20px; text-align: center; }
+  .header h1 { font-size: 28px; margin-bottom: 8px; }
+  .header p { opacity: 0.7; font-size: 15px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 30px 20px; }
+  .section { margin-bottom: 40px; }
+  .section h2 { font-size: 20px; margin-bottom: 6px; color: #2B3544; }
+  .section .subtitle { font-size: 13px; color: #888; margin-bottom: 16px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+  .card { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .card-preview { display: flex; align-items: center; justify-content: center; min-height: 180px; padding: 20px; }
+  .card-preview.light { background: #ffffff; }
+  .card-preview.dark { background: #2B3544; }
+  .card-preview.checker {
+    background-image: repeating-conic-gradient(#e8e8e8 0% 25%, #fff 0% 50%);
+    background-size: 16px 16px;
+  }
+  .card-preview img { max-width: 100%; max-height: 160px; object-fit: contain; }
+  .card-preview.small img { max-height: 64px; image-rendering: pixelated; }
+  .card-info { padding: 12px 16px; border-top: 1px solid #f0f0f0; }
+  .card-info .name { font-size: 13px; font-weight: 600; font-family: 'SF Mono', monospace; color: #2B3544; }
+  .card-info .desc { font-size: 12px; color: #888; margin-top: 2px; }
+  .color-row { display: flex; gap: 16px; margin-bottom: 20px; }
+  .color-swatch { width: 80px; height: 80px; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.12); }
+  .color-label { font-size: 13px; font-weight: 600; margin-top: 6px; }
+  .color-hex { font-size: 12px; color: #888; font-family: monospace; }
+  .wide-grid { grid-template-columns: 1fr; }
+  .wide-grid .card-preview img { max-height: 200px; }
+  .badge { display: inline-block; background: #e8ecf0; color: #2B3544; font-size: 11px; padding: 2px 8px; border-radius: 6px; font-weight: 600; margin-left: 6px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Logo-pakket</h1>
+  <p>VvE Beheer Collectief — 22 bestanden</p>
+</div>
+
+<div class="container">
+
+  <!-- Brand kleuren -->
+  <div class="section">
+    <h2>Brandkleuren</h2>
+    <div class="subtitle">De twee kleuren van het logo</div>
+    <div class="color-row">
+      <div>
+        <div class="color-swatch" style="background:#2B3544;"></div>
+        <div class="color-label">Donker Navy</div>
+        <div class="color-hex">#2B3544</div>
+      </div>
+      <div>
+        <div class="color-swatch" style="background:#FFFFFF; border: 1px solid #e0e0e0;"></div>
+        <div class="color-label">Wit</div>
+        <div class="color-hex">#FFFFFF</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Volledige logo's -->
+  <div class="section">
+    <h2>Volledig logo <span class="badge">Master</span></h2>
+    <div class="subtitle">Icoon + tekst — hoge resolutie bronbestanden (4090 x 2022 px)</div>
+    <div class="grid">
+      <div class="card">
+        <div class="card-preview light">
+          <img src="logo-volledig-donker.png" alt="Logo donker">
+        </div>
+        <div class="card-info">
+          <div class="name">logo-volledig-donker.png</div>
+          <div class="desc">Donker op transparant — voor lichte achtergronden</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-preview dark">
+          <img src="logo-volledig-wit.png" alt="Logo wit">
+        </div>
+        <div class="card-info">
+          <div class="name">logo-volledig-wit.png</div>
+          <div class="desc">Wit op transparant — voor donkere achtergronden</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Icoon los -->
+  <div class="section">
+    <h2>Icoon (zonder tekst)</h2>
+    <div class="subtitle">Alleen de handen + dak — hoge resolutie (1509 x 1597 px)</div>
+    <div class="grid">
+      <div class="card">
+        <div class="card-preview light">
+          <img src="icoon-donker.png" alt="Icoon donker">
+        </div>
+        <div class="card-info">
+          <div class="name">icoon-donker.png</div>
+          <div class="desc">Donker op transparant</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-preview dark">
+          <img src="icoon-wit.png" alt="Icoon wit">
+        </div>
+        <div class="card-info">
+          <div class="name">icoon-wit.png</div>
+          <div class="desc">Wit op transparant</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- App-iconen -->
+  <div class="section">
+    <h2>App-iconen <span class="badge">PWA</span></h2>
+    <div class="subtitle">Vierkant, afgeronde hoeken, witte achtergrond — voor homescreen en app stores</div>
+    <div class="grid">
+      <div class="card">
+        <div class="card-preview checker">
+          <img src="app-icon-512.png" alt="512" style="max-height:140px;">
+        </div>
+        <div class="card-info">
+          <div class="name">app-icon-512.png</div>
+          <div class="desc">512x512 — PWA splashscreen</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-preview checker">
+          <img src="app-icon-192.png" alt="192" style="max-height:96px;">
+        </div>
+        <div class="card-info">
+          <div class="name">app-icon-192.png</div>
+          <div class="desc">192x192 — PWA manifest</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-preview checker">
+          <img src="app-icon-128.png" alt="128" style="max-height:64px;">
+        </div>
+        <div class="card-info">
+          <div class="name">app-icon-128.png</div>
+          <div class="desc">128x128 — Chrome Web Store</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-preview checker small">
+          <img src="app-icon-64.png" alt="64">
+        </div>
+        <div class="card-info">
+          <div class="name">app-icon-64.png</div>
+          <div class="desc">64x64 — Klein icoon</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Maskable -->
+  <div class="section">
+    <h2>Maskable iconen <span class="badge">Android</span></h2>
+    <div class="subtitle">Extra padding voor Android adaptive icons — het systeem knipt het in een cirkel of vorm</div>
+    <div class="grid">
+      <div class="card">
+        <div class="card-preview checker">
+          <img src="maskable-512.png" alt="Maskable 512" style="max-height:140px;">
+        </div>
+        <div class="card-info">
+          <div class="name">maskable-512.png</div>
+          <div class="desc">512x512 — manifest (purpose: maskable)</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-preview checker">
+          <img src="maskable-192.png" alt="Maskable 192" style="max-height:96px;">
+        </div>
+        <div class="card-info">
+          <div class="name">maskable-192.png</div>
+          <div class="desc">192x192 — manifest (purpose: maskable)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Favicons -->
+  <div class="section">
+    <h2>Favicons <span class="badge">Browser</span></h2>
+    <div class="subtitle">Voor het icoontje in de browser-tab</div>
+    <div class="grid">
+      <div class="card">
+        <div class="card-preview checker small">
+          <img src="favicon-48x48.png" alt="48" style="max-height:48px;">
+          <span style="margin:0 12px; color:#ccc;">|</span>
+          <img src="favicon-32x32.png" alt="32" style="max-height:32px;">
+          <span style="margin:0 12px; color:#ccc;">|</span>
+          <img src="favicon-16x16.png" alt="16" style="max-height:16px;">
+        </div>
+        <div class="card-info">
+          <div class="name">favicon-48 / 32 / 16.png</div>
+          <div class="desc">PNG favicons in drie maten</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-preview checker small">
+          <span style="font-size:40px;">📄</span>
+        </div>
+        <div class="card-info">
+          <div class="name">favicon.ico</div>
+          <div class="desc">ICO met 16/32/48 — universeel, werkt overal</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Apple -->
+  <div class="section">
+    <h2>Apple Touch Icon <span class="badge">iOS</span></h2>
+    <div class="subtitle">Wordt getoond als je de site toevoegt aan je iPhone homescreen</div>
+    <div class="grid">
+      <div class="card">
+        <div class="card-preview checker">
+          <img src="apple-touch-icon.png" alt="Apple" style="max-height:100px;">
+        </div>
+        <div class="card-info">
+          <div class="name">apple-touch-icon.png</div>
+          <div class="desc">180x180 — iOS homescreen icoon</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Social media -->
+  <div class="section">
+    <h2>Social media / Open Graph</h2>
+    <div class="subtitle">Preview-afbeelding als je een link deelt via WhatsApp, Facebook of LinkedIn</div>
+    <div class="grid wide-grid">
+      <div class="card">
+        <div class="card-preview light" style="padding:10px;">
+          <img src="og-image-1200x630.png" alt="OG licht" style="max-height:260px; border-radius:8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+        </div>
+        <div class="card-info">
+          <div class="name">og-image-1200x630.png</div>
+          <div class="desc">1200x630 — Lichte variant</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-preview light" style="padding:10px;">
+          <img src="og-image-donker-1200x630.png" alt="OG donker" style="max-height:260px; border-radius:8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+        </div>
+        <div class="card-info">
+          <div class="name">og-image-donker-1200x630.png</div>
+          <div class="desc">1200x630 — Donkere variant</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Banners -->
+  <div class="section">
+    <h2>Banners</h2>
+    <div class="subtitle">Voor e-mail handtekeningen, website headers, briefpapier</div>
+    <div class="grid wide-grid">
+      <div class="card">
+        <div class="card-preview light">
+          <img src="banner-wit-800x200.png" alt="Banner wit">
+        </div>
+        <div class="card-info">
+          <div class="name">banner-wit-800x200.png</div>
+          <div class="desc">800x200 — Lichte achtergrond</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-preview dark">
+          <img src="banner-donker-800x200.png" alt="Banner donker">
+        </div>
+        <div class="card-info">
+          <div class="name">banner-donker-800x200.png</div>
+          <div class="desc">800x200 — Donkere achtergrond</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Overig -->
+  <div class="section">
+    <h2>Overig</h2>
+    <div class="subtitle">Windows tile, notification badge</div>
+    <div class="grid">
+      <div class="card">
+        <div class="card-preview checker">
+          <img src="mstile-150x150.png" alt="Tile" style="max-height:100px;">
+        </div>
+        <div class="card-info">
+          <div class="name">mstile-150x150.png</div>
+          <div class="desc">150x150 — Windows Start-tegel</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-preview dark small">
+          <img src="badge-96.png" alt="Badge" style="max-height:48px;">
+        </div>
+        <div class="card-info">
+          <div class="name">badge-96.png</div>
+          <div class="desc">96x96 — Push notification badge (wit)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VvE Beheer Collectief — Brand Preview</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter',sans-serif; background:#f5f5f5; color:#1e293b; padding:40px; }
+  h1 { font-size:28px; font-weight:800; margin-bottom:8px; }
+  .subtitle { font-size:14px; color:#64748b; margin-bottom:48px; }
+
+  section { margin-bottom:56px; }
+  h2 { font-size:18px; font-weight:700; margin-bottom:20px; border-bottom:2px solid #e2e8f0; padding-bottom:8px; }
+
+  /* Color swatches */
+  .palette { display:flex; gap:16px; flex-wrap:wrap; margin-bottom:32px; }
+  .swatch { width:160px; border-radius:12px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,.1); background:#fff; }
+  .swatch-color { height:100px; display:flex; align-items:end; padding:10px; }
+  .swatch-info { padding:12px; }
+  .swatch-name { font-size:13px; font-weight:700; }
+  .swatch-hex { font-size:12px; color:#64748b; font-family:monospace; }
+  .swatch-role { font-size:11px; color:#94a3b8; margin-top:2px; }
+
+  /* Teal variants */
+  .teal-options { display:flex; gap:24px; flex-wrap:wrap; margin-bottom:32px; }
+  .teal-card { flex:1; min-width:280px; background:#fff; border-radius:16px; padding:28px; box-shadow:0 2px 12px rgba(0,0,0,.08); }
+  .teal-card h3 { font-size:15px; font-weight:700; margin-bottom:16px; }
+  .teal-strip { height:60px; border-radius:10px; margin-bottom:12px; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:14px; }
+  .teal-shades { display:flex; gap:6px; margin-bottom:16px; }
+  .teal-shade { flex:1; height:36px; border-radius:6px; }
+  .teal-label { font-size:11px; color:#64748b; text-align:center; margin-top:4px; }
+
+  /* Button previews */
+  .btn-row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:16px; }
+  .btn { padding:9px 20px; border-radius:8px; font-size:13px; font-weight:600; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+  .btn-outline { background:transparent; border:2px solid; }
+
+  /* Dashboard mockup */
+  .mock { background:#fff; border-radius:16px; box-shadow:0 4px 20px rgba(0,0,0,.1); overflow:hidden; max-width:700px; }
+  .mock-sidebar { width:200px; background:#2B3544; min-height:360px; display:flex; flex-direction:column; padding:16px 0; }
+  .mock-layout { display:flex; }
+  .mock-main { flex:1; padding:24px; background:#f0f4f8; }
+  .mock-logo { padding:12px 16px; display:flex; align-items:center; gap:10px; border-bottom:1px solid rgba(255,255,255,.1); margin-bottom:16px; }
+  .mock-logo-icon { width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; font-size:10px; }
+  .mock-logo-text { color:#fff; font-size:12px; font-weight:700; line-height:1.3; }
+  .mock-logo-text span { display:block; font-size:10px; font-weight:400; color:rgba(255,255,255,.5); }
+  .mock-nav { padding:0 10px; }
+  .mock-nav-item { padding:8px 12px; border-radius:8px; color:rgba(255,255,255,.5); font-size:12px; font-weight:500; margin-bottom:4px; display:flex; align-items:center; gap:8px; }
+  .mock-nav-item.active { color:#fff; }
+  .mock-stat-row { display:flex; gap:12px; margin-bottom:20px; }
+  .mock-stat { flex:1; background:#fff; border-radius:10px; padding:14px; border-top:3px solid; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+  .mock-stat-val { font-size:22px; font-weight:800; }
+  .mock-stat-lbl { font-size:10px; color:#64748b; font-weight:600; text-transform:uppercase; letter-spacing:.05em; }
+  .mock-table { background:#fff; border-radius:10px; padding:16px; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+  .mock-table-hdr { display:flex; gap:8px; margin-bottom:12px; align-items:center; }
+  .mock-table-hdr h3 { font-size:14px; font-weight:700; flex:1; }
+  .mock-row { display:flex; padding:10px 0; border-bottom:1px solid #e2e8f0; font-size:12px; align-items:center; }
+  .mock-row:last-child { border:none; }
+  .mock-cell { flex:1; }
+  .mock-badge { padding:3px 10px; border-radius:20px; font-size:10px; font-weight:700; display:inline-block; }
+
+  /* Combo strip */
+  .combo-strip { display:flex; border-radius:12px; overflow:hidden; height:80px; max-width:500px; margin-bottom:16px; }
+  .combo-part { flex:1; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; }
+</style>
+</head>
+<body>
+
+<h1>VvE Beheer Collectief — Brand Kleuren Preview</h1>
+<p class="subtitle">Gebaseerd op het logo: donker navy als primaire kleur, met diep teal als accentkleur</p>
+
+<!-- SECTION: Logo kleur -->
+<section>
+  <h2>1. Basiskleuren uit het logo</h2>
+  <div class="palette">
+    <div class="swatch">
+      <div class="swatch-color" style="background:#2B3544;">
+        <span style="color:#fff;font-size:11px;font-weight:600;">Aa</span>
+      </div>
+      <div class="swatch-info">
+        <div class="swatch-name">Navy (primair)</div>
+        <div class="swatch-hex">#2B3544</div>
+        <div class="swatch-role">Tekst, sidebar, headers</div>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-color" style="background:#1E2530;">
+        <span style="color:#fff;font-size:11px;font-weight:600;">Aa</span>
+      </div>
+      <div class="swatch-info">
+        <div class="swatch-name">Navy donker</div>
+        <div class="swatch-hex">#1E2530</div>
+        <div class="swatch-role">Dark mode, hover-states</div>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-color" style="background:#FFFFFF; border:1px solid #e2e8f0;">
+        <span style="color:#2B3544;font-size:11px;font-weight:600;">Aa</span>
+      </div>
+      <div class="swatch-info">
+        <div class="swatch-name">Wit</div>
+        <div class="swatch-hex">#FFFFFF</div>
+        <div class="swatch-role">Achtergrond, kaarten</div>
+      </div>
+    </div>
+    <div class="swatch">
+      <div class="swatch-color" style="background:#F0F2F5;">
+        <span style="color:#2B3544;font-size:11px;font-weight:600;">Aa</span>
+      </div>
+      <div class="swatch-info">
+        <div class="swatch-name">Lichtgrijs</div>
+        <div class="swatch-hex">#F0F2F5</div>
+        <div class="swatch-role">Pagina-achtergrond</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION: Teal opties -->
+<section>
+  <h2>2. Accentkleur — Drie teal-varianten</h2>
+  <div class="teal-options">
+
+    <div class="teal-card">
+      <h3>A. Diep Teal (donker)</h3>
+      <div class="teal-strip" style="background:#0D7377;">Primair accent</div>
+      <div class="teal-shades">
+        <div>
+          <div class="teal-shade" style="background:#064E50;"></div>
+          <div class="teal-label">900</div>
+        </div>
+        <div>
+          <div class="teal-shade" style="background:#0D7377;"></div>
+          <div class="teal-label">700</div>
+        </div>
+        <div>
+          <div class="teal-shade" style="background:#14B8A6;"></div>
+          <div class="teal-label">500</div>
+        </div>
+        <div>
+          <div class="teal-shade" style="background:#5EEAD4;"></div>
+          <div class="teal-label">300</div>
+        </div>
+        <div>
+          <div class="teal-shade" style="background:#CCFBF1;"></div>
+          <div class="teal-label">100</div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn" style="background:#0D7377;color:#fff;">Nieuwe taak +</button>
+        <button class="btn btn-outline" style="border-color:#0D7377;color:#0D7377;">Annuleer</button>
+      </div>
+      <p style="font-size:11px;color:#64748b;margin-top:12px;">Meest krachtig &amp; professioneel. Subtiel contrast met navy.</p>
+    </div>
+
+    <div class="teal-card">
+      <h3>B. Midden Teal (gebalanceerd)</h3>
+      <div class="teal-strip" style="background:#0F8B8D;">Primair accent</div>
+      <div class="teal-shades">
+        <div>
+          <div class="teal-shade" style="background:#065F60;"></div>
+          <div class="teal-label">900</div>
+        </div>
+        <div>
+          <div class="teal-shade" style="background:#0F8B8D;"></div>
+          <div class="teal-label">700</div>
+        </div>
+        <div>
+          <div class="teal-shade" style="background:#2DD4BF;"></div>
+          <div class="teal-label">500</div>
+        </div>
+        <div>
+          <div class="teal-shade" style="background:#99F6E4;"></div>
+          <div class="teal-label">300</div>
+        </div>
+        <div>
+          <div class="teal-shade" style="background:#D5FAF4;"></div>
+          <div class="teal-label">100</div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn" style="background:#0F8B8D;color:#fff;">Nieuwe taak +</button>
+        <button class="btn btn-outline" style="border-color:#0F8B8D;color:#0F8B8D;">Annuleer</button>
+      </div>
+      <p style="font-size:11px;color:#64748b;margin-top:12px;">Balans tussen krachtig en toegankelijk. Iets lichter, maar nog steeds serieus.</p>
+    </div>
+
+    <div class="teal-card">
+      <h3>C. Warm Teal (toegankelijk)</h3>
+      <div class="teal-strip" style="background:#0E9AA7;">Primair accent</div>
+      <div class="teal-shades">
+        <div>
+          <div class="teal-shade" style="background:#076B75;"></div>
+          <div class="teal-label">900</div>
+        </div>
+        <div>
+          <div class="teal-shade" style="background:#0E9AA7;"></div>
+          <div class="teal-label">700</div>
+        </div>
+        <div>
+          <div class="teal-shade" style="background:#38BEC9;"></div>
+          <div class="teal-label">500</div>
+        </div>
+        <div>
+          <div class="teal-shade" style="background:#A5E9ED;"></div>
+          <div class="teal-label">300</div>
+        </div>
+        <div>
+          <div class="teal-shade" style="background:#DFFBFC;"></div>
+          <div class="teal-label">100</div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn" style="background:#0E9AA7;color:#fff;">Nieuwe taak +</button>
+        <button class="btn btn-outline" style="border-color:#0E9AA7;color:#0E9AA7;">Annuleer</button>
+      </div>
+      <p style="font-size:11px;color:#64748b;margin-top:12px;">Meest toegankelijk &amp; uitnodigend. Iets meer energie.</p>
+    </div>
+  </div>
+
+  <!-- Combo strips -->
+  <h3 style="font-size:14px; font-weight:600; margin-bottom:12px;">Hoe ze naast het navy staan:</h3>
+  <div style="display:flex;flex-direction:column;gap:12px;max-width:500px;">
+    <div>
+      <div class="combo-strip">
+        <div class="combo-part" style="background:#2B3544;color:#fff;">Navy</div>
+        <div class="combo-part" style="background:#0D7377;color:#fff;">A. Diep</div>
+        <div class="combo-part" style="background:#CCFBF1;color:#0D7377;">A. Licht</div>
+        <div class="combo-part" style="background:#F0F2F5;color:#2B3544;">Grijs</div>
+      </div>
+    </div>
+    <div>
+      <div class="combo-strip">
+        <div class="combo-part" style="background:#2B3544;color:#fff;">Navy</div>
+        <div class="combo-part" style="background:#0F8B8D;color:#fff;">B. Midden</div>
+        <div class="combo-part" style="background:#D5FAF4;color:#0F8B8D;">B. Licht</div>
+        <div class="combo-part" style="background:#F0F2F5;color:#2B3544;">Grijs</div>
+      </div>
+    </div>
+    <div>
+      <div class="combo-strip">
+        <div class="combo-part" style="background:#2B3544;color:#fff;">Navy</div>
+        <div class="combo-part" style="background:#0E9AA7;color:#fff;">C. Warm</div>
+        <div class="combo-part" style="background:#DFFBFC;color:#0E9AA7;">C. Licht</div>
+        <div class="combo-part" style="background:#F0F2F5;color:#2B3544;">Grijs</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SECTION: Typography comparison -->
+<section>
+  <h2>3. Typografie vergelijking — drie opties</h2>
+  <p style="font-size:13px;color:#64748b;margin-bottom:28px;">Alle drie zijn gratis Google Fonts. Koppen in Navy, body in donkergrijs, accenten in Teal.</p>
+
+  <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:32px;">
+
+    <!-- Inter -->
+    <div style="flex:1;min-width:280px;background:#fff;border-radius:16px;padding:28px;box-shadow:0 2px 12px rgba(0,0,0,.08);">
+      <div style="font-size:11px;font-weight:700;color:#0D7377;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;">Huidige keuze</div>
+      <h3 style="font-family:'Inter',sans-serif;font-size:22px;font-weight:800;color:#2B3544;margin-bottom:4px;">Inter</h3>
+      <p style="font-family:'Inter',sans-serif;font-size:13px;color:#64748b;margin-bottom:20px;">Strak, neutraal, en breed inzetbaar</p>
+      <div style="border-top:1px solid #e2e8f0;padding-top:20px;">
+        <h4 style="font-family:'Inter',sans-serif;font-size:18px;font-weight:700;color:#2B3544;margin-bottom:6px;">VvE Beheer Collectief</h4>
+        <p style="font-family:'Inter',sans-serif;font-size:14px;color:#334155;line-height:1.6;margin-bottom:12px;">Professioneel beheer van uw Vereniging van Eigenaren. Wij zorgen voor transparante communicatie en zorgvuldig financieel beheer.</p>
+        <p style="font-family:'Inter',sans-serif;font-size:12px;color:#64748b;">Nog te doen &middot; 24 open taken &middot; 5 verlopen</p>
+        <div style="margin-top:14px;">
+          <button class="btn" style="font-family:'Inter',sans-serif;background:#0D7377;color:#fff;font-size:13px;">Nieuwe taak +</button>
+        </div>
+      </div>
+      <p style="font-size:11px;color:#94a3b8;margin-top:16px;">Zakelijk, clean. Geen extra uitstraling.</p>
+    </div>
+
+    <!-- DM Sans -->
+    <div style="flex:1;min-width:280px;background:#fff;border-radius:16px;padding:28px;box-shadow:0 2px 12px rgba(0,0,0,.08);border:2px solid #0D7377;">
+      <div style="font-size:11px;font-weight:700;color:#0D7377;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;">Aanbevolen</div>
+      <h3 style="font-family:'DM Sans',sans-serif;font-size:22px;font-weight:800;color:#2B3544;margin-bottom:4px;">DM Sans</h3>
+      <p style="font-family:'DM Sans',sans-serif;font-size:13px;color:#64748b;margin-bottom:20px;">Net iets ronder en warmer, subtiel luxer</p>
+      <div style="border-top:1px solid #e2e8f0;padding-top:20px;">
+        <h4 style="font-family:'DM Sans',sans-serif;font-size:18px;font-weight:700;color:#2B3544;margin-bottom:6px;">VvE Beheer Collectief</h4>
+        <p style="font-family:'DM Sans',sans-serif;font-size:14px;color:#334155;line-height:1.6;margin-bottom:12px;">Professioneel beheer van uw Vereniging van Eigenaren. Wij zorgen voor transparante communicatie en zorgvuldig financieel beheer.</p>
+        <p style="font-family:'DM Sans',sans-serif;font-size:12px;color:#64748b;">Nog te doen &middot; 24 open taken &middot; 5 verlopen</p>
+        <div style="margin-top:14px;">
+          <button class="btn" style="font-family:'DM Sans',sans-serif;background:#0D7377;color:#fff;font-size:13px;">Nieuwe taak +</button>
+        </div>
+      </div>
+      <p style="font-size:11px;color:#94a3b8;margin-top:16px;">Verfijnd maar niet overdreven. Voelt net wat premium.</p>
+    </div>
+
+    <!-- Plus Jakarta Sans -->
+    <div style="flex:1;min-width:280px;background:#fff;border-radius:16px;padding:28px;box-shadow:0 2px 12px rgba(0,0,0,.08);">
+      <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;">Alternatief</div>
+      <h3 style="font-family:'Plus Jakarta Sans',sans-serif;font-size:22px;font-weight:800;color:#2B3544;margin-bottom:4px;">Plus Jakarta Sans</h3>
+      <p style="font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;color:#64748b;margin-bottom:20px;">Geometrisch, modern, en fris</p>
+      <div style="border-top:1px solid #e2e8f0;padding-top:20px;">
+        <h4 style="font-family:'Plus Jakarta Sans',sans-serif;font-size:18px;font-weight:700;color:#2B3544;margin-bottom:6px;">VvE Beheer Collectief</h4>
+        <p style="font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;color:#334155;line-height:1.6;margin-bottom:12px;">Professioneel beheer van uw Vereniging van Eigenaren. Wij zorgen voor transparante communicatie en zorgvuldig financieel beheer.</p>
+        <p style="font-family:'Plus Jakarta Sans',sans-serif;font-size:12px;color:#64748b;">Nog te doen &middot; 24 open taken &middot; 5 verlopen</p>
+        <div style="margin-top:14px;">
+          <button class="btn" style="font-family:'Plus Jakarta Sans',sans-serif;background:#0D7377;color:#fff;font-size:13px;">Nieuwe taak +</button>
+        </div>
+      </div>
+      <p style="font-size:11px;color:#94a3b8;margin-top:16px;">Meest uitgesproken. Iets meer karakter, maar minder neutraal.</p>
+    </div>
+
+  </div>
+</section>
+
+<!-- SECTION: Icon comparison -->
+<section>
+  <h2>4. Iconen vergelijking — Emoji vs. Phosphor Duotone</h2>
+  <p style="font-size:13px;color:#64748b;margin-bottom:28px;">Links de huidige emoji-iconen, rechts de Phosphor duotone iconen in jullie huisstijlkleuren.</p>
+
+  <div style="display:flex;gap:32px;flex-wrap:wrap;">
+
+    <!-- OLD: Emoji sidebar -->
+    <div>
+      <div style="font-size:11px;font-weight:700;color:#DC2626;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;">Huidig (emoji)</div>
+      <div style="width:220px;background:#2B3544;border-radius:16px;padding:16px 0;box-shadow:0 4px 20px rgba(0,0,0,.15);">
+        <div style="padding:12px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,.1);margin-bottom:12px;">
+          <div style="width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#2B3544,#0D7377);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:10px;">VBC</div>
+          <div style="color:#fff;font-size:12px;font-weight:700;line-height:1.3;font-family:'DM Sans',sans-serif;">VvE Beheer<span style="display:block;font-size:10px;font-weight:400;color:rgba(255,255,255,.5);">Collectief Dashboard</span></div>
+        </div>
+        <div style="padding:0 10px;">
+          <div style="padding:8px 12px;border-radius:8px;background:#0D7377;color:#fff;font-size:12px;font-weight:500;margin-bottom:4px;display:flex;align-items:center;gap:8px;font-family:'DM Sans',sans-serif;">📋 Nog te doen</div>
+          <div style="padding:8px 12px;border-radius:8px;color:rgba(255,255,255,.5);font-size:12px;font-weight:500;margin-bottom:4px;display:flex;align-items:center;gap:8px;font-family:'DM Sans',sans-serif;">✅ Afgerond</div>
+          <div style="padding:8px 12px;border-radius:8px;color:rgba(255,255,255,.5);font-size:12px;font-weight:500;margin-bottom:4px;display:flex;align-items:center;gap:8px;font-family:'DM Sans',sans-serif;">📅 ALV's overzicht</div>
+          <div style="padding:8px 12px;border-radius:8px;color:rgba(255,255,255,.5);font-size:12px;font-weight:500;margin-bottom:4px;display:flex;align-items:center;gap:8px;font-family:'DM Sans',sans-serif;">📒 Logboek</div>
+          <div style="padding:8px 12px;border-radius:8px;color:rgba(255,255,255,.5);font-size:12px;font-weight:500;margin-bottom:4px;display:flex;align-items:center;gap:8px;font-family:'DM Sans',sans-serif;">🔔 Meldingen</div>
+          <div style="padding:8px 12px;border-radius:8px;color:rgba(255,255,255,.5);font-size:12px;font-weight:500;margin-bottom:4px;display:flex;align-items:center;gap:8px;font-family:'DM Sans',sans-serif;">📊 Statistieken</div>
+          <div style="padding:8px 12px;border-radius:8px;color:rgba(255,255,255,.5);font-size:12px;font-weight:500;margin-bottom:4px;display:flex;align-items:center;gap:8px;font-family:'DM Sans',sans-serif;">⚙️ Ontwikkeling</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- NEW: Phosphor Duotone sidebar -->
+    <div>
+      <div style="font-size:11px;font-weight:700;color:#0D7377;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;">Nieuw (Phosphor Duotone)</div>
+      <div style="width:220px;background:#2B3544;border-radius:16px;padding:16px 0;box-shadow:0 4px 20px rgba(0,0,0,.15);">
+        <div style="padding:12px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid rgba(255,255,255,.1);margin-bottom:12px;">
+          <div style="width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#2B3544,#0D7377);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:10px;">VBC</div>
+          <div style="color:#fff;font-size:12px;font-weight:700;line-height:1.3;font-family:'DM Sans',sans-serif;">VvE Beheer<span style="display:block;font-size:10px;font-weight:400;color:rgba(255,255,255,.5);">Collectief Dashboard</span></div>
+        </div>
+        <div style="padding:0 10px;">
+          <div style="padding:8px 12px;border-radius:8px;background:#0D7377;color:#fff;font-size:12px;font-weight:500;margin-bottom:4px;display:flex;align-items:center;gap:9px;font-family:'DM Sans',sans-serif;"><i class="ph-duotone ph-clipboard-text" style="font-size:18px;"></i> Nog te doen</div>
+          <div style="padding:8px 12px;border-radius:8px;color:rgba(255,255,255,.5);font-size:12px;font-weight:500;margin-bottom:4px;display:flex;align-items:center;gap:9px;font-family:'DM Sans',sans-serif;"><i class="ph-duotone ph-check-circle" style="font-size:18px;"></i> Afgerond</div>
+          <div style="padding:8px 12px;border-radius:8px;color:rgba(255,255,255,.5);font-size:12px;font-weight:500;margin-bottom:4px;display:flex;align-items:center;gap:9px;font-family:'DM Sans',sans-serif;"><i class="ph-duotone ph-calendar-blank" style="font-size:18px;"></i> ALV's overzicht</div>
+          <div style="padding:8px 12px;border-radius:8px;color:rgba(255,255,255,.5);font-size:12px;font-weight:500;margin-bottom:4px;display:flex;align-items:center;gap:9px;font-family:'DM Sans',sans-serif;"><i class="ph-duotone ph-book-open" style="font-size:18px;"></i> Logboek</div>
+          <div style="padding:8px 12px;border-radius:8px;color:rgba(255,255,255,.5);font-size:12px;font-weight:500;margin-bottom:4px;display:flex;align-items:center;gap:9px;font-family:'DM Sans',sans-serif;"><i class="ph-duotone ph-bell" style="font-size:18px;"></i> Meldingen</div>
+          <div style="padding:8px 12px;border-radius:8px;color:rgba(255,255,255,.5);font-size:12px;font-weight:500;margin-bottom:4px;display:flex;align-items:center;gap:9px;font-family:'DM Sans',sans-serif;"><i class="ph-duotone ph-chart-bar" style="font-size:18px;"></i> Statistieken</div>
+          <div style="padding:8px 12px;border-radius:8px;color:rgba(255,255,255,.5);font-size:12px;font-weight:500;margin-bottom:4px;display:flex;align-items:center;gap:9px;font-family:'DM Sans',sans-serif;"><i class="ph-duotone ph-gear" style="font-size:18px;"></i> Ontwikkeling</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Standalone icon showcase -->
+    <div style="flex:1;min-width:280px;">
+      <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px;">Iconen op lichte achtergrond</div>
+      <div style="background:#fff;border-radius:16px;padding:28px;box-shadow:0 2px 12px rgba(0,0,0,.08);">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:20px;text-align:center;">
+          <div>
+            <div style="width:48px;height:48px;border-radius:12px;background:#CCFBF1;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;"><i class="ph-duotone ph-clipboard-text" style="font-size:24px;color:#0D7377;"></i></div>
+            <div style="font-size:10px;color:#64748b;font-family:'DM Sans',sans-serif;">Taken</div>
+          </div>
+          <div>
+            <div style="width:48px;height:48px;border-radius:12px;background:#CCFBF1;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;"><i class="ph-duotone ph-check-circle" style="font-size:24px;color:#0D7377;"></i></div>
+            <div style="font-size:10px;color:#64748b;font-family:'DM Sans',sans-serif;">Afgerond</div>
+          </div>
+          <div>
+            <div style="width:48px;height:48px;border-radius:12px;background:#CCFBF1;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;"><i class="ph-duotone ph-calendar-blank" style="font-size:24px;color:#0D7377;"></i></div>
+            <div style="font-size:10px;color:#64748b;font-family:'DM Sans',sans-serif;">ALV's</div>
+          </div>
+          <div>
+            <div style="width:48px;height:48px;border-radius:12px;background:#CCFBF1;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;"><i class="ph-duotone ph-book-open" style="font-size:24px;color:#0D7377;"></i></div>
+            <div style="font-size:10px;color:#64748b;font-family:'DM Sans',sans-serif;">Logboek</div>
+          </div>
+          <div>
+            <div style="width:48px;height:48px;border-radius:12px;background:#CCFBF1;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;"><i class="ph-duotone ph-bell" style="font-size:24px;color:#0D7377;"></i></div>
+            <div style="font-size:10px;color:#64748b;font-family:'DM Sans',sans-serif;">Meldingen</div>
+          </div>
+          <div>
+            <div style="width:48px;height:48px;border-radius:12px;background:#CCFBF1;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;"><i class="ph-duotone ph-chart-bar" style="font-size:24px;color:#0D7377;"></i></div>
+            <div style="font-size:10px;color:#64748b;font-family:'DM Sans',sans-serif;">Statistieken</div>
+          </div>
+          <div>
+            <div style="width:48px;height:48px;border-radius:12px;background:#CCFBF1;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;"><i class="ph-duotone ph-warning" style="font-size:24px;color:#D97706;"></i></div>
+            <div style="font-size:10px;color:#64748b;font-family:'DM Sans',sans-serif;">Waarschuwing</div>
+          </div>
+          <div>
+            <div style="width:48px;height:48px;border-radius:12px;background:#FEE2E2;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;"><i class="ph-duotone ph-trash" style="font-size:24px;color:#DC2626;"></i></div>
+            <div style="font-size:10px;color:#64748b;font-family:'DM Sans',sans-serif;">Verwijderen</div>
+          </div>
+        </div>
+
+        <div style="margin-top:24px;padding-top:20px;border-top:1px solid #e2e8f0;">
+          <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:12px;">In knoppen:</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="btn" style="background:#0D7377;color:#fff;font-size:13px;font-family:'DM Sans',sans-serif;"><i class="ph-duotone ph-plus-circle" style="font-size:16px;"></i> Nieuwe taak</button>
+            <button class="btn" style="background:#059669;color:#fff;font-size:13px;font-family:'DM Sans',sans-serif;"><i class="ph-duotone ph-check" style="font-size:16px;"></i> Opslaan</button>
+            <button class="btn btn-outline" style="border:2px solid #2B3544;color:#2B3544;font-size:13px;font-family:'DM Sans',sans-serif;"><i class="ph-duotone ph-export" style="font-size:16px;"></i> Exporteren</button>
+            <button class="btn" style="background:#FEE2E2;color:#DC2626;font-size:13px;font-family:'DM Sans',sans-serif;"><i class="ph-duotone ph-trash" style="font-size:16px;"></i> Verwijderen</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- SECTION: Full dashboard mockup -->
+<section>
+  <h2>5. Compleet dashboard mockup — alle brand guidelines samen</h2>
+  <div class="mock">
+    <div class="mock-layout">
+      <div class="mock-sidebar" style="font-family:'DM Sans',sans-serif;">
+        <div class="mock-logo">
+          <div class="mock-logo-icon" style="background:linear-gradient(135deg,#2B3544,#0D7377);">VBC</div>
+          <div class="mock-logo-text" style="font-family:'DM Sans',sans-serif;">VvE Beheer<span>Collectief Dashboard</span></div>
+        </div>
+        <div class="mock-nav">
+          <div class="mock-nav-item active" style="background:#0D7377;"><i class="ph-duotone ph-clipboard-text" style="font-size:16px;"></i> Nog te doen</div>
+          <div class="mock-nav-item"><i class="ph-duotone ph-check-circle" style="font-size:16px;"></i> Afgerond</div>
+          <div class="mock-nav-item"><i class="ph-duotone ph-calendar-blank" style="font-size:16px;"></i> ALV's overzicht</div>
+          <div class="mock-nav-item"><i class="ph-duotone ph-book-open" style="font-size:16px;"></i> Logboek</div>
+          <div class="mock-nav-item"><i class="ph-duotone ph-bell" style="font-size:16px;"></i> Meldingen</div>
+          <div class="mock-nav-item"><i class="ph-duotone ph-chart-bar" style="font-size:16px;"></i> Statistieken</div>
+        </div>
+      </div>
+      <div class="mock-main" style="font-family:'DM Sans',sans-serif;">
+        <div class="mock-stat-row">
+          <div class="mock-stat" style="border-top-color:#0D7377;">
+            <div class="mock-stat-val" style="color:#0D7377;">24</div>
+            <div class="mock-stat-lbl">Open taken</div>
+          </div>
+          <div class="mock-stat" style="border-top-color:#D97706;">
+            <div class="mock-stat-val" style="color:#D97706;">5</div>
+            <div class="mock-stat-lbl">Verlopen</div>
+          </div>
+          <div class="mock-stat" style="border-top-color:#059669;">
+            <div class="mock-stat-val" style="color:#059669;">142</div>
+            <div class="mock-stat-lbl">Afgerond</div>
+          </div>
+        </div>
+        <div class="mock-table">
+          <div class="mock-table-hdr">
+            <h3 style="font-family:'DM Sans',sans-serif;">Nog te doen</h3>
+            <button class="btn" style="background:#0D7377;color:#fff;font-size:12px;padding:6px 14px;font-family:'DM Sans',sans-serif;"><i class="ph-duotone ph-plus-circle" style="font-size:14px;"></i> Nieuwe taak</button>
+          </div>
+          <div class="mock-row" style="font-family:'DM Sans',sans-serif;">
+            <div class="mock-cell" style="font-weight:600;">VvE Parkzicht</div>
+            <div class="mock-cell">Offerte dakbedekking opvragen</div>
+            <div class="mock-cell"><span class="mock-badge" style="background:#FEF3C7;color:#D97706;"><i class="ph-duotone ph-warning" style="font-size:12px;"></i> Deadline morgen</span></div>
+          </div>
+          <div class="mock-row" style="font-family:'DM Sans',sans-serif;">
+            <div class="mock-cell" style="font-weight:600;">VvE De Linden</div>
+            <div class="mock-cell">Notulen ALV versturen</div>
+            <div class="mock-cell"><span class="mock-badge" style="background:#CCFBF1;color:#0D7377;"><i class="ph-duotone ph-spinner" style="font-size:12px;"></i> In behandeling</span></div>
+          </div>
+          <div class="mock-row" style="font-family:'DM Sans',sans-serif;">
+            <div class="mock-cell" style="font-weight:600;">VvE Rivierstaete</div>
+            <div class="mock-cell">MJOP laten opstellen</div>
+            <div class="mock-cell"><span class="mock-badge" style="background:#F0F2F5;color:#64748b;"><i class="ph-duotone ph-clock" style="font-size:12px;"></i> Oppakken</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

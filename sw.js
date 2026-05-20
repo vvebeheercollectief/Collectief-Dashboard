@@ -1,7 +1,7 @@
 // Collectief Dashboard — Service Worker
 // Verhoog versie bij elke nieuwe deploy zodat clients de nieuwe cache pakken.
 
-const CACHE_VERSION = 'cd-v3';
+const CACHE_VERSION = 'cd-v4';
 const APP_SHELL = [
   './',
   './index.html',

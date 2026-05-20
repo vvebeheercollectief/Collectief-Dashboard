@@ -7,8 +7,8 @@
 
   <!-- PWA manifest -->
   <link rel="manifest" href="manifest.json"/>
-  <meta name="theme-color" content="#2563eb"/>
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://accounts.google.com https://cdn.onesignal.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://sheets.googleapis.com https://www.googleapis.com https://script.google.com https://accounts.google.com https://onesignal.com https://*.onesignal.com; img-src 'self' data: https:; frame-src https://accounts.google.com;"/>
+  <meta name="theme-color" content="#2B3544"/>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://accounts.google.com https://cdn.onesignal.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://sheets.googleapis.com https://www.googleapis.com https://script.google.com https://accounts.google.com https://onesignal.com https://*.onesignal.com; img-src 'self' data: https:; frame-src https://accounts.google.com;"/>
 
   <!-- iOS / Safari -->
   <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -21,7 +21,8 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
   <style>
     :root{
       --bg:#f0f4f8;--sur:#fff;--sur2:#f8fafc;--bor:#e2e8f0;
@@ -35,14 +36,17 @@
       --rd:#dc2626;--rd-l:#fee2e2;--rd-b:#fecaca;
       --gn:#059669;--gn-l:#d1fae5;--gn-b:#a7f3d0;
       --pk:#db2777;--pk-l:#fce7f3;--pk-b:#fbcfe8;
+      --ac:#0D7377;--ac-l:#CCFBF1;--ac-b:#5EEAD4;--ac-900:#064E50;--ac-500:#14B8A6;
+      --nv:#2B3544;--nv-d:#1E2530;
     }
     [data-theme=dark]{
-      --bg:#0f172a;--sur:#1e293b;--sur2:#162032;--bor:#334155;
+      --bg:#1E2530;--sur:#2B3544;--sur2:#232D3A;--bor:#3A4553;
       --txt:#f1f5f9;--mut:#94a3b8;--fnt:#475569;
       --bl-l:#1e3a8a;--am-l:#451a03;--pu-l:#2e1065;--rd-l:#450a0a;--gn-l:#064e3b;--pk-l:#500724;
+      --ac-l:#064E50;--ac-b:#0D7377;
     }
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    html,body{height:100%;font-family:'Inter',sans-serif;font-size:14px;background:var(--bg);color:var(--txt);line-height:1.5}
+    html,body{height:100%;font-family:'DM Sans',sans-serif;font-size:14px;background:var(--bg);color:var(--txt);line-height:1.5}
     button{cursor:pointer;border:none;background:none;font:inherit;color:inherit}
     input,select,textarea{font:inherit}
     ul{list-style:none}
@@ -53,21 +57,21 @@
     #overlay.on{display:block}
 
     /* Sidebar */
-    #sb{width:var(--sb);background:var(--sur);border-right:1px solid var(--bor);display:flex;flex-direction:column;flex-shrink:0;z-index:200;transition:transform var(--tr)}
-    .sb-logo{padding:15px 16px;border-bottom:1px solid var(--bor);display:flex;align-items:center;gap:10px}
+    #sb{width:var(--sb);background:var(--nv);border-right:1px solid var(--bor);display:flex;flex-direction:column;flex-shrink:0;z-index:200;transition:transform var(--tr);color:#e2e8f0}
+    .sb-logo{padding:15px 16px;border-bottom:1px solid #3A4553;display:flex;align-items:center;gap:10px}
     .sb-logo img{height:30px;width:auto;object-fit:contain}
-    .sb-logo-fb{width:30px;height:30px;background:linear-gradient(135deg,#2563eb,#7c3aed);border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:11px;flex-shrink:0}
+    .sb-logo-fb{width:30px;height:30px;background:linear-gradient(135deg,#2B3544,#0D7377);border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:11px;flex-shrink:0}
     .sb-brand{font-size:12.5px;font-weight:700;line-height:1.25}
-    .sb-brand span{display:block;font-size:11px;font-weight:400;color:var(--mut)}
+    .sb-brand span{display:block;font-size:11px;font-weight:400;color:#94a3b8}
     .sb-nav{flex:1;padding:8px 8px;overflow-y:auto}
-    .sb-lbl{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--fnt);padding:13px 10px 5px}
-    .ni{display:flex;align-items:center;gap:9px;padding:8px 11px;border-radius:var(--rs);color:var(--mut);font-weight:500;font-size:13px;cursor:pointer;transition:background var(--tr),color var(--tr);user-select:none}
-    .ni:hover{background:var(--sur2);color:var(--txt)}
-    .ni.on{background:var(--bl-l);color:var(--bl)}
+    .sb-lbl{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#64748b;padding:13px 10px 5px}
+    .ni{display:flex;align-items:center;gap:9px;padding:8px 11px;border-radius:var(--rs);color:#94a3b8;font-weight:500;font-size:13px;cursor:pointer;transition:background var(--tr),color var(--tr);user-select:none}
+    .ni:hover{background:rgba(255,255,255,.08);color:#f1f5f9}
+    .ni.on{background:rgba(13,115,119,.25);color:#5EEAD4}
     .ni svg{width:15px;height:15px;flex-shrink:0}
-    .ni-badge{margin-left:auto;padding:2px 7px;border-radius:20px;font-size:11px;font-weight:700;background:var(--bl);color:#fff}
-    .ni.on .ni-badge{background:var(--sec,var(--bl))}
-    .sb-foot{padding:12px 16px;border-top:1px solid var(--bor);display:flex;align-items:center;justify-content:space-between}
+    .ni-badge{margin-left:auto;padding:2px 7px;border-radius:20px;font-size:11px;font-weight:700;background:var(--ac);color:#fff}
+    .ni.on .ni-badge{background:var(--sec,var(--ac))}
+    .sb-foot{padding:12px 16px;border-top:1px solid #3A4553;display:flex;align-items:center;justify-content:space-between}
     .sync-row{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--mut)}
     .dot{width:7px;height:7px;border-radius:50%;background:var(--gn);animation:pulse 2s infinite;flex-shrink:0}
     .dot.loading{background:var(--am)}
@@ -84,18 +88,18 @@
     .ico-btn:hover{background:var(--sur2);color:var(--txt)}
     .ico-btn svg{width:15px;height:15px}
     .btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--rs);font-size:13px;font-weight:600;transition:all var(--tr);white-space:nowrap;cursor:pointer}
-    .btn-pri{background:var(--bl);color:#fff;border:none}.btn-pri:hover{filter:brightness(1.1)}
+    .btn-pri{background:var(--ac);color:#fff;border:none}.btn-pri:hover{filter:brightness(1.1)}
     .btn-sec{background:var(--sur);color:var(--mut);border:1px solid var(--bor)}.btn-sec:hover{background:var(--sur2);color:var(--txt)}
     .btn-sm{padding:5px 10px;font-size:12px}
     .btn-edit{width:28px;height:28px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid var(--bor);background:var(--sur2);color:var(--mut);transition:all var(--tr);flex-shrink:0}
-    .btn-edit:hover{background:var(--bl-l);color:var(--bl);border-color:var(--bl-b)}
+    .btn-edit:hover{background:var(--ac-l);color:var(--ac);border-color:var(--ac-b)}
     .btn-del{padding:4px 10px;border-radius:6px;border:1px solid var(--rd-b);background:var(--rd-l);color:var(--rd);font-size:11px;font-weight:600;transition:all var(--tr)}
     .btn-del:hover{background:var(--rd);color:#fff;border-color:var(--rd)}
     .btn-done{width:28px;height:28px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid var(--gn-b);background:var(--gn-l);color:var(--gn);transition:all var(--tr);flex-shrink:0;margin-left:4px}
     .btn-done:hover{background:var(--gn);color:#fff;border-color:var(--gn)}
-    tr.ib-row td{background:#eff6ff!important;border-color:#bfdbfe!important}
-    tr.ib-row .code{background:#dbeafe!important;color:#1d4ed8!important}
-    [data-theme=dark] tr.ib-row td{background:#1e3a8a!important;border-color:#1e40af!important}
+    tr.ib-row td{background:#f0fdfa!important;border-color:#5EEAD4!important}
+    tr.ib-row .code{background:#CCFBF1!important;color:#064E50!important}
+    [data-theme=dark] tr.ib-row td{background:#064E50!important;border-color:#0D7377!important}
     .hamburger{display:none}
 
     /* Content */
@@ -104,11 +108,11 @@
 
     /* Stats */
     .stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:12px;margin-bottom:18px}
-    .stat{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);padding:16px 18px;box-shadow:var(--sh);border-top:3px solid var(--sec,var(--bl))}
+    .stat{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);padding:16px 18px;box-shadow:var(--sh);border-top:3px solid var(--sec,var(--ac))}
     .stat-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px}
     .stat-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mut)}
-    .stat-ico{width:34px;height:34px;border-radius:9px;background:var(--sec-l,var(--bl-l));display:flex;align-items:center;justify-content:center;font-size:16px}
-    .stat-num{font-size:28px;font-weight:800;letter-spacing:-.04em;color:var(--sec,var(--bl))}
+    .stat-ico{width:34px;height:34px;border-radius:9px;background:var(--sec-l,var(--ac-l));display:flex;align-items:center;justify-content:center;font-size:16px}
+    .stat-num{font-size:28px;font-weight:800;letter-spacing:-.04em;color:var(--sec,var(--ac))}
     .stat-sub{font-size:11px;color:var(--mut);margin-top:3px}
 
     /* Card */
@@ -123,14 +127,14 @@
     .search-box input{background:none;border:none;outline:none;color:var(--txt);font-size:13px;width:155px}
     .search-box input::placeholder{color:var(--fnt)}
     .filter-select{background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rs);padding:6px 10px;color:var(--txt);font-size:13px;outline:none;cursor:pointer;transition:border var(--tr)}
-    .filter-select:focus{border-color:var(--sec,var(--bl))}
+    .filter-select:focus{border-color:var(--sec,var(--ac))}
 
     /* Tabs */
     .tabs{display:flex;gap:1px;padding:0 16px;border-bottom:1px solid var(--bor);background:var(--sur);overflow-x:auto}
     .tab{padding:9px 13px;font-size:13px;font-weight:500;color:var(--mut);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all var(--tr);display:flex;align-items:center;gap:5px;white-space:nowrap;flex-shrink:0}
     .tab:hover{color:var(--txt)}
-    .tab.on{color:var(--sec,var(--bl));border-bottom-color:var(--sec,var(--bl))}
-    .tab .cnt{min-width:17px;height:17px;padding:0 4px;border-radius:20px;font-size:11px;font-weight:700;background:var(--sec-l,var(--bl-l));color:var(--sec,var(--bl));display:inline-flex;align-items:center;justify-content:center}
+    .tab.on{color:var(--sec,var(--ac));border-bottom-color:var(--sec,var(--ac))}
+    .tab .cnt{min-width:17px;height:17px;padding:0 4px;border-radius:20px;font-size:11px;font-weight:700;background:var(--sec-l,var(--ac-l));color:var(--sec,var(--ac));display:inline-flex;align-items:center;justify-content:center}
 
     /* Table */
     .tbl-wrap{overflow-x:auto}
@@ -140,7 +144,7 @@
     tbody tr:last-child{border-bottom:none}
     tbody tr:hover{background:var(--sur2)}
     td{padding:9px 13px;vertical-align:middle}
-    .code{font-family:'SF Mono','Fira Code',monospace;font-size:12px;font-weight:700;color:var(--sec,var(--bl));background:var(--sec-l,var(--bl-l));padding:3px 8px;border-radius:6px;white-space:nowrap}
+    .code{font-family:'SF Mono','Fira Code',monospace;font-size:12px;font-weight:700;color:var(--sec,var(--ac));background:var(--sec-l,var(--ac-l));padding:3px 8px;border-radius:6px;white-space:nowrap}
     .cell-name{font-weight:500;max-width:200px;line-height:1.4}
     .cell-txt{color:var(--mut);max-width:240px;line-height:1.4;font-size:12.5px}
     .cell-sm{font-size:12px;color:var(--mut);white-space:nowrap}
@@ -154,7 +158,7 @@
     .status-gepland{background:var(--am-l);color:var(--am)}
     .status-afgerond{background:var(--gn-l);color:var(--gn)}
     .pers{padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;margin:1px 2px 1px 0;display:inline-flex;align-items:center}
-    .pers-jer{background:var(--bl-l);color:var(--bl)}
+    .pers-jer{background:var(--ac-l);color:var(--ac)}
     .pers-cihad{background:var(--pu-l);color:var(--pu)}
     .pers-gabos{background:var(--pk-l);color:var(--pk)}
     .pers-default{background:var(--sur2);color:var(--mut)}
@@ -166,10 +170,10 @@
     /* Progress */
     .prog-wrap{display:flex;align-items:center;gap:7px}
     .prog-bar{width:60px;height:5px;background:var(--bor);border-radius:3px;overflow:hidden;flex-shrink:0}
-    .prog-fill{height:100%;background:var(--sec,var(--bl));border-radius:3px}
+    .prog-fill{height:100%;background:var(--sec,var(--ac));border-radius:3px}
     /* ── In-app toasts ── */
     #toast-container{position:fixed;top:72px;right:16px;z-index:400;display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:340px}
-    .toast{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);box-shadow:var(--shl);padding:12px 14px;display:flex;gap:10px;align-items:flex-start;pointer-events:all;animation:toast-in .25s ease;border-left:4px solid var(--toast-clr,var(--bl))}
+    .toast{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);box-shadow:var(--shl);padding:12px 14px;display:flex;gap:10px;align-items:flex-start;pointer-events:all;animation:toast-in .25s ease;border-left:4px solid var(--toast-clr,var(--ac))}
     .toast.removing{animation:toast-out .25s ease forwards}
     .toast-ico{font-size:18px;flex-shrink:0;line-height:1.3}
     .toast-body{flex:1;min-width:0}
@@ -177,7 +181,7 @@
     .toast-msg{font-size:12px;color:var(--mut);margin-top:3px;line-height:1.4}
     .toast-close{background:none;border:none;font-size:17px;color:var(--fnt);cursor:pointer;padding:0;line-height:1;flex-shrink:0;transition:color var(--tr)}
     .toast-close:hover{color:var(--txt)}
-    .toast-bar{height:3px;background:var(--toast-clr,var(--bl));border-radius:0 0 2px 2px;position:absolute;bottom:0;left:0;animation:toast-bar linear forwards}
+    .toast-bar{height:3px;background:var(--toast-clr,var(--ac));border-radius:0 0 2px 2px;position:absolute;bottom:0;left:0;animation:toast-bar linear forwards}
     @keyframes toast-in{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:translateX(0)}}
     @keyframes toast-out{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(24px)}}
     @keyframes toast-bar{from{width:100%}to{width:0%}}
@@ -189,8 +193,8 @@
     .pag-info{font-size:12px;color:var(--mut)}
     .pag-btns{display:flex;gap:3px}
     .pb{min-width:28px;height:28px;padding:0 5px;border-radius:6px;border:1px solid var(--bor);background:var(--sur);font-size:12px;color:var(--mut);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all var(--tr)}
-    .pb:hover:not([disabled]){background:var(--sec-l,var(--bl-l));color:var(--sec,var(--bl));border-color:var(--sec-b,var(--bl-b))}
-    .pb.on{background:var(--sec,var(--bl));color:#fff;border-color:var(--sec,var(--bl))}
+    .pb:hover:not([disabled]){background:var(--sec-l,var(--ac-l));color:var(--sec,var(--ac));border-color:var(--sec-b,var(--ac-b))}
+    .pb.on{background:var(--sec,var(--ac));color:#fff;border-color:var(--sec,var(--ac))}
     .pb[disabled]{opacity:.35;cursor:default}
 
     /* Charts */
@@ -201,7 +205,7 @@
     .chart-wrap{position:relative;height:185px}
     .period-btns{display:flex;gap:4px}
     .period-btn{padding:3px 9px;border-radius:6px;border:1px solid var(--bor);background:var(--sur2);color:var(--mut);font-size:11px;font-weight:600;cursor:pointer;transition:all var(--tr)}
-    .period-btn.on{background:var(--bl);color:#fff;border-color:var(--bl)}
+    .period-btn.on{background:var(--ac);color:#fff;border-color:var(--ac)}
 
     /* Empty */
     .empty{padding:36px;text-align:center;color:var(--mut);font-size:13px}
@@ -223,13 +227,13 @@
     .fld{margin-bottom:13px}
     .fld label{display:block;font-size:11.5px;font-weight:700;color:var(--mut);margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em}
     .fld input,.fld select,.fld textarea{width:100%;background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rs);padding:8px 11px;color:var(--txt);font-size:13px;outline:none;transition:border var(--tr)}
-    .fld input:focus,.fld select:focus,.fld textarea:focus{border-color:var(--modal-sec,var(--bl));box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+    .fld input:focus,.fld select:focus,.fld textarea:focus{border-color:var(--modal-sec,var(--ac));box-shadow:0 0 0 3px rgba(13,115,119,.1)}
     .fld textarea{resize:vertical;min-height:68px}
     .fld-row{display:grid;grid-template-columns:1fr 1fr;gap:11px}
     @media(max-width:480px){.fld-row{grid-template-columns:1fr}}
     .toggle-row{display:flex;align-items:center;gap:10px;padding:7px 0}
     .tog{width:36px;height:20px;border-radius:10px;background:var(--bor);position:relative;cursor:pointer;transition:background var(--tr);flex-shrink:0}
-    .tog.on{background:var(--modal-sec,var(--bl))}
+    .tog.on{background:var(--modal-sec,var(--ac))}
     .tog::after{content:'';width:16px;height:16px;background:#fff;border-radius:50%;position:absolute;top:2px;left:2px;transition:left var(--tr);box-shadow:0 1px 2px rgba(0,0,0,.2)}
     .tog.on::after{left:18px}
     .auth-box{background:var(--am-l);border:1px solid var(--am-b);border-radius:var(--rs);padding:11px 13px;font-size:12.5px;color:var(--am);margin-bottom:13px;display:none}
@@ -242,7 +246,7 @@
     .vve-suggestions{position:absolute;top:100%;left:0;right:0;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rs);box-shadow:var(--shm);z-index:10;max-height:180px;overflow-y:auto;display:none}
     .vve-sug-item{padding:8px 11px;cursor:pointer;font-size:13px;transition:background var(--tr);border-bottom:1px solid var(--bor)}
     .vve-sug-item:last-child{border-bottom:none}
-    .vve-sug-item:hover{background:var(--bl-l);color:var(--bl)}
+    .vve-sug-item:hover{background:var(--ac-l);color:var(--ac)}
     .vve-sug-code{font-weight:700;font-size:12px}
     .vve-sug-naam{font-size:11px;color:var(--mut);margin-top:1px}
 
@@ -403,12 +407,12 @@
         <div class="tbl-wrap">
           <table>
             <thead><tr>
-              <th style="background:var(--bl-l);color:var(--bl);border-bottom:1px solid var(--bl-b)">VvE Code</th>
-              <th style="background:var(--bl-l);color:var(--bl);border-bottom:1px solid var(--bl-b)">VvE Naam</th>
-              <th style="background:var(--bl-l);color:var(--bl);border-bottom:1px solid var(--bl-b)">Uitnodiging</th>
-              <th style="background:var(--bl-l);color:var(--bl);border-bottom:1px solid var(--bl-b)">Notulen</th>
-              <th style="background:var(--bl-l);color:var(--bl);border-bottom:1px solid var(--bl-b)">Begroting</th>
-              <th style="background:var(--bl-l);color:var(--bl);border-bottom:1px solid var(--bl-b)">Status</th>
+              <th style="background:var(--ac-l);color:var(--ac);border-bottom:1px solid var(--ac-b)">VvE Code</th>
+              <th style="background:var(--ac-l);color:var(--ac);border-bottom:1px solid var(--ac-b)">VvE Naam</th>
+              <th style="background:var(--ac-l);color:var(--ac);border-bottom:1px solid var(--ac-b)">Uitnodiging</th>
+              <th style="background:var(--ac-l);color:var(--ac);border-bottom:1px solid var(--ac-b)">Notulen</th>
+              <th style="background:var(--ac-l);color:var(--ac);border-bottom:1px solid var(--ac-b)">Begroting</th>
+              <th style="background:var(--ac-l);color:var(--ac);border-bottom:1px solid var(--ac-b)">Status</th>
             </tr></thead>
             <tbody id="alvo-tbody"></tbody>
           </table>
@@ -805,7 +809,7 @@
 
 <div id="login-gate" style="position:fixed;inset:0;z-index:99999;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:20px">
   <div style="background:var(--sur);border:1px solid var(--bor);border-radius:16px;padding:40px 36px;box-shadow:var(--shm);text-align:center;max-width:360px;width:90%">
-    <div style="font-size:36px;margin-bottom:12px">🏢</div>
+    <div style="font-size:36px;margin-bottom:12px;color:var(--ac)"><i class="ph-duotone ph-buildings"></i></div>
     <h1 style="font-size:20px;font-weight:800;margin:0 0 6px">Collectief Dashboard</h1>
     <p style="font-size:13px;color:var(--mut);margin:0 0 24px">Log in met je VvE Beheer Collectief account</p>
     <button id="login-btn" class="btn btn-pri" style="width:100%;justify-content:center;padding:11px 20px;font-size:14px" onclick="doLogin()">Inloggen met Google</button>
@@ -1139,7 +1143,7 @@ function renderAll(){
 // ══════════════════════════════════════
 //  NTD STATS
 // ══════════════════════════════════════
-const SEC_ICONS={OPPAKKEN:'📋',VERGADERVERZOEKEN:'📅','OFFERTE-TRAJECTEN':'📄',LOD:'⚠️'};
+const SEC_ICONS={OPPAKKEN:'<i class="ph-duotone ph-clipboard-text"></i>',VERGADERVERZOEKEN:'<i class="ph-duotone ph-calendar-dots"></i>','OFFERTE-TRAJECTEN':'<i class="ph-duotone ph-file-text"></i>',LOD:'<i class="ph-duotone ph-warning"></i>'};
 const SEC_THEMES={
   OPPAKKEN:'--sec:var(--bl);--sec-l:var(--bl-l)',
   VERGADERVERZOEKEN:'--sec:var(--am);--sec-l:var(--am-l)',
@@ -1226,10 +1230,10 @@ function renderAlvo(){
   const gep=D.alvo.filter(r=>r.status==='Gepland').length;
   const opn=D.alvo.filter(r=>r.status==='Open').length;
   document.getElementById('alvo-stats').innerHTML=`
-    <div class="stat" style="--sec:var(--bl);--sec-l:var(--bl-l)"><div class="stat-top"><div class="stat-lbl">Totaal VvE's</div><div class="stat-ico">🏢</div></div><div class="stat-num">${tot}</div><div class="stat-sub">in beheer</div></div>
-    <div class="stat" style="--sec:var(--gn);--sec-l:var(--gn-l)"><div class="stat-top"><div class="stat-lbl">Afgerond</div><div class="stat-ico">✅</div></div><div class="stat-num">${afd}</div><div class="stat-sub">notulen verstuurd</div></div>
-    <div class="stat" style="--sec:var(--am);--sec-l:var(--am-l)"><div class="stat-top"><div class="stat-lbl">Gepland</div><div class="stat-ico">📅</div></div><div class="stat-num">${gep}</div><div class="stat-sub">uitnodiging verstuurd</div></div>
-    <div class="stat" style="--sec:var(--rd);--sec-l:var(--rd-l)"><div class="stat-top"><div class="stat-lbl">Open</div><div class="stat-ico">⏳</div></div><div class="stat-num">${opn}</div><div class="stat-sub">nog te plannen</div></div>`;
+    <div class="stat" style="--sec:var(--ac);--sec-l:var(--ac-l)"><div class="stat-top"><div class="stat-lbl">Totaal VvE's</div><div class="stat-ico"><i class="ph-duotone ph-buildings"></i></div></div><div class="stat-num">${tot}</div><div class="stat-sub">in beheer</div></div>
+    <div class="stat" style="--sec:var(--gn);--sec-l:var(--gn-l)"><div class="stat-top"><div class="stat-lbl">Afgerond</div><div class="stat-ico"><i class="ph-duotone ph-check-circle"></i></div></div><div class="stat-num">${afd}</div><div class="stat-sub">notulen verstuurd</div></div>
+    <div class="stat" style="--sec:var(--am);--sec-l:var(--am-l)"><div class="stat-top"><div class="stat-lbl">Gepland</div><div class="stat-ico"><i class="ph-duotone ph-calendar-dots"></i></div></div><div class="stat-num">${gep}</div><div class="stat-sub">uitnodiging verstuurd</div></div>
+    <div class="stat" style="--sec:var(--rd);--sec-l:var(--rd-l)"><div class="stat-top"><div class="stat-lbl">Open</div><div class="stat-ico"><i class="ph-duotone ph-hourglass-medium"></i></div></div><div class="stat-num">${opn}</div><div class="stat-sub">nog te plannen</div></div>`;
 
   const q=document.getElementById('s-alvo').value.toLowerCase();
   const fs=document.getElementById('f-status-alvo').value;
@@ -1241,7 +1245,7 @@ function renderAlvo(){
   const sl=rows.slice((pgs.alvo-1)*PG,pgs.alvo*PG);
   document.getElementById('alvo-tbody').innerHTML=sl.length
     ?sl.map(r=>`<tr>
-        <td><span class="code" style="--sec:var(--bl);--sec-l:var(--bl-l)">${esc(r.code)}</span></td>
+        <td><span class="code" style="--sec:var(--ac);--sec-l:var(--ac-l)">${esc(r.code)}</span></td>
         <td class="cell-name">${esc(r.naam)}</td>
         <td>${r.uitnodiging?'<span class="check-yes">✓ Ja</span>':'<span class="check-no">–</span>'}</td>
         <td>${r.notulen?'<span class="check-yes">✓ Ja</span>':'<span class="check-no">–</span>'}</td>
@@ -1299,10 +1303,10 @@ function buildAnalytics(){
   const uitn=D.alvo.filter(r=>r.uitnodiging).length;
   const begr=D.alvo.filter(r=>r.begroting).length;
   document.getElementById('ana-stats').innerHTML=`
-    <div class="stat" style="--sec:var(--bl);--sec-l:var(--bl-l)"><div class="stat-top"><div class="stat-lbl">Totaal VvE's</div><div class="stat-ico">🏢</div></div><div class="stat-num">${tot}</div><div class="stat-sub">in beheer</div></div>
-    <div class="stat" style="--sec:var(--am);--sec-l:var(--am-l)"><div class="stat-top"><div class="stat-lbl">Uitnodigingen</div><div class="stat-ico">📬</div></div><div class="stat-num">${uitn}</div><div class="stat-sub">${Math.round(uitn/tot*100)}% van totaal</div></div>
-    <div class="stat" style="--sec:var(--gn);--sec-l:var(--gn-l)"><div class="stat-top"><div class="stat-lbl">Notulen</div><div class="stat-ico">📝</div></div><div class="stat-num">${afd}</div><div class="stat-sub">${Math.round(afd/tot*100)}% van totaal</div></div>
-    <div class="stat" style="--sec:var(--pu);--sec-l:var(--pu-l)"><div class="stat-top"><div class="stat-lbl">Begroting</div><div class="stat-ico">💰</div></div><div class="stat-num">${begr}</div><div class="stat-sub">${Math.round(begr/tot*100)}% doorgezet</div></div>`;
+    <div class="stat" style="--sec:var(--ac);--sec-l:var(--ac-l)"><div class="stat-top"><div class="stat-lbl">Totaal VvE's</div><div class="stat-ico"><i class="ph-duotone ph-buildings"></i></div></div><div class="stat-num">${tot}</div><div class="stat-sub">in beheer</div></div>
+    <div class="stat" style="--sec:var(--am);--sec-l:var(--am-l)"><div class="stat-top"><div class="stat-lbl">Uitnodigingen</div><div class="stat-ico"><i class="ph-duotone ph-envelope-open"></i></div></div><div class="stat-num">${uitn}</div><div class="stat-sub">${Math.round(uitn/tot*100)}% van totaal</div></div>
+    <div class="stat" style="--sec:var(--gn);--sec-l:var(--gn-l)"><div class="stat-top"><div class="stat-lbl">Notulen</div><div class="stat-ico"><i class="ph-duotone ph-note-pencil"></i></div></div><div class="stat-num">${afd}</div><div class="stat-sub">${Math.round(afd/tot*100)}% van totaal</div></div>
+    <div class="stat" style="--sec:var(--pu);--sec-l:var(--pu-l)"><div class="stat-top"><div class="stat-lbl">Begroting</div><div class="stat-ico"><i class="ph-duotone ph-coins"></i></div></div><div class="stat-num">${begr}</div><div class="stat-sub">${Math.round(begr/tot*100)}% doorgezet</div></div>`;
 
   // Group alfa by period
   const vLabels=getPeriodLabels(anaPeriod.vergader);
@@ -1310,11 +1314,11 @@ function buildAnalytics(){
   const nLabels=getPeriodLabels(anaPeriod.notulen);
   const nData=groupByPeriod(D.alfa,anaPeriod.notulen); // same source for now
 
-  buildBarChart('chart-vergader',vLabels,vLabels.map(l=>vData[l]||0),'#2563eb',tc,gc);
+  buildBarChart('chart-vergader',vLabels,vLabels.map(l=>vData[l]||0),'#0D7377',tc,gc);
   buildBarChart('chart-notulen',nLabels,nLabels.map(l=>nData[l]||0),'#059669',tc,gc);
 
   // Status donut — Uitnodiging verstuurd = "afgerond" (fix 4), getallen (fix 3)
-  buildDonut('chart-status',['Uitgeschreven','Nog uitschrijven'],[uitn,tot-uitn],['#2563eb','#ef4444'],tc,`${uitn}/${tot}`,'Uitgeschreven');
+  buildDonut('chart-status',['Uitgeschreven','Nog uitschrijven'],[uitn,tot-uitn],['#0D7377','#ef4444'],tc,`${uitn}/${tot}`,'Uitgeschreven');
 
   // Begroting donut — getallen
   buildDonut('chart-begroting',['Doorgezet','Niet doorgezet'],[begr,tot-begr],['#7c3aed','#e2e8f0'],tc,`${begr}/${tot}`,'Doorgezet');
@@ -1397,10 +1401,10 @@ function buildDonut(id,labels,data,colors,tc,centerVal,centerLbl){
       ctx.save();
       ctx.textAlign='center'; ctx.textBaseline='middle';
       const fSize=centerVal&&centerVal.includes('/')?'18px':'24px';
-      ctx.font=`bold ${fSize} Inter,sans-serif`;
+      ctx.font=`bold ${fSize} 'DM Sans',sans-serif`;
       ctx.fillStyle=colors[0];
       ctx.fillText(centerVal,cx,cy-10);
-      ctx.font='500 11px Inter,sans-serif';
+      ctx.font="500 11px 'DM Sans',sans-serif";
       ctx.fillStyle=tc;
       ctx.fillText(centerLbl||'',cx,cy+14);
       ctx.restore();
@@ -1431,13 +1435,13 @@ function buildDash(){
   const afTotal=SKEYS.reduce((s,k)=>s+(D.af[k]?.length||0),0);
 
   document.getElementById('dash-stats').innerHTML=`
-    <div class="stat" style="--sec:var(--bl);--sec-l:var(--bl-l)"><div class="stat-top"><div class="stat-lbl">Open taken</div><div class="stat-ico">📋</div></div><div class="stat-num">${ntdTotal}</div><div class="stat-sub">nog op te pakken</div></div>
-    <div class="stat" style="--sec:var(--gn);--sec-l:var(--gn-l)"><div class="stat-top"><div class="stat-lbl">Taken afgerond</div><div class="stat-ico">✅</div></div><div class="stat-num">${afTotal}</div><div class="stat-sub">afgeronde taken</div></div>
-    <div class="stat" style="--sec:var(--am);--sec-l:var(--am-l)"><div class="stat-top"><div class="stat-lbl">ALV's uitgeschreven</div><div class="stat-ico">📬</div></div><div class="stat-num">${uitnD}</div><div class="stat-sub">uitnodiging verstuurd</div></div>
-    <div class="stat" style="--sec:var(--gn);--sec-l:var(--gn-l)"><div class="stat-top"><div class="stat-lbl">Notulen verstuurd</div><div class="stat-ico">📝</div></div><div class="stat-num">${notulenD}</div><div class="stat-sub">van ${uitnD} uitgeschreven</div></div>`;
+    <div class="stat" style="--sec:var(--ac);--sec-l:var(--ac-l)"><div class="stat-top"><div class="stat-lbl">Open taken</div><div class="stat-ico"><i class="ph-duotone ph-clipboard-text"></i></div></div><div class="stat-num">${ntdTotal}</div><div class="stat-sub">nog op te pakken</div></div>
+    <div class="stat" style="--sec:var(--gn);--sec-l:var(--gn-l)"><div class="stat-top"><div class="stat-lbl">Taken afgerond</div><div class="stat-ico"><i class="ph-duotone ph-check-circle"></i></div></div><div class="stat-num">${afTotal}</div><div class="stat-sub">afgeronde taken</div></div>
+    <div class="stat" style="--sec:var(--am);--sec-l:var(--am-l)"><div class="stat-top"><div class="stat-lbl">ALV's uitgeschreven</div><div class="stat-ico"><i class="ph-duotone ph-envelope-open"></i></div></div><div class="stat-num">${uitnD}</div><div class="stat-sub">uitnodiging verstuurd</div></div>
+    <div class="stat" style="--sec:var(--gn);--sec-l:var(--gn-l)"><div class="stat-top"><div class="stat-lbl">Notulen verstuurd</div><div class="stat-ico"><i class="ph-duotone ph-note-pencil"></i></div></div><div class="stat-num">${notulenD}</div><div class="stat-sub">van ${uitnD} uitgeschreven</div></div>`;
 
   // ALV progress donut — uitnodiging=afgerond (fix 4), getallen (fix 3)
-  buildDonut('chart-alv-prog',['Uitgeschreven','Nog uitschrijven'],[uitnD,totD-uitnD],['#2563eb','#ef4444'],tc,`${uitnD}/${totD}`,'Uitgeschreven');
+  buildDonut('chart-alv-prog',['Uitgeschreven','Nog uitschrijven'],[uitnD,totD-uitnD],['#0D7377','#ef4444'],tc,`${uitnD}/${totD}`,'Uitgeschreven');
 
   // Taken per categorie
   const catTotal=SKEYS.reduce((s,k)=>s+(D.ntd[k]?.length||0),0);
@@ -1480,7 +1484,7 @@ function renderTbody(tbodyId,rows,sec,page,isAf){
   let html=main.map(r=>rowNtd(r,sec)).join('');
   if(ib.length){
     const cols=SECS[sec].cols.length+1;
-    html+=`<tr><td colspan="${cols}" style="background:var(--bl-l);padding:8px 13px;font-size:11px;font-weight:700;color:var(--bl);text-transform:uppercase;letter-spacing:.05em;border:none">⟳ In behandeling (${ib.length})</td></tr>`;
+    html+=`<tr><td colspan="${cols}" style="background:var(--ac-l);padding:8px 13px;font-size:11px;font-weight:700;color:var(--ac);text-transform:uppercase;letter-spacing:.05em;border:none">⟳ In behandeling (${ib.length})</td></tr>`;
     html+=ib.map(r=>rowNtd(r,sec)).join('');
   }
   el.innerHTML=html;
@@ -2040,7 +2044,7 @@ function setupSearch(id,cb){
 //  ONTWIKKELING
 // ══════════════════════════════════════
 const ONTW_CATS=['Opmerkingen','Verbeteringen','Vragen aan Cihan','Ideeën'];
-const ONTW_CAT_COLORS={'Opmerkingen':'var(--bl)','Verbeteringen':'var(--gn)','Vragen aan Cihan':'var(--am)','Ideeën':'var(--pu)'};
+const ONTW_CAT_COLORS={'Opmerkingen':'var(--ac)','Verbeteringen':'var(--gn)','Vragen aan Cihan':'var(--am)','Ideeën':'var(--pu)'};
 
 function parseOntw(rows){
   if(!rows||rows.length<2) return [];
@@ -2179,10 +2183,10 @@ function actieBadge(actie){
   const map={
     'Afgerond':['--sec:var(--gn);--sec-l:var(--gn-l)','✓'],
     'Verwijderd':['--sec:var(--rd);--sec-l:var(--rd-l)','✕'],
-    'Bewerkt':['--sec:var(--bl);--sec-l:var(--bl-l)','✎'],
+    'Bewerkt':['--sec:var(--ac);--sec-l:var(--ac-l)','✎'],
     'Aangemaakt':['--sec:var(--pu);--sec-l:var(--pu-l)','+'],
     'Teruggezet':['--sec:var(--am);--sec-l:var(--am-l)','↩'],
-    'Behandelaar gewijzigd':['--sec:var(--bl);--sec-l:var(--bl-l)','👤'],
+    'Behandelaar gewijzigd':['--sec:var(--ac);--sec-l:var(--ac-l)','👤'],
     'Aangemaakt (sheet)':['--sec:var(--pu);--sec-l:var(--pu-l)','+'],
     'Opmerking':['--sec:var(--am);--sec-l:var(--am-l)','💬'],
   };
@@ -2204,7 +2208,7 @@ function renderLogboek(){
   if(!sl.length){el.innerHTML=`<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--mut)">Geen logboek-items gevonden</td></tr>`;} else {
     el.innerHTML=sl.map(r=>`<tr>
       <td class="cell-sm" style="white-space:nowrap">${esc(fmtLogTs(r.timestamp))}</td>
-      <td><span class="code" style="--sec:var(--bl);--sec-l:var(--bl-l)">${esc(r.code)}</span></td>
+      <td><span class="code" style="--sec:var(--ac);--sec-l:var(--ac-l)">${esc(r.code)}</span></td>
       <td class="cell-sm">${esc(r.sectie)}</td>
       <td>${actieBadge(r.actie)}</td>
       <td class="cell-sm">${esc(r.veld)}</td>
@@ -2292,7 +2296,7 @@ async function fireNotifEvent(event, payload) {
 
   if (event === 'newtask' && prefs.newtask) {
     const msg = code + (naam ? ' · ' + naam : '') + (beh ? ' → ' + beh : '');
-    showToast('📋 Nieuwe taak — ' + sec, msg, 'var(--bl)');
+    showToast('📋 Nieuwe taak — ' + sec, msg, 'var(--ac)');
   } else if (event === 'assigned' && prefs.assigned && who) {
     const behs = beh.split(/[,\/]/).map(s => s.trim());
     if (behs.includes(who)) {
@@ -2314,8 +2318,8 @@ async function fireNotifEvent(event, payload) {
 // ══════════════════════════════════════
 //  IN-APP TOASTS
 // ══════════════════════════════════════
-const TOAST_ICONS  = { n_newtask:'📋', n_assigned:'➕', n_deadline:'⏰', n_alv:'🏢', n_daily:'☀️', test:'🔔' };
-const TOAST_COLORS = { n_newtask:'var(--bl)', n_assigned:'var(--gn)', n_deadline:'var(--am)', n_alv:'var(--pu)', n_daily:'var(--am)', test:'var(--bl)' };
+const TOAST_ICONS  = { n_newtask:'<i class="ph-duotone ph-clipboard-text"></i>', n_assigned:'<i class="ph-duotone ph-user-plus"></i>', n_deadline:'<i class="ph-duotone ph-alarm"></i>', n_alv:'<i class="ph-duotone ph-buildings"></i>', n_daily:'<i class="ph-duotone ph-sun"></i>', test:'<i class="ph-duotone ph-bell"></i>' };
+const TOAST_COLORS = { n_newtask:'var(--ac)', n_assigned:'var(--gn)', n_deadline:'var(--am)', n_alv:'var(--pu)', n_daily:'var(--am)', test:'var(--ac)' };
 const TOAST_DURATION = 5000;
 
 function showToast(title, msg, color) {
@@ -2326,7 +2330,7 @@ function showToast(title, msg, color) {
 
   const el = document.createElement('div');
   el.className = 'toast';
-  el.style.setProperty('--toast-clr', color || 'var(--bl)');
+  el.style.setProperty('--toast-clr', color || 'var(--ac)');
   el.style.position = 'relative';
   el.style.overflow = 'hidden';
   el.innerHTML = `
@@ -2451,7 +2455,7 @@ async function pollNotifsForToast() {
       if (n.voor !== 'allen' && n.voor && who && n.voor !== who) continue;
       const prefKey = typeToPrefs[n.type];
       if (prefKey && prefs[prefKey] === false) continue;
-      showToast(n.title, n.body, TOAST_COLORS[n.type] || 'var(--bl)');
+      showToast(n.title, n.body, TOAST_COLORS[n.type] || 'var(--ac)');
     }
     if (newRows.length) _lastNotifTs = rows[0].ts;
   } catch(e) { /* stil falen */ }
@@ -2608,7 +2612,7 @@ async function unsubscribeNotifs() {
 }
 
 function sendTestNotif(who, title, body) {
-  showToast(title || '🧪 Test melding', body || 'Notificaties werken correct!', 'var(--bl)');
+  showToast(title || '🧪 Test melding', body || 'Notificaties werken correct!', 'var(--ac)');
   if (NOTIF_WEBHOOK_URL) {
     fetch(NOTIF_WEBHOOK_URL, {
       method: 'POST', mode: 'no-cors',

@@ -155,6 +155,13 @@
     .prio-hoog{background:var(--rd-l);color:var(--rd)}
     .prio-mid{background:var(--am-l);color:var(--am)}
     .prio-laag{background:var(--gn-l);color:var(--gn)}
+    .row-telaat td{background:rgba(220,38,38,0.06);position:relative}
+    .row-telaat td:first-child{box-shadow:inset 3px 0 0 #dc2626}
+    .pill-telaat{display:inline-block;background:#dc2626;color:#fff;font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;margin-left:6px;letter-spacing:.02em}
+    .warn-geen-deadline{display:inline-flex;align-items:center;gap:4px;color:#d97706;font-size:12px;font-weight:600}
+    .warn-geen-deadline::before{content:'⚠'}
+    .pill-stil{display:inline-block;background:rgba(107,114,128,0.15);color:#4b5563;font-size:11px;font-weight:600;padding:2px 7px;border-radius:10px;margin-left:6px;cursor:pointer}
+    .pill-stil::before{content:'🔕 '}
     .status-open{background:var(--rd-l);color:var(--rd)}
     .status-gepland{background:var(--am-l);color:var(--am)}
     .status-afgerond{background:var(--gn-l);color:var(--gn)}
@@ -2173,6 +2180,13 @@ function renderTbody(tbodyId,rows,sec,page,isAf){
   el.innerHTML=html;
 }
 
+function deadlineCel(r, sec){
+  if (!r.deadline) return `<td class="cell-sm"><span class="warn-geen-deadline">Geen deadline</span></td>`;
+  const { teLaat, dagenTot } = berekenPrioriteit(r.deadline, sec);
+  const pill = teLaat ? ` <span class="pill-telaat">Te laat (${Math.abs(dagenTot)}d)</span>` : '';
+  return `<td class="cell-sm">${esc(r.deadline)}${pill}</td>`;
+}
+
 function rowNtd(r,sec){
   const css=SECS[sec].css;
   const rid=_rowCache.length; _rowCache.push(r);
@@ -2183,7 +2197,7 @@ function rowNtd(r,sec){
       cells=`<td><span class="code" style="${css}">${esc(r.code)}</span></td>
         <td class="cell-name">${esc(r.naam)}${subBadge(r.subcategorie)}</td>
         <td class="cell-txt">${esc(r.actiepunt)}</td>
-        <td class="cell-sm">${r.deadline?esc(r.deadline):'<span style="color:var(--fnt)">–</span>'}</td>
+        ${deadlineCel(r, 'OPPAKKEN')}
         <td>${persBadges(r.behandelaar)}</td>
         <td>${prioBadge(r, 'OPPAKKEN')}</td>
         <td class="cell-txt">${r.opmerkingen?`<span style="font-size:12px">${esc(r.opmerkingen)}</span>`:''}</td>
@@ -2196,7 +2210,7 @@ function rowNtd(r,sec){
         <td><span class="badge" style="background:var(--am-l);color:var(--am)">${esc(r.periode||r.agendapunten||'')}</span></td>
         <td class="cell-txt">${esc(r.agendapunten||r.actiepunt||'')}</td>
         <td>${persBadges(r.behandelaar)}</td>
-        <td class="cell-sm">${r.deadline?esc(r.deadline):'<span style="color:var(--fnt)">–</span>'}</td>
+        ${deadlineCel(r, 'VERGADERVERZOEKEN')}
         <td>${prioBadge(r, 'VERGADERVERZOEKEN')}</td>
         <td class="cell-txt">${r.opmerkingen?`<span style="font-size:12px">${esc(r.opmerkingen)}</span>`:''}</td>
         <td>${ibBadge(r.inBehandeling)}</td>
@@ -2208,7 +2222,7 @@ function rowNtd(r,sec){
         <td class="cell-sm">${esc(r.datumAangevraagd||'')}</td>
         <td>${offProg(r.offertes)}</td>
         <td>${persBadges(r.behandelaar)}</td>
-        <td class="cell-sm">${r.deadline?esc(r.deadline):'<span style="color:var(--fnt)">–</span>'}</td>
+        ${deadlineCel(r, 'OFFERTE-TRAJECTEN')}
         <td>${prioBadge(r, 'OFFERTE-TRAJECTEN')}</td>
         <td class="cell-txt">${r.opmerkingen?`<span style="font-size:12px">${esc(r.opmerkingen)}</span>`:''}</td>
         <td>${editBtn}</td>`;
@@ -2219,14 +2233,19 @@ function rowNtd(r,sec){
         <td class="cell-txt">${esc(r.actiepunt||'')}</td>
         <td class="cell-txt" style="font-style:italic;font-size:12px">${esc(r.status||'')}</td>
         <td>${persBadges(r.behandelaar)}</td>
-        <td class="cell-sm">${r.deadline?esc(r.deadline):'<span style="color:var(--fnt)">–</span>'}</td>
+        ${deadlineCel(r, 'LOD')}
         <td>${prioBadge(r, 'LOD')}</td>
         <td class="cell-txt">${r.opmerkingen?`<span style="font-size:12px">${esc(r.opmerkingen)}</span>`:''}</td>
         <td>${ibBadge(r.inBehandeling)}</td>
         <td>${editBtn}</td>`;
       break;
   }
-  return`<tr class="${r.inBehandeling==='TRUE'?'ib-row':''}">${cells}</tr>`;
+  const { teLaat: rowTeLaat } = berekenPrioriteit(r.deadline, sec);
+  const rowCls = [
+    r.inBehandeling === 'TRUE' ? 'ib-row' : '',
+    rowTeLaat ? 'row-telaat' : ''
+  ].filter(Boolean).join(' ');
+  return `<tr class="${rowCls}">${cells}</tr>`;
 }
 
 function rowAf(r,sec){

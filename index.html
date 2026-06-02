@@ -799,10 +799,7 @@
           </div>
         </div>
         <div class="fld-row">
-          <div class="fld"><label>Prioriteit</label>
-            <select id="m-prio"><option value="">Selecteer…</option><option>Hoog</option><option>Midden</option><option>Laag</option></select>
-          </div>
-          <div class="fld"><label>Opmerkingen</label><input type="text" id="m-opm"/></div>
+          <div class="fld" style="flex:1"><label>Opmerkingen</label><input type="text" id="m-opm"/></div>
         </div>
         <div class="fld"><label>Subcategorie</label><select id="m-sub-opp"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option></select></div>
         <div class="toggle-row"><div class="tog" id="tog-ib" onclick="this.classList.toggle('on')"></div><span>In behandeling</span></div>
@@ -2334,7 +2331,7 @@ function fillModalFields(sec,r){
   switch(sec){
     case'OPPAKKEN':
       setv('m-actie',r.actiepunt);setv('m-dl',toISODate(r.deadline));setv('m-beh',r.behandelaar);
-      setv('m-prio',r.prioriteit);setv('m-opm',r.opmerkingen);setv('m-sub-opp',r.subcategorie);
+      setv('m-opm',r.opmerkingen);setv('m-sub-opp',r.subcategorie);
       document.getElementById('tog-ib').classList.toggle('on',r.inBehandeling==='TRUE');break;
     case'VERGADERVERZOEKEN':
       setv('m-per',r.periode);setv('m-beh-v',r.behandelaar);setv('m-agenda',r.agendapunten||r.actiepunt);
@@ -2549,9 +2546,10 @@ async function submitTask(){
     const subId={OPPAKKEN:'m-sub-opp',VERGADERVERZOEKEN:'m-sub-verg','OFFERTE-TRAJECTEN':'m-sub-off',LOD:'m-sub-lod'}[sec];
     const sub=gv(subId);
     switch(sec){
-      case'OPPAKKEN':
-        values=[code,naam,gv('m-actie'),toDutchDate(gv('m-dl')),gv('m-beh'),gv('m-prio'),gv('m-opm'),
-          document.getElementById('tog-ib').classList.contains('on'),'',sub];break;
+      case'OPPAKKEN':{
+        const _berekend = berekenPrioriteit(toDutchDate(gv('m-dl')), 'OPPAKKEN').prioriteit;
+        values=[code,naam,gv('m-actie'),toDutchDate(gv('m-dl')),gv('m-beh'),_berekend,gv('m-opm'),
+          document.getElementById('tog-ib').classList.contains('on'),'',sub];break;}
       case'VERGADERVERZOEKEN':
         values=[code,naam,gv('m-per'),gv('m-agenda'),gv('m-beh-v'),toDutchDate(gv('m-dl-v')),gv('m-opm-v'),
           document.getElementById('tog-ib-v').classList.contains('on'),'',sub];break;

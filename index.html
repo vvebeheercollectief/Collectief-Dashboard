@@ -2639,6 +2639,48 @@ function filt(rows,q){
   return rows.filter(r=>Object.values(r).some(v=>String(v??'').toLowerCase().includes(q)));
 }
 
+// ══════════════════════════════════════
+//  AUTO-PRIORITEIT (zie docs/superpowers/specs/2026-06-02-auto-prioriteit-design.md)
+// ══════════════════════════════════════
+const PRIO_REGELS = {
+  'OPPAKKEN':          { hoog:  7, midden:  14 },
+  'VERGADERVERZOEKEN': { hoog: 14, midden:  21 },
+  'OFFERTE-TRAJECTEN': { hoog: 21, midden:  42 },
+  'LOD':               { hoog: 90, midden: 240 },
+};
+const STIL_DREMPEL_DAGEN = 14;
+
+function _vandaagAmsterdam(){
+  // Lokale datum (Europe/Amsterdam = browser-locale van de gebruiker), tijd op 00:00
+  const d = new Date();
+  d.setHours(0,0,0,0);
+  return d;
+}
+
+function _verschilInKalenderdagen(deadline, vandaag){
+  if (!(deadline instanceof Date) || isNaN(deadline)) return null;
+  const d = new Date(deadline.getFullYear(), deadline.getMonth(), deadline.getDate());
+  const v = new Date(vandaag.getFullYear(), vandaag.getMonth(), vandaag.getDate());
+  return Math.round((d - v) / 86400000);
+}
+
+function berekenPrioriteit(deadlineStr, categorie, vandaag){
+  vandaag = vandaag || _vandaagAmsterdam();
+  if (!deadlineStr) return { prioriteit: '', dagenTot: null, teLaat: false };
+  const parsed = _parseAnyDate(deadlineStr);
+  if (!parsed) return { prioriteit: '', dagenTot: null, teLaat: false };
+  const deadline = new Date(parsed.y, parsed.m - 1, parsed.d);
+  const dagenTot = _verschilInKalenderdagen(deadline, vandaag);
+  const teLaat = dagenTot < 0;
+  const regels = PRIO_REGELS[categorie];
+  if (!regels) return { prioriteit: '', dagenTot, teLaat };
+  let prioriteit;
+  if (dagenTot <= regels.hoog) prioriteit = 'Hoog';
+  else if (dagenTot <= regels.midden) prioriteit = 'Midden';
+  else prioriteit = 'Laag';
+  return { prioriteit, dagenTot, teLaat };
+}
+
 function prioBadge(v){
   if(!v)return'';
   const cls={Hoog:'prio-hoog',Midden:'prio-mid',Laag:'prio-laag'}[v]||'prio-mid';
@@ -3336,6 +3378,45 @@ OneSignalDeferred.push(async function(OneSignal) {
     console.error('[Notif] OneSignal init faalde:', e);
   }
 });
+
+// ══════════════════════════════════════
+//  TESTS (alleen actief met ?test=1)
+// ══════════════════════════════════════
+if (location.search.includes('test=1')) {
+  console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+  const T = new Date(2026, 5, 2); // 2 juni 2026
+  const fmt = d => `${d.getDate()} ${['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'][d.getMonth()]} ${d.getFullYear()}`;
+  const plus = n => fmt(new Date(T.getFullYear(), T.getMonth(), T.getDate() + n));
+
+  const cases = [
+    [  7, 'OPPAKKEN',          'Hoog',   false],
+    [  8, 'OPPAKKEN',          'Midden', false],
+    [ 14, 'OPPAKKEN',          'Midden', false],
+    [ 15, 'OPPAKKEN',          'Laag',   false],
+    [ 14, 'VERGADERVERZOEKEN', 'Hoog',   false],
+    [ 15, 'VERGADERVERZOEKEN', 'Midden', false],
+    [ 21, 'VERGADERVERZOEKEN', 'Midden', false],
+    [ 22, 'VERGADERVERZOEKEN', 'Laag',   false],
+    [ 21, 'OFFERTE-TRAJECTEN', 'Hoog',   false],
+    [ 42, 'OFFERTE-TRAJECTEN', 'Midden', false],
+    [ 43, 'OFFERTE-TRAJECTEN', 'Laag',   false],
+    [ 90, 'LOD',               'Hoog',   false],
+    [240, 'LOD',               'Midden', false],
+    [241, 'LOD',               'Laag',   false],
+    [ -3, 'OPPAKKEN',          'Hoog',   true ],
+    [  0, 'OPPAKKEN',          'Hoog',   false],
+  ];
+  let ok = 0, fail = 0;
+  cases.forEach(([off, cat, prio, teLaat]) => {
+    const got = berekenPrioriteit(plus(off), cat, T);
+    const pass = got.prioriteit === prio && got.teLaat === teLaat;
+    if (pass) ok++; else { fail++; console.error(`FAIL: ${cat} +${off}d → expected ${prio}/teLaat=${teLaat}, got ${got.prioriteit}/teLaat=${got.teLaat}`); }
+  });
+  const leeg = berekenPrioriteit('', 'OPPAKKEN', T);
+  if (leeg.prioriteit === '' && leeg.teLaat === false) ok++; else { fail++; console.error('FAIL: lege deadline →', leeg); }
+
+  console.log(`%c[TESTS] ${ok} OK, ${fail} FAIL`, fail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');
+}
 </script>
 </body>
 </html>

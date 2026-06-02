@@ -1444,13 +1444,22 @@ function filterNtd(rows,q,fCode,beh,prio,sec){
     }
     return true;
   }).sort((a,b)=>{
-    const ibA=a.inBehandeling==='TRUE'?1:0, ibB=b.inBehandeling==='TRUE'?1:0;
-    if(ibA!==ibB) return ibA-ibB;
-    const dA=parseDt(a.deadline), dB=parseDt(b.deadline);
-    if(dA&&dB) return dA-dB;
-    if(dA) return -1;
-    if(dB) return 1;
-    return 0;
+    const ibA = a.inBehandeling==='TRUE'?1:0, ibB = b.inBehandeling==='TRUE'?1:0;
+    if (ibA !== ibB) return ibA - ibB;
+    const pa = berekenPrioriteit(a.deadline, sec);
+    const pb = berekenPrioriteit(b.deadline, sec);
+    // 1. Te laat altijd bovenaan
+    if (pa.teLaat !== pb.teLaat) return pa.teLaat ? -1 : 1;
+    // 2. Prioriteit-rang
+    const rang = { 'Hoog':0, 'Midden':1, 'Laag':2, '':3 };
+    if (rang[pa.prioriteit] !== rang[pb.prioriteit]) return rang[pa.prioriteit] - rang[pb.prioriteit];
+    // 3. Deadline oplopend (vroegste eerst)
+    const dA = parseDt(a.deadline), dB = parseDt(b.deadline);
+    if (dA && dB && dA !== dB) return dA - dB;
+    if (dA && !dB) return -1;
+    if (dB && !dA) return 1;
+    // 4. VvE-code alfabetisch
+    return (a.code || '').localeCompare(b.code || '');
   });
 }
 

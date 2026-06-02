@@ -232,19 +232,20 @@
     .kpi-trend i{font-size:13px}
     .kpi-trend-arrow{font-size:9px;line-height:1;display:inline-block;transform:translateY(-1px)}
 
-    /* NTD top-row: stats links, donut rechts */
-    .ntd-top-row{display:flex;gap:14px;margin-bottom:18px;align-items:stretch}
-    .ntd-donut-card{background:var(--sur);border:1px solid var(--bor);border-radius:14px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 12px color-mix(in srgb,var(--ac) 10%,transparent);min-width:280px;max-width:320px;display:flex;flex-direction:column;gap:8px}
+    /* NTD top-row: stats links, donut rechts (gelijke hoogte, geen stretch-rek) */
+    .ntd-top-row{display:flex;gap:14px;margin-bottom:18px;align-items:flex-start}
+    .ntd-top-row > .stats-grid{flex:1;min-width:0}
+    .ntd-donut-card{background:var(--sur);border:1px solid var(--bor);border-radius:14px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 12px color-mix(in srgb,var(--ac) 10%,transparent);width:300px;flex-shrink:0;display:flex;flex-direction:column;gap:8px;height:fit-content}
     .ntd-donut-hdr{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
     .ntd-donut-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);line-height:1.2}
     .ntd-donut-sub{font-size:12px;font-weight:600;color:var(--ac);margin-top:2px}
-    .ntd-donut-tabs{display:flex;gap:2px;background:var(--sur2);padding:2px;border-radius:7px}
+    .ntd-donut-tabs{display:flex;gap:2px;background:var(--sur2);padding:2px;border-radius:7px;flex-shrink:0}
     .ntd-donut-tab{padding:3px 8px;border:none;background:transparent;border-radius:5px;font-size:10px;font-weight:700;color:var(--mut);cursor:pointer;text-transform:uppercase;letter-spacing:.04em}
     .ntd-donut-tab.on{background:var(--sur);color:var(--ac);box-shadow:0 1px 2px rgba(0,0,0,.08)}
-    .ntd-donut-wrap{position:relative;height:140px;flex:1;min-height:120px}
+    .ntd-donut-wrap{position:relative;height:150px}
     @media(max-width:900px){
       .ntd-top-row{flex-direction:column}
-      .ntd-donut-card{max-width:none}
+      .ntd-donut-card{width:100%}
     }
     .kpi-spark{position:relative;height:36px;margin-top:8px}
     .kpi-spark canvas{position:absolute;inset:0}
@@ -1556,10 +1557,12 @@ const PERIODE_LABEL_PREV={dag:'gisteren',week:'vorige week',maand:'vorige maand'
 const HERO_BUCKETS={dag:14,week:12,maand:12,kwartaal:8};
 const SPARK_BUCKETS=8;
 
-// Bucket helpers — datum (string of {y,m,d}) → sleutel
+// Bucket helpers — datum (Date, string, of {y,m,d}) → sleutel
 function _toDateObj(v){
   if(!v) return null;
+  if(v instanceof Date) return isNaN(v)?null:v;
   if(typeof v==='object'&&v.y) return new Date(v.y,v.m-1,v.d);
+  if(typeof v!=='string') return null;
   const p=_parseAnyDate(v);
   return p?new Date(p.y,p.m-1,p.d):null;
 }

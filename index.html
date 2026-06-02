@@ -272,13 +272,17 @@
     /* NTD top-row: stats links, totaal-teller rechts */
     .ntd-top-row{display:flex;gap:14px;margin-bottom:18px;align-items:stretch}
     .ntd-top-row > .stats-grid{flex:1;min-width:0}
-    .ntd-total-card{background:linear-gradient(135deg,var(--ac) 0%,color-mix(in srgb,var(--ac) 75%,#000) 100%);border-radius:14px;padding:16px 20px;box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 12px color-mix(in srgb,var(--ac) 25%,transparent);width:260px;flex-shrink:0;display:flex;flex-direction:column;justify-content:center;gap:6px;color:#fff}
-    .ntd-total-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;opacity:.9;line-height:1.2}
-    .ntd-total-num{font-size:42px;font-weight:800;line-height:1;letter-spacing:-.02em}
-    .ntd-total-sub{font-size:12px;font-weight:500;opacity:.85}
+    .ntd-progress-card{background:var(--sur);border-radius:14px;padding:16px 20px;box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 12px color-mix(in srgb,var(--ac) 18%,transparent);width:260px;flex-shrink:0;display:flex;flex-direction:column;justify-content:center;gap:10px}
+    .ntd-progress-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--txt);opacity:.7;line-height:1.2}
+    .ntd-progress-track{position:relative;height:30px;border-radius:999px;background:var(--sur2);overflow:hidden}
+    .ntd-progress-fill{position:absolute;inset:0 auto 0 0;width:0;overflow:hidden;border-radius:999px;background:linear-gradient(135deg,#0D7377,#14B8A6);transition:width .9s cubic-bezier(.22,1,.36,1)}
+    .ntd-progress-val{position:absolute;top:0;left:0;height:30px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;letter-spacing:-.01em;white-space:nowrap;pointer-events:none;font-variant-numeric:tabular-nums}
+    .ntd-progress-val-base{color:var(--txt)}
+    .ntd-progress-fill .ntd-progress-val{color:#fff}
+    .ntd-progress-sub{font-size:12px;font-weight:500;color:var(--mut)}
     @media(max-width:900px){
       .ntd-top-row{flex-direction:column}
-      .ntd-total-card{width:100%}
+      .ntd-progress-card{width:100%}
     }
     .kpi-spark{position:relative;height:36px;margin-top:8px}
     .kpi-spark canvas{position:absolute;inset:0}
@@ -459,10 +463,15 @@
     <div class="page" id="page-ntd">
       <div class="ntd-top-row">
         <div class="stats-grid" id="ntd-stats" style="flex:1;margin-bottom:0"></div>
-        <div class="ntd-total-card" id="ntd-total-card">
-          <div class="ntd-total-lbl">Vergaderingen uitgeschreven</div>
-          <div class="ntd-total-num" id="ntd-total-num">0</div>
-          <div class="ntd-total-sub">uitnodigingen verzonden</div>
+        <div class="ntd-progress-card" id="ntd-progress-card">
+          <div class="ntd-progress-lbl">Vergaderingen uitgeschreven</div>
+          <div class="ntd-progress-track" id="ntd-progress-track">
+            <div class="ntd-progress-fill" id="ntd-progress-fill">
+              <span class="ntd-progress-val" id="ntd-progress-val-fill">0 / 0</span>
+            </div>
+            <span class="ntd-progress-val ntd-progress-val-base" id="ntd-progress-val-base">0 / 0</span>
+          </div>
+          <div class="ntd-progress-sub" id="ntd-progress-sub">0% van de vergaderingen uitgeschreven</div>
         </div>
       </div>
       <div class="card" id="ntd-card">
@@ -1368,11 +1377,21 @@ function renderNtdStats(){
   renderNtdDonut();
 }
 
-// NTD: totaal uitgeschreven vergaderingen (alvo: uitnodiging=TRUE → uitnodiging verzonden)
+// NTD: voortgangsbalk uitgeschreven vergaderingen (alvo: uitnodiging=TRUE → uitnodiging verzonden)
 function renderNtdDonut(){
-  const el=document.getElementById('ntd-total-num');
-  if(!el) return;
-  el.textContent=(D.alvo||[]).filter(r=>r.uitnodiging).length;
+  const track=document.getElementById('ntd-progress-track');
+  if(!track) return;
+  const done=(D.alvo||[]).filter(r=>r.uitnodiging).length;
+  const total=(D.alvo||[]).length;
+  const pct=total?Math.round(done/total*100):0;
+  const txt=`${done} / ${total}`;
+  const w=track.clientWidth+'px';
+  const base=document.getElementById('ntd-progress-val-base');
+  const fillVal=document.getElementById('ntd-progress-val-fill');
+  base.textContent=fillVal.textContent=txt;
+  base.style.width=fillVal.style.width=w;     // zelfde breedte → exacte overlap voor reveal-effect
+  document.getElementById('ntd-progress-sub').textContent=`${pct}% van de vergaderingen uitgeschreven`;
+  requestAnimationFrame(()=>{document.getElementById('ntd-progress-fill').style.width=pct+'%'});
 }
 
 // Helper: ligt date d in (current period - offset) gerekend vanaf ref?
@@ -1560,7 +1579,7 @@ async function toggleAlvoFlag(idx,field){
       body:JSON.stringify({requests:[{
         updateCells:{
           range:{sheetId,startRowIndex:r._row-1,endRowIndex:r._row,startColumnIndex:col,endColumnIndex:col+1},
-          rows:[{values:[{userEnteredValue:{stringValue:newVal?'TRUE':'FALSE'}}]}],
+          rows:[{values:[{userEnteredValue:{boolValue:newVal}}]}],
           fields:'userEnteredValue'
         }
       }]})
@@ -2698,7 +2717,7 @@ const PRIO_REGELS = {
   'OFFERTE-TRAJECTEN': { hoog: 21, midden:  42 },
   'LOD':               { hoog: 90, midden: 240 },
 };
-const STIL_DREMPEL_DAGEN = 14;
+const STIL_DREMPEL_DAGEN = 4;
 
 function _vandaagAmsterdam(){
   // Lokale datum (Europe/Amsterdam = browser-locale van de gebruiker), tijd op 00:00

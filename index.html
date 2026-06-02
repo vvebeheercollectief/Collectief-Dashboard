@@ -208,6 +208,64 @@
     .period-btn{padding:3px 9px;border-radius:6px;border:1px solid var(--bor);background:var(--sur2);color:var(--mut);font-size:11px;font-weight:600;cursor:pointer;transition:all var(--tr)}
     .period-btn.on{background:var(--ac);color:#fff;border-color:var(--ac)}
 
+    /* Productivity tracker */
+    .prod-hdr{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+    .prod-hdr h2{font-size:18px;font-weight:800;letter-spacing:-.02em;color:var(--txt);display:flex;align-items:center;gap:9px}
+    .prod-hdr h2 i{color:var(--ac);font-size:22px}
+    .period-bar{display:inline-flex;background:var(--sur);border:1px solid var(--bor);border-radius:10px;padding:4px;gap:2px;box-shadow:var(--sh)}
+    .period-bar .period-btn{padding:6px 14px;border:none;background:transparent;border-radius:7px;font-size:12px}
+    .period-bar .period-btn.on{background:var(--ac);color:#fff;box-shadow:0 1px 3px color-mix(in srgb,var(--ac) 30%,transparent)}
+
+    .kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-bottom:18px}
+    .kpi{position:relative;background:var(--sur);border:1px solid var(--bor);border-radius:14px;padding:18px 20px 14px;box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 12px color-mix(in srgb,var(--sec,var(--ac)) 10%,transparent);overflow:hidden;transition:transform var(--tr),box-shadow var(--tr)}
+    .kpi:hover{transform:translateY(-2px);box-shadow:0 2px 6px rgba(0,0,0,.08),0 8px 20px color-mix(in srgb,var(--sec,var(--ac)) 18%,transparent)}
+    .kpi::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--sec,var(--ac))}
+    .kpi-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px}
+    .kpi-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mut)}
+    .kpi-ico{width:34px;height:34px;border-radius:9px;background:var(--sec-l,var(--ac-l));display:flex;align-items:center;justify-content:center;color:var(--sec,var(--ac));font-size:20px;flex-shrink:0}
+    .kpi-num{font-size:34px;font-weight:800;line-height:1;letter-spacing:-.04em;color:var(--sec,var(--ac));margin-bottom:4px}
+    .kpi-sub{font-size:11px;color:var(--mut);margin-bottom:8px;min-height:14px}
+    .kpi-trend{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;padding:3px 8px;border-radius:20px;line-height:1}
+    .kpi-trend.up{background:var(--gn-l);color:var(--gn)}
+    .kpi-trend.down{background:var(--rd-l);color:var(--rd)}
+    .kpi-trend.flat{background:var(--sur2);color:var(--mut)}
+    .kpi-trend i{font-size:13px}
+    .kpi-spark{position:relative;height:36px;margin-top:8px}
+    .kpi-spark canvas{position:absolute;inset:0}
+
+    .kpi-persons{display:flex;flex-direction:column;gap:7px;margin-top:2px}
+    .kpi-person-row{display:grid;grid-template-columns:48px 1fr 28px;align-items:center;gap:8px;font-size:12px}
+    .kpi-person-name{font-weight:600;color:var(--txt)}
+    .kpi-person-bar{height:7px;background:var(--sur2);border-radius:4px;overflow:hidden}
+    .kpi-person-fill{height:100%;background:var(--sec,var(--ac));border-radius:4px;transition:width .4s ease}
+    .kpi-person-num{font-weight:800;color:var(--sec,var(--ac));text-align:right;font-variant-numeric:tabular-nums}
+
+    .hero-chart{padding:18px 20px}
+    .hero-chart-hdr{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+    .hero-chart-hdr h3{font-size:14px;font-weight:700;color:var(--txt)}
+    .hero-chart-hdr h3 .sub{font-size:11px;font-weight:500;color:var(--mut);margin-left:6px}
+    .metric-toggle{display:inline-flex;background:var(--sur2);border-radius:8px;padding:3px;gap:2px}
+    .metric-btn{padding:5px 12px;border:none;background:transparent;border-radius:6px;font-size:12px;font-weight:600;color:var(--mut);cursor:pointer;transition:all var(--tr)}
+    .metric-btn:hover{color:var(--txt)}
+    .metric-btn.on{background:var(--sur);color:var(--ac);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+    .hero-chart-wrap{position:relative;height:260px}
+
+    .leaderboard{padding:0}
+    .leaderboard table{width:100%;border-collapse:collapse}
+    .leaderboard thead th{background:var(--sur2);padding:11px 16px;text-align:left;font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--bor)}
+    .leaderboard thead th:last-child{text-align:right}
+    .leaderboard tbody td{padding:13px 16px;border-bottom:1px solid var(--bor);font-size:13px}
+    .leaderboard tbody tr:last-child td{border-bottom:none}
+    .leaderboard tbody tr:hover{background:var(--sur2)}
+    .lb-rank{font-weight:800;color:var(--mut);width:30px;font-variant-numeric:tabular-nums}
+    .lb-rank.gold{color:#D97706}
+    .lb-rank.silver{color:#64748B}
+    .lb-rank.bronze{color:#B45309}
+    .lb-name{font-weight:700;color:var(--txt)}
+    .lb-now{font-weight:800;color:var(--ac);font-variant-numeric:tabular-nums}
+    .lb-prev{color:var(--mut);font-variant-numeric:tabular-nums}
+    .lb-trend{text-align:right;font-variant-numeric:tabular-nums}
+
     /* Empty */
     .empty{padding:36px;text-align:center;color:var(--mut);font-size:13px}
     .empty-ico{font-size:32px;margin-bottom:8px}
@@ -538,25 +596,80 @@
 
     <!-- ══ ANALYTICS ══ -->
     <div class="page" id="page-analytics">
-      <div class="stats-grid" id="ana-stats"></div>
-      <div class="charts-grid">
-        <div class="chart-card">
-          <h3>Vergaderingen afgerond<div class="period-btns" id="pb-vergader"></div></h3>
-          <div class="chart-wrap"><canvas id="chart-vergader"></canvas></div>
+      <div class="prod-hdr">
+        <h2><i class="ph-duotone ph-chart-line-up"></i>Productiviteit</h2>
+        <div class="period-bar" id="ana-period-bar"></div>
+      </div>
+
+      <div class="kpi-grid" id="ana-kpi-grid">
+        <div class="kpi" id="kpi-vergader" style="--sec:var(--ac);--sec-l:var(--ac-l)">
+          <div class="kpi-top">
+            <div>
+              <div class="kpi-lbl">Vergaderingen uitgeschreven</div>
+            </div>
+            <div class="kpi-ico"><i class="ph-duotone ph-note-pencil"></i></div>
+          </div>
+          <div class="kpi-num" id="kpi-vergader-num">–</div>
+          <div class="kpi-sub" id="kpi-vergader-sub"></div>
+          <div class="kpi-spark"><canvas id="spark-vergader"></canvas></div>
         </div>
-        <div class="chart-card">
-          <h3>Notulen verstuurd<div class="period-btns" id="pb-notulen"></div></h3>
-          <div class="chart-wrap"><canvas id="chart-notulen"></canvas></div>
+
+        <div class="kpi" id="kpi-openalv" style="--sec:var(--am);--sec-l:var(--am-l)">
+          <div class="kpi-top">
+            <div>
+              <div class="kpi-lbl">Open ALV's (werkvoorraad)</div>
+            </div>
+            <div class="kpi-ico"><i class="ph-duotone ph-hourglass-medium"></i></div>
+          </div>
+          <div class="kpi-num" id="kpi-openalv-num">–</div>
+          <div class="kpi-sub" id="kpi-openalv-sub">nog uit te schrijven</div>
+          <div class="kpi-spark" style="height:36px;display:flex;align-items:center"><div style="width:100%;height:8px;background:var(--sur2);border-radius:4px;overflow:hidden"><div id="kpi-openalv-bar" style="height:100%;background:var(--am);border-radius:4px;width:0;transition:width .6s ease"></div></div></div>
+        </div>
+
+        <div class="kpi" id="kpi-taken" style="--sec:var(--gn);--sec-l:var(--gn-l)">
+          <div class="kpi-top">
+            <div>
+              <div class="kpi-lbl">Taken afgerond</div>
+            </div>
+            <div class="kpi-ico"><i class="ph-duotone ph-check-circle"></i></div>
+          </div>
+          <div class="kpi-num" id="kpi-taken-num">–</div>
+          <div class="kpi-sub" id="kpi-taken-sub"></div>
+          <div class="kpi-spark"><canvas id="spark-taken"></canvas></div>
+        </div>
+
+        <div class="kpi" id="kpi-pers" style="--sec:var(--pu);--sec-l:var(--pu-l)">
+          <div class="kpi-top">
+            <div>
+              <div class="kpi-lbl">Taken per behandelaar</div>
+            </div>
+            <div class="kpi-ico"><i class="ph-duotone ph-users-three"></i></div>
+          </div>
+          <div class="kpi-persons" id="kpi-pers-rows"></div>
         </div>
       </div>
-      <div class="charts-grid">
-        <div class="chart-card">
-          <h3>Voortgang per status</h3>
-          <div class="chart-wrap"><canvas id="chart-status"></canvas></div>
+
+      <div class="card hero-chart">
+        <div class="hero-chart-hdr">
+          <h3 id="hero-chart-title">Vergaderingen uitgeschreven<span class="sub" id="hero-chart-sub"></span></h3>
+          <div class="metric-toggle" id="hero-metric-toggle"></div>
         </div>
-        <div class="chart-card">
-          <h3>Begroting doorgezet</h3>
-          <div class="chart-wrap"><canvas id="chart-begroting"></canvas></div>
+        <div class="hero-chart-wrap"><canvas id="chart-hero"></canvas></div>
+      </div>
+
+      <div class="card leaderboard">
+        <div class="card-hdr" style="padding-bottom:13px"><h2 id="lb-title">Leaderboard — Taken afgerond</h2></div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr>
+              <th style="width:50px">#</th>
+              <th>Behandelaar</th>
+              <th id="lb-now-hdr">Deze periode</th>
+              <th id="lb-prev-hdr">Vorige periode</th>
+              <th>Trend</th>
+            </tr></thead>
+            <tbody id="lb-tbody"></tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -572,6 +685,16 @@
         <div class="chart-card">
           <h3>Open taken per categorie</h3>
           <div class="chart-wrap"><canvas id="chart-taken-cat"></canvas></div>
+        </div>
+      </div>
+      <div class="charts-grid">
+        <div class="chart-card">
+          <h3>Voortgang per status</h3>
+          <div class="chart-wrap"><canvas id="chart-status"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Begroting doorgezet</h3>
+          <div class="chart-wrap"><canvas id="chart-begroting"></canvas></div>
         </div>
       </div>
       <div class="card">
@@ -889,7 +1012,8 @@ let activeNtd='OPPAKKEN', activeAf='OPPAKKEN';
 let charts = {};
 let oauthToken=null, oauthExpiry=0, currentUserEmail=null, _gsiTokenClient=null, clientId='560046984985-1371r4bbt28umi6uslims6mlkucn1278.apps.googleusercontent.com';
 let editMode=false, editRowData=null, editSec=null;
-let anaPeriod={vergader:'maand',notulen:'maand'};
+let anaPeriod='maand';        // 'dag' | 'week' | 'maand' | 'kwartaal'
+let anaMetric='vergader';     // 'vergader' | 'taken'  (voor hoofdgrafiek)
 let _rowCache = [];
 let _undoStack = [];
 
@@ -1309,98 +1433,342 @@ function renderAlfa(){
 }
 
 // ══════════════════════════════════════
-//  ANALYTICS
+//  ANALYTICS — Productiviteits-tracker
 // ══════════════════════════════════════
-function buildPeriodBtns(id, key){
-  const el=document.getElementById(id);
-  ['week','maand','kwartaal'].forEach(p=>{
-    const b=document.createElement('button');
-    b.className='period-btn'+(p==='maand'?' on':'');
-    b.textContent=p.charAt(0).toUpperCase()+p.slice(1);
+const PERIODS=['dag','week','maand','kwartaal'];
+const MAAND_KORT=['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
+const PERIODE_LABEL_NU={dag:'vandaag',week:'deze week',maand:'deze maand',kwartaal:'dit kwartaal'};
+const PERIODE_LABEL_PREV={dag:'gisteren',week:'vorige week',maand:'vorige maand',kwartaal:'vorig kwartaal'};
+const HERO_BUCKETS={dag:14,week:12,maand:12,kwartaal:8};
+const SPARK_BUCKETS=8;
+
+// Bucket helpers — datum (string of {y,m,d}) → sleutel
+function _toDateObj(v){
+  if(!v) return null;
+  if(typeof v==='object'&&v.y) return new Date(v.y,v.m-1,v.d);
+  const p=_parseAnyDate(v);
+  return p?new Date(p.y,p.m-1,p.d):null;
+}
+function bucketKey(date,period){
+  const d=_toDateObj(date); if(!d) return null;
+  if(period==='dag'){
+    return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+  if(period==='week'){
+    // ISO-week jaar: pak donderdag van die week
+    const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+    const day=t.getUTCDay()||7;
+    t.setUTCDate(t.getUTCDate()+4-day);
+    const wk=getWeekNum(d);
+    return`${t.getUTCFullYear()}-W${String(wk).padStart(2,'0')}`;
+  }
+  if(period==='maand'){
+    return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  }
+  if(period==='kwartaal'){
+    return`${d.getFullYear()}-Q${Math.floor(d.getMonth()/3)+1}`;
+  }
+  return null;
+}
+function bucketLabel(key,period){
+  if(!key) return '';
+  if(period==='dag'){
+    const [y,m,d]=key.split('-').map(Number);
+    return`${d} ${MAAND_KORT[m-1].toLowerCase()}`;
+  }
+  if(period==='week'){
+    const [y,w]=key.split('-W');
+    return`W${+w} '${y.slice(2)}`;
+  }
+  if(period==='maand'){
+    const [y,m]=key.split('-').map(Number);
+    return`${MAAND_KORT[m-1]} '${String(y).slice(2)}`;
+  }
+  if(period==='kwartaal'){
+    const [y,q]=key.split('-Q');
+    return`Q${q} '${y.slice(2)}`;
+  }
+  return key;
+}
+// Genereer laatste n bucket-sleutels eindigend op vandaag
+function lastBucketKeys(period,n){
+  const today=new Date();
+  const out=[];
+  for(let i=n-1;i>=0;i--){
+    let d=new Date(today.getFullYear(),today.getMonth(),today.getDate());
+    if(period==='dag') d.setDate(d.getDate()-i);
+    else if(period==='week') d.setDate(d.getDate()-i*7);
+    else if(period==='maand') d=new Date(today.getFullYear(),today.getMonth()-i,1);
+    else if(period==='kwartaal'){
+      const curQ=Math.floor(today.getMonth()/3);
+      d=new Date(today.getFullYear(),(curQ-i)*3,1);
+    }
+    out.push(bucketKey(d,period));
+  }
+  return out;
+}
+// rows = array met datum-string; geef array {key,label,count} voor laatste n buckets
+function seriesByPeriod(rows,dateField,period,n){
+  const keys=lastBucketKeys(period,n);
+  const counts={}; keys.forEach(k=>counts[k]=0);
+  rows.forEach(r=>{
+    const k=bucketKey(r[dateField],period);
+    if(k!=null&&counts[k]!==undefined) counts[k]++;
+  });
+  return keys.map(k=>({key:k,label:bucketLabel(k,period),count:counts[k]}));
+}
+// behandelaar-veld kan "Jer" of "Cihad, Jer" zijn → split op komma
+function _splitBeh(v){
+  return String(v||'').split(/[,;/]/).map(s=>displayName(s.trim())).filter(Boolean);
+}
+// rows + behandelaar-veld → dict {persoon: [{key,label,count}]}
+function seriesPerPersonByPeriod(rows,dateField,persField,period,n){
+  const keys=lastBucketKeys(period,n);
+  const out={};
+  rows.forEach(r=>{
+    const names=_splitBeh(r[persField]);
+    if(!names.length) return;
+    const k=bucketKey(r[dateField],period);
+    if(k==null) return;
+    names.forEach(name=>{
+      if(!out[name]){out[name]={}; keys.forEach(kk=>out[name][kk]=0)}
+      if(out[name][k]!==undefined) out[name][k]++;
+    });
+  });
+  const res={};
+  Object.keys(out).forEach(name=>{
+    res[name]=keys.map(k=>({key:k,label:bucketLabel(k,period),count:out[name][k]}));
+  });
+  return res;
+}
+function computeTrend(series){
+  const n=series.length;
+  const huidig=n?series[n-1].count:0;
+  const vorig=n>1?series[n-2].count:0;
+  let dir='flat',label='0%',deltaPct=0;
+  if(vorig===0&&huidig===0){dir='flat';label='0%'}
+  else if(vorig===0&&huidig>0){dir='up';label='nieuw'}
+  else{
+    deltaPct=Math.round((huidig-vorig)/vorig*100);
+    if(deltaPct>0){dir='up';label='+'+deltaPct+'%'}
+    else if(deltaPct<0){dir='down';label=deltaPct+'%'}
+    else{dir='flat';label='0%'}
+  }
+  return{huidig,vorig,deltaPct,dir,label};
+}
+
+// Sparkline — kleine lijngrafiek zonder assen
+function renderSparkline(canvasId,values,color){
+  if(charts[canvasId]) charts[canvasId].destroy();
+  const el=document.getElementById(canvasId); if(!el) return;
+  charts[canvasId]=new Chart(el,{
+    type:'line',
+    data:{labels:values.map((_,i)=>i),datasets:[{
+      data:values,
+      borderColor:color,
+      backgroundColor:color+'22',
+      borderWidth:2,
+      fill:true,
+      tension:.35,
+      pointRadius:0,
+      pointHoverRadius:3,
+      pointHoverBackgroundColor:color
+    }]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{enabled:false}},
+      scales:{x:{display:false},y:{display:false,beginAtZero:true}},
+      elements:{line:{borderJoinStyle:'round'}}}
+  });
+}
+
+// KPI-tegel updaten (titel/getal/sub blijven HTML; trend wordt ingevoegd)
+function renderKpiTile(id,opts){
+  // opts: {num, sub, trend:{dir,label}, sparkId?, sparkValues?, sparkColor?}
+  const numEl=document.getElementById(id+'-num');
+  const subEl=document.getElementById(id+'-sub');
+  if(numEl) numEl.textContent=opts.num;
+  if(subEl){
+    const arrow=opts.trend?(opts.trend.dir==='up'?'<i class="ph-bold ph-arrow-up"></i>':opts.trend.dir==='down'?'<i class="ph-bold ph-arrow-down"></i>':'<i class="ph-bold ph-minus"></i>'):'';
+    const trendHtml=opts.trend?`<span class="kpi-trend ${opts.trend.dir}">${arrow}${opts.trend.label}</span>`:'';
+    const subText=opts.sub||'';
+    subEl.innerHTML=`${trendHtml}${subText?'&nbsp;&nbsp;'+subText:''}`;
+  }
+  if(opts.sparkId&&opts.sparkValues){
+    renderSparkline(opts.sparkId,opts.sparkValues,opts.sparkColor||'#0D7377');
+  }
+}
+
+// KPI 4: per persoon — mini-balkjes
+function renderKpiPersonTile(period){
+  const rowsEl=document.getElementById('kpi-pers-rows'); if(!rowsEl) return;
+  // Verzamel alle taken in laatste bucket (huidige periode)
+  const keys=lastBucketKeys(period,1);
+  const curKey=keys[0];
+  const allTaken=SKEYS.flatMap(s=>D.af[s]||[]);
+  const tally={};
+  ['Jer','Cihad','Gabos','Cihan'].forEach(n=>tally[n]=0);
+  allTaken.forEach(r=>{
+    const k=bucketKey(r.datum,period);
+    if(k!==curKey) return;
+    _splitBeh(r.behandelaar).forEach(name=>{
+      if(tally[name]!==undefined) tally[name]++;
+    });
+  });
+  const max=Math.max(1,...Object.values(tally));
+  rowsEl.innerHTML=['Jer','Cihad','Gabos','Cihan'].map(name=>{
+    const v=tally[name];
+    const pct=Math.round(v/max*100);
+    return`<div class="kpi-person-row"><div class="kpi-person-name">${name}</div><div class="kpi-person-bar"><div class="kpi-person-fill" style="width:${pct}%"></div></div><div class="kpi-person-num">${v}</div></div>`;
+  }).join('');
+}
+
+// Hoofdgrafiek: combo bar + lijn (vorige cyclus van gelijke lengte, verschoven)
+function renderHeroChart(metric,period){
+  const dark=document.documentElement.dataset.theme==='dark';
+  const tc=dark?'#94a3b8':'#64748b';
+  const gc=dark?'#1e293b':'#f1f5f9';
+  const n=HERO_BUCKETS[period]||12;
+  // Bouw 2n buckets om huidige + vorige cyclus te dekken
+  const fullN=n*2;
+  let rows,dateField,color,title;
+  if(metric==='vergader'){
+    rows=D.alfa; dateField='datum'; color='#0D7377'; title='Vergaderingen uitgeschreven';
+  }else{
+    rows=SKEYS.flatMap(s=>D.af[s]||[]); dateField='datum'; color='#047857'; title='Taken afgerond';
+  }
+  const full=seriesByPeriod(rows,dateField,period,fullN);
+  const curr=full.slice(n);             // laatste n
+  const prev=full.slice(0,n).map(b=>b.count); // de n daarvoor
+  document.getElementById('hero-chart-title').firstChild.nodeValue=title;
+  document.getElementById('hero-chart-sub').textContent=` — laatste ${n} ${period==='dag'?'dagen':period+'en'}`;
+  if(charts['chart-hero']) charts['chart-hero'].destroy();
+  charts['chart-hero']=new Chart(document.getElementById('chart-hero'),{
+    type:'bar',
+    data:{
+      labels:curr.map(b=>b.label),
+      datasets:[
+        {type:'bar',label:'Deze cyclus',data:curr.map(b=>b.count),backgroundColor:color,borderRadius:6,borderSkipped:false,order:2},
+        {type:'line',label:'Vorige cyclus (referentie)',data:prev,borderColor:dark?'#cbd5e1':'#94a3b8',backgroundColor:'transparent',borderWidth:2,borderDash:[5,4],pointRadius:0,pointHoverRadius:4,tension:.3,order:1}
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{position:'top',align:'end',labels:{color:tc,padding:12,font:{size:11},usePointStyle:true,pointStyle:'circle',boxWidth:8}},
+        tooltip:{mode:'index',intersect:false,backgroundColor:dark?'#0f172a':'#fff',titleColor:tc,bodyColor:dark?'#e2e8f0':'#1e293b',borderColor:gc,borderWidth:1,padding:10,cornerRadius:8,displayColors:true,usePointStyle:true}
+      },
+      scales:{
+        x:{grid:{display:false},ticks:{color:tc,font:{size:11}}},
+        y:{grid:{color:gc},ticks:{color:tc,precision:0},beginAtZero:true}
+      }}
+  });
+}
+
+// Leaderboard — taken per behandelaar deze vs vorige periode
+function renderLeaderboard(period){
+  const rows=SKEYS.flatMap(s=>D.af[s]||[]);
+  const series=seriesPerPersonByPeriod(rows,'datum','behandelaar',period,2);
+  const team=['Jer','Cihad','Gabos','Cihan'];
+  const data=team.map(name=>{
+    const s=series[name]||[{count:0},{count:0}];
+    const huidig=s[s.length-1].count;
+    const vorig=s.length>1?s[s.length-2].count:0;
+    const trend=computeTrend(s);
+    return{name,huidig,vorig,trend};
+  }).sort((a,b)=>b.huidig-a.huidig);
+
+  document.getElementById('lb-title').textContent=`Leaderboard — Taken afgerond ${PERIODE_LABEL_NU[period]}`;
+  document.getElementById('lb-now-hdr').textContent=PERIODE_LABEL_NU[period].charAt(0).toUpperCase()+PERIODE_LABEL_NU[period].slice(1);
+  document.getElementById('lb-prev-hdr').textContent=PERIODE_LABEL_PREV[period].charAt(0).toUpperCase()+PERIODE_LABEL_PREV[period].slice(1);
+
+  const tbody=document.getElementById('lb-tbody');
+  const medalCls=['gold','silver','bronze',''];
+  tbody.innerHTML=data.map((r,i)=>{
+    const arrow=r.trend.dir==='up'?'<i class="ph-bold ph-arrow-up"></i>':r.trend.dir==='down'?'<i class="ph-bold ph-arrow-down"></i>':'<i class="ph-bold ph-minus"></i>';
+    return`<tr>
+      <td class="lb-rank ${medalCls[i]||''}">${i+1}</td>
+      <td class="lb-name">${esc(r.name)}</td>
+      <td class="lb-now">${r.huidig}</td>
+      <td class="lb-prev">${r.vorig}</td>
+      <td class="lb-trend"><span class="kpi-trend ${r.trend.dir}">${arrow}${r.trend.label}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+// Globale periode-balk
+function renderPeriodBar(){
+  const el=document.getElementById('ana-period-bar'); if(!el) return;
+  el.innerHTML=PERIODS.map(p=>{
+    const lbl=p.charAt(0).toUpperCase()+p.slice(1);
+    return`<button class="period-btn${anaPeriod===p?' on':''}" data-p="${p}">${lbl}</button>`;
+  }).join('');
+  el.querySelectorAll('.period-btn').forEach(b=>{
     b.onclick=()=>{
-      anaPeriod[key]=p;
-      el.querySelectorAll('.period-btn').forEach(btn=>btn.classList.toggle('on',btn.textContent.toLowerCase()===p));
+      anaPeriod=b.dataset.p;
+      el.querySelectorAll('.period-btn').forEach(x=>x.classList.toggle('on',x.dataset.p===anaPeriod));
       buildAnalytics();
     };
-    el.appendChild(b);
+  });
+}
+// Metric-toggle in hoofdgrafiek
+function renderMetricToggle(){
+  const el=document.getElementById('hero-metric-toggle'); if(!el) return;
+  const metrics=[{k:'vergader',l:'Vergaderingen'},{k:'taken',l:'Taken'}];
+  el.innerHTML=metrics.map(m=>`<button class="metric-btn${anaMetric===m.k?' on':''}" data-m="${m.k}">${m.l}</button>`).join('');
+  el.querySelectorAll('.metric-btn').forEach(b=>{
+    b.onclick=()=>{
+      anaMetric=b.dataset.m;
+      el.querySelectorAll('.metric-btn').forEach(x=>x.classList.toggle('on',x.dataset.m===anaMetric));
+      renderHeroChart(anaMetric,anaPeriod);
+    };
   });
 }
 
 function buildAnalytics(){
-  const dark=document.documentElement.dataset.theme==='dark';
-  const tc=dark?'#94a3b8':'#64748b';
-  const gc=dark?'#1e293b':'#f1f5f9';
+  renderPeriodBar();
+  renderMetricToggle();
 
-  // Stats
-  const tot=D.alvo.length;
-  const afd=D.alvo.filter(r=>r.notulen).length;
-  const uitn=D.alvo.filter(r=>r.uitnodiging).length;
-  const begr=D.alvo.filter(r=>r.begroting).length;
-  document.getElementById('ana-stats').innerHTML=`
-    <div class="stat" style="--sec:var(--ac);--sec-l:var(--ac-l)"><div class="stat-top"><div class="stat-lbl">Totaal VvE's</div><div class="stat-ico"><i class="ph-duotone ph-buildings"></i></div></div><div class="stat-num">${tot}</div><div class="stat-sub">in beheer</div></div>
-    <div class="stat" style="--sec:var(--am);--sec-l:var(--am-l)"><div class="stat-top"><div class="stat-lbl">Uitnodigingen</div><div class="stat-ico"><i class="ph-duotone ph-envelope-open"></i></div></div><div class="stat-num">${uitn}</div><div class="stat-sub">${Math.round(uitn/tot*100)}% van totaal</div></div>
-    <div class="stat" style="--sec:var(--gn);--sec-l:var(--gn-l)"><div class="stat-top"><div class="stat-lbl">Notulen</div><div class="stat-ico"><i class="ph-duotone ph-note-pencil"></i></div></div><div class="stat-num">${afd}</div><div class="stat-sub">${Math.round(afd/tot*100)}% van totaal</div></div>
-    <div class="stat" style="--sec:var(--pu);--sec-l:var(--pu-l)"><div class="stat-top"><div class="stat-lbl">Begroting</div><div class="stat-ico"><i class="ph-duotone ph-coins"></i></div></div><div class="stat-num">${begr}</div><div class="stat-sub">${Math.round(begr/tot*100)}% doorgezet</div></div>`;
-
-  // Group alfa by period
-  const vLabels=getPeriodLabels(anaPeriod.vergader);
-  const vData=groupByPeriod(D.alfa,anaPeriod.vergader);
-  const nLabels=getPeriodLabels(anaPeriod.notulen);
-  const nData=groupByPeriod(D.alfa,anaPeriod.notulen); // same source for now
-
-  buildBarChart('chart-vergader',vLabels,vLabels.map(l=>vData[l]||0),'#0D7377',tc,gc);
-  buildBarChart('chart-notulen',nLabels,nLabels.map(l=>nData[l]||0),'#047857',tc,gc);
-
-  // Status donut — Uitnodiging verstuurd = "afgerond" (fix 4), getallen (fix 3)
-  buildDonut('chart-status',['Uitgeschreven','Nog uitschrijven'],[uitn,tot-uitn],['#0D7377','#B91C1C'],tc,`${uitn}/${tot}`,'Uitgeschreven');
-
-  // Begroting donut — getallen
-  buildDonut('chart-begroting',['Doorgezet','Niet doorgezet'],[begr,tot-begr],['#6D5BD0','#e2e8f0'],tc,`${begr}/${tot}`,'Doorgezet');
-}
-
-function groupByPeriod(rows,period){
-  const map={};
-  rows.forEach(r=>{
-    const lbl=periodLabel(r.datum,period);
-    if(lbl) map[lbl]=(map[lbl]||0)+1;
+  // ── KPI 1: Vergaderingen uitgeschreven (D.alfa, per periode)
+  const vSeries=seriesByPeriod(D.alfa,'datum',anaPeriod,SPARK_BUCKETS);
+  const vTrend=computeTrend(vSeries);
+  renderKpiTile('kpi-vergader',{
+    num:vTrend.huidig,
+    sub:`vs ${vTrend.vorig} ${PERIODE_LABEL_PREV[anaPeriod]}`,
+    trend:vTrend,
+    sparkId:'spark-vergader',
+    sparkValues:vSeries.map(b=>b.count),
+    sparkColor:'#0D7377'
   });
-  return map;
-}
 
-function periodLabel(dateStr,period){
-  if(!dateStr) return null;
-  const parts=dateStr.split('-');
-  if(parts.length<3) return null;
-  const d=new Date(parts[2],parts[1]-1,parts[0]);
-  if(isNaN(d)) return null;
-  if(period==='week'){
-    const wk=getWeekNum(d);
-    return`W${wk} '${String(d.getFullYear()).slice(2)}`;
-  }
-  if(period==='maand'){
-    const mn=['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'][d.getMonth()];
-    return`${mn} '${String(d.getFullYear()).slice(2)}`;
-  }
-  if(period==='kwartaal'){
-    const q=Math.floor(d.getMonth()/3)+1;
-    return`Q${q} '${String(d.getFullYear()).slice(2)}`;
-  }
-  return null;
-}
+  // ── KPI 2: Open ALV's (cumulatief, stand-meting)
+  const totAlv=D.alvo.length;
+  const openAlv=D.alvo.filter(r=>!r.notulen).length;
+  const openPct=totAlv?Math.round(openAlv/totAlv*100):0;
+  document.getElementById('kpi-openalv-num').textContent=openAlv;
+  document.getElementById('kpi-openalv-sub').textContent=`van ${totAlv} ALV's · ${openPct}% nog uit te schrijven`;
+  const barEl=document.getElementById('kpi-openalv-bar');
+  if(barEl) barEl.style.width=openPct+'%';
 
-function getPeriodLabels(period){
-  const seen=new Set();
-  D.alfa.forEach(r=>{ const l=periodLabel(r.datum,period); if(l)seen.add(l); });
-  return [...seen].sort((a,b)=>sortPeriod(a,b,period));
-}
+  // ── KPI 3: Taken afgerond (D.af alle SKEYS, per periode)
+  const tRows=SKEYS.flatMap(s=>D.af[s]||[]);
+  const tSeries=seriesByPeriod(tRows,'datum',anaPeriod,SPARK_BUCKETS);
+  const tTrend=computeTrend(tSeries);
+  renderKpiTile('kpi-taken',{
+    num:tTrend.huidig,
+    sub:`vs ${tTrend.vorig} ${PERIODE_LABEL_PREV[anaPeriod]}`,
+    trend:tTrend,
+    sparkId:'spark-taken',
+    sparkValues:tSeries.map(b=>b.count),
+    sparkColor:'#047857'
+  });
 
-function sortPeriod(a,b){
-  // Convert label back to comparable string
-  const toNum=s=>{ const m=s.match(/(\d+)/g); return m?m.map(Number):[]};
-  const an=toNum(a), bn=toNum(b);
-  const ay=an[an.length-1], by=bn[bn.length-1];
-  if(ay!==by) return ay-by;
-  return an[0]-bn[0];
+  // ── KPI 4: Per persoon
+  renderKpiPersonTile(anaPeriod);
+
+  // ── Hoofdgrafiek
+  renderHeroChart(anaMetric,anaPeriod);
+
+  // ── Leaderboard
+  renderLeaderboard(anaPeriod);
 }
 
 function getWeekNum(d){
@@ -1481,6 +1849,13 @@ function buildDash(){
   const catTotal=SKEYS.reduce((s,k)=>s+(D.ntd[k]?.length||0),0);
   buildDonut('chart-taken-cat',SKEYS.map(s=>SECS[s].label),SKEYS.map(s=>D.ntd[s]?.length||0),
     ['#0D7377','#B45309','#6D5BD0','#B91C1C'],tc,`${catTotal}`,'open taken');
+
+  // Status donut — verhuisd van Analytics
+  buildDonut('chart-status',['Uitgeschreven','Nog uitschrijven'],[uitnD,totD-uitnD],['#0D7377','#B91C1C'],tc,`${uitnD}/${totD}`,'Uitgeschreven');
+
+  // Begroting donut — verhuisd van Analytics
+  const begrD=D.alvo.filter(r=>r.begroting).length;
+  buildDonut('chart-begroting',['Doorgezet','Niet doorgezet'],[begrD,totD-begrD],['#6D5BD0','#e2e8f0'],tc,`${begrD}/${totD}`,'Doorgezet');
 
   // Recent afgerond
   const secPill={

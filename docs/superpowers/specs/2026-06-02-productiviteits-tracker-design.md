@@ -39,10 +39,17 @@ Geen nieuwe Google Sheets nodig. Hergebruik bestaande data uit `D`:
 
 | Metric | Bron | Datumveld | Filter |
 |---|---|---|---|
-| Notulen verstuurd | `D.alvo` | `r.notulen` | Alleen rijen waarvoor notulen-datum gevuld is |
-| ALV's afgerond | `D.alfa` | `r.datum` | Alle rijen (elke rij = afgeronde ALV) |
+| Vergaderingen uitgeschreven | `D.alfa` | `r.datum` | Alle rijen (elke rij = afgeronde ALV met verstuurde notulen) |
+| Open ALV's (werkvoorraad) | `D.alvo` | n.v.t. (stand) | `!r.notulen` — cumulatieve teller, geen periode-trend |
 | Taken afgerond (totaal) | `D.af` (alle SKEYS) | `r.datum` | Alle rijen, alle subcategorieën |
 | Taken afgerond per persoon | `D.af` | `r.datum` | Groeperen op `r.behandelaar` |
+
+**Datamodel-noot:** `D.alvo` heeft `notulen` als boolean (TRUE/FALSE) zonder datum.
+Daarom kunnen "notulen verstuurd" en "ALV's afgerond" niet beide als losse tijdreeks
+worden getoond — in praktijk is elke rij in `D.alfa` precies één ALV waarvan notulen
+zijn verstuurd. KPI 1 ("Vergaderingen uitgeschreven") gebruikt `D.alfa` voor de
+tijdsdimensie; KPI 2 ("Open ALV's") toont de huidige werkvoorraad uit `D.alvo` als
+stand-meting (zonder sparkline, met percentage-balk).
 
 Datum-parsing **altijd** via bestaande `_parseAnyDate()` — Google Sheets retourneert
 Nederlandse long-dates ("21 mei 2026") en gemixte formaten.

@@ -24,9 +24,22 @@ const ICON_URL = APP_URL + 'icon-192.png';
 const DEADLINE_TOLERANCE_HOURS = 1;
 
 // ════════════════════════════════════════════════════════════
+//  AUTO-PRIORITEIT CONFIG (zie spec 2026-06-02-auto-prioriteit)
+// ════════════════════════════════════════════════════════════
+const CD_PRIO_REGELS = {
+  'OPPAKKEN':          { hoog:  7, midden:  14 },
+  'VERGADERVERZOEKEN': { hoog: 14, midden:  21 },
+  'OFFERTE-TRAJECTEN': { hoog: 21, midden:  42 },
+  'LOD':               { hoog: 90, midden: 240 },
+};
+// Voor deze iteratie schrijven we alleen weg voor OPPAKKEN (kolom F = index 5).
+// Andere secties hebben (nog) geen Prioriteit-kolom in de Sheet.
+const CD_PRIO_WRITEBACK = { 'OPPAKKEN': 5 }; // 0-indexed kolompositie
+
+// ════════════════════════════════════════════════════════════
 //  SETUP
 // ════════════════════════════════════════════════════════════
-const CD_TRIGGER_FUNCS = ['cd_onEditChange', 'cd_checkDeadlines', 'cd_dailySummary'];
+const CD_TRIGGER_FUNCS = ['cd_onEditChange', 'cd_checkDeadlines', 'cd_dailySummary', 'cd_recalcPrioriteiten'];
 
 function setupWebhookSecret() {
   PropertiesService.getScriptProperties().setProperty('CD_WEBHOOK_SECRET', '8e0642cbd3f44f44a4711d1ec5bae0a78d17e902b29a0ef7');
@@ -50,7 +63,10 @@ function setupNotificationTriggers() {
   // Dagelijks om 08:30: samenvattingen
   ScriptApp.newTrigger('cd_dailySummary').timeBased().atHour(8).nearMinute(30).everyDays(1).create();
 
-  SpreadsheetApp.getUi().alert('✓ Notificatie-triggers ingesteld!\n\n• cd_onEditChange (nieuwe taken / wijzigingen)\n• cd_checkDeadlines (elk uur)\n• cd_dailySummary (dagelijks 08:30)\n\nJe bestaande triggers zijn ongemoeid gebleven.');
+  // Dagelijks om 06:00: auto-prioriteit herberekening
+  ScriptApp.newTrigger('cd_recalcPrioriteiten').timeBased().atHour(6).everyDays(1).create();
+
+  SpreadsheetApp.getUi().alert('✓ Notificatie-triggers ingesteld!\n\n• cd_onEditChange (nieuwe taken / wijzigingen)\n• cd_checkDeadlines (elk uur)\n• cd_dailySummary (dagelijks 08:30)\n• cd_recalcPrioriteiten (dagelijks 06:00)\n\nJe bestaande triggers zijn ongemoeid gebleven.');
 }
 
 function removeNotificationTriggers() {
@@ -264,6 +280,58 @@ function cd_dailySummary() {
       url: APP_URL
     });
   });
+}
+
+// ════════════════════════════════════════════════════════════
+//  TRIGGER 4: dagelijkse auto-prioriteit herberekening (06:00)
+// ════════════════════════════════════════════════════════════
+function cd_recalcPrioriteiten() {
+  const sheet = SpreadsheetApp.getActive().getSheetByName(NTD_SHEET);
+  if (!sheet) return;
+  const data = sheet.getDataRange().getValues();
+  const today = new Date();
+  today.setHours(0,0,0,0);
+  const SKEYS = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD'];
+  const DEADLINE_COL = { 'OPPAKKEN': 3, 'VERGADERVERZOEKEN': 5, 'OFFERTE-TRAJECTEN': 5, 'LOD': 5 };
+
+  let curSec = null;
+  const updates = { OPPAKKEN: 0, VERGADERVERZOEKEN: 0, 'OFFERTE-TRAJECTEN': 0, LOD: 0 };
+
+  for (let i = 0; i < data.length; i++) {
+    const first = (data[i][0] || '').toString().trim().toUpperCase();
+    if (SKEYS.indexOf(first) !== -1) { curSec = first; continue; }
+    if (!curSec || !data[i][0]) continue;
+    if ((data[i][0] + '').trim() === 'VvE Code' || (data[i][0] + '').trim() === 'VvE-Code') continue;
+    if (!(curSec in CD_PRIO_WRITEBACK)) continue;
+
+    const dlVal = data[i][DEADLINE_COL[curSec]];
+    const prioCol = CD_PRIO_WRITEBACK[curSec];
+    const huidig = (data[i][prioCol] || '').toString().trim();
+    const nieuwe = cd_berekenPrioriteit(dlVal, curSec, today);
+
+    if (nieuwe !== huidig) {
+      sheet.getRange(i + 1, prioCol + 1).setValue(nieuwe);
+      updates[curSec]++;
+    }
+  }
+
+  const totaal = Object.values(updates).reduce(function(a,b){ return a+b; }, 0);
+  Logger.log('cd_recalcPrioriteiten: ' + totaal + ' updates ' + JSON.stringify(updates));
+  const detail = 'Bijgewerkt: ' + Object.keys(updates).map(function(k){ return k + '=' + updates[k]; }).join(', ');
+  cd_schrijfLogboek('', '', 'Auto-prioriteit', '', '', detail, 'systeem');
+}
+
+function cd_berekenPrioriteit(dlVal, sec, today) {
+  if (!dlVal) return '';
+  const dl = cd_parseDate(dlVal);
+  if (!dl) return '';
+  const dlDate = new Date(dl.getFullYear(), dl.getMonth(), dl.getDate());
+  const dagenTot = Math.round((dlDate - today) / 86400000);
+  const r = CD_PRIO_REGELS[sec];
+  if (!r) return '';
+  if (dagenTot <= r.hoog) return 'Hoog';
+  if (dagenTot <= r.midden) return 'Midden';
+  return 'Laag';
 }
 
 // ════════════════════════════════════════════════════════════

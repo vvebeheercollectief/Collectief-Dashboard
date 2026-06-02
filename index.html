@@ -155,6 +155,13 @@
     .prio-hoog{background:var(--rd-l);color:var(--rd)}
     .prio-mid{background:var(--am-l);color:var(--am)}
     .prio-laag{background:var(--gn-l);color:var(--gn)}
+    .row-telaat td{background:rgba(220,38,38,0.06);position:relative}
+    .row-telaat td:first-child{box-shadow:inset 3px 0 0 #dc2626}
+    .pill-telaat{display:inline-block;background:#dc2626;color:#fff;font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;margin-left:6px;letter-spacing:.02em}
+    .warn-geen-deadline{display:inline-flex;align-items:center;gap:4px;color:#d97706;font-size:12px;font-weight:600}
+    .warn-geen-deadline::before{content:'⚠'}
+    .pill-stil{display:inline-block;background:rgba(107,114,128,0.15);color:#4b5563;font-size:11px;font-weight:600;padding:2px 7px;border-radius:10px;margin-left:6px;cursor:pointer}
+    .pill-stil::before{content:'🔕 '}
     .status-open{background:var(--rd-l);color:var(--rd)}
     .status-gepland{background:var(--am-l);color:var(--am)}
     .status-afgerond{background:var(--gn-l);color:var(--gn)}
@@ -792,10 +799,7 @@
           </div>
         </div>
         <div class="fld-row">
-          <div class="fld"><label>Prioriteit</label>
-            <select id="m-prio"><option value="">Selecteer…</option><option>Hoog</option><option>Midden</option><option>Laag</option></select>
-          </div>
-          <div class="fld"><label>Opmerkingen</label><input type="text" id="m-opm"/></div>
+          <div class="fld" style="flex:1"><label>Opmerkingen</label><input type="text" id="m-opm"/></div>
         </div>
         <div class="fld"><label>Subcategorie</label><select id="m-sub-opp"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option></select></div>
         <div class="toggle-row"><div class="tog" id="tog-ib" onclick="this.classList.toggle('on')"></div><span>In behandeling</span></div>
@@ -1022,13 +1026,13 @@ const SECS = {
     cols:['VvE Code','VvE','Actiepunt','Deadline','Behandelaar','Prioriteit','Opmerkingen','In beh.'],
     keys:['code','naam','actiepunt','deadline','behandelaar','prioriteit','opmerkingen','inBehandeling']},
   VERGADERVERZOEKEN:{label:'Vergaderverzoeken',css:'--sec:var(--am);--sec-l:var(--am-l);--sec-b:var(--am-b)',color:'#B45309',
-    cols:['VvE Code','VvE','Periode','Agendapunten','Behandelaar','Deadline uitschr.','Opmerkingen','In beh.'],
+    cols:['VvE Code','VvE','Periode','Agendapunten','Behandelaar','Deadline uitschr.','Prioriteit','Opmerkingen','In beh.'],
     keys:['code','naam','periode','agendapunten','behandelaar','deadline','opmerkingen','inBehandeling']},
   'OFFERTE-TRAJECTEN':{label:'Offerte-trajecten',css:'--sec:var(--pu);--sec-l:var(--pu-l);--sec-b:var(--pu-b)',color:'#6D5BD0',
-    cols:['VvE Code','VvE','Datum aangevr.','Ontvangen/Aangevr.','Behandelaar','Deadline','Opmerkingen'],
+    cols:['VvE Code','VvE','Datum aangevr.','Ontvangen/Aangevr.','Behandelaar','Deadline','Prioriteit','Opmerkingen'],
     keys:['code','naam','datumAangevraagd','offertes','behandelaar','deadline','opmerkingen']},
   LOD:{label:'LOD',css:'--sec:var(--rd);--sec-l:var(--rd-l);--sec-b:var(--rd-b)',color:'#B91C1C',
-    cols:['VvE Code','VvE','Actiepunt','Status','Behandelaar','Deadline LOD','Opmerkingen','In beh.'],
+    cols:['VvE Code','VvE','Actiepunt','Status','Behandelaar','Deadline LOD','Prioriteit','Opmerkingen','In beh.'],
     keys:['code','naam','actiepunt','status','behandelaar','deadline','opmerkingen','inBehandeling']},
 };
 const SKEYS = Object.keys(SECS);
@@ -1431,16 +1435,28 @@ function filterNtd(rows,q,fCode,beh,prio,sec){
     if(q&&!SECS[sec].keys.some(k=>(r[k]||'').toLowerCase().includes(q))) return false;
     if(fCode&&!(r.code||'').toLowerCase().includes(fCode)) return false;
     if(beh&&!(r.behandelaar||'').toLowerCase().includes(beh.toLowerCase())) return false;
-    if(prio&&sec==='OPPAKKEN'&&r.prioriteit!==prio) return false;
+    if(prio){
+      const berekend = berekenPrioriteit(r.deadline, sec).prioriteit;
+      if (berekend !== prio) return false;
+    }
     return true;
   }).sort((a,b)=>{
-    const ibA=a.inBehandeling==='TRUE'?1:0, ibB=b.inBehandeling==='TRUE'?1:0;
-    if(ibA!==ibB) return ibA-ibB;
-    const dA=parseDt(a.deadline), dB=parseDt(b.deadline);
-    if(dA&&dB) return dA-dB;
-    if(dA) return -1;
-    if(dB) return 1;
-    return 0;
+    const ibA = a.inBehandeling==='TRUE'?1:0, ibB = b.inBehandeling==='TRUE'?1:0;
+    if (ibA !== ibB) return ibA - ibB;
+    const pa = berekenPrioriteit(a.deadline, sec);
+    const pb = berekenPrioriteit(b.deadline, sec);
+    // 1. Te laat altijd bovenaan
+    if (pa.teLaat !== pb.teLaat) return pa.teLaat ? -1 : 1;
+    // 2. Prioriteit-rang
+    const rang = { 'Hoog':0, 'Midden':1, 'Laag':2, '':3 };
+    if (rang[pa.prioriteit] !== rang[pb.prioriteit]) return rang[pa.prioriteit] - rang[pb.prioriteit];
+    // 3. Deadline oplopend (vroegste eerst)
+    const dA = parseDt(a.deadline), dB = parseDt(b.deadline);
+    if (dA && dB && dA !== dB) return dA - dB;
+    if (dA && !dB) return -1;
+    if (dB && !dA) return 1;
+    // 4. VvE-code alfabetisch
+    return (a.code || '').localeCompare(b.code || '');
   });
 }
 
@@ -2170,19 +2186,44 @@ function renderTbody(tbodyId,rows,sec,page,isAf){
   el.innerHTML=html;
 }
 
+function bepaalStil(r, sec){
+  if (r.inBehandeling !== 'TRUE') return null;
+  const entries = (D.logboek || []).filter(e => e.code === r.code && (!sec || e.sectie === sec || !e.sectie));
+  if (!entries.length) return null; // geen activiteit-data → niet markeren
+  let laatst = null;
+  entries.forEach(e => {
+    const t = e.timestamp ? new Date(e.timestamp) : null;
+    if (t && !isNaN(t) && (!laatst || t > laatst)) laatst = t;
+  });
+  if (!laatst) return null;
+  const dagen = _verschilInKalenderdagen(_vandaagAmsterdam(), laatst);
+  return dagen >= STIL_DREMPEL_DAGEN ? dagen : null;
+}
+
+function deadlineCel(r, sec){
+  if (!r.deadline) return `<td class="cell-sm"><span class="warn-geen-deadline">Geen deadline</span></td>`;
+  const { teLaat, dagenTot } = berekenPrioriteit(r.deadline, sec);
+  const pill = teLaat ? ` <span class="pill-telaat">Te laat (${Math.abs(dagenTot)}d)</span>` : '';
+  return `<td class="cell-sm">${esc(r.deadline)}${pill}</td>`;
+}
+
 function rowNtd(r,sec){
   const css=SECS[sec].css;
   const rid=_rowCache.length; _rowCache.push(r);
   const editBtn=`<button class="btn-edit" onclick="editRow(${rid})" title="Bewerken"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><button class="btn-done" onclick="completeTask(${rid})" title="Afgehandeld"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></button>`;
   let cells='';
+  const _stilDagen = bepaalStil(r, sec);
+  const stilPill = _stilDagen !== null
+    ? `<span class="pill-stil" onclick="event.stopPropagation(); editRow(${rid})" title="Geen activiteit in ${_stilDagen} dagen">Stil ${_stilDagen}d</span>`
+    : '';
   switch(sec){
     case'OPPAKKEN':
       cells=`<td><span class="code" style="${css}">${esc(r.code)}</span></td>
         <td class="cell-name">${esc(r.naam)}${subBadge(r.subcategorie)}</td>
-        <td class="cell-txt">${esc(r.actiepunt)}</td>
-        <td class="cell-sm">${r.deadline?esc(r.deadline):'<span style="color:var(--fnt)">–</span>'}</td>
+        <td class="cell-txt">${esc(r.actiepunt)}${stilPill}</td>
+        ${deadlineCel(r, 'OPPAKKEN')}
         <td>${persBadges(r.behandelaar)}</td>
-        <td>${prioBadge(r.prioriteit)}</td>
+        <td>${prioBadge(r, 'OPPAKKEN')}</td>
         <td class="cell-txt">${r.opmerkingen?`<span style="font-size:12px">${esc(r.opmerkingen)}</span>`:''}</td>
         <td>${ibBadge(r.inBehandeling)}</td>
         <td>${editBtn}</td>`;
@@ -2191,9 +2232,10 @@ function rowNtd(r,sec){
       cells=`<td><span class="code" style="${css}">${esc(r.code)}</span></td>
         <td class="cell-name">${esc(r.naam)}${subBadge(r.subcategorie)}</td>
         <td><span class="badge" style="background:var(--am-l);color:var(--am)">${esc(r.periode||r.agendapunten||'')}</span></td>
-        <td class="cell-txt">${esc(r.agendapunten||r.actiepunt||'')}</td>
+        <td class="cell-txt">${esc(r.agendapunten||r.actiepunt||'')}${stilPill}</td>
         <td>${persBadges(r.behandelaar)}</td>
-        <td class="cell-sm">${r.deadline?esc(r.deadline):'<span style="color:var(--fnt)">–</span>'}</td>
+        ${deadlineCel(r, 'VERGADERVERZOEKEN')}
+        <td>${prioBadge(r, 'VERGADERVERZOEKEN')}</td>
         <td class="cell-txt">${r.opmerkingen?`<span style="font-size:12px">${esc(r.opmerkingen)}</span>`:''}</td>
         <td>${ibBadge(r.inBehandeling)}</td>
         <td>${editBtn}</td>`;
@@ -2204,23 +2246,30 @@ function rowNtd(r,sec){
         <td class="cell-sm">${esc(r.datumAangevraagd||'')}</td>
         <td>${offProg(r.offertes)}</td>
         <td>${persBadges(r.behandelaar)}</td>
-        <td class="cell-sm">${r.deadline?esc(r.deadline):'<span style="color:var(--fnt)">–</span>'}</td>
-        <td class="cell-txt">${r.opmerkingen?`<span style="font-size:12px">${esc(r.opmerkingen)}</span>`:''}</td>
+        ${deadlineCel(r, 'OFFERTE-TRAJECTEN')}
+        <td>${prioBadge(r, 'OFFERTE-TRAJECTEN')}</td>
+        <td class="cell-txt">${r.opmerkingen?`<span style="font-size:12px">${esc(r.opmerkingen)}</span>`:''}${stilPill}</td>
         <td>${editBtn}</td>`;
       break;
     case'LOD':
       cells=`<td><span class="code" style="${css}">${esc(r.code)}</span></td>
         <td class="cell-name">${esc(r.naam)}${subBadge(r.subcategorie)}</td>
-        <td class="cell-txt">${esc(r.actiepunt||'')}</td>
+        <td class="cell-txt">${esc(r.actiepunt||'')}${stilPill}</td>
         <td class="cell-txt" style="font-style:italic;font-size:12px">${esc(r.status||'')}</td>
         <td>${persBadges(r.behandelaar)}</td>
-        <td class="cell-sm">${r.deadline?esc(r.deadline):'<span style="color:var(--fnt)">–</span>'}</td>
+        ${deadlineCel(r, 'LOD')}
+        <td>${prioBadge(r, 'LOD')}</td>
         <td class="cell-txt">${r.opmerkingen?`<span style="font-size:12px">${esc(r.opmerkingen)}</span>`:''}</td>
         <td>${ibBadge(r.inBehandeling)}</td>
         <td>${editBtn}</td>`;
       break;
   }
-  return`<tr class="${r.inBehandeling==='TRUE'?'ib-row':''}">${cells}</tr>`;
+  const { teLaat: rowTeLaat } = berekenPrioriteit(r.deadline, sec);
+  const rowCls = [
+    r.inBehandeling === 'TRUE' ? 'ib-row' : '',
+    rowTeLaat ? 'row-telaat' : ''
+  ].filter(Boolean).join(' ');
+  return `<tr class="${rowCls}">${cells}</tr>`;
 }
 
 function rowAf(r,sec){
@@ -2300,7 +2349,7 @@ function fillModalFields(sec,r){
   switch(sec){
     case'OPPAKKEN':
       setv('m-actie',r.actiepunt);setv('m-dl',toISODate(r.deadline));setv('m-beh',r.behandelaar);
-      setv('m-prio',r.prioriteit);setv('m-opm',r.opmerkingen);setv('m-sub-opp',r.subcategorie);
+      setv('m-opm',r.opmerkingen);setv('m-sub-opp',r.subcategorie);
       document.getElementById('tog-ib').classList.toggle('on',r.inBehandeling==='TRUE');break;
     case'VERGADERVERZOEKEN':
       setv('m-per',r.periode);setv('m-beh-v',r.behandelaar);setv('m-agenda',r.agendapunten||r.actiepunt);
@@ -2515,9 +2564,10 @@ async function submitTask(){
     const subId={OPPAKKEN:'m-sub-opp',VERGADERVERZOEKEN:'m-sub-verg','OFFERTE-TRAJECTEN':'m-sub-off',LOD:'m-sub-lod'}[sec];
     const sub=gv(subId);
     switch(sec){
-      case'OPPAKKEN':
-        values=[code,naam,gv('m-actie'),toDutchDate(gv('m-dl')),gv('m-beh'),gv('m-prio'),gv('m-opm'),
-          document.getElementById('tog-ib').classList.contains('on'),'',sub];break;
+      case'OPPAKKEN':{
+        const _berekend = berekenPrioriteit(toDutchDate(gv('m-dl')), 'OPPAKKEN').prioriteit;
+        values=[code,naam,gv('m-actie'),toDutchDate(gv('m-dl')),gv('m-beh'),_berekend,gv('m-opm'),
+          document.getElementById('tog-ib').classList.contains('on'),'',sub];break;}
       case'VERGADERVERZOEKEN':
         values=[code,naam,gv('m-per'),gv('m-agenda'),gv('m-beh-v'),toDutchDate(gv('m-dl-v')),gv('m-opm-v'),
           document.getElementById('tog-ib-v').classList.contains('on'),'',sub];break;
@@ -2639,11 +2689,54 @@ function filt(rows,q){
   return rows.filter(r=>Object.values(r).some(v=>String(v??'').toLowerCase().includes(q)));
 }
 
-function prioBadge(v){
-  if(!v)return'';
-  const cls={Hoog:'prio-hoog',Midden:'prio-mid',Laag:'prio-laag'}[v]||'prio-mid';
-  const ico={Hoog:'↑',Midden:'→',Laag:'↓'}[v]||'';
-  return`<span class="badge ${cls}">${ico} ${esc(v)}</span>`;
+// ══════════════════════════════════════
+//  AUTO-PRIORITEIT (zie docs/superpowers/specs/2026-06-02-auto-prioriteit-design.md)
+// ══════════════════════════════════════
+const PRIO_REGELS = {
+  'OPPAKKEN':          { hoog:  7, midden:  14 },
+  'VERGADERVERZOEKEN': { hoog: 14, midden:  21 },
+  'OFFERTE-TRAJECTEN': { hoog: 21, midden:  42 },
+  'LOD':               { hoog: 90, midden: 240 },
+};
+const STIL_DREMPEL_DAGEN = 14;
+
+function _vandaagAmsterdam(){
+  // Lokale datum (Europe/Amsterdam = browser-locale van de gebruiker), tijd op 00:00
+  const d = new Date();
+  d.setHours(0,0,0,0);
+  return d;
+}
+
+function _verschilInKalenderdagen(deadline, vandaag){
+  if (!(deadline instanceof Date) || isNaN(deadline)) return null;
+  const d = new Date(deadline.getFullYear(), deadline.getMonth(), deadline.getDate());
+  const v = new Date(vandaag.getFullYear(), vandaag.getMonth(), vandaag.getDate());
+  return Math.round((d - v) / 86400000);
+}
+
+function berekenPrioriteit(deadlineStr, categorie, vandaag){
+  vandaag = vandaag || _vandaagAmsterdam();
+  if (!deadlineStr) return { prioriteit: '', dagenTot: null, teLaat: false };
+  const parsed = _parseAnyDate(deadlineStr);
+  if (!parsed) return { prioriteit: '', dagenTot: null, teLaat: false };
+  const deadline = new Date(parsed.y, parsed.m - 1, parsed.d);
+  const dagenTot = _verschilInKalenderdagen(deadline, vandaag);
+  const teLaat = dagenTot < 0;
+  const regels = PRIO_REGELS[categorie];
+  if (!regels) return { prioriteit: '', dagenTot, teLaat };
+  let prioriteit;
+  if (dagenTot <= regels.hoog) prioriteit = 'Hoog';
+  else if (dagenTot <= regels.midden) prioriteit = 'Midden';
+  else prioriteit = 'Laag';
+  return { prioriteit, dagenTot, teLaat };
+}
+
+function prioBadge(r, sec){
+  const { prioriteit } = berekenPrioriteit(r.deadline, sec);
+  if(!prioriteit)return'';
+  const cls={Hoog:'prio-hoog',Midden:'prio-mid',Laag:'prio-laag'}[prioriteit]||'prio-mid';
+  const ico={Hoog:'↑',Midden:'→',Laag:'↓'}[prioriteit]||'';
+  return`<span class="badge ${cls}">${ico} ${esc(prioriteit)}</span>`;
 }
 
 function persBadges(v){
@@ -3336,6 +3429,45 @@ OneSignalDeferred.push(async function(OneSignal) {
     console.error('[Notif] OneSignal init faalde:', e);
   }
 });
+
+// ══════════════════════════════════════
+//  TESTS (alleen actief met ?test=1)
+// ══════════════════════════════════════
+if (location.search.includes('test=1')) {
+  console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+  const T = new Date(2026, 5, 2); // 2 juni 2026
+  const fmt = d => `${d.getDate()} ${['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'][d.getMonth()]} ${d.getFullYear()}`;
+  const plus = n => fmt(new Date(T.getFullYear(), T.getMonth(), T.getDate() + n));
+
+  const cases = [
+    [  7, 'OPPAKKEN',          'Hoog',   false],
+    [  8, 'OPPAKKEN',          'Midden', false],
+    [ 14, 'OPPAKKEN',          'Midden', false],
+    [ 15, 'OPPAKKEN',          'Laag',   false],
+    [ 14, 'VERGADERVERZOEKEN', 'Hoog',   false],
+    [ 15, 'VERGADERVERZOEKEN', 'Midden', false],
+    [ 21, 'VERGADERVERZOEKEN', 'Midden', false],
+    [ 22, 'VERGADERVERZOEKEN', 'Laag',   false],
+    [ 21, 'OFFERTE-TRAJECTEN', 'Hoog',   false],
+    [ 42, 'OFFERTE-TRAJECTEN', 'Midden', false],
+    [ 43, 'OFFERTE-TRAJECTEN', 'Laag',   false],
+    [ 90, 'LOD',               'Hoog',   false],
+    [240, 'LOD',               'Midden', false],
+    [241, 'LOD',               'Laag',   false],
+    [ -3, 'OPPAKKEN',          'Hoog',   true ],
+    [  0, 'OPPAKKEN',          'Hoog',   false],
+  ];
+  let ok = 0, fail = 0;
+  cases.forEach(([off, cat, prio, teLaat]) => {
+    const got = berekenPrioriteit(plus(off), cat, T);
+    const pass = got.prioriteit === prio && got.teLaat === teLaat;
+    if (pass) ok++; else { fail++; console.error(`FAIL: ${cat} +${off}d → expected ${prio}/teLaat=${teLaat}, got ${got.prioriteit}/teLaat=${got.teLaat}`); }
+  });
+  const leeg = berekenPrioriteit('', 'OPPAKKEN', T);
+  if (leeg.prioriteit === '' && leeg.teLaat === false) ok++; else { fail++; console.error('FAIL: lege deadline →', leeg); }
+
+  console.log(`%c[TESTS] ${ok} OK, ${fail} FAIL`, fail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');
+}
 </script>
 </body>
 </html>

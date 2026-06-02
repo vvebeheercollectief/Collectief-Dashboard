@@ -111,7 +111,8 @@
     .stat{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);padding:16px 18px;box-shadow:0 1px 3px rgba(0,0,0,.06),0 2px 8px color-mix(in srgb,var(--sec,var(--ac)) 12%,transparent);border-top:3px solid var(--sec,var(--ac))}
     .stat-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px}
     .stat-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mut)}
-    .stat-ico{width:34px;height:34px;border-radius:9px;background:var(--sec-l,var(--ac-l));display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--sec,var(--ac))}
+    .stat-ico{width:36px;height:36px;border-radius:9px;background:var(--sec-l,var(--ac-l));display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--sec,var(--ac))}
+    .stat-ico svg{width:22px;height:22px;display:block}
     .stat-num{font-size:28px;font-weight:800;letter-spacing:-.04em;color:var(--sec,var(--ac))}
     .stat-sub{font-size:11px;color:var(--mut);margin-top:3px}
 
@@ -1167,7 +1168,16 @@ function renderAll(){
 // ══════════════════════════════════════
 //  NTD STATS
 // ══════════════════════════════════════
-const SEC_ICONS={OPPAKKEN:'<i class="ph-duotone ph-clipboard-text"></i>',VERGADERVERZOEKEN:'<i class="ph-duotone ph-calendar-dots"></i>','OFFERTE-TRAJECTEN':'<i class="ph-duotone ph-file-text"></i>',LOD:'<i class="ph-duotone ph-warning"></i>'};
+const SEC_ICONS={
+  // Klembord met vinkje — taken oppakken
+  OPPAKKEN:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2" fill="currentColor" fill-opacity="0.18"/><rect x="9" y="2.5" width="6" height="3.5" rx="1" fill="currentColor" fill-opacity="0.35"/><path d="M9 13l2 2 4-4.2"/></svg>`,
+  // Groep van drie mensen — vergaderen
+  VERGADERVERZOEKEN:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3" fill="currentColor" fill-opacity="0.25"/><circle cx="5.5" cy="10" r="2.2" fill="currentColor" fill-opacity="0.18"/><circle cx="18.5" cy="10" r="2.2" fill="currentColor" fill-opacity="0.18"/><path d="M6.5 20c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><path d="M2 19c.3-2 1.7-3.3 3.5-3.6"/><path d="M22 19c-.3-2-1.7-3.3-3.5-3.6"/></svg>`,
+  // Document met eurosymbool — offerte
+  'OFFERTE-TRAJECTEN':`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l4 4v13a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 016 20V4.5A1.5 1.5 0 017.5 3z" fill="currentColor" fill-opacity="0.18"/><path d="M14 3v4h4"/><path d="M15 12c-.7-.9-1.8-1.4-3-1.4-2.2 0-4 1.9-4 4.2s1.8 4.2 4 4.2c1.2 0 2.3-.5 3-1.4"/><path d="M8.5 14h4.2M8.5 16.2h4.2"/></svg>`,
+  // Map met klok/uitroep — openstaande dossiers (LOD)
+  LOD:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" fill="currentColor" fill-opacity="0.18"/><circle cx="15.5" cy="14" r="3.2" fill="currentColor" fill-opacity="0.3"/><path d="M15.5 12.2v2l1.3.8" stroke-width="1.6"/></svg>`
+};
 const SEC_THEMES={
   OPPAKKEN:'--sec:var(--ac);--sec-l:var(--ac-l)',
   VERGADERVERZOEKEN:'--sec:var(--am);--sec-l:var(--am-l)',

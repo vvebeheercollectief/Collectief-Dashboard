@@ -168,6 +168,17 @@
     .check-yes{color:var(--gn);font-weight:700}
     .check-no{color:var(--fnt)}
 
+    /* Aanvinkbare ALV-flag pills */
+    .flag-toggle{display:inline-flex;align-items:center;gap:5px;padding:4px 11px;border-radius:20px;font-size:12px;font-weight:700;border:1px solid transparent;cursor:pointer;font-family:inherit;transition:transform var(--tr),box-shadow var(--tr),background var(--tr),color var(--tr);user-select:none;line-height:1}
+    .flag-toggle.on{background:var(--gn-l);color:var(--gn);border-color:color-mix(in srgb,var(--gn) 18%,transparent)}
+    .flag-toggle.off{background:var(--sur2);color:var(--mut);border-color:var(--bor)}
+    .flag-toggle:hover{transform:translateY(-1px);box-shadow:0 2px 6px rgba(0,0,0,.08)}
+    .flag-toggle.off:hover{background:color-mix(in srgb,var(--gn) 8%,var(--sur2));color:var(--gn);border-color:color-mix(in srgb,var(--gn) 20%,transparent)}
+    .flag-toggle.on:hover{background:color-mix(in srgb,var(--gn) 22%,var(--gn-l));color:var(--gn)}
+    .flag-toggle:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+    .flag-toggle.toggling{pointer-events:none;opacity:.6;animation:flagPulse 1s ease-in-out infinite}
+    @keyframes flagPulse{0%,100%{opacity:.6}50%{opacity:.85}}
+
     /* Progress */
     .prog-wrap{display:flex;align-items:center;gap:7px}
     .prog-bar{width:60px;height:5px;background:var(--bor);border-radius:3px;overflow:hidden;flex-shrink:0}
@@ -1474,16 +1485,85 @@ function renderAlvo(){
   });
   const sl=rows.slice((pgs.alvo-1)*PG,pgs.alvo*PG);
   document.getElementById('alvo-tbody').innerHTML=sl.length
-    ?sl.map(r=>`<tr>
+    ?sl.map(r=>{
+      const idx=D.alvo.indexOf(r);
+      return`<tr>
         <td><span class="code" style="--sec:var(--ac);--sec-l:var(--ac-l)">${esc(r.code)}</span></td>
         <td class="cell-name">${esc(r.naam)}</td>
-        <td>${r.uitnodiging?'<span class="check-yes">✓ Ja</span>':'<span class="check-no">–</span>'}</td>
-        <td>${r.notulen?'<span class="check-yes">✓ Ja</span>':'<span class="check-no">–</span>'}</td>
-        <td>${r.begroting?'<span class="check-yes">✓ Ja</span>':'<span class="check-no">–</span>'}</td>
+        <td>${flagPill(idx,'uitnodiging',r.uitnodiging)}</td>
+        <td>${flagPill(idx,'notulen',r.notulen)}</td>
+        <td>${flagPill(idx,'begroting',r.begroting)}</td>
         <td><span class="badge status-${r.status.toLowerCase()}">${statusIco(r.status)} ${r.status}</span></td>
-      </tr>`).join('')
+      </tr>`;
+    }).join('')
     :emptyRow(6);
   renderPag('alvo-pag',rows.length,pgs.alvo,p=>{pgs.alvo=p;renderAlvo()});
+}
+
+const ALVO_COLS={uitnodiging:2,notulen:3,begroting:4};
+const ALVO_LABELS={uitnodiging:'Uitnodiging',notulen:'Notulen',begroting:'Begroting'};
+
+function flagPill(idx,field,val){
+  const cls=val?'on':'off';
+  const lbl=val?'✓ Ja':'–';
+  const aria=val?'true':'false';
+  const title=`Klik om ${ALVO_LABELS[field]} ${val?'uit':'aan'} te zetten`;
+  return`<button type="button" class="flag-toggle ${cls}" data-idx="${idx}" data-field="${field}" aria-pressed="${aria}" title="${title}" onclick="toggleAlvoFlag(${idx},'${field}')">${lbl}</button>`;
+}
+
+function _recomputeAlvoStatus(r){
+  r.status=r.notulen?'Afgerond':r.uitnodiging?'Gepland':'Open';
+}
+
+async function toggleAlvoFlag(idx,field){
+  const r=D.alvo[idx];
+  if(!r){console.warn('toggleAlvoFlag: rij niet gevonden',idx);return}
+  if(!await ensureToken()){showToast('Niet ingelogd','Kan wijziging niet opslaan','var(--rd)');return}
+
+  // Lock UI op de specifieke pill
+  const btn=document.querySelector(`.flag-toggle[data-idx="${idx}"][data-field="${field}"]`);
+  if(btn) btn.classList.add('toggling');
+
+  const oldVal=!!r[field];
+  const newVal=!oldVal;
+  const oldStatus=r.status;
+
+  // Optimistische update
+  r[field]=newVal;
+  _recomputeAlvoStatus(r);
+  renderAlvo();
+
+  try{
+    const ids=await getSheetIds();
+    const sheetId=ids["ALV's overzicht"]??ids["ALV's Overzicht"]??ids["ALV's overzicht "];
+    if(sheetId==null) throw new Error("Sheet 'ALV's overzicht' niet gevonden");
+    const col=ALVO_COLS[field];
+    const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+      method:'POST',
+      headers:{Authorization:`Bearer ${oauthToken}`,'Content-Type':'application/json'},
+      body:JSON.stringify({requests:[{
+        updateCells:{
+          range:{sheetId,startRowIndex:r._row-1,endRowIndex:r._row,startColumnIndex:col,endColumnIndex:col+1},
+          rows:[{values:[{userEnteredValue:{stringValue:newVal?'TRUE':'FALSE'}}]}],
+          fields:'userEnteredValue'
+        }
+      }]})
+    });
+    if(!resp.ok){const t=await resp.text();throw new Error(`HTTP ${resp.status}: ${t.slice(0,120)}`)}
+
+    logEvent(r.code,'ALVS',newVal?'Aangevinkt':'Uitgevinkt',ALVO_LABELS[field],oldVal?'TRUE':'FALSE',newVal?'TRUE':'FALSE');
+    showToast(`${newVal?'✓':'○'} ${ALVO_LABELS[field]} ${newVal?'aan':'uit'}`,`${r.code} – ${r.naam}`,newVal?'var(--gn)':'var(--mut)');
+  }catch(e){
+    // Revert
+    r[field]=oldVal;
+    r.status=oldStatus;
+    renderAlvo();
+    showToast('Opslaan mislukt',e.message||'Onbekende fout','var(--rd)');
+    console.error('toggleAlvoFlag fout:',e);
+  }finally{
+    const btn2=document.querySelector(`.flag-toggle[data-idx="${idx}"][data-field="${field}"]`);
+    if(btn2) btn2.classList.remove('toggling');
+  }
 }
 function statusIco(s){return{Open:'⏳',Gepland:'📅',Afgerond:'✅'}[s]||''}
 

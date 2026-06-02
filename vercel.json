@@ -23,7 +23,7 @@
       ]
     },
     {
-      "source": "/(.*\\.(png|jpg|jpeg|svg|webp|ico))",
+      "source": "/:path*.:ext(png|jpg|jpeg|svg|webp|ico)",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=604800, immutable" }
       ]

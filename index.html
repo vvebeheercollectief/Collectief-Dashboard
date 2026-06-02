@@ -230,6 +230,22 @@
     .kpi-trend.down{background:var(--rd-l);color:var(--rd)}
     .kpi-trend.flat{background:var(--sur2);color:var(--mut)}
     .kpi-trend i{font-size:13px}
+    .kpi-trend-arrow{font-size:9px;line-height:1;display:inline-block;transform:translateY(-1px)}
+
+    /* NTD top-row: stats links, donut rechts */
+    .ntd-top-row{display:flex;gap:14px;margin-bottom:18px;align-items:stretch}
+    .ntd-donut-card{background:var(--sur);border:1px solid var(--bor);border-radius:14px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 12px color-mix(in srgb,var(--ac) 10%,transparent);min-width:280px;max-width:320px;display:flex;flex-direction:column;gap:8px}
+    .ntd-donut-hdr{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+    .ntd-donut-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);line-height:1.2}
+    .ntd-donut-sub{font-size:12px;font-weight:600;color:var(--ac);margin-top:2px}
+    .ntd-donut-tabs{display:flex;gap:2px;background:var(--sur2);padding:2px;border-radius:7px}
+    .ntd-donut-tab{padding:3px 8px;border:none;background:transparent;border-radius:5px;font-size:10px;font-weight:700;color:var(--mut);cursor:pointer;text-transform:uppercase;letter-spacing:.04em}
+    .ntd-donut-tab.on{background:var(--sur);color:var(--ac);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+    .ntd-donut-wrap{position:relative;height:140px;flex:1;min-height:120px}
+    @media(max-width:900px){
+      .ntd-top-row{flex-direction:column}
+      .ntd-donut-card{max-width:none}
+    }
     .kpi-spark{position:relative;height:36px;margin-top:8px}
     .kpi-spark canvas{position:absolute;inset:0}
 
@@ -407,7 +423,19 @@
 
     <!-- ══ NOG TE DOEN ══ -->
     <div class="page" id="page-ntd">
-      <div class="stats-grid" id="ntd-stats"></div>
+      <div class="ntd-top-row">
+        <div class="stats-grid" id="ntd-stats" style="flex:1;margin-bottom:0"></div>
+        <div class="ntd-donut-card" id="ntd-donut-card">
+          <div class="ntd-donut-hdr">
+            <div>
+              <div class="ntd-donut-lbl">Vergaderingen uitgeschreven</div>
+              <div class="ntd-donut-sub" id="ntd-donut-period">deze maand</div>
+            </div>
+            <div class="ntd-donut-tabs" id="ntd-donut-tabs"></div>
+          </div>
+          <div class="ntd-donut-wrap"><canvas id="ntd-donut"></canvas></div>
+        </div>
+      </div>
       <div class="card" id="ntd-card">
         <div class="card-hdr">
           <h2 id="ntd-title">Nog Te Doen</h2>
@@ -651,7 +679,7 @@
 
       <div class="card hero-chart">
         <div class="hero-chart-hdr">
-          <h3 id="hero-chart-title">Vergaderingen uitgeschreven<span class="sub" id="hero-chart-sub"></span></h3>
+          <h3><span id="hero-chart-title">Vergaderingen uitgeschreven</span><span class="sub" id="hero-chart-sub"></span></h3>
           <div class="metric-toggle" id="hero-metric-toggle"></div>
         </div>
         <div class="hero-chart-wrap"><canvas id="chart-hero"></canvas></div>
@@ -1219,6 +1247,10 @@ async function loadAll(silent){
     if(hash!==_lastDHash){
       _lastDHash=hash;
       renderAll();
+      // Re-render actieve detailpagina's met nieuwe data
+      if(document.getElementById('page-analytics')?.classList.contains('active')) buildAnalytics();
+      if(document.getElementById('page-dash')?.classList.contains('active')) buildDash();
+      if(document.getElementById('page-ntd')?.classList.contains('active')) renderNtdDonut();
     }
   }catch(e){setSyncErr();console.error(e)}
 }
@@ -1315,6 +1347,88 @@ function renderNtdStats(){
       <div class="stat-num">${D.ntd[s]?.length||0}</div>
       <div class="stat-sub">open ${s==='OFFERTE-TRAJECTEN'?'trajecten':s==='LOD'?'dossiers':'taken'}</div>
     </div>`).join('');
+  renderNtdDonut();
+}
+
+// NTD-donut: vergaderingen uitgeschreven deze maand/kwartaal/jaar
+let ntdDonutPeriod='maand'; // 'week' | 'maand' | 'kwartaal' | 'jaar'
+function renderNtdDonut(){
+  const tabsEl=document.getElementById('ntd-donut-tabs');
+  if(!tabsEl) return;
+  const opts=[{k:'week',l:'Week'},{k:'maand',l:'Maand'},{k:'kwartaal',l:'Kwart'},{k:'jaar',l:'Jaar'}];
+  tabsEl.innerHTML=opts.map(o=>`<button class="ntd-donut-tab${ntdDonutPeriod===o.k?' on':''}" data-p="${o.k}">${o.l}</button>`).join('');
+  tabsEl.querySelectorAll('.ntd-donut-tab').forEach(b=>{
+    b.onclick=()=>{ntdDonutPeriod=b.dataset.p; renderNtdDonut();};
+  });
+
+  // Tel huidig vs target (vorige periode of doel) — voor donut "voortgang"
+  const subEl=document.getElementById('ntd-donut-period');
+  const labelMap={week:'deze week',maand:'deze maand',kwartaal:'dit kwartaal',jaar:'dit jaar'};
+  if(subEl) subEl.textContent=labelMap[ntdDonutPeriod];
+
+  // Pak alfa-rijen in huidige periode (vergaderingen uitgeschreven)
+  const today=new Date();
+  let huidig=0, vorig=0;
+  (D.alfa||[]).forEach(r=>{
+    const p=_parseAnyDate(r.datum); if(!p) return;
+    const d=new Date(p.y,p.m-1,p.d);
+    const inCur=_inPeriod(d,today,ntdDonutPeriod,0);
+    const inPrev=_inPeriod(d,today,ntdDonutPeriod,1);
+    if(inCur) huidig++;
+    if(inPrev) vorig++;
+  });
+
+  const dark=document.documentElement.dataset.theme==='dark';
+  const tc=dark?'#94a3b8':'#64748b';
+
+  // Donut: huidig vs. (vorig - huidig) als referentie. Als huidig >= vorig: vol cirkel (groen)
+  let centerVal=`${huidig}`;
+  let centerLbl='UITGESCHREVEN';
+  let labels, data, colors;
+  if(vorig===0&&huidig===0){
+    labels=['Geen data','']; data=[0,1]; colors=['#e2e8f0','#f1f5f9'];
+    centerVal='0'; centerLbl='UITGESCHREVEN';
+  } else if(huidig>=vorig){
+    // overschreden of nieuw record
+    labels=['Uitgeschreven']; data=[Math.max(huidig,1)]; colors=['#047857'];
+    centerVal=`${huidig}`; centerLbl=vorig>0?'+'+(huidig-vorig)+' VS VORIGE':'UITGESCHREVEN';
+  } else {
+    labels=['Uitgeschreven','Te gaan voor vorige periode'];
+    data=[huidig,vorig-huidig];
+    colors=['#0D7377','#e2e8f0'];
+    centerVal=`${huidig}/${vorig}`;
+    centerLbl='T.O.V. VORIGE';
+  }
+  buildDonut('ntd-donut',labels,data,colors,tc,centerVal,centerLbl);
+}
+
+// Helper: ligt date d in (current period - offset) gerekend vanaf ref?
+function _inPeriod(d,ref,period,offset){
+  if(period==='week'){
+    // ISO-week-index
+    const w1=_weekIndex(d), w2=_weekIndex(ref);
+    return (w2-w1)===offset;
+  }
+  if(period==='maand'){
+    const idx=(ref.getFullYear()*12+ref.getMonth())-(d.getFullYear()*12+d.getMonth());
+    return idx===offset;
+  }
+  if(period==='kwartaal'){
+    const qR=Math.floor(ref.getMonth()/3), qD=Math.floor(d.getMonth()/3);
+    const idx=(ref.getFullYear()*4+qR)-(d.getFullYear()*4+qD);
+    return idx===offset;
+  }
+  if(period==='jaar'){
+    return (ref.getFullYear()-d.getFullYear())===offset;
+  }
+  return false;
+}
+function _weekIndex(d){
+  // dagen-sinds-epoch / 7 als grove index
+  const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+  const day=t.getUTCDay()||7;
+  t.setUTCDate(t.getUTCDate()+4-day);
+  return Math.floor(t.getTime()/(7*86400000));
 }
 
 // ══════════════════════════════════════
@@ -1588,8 +1702,8 @@ function renderKpiTile(id,opts){
   const subEl=document.getElementById(id+'-sub');
   if(numEl) numEl.textContent=opts.num;
   if(subEl){
-    const arrow=opts.trend?(opts.trend.dir==='up'?'<i class="ph-bold ph-arrow-up"></i>':opts.trend.dir==='down'?'<i class="ph-bold ph-arrow-down"></i>':'<i class="ph-bold ph-minus"></i>'):'';
-    const trendHtml=opts.trend?`<span class="kpi-trend ${opts.trend.dir}">${arrow}${opts.trend.label}</span>`:'';
+    const arrow=opts.trend?(opts.trend.dir==='up'?'▲':opts.trend.dir==='down'?'▼':'■'):'';
+    const trendHtml=opts.trend?`<span class="kpi-trend ${opts.trend.dir}"><span class="kpi-trend-arrow">${arrow}</span>${opts.trend.label}</span>`:'';
     const subText=opts.sub||'';
     subEl.innerHTML=`${trendHtml}${subText?'&nbsp;&nbsp;'+subText:''}`;
   }
@@ -1639,8 +1753,9 @@ function renderHeroChart(metric,period){
   const full=seriesByPeriod(rows,dateField,period,fullN);
   const curr=full.slice(n);             // laatste n
   const prev=full.slice(0,n).map(b=>b.count); // de n daarvoor
-  document.getElementById('hero-chart-title').firstChild.nodeValue=title;
-  document.getElementById('hero-chart-sub').textContent=` — laatste ${n} ${period==='dag'?'dagen':period+'en'}`;
+  document.getElementById('hero-chart-title').textContent=title;
+  const periodeNoun={dag:'dagen',week:'weken',maand:'maanden',kwartaal:'kwartalen'}[period]||period;
+  document.getElementById('hero-chart-sub').textContent=` — laatste ${n} ${periodeNoun}`;
   if(charts['chart-hero']) charts['chart-hero'].destroy();
   charts['chart-hero']=new Chart(document.getElementById('chart-hero'),{
     type:'bar',
@@ -1683,13 +1798,13 @@ function renderLeaderboard(period){
   const tbody=document.getElementById('lb-tbody');
   const medalCls=['gold','silver','bronze',''];
   tbody.innerHTML=data.map((r,i)=>{
-    const arrow=r.trend.dir==='up'?'<i class="ph-bold ph-arrow-up"></i>':r.trend.dir==='down'?'<i class="ph-bold ph-arrow-down"></i>':'<i class="ph-bold ph-minus"></i>';
+    const arrow=r.trend.dir==='up'?'▲':r.trend.dir==='down'?'▼':'■';
     return`<tr>
       <td class="lb-rank ${medalCls[i]||''}">${i+1}</td>
       <td class="lb-name">${esc(r.name)}</td>
       <td class="lb-now">${r.huidig}</td>
       <td class="lb-prev">${r.vorig}</td>
-      <td class="lb-trend"><span class="kpi-trend ${r.trend.dir}">${arrow}${r.trend.label}</span></td>
+      <td class="lb-trend"><span class="kpi-trend ${r.trend.dir}"><span class="kpi-trend-arrow">${arrow}</span>${r.trend.label}</span></td>
     </tr>`;
   }).join('');
 }
@@ -1723,52 +1838,62 @@ function renderMetricToggle(){
   });
 }
 
+function _try(label,fn){try{fn()}catch(e){console.error('[Analytics]',label,e)}}
+
 function buildAnalytics(){
-  renderPeriodBar();
-  renderMetricToggle();
+  _try('periode-bar',()=>renderPeriodBar());
+  _try('metric-toggle',()=>renderMetricToggle());
 
   // ── KPI 1: Vergaderingen uitgeschreven (D.alfa, per periode)
-  const vSeries=seriesByPeriod(D.alfa,'datum',anaPeriod,SPARK_BUCKETS);
-  const vTrend=computeTrend(vSeries);
-  renderKpiTile('kpi-vergader',{
-    num:vTrend.huidig,
-    sub:`vs ${vTrend.vorig} ${PERIODE_LABEL_PREV[anaPeriod]}`,
-    trend:vTrend,
-    sparkId:'spark-vergader',
-    sparkValues:vSeries.map(b=>b.count),
-    sparkColor:'#0D7377'
+  _try('kpi-vergader',()=>{
+    const vSeries=seriesByPeriod(D.alfa||[],'datum',anaPeriod,SPARK_BUCKETS);
+    const vTrend=computeTrend(vSeries);
+    renderKpiTile('kpi-vergader',{
+      num:vTrend.huidig,
+      sub:`vs ${vTrend.vorig} ${PERIODE_LABEL_PREV[anaPeriod]}`,
+      trend:vTrend,
+      sparkId:'spark-vergader',
+      sparkValues:vSeries.map(b=>b.count),
+      sparkColor:'#0D7377'
+    });
   });
 
   // ── KPI 2: Open ALV's (cumulatief, stand-meting)
-  const totAlv=D.alvo.length;
-  const openAlv=D.alvo.filter(r=>!r.notulen).length;
-  const openPct=totAlv?Math.round(openAlv/totAlv*100):0;
-  document.getElementById('kpi-openalv-num').textContent=openAlv;
-  document.getElementById('kpi-openalv-sub').textContent=`van ${totAlv} ALV's · ${openPct}% nog uit te schrijven`;
-  const barEl=document.getElementById('kpi-openalv-bar');
-  if(barEl) barEl.style.width=openPct+'%';
+  _try('kpi-openalv',()=>{
+    const totAlv=(D.alvo||[]).length;
+    const openAlv=(D.alvo||[]).filter(r=>!r.notulen).length;
+    const openPct=totAlv?Math.round(openAlv/totAlv*100):0;
+    const numEl=document.getElementById('kpi-openalv-num');
+    const subEl=document.getElementById('kpi-openalv-sub');
+    if(numEl) numEl.textContent=openAlv;
+    if(subEl) subEl.textContent=totAlv?`van ${totAlv} ALV's · ${openPct}% nog uit te schrijven`:'geen data';
+    const barEl=document.getElementById('kpi-openalv-bar');
+    if(barEl) barEl.style.width=openPct+'%';
+  });
 
   // ── KPI 3: Taken afgerond (D.af alle SKEYS, per periode)
-  const tRows=SKEYS.flatMap(s=>D.af[s]||[]);
-  const tSeries=seriesByPeriod(tRows,'datum',anaPeriod,SPARK_BUCKETS);
-  const tTrend=computeTrend(tSeries);
-  renderKpiTile('kpi-taken',{
-    num:tTrend.huidig,
-    sub:`vs ${tTrend.vorig} ${PERIODE_LABEL_PREV[anaPeriod]}`,
-    trend:tTrend,
-    sparkId:'spark-taken',
-    sparkValues:tSeries.map(b=>b.count),
-    sparkColor:'#047857'
+  _try('kpi-taken',()=>{
+    const tRows=SKEYS.flatMap(s=>(D.af||{})[s]||[]);
+    const tSeries=seriesByPeriod(tRows,'datum',anaPeriod,SPARK_BUCKETS);
+    const tTrend=computeTrend(tSeries);
+    renderKpiTile('kpi-taken',{
+      num:tTrend.huidig,
+      sub:`vs ${tTrend.vorig} ${PERIODE_LABEL_PREV[anaPeriod]}`,
+      trend:tTrend,
+      sparkId:'spark-taken',
+      sparkValues:tSeries.map(b=>b.count),
+      sparkColor:'#047857'
+    });
   });
 
   // ── KPI 4: Per persoon
-  renderKpiPersonTile(anaPeriod);
+  _try('kpi-pers',()=>renderKpiPersonTile(anaPeriod));
 
   // ── Hoofdgrafiek
-  renderHeroChart(anaMetric,anaPeriod);
+  _try('hero-chart',()=>renderHeroChart(anaMetric,anaPeriod));
 
   // ── Leaderboard
-  renderLeaderboard(anaPeriod);
+  _try('leaderboard',()=>renderLeaderboard(anaPeriod));
 }
 
 function getWeekNum(d){
@@ -1793,6 +1918,15 @@ function buildBarChart(id,labels,data,color,tc,gc){
 
 function buildDonut(id,labels,data,colors,tc,centerVal,centerLbl){
   if(charts[id]) charts[id].destroy();
+  const el=document.getElementById(id); if(!el) return;
+  // Maak verticale gradient van basiskleur naar lichtere variant
+  const ctxG=el.getContext('2d');
+  const gradients=colors.map(c=>{
+    const g=ctxG.createLinearGradient(0,0,0,el.height||220);
+    g.addColorStop(0,c);
+    g.addColorStop(1,_lightenHex(c,18));
+    return g;
+  });
   const centerPlugin={
     id:'center',
     afterDraw(chart){
@@ -1802,24 +1936,57 @@ function buildDonut(id,labels,data,colors,tc,centerVal,centerLbl){
       const cy=(chartArea.top+chartArea.bottom)/2;
       ctx.save();
       ctx.textAlign='center'; ctx.textBaseline='middle';
-      const fSize=centerVal&&centerVal.includes('/')?'18px':'24px';
-      ctx.font=`bold ${fSize} 'DM Sans',sans-serif`;
+      const isFrac=centerVal&&String(centerVal).includes('/');
+      const fSize=isFrac?'22px':'30px';
+      // Subtiele schaduw onder het cijfer
+      ctx.shadowColor='rgba(0,0,0,.08)';
+      ctx.shadowBlur=4;
+      ctx.shadowOffsetY=1;
+      ctx.font=`800 ${fSize} 'DM Sans',sans-serif`;
       ctx.fillStyle=colors[0];
-      ctx.fillText(centerVal,cx,cy-10);
-      ctx.font="500 11px 'DM Sans',sans-serif";
+      ctx.fillText(centerVal,cx,cy-8);
+      ctx.shadowColor='transparent';
+      ctx.font="600 11px 'DM Sans',sans-serif";
       ctx.fillStyle=tc;
-      ctx.fillText(centerLbl||'',cx,cy+14);
+      const lbl=(centerLbl||'').toUpperCase();
+      // Letter-spacing simuleren door letters één voor één te tekenen
+      const letters=lbl.split('');
+      const trackEm=0.08;
+      ctx.font="600 10px 'DM Sans',sans-serif";
+      let totalW=0;
+      letters.forEach(c=>{totalW+=ctx.measureText(c).width+10*trackEm});
+      let x=cx-totalW/2;
+      letters.forEach(c=>{
+        ctx.textAlign='left';
+        ctx.fillText(c,x,cy+18);
+        x+=ctx.measureText(c).width+10*trackEm;
+      });
       ctx.restore();
     }
   };
-  charts[id]=new Chart(document.getElementById(id),{
+  charts[id]=new Chart(el,{
     type:'doughnut',
-    data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:3,borderColor:'var(--sur)',hoverOffset:6,hoverBorderWidth:3}]},
-    options:{responsive:true,maintainAspectRatio:false,cutout:'70%',
-      plugins:{legend:{position:'right',labels:{color:tc,padding:16,font:{size:12},
-        usePointStyle:true,pointStyle:'circle'}}}},
+    data:{labels,datasets:[{data,backgroundColor:gradients,borderWidth:0,hoverOffset:10,hoverBorderWidth:3,hoverBorderColor:'var(--sur)',spacing:2}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'72%',
+      animation:{animateRotate:true,animateScale:false,duration:900,easing:'easeOutCubic'},
+      plugins:{
+        legend:{position:'right',align:'center',labels:{color:tc,padding:14,font:{size:12,weight:'500'},
+          usePointStyle:true,pointStyle:'circle',boxWidth:9,boxHeight:9}},
+        tooltip:{backgroundColor:'rgba(15,23,42,.94)',titleColor:'#fff',bodyColor:'#e2e8f0',
+          padding:11,cornerRadius:8,displayColors:true,usePointStyle:true,boxPadding:4,
+          titleFont:{size:12,weight:'600'},bodyFont:{size:12}}
+      }},
     plugins:[centerPlugin]
   });
+}
+
+// Lichten/donker maken van hex-kleur (perc -100..+100)
+function _lightenHex(hex,perc){
+  let h=hex.replace('#','');
+  if(h.length===3) h=h.split('').map(c=>c+c).join('');
+  const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);
+  const f=(v)=>Math.max(0,Math.min(255,Math.round(v+(perc/100)*(perc>0?255-v:v))));
+  return`#${[f(r),f(g),f(b)].map(v=>v.toString(16).padStart(2,'0')).join('')}`;
 }
 
 // ══════════════════════════════════════

@@ -208,6 +208,25 @@
     .period-btn{padding:3px 9px;border-radius:6px;border:1px solid var(--bor);background:var(--sur2);color:var(--mut);font-size:11px;font-weight:600;cursor:pointer;transition:all var(--tr)}
     .period-btn.on{background:var(--ac);color:#fff;border-color:var(--ac)}
 
+    /* Hero donut card — één grote donut met categorie-filter */
+    .hero-donut-card{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);padding:22px 26px;box-shadow:var(--sh);margin-bottom:18px;position:relative;overflow:hidden}
+    .hero-donut-card::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 0% 0%,color-mix(in srgb,var(--hero-color,var(--ac)) 7%,transparent),transparent 55%);pointer-events:none;transition:background .35s ease}
+    .hero-donut-hdr{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:18px;position:relative;flex-wrap:wrap}
+    .hero-donut-hdr h3{font-size:16px;font-weight:700;margin:0;color:var(--fg);letter-spacing:-.01em}
+    .hero-donut-sub{font-size:12px;color:var(--mut);margin-top:3px;font-weight:500}
+    .hero-donut-tabs{display:inline-flex;background:var(--sur2);border:1px solid var(--bor);border-radius:12px;padding:4px;gap:2px}
+    .hdt-tab{padding:7px 14px;border-radius:8px;border:none;background:transparent;color:var(--mut);font-size:12px;font-weight:600;cursor:pointer;transition:all var(--tr);font-family:inherit;display:flex;align-items:center;gap:6px;white-space:nowrap}
+    .hdt-tab:hover{color:var(--fg)}
+    .hdt-tab.on{background:var(--sur);color:var(--hero-color,var(--ac));box-shadow:0 1px 3px rgba(0,0,0,.06),0 2px 6px color-mix(in srgb,var(--hero-color,var(--ac)) 14%,transparent)}
+    .hdt-tab svg{width:14px;height:14px}
+    .hero-donut-body{position:relative;height:340px;display:flex;align-items:center;justify-content:center}
+    .hero-donut-wrap{position:relative;width:100%;height:100%;max-width:680px}
+    @media(max-width:720px){
+      .hero-donut-hdr{flex-direction:column;align-items:stretch}
+      .hero-donut-tabs{overflow-x:auto;flex-wrap:nowrap}
+      .hero-donut-body{height:300px}
+    }
+
     /* Productivity tracker */
     .prod-hdr{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px}
     .prod-hdr h2{font-size:18px;font-weight:800;letter-spacing:-.02em;color:var(--txt);display:flex;align-items:center;gap:9px}
@@ -697,24 +716,16 @@
     <!-- ══ DASHBOARD ══ -->
     <div class="page" id="page-dash">
       <div class="stats-grid" id="dash-stats"></div>
-      <div class="charts-grid">
-        <div class="chart-card">
-          <h3>ALV Voortgang — Vergaderingen</h3>
-          <div class="chart-wrap"><canvas id="chart-alv-prog"></canvas></div>
+      <div class="hero-donut-card">
+        <div class="hero-donut-hdr">
+          <div>
+            <h3 id="hero-donut-title">Voortgang</h3>
+            <div class="hero-donut-sub" id="hero-donut-sub">Kies een categorie</div>
+          </div>
+          <div class="hero-donut-tabs" id="hero-donut-tabs"></div>
         </div>
-        <div class="chart-card">
-          <h3>Open taken per categorie</h3>
-          <div class="chart-wrap"><canvas id="chart-taken-cat"></canvas></div>
-        </div>
-      </div>
-      <div class="charts-grid">
-        <div class="chart-card">
-          <h3>Voortgang per status</h3>
-          <div class="chart-wrap"><canvas id="chart-status"></canvas></div>
-        </div>
-        <div class="chart-card">
-          <h3>Begroting doorgezet</h3>
-          <div class="chart-wrap"><canvas id="chart-begroting"></canvas></div>
+        <div class="hero-donut-body">
+          <div class="hero-donut-wrap"><canvas id="chart-hero-donut"></canvas></div>
         </div>
       </div>
       <div class="card">
@@ -1342,11 +1353,11 @@ function renderNtdStats(){
   renderNtdDonut();
 }
 
-// NTD: totaal uitgeschreven vergaderingen (alfa = uitnodigingen verzonden)
+// NTD: totaal uitgeschreven vergaderingen (alvo: uitnodiging=TRUE → uitnodiging verzonden)
 function renderNtdDonut(){
   const el=document.getElementById('ntd-total-num');
   if(!el) return;
-  el.textContent=(D.alfa||[]).length;
+  el.textContent=(D.alvo||[]).filter(r=>r.uitnodiging).length;
 }
 
 // Helper: ligt date d in (current period - offset) gerekend vanaf ref?
@@ -1941,37 +1952,101 @@ function _lightenHex(hex,perc){
 // ══════════════════════════════════════
 //  DASHBOARD
 // ══════════════════════════════════════
-function buildDash(){
+const DASH_ICONS={
+  // Klembord met lijntjes — open taken
+  open:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2" fill="currentColor" fill-opacity="0.18"/><rect x="9" y="2.5" width="6" height="3.5" rx="1" fill="currentColor" fill-opacity="0.35"/><path d="M9 11h6M9 14.5h6M9 18h4"/></svg>`,
+  // Cirkel met dikke vink — taken afgerond
+  done:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="currentColor" fill-opacity="0.18"/><path d="M8 12.5l2.7 2.7L16 9.8"/></svg>`,
+  // Envelop met vinkje en pijl — ALV uitgeschreven
+  alv:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6.5a2 2 0 012-2h14a2 2 0 012 2v11a2 2 0 01-2 2H5a2 2 0 01-2-2v-11z" fill="currentColor" fill-opacity="0.18"/><path d="M3.5 7l8.5 6 8.5-6"/><path d="M9 16.5l1.6 1.6L14 14.7"/></svg>`,
+  // Document met pen — notulen verstuurd
+  notes:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l4 4v13a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 016 20V4.5A1.5 1.5 0 017.5 3z" fill="currentColor" fill-opacity="0.18"/><path d="M14 3v4h4"/><path d="M9 12h6M9 15h6M9 18h3"/><path d="M17.6 13.4l1.4-1.4a1.1 1.1 0 011.6 1.6l-1.4 1.4-1.6-1.6z" fill="currentColor" fill-opacity="0.35"/></svg>`,
+  // Tab-iconen (kleine 14px versies)
+  tabAlv:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5a2 2 0 012-2h14a2 2 0 012 2v11a2 2 0 01-2 2H5a2 2 0 01-2-2v-11z"/><path d="M3.5 7l8.5 6 8.5-6"/></svg>`,
+  tabNotes:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l4 4v13a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 016 20V4.5A1.5 1.5 0 017.5 3z"/><path d="M14 3v4h4"/><path d="M9 13h6M9 16h4"/></svg>`,
+  tabBudget:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M14.5 9.5c-.6-.7-1.5-1.1-2.5-1.1-1.7 0-3 1.1-3 2.5s1.3 2.5 3 2.5 3 1.1 3 2.5-1.3 2.5-3 2.5c-1 0-1.9-.4-2.5-1.1"/><path d="M12 7v10"/></svg>`,
+  tabTasks:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><rect x="9" y="2.5" width="6" height="3.5" rx="1"/><path d="M9 11h6M9 14.5h6M9 18h4"/></svg>`,
+};
+
+const HERO_VIEWS=[
+  {
+    key:'alv', label:'ALV Voortgang', icon:'tabAlv',
+    color:'#0D7377',
+    title:'ALV Voortgang — Uitnodigingen',
+    sub:'Hoeveel uitnodigingen zijn de deur uit',
+    build:()=>{
+      const u=D.alvo.filter(r=>r.uitnodiging).length;
+      const t=D.alvo.length;
+      return{labels:['Uitgeschreven','Nog uitschrijven'],data:[u,t-u],colors:['#0D7377','#E5E7EB'],centerVal:`${u}/${t}`,centerLbl:'Uitgeschreven'};
+    }
+  },
+  {
+    key:'notulen', label:'Notulen', icon:'tabNotes',
+    color:'#15803D',
+    title:'Notulen verstuurd',
+    sub:'Van uitgeschreven vergaderingen',
+    build:()=>{
+      const u=D.alvo.filter(r=>r.uitnodiging).length;
+      const n=D.alvo.filter(r=>r.notulen).length;
+      return{labels:['Notulen verstuurd','Nog te versturen'],data:[n,Math.max(0,u-n)],colors:['#15803D','#E5E7EB'],centerVal:`${n}/${u}`,centerLbl:'Verstuurd'};
+    }
+  },
+  {
+    key:'begroting', label:'Begroting', icon:'tabBudget',
+    color:'#6D5BD0',
+    title:'Begroting doorgezet',
+    sub:'Vergaderingen waar de begroting is doorgezet',
+    build:()=>{
+      const b=D.alvo.filter(r=>r.begroting).length;
+      const t=D.alvo.length;
+      return{labels:['Doorgezet','Niet doorgezet'],data:[b,t-b],colors:['#6D5BD0','#E5E7EB'],centerVal:`${b}/${t}`,centerLbl:'Doorgezet'};
+    }
+  },
+  {
+    key:'taken', label:'Open Taken', icon:'tabTasks',
+    color:'#B45309',
+    title:'Open taken per categorie',
+    sub:'Verdeling van openstaande werkzaamheden',
+    build:()=>{
+      const data=SKEYS.map(s=>D.ntd[s]?.length||0);
+      const tot=data.reduce((a,b)=>a+b,0);
+      return{labels:SKEYS.map(s=>SECS[s].label),data,colors:['#0D7377','#B45309','#6D5BD0','#B91C1C'],centerVal:`${tot}`,centerLbl:'Open Taken'};
+    }
+  },
+];
+let activeHeroView='alv';
+
+function renderHeroDonut(){
   const dark=document.documentElement.dataset.theme==='dark';
   const tc=dark?'#94a3b8':'#64748b';
-  const gc=dark?'#1e293b':'#f1f5f9';
+  const view=HERO_VIEWS.find(v=>v.key===activeHeroView)||HERO_VIEWS[0];
+  const card=document.querySelector('.hero-donut-card');
+  if(card) card.style.setProperty('--hero-color',view.color);
+  document.getElementById('hero-donut-title').textContent=view.title;
+  document.getElementById('hero-donut-sub').textContent=view.sub;
+  document.getElementById('hero-donut-tabs').innerHTML=HERO_VIEWS.map(v=>
+    `<button class="hdt-tab ${v.key===activeHeroView?'on':''}" data-key="${v.key}" style="${v.key===activeHeroView?`--hero-color:${v.color}`:''}">${DASH_ICONS[v.icon]||''}<span>${v.label}</span></button>`
+  ).join('');
+  document.querySelectorAll('#hero-donut-tabs .hdt-tab').forEach(btn=>{
+    btn.onclick=()=>{activeHeroView=btn.dataset.key;renderHeroDonut();};
+  });
+  const cfg=view.build();
+  buildDonut('chart-hero-donut',cfg.labels,cfg.data,cfg.colors,tc,cfg.centerVal,cfg.centerLbl);
+}
 
+function buildDash(){
   const uitnD=D.alvo.filter(r=>r.uitnodiging).length;
   const notulenD=D.alvo.filter(r=>r.notulen).length;
-  const totD=D.alvo.length;
   const ntdTotal=SKEYS.reduce((s,k)=>s+(D.ntd[k]?.length||0),0);
   const afTotal=SKEYS.reduce((s,k)=>s+(D.af[k]?.length||0),0);
 
   document.getElementById('dash-stats').innerHTML=`
-    <div class="stat" style="--sec:var(--ac);--sec-l:var(--ac-l)"><div class="stat-top"><div class="stat-lbl">Open taken</div><div class="stat-ico"><i class="ph-duotone ph-clipboard-text"></i></div></div><div class="stat-num">${ntdTotal}</div><div class="stat-sub">nog op te pakken</div></div>
-    <div class="stat" style="--sec:var(--gn);--sec-l:var(--gn-l)"><div class="stat-top"><div class="stat-lbl">Taken afgerond</div><div class="stat-ico"><i class="ph-duotone ph-check-circle"></i></div></div><div class="stat-num">${afTotal}</div><div class="stat-sub">afgeronde taken</div></div>
-    <div class="stat" style="--sec:var(--am);--sec-l:var(--am-l)"><div class="stat-top"><div class="stat-lbl">ALV's uitgeschreven</div><div class="stat-ico"><i class="ph-duotone ph-envelope-open"></i></div></div><div class="stat-num">${uitnD}</div><div class="stat-sub">uitnodiging verstuurd</div></div>
-    <div class="stat" style="--sec:var(--gn);--sec-l:var(--gn-l)"><div class="stat-top"><div class="stat-lbl">Notulen verstuurd</div><div class="stat-ico"><i class="ph-duotone ph-note-pencil"></i></div></div><div class="stat-num">${notulenD}</div><div class="stat-sub">van ${uitnD} uitgeschreven</div></div>`;
+    <div class="stat" style="--sec:var(--ac);--sec-l:var(--ac-l)"><div class="stat-top"><div class="stat-lbl">Open taken</div><div class="stat-ico">${DASH_ICONS.open}</div></div><div class="stat-num">${ntdTotal}</div><div class="stat-sub">nog op te pakken</div></div>
+    <div class="stat" style="--sec:var(--gn);--sec-l:var(--gn-l)"><div class="stat-top"><div class="stat-lbl">Taken afgerond</div><div class="stat-ico">${DASH_ICONS.done}</div></div><div class="stat-num">${afTotal}</div><div class="stat-sub">afgeronde taken</div></div>
+    <div class="stat" style="--sec:var(--am);--sec-l:var(--am-l)"><div class="stat-top"><div class="stat-lbl">ALV's uitgeschreven</div><div class="stat-ico">${DASH_ICONS.alv}</div></div><div class="stat-num">${uitnD}</div><div class="stat-sub">uitnodiging verstuurd</div></div>
+    <div class="stat" style="--sec:var(--gn);--sec-l:var(--gn-l)"><div class="stat-top"><div class="stat-lbl">Notulen verstuurd</div><div class="stat-ico">${DASH_ICONS.notes}</div></div><div class="stat-num">${notulenD}</div><div class="stat-sub">van ${uitnD} uitgeschreven</div></div>`;
 
-  // ALV progress donut — uitnodiging=afgerond (fix 4), getallen (fix 3)
-  buildDonut('chart-alv-prog',['Uitgeschreven','Nog uitschrijven'],[uitnD,totD-uitnD],['#0D7377','#B91C1C'],tc,`${uitnD}/${totD}`,'Uitgeschreven');
-
-  // Taken per categorie
-  const catTotal=SKEYS.reduce((s,k)=>s+(D.ntd[k]?.length||0),0);
-  buildDonut('chart-taken-cat',SKEYS.map(s=>SECS[s].label),SKEYS.map(s=>D.ntd[s]?.length||0),
-    ['#0D7377','#B45309','#6D5BD0','#B91C1C'],tc,`${catTotal}`,'open taken');
-
-  // Status donut — verhuisd van Analytics
-  buildDonut('chart-status',['Uitgeschreven','Nog uitschrijven'],[uitnD,totD-uitnD],['#0D7377','#B91C1C'],tc,`${uitnD}/${totD}`,'Uitgeschreven');
-
-  // Begroting donut — verhuisd van Analytics
-  const begrD=D.alvo.filter(r=>r.begroting).length;
-  buildDonut('chart-begroting',['Doorgezet','Niet doorgezet'],[begrD,totD-begrD],['#6D5BD0','#e2e8f0'],tc,`${begrD}/${totD}`,'Doorgezet');
+  renderHeroDonut();
 
   // Recent afgerond
   const secPill={

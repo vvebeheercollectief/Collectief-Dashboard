@@ -1022,13 +1022,13 @@ const SECS = {
     cols:['VvE Code','VvE','Actiepunt','Deadline','Behandelaar','Prioriteit','Opmerkingen','In beh.'],
     keys:['code','naam','actiepunt','deadline','behandelaar','prioriteit','opmerkingen','inBehandeling']},
   VERGADERVERZOEKEN:{label:'Vergaderverzoeken',css:'--sec:var(--am);--sec-l:var(--am-l);--sec-b:var(--am-b)',color:'#B45309',
-    cols:['VvE Code','VvE','Periode','Agendapunten','Behandelaar','Deadline uitschr.','Opmerkingen','In beh.'],
+    cols:['VvE Code','VvE','Periode','Agendapunten','Behandelaar','Deadline uitschr.','Prioriteit','Opmerkingen','In beh.'],
     keys:['code','naam','periode','agendapunten','behandelaar','deadline','opmerkingen','inBehandeling']},
   'OFFERTE-TRAJECTEN':{label:'Offerte-trajecten',css:'--sec:var(--pu);--sec-l:var(--pu-l);--sec-b:var(--pu-b)',color:'#6D5BD0',
-    cols:['VvE Code','VvE','Datum aangevr.','Ontvangen/Aangevr.','Behandelaar','Deadline','Opmerkingen'],
+    cols:['VvE Code','VvE','Datum aangevr.','Ontvangen/Aangevr.','Behandelaar','Deadline','Prioriteit','Opmerkingen'],
     keys:['code','naam','datumAangevraagd','offertes','behandelaar','deadline','opmerkingen']},
   LOD:{label:'LOD',css:'--sec:var(--rd);--sec-l:var(--rd-l);--sec-b:var(--rd-b)',color:'#B91C1C',
-    cols:['VvE Code','VvE','Actiepunt','Status','Behandelaar','Deadline LOD','Opmerkingen','In beh.'],
+    cols:['VvE Code','VvE','Actiepunt','Status','Behandelaar','Deadline LOD','Prioriteit','Opmerkingen','In beh.'],
     keys:['code','naam','actiepunt','status','behandelaar','deadline','opmerkingen','inBehandeling']},
 };
 const SKEYS = Object.keys(SECS);
@@ -1431,7 +1431,10 @@ function filterNtd(rows,q,fCode,beh,prio,sec){
     if(q&&!SECS[sec].keys.some(k=>(r[k]||'').toLowerCase().includes(q))) return false;
     if(fCode&&!(r.code||'').toLowerCase().includes(fCode)) return false;
     if(beh&&!(r.behandelaar||'').toLowerCase().includes(beh.toLowerCase())) return false;
-    if(prio&&sec==='OPPAKKEN'&&r.prioriteit!==prio) return false;
+    if(prio){
+      const berekend = berekenPrioriteit(r.deadline, sec).prioriteit;
+      if (berekend !== prio) return false;
+    }
     return true;
   }).sort((a,b)=>{
     const ibA=a.inBehandeling==='TRUE'?1:0, ibB=b.inBehandeling==='TRUE'?1:0;
@@ -2182,7 +2185,7 @@ function rowNtd(r,sec){
         <td class="cell-txt">${esc(r.actiepunt)}</td>
         <td class="cell-sm">${r.deadline?esc(r.deadline):'<span style="color:var(--fnt)">–</span>'}</td>
         <td>${persBadges(r.behandelaar)}</td>
-        <td>${prioBadge(r.prioriteit)}</td>
+        <td>${prioBadge(r, 'OPPAKKEN')}</td>
         <td class="cell-txt">${r.opmerkingen?`<span style="font-size:12px">${esc(r.opmerkingen)}</span>`:''}</td>
         <td>${ibBadge(r.inBehandeling)}</td>
         <td>${editBtn}</td>`;
@@ -2194,6 +2197,7 @@ function rowNtd(r,sec){
         <td class="cell-txt">${esc(r.agendapunten||r.actiepunt||'')}</td>
         <td>${persBadges(r.behandelaar)}</td>
         <td class="cell-sm">${r.deadline?esc(r.deadline):'<span style="color:var(--fnt)">–</span>'}</td>
+        <td>${prioBadge(r, 'VERGADERVERZOEKEN')}</td>
         <td class="cell-txt">${r.opmerkingen?`<span style="font-size:12px">${esc(r.opmerkingen)}</span>`:''}</td>
         <td>${ibBadge(r.inBehandeling)}</td>
         <td>${editBtn}</td>`;
@@ -2205,6 +2209,7 @@ function rowNtd(r,sec){
         <td>${offProg(r.offertes)}</td>
         <td>${persBadges(r.behandelaar)}</td>
         <td class="cell-sm">${r.deadline?esc(r.deadline):'<span style="color:var(--fnt)">–</span>'}</td>
+        <td>${prioBadge(r, 'OFFERTE-TRAJECTEN')}</td>
         <td class="cell-txt">${r.opmerkingen?`<span style="font-size:12px">${esc(r.opmerkingen)}</span>`:''}</td>
         <td>${editBtn}</td>`;
       break;
@@ -2215,6 +2220,7 @@ function rowNtd(r,sec){
         <td class="cell-txt" style="font-style:italic;font-size:12px">${esc(r.status||'')}</td>
         <td>${persBadges(r.behandelaar)}</td>
         <td class="cell-sm">${r.deadline?esc(r.deadline):'<span style="color:var(--fnt)">–</span>'}</td>
+        <td>${prioBadge(r, 'LOD')}</td>
         <td class="cell-txt">${r.opmerkingen?`<span style="font-size:12px">${esc(r.opmerkingen)}</span>`:''}</td>
         <td>${ibBadge(r.inBehandeling)}</td>
         <td>${editBtn}</td>`;
@@ -2681,11 +2687,12 @@ function berekenPrioriteit(deadlineStr, categorie, vandaag){
   return { prioriteit, dagenTot, teLaat };
 }
 
-function prioBadge(v){
-  if(!v)return'';
-  const cls={Hoog:'prio-hoog',Midden:'prio-mid',Laag:'prio-laag'}[v]||'prio-mid';
-  const ico={Hoog:'↑',Midden:'→',Laag:'↓'}[v]||'';
-  return`<span class="badge ${cls}">${ico} ${esc(v)}</span>`;
+function prioBadge(r, sec){
+  const { prioriteit } = berekenPrioriteit(r.deadline, sec);
+  if(!prioriteit)return'';
+  const cls={Hoog:'prio-hoog',Midden:'prio-mid',Laag:'prio-laag'}[prioriteit]||'prio-mid';
+  const ico={Hoog:'↑',Midden:'→',Laag:'↓'}[prioriteit]||'';
+  return`<span class="badge ${cls}">${ico} ${esc(prioriteit)}</span>`;
 }
 
 function persBadges(v){

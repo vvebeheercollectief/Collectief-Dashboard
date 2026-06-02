@@ -831,12 +831,19 @@ const ALLOWED_EMAILS = [
   'info@vvebeheercollectief.nl',
   'djiowchico@gmail.com',
   'gabrielateterycz1616@gmail.com',
+  'cihan_celik@live.nl',
 ];
 const EMAIL_NAMES = {
   'info@vvebeheercollectief.nl':'Jer',
   'djiowchico@gmail.com':'Cihad',
-  'gabriellateterycz1616@gmail.com':'Gabos',
+  'gabrielateterycz1616@gmail.com':'Gabos',
+  'cihan_celik@live.nl':'Cihan',
 };
+function displayName(s){
+  if(!s) return '';
+  const key = String(s).toLowerCase().trim();
+  return EMAIL_NAMES[key] || s;
+}
 
 let oneSignalReady  = false;
 let isSubscribed    = false;
@@ -966,14 +973,23 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('notif-test-btn').onclick = () => sendTestNotif(getCurrentWho(), '🔔 Test melding', 'Notificaties werken correct op dit apparaat!');
   startNotifPoll();
 
-  // Live updates — auto-refresh elke 45 seconden
-  setInterval(()=>{
+  // Live updates — auto-refresh elke 8 seconden (smart diff voorkomt onnodige re-renders)
+  setInterval(async ()=>{
+    if(document.hidden) return;
     if(document.getElementById('modal-bg').classList.contains('open')) return;
     if(document.getElementById('complete-bg').classList.contains('open')) return;
     if(document.getElementById('ontw-modal-bg').classList.contains('open')) return;
     if(document.getElementById('dot').classList.contains('loading')) return;
-    loadAll();
-  },45000);
+    if(!await ensureToken()) return;
+    loadAll(true);
+  },8000);
+
+  // Token-refresh heartbeat — elke 4 min proactief vernieuwen vóór expiry
+  setInterval(()=>{
+    if(!oauthToken) return;
+    if(oauthExpiry - Date.now() > 5*60*1000) return;
+    try{ _gsiTokenClient && _gsiTokenClient.requestAccessToken({prompt:''}); }catch(e){}
+  },4*60*1000);
 
   // Sessie herstellen uit sessionStorage
   const _st=sessionStorage.getItem('oauthToken');
@@ -1053,9 +1069,12 @@ function setSynced(){dot('');document.getElementById('sync-lbl').textContent='Li
 function setSyncErr(){dot('err');document.getElementById('sync-lbl').textContent='Fout'}
 function dot(cls){const d=document.getElementById('dot');d.className='dot'+(cls?' '+cls:'')}
 
-async function loadAll(){
-  if(!oauthToken){setSyncErr();return}
-  setSyncing();
+let _lastDHash=null;
+async function loadAll(silent){
+  if(!oauthToken){
+    if(!await ensureToken()){setSyncErr();return}
+  }
+  if(!silent) setSyncing();
   try{
     const[ntdR,afR,alvoR,alfaR,ontwR,logR]=await Promise.all([
       fetchSheet("Nog Te Doen"),fetchSheet("Afgerond"),
@@ -1071,7 +1090,11 @@ async function loadAll(){
     D.ontw=parseOntw(ontwR);
     D.logboek=parseLogboek(logR);
     setSynced();
-    renderAll();
+    const hash=JSON.stringify([D.ntd,D.af,D.alvo,D.alfa,D.ontw,D.logboek]);
+    if(hash!==_lastDHash){
+      _lastDHash=hash;
+      renderAll();
+    }
   }catch(e){setSyncErr();console.error(e)}
 }
 
@@ -1957,7 +1980,7 @@ async function ensureToken(){
 // ══════════════════════════════════════
 function filt(rows,q){
   if(!q)return rows;
-  return rows.filter(r=>Object.values(r).some(v=>(v||'').toLowerCase().includes(q)));
+  return rows.filter(r=>Object.values(r).some(v=>String(v??'').toLowerCase().includes(q)));
 }
 
 function prioBadge(v){
@@ -2058,14 +2081,24 @@ function parseOntw(rows){
 
 function renderOntw(){
   const q=(document.getElementById('s-ontw')?.value||'').toLowerCase();
-  const cats=['Alles',...ONTW_CATS];
+  const cats=['Alles',...ONTW_CATS,'Afgerond'];
+  const openItems=D.ontw.filter(r=>r.status!=='Afgerond');
+  const doneItems=D.ontw.filter(r=>r.status==='Afgerond');
   document.getElementById('ontw-tabs').innerHTML=cats.map(c=>{
-    const cnt=c==='Alles'?D.ontw.length:D.ontw.filter(r=>r.categorie===c).length;
-    return`<div class="tab ${c===activeOntw?'on':''}" style="${c===activeOntw?'--sec:var(--pk);--sec-l:var(--pk-l);--sec-b:var(--pk-b)':''}" onclick="setOntw('${c.replace(/'/g,"\\'")}')">${c}<span class="cnt">${cnt}</span></div>`;
+    let cnt;
+    if(c==='Alles') cnt=openItems.length;
+    else if(c==='Afgerond') cnt=doneItems.length;
+    else cnt=openItems.filter(r=>r.categorie===c).length;
+    const activeStyle = c===activeOntw
+      ? (c==='Afgerond' ? '--sec:var(--gn);--sec-l:var(--gn-l);--sec-b:var(--gn-b)' : '--sec:var(--pk);--sec-l:var(--pk-l);--sec-b:var(--pk-b)')
+      : '';
+    return`<div class="tab ${c===activeOntw?'on':''}" style="${activeStyle}" onclick="setOntw('${c.replace(/'/g,"\\'")}')">${c}<span class="cnt">${cnt}</span></div>`;
   }).join('');
 
-  let rows=D.ontw;
-  if(activeOntw!=='Alles') rows=rows.filter(r=>r.categorie===activeOntw);
+  let rows;
+  if(activeOntw==='Afgerond') rows=doneItems;
+  else if(activeOntw==='Alles') rows=openItems;
+  else rows=openItems.filter(r=>r.categorie===activeOntw);
   if(q) rows=rows.filter(r=>`${r.titel} ${r.inhoud} ${r.categorie} ${r.door}`.toLowerCase().includes(q));
 
   renderThead('ontw-thead',['Titel','Categorie','Inhoud','Door','Datum','Status',''],'--sec:var(--pk);--sec-l:var(--pk-l);--sec-b:var(--pk-b)');
@@ -2200,7 +2233,7 @@ function renderLogboek(){
   const fa=document.getElementById('f-actie-logboek')?.value||'';
   const rows=D.logboek.filter(r=>{
     if(fa&&r.actie!==fa) return false;
-    if(q&&!`${r.timestamp} ${r.code} ${r.sectie} ${r.actie} ${r.veld} ${r.oudeWaarde} ${r.nieuweWaarde} ${r.gebruiker}`.toLowerCase().includes(q)) return false;
+    if(q&&!`${r.timestamp} ${r.code} ${r.sectie} ${r.actie} ${r.veld} ${r.oudeWaarde} ${r.nieuweWaarde} ${r.gebruiker} ${displayName(r.gebruiker)}`.toLowerCase().includes(q)) return false;
     return true;
   });
   const sl=rows.slice((pgs.logboek-1)*PG,pgs.logboek*PG);
@@ -2215,7 +2248,7 @@ function renderLogboek(){
       <td class="cell-sm">${esc(r.veld)}</td>
       <td class="cell-txt" style="font-size:12px">${esc(r.oudeWaarde)}</td>
       <td class="cell-txt" style="font-size:12px">${esc(r.nieuweWaarde)}</td>
-      <td class="cell-sm">${esc(r.gebruiker)}</td>
+      <td class="cell-sm">${esc(displayName(r.gebruiker))}</td>
     </tr>`).join('');
   }
   renderPag('logboek-pag',rows.length,pgs.logboek,p=>{pgs.logboek=p;renderLogboek()});
@@ -2248,7 +2281,7 @@ function renderTaskHistory(code,sec){
       <div class="hist-ts">${esc(fmtLogTs(r.timestamp))}</div>
       <div class="hist-detail">
         ${actieBadge(r.actie)}
-        <span style="margin-left:6px;color:var(--mut)">${esc(r.gebruiker)}</span>
+        <span style="margin-left:6px;color:var(--mut)">${esc(displayName(r.gebruiker))}</span>
         ${r.veld?`<div class="hist-change">${esc(r.veld)}: ${esc(r.oudeWaarde)} → ${esc(r.nieuweWaarde)}</div>`:''}
         ${r.actie==='Opmerking'&&r.nieuweWaarde?`<div class="hist-change">${esc(r.nieuweWaarde)}</div>`:''}
       </div>
@@ -2466,7 +2499,7 @@ function startNotifPoll() {
   pollNotifsForToast();
   _notifPollTimer = setInterval(pollNotifsForToast, 10000);
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) { pollNotifsForToast(); loadAll(); }
+    if (!document.hidden) { pollNotifsForToast(); loadAll(true); }
   });
 }
 
@@ -2520,7 +2553,7 @@ function getCurrentWho() {
   }
   const stored = localStorage.getItem('notif_who');
   if (stored) return stored;
-  if (currentUserEmail) return EMAIL_NAMES[currentUserEmail.toLowerCase()] || currentUserEmail;
+  if (currentUserEmail) return displayName(currentUserEmail);
   return '';
 }
 

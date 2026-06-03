@@ -21,7 +21,6 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-  <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
   <style>
     :root{
@@ -255,7 +254,7 @@
     /* Productivity tracker */
     .prod-hdr{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px}
     .prod-hdr h2{font-size:18px;font-weight:800;letter-spacing:-.02em;color:var(--txt);display:flex;align-items:center;gap:9px}
-    .prod-hdr h2 i{color:var(--ac);font-size:22px}
+    .prod-hdr h2 svg{color:var(--ac);width:22px;height:22px;flex-shrink:0}
     .period-bar{display:inline-flex;background:var(--sur);border:1px solid var(--bor);border-radius:10px;padding:4px;gap:2px;box-shadow:var(--sh)}
     .period-bar .period-btn{padding:6px 14px;border:none;background:transparent;border-radius:7px;font-size:12px}
     .period-bar .period-btn.on{background:var(--ac);color:#fff;box-shadow:0 1px 3px color-mix(in srgb,var(--ac) 30%,transparent)}
@@ -267,6 +266,7 @@
     .kpi-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px}
     .kpi-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mut)}
     .kpi-ico{width:34px;height:34px;border-radius:9px;background:var(--sec-l,var(--ac-l));display:flex;align-items:center;justify-content:center;color:var(--sec,var(--ac));font-size:20px;flex-shrink:0}
+    .kpi-ico svg{width:20px;height:20px}
     .kpi-num{font-size:34px;font-weight:800;line-height:1;letter-spacing:-.04em;color:var(--sec,var(--ac));margin-bottom:4px}
     .kpi-sub{font-size:11px;color:var(--mut);margin-bottom:8px;min-height:14px}
     .kpi-trend{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;padding:3px 8px;border-radius:20px;line-height:1}
@@ -685,7 +685,7 @@
     <!-- ══ ANALYTICS ══ -->
     <div class="page" id="page-analytics">
       <div class="prod-hdr">
-        <h2><i class="ph-duotone ph-chart-line-up"></i>Productiviteit</h2>
+        <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 15l3.5-3.5 3 3L20 7v8H7z" fill="currentColor" fill-opacity="0.18" stroke="none"/><path d="M4 4v15a1 1 0 001 1h15"/><path d="M7 15l3.5-3.5 3 3L20 7"/><path d="M20 11V7h-4"/></svg>Productiviteit</h2>
         <div class="period-bar" id="ana-period-bar"></div>
       </div>
 
@@ -695,7 +695,7 @@
             <div>
               <div class="kpi-lbl">Vergaderingen uitgeschreven</div>
             </div>
-            <div class="kpi-ico"><i class="ph-duotone ph-note-pencil"></i></div>
+            <div class="kpi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l4 4v13a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 016 20V4.5A1.5 1.5 0 017.5 3z" fill="currentColor" fill-opacity="0.18"/><path d="M14 3v4h4"/><path d="M9 12h6M9 15h6M9 18h3"/></svg></div>
           </div>
           <div class="kpi-num" id="kpi-vergader-num">–</div>
           <div class="kpi-sub" id="kpi-vergader-sub"></div>
@@ -707,7 +707,7 @@
             <div>
               <div class="kpi-lbl">Open ALV's (werkvoorraad)</div>
             </div>
-            <div class="kpi-ico"><i class="ph-duotone ph-hourglass-medium"></i></div>
+            <div class="kpi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3c0 5 5 6 5 9s-5 4-5 9M17 3c0 5-5 6-5 9s5 4 5 9" fill="currentColor" fill-opacity="0.18"/><path d="M6 3h12M6 21h12"/></svg></div>
           </div>
           <div class="kpi-num" id="kpi-openalv-num">–</div>
           <div class="kpi-sub" id="kpi-openalv-sub">nog uit te schrijven</div>
@@ -719,7 +719,7 @@
             <div>
               <div class="kpi-lbl">Taken afgerond</div>
             </div>
-            <div class="kpi-ico"><i class="ph-duotone ph-check-circle"></i></div>
+            <div class="kpi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="currentColor" fill-opacity="0.18"/><path d="M8 12.5l2.7 2.7L16 9.8"/></svg></div>
           </div>
           <div class="kpi-num" id="kpi-taken-num">–</div>
           <div class="kpi-sub" id="kpi-taken-sub"></div>
@@ -731,7 +731,7 @@
             <div>
               <div class="kpi-lbl">Taken per behandelaar</div>
             </div>
-            <div class="kpi-ico"><i class="ph-duotone ph-users-three"></i></div>
+            <div class="kpi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2" fill="currentColor" fill-opacity="0.18"/><path d="M3.6 19c0-3 2.4-4.9 5.4-4.9s5.4 1.9 5.4 4.9z" fill="currentColor" fill-opacity="0.18"/><path d="M16 5.3a3 3 0 010 5.5M17.6 14.4c2.1.5 3.4 2 3.4 4.6"/></svg></div>
           </div>
           <div class="kpi-persons" id="kpi-pers-rows"></div>
         </div>
@@ -3151,7 +3151,14 @@ async function fireNotifEvent(event, payload) {
 // ══════════════════════════════════════
 //  IN-APP TOASTS
 // ══════════════════════════════════════
-const TOAST_ICONS  = { n_newtask:'<i class="ph-duotone ph-clipboard-text"></i>', n_assigned:'<i class="ph-duotone ph-user-plus"></i>', n_deadline:'<i class="ph-duotone ph-alarm"></i>', n_alv:'<i class="ph-duotone ph-buildings"></i>', n_daily:'<i class="ph-duotone ph-sun"></i>', test:'<i class="ph-duotone ph-bell"></i>' };
+const TOAST_ICONS  = {
+  n_newtask:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2" fill="currentColor" fill-opacity="0.18"/><rect x="9" y="2.5" width="6" height="3.5" rx="1" fill="currentColor" fill-opacity="0.35"/><path d="M9 11h6M9 14.5h6M9 18h4"/></svg>',
+  n_assigned:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="8" r="3.4" fill="currentColor" fill-opacity="0.18"/><path d="M3.8 19c0-3.2 2.6-5.2 6.2-5.2 1.3 0 2.5.3 3.5.8" fill="currentColor" fill-opacity="0.18"/><path d="M18 14v6M15 17h6"/></svg>',
+  n_deadline:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8" fill="currentColor" fill-opacity="0.18"/><path d="M12 9v4l2.5 2"/><path d="M4.5 5.5l3-2M19.5 5.5l-3-2"/></svg>',
+  n_alv:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="8" height="13" rx="1" fill="currentColor" fill-opacity="0.18"/><rect x="11" y="4" width="10" height="17" rx="1" fill="currentColor" fill-opacity="0.18"/><path d="M2 21h20M6 12h2M6 15.5h2M15 8h2M15 11.5h2M15 15h2"/></svg>',
+  n_daily:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.5" fill="currentColor" fill-opacity="0.18"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.2 5.2l1.8 1.8M17 17l1.8 1.8M18.8 5.2L17 7M7 17l-1.8 1.8"/></svg>',
+  test:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 0112 0c0 5 2 6 2 6H4s2-1 2-6z" fill="currentColor" fill-opacity="0.18"/><path d="M10 19a2 2 0 004 0"/></svg>'
+};
 const TOAST_COLORS = { n_newtask:'var(--ac)', n_assigned:'var(--gn)', n_deadline:'var(--am)', n_alv:'var(--pu)', n_daily:'var(--am)', test:'var(--ac)' };
 const TOAST_DURATION = 5000;
 

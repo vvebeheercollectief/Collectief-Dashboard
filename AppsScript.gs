@@ -216,21 +216,13 @@ function cd_checkDeadlines() {
     [1, 4, 8, 24, 48].forEach(h => {
       if (Math.abs(hoursUntil - h) <= DEADLINE_TOLERANCE_HOURS) {
         const body = code + (naam ? ' · ' + naam : '') + ' — over ' + Math.round(hoursUntil) + ' uur';
-        // Stuur naar iedereen met deadline_h = h EN n_deadline = 1 EN behandelaar matched
+        // Stuur naar de behandelaar(s) van deze taak
         if (beh) {
           cd_splitBehandelaar(beh).forEach(name => {
-            cd_sendNotification({
-              filters: [
-                { field: 'tag', key: 'behandelaar', relation: '=', value: name },
-                { operator: 'AND' },
-                { field: 'tag', key: 'n_deadline', relation: '=', value: '1' },
-                { operator: 'AND' },
-                { field: 'tag', key: 'deadline_h', relation: '=', value: String(h) },
-              ],
+            cd_notifyByExternalId(name, 'n_deadline', '1', {
               title: '⏰ Deadline nadert',
               body: body,
-              url: APP_URL,
-              dedupKey: 'dl-' + code + '-' + h
+              url: APP_URL
             });
           });
         }
@@ -497,11 +489,9 @@ function doGet(e) {
 //  TEST FUNCTIES — kun je los runnen vanuit Apps Script editor
 // ════════════════════════════════════════════════════════════
 function cd_testPushToAll() {
-  return cd_sendNotification({
-    filters: [{ field: 'tag', key: 'n_newtask', relation: 'exists' }],
+  return cd_notifyByTag('n_deadline', '1', {
     title: '🧪 Test vanuit Apps Script',
-    body: 'Als je dit ziet, dan werkt het einde-tot-einde!',
-    dedupKey: 'test-' + Date.now()
+    body: 'Als je dit ziet, dan werkt het einde-tot-einde!'
   });
 }
 

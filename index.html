@@ -2427,6 +2427,7 @@ let _sheetIds=null;
 async function getSheetIds(){
   if(_sheetIds) return _sheetIds;
   const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}`,{headers:{Authorization:`Bearer ${oauthToken}`}});
+  if(!r.ok){ if(r.status===401){oauthToken=null;oauthExpiry=0} throw new Error('getSheetIds '+r.status); }
   const d=await r.json();
   _sheetIds={};
   (d.sheets||[]).forEach(s=>{_sheetIds[s.properties.title]=s.properties.sheetId});

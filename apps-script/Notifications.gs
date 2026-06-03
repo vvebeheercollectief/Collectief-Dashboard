@@ -1,21 +1,26 @@
 /****************************************************************
- *  Collectief Dashboard — In-app meldingen via Sheets           *
+ *  Collectief Dashboard — Push Notifications via OneSignal     *
  *  ----------------------------------------------------------- *
  *  Triggers:                                                   *
  *   - onEdit:   nieuwe taak / toewijzing / ALV-status          *
- *   - hourly:   deadline-checks                                *
+ *   - hourly:   deadline-checks (op basis van voorkeur uren)   *
  *   - 08:30:    dagelijkse samenvatting per behandelaar        *
  *                                                              *
  *  Eénmalige setup:                                            *
- *   1. Run: setupNotificationTriggers()  (van de menubalk)     *
- *   2. Geen API-keys nodig — meldingen staan in de spreadsheet *
+ *   1. Vul je OneSignal REST API key in via Script Properties: *
+ *      Extensions → Apps Script → ⚙ Project Settings →         *
+ *      Script Properties → Add: ONESIGNAL_REST_API_KEY = ...   *
+ *   2. Run: setupNotificationTriggers()  (van de menubalk)     *
+ *                                                              *
+ *  VEILIG NAAST BESTAANDE CODE:                                *
+ *   - Alle functienamen hebben prefix om conflicten te         *
+ *     voorkomen (bv. cd_onEditChange ipv onEdit)               *
+ *   - Trigger-setup raakt ALLEEN onze eigen triggers aan       *
  ****************************************************************/
 
+const ONESIGNAL_APP_ID = 'c0e1301b-2cee-4646-8fab-99698e10e78c';
 const NTD_SHEET   = 'Nog Te Doen';
 const ALVO_SHEET  = "ALV's overzicht";
-
-const MELDING_SHEET = 'Meldingen';
-const MELDING_MAX   = 200;
 
 const APP_URL = 'https://vvebeheercollectief.github.io/Collectief-Dashboard/';
 const ICON_URL = APP_URL + 'icon-192.png';
@@ -24,53 +29,25 @@ const ICON_URL = APP_URL + 'icon-192.png';
 const DEADLINE_TOLERANCE_HOURS = 1;
 
 // ════════════════════════════════════════════════════════════
-//  AUTO-PRIORITEIT CONFIG (zie spec 2026-06-02-auto-prioriteit)
-// ════════════════════════════════════════════════════════════
-const CD_PRIO_REGELS = {
-  'OPPAKKEN':          { hoog:  7, midden:  14 },
-  'VERGADERVERZOEKEN': { hoog: 14, midden:  21 },
-  'OFFERTE-TRAJECTEN': { hoog: 21, midden:  42 },
-  'LOD':               { hoog: 90, midden: 240 },
-};
-// Voor deze iteratie schrijven we alleen weg voor OPPAKKEN (kolom F = index 5).
-// Andere secties hebben (nog) geen Prioriteit-kolom in de Sheet.
-const CD_PRIO_WRITEBACK = { 'OPPAKKEN': 5 }; // 0-indexed kolompositie
-
-// ════════════════════════════════════════════════════════════
 //  SETUP
 // ════════════════════════════════════════════════════════════
-const CD_TRIGGER_FUNCS = ['cd_onEditChange', 'cd_checkDeadlines', 'cd_dailySummary', 'cd_recalcPrioriteiten'];
-
-function setupWebhookSecret() {
-  PropertiesService.getScriptProperties().setProperty('CD_WEBHOOK_SECRET', '8e0642cbd3f44f44a4711d1ec5bae0a78d17e902b29a0ef7');
-  SpreadsheetApp.getUi().alert('Webhook secret is ingesteld.');
-}
+const CD_TRIGGER_FUNCS = ['cd_onEditChange', 'cd_checkDeadlines', 'cd_dailySummary'];
 
 function setupNotificationTriggers() {
-  // Verwijder ALLEEN onze eigen triggers (laat andere triggers met rust!)
   ScriptApp.getProjectTriggers()
     .filter(t => CD_TRIGGER_FUNCS.indexOf(t.getHandlerFunction()) !== -1)
     .forEach(t => ScriptApp.deleteTrigger(t));
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  // Bij elke wijziging in de spreadsheet (nieuwe taak / toewijzing / ALV-update)
   ScriptApp.newTrigger('cd_onEditChange').forSpreadsheet(ss).onEdit().create();
-
-  // Elk uur: deadline-checks
   ScriptApp.newTrigger('cd_checkDeadlines').timeBased().everyHours(1).create();
-
-  // Dagelijks om 08:30: samenvattingen
   ScriptApp.newTrigger('cd_dailySummary').timeBased().atHour(8).nearMinute(30).everyDays(1).create();
 
-  // Dagelijks om 06:00: auto-prioriteit herberekening
-  ScriptApp.newTrigger('cd_recalcPrioriteiten').timeBased().atHour(6).everyDays(1).create();
-
-  SpreadsheetApp.getUi().alert('✓ Notificatie-triggers ingesteld!\n\n• cd_onEditChange (nieuwe taken / wijzigingen)\n• cd_checkDeadlines (elk uur)\n• cd_dailySummary (dagelijks 08:30)\n• cd_recalcPrioriteiten (dagelijks 06:00)\n\nJe bestaande triggers zijn ongemoeid gebleven.');
+  SpreadsheetApp.getUi().alert('✓ Notificatie-triggers ingesteld!\n\n• cd_onEditChange (nieuwe taken / wijzigingen)\n• cd_checkDeadlines (elk uur)\n• cd_dailySummary (dagelijks 08:30)\n\nJe bestaande triggers zijn ongemoeid gebleven.');
 }
 
 function removeNotificationTriggers() {
-  // Handig om alles in één klap weer weg te halen indien gewenst
   const before = ScriptApp.getProjectTriggers().length;
   ScriptApp.getProjectTriggers()
     .filter(t => CD_TRIGGER_FUNCS.indexOf(t.getHandlerFunction()) !== -1)
@@ -100,7 +77,6 @@ function cd_onEditChange(e) {
 }
 
 function cd_handleNtdEdit(sheet, row, e) {
-  // Vind de huidige sectie (OPPAKKEN/VERGADERVERZOEKEN/etc.) door omhoog te zoeken
   const sec = cd_findSection(sheet, row);
   if (!sec) return;
 
@@ -109,17 +85,15 @@ function cd_handleNtdEdit(sheet, row, e) {
   const naam = (rowData[1] || '').toString().trim();
   if (!code) return;
 
-  // Vind de "behandelaar" kolom — verschilt per sectie
   const behandelaarColMap = {
-    'OPPAKKEN': 5,            // E
+    'OPPAKKEN': 5,
     'VERGADERVERZOEKEN': 5,
     'OFFERTE-TRAJECTEN': 5,
     'LOD': 5,
   };
   const beh = (rowData[behandelaarColMap[sec] - 1] || '').toString().trim();
 
-  // Onderscheid: nieuwe taak (oldValue leeg, hele rij ingevuld) vs wijziging op behandelaar-kolom
-  const isNew = !e.oldValue && code; // ruwe detectie
+  const isNew = !e.oldValue && code;
   const colChanged = e.range.getColumn();
 
   if (isNew && colChanged === 1) {
@@ -130,7 +104,6 @@ function cd_handleNtdEdit(sheet, row, e) {
       url: APP_URL
     });
     if (beh) {
-      // Ook gericht naar de behandelaar(s)
       cd_splitBehandelaar(beh).forEach(name => {
         cd_notifyByExternalId(name, 'n_assigned', '1', {
           title: '➕ Toegewezen aan jou',
@@ -140,7 +113,6 @@ function cd_handleNtdEdit(sheet, row, e) {
       });
     }
   } else if (colChanged === behandelaarColMap[sec] && beh && e.oldValue !== beh) {
-    // Behandelaar veranderd → notify nieuwe behandelaar(s)
     cd_splitBehandelaar(beh).forEach(name => {
       cd_notifyByExternalId(name, 'n_assigned', '1', {
         title: '➕ Toegewezen aan jou',
@@ -163,7 +135,6 @@ function cd_handleAlvoEdit(sheet, row, e) {
   const oldVal = (e.oldValue || '').toString().toUpperCase();
   if (newVal === oldVal) return;
 
-  // Kolom C=Uitnodiging, D=Notulen, E=Begroting
   let label = null;
   if (col === 3 && newVal === 'TRUE') label = '📬 Uitnodiging verstuurd';
   else if (col === 4 && newVal === 'TRUE') label = '✅ Notulen verstuurd';
@@ -188,7 +159,6 @@ function cd_checkDeadlines() {
   let curSec = null;
   const SKEYS = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD'];
 
-  // Kolomindex voor deadline per sectie (0-indexed in de rijdata)
   const DEADLINE_COL = { 'OPPAKKEN': 3, 'VERGADERVERZOEKEN': 5, 'OFFERTE-TRAJECTEN': 5, 'LOD': 5 };
   const BEH_COL      = { 'OPPAKKEN': 4, 'VERGADERVERZOEKEN': 4, 'OFFERTE-TRAJECTEN': 4, 'LOD': 4 };
 
@@ -209,20 +179,26 @@ function cd_checkDeadlines() {
     if (!dl) continue;
 
     const hoursUntil = (dl.getTime() - now.getTime()) / 3600000;
-    if (hoursUntil < 0) continue; // al verlopen
-    if (hoursUntil > 72) continue; // verder dan 2 dagen, niet relevant
+    if (hoursUntil < 0) continue;
+    if (hoursUntil > 72) continue;
 
-    // Targets per uur-voorkeur (filter via OneSignal tags)
     [1, 4, 8, 24, 48].forEach(h => {
       if (Math.abs(hoursUntil - h) <= DEADLINE_TOLERANCE_HOURS) {
         const body = code + (naam ? ' · ' + naam : '') + ' — over ' + Math.round(hoursUntil) + ' uur';
-        // Stuur naar de behandelaar(s) van deze taak
         if (beh) {
           cd_splitBehandelaar(beh).forEach(name => {
-            cd_notifyByExternalId(name, 'n_deadline', '1', {
+            cd_sendNotification({
+              filters: [
+                { field: 'tag', key: 'behandelaar', relation: '=', value: name },
+                { operator: 'AND' },
+                { field: 'tag', key: 'n_deadline', relation: '=', value: '1' },
+                { operator: 'AND' },
+                { field: 'tag', key: 'deadline_h', relation: '=', value: String(h) },
+              ],
               title: '⏰ Deadline nadert',
               body: body,
-              url: APP_URL
+              url: APP_URL,
+              dedupKey: 'dl-' + code + '-' + h
             });
           });
         }
@@ -242,7 +218,7 @@ function cd_dailySummary() {
   const SKEYS = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD'];
   const BEH_COL = { 'OPPAKKEN': 4, 'VERGADERVERZOEKEN': 4, 'OFFERTE-TRAJECTEN': 4, 'LOD': 4 };
 
-  const perPerson = {}; // { 'Jer': { OPPAKKEN: 3, LOD: 1, ... } }
+  const perPerson = {};
   for (let i = 0; i < data.length; i++) {
     const first = (data[i][0] || '').toString().trim().toUpperCase();
     if (SKEYS.indexOf(first) !== -1) { curSec = first; continue; }
@@ -275,58 +251,6 @@ function cd_dailySummary() {
 }
 
 // ════════════════════════════════════════════════════════════
-//  TRIGGER 4: dagelijkse auto-prioriteit herberekening (06:00)
-// ════════════════════════════════════════════════════════════
-function cd_recalcPrioriteiten() {
-  const sheet = SpreadsheetApp.getActive().getSheetByName(NTD_SHEET);
-  if (!sheet) return;
-  const data = sheet.getDataRange().getValues();
-  const today = new Date();
-  today.setHours(0,0,0,0);
-  const SKEYS = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD'];
-  const DEADLINE_COL = { 'OPPAKKEN': 3, 'VERGADERVERZOEKEN': 5, 'OFFERTE-TRAJECTEN': 5, 'LOD': 5 };
-
-  let curSec = null;
-  const updates = { OPPAKKEN: 0, VERGADERVERZOEKEN: 0, 'OFFERTE-TRAJECTEN': 0, LOD: 0 };
-
-  for (let i = 0; i < data.length; i++) {
-    const first = (data[i][0] || '').toString().trim().toUpperCase();
-    if (SKEYS.indexOf(first) !== -1) { curSec = first; continue; }
-    if (!curSec || !data[i][0]) continue;
-    if ((data[i][0] + '').trim() === 'VvE Code' || (data[i][0] + '').trim() === 'VvE-Code') continue;
-    if (!(curSec in CD_PRIO_WRITEBACK)) continue;
-
-    const dlVal = data[i][DEADLINE_COL[curSec]];
-    const prioCol = CD_PRIO_WRITEBACK[curSec];
-    const huidig = (data[i][prioCol] || '').toString().trim();
-    const nieuwe = cd_berekenPrioriteit(dlVal, curSec, today);
-
-    if (nieuwe !== huidig) {
-      sheet.getRange(i + 1, prioCol + 1).setValue(nieuwe);
-      updates[curSec]++;
-    }
-  }
-
-  const totaal = Object.values(updates).reduce(function(a,b){ return a+b; }, 0);
-  Logger.log('cd_recalcPrioriteiten: ' + totaal + ' updates ' + JSON.stringify(updates));
-  const detail = 'Bijgewerkt: ' + Object.keys(updates).map(function(k){ return k + '=' + updates[k]; }).join(', ');
-  cd_schrijfLogboek('', '', 'Auto-prioriteit', '', '', detail, 'systeem');
-}
-
-function cd_berekenPrioriteit(dlVal, sec, today) {
-  if (!dlVal) return '';
-  const dl = cd_parseDate(dlVal);
-  if (!dl) return '';
-  const dlDate = new Date(dl.getFullYear(), dl.getMonth(), dl.getDate());
-  const dagenTot = Math.round((dlDate - today) / 86400000);
-  const r = CD_PRIO_REGELS[sec];
-  if (!r) return '';
-  if (dagenTot <= r.hoog) return 'Hoog';
-  if (dagenTot <= r.midden) return 'Midden';
-  return 'Laag';
-}
-
-// ════════════════════════════════════════════════════════════
 //  HELPERS
 // ════════════════════════════════════════════════════════════
 function cd_findSection(sheet, row) {
@@ -347,7 +271,6 @@ function cd_parseDate(v) {
   if (!v) return null;
   if (v instanceof Date) return v;
   const s = v.toString().trim();
-  // dd-mm-yyyy
   const m = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/);
   if (m) return new Date(+m[3], +m[2] - 1, +m[1]);
   const d = new Date(s);
@@ -355,57 +278,60 @@ function cd_parseDate(v) {
 }
 
 // ════════════════════════════════════════════════════════════
-//  IN-APP MELDINGEN — schrijf naar 'Meldingen' sheet
+//  ONESIGNAL API
 // ════════════════════════════════════════════════════════════
-
-function cd_schrijfMelding(type, titel, inhoud, voor) {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    let sheet = ss.getSheetByName(MELDING_SHEET);
-    if (!sheet) {
-      sheet = ss.insertSheet(MELDING_SHEET);
-      sheet.appendRow(['Timestamp','Type','Titel','Inhoud','Voor']);
-      sheet.setFrozenRows(1);
-    }
-    sheet.appendRow([new Date().toISOString(), type || 'algemeen', titel || '', inhoud || '', voor || 'allen']);
-    // Houd max MELDING_MAX rijen bij (excl. header)
-    const last = sheet.getLastRow();
-    if (last > MELDING_MAX + 1) sheet.deleteRows(2, last - MELDING_MAX - 1);
-  } catch(e) { Logger.log('cd_schrijfMelding fout: ' + e); }
+function cd_getApiKey() {
+  const k = PropertiesService.getScriptProperties().getProperty('ONESIGNAL_REST_API_KEY');
+  if (!k) throw new Error('ONESIGNAL_REST_API_KEY ontbreekt in Script Properties.');
+  return k;
 }
 
 function cd_notifyByTag(tagKey, tagValue, opts) {
   cd_schrijfMelding(opts.type || tagKey, opts.title, opts.body, 'allen');
+  return cd_sendNotification({
+    filters: [{ field: 'tag', key: tagKey, relation: '=', value: tagValue }],
+    title: opts.title, body: opts.body, url: opts.url, dedupKey: opts.dedupKey
+  });
 }
 
-function cd_notifyByExternalId(naam, tagKey, tagValue, opts) {
-  cd_schrijfMelding(opts.type || tagKey, opts.title, opts.body, naam);
+function cd_notifyByExternalId(extId, tagKey, tagValue, opts) {
+  cd_schrijfMelding(opts.type || tagKey, opts.title, opts.body, extId);
+  return cd_sendNotification({
+    filters: [
+      { field: 'tag', key: 'behandelaar', relation: '=', value: extId },
+      { operator: 'AND' },
+      { field: 'tag', key: tagKey, relation: '=', value: tagValue }
+    ],
+    title: opts.title, body: opts.body, url: opts.url, dedupKey: opts.dedupKey
+  });
 }
 
-// ════════════════════════════════════════════════════════════
-//  LOGBOEK — schrijf naar 'Logboek' sheet (server-side)
-// ════════════════════════════════════════════════════════════
+function cd_sendNotification(p) {
+  const payload = {
+    app_id: ONESIGNAL_APP_ID,
+    filters: p.filters,
+    headings: { en: p.title, nl: p.title },
+    contents: { en: p.body, nl: p.body },
+    chrome_web_icon: ICON_URL,
+    chrome_web_badge: ICON_URL,
+    url: p.url || APP_URL,
+  };
+  if (p.dedupKey) payload.web_push_topic = p.dedupKey;
 
-function cd_schrijfLogboek(code, sectie, actie, veld, oudeWaarde, nieuweWaarde, gebruiker) {
   try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    let sheet = ss.getSheetByName('Logboek');
-    if (!sheet) {
-      sheet = ss.insertSheet('Logboek');
-      sheet.appendRow(['Timestamp','VvE Code','Sectie','Actie','Veld','Oude Waarde','Nieuwe Waarde','Gebruiker']);
-      sheet.setFrozenRows(1);
-    }
-    sheet.appendRow([
-      new Date().toISOString(),
-      code || '',
-      sectie || '',
-      actie || '',
-      veld || '',
-      oudeWaarde || '',
-      nieuweWaarde || '',
-      gebruiker || ''
-    ]);
-  } catch(e) { Logger.log('cd_schrijfLogboek fout: ' + e); }
+    const resp = UrlFetchApp.fetch('https://api.onesignal.com/notifications', {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { 'Authorization': 'Key ' + cd_getApiKey() },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true,
+    });
+    const code = resp.getResponseCode();
+    if (code >= 300) Logger.log('OneSignal error ' + code + ': ' + resp.getContentText());
+    return JSON.parse(resp.getContentText());
+  } catch(e) {
+    Logger.log('OneSignal call faalde: ' + e);
+  }
 }
 
 // ════════════════════════════════════════════════════════════
@@ -424,7 +350,7 @@ function doPost(e) {
     const naam = (data.naam || '').toString();
     const beh  = (data.behandelaar || '').toString();
     const sec  = (data.sec || '').toString();
-    const actor = (data.actor || '').toString(); // wie heeft de actie uitgevoerd
+    const actor = (data.actor || '').toString();
 
     if (ev === 'newtask') {
       cd_notifyByTag('n_newtask', '1', {
@@ -456,7 +382,7 @@ function doPost(e) {
         });
       }
     } else if (ev === 'completed') {
-      // Niet pushen, alleen loggen — taakafronding levert geen notificatie
+      // Niet pushen, alleen loggen
     } else if (ev === 'alv_update') {
       cd_notifyByTag('n_alv', '1', {
         title: data.title || '🏢 ALV-status verandert',
@@ -471,7 +397,6 @@ function doPost(e) {
       const body  = (data.body  || 'Notificaties werken correct!').toString();
       cd_schrijfMelding('test', title, body, who || 'allen');
     } else if (ev === 'ping') {
-      // Healthcheck
       return ContentService.createTextOutput(JSON.stringify({pong: true})).setMimeType(ContentService.MimeType.JSON);
     }
 
@@ -486,12 +411,14 @@ function doGet(e) {
 }
 
 // ════════════════════════════════════════════════════════════
-//  TEST FUNCTIES — kun je los runnen vanuit Apps Script editor
+//  TEST FUNCTIES
 // ════════════════════════════════════════════════════════════
 function cd_testPushToAll() {
-  return cd_notifyByTag('n_deadline', '1', {
+  return cd_sendNotification({
+    filters: [{ field: 'tag', key: 'n_newtask', relation: 'exists' }],
     title: '🧪 Test vanuit Apps Script',
-    body: 'Als je dit ziet, dan werkt het einde-tot-einde!'
+    body: 'Als je dit ziet, dan werkt het einde-tot-einde!',
+    dedupKey: 'test-' + Date.now()
   });
 }
 
@@ -501,4 +428,7 @@ function cd_testPushToJer() {
     body: 'Alleen Jer ontvangt deze melding.',
     dedupKey: 'test-jer-' + Date.now()
   });
+}
+function setupWebhookSecret() {
+  PropertiesService.getScriptProperties().setProperty('CD_WEBHOOK_SECRET', '8e0642cbd3f44f44a4711d1ec5bae0a78d17e902b29a0ef7');
 }

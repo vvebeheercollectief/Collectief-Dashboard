@@ -434,6 +434,49 @@
     .log-note{margin-top:5px;font-size:12.5px;color:var(--txt);background:var(--am-l);border-left:3px solid var(--am);border-radius:6px;padding:7px 11px;font-style:italic}
     .log-time{font-size:11.5px;color:var(--mut);white-space:nowrap;flex-shrink:0;padding-top:3px}
     .log-empty{text-align:center;color:var(--mut);padding:40px;font-style:italic}
+
+    /* ── AI-hulp ── */
+    .ai-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+    @media(max-width:720px){.ai-grid{grid-template-columns:1fr}}
+    .ai-step{font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;margin:0 0 7px;display:flex;align-items:center;gap:7px}
+    .ai-step .dot{width:18px;height:18px;border-radius:50%;background:var(--ac);color:#fff;font-size:11px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
+    .ai-ta{width:100%;background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rs);padding:10px 12px;color:var(--txt);font-size:13px;outline:none;resize:vertical;line-height:1.55;font-family:inherit;transition:border var(--tr),box-shadow var(--tr)}
+    .ai-ta:focus{border-color:var(--ac);box-shadow:0 0 0 3px rgba(13,115,119,.14)}
+    .ai-select{width:100%;background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rs);padding:9px 12px;color:var(--txt);font-size:13px;outline:none;cursor:pointer;font-family:inherit}
+    .ai-select:focus{border-color:var(--ac)}
+    .ai-chips{display:flex;flex-wrap:wrap;gap:7px}
+    .ai-chip{border:1.5px solid var(--bor);background:var(--sur);border-radius:20px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--txt);cursor:pointer;font-family:inherit;transition:all var(--tr)}
+    .ai-chip:hover{border-color:var(--ac-b)}
+    .ai-chip.on{border-color:var(--ac);background:var(--ac-l);color:var(--ac-900)}
+    .ai-ctx{background:var(--ac-l);border:1px solid var(--ac-b);border-radius:var(--rs);padding:10px 12px;margin-top:10px;font-size:11.5px;color:var(--ac-900);display:none}
+    .ai-ctx.show{display:block}
+    .ai-ctx ul{margin:5px 0 0;padding-left:17px}
+    .ai-ctx li{margin:2px 0}
+    .ai-prompt{background:#0f1b1c;color:#cdeae9;border-radius:var(--rs);padding:12px 13px;font-size:11.5px;line-height:1.55;white-space:pre-wrap;font-family:'SF Mono',ui-monospace,monospace;max-height:240px;overflow-y:auto;border:1px solid #16302f}
+    .ai-prompt .k{color:#5EEAD4;font-weight:700}
+    .ai-prompt .empty{color:#6f8a89;font-style:italic}
+    .ai-send{display:flex;gap:8px;margin-top:11px;flex-wrap:wrap}
+    .ai-claude{background:#C96442;color:#fff}
+    .ai-gemini{background:#3a6df0;color:#fff}
+    .ai-send .btn{font-size:12.5px;padding:9px 13px}
+    .ai-result{margin-top:14px;display:flex;flex-direction:column;gap:11px}
+    .ai-rhead{font-size:11px;font-weight:700;color:var(--ac-900);text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;gap:8px}
+    .ai-rhead::after{content:'';flex:1;height:1px;background:var(--ac-b)}
+    .ai-card{border:1px solid var(--bor);border-radius:10px;overflow:hidden;background:var(--sur)}
+    .ai-card-hd{display:flex;align-items:center;gap:8px;padding:8px 12px;font-size:12px;font-weight:700;background:var(--sur2);border-bottom:1px solid var(--bor)}
+    .ai-card-hd .sp{flex:1}
+    .ai-mini{border:none;background:var(--ac-l);color:var(--ac-900);font-family:inherit;font-size:11.5px;font-weight:700;padding:5px 11px;border-radius:7px;cursor:pointer;transition:filter var(--tr)}
+    .ai-mini:hover{filter:brightness(.97)}
+    .ai-mini.plus{background:var(--ac);color:#fff}
+    .ai-card-bd{padding:11px 13px;font-size:13px;line-height:1.55;color:var(--txt)}
+    .ai-catline{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+    .ai-catpill{display:inline-flex;align-items:center;gap:5px;background:var(--ac-l);color:var(--ac-900);font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px}
+    .ai-catpill.prio{background:var(--rd-l);color:var(--rd)}
+    .ai-acts{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+    .ai-acts li{display:flex;align-items:flex-start;gap:9px;font-size:13px}
+    .ai-acts .ck{width:16px;height:16px;border-radius:5px;border:1.5px solid var(--ac-b);flex-shrink:0;margin-top:2px}
+    .ai-acts .atxt{flex:1}
+    .ai-reply{white-space:pre-wrap;font-size:13px;line-height:1.6}
   </style>
 </head>
 <body>
@@ -504,6 +547,9 @@
     <button class="ico-btn" id="notif-btn" title="Meldingen" style="position:relative">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
       <span id="notif-dot" style="display:none;position:absolute;top:6px;right:7px;width:8px;height:8px;background:var(--rd);border-radius:50%;border:2px solid var(--sur)"></span>
+    </button>
+    <button class="ico-btn" id="ai-btn" title="AI-hulp — mail plakken">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" fill="currentColor" fill-opacity="0.18"/><path d="M18.5 14.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" fill="currentColor" fill-opacity="0.18"/></svg>
     </button>
     <button class="ico-btn" id="density-btn" title="Weergave: dichtheid">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
@@ -1046,6 +1092,54 @@
   </div>
 </div>
 
+<!-- ═══════ AI-HULP ═══════ -->
+<div class="modal-bg" id="ai-bg">
+  <div class="modal" style="max-width:780px">
+    <div class="modal-hdr">
+      <h2>✦ AI-hulp</h2>
+      <button class="modal-close" id="ai-close">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12.5px;color:var(--mut);margin:0 0 14px;line-height:1.5">Plak een mail, kies wat je nodig hebt, en het dashboard bouwt de vraag mét VvE-context. Kopieer naar Claude of Gemini en plak het antwoord terug. <b>Geen kosten, jij houdt de regie.</b></p>
+
+      <div class="ai-grid">
+        <!-- LINKS -->
+        <div>
+          <p class="ai-step"><span class="dot">1</span> Plak de e-mail of tekst</p>
+          <textarea id="ai-mail" class="ai-ta" rows="6" placeholder="Plak hier de e-mail…"></textarea>
+
+          <p class="ai-step" style="margin-top:16px"><span class="dot">2</span> Wat heb je nodig?</p>
+          <div class="ai-chips" id="ai-chips">
+            <button class="ai-chip on" data-k="samenvatting">📝 Samenvatting</button>
+            <button class="ai-chip on" data-k="categorie">🏷️ Categorie &amp; VvE</button>
+            <button class="ai-chip on" data-k="acties">✅ Actiepunten</button>
+            <button class="ai-chip on" data-k="antwoord">✍️ Concept-antwoord</button>
+          </div>
+
+          <p class="ai-step" style="margin-top:16px"><span class="dot">3</span> Koppel een VvE <span style="font-weight:500;text-transform:none;letter-spacing:0;color:var(--mut)">— optioneel, geeft live context</span></p>
+          <select id="ai-vve" class="ai-select"><option value="">— Geen VvE koppelen —</option></select>
+          <div class="ai-ctx" id="ai-ctx"></div>
+        </div>
+
+        <!-- RECHTS -->
+        <div>
+          <p class="ai-step"><span class="dot">4</span> De vraag die het dashboard bouwt</p>
+          <div class="ai-prompt" id="ai-prompt"></div>
+          <div class="ai-send">
+            <button class="btn ai-claude" onclick="copyAiPrompt('Claude')">📎 Kopieer &amp; open Claude</button>
+            <button class="btn ai-gemini" onclick="copyAiPrompt('Gemini')">📎 Kopieer &amp; open Gemini</button>
+          </div>
+          <p style="font-size:11.5px;color:var(--mut);margin:9px 0 0">De vraag staat dan op je klembord — plak met <kbd>Ctrl/⌘+V</kbd>.</p>
+
+          <p class="ai-step" style="margin-top:16px"><span class="dot">5</span> Plak het antwoord van de AI terug</p>
+          <textarea id="ai-answer" class="ai-ta" rows="4" placeholder="Plak hier wat Claude/Gemini teruggeeft…"></textarea>
+          <div class="ai-result" id="ai-result" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="login-gate" style="position:fixed;inset:0;z-index:99999;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:20px">
   <div style="background:var(--sur);border:1px solid var(--bor);border-radius:16px;padding:40px 36px;box-shadow:var(--shm);text-align:center;max-width:400px;width:90%">
     <img src="logo-login.png" alt="VvE Beheer Collectief" style="width:220px;margin:0 auto 24px;display:block"/>
@@ -1173,6 +1267,15 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('refresh-btn').onclick=loadAll;
   document.getElementById('theme-btn').onclick=()=>applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
   document.getElementById('density-btn').onclick=cycleDensity;
+  document.getElementById('ai-btn').onclick=openAiHelp;
+  document.getElementById('ai-close').onclick=closeAiHelp;
+  let _aiMouseDown=null;
+  document.getElementById('ai-bg').addEventListener('mousedown',e=>{_aiMouseDown=e.target});
+  document.getElementById('ai-bg').addEventListener('click',e=>{if(e.target.id==='ai-bg'&&_aiMouseDown?.id==='ai-bg')closeAiHelp()});
+  document.getElementById('ai-chips').addEventListener('click',e=>{const b=e.target.closest('.ai-chip');if(!b)return;b.classList.toggle('on');buildAiPrompt();parseAiAnswer();});
+  document.getElementById('ai-mail').addEventListener('input',buildAiPrompt);
+  document.getElementById('ai-vve').addEventListener('change',()=>{buildAiPrompt();parseAiAnswer();});
+  document.getElementById('ai-answer').addEventListener('input',parseAiAnswer);
   document.getElementById('hamburger').onclick=()=>{document.getElementById('sb').classList.toggle('open');document.getElementById('overlay').classList.toggle('on')};
   document.getElementById('overlay').onclick=closeSb;
 
@@ -2805,6 +2908,188 @@ async function submitTask(){
   }
 }
 function gv(id){const el=document.getElementById(id);return el?el.value.trim():''}
+
+// ══════════════════════════════════════
+//  AI-HULP — plak mailtekst (slim kopieer-plak)
+// ══════════════════════════════════════
+let _aiLastCode='', _aiLastNaam='';
+
+function openAiHelp(){
+  const sel=document.getElementById('ai-vve');
+  const huidige=sel.value;
+  const opts=['<option value="">— Geen VvE koppelen —</option>'];
+  (D.alvo||[]).slice().sort((a,b)=>String(a.code||'').localeCompare(String(b.code||''))).forEach(r=>{
+    if(!r.code) return;
+    opts.push(`<option value="${esc(r.code)}">${esc(r.code)} — ${esc(r.naam||'')}</option>`);
+  });
+  sel.innerHTML=opts.join('');
+  if(huidige) sel.value=huidige;
+  document.getElementById('ai-answer').value='';
+  const res=document.getElementById('ai-result'); res.style.display='none'; res.innerHTML='';
+  document.querySelectorAll('#ai-chips .ai-chip').forEach(c=>c.classList.add('on'));
+  buildAiPrompt();
+  document.getElementById('ai-bg').classList.add('open');
+}
+function closeAiHelp(){ document.getElementById('ai-bg').classList.remove('open'); }
+
+function aiSelectedWants(){
+  return [...document.querySelectorAll('#ai-chips .ai-chip.on')].map(c=>c.dataset.k);
+}
+
+// Live context voor een VvE-code uit de huidige dashboard-data
+function aiVveContext(code){
+  if(!code) return null;
+  const c=String(code).toLowerCase();
+  let naam='', behs=new Set(), open=[];
+  SKEYS.forEach(s=>{
+    (D.ntd[s]||[]).forEach(r=>{
+      if(String(r.code||'').toLowerCase()!==c) return;
+      if(r.naam && !naam) naam=r.naam;
+      if(r.behandelaar) String(r.behandelaar).split(/[,\/]/).forEach(b=>{const t=b.trim();if(t)behs.add(t);});
+      const titel=r.actiepunt||r.agendapunten||r.status||SECS[s].label;
+      open.push(`${SECS[s].label}: ${titel}`.trim());
+    });
+  });
+  if(!naam){ const a=(D.alvo||[]).find(x=>String(x.code||'').toLowerCase()===c); if(a)naam=a.naam||''; }
+  const laatste=(D.logboek||[]).filter(r=>String(r.code||'').toLowerCase()===c).slice(0,3)
+    .map(r=>`${fmtLogTs(r.timestamp)} — ${displayName(r.gebruiker)}: ${r.actie}${r.nieuweWaarde?' ('+r.nieuweWaarde+')':''}`);
+  if(!naam && !behs.size && !open.length && !laatste.length) return null;
+  return {code, naam, beh:[...behs].join(', '), open, laatste};
+}
+
+const AI_WANT_TEKST={
+  samenvatting:'Een korte samenvatting in 2-3 zinnen.',
+  categorie:'In welke categorie dit valt (Oppakken / Vergaderverzoeken / Offerte-trajecten / LOD) en om welke VvE het gaat, met een prioriteit-inschatting (Hoog/Midden/Laag).',
+  acties:'De concrete actiepunten als bulletlijst (begin elke regel met "- ").',
+  antwoord:'Een vriendelijk, professioneel concept-antwoord namens VvE Beheer Collectief.'
+};
+const AI_KOPPEN={samenvatting:'Samenvatting:',categorie:'Categorie:',acties:'Actiepunten:',antwoord:'Concept-antwoord:'};
+
+function buildAiPrompt(){
+  const mail=(document.getElementById('ai-mail').value||'').trim();
+  const wants=aiSelectedWants();
+  const code=document.getElementById('ai-vve').value;
+  const ctxBox=document.getElementById('ai-ctx');
+  const ctx=code?aiVveContext(code):null;
+
+  if(ctx){
+    ctxBox.classList.add('show');
+    ctxBox.innerHTML=`<b>Live context — VvE ${esc(ctx.code)}${ctx.naam?' ('+esc(ctx.naam)+')':''}:</b><ul>`
+      +(ctx.beh?`<li>Behandelaar: ${esc(ctx.beh)}</li>`:'')
+      +(ctx.open.length?`<li>Open taken: ${esc(ctx.open.join('; '))}</li>`:'')
+      +(ctx.laatste.length?`<li>Laatste logboek: ${esc(ctx.laatste[0])}</li>`:'')
+      +`</ul>`;
+  } else { ctxBox.classList.remove('show'); ctxBox.innerHTML=''; }
+
+  const p=document.getElementById('ai-prompt');
+  if(!mail && !wants.length){ p.innerHTML='<span class="empty">Plak een mail en kies wat je nodig hebt — hier verschijnt dan vanzelf de vraag.</span>'; return; }
+
+  let out='<span class="k">Rol:</span> Je bent de assistent van VvE Beheer Collectief, een VvE-beheerkantoor. Antwoord in het Nederlands, zakelijk en bondig.\n\n';
+  out+='<span class="k">De binnengekomen e-mail:</span>\n"""'+esc(mail||'(nog leeg)')+'"""\n';
+  if(ctx){
+    out+='\n<span class="k">Wat wij al weten over deze VvE ('+esc(ctx.code)+(ctx.naam?' — '+esc(ctx.naam):'')+'):</span>\n';
+    if(ctx.beh) out+='- Behandelaar: '+esc(ctx.beh)+'\n';
+    if(ctx.open.length) out+='- Open taken: '+esc(ctx.open.join('; '))+'\n';
+    if(ctx.laatste.length) out+='- Laatste logboek: '+esc(ctx.laatste.join(' | '))+'\n';
+  }
+  out+='\n<span class="k">Geef mij — gebruik exact deze kopjes zodat ik het kan inlezen:</span>\n';
+  if(wants.length){
+    wants.forEach(w=>{ out+='\n'+AI_KOPPEN[w]+'\n'+AI_WANT_TEKST[w]+'\n'; });
+  } else { out+='- (kies hierboven minstens één optie)\n'; }
+  p.innerHTML=out;
+}
+
+function copyAiPrompt(waar){
+  const txt=document.getElementById('ai-prompt').innerText;
+  if(navigator.clipboard) navigator.clipboard.writeText(txt).catch(()=>{});
+  showToast('📎 Gekopieerd','Plak in '+waar+' met Ctrl/⌘+V','var(--ac)');
+  const url=waar==='Claude'?'https://claude.ai/new':'https://gemini.google.com/app';
+  try{ window.open(url,'_blank'); }catch(e){}
+}
+
+// Antwoord ontleden op de vaste kopjes
+function aiParseSections(txt){
+  const koppen=[['samenvatting','samenvatting'],['categorie','categorie'],['acties','actiepunten'],['antwoord','concept-antwoord']];
+  const res={};
+  const lines=txt.split(/\r?\n/);
+  let huidig=null, buf=[];
+  const flush=()=>{ if(huidig) res[huidig]=buf.join('\n').trim(); buf=[]; };
+  lines.forEach(line=>{
+    const m=line.match(/^\s*([^:]{2,30}?)\s*:\s*(.*)$/);
+    let key=null;
+    if(m){ const lab=m[1].toLowerCase().replace(/[\s*#_-]/g,''); koppen.forEach(([k,l])=>{ if(lab===l.replace(/[\s-]/g,'')) key=k; }); }
+    if(key){ flush(); huidig=key; if(m[2].trim()) buf.push(m[2].trim()); }
+    else if(huidig){ buf.push(line); }
+  });
+  flush();
+  return res;
+}
+
+function parseAiAnswer(){
+  const box=document.getElementById('ai-result');
+  const txt=(document.getElementById('ai-answer').value||'').trim();
+  if(!txt){ box.style.display='none'; box.innerHTML=''; return; }
+  const wants=aiSelectedWants();
+  const sec=aiParseSections(txt);
+  const code=document.getElementById('ai-vve').value;
+  const ctx=code?aiVveContext(code):null;
+  _aiLastCode=code||''; _aiLastNaam=ctx?(ctx.naam||''):'';
+
+  let html='<div class="ai-rhead">📥 Wat het dashboard eruit haalt</div>';
+  if(wants.includes('samenvatting') && sec.samenvatting){
+    html+=`<div class="ai-card"><div class="ai-card-hd">📝 Samenvatting<span class="sp"></span></div><div class="ai-card-bd">${esc(sec.samenvatting)}</div></div>`;
+  }
+  if(wants.includes('categorie') && sec.categorie){
+    const catSec=aiGisCategorie(sec.categorie);
+    html+=`<div class="ai-card"><div class="ai-card-hd">🏷️ Categorie &amp; VvE<span class="sp"></span><button class="ai-mini" onclick="aiOvernemen('${catSec}')">Overnemen</button></div><div class="ai-card-bd">${esc(sec.categorie)}</div></div>`;
+  }
+  if(wants.includes('acties') && sec.acties){
+    const items=sec.acties.split(/\r?\n/).map(s=>s.replace(/^[-*•\d.]+\s*/,'').trim()).filter(Boolean);
+    const li=items.map(a=>`<li><span class="ck"></span><span class="atxt">${esc(a)}</span><button class="ai-mini plus" onclick="aiActieTaak(this)">+ Taak</button></li>`).join('');
+    html+=`<div class="ai-card"><div class="ai-card-hd">✅ Actiepunten<span class="sp"></span></div><div class="ai-card-bd"><ul class="ai-acts">${li||'<li><span class="atxt" style="color:var(--mut)">Geen losse punten gevonden.</span></li>'}</ul></div></div>`;
+  }
+  if(wants.includes('antwoord') && sec.antwoord){
+    html+=`<div class="ai-card"><div class="ai-card-hd">✍️ Concept-antwoord<span class="sp"></span><button class="ai-mini" onclick="aiKopieerConcept(this)">Kopieer</button></div><div class="ai-card-bd"><div class="ai-reply">${esc(sec.antwoord)}</div></div></div>`;
+  }
+  const gevonden=Object.keys(sec).length;
+  if(!gevonden){ html+=`<div class="ai-card"><div class="ai-card-bd" style="color:var(--mut)">Geen herkenbare kopjes gevonden. Plak het hele antwoord van de AI (met de kopjes Samenvatting:, Categorie:, Actiepunten:, Concept-antwoord:).</div></div>`; }
+  box.innerHTML=html;
+  box.style.display='flex';
+}
+
+function aiGisCategorie(txt){
+  const t=(txt||'').toLowerCase();
+  if(t.includes('vergader')) return 'VERGADERVERZOEKEN';
+  if(t.includes('offerte')) return 'OFFERTE-TRAJECTEN';
+  if(/\blod\b/.test(t)) return 'LOD';
+  return 'OPPAKKEN';
+}
+
+function prefillNieuweTaak(sec, code, naam, actiepunt){
+  if(!SECS[sec]) sec='OPPAKKEN';
+  closeAiHelp();
+  activeNtd=sec;
+  goTo('ntd');
+  openModal(false);
+  const setIf=(id,v)=>{const el=document.getElementById(id);if(el&&v)el.value=v;};
+  setIf('m-code',code); setIf('m-naam',naam);
+  if(actiepunt){
+    if(sec==='OPPAKKEN') setIf('m-actie',actiepunt);
+    else if(sec==='VERGADERVERZOEKEN') setIf('m-agenda',actiepunt);
+    else if(sec==='OFFERTE-TRAJECTEN') setIf('m-opm-o',actiepunt);
+    else if(sec==='LOD') setIf('m-actie-l',actiepunt);
+  }
+}
+function aiOvernemen(sec){ prefillNieuweTaak(sec,_aiLastCode,_aiLastNaam,''); }
+function aiActieTaak(btn){
+  const txt=btn.closest('li').querySelector('.atxt').textContent;
+  prefillNieuweTaak('OPPAKKEN',_aiLastCode,_aiLastNaam,txt);
+}
+function aiKopieerConcept(btn){
+  const txt=btn.closest('.ai-card').querySelector('.ai-reply').innerText;
+  if(navigator.clipboard) navigator.clipboard.writeText(txt).catch(()=>{});
+  showToast('📋 Gekopieerd','Concept-antwoord klaar voor je mail','var(--gn)');
+}
 
 // ══════════════════════════════════════
 //  OAUTH

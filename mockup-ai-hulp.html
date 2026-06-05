@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup — AI-hulp (plak mailtekst)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F0F2F5;--sur:#fff;--sur2:#F7F8FA;--bor:#e2e8f0;
+    --txt:#0f172a;--mut:#64748b;
+    --r:12px;--rs:8px;--sh:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.05);
+    --am:#B45309;--am-l:#fef3c7;--pu:#6D5BD0;--pu-l:#EEEAFD;
+    --rd:#B91C1C;--rd-l:#fee2e2;--gn:#047857;--gn-l:#d1fae5;
+    --pk:#BE185D;--pk-l:#fce7f3;
+    --ac:#0D7377;--ac-l:#CCFBF1;--ac-b:#5EEAD4;--ac-900:#064E50;
+    --navy:#2B3544;
+    --tr:.15s ease;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);line-height:1.5;font-size:14px}
+  .wrap{max-width:1080px;margin:0 auto;padding:28px 20px 90px}
+  .top{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+  .logo-dot{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,var(--navy),var(--ac));flex-shrink:0}
+  h1{font-size:22px;font-weight:800;margin:0;letter-spacing:-.01em}
+  .lead{color:var(--mut);font-size:14px;margin:2px 0 26px;max-width:680px}
+  .panel{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);box-shadow:var(--sh);margin-bottom:24px;overflow:hidden}
+  .panel-hd{padding:15px 20px;border-bottom:1px solid var(--bor)}
+  .panel-hd h2{font-size:15px;font-weight:800;margin:0;display:flex;align-items:center;gap:9px}
+  .num{width:24px;height:24px;border-radius:7px;background:var(--ac-l);color:var(--ac);font-size:13px;font-weight:800;display:inline-flex;align-items:center;justify-content:center}
+  .panel-hd p{margin:6px 0 0;font-size:12.5px;color:var(--mut)}
+  .panel-bd{padding:18px 20px}
+
+  /* entry button (zoals topbar) */
+  .entry{display:inline-flex;align-items:center;gap:9px;background:var(--ac);color:#fff;border:none;font-family:inherit;font-size:13.5px;font-weight:700;padding:10px 16px;border-radius:9px;cursor:pointer;box-shadow:var(--sh);transition:filter var(--tr)}
+  .entry:hover{filter:brightness(1.08)}
+  .entry svg{width:17px;height:17px}
+
+  .step-lbl{font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;margin:0 0 7px;display:flex;align-items:center;gap:7px}
+  .step-lbl .dot{width:18px;height:18px;border-radius:50%;background:var(--ac);color:#fff;font-size:11px;font-weight:800;display:inline-flex;align-items:center;justify-content:center}
+  .ta{width:100%;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rs);padding:11px 13px;color:var(--txt);font-size:13px;outline:none;resize:vertical;line-height:1.55;font-family:inherit;transition:border var(--tr),box-shadow var(--tr)}
+  .ta:focus{border-color:var(--ac);box-shadow:0 0 0 3px rgba(13,115,119,.14)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  @media(max-width:820px){.grid{grid-template-columns:1fr}}
+  .block{margin-bottom:18px}
+
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{display:inline-flex;align-items:center;gap:7px;border:1.5px solid var(--bor);background:var(--sur);border-radius:20px;padding:7px 13px;font-size:12.5px;font-weight:600;color:var(--txt);cursor:pointer;transition:all var(--tr);user-select:none}
+  .chip:hover{border-color:var(--ac-b)}
+  .chip.on{border-color:var(--ac);background:var(--ac-l);color:var(--ac-900)}
+  .chip .tick{width:15px;height:15px;border-radius:50%;border:1.5px solid var(--bor);display:inline-flex;align-items:center;justify-content:center;font-size:10px;color:#fff}
+  .chip.on .tick{background:var(--ac);border-color:var(--ac)}
+
+  select{font-family:inherit;font-size:13px;font-weight:600;color:var(--txt);background:var(--sur);border:1px solid var(--bor);border-radius:var(--rs);padding:9px 12px;outline:none;cursor:pointer;width:100%}
+  select:focus{border-color:var(--ac)}
+
+  .ctx{background:linear-gradient(180deg,var(--ac-l),color-mix(in srgb,var(--ac-l) 25%,transparent));border:1px solid var(--ac-b);border-radius:var(--rs);padding:11px 13px;margin-top:10px;font-size:12px;color:var(--ac-900);display:none}
+  .ctx.show{display:block}
+  .ctx b{font-weight:700}
+  .ctx ul{margin:6px 0 0;padding-left:18px}
+  .ctx li{margin:2px 0}
+
+  /* prompt preview */
+  .prompt{background:#0f1b1c;color:#cdeae9;border-radius:var(--rs);padding:14px 15px;font-size:12px;line-height:1.6;white-space:pre-wrap;font-family:'SF Mono',ui-monospace,monospace;max-height:330px;overflow-y:auto;border:1px solid #16302f}
+  .prompt .k{color:#5EEAD4;font-weight:700}
+  .prompt .v{color:#fbe7a6}
+  .send-row{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+  .btn{display:inline-flex;align-items:center;gap:8px;border:none;font-family:inherit;font-size:13px;font-weight:700;padding:10px 15px;border-radius:9px;cursor:pointer;transition:filter var(--tr),background var(--tr)}
+  .btn svg{width:16px;height:16px}
+  .btn-claude{background:#C96442;color:#fff}
+  .btn-gemini{background:#3a6df0;color:#fff}
+  .btn-ghost{background:var(--sur2);color:var(--txt);border:1px solid var(--bor)}
+  .btn-pri{background:var(--ac);color:#fff}
+  .btn:hover{filter:brightness(1.07)}
+  .copy-hint{font-size:12px;color:var(--mut);margin-top:10px;display:flex;align-items:center;gap:7px}
+
+  .ret-row{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+  .empty-prompt{color:var(--mut);font-style:italic}
+
+  /* resultaat-cards na plakken */
+  .demo-paste{background:none;border:1px dashed var(--ac-b);color:var(--ac);font-family:inherit;font-size:12px;font-weight:700;padding:7px 12px;border-radius:8px;cursor:pointer;margin-top:9px;transition:background var(--tr)}
+  .demo-paste:hover{background:var(--ac-l)}
+  .result{margin-top:16px;display:flex;flex-direction:column;gap:13px}
+  .rhead{font-size:11px;font-weight:700;color:var(--ac-900);text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;gap:8px}
+  .rhead::after{content:'';flex:1;height:1px;background:var(--ac-b)}
+  .rcard{border:1px solid var(--bor);border-radius:10px;overflow:hidden;background:var(--sur)}
+  .rcard-hd{display:flex;align-items:center;gap:8px;padding:9px 13px;font-size:12px;font-weight:700;background:var(--sur2);border-bottom:1px solid var(--bor)}
+  .rcard-hd .em{font-size:14px}
+  .rcard-hd .sp{flex:1}
+  .mini{border:none;background:var(--ac-l);color:var(--ac-900);font-family:inherit;font-size:11.5px;font-weight:700;padding:5px 11px;border-radius:7px;cursor:pointer;transition:filter var(--tr)}
+  .mini:hover{filter:brightness(.97)}
+  .mini.plus{background:var(--ac);color:#fff}
+  .rcard-bd{padding:12px 14px;font-size:13px;line-height:1.55}
+  .catline{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .catpill{display:inline-flex;align-items:center;gap:6px;background:var(--ac-l);color:var(--ac-900);font-size:12px;font-weight:700;padding:4px 11px;border-radius:20px}
+  .catpill.prio{background:var(--rd-l);color:var(--rd)}
+  .acts{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+  .acts li{display:flex;align-items:flex-start;gap:10px;font-size:13px}
+  .acts .ck{width:17px;height:17px;border-radius:5px;border:1.5px solid var(--ac-b);flex-shrink:0;margin-top:2px}
+  .acts .atxt{flex:1}
+  .acts .mini{flex-shrink:0}
+  .reply{white-space:pre-wrap;font-size:13px;line-height:1.6;color:var(--txt)}
+
+  .toast-zone{position:fixed;top:18px;right:18px;display:flex;flex-direction:column;gap:8px;z-index:50}
+  .toast{background:var(--sur);border:1px solid var(--bor);border-left:4px solid var(--gn);border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.13);padding:11px 14px;display:flex;gap:10px;align-items:center;min-width:230px;animation:tin .25s ease}
+  .toast .ic{font-size:17px}.toast .tt{font-size:13px;font-weight:700}.toast .ts{font-size:12px;color:var(--mut)}
+  @keyframes tin{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:translateX(0)}}
+  .legend{font-size:12.5px;color:var(--mut);margin-top:8px;line-height:1.6;background:var(--sur2);border-radius:8px;padding:13px 15px}
+  .legend b{color:var(--txt)}
+  .flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;color:var(--mut);margin-top:4px}
+  .flow span{background:var(--sur2);border:1px solid var(--bor);border-radius:7px;padding:5px 10px;font-weight:600;color:var(--txt)}
+  .flow .arr{background:none;border:none;color:var(--ac);font-weight:800;padding:0}
+</style>
+</head>
+<body>
+<div class="toast-zone" id="toastZone"></div>
+<div class="wrap">
+  <div class="top">
+    <div class="logo-dot"></div>
+    <div><h1>AI-hulp — proefbeeld</h1></div>
+  </div>
+  <p class="lead">Plak een e-mail, kies wat je nodig hebt, en het dashboard bouwt automatisch de perfecte vraag mét VvE-context. Eén klik kopieert 'm naar Claude of Gemini; het antwoord plak je terug en maak je er direct een taak van. <b>Geen sleutels, geen kosten, jij houdt de regie.</b></p>
+
+  <div class="flow">
+    <span>📋 Mail plakken</span><span class="arr">→</span>
+    <span>✓ Kiezen wat je wilt</span><span class="arr">→</span>
+    <span>📎 Kopieer naar Claude/Gemini</span><span class="arr">→</span>
+    <span>↩ Antwoord terugplakken</span><span class="arr">→</span>
+    <span>✅ Taak of concept klaar</span>
+  </div>
+
+  <div style="margin:22px 0 6px">
+    <button class="entry" onclick="document.getElementById('demo').scrollIntoView({behavior:'smooth'})">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6l2.1 2.1m0-12.8l-2.1 2.1m-8.6 8.6l-2.1 2.1"/></svg>
+      AI-hulp openen
+    </button>
+    <span style="font-size:12px;color:var(--mut);margin-left:12px">↑ Zo'n knop komt in de bovenbalk, naast 🌙 en de dichtheid-knop.</span>
+  </div>
+
+  <div class="panel" id="demo">
+    <div class="panel-hd">
+      <h2><span class="num">✦</span> AI-hulp</h2>
+      <p>Probeer het gerust — er gaat niets naar buiten en het echte dashboard verandert niet. (Er zit een voorbeeldmail klaar.)</p>
+    </div>
+    <div class="panel-bd">
+      <div class="grid">
+        <!-- LINKS: input -->
+        <div>
+          <div class="block">
+            <p class="step-lbl"><span class="dot">1</span> Plak de e-mail of tekst</p>
+            <textarea id="mail" class="ta" rows="7" oninput="build()"></textarea>
+          </div>
+
+          <div class="block">
+            <p class="step-lbl"><span class="dot">2</span> Wat heb je nodig? (meerdere mag)</p>
+            <div class="chips" id="chips">
+              <div class="chip on" data-k="samenvatting"><span class="tick">✓</span>📝 Korte samenvatting</div>
+              <div class="chip on" data-k="categorie"><span class="tick">✓</span>🏷️ Categorie &amp; welke VvE</div>
+              <div class="chip" data-k="acties"><span class="tick">✓</span>✅ Actiepunten eruit</div>
+              <div class="chip" data-k="antwoord"><span class="tick">✓</span>✍️ Concept-antwoord</div>
+            </div>
+          </div>
+
+          <div class="block">
+            <p class="step-lbl"><span class="dot">3</span> Koppel aan een VvE <span style="font-weight:600;text-transform:none;letter-spacing:0;color:var(--mut)">— optioneel, geeft de AI live context</span></p>
+            <select id="vve" onchange="build()">
+              <option value="">— Geen VvE koppelen —</option>
+              <option value="0142">VvE 0142 — Mozartlaan 12-48</option>
+              <option value="0087">VvE 0087 — De Savornin Lohmanplein</option>
+              <option value="0203">VvE 0203 — Beethovenhof 2-22</option>
+            </select>
+            <div class="ctx" id="ctx"></div>
+          </div>
+        </div>
+
+        <!-- RECHTS: prompt + roundtrip -->
+        <div>
+          <div class="block">
+            <p class="step-lbl"><span class="dot">4</span> De vraag die het dashboard bouwt</p>
+            <div class="prompt" id="prompt"></div>
+            <div class="send-row">
+              <button class="btn btn-claude" onclick="copyPrompt('Claude')">
+                <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="9"/></svg>
+                Kopieer &amp; open Claude
+              </button>
+              <button class="btn btn-gemini" onclick="copyPrompt('Gemini')">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4z"/></svg>
+                Kopieer &amp; open Gemini
+              </button>
+            </div>
+            <div class="copy-hint">📋 De vraag staat dan op je klembord — plak 'm in de chat met <kbd>Ctrl/⌘ + V</kbd>.</div>
+          </div>
+
+          <div class="block">
+            <p class="step-lbl"><span class="dot">5</span> Plak het antwoord van de AI hier terug</p>
+            <textarea id="answer" class="ta" rows="4" placeholder="Plak hier wat Claude/Gemini teruggeeft…" oninput="parseAnswer()"></textarea>
+            <button class="demo-paste" onclick="loadSample()">▶︎ Toon voorbeeld: antwoord van Gemini plakken</button>
+
+            <!-- resultaat verschijnt hier -->
+            <div class="result" id="result" style="display:none"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="legend">
+        <b>Waarom dit fijn werkt:</b> jij hoeft niet meer na te denken over hóe je het aan de AI vraagt — het dashboard zet de mail, jouw keuzes én de bekende info over die VvE (open taken, behandelaar, recente activiteit) in één nette vraag. Je plakt 'm in de chat die je toch al gebruikt. Niets gevoeligs verlaat het dashboard automatisch; jij beslist wat je kopieert.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // voorbeeldmail
+  const SAMPLE = `Geachte heer/mevrouw,
+
+Bij ons in de Mozartlaan is er sinds gisteren een lekkage in de kelderberging onder nummer 24. Het water komt langs de muur naar binnen en er staat inmiddels een laag op de vloer. Kunnen jullie met spoed een loodgieter sturen? De bewoner van 24 is bereikbaar op 06-12345678.
+
+Met vriendelijke groet,
+J. de Vries (bewoner nr. 24)`;
+  document.getElementById('mail').value = SAMPLE;
+
+  // VvE context (live-context demo)
+  const CTX = {
+    '0142':{naam:'Mozartlaan 12-48',beh:'Jer',open:['Lekkage kelderberging (Hoog, deadline 8 jun)','Servicekosten-vraag bewoner nr. 12'],laatste:'3 jun — Jer: loodgieter gebeld, wacht op offerte'},
+    '0087':{naam:'De Savornin Lohmanplein',beh:'Gabos',open:['Klacht geluidsoverlast lift (Midden)'],laatste:'1 jun — Gabos: liftbedrijf ingelicht'},
+    '0203':{naam:'Beethovenhof 2-22',beh:'Cihad',open:['Offerte schilderwerk doorzetten (Midden)'],laatste:'2 jun — Cihad: 2 offertes ontvangen'}
+  };
+
+  const WANT = {
+    samenvatting:'- Een korte samenvatting in 2-3 zinnen.',
+    categorie:'- In welke categorie valt dit (Oppakken / Vergaderverzoek / Offerte-traject / LOD) en om welke VvE het gaat.',
+    acties:'- De concrete actiepunten als bulletlijst, met wie en hoe urgent.',
+    antwoord:'- Een vriendelijk, professioneel concept-antwoord namens VvE Beheer Collectief.'
+  };
+
+  function selectedWants(){
+    return [...document.querySelectorAll('.chip.on')].map(c=>c.dataset.k);
+  }
+  document.getElementById('chips').addEventListener('click',e=>{
+    const c=e.target.closest('.chip'); if(!c)return;
+    c.classList.toggle('on'); build();
+  });
+
+  function build(){
+    const mail = document.getElementById('mail').value.trim();
+    const wants = selectedWants();
+    const vve = document.getElementById('vve').value;
+    const ctxBox = document.getElementById('ctx');
+
+    // context-blok tonen
+    if(vve && CTX[vve]){
+      const c=CTX[vve];
+      ctxBox.classList.add('show');
+      ctxBox.innerHTML = `<b>Live context die wordt meegestuurd — VvE ${vve} (${c.naam}):</b>
+        <ul><li>Behandelaar: ${c.beh}</li>
+        <li>Open taken: ${c.open.join('; ')}</li>
+        <li>Laatste logboek: ${c.laatste}</li></ul>`;
+    } else { ctxBox.classList.remove('show'); }
+
+    // prompt opbouwen
+    const p = document.getElementById('prompt');
+    if(!mail && !wants.length){ p.innerHTML='<span class="empty-prompt">Plak een mail en kies wat je nodig hebt — hier verschijnt dan vanzelf de vraag.</span>'; return; }
+
+    let out = '<span class="k">Rol:</span> Je bent de assistent van VvE Beheer Collectief, een VvE-beheerkantoor. Antwoord in het Nederlands, zakelijk en bondig.\n\n';
+    out += '<span class="k">De binnengekomen e-mail:</span>\n<span class="v">"""' + esc(mail || '(nog leeg)') + '"""</span>\n';
+
+    if(vve && CTX[vve]){
+      const c=CTX[vve];
+      out += '\n<span class="k">Wat wij al weten over deze VvE (' + vve + ' — ' + c.naam + '):</span>\n';
+      out += '- Behandelaar: ' + c.beh + '\n';
+      out += '- Open taken: ' + c.open.join('; ') + '\n';
+      out += '- Laatste logboek: ' + c.laatste + '\n';
+    }
+
+    out += '\n<span class="k">Geef mij:</span>\n';
+    out += (wants.length ? wants.map(w=>WANT[w]).join('\n') : '- (kies hierboven minstens één optie)');
+
+    p.innerHTML = out;
+  }
+
+  function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+  function copyPrompt(waar){
+    const txt = document.getElementById('prompt').innerText;
+    if(navigator.clipboard) navigator.clipboard.writeText(txt).catch(()=>{});
+    toast('📎','Gekopieerd naar klembord', 'Open '+waar+' en plak met Ctrl/⌘+V');
+    const url = waar==='Claude' ? 'https://claude.ai/new' : 'https://gemini.google.com/app';
+    window.open(url,'_blank');
+  }
+
+  function toast(ic,tt,ts){
+    const z=document.getElementById('toastZone');
+    const t=document.createElement('div'); t.className='toast';
+    t.innerHTML=`<span class="ic">${ic}</span><div><div class="tt">${tt}</div><div class="ts">${ts}</div></div>`;
+    z.appendChild(t);
+    setTimeout(()=>{t.style.transition='opacity .3s';t.style.opacity='0';setTimeout(()=>t.remove(),300);},3500);
+  }
+
+  // ── antwoord verwerken (round-trip) ──
+  const SAMPLE_ANSWER = `Samenvatting:
+Een bewoner van Mozartlaan 24 meldt een acute lekkage in de kelderberging. Water loopt langs de muur en staat op de vloer. Verzoek om met spoed een loodgieter te sturen. Bewoner is bereikbaar op 06-12345678.
+
+Categorie: Oppakken — VvE 0142 (Mozartlaan 12-48). Prioriteit: Hoog (acute waterschade).
+
+Actiepunten:
+- Met spoed een loodgieter inschakelen voor de kelderberging onder nr. 24.
+- Bewoner nr. 24 terugbellen (06-12345678) met een verwachte aankomsttijd.
+- Schade fotograferen en vastleggen voor een mogelijke verzekeringsclaim.
+
+Concept-antwoord:
+Geachte heer De Vries,
+
+Hartelijk dank voor uw melding. Wat vervelend dat er sprake is van een lekkage in de kelderberging. Wij schakelen met spoed een loodgieter in en nemen vandaag nog telefonisch contact met u op over het tijdstip van langskomen.
+
+Met vriendelijke groet,
+VvE Beheer Collectief`;
+
+  function loadSample(){
+    // zet de chips aan die bij dit antwoord horen, zodat vraag en resultaat kloppen
+    document.querySelectorAll('.chip').forEach(c=>c.classList.add('on'));
+    if(!document.getElementById('vve').value) document.getElementById('vve').value='0142';
+    build();
+    document.getElementById('answer').value = SAMPLE_ANSWER;
+    parseAnswer();
+    document.getElementById('result').scrollIntoView({behavior:'smooth',block:'center'});
+  }
+
+  // de gestructureerde inhoud (in het echt parsen we de tekst; hier tonen we het resultaat)
+  const PARSED = {
+    samenvatting:'Een bewoner van Mozartlaan 24 meldt een acute lekkage in de kelderberging. Water loopt langs de muur en staat op de vloer. Verzoek om met spoed een loodgieter te sturen. Bewoner is bereikbaar op 06-12345678.',
+    categorie:{sec:'Oppakken', vve:'0142 — Mozartlaan 12-48', prio:'Hoog'},
+    acties:[
+      'Met spoed een loodgieter inschakelen voor de kelderberging onder nr. 24.',
+      'Bewoner nr. 24 terugbellen (06-12345678) met een verwachte aankomsttijd.',
+      'Schade fotograferen en vastleggen voor een mogelijke verzekeringsclaim.'
+    ],
+    antwoord:`Geachte heer De Vries,\n\nHartelijk dank voor uw melding. Wat vervelend dat er sprake is van een lekkage in de kelderberging. Wij schakelen met spoed een loodgieter in en nemen vandaag nog telefonisch contact met u op over het tijdstip van langskomen.\n\nMet vriendelijke groet,\nVvE Beheer Collectief`
+  };
+
+  function parseAnswer(){
+    const box=document.getElementById('result');
+    const txt=document.getElementById('answer').value.trim();
+    if(!txt){ box.style.display='none'; box.innerHTML=''; return; }
+    const wants=selectedWants();
+    let html='<div class="rhead">📥 Wat het dashboard eruit haalt</div>';
+
+    if(wants.includes('samenvatting')){
+      html+=`<div class="rcard">
+        <div class="rcard-hd"><span class="em">📝</span> Samenvatting<span class="sp"></span></div>
+        <div class="rcard-bd">${esc(PARSED.samenvatting)}</div>
+      </div>`;
+    }
+    if(wants.includes('categorie')){
+      const c=PARSED.categorie;
+      html+=`<div class="rcard">
+        <div class="rcard-hd"><span class="em">🏷️</span> Categorie &amp; VvE<span class="sp"></span><button class="mini" onclick="toast('✓','Overgenomen','Categorie en VvE ingevuld in de nieuwe taak')">Overnemen</button></div>
+        <div class="rcard-bd"><div class="catline">
+          <span class="catpill">📂 ${esc(c.sec)}</span>
+          <span class="catpill">🏠 VvE ${esc(c.vve)}</span>
+          <span class="catpill prio">⚑ Prioriteit ${esc(c.prio)}</span>
+        </div></div>
+      </div>`;
+    }
+    if(wants.includes('acties')){
+      const items=PARSED.acties.map(a=>`<li><span class="ck"></span><span class="atxt">${esc(a)}</span><button class="mini plus" onclick="toast('✅','Taak aangemaakt','${esc(a).slice(0,40)}…')">+ Taak</button></li>`).join('');
+      html+=`<div class="rcard">
+        <div class="rcard-hd"><span class="em">✅</span> Actiepunten<span class="sp"></span><button class="mini" onclick="toast('✅','3 taken aangemaakt','Alle actiepunten als taak toegevoegd')">Alles → taken</button></div>
+        <div class="rcard-bd"><ul class="acts">${items}</ul></div>
+      </div>`;
+    }
+    if(wants.includes('antwoord')){
+      html+=`<div class="rcard">
+        <div class="rcard-hd"><span class="em">✍️</span> Concept-antwoord<span class="sp"></span><button class="mini" onclick="toast('📋','Gekopieerd','Concept klaar om in je mail te plakken')">Kopieer</button></div>
+        <div class="rcard-bd"><div class="reply">${esc(PARSED.antwoord)}</div></div>
+      </div>`;
+    }
+    box.innerHTML=html;
+    box.style.display='flex';
+  }
+
+  build();
+</script>
+</body>
+</html>

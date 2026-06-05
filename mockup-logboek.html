@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup — Logboek-redesign</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F0F2F5;--sur:#fff;--sur2:#F7F8FA;--bor:#e2e8f0;
+    --txt:#0f172a;--mut:#64748b;
+    --r:12px;--rs:8px;--sh:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.05);
+    --am:#B45309;--am-l:#fef3c7;--pu:#6D5BD0;--pu-l:#EEEAFD;
+    --rd:#B91C1C;--rd-l:#fee2e2;--gn:#047857;--gn-l:#d1fae5;
+    --pk:#BE185D;--pk-l:#fce7f3;
+    --ac:#0D7377;--ac-l:#CCFBF1;--ac-b:#5EEAD4;--ac-900:#064E50;
+    --navy:#2B3544;
+    --tr:.15s ease;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);line-height:1.5;font-size:14px}
+  .wrap{max-width:1080px;margin:0 auto;padding:28px 20px 90px}
+  .top{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+  .logo-dot{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,var(--navy),var(--ac));flex-shrink:0}
+  h1{font-size:22px;font-weight:800;margin:0;letter-spacing:-.01em}
+  .lead{color:var(--mut);font-size:14px;margin:2px 0 24px;max-width:680px}
+
+  .panel{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);box-shadow:var(--sh);margin-bottom:24px;overflow:hidden}
+  .panel-hd{padding:15px 20px;border-bottom:1px solid var(--bor)}
+  .panel-hd h2{font-size:15px;font-weight:800;margin:0;display:flex;align-items:center;gap:9px}
+  .tag{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:3px 9px;border-radius:20px}
+  .tag-nu{background:#FFF7ED;color:#9a3412}
+  .tag-new{background:var(--ac-l);color:var(--ac)}
+  .panel-hd p{margin:6px 0 0;font-size:12.5px;color:var(--mut)}
+  .panel-bd{padding:18px 20px}
+
+  /* OUD: cramped tabel */
+  .old-wrap{overflow-x:auto;border:1px solid var(--bor);border-radius:var(--rs)}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  thead th{background:var(--ac-l);padding:8px 10px;text-align:left;font-size:10.5px;font-weight:700;color:var(--ac);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--ac-b);white-space:nowrap}
+  tbody tr{border-bottom:1px solid var(--bor)}
+  td{padding:7px 10px;vertical-align:middle;color:var(--txt)}
+  .code{font-family:'SF Mono',monospace;font-size:11px;font-weight:700;color:var(--ac);background:var(--ac-l);padding:2px 6px;border-radius:5px}
+  .cell-sm{font-size:11.5px;color:var(--mut);white-space:nowrap}
+  .badge{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:20px;font-size:10.5px;font-weight:700;white-space:nowrap}
+  .b-af{background:var(--gn-l);color:var(--gn)}.b-bew{background:var(--ac-l);color:var(--ac)}
+  .b-aan{background:var(--pu-l);color:var(--pu)}.b-opm{background:var(--am-l);color:var(--am)}
+
+  /* controls */
+  .controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+  .search{flex:1;min-width:200px;position:relative}
+  .search input{width:100%;border:1px solid var(--bor);border-radius:9px;padding:9px 12px 9px 34px;font-family:inherit;font-size:13px;outline:none}
+  .search input:focus{border-color:var(--ac);box-shadow:0 0 0 3px rgba(13,115,119,.12)}
+  .search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--mut)}
+  .fchips{display:flex;gap:7px;flex-wrap:wrap}
+  .fchip{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--bor);background:var(--sur);border-radius:20px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--txt);cursor:pointer;transition:all var(--tr);user-select:none}
+  .fchip:hover{border-color:var(--ac-b)}
+  .fchip.on{border-color:var(--ac);background:var(--ac-l);color:var(--ac-900)}
+  .fchip .av{width:17px;height:17px;border-radius:50%;font-size:9px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;color:#fff}
+
+  /* FEED */
+  .day{margin:18px 0 9px;font-size:11px;font-weight:800;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;position:sticky;top:0;background:var(--sur);padding:5px 0;z-index:2}
+  .day:first-child{margin-top:0}
+  .feed{display:flex;flex-direction:column}
+  .item{display:flex;gap:13px;padding:11px 12px;border-radius:10px;transition:background var(--tr);position:relative}
+  .item:hover{background:var(--sur2)}
+  .item::before{content:'';position:absolute;left:30px;top:46px;bottom:-11px;width:2px;background:var(--bor)}
+  .item:last-child::before{display:none}
+  .av{width:34px;height:34px;border-radius:50%;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff;position:relative;z-index:1}
+  .av-jer{background:var(--ac)}.av-cihad{background:var(--pu)}.av-gabos{background:var(--pk)}.av-cihan{background:var(--am)}
+  .ibody{flex:1;min-width:0}
+  .iline{font-size:13.5px;line-height:1.45}
+  .iline b{font-weight:700}
+  .iact{font-weight:700}
+  .iact.af{color:var(--gn)}.iact.bew{color:var(--ac)}.iact.aan{color:var(--pu)}.iact.opm{color:var(--am)}.iact.verw{color:var(--rd)}
+  .icode{font-family:'SF Mono',monospace;font-size:11.5px;font-weight:700;color:var(--ac);background:var(--ac-l);padding:1px 7px;border-radius:5px;white-space:nowrap}
+  .change{margin-top:5px;font-size:12px;color:var(--mut);background:var(--sur2);border:1px solid var(--bor);border-radius:7px;padding:6px 10px;display:inline-block}
+  .change .old{text-decoration:line-through;opacity:.7}
+  .change .arr{color:var(--ac);font-weight:800;margin:0 5px}
+  .change .new{color:var(--txt);font-weight:600}
+  .note{margin-top:5px;font-size:12.5px;color:var(--txt);background:var(--am-l);border-left:3px solid var(--am);border-radius:6px;padding:7px 11px;font-style:italic}
+  .itime{font-size:11.5px;color:var(--mut);white-space:nowrap;flex-shrink:0;padding-top:2px}
+  .ico{font-size:11px;margin-right:3px}
+
+  .count{font-size:12px;color:var(--mut);margin:2px 0 0;font-weight:600}
+  .legend{font-size:12.5px;color:var(--mut);margin-top:18px;line-height:1.6;background:var(--sur2);border-radius:8px;padding:13px 15px}
+  .legend b{color:var(--txt)}
+  .empty{text-align:center;color:var(--mut);padding:34px;font-style:italic}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="logo-dot"></div>
+    <div><h1>Logboek-redesign — proefbeeld</h1></div>
+  </div>
+  <p class="lead">Het logboek houdt alles vast wat er gebeurt, maar leest nu als een spreadsheet met acht kolommen. Hieronder eerst hoe het er <b>nu</b> uitziet, daaronder het <b>voorstel</b>: een rustige tijdlijn die je leest als zinnen, met snelle filters per collega en per soort actie.</p>
+
+  <!-- NU -->
+  <div class="panel">
+    <div class="panel-hd">
+      <h2><span class="tag tag-nu">Nu</span> Logboek — huidige weergave</h2>
+      <p>Acht kolommen naast elkaar; je moet horizontaal scrollen en de kolommen "lezen" om te snappen wat er gebeurde.</p>
+    </div>
+    <div class="panel-bd">
+      <div class="old-wrap">
+        <table>
+          <thead><tr>
+            <th>Tijdstip</th><th>Code</th><th>Sectie</th><th>Actie</th><th>Veld</th><th>Oude waarde</th><th>Nieuwe waarde</th><th>Gebruiker</th>
+          </tr></thead>
+          <tbody>
+            <tr><td class="cell-sm">5 jun 2026, 14:22</td><td><span class="code">0142</span></td><td class="cell-sm">Oppakken</td><td><span class="badge b-af">✓ Afgerond</span></td><td class="cell-sm">—</td><td class="cell-sm">—</td><td class="cell-sm">—</td><td class="cell-sm">Jer</td></tr>
+            <tr><td class="cell-sm">5 jun 2026, 11:05</td><td><span class="code">0203</span></td><td class="cell-sm">Offerte-trajecten</td><td><span class="badge b-bew">✎ Bewerkt</span></td><td class="cell-sm">Deadline</td><td class="cell-sm">12 jun 2026</td><td class="cell-sm">18 jun 2026</td><td class="cell-sm">Cihad</td></tr>
+            <tr><td class="cell-sm">5 jun 2026, 09:48</td><td><span class="code">0087</span></td><td class="cell-sm">Oppakken</td><td><span class="badge b-opm">💬 Opmerking</span></td><td class="cell-sm">—</td><td class="cell-sm">—</td><td class="cell-sm">Liftbedrijf gebeld, komt dinsdag langs</td><td class="cell-sm">Gabos</td></tr>
+            <tr><td class="cell-sm">4 jun 2026, 16:30</td><td><span class="code">0311</span></td><td class="cell-sm">Oppakken</td><td><span class="badge b-aan">+ Aangemaakt</span></td><td class="cell-sm">—</td><td class="cell-sm">—</td><td class="cell-sm">—</td><td class="cell-sm">Jer</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- VOORSTEL -->
+  <div class="panel">
+    <div class="panel-hd">
+      <h2><span class="tag tag-new">Voorstel</span> Logboek — activiteitentijdlijn</h2>
+      <p>Dezelfde gegevens, maar als leesbare tijdlijn. Filter met één klik op collega of soort actie, of zoek vrij. Probeer de filters gerust.</p>
+    </div>
+    <div class="panel-bd">
+      <div class="controls">
+        <div class="search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input id="q" type="text" placeholder="Zoek op VvE, woord of naam…" oninput="render()">
+        </div>
+      </div>
+      <div class="controls" style="margin-top:-6px">
+        <div class="fchips" id="who">
+          <div class="fchip on" data-who=""><span class="av" style="background:var(--navy)">∗</span>Iedereen</div>
+          <div class="fchip" data-who="Jer"><span class="av av-jer">J</span>Jer</div>
+          <div class="fchip" data-who="Cihad"><span class="av av-cihad">C</span>Cihad</div>
+          <div class="fchip" data-who="Gabos"><span class="av av-gabos">G</span>Gabos</div>
+          <div class="fchip" data-who="Cihan"><span class="av av-cihan">C</span>Cihan</div>
+        </div>
+      </div>
+      <div class="controls" style="margin-top:-6px">
+        <div class="fchips" id="act">
+          <div class="fchip on" data-act="">Alle acties</div>
+          <div class="fchip" data-act="Afgerond">✓ Afgerond</div>
+          <div class="fchip" data-act="Bewerkt">✎ Bewerkt</div>
+          <div class="fchip" data-act="Aangemaakt">+ Aangemaakt</div>
+          <div class="fchip" data-act="Opmerking">💬 Opmerkingen</div>
+        </div>
+      </div>
+      <p class="count" id="count"></p>
+
+      <div class="feed" id="feed"></div>
+
+      <div class="legend">
+        <b>Wat verandert er?</b> De data en de Google Sheet blijven exact hetzelfde — alleen de weergave wordt rustiger. In plaats van acht kolommen lees je per regel een zin: <i>wie</i> deed <i>wat</i> bij <i>welke VvE</i>, en bij wijzigingen zie je oud → nieuw in één oogopslag. De filterknoppen ("alleen Gabos", "alleen opmerkingen") zoeken sneller dan scrollen.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // dezelfde data als de "nu"-tabel, plus wat extra voor een mooiere tijdlijn
+  const LOG = [
+    {ts:'2026-06-05T14:22', dag:'Vandaag', tijd:'14:22', who:'Jer', act:'Afgerond', code:'0142', sec:'Oppakken', titel:'Lekkage kelderberging'},
+    {ts:'2026-06-05T11:05', dag:'Vandaag', tijd:'11:05', who:'Cihad', act:'Bewerkt', code:'0203', sec:'Offerte-trajecten', veld:'Deadline', oud:'12 jun 2026', nieuw:'18 jun 2026'},
+    {ts:'2026-06-05T09:48', dag:'Vandaag', tijd:'09:48', who:'Gabos', act:'Opmerking', code:'0087', sec:'Oppakken', note:'Liftbedrijf gebeld, komt dinsdag langs'},
+    {ts:'2026-06-04T16:30', dag:'Gisteren', tijd:'16:30', who:'Jer', act:'Aangemaakt', code:'0311', sec:'Oppakken', titel:'Vraag bewoner over servicekosten'},
+    {ts:'2026-06-04T13:12', dag:'Gisteren', tijd:'13:12', who:'Cihad', act:'Bewerkt', code:'0203', sec:'Offerte-trajecten', veld:'Behandelaar', oud:'Jer', nieuw:'Cihad'},
+    {ts:'2026-06-03T10:02', dag:'Woensdag 3 juni', tijd:'10:02', who:'Gabos', act:'Afgerond', code:'0098', sec:'Oppakken', titel:'Controle dakgoot'},
+    {ts:'2026-06-03T08:40', dag:'Woensdag 3 juni', tijd:'08:40', who:'Cihan', act:'Opmerking', code:'0142', sec:'Oppakken', note:'Loodgieter gebeld, wacht op offerte'},
+  ];
+
+  const ACTMAP = {
+    Afgerond:{cls:'af', ico:'✓', verb:'rondde'},
+    Bewerkt:{cls:'bew', ico:'✎', verb:'wijzigde'},
+    Aangemaakt:{cls:'aan', ico:'+', verb:'maakte'},
+    Opmerking:{cls:'opm', ico:'💬', verb:'noteerde bij'},
+  };
+  const AVCLS = {Jer:'av-jer',Cihad:'av-cihad',Gabos:'av-gabos',Cihan:'av-cihan'};
+
+  let fWho='', fAct='';
+  document.getElementById('who').addEventListener('click',e=>{const c=e.target.closest('.fchip');if(!c)return;document.querySelectorAll('#who .fchip').forEach(x=>x.classList.remove('on'));c.classList.add('on');fWho=c.dataset.who;render();});
+  document.getElementById('act').addEventListener('click',e=>{const c=e.target.closest('.fchip');if(!c)return;document.querySelectorAll('#act .fchip').forEach(x=>x.classList.remove('on'));c.classList.add('on');fAct=c.dataset.act;render();});
+
+  function sentence(r){
+    const a=ACTMAP[r.act];
+    if(r.act==='Afgerond') return `<b>${r.who}</b> <span class="iact af">rondde</span> <span class="icode">${r.code}</span> af — ${r.titel}`;
+    if(r.act==='Aangemaakt') return `<b>${r.who}</b> <span class="iact aan">maakte</span> een nieuwe taak bij <span class="icode">${r.code}</span> — ${r.titel}`;
+    if(r.act==='Bewerkt') return `<b>${r.who}</b> <span class="iact bew">wijzigde</span> ${r.veld.toLowerCase()} bij <span class="icode">${r.code}</span>`;
+    if(r.act==='Opmerking') return `<b>${r.who}</b> <span class="iact opm">noteerde</span> bij <span class="icode">${r.code}</span>`;
+    return `<b>${r.who}</b> — <span class="icode">${r.code}</span>`;
+  }
+
+  function render(){
+    const q=document.getElementById('q').value.toLowerCase();
+    const rows=LOG.filter(r=>{
+      if(fWho && r.who!==fWho) return false;
+      if(fAct && r.act!==fAct) return false;
+      if(q){
+        const blob=`${r.who} ${r.code} ${r.sec} ${r.act} ${r.veld||''} ${r.oud||''} ${r.nieuw||''} ${r.titel||''} ${r.note||''}`.toLowerCase();
+        if(!blob.includes(q)) return false;
+      }
+      return true;
+    });
+    document.getElementById('count').textContent = `${rows.length} ${rows.length===1?'gebeurtenis':'gebeurtenissen'}`;
+
+    const feed=document.getElementById('feed');
+    if(!rows.length){feed.innerHTML='<div class="empty">Niets gevonden met deze filters.</div>';return;}
+
+    let html='', lastDay='';
+    rows.forEach(r=>{
+      if(r.dag!==lastDay){ html+=`<div class="day">${r.dag}</div>`; lastDay=r.dag; }
+      let extra='';
+      if(r.act==='Bewerkt') extra=`<div class="change"><span class="old">${r.oud}</span><span class="arr">→</span><span class="new">${r.nieuw}</span></div>`;
+      if(r.act==='Opmerking') extra=`<div class="note">"${r.note}"</div>`;
+      html+=`<div class="item">
+        <span class="av ${AVCLS[r.who]||''}">${r.who[0]}</span>
+        <div class="ibody">
+          <div class="iline">${sentence(r)}</div>
+          ${extra}
+        </div>
+        <span class="itime">${r.tijd}</span>
+      </div>`;
+    });
+    feed.innerHTML=html;
+  }
+  render();
+</script>
+</body>
+</html>

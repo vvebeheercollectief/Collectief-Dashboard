@@ -406,6 +406,34 @@
     .logboek-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
     .logboek-hint{font-size:11px;color:var(--mut)}
     .logboek-hint kbd{font-family:inherit;font-size:10.5px;background:var(--sur2);border:1px solid var(--bor);border-radius:4px;padding:1px 5px;color:var(--mut)}
+
+    /* ── Logboek-tijdlijn ── */
+    .log-filters{padding:12px 16px 0;display:flex;flex-direction:column;gap:9px}
+    .lchips{display:flex;gap:7px;flex-wrap:wrap}
+    .lchip{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--bor);background:var(--sur);border-radius:20px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--txt);cursor:pointer;font-family:inherit;transition:all var(--tr)}
+    .lchip:hover{border-color:var(--ac-b)}
+    .lchip.on{border-color:var(--ac);background:var(--ac-l);color:var(--ac)}
+    .lchip .av{width:17px;height:17px;border-radius:50%;font-size:9px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;color:#fff}
+    .log-count{font-size:12px;color:var(--mut);font-weight:600;margin:11px 16px 0}
+    .log-feed{padding:6px 16px 14px;display:flex;flex-direction:column}
+    .log-day{margin:13px 0 7px;font-size:11px;font-weight:800;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;position:sticky;top:0;background:var(--sur);padding:5px 0;z-index:2}
+    .log-day:first-child{margin-top:4px}
+    .log-item{display:flex;gap:13px;padding:10px 10px;border-radius:10px;transition:background var(--tr);position:relative}
+    .log-item:hover{background:var(--sur2)}
+    .log-item::before{content:'';position:absolute;left:27px;top:44px;bottom:-10px;width:2px;background:var(--bor)}
+    .log-item:last-child::before{display:none}
+    .log-av{width:32px;height:32px;border-radius:50%;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800;color:#fff;position:relative;z-index:1}
+    .log-body{flex:1;min-width:0}
+    .log-line{font-size:13.5px;line-height:1.45;color:var(--txt)}
+    .log-line b{font-weight:700}
+    .log-act{font-weight:700}
+    .log-change{margin-top:5px;font-size:12px;color:var(--mut);background:var(--sur2);border:1px solid var(--bor);border-radius:7px;padding:6px 10px;display:inline-block}
+    .log-change .old{text-decoration:line-through;opacity:.7}
+    .log-change .arr{color:var(--ac);font-weight:800;margin:0 5px}
+    .log-change .new{color:var(--txt);font-weight:600}
+    .log-note{margin-top:5px;font-size:12.5px;color:var(--txt);background:var(--am-l);border-left:3px solid var(--am);border-radius:6px;padding:7px 11px;font-style:italic}
+    .log-time{font-size:11.5px;color:var(--mut);white-space:nowrap;flex-shrink:0;padding-top:3px}
+    .log-empty{text-align:center;color:var(--mut);padding:40px;font-style:italic}
   </style>
 </head>
 <body>
@@ -663,30 +691,28 @@
           <div class="filter-bar">
             <div class="search-box">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-              <input type="text" id="s-logboek" placeholder="Zoek…"/>
+              <input type="text" id="s-logboek" placeholder="Zoek op VvE, woord of naam…"/>
             </div>
-            <select class="filter-select" id="f-actie-logboek">
-              <option value="">Alle acties</option>
-              <option>Afgerond</option>
-              <option>Bewerkt</option>
-              <option>Aangemaakt</option>
-              <option>Verwijderd</option>
-              <option>Teruggezet</option>
-              <option>Behandelaar gewijzigd</option>
-            </select>
           </div>
         </div>
-        <div class="tbl-wrap">
-          <table>
-            <thead id="logboek-thead">
-              <tr>
-                <th>Datum/tijd</th><th>VvE Code</th><th>Sectie</th><th>Actie</th>
-                <th>Veld</th><th>Oude waarde</th><th>Nieuwe waarde</th><th>Gebruiker</th>
-              </tr>
-            </thead>
-            <tbody id="logboek-tbody"></tbody>
-          </table>
+        <div class="log-filters">
+          <div class="lchips" id="logboek-who">
+            <button class="lchip on" data-who=""><span class="av" style="background:var(--nv)">∗</span>Iedereen</button>
+            <button class="lchip" data-who="Jer"><span class="av" style="background:var(--ac)">J</span>Jer</button>
+            <button class="lchip" data-who="Cihad"><span class="av" style="background:var(--pu)">C</span>Cihad</button>
+            <button class="lchip" data-who="Gabos"><span class="av" style="background:var(--pk)">G</span>Gabos</button>
+            <button class="lchip" data-who="Cihan"><span class="av" style="background:var(--am)">C</span>Cihan</button>
+          </div>
+          <div class="lchips" id="logboek-act">
+            <button class="lchip on" data-act="">Alle acties</button>
+            <button class="lchip" data-act="Afgerond">✓ Afgerond</button>
+            <button class="lchip" data-act="Bewerkt">✎ Bewerkt</button>
+            <button class="lchip" data-act="Aangemaakt">+ Aangemaakt</button>
+            <button class="lchip" data-act="Opmerking">💬 Opmerkingen</button>
+          </div>
         </div>
+        <p class="log-count" id="logboek-count"></p>
+        <div id="logboek-feed" class="log-feed"></div>
         <div class="pag" id="logboek-pag"></div>
       </div>
     </div>
@@ -1133,7 +1159,16 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('f-prio-ntd').onchange=()=>{pgs.ntd=1;renderNtd()};
   document.getElementById('f-status-alvo').onchange=()=>{pgs.alvo=1;renderAlvo()};
   setupSearch('s-logboek',()=>{pgs.logboek=1;renderLogboek()});
-  document.getElementById('f-actie-logboek').onchange=()=>{pgs.logboek=1;renderLogboek()};
+  document.getElementById('logboek-who').addEventListener('click',e=>{
+    const b=e.target.closest('.lchip'); if(!b)return;
+    document.querySelectorAll('#logboek-who .lchip').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); logWho=b.dataset.who; pgs.logboek=1; renderLogboek();
+  });
+  document.getElementById('logboek-act').addEventListener('click',e=>{
+    const b=e.target.closest('.lchip'); if(!b)return;
+    document.querySelectorAll('#logboek-act .lchip').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); logAct=b.dataset.act; pgs.logboek=1; renderLogboek();
+  });
 
   document.getElementById('refresh-btn').onclick=loadAll;
   document.getElementById('theme-btn').onclick=()=>applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
@@ -3138,28 +3173,89 @@ function actieBadge(actie){
   return css?`<span class="badge" style="background:var(--sec-l);color:var(--sec);${css}">${ico} ${esc(actie)}</span>`:`<span class="badge">${esc(actie)}</span>`;
 }
 
+// Filterstatus voor de tijdlijn (leeg = alles)
+let logWho='', logAct='';
+
+const _LOG_AVKLEUR={Jer:'var(--ac)',Cihad:'var(--pu)',Gabos:'var(--pk)',Cihan:'var(--am)'};
+function avatarKleur(naam){ return _LOG_AVKLEUR[naam] || 'var(--nv)'; }
+
+function logDayLabel(iso){
+  const d=new Date(iso);
+  if(isNaN(d)) return 'Eerder';
+  const dag=new Date(d.getFullYear(),d.getMonth(),d.getDate());
+  const vandaag=_vandaagAmsterdam();
+  const verschil=Math.round((vandaag-dag)/86400000);
+  if(verschil===0) return 'Vandaag';
+  if(verschil===1) return 'Gisteren';
+  const s=d.toLocaleDateString('nl-NL',{weekday:'long',day:'numeric',month:'long'});
+  return s.charAt(0).toUpperCase()+s.slice(1);
+}
+
+// Natuurlijke zin per logboek-actie
+function logZin(r){
+  const naam=esc(displayName(r.gebruiker)||'Iemand');
+  const chip=`<span class="code" style="--sec:var(--ac);--sec-l:var(--ac-l)">${esc(r.code||'—')}</span>`;
+  const A=(verb,kleur)=>`<b>${naam}</b> <span class="log-act" style="color:${kleur}">${verb}</span> `;
+  switch(r.actie){
+    case'Afgerond':            return A('rondde','var(--gn)')+chip+' af';
+    case'Verwijderd':          return A('verwijderde','var(--rd)')+'een taak bij '+chip;
+    case'Teruggezet':          return A('zette','var(--am)')+chip+' terug';
+    case'Opmerking':           return A('noteerde','var(--am)')+'bij '+chip;
+    case'Behandelaar gewijzigd':return A('wees','var(--ac)')+chip+' toe';
+    case'Aangemaakt':
+    case'Aangemaakt (sheet)':  return A('maakte','var(--pu)')+'een nieuwe taak bij '+chip+(r.nieuweWaarde?` <span style="color:var(--mut)">→ ${esc(r.nieuweWaarde)}</span>`:'');
+    case'Bewerkt':             return A('bewerkte','var(--ac)')+chip+(r.veld?` <span style="color:var(--mut)">— ${esc(r.veld)}</span>`:'');
+    default:                   return `<b>${naam}</b> — ${esc(r.actie||'')} `+chip;
+  }
+}
+
+function logTijd(iso){
+  const d=new Date(iso);
+  if(isNaN(d)) return '';
+  return d.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
+}
+
 function renderLogboek(){
   const q=(document.getElementById('s-logboek')?.value||'').toLowerCase();
-  const fa=document.getElementById('f-actie-logboek')?.value||'';
   const rows=D.logboek.filter(r=>{
-    if(fa&&r.actie!==fa) return false;
+    if(logWho && displayName(r.gebruiker)!==logWho) return false;
+    if(logAct){
+      const m = r.actie===logAct || (logAct==='Aangemaakt' && (r.actie||'').indexOf('Aangemaakt')===0);
+      if(!m) return false;
+    }
     if(q&&!`${r.timestamp} ${r.code} ${r.sectie} ${r.actie} ${r.veld} ${r.oudeWaarde} ${r.nieuweWaarde} ${r.gebruiker} ${displayName(r.gebruiker)}`.toLowerCase().includes(q)) return false;
     return true;
   });
+
+  const countEl=document.getElementById('logboek-count');
+  if(countEl) countEl.textContent=`${rows.length} ${rows.length===1?'gebeurtenis':'gebeurtenissen'}`;
+
   const sl=rows.slice((pgs.logboek-1)*PG,pgs.logboek*PG);
-  const el=document.getElementById('logboek-tbody');
+  const el=document.getElementById('logboek-feed');
   if(!el) return;
-  if(!sl.length){el.innerHTML=`<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--mut)">Geen logboek-items gevonden</td></tr>`;} else {
-    el.innerHTML=sl.map(r=>`<tr>
-      <td class="cell-sm" style="white-space:nowrap">${esc(fmtLogTs(r.timestamp))}</td>
-      <td><span class="code" style="--sec:var(--ac);--sec-l:var(--ac-l)">${esc(r.code)}</span></td>
-      <td class="cell-sm">${esc(r.sectie)}</td>
-      <td>${actieBadge(r.actie)}</td>
-      <td class="cell-sm">${esc(r.veld)}</td>
-      <td class="cell-txt" style="font-size:12px">${esc(r.oudeWaarde)}</td>
-      <td class="cell-txt" style="font-size:12px">${esc(r.nieuweWaarde)}</td>
-      <td class="cell-sm">${esc(displayName(r.gebruiker))}</td>
-    </tr>`).join('');
+
+  if(!sl.length){
+    el.innerHTML=`<div class="log-empty">Niets gevonden met deze filters.</div>`;
+  } else {
+    let html='', lastDay='';
+    sl.forEach(r=>{
+      const dag=logDayLabel(r.timestamp);
+      if(dag!==lastDay){ html+=`<div class="log-day">${dag}</div>`; lastDay=dag; }
+      let extra='';
+      if((r.actie==='Behandelaar gewijzigd'||r.actie==='Bewerkt') && r.veld && (r.oudeWaarde||r.nieuweWaarde)){
+        extra=`<div class="log-change"><span class="old">${esc(r.oudeWaarde||'—')}</span><span class="arr">→</span><span class="new">${esc(r.nieuweWaarde||'—')}</span></div>`;
+      }
+      if(r.actie==='Opmerking' && r.nieuweWaarde){
+        extra=`<div class="log-note">"${esc(r.nieuweWaarde)}"</div>`;
+      }
+      const init=(displayName(r.gebruiker)||'?').charAt(0).toUpperCase();
+      html+=`<div class="log-item">
+        <span class="log-av" style="background:${avatarKleur(displayName(r.gebruiker))}">${esc(init)}</span>
+        <div class="log-body"><div class="log-line">${logZin(r)}</div>${extra}</div>
+        <span class="log-time">${esc(logTijd(r.timestamp))}</span>
+      </div>`;
+    });
+    el.innerHTML=html;
   }
   renderPag('logboek-pag',rows.length,pgs.logboek,p=>{pgs.logboek=p;renderLogboek()});
 }

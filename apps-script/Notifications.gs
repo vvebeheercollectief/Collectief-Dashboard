@@ -469,10 +469,14 @@ function cd_createTaskRow(categorie, code, naam, actiepunt, behandelaar, deadlin
   }
 
   // 3) rij invoegen (erft opmaak/checkbox-validatie van de rij erboven)
+  //    Kolommen: A=code B=naam C=actiepunt E=behandelaar (alle secties).
+  //    Deadline verschilt per sectie: OPPAKKEN→D(4), overige→F(6) — zie
+  //    DEADLINE_COL in cd_checkDeadlines.
   sheet.insertRowBefore(insertRow);
-  sheet.getRange(insertRow, 1, 1, 5).setValues([[
-    code || '', naam || '', actiepunt || '', deadline || '', behandelaar || ''
-  ]]);
+  sheet.getRange(insertRow, 1, 1, 3).setValues([[code || '', naam || '', actiepunt || '']]);
+  sheet.getRange(insertRow, 5).setValue(behandelaar || ''); // E = behandelaar
+  const deadlineCol = (sectie === 'OPPAKKEN') ? 4 : 6;      // D voor Oppakken, F voor rest
+  if (deadline) sheet.getRange(insertRow, deadlineCol).setValue(deadline);
   return insertRow;
 }
 

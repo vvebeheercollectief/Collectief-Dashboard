@@ -351,6 +351,9 @@ function doPost(e) {
     const beh  = (data.behandelaar || '').toString();
     const sec  = (data.sec || '').toString();
     const actor = (data.actor || '').toString();
+    const categorie = (data.categorie || '').toString();
+    const actiepunt = (data.actiepunt || '').toString();
+    const deadline  = (data.deadline || '').toString();
 
     if (ev === 'newtask') {
       cd_notifyByTag('n_newtask', '1', {
@@ -396,6 +399,28 @@ function doPost(e) {
       const title = (data.title || '🔔 Test melding').toString();
       const body  = (data.body  || 'Notificaties werken correct!').toString();
       cd_schrijfMelding('test', title, body, who || 'allen');
+    } else if (ev === 'create_task') {
+      const rij = cd_createTaskRow(categorie, code, naam, actiepunt, beh, deadline);
+      // zelfde melding als bij een normale nieuwe taak
+      cd_notifyByTag('n_newtask', '1', {
+        title: '📋 Nieuwe taak — ' + (categorie || '').toLowerCase(),
+        body: code + (naam ? ' · ' + naam : '') + (beh ? ' → ' + beh : ''),
+        url: APP_URL, dedupKey: 'mailnew-' + code + '-' + Date.now()
+      });
+      if (beh) {
+        cd_splitBehandelaar(beh).forEach(name => {
+          if (name && name !== actor) {
+            cd_notifyByExternalId(name, 'n_assigned', '1', {
+              title: '➕ Toegewezen aan jou',
+              body: code + (naam ? ' · ' + naam : ''),
+              url: APP_URL, dedupKey: 'mailassign-' + code + '-' + name + '-' + Date.now()
+            });
+          }
+        });
+      }
+      cd_schrijfLogboek(code, categorie, 'Aangemaakt via mail-intake', '', '', actiepunt, actor || 'mail-intake');
+      return ContentService.createTextOutput(JSON.stringify({ ok: true, event: ev, rij: rij }))
+        .setMimeType(ContentService.MimeType.JSON);
     } else if (ev === 'ping') {
       return ContentService.createTextOutput(JSON.stringify({pong: true})).setMimeType(ContentService.MimeType.JSON);
     }
@@ -408,6 +433,52 @@ function doPost(e) {
 
 function doGet(e) {
   return ContentService.createTextOutput('Collectief Dashboard webhook. Use POST.').setMimeType(ContentService.MimeType.TEXT);
+}
+
+// ════════════════════════════════════════════════════════════
+//  TAAK AANMAKEN via webhook (mail-intake motor)
+//  Kolommen "Nog Te Doen" (1-geteld): A=code B=naam C=actiepunt
+//  D=deadline E=behandelaar F=prioriteit. Data start op kop+2.
+// ════════════════════════════════════════════════════════════
+const CD_NTD_SECTIES = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD'];
+
+function cd_createTaskRow(categorie, code, naam, actiepunt, behandelaar, deadline) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(NTD_SHEET); // 'Nog Te Doen'
+  if (!sheet) throw new Error('Sheet "' + NTD_SHEET + '" niet gevonden');
+
+  const sectie = (categorie || 'OPPAKKEN').toString().trim().toUpperCase();
+  if (CD_NTD_SECTIES.indexOf(sectie) === -1) throw new Error('Onbekende categorie: ' + categorie);
+
+  // 1) vind de sectie-kop in kolom A
+  const lastRow = Math.max(sheet.getLastRow(), 1);
+  const colA = sheet.getRange(1, 1, lastRow, 1).getValues();
+  let headerRow = -1;
+  for (let i = 0; i < colA.length; i++) {
+    if ((colA[i][0] || '').toString().trim().toUpperCase() === sectie) { headerRow = i + 1; break; }
+  }
+  if (headerRow === -1) throw new Error('Sectie-kop niet gevonden: ' + sectie);
+
+  // 2) insert-positie: vanaf kop+2 tot eerste lege rij of volgende sectie-kop
+  let insertRow = headerRow + 2;
+  while (insertRow <= lastRow) {
+    const v = (sheet.getRange(insertRow, 1).getValue() || '').toString().trim().toUpperCase();
+    if (CD_NTD_SECTIES.indexOf(v) !== -1) break;          // volgende sectie
+    if (sheet.getRange(insertRow, 1).getValue() === '') break; // lege rij
+    insertRow++;
+  }
+
+  // 3) rij invoegen (erft opmaak/checkbox-validatie van de rij erboven)
+  sheet.insertRowBefore(insertRow);
+  sheet.getRange(insertRow, 1, 1, 5).setValues([[
+    code || '', naam || '', actiepunt || '', deadline || '', behandelaar || ''
+  ]]);
+  return insertRow;
+}
+
+function test_createTask() {
+  const rij = cd_createTaskRow('OPPAKKEN', 'TESTVVE', 'VvE Testlaan 1', 'TEST — taak via script', 'Cihad', '2026-06-12');
+  Logger.log('Testtaak ingevoegd op rij ' + rij + ' (handmatig verwijderen na controle)');
 }
 
 // ════════════════════════════════════════════════════════════

@@ -1196,6 +1196,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(document.getElementById('complete-bg').classList.contains('open')) return;
     if(document.getElementById('ontw-modal-bg').classList.contains('open')) return;
     if(document.getElementById('dot').classList.contains('loading')) return;
+    if(pendingWrites>0) return;
     if(!await ensureToken()) return;
     loadAll(true);
   },8000);
@@ -1294,6 +1295,31 @@ async function appendRange(range,values){
   const r=await fetch(url,{method:'POST',headers:{Authorization:`Bearer ${oauthToken}`,'Content-Type':'application/json'},body:JSON.stringify({values:[values]})});
   if(!r.ok){const e=await r.json();if(r.status===401){oauthToken=null;oauthExpiry=0}throw new Error(e.error?.message||'Schrijffout')}
   return r.json();
+}
+
+// Aantal lopende achtergrond-schrijfacties. Zolang >0 slaat de 8s-poll over,
+// zodat een optimistische wijziging niet kort teruggedraaid wordt.
+let pendingWrites=0;
+// Voert een Sheets-schrijfactie op de achtergrond uit. De UI is al optimistisch
+// bijgewerkt door de aanroeper. Bij fout draait `rollback` de lokale wijziging terug.
+async function backgroundWrite(writeFn, rollback, foutTitel){
+  pendingWrites++;
+  try{
+    await writeFn();
+  }catch(e){
+    try{ rollback(); renderAll(); }catch(_){}
+    const msg=(e.message||'').toLowerCase();
+    if(msg.includes('authentication')||msg.includes('unauthenticated')||msg.includes('unauthorized')){
+      oauthToken=null;oauthExpiry=0;
+      showToast(foutTitel,'Sessie verlopen — wijziging teruggezet. Probeer opnieuw.','#dc2626');
+    }else{
+      showToast(foutTitel,'Niet opgeslagen — wijziging teruggezet.','#dc2626');
+    }
+    console.error(foutTitel,e);
+  }finally{
+    pendingWrites--;
+    if(pendingWrites===0){ loadAll(true); } // stille resync van rij-indexen
+  }
 }
 
 function setSyncing(){dot('loading');document.getElementById('sync-lbl').textContent='Laden…'}

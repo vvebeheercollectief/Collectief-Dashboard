@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup — Snelle UX-winst</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F0F2F5;--sur:#fff;--sur2:#F7F8FA;--bor:#e2e8f0;
+    --txt:#0f172a;--mut:#64748b;--fnt:#94a3b8;
+    --r:12px;--rs:8px;--sh:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.05);
+    --am:#B45309;--am-l:#fef3c7;--pu:#6D5BD0;--pu-l:#EEEAFD;
+    --rd:#B91C1C;--rd-l:#fee2e2;--gn:#047857;--gn-l:#d1fae5;
+    --pk:#BE185D;--pk-l:#fce7f3;
+    --ac:#0D7377;--ac-l:#CCFBF1;--ac-b:#5EEAD4;
+    --navy:#2B3544;
+    --tr:.15s ease;
+    /* density vars (overschreven door JS) */
+    --row-py:9px; --row-px:13px; --row-fs:13px; --row-lh:1.4;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);line-height:1.5;font-size:14px}
+  .wrap{max-width:1100px;margin:0 auto;padding:28px 20px 80px}
+  .top{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+  .logo-dot{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,var(--navy),var(--ac));flex-shrink:0}
+  h1{font-size:22px;font-weight:700;margin:0;letter-spacing:-.01em}
+  .lead{color:var(--mut);font-size:14px;margin:2px 0 26px;max-width:620px}
+  .panel{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);box-shadow:var(--sh);margin-bottom:26px;overflow:hidden}
+  .panel-hd{padding:16px 20px;border-bottom:1px solid var(--bor);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+  .panel-hd h2{font-size:15px;font-weight:700;margin:0;display:flex;align-items:center;gap:9px}
+  .num{width:24px;height:24px;border-radius:7px;background:var(--ac-l);color:var(--ac);font-size:13px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+  .panel-hd p{margin:4px 0 0;font-size:12.5px;color:var(--mut);width:100%}
+  .panel-bd{padding:18px 20px}
+
+  /* segmented control */
+  .seg{display:inline-flex;background:var(--sur2);border:1px solid var(--bor);border-radius:9px;padding:3px;gap:2px}
+  .seg button{border:none;background:transparent;font-family:inherit;font-size:13px;font-weight:600;color:var(--mut);padding:6px 14px;border-radius:7px;cursor:pointer;transition:all var(--tr)}
+  .seg button.on{background:var(--ac);color:#fff;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+  .ctrl-row{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:16px}
+  .ctrl-row .lbl{font-size:12px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.05em}
+  .switch{display:inline-flex;align-items:center;gap:8px;cursor:pointer;user-select:none;font-size:13px;font-weight:600;color:var(--txt)}
+  .switch input{display:none}
+  .track{width:38px;height:22px;border-radius:20px;background:var(--bor);position:relative;transition:background var(--tr)}
+  .track::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:transform var(--tr)}
+  .switch input:checked + .track{background:var(--ac)}
+  .switch input:checked + .track::after{transform:translateX(16px)}
+
+  /* table — kopie van het echte dashboard */
+  .tbl-wrap{overflow-x:auto;border:1px solid var(--bor);border-radius:var(--rs)}
+  table{width:100%;border-collapse:collapse;font-size:var(--row-fs)}
+  thead th{background:var(--ac-l);padding:9px 13px;text-align:left;font-size:11px;font-weight:700;color:var(--ac);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--ac-b);white-space:nowrap}
+  tbody tr{border-bottom:1px solid var(--bor);transition:background var(--tr),opacity .3s ease,transform .3s ease}
+  tbody tr:last-child{border-bottom:none}
+  tbody tr:hover{background:var(--sur2)}
+  td{padding:var(--row-py) var(--row-px);vertical-align:middle;line-height:var(--row-lh)}
+  body.zebra tbody tr:nth-child(even){background:#FBFCFD}
+  body.softlines tbody tr{border-bottom-color:#eef1f4}
+  .code{font-family:'SF Mono',monospace;font-size:12px;font-weight:700;color:var(--ac);background:var(--ac-l);padding:3px 8px;border-radius:6px;white-space:nowrap}
+  .cell-name{font-weight:500;max-width:200px}
+  .cell-txt{color:var(--mut);max-width:260px;font-size:calc(var(--row-fs) - .5px)}
+  .cell-sm{font-size:12px;color:var(--mut);white-space:nowrap}
+  .badge{display:inline-flex;align-items:center;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap}
+  .prio-hoog{background:var(--rd-l);color:var(--rd)}
+  .prio-mid{background:var(--am-l);color:var(--am)}
+  .prio-laag{background:var(--gn-l);color:var(--gn)}
+  .pill-telaat{display:inline-block;background:#dc2626;color:#fff;font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;margin-left:6px}
+  .row-telaat td{background:rgba(220,38,38,0.06)}
+  .row-telaat td:first-child{box-shadow:inset 3px 0 0 #dc2626}
+  .pers{padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;display:inline-flex}
+  .pers-jer{background:var(--ac-l);color:var(--ac)}
+  .pers-cihad{background:var(--pu-l);color:var(--pu)}
+  .pers-gabos{background:var(--pk-l);color:var(--pk)}
+  .btn-x{border:none;background:var(--sur2);color:var(--mut);border-radius:6px;width:26px;height:26px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all var(--tr)}
+  .btn-x:hover{background:var(--gn-l);color:var(--gn)}
+  tbody tr.leaving{opacity:0;transform:translateX(40px)}
+  .hint{font-size:12.5px;color:var(--mut);margin-top:12px;display:flex;align-items:center;gap:7px}
+  .hint::before{content:'👆';font-size:14px}
+
+  /* speed demo */
+  .speed-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:760px){.speed-grid{grid-template-columns:1fr}}
+  .demo{border:1px solid var(--bor);border-radius:var(--rs);overflow:hidden}
+  .demo-hd{padding:11px 15px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px}
+  .demo.nu .demo-hd{background:#FFF7ED;color:#9a3412}
+  .demo.nieuw .demo-hd{background:var(--ac-l);color:var(--ac)}
+  .demo-bd{padding:15px}
+  .task-card{background:var(--sur2);border:1px solid var(--bor);border-radius:8px;padding:11px 13px;display:flex;align-items:center;gap:11px;transition:opacity .35s ease,transform .35s ease}
+  .task-card.gone{opacity:0;transform:translateX(40px)}
+  .task-card .tc-main{flex:1;min-width:0}
+  .task-card .tc-t{font-size:13px;font-weight:600}
+  .task-card .tc-s{font-size:12px;color:var(--mut);margin-top:1px}
+  .do-btn{border:none;background:var(--ac);color:#fff;font-family:inherit;font-size:12.5px;font-weight:700;padding:7px 13px;border-radius:7px;cursor:pointer;white-space:nowrap;transition:filter var(--tr)}
+  .do-btn:hover{filter:brightness(1.08)}
+  .do-btn:disabled{opacity:.6;cursor:default}
+  .overlay-load{position:relative}
+  .spin{display:inline-block;width:15px;height:15px;border:2px solid var(--ac-l);border-top-color:var(--ac);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-2px;margin-right:6px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .status-line{font-size:12px;margin-top:11px;min-height:18px;color:var(--mut);font-weight:600}
+  .reset{margin-top:10px;background:none;border:none;color:var(--ac);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;padding:0}
+  .toast-zone{position:fixed;top:18px;right:18px;display:flex;flex-direction:column;gap:8px;z-index:50}
+  .toast{background:var(--sur);border:1px solid var(--bor);border-left:4px solid var(--gn);border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.13);padding:11px 14px;display:flex;gap:10px;align-items:center;min-width:230px;animation:tin .25s ease}
+  .toast .ic{font-size:17px}
+  .toast .tt{font-size:13px;font-weight:600}
+  .toast .ts{font-size:12px;color:var(--mut)}
+  .toast .undo{margin-left:auto;background:var(--gn);color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:11.5px;font-weight:700;padding:4px 10px;cursor:pointer}
+  @keyframes tin{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:translateX(0)}}
+  .legend{font-size:12.5px;color:var(--mut);margin-top:14px;line-height:1.6;background:var(--sur2);border-radius:8px;padding:12px 15px}
+  .legend b{color:var(--txt)}
+  .pickrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+  .pick{flex:1;min-width:200px;border:2px solid var(--bor);border-radius:10px;padding:14px;cursor:pointer;transition:all var(--tr);background:var(--sur)}
+  .pick:hover{border-color:var(--ac-b);background:var(--ac-l)}
+  .pick.sel{border-color:var(--ac);background:var(--ac-l)}
+  .pick h4{margin:0 0 4px;font-size:13.5px;font-weight:700}
+  .pick p{margin:0;font-size:12px;color:var(--mut)}
+</style>
+</head>
+<body class="softlines">
+<div class="toast-zone" id="toastZone"></div>
+<div class="wrap">
+  <div class="top">
+    <div class="logo-dot"></div>
+    <div>
+      <h1>Snelle UX-winst — proefbeeld</h1>
+    </div>
+  </div>
+  <p class="lead">Dit is een losstaand voorbeeld in jullie echte huisstijl. Klik gerust overal op — er verandert niets aan het echte dashboard. Hieronder zie je de twee kernverbeteringen waar je iets van moet vínden.</p>
+
+  <!-- 1. RUSTIGER OVERZICHT -->
+  <div class="panel">
+    <div class="panel-hd">
+      <h2><span class="num">1</span> Rustiger overzicht — kies een dichtheid</h2>
+      <p>Dezelfde takenlijst (Oppakken). Schuif tussen de standen en kijk welke voor jullie het prettigst leest.</p>
+    </div>
+    <div class="panel-bd">
+      <div class="ctrl-row">
+        <span class="lbl">Dichtheid</span>
+        <div class="seg" id="densitySeg">
+          <button data-d="compact">Compact</button>
+          <button data-d="standaard" class="on">Standaard&nbsp;(nu)</button>
+          <button data-d="ruim">Ruim</button>
+        </div>
+        <label class="switch"><input type="checkbox" id="zebra"><span class="track"></span>Zebra-strepen</label>
+        <label class="switch"><input type="checkbox" id="soft" checked><span class="track"></span>Zachtere lijnen</label>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th>Code</th><th>VvE</th><th>Actiepunt</th><th>Deadline</th><th>Behandelaar</th><th>Prioriteit</th><th></th>
+          </tr></thead>
+          <tbody id="demoBody"></tbody>
+        </table>
+      </div>
+      <div class="hint">Tip: zet 'm op <b>&nbsp;Ruim&nbsp;</b> voor meer lucht, of <b>&nbsp;Compact&nbsp;</b> om meer taken tegelijk te zien zonder scrollen.</div>
+    </div>
+  </div>
+
+  <!-- 2. VOELT SNELLER -->
+  <div class="panel">
+    <div class="panel-hd">
+      <h2><span class="num">2</span> Voelt sneller — afronden &amp; opslaan</h2>
+      <p>Links: zoals het nú gaat (wachten tot alles opnieuw geladen is). Rechts: het voorstel (meteen weg, op de achtergrond opgeslagen, met "ongedaan maken").</p>
+    </div>
+    <div class="panel-bd">
+      <div class="speed-grid">
+        <div class="demo nu">
+          <div class="demo-hd">🐢 Zoals het nu gaat</div>
+          <div class="demo-bd">
+            <div class="task-card" id="cardNu">
+              <div class="tc-main">
+                <div class="tc-t">Lekkage kelderberging</div>
+                <div class="tc-s">VvE 0142 · Mozartlaan</div>
+              </div>
+              <button class="do-btn" id="btnNu" onclick="doNu()">Afronden</button>
+            </div>
+            <div class="status-line" id="statusNu"></div>
+            <button class="reset" onclick="resetNu()" style="display:none" id="resetNu">↺ Opnieuw proberen</button>
+          </div>
+        </div>
+        <div class="demo nieuw">
+          <div class="demo-hd">⚡ Voorstel</div>
+          <div class="demo-bd">
+            <div class="task-card" id="cardNieuw">
+              <div class="tc-main">
+                <div class="tc-t">Lekkage kelderberging</div>
+                <div class="tc-s">VvE 0142 · Mozartlaan</div>
+              </div>
+              <button class="do-btn" id="btnNieuw" onclick="doNieuw()">Afronden</button>
+            </div>
+            <div class="status-line" id="statusNieuw"></div>
+            <button class="reset" onclick="resetNieuw()" style="display:none" id="resetNieuw">↺ Opnieuw proberen</button>
+          </div>
+        </div>
+      </div>
+      <div class="legend">
+        <b>Wat is het verschil?</b> Technisch verandert het opslaan niet — de taak komt nét zo veilig in Google Sheets. Het verschil is wíé er wacht: nu wacht <b>jij</b> op het scherm, in het voorstel werk je gewoon door en regelt het dashboard het op de achtergrond. Gaat er iets mis, dan krijg je een melding en komt de taak terug.
+      </div>
+    </div>
+  </div>
+
+  <!-- KEUZE -->
+  <div class="panel">
+    <div class="panel-hd">
+      <h2><span class="num">3</span> Welke dichtheid heeft jouw voorkeur?</h2>
+      <p>Klik je voorkeur aan (puur om te onthouden — je kunt het straks in het echte dashboard altijd nog wisselen).</p>
+    </div>
+    <div class="panel-bd">
+      <div class="pickrow" id="pickrow">
+        <div class="pick" data-p="Compact"><h4>Compact</h4><p>Strak, veel taken in beeld, weinig scrollen.</p></div>
+        <div class="pick sel" data-p="Standaard"><h4>Standaard</h4><p>Zoals nu — vertrouwd en rustig.</p></div>
+        <div class="pick" data-p="Ruim"><h4>Ruim</h4><p>Veel lucht, prettig lezen, minder druk.</p></div>
+        <div class="pick" data-p="Instelbaar"><h4>Per persoon instelbaar</h4><p>Ieder teamlid kiest zelf z'n stand.</p></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── data voor de tabel ──
+  const ROWS = [
+    {code:'0142',naam:'Mozartlaan 12-48',actie:'Lekkage kelderberging verhelpen',dl:'8 jun 2026',telaat:true,laatdg:2,beh:'jer',behN:'Jer',prio:'hoog'},
+    {code:'0087',naam:'De Savornin Lohmanplein',actie:'Klacht geluidsoverlast lift',dl:'12 jun 2026',telaat:false,beh:'gabos',behN:'Gabos',prio:'mid'},
+    {code:'0203',naam:'Beethovenhof 2-22',actie:'Offerte schilderwerk doorzetten',dl:'18 jun 2026',telaat:false,beh:'cihad',behN:'Cihad',prio:'mid'},
+    {code:'0311',naam:'Vivaldistraat 5',actie:'Vraag bewoner over servicekosten',dl:'25 jun 2026',telaat:false,beh:'jer',behN:'Jer',prio:'laag'},
+    {code:'0098',naam:'Chopinrode 14-30',actie:'Controle dakgoot inplannen',dl:'2 jul 2026',telaat:false,beh:'gabos',behN:'Gabos',prio:'laag'},
+  ];
+  const prioMap={hoog:['prio-hoog','Hoog'],mid:['prio-mid','Midden'],laag:['prio-laag','Laag']};
+  function renderTable(){
+    document.getElementById('demoBody').innerHTML = ROWS.map((r,i)=>{
+      const [pc,pl]=prioMap[r.prio];
+      const late = r.telaat?`<span class="pill-telaat">Te laat (${r.laatdg}d)</span>`:'';
+      return `<tr class="${r.telaat?'row-telaat':''}">
+        <td><span class="code">${r.code}</span></td>
+        <td class="cell-name">${r.naam}</td>
+        <td class="cell-txt">${r.actie}</td>
+        <td class="cell-sm">${r.dl} ${late}</td>
+        <td><span class="pers pers-${r.beh}">${r.behN}</span></td>
+        <td><span class="badge ${pc}">${pl}</span></td>
+        <td><button class="btn-x" title="Afgehandeld" onclick="removeDemoRow(this)">✓</button></td>
+      </tr>`;
+    }).join('');
+  }
+  renderTable();
+  function removeDemoRow(btn){
+    const tr=btn.closest('tr'); tr.classList.add('leaving');
+    setTimeout(()=>{ tr.remove(); if(!document.querySelectorAll('#demoBody tr').length){renderTable();} },330);
+  }
+
+  // ── dichtheid ──
+  const DENS={compact:['5px','13px','12.5px','1.3'],standaard:['9px','13px','13px','1.4'],ruim:['14px','16px','14px','1.6']};
+  document.getElementById('densitySeg').addEventListener('click',e=>{
+    const b=e.target.closest('button'); if(!b)return;
+    document.querySelectorAll('#densitySeg button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on');
+    const [py,px,fs,lh]=DENS[b.dataset.d];
+    const s=document.documentElement.style;
+    s.setProperty('--row-py',py);s.setProperty('--row-px',px);s.setProperty('--row-fs',fs);s.setProperty('--row-lh',lh);
+  });
+  document.getElementById('zebra').addEventListener('change',e=>document.body.classList.toggle('zebra',e.target.checked));
+  document.getElementById('soft').addEventListener('change',e=>document.body.classList.toggle('softlines',e.target.checked));
+
+  // ── speed demo: NU ──
+  function doNu(){
+    const btn=document.getElementById('btnNu'), st=document.getElementById('statusNu');
+    btn.disabled=true; btn.innerHTML='<span class="spin"></span>Bezig…';
+    st.textContent='Even wachten — alles wordt opnieuw geladen…';
+    setTimeout(()=>{
+      document.getElementById('cardNu').classList.add('gone');
+      st.textContent='✓ Klaar. (Je wachtte ~1,5 sec op het scherm.)';
+      document.getElementById('resetNu').style.display='inline';
+    },1500);
+  }
+  function resetNu(){
+    document.getElementById('cardNu').classList.remove('gone');
+    document.getElementById('btnNu').disabled=false;
+    document.getElementById('btnNu').textContent='Afronden';
+    document.getElementById('statusNu').textContent='';
+    document.getElementById('resetNu').style.display='none';
+  }
+  // ── speed demo: NIEUW ──
+  function doNieuw(){
+    document.getElementById('cardNieuw').classList.add('gone');
+    document.getElementById('statusNieuw').textContent='✓ Direct weg. Opslaan gebeurt op de achtergrond.';
+    document.getElementById('resetNieuw').style.display='inline';
+    showToast();
+  }
+  function resetNieuw(){
+    document.getElementById('cardNieuw').classList.remove('gone');
+    document.getElementById('statusNieuw').textContent='';
+    document.getElementById('resetNieuw').style.display='none';
+  }
+  function showToast(){
+    const z=document.getElementById('toastZone');
+    const t=document.createElement('div'); t.className='toast';
+    t.innerHTML='<span class="ic">✅</span><div><div class="tt">Taak afgerond</div><div class="ts">Lekkage kelderberging</div></div><button class="undo" onclick="undoToast(this)">Ongedaan</button>';
+    z.appendChild(t);
+    setTimeout(()=>{ if(t.parentNode){t.style.transition="opacity .3s";t.style.opacity="0";setTimeout(()=>t.remove(),300);} },4000);
+  }
+  function undoToast(b){ resetNieuw(); b.closest('.toast').remove(); }
+
+  // ── voorkeur ──
+  document.getElementById('pickrow').addEventListener('click',e=>{
+    const p=e.target.closest('.pick'); if(!p)return;
+    document.querySelectorAll('.pick').forEach(x=>x.classList.remove('sel'));
+    p.classList.add('sel');
+  });
+</script>
+</body>
+</html>

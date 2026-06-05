@@ -150,11 +150,17 @@
     tbody tr{border-bottom:1px solid var(--bor);transition:background var(--tr)}
     tbody tr:last-child{border-bottom:none}
     tbody tr:hover{background:var(--sur2)}
-    td{padding:9px 13px;vertical-align:middle}
+    td{padding:var(--row-py,9px) var(--row-px,13px);vertical-align:middle;font-size:var(--row-fs,13px);line-height:var(--row-lh,1.4)}
     .code{font-family:'SF Mono','Fira Code',monospace;font-size:12px;font-weight:700;color:var(--sec,var(--ac));background:var(--sec-l,var(--ac-l));padding:3px 8px;border-radius:6px;white-space:nowrap}
-    .cell-name{font-weight:500;max-width:200px;line-height:1.4}
-    .cell-txt{color:var(--mut);max-width:240px;line-height:1.4;font-size:12.5px}
+    .cell-name{font-weight:500;max-width:200px;line-height:var(--row-lh,1.4)}
+    .cell-txt{color:var(--mut);max-width:240px;line-height:var(--row-lh,1.4);font-size:calc(var(--row-fs,13px) - .5px)}
     .cell-sm{font-size:12px;color:var(--mut);white-space:nowrap}
+    /* Dichtheid (per collega, onthouden in localStorage) */
+    html[data-density="compact"]{--row-py:5px;--row-px:13px;--row-fs:12.5px;--row-lh:1.3}
+    html[data-density="standaard"]{--row-py:9px;--row-px:13px;--row-fs:13px;--row-lh:1.4}
+    html[data-density="ruim"]{--row-py:14px;--row-px:16px;--row-fs:14px;--row-lh:1.6}
+    /* Zachtere scheidingslijnen voor iedereen */
+    tbody tr{border-bottom-color:color-mix(in srgb,var(--bor) 60%,transparent)}
 
     /* Badges */
     .badge{display:inline-flex;align-items:center;gap:3px;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap}
@@ -470,6 +476,9 @@
     <button class="ico-btn" id="notif-btn" title="Meldingen" style="position:relative">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
       <span id="notif-dot" style="display:none;position:absolute;top:6px;right:7px;width:8px;height:8px;background:var(--rd);border-radius:50%;border:2px solid var(--sur)"></span>
+    </button>
+    <button class="ico-btn" id="density-btn" title="Weergave: dichtheid">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
     </button>
     <button class="ico-btn" id="theme-btn">
       <svg id="ico-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
@@ -1110,6 +1119,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   }
 
   if(localStorage.getItem('theme')==='dark') applyTheme('dark');
+  applyDensity(localStorage.getItem('density')||'standaard');
 
   document.querySelectorAll('.ni[data-page]').forEach(el=>
     el.addEventListener('click',()=>goTo(el.dataset.page)));
@@ -1127,6 +1137,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 
   document.getElementById('refresh-btn').onclick=loadAll;
   document.getElementById('theme-btn').onclick=()=>applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
+  document.getElementById('density-btn').onclick=cycleDensity;
   document.getElementById('hamburger').onclick=()=>{document.getElementById('sb').classList.toggle('open');document.getElementById('overlay').classList.toggle('on')};
   document.getElementById('overlay').onclick=closeSb;
 
@@ -1239,6 +1250,22 @@ function applyTheme(t){
   charts={};
   if(document.getElementById('page-analytics').classList.contains('active')) buildAnalytics();
   if(document.getElementById('page-dash').classList.contains('active')) buildDash();
+}
+
+// ══════════════════════════════════════
+//  DICHTHEID (per collega, onthouden in localStorage)
+// ══════════════════════════════════════
+const DENSITIES=['standaard','compact','ruim'];
+function applyDensity(d){
+  if(!DENSITIES.includes(d)) d='standaard';
+  document.documentElement.dataset.density=d;
+  localStorage.setItem('density',d);
+}
+function cycleDensity(){
+  const cur=document.documentElement.dataset.density||'standaard';
+  const next=DENSITIES[(DENSITIES.indexOf(cur)+1)%DENSITIES.length];
+  applyDensity(next);
+  showToast('Weergave: '+next.charAt(0).toUpperCase()+next.slice(1),'',null);
 }
 
 // ══════════════════════════════════════

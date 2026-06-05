@@ -1297,29 +1297,44 @@ async function appendRange(range,values){
   return r.json();
 }
 
-// Aantal lopende achtergrond-schrijfacties. Zolang >0 slaat de 8s-poll over,
-// zodat een optimistische wijziging niet kort teruggedraaid wordt.
+// Aantal lopende/wachtende achtergrond-schrijfacties. Zolang >0 slaat de 8s-poll
+// over, zodat een optimistische wijziging niet kort teruggedraaid wordt.
 let pendingWrites=0;
-// Voert een Sheets-schrijfactie op de achtergrond uit. De UI is al optimistisch
-// bijgewerkt door de aanroeper. Bij fout draait `rollback` de lokale wijziging terug.
-async function backgroundWrite(writeFn, rollback, foutTitel){
+// Seriële wachtrij: schrijfacties lopen één voor één, zodat rij-indexen in de Sheet
+// niet door elkaar lopen bij snel opeenvolgende acties.
+let _writeChain=Promise.resolve();
+
+// Verschuift lokale _row-nummers mee bij invoegen/verwijderen van een Sheet-rij,
+// zodat een volgende optimistische actie de juiste rij raakt. "Nog Te Doen" is één
+// sheet met meerdere secties; alle rijen onder `fromRow` schuiven `delta` op.
+function _shiftNtdRows(fromRow, delta){
+  SKEYS.forEach(s=>{ (D.ntd[s]||[]).forEach(row=>{ if(row._row>fromRow) row._row+=delta; }); });
+}
+
+// Voert een Sheets-schrijfactie op de achtergrond uit (serieel). De UI is al
+// optimistisch bijgewerkt door de aanroeper. Bij fout draait `rollback` de lokale
+// wijziging terug en verschijnt een foutmelding.
+function backgroundWrite(writeFn, rollback, foutTitel){
   pendingWrites++;
-  try{
-    await writeFn();
-  }catch(e){
-    try{ rollback(); renderAll(); }catch(_){}
-    const msg=(e.message||'').toLowerCase();
-    if(msg.includes('authentication')||msg.includes('unauthenticated')||msg.includes('unauthorized')){
-      oauthToken=null;oauthExpiry=0;
-      showToast(foutTitel,'Sessie verlopen — wijziging teruggezet. Probeer opnieuw.','#dc2626');
-    }else{
-      showToast(foutTitel,'Niet opgeslagen — wijziging teruggezet.','#dc2626');
+  _writeChain=_writeChain.then(async()=>{
+    try{
+      await writeFn();
+    }catch(e){
+      try{ rollback(); renderAll(); }catch(_){}
+      const msg=(e.message||'').toLowerCase();
+      if(msg.includes('authentication')||msg.includes('unauthenticated')||msg.includes('unauthorized')){
+        oauthToken=null;oauthExpiry=0;
+        showToast(foutTitel,'Sessie verlopen — wijziging teruggezet. Probeer opnieuw.','#dc2626');
+      }else{
+        showToast(foutTitel,'Niet opgeslagen — wijziging teruggezet.','#dc2626');
+      }
+      console.error(foutTitel,e);
+    }finally{
+      pendingWrites--;
+      if(pendingWrites===0){ loadAll(true); } // stille resync van rij-indexen
     }
-    console.error(foutTitel,e);
-  }finally{
-    pendingWrites--;
-    if(pendingWrites===0){ loadAll(true); } // stille resync van rij-indexen
-  }
+  });
+  return _writeChain;
 }
 
 function setSyncing(){dot('loading');document.getElementById('sync-lbl').textContent='Laden…'}
@@ -2643,10 +2658,11 @@ async function doCompleteTask(){
     const ntdKeys=SECS[sec].keys;
     const ntdValues=ntdKeys.map(k=>r[k]||''); ntdValues.push(r.subcategorie||'');
     const undoData={sec,code:r.code,ntdValues,ntdRow:r._row};
-    // 1) optimistisch: meteen uit de lokale lijst halen + opnieuw tekenen
+    // 1) optimistisch: meteen uit de lokale lijst halen + indexen meeschuiven + opnieuw tekenen
     const arr=D.ntd[sec]||[];
     const pos=arr.indexOf(r);
     if(pos>-1) arr.splice(pos,1);
+    _shiftNtdRows(r._row,-1);
     renderAll();
     closeCompleteModal();
     showUndoToast('✅ Taak afgerond',`${r.code} — ${r.actiepunt||r.naam||''}`,()=>undoComplete(undoData));
@@ -2701,24 +2717,50 @@ async function submitTask(){
     }
 
     const endCol=String.fromCharCode(64+Math.max(values.length,9));
+    const keys=SECS[sec].keys;
+    const norm=v=>v===true?'TRUE':v===false?'FALSE':v; // boolean → Sheets-stringvorm
+    const newBeh=(sec==='OPPAKKEN'?gv('m-beh'):sec==='VERGADERVERZOEKEN'?gv('m-beh-v'):sec==='OFFERTE-TRAJECTEN'?gv('m-beh-o'):gv('m-beh-l'));
     if(editMode&&editRowData?._row){
-      await writeRange(`'Nog Te Doen'!A${editRowData._row}:${endCol}${editRowData._row}`,values);
-      const newBeh = (sec==='OPPAKKEN'?gv('m-beh'):sec==='VERGADERVERZOEKEN'?gv('m-beh-v'):sec==='OFFERTE-TRAJECTEN'?gv('m-beh-o'):gv('m-beh-l'));
-      if (newBeh && newBeh !== (editRowData.behandelaar||'')) {
-        fireNotifEvent('assigned', { sec, code, naam, behandelaar: newBeh });
-        logEvent(code, sec, 'Behandelaar gewijzigd', 'behandelaar', editRowData.behandelaar, newBeh);
-      }
-      logEvent(code, sec, 'Bewerkt', '', '', '');
+      // ── Bewerken: lokale rij meteen bijwerken, dan op de achtergrond opslaan ──
+      const doelRow=editRowData, oudeWaarden={...editRowData};
+      keys.forEach((k,i)=>{ doelRow[k]=norm(values[i]); });
+      doelRow.subcategorie=values[values.length-1];
+      renderAll();
+      closeModal();clearModal();
+      showToast('💾 Opgeslagen',`${code} — ${naam||''}`,null);
+      backgroundWrite(
+        async ()=>{
+          await writeRange(`'Nog Te Doen'!A${doelRow._row}:${endCol}${doelRow._row}`,values);
+          if(newBeh && newBeh!==(oudeWaarden.behandelaar||'')){
+            fireNotifEvent('assigned',{sec,code,naam,behandelaar:newBeh});
+            logEvent(code,sec,'Behandelaar gewijzigd','behandelaar',oudeWaarden.behandelaar,newBeh);
+          }
+          logEvent(code,sec,'Bewerkt','','','');
+        },
+        ()=>{ keys.forEach(k=>{ doelRow[k]=oudeWaarden[k]; }); doelRow.subcategorie=oudeWaarden.subcategorie; },
+        'Opslaan mislukt'
+      );
     } else {
+      // ── Toevoegen: rij meteen lokaal tonen, dan op de achtergrond opslaan ──
       const afterRow=getInsertRow(sec);
-      await insertAndWriteRow('Nog Te Doen',afterRow,values);
-      const newBeh = (sec==='OPPAKKEN'?gv('m-beh'):sec==='VERGADERVERZOEKEN'?gv('m-beh-v'):sec==='OFFERTE-TRAJECTEN'?gv('m-beh-o'):gv('m-beh-l'));
-      fireNotifEvent('newtask', { sec, code, naam, behandelaar: newBeh });
-      logEvent(code, sec, 'Aangemaakt', '', '', newBeh||'');
+      const nieuw={_sec:sec,_row:afterRow+1};
+      keys.forEach((k,i)=>{ nieuw[k]=norm(values[i]); });
+      nieuw.subcategorie=values[values.length-1];
+      _shiftNtdRows(afterRow,+1); // bestaande rijen eronder schuiven mee
+      (D.ntd[sec]=D.ntd[sec]||[]).push(nieuw);
+      renderAll();
+      closeModal();clearModal();
+      showToast('➕ Taak toegevoegd',`${code} — ${naam||''}`,null);
+      backgroundWrite(
+        async ()=>{
+          await insertAndWriteRow('Nog Te Doen',afterRow,values);
+          fireNotifEvent('newtask',{sec,code,naam,behandelaar:newBeh});
+          logEvent(code,sec,'Aangemaakt','','',newBeh||'');
+        },
+        ()=>{ const a=D.ntd[sec]||[]; const p=a.indexOf(nieuw); if(p>-1)a.splice(p,1); },
+        'Toevoegen mislukt'
+      );
     }
-
-    closeModal();clearModal();
-    await loadAll();
   }catch(e){
     const msg=(e.message||'').toLowerCase();
     if(msg.includes('invalid authentication')||msg.includes('unauthenticated')||msg.includes('unauthorized')){

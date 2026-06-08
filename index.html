@@ -3632,7 +3632,7 @@ async function logEvent(code, sec, actie, veld, oudeWaarde, nieuweWaarde) {
 }
 
 // ══════════════════════════════════════
-//  NOTIF WEBHOOK — vuurt event af én toont directe in-app toast
+//  NOTIF — enqueuet event in de Notif-wachtrij én toont directe in-app toast
 // ══════════════════════════════════════
 async function fireNotifEvent(event, payload) {
   const who   = getCurrentWho();
@@ -3652,15 +3652,13 @@ async function fireNotifEvent(event, payload) {
     }
   }
 
-  if (!NOTIF_WEBHOOK_URL) return;
+  // Schrijf een meldings-intentie als rij in de Notif-wachtrij (via het OAuth-schrijfpad).
+  // Een onChange-trigger in Apps Script pikt 'm op en verstuurt de push — geen secret meer
+  // nodig in de frontend.
   try {
-    const resp = await fetch(NOTIF_WEBHOOK_URL, {
-      method: 'POST',
-      headers: {'Content-Type': 'text/plain'},
-      body: JSON.stringify(Object.assign({}, payload, { event, actor: who, secret: NOTIF_WEBHOOK_SECRET }))
-    });
-    if (resp.ok) { try { const j=await resp.json(); console.log('[Notif] webhook ok:', j); } catch(e){} }
-  } catch(e) { console.warn('Notif webhook faalde:', e); }
+    const data = Object.assign({}, payload, { event, actor: who });
+    await appendRange("'Notif-wachtrij'!A:D", [new Date().toISOString(), event, JSON.stringify(data), '']);
+  } catch (e) { console.warn('Notif-wachtrij faalde:', e); }
 }
 
 // ══════════════════════════════════════
@@ -3968,12 +3966,9 @@ async function unsubscribeNotifs() {
 
 function sendTestNotif(who, title, body) {
   showToast(title || '🧪 Test melding', body || 'Notificaties werken correct!', 'var(--ac)');
-  if (NOTIF_WEBHOOK_URL) {
-    fetch(NOTIF_WEBHOOK_URL, {
-      method: 'POST', mode: 'no-cors',
-      body: JSON.stringify({ event:'test', who, title, body, secret: NOTIF_WEBHOOK_SECRET })
-    }).catch(() => {});
-  }
+  try {
+    appendRange("'Notif-wachtrij'!A:D", [new Date().toISOString(), 'test', JSON.stringify({ event:'test', who, title, body }), '']).catch(() => {});
+  } catch (e) { console.warn('Notif-wachtrij faalde:', e); }
 }
 
 // ══════════════════════════════════════
@@ -4007,6 +4002,14 @@ OneSignalDeferred.push(async function(OneSignal) {
 // ══════════════════════════════════════
 if (location.search.includes('test=1')) {
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+  // ── mini-assert helper (Fase 1 testnet) ──
+  let _tOk = 0, _tFail = 0;
+  const eq = (label, got, exp) => {
+    const g = JSON.stringify(got), e = JSON.stringify(exp);
+    if (g === e) { _tOk++; }
+    else { _tFail++; console.error(`FAIL: ${label} → verwacht ${e}, kreeg ${g}`); }
+  };
+  const truthy = (label, got) => { if (got) { _tOk++; } else { _tFail++; console.error(`FAIL: ${label} → verwacht waar, kreeg ${JSON.stringify(got)}`); } };
   const T = new Date(2026, 5, 2); // 2 juni 2026
   const fmt = d => `${d.getDate()} ${['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'][d.getMonth()]} ${d.getFullYear()}`;
   const plus = n => fmt(new Date(T.getFullYear(), T.getMonth(), T.getDate() + n));
@@ -4038,7 +4041,27 @@ if (location.search.includes('test=1')) {
   const leeg = berekenPrioriteit('', 'OPPAKKEN', T);
   if (leeg.prioriteit === '' && leeg.teLaat === false) ok++; else { fail++; console.error('FAIL: lege deadline →', leeg); }
 
-  console.log(`%c[TESTS] ${ok} OK, ${fail} FAIL`, fail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');
+  // ── _parseAnyDate ──
+  eq('ISO yyyy-mm-dd',  _parseAnyDate('2026-05-21'),  {y:2026,m:5,d:21});
+  eq('dd-mm-yyyy',      _parseAnyDate('21-05-2026'),  {y:2026,m:5,d:21});
+  eq('dd/mm/yyyy',      _parseAnyDate('21/05/2026'),  {y:2026,m:5,d:21});
+  eq('NL long "21 mei 2026"', _parseAnyDate('21 mei 2026'), {y:2026,m:5,d:21});
+  eq('NL afk "3 jan. 2025"',  _parseAnyDate('3 jan. 2025'),  {y:2025,m:1,d:3});
+  eq('NL "1 sept 2026"',      _parseAnyDate('1 sept 2026'),  {y:2026,m:9,d:1});
+  eq('2-cijfer jaar "21 mei \'26"', _parseAnyDate("21 mei '26"), {y:2026,m:5,d:21});
+  eq('leeg → null',     _parseAnyDate(''),            null);
+  eq('onzin → null',    _parseAnyDate('geen datum'),  null);
+
+  // ── displayName ── (EMAIL_NAMES-lookup, anders ruwe invoer terug)
+  eq('displayName leeg', displayName(''), '');
+  truthy('displayName onbekend e-mail geeft input terug', displayName('xyz@example.com') === 'xyz@example.com');
+
+  // ── logZin ── (natuurlijke zin per logboek-actie; bevat juiste werkwoord)
+  truthy('logZin Afgerond bevat "rondde"',  logZin({actie:'Afgerond', code:'TEST01', gebruiker:'info@vvebeheercollectief.nl'}).includes('rondde'));
+  truthy('logZin Verwijderd bevat "verwijderde"', logZin({actie:'Verwijderd', code:'TEST01', gebruiker:'info@vvebeheercollectief.nl'}).includes('verwijderde'));
+
+  const totOk = ok + _tOk, totFail = fail + _tFail;
+  console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');
 }
 </script>
 </body>

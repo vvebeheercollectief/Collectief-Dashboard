@@ -1155,9 +1155,9 @@
 // ══════════════════════════════════════
 const SID  = '1fnUsbwb4nDMNttWym9FWBw1CMMMAVTuZ3v88b35isUw';
 const PG   = 25;
-// Webhook URL van het Apps Script (Deploy → Web app)
-const NOTIF_WEBHOOK_URL    = 'https://script.google.com/macros/s/AKfycbz_AC5YgAzUlcx9HrI4nv6jkoSung-T5WPHJPSSqwwBXcbv7NUUNKl1pzrd5qBf8so1WA/exec';
-const NOTIF_WEBHOOK_SECRET = '0038352e880dab9ee033277cbb19ef68f3ca5378077ee09d'; // geroteerd 2026-06-08 — moet gelijk zijn aan CD_WEBHOOK_SECRET in Apps Script
+// Meldingen lopen via de 'Notif-wachtrij'-tab (OAuth-append vanuit de ingelogde
+// gebruiker) — een Apps Script-trigger verstuurt de push. Geen webhook-URL of
+// secret meer nodig in deze (publieke) frontend.
 const ONESIGNAL_APP_ID     = 'c0e1301b-2cee-4646-8fab-99698e10e78c';
 
 const ALLOWED_EMAILS = [

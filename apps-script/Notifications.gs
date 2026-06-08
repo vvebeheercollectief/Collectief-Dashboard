@@ -29,6 +29,39 @@ const ICON_URL = APP_URL + 'icon-192.png';
 const DEADLINE_TOLERANCE_HOURS = 1;
 
 // ════════════════════════════════════════════════════════════
+//  CONCURRENCY + FOUTAFHANDELING HELPERS
+// ════════════════════════════════════════════════════════════
+// Serialiseert Apps Script-mutaties (webhook / onEdit / triggers) zodat gelijktijdige
+// uitvoeringen elkaars rij-invoegingen niet verstoren. LET OP: lockt alléén Apps Script
+// onderling — niet tegen directe Sheets-API-schrijfacties vanuit het dashboard.
+// Vangt fouten NIET op (laat ze door, bv. voor doPost die {error} moet teruggeven).
+function cd_withLock(fn) {
+  const lock = LockService.getDocumentLock();
+  try {
+    if (!lock.tryLock(10000)) { Logger.log('cd_withLock: lock niet verkregen — overgeslagen'); return; }
+    return fn();
+  } finally {
+    try { lock.releaseLock(); } catch (_) {}
+  }
+}
+// Lock + foutopvang: voor mutaties waarbij een fout niet de uitvoering mag laten klappen.
+function cd_lockedRun(label, fn) {
+  const lock = LockService.getDocumentLock();
+  try {
+    if (!lock.tryLock(10000)) { Logger.log(label + ': lock niet verkregen — overgeslagen'); return; }
+    return fn();
+  } catch (e) {
+    Logger.log(label + ' fout: ' + e);
+  } finally {
+    try { lock.releaseLock(); } catch (_) {}
+  }
+}
+// Alleen foutopvang: voor read-only triggers, zodat één foute rij niet de hele run sloopt.
+function cd_safeRun(label, fn) {
+  try { return fn(); } catch (e) { Logger.log(label + ' fout: ' + e); }
+}
+
+// ════════════════════════════════════════════════════════════
 //  SETUP
 // ════════════════════════════════════════════════════════════
 const CD_TRIGGER_FUNCS = ['cd_onEditChange', 'cd_checkDeadlines', 'cd_dailySummary'];
@@ -152,100 +185,104 @@ function cd_handleAlvoEdit(sheet, row, e) {
 //  TRIGGER 2: hourly deadline check
 // ════════════════════════════════════════════════════════════
 function cd_checkDeadlines() {
-  const sheet = SpreadsheetApp.getActive().getSheetByName(NTD_SHEET);
-  if (!sheet) return;
-  const data = sheet.getDataRange().getValues();
-  const now = new Date();
-  let curSec = null;
-  const SKEYS = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD'];
+  cd_safeRun('cd_checkDeadlines', () => {
+    const sheet = SpreadsheetApp.getActive().getSheetByName(NTD_SHEET);
+    if (!sheet) return;
+    const data = sheet.getDataRange().getValues();
+    const now = new Date();
+    let curSec = null;
+    const SKEYS = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD'];
 
-  const DEADLINE_COL = { 'OPPAKKEN': 3, 'VERGADERVERZOEKEN': 5, 'OFFERTE-TRAJECTEN': 5, 'LOD': 5 };
-  const BEH_COL      = { 'OPPAKKEN': 4, 'VERGADERVERZOEKEN': 4, 'OFFERTE-TRAJECTEN': 4, 'LOD': 4 };
+    const DEADLINE_COL = { 'OPPAKKEN': 3, 'VERGADERVERZOEKEN': 5, 'OFFERTE-TRAJECTEN': 5, 'LOD': 5 };
+    const BEH_COL      = { 'OPPAKKEN': 4, 'VERGADERVERZOEKEN': 4, 'OFFERTE-TRAJECTEN': 4, 'LOD': 4 };
 
-  for (let i = 0; i < data.length; i++) {
-    const first = (data[i][0] || '').toString().trim().toUpperCase();
-    if (SKEYS.indexOf(first) !== -1) { curSec = first; continue; }
-    if (!curSec) continue;
-    if (!data[i][0]) continue;
-    if ((data[i][0] + '').trim() === 'VvE Code' || (data[i][0] + '').trim() === 'VvE-Code') continue;
+    for (let i = 0; i < data.length; i++) {
+      const first = (data[i][0] || '').toString().trim().toUpperCase();
+      if (SKEYS.indexOf(first) !== -1) { curSec = first; continue; }
+      if (!curSec || !data[i][0]) continue;
+      if ((data[i][0] + '').trim() === 'VvE Code' || (data[i][0] + '').trim() === 'VvE-Code') continue;
 
-    const code = (data[i][0] || '').toString().trim();
-    const naam = (data[i][1] || '').toString().trim();
-    const beh  = (data[i][BEH_COL[curSec]] || '').toString().trim();
-    const dlVal = data[i][DEADLINE_COL[curSec]];
-    if (!code || !dlVal) continue;
+      try {
+        const code = (data[i][0] || '').toString().trim();
+        const naam = (data[i][1] || '').toString().trim();
+        const beh  = (data[i][BEH_COL[curSec]] || '').toString().trim();
+        const dlVal = data[i][DEADLINE_COL[curSec]];
+        if (!code || !dlVal) continue;
 
-    const dl = cd_parseDate(dlVal);
-    if (!dl) continue;
+        const dl = cd_parseDate(dlVal);
+        if (!dl) continue;
 
-    const hoursUntil = (dl.getTime() - now.getTime()) / 3600000;
-    if (hoursUntil < 0) continue;
-    if (hoursUntil > 72) continue;
+        const hoursUntil = (dl.getTime() - now.getTime()) / 3600000;
+        if (hoursUntil < 0 || hoursUntil > 72) continue;
 
-    [1, 4, 8, 24, 48].forEach(h => {
-      if (Math.abs(hoursUntil - h) <= DEADLINE_TOLERANCE_HOURS) {
-        const body = code + (naam ? ' · ' + naam : '') + ' — over ' + Math.round(hoursUntil) + ' uur';
-        if (beh) {
-          cd_splitBehandelaar(beh).forEach(name => {
-            cd_sendNotification({
-              filters: [
-                { field: 'tag', key: 'behandelaar', relation: '=', value: name },
-                { operator: 'AND' },
-                { field: 'tag', key: 'n_deadline', relation: '=', value: '1' },
-                { operator: 'AND' },
-                { field: 'tag', key: 'deadline_h', relation: '=', value: String(h) },
-              ],
-              title: '⏰ Deadline nadert',
-              body: body,
-              url: APP_URL,
-              dedupKey: 'dl-' + code + '-' + h
+        [1, 4, 8, 24, 48].forEach(h => {
+          if (Math.abs(hoursUntil - h) <= DEADLINE_TOLERANCE_HOURS && beh) {
+            const body = code + (naam ? ' · ' + naam : '') + ' — over ' + Math.round(hoursUntil) + ' uur';
+            cd_splitBehandelaar(beh).forEach(name => {
+              cd_sendNotification({
+                filters: [
+                  { field: 'tag', key: 'behandelaar', relation: '=', value: name },
+                  { operator: 'AND' },
+                  { field: 'tag', key: 'n_deadline', relation: '=', value: '1' },
+                  { operator: 'AND' },
+                  { field: 'tag', key: 'deadline_h', relation: '=', value: String(h) },
+                ],
+                title: '⏰ Deadline nadert',
+                body: body,
+                url: APP_URL,
+                dedupKey: 'dl-' + code + '-' + h
+              });
             });
-          });
-        }
-      }
-    });
-  }
+          }
+        });
+      } catch (rowErr) { Logger.log('cd_checkDeadlines rij ' + (i + 1) + ' fout: ' + rowErr); }
+    }
+  });
 }
 
 // ════════════════════════════════════════════════════════════
 //  TRIGGER 3: daily summary om 08:30
 // ════════════════════════════════════════════════════════════
 function cd_dailySummary() {
-  const sheet = SpreadsheetApp.getActive().getSheetByName(NTD_SHEET);
-  if (!sheet) return;
-  const data = sheet.getDataRange().getValues();
-  let curSec = null;
-  const SKEYS = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD'];
-  const BEH_COL = { 'OPPAKKEN': 4, 'VERGADERVERZOEKEN': 4, 'OFFERTE-TRAJECTEN': 4, 'LOD': 4 };
+  cd_safeRun('cd_dailySummary', () => {
+    const sheet = SpreadsheetApp.getActive().getSheetByName(NTD_SHEET);
+    if (!sheet) return;
+    const data = sheet.getDataRange().getValues();
+    let curSec = null;
+    const SKEYS = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD'];
+    const BEH_COL = { 'OPPAKKEN': 4, 'VERGADERVERZOEKEN': 4, 'OFFERTE-TRAJECTEN': 4, 'LOD': 4 };
 
-  const perPerson = {};
-  for (let i = 0; i < data.length; i++) {
-    const first = (data[i][0] || '').toString().trim().toUpperCase();
-    if (SKEYS.indexOf(first) !== -1) { curSec = first; continue; }
-    if (!curSec || !data[i][0]) continue;
-    if ((data[i][0] + '').trim() === 'VvE Code' || (data[i][0] + '').trim() === 'VvE-Code') continue;
+    const perPerson = {};
+    for (let i = 0; i < data.length; i++) {
+      const first = (data[i][0] || '').toString().trim().toUpperCase();
+      if (SKEYS.indexOf(first) !== -1) { curSec = first; continue; }
+      if (!curSec || !data[i][0]) continue;
+      if ((data[i][0] + '').trim() === 'VvE Code' || (data[i][0] + '').trim() === 'VvE-Code') continue;
 
-    const beh = (data[i][BEH_COL[curSec]] || '').toString().trim();
-    if (!beh) continue;
-    cd_splitBehandelaar(beh).forEach(name => {
-      if (!perPerson[name]) perPerson[name] = {};
-      perPerson[name][curSec] = (perPerson[name][curSec] || 0) + 1;
-    });
-  }
+      const beh = (data[i][BEH_COL[curSec]] || '').toString().trim();
+      if (!beh) continue;
+      cd_splitBehandelaar(beh).forEach(name => {
+        if (!perPerson[name]) perPerson[name] = {};
+        perPerson[name][curSec] = (perPerson[name][curSec] || 0) + 1;
+      });
+    }
 
-  Object.keys(perPerson).forEach(name => {
-    const tots = perPerson[name];
-    const total = Object.values(tots).reduce((a,b) => a+b, 0);
-    const parts = [];
-    if (tots['OPPAKKEN']) parts.push(tots['OPPAKKEN'] + ' oppakken');
-    if (tots['VERGADERVERZOEKEN']) parts.push(tots['VERGADERVERZOEKEN'] + ' vergaderverzoek' + (tots['VERGADERVERZOEKEN']>1?'en':''));
-    if (tots['OFFERTE-TRAJECTEN']) parts.push(tots['OFFERTE-TRAJECTEN'] + ' offerte-traject' + (tots['OFFERTE-TRAJECTEN']>1?'en':''));
-    if (tots['LOD']) parts.push(tots['LOD'] + ' LOD');
+    Object.keys(perPerson).forEach(name => {
+      try {
+        const tots = perPerson[name];
+        const total = Object.values(tots).reduce((a,b) => a+b, 0);
+        const parts = [];
+        if (tots['OPPAKKEN']) parts.push(tots['OPPAKKEN'] + ' oppakken');
+        if (tots['VERGADERVERZOEKEN']) parts.push(tots['VERGADERVERZOEKEN'] + ' vergaderverzoek' + (tots['VERGADERVERZOEKEN']>1?'en':''));
+        if (tots['OFFERTE-TRAJECTEN']) parts.push(tots['OFFERTE-TRAJECTEN'] + ' offerte-traject' + (tots['OFFERTE-TRAJECTEN']>1?'en':''));
+        if (tots['LOD']) parts.push(tots['LOD'] + ' LOD');
 
-    cd_notifyByExternalId(name, 'n_daily', '1', {
-      title: '☀️ Goedemorgen — ' + total + ' open ' + (total===1?'taak':'taken'),
-      body: parts.join(' · '),
-      url: APP_URL
+        cd_notifyByExternalId(name, 'n_daily', '1', {
+          title: '☀️ Goedemorgen — ' + total + ' open ' + (total===1?'taak':'taken'),
+          body: parts.join(' · '),
+          url: APP_URL
+        });
+      } catch (e) { Logger.log('cd_dailySummary persoon ' + name + ' fout: ' + e); }
     });
   });
 }
@@ -342,7 +379,9 @@ function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
     const secret = PropertiesService.getScriptProperties().getProperty('CD_WEBHOOK_SECRET');
-    if (secret && data.secret !== secret) {
+    // FAIL CLOSED: ontbreekt het server-secret of klopt het niet, dan weigeren we.
+    // (Voorheen werd de check overgeslagen als de property leeg was → open endpoint.)
+    if (!secret || data.secret !== secret) {
       return ContentService.createTextOutput(JSON.stringify({error:'forbidden'})).setMimeType(ContentService.MimeType.JSON);
     }
     const ev = data.event;
@@ -400,7 +439,7 @@ function doPost(e) {
       const body  = (data.body  || 'Notificaties werken correct!').toString();
       cd_schrijfMelding('test', title, body, who || 'allen');
     } else if (ev === 'create_task') {
-      const rij = cd_createTaskRow(categorie, code, naam, actiepunt, beh, deadline);
+      const rij = cd_withLock(function(){ return cd_createTaskRow(categorie, code, naam, actiepunt, beh, deadline); });
       // zelfde melding als bij een normale nieuwe taak
       cd_notifyByTag('n_newtask', '1', {
         title: '📋 Nieuwe taak — ' + (categorie || '').toLowerCase(),
@@ -505,5 +544,8 @@ function cd_testPushToJer() {
   });
 }
 function setupWebhookSecret() {
-  PropertiesService.getScriptProperties().setProperty('CD_WEBHOOK_SECRET', '8e0642cbd3f44f44a4711d1ec5bae0a78d17e902b29a0ef7');
+  // Geroteerd 2026-06-08 (oude secret stond in git-history + publieke index.html).
+  // Moet IDENTIEK zijn aan NOTIF_WEBHOOK_SECRET in index.html. Na wijzigen: deze
+  // functie één keer draaien én de nieuwe index.html pushen.
+  PropertiesService.getScriptProperties().setProperty('CD_WEBHOOK_SECRET', '0038352e880dab9ee033277cbb19ef68f3ca5378077ee09d');
 }

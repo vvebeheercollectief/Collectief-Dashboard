@@ -1157,7 +1157,7 @@ const SID  = '1fnUsbwb4nDMNttWym9FWBw1CMMMAVTuZ3v88b35isUw';
 const PG   = 25;
 // Webhook URL van het Apps Script (Deploy → Web app)
 const NOTIF_WEBHOOK_URL    = 'https://script.google.com/macros/s/AKfycbz_AC5YgAzUlcx9HrI4nv6jkoSung-T5WPHJPSSqwwBXcbv7NUUNKl1pzrd5qBf8so1WA/exec';
-const NOTIF_WEBHOOK_SECRET = '8e0642cbd3f44f44a4711d1ec5bae0a78d17e902b29a0ef7';
+const NOTIF_WEBHOOK_SECRET = '0038352e880dab9ee033277cbb19ef68f3ca5378077ee09d'; // geroteerd 2026-06-08 — moet gelijk zijn aan CD_WEBHOOK_SECRET in Apps Script
 const ONESIGNAL_APP_ID     = 'c0e1301b-2cee-4646-8fab-99698e10e78c';
 
 const ALLOWED_EMAILS = [
@@ -1424,7 +1424,7 @@ async function writeRange(range,values,method='PUT'){
   const url=`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`;
   const opts={method,headers:{Authorization:`Bearer ${oauthToken}`,'Content-Type':'application/json'},body:JSON.stringify({values:[values]})};
   const r=await fetch(url,opts);
-  if(!r.ok){const e=await r.json();if(r.status===401){oauthToken=null;oauthExpiry=0}throw new Error(e.error?.message||'Schrijffout')}
+  if(!r.ok){const e=await r.json();if(r.status===401){oauthToken=null;oauthExpiry=0}const err=new Error(e.error?.message||'Schrijffout');err.status=r.status;throw err}
   return r.json();
 }
 async function appendRange(range,values){
@@ -1449,6 +1449,24 @@ function _shiftNtdRows(fromRow, delta){
   SKEYS.forEach(s=>{ (D.ntd[s]||[]).forEach(row=>{ if(row._row>fromRow) row._row+=delta; }); });
 }
 
+// Herkent tijdelijke API-fouten (rate-limit 429 / serverfout 5xx) die een herkansing
+// rechtvaardigen — i.t.t. een echte fout (verkeerde data, geen rechten) die direct faalt.
+function _isTransient(e){
+  if(!e) return false;
+  if(e.status===429 || (e.status>=500 && e.status<600)) return true;
+  return /quota|rate.?limit|resource_exhausted|backend error|internal error|unavailable|try again/i.test(e.message||'');
+}
+// Voert een schrijfactie uit met max. 2 herkansingen (exponentiële backoff) bij transient fouten.
+async function _withRetry(fn){
+  for(let attempt=0;;attempt++){
+    try{ return await fn(); }
+    catch(e){
+      if(attempt<2 && _isTransient(e)){ await new Promise(r=>setTimeout(r,600*Math.pow(2,attempt))); continue; }
+      throw e;
+    }
+  }
+}
+
 // Voert een Sheets-schrijfactie op de achtergrond uit (serieel). De UI is al
 // optimistisch bijgewerkt door de aanroeper. Bij fout draait `rollback` de lokale
 // wijziging terug en verschijnt een foutmelding.
@@ -1456,7 +1474,7 @@ function backgroundWrite(writeFn, rollback, foutTitel){
   pendingWrites++;
   _writeChain=_writeChain.then(async()=>{
     try{
-      await writeFn();
+      await _withRetry(writeFn);
     }catch(e){
       try{ rollback(); renderAll(); }catch(_){}
       const msg=(e.message||'').toLowerCase();
@@ -1481,18 +1499,26 @@ function setSyncErr(){dot('err');document.getElementById('sync-lbl').textContent
 function dot(cls){const d=document.getElementById('dot');d.className='dot'+(cls?' '+cls:'')}
 
 let _lastDHash=null;
+// Herhaal-slot: voorkomt dat twee loadAll-aanroepen tegelijk lopen en elkaars data
+// overschrijven (8s-poll, schrijf-resync, refresh-knop, handmatige awaits).
+let _loadInFlight=false, _loadAgain=false;
 async function loadAll(silent){
-  if(!oauthToken){
-    if(!await ensureToken()){setSyncErr();return}
-  }
-  if(!silent) setSyncing();
+  if(_loadInFlight){ _loadAgain=true; return; }
+  _loadInFlight=true;
   try{
+    if(!oauthToken){
+      if(!await ensureToken()){setSyncErr();return}
+    }
+    if(!silent) setSyncing();
     const[ntdR,afR,alvoR,alfaR,ontwR,logR]=await Promise.all([
       fetchSheet("Nog Te Doen"),fetchSheet("Afgerond"),
       fetchSheet("ALV's overzicht"),fetchSheet("ALV's afgerond"),
       fetchSheet("Ontwikkeling").catch(()=>[]),
       fetchSheet("Logboek").catch(()=>[]),
     ]);
+    // Kwam er tijdens het lezen een schrijfactie tussen? Dan is de lokale (optimistische)
+    // staat leidend; de eigen resync van die schrijfactie haalt zo de verse data op.
+    if(pendingWrites>0){ if(!silent) setSynced(); return; }
     const ntdP=parseSections(ntdR); D.ntd=ntdP.data; D.ntdSecInfo=ntdP.secInfo;
     const afP=parseSections(afR); D.af=afP.data; D.afSecInfo=afP.secInfo;
     SKEYS.forEach(s=>{if(D.af[s])D.af[s].sort((a,b)=>parseDt(b.datum)-parseDt(a.datum))});
@@ -1511,6 +1537,10 @@ async function loadAll(silent){
       if(document.getElementById('page-ntd')?.classList.contains('active')) renderNtdDonut();
     }
   }catch(e){setSyncErr();console.error(e)}
+  finally{
+    _loadInFlight=false;
+    if(_loadAgain){ _loadAgain=false; loadAll(true); } // een onderdrukte aanroep alsnog uitvoeren
+  }
 }
 
 // ══════════════════════════════════════
@@ -2450,7 +2480,7 @@ function renderTbody(tbodyId,rows,sec,page,isAf){
 
 function bepaalStil(r, sec){
   if (r.inBehandeling !== 'TRUE') return null;
-  const entries = (D.logboek || []).filter(e => e.code === r.code && (!sec || e.sectie === sec || !e.sectie));
+  const entries = (D.logboek || []).filter(e => e.code === r.code && (!sec || e.sectie === sec));
   if (!entries.length) return null; // geen activiteit-data → niet markeren
   let laatst = null;
   entries.forEach(e => {
@@ -2693,7 +2723,7 @@ async function insertAndWriteRow(sheetName,afterRow,values){
     headers:{Authorization:`Bearer ${oauthToken}`,'Content-Type':'application/json'},
     body:JSON.stringify({requests:[{insertDimension:{range:{sheetId,dimension:'ROWS',startIndex:afterRow,endIndex:afterRow+1},inheritFromBefore:true}}]})
   });
-  if(!insResp.ok){const e=await insResp.json();if(insResp.status===401){oauthToken=null;oauthExpiry=0}throw new Error(e.error?.message||'Invoegfout')}
+  if(!insResp.ok){const e=await insResp.json();if(insResp.status===401){oauthToken=null;oauthExpiry=0}const err=new Error(e.error?.message||'Invoegfout');err.status=insResp.status;throw err}
   const endCol=String.fromCharCode(64+Math.max(values.length,9));
   await writeRange(`'${sheetName}'!A${afterRow+1}:${endCol}${afterRow+1}`,values);
 }
@@ -2810,10 +2840,10 @@ async function doCompleteTask(){
         const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
           method:'POST',headers:{Authorization:`Bearer ${oauthToken}`,'Content-Type':'application/json'},
           body:JSON.stringify(batchBody)});
-        if(!resp.ok){const e=await resp.json();if(resp.status===401){oauthToken=null;oauthExpiry=0}throw new Error(e.error?.message||'Fout bij afhandelen taak')}
+        if(!resp.ok){const e=await resp.json();if(resp.status===401){oauthToken=null;oauthExpiry=0}const err=new Error(e.error?.message||'Fout bij afhandelen taak');err.status=resp.status;throw err}
         logEvent(r.code, sec, 'Afgerond', 'status', 'Nog Te Doen', 'Afgerond op ' + today + (comment ? ' — ' + comment : ''));
       },
-      ()=>{ const a=(D.ntd[sec]=D.ntd[sec]||[]); if(a.indexOf(r)===-1) a.splice(Math.min(pos<0?a.length:pos,a.length),0,r); },
+      ()=>{ const a=(D.ntd[sec]=D.ntd[sec]||[]); if(a.indexOf(r)===-1){ _shiftNtdRows(r._row,+1); a.splice(Math.min(pos<0?a.length:pos,a.length),0,r); } },
       'Afronden mislukt'
     );
   }catch(e){alert('Fout bij afhandelen: '+e.message)}
@@ -2895,7 +2925,7 @@ async function submitTask(){
           fireNotifEvent('newtask',{sec,code,naam,behandelaar:newBeh});
           logEvent(code,sec,'Aangemaakt','','',newBeh||'');
         },
-        ()=>{ const a=D.ntd[sec]||[]; const p=a.indexOf(nieuw); if(p>-1)a.splice(p,1); },
+        ()=>{ const a=D.ntd[sec]||[]; const p=a.indexOf(nieuw); if(p>-1){ a.splice(p,1); _shiftNtdRows(afterRow,-1); } },
         'Toevoegen mislukt'
       );
     }
@@ -3247,7 +3277,7 @@ function offProg(v){
     <div class="prog-bar"><div class="prog-fill" style="width:${pct}%;background:var(--pu)"></div></div></div>`;
 }
 
-const _MAANDEN={jan:1,feb:2,mrt:3,maa:3,apr:4,mei:5,jun:6,jul:7,aug:8,sep:9,okt:10,nov:11,dec:12,
+const _MAANDEN={jan:1,feb:2,mrt:3,maa:3,apr:4,mei:5,jun:6,jul:7,aug:8,sep:9,sept:9,okt:10,nov:11,dec:12,
   januari:1,februari:2,maart:3,april:4,juni:6,juli:7,augustus:8,september:9,oktober:10,november:11,december:12};
 
 function _parseAnyDate(s){
@@ -3262,9 +3292,9 @@ function _parseAnyDate(s){
   // dd/mm/yyyy
   m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if(m)return{y:+m[3],m:+m[2],d:+m[1]};
-  // "21 mei 2026" / "3 januari 2025"
-  m=s.match(/^(\d{1,2})\s+([a-zA-Z]+)\s+(\d{4})$/);
-  if(m){const mn=_MAANDEN[m[2].toLowerCase()];if(mn)return{y:+m[3],m:mn,d:+m[1]}}
+  // "21 mei 2026" / "3 jan. 2025" / "21 mei '26"
+  m=s.match(/^(\d{1,2})\s+([a-zA-Z]+)\.?\s+'?(\d{2,4})$/);
+  if(m){const mn=_MAANDEN[m[2].toLowerCase()];if(mn){let y=+m[3];if(y<100)y+=2000;return{y,m:mn,d:+m[1]}}}
   return null;
 }
 
@@ -3344,7 +3374,7 @@ function renderOntw(){
       <td class="cell-txt">${r.inhoud?`<span style="font-size:12px">${esc(r.inhoud.substring(0,80))}${r.inhoud.length>80?'…':''}</span>`:''}</td>
       <td>${persBadges(r.door)}</td>
       <td class="cell-sm">${esc(r.datum)}</td>
-      <td><span class="badge status-${r.status.toLowerCase()}">${r.status==='Afgerond'?'✅':'⏳'} ${r.status}</span></td>
+      <td><span class="badge status-${esc((r.status||'').toLowerCase())}">${r.status==='Afgerond'?'✅':'⏳'} ${esc(r.status)}</span></td>
       <td><button class="btn-edit" onclick="editOntwItem(${rid})" title="Bewerken"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button></td>
     </tr>`;
   }).join('');
@@ -3560,7 +3590,7 @@ function renderTaskHistory(code,sec){
   container.style.display='';
   container.dataset.code=code;
   container.dataset.sec=sec||'';
-  const entries=(D.logboek||[]).filter(r=>r.code===code&&(!sec||r.sectie===sec||!r.sectie));
+  const entries=(D.logboek||[]).filter(r=>r.code===code&&(!sec||r.sectie===sec));
   countEl.textContent=entries.length||'';
   countEl.style.display=entries.length?'':'none';
   if(!entries.length){

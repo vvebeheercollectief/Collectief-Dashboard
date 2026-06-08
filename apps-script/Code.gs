@@ -1,4 +1,5 @@
 function verplaatsAfgerond(e) {
+ cd_lockedRun('verplaatsAfgerond', () => {
   var sheet = e.source.getActiveSheet();
   var range = e.range;
 
@@ -65,6 +66,7 @@ function verplaatsAfgerond(e) {
   targetSheet.getRange(insertRow, 1, 1, 5).setValues([newRow]);
 
   sheet.deleteRow(row);
+ });
 }
 
 function setupAfgerondSheet(sheet) {
@@ -96,6 +98,7 @@ function findSectieRow(sheet, sectie) {
   return -1;
 }
 function verplaatsALV(e) {
+ cd_lockedRun('verplaatsALV', () => {
   var sheet = e.source.getActiveSheet();
   var range = e.range;
 
@@ -126,6 +129,7 @@ function verplaatsALV(e) {
     lastRow = 1;
   }
   targetSheet.getRange(lastRow + 1, 1, 1, 3).setValues([newRow]);
+ });
 }
 function sorteerOfferteTrajecten(e) {
   var ss = e ? e.source : SpreadsheetApp.getActiveSpreadsheet();

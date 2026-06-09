@@ -18,9 +18,16 @@
  *   - Trigger-setup raakt ALLEEN onze eigen triggers aan       *
  ****************************************************************/
 
-const ONESIGNAL_APP_ID = 'c0e1301b-2cee-4646-8fab-99698e10e78c';
+// App-id komt uit Script Properties (prod-project: prod-app, test-project: test-app).
+// Fallback = prod-app-id, zodat productie blijft werken zonder extra property.
+function cd_oneSignalAppId(){
+  return PropertiesService.getScriptProperties().getProperty('ONESIGNAL_APP_ID')
+      || 'c0e1301b-2cee-4646-8fab-99698e10e78c';
+}
 const NTD_SHEET   = 'Nog Te Doen';
 const ALVO_SHEET  = "ALV's overzicht";
+const NOTIF_QUEUE_SHEET = 'Notif-wachtrij';
+const NOTIF_QUEUE_MAX = 200; // verwerkte rijen die we bewaren
 
 const APP_URL = 'https://vvebeheercollectief.github.io/Collectief-Dashboard/';
 const ICON_URL = APP_URL + 'icon-192.png';
@@ -64,7 +71,7 @@ function cd_safeRun(label, fn) {
 // ════════════════════════════════════════════════════════════
 //  SETUP
 // ════════════════════════════════════════════════════════════
-const CD_TRIGGER_FUNCS = ['cd_onEditChange', 'cd_checkDeadlines', 'cd_dailySummary'];
+const CD_TRIGGER_FUNCS = ['cd_onEditChange', 'cd_checkDeadlines', 'cd_dailySummary', 'cd_onNotifQueueChange', 'cd_sweepNotifQueue'];
 
 function setupNotificationTriggers() {
   ScriptApp.getProjectTriggers()
@@ -76,8 +83,10 @@ function setupNotificationTriggers() {
   ScriptApp.newTrigger('cd_onEditChange').forSpreadsheet(ss).onEdit().create();
   ScriptApp.newTrigger('cd_checkDeadlines').timeBased().everyHours(1).create();
   ScriptApp.newTrigger('cd_dailySummary').timeBased().atHour(8).nearMinute(30).everyDays(1).create();
+  ScriptApp.newTrigger('cd_onNotifQueueChange').forSpreadsheet(ss).onChange().create();
+  ScriptApp.newTrigger('cd_sweepNotifQueue').timeBased().everyMinutes(5).create();
 
-  SpreadsheetApp.getUi().alert('✓ Notificatie-triggers ingesteld!\n\n• cd_onEditChange (nieuwe taken / wijzigingen)\n• cd_checkDeadlines (elk uur)\n• cd_dailySummary (dagelijks 08:30)\n\nJe bestaande triggers zijn ongemoeid gebleven.');
+  SpreadsheetApp.getUi().alert('✓ Notificatie-triggers ingesteld!\n\n• cd_onEditChange (nieuwe taken / wijzigingen)\n• cd_checkDeadlines (elk uur)\n• cd_dailySummary (dagelijks 08:30)\n• cd_onNotifQueueChange (Notif-wachtrij, direct)\n• cd_sweepNotifQueue (Notif-wachtrij, elke 5 min)\n\nJe bestaande triggers zijn ongemoeid gebleven.');
 }
 
 function removeNotificationTriggers() {
@@ -345,7 +354,7 @@ function cd_notifyByExternalId(extId, tagKey, tagValue, opts) {
 
 function cd_sendNotification(p) {
   const payload = {
-    app_id: ONESIGNAL_APP_ID,
+    app_id: cd_oneSignalAppId(),
     filters: p.filters,
     headings: { en: p.title, nl: p.title },
     contents: { en: p.body, nl: p.body },
@@ -372,99 +381,106 @@ function cd_sendNotification(p) {
 }
 
 // ════════════════════════════════════════════════════════════
-//  WEBHOOK — wordt aangeroepen vanuit het dashboard
-//  (omdat API-edits geen onEdit-trigger vuren in Apps Script)
+//  MELDINGEN — kernlogica, hergebruikt door de webhook (doPost)
+//  én door de Notif-wachtrij-wachter (cd_drainNotifQueue).
+//  Retourneert een resultaat-object (doPost serialiseert het).
+// ════════════════════════════════════════════════════════════
+function cd_processNotifEvent(data) {
+  const ev = data.event;
+  const code = (data.code || '').toString();
+  const naam = (data.naam || '').toString();
+  const beh  = (data.behandelaar || '').toString();
+  const sec  = (data.sec || '').toString();
+  const actor = (data.actor || '').toString();
+  const categorie = (data.categorie || '').toString();
+  const actiepunt = (data.actiepunt || '').toString();
+  const deadline  = (data.deadline || '').toString();
+
+  if (ev === 'newtask') {
+    cd_notifyByTag('n_newtask', '1', {
+      title: '📋 Nieuwe taak — ' + sec.toLowerCase(),
+      body: code + (naam ? ' · ' + naam : '') + (beh ? ' → ' + beh : ''),
+      url: APP_URL, dedupKey: 'new-' + code + '-' + Date.now()
+    });
+    if (beh) {
+      cd_splitBehandelaar(beh).forEach(name => {
+        if (name && name !== actor) {
+          cd_notifyByExternalId(name, 'n_assigned', '1', {
+            title: '➕ Toegewezen aan jou',
+            body: code + (naam ? ' · ' + naam : ''),
+            url: APP_URL, dedupKey: 'assign-' + code + '-' + name + '-' + Date.now()
+          });
+        }
+      });
+    }
+  } else if (ev === 'assigned') {
+    if (beh) {
+      cd_splitBehandelaar(beh).forEach(name => {
+        if (name && name !== actor) {
+          cd_notifyByExternalId(name, 'n_assigned', '1', {
+            title: '➕ Toegewezen aan jou',
+            body: code + (naam ? ' · ' + naam : ''),
+            url: APP_URL, dedupKey: 'reassign-' + code + '-' + name + '-' + Date.now()
+          });
+        }
+      });
+    }
+  } else if (ev === 'completed') {
+    // Niet pushen, alleen loggen
+  } else if (ev === 'alv_update') {
+    cd_notifyByTag('n_alv', '1', {
+      title: data.title || '🏢 ALV-status verandert',
+      body: code + (naam ? ' · ' + naam : ''),
+      url: APP_URL, dedupKey: 'alv-' + code + '-' + Date.now()
+    });
+  } else if (ev === 'logboek') {
+    cd_schrijfLogboek(code, sec, data.actie, data.veld, data.oudeWaarde, data.nieuweWaarde, actor);
+  } else if (ev === 'test') {
+    const who   = (data.who   || '').toString();
+    const title = (data.title || '🔔 Test melding').toString();
+    const body  = (data.body  || 'Notificaties werken correct!').toString();
+    cd_schrijfMelding('test', title, body, who || 'allen');
+  } else if (ev === 'create_task') {
+    const rij = cd_withLock(function(){ return cd_createTaskRow(categorie, code, naam, actiepunt, beh, deadline); });
+    // zelfde melding als bij een normale nieuwe taak
+    cd_notifyByTag('n_newtask', '1', {
+      title: '📋 Nieuwe taak — ' + (categorie || '').toLowerCase(),
+      body: code + (naam ? ' · ' + naam : '') + (beh ? ' → ' + beh : ''),
+      url: APP_URL, dedupKey: 'mailnew-' + code + '-' + Date.now()
+    });
+    if (beh) {
+      cd_splitBehandelaar(beh).forEach(name => {
+        if (name && name !== actor) {
+          cd_notifyByExternalId(name, 'n_assigned', '1', {
+            title: '➕ Toegewezen aan jou',
+            body: code + (naam ? ' · ' + naam : ''),
+            url: APP_URL, dedupKey: 'mailassign-' + code + '-' + name + '-' + Date.now()
+          });
+        }
+      });
+    }
+    cd_schrijfLogboek(code, categorie, 'Aangemaakt via mail-intake', '', '', actiepunt, actor || 'mail-intake');
+    return { ok: true, event: ev, rij: rij };
+  } else if (ev === 'ping') {
+    return { pong: true };
+  }
+  return { ok: true, event: ev };
+}
+
+// ════════════════════════════════════════════════════════════
+//  WEBHOOK — server-to-server endpoint (mail-intake).
+//  De frontend gaat via de Notif-wachtrij i.p.v. dit endpoint.
 // ════════════════════════════════════════════════════════════
 function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
     const secret = PropertiesService.getScriptProperties().getProperty('CD_WEBHOOK_SECRET');
     // FAIL CLOSED: ontbreekt het server-secret of klopt het niet, dan weigeren we.
-    // (Voorheen werd de check overgeslagen als de property leeg was → open endpoint.)
     if (!secret || data.secret !== secret) {
       return ContentService.createTextOutput(JSON.stringify({error:'forbidden'})).setMimeType(ContentService.MimeType.JSON);
     }
-    const ev = data.event;
-    const code = (data.code || '').toString();
-    const naam = (data.naam || '').toString();
-    const beh  = (data.behandelaar || '').toString();
-    const sec  = (data.sec || '').toString();
-    const actor = (data.actor || '').toString();
-    const categorie = (data.categorie || '').toString();
-    const actiepunt = (data.actiepunt || '').toString();
-    const deadline  = (data.deadline || '').toString();
-
-    if (ev === 'newtask') {
-      cd_notifyByTag('n_newtask', '1', {
-        title: '📋 Nieuwe taak — ' + sec.toLowerCase(),
-        body: code + (naam ? ' · ' + naam : '') + (beh ? ' → ' + beh : ''),
-        url: APP_URL, dedupKey: 'new-' + code + '-' + Date.now()
-      });
-      if (beh) {
-        cd_splitBehandelaar(beh).forEach(name => {
-          if (name && name !== actor) {
-            cd_notifyByExternalId(name, 'n_assigned', '1', {
-              title: '➕ Toegewezen aan jou',
-              body: code + (naam ? ' · ' + naam : ''),
-              url: APP_URL, dedupKey: 'assign-' + code + '-' + name + '-' + Date.now()
-            });
-          }
-        });
-      }
-    } else if (ev === 'assigned') {
-      if (beh) {
-        cd_splitBehandelaar(beh).forEach(name => {
-          if (name && name !== actor) {
-            cd_notifyByExternalId(name, 'n_assigned', '1', {
-              title: '➕ Toegewezen aan jou',
-              body: code + (naam ? ' · ' + naam : ''),
-              url: APP_URL, dedupKey: 'reassign-' + code + '-' + name + '-' + Date.now()
-            });
-          }
-        });
-      }
-    } else if (ev === 'completed') {
-      // Niet pushen, alleen loggen
-    } else if (ev === 'alv_update') {
-      cd_notifyByTag('n_alv', '1', {
-        title: data.title || '🏢 ALV-status verandert',
-        body: code + (naam ? ' · ' + naam : ''),
-        url: APP_URL, dedupKey: 'alv-' + code + '-' + Date.now()
-      });
-    } else if (ev === 'logboek') {
-      cd_schrijfLogboek(code, sec, data.actie, data.veld, data.oudeWaarde, data.nieuweWaarde, actor);
-    } else if (ev === 'test') {
-      const who   = (data.who   || '').toString();
-      const title = (data.title || '🔔 Test melding').toString();
-      const body  = (data.body  || 'Notificaties werken correct!').toString();
-      cd_schrijfMelding('test', title, body, who || 'allen');
-    } else if (ev === 'create_task') {
-      const rij = cd_withLock(function(){ return cd_createTaskRow(categorie, code, naam, actiepunt, beh, deadline); });
-      // zelfde melding als bij een normale nieuwe taak
-      cd_notifyByTag('n_newtask', '1', {
-        title: '📋 Nieuwe taak — ' + (categorie || '').toLowerCase(),
-        body: code + (naam ? ' · ' + naam : '') + (beh ? ' → ' + beh : ''),
-        url: APP_URL, dedupKey: 'mailnew-' + code + '-' + Date.now()
-      });
-      if (beh) {
-        cd_splitBehandelaar(beh).forEach(name => {
-          if (name && name !== actor) {
-            cd_notifyByExternalId(name, 'n_assigned', '1', {
-              title: '➕ Toegewezen aan jou',
-              body: code + (naam ? ' · ' + naam : ''),
-              url: APP_URL, dedupKey: 'mailassign-' + code + '-' + name + '-' + Date.now()
-            });
-          }
-        });
-      }
-      cd_schrijfLogboek(code, categorie, 'Aangemaakt via mail-intake', '', '', actiepunt, actor || 'mail-intake');
-      return ContentService.createTextOutput(JSON.stringify({ ok: true, event: ev, rij: rij }))
-        .setMimeType(ContentService.MimeType.JSON);
-    } else if (ev === 'ping') {
-      return ContentService.createTextOutput(JSON.stringify({pong: true})).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    return ContentService.createTextOutput(JSON.stringify({ok:true,event:ev})).setMimeType(ContentService.MimeType.JSON);
+    const result = cd_processNotifEvent(data);
+    return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({error: String(err)})).setMimeType(ContentService.MimeType.JSON);
   }
@@ -472,6 +488,53 @@ function doPost(e) {
 
 function doGet(e) {
   return ContentService.createTextOutput('Collectief Dashboard webhook. Use POST.').setMimeType(ContentService.MimeType.TEXT);
+}
+
+// ════════════════════════════════════════════════════════════
+//  NOTIF-WACHTRIJ — de frontend enqueuet hier (via OAuth-append);
+//  een onChange-trigger + 5-min veegbeurt sturen de push.
+// ════════════════════════════════════════════════════════════
+function cd_setupNotifQueue() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(NOTIF_QUEUE_SHEET);
+  if (!sheet) {
+    sheet = ss.insertSheet(NOTIF_QUEUE_SHEET);
+    sheet.appendRow(['Timestamp', 'Event', 'Payload', 'Verwerkt']);
+    sheet.setFrozenRows(1);
+  }
+  SpreadsheetApp.getUi().alert('✓ Tab "' + NOTIF_QUEUE_SHEET + '" staat klaar.');
+}
+
+// onChange vuurt — anders dan onEdit — óók bij wijzigingen via de Sheets-API.
+function cd_onNotifQueueChange(e) { cd_drainNotifQueue(); }
+
+// Vangnet: pakt rijen op die een gemiste onChange anders zou laten liggen.
+function cd_sweepNotifQueue() { cd_drainNotifQueue(); }
+
+function cd_drainNotifQueue() {
+  cd_lockedRun('cd_drainNotifQueue', function() {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(NOTIF_QUEUE_SHEET);
+    if (!sheet) return;
+    const last = sheet.getLastRow();
+    if (last < 2) return;
+    const rows = sheet.getRange(2, 1, last - 1, 4).getValues(); // A:D
+    for (let i = 0; i < rows.length; i++) {
+      const payload = rows[i][2], verwerkt = rows[i][3];
+      if (verwerkt) continue; // al gedaan (of door de andere trigger)
+      let data;
+      try { data = JSON.parse(payload); }
+      catch (err) { sheet.getRange(i + 2, 4).setValue('FOUT: ' + err); continue; }
+      try {
+        cd_processNotifEvent(data);
+        sheet.getRange(i + 2, 4).setValue(new Date().toISOString());
+      } catch (err) {
+        sheet.getRange(i + 2, 4).setValue('FOUT: ' + err);
+      }
+    }
+    const now = sheet.getLastRow();
+    if (now > NOTIF_QUEUE_MAX + 1) sheet.deleteRows(2, now - NOTIF_QUEUE_MAX - 1);
+  });
 }
 
 // ════════════════════════════════════════════════════════════
@@ -544,8 +607,26 @@ function cd_testPushToJer() {
   });
 }
 function setupWebhookSecret() {
-  // Geroteerd 2026-06-08 (oude secret stond in git-history + publieke index.html).
-  // Moet IDENTIEK zijn aan NOTIF_WEBHOOK_SECRET in index.html. Na wijzigen: deze
-  // functie één keer draaien én de nieuwe index.html pushen.
-  PropertiesService.getScriptProperties().setProperty('CD_WEBHOOK_SECRET', '0038352e880dab9ee033277cbb19ef68f3ca5378077ee09d');
+  // VEILIGHEID: het ECHTE secret staat ALLEEN in de live Apps Script-editor en in de
+  // Script Property CD_WEBHOOK_SECRET. Het mag NOOIT in dit (openbaar gevolgde) back-up-
+  // bestand of in index.html staan. Hieronder staat bewust een PLAATSHOUDER.
+  // Roteren = in de LIVE editor de echte waarde invullen en deze functie 1x draaien.
+  // (Geroteerd 2026-06-08: het oude secret was gelekt via git-history + publieke index.html.)
+  var nieuwSecret = 'ZET-DE-ECHTE-WAARDE-ALLEEN-IN-DE-LIVE-EDITOR';
+  var oudGelekt   = '0038352e880dab9ee033277cbb19ef68f3ca5378077ee09d';
+
+  // Vangnet: voorkomt dat deze plaatshouder per ongeluk als echt secret wordt ingesteld.
+  if (nieuwSecret.indexOf('ZET-DE-ECHTE') === 0) {
+    throw new Error('Vul eerst het echte secret in (in de LIVE editor), niet de plaatshouder uit de back-up.');
+  }
+
+  PropertiesService.getScriptProperties().setProperty('CD_WEBHOOK_SECRET', nieuwSecret);
+
+  var opgeslagen = PropertiesService.getScriptProperties().getProperty('CD_WEBHOOK_SECRET');
+  if (opgeslagen === nieuwSecret && nieuwSecret !== oudGelekt) {
+    Logger.log('✅ Gelukt — het secret is geroteerd (' + opgeslagen.length + ' tekens).');
+    Logger.log('   Het oude, gelekte wachtwoord werkt vanaf nu NIET meer.');
+  } else {
+    Logger.log('❌ Er ging iets mis — het secret is niet correct ingesteld.');
+  }
 }

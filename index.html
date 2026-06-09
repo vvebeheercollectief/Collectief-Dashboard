@@ -1157,7 +1157,8 @@
 // Fail-safe: alleen deze exacte hosts zijn PRODUCTIE; al het andere
 // (staging-branch, andere previews, localhost) draait op de TEST-data.
 const PROD_HOSTS = [
-  'collectief-dashboard.vercel.app',
+  'vvebeheercollectief.github.io',                            // ECHTE productie (GitHub Pages, source=main)
+  'collectief-dashboard.vercel.app',                          // Vercel-spiegel van main (parallel/handmatig)
   'collectief-dashboard-vve-beheer-collectief.vercel.app',
   'collectief-dashboard-vvebeheercollectief-vve-beheer-collectief.vercel.app',
   'collectief-dashboard-git-main-vve-beheer-collectief.vercel.app',
@@ -4093,6 +4094,7 @@ if (location.search.includes('test=1')) {
   truthy('staging host = staging',       _isStagingHost('collectief-dashboard-git-staging-vve-beheer-collectief.vercel.app') === true);
   truthy('andere preview = staging (veilig)', _isStagingHost('collectief-dashboard-git-experiment-vve-beheer-collectief.vercel.app') === true);
   truthy('localhost = staging',          _isStagingHost('localhost') === true);
+  truthy('github.io = echte productie (geen staging)', _isStagingHost('vvebeheercollectief.github.io') === false);
 
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');

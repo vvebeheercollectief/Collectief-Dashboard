@@ -98,7 +98,7 @@ function renderNtd(){
   // Tabs
   document.getElementById('ntd-tabs').innerHTML=SKEYS.map(s=>{
     const rows=filterNtd(D.ntd[s]||[],q,fCode,fBeh,fPrio,s);
-    return`<div class="tab ${s===state.activeNtd?'on':''}" style="${s===state.activeNtd?SECS[s].css:''}" onclick="setNtd('${s}')">${SECS[s].label}<span class="cnt">${rows.length}</span></div>`;
+    return`<div class="tab ${s===state.activeNtd?'on':''}" style="${s===state.activeNtd?SECS[s].css:''}" data-action="ntd-sectie" data-sec="${s}">${SECS[s].label}<span class="cnt">${rows.length}</span></div>`;
   }).join('');
 
   document.getElementById('ntd-title').textContent=SECS[state.activeNtd].label;
@@ -149,7 +149,7 @@ function renderAf(){
   const q=document.getElementById('s-af').value.toLowerCase();
   document.getElementById('af-tabs').innerHTML=SKEYS.map(s=>{
     const rows=filt(D.af[s]||[],q);
-    return`<div class="tab ${s===state.activeAf?'on':''}" style="${s===state.activeAf?SECS[s].css:''}" onclick="setAf('${s}')">${SECS[s].label}<span class="cnt">${rows.length}</span></div>`;
+    return`<div class="tab ${s===state.activeAf?'on':''}" style="${s===state.activeAf?SECS[s].css:''}" data-action="af-sectie" data-sec="${s}">${SECS[s].label}<span class="cnt">${rows.length}</span></div>`;
   }).join('');
   const cols=['VvE Code','VvE','Categorie','Subcategorie','Afgerond op','Opmerking'];
   renderThead('af-thead',cols,SECS[state.activeAf].css);
@@ -214,7 +214,7 @@ function flagPill(idx,field,val){
   const lbl=val?'✓ Ja':'–';
   const aria=val?'true':'false';
   const title=`Klik om ${ALVO_LABELS[field]} ${val?'uit':'aan'} te zetten`;
-  return`<button type="button" class="flag-toggle ${cls}" data-idx="${idx}" data-field="${field}" aria-pressed="${aria}" title="${title}" onclick="toggleAlvoFlag(${idx},'${field}')">${lbl}</button>`;
+  return`<button type="button" class="flag-toggle ${cls}" data-action="alvo-flag" data-idx="${idx}" data-field="${field}" aria-pressed="${aria}" title="${title}">${lbl}</button>`;
 }
 
 function _recomputeAlvoStatus(r){
@@ -339,11 +339,11 @@ function deadlineCel(r, sec){
 function rowNtd(r,sec){
   const css=SECS[sec].css;
   const rid=state._rowCache.length; state._rowCache.push(r);
-  const editBtn=`<button class="btn-edit" onclick="editRow(${rid})" title="Bewerken"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><button class="btn-done" onclick="completeTask(${rid})" title="Afgehandeld"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></button>`;
+  const editBtn=`<button class="btn-edit" data-action="taak-bewerken" data-rid="${rid}" title="Bewerken"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><button class="btn-done" data-action="taak-afronden" data-rid="${rid}" title="Afgehandeld"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></button>`;
   let cells='';
   const _stilDagen = bepaalStil(r, sec);
   const stilPill = _stilDagen !== null
-    ? `<span class="pill-stil" onclick="event.stopPropagation(); editRow(${rid})" title="Geen activiteit in ${_stilDagen} dagen">Stil ${_stilDagen}d</span>`
+    ? `<span class="pill-stil" data-action="taak-bewerken" data-rid="${rid}" title="Geen activiteit in ${_stilDagen} dagen">Stil ${_stilDagen}d</span>`
     : '';
   switch(sec){
     case'OPPAKKEN':

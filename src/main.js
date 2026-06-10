@@ -10,23 +10,23 @@ import { D, pgs, _shownToasts, _undoStack, state } from './state.js';
 import {
   displayName, filt, PRIO_REGELS, STIL_DREMPEL_DAGEN, _vandaagAmsterdam,
   _verschilInKalenderdagen, berekenPrioriteit, prioBadge, persBadges, ibBadge,
-  adjOff, offProg, _MAANDEN, _parseAnyDate, parseDt, toISODate, toDutchDate,
+  _MAANDEN, _parseAnyDate, parseDt, toISODate, toDutchDate,
   emptyRow, esc, subBadge,
 } from './util.js';
 import { fetchSheet, writeRange, appendRange, _shiftNtdRows, _isTransient, _withRetry } from './api.js';
-import { doOAuth, fetchUserEmail, doLogin, ensureToken } from './auth.js';
+import { doOAuth, fetchUserEmail, ensureToken } from './auth.js';
 import { goTo, closeSb, applyTheme, applyDensity, cycleDensity, setupSearch } from './ui.js';
 import { buildAnalytics, buildDash } from './render-analytics.js';
 import {
   renderNtd, renderAf, renderAlvo, renderAlfa, renderNtdStats, renderNtdDonut,
-  setNtd, setAf, toggleAlvoFlag, renderThead, renderPag,
+  renderThead, renderPag,
 } from './render-lijsten.js';
 import {
-  renderOntw, renderLogboek, parseOntw, parseLogboek, setOntw, openOntwModal, closeOntwModal,
-  submitOntwItem, deleteOntwItem, editOntwItem, addTaskNote, histNoteKey, renderTaskHistory, logEvent, logZin,
+  renderOntw, renderLogboek, parseOntw, parseLogboek, openOntwModal, closeOntwModal,
+  submitOntwItem, deleteOntwItem, histNoteKey, renderTaskHistory, logEvent, logZin,
 } from './render-overig.js';
 import {
-  openAiHelp, closeAiHelp, buildAiPrompt, parseAiAnswer, copyAiPrompt,
+  openAiHelp, closeAiHelp, buildAiPrompt, parseAiAnswer,
   aiOvernemen, aiActieTaak, aiKopieerConcept,
 } from './ai.js';
 import {
@@ -35,8 +35,8 @@ import {
   startNotifPoll, undoComplete,
 } from './notifications.js';
 import {
-  openModal, editRow, closeModal, submitTask, doCompleteTask, closeCompleteModal,
-  completeTask, deleteCurrentEditTask, onCodeInput,
+  openModal, closeModal, submitTask, doCompleteTask, closeCompleteModal,
+  onCodeInput,
 } from './crud.js';
 import { loadAll } from './data.js';
 import { initActions } from './actions.js';
@@ -118,7 +118,6 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('overlay').onclick=closeSb;
 
   document.getElementById('btn-add').onclick=()=>openModal(false);
-  window.editRow=idx=>openModal(true,state._rowCache[idx]);
   document.getElementById('m-close').onclick=closeModal;
   document.getElementById('m-cancel').onclick=closeModal;
   let _modalMouseDownTarget=null;
@@ -224,7 +223,6 @@ if (location.search.includes('test=1')) import('./tests.js');
 // Houdt de 35 inline on*-handlers + de paginerings-callback werkend nu de
 // functies module-scoped zijn. Opgeruimd zodra alles via data-action loopt.
 Object.assign(window, {
-  setNtd, setAf, toggleAlvoFlag, editRow, completeTask,
-  aiOvernemen, aiActieTaak, aiKopieerConcept, setOntw, editOntwItem, dismissToast,
+  aiOvernemen, aiActieTaak, aiKopieerConcept, dismissToast,
   pgs, renderNtd, renderAf, renderAlvo, renderAlfa, renderOntw, renderLogboek,
 });

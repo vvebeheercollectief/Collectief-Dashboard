@@ -5,7 +5,7 @@ import { esc, filt, prioBadge, persBadges, ibBadge, subBadge, offProg, emptyRow,
 import { SID, SECS, SKEYS, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { ensureToken } from "./auth.js";
-import { getSheetIds } from "./main.js";
+import { getSheetIds } from "./crud.js";
 import { logEvent } from "./render-overig.js";
 import { showToast } from "./notifications.js";
 

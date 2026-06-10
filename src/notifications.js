@@ -7,7 +7,8 @@ import { SID, ONESIGNAL_APP_ID } from "./config.js";
 import { ensureToken } from "./auth.js";
 import { fetchSheet, appendRange } from "./api.js";
 import { logEvent } from "./render-overig.js";
-import { getSheetIds, loadAll, insertAndWriteRow, getInsertRow } from "./main.js";
+import { getSheetIds, insertAndWriteRow, getInsertRow } from "./crud.js";
+import { loadAll } from "./main.js";
 
 //  NOTIF — enqueuet event in de Notif-wachtrij én toont directe in-app toast
 // ══════════════════════════════════════

@@ -7,7 +7,8 @@ import { state, D, pgs } from "./state.js";
 import { ensureToken } from "./auth.js";
 import { writeRange, appendRange } from "./api.js";
 import { renderThead, renderPag } from "./render-lijsten.js";
-import { loadAll, getSheetIds } from "./main.js";
+import { getSheetIds } from "./crud.js";
+import { loadAll } from "./main.js";
 
 // ══════════════════════════════════════
 //  ONTWIKKELING

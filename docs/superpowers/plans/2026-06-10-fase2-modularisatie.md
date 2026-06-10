@@ -595,26 +595,26 @@ git push origin staging
 
 **Files:** geen wijziging (alleen controle).
 
-- [ ] **Stap 1: Controleer op string-naar-code.**
+- [x] **Stap 1: Controleer op string-naar-code.**
 ```bash
 grep -nE '\beval\(|new Function\(' index.html src/*.js   # verwacht: geen treffers
 ```
 (De paginerings-callback-truc was het enige patroon dat hierop leek en is in B4 verwijderd.)
 
-- [ ] **Stap 2: Controleer op inline `<script>` zonder src.**
+- [x] **Stap 2: Controleer op inline `<script>` zonder src.**
 ```bash
 grep -nE '<script(?![^>]*src=)' index.html   # verwacht: geen inline scriptblok meer (alleen <script ... src=...>)
 ```
-- [ ] **Stap 3: Noteer bevindingen.** Als iets `eval`/inline-script gebruikt: stop en los eerst op (mag niet onder strikte script-CSP).
+- [x] **Stap 3: Noteer bevindingen.** Als iets `eval`/inline-script gebruikt: stop en los eerst op (mag niet onder strikte script-CSP).
 
 ### Task C2: CSP aanscherpen + empirisch dichttimmeren op de test-link
 
 **Files:**
 - Modify: `index.html` (regel 11, de CSP-`<meta>`)
 
-- [ ] **Stap 1: Vervang de CSP** door de eind-CSP uit de sectie "Eind-CSP" (`script-src` zonder `'unsafe-inline'`/`'unsafe-eval'`, stray `unpkg.com` weg).
+- [x] **Stap 1: Vervang de CSP** door de eind-CSP uit de sectie "Eind-CSP" (`script-src` zonder `'unsafe-inline'`/`'unsafe-eval'`, stray `unpkg.com` weg).
 
-- [ ] **Stap 2: Push naar `staging` en open de test-link met de console open.**
+- [x] **Stap 2: Push naar `staging` en open de test-link met de console open.**
 ```bash
 git add index.html && git commit -m "Fase 2C: script-CSP aanscherpen (unsafe-inline/eval eruit)" && git push origin staging
 ```

@@ -22,7 +22,7 @@ IJkpunt zelftest vóór dit plan: **56 OK, 0 FAIL**.
 - Create: `src/vve-zoekveld.js`
 - Modify: `src/tests.js`
 
-- [ ] **Stap 1: Schrijf de falende test.** In `src/tests.js`, ná de `_isStagingHost`-asserts en vóór de actions-registry-sectie:
+- [x] **Stap 1: Schrijf de falende test.** In `src/tests.js`, ná de `_isStagingHost`-asserts en vóór de actions-registry-sectie:
 
 ```js
   // ── filterVves ── (VvE-zoekveld: zoekt op code én naam, case-insensitief)
@@ -36,9 +36,9 @@ IJkpunt zelftest vóór dit plan: **56 OK, 0 FAIL**.
 ```
 en bovenaan de import: `import { filterVves } from "./vve-zoekveld.js";`
 
-- [ ] **Stap 2: Run en zie hem falen.** Preview + cache-bust-routine, `?test=1`. Verwacht: module-resolve-fout ("vve-zoekveld.js" bestaat niet) → tests draaien niet. Dat is de rode fase.
+- [x] **Stap 2: Run en zie hem falen.** Preview + cache-bust-routine, `?test=1`. Verwacht: module-resolve-fout ("vve-zoekveld.js" bestaat niet) → tests draaien niet. Dat is de rode fase.
 
-- [ ] **Stap 3: Minimale implementatie.** Maak `src/vve-zoekveld.js`:
+- [x] **Stap 3: Minimale implementatie.** Maak `src/vve-zoekveld.js`:
 
 ```js
 // ══════════════════════════════════════
@@ -58,9 +58,9 @@ function filterVves(q, lijst){
 export { filterVves };
 ```
 
-- [ ] **Stap 4: Run en zie hem slagen.** Cache-bust + `?test=1`. Verwacht: **62 OK, 0 FAIL** (56+6).
+- [x] **Stap 4: Run en zie hem slagen.** Cache-bust + `?test=1`. Verwacht: **62 OK, 0 FAIL** (56+6).
 
-- [ ] **Stap 5: Commit.**
+- [x] **Stap 5: Commit.**
 ```bash
 git add src/vve-zoekveld.js src/tests.js
 git commit -m "feat: filterVves (zoeken op VvE-code en -naam) + zelftests"
@@ -71,7 +71,7 @@ git commit -m "feat: filterVves (zoeken op VvE-code en -naam) + zelftests"
 **Files:**
 - Modify: `src/vve-zoekveld.js`, `src/crud.js` (onCodeInput/selectVvE eruit), `src/main.js`
 
-- [ ] **Stap 1: Component toevoegen** aan `src/vve-zoekveld.js` (onder `filterVves`):
+- [x] **Stap 1: Component toevoegen** aan `src/vve-zoekveld.js` (onder `filterVves`):
 
 ```js
 function sugItemsHtml(matches){
@@ -110,7 +110,7 @@ export { filterVves, sugItemsHtml, initVveZoekveld };
 ```
 (Vervang de bestaande `export { filterVves };`-regel door dit export-blok.)
 
-- [ ] **Stap 2: Taakmodal omhangen.** In `src/crud.js`: verwijder de functies `onCodeInput` en `selectVvE` (regels ~82–106, sectie "VvE CODE AUTOCOMPLETE") en haal beide namen uit het export-blok onderaan. In `src/main.js`: vervang het blok
+- [x] **Stap 2: Taakmodal omhangen.** In `src/crud.js`: verwijder de functies `onCodeInput` en `selectVvE` (regels ~82–106, sectie "VvE CODE AUTOCOMPLETE") en haal beide namen uit het export-blok onderaan. In `src/main.js`: vervang het blok
 
 ```js
   // VvE autocomplete
@@ -133,7 +133,7 @@ door
 ```
 en pas de imports aan: `onCodeInput` weg uit de crud-import; nieuwe regel `import { initVveZoekveld } from './vve-zoekveld.js';`
 
-- [ ] **Stap 3: Verifieer.** Cache-bust + reload. Uitgelogd is `D.alvo` leeg, dus test met nepdata via `preview_eval`:
+- [x] **Stap 3: Verifieer.** Cache-bust + reload. Uitgelogd is `D.alvo` leeg, dus test met nepdata via `preview_eval`:
 ```js
 (async()=>{ const st=await import('./src/state.js');
   st.D.alvo=[{code:'VVE-001',naam:'Parkzicht'},{code:'VVE-002',naam:'De Boog'}];
@@ -146,7 +146,7 @@ en pas de imports aan: `onCodeInput` weg uit de crud-import; nieuwe regel `impor
 ```
 Verwacht: `zichtbaar:true, code:'VVE-001', naam:'Parkzicht'`. `?test=1` → 62 OK.
 
-- [ ] **Stap 4: Commit.**
+- [x] **Stap 4: Commit.**
 ```bash
 git add src/vve-zoekveld.js src/crud.js src/main.js
 git commit -m "feat: herbruikbaar VvE-zoekveld-component; taakmodal gebruikt het"
@@ -157,7 +157,7 @@ git commit -m "feat: herbruikbaar VvE-zoekveld-component; taakmodal gebruikt het
 **Files:**
 - Modify: `index.html` (regel 665), `src/ai.js` (regels 16–24, 69, 132), `src/state.js`, `src/main.js`, `styles.css`
 
-- [ ] **Stap 1: Markup.** In `index.html` vervang regel 665 (`<select id="ai-vve" …></select>`) door:
+- [x] **Stap 1: Markup.** In `index.html` vervang regel 665 (`<select id="ai-vve" …></select>`) door:
 
 ```html
           <div class="ai-vve-wrap">
@@ -167,7 +167,7 @@ git commit -m "feat: herbruikbaar VvE-zoekveld-component; taakmodal gebruikt het
           </div>
 ```
 
-- [ ] **Stap 2: CSS.** Onderaan `styles.css`:
+- [x] **Stap 2: CSS.** Onderaan `styles.css`:
 
 ```css
     /* ── AI-hulp VvE-zoekveld ── */
@@ -178,12 +178,12 @@ git commit -m "feat: herbruikbaar VvE-zoekveld-component; taakmodal gebruikt het
     .ai-vve-wrap .vve-suggestions{max-height:240px}
 ```
 
-- [ ] **Stap 3: State.** In `src/state.js`, in het `state`-object onder `_aiLastNaam: '',` toevoegen:
+- [x] **Stap 3: State.** In `src/state.js`, in het `state`-object onder `_aiLastNaam: '',` toevoegen:
 ```js
   _aiVveCode: '',
 ```
 
-- [ ] **Stap 4: `src/ai.js` omhangen.** (a) In `openAiHelp` (regels 16–24) vervang het select-vullen:
+- [x] **Stap 4: `src/ai.js` omhangen.** (a) In `openAiHelp` (regels 16–24) vervang het select-vullen:
 ```js
 function openAiHelp(){
   // zoekveld toont de actuele koppeling (suggesties komen live uit D.alvo bij focus)
@@ -193,7 +193,7 @@ function openAiHelp(){
 (b) In `buildAiPrompt` regel 69: `const code=document.getElementById('ai-vve').value;` → `const code=state._aiVveCode;`
 (c) In `parseAiAnswer` regel 132: idem.
 
-- [ ] **Stap 5: Wiring in `src/main.js`.** Vervang in het AI-blok de regel `document.getElementById('ai-vve').addEventListener('change',()=>{buildAiPrompt();parseAiAnswer();});` door:
+- [x] **Stap 5: Wiring in `src/main.js`.** Vervang in het AI-blok de regel `document.getElementById('ai-vve').addEventListener('change',()=>{buildAiPrompt();parseAiAnswer();});` door:
 
 ```js
   const aiVveInput=document.getElementById('ai-vve-input');
@@ -212,7 +212,7 @@ function openAiHelp(){
   aiVveWis.onclick=()=>zetAiVve('','');
 ```
 
-- [ ] **Stap 6: Verifieer.** Cache-bust + reload, dan `preview_eval`:
+- [x] **Stap 6: Verifieer.** Cache-bust + reload, dan `preview_eval`:
 ```js
 (async()=>{ const st=await import('./src/state.js'); const ai=await import('./src/ai.js');
   st.D.alvo=[{code:'VVE-001',naam:'Parkzicht'},{code:'VVE-002',naam:'De Boog'}];
@@ -231,7 +231,7 @@ function openAiHelp(){
 ```
 Verwacht: `lijstBijFocus:2`, `naSelect:{code:'VVE-002',veld:'VVE-002 — De Boog',wisZichtbaar:true}`, `naWis:{code:'',veld:''}`. Plus: geen console-fouten, `?test=1` → 62 OK.
 
-- [ ] **Stap 7: Commit.**
+- [x] **Stap 7: Commit.**
 ```bash
 git add index.html styles.css src/state.js src/ai.js src/main.js
 git commit -m "feat: AI-hulp VvE-koppeling als typebaar zoekveld (code+naam, lijst bij focus, wis-knop)"
@@ -243,7 +243,7 @@ git commit -m "feat: AI-hulp VvE-koppeling als typebaar zoekveld (code+naam, lij
 - Create: `src/anim.js`
 - Modify: `styles.css`, `src/render-lijsten.js` (regel 401), `src/render-overig.js` (ontw-`<tr>`), `src/state.js`, `src/main.js` (8s-poll)
 
-- [ ] **Stap 1: CSS.** Onderaan `styles.css`:
+- [x] **Stap 1: CSS.** Onderaan `styles.css`:
 
 ```css
     /* ── Rij-overgangen: kleurpuls + fade bij acties (effect B, sterkte 2) ── */
@@ -262,7 +262,7 @@ git commit -m "feat: AI-hulp VvE-koppeling als typebaar zoekveld (code+naam, lij
     }
 ```
 
-- [ ] **Stap 2: `src/anim.js`:**
+- [x] **Stap 2: `src/anim.js`:**
 
 ```js
 // ══════════════════════════════════════
@@ -297,13 +297,13 @@ function flashRow(tbodyId, row, cls = 'rij-flits'){
 export { animateRowOut, flashRow };
 ```
 
-- [ ] **Stap 3: `data-row` op rijen.** `src/render-lijsten.js` regel 401: `return `<tr class="${rowCls}">${cells}</tr>`;` → `return `<tr class="${rowCls}" data-row="${r._row}">${cells}</tr>`;`. `src/render-overig.js` (renderOntw, regel ~58): `return`<tr>` → `return`<tr data-row="${r._row}">`.
+- [x] **Stap 3: `data-row` op rijen.** `src/render-lijsten.js` regel 401: `return `<tr class="${rowCls}">${cells}</tr>`;` → `return `<tr class="${rowCls}" data-row="${r._row}">${cells}</tr>`;`. `src/render-overig.js` (renderOntw, regel ~58): `return`<tr>` → `return`<tr data-row="${r._row}">`.
 
-- [ ] **Stap 4: Guard.** `src/state.js`: voeg in het `state`-object toe (onder `_loadAgain: false,`): `_animBusy: false,`. `src/main.js`, in de 8s-interval direct onder `if(state.pendingWrites>0) return;`: `if(state._animBusy) return;`
+- [x] **Stap 4: Guard.** `src/state.js`: voeg in het `state`-object toe (onder `_loadAgain: false,`): `_animBusy: false,`. `src/main.js`, in de 8s-interval direct onder `if(state.pendingWrites>0) return;`: `if(state._animBusy) return;`
 
-- [ ] **Stap 5: Verifieer fundament.** Cache-bust + reload; `preview_eval`: `import('./src/anim.js').then(m=>typeof m.animateRowOut+','+typeof m.flashRow)` → `"function,function"`. `?test=1` → 62 OK, geen console-fouten.
+- [x] **Stap 5: Verifieer fundament.** Cache-bust + reload; `preview_eval`: `import('./src/anim.js').then(m=>typeof m.animateRowOut+','+typeof m.flashRow)` → `"function,function"`. `?test=1` → 62 OK, geen console-fouten.
 
-- [ ] **Stap 6: Commit.**
+- [x] **Stap 6: Commit.**
 ```bash
 git add styles.css src/anim.js src/render-lijsten.js src/render-overig.js src/state.js src/main.js
 git commit -m "feat: animatie-fundament (pulsklassen, data-row, anim.js, poll-guard)"
@@ -314,7 +314,7 @@ git commit -m "feat: animatie-fundament (pulsklassen, data-row, anim.js, poll-gu
 **Files:**
 - Modify: `src/crud.js` (doCompleteTask, regels ~240–247)
 
-- [ ] **Stap 1: Ombouwen.** In `doCompleteTask`, vervang het blok "1) optimistisch …" t/m `showUndoToast(…)`:
+- [x] **Stap 1: Ombouwen.** In `doCompleteTask`, vervang het blok "1) optimistisch …" t/m `showUndoToast(…)`:
 
 ```js
     // 1) optimistisch: meteen uit de lokale lijst + indexen meeschuiven;
@@ -333,7 +333,7 @@ en vervang de losse regel `renderAll();` uit dat blok door — ná de `backgroun
 ```
 Imports in `crud.js`: `import { animateRowOut, flashRow } from './anim.js';` (flashRow is voor Task 8).
 
-- [ ] **Stap 2: Verifieer met nepdata** (uitgelogd kan de write niet slagen, maar puls + lokale flow wel — de foutmelding "Afronden mislukt" met rollback is dan juist het bewijs dat het vangnet werkt):
+- [x] **Stap 2: Verifieer met nepdata** (uitgelogd kan de write niet slagen, maar puls + lokale flow wel — de foutmelding "Afronden mislukt" met rollback is dan juist het bewijs dat het vangnet werkt):
 ```js
 (async()=>{ const st=await import('./src/state.js'); const c=await import('./src/crud.js'); const m=await import('./src/main.js');
   st.D.ntd.OPPAKKEN=[{_row:3,_sec:'OPPAKKEN',code:'TEST-1',naam:'Demo',actiepunt:'Pulstest',deadline:'',behandelaar:'',prioriteit:'',opmerkingen:'',inBehandeling:'',subcategorie:''}];
@@ -343,9 +343,9 @@ Imports in `crud.js`: `import { animateRowOut, flashRow } from './anim.js';` (fl
 ```
 Daarna `renderAll` is al gedraaid via goTo? Zo niet: roep in dezelfde eval `document.querySelector('[data-action="ntd-sectie"]')` na — eenvoudiger: voer ná bovenstaande een tweede eval uit die `#ntd-tbody tr[data-row="3"]` controleert, op het vinkje klikt (`[data-action="taak-afronden"]`), de afrond-modal bevestigt (`#complete-confirm`), en checkt: (a) tr krijgt klasse `rij-puls-groen`, (b) undo-toast zichtbaar, (c) na ~1,3s is de rij weg. Console: "Afronden mislukt"-toast mag (nep-token), rij komt door rollback terug — óók goed om te zien.
 
-- [ ] **Stap 3: Opruimen testdata.** Reload de preview (vers, zonder nepdata). `?test=1` → 62 OK.
+- [x] **Stap 3: Opruimen testdata.** Reload de preview (vers, zonder nepdata). `?test=1` → 62 OK.
 
-- [ ] **Stap 4: Commit.**
+- [x] **Stap 4: Commit.**
 ```bash
 git add src/crud.js
 git commit -m "feat: groene puls + fade bij taak afronden"
@@ -356,7 +356,7 @@ git commit -m "feat: groene puls + fade bij taak afronden"
 **Files:**
 - Modify: `src/crud.js` (deleteTaskRow, regels ~156–173), `src/notifications.js` (undoDelete + export)
 
-- [ ] **Stap 1: `deleteTaskRow` vervangen** door:
+- [x] **Stap 1: `deleteTaskRow` vervangen** door:
 
 ```js
 async function deleteTaskRow(r){
@@ -396,7 +396,7 @@ async function deleteTaskRow(r){
 ```
 Imports: `crud.js` importeert al `backgroundWrite`? Zo nee: `import { backgroundWrite, loadAll } from './data.js';` aanvullen. Voeg `undoDelete` toe aan de notifications-import van crud.js.
 
-- [ ] **Stap 2: `undoDelete` in `src/notifications.js`** (onder `undoComplete`), en toevoegen aan het export-blok:
+- [x] **Stap 2: `undoDelete` in `src/notifications.js`** (onder `undoComplete`), en toevoegen aan het export-blok:
 
 ```js
 async function undoDelete(undoData) {
@@ -414,9 +414,9 @@ async function undoDelete(undoData) {
 ```
 (`getInsertRow`, `insertAndWriteRow`, `logEvent`, `loadAll`, `ensureToken` zijn daar al geïmporteerd t.b.v. `undoComplete` — controleer en vul aan waar nodig.)
 
-- [ ] **Stap 3: Verifieer** zoals Task 5 stap 2, maar via bewerken-modal: nepdata-rij, potlood (`[data-action="taak-bewerken"]`), dan `#m-del` (verwijder-knop): (a) géén confirm-pop-up meer, (b) rode puls, (c) undo-toast "🗑️ Taak verwijderd", (d) rij weg na animatie, (e) "Verwijderen mislukt"-rollback (nep-token) zet de rij terug. Reload daarna vers; `?test=1` → 62 OK.
+- [x] **Stap 3: Verifieer** zoals Task 5 stap 2, maar via bewerken-modal: nepdata-rij, potlood (`[data-action="taak-bewerken"]`), dan `#m-del` (verwijder-knop): (a) géén confirm-pop-up meer, (b) rode puls, (c) undo-toast "🗑️ Taak verwijderd", (d) rij weg na animatie, (e) "Verwijderen mislukt"-rollback (nep-token) zet de rij terug. Reload daarna vers; `?test=1` → 62 OK.
 
-- [ ] **Stap 4: Commit.**
+- [x] **Stap 4: Commit.**
 ```bash
 git add src/crud.js src/notifications.js
 git commit -m "feat: taak verwijderen optimistisch met rode puls en ongedaan-maken (confirm-popup weg)"
@@ -427,7 +427,7 @@ git commit -m "feat: taak verwijderen optimistisch met rode puls en ongedaan-mak
 **Files:**
 - Modify: `src/render-overig.js` (deleteOntwItem, regels ~118–134 + imports)
 
-- [ ] **Stap 1: `deleteOntwItem` vervangen** door:
+- [x] **Stap 1: `deleteOntwItem` vervangen** door:
 
 ```js
 async function deleteOntwItem(){
@@ -473,9 +473,9 @@ async function undoOntwDelete(values, titel){
 ```
 Imports aanvullen in `render-overig.js`: `showToast, showUndoToast` bij de notifications-import; `backgroundWrite` bij de data-import; `import { animateRowOut } from './anim.js';`.
 
-- [ ] **Stap 2: Verifieer** met nepdata in `D.ontw` (zelfde recept; item bewerken → 🗑️): geen confirm, rode puls, undo-toast, rollback bij nep-token. Reload vers; `?test=1` → 62 OK.
+- [x] **Stap 2: Verifieer** met nepdata in `D.ontw` (zelfde recept; item bewerken → 🗑️): geen confirm, rode puls, undo-toast, rollback bij nep-token. Reload vers; `?test=1` → 62 OK.
 
-- [ ] **Stap 3: Commit.**
+- [x] **Stap 3: Commit.**
 ```bash
 git add src/render-overig.js
 git commit -m "feat: Ontwikkeling-item verwijderen optimistisch met rode puls en ongedaan-maken"
@@ -486,9 +486,9 @@ git commit -m "feat: Ontwikkeling-item verwijderen optimistisch met rode puls en
 **Files:**
 - Modify: `src/crud.js` (submitTask), `src/notifications.js` (undoComplete + undoDelete)
 
-- [ ] **Stap 1: submitTask.** In het bewerken-pad, direct ná `renderAll();`: `flashRow('ntd-tbody', doelRow._row);`. In het toevoegen-pad, direct ná `renderAll();`: `flashRow('ntd-tbody', nieuw._row, 'rij-flits-groen');`
+- [x] **Stap 1: submitTask.** In het bewerken-pad, direct ná `renderAll();`: `flashRow('ntd-tbody', doelRow._row);`. In het toevoegen-pad, direct ná `renderAll();`: `flashRow('ntd-tbody', nieuw._row, 'rij-flits-groen');`
 
-- [ ] **Stap 2: Teruggezet-flits (best effort).** In `undoComplete` én `undoDelete`, ná `await loadAll();`:
+- [x] **Stap 2: Teruggezet-flits (best effort).** In `undoComplete` én `undoDelete`, ná `await loadAll();`:
 
 ```js
     const terug=(D.ntd[sec]||[]).filter(x=>x.code===undoData.code).pop();
@@ -496,9 +496,9 @@ git commit -m "feat: Ontwikkeling-item verwijderen optimistisch met rode puls en
 ```
 Imports in notifications.js: `import { flashRow } from './anim.js';` en `D` bij de state-import (controleer of `D` daar al geïmporteerd is — `undoComplete` gebruikt `D.af`, dus ja).
 
-- [ ] **Stap 3: Verifieer** met nepdata: taak toevoegen (groene flits op nieuwe rij), bewerken+opslaan (teal-flits). Reload vers; `?test=1` → 62 OK.
+- [x] **Stap 3: Verifieer** met nepdata: taak toevoegen (groene flits op nieuwe rij), bewerken+opslaan (teal-flits). Reload vers; `?test=1` → 62 OK.
 
-- [ ] **Stap 4: Commit.**
+- [x] **Stap 4: Commit.**
 ```bash
 git add src/crud.js src/notifications.js
 git commit -m "feat: rij-flits bij bewerken (teal), toevoegen (groen) en teruggezet (amber)"
@@ -506,38 +506,38 @@ git commit -m "feat: rij-flits bij bewerken (teal), toevoegen (groen) en terugge
 
 ### Task 9: Features compleet — verificatie + push naar staging
 
-- [ ] **Stap 1:** Volledige uitgelogde doorloop op de preview (alle pagina's, modals, zoekvelden, animaties via nepdata-recepten), console schoon (bekende OneSignal-timeout uitgezonderd), `?test=1` → **62 OK, 0 FAIL**.
-- [ ] **Stap 2:** `git push origin staging`; controleer met `curl -sL …/src/vve-zoekveld.js | head -3` dat de test-link de nieuwe modules serveert (géén `?cb=`-query gebruiken — geeft een redirect-pagina).
+- [x] **Stap 1:** Volledige uitgelogde doorloop op de preview (alle pagina's, modals, zoekvelden, animaties via nepdata-recepten), console schoon (bekende OneSignal-timeout uitgezonderd), `?test=1` → **62 OK, 0 FAIL**.
+- [x] **Stap 2:** `git push origin staging`; controleer met `curl -sL …/src/vve-zoekveld.js | head -3` dat de test-link de nieuwe modules serveert (géén `?cb=`-query gebruiken — geeft een redirect-pagina).
 
 ### Task 10: Mijlpaal C — script-CSP dichttimmeren
 
 **Files:**
 - Modify: `index.html` (regel 11)
 
-- [ ] **Stap 1: Voorcontrole (C1).**
+- [x] **Stap 1: Voorcontrole (C1).**
 ```bash
 grep -n "eval\|new Function" index.html src/*.js | grep -v "evalu"   # verwacht: alleen de CSP-meta zelf
 grep -cE "<script" index.html                                          # verwacht: 4, allemaal met src=
 ```
 ⚠ Vermijd `(` in grep-patronen (geeft hier soms een ENOSPC-schijnfout in de tooling).
 
-- [ ] **Stap 2: CSP aanscherpen (C2).** In regel 11 het `script-src`-deel:
+- [x] **Stap 2: CSP aanscherpen (C2).** In regel 11 het `script-src`-deel:
 `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://accounts.google.com https://cdn.onesignal.com https://unpkg.com;` → `script-src 'self' https://cdn.jsdelivr.net https://accounts.google.com https://cdn.onesignal.com;`
 (De rest van de CSP blijft staan; `style-src` houdt bewust `'unsafe-inline'`.)
 
-- [ ] **Stap 3: Lokale rooktest.** Cache-bust + reload: boot voltooit, login-scherm rendert, geen CSP-fouten in console, `?test=1` → 62 OK.
+- [x] **Stap 3: Lokale rooktest.** Cache-bust + reload: boot voltooit, login-scherm rendert, geen CSP-fouten in console, `?test=1` → 62 OK.
 
-- [ ] **Stap 4: Commit + push, empirisch dichttimmeren op de test-link.**
+- [x] **Stap 4: Commit + push, empirisch dichttimmeren op de test-link.**
 ```bash
 git add index.html && git commit -m "Fase 2C: script-CSP aanscherpen (unsafe-inline/eval en unpkg weg)" && git push origin staging
 ```
 Op de test-link met console open: login (Google Sign-In), data laden, grafieken (Chart.js), meldingen-modal, service-worker-registratie. Alleen bij échte CSP-overtredingen de witte lijst bijstellen (bv. `worker-src` of extra `*.onesignal.com`), per aanpassing committen.
 
-- [ ] **Stap 5: Checkpoint C3.** Schone console-doorloop + `?test=1` groen op de test-link.
+- [x] **Stap 5: Checkpoint C3.** Schone console-doorloop + `?test=1` groen op de test-link.
 
 ### Task 11: Eindverificatie Fase 2 (D1) — en stoppen vóór de merge
 
-- [ ] **Stap 1:** `git log --oneline main..staging` — alleen frontend-werk, geen `apps-script/**`.
+- [x] **Stap 1:** `git log --oneline main..staging` — alleen frontend-werk, geen `apps-script/**`.
 - [ ] **Stap 2:** Gebruiker vragen: ingelogde acceptatie op de test-link (verwijderen+undo taak & ontw-item, VvE-zoekveld, pulsen/flitsen, dark mode) én expliciete GO voor de merge naar `main`. **De merge zelf (D2) gebeurt pas na die GO** — zie het Fase 2-plan voor de merge-stappen (neem bij het index.html-conflict de staging-versie).
 
 ---

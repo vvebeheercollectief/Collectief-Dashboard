@@ -23,7 +23,7 @@ import {
 } from './render-lijsten.js';
 import {
   renderOntw, renderLogboek, parseOntw, parseLogboek, setOntw, openOntwModal, closeOntwModal,
-  submitOntwItem, deleteOntwItem, addTaskNote, histNoteKey, renderTaskHistory, logEvent, logZin,
+  submitOntwItem, deleteOntwItem, editOntwItem, addTaskNote, histNoteKey, renderTaskHistory, logEvent, logZin,
 } from './render-overig.js';
 import {
   openAiHelp, closeAiHelp, buildAiPrompt, parseAiAnswer, copyAiPrompt,
@@ -39,6 +39,7 @@ import {
   completeTask, deleteCurrentEditTask, onCodeInput,
 } from './crud.js';
 import { loadAll } from './data.js';
+import { initActions } from './actions.js';
 
 // ── TIJDELIJKE re-export (Fase 2A) — renderAll woont nog in main.js (orchestrator)
 // en wordt door data.js/crud.js gebruikt. Weg in mijlpaal B.
@@ -54,6 +55,9 @@ export { renderAll };
 //  BOOT
 // ══════════════════════════════════════
 document.addEventListener('DOMContentLoaded',()=>{
+  // Centraal klik-systeem: één delegatie-listener voor alle data-action-elementen
+  initActions();
+
   // Zichtbare waarschuwingsbalk in de testomgeving
   if (IS_STAGING) {
     document.title = '[TEST] ' + document.title;
@@ -218,6 +222,6 @@ if (location.search.includes('test=1')) import('./tests.js');
 Object.assign(window, {
   adjOff, histNoteKey, addTaskNote, deleteCurrentEditTask, saveNotifPrefs,
   copyAiPrompt, doLogin, setNtd, setAf, toggleAlvoFlag, editRow, completeTask,
-  aiOvernemen, aiActieTaak, aiKopieerConcept, setOntw, dismissToast,
+  aiOvernemen, aiActieTaak, aiKopieerConcept, setOntw, editOntwItem, dismissToast,
   pgs, renderNtd, renderAf, renderAlvo, renderAlfa, renderOntw, renderLogboek,
 });

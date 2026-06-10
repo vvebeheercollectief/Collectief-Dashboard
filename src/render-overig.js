@@ -87,10 +87,10 @@ function openOntwModal(isEdit, rowData){
 }
 function closeOntwModal(){document.getElementById('ontw-modal-bg').classList.remove('open')}
 
-window.editOntwItem=function(idx){
+function editOntwItem(idx){
   const r=state._rowCache[idx];
   if(r) openOntwModal(true,r);
-};
+}
 
 async function submitOntwItem(){
   if(!await ensureToken()){alert('Inloggen mislukt.');return}
@@ -319,6 +319,6 @@ async function logEvent(code, sec, actie, veld, oudeWaarde, nieuweWaarde) {
 
 export {
   ONTW_CATS, ONTW_CAT_COLORS, parseOntw, renderOntw, setOntw, openOntwModal, closeOntwModal,
-  submitOntwItem, deleteOntwItem, parseLogboek, fmtLogTs, actieBadge, _LOG_AVKLEUR, avatarKleur,
+  submitOntwItem, deleteOntwItem, editOntwItem, parseLogboek, fmtLogTs, actieBadge, _LOG_AVKLEUR, avatarKleur,
   logDayLabel, logZin, logTijd, renderLogboek, histNoteKey, renderTaskHistory, addTaskNote, logEvent,
 };

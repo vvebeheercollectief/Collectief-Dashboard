@@ -130,21 +130,38 @@ async function deleteCurrentEditTask(){
 
 async function deleteTaskRow(r){
   const omschrijving=r.actiepunt||r.periode||r.code||'deze taak';
-  if(!confirm(`Weet je zeker dat je deze taak wilt verwijderen?\n\n"${omschrijving}"`)) return;
   if(!await ensureToken()){alert('Inloggen mislukt. Probeer het opnieuw.');return}
-  try{
-    const ids=await getSheetIds();
-    const sheetId=ids['Nog Te Doen'];
-    if(sheetId==null) throw new Error('Sheet "Nog Te Doen" niet gevonden');
-    const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
-      method:'POST',
-      headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
-      body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:r._row-1,endIndex:r._row}}}]})
-    });
-    if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}throw new Error(e.error?.message||'Verwijderfout')}
-    logEvent(r.code, r._sec, 'Verwijderd', '', r.actiepunt||r.periode||'', '');
-    await loadAll();
-  }catch(e){alert('Fout bij verwijderen: '+e.message)}
+  const sec=r._sec;
+  // undo-data vastleggen vóór de mutatie (zelfde serialisatie als afronden)
+  const ntdKeys=SECS[sec].keys;
+  const ntdValues=ntdKeys.map(k=>r[k]||''); ntdValues.push(r.subcategorie||'');
+  const undoData={sec,code:r.code,ntdValues};
+  const oudeRow=r._row;
+  const tr=document.querySelector(`#ntd-tbody tr[data-row="${oudeRow}"]`);
+  // optimistisch: meteen lokaal weg + indexen meeschuiven
+  const arr=D.ntd[sec]||[];
+  const pos=arr.indexOf(r);
+  if(pos>-1) arr.splice(pos,1);
+  _shiftNtdRows(oudeRow,-1);
+  showUndoToast('🗑️ Taak verwijderd',`${r.code} — ${omschrijving}`,()=>undoDelete(undoData));
+  backgroundWrite(
+    async ()=>{
+      const ids=await getSheetIds();
+      const sheetId=ids['Nog Te Doen'];
+      if(sheetId==null) throw new Error('Sheet "Nog Te Doen" niet gevonden');
+      const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+        method:'POST',
+        headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
+        body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:oudeRow-1,endIndex:oudeRow}}}]})
+      });
+      if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Verwijderfout');err.status=resp.status;throw err}
+      logEvent(r.code, sec, 'Verwijderd', '', r.actiepunt||r.periode||'', '');
+    },
+    ()=>{ if(arr.indexOf(r)===-1){ _shiftNtdRows(oudeRow,+1); arr.splice(Math.min(pos<0?arr.length:pos,arr.length),0,r); } },
+    'Verwijderen mislukt'
+  );
+  // rode puls + fade op de oude rij; daarná pas hertekenen
+  animateRowOut(tr,'rij-puls-rood',renderAll);
 }
 
 function getAfInsertRow(sec){

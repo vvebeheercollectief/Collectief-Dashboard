@@ -5,7 +5,8 @@ import { esc, displayName } from "./util.js";
 import { state, D } from "./state.js";
 import { SECS } from "./config.js";
 import { goTo } from "./ui.js";
-import { openModal, showToast } from "./main.js";
+import { openModal } from "./main.js";
+import { showToast } from "./notifications.js";
 
 //  AI-HULP — plak mailtekst (slim kopieer-plak)
 // ══════════════════════════════════════

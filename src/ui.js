@@ -3,9 +3,9 @@
 // ══════════════════════════════════════
 import { PAGE_META } from "./config.js";
 import { state } from "./state.js";
-import { showToast } from "./main.js";
 import { buildAnalytics, buildDash } from "./render-analytics.js";
 import { renderOntw, renderLogboek } from "./render-overig.js";
+import { showToast } from "./notifications.js";
 
 function goTo(page){
   document.querySelectorAll('.ni[data-page]').forEach(el=>el.classList.toggle('on',el.dataset.page===page));

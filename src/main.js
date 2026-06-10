@@ -224,5 +224,4 @@ if (location.search.includes('test=1')) import('./tests.js');
 // functies module-scoped zijn. Opgeruimd zodra alles via data-action loopt.
 Object.assign(window, {
   aiOvernemen, aiActieTaak, aiKopieerConcept, dismissToast,
-  pgs, renderNtd, renderAf, renderAlvo, renderAlfa, renderOntw, renderLogboek,
 });

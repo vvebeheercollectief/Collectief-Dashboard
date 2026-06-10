@@ -109,7 +109,7 @@ function renderNtd(){
   const rows=filterNtd(D.ntd[state.activeNtd]||[],q,fCode,fBeh,fPrio,state.activeNtd);
   renderThead('ntd-thead',[...SECS[state.activeNtd].cols,''],SECS[state.activeNtd].css);
   renderTbody('ntd-tbody',rows,state.activeNtd,pgs.ntd,false);
-  renderPag('ntd-pag',rows.length,pgs.ntd,p=>{pgs.ntd=p;renderNtd()});
+  renderPag('ntd-pag',rows.length,pgs.ntd,'ntd');
 }
 function setNtd(s){state.activeNtd=s;pgs.ntd=1;renderNtd()}
 function filterNtd(rows,q,fCode,beh,prio,sec){
@@ -155,7 +155,7 @@ function renderAf(){
   renderThead('af-thead',cols,SECS[state.activeAf].css);
   const rows=filt(D.af[state.activeAf]||[],q);
   renderTbody('af-tbody',rows,state.activeAf,pgs.af,true);
-  renderPag('af-pag',rows.length,pgs.af,p=>{pgs.af=p;renderAf()});
+  renderPag('af-pag',rows.length,pgs.af,'af');
 }
 function setAf(s){state.activeAf=s;pgs.af=1;renderAf()}
 
@@ -203,7 +203,7 @@ function renderAlvo(){
       </tr>`;
     }).join('')
     :emptyRow(6);
-  renderPag('alvo-pag',rows.length,pgs.alvo,p=>{pgs.alvo=p;renderAlvo()});
+  renderPag('alvo-pag',rows.length,pgs.alvo,'alvo');
 }
 
 const ALVO_COLS={uitnodiging:2,notulen:3,begroting:4};
@@ -289,7 +289,7 @@ function renderAlfa(){
         <td class="cell-sm">${esc(r.datum)}</td>
       </tr>`).join('')
     :emptyRow(3);
-  renderPag('alfa-pag',rows.length,pgs.alfa,p=>{pgs.alfa=p;renderAlfa()});
+  renderPag('alfa-pag',rows.length,pgs.alfa,'alfa');
 }
 
 // ══════════════════════════════════════
@@ -416,7 +416,7 @@ function rowAf(r,sec){
 // ══════════════════════════════════════
 //  PAGINATION
 // ══════════════════════════════════════
-function renderPag(id,total,cur,cb){
+function renderPag(id,total,cur,doel){
   const el=document.getElementById(id);if(!el)return;
   const tp=Math.ceil(total/PG);
   if(tp<=1){el.innerHTML='';return}
@@ -427,10 +427,10 @@ function renderPag(id,total,cur,cb){
     :[1,'…',cur-1,cur,cur+1,'…',tp];
   el.innerHTML=`<div class="pag-info">Toont ${s}–${e} van ${total}</div>
     <div class="pag-btns">
-      <button class="pb" onclick="(${cb})(${cur-1})" ${cur<=1?'disabled':''}>‹</button>
+      <button class="pb" data-action="pagineer" data-doel="${doel}" data-pg="${cur-1}" ${cur<=1?'disabled':''}>‹</button>
       ${rng.map(p=>p==='…'?`<span class="pb" style="border:none;cursor:default">…</span>`
-        :`<button class="pb ${p===cur?'on':''}" onclick="(${cb})(${p})">${p}</button>`).join('')}
-      <button class="pb" onclick="(${cb})(${cur+1})" ${cur>=tp?'disabled':''}>›</button>
+        :`<button class="pb ${p===cur?'on':''}" data-action="pagineer" data-doel="${doel}" data-pg="${p}">${p}</button>`).join('')}
+      <button class="pb" data-action="pagineer" data-doel="${doel}" data-pg="${cur+1}" ${cur>=tp?'disabled':''}>›</button>
     </div>`;
 }
 

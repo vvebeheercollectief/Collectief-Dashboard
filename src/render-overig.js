@@ -8,8 +8,9 @@ import { ensureToken } from "./auth.js";
 import { writeRange, appendRange } from "./api.js";
 import { renderThead, renderPag } from "./render-lijsten.js";
 import { getSheetIds, setv, gv } from "./crud.js";
-import { loadAll } from "./data.js";
-import { getCurrentWho } from "./notifications.js";
+import { loadAll, backgroundWrite } from "./data.js";
+import { getCurrentWho, showToast, showUndoToast } from "./notifications.js";
+import { animateRowOut } from "./anim.js";
 
 // ══════════════════════════════════════
 //  ONTWIKKELING
@@ -117,20 +118,46 @@ async function submitOntwItem(){
 
 async function deleteOntwItem(){
   if(!state.ontwEditRow) return;
-  if(!confirm('Dit item verwijderen?')) return;
+  if(!await ensureToken()){alert('Inloggen mislukt.');return}
+  const r=state.ontwEditRow;
+  const values=[r.titel||'',r.categorie||'',r.inhoud||'',r.door||'',r.datum||'',r.status||''];
+  const oudeRow=r._row;
+  const tr=document.querySelector(`#ontw-tbody tr[data-row="${oudeRow}"]`);
+  // optimistisch: lokaal weg + rij-indexen van latere items bijwerken
+  // LET OP: ontwEditRow is een kloon uit _rowCache → het échte object op _row zoeken
+  const pos=D.ontw.findIndex(x=>x._row===oudeRow);
+  const echte=pos>-1?D.ontw[pos]:null;
+  if(pos>-1) D.ontw.splice(pos,1);
+  D.ontw.forEach(x=>{ if(x._row>oudeRow) x._row--; });
+  closeOntwModal();
+  showUndoToast('🗑️ Item verwijderd', r.titel||'', ()=>undoOntwDelete(values, r.titel));
+  backgroundWrite(
+    async ()=>{
+      const ids=await getSheetIds();
+      const sheetId=ids['Ontwikkeling'];
+      if(sheetId==null) throw new Error('Sheet "Ontwikkeling" niet gevonden');
+      const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+        method:'POST',
+        headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
+        body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:oudeRow-1,endIndex:oudeRow}}}]})
+      });
+      if(!resp.ok){const e=await resp.json();const err=new Error(e.error?.message||'Verwijderfout');err.status=resp.status;throw err}
+    },
+    ()=>{ if(echte&&D.ontw.indexOf(echte)===-1){ D.ontw.forEach(x=>{ if(x._row>=oudeRow) x._row++; }); D.ontw.splice(Math.min(pos<0?D.ontw.length:pos,D.ontw.length),0,echte); } },
+    'Verwijderen mislukt'
+  );
+  // rode puls + fade op de oude rij; daarná pas hertekenen
+  animateRowOut(tr,'rij-puls-rood',renderOntw);
+}
+
+async function undoOntwDelete(values, titel){
   if(!await ensureToken()){alert('Inloggen mislukt.');return}
   try{
-    const ids=await getSheetIds();
-    const sheetId=ids['Ontwikkeling'];
-    if(sheetId==null) throw new Error('Sheet "Ontwikkeling" niet gevonden');
-    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
-      method:'POST',
-      headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
-      body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:state.ontwEditRow._row-1,endIndex:state.ontwEditRow._row}}}]})
-    });
-    closeOntwModal();
+    await state._writeChain;
+    await appendRange("'Ontwikkeling'!A:F", values);
+    showToast('↩ Ongedaan gemaakt', `"${titel||''}" teruggezet`, 'var(--am)');
     await loadAll();
-  }catch(e){alert('Fout bij verwijderen: '+e.message)}
+  }catch(e){alert('Undo fout: '+e.message)}
 }
 
 // ══════════════════════════════════════

@@ -6,7 +6,8 @@ import { state, D } from "./state.js";
 import { SECS, SKEYS, SID } from "./config.js";
 import { writeRange, _shiftNtdRows } from "./api.js";
 import { ensureToken } from "./auth.js";
-import { showToast, showUndoToast, fireNotifEvent, undoComplete } from "./notifications.js";
+import { showToast, showUndoToast, fireNotifEvent, undoComplete, undoDelete } from "./notifications.js";
+import { animateRowOut, flashRow } from "./anim.js";
 import { logEvent, renderTaskHistory } from "./render-overig.js";
 import { backgroundWrite, loadAll } from "./data.js";
 import { renderAll } from "./main.js";
@@ -211,12 +212,13 @@ async function doCompleteTask(){
     const ntdKeys=SECS[sec].keys;
     const ntdValues=ntdKeys.map(k=>r[k]||''); ntdValues.push(r.subcategorie||'');
     const undoData={sec,code:r.code,ntdValues,ntdRow:r._row};
-    // 1) optimistisch: meteen uit de lokale lijst halen + indexen meeschuiven + opnieuw tekenen
+    // 1) optimistisch: meteen uit de lokale lijst + indexen meeschuiven;
+    //    de oude DOM-rij pulst groen en pas daarná hertekenen we (anim.js)
+    const tr=document.querySelector(`#ntd-tbody tr[data-row="${r._row}"]`);
     const arr=D.ntd[sec]||[];
     const pos=arr.indexOf(r);
     if(pos>-1) arr.splice(pos,1);
     _shiftNtdRows(r._row,-1);
-    renderAll();
     closeCompleteModal();
     showUndoToast('✅ Taak afgerond',`${r.code} — ${r.actiepunt||r.naam||''}`,()=>undoComplete(undoData));
     // 2) op de achtergrond wegschrijven; bij fout de taak terugzetten
@@ -231,6 +233,8 @@ async function doCompleteTask(){
       ()=>{ const a=(D.ntd[sec]=D.ntd[sec]||[]); if(a.indexOf(r)===-1){ _shiftNtdRows(r._row,+1); a.splice(Math.min(pos<0?a.length:pos,a.length),0,r); } },
       'Afronden mislukt'
     );
+    // 3) groene puls + fade op de oude rij; daarná pas hertekenen
+    animateRowOut(tr,'rij-puls-groen',renderAll);
   }catch(e){alert('Fout bij afhandelen: '+e.message)}
 }
 

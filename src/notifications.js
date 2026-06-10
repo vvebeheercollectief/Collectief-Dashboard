@@ -153,6 +153,19 @@ async function undoComplete(undoData) {
   } catch(e) { alert('Undo fout: ' + e.message); }
 }
 
+async function undoDelete(undoData) {
+  if (!await ensureToken()) { alert('Inloggen mislukt.'); return; }
+  try {
+    await state._writeChain;            // delete-write gegarandeerd vóór de re-insert
+    const { sec, ntdValues } = undoData;
+    const insertRow = getInsertRow(sec);
+    await insertAndWriteRow('Nog Te Doen', insertRow, ntdValues);
+    logEvent(undoData.code, sec, 'Teruggezet', 'status', 'Verwijderd', 'Nog Te Doen');
+    showToast('↩ Ongedaan gemaakt', `${undoData.code} terug in Nog Te Doen`, 'var(--am)');
+    await loadAll();
+  } catch(e) { alert('Undo fout: ' + e.message); }
+}
+
 // ══════════════════════════════════════
 //  POLLING — toont toasts voor andere gebruikers
 // ══════════════════════════════════════
@@ -379,7 +392,7 @@ OneSignalDeferred.push(async function(OneSignal) {
 
 export {
   fireNotifEvent, TOAST_ICONS, TOAST_COLORS, TOAST_DURATION, showToast, dismissToast, showUndoToast,
-  undoComplete, getNotifPrefs, pollNotifsForToast, startNotifPoll, openNotifModal, closeNotifModal,
+  undoComplete, undoDelete, getNotifPrefs, pollNotifsForToast, startNotifPoll, openNotifModal, closeNotifModal,
   refreshNotifUI, onWhoChange, getCurrentWho, saveNotifPrefs, waitForOneSignal, subscribeNotifs,
   unsubscribeNotifs, sendTestNotif,
 };

@@ -6,8 +6,8 @@ import { state, D } from "./state.js";
 import { SECS, SKEYS, SID } from "./config.js";
 import { writeRange, _shiftNtdRows } from "./api.js";
 import { ensureToken } from "./auth.js";
-import { showToast, showUndoToast, fireNotifEvent } from "./notifications.js";
-import { logEvent } from "./render-overig.js";
+import { showToast, showUndoToast, fireNotifEvent, undoComplete } from "./notifications.js";
+import { logEvent, renderTaskHistory } from "./render-overig.js";
 import { backgroundWrite, loadAll } from "./data.js";
 import { renderAll } from "./main.js";
 
@@ -301,7 +301,7 @@ async function submitTask(){
     const newBeh=(sec==='OPPAKKEN'?gv('m-beh'):sec==='VERGADERVERZOEKEN'?gv('m-beh-v'):sec==='OFFERTE-TRAJECTEN'?gv('m-beh-o'):gv('m-beh-l'));
     if(state.editMode&&state.editRowData?._row){
       // ── Bewerken: lokale rij meteen bijwerken, dan op de achtergrond opslaan ──
-      const doelRow=state.editRowData, oudeWaarden={...editRowData};
+      const doelRow=state.editRowData, oudeWaarden={...state.editRowData};
       keys.forEach((k,i)=>{ doelRow[k]=norm(values[i]); });
       doelRow.subcategorie=values[values.length-1];
       renderAll();

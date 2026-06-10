@@ -1,42 +1,11 @@
 // ══════════════════════════════════════
 //  CONFIG
 // ══════════════════════════════════════
-// ── Omgeving (productie vs. testomgeving) ──────────────────────────────
-// Fail-safe: alleen deze exacte hosts zijn PRODUCTIE; al het andere
-// (staging-branch, andere previews, localhost) draait op de TEST-data.
-const PROD_HOSTS = [
-  'vvebeheercollectief.github.io',                            // ECHTE productie (GitHub Pages, source=main)
-  'collectief-dashboard.vercel.app',                          // Vercel-spiegel van main (parallel/handmatig)
-  'collectief-dashboard-vve-beheer-collectief.vercel.app',
-  'collectief-dashboard-vvebeheercollectief-vve-beheer-collectief.vercel.app',
-  'collectief-dashboard-git-main-vve-beheer-collectief.vercel.app',
-];
-function _isStagingHost(hostname){ return !PROD_HOSTS.includes(hostname); }
-const IS_STAGING = _isStagingHost(location.hostname);
-
-const SID_PROD = '1fnUsbwb4nDMNttWym9FWBw1CMMMAVTuZ3v88b35isUw';
-const SID_TEST = '1-6Q36CrwB0szX2DS2eLjPwfiY-jAw8lK9JOPDSlljm4';   // test-Sheet "Collectief Dashboard - Kopie" (Taak 3)
-const SID = IS_STAGING ? SID_TEST : SID_PROD;
-const PG   = 25;
-// Meldingen lopen via de 'Notif-wachtrij'-tab (OAuth-append vanuit de ingelogde
-// gebruiker) — een Apps Script-trigger verstuurt de push. Geen webhook-URL of
-// secret meer nodig in deze (publieke) frontend.
-const ONESIGNAL_APP_ID_PROD = 'c0e1301b-2cee-4646-8fab-99698e10e78c';
-const ONESIGNAL_APP_ID_TEST = '11b00aea-496b-44d5-8b9f-5012fcb48fd4';   // test-OneSignal app "Collectief Dashboard TEST" (Taak 4)
-const ONESIGNAL_APP_ID      = IS_STAGING ? ONESIGNAL_APP_ID_TEST : ONESIGNAL_APP_ID_PROD;
-
-const ALLOWED_EMAILS = [
-  'info@vvebeheercollectief.nl',
-  'djiowchico@gmail.com',
-  'gabrielateterycz1616@gmail.com',
-  'giocan175@gmail.com',
-];
-const EMAIL_NAMES = {
-  'info@vvebeheercollectief.nl':'Jer',
-  'djiowchico@gmail.com':'Cihad',
-  'gabrielateterycz1616@gmail.com':'Gabos',
-  'giocan175@gmail.com':'Cihan',
-};
+import {
+  PROD_HOSTS, _isStagingHost, IS_STAGING, SID, SID_PROD, SID_TEST, PG,
+  ONESIGNAL_APP_ID, ONESIGNAL_APP_ID_PROD, ONESIGNAL_APP_ID_TEST,
+  ALLOWED_EMAILS, EMAIL_NAMES, SECS, SKEYS, PAGE_META,
+} from './config.js';
 function displayName(s){
   if(!s) return '';
   const key = String(s).toLowerCase().trim();
@@ -49,32 +18,6 @@ let _lastNotifTs    = new Date().toISOString();
 let _notifPollTimer = null;
 let _shownToasts    = new Set();
 
-const SECS = {
-  OPPAKKEN:{label:'Oppakken',css:'--sec:var(--ac);--sec-l:var(--ac-l);--sec-b:var(--ac-b)',color:'#0D7377',
-    cols:['VvE Code','VvE','Actiepunt','Deadline','Behandelaar','Prioriteit','Opmerkingen','In beh.'],
-    keys:['code','naam','actiepunt','deadline','behandelaar','prioriteit','opmerkingen','inBehandeling']},
-  VERGADERVERZOEKEN:{label:'Vergaderverzoeken',css:'--sec:var(--am);--sec-l:var(--am-l);--sec-b:var(--am-b)',color:'#B45309',
-    cols:['VvE Code','VvE','Periode','Agendapunten','Behandelaar','Deadline uitschr.','Prioriteit','Opmerkingen','In beh.'],
-    keys:['code','naam','periode','agendapunten','behandelaar','deadline','opmerkingen','inBehandeling']},
-  'OFFERTE-TRAJECTEN':{label:'Offerte-trajecten',css:'--sec:var(--pu);--sec-l:var(--pu-l);--sec-b:var(--pu-b)',color:'#6D5BD0',
-    cols:['VvE Code','VvE','Datum aangevr.','Ontvangen/Aangevr.','Behandelaar','Deadline','Prioriteit','Opmerkingen'],
-    keys:['code','naam','datumAangevraagd','offertes','behandelaar','deadline','opmerkingen']},
-  LOD:{label:'LOD',css:'--sec:var(--rd);--sec-l:var(--rd-l);--sec-b:var(--rd-b)',color:'#B91C1C',
-    cols:['VvE Code','VvE','Actiepunt','Status','Behandelaar','Deadline LOD','Prioriteit','Opmerkingen','In beh.'],
-    keys:['code','naam','actiepunt','status','behandelaar','deadline','opmerkingen','inBehandeling']},
-};
-const SKEYS = Object.keys(SECS);
-
-const PAGE_META = {
-  ntd:['Nog Te Doen','Openstaande taken en actiepunten'],
-  af:['Afgerond','Afgeronde taken per categorie'],
-  alvo:["ALV's Overzicht","Voortgang vergaderingen per VvE"],
-  alfa:["ALV's Afgerond","Afgeronde jaarvergaderingen"],
-  ontw:['Ontwikkeling','Interne notities, verbeteringen en ideeën'],
-  logboek:['Logboek','Wijzigingshistorie van alle taken'],
-  analytics:['Analytics','Statistieken en grafieken'],
-  dash:['Dashboard','Totaaloverzicht'],
-};
 
 // ══════════════════════════════════════
 //  STATE

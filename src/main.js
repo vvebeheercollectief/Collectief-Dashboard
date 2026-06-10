@@ -13,6 +13,13 @@ import {
   adjOff, offProg, _MAANDEN, _parseAnyDate, parseDt, toISODate, toDutchDate,
   emptyRow, esc, subBadge,
 } from './util.js';
+import { fetchSheet, writeRange, appendRange, _shiftNtdRows, _isTransient, _withRetry } from './api.js';
+import { doOAuth, fetchUserEmail, doLogin, ensureToken } from './auth.js';
+
+// ── TIJDELIJKE re-exports (Fase 2A) — functies die nog in main.js wonen maar
+// door reeds-afgesplitste modules gebruikt worden. Krimpt naarmate we verder
+// opsplitsen; aan het eind van mijlpaal A weg.
+export { loadAll };
 
 
 
@@ -214,60 +221,6 @@ function cycleDensity(){
 // ══════════════════════════════════════
 //  API
 // ══════════════════════════════════════
-async function fetchSheet(name){
-  if(!state.oauthToken) throw new Error('Niet ingelogd');
-  const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values/${encodeURIComponent(name)}`,{
-    cache:'no-store',
-    headers:{Authorization:`Bearer ${state.oauthToken}`}
-  });
-  if(!r.ok){const e=await r.json();if(r.status===401){state.oauthToken=null;state.oauthExpiry=0}throw new Error(e.error?.message||'API fout')}
-  return (await r.json()).values||[];
-}
-async function writeRange(range,values,method='PUT'){
-  if(!state.oauthToken) throw new Error('Niet ingelogd');
-  const url=`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`;
-  const opts={method,headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},body:JSON.stringify({values:[values]})};
-  const r=await fetch(url,opts);
-  if(!r.ok){const e=await r.json();if(r.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Schrijffout');err.status=r.status;throw err}
-  return r.json();
-}
-async function appendRange(range,values){
-  if(!state.oauthToken) throw new Error('Niet ingelogd');
-  const url=`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
-  const r=await fetch(url,{method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},body:JSON.stringify({values:[values]})});
-  if(!r.ok){const e=await r.json();if(r.status===401){state.oauthToken=null;state.oauthExpiry=0}throw new Error(e.error?.message||'Schrijffout')}
-  return r.json();
-}
-
-// Aantal lopende/wachtende achtergrond-schrijfacties. Zolang >0 slaat de 8s-poll
-// over, zodat een optimistische wijziging niet kort teruggedraaid wordt.
-// Seriële wachtrij: schrijfacties lopen één voor één, zodat rij-indexen in de Sheet
-// niet door elkaar lopen bij snel opeenvolgende acties.
-
-// Verschuift lokale _row-nummers mee bij invoegen/verwijderen van een Sheet-rij,
-// zodat een volgende optimistische actie de juiste rij raakt. "Nog Te Doen" is één
-// sheet met meerdere secties; alle rijen onder `fromRow` schuiven `delta` op.
-function _shiftNtdRows(fromRow, delta){
-  SKEYS.forEach(s=>{ (D.ntd[s]||[]).forEach(row=>{ if(row._row>fromRow) row._row+=delta; }); });
-}
-
-// Herkent tijdelijke API-fouten (rate-limit 429 / serverfout 5xx) die een herkansing
-// rechtvaardigen — i.t.t. een echte fout (verkeerde data, geen rechten) die direct faalt.
-function _isTransient(e){
-  if(!e) return false;
-  if(e.status===429 || (e.status>=500 && e.status<600)) return true;
-  return /quota|rate.?limit|resource_exhausted|backend error|internal error|unavailable|try again/i.test(e.message||'');
-}
-// Voert een schrijfactie uit met max. 2 herkansingen (exponentiële backoff) bij transient fouten.
-async function _withRetry(fn){
-  for(let attempt=0;;attempt++){
-    try{ return await fn(); }
-    catch(e){
-      if(attempt<2 && _isTransient(e)){ await new Promise(r=>setTimeout(r,600*Math.pow(2,attempt))); continue; }
-      throw e;
-    }
-  }
-}
 
 // Voert een Sheets-schrijfactie op de achtergrond uit (serieel). De UI is al
 // optimistisch bijgewerkt door de aanroeper. Bij fout draait `rollback` de lokale
@@ -1917,76 +1870,6 @@ function aiKopieerConcept(btn){
   showToast('📋 Gekopieerd','Concept-antwoord klaar voor je mail','var(--gn)');
 }
 
-// ══════════════════════════════════════
-//  OAUTH
-// ══════════════════════════════════════
-function doOAuth(forcePrompt){
-  return new Promise(resolve=>{
-    if(!clientId){resolve(null);return}
-    try{
-      if(!state._gsiTokenClient){
-        state._gsiTokenClient=google.accounts.oauth2.initTokenClient({
-          client_id:clientId,
-          scope:'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.email',
-          callback:resp=>{
-            if(resp.error){console.warn('OAuth fout:',resp.error);state.oauthToken=null;state.oauthExpiry=0;resolve(null);return}
-            state.oauthToken=resp.access_token;
-            state.oauthExpiry=Date.now()+((resp.expires_in||3600)-120)*1000;
-            sessionStorage.setItem('oauthToken',state.oauthToken);
-            sessionStorage.setItem('oauthExpiry',String(state.oauthExpiry));
-            resolve(state.oauthToken);
-          }
-        });
-      }
-      state._gsiTokenClient.requestAccessToken(forcePrompt?{}:{prompt:''});
-    }catch(e){console.error('OAuth:',e);resolve(null)}
-  });
-}
-
-async function fetchUserEmail(){
-  if(!state.oauthToken) return null;
-  try{
-    const r=await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:`Bearer ${state.oauthToken}`}});
-    if(!r.ok) return null;
-    const d=await r.json();
-    return d.email||null;
-  }catch(e){return null}
-}
-
-async function doLogin(){
-  const errEl=document.getElementById('login-error');
-  const btn=document.getElementById('login-btn');
-  errEl.style.display='none';
-  btn.textContent='Even geduld…';btn.disabled=true;
-  await doOAuth(true);
-  if(!state.oauthToken){errEl.textContent='Inloggen geannuleerd of mislukt.';errEl.style.display='block';btn.textContent='Inloggen met Google';btn.disabled=false;return}
-  const email=await fetchUserEmail();
-  if(!email){errEl.textContent='Kon e-mailadres niet ophalen.';errEl.style.display='block';btn.textContent='Inloggen met Google';btn.disabled=false;return}
-  if(!ALLOWED_EMAILS.includes(email.toLowerCase())){
-    state.oauthToken=null;state.oauthExpiry=0;
-    errEl.textContent='Geen toegang. Gebruik je VvE Beheer Collectief account.';errEl.style.display='block';btn.textContent='Inloggen met Google';btn.disabled=false;return;
-  }
-  state.currentUserEmail=email;
-  sessionStorage.setItem('currentUserEmail',email);
-  document.getElementById('login-gate').style.display='none';
-  loadAll();
-}
-
-async function ensureToken(){
-  if(state.oauthToken && Date.now()<state.oauthExpiry) return true;
-  state.oauthToken=null; state.oauthExpiry=0;
-  await doOAuth(false);
-  if(!state.oauthToken){
-    await doOAuth(true);
-    if(!state.oauthToken) return false;
-  }
-  if(state.currentUserEmail) return true;
-  const email=await fetchUserEmail();
-  if(!email||!ALLOWED_EMAILS.includes(email.toLowerCase())){state.oauthToken=null;state.oauthExpiry=0;return false}
-  state.currentUserEmail=email;
-  sessionStorage.setItem('currentUserEmail',email);
-  return true;
-}
 
 
 function setupSearch(id,cb){

@@ -1,38 +1,19 @@
 // ══════════════════════════════════════
-//  CONFIG
+//  MAIN — boot/orchestrator
 // ══════════════════════════════════════
-import {
-  PROD_HOSTS, _isStagingHost, IS_STAGING, SID, SID_PROD, SID_TEST, PG,
-  ONESIGNAL_APP_ID, ONESIGNAL_APP_ID_PROD, ONESIGNAL_APP_ID_TEST,
-  ALLOWED_EMAILS, EMAIL_NAMES, SECS, SKEYS, PAGE_META, clientId,
-} from './config.js';
-import { D, pgs, _shownToasts, _undoStack, state } from './state.js';
-import {
-  displayName, filt, PRIO_REGELS, STIL_DREMPEL_DAGEN, _vandaagAmsterdam,
-  _verschilInKalenderdagen, berekenPrioriteit, prioBadge, persBadges, ibBadge,
-  _MAANDEN, _parseAnyDate, parseDt, toISODate, toDutchDate,
-  emptyRow, esc, subBadge,
-} from './util.js';
-import { fetchSheet, writeRange, appendRange, _shiftNtdRows, _isTransient, _withRetry } from './api.js';
-import { doOAuth, fetchUserEmail, ensureToken } from './auth.js';
+import { IS_STAGING, ALLOWED_EMAILS, SKEYS } from './config.js';
+import { D, pgs, state } from './state.js';
+import { ensureToken } from './auth.js';
 import { goTo, closeSb, applyTheme, applyDensity, cycleDensity, setupSearch } from './ui.js';
-import { buildAnalytics, buildDash } from './render-analytics.js';
+import { renderNtd, renderAf, renderAlvo, renderAlfa, renderNtdStats } from './render-lijsten.js';
 import {
-  renderNtd, renderAf, renderAlvo, renderAlfa, renderNtdStats, renderNtdDonut,
-  renderThead, renderPag,
-} from './render-lijsten.js';
-import {
-  renderOntw, renderLogboek, parseOntw, parseLogboek, openOntwModal, closeOntwModal,
-  submitOntwItem, deleteOntwItem, histNoteKey, renderTaskHistory, logEvent, logZin,
+  renderOntw, renderLogboek, openOntwModal, closeOntwModal,
+  submitOntwItem, deleteOntwItem, histNoteKey,
 } from './render-overig.js';
+import { openAiHelp, closeAiHelp, buildAiPrompt, parseAiAnswer } from './ai.js';
 import {
-  openAiHelp, closeAiHelp, buildAiPrompt, parseAiAnswer,
-  aiOvernemen, aiActieTaak, aiKopieerConcept,
-} from './ai.js';
-import {
-  showToast, dismissToast, showUndoToast, fireNotifEvent, openNotifModal, closeNotifModal,
-  onWhoChange, saveNotifPrefs, subscribeNotifs, unsubscribeNotifs, sendTestNotif, getCurrentWho,
-  startNotifPoll, undoComplete,
+  openNotifModal, closeNotifModal, onWhoChange, saveNotifPrefs,
+  subscribeNotifs, unsubscribeNotifs, sendTestNotif, getCurrentWho, startNotifPoll,
 } from './notifications.js';
 import {
   openModal, closeModal, submitTask, doCompleteTask, closeCompleteModal,
@@ -40,16 +21,6 @@ import {
 } from './crud.js';
 import { loadAll } from './data.js';
 import { initActions } from './actions.js';
-
-// ── TIJDELIJKE re-export (Fase 2A) — renderAll woont nog in main.js (orchestrator)
-// en wordt door data.js/crud.js gebruikt. Weg in mijlpaal B.
-export { renderAll };
-
-
-
-// ══════════════════════════════════════
-//  STATE
-// ══════════════════════════════════════
 
 // ══════════════════════════════════════
 //  BOOT
@@ -200,7 +171,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 // ══════════════════════════════════════
 //  RENDER ALL
 // ══════════════════════════════════════
-function renderAll(){
+// renderAll woont bewust in main.js (orchestrator); data.js/crud.js importeren
+// hem als live binding (kringverwijzing is ok — aanroep gebeurt op runtime).
+export function renderAll(){
   state._rowCache=[];
   const ntdTotal=SKEYS.reduce((s,k)=>s+(D.ntd[k]?.length||0),0);
   document.getElementById('b-ntd').textContent=ntdTotal;
@@ -219,9 +192,3 @@ function renderAll(){
 // ── Zelftest (alleen met ?test=1) — lazy-geladen, niet in productie ──
 if (location.search.includes('test=1')) import('./tests.js');
 
-// ── TIJDELIJKE window-shim (Fase 2A) — verwijderd in mijlpaal B ──────────────
-// Houdt de 35 inline on*-handlers + de paginerings-callback werkend nu de
-// functies module-scoped zijn. Opgeruimd zodra alles via data-action loopt.
-Object.assign(window, {
-  aiOvernemen, aiActieTaak, aiKopieerConcept, dismissToast,
-});

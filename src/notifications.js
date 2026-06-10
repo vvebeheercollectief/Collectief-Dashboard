@@ -69,7 +69,7 @@ function showToast(title, msg, color) {
       <div class="toast-title">${esc(title)}</div>
       ${msg ? `<div class="toast-msg">${esc(msg)}</div>` : ''}
     </div>
-    <button class="toast-close" onclick="dismissToast(this.parentElement)">×</button>
+    <button class="toast-close" data-action="toast-sluiten">×</button>
     <div class="toast-bar" style="animation-duration:${TOAST_DURATION}ms"></div>`;
 
   const container = document.getElementById('toast-container');
@@ -113,7 +113,7 @@ function showUndoToast(title, msg, undoFn) {
       ${msg ? `<div class="toast-msg">${esc(msg)}</div>` : ''}
       <button class="toast-undo" id="undo-btn-${Date.now()}">↩ Ongedaan maken</button>
     </div>
-    <button class="toast-close" onclick="dismissToast(this.parentElement)">×</button>
+    <button class="toast-close" data-action="toast-sluiten">×</button>
     <div class="toast-bar" style="animation-duration:${UNDO_DURATION}ms"></div>`;
 
   const container = document.getElementById('toast-container');

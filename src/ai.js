@@ -139,15 +139,15 @@ function parseAiAnswer(){
   }
   if(wants.includes('categorie') && sec.categorie){
     const catSec=aiGisCategorie(sec.categorie);
-    html+=`<div class="ai-card"><div class="ai-card-hd">🏷️ Categorie &amp; VvE<span class="sp"></span><button class="ai-mini" onclick="aiOvernemen('${catSec}')">Overnemen</button></div><div class="ai-card-bd">${esc(sec.categorie)}</div></div>`;
+    html+=`<div class="ai-card"><div class="ai-card-hd">🏷️ Categorie &amp; VvE<span class="sp"></span><button class="ai-mini" data-action="ai-overnemen" data-sec="${catSec}">Overnemen</button></div><div class="ai-card-bd">${esc(sec.categorie)}</div></div>`;
   }
   if(wants.includes('acties') && sec.acties){
     const items=sec.acties.split(/\r?\n/).map(s=>s.replace(/^[-*•\d.]+\s*/,'').trim()).filter(Boolean);
-    const li=items.map(a=>`<li><span class="ck"></span><span class="atxt">${esc(a)}</span><button class="ai-mini plus" onclick="aiActieTaak(this)">+ Taak</button></li>`).join('');
+    const li=items.map(a=>`<li><span class="ck"></span><span class="atxt">${esc(a)}</span><button class="ai-mini plus" data-action="ai-actie-taak">+ Taak</button></li>`).join('');
     html+=`<div class="ai-card"><div class="ai-card-hd">✅ Actiepunten<span class="sp"></span></div><div class="ai-card-bd"><ul class="ai-acts">${li||'<li><span class="atxt" style="color:var(--mut)">Geen losse punten gevonden.</span></li>'}</ul></div></div>`;
   }
   if(wants.includes('antwoord') && sec.antwoord){
-    html+=`<div class="ai-card"><div class="ai-card-hd">✍️ Concept-antwoord<span class="sp"></span><button class="ai-mini" onclick="aiKopieerConcept(this)">Kopieer</button></div><div class="ai-card-bd"><div class="ai-reply">${esc(sec.antwoord)}</div></div></div>`;
+    html+=`<div class="ai-card"><div class="ai-card-hd">✍️ Concept-antwoord<span class="sp"></span><button class="ai-mini" data-action="ai-kopieer-concept">Kopieer</button></div><div class="ai-card-bd"><div class="ai-reply">${esc(sec.antwoord)}</div></div></div>`;
   }
   const gevonden=Object.keys(sec).length;
   if(!gevonden){ html+=`<div class="ai-card"><div class="ai-card-bd" style="color:var(--mut)">Geen herkenbare kopjes gevonden. Plak het hele antwoord van de AI (met de kopjes Samenvatting:, Categorie:, Actiepunten:, Concept-antwoord:).</div></div>`; }

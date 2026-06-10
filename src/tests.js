@@ -5,6 +5,7 @@ import { berekenPrioriteit, _parseAnyDate, displayName } from "./util.js";
 import { logZin } from "./render-overig.js";
 import { _isStagingHost } from "./config.js";
 import { ACTIONS } from "./actions.js";
+import { filterVves } from "./vve-zoekveld.js";
 
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
   // ── mini-assert helper (Fase 1 testnet) ──
@@ -73,6 +74,15 @@ import { ACTIONS } from "./actions.js";
   truthy('andere preview = staging (veilig)', _isStagingHost('collectief-dashboard-git-experiment-vve-beheer-collectief.vercel.app') === true);
   truthy('localhost = staging',          _isStagingHost('localhost') === true);
   truthy('github.io = echte productie (geen staging)', _isStagingHost('vvebeheercollectief.github.io') === false);
+
+  // ── filterVves ── (VvE-zoekveld: zoekt op code én naam, case-insensitief)
+  const _vves=[{code:'VVE-001',naam:'Parkzicht'},{code:'VVE-002',naam:'De Boog'},{code:'B-100',naam:'Vveldzicht'}];
+  eq('filterVves op code',        filterVves('vve-001',_vves).map(r=>r.code), ['VVE-001']);
+  eq('filterVves op naam',        filterVves('boog',_vves).map(r=>r.code),    ['VVE-002']);
+  eq('filterVves hoofdletters',   filterVves('PARK',_vves).length, 1);
+  eq('filterVves leeg → alles',   filterVves('',_vves).length, 3);
+  eq('filterVves geen match',     filterVves('xyz',_vves).length, 0);
+  eq('filterVves deelstring',     filterVves('vve',_vves).length, 3);
 
   // ── actions-registry ── (dekkings-test: elke verwachte data-action bestaat)
   const VERWACHTE_ACTIES = ['toggle','notif-toggle','off','notitie-toevoegen','taak-verwijder-modal','ai-kopieer','login','ntd-sectie','af-sectie','alvo-flag','taak-bewerken','taak-afronden','pagineer','ai-overnemen','ai-actie-taak','ai-kopieer-concept','ontw-cat','ontw-bewerken','toast-sluiten'];

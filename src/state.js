@@ -52,6 +52,7 @@ export const state = {
   _completeIdx: null,
   _aiLastCode: '',
   _aiLastNaam: '',
+  _aiVveCode: '',
   ontwEditMode: false,
   ontwEditRow: null,
   // logboek-filters

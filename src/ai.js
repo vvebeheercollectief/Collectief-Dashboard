@@ -13,15 +13,8 @@ import { fmtLogTs } from "./render-overig.js";
 // ══════════════════════════════════════
 
 function openAiHelp(){
-  const sel=document.getElementById('ai-vve');
-  const huidige=sel.value;
-  const opts=['<option value="">— Geen VvE koppelen —</option>'];
-  (D.alvo||[]).slice().sort((a,b)=>String(a.code||'').localeCompare(String(b.code||''))).forEach(r=>{
-    if(!r.code) return;
-    opts.push(`<option value="${esc(r.code)}">${esc(r.code)} — ${esc(r.naam||'')}</option>`);
-  });
-  sel.innerHTML=opts.join('');
-  if(huidige) sel.value=huidige;
+  // zoekveld toont de actuele koppeling (suggesties komen live uit D.alvo bij focus)
+  if(!state._aiVveCode) document.getElementById('ai-vve-input').value='';
   document.getElementById('ai-answer').value='';
   const res=document.getElementById('ai-result'); res.style.display='none'; res.innerHTML='';
   document.querySelectorAll('#ai-chips .ai-chip').forEach(c=>c.classList.add('on'));
@@ -66,7 +59,7 @@ const AI_KOPPEN={samenvatting:'Samenvatting:',categorie:'Categorie:',acties:'Act
 function buildAiPrompt(){
   const mail=(document.getElementById('ai-mail').value||'').trim();
   const wants=aiSelectedWants();
-  const code=document.getElementById('ai-vve').value;
+  const code=state._aiVveCode;
   const ctxBox=document.getElementById('ai-ctx');
   const ctx=code?aiVveContext(code):null;
 
@@ -129,7 +122,7 @@ function parseAiAnswer(){
   if(!txt){ box.style.display='none'; box.innerHTML=''; return; }
   const wants=aiSelectedWants();
   const sec=aiParseSections(txt);
-  const code=document.getElementById('ai-vve').value;
+  const code=state._aiVveCode;
   const ctx=code?aiVveContext(code):null;
   state._aiLastCode=code||''; state._aiLastNaam=ctx?(ctx.naam||''):'';
 

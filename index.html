@@ -662,7 +662,11 @@
           </div>
 
           <p class="ai-step" style="margin-top:16px"><span class="dot">3</span> Koppel een VvE <span style="font-weight:500;text-transform:none;letter-spacing:0;color:var(--mut)">— optioneel, geeft live context</span></p>
-          <select id="ai-vve" class="ai-select"><option value="">— Geen VvE koppelen —</option></select>
+          <div class="ai-vve-wrap">
+            <input type="text" id="ai-vve-input" placeholder="Zoek op code of naam… (klik voor de hele lijst)" autocomplete="off"/>
+            <button type="button" id="ai-vve-wis" title="Koppeling wissen" aria-label="Koppeling wissen" style="display:none">×</button>
+            <div class="vve-suggestions" id="ai-vve-sug"></div>
+          </div>
           <div class="ai-ctx" id="ai-ctx"></div>
         </div>
 

@@ -83,7 +83,20 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('ai-bg').addEventListener('click',e=>{if(e.target.id==='ai-bg'&&_aiMouseDown?.id==='ai-bg')closeAiHelp()});
   document.getElementById('ai-chips').addEventListener('click',e=>{const b=e.target.closest('.ai-chip');if(!b)return;b.classList.toggle('on');buildAiPrompt();parseAiAnswer();});
   document.getElementById('ai-mail').addEventListener('input',buildAiPrompt);
-  document.getElementById('ai-vve').addEventListener('change',()=>{buildAiPrompt();parseAiAnswer();});
+  const aiVveInput=document.getElementById('ai-vve-input');
+  const aiVveWis=document.getElementById('ai-vve-wis');
+  const zetAiVve=(code,naam)=>{
+    state._aiVveCode=code||'';
+    aiVveInput.value=code?`${code} — ${naam||''}`:'';
+    aiVveWis.style.display=code?'':'none';
+    buildAiPrompt(); parseAiAnswer();
+  };
+  initVveZoekveld({ input: aiVveInput, lijstEl: document.getElementById('ai-vve-sug'),
+    minTekens: 0, onSelect: ({code,naam}) => zetAiVve(code,naam) });
+  aiVveInput.addEventListener('input',()=>{   // overtypen = koppeling los
+    if(state._aiVveCode){ state._aiVveCode=''; aiVveWis.style.display='none'; buildAiPrompt(); parseAiAnswer(); }
+  });
+  aiVveWis.onclick=()=>zetAiVve('','');
   document.getElementById('ai-answer').addEventListener('input',parseAiAnswer);
   document.getElementById('hamburger').onclick=()=>{document.getElementById('sb').classList.toggle('open');document.getElementById('overlay').classList.toggle('on')};
   document.getElementById('overlay').onclick=closeSb;

@@ -24,7 +24,9 @@ function flashRow(tbodyId, row, cls = 'rij-flits'){
   const tr = document.querySelector(`#${tbodyId} tr[data-row="${row}"]`);
   if(!tr) return;
   tr.classList.add(cls);
-  tr.addEventListener('animationend', () => tr.classList.remove(cls), { once: true });
+  const opruimen = () => tr.classList.remove(cls);
+  tr.addEventListener('animationend', opruimen, { once: true });
+  setTimeout(opruimen, 1500);   // vangnet: animationend vuurt niet altijd (throttled tab)
 }
 
 export { animateRowOut, flashRow };

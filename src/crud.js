@@ -300,6 +300,7 @@ async function submitTask(){
       keys.forEach((k,i)=>{ doelRow[k]=norm(values[i]); });
       doelRow.subcategorie=values[values.length-1];
       renderAll();
+      flashRow('ntd-tbody', doelRow._row);
       closeModal();clearModal();
       showToast('💾 Opgeslagen',`${code} — ${naam||''}`,null);
       backgroundWrite(
@@ -323,6 +324,7 @@ async function submitTask(){
       _shiftNtdRows(afterRow,+1); // bestaande rijen eronder schuiven mee
       (D.ntd[sec]=D.ntd[sec]||[]).push(nieuw);
       renderAll();
+      flashRow('ntd-tbody', nieuw._row, 'rij-flits-groen');
       closeModal();clearModal();
       showToast('➕ Taak toegevoegd',`${code} — ${naam||''}`,null);
       backgroundWrite(

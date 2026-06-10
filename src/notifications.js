@@ -9,6 +9,7 @@ import { fetchSheet, appendRange } from "./api.js";
 import { logEvent } from "./render-overig.js";
 import { getSheetIds, insertAndWriteRow, getInsertRow } from "./crud.js";
 import { loadAll } from "./data.js";
+import { flashRow } from "./anim.js";
 
 //  NOTIF — enqueuet event in de Notif-wachtrij én toont directe in-app toast
 // ══════════════════════════════════════
@@ -150,6 +151,8 @@ async function undoComplete(undoData) {
     logEvent(undoData.code, sec, 'Teruggezet', 'status', 'Afgerond', 'Nog Te Doen');
     showToast('↩ Ongedaan gemaakt', `${undoData.code} terug in Nog Te Doen`, 'var(--am)');
     await loadAll();
+    const terug=(D.ntd[sec]||[]).filter(x=>x.code===undoData.code).pop();
+    if(terug) flashRow('ntd-tbody', terug._row, 'rij-flits-amber');
   } catch(e) { alert('Undo fout: ' + e.message); }
 }
 
@@ -163,6 +166,8 @@ async function undoDelete(undoData) {
     logEvent(undoData.code, sec, 'Teruggezet', 'status', 'Verwijderd', 'Nog Te Doen');
     showToast('↩ Ongedaan gemaakt', `${undoData.code} terug in Nog Te Doen`, 'var(--am)');
     await loadAll();
+    const terug=(D.ntd[sec]||[]).filter(x=>x.code===undoData.code).pop();
+    if(terug) flashRow('ntd-tbody', terug._row, 'rij-flits-amber');
   } catch(e) { alert('Undo fout: ' + e.message); }
 }
 

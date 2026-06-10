@@ -124,10 +124,6 @@ document.addEventListener('DOMContentLoaded',()=>{
   codeInput.addEventListener('input',onCodeInput);
   codeInput.addEventListener('blur',()=>setTimeout(()=>{document.getElementById('vve-sug').style.display='none'},200));
 
-  // Period buttons
-  buildPeriodBtns('pb-vergader','vergader');
-  buildPeriodBtns('pb-notulen','notulen');
-
   // Notificatie-modal handlers
   document.getElementById('notif-btn').onclick = openNotifModal;
   document.getElementById('notif-close').onclick = closeNotifModal;

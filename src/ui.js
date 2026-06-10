@@ -3,7 +3,8 @@
 // ══════════════════════════════════════
 import { PAGE_META } from "./config.js";
 import { state } from "./state.js";
-import { renderOntw, renderLogboek, buildAnalytics, buildDash, showToast } from "./main.js";
+import { renderOntw, renderLogboek, showToast } from "./main.js";
+import { buildAnalytics, buildDash } from "./render-analytics.js";
 
 function goTo(page){
   document.querySelectorAll('.ni[data-page]').forEach(el=>el.classList.toggle('on',el.dataset.page===page));

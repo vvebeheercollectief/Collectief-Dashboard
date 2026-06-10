@@ -457,3 +457,18 @@
     #ai-vve-wis{position:absolute;right:4px;top:50%;transform:translateY(-50%);border:none;background:none;font-size:17px;line-height:1;color:var(--mut);cursor:pointer;padding:4px 8px}
     #ai-vve-wis:hover{color:var(--rd)}
     .ai-vve-wrap .vve-suggestions{max-height:240px}
+
+    /* ── Rij-overgangen: kleurpuls + fade bij acties (effect B, sterkte 2) ── */
+    :root{--puls-gn:#C0DD97;--puls-gn-t:#173404;--puls-rd:#F7C1C1;--puls-rd-t:#501313;--flits-gn:#C0DD97;--flits-am:#FAC775}
+    [data-theme=dark]{--puls-gn:#27500A;--puls-gn-t:#C0DD97;--puls-rd:#791F1F;--puls-rd-t:#F7C1C1;--flits-gn:#27500A;--flits-am:#854F0B}
+    @media (prefers-reduced-motion: no-preference){
+      tr.rij-puls-groen td{background:var(--puls-gn)!important;color:var(--puls-gn-t)!important;transition:background .15s ease}
+      tr.rij-puls-rood td{background:var(--puls-rd)!important;color:var(--puls-rd-t)!important;transition:background .15s ease}
+      tr.rij-fade-weg{opacity:0;transition:opacity .4s ease}
+      @keyframes rijFlits{0%{background:var(--ac-l)}100%{background:transparent}}
+      tr.rij-flits td{animation:rijFlits 1.2s ease}
+      @keyframes rijFlitsGroen{0%{background:var(--flits-gn)}100%{background:transparent}}
+      tr.rij-flits-groen td{animation:rijFlitsGroen 1.2s ease}
+      @keyframes rijFlitsAmber{0%{background:var(--flits-am)}100%{background:transparent}}
+      tr.rij-flits-amber td{animation:rijFlitsAmber 1.2s ease}
+    }

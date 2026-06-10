@@ -55,7 +55,7 @@ function renderOntw(){
   el.innerHTML=sl.map(r=>{
     const rid=state._rowCache.length;state._rowCache.push(Object.assign({},r,{_sec:'ONTW'}));
     const clr=ONTW_CAT_COLORS[r.categorie]||'var(--mut)';
-    return`<tr>
+    return`<tr data-row="${r._row}">
       <td class="cell-name">${esc(r.titel)}</td>
       <td><span class="badge" style="background:color-mix(in srgb,${clr} 15%,transparent);color:${clr}">${esc(r.categorie)}</span></td>
       <td class="cell-txt">${r.inhoud?`<span style="font-size:12px">${esc(r.inhoud.substring(0,80))}${r.inhoud.length>80?'…':''}</span>`:''}</td>

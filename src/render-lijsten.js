@@ -398,7 +398,7 @@ function rowNtd(r,sec){
     r.inBehandeling === 'TRUE' ? 'ib-row' : '',
     rowTeLaat ? 'row-telaat' : ''
   ].filter(Boolean).join(' ');
-  return `<tr class="${rowCls}">${cells}</tr>`;
+  return `<tr class="${rowCls}" data-row="${r._row}">${cells}</tr>`;
 }
 
 function rowAf(r,sec){

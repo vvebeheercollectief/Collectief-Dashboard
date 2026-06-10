@@ -47,6 +47,7 @@ export const state = {
   _lastDHash: null,
   _loadInFlight: false,
   _loadAgain: false,
+  _animBusy: false,
   // diversen
   _sheetIds: null,
   _completeIdx: null,

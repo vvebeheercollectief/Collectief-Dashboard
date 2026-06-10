@@ -162,6 +162,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(document.getElementById('ontw-modal-bg').classList.contains('open')) return;
     if(document.getElementById('dot').classList.contains('loading')) return;
     if(state.pendingWrites>0) return;
+    if(state._animBusy) return;
     if(!await ensureToken()) return;
     loadAll(true);
   },8000);

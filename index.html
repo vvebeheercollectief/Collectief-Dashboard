@@ -459,7 +459,7 @@
           <div class="fld" style="flex:1"><label>Opmerkingen</label><input type="text" id="m-opm"/></div>
         </div>
         <div class="fld"><label>Subcategorie</label><select id="m-sub-opp"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option></select></div>
-        <div class="toggle-row"><div class="tog" id="tog-ib" onclick="this.classList.toggle('on')"></div><span>In behandeling</span></div>
+        <div class="toggle-row"><div class="tog" id="tog-ib" data-action="toggle"></div><span>In behandeling</span></div>
       </div>
 
       <!-- VERGADERVERZOEKEN -->
@@ -476,7 +476,7 @@
           <div class="fld"><label>Opmerkingen</label><input type="text" id="m-opm-v"/></div>
         </div>
         <div class="fld"><label>Subcategorie</label><select id="m-sub-verg"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option></select></div>
-        <div class="toggle-row"><div class="tog" id="tog-ib-v" onclick="this.classList.toggle('on')"></div><span>In behandeling</span></div>
+        <div class="toggle-row"><div class="tog" id="tog-ib-v" data-action="toggle"></div><span>In behandeling</span></div>
       </div>
 
       <!-- OFFERTE-TRAJECTEN -->
@@ -493,16 +493,16 @@
             <div class="off-counter">
               <span class="off-lbl">Ontvangen</span>
               <div class="off-spin">
-                <button type="button" class="off-btn" onclick="adjOff('m-off-recv',-1)">−</button>
+                <button type="button" class="off-btn" data-action="off" data-off="m-off-recv" data-delta="-1">−</button>
                 <input type="number" id="m-off-recv" min="0" value="0" class="off-inp">
-                <button type="button" class="off-btn" onclick="adjOff('m-off-recv',1)">+</button>
+                <button type="button" class="off-btn" data-action="off" data-off="m-off-recv" data-delta="1">+</button>
               </div>
               <span class="off-sep">/</span>
               <span class="off-lbl">Aangevraagd</span>
               <div class="off-spin">
-                <button type="button" class="off-btn" onclick="adjOff('m-off-total',-1)">−</button>
+                <button type="button" class="off-btn" data-action="off" data-off="m-off-total" data-delta="-1">−</button>
                 <input type="number" id="m-off-total" min="0" value="0" class="off-inp">
-                <button type="button" class="off-btn" onclick="adjOff('m-off-total',1)">+</button>
+                <button type="button" class="off-btn" data-action="off" data-off="m-off-total" data-delta="1">+</button>
               </div>
             </div>
           </div>
@@ -526,7 +526,7 @@
           <div class="fld"><label>Opmerkingen</label><input type="text" id="m-opm-l"/></div>
         </div>
         <div class="fld"><label>Subcategorie</label><select id="m-sub-lod"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option></select></div>
-        <div class="toggle-row"><div class="tog" id="tog-ib-l" onclick="this.classList.toggle('on')"></div><span>In behandeling</span></div>
+        <div class="toggle-row"><div class="tog" id="tog-ib-l" data-action="toggle"></div><span>In behandeling</span></div>
       </div>
       <!-- Logboek per taak -->
       <div id="fg-history" class="logboek-box" style="display:none">
@@ -538,17 +538,17 @@
         <p class="logboek-sub">Leg vast wat je hebt gedaan — ook korte notities helpen collega's de status te volgen.</p>
         <div id="hist-body" class="logboek-body"></div>
         <div class="logboek-add">
-          <textarea id="hist-note" rows="3" placeholder="Typ hier je notitie… (Enter = nieuwe regel)" onkeydown="histNoteKey(event)"></textarea>
+          <textarea id="hist-note" rows="3" placeholder="Typ hier je notitie… (Enter = nieuwe regel)"></textarea>
           <div class="logboek-foot">
             <span class="logboek-hint"><kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>Enter</kbd> om snel toe te voegen</span>
-            <button class="btn btn-pri" onclick="addTaskNote()" style="padding:7px 16px">Toevoegen</button>
+            <button class="btn btn-pri" data-action="notitie-toevoegen" style="padding:7px 16px">Toevoegen</button>
           </div>
         </div>
       </div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-sec" id="m-cancel">Annuleren</button>
-      <button class="btn btn-del" id="m-del" style="display:none" onclick="deleteCurrentEditTask()">🗑️ Verwijder</button>
+      <button class="btn btn-del" id="m-del" style="display:none" data-action="taak-verwijder-modal">🗑️ Verwijder</button>
       <button class="btn btn-pri" id="m-submit">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         <span id="m-submit-lbl">Toevoegen</span>
@@ -600,12 +600,12 @@
       </div>
 
       <div style="font-size:11.5px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin:18px 0 6px">Soorten meldingen</div>
-      <div class="toggle-row"><div class="tog" id="tog-notif-newtask" onclick="this.classList.toggle('on');saveNotifPrefs()"></div><span>Nieuwe taak toegevoegd</span></div>
-      <div class="toggle-row"><div class="tog" id="tog-notif-assigned" onclick="this.classList.toggle('on');saveNotifPrefs()"></div><span>Taak aan mij toegewezen</span></div>
-      <div class="toggle-row"><div class="tog" id="tog-notif-deadline" onclick="this.classList.toggle('on');saveNotifPrefs()"></div><span>Deadline nadert</span></div>
+      <div class="toggle-row"><div class="tog" id="tog-notif-newtask" data-action="notif-toggle"></div><span>Nieuwe taak toegevoegd</span></div>
+      <div class="toggle-row"><div class="tog" id="tog-notif-assigned" data-action="notif-toggle"></div><span>Taak aan mij toegewezen</span></div>
+      <div class="toggle-row"><div class="tog" id="tog-notif-deadline" data-action="notif-toggle"></div><span>Deadline nadert</span></div>
       <div class="fld" style="margin:2px 0 10px 46px">
         <label style="text-transform:none;letter-spacing:normal;font-size:12px;color:var(--mut)">Hoe lang van tevoren?</label>
-        <select id="notif-deadline-hours" onchange="saveNotifPrefs()" style="width:auto;padding:5px 9px">
+        <select id="notif-deadline-hours" style="width:auto;padding:5px 9px">
           <option value="1">1 uur</option>
           <option value="4">4 uur</option>
           <option value="8">8 uur</option>
@@ -613,8 +613,8 @@
           <option value="48">2 dagen</option>
         </select>
       </div>
-      <div class="toggle-row"><div class="tog" id="tog-notif-alv" onclick="this.classList.toggle('on');saveNotifPrefs()"></div><span>ALV-status verandert</span></div>
-      <div class="toggle-row"><div class="tog" id="tog-notif-daily" onclick="this.classList.toggle('on');saveNotifPrefs()"></div><span>Dagelijkse samenvatting (08:30)</span></div>
+      <div class="toggle-row"><div class="tog" id="tog-notif-alv" data-action="notif-toggle"></div><span>ALV-status verandert</span></div>
+      <div class="toggle-row"><div class="tog" id="tog-notif-daily" data-action="notif-toggle"></div><span>Dagelijkse samenvatting (08:30)</span></div>
 
       <div style="border-top:1px solid var(--bor);margin-top:20px;padding-top:16px">
         <div style="font-size:11.5px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px">Push-meldingen</div>
@@ -671,8 +671,8 @@
           <p class="ai-step"><span class="dot">4</span> De vraag die het dashboard bouwt</p>
           <div class="ai-prompt" id="ai-prompt"></div>
           <div class="ai-send">
-            <button class="btn ai-claude" onclick="copyAiPrompt('Claude')">📎 Kopieer &amp; open Claude</button>
-            <button class="btn ai-gemini" onclick="copyAiPrompt('Gemini')">📎 Kopieer &amp; open Gemini</button>
+            <button class="btn ai-claude" data-action="ai-kopieer" data-waar="Claude">📎 Kopieer &amp; open Claude</button>
+            <button class="btn ai-gemini" data-action="ai-kopieer" data-waar="Gemini">📎 Kopieer &amp; open Gemini</button>
           </div>
           <p style="font-size:11.5px;color:var(--mut);margin:9px 0 0">De vraag staat dan op je klembord — plak met <kbd>Ctrl/⌘+V</kbd>.</p>
 
@@ -689,7 +689,7 @@
   <div style="background:var(--sur);border:1px solid var(--bor);border-radius:16px;padding:40px 36px;box-shadow:var(--shm);text-align:center;max-width:400px;width:90%">
     <img src="logo-login.png" alt="VvE Beheer Collectief" style="width:220px;margin:0 auto 24px;display:block"/>
     <p style="font-size:13px;color:var(--mut);margin:0 0 24px">Log in met je VvE Beheer Collectief account</p>
-    <button id="login-btn" class="btn btn-pri" style="width:100%;justify-content:center;padding:11px 20px;font-size:14px" onclick="doLogin()">Inloggen met Google</button>
+    <button id="login-btn" class="btn btn-pri" style="width:100%;justify-content:center;padding:11px 20px;font-size:14px" data-action="login">Inloggen met Google</button>
     <p id="login-error" style="font-size:12px;color:var(--rd);margin:12px 0 0;display:none"></p>
   </div>
 </div>

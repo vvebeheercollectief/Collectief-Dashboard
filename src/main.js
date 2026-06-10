@@ -150,6 +150,10 @@ document.addEventListener('DOMContentLoaded',()=>{
   codeInput.addEventListener('input',onCodeInput);
   codeInput.addEventListener('blur',()=>setTimeout(()=>{document.getElementById('vve-sug').style.display='none'},200));
 
+  // Logboek-notitieveld (was inline onkeydown/onchange — Fase 2B)
+  document.getElementById('hist-note').addEventListener('keydown', histNoteKey);
+  document.getElementById('notif-deadline-hours').addEventListener('change', saveNotifPrefs);
+
   // Notificatie-modal handlers
   document.getElementById('notif-btn').onclick = openNotifModal;
   document.getElementById('notif-close').onclick = closeNotifModal;
@@ -220,8 +224,7 @@ if (location.search.includes('test=1')) import('./tests.js');
 // Houdt de 35 inline on*-handlers + de paginerings-callback werkend nu de
 // functies module-scoped zijn. Opgeruimd zodra alles via data-action loopt.
 Object.assign(window, {
-  adjOff, histNoteKey, addTaskNote, deleteCurrentEditTask, saveNotifPrefs,
-  copyAiPrompt, doLogin, setNtd, setAf, toggleAlvoFlag, editRow, completeTask,
+  setNtd, setAf, toggleAlvoFlag, editRow, completeTask,
   aiOvernemen, aiActieTaak, aiKopieerConcept, setOntw, editOntwItem, dismissToast,
   pgs, renderNtd, renderAf, renderAlvo, renderAlfa, renderOntw, renderLogboek,
 });

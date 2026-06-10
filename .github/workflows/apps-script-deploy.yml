@@ -1,0 +1,38 @@
+name: Apps Script uitrollen
+
+on:
+  push:
+    branches: [main, staging]
+    paths:
+      - 'apps-script/**'
+      - '.github/workflows/apps-script-deploy.yml'
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+      - name: Installeer clasp
+        run: npm install -g @google/clasp@2.4.2
+      - name: Schrijf clasp-credentials
+        run: printf '%s' "$CLASPRC_JSON" > "$HOME/.clasprc.json"
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+      - name: Kies doel-script (staging -> test, main -> productie)
+        id: target
+        run: |
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            echo "scriptId=${{ secrets.PROD_SCRIPT_ID }}" >> "$GITHUB_OUTPUT"
+            echo "omgeving=PRODUCTIE" >> "$GITHUB_OUTPUT"
+          else
+            echo "scriptId=${{ secrets.TEST_SCRIPT_ID }}" >> "$GITHUB_OUTPUT"
+            echo "omgeving=TEST" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Genereer .clasp.json
+        run: echo '{"scriptId":"${{ steps.target.outputs.scriptId }}","rootDir":"apps-script"}' > .clasp.json
+      - name: Push code naar ${{ steps.target.outputs.omgeving }}
+        run: clasp push --force

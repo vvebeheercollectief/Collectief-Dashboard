@@ -1153,12 +1153,29 @@
 // ══════════════════════════════════════
 //  CONFIG
 // ══════════════════════════════════════
-const SID  = '1fnUsbwb4nDMNttWym9FWBw1CMMMAVTuZ3v88b35isUw';
+// ── Omgeving (productie vs. testomgeving) ──────────────────────────────
+// Fail-safe: alleen deze exacte hosts zijn PRODUCTIE; al het andere
+// (staging-branch, andere previews, localhost) draait op de TEST-data.
+const PROD_HOSTS = [
+  'vvebeheercollectief.github.io',                            // ECHTE productie (GitHub Pages, source=main)
+  'collectief-dashboard.vercel.app',                          // Vercel-spiegel van main (parallel/handmatig)
+  'collectief-dashboard-vve-beheer-collectief.vercel.app',
+  'collectief-dashboard-vvebeheercollectief-vve-beheer-collectief.vercel.app',
+  'collectief-dashboard-git-main-vve-beheer-collectief.vercel.app',
+];
+function _isStagingHost(hostname){ return !PROD_HOSTS.includes(hostname); }
+const IS_STAGING = _isStagingHost(location.hostname);
+
+const SID_PROD = '1fnUsbwb4nDMNttWym9FWBw1CMMMAVTuZ3v88b35isUw';
+const SID_TEST = '1-6Q36CrwB0szX2DS2eLjPwfiY-jAw8lK9JOPDSlljm4';   // test-Sheet "Collectief Dashboard - Kopie" (Taak 3)
+const SID = IS_STAGING ? SID_TEST : SID_PROD;
 const PG   = 25;
 // Meldingen lopen via de 'Notif-wachtrij'-tab (OAuth-append vanuit de ingelogde
 // gebruiker) — een Apps Script-trigger verstuurt de push. Geen webhook-URL of
 // secret meer nodig in deze (publieke) frontend.
-const ONESIGNAL_APP_ID     = 'c0e1301b-2cee-4646-8fab-99698e10e78c';
+const ONESIGNAL_APP_ID_PROD = 'c0e1301b-2cee-4646-8fab-99698e10e78c';
+const ONESIGNAL_APP_ID_TEST = '11b00aea-496b-44d5-8b9f-5012fcb48fd4';   // test-OneSignal app "Collectief Dashboard TEST" (Taak 4)
+const ONESIGNAL_APP_ID      = IS_STAGING ? ONESIGNAL_APP_ID_TEST : ONESIGNAL_APP_ID_PROD;
 
 const ALLOWED_EMAILS = [
   'info@vvebeheercollectief.nl',
@@ -1230,6 +1247,16 @@ let _undoStack = [];
 //  BOOT
 // ══════════════════════════════════════
 document.addEventListener('DOMContentLoaded',()=>{
+  // Zichtbare waarschuwingsbalk in de testomgeving
+  if (IS_STAGING) {
+    document.title = '[TEST] ' + document.title;
+    document.body.insertAdjacentHTML('afterbegin',
+      '<div style="position:fixed;top:0;left:0;right:0;z-index:100000;background:#B45309;color:#fff;'
+      + 'text-align:center;font:600 13px/2.4 system-ui,sans-serif;letter-spacing:.3px">'
+      + '⚠ TESTOMGEVING — dit is niet het echte dashboard</div>'
+      + '<div style="height:34px"></div>');
+  }
+
   // Service worker registreren (PWA-ondersteuning)
   if('serviceWorker' in navigator){
     window.addEventListener('load',()=>{
@@ -4059,6 +4086,15 @@ if (location.search.includes('test=1')) {
   // ── logZin ── (natuurlijke zin per logboek-actie; bevat juiste werkwoord)
   truthy('logZin Afgerond bevat "rondde"',  logZin({actie:'Afgerond', code:'TEST01', gebruiker:'info@vvebeheercollectief.nl'}).includes('rondde'));
   truthy('logZin Verwijderd bevat "verwijderde"', logZin({actie:'Verwijderd', code:'TEST01', gebruiker:'info@vvebeheercollectief.nl'}).includes('verwijderde'));
+
+  // ── _isStagingHost ── (fail-safe: alleen bekende productie-hosts = productie)
+  truthy('prod host = geen staging',     _isStagingHost('collectief-dashboard.vercel.app') === false);
+  truthy('prod team-alias = geen staging', _isStagingHost('collectief-dashboard-vve-beheer-collectief.vercel.app') === false);
+  truthy('main-branch alias = geen staging', _isStagingHost('collectief-dashboard-git-main-vve-beheer-collectief.vercel.app') === false);
+  truthy('staging host = staging',       _isStagingHost('collectief-dashboard-git-staging-vve-beheer-collectief.vercel.app') === true);
+  truthy('andere preview = staging (veilig)', _isStagingHost('collectief-dashboard-git-experiment-vve-beheer-collectief.vercel.app') === true);
+  truthy('localhost = staging',          _isStagingHost('localhost') === true);
+  truthy('github.io = echte productie (geen staging)', _isStagingHost('vvebeheercollectief.github.io') === false);
 
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');

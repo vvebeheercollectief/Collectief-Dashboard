@@ -207,7 +207,7 @@ frame-src https://accounts.google.com;
 
 **Files:** geen wijziging.
 
-- [ ] **Stap 1: Sta op `staging` met schone, actuele basis.**
+- [x] **Stap 1: Sta op `staging` met schone, actuele basis.**
 
 Run:
 ```bash
@@ -218,12 +218,12 @@ git log --oneline -1
 ```
 Verwacht: branch `staging`, schone of bekende werkmap.
 
-- [ ] **Stap 2: Nul-meting zelftest.** Start de preview en open `?test=1`.
+- [x] **Stap 2: Nul-meting zelftest.** Start de preview en open `?test=1`.
 
 Gebruik `preview_start` (servet de map) en open `index.html?test=1`; lees de console.
 Verwacht: `[TESTS] 37 OK, 0 FAIL` (of het actuele aantal — noteer dit getal als ijkpunt).
 
-- [ ] **Stap 3: Nul-meting beeld.** Maak een screenshot van het ingelogde dashboard (of het login-scherm) met `preview_screenshot`, als visuele referentie voor "ziet er identiek uit".
+- [x] **Stap 3: Nul-meting beeld.** Maak een screenshot van het ingelogde dashboard (of het login-scherm) met `preview_screenshot`, als visuele referentie voor "ziet er identiek uit".
 
 > Geen commit — dit is meten.
 
@@ -233,17 +233,17 @@ Verwacht: `[TESTS] 37 OK, 0 FAIL` (of het actuele aantal — noteer dit getal al
 - Create: `styles.css`
 - Modify: `index.html` (regels 25–480 = het `<style>…</style>`-blok; regel 24/481 omgeving)
 
-- [ ] **Stap 1: Verplaats de stijl.** Knip de **inhoud** tussen `<style>` (na regel 25) en `</style>` (regel 480) naar een nieuw `styles.css`. Vervang het hele `<style>…</style>`-blok in `index.html` door:
+- [x] **Stap 1: Verplaats de stijl.** Knip de **inhoud** tussen `<style>` (na regel 25) en `</style>` (regel 480) naar een nieuw `styles.css`. Vervang het hele `<style>…</style>`-blok in `index.html` door:
 ```html
   <link rel="stylesheet" href="styles.css"/>
 ```
 Plaats deze `<link>` op dezelfde plek (vlak vóór `</head>`).
 
-- [ ] **Stap 2: Verifieer beeld identiek.** Herlaad de preview, maak `preview_screenshot`, vergelijk met A0-stap 3. Geen verschil.
+- [x] **Stap 2: Verifieer beeld identiek.** Herlaad de preview, maak `preview_screenshot`, vergelijk met A0-stap 3. Geen verschil.
 
-- [ ] **Stap 3: Verifieer zelftest.** Open `?test=1`. Verwacht: zelfde aantal OK, 0 FAIL.
+- [x] **Stap 3: Verifieer zelftest.** Open `?test=1`. Verwacht: zelfde aantal OK, 0 FAIL.
 
-- [ ] **Stap 4: Commit.**
+- [x] **Stap 4: Commit.**
 ```bash
 git add index.html styles.css
 git commit -m "Fase 2A: CSS naar styles.css"
@@ -255,18 +255,18 @@ git commit -m "Fase 2A: CSS naar styles.css"
 - Create: `src/main.js`
 - Modify: `index.html` (regels 1152–4102 = het `<script>…</script>`-blok)
 
-- [ ] **Stap 1: Verplaats het script.** Knip de **inhoud** tussen `<script>` (regel 1152) en `</script>` (regel 4102) naar `src/main.js`. Vervang het `<script>…</script>`-blok in `index.html` door:
+- [x] **Stap 1: Verplaats het script.** Knip de **inhoud** tussen `<script>` (regel 1152) en `</script>` (regel 4102) naar `src/main.js`. Vervang het `<script>…</script>`-blok in `index.html` door:
 ```html
 <script type="module" src="src/main.js"></script>
 ```
 
-- [ ] **Stap 2: Voeg de window-shim toe** onderaan `src/main.js` (zie sectie "Tijdelijke window-shim"). Dit houdt de 35 inline-handlers + de paginering werkend nu de functies module-scoped zijn.
+- [x] **Stap 2: Voeg de window-shim toe** onderaan `src/main.js` (zie sectie "Tijdelijke window-shim"). Dit houdt de 35 inline-handlers + de paginering werkend nu de functies module-scoped zijn.
 
-- [ ] **Stap 3: Verifieer volledige werking.** Herlaad. Loop met de preview-tools door: login-scherm rendert, (na inloggen of met test-sessie) tabellen, tabs aanklikken (`setNtd`/`setAf`), paginering, een rij bewerken (potlood), de Ontwikkeling-tab, AI-modal openen. Controleer `preview_console_logs` op fouten. Geen fouten, alles werkt als vóór.
+- [x] **Stap 3: Verifieer volledige werking.** Herlaad. Loop met de preview-tools door: login-scherm rendert, (na inloggen of met test-sessie) tabellen, tabs aanklikken (`setNtd`/`setAf`), paginering, een rij bewerken (potlood), de Ontwikkeling-tab, AI-modal openen. Controleer `preview_console_logs` op fouten. Geen fouten, alles werkt als vóór.
 
-- [ ] **Stap 4: Verifieer zelftest.** `?test=1` → zelfde OK, 0 FAIL.
+- [x] **Stap 4: Verifieer zelftest.** `?test=1` → zelfde OK, 0 FAIL.
 
-- [ ] **Stap 5: Commit.**
+- [x] **Stap 5: Commit.**
 ```bash
 git add index.html src/main.js
 git commit -m "Fase 2A: script naar src/main.js als ES-module (+ tijdelijke window-shim)"
@@ -278,17 +278,17 @@ git commit -m "Fase 2A: script naar src/main.js als ES-module (+ tijdelijke wind
 - Create: `src/config.js`
 - Modify: `src/main.js`
 
-- [ ] **Stap 1: Knip de constanten** (zie config-lijst in "Doelstructuur") uit `main.js` naar `src/config.js` en zet `export` voor elke declaratie. Pure data, geen afhankelijkheden. Let op: `_isStagingHost`/`IS_STAGING`/`SID`/`ONESIGNAL_APP_ID` zijn afgeleid — verplaats `_isStagingHost` + de afgeleide consts mee (export beide).
+- [x] **Stap 1: Knip de constanten** (zie config-lijst in "Doelstructuur") uit `main.js` naar `src/config.js` en zet `export` voor elke declaratie. Pure data, geen afhankelijkheden. Let op: `_isStagingHost`/`IS_STAGING`/`SID`/`ONESIGNAL_APP_ID` zijn afgeleid — verplaats `_isStagingHost` + de afgeleide consts mee (export beide).
 
-- [ ] **Stap 2: Importeer in `main.js`** bovenaan:
+- [x] **Stap 2: Importeer in `main.js`** bovenaan:
 ```js
 import { PROD_HOSTS, IS_STAGING, SID, ONESIGNAL_APP_ID, ALLOWED_EMAILS, EMAIL_NAMES, clientId, SECS, SKEYS, PAGE_META, PG, PRIO_REGELS, STIL_DREMPEL_DAGEN, /* …alle gebruikte… */ } from './config.js';
 ```
 Importeer precies wat `main.js` nog gebruikt (laat de browser-console "X is not defined" aanwijzen en vul aan).
 
-- [ ] **Stap 3: Verifieer.** Herlaad → geen console-fouten; `?test=1` (de staging-asserts gebruiken `_isStagingHost`/`PROD_HOSTS`) → zelfde OK, 0 FAIL. Korte klik-doorloop.
+- [x] **Stap 3: Verifieer.** Herlaad → geen console-fouten; `?test=1` (de staging-asserts gebruiken `_isStagingHost`/`PROD_HOSTS`) → zelfde OK, 0 FAIL. Korte klik-doorloop.
 
-- [ ] **Stap 4: Commit.**
+- [x] **Stap 4: Commit.**
 ```bash
 git add src/config.js src/main.js
 git commit -m "Fase 2A: config.js (constanten + iconen)"
@@ -300,7 +300,7 @@ git commit -m "Fase 2A: config.js (constanten + iconen)"
 - Create: `src/state.js`
 - Modify: `src/main.js`
 
-- [ ] **Stap 1: Bepaal per variabele de groep** (zie "Toestands-strategie"). Run voor de twijfelgevallen:
+- [x] **Stap 1: Bepaal per variabele de groep** (zie "Toestands-strategie"). Run voor de twijfelgevallen:
 ```bash
 for v in D pgs charts _shownToasts _undoStack _rowCache _writeChain; do
   echo "== $v =="; grep -nE "(^|[^.])\b$v\s*=" index.html | grep -v '==' ;
@@ -308,13 +308,13 @@ done
 ```
 Alleen-declaratie → groep 1 (direct export). Echte hertoekenning → groep 2 (`state.x`).
 
-- [ ] **Stap 2: Maak `src/state.js`** met groep 1 als directe exports en groep 2 op `export const state = {…}` (zie sectie). Verwijder deze declaraties uit `main.js`.
+- [x] **Stap 2: Maak `src/state.js`** met groep 1 als directe exports en groep 2 op `export const state = {…}` (zie sectie). Verwijder deze declaraties uit `main.js`.
 
-- [ ] **Stap 3: Werk de referenties bij.** Groep 1: alleen `import {D, pgs, charts, …} from './state.js'` toevoegen (geen referentie-wijziging). Groep 2: vervang `oauthToken`→`state.oauthToken`, `activeNtd`→`state.activeNtd`, enz. Doe dit **één variabele tegelijk** met woordgrens-regex en controleer elke vervanging (niet in strings/commentaar raken). Werk ook de window-shim bij (`pgs` blijft direct; verwijs render-fns nog ongewijzigd).
+- [x] **Stap 3: Werk de referenties bij.** Groep 1: alleen `import {D, pgs, charts, …} from './state.js'` toevoegen (geen referentie-wijziging). Groep 2: vervang `oauthToken`→`state.oauthToken`, `activeNtd`→`state.activeNtd`, enz. Doe dit **één variabele tegelijk** met woordgrens-regex en controleer elke vervanging (niet in strings/commentaar raken). Werk ook de window-shim bij (`pgs` blijft direct; verwijs render-fns nog ongewijzigd).
 
-- [ ] **Stap 4: Verifieer grondig** (dit is de gevoeligste stap). Herlaad → geen fouten. Klik-doorloop: tabs wisselen (muteert `state.activeNtd`), paginering (muteert `pgs`), inloggen/sessie (muteert `state.oauthToken`), een taak bewerken+opslaan, afronden. `?test=1` → zelfde OK, 0 FAIL.
+- [x] **Stap 4: Verifieer grondig** (dit is de gevoeligste stap). Herlaad → geen fouten. Klik-doorloop: tabs wisselen (muteert `state.activeNtd`), paginering (muteert `pgs`), inloggen/sessie (muteert `state.oauthToken`), een taak bewerken+opslaan, afronden. `?test=1` → zelfde OK, 0 FAIL.
 
-- [ ] **Stap 5: Commit.**
+- [x] **Stap 5: Commit.**
 ```bash
 git add src/state.js src/main.js
 git commit -m "Fase 2A: state.js (gedeelde toestand)"
@@ -326,13 +326,13 @@ git commit -m "Fase 2A: state.js (gedeelde toestand)"
 - Create: `src/util.js`
 - Modify: `src/main.js`
 
-- [ ] **Stap 1: Knip de pure helpers** (zie util-lijst) uit `main.js` naar `src/util.js`, `export` per functie. Deze hangen alleen van `config.js` af (bv. `berekenPrioriteit`→`PRIO_REGELS`, `displayName`→`EMAIL_NAMES`); voeg daar de nodige `import … from './config.js'` toe.
+- [x] **Stap 1: Knip de pure helpers** (zie util-lijst) uit `main.js` naar `src/util.js`, `export` per functie. Deze hangen alleen van `config.js` af (bv. `berekenPrioriteit`→`PRIO_REGELS`, `displayName`→`EMAIL_NAMES`); voeg daar de nodige `import … from './config.js'` toe.
 
-- [ ] **Stap 2: Importeer in `main.js`** wat nog gebruikt wordt.
+- [x] **Stap 2: Importeer in `main.js`** wat nog gebruikt wordt.
 
-- [ ] **Stap 3: Verifieer.** `?test=1` test juist véél van deze functies (`berekenPrioriteit`, `_parseAnyDate`, `displayName`) → moet `37 OK, 0 FAIL` blijven. Klik-doorloop kort.
+- [x] **Stap 3: Verifieer.** `?test=1` test juist véél van deze functies (`berekenPrioriteit`, `_parseAnyDate`, `displayName`) → moet `37 OK, 0 FAIL` blijven. Klik-doorloop kort.
 
-- [ ] **Stap 4: Commit.**
+- [x] **Stap 4: Commit.**
 ```bash
 git add src/util.js src/main.js
 git commit -m "Fase 2A: util.js (pure helpers)"
@@ -344,17 +344,17 @@ git commit -m "Fase 2A: util.js (pure helpers)"
 - Create: `src/api.js`, `src/data.js`, `src/auth.js`
 - Modify: `src/main.js`
 
-- [ ] **Stap 1: `api.js`.** Knip de Sheets-laag-functies (zie lijst) naar `src/api.js` met `export`; `import {state} from './state.js'` (gebruikt `state.oauthToken`, `state._sheetIds`), `import {SID} from './config.js'`.
+- [x] **Stap 1: `api.js`.** Knip de Sheets-laag-functies (zie lijst) naar `src/api.js` met `export`; `import {state} from './state.js'` (gebruikt `state.oauthToken`, `state._sheetIds`), `import {SID} from './config.js'`.
 
-- [ ] **Stap 2: `data.js`.** Knip laden/parsen/`backgroundWrite`/sync-indicator naar `src/data.js`; importeert uit `api.js`, `state.js`, `config.js`, `util.js`. `loadAll` roept `renderAll()` aan → die staat in `main.js`; importeer `renderAll` uit `main.js` **of** laat `loadAll` een doorgegeven callback gebruiken. Eenvoudigst: `import { renderAll } from './main.js';` (live binding, kringverwijzing is ok want aanroep op runtime).
+- [x] **Stap 2: `data.js`.** Knip laden/parsen/`backgroundWrite`/sync-indicator naar `src/data.js`; importeert uit `api.js`, `state.js`, `config.js`, `util.js`. `loadAll` roept `renderAll()` aan → die staat in `main.js`; importeer `renderAll` uit `main.js` **of** laat `loadAll` een doorgegeven callback gebruiken. Eenvoudigst: `import { renderAll } from './main.js';` (live binding, kringverwijzing is ok want aanroep op runtime).
 
-- [ ] **Stap 3: `auth.js`.** Knip `doOAuth/fetchUserEmail/doLogin/ensureToken` naar `src/auth.js`; importeert `state`, `config` (clientId, ALLOWED_EMAILS), en `loadAll` uit `data.js`.
+- [x] **Stap 3: `auth.js`.** Knip `doOAuth/fetchUserEmail/doLogin/ensureToken` naar `src/auth.js`; importeert `state`, `config` (clientId, ALLOWED_EMAILS), en `loadAll` uit `data.js`.
 
-- [ ] **Stap 4: Importeer** in `main.js` wat nog gebruikt wordt; werk de window-shim bij (`doLogin` blijft erop tot mijlpaal B).
+- [x] **Stap 4: Importeer** in `main.js` wat nog gebruikt wordt; werk de window-shim bij (`doLogin` blijft erop tot mijlpaal B).
 
-- [ ] **Stap 5: Verifieer.** Herlaad, log in (of sessieherstel), data laadt, tabellen vullen, een schrijf-actie (taak opslaan) werkt en `backgroundWrite` rondt af. Console schoon. `?test=1` ok.
+- [x] **Stap 5: Verifieer.** Herlaad, log in (of sessieherstel), data laadt, tabellen vullen, een schrijf-actie (taak opslaan) werkt en `backgroundWrite` rondt af. Console schoon. `?test=1` ok.
 
-- [ ] **Stap 6: Commit.**
+- [x] **Stap 6: Commit.**
 ```bash
 git add src/api.js src/data.js src/auth.js src/main.js
 git commit -m "Fase 2A: gegevenslaag (api/data/auth)"
@@ -366,13 +366,13 @@ git commit -m "Fase 2A: gegevenslaag (api/data/auth)"
 - Create: `src/ui.js`
 - Modify: `src/main.js`
 
-- [ ] **Stap 1: Knip** `goTo, closeSb, applyTheme, applyDensity, cycleDensity, setupSearch` naar `src/ui.js` met `export`; importeer wat nodig is (`config`: DENSITIES; `state`/render voor `goTo` indien het rendert).
+- [x] **Stap 1: Knip** `goTo, closeSb, applyTheme, applyDensity, cycleDensity, setupSearch` naar `src/ui.js` met `export`; importeer wat nodig is (`config`: DENSITIES; `state`/render voor `goTo` indien het rendert).
 
-- [ ] **Stap 2: Importeer** in `main.js`.
+- [x] **Stap 2: Importeer** in `main.js`.
 
-- [ ] **Stap 3: Verifieer.** Navigatie (zijbalk-items), thema-knop, dichtheid-knop, zoekvelden werken. `?test=1` ok.
+- [x] **Stap 3: Verifieer.** Navigatie (zijbalk-items), thema-knop, dichtheid-knop, zoekvelden werken. `?test=1` ok.
 
-- [ ] **Stap 4: Commit.**
+- [x] **Stap 4: Commit.**
 ```bash
 git add src/ui.js src/main.js
 git commit -m "Fase 2A: ui.js (navigatie/thema/dichtheid/zoeken)"
@@ -384,13 +384,13 @@ git commit -m "Fase 2A: ui.js (navigatie/thema/dichtheid/zoeken)"
 - Create: `src/render-taken.js`, `src/render-alv.js`, `src/render-analytics.js`, `src/render-overig.js`
 - Modify: `src/main.js`
 
-- [ ] **Stap 1: Verdeel de render-functies** over de vier bestanden (zie "Doelstructuur"). Elke functie `export`. Importeer per bestand wat het gebruikt uit `config/state/util/api/data` en — bij kruisverwijzing — uit `crud.js`/elkaar (kringverwijzing toegestaan; bv. `render-taken` → `openModal` uit `crud`, dat in A9 ontstaat → zet die import er pas in A9 bij, óf houd `openModal` voorlopig via window-shim). Laat `renderAll()` in `main.js`; het importeert de losse `render*`-functies.
+- [x] **Stap 1: Verdeel de render-functies** over de vier bestanden (zie "Doelstructuur"). Elke functie `export`. Importeer per bestand wat het gebruikt uit `config/state/util/api/data` en — bij kruisverwijzing — uit `crud.js`/elkaar (kringverwijzing toegestaan; bv. `render-taken` → `openModal` uit `crud`, dat in A9 ontstaat → zet die import er pas in A9 bij, óf houd `openModal` voorlopig via window-shim). Laat `renderAll()` in `main.js`; het importeert de losse `render*`-functies.
 
-- [ ] **Stap 2: Importeer** in `main.js`; werk window-shim bij (`setNtd, setAf, toggleAlvoFlag, editRow, setOntw, editOntwItem, addTaskNote` + de render-fns voor paginering blijven erop tot B).
+- [x] **Stap 2: Importeer** in `main.js`; werk window-shim bij (`setNtd, setAf, toggleAlvoFlag, editRow, setOntw, editOntwItem, addTaskNote` + de render-fns voor paginering blijven erop tot B).
 
-- [ ] **Stap 3: Verifieer.** Alle pagina's renderen: Nog-te-doen (tabs/secties, badges, deadlines, Stil-pill), Afgerond, ALV's (vinkjes), Analytics (grafieken/sparklines/leaderboard — Chart.js werkt), Alfabetisch, Ontwikkeling, Logboek (tijdlijn, filterchips). Console schoon. `?test=1` ok (incl. `logZin`).
+- [x] **Stap 3: Verifieer.** Alle pagina's renderen: Nog-te-doen (tabs/secties, badges, deadlines, Stil-pill), Afgerond, ALV's (vinkjes), Analytics (grafieken/sparklines/leaderboard — Chart.js werkt), Alfabetisch, Ontwikkeling, Logboek (tijdlijn, filterchips). Console schoon. `?test=1` ok (incl. `logZin`).
 
-- [ ] **Stap 4: Commit.**
+- [x] **Stap 4: Commit.**
 ```bash
 git add src/render-taken.js src/render-alv.js src/render-analytics.js src/render-overig.js src/main.js
 git commit -m "Fase 2A: renderlaag (taken/alv/analytics/overig)"
@@ -402,17 +402,17 @@ git commit -m "Fase 2A: renderlaag (taken/alv/analytics/overig)"
 - Create: `src/crud.js`, `src/ai.js`, `src/notifications.js`
 - Modify: `src/main.js`, render-modules (kruis-imports invullen)
 
-- [ ] **Stap 1: `crud.js`.** Knip taak-modal/CRUD-functies (zie lijst) hierheen, `export` per functie. Importeer `state/config/util/api/data` en render-functies (voor re-render na opslaan) + `notifications` (toast/notif). Vul nu de in A8 uitgestelde kruis-imports in (render→`openModal/completeTask` uit `crud`).
+- [x] **Stap 1: `crud.js`.** Knip taak-modal/CRUD-functies (zie lijst) hierheen, `export` per functie. Importeer `state/config/util/api/data` en render-functies (voor re-render na opslaan) + `notifications` (toast/notif). Vul nu de in A8 uitgestelde kruis-imports in (render→`openModal/completeTask` uit `crud`).
 
-- [ ] **Stap 2: `ai.js`.** Knip AI-hulp-functies hierheen; importeert `state` (`state._aiLastCode/_aiLastNaam`), `config` (AI_KOPPEN/AI_WANT_TEKST), `util` (esc), en `crud` (`prefillNieuweTaak`).
+- [x] **Stap 2: `ai.js`.** Knip AI-hulp-functies hierheen; importeert `state` (`state._aiLastCode/_aiLastNaam`), `config` (AI_KOPPEN/AI_WANT_TEKST), `util` (esc), en `crud` (`prefillNieuweTaak`).
 
-- [ ] **Stap 3: `notifications.js`.** Knip toasts + push hierheen; importeert `state/config/util/api`. (`fireNotifEvent`/`logEvent` zitten functioneel bij schrijven — mogen in `crud.js` of `data.js`; kies één plek en importeer waar nodig.)
+- [x] **Stap 3: `notifications.js`.** Knip toasts + push hierheen; importeert `state/config/util/api`. (`fireNotifEvent`/`logEvent` zitten functioneel bij schrijven — mogen in `crud.js` of `data.js`; kies één plek en importeer waar nodig.)
 
-- [ ] **Stap 4: Importeer** in `main.js`; trim de window-shim tot enkel nog wat de inline-handlers nodig hebben (alle functies nu via imports beschikbaar).
+- [x] **Stap 4: Importeer** in `main.js`; trim de window-shim tot enkel nog wat de inline-handlers nodig hebben (alle functies nu via imports beschikbaar).
 
-- [ ] **Stap 5: Verifieer (volledige doorloop).** Nieuwe taak toevoegen, bewerken, afronden (optimistische update + achtergrond-write + undo-toast), verwijderen; Ontwikkeling toevoegen/bewerken/verwijderen; AI-modal: mail plakken → chips → prompt kopiëren → antwoord plakken → kaarten → "Overnemen"/"+ Taak"; notificatie-modal: who kiezen, test-melding. Console schoon. `?test=1` ok.
+- [x] **Stap 5: Verifieer (volledige doorloop).** Nieuwe taak toevoegen, bewerken, afronden (optimistische update + achtergrond-write + undo-toast), verwijderen; Ontwikkeling toevoegen/bewerken/verwijderen; AI-modal: mail plakken → chips → prompt kopiëren → antwoord plakken → kaarten → "Overnemen"/"+ Taak"; notificatie-modal: who kiezen, test-melding. Console schoon. `?test=1` ok.
 
-- [ ] **Stap 6: Commit.**
+- [x] **Stap 6: Commit.**
 ```bash
 git add src/crud.js src/ai.js src/notifications.js src/main.js src/render-*.js
 git commit -m "Fase 2A: actielaag (crud/ai/notifications)"
@@ -424,16 +424,16 @@ git commit -m "Fase 2A: actielaag (crud/ai/notifications)"
 - Create: `src/tests.js`
 - Modify: `src/main.js`
 
-- [ ] **Stap 1: Knip het `if (location.search.includes('test=1')) {…}`-blok** (regels ~4030–einde) naar `src/tests.js`. Importeer de geteste functies (`berekenPrioriteit, _parseAnyDate, displayName, logZin, _isStagingHost`) uit hun modules. Roep de test vanuit `main.js` aan met een dynamische import zodat hij niet in productie meelaadt:
+- [x] **Stap 1: Knip het `if (location.search.includes('test=1')) {…}`-blok** (regels ~4030–einde) naar `src/tests.js`. Importeer de geteste functies (`berekenPrioriteit, _parseAnyDate, displayName, logZin, _isStagingHost`) uit hun modules. Roep de test vanuit `main.js` aan met een dynamische import zodat hij niet in productie meelaadt:
 ```js
 // onderaan main.js, na boot:
 if (location.search.includes('test=1')) import('./tests.js');
 ```
 en laat `tests.js` de testlogica bij import meteen draaien (top-level), of exporteer `runTests()` en roep die aan.
 
-- [ ] **Stap 2: Verifieer.** `?test=1` → `37 OK, 0 FAIL`. Zonder `?test=1` → `tests.js` wordt niet geladen (check `preview_network`: geen `tests.js`-request).
+- [x] **Stap 2: Verifieer.** `?test=1` → `37 OK, 0 FAIL`. Zonder `?test=1` → `tests.js` wordt niet geladen (check `preview_network`: geen `tests.js`-request).
 
-- [ ] **Stap 3: Commit.**
+- [x] **Stap 3: Commit.**
 ```bash
 git add src/tests.js src/main.js
 git commit -m "Fase 2A: tests.js (zelftest los, lazy-load)"
@@ -443,15 +443,15 @@ git commit -m "Fase 2A: tests.js (zelftest los, lazy-load)"
 
 **Files:** geen wijziging.
 
-- [ ] **Stap 1: Inventariseer `main.js`.** `main.js` bevat nu vooral: imports, `renderAll()`, het `DOMContentLoaded`-blok (vaste listeners + intervallen + sessieherstel + `goTo('ntd')`), en de (nog aanwezige) window-shim. Bevestig dat er geen grote functie-blokken zijn blijven hangen die in een module horen.
+- [x] **Stap 1: Inventariseer `main.js`.** `main.js` bevat nu vooral: imports, `renderAll()`, het `DOMContentLoaded`-blok (vaste listeners + intervallen + sessieherstel + `goTo('ntd')`), en de (nog aanwezige) window-shim. Bevestig dat er geen grote functie-blokken zijn blijven hangen die in een module horen.
 
-- [ ] **Stap 2: Volledige doorloop op de test-link.** Push naar `staging`, open de echte test-link, log in, en loop álle flows na (render alle pagina's, CRUD, AI, notificaties, thema/dichtheid, paginering, TESTOMGEVING-balk zichtbaar). `preview_console_logs`/test-link-console schoon.
+- [x] **Stap 2: Volledige doorloop op de test-link.** Push naar `staging`, open de echte test-link, log in, en loop álle flows na (render alle pagina's, CRUD, AI, notificaties, thema/dichtheid, paginering, TESTOMGEVING-balk zichtbaar). `preview_console_logs`/test-link-console schoon.
 ```bash
 git push origin staging
 ```
-- [ ] **Stap 3: `?test=1` op de test-link** → `37 OK, 0 FAIL`.
+- [x] **Stap 3: `?test=1` op de test-link** → `37 OK, 0 FAIL`.
 
-- [ ] **Stap 4: Checkpoint-commit (indien nog iets aangepast) of door.** Mijlpaal A klaar: zelfde gedrag/uiterlijk, code opgesplitst.
+- [x] **Stap 4: Checkpoint-commit (indien nog iets aangepast) of door.** Mijlpaal A klaar: zelfde gedrag/uiterlijk, code opgesplitst.
 
 ---
 
@@ -463,19 +463,19 @@ git push origin staging
 - Create: `src/actions.js`
 - Modify: `src/main.js`, `src/tests.js`
 
-- [ ] **Stap 1: Maak `src/actions.js`** met `ACTIONS` + `initActions()` (zie sectie "actions.js volledig"). Importeer de benodigde functies.
+- [x] **Stap 1: Maak `src/actions.js`** met `ACTIONS` + `initActions()` (zie sectie "actions.js volledig"). Importeer de benodigde functies.
 
-- [ ] **Stap 2: Roep `initActions()` aan** in het `DOMContentLoaded`-blok van `main.js` (één keer).
+- [x] **Stap 2: Roep `initActions()` aan** in het `DOMContentLoaded`-blok van `main.js` (één keer).
 
-- [ ] **Stap 3: Nieuwe test (TDD) — dekking.** Voeg aan `tests.js` een assert toe die controleert dat elke verwachte actie bestaat:
+- [x] **Stap 3: Nieuwe test (TDD) — dekking.** Voeg aan `tests.js` een assert toe die controleert dat elke verwachte actie bestaat:
 ```js
 import { ACTIONS } from './actions.js';
 const VERWACHTE_ACTIES = ['toggle','notif-toggle','off','notitie-toevoegen','taak-verwijder-modal','ai-kopieer','login','ntd-sectie','af-sectie','alvo-flag','taak-bewerken','taak-afronden','pagineer','ai-overnemen','ai-actie-taak','ai-kopieer-concept','ontw-cat','ontw-bewerken','toast-sluiten'];
 VERWACHTE_ACTIES.forEach(a => truthy(`actie '${a}' bestaat`, typeof ACTIONS[a] === 'function'));
 ```
-- [ ] **Stap 4: Verifieer test rood→groen.** Eerst draait niets via delegatie (inline-handlers doen nog het werk), maar de dekkings-assert hoort meteen groen te zijn zodra de registry compleet is. `?test=1` → OK-aantal omhoog (≈37+19), 0 FAIL.
+- [x] **Stap 4: Verifieer test rood→groen.** Eerst draait niets via delegatie (inline-handlers doen nog het werk), maar de dekkings-assert hoort meteen groen te zijn zodra de registry compleet is. `?test=1` → OK-aantal omhoog (≈37+19), 0 FAIL.
 
-- [ ] **Stap 5: Commit.**
+- [x] **Stap 5: Commit.**
 ```bash
 git add src/actions.js src/main.js src/tests.js
 git commit -m "Fase 2B: actions.js (registry + delegatie + dekkings-test)"
@@ -486,7 +486,7 @@ git commit -m "Fase 2B: actions.js (registry + delegatie + dekkings-test)"
 **Files:**
 - Modify: `index.html` (regels 917–1147), `src/main.js`
 
-- [ ] **Stap 1: Vervang in `index.html`** de inline-handlers #1–17 + #34/#35 uit de omzettabel door hun `data-action`-attributen. Voor #34 (`onkeydown`) en #35 (`onchange`): verwijder het inline-attribuut en voeg in het `DOMContentLoaded`-blok van `main.js` een expliciete listener toe:
+- [x] **Stap 1: Vervang in `index.html`** de inline-handlers #1–17 + #34/#35 uit de omzettabel door hun `data-action`-attributen. Voor #34 (`onkeydown`) en #35 (`onchange`): verwijder het inline-attribuut en voeg in het `DOMContentLoaded`-blok van `main.js` een expliciete listener toe:
 ```js
 document.getElementById('m-note')?.addEventListener('keydown', histNoteKey);
 // #35: vervang door change-listener op het juiste select-element:
@@ -494,11 +494,11 @@ document.getElementById('<select-id>')?.addEventListener('change', saveNotifPref
 ```
 (Zoek de exacte id's op regel 996 en 1063.)
 
-- [ ] **Stap 2: Verwijder uit de window-shim** de functies die nu via de registry lopen: `adjOff, histNoteKey, addTaskNote, deleteCurrentEditTask, saveNotifPrefs, copyAiPrompt, doLogin`.
+- [x] **Stap 2: Verwijder uit de window-shim** de functies die nu via de registry lopen: `adjOff, histNoteKey, addTaskNote, deleteCurrentEditTask, saveNotifPrefs, copyAiPrompt, doLogin`.
 
-- [ ] **Stap 3: Verifieer.** In-behandeling-toggles, offerte +/- knoppen, notitie toevoegen, taak verwijderen (modal), notificatie-toggles + who-select, AI Claude/Gemini-kopieerknoppen, **inloggen**. Console schoon. `?test=1` ok.
+- [x] **Stap 3: Verifieer.** In-behandeling-toggles, offerte +/- knoppen, notitie toevoegen, taak verwijderen (modal), notificatie-toggles + who-select, AI Claude/Gemini-kopieerknoppen, **inloggen**. Console schoon. `?test=1` ok.
 
-- [ ] **Stap 4: Commit.**
+- [x] **Stap 4: Commit.**
 ```bash
 git add index.html src/main.js
 git commit -m "Fase 2B: statische markup-handlers -> data-action"
@@ -509,7 +509,7 @@ git commit -m "Fase 2B: statische markup-handlers -> data-action"
 **Files:**
 - Modify: `src/render-taken.js`, `src/render-alv.js`, `src/render-overig.js`, `src/main.js`
 
-- [ ] **Stap 1: Vervang in de render-strings** de handlers #18–23, #30–31 uit de tabel:
+- [x] **Stap 1: Vervang in de render-strings** de handlers #18–23, #30–31 uit de tabel:
   - `setNtd('${s}')` → `data-action="ntd-sectie" data-sec="${s}"` (regel 1728-equivalent in `render-taken.js`)
   - `setAf('${s}')` → `data-action="af-sectie" data-sec="${s}"`
   - `toggleAlvoFlag(${idx},'${field}')` → `data-action="alvo-flag" data-idx="${idx}" data-field="${field}"` (`render-alv.js`)
@@ -519,11 +519,11 @@ git commit -m "Fase 2B: statische markup-handlers -> data-action"
   - `setOntw(...)` → `data-action="ontw-cat" data-cat="${c}"` (de `replace(/'/g,…)`-esc-truc vervalt) (`render-overig.js`)
   - `editOntwItem(${rid})` → `data-action="ontw-bewerken" data-rid="${rid}"`
 
-- [ ] **Stap 2: Verwijder uit de window-shim:** `setNtd, setAf, toggleAlvoFlag, editRow, completeTask, setOntw, editOntwItem`.
+- [x] **Stap 2: Verwijder uit de window-shim:** `setNtd, setAf, toggleAlvoFlag, editRow, completeTask, setOntw, editOntwItem`.
 
-- [ ] **Stap 3: Verifieer.** Sectie-tabs (Nog-te-doen + Afgerond), ALV-vinkjes togglen + status werkt, rij bewerken via potlood én via Stil-pill, taak afronden, Ontwikkeling-categorietabs + item bewerken. Console schoon. `?test=1` ok.
+- [x] **Stap 3: Verifieer.** Sectie-tabs (Nog-te-doen + Afgerond), ALV-vinkjes togglen + status werkt, rij bewerken via potlood én via Stil-pill, taak afronden, Ontwikkeling-categorietabs + item bewerken. Console schoon. `?test=1` ok.
 
-- [ ] **Stap 4: Commit.**
+- [x] **Stap 4: Commit.**
 ```bash
 git add src/render-*.js src/main.js
 git commit -m "Fase 2B: render-handlers (taken/alv/ontw) -> data-action"
@@ -534,15 +534,15 @@ git commit -m "Fase 2B: render-handlers (taken/alv/ontw) -> data-action"
 **Files:**
 - Modify: `src/render-taken.js` (renderPag + ntd/af-aanroepers), `src/render-alv.js`, `src/render-analytics.js` (alfa-aanroeper), `src/render-overig.js` (ontw/logboek-aanroepers), `src/main.js`
 
-- [ ] **Stap 1: Wijzig `renderPag`-signatuur** naar `renderPag(id,total,cur,doel)` en de drie knop-templates (regels 2620/2622/2623-equivalent) naar `data-action="pagineer" data-doel="${doel}" data-pg="${...}"` (prev=`cur-1`, page=`p`, next=`cur+1`).
+- [x] **Stap 1: Wijzig `renderPag`-signatuur** naar `renderPag(id,total,cur,doel)` en de drie knop-templates (regels 2620/2622/2623-equivalent) naar `data-action="pagineer" data-doel="${doel}" data-pg="${...}"` (prev=`cur-1`, page=`p`, next=`cur+1`).
 
-- [ ] **Stap 2: Pas de 6 aanroepers aan** (regels 1739/1785/1833/1919/3408/3602-equivalent): laatste argument van een callback → de doel-string (`'ntd'`,`'af'`,`'alvo'`,`'alfa'`,`'ontw'`,`'logboek'`).
+- [x] **Stap 2: Pas de 6 aanroepers aan** (regels 1739/1785/1833/1919/3408/3602-equivalent): laatste argument van een callback → de doel-string (`'ntd'`,`'af'`,`'alvo'`,`'alfa'`,`'ontw'`,`'logboek'`).
 
-- [ ] **Stap 3: Verwijder uit de window-shim** `pgs` + alle `render*`-functies (alleen nog door de registry's `PAG_RENDER` gebruikt). De shim hoort nu (vrijwel) leeg.
+- [x] **Stap 3: Verwijder uit de window-shim** `pgs` + alle `render*`-functies (alleen nog door de registry's `PAG_RENDER` gebruikt). De shim hoort nu (vrijwel) leeg.
 
-- [ ] **Stap 4: Verifieer.** Paginering op álle pagina's met >25 rijen: vorige/volgende/cijferknoppen springen naar de juiste pagina en re-renderen. Console schoon. `?test=1` ok.
+- [x] **Stap 4: Verifieer.** Paginering op álle pagina's met >25 rijen: vorige/volgende/cijferknoppen springen naar de juiste pagina en re-renderen. Console schoon. `?test=1` ok.
 
-- [ ] **Stap 5: Commit.**
+- [x] **Stap 5: Commit.**
 ```bash
 git add src/render-*.js src/main.js
 git commit -m "Fase 2B: paginering via data-action (callback-truc verwijderd)"
@@ -553,13 +553,13 @@ git commit -m "Fase 2B: paginering via data-action (callback-truc verwijderd)"
 **Files:**
 - Modify: `src/ai.js`, `src/notifications.js`
 
-- [ ] **Stap 1: Vervang** #27–29 (`aiOvernemen('${catSec}')`, `aiActieTaak(this)`, `aiKopieerConcept(this)`) en #32–33 (toast `dismissToast(this.parentElement)`) door hun `data-action`-attributen uit de tabel. Pas `dismissToast` aan zodat hij met het toast-element overweg kan via `el.closest('.toast')` (registry doet dat al).
+- [x] **Stap 1: Vervang** #27–29 (`aiOvernemen('${catSec}')`, `aiActieTaak(this)`, `aiKopieerConcept(this)`) en #32–33 (toast `dismissToast(this.parentElement)`) door hun `data-action`-attributen uit de tabel. Pas `dismissToast` aan zodat hij met het toast-element overweg kan via `el.closest('.toast')` (registry doet dat al).
 
-- [ ] **Stap 2: Verwijder uit de window-shim** `aiOvernemen, aiActieTaak, aiKopieerConcept, dismissToast`. De shim moet nu **leeg** zijn → verwijder het `Object.assign(window, …)`-blok volledig.
+- [x] **Stap 2: Verwijder uit de window-shim** `aiOvernemen, aiActieTaak, aiKopieerConcept, dismissToast`. De shim moet nu **leeg** zijn → verwijder het `Object.assign(window, …)`-blok volledig.
 
-- [ ] **Stap 3: Verifieer.** AI-kaarten: "Overnemen" (categorie/VvE), "+ Taak" per actiepunt, "Kopieer" concept-antwoord; toasts sluiten met het kruisje (gewone toast én undo-toast). Console schoon. `?test=1` ok.
+- [x] **Stap 3: Verifieer.** AI-kaarten: "Overnemen" (categorie/VvE), "+ Taak" per actiepunt, "Kopieer" concept-antwoord; toasts sluiten met het kruisje (gewone toast én undo-toast). Console schoon. `?test=1` ok.
 
-- [ ] **Stap 4: Commit.**
+- [x] **Stap 4: Commit.**
 ```bash
 git add src/ai.js src/notifications.js src/main.js
 git commit -m "Fase 2B: AI-kaart- en toast-handlers -> data-action; window-shim weg"
@@ -569,23 +569,23 @@ git commit -m "Fase 2B: AI-kaart- en toast-handlers -> data-action; window-shim 
 
 **Files:** geen of kleine opschoning.
 
-- [ ] **Stap 1: Bewijs dat er geen inline-handlers meer zijn.**
+- [x] **Stap 1: Bewijs dat er geen inline-handlers meer zijn.**
 ```bash
 grep -nE '(^|[^.])\b(onclick|onchange|oninput|onsubmit|onkeyup|onkeydown|onfocus|onblur|onmousedown|onmouseup)=' index.html | grep -vE 'addEventListener|\.(onclick|onchange|oninput|onsubmit)='
 ```
 Verwacht: **geen treffers**. (De resterende `.onclick=`/`addEventListener` in `src/*.js` zijn JS-toegekend en CSP-veilig — die mogen blijven.)
 
-- [ ] **Stap 2: Bevestig window-shim weg.**
+- [x] **Stap 2: Bevestig window-shim weg.**
 ```bash
 grep -n "Object.assign(window" src/main.js   # verwacht: geen treffer
 ```
-- [ ] **Stap 3: Volledige doorloop op de test-link** (push → test-link): álle flows opnieuw, met focus op alles wat nu via delegatie loopt. Console schoon.
+- [x] **Stap 3: Volledige doorloop op de test-link** (push → test-link): álle flows opnieuw, met focus op alles wat nu via delegatie loopt. Console schoon.
 ```bash
 git push origin staging
 ```
-- [ ] **Stap 4: `?test=1`** → alle OK, 0 FAIL.
+- [x] **Stap 4: `?test=1`** → alle OK, 0 FAIL.
 
-- [ ] **Stap 5: Checkpoint.** Mijlpaal B klaar: één centraal klik-systeem, nul inline-handlers.
+- [x] **Stap 5: Checkpoint.** Mijlpaal B klaar: één centraal klik-systeem, nul inline-handlers.
 
 ---
 

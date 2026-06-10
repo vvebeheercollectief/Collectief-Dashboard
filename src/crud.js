@@ -80,32 +80,6 @@ function clearModal(){
 }
 
 // ══════════════════════════════════════
-//  VvE CODE AUTOCOMPLETE
-// ══════════════════════════════════════
-function onCodeInput(){
-  const q=document.getElementById('m-code').value.trim().toLowerCase();
-  const sug=document.getElementById('vve-sug');
-  if(q.length<2){sug.style.display='none';return}
-  const matches=D.alvo.filter(r=>r.code.toLowerCase().includes(q)||r.naam.toLowerCase().includes(q)).slice(0,8);
-  if(!matches.length){sug.style.display='none';return}
-  sug.style.display='block';
-  sug.innerHTML=matches.map(r=>`
-    <div class="vve-sug-item" data-code="${esc(r.code)}" data-naam="${esc(r.naam)}">
-      <div class="vve-sug-code">${esc(r.code)}</div>
-      <div class="vve-sug-naam">${esc(r.naam)}</div>
-    </div>`).join('');
-  sug.querySelectorAll('.vve-sug-item').forEach(el=>{
-    el.onclick=()=>selectVvE(el.dataset.code,el.dataset.naam);
-  });
-}
-
-function selectVvE(code,naam){
-  document.getElementById('m-code').value=code;
-  document.getElementById('m-naam').value=naam;
-  document.getElementById('vve-sug').style.display='none';
-}
-
-// ══════════════════════════════════════
 //  SHEET HELPERS (insert / delete rows)
 // ══════════════════════════════════════
 async function getSheetIds(){
@@ -353,7 +327,7 @@ function gv(id){const el=document.getElementById(id);return el?el.value.trim():'
 // ══════════════════════════════════════
 
 export {
-  openModal, editRow, closeModal, fillModalFields, setv, clearModal, onCodeInput, selectVvE,
+  openModal, editRow, closeModal, fillModalFields, setv, clearModal,
   getSheetIds, getInsertRow, insertAndWriteRow, deleteTask, deleteCurrentEditTask, deleteTaskRow,
   getAfInsertRow, completeTask, doCompleteTask, closeCompleteModal, submitTask, gv,
 };

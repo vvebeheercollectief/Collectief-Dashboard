@@ -17,10 +17,10 @@ import {
 } from './notifications.js';
 import {
   openModal, closeModal, submitTask, doCompleteTask, closeCompleteModal,
-  onCodeInput,
 } from './crud.js';
 import { loadAll } from './data.js';
 import { initActions } from './actions.js';
+import { initVveZoekveld } from './vve-zoekveld.js';
 
 // ══════════════════════════════════════
 //  BOOT
@@ -115,10 +115,16 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('complete-bg').addEventListener('mousedown',e=>{_compMouseDown=e.target});
   document.getElementById('complete-bg').addEventListener('click',e=>{if(e.target.id==='complete-bg'&&_compMouseDown?.id==='complete-bg')closeCompleteModal()});
 
-  // VvE autocomplete
-  const codeInput = document.getElementById('m-code');
-  codeInput.addEventListener('input',onCodeInput);
-  codeInput.addEventListener('blur',()=>setTimeout(()=>{document.getElementById('vve-sug').style.display='none'},200));
+  // VvE autocomplete (gedeeld component; gedrag identiek: ≥2 tekens, max 8)
+  initVveZoekveld({
+    input: document.getElementById('m-code'),
+    lijstEl: document.getElementById('vve-sug'),
+    minTekens: 2, maxItems: 8,
+    onSelect: ({code,naam}) => {
+      document.getElementById('m-code').value = code;
+      document.getElementById('m-naam').value = naam;
+    },
+  });
 
   // Logboek-notitieveld (was inline onkeydown/onchange — Fase 2B)
   document.getElementById('hist-note').addEventListener('keydown', histNoteKey);

@@ -4,35 +4,20 @@
 import {
   PROD_HOSTS, _isStagingHost, IS_STAGING, SID, SID_PROD, SID_TEST, PG,
   ONESIGNAL_APP_ID, ONESIGNAL_APP_ID_PROD, ONESIGNAL_APP_ID_TEST,
-  ALLOWED_EMAILS, EMAIL_NAMES, SECS, SKEYS, PAGE_META,
+  ALLOWED_EMAILS, EMAIL_NAMES, SECS, SKEYS, PAGE_META, clientId,
 } from './config.js';
+import { D, pgs, _shownToasts, _undoStack, state } from './state.js';
 function displayName(s){
   if(!s) return '';
   const key = String(s).toLowerCase().trim();
   return EMAIL_NAMES[key] || s;
 }
 
-let oneSignalReady  = false;
-let isSubscribed    = false;
-let _lastNotifTs    = new Date().toISOString();
-let _notifPollTimer = null;
-let _shownToasts    = new Set();
 
 
 // ══════════════════════════════════════
 //  STATE
 // ══════════════════════════════════════
-let D = {ntd:{},af:{},alvo:[],alfa:[],ontw:[],logboek:[],ntdSecInfo:{},afSecInfo:{}};
-let pgs = {ntd:1,af:1,alvo:1,alfa:1,ontw:1,logboek:1};
-let activeOntw='Alles';
-let activeNtd='OPPAKKEN', activeAf='OPPAKKEN';
-let charts = {};
-let oauthToken=null, oauthExpiry=0, currentUserEmail=null, _gsiTokenClient=null, clientId='560046984985-1371r4bbt28umi6uslims6mlkucn1278.apps.googleusercontent.com';
-let editMode=false, editRowData=null, editSec=null;
-let anaPeriod='maand';        // 'dag' | 'week' | 'maand' | 'kwartaal'
-let anaMetric='vergader';     // 'vergader' | 'taken'  (voor hoofdgrafiek)
-let _rowCache = [];
-let _undoStack = [];
 
 // ══════════════════════════════════════
 //  BOOT
@@ -74,12 +59,12 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('logboek-who').addEventListener('click',e=>{
     const b=e.target.closest('.lchip'); if(!b)return;
     document.querySelectorAll('#logboek-who .lchip').forEach(x=>x.classList.remove('on'));
-    b.classList.add('on'); logWho=b.dataset.who; pgs.logboek=1; renderLogboek();
+    b.classList.add('on'); state.logWho=b.dataset.who; pgs.logboek=1; renderLogboek();
   });
   document.getElementById('logboek-act').addEventListener('click',e=>{
     const b=e.target.closest('.lchip'); if(!b)return;
     document.querySelectorAll('#logboek-act .lchip').forEach(x=>x.classList.remove('on'));
-    b.classList.add('on'); logAct=b.dataset.act; pgs.logboek=1; renderLogboek();
+    b.classList.add('on'); state.logAct=b.dataset.act; pgs.logboek=1; renderLogboek();
   });
 
   document.getElementById('refresh-btn').onclick=loadAll;
@@ -98,7 +83,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('overlay').onclick=closeSb;
 
   document.getElementById('btn-add').onclick=()=>openModal(false);
-  window.editRow=idx=>openModal(true,_rowCache[idx]);
+  window.editRow=idx=>openModal(true,state._rowCache[idx]);
   document.getElementById('m-close').onclick=closeModal;
   document.getElementById('m-cancel').onclick=closeModal;
   let _modalMouseDownTarget=null;
@@ -152,16 +137,16 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(document.getElementById('complete-bg').classList.contains('open')) return;
     if(document.getElementById('ontw-modal-bg').classList.contains('open')) return;
     if(document.getElementById('dot').classList.contains('loading')) return;
-    if(pendingWrites>0) return;
+    if(state.pendingWrites>0) return;
     if(!await ensureToken()) return;
     loadAll(true);
   },8000);
 
   // Token-refresh heartbeat — elke 4 min proactief vernieuwen vóór expiry
   setInterval(()=>{
-    if(!oauthToken) return;
-    if(oauthExpiry - Date.now() > 5*60*1000) return;
-    try{ _gsiTokenClient && _gsiTokenClient.requestAccessToken({prompt:''}); }catch(e){}
+    if(!state.oauthToken) return;
+    if(state.oauthExpiry - Date.now() > 5*60*1000) return;
+    try{ state._gsiTokenClient && state._gsiTokenClient.requestAccessToken({prompt:''}); }catch(e){}
   },4*60*1000);
 
   // Sessie herstellen uit sessionStorage
@@ -169,7 +154,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   const _se=parseInt(sessionStorage.getItem('oauthExpiry')||'0');
   const _sm=sessionStorage.getItem('currentUserEmail');
   if(_st&&Date.now()<_se&&_sm&&ALLOWED_EMAILS.includes(_sm.toLowerCase())){
-    oauthToken=_st;oauthExpiry=_se;currentUserEmail=_sm;
+    state.oauthToken=_st;state.oauthExpiry=_se;state.currentUserEmail=_sm;
     document.getElementById('login-gate').style.display='none';
     loadAll();
   }
@@ -203,8 +188,8 @@ function applyTheme(t){
   localStorage.setItem('theme',t);
   document.getElementById('ico-sun').style.display=t==='dark'?'none':'';
   document.getElementById('ico-moon').style.display=t==='dark'?'':'none';
-  Object.values(charts).forEach(c=>{try{c.destroy()}catch(e){}});
-  charts={};
+  Object.values(state.charts).forEach(c=>{try{c.destroy()}catch(e){}});
+  state.charts={};
   if(document.getElementById('page-analytics').classList.contains('active')) buildAnalytics();
   if(document.getElementById('page-dash').classList.contains('active')) buildDash();
 }
@@ -229,36 +214,34 @@ function cycleDensity(){
 //  API
 // ══════════════════════════════════════
 async function fetchSheet(name){
-  if(!oauthToken) throw new Error('Niet ingelogd');
+  if(!state.oauthToken) throw new Error('Niet ingelogd');
   const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values/${encodeURIComponent(name)}`,{
     cache:'no-store',
-    headers:{Authorization:`Bearer ${oauthToken}`}
+    headers:{Authorization:`Bearer ${state.oauthToken}`}
   });
-  if(!r.ok){const e=await r.json();if(r.status===401){oauthToken=null;oauthExpiry=0}throw new Error(e.error?.message||'API fout')}
+  if(!r.ok){const e=await r.json();if(r.status===401){state.oauthToken=null;state.oauthExpiry=0}throw new Error(e.error?.message||'API fout')}
   return (await r.json()).values||[];
 }
 async function writeRange(range,values,method='PUT'){
-  if(!oauthToken) throw new Error('Niet ingelogd');
+  if(!state.oauthToken) throw new Error('Niet ingelogd');
   const url=`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`;
-  const opts={method,headers:{Authorization:`Bearer ${oauthToken}`,'Content-Type':'application/json'},body:JSON.stringify({values:[values]})};
+  const opts={method,headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},body:JSON.stringify({values:[values]})};
   const r=await fetch(url,opts);
-  if(!r.ok){const e=await r.json();if(r.status===401){oauthToken=null;oauthExpiry=0}const err=new Error(e.error?.message||'Schrijffout');err.status=r.status;throw err}
+  if(!r.ok){const e=await r.json();if(r.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Schrijffout');err.status=r.status;throw err}
   return r.json();
 }
 async function appendRange(range,values){
-  if(!oauthToken) throw new Error('Niet ingelogd');
+  if(!state.oauthToken) throw new Error('Niet ingelogd');
   const url=`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
-  const r=await fetch(url,{method:'POST',headers:{Authorization:`Bearer ${oauthToken}`,'Content-Type':'application/json'},body:JSON.stringify({values:[values]})});
-  if(!r.ok){const e=await r.json();if(r.status===401){oauthToken=null;oauthExpiry=0}throw new Error(e.error?.message||'Schrijffout')}
+  const r=await fetch(url,{method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},body:JSON.stringify({values:[values]})});
+  if(!r.ok){const e=await r.json();if(r.status===401){state.oauthToken=null;state.oauthExpiry=0}throw new Error(e.error?.message||'Schrijffout')}
   return r.json();
 }
 
 // Aantal lopende/wachtende achtergrond-schrijfacties. Zolang >0 slaat de 8s-poll
 // over, zodat een optimistische wijziging niet kort teruggedraaid wordt.
-let pendingWrites=0;
 // Seriële wachtrij: schrijfacties lopen één voor één, zodat rij-indexen in de Sheet
 // niet door elkaar lopen bij snel opeenvolgende acties.
-let _writeChain=Promise.resolve();
 
 // Verschuift lokale _row-nummers mee bij invoegen/verwijderen van een Sheet-rij,
 // zodat een volgende optimistische actie de juiste rij raakt. "Nog Te Doen" is één
@@ -289,26 +272,26 @@ async function _withRetry(fn){
 // optimistisch bijgewerkt door de aanroeper. Bij fout draait `rollback` de lokale
 // wijziging terug en verschijnt een foutmelding.
 function backgroundWrite(writeFn, rollback, foutTitel){
-  pendingWrites++;
-  _writeChain=_writeChain.then(async()=>{
+  state.pendingWrites++;
+  state._writeChain=state._writeChain.then(async()=>{
     try{
       await _withRetry(writeFn);
     }catch(e){
       try{ rollback(); renderAll(); }catch(_){}
       const msg=(e.message||'').toLowerCase();
       if(msg.includes('authentication')||msg.includes('unauthenticated')||msg.includes('unauthorized')){
-        oauthToken=null;oauthExpiry=0;
+        state.oauthToken=null;state.oauthExpiry=0;
         showToast(foutTitel,'Sessie verlopen — wijziging teruggezet. Probeer opnieuw.','#dc2626');
       }else{
         showToast(foutTitel,'Niet opgeslagen — wijziging teruggezet.','#dc2626');
       }
       console.error(foutTitel,e);
     }finally{
-      pendingWrites--;
-      if(pendingWrites===0){ loadAll(true); } // stille resync van rij-indexen
+      state.pendingWrites--;
+      if(state.pendingWrites===0){ loadAll(true); } // stille resync van rij-indexen
     }
   });
-  return _writeChain;
+  return state._writeChain;
 }
 
 function setSyncing(){dot('loading');document.getElementById('sync-lbl').textContent='Laden…'}
@@ -316,15 +299,13 @@ function setSynced(){dot('');document.getElementById('sync-lbl').textContent='Li
 function setSyncErr(){dot('err');document.getElementById('sync-lbl').textContent='Fout'}
 function dot(cls){const d=document.getElementById('dot');d.className='dot'+(cls?' '+cls:'')}
 
-let _lastDHash=null;
 // Herhaal-slot: voorkomt dat twee loadAll-aanroepen tegelijk lopen en elkaars data
 // overschrijven (8s-poll, schrijf-resync, refresh-knop, handmatige awaits).
-let _loadInFlight=false, _loadAgain=false;
 async function loadAll(silent){
-  if(_loadInFlight){ _loadAgain=true; return; }
-  _loadInFlight=true;
+  if(state._loadInFlight){ state._loadAgain=true; return; }
+  state._loadInFlight=true;
   try{
-    if(!oauthToken){
+    if(!state.oauthToken){
       if(!await ensureToken()){setSyncErr();return}
     }
     if(!silent) setSyncing();
@@ -336,7 +317,7 @@ async function loadAll(silent){
     ]);
     // Kwam er tijdens het lezen een schrijfactie tussen? Dan is de lokale (optimistische)
     // staat leidend; de eigen resync van die schrijfactie haalt zo de verse data op.
-    if(pendingWrites>0){ if(!silent) setSynced(); return; }
+    if(state.pendingWrites>0){ if(!silent) setSynced(); return; }
     const ntdP=parseSections(ntdR); D.ntd=ntdP.data; D.ntdSecInfo=ntdP.secInfo;
     const afP=parseSections(afR); D.af=afP.data; D.afSecInfo=afP.secInfo;
     SKEYS.forEach(s=>{if(D.af[s])D.af[s].sort((a,b)=>parseDt(b.datum)-parseDt(a.datum))});
@@ -346,8 +327,8 @@ async function loadAll(silent){
     D.logboek=parseLogboek(logR);
     setSynced();
     const hash=JSON.stringify([D.ntd,D.af,D.alvo,D.alfa,D.ontw,D.logboek]);
-    if(hash!==_lastDHash){
-      _lastDHash=hash;
+    if(hash!==state._lastDHash){
+      state._lastDHash=hash;
       renderAll();
       // Re-render actieve detailpagina's met nieuwe data
       if(document.getElementById('page-analytics')?.classList.contains('active')) buildAnalytics();
@@ -356,8 +337,8 @@ async function loadAll(silent){
     }
   }catch(e){setSyncErr();console.error(e)}
   finally{
-    _loadInFlight=false;
-    if(_loadAgain){ _loadAgain=false; loadAll(true); } // een onderdrukte aanroep alsnog uitvoeren
+    state._loadInFlight=false;
+    if(state._loadAgain){ state._loadAgain=false; loadAll(true); } // een onderdrukte aanroep alsnog uitvoeren
   }
 }
 
@@ -415,7 +396,7 @@ function parseAlfa(rows){
 //  RENDER ALL
 // ══════════════════════════════════════
 function renderAll(){
-  _rowCache=[];
+  state._rowCache=[];
   const ntdTotal=SKEYS.reduce((s,k)=>s+(D.ntd[k]?.length||0),0);
   document.getElementById('b-ntd').textContent=ntdTotal;
   renderNtdStats();
@@ -516,20 +497,20 @@ function renderNtd(){
   // Tabs
   document.getElementById('ntd-tabs').innerHTML=SKEYS.map(s=>{
     const rows=filterNtd(D.ntd[s]||[],q,fCode,fBeh,fPrio,s);
-    return`<div class="tab ${s===activeNtd?'on':''}" style="${s===activeNtd?SECS[s].css:''}" onclick="setNtd('${s}')">${SECS[s].label}<span class="cnt">${rows.length}</span></div>`;
+    return`<div class="tab ${s===state.activeNtd?'on':''}" style="${s===state.activeNtd?SECS[s].css:''}" onclick="setNtd('${s}')">${SECS[s].label}<span class="cnt">${rows.length}</span></div>`;
   }).join('');
 
-  document.getElementById('ntd-title').textContent=SECS[activeNtd].label;
+  document.getElementById('ntd-title').textContent=SECS[state.activeNtd].label;
   // Apply card theme
   const card=document.getElementById('ntd-card');
-  SECS[activeNtd].css.split(';').forEach(p=>{const[k,v]=p.split(':');if(k&&v)card.style.setProperty(k.trim(),v.trim())});
+  SECS[state.activeNtd].css.split(';').forEach(p=>{const[k,v]=p.split(':');if(k&&v)card.style.setProperty(k.trim(),v.trim())});
 
-  const rows=filterNtd(D.ntd[activeNtd]||[],q,fCode,fBeh,fPrio,activeNtd);
-  renderThead('ntd-thead',[...SECS[activeNtd].cols,''],SECS[activeNtd].css);
-  renderTbody('ntd-tbody',rows,activeNtd,pgs.ntd,false);
+  const rows=filterNtd(D.ntd[state.activeNtd]||[],q,fCode,fBeh,fPrio,state.activeNtd);
+  renderThead('ntd-thead',[...SECS[state.activeNtd].cols,''],SECS[state.activeNtd].css);
+  renderTbody('ntd-tbody',rows,state.activeNtd,pgs.ntd,false);
   renderPag('ntd-pag',rows.length,pgs.ntd,p=>{pgs.ntd=p;renderNtd()});
 }
-function setNtd(s){activeNtd=s;pgs.ntd=1;renderNtd()}
+function setNtd(s){state.activeNtd=s;pgs.ntd=1;renderNtd()}
 function filterNtd(rows,q,fCode,beh,prio,sec){
   return rows.filter(r=>{
     if(q&&!SECS[sec].keys.some(k=>(r[k]||'').toLowerCase().includes(q))) return false;
@@ -567,15 +548,15 @@ function renderAf(){
   const q=document.getElementById('s-af').value.toLowerCase();
   document.getElementById('af-tabs').innerHTML=SKEYS.map(s=>{
     const rows=filt(D.af[s]||[],q);
-    return`<div class="tab ${s===activeAf?'on':''}" style="${s===activeAf?SECS[s].css:''}" onclick="setAf('${s}')">${SECS[s].label}<span class="cnt">${rows.length}</span></div>`;
+    return`<div class="tab ${s===state.activeAf?'on':''}" style="${s===state.activeAf?SECS[s].css:''}" onclick="setAf('${s}')">${SECS[s].label}<span class="cnt">${rows.length}</span></div>`;
   }).join('');
   const cols=['VvE Code','VvE','Categorie','Subcategorie','Afgerond op','Opmerking'];
-  renderThead('af-thead',cols,SECS[activeAf].css);
-  const rows=filt(D.af[activeAf]||[],q);
-  renderTbody('af-tbody',rows,activeAf,pgs.af,true);
+  renderThead('af-thead',cols,SECS[state.activeAf].css);
+  const rows=filt(D.af[state.activeAf]||[],q);
+  renderTbody('af-tbody',rows,state.activeAf,pgs.af,true);
   renderPag('af-pag',rows.length,pgs.af,p=>{pgs.af=p;renderAf()});
 }
-function setAf(s){activeAf=s;pgs.af=1;renderAf()}
+function setAf(s){state.activeAf=s;pgs.af=1;renderAf()}
 
 // ══════════════════════════════════════
 //  ALV OVERZICHT
@@ -665,7 +646,7 @@ async function toggleAlvoFlag(idx,field){
     const col=ALVO_COLS[field];
     const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
       method:'POST',
-      headers:{Authorization:`Bearer ${oauthToken}`,'Content-Type':'application/json'},
+      headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
       body:JSON.stringify({requests:[{
         updateCells:{
           range:{sheetId,startRowIndex:r._row-1,endRowIndex:r._row,startColumnIndex:col,endColumnIndex:col+1},
@@ -839,9 +820,9 @@ function computeTrend(series){
 
 // Sparkline — kleine lijngrafiek zonder assen
 function renderSparkline(canvasId,values,color){
-  if(charts[canvasId]) charts[canvasId].destroy();
+  if(state.charts[canvasId]) state.charts[canvasId].destroy();
   const el=document.getElementById(canvasId); if(!el) return;
-  charts[canvasId]=new Chart(el,{
+  state.charts[canvasId]=new Chart(el,{
     type:'line',
     data:{labels:values.map((_,i)=>i),datasets:[{
       data:values,
@@ -922,8 +903,8 @@ function renderHeroChart(metric,period){
   document.getElementById('hero-chart-title').textContent=title;
   const periodeNoun={dag:'dagen',week:'weken',maand:'maanden',kwartaal:'kwartalen'}[period]||period;
   document.getElementById('hero-chart-sub').textContent=` — laatste ${n} ${periodeNoun}`;
-  if(charts['chart-hero']) charts['chart-hero'].destroy();
-  charts['chart-hero']=new Chart(document.getElementById('chart-hero'),{
+  if(state.charts['chart-hero']) state.charts['chart-hero'].destroy();
+  state.charts['chart-hero']=new Chart(document.getElementById('chart-hero'),{
     type:'bar',
     data:{
       labels:curr.map(b=>b.label),
@@ -980,12 +961,12 @@ function renderPeriodBar(){
   const el=document.getElementById('ana-period-bar'); if(!el) return;
   el.innerHTML=PERIODS.map(p=>{
     const lbl=p.charAt(0).toUpperCase()+p.slice(1);
-    return`<button class="period-btn${anaPeriod===p?' on':''}" data-p="${p}">${lbl}</button>`;
+    return`<button class="period-btn${state.anaPeriod===p?' on':''}" data-p="${p}">${lbl}</button>`;
   }).join('');
   el.querySelectorAll('.period-btn').forEach(b=>{
     b.onclick=()=>{
-      anaPeriod=b.dataset.p;
-      el.querySelectorAll('.period-btn').forEach(x=>x.classList.toggle('on',x.dataset.p===anaPeriod));
+      state.anaPeriod=b.dataset.p;
+      el.querySelectorAll('.period-btn').forEach(x=>x.classList.toggle('on',x.dataset.p===state.anaPeriod));
       buildAnalytics();
     };
   });
@@ -994,12 +975,12 @@ function renderPeriodBar(){
 function renderMetricToggle(){
   const el=document.getElementById('hero-metric-toggle'); if(!el) return;
   const metrics=[{k:'vergader',l:'Vergaderingen'},{k:'taken',l:'Taken'}];
-  el.innerHTML=metrics.map(m=>`<button class="metric-btn${anaMetric===m.k?' on':''}" data-m="${m.k}">${m.l}</button>`).join('');
+  el.innerHTML=metrics.map(m=>`<button class="metric-btn${state.anaMetric===m.k?' on':''}" data-m="${m.k}">${m.l}</button>`).join('');
   el.querySelectorAll('.metric-btn').forEach(b=>{
     b.onclick=()=>{
-      anaMetric=b.dataset.m;
-      el.querySelectorAll('.metric-btn').forEach(x=>x.classList.toggle('on',x.dataset.m===anaMetric));
-      renderHeroChart(anaMetric,anaPeriod);
+      state.anaMetric=b.dataset.m;
+      el.querySelectorAll('.metric-btn').forEach(x=>x.classList.toggle('on',x.dataset.m===state.anaMetric));
+      renderHeroChart(state.anaMetric,state.anaPeriod);
     };
   });
 }
@@ -1012,11 +993,11 @@ function buildAnalytics(){
 
   // ── KPI 1: Vergaderingen uitgeschreven (D.alfa, per periode)
   _try('kpi-vergader',()=>{
-    const vSeries=seriesByPeriod(D.alfa||[],'datum',anaPeriod,SPARK_BUCKETS);
+    const vSeries=seriesByPeriod(D.alfa||[],'datum',state.anaPeriod,SPARK_BUCKETS);
     const vTrend=computeTrend(vSeries);
     renderKpiTile('kpi-vergader',{
       num:vTrend.huidig,
-      sub:`vs ${vTrend.vorig} ${PERIODE_LABEL_PREV[anaPeriod]}`,
+      sub:`vs ${vTrend.vorig} ${PERIODE_LABEL_PREV[state.anaPeriod]}`,
       trend:vTrend,
       sparkId:'spark-vergader',
       sparkValues:vSeries.map(b=>b.count),
@@ -1040,11 +1021,11 @@ function buildAnalytics(){
   // ── KPI 3: Taken afgerond (D.af alle SKEYS, per periode)
   _try('kpi-taken',()=>{
     const tRows=SKEYS.flatMap(s=>(D.af||{})[s]||[]);
-    const tSeries=seriesByPeriod(tRows,'datum',anaPeriod,SPARK_BUCKETS);
+    const tSeries=seriesByPeriod(tRows,'datum',state.anaPeriod,SPARK_BUCKETS);
     const tTrend=computeTrend(tSeries);
     renderKpiTile('kpi-taken',{
       num:tTrend.huidig,
-      sub:`vs ${tTrend.vorig} ${PERIODE_LABEL_PREV[anaPeriod]}`,
+      sub:`vs ${tTrend.vorig} ${PERIODE_LABEL_PREV[state.anaPeriod]}`,
       trend:tTrend,
       sparkId:'spark-taken',
       sparkValues:tSeries.map(b=>b.count),
@@ -1053,13 +1034,13 @@ function buildAnalytics(){
   });
 
   // ── KPI 4: Per persoon
-  _try('kpi-pers',()=>renderKpiPersonTile(anaPeriod));
+  _try('kpi-pers',()=>renderKpiPersonTile(state.anaPeriod));
 
   // ── Hoofdgrafiek
-  _try('hero-chart',()=>renderHeroChart(anaMetric,anaPeriod));
+  _try('hero-chart',()=>renderHeroChart(state.anaMetric,state.anaPeriod));
 
   // ── Leaderboard
-  _try('leaderboard',()=>renderLeaderboard(anaPeriod));
+  _try('leaderboard',()=>renderLeaderboard(state.anaPeriod));
 }
 
 function getWeekNum(d){
@@ -1071,8 +1052,8 @@ function getWeekNum(d){
 }
 
 function buildBarChart(id,labels,data,color,tc,gc){
-  if(charts[id]) charts[id].destroy();
-  charts[id]=new Chart(document.getElementById(id),{
+  if(state.charts[id]) state.charts[id].destroy();
+  state.charts[id]=new Chart(document.getElementById(id),{
     type:'bar',
     data:{labels,datasets:[{label:'Aantal',data,backgroundColor:color,borderRadius:6,borderSkipped:false}]},
     options:{responsive:true,maintainAspectRatio:false,
@@ -1083,7 +1064,7 @@ function buildBarChart(id,labels,data,color,tc,gc){
 }
 
 function buildDonut(id,labels,data,colors,tc,centerVal,centerLbl){
-  if(charts[id]) charts[id].destroy();
+  if(state.charts[id]) state.charts[id].destroy();
   const el=document.getElementById(id); if(!el) return;
   // Maak verticale gradient van basiskleur naar lichtere variant
   const ctxG=el.getContext('2d');
@@ -1130,7 +1111,7 @@ function buildDonut(id,labels,data,colors,tc,centerVal,centerLbl){
       ctx.restore();
     }
   };
-  charts[id]=new Chart(el,{
+  state.charts[id]=new Chart(el,{
     type:'doughnut',
     data:{labels,datasets:[{data,backgroundColor:gradients,borderWidth:0,hoverOffset:10,hoverBorderWidth:3,hoverBorderColor:'var(--sur)',spacing:2}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:'72%',
@@ -1220,21 +1201,20 @@ const HERO_VIEWS=[
     }
   },
 ];
-let activeHeroView='alv';
 
 function renderHeroDonut(){
   const dark=document.documentElement.dataset.theme==='dark';
   const tc=dark?'#94a3b8':'#64748b';
-  const view=HERO_VIEWS.find(v=>v.key===activeHeroView)||HERO_VIEWS[0];
+  const view=HERO_VIEWS.find(v=>v.key===state.activeHeroView)||HERO_VIEWS[0];
   const card=document.querySelector('.hero-donut-card');
   if(card) card.style.setProperty('--hero-color',view.color);
   document.getElementById('hero-donut-title').textContent=view.title;
   document.getElementById('hero-donut-sub').textContent=view.sub;
   document.getElementById('hero-donut-tabs').innerHTML=HERO_VIEWS.map(v=>
-    `<button class="hdt-tab ${v.key===activeHeroView?'on':''}" data-key="${v.key}" style="${v.key===activeHeroView?`--hero-color:${v.color}`:''}">${DASH_ICONS[v.icon]||''}<span>${v.label}</span></button>`
+    `<button class="hdt-tab ${v.key===state.activeHeroView?'on':''}" data-key="${v.key}" style="${v.key===state.activeHeroView?`--hero-color:${v.color}`:''}">${DASH_ICONS[v.icon]||''}<span>${v.label}</span></button>`
   ).join('');
   document.querySelectorAll('#hero-donut-tabs .hdt-tab').forEach(btn=>{
-    btn.onclick=()=>{activeHeroView=btn.dataset.key;renderHeroDonut();};
+    btn.onclick=()=>{state.activeHeroView=btn.dataset.key;renderHeroDonut();};
   });
   const cfg=view.build();
   buildDonut('chart-hero-donut',cfg.labels,cfg.data,cfg.colors,tc,cfg.centerVal,cfg.centerLbl);
@@ -1319,7 +1299,7 @@ function deadlineCel(r, sec){
 
 function rowNtd(r,sec){
   const css=SECS[sec].css;
-  const rid=_rowCache.length; _rowCache.push(r);
+  const rid=state._rowCache.length; state._rowCache.push(r);
   const editBtn=`<button class="btn-edit" onclick="editRow(${rid})" title="Bewerken"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><button class="btn-done" onclick="completeTask(${rid})" title="Afgehandeld"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></button>`;
   let cells='';
   const _stilDagen = bepaalStil(r, sec);
@@ -1419,9 +1399,9 @@ function renderPag(id,total,cur,cb){
 //  MODAL — Open / Close
 // ══════════════════════════════════════
 function openModal(isEdit,rowData){
-  editMode=!!isEdit;
-  const sec=isEdit?rowData._sec:activeNtd;
-  editSec=sec; editRowData=rowData||null;
+  state.editMode=!!isEdit;
+  const sec=isEdit?rowData._sec:state.activeNtd;
+  state.editSec=sec; state.editRowData=rowData||null;
 
   document.getElementById('m-title').textContent=(isEdit?'Taak bewerken — ':'Taak toevoegen — ')+SECS[sec].label;
   document.getElementById('m-submit-lbl').textContent=isEdit?'Opslaan':'Toevoegen';
@@ -1438,11 +1418,11 @@ function openModal(isEdit,rowData){
   const fg={OPPAKKEN:'fg-opp',VERGADERVERZOEKEN:'fg-verg','OFFERTE-TRAJECTEN':'fg-off',LOD:'fg-lod'}[sec];
   if(fg) document.getElementById(fg).style.display='';
 
-  if(isEdit&&editRowData){
-    document.getElementById('m-code').value=editRowData.code||'';
-    document.getElementById('m-naam').value=editRowData.naam||'';
-    fillModalFields(sec,editRowData);
-    renderTaskHistory(editRowData.code,sec);
+  if(isEdit&&state.editRowData){
+    document.getElementById('m-code').value=state.editRowData.code||'';
+    document.getElementById('m-naam').value=state.editRowData.naam||'';
+    fillModalFields(sec,state.editRowData);
+    renderTaskHistory(state.editRowData.code,sec);
   } else {
     clearModal();
     document.getElementById('fg-history').style.display='none';
@@ -1513,15 +1493,14 @@ function selectVvE(code,naam){
 // ══════════════════════════════════════
 //  SHEET HELPERS (insert / delete rows)
 // ══════════════════════════════════════
-let _sheetIds=null;
 async function getSheetIds(){
-  if(_sheetIds) return _sheetIds;
-  const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}`,{headers:{Authorization:`Bearer ${oauthToken}`}});
-  if(!r.ok){ if(r.status===401){oauthToken=null;oauthExpiry=0} throw new Error('getSheetIds '+r.status); }
+  if(state._sheetIds) return state._sheetIds;
+  const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}`,{headers:{Authorization:`Bearer ${state.oauthToken}`}});
+  if(!r.ok){ if(r.status===401){state.oauthToken=null;state.oauthExpiry=0} throw new Error('getSheetIds '+r.status); }
   const d=await r.json();
-  _sheetIds={};
-  (d.sheets||[]).forEach(s=>{_sheetIds[s.properties.title]=s.properties.sheetId});
-  return _sheetIds;
+  state._sheetIds={};
+  (d.sheets||[]).forEach(s=>{state._sheetIds[s.properties.title]=s.properties.sheetId});
+  return state._sheetIds;
 }
 
 function getInsertRow(sec){
@@ -1532,29 +1511,29 @@ function getInsertRow(sec){
 }
 
 async function insertAndWriteRow(sheetName,afterRow,values){
-  if(!oauthToken) throw new Error('Niet ingelogd');
+  if(!state.oauthToken) throw new Error('Niet ingelogd');
   const ids=await getSheetIds();
   const sheetId=ids[sheetName];
   if(sheetId==null) throw new Error('Sheet niet gevonden: '+sheetName);
   const insResp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
     method:'POST',
-    headers:{Authorization:`Bearer ${oauthToken}`,'Content-Type':'application/json'},
+    headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
     body:JSON.stringify({requests:[{insertDimension:{range:{sheetId,dimension:'ROWS',startIndex:afterRow,endIndex:afterRow+1},inheritFromBefore:true}}]})
   });
-  if(!insResp.ok){const e=await insResp.json();if(insResp.status===401){oauthToken=null;oauthExpiry=0}const err=new Error(e.error?.message||'Invoegfout');err.status=insResp.status;throw err}
+  if(!insResp.ok){const e=await insResp.json();if(insResp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Invoegfout');err.status=insResp.status;throw err}
   const endCol=String.fromCharCode(64+Math.max(values.length,9));
   await writeRange(`'${sheetName}'!A${afterRow+1}:${endCol}${afterRow+1}`,values);
 }
 
 async function deleteTask(idx){
-  const r=_rowCache[idx];
+  const r=state._rowCache[idx];
   if(!r) return;
   await deleteTaskRow(r);
 }
 
 async function deleteCurrentEditTask(){
-  if(!editRowData) return;
-  const r=editRowData;
+  if(!state.editRowData) return;
+  const r=state.editRowData;
   closeModal();
   await deleteTaskRow(r);
 }
@@ -1569,10 +1548,10 @@ async function deleteTaskRow(r){
     if(sheetId==null) throw new Error('Sheet "Nog Te Doen" niet gevonden');
     const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
       method:'POST',
-      headers:{Authorization:`Bearer ${oauthToken}`,'Content-Type':'application/json'},
+      headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
       body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:r._row-1,endIndex:r._row}}}]})
     });
-    if(!resp.ok){const e=await resp.json();if(resp.status===401){oauthToken=null;oauthExpiry=0}throw new Error(e.error?.message||'Verwijderfout')}
+    if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}throw new Error(e.error?.message||'Verwijderfout')}
     logEvent(r.code, r._sec, 'Verwijderd', '', r.actiepunt||r.periode||'', '');
     await loadAll();
   }catch(e){alert('Fout bij verwijderen: '+e.message)}
@@ -1592,11 +1571,10 @@ function getAfInsertRow(sec){
   return 2;
 }
 
-let _completeIdx=null;
 async function completeTask(idx){
-  const r=_rowCache[idx];
+  const r=state._rowCache[idx];
   if(!r){alert('Taak niet gevonden. Vernieuw de pagina en probeer opnieuw.');return}
-  _completeIdx=idx;
+  state._completeIdx=idx;
   const d=new Date();
   document.getElementById('complete-date').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   document.getElementById('complete-comment').value='';
@@ -1605,8 +1583,8 @@ async function completeTask(idx){
 }
 
 async function doCompleteTask(){
-  const idx=_completeIdx;
-  const r=_rowCache[idx];
+  const idx=state._completeIdx;
+  const r=state._rowCache[idx];
   if(!r){alert('Taak niet gevonden.');closeCompleteModal();return}
   const dateVal=document.getElementById('complete-date').value;
   const comment=document.getElementById('complete-comment').value.trim();
@@ -1656,9 +1634,9 @@ async function doCompleteTask(){
     backgroundWrite(
       async ()=>{
         const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
-          method:'POST',headers:{Authorization:`Bearer ${oauthToken}`,'Content-Type':'application/json'},
+          method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
           body:JSON.stringify(batchBody)});
-        if(!resp.ok){const e=await resp.json();if(resp.status===401){oauthToken=null;oauthExpiry=0}const err=new Error(e.error?.message||'Fout bij afhandelen taak');err.status=resp.status;throw err}
+        if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Fout bij afhandelen taak');err.status=resp.status;throw err}
         logEvent(r.code, sec, 'Afgerond', 'status', 'Nog Te Doen', 'Afgerond op ' + today + (comment ? ' — ' + comment : ''));
       },
       ()=>{ const a=(D.ntd[sec]=D.ntd[sec]||[]); if(a.indexOf(r)===-1){ _shiftNtdRows(r._row,+1); a.splice(Math.min(pos<0?a.length:pos,a.length),0,r); } },
@@ -1667,7 +1645,7 @@ async function doCompleteTask(){
   }catch(e){alert('Fout bij afhandelen: '+e.message)}
 }
 
-function closeCompleteModal(){document.getElementById('complete-bg').classList.remove('open');_completeIdx=null}
+function closeCompleteModal(){document.getElementById('complete-bg').classList.remove('open');state._completeIdx=null}
 
 // ══════════════════════════════════════
 //  SUBMIT TASK (Add + Edit)
@@ -1678,7 +1656,7 @@ async function submitTask(){
   const naam=document.getElementById('m-naam').value.trim();
   if(!code){alert('VvE Code is verplicht.');return}
 
-  const sec=editSec||activeNtd;
+  const sec=state.editSec||state.activeNtd;
   let values;
 
   try{
@@ -1706,9 +1684,9 @@ async function submitTask(){
     const keys=SECS[sec].keys;
     const norm=v=>v===true?'TRUE':v===false?'FALSE':v; // boolean → Sheets-stringvorm
     const newBeh=(sec==='OPPAKKEN'?gv('m-beh'):sec==='VERGADERVERZOEKEN'?gv('m-beh-v'):sec==='OFFERTE-TRAJECTEN'?gv('m-beh-o'):gv('m-beh-l'));
-    if(editMode&&editRowData?._row){
+    if(state.editMode&&state.editRowData?._row){
       // ── Bewerken: lokale rij meteen bijwerken, dan op de achtergrond opslaan ──
-      const doelRow=editRowData, oudeWaarden={...editRowData};
+      const doelRow=state.editRowData, oudeWaarden={...editRowData};
       keys.forEach((k,i)=>{ doelRow[k]=norm(values[i]); });
       doelRow.subcategorie=values[values.length-1];
       renderAll();
@@ -1750,7 +1728,7 @@ async function submitTask(){
   }catch(e){
     const msg=(e.message||'').toLowerCase();
     if(msg.includes('invalid authentication')||msg.includes('unauthenticated')||msg.includes('unauthorized')){
-      oauthToken=null;oauthExpiry=0;
+      state.oauthToken=null;state.oauthExpiry=0;
       alert('Je sessie is verlopen. Klik nogmaals op Opslaan om opnieuw in te loggen.');
     }else{alert('Fout: '+e.message)}
   }
@@ -1760,7 +1738,6 @@ function gv(id){const el=document.getElementById(id);return el?el.value.trim():'
 // ══════════════════════════════════════
 //  AI-HULP — plak mailtekst (slim kopieer-plak)
 // ══════════════════════════════════════
-let _aiLastCode='', _aiLastNaam='';
 
 function openAiHelp(){
   const sel=document.getElementById('ai-vve');
@@ -1881,7 +1858,7 @@ function parseAiAnswer(){
   const sec=aiParseSections(txt);
   const code=document.getElementById('ai-vve').value;
   const ctx=code?aiVveContext(code):null;
-  _aiLastCode=code||''; _aiLastNaam=ctx?(ctx.naam||''):'';
+  state._aiLastCode=code||''; state._aiLastNaam=ctx?(ctx.naam||''):'';
 
   let html='<div class="ai-rhead">📥 Wat het dashboard eruit haalt</div>';
   if(wants.includes('samenvatting') && sec.samenvatting){
@@ -1916,7 +1893,7 @@ function aiGisCategorie(txt){
 function prefillNieuweTaak(sec, code, naam, actiepunt){
   if(!SECS[sec]) sec='OPPAKKEN';
   closeAiHelp();
-  activeNtd=sec;
+  state.activeNtd=sec;
   goTo('ntd');
   openModal(false);
   const setIf=(id,v)=>{const el=document.getElementById(id);if(el&&v)el.value=v;};
@@ -1928,10 +1905,10 @@ function prefillNieuweTaak(sec, code, naam, actiepunt){
     else if(sec==='LOD') setIf('m-actie-l',actiepunt);
   }
 }
-function aiOvernemen(sec){ prefillNieuweTaak(sec,_aiLastCode,_aiLastNaam,''); }
+function aiOvernemen(sec){ prefillNieuweTaak(sec,state._aiLastCode,state._aiLastNaam,''); }
 function aiActieTaak(btn){
   const txt=btn.closest('li').querySelector('.atxt').textContent;
-  prefillNieuweTaak('OPPAKKEN',_aiLastCode,_aiLastNaam,txt);
+  prefillNieuweTaak('OPPAKKEN',state._aiLastCode,state._aiLastNaam,txt);
 }
 function aiKopieerConcept(btn){
   const txt=btn.closest('.ai-card').querySelector('.ai-reply').innerText;
@@ -1946,29 +1923,29 @@ function doOAuth(forcePrompt){
   return new Promise(resolve=>{
     if(!clientId){resolve(null);return}
     try{
-      if(!_gsiTokenClient){
-        _gsiTokenClient=google.accounts.oauth2.initTokenClient({
+      if(!state._gsiTokenClient){
+        state._gsiTokenClient=google.accounts.oauth2.initTokenClient({
           client_id:clientId,
           scope:'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.email',
           callback:resp=>{
-            if(resp.error){console.warn('OAuth fout:',resp.error);oauthToken=null;oauthExpiry=0;resolve(null);return}
-            oauthToken=resp.access_token;
-            oauthExpiry=Date.now()+((resp.expires_in||3600)-120)*1000;
-            sessionStorage.setItem('oauthToken',oauthToken);
-            sessionStorage.setItem('oauthExpiry',String(oauthExpiry));
-            resolve(oauthToken);
+            if(resp.error){console.warn('OAuth fout:',resp.error);state.oauthToken=null;state.oauthExpiry=0;resolve(null);return}
+            state.oauthToken=resp.access_token;
+            state.oauthExpiry=Date.now()+((resp.expires_in||3600)-120)*1000;
+            sessionStorage.setItem('oauthToken',state.oauthToken);
+            sessionStorage.setItem('oauthExpiry',String(state.oauthExpiry));
+            resolve(state.oauthToken);
           }
         });
       }
-      _gsiTokenClient.requestAccessToken(forcePrompt?{}:{prompt:''});
+      state._gsiTokenClient.requestAccessToken(forcePrompt?{}:{prompt:''});
     }catch(e){console.error('OAuth:',e);resolve(null)}
   });
 }
 
 async function fetchUserEmail(){
-  if(!oauthToken) return null;
+  if(!state.oauthToken) return null;
   try{
-    const r=await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:`Bearer ${oauthToken}`}});
+    const r=await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:`Bearer ${state.oauthToken}`}});
     if(!r.ok) return null;
     const d=await r.json();
     return d.email||null;
@@ -1981,31 +1958,31 @@ async function doLogin(){
   errEl.style.display='none';
   btn.textContent='Even geduld…';btn.disabled=true;
   await doOAuth(true);
-  if(!oauthToken){errEl.textContent='Inloggen geannuleerd of mislukt.';errEl.style.display='block';btn.textContent='Inloggen met Google';btn.disabled=false;return}
+  if(!state.oauthToken){errEl.textContent='Inloggen geannuleerd of mislukt.';errEl.style.display='block';btn.textContent='Inloggen met Google';btn.disabled=false;return}
   const email=await fetchUserEmail();
   if(!email){errEl.textContent='Kon e-mailadres niet ophalen.';errEl.style.display='block';btn.textContent='Inloggen met Google';btn.disabled=false;return}
   if(!ALLOWED_EMAILS.includes(email.toLowerCase())){
-    oauthToken=null;oauthExpiry=0;
+    state.oauthToken=null;state.oauthExpiry=0;
     errEl.textContent='Geen toegang. Gebruik je VvE Beheer Collectief account.';errEl.style.display='block';btn.textContent='Inloggen met Google';btn.disabled=false;return;
   }
-  currentUserEmail=email;
+  state.currentUserEmail=email;
   sessionStorage.setItem('currentUserEmail',email);
   document.getElementById('login-gate').style.display='none';
   loadAll();
 }
 
 async function ensureToken(){
-  if(oauthToken && Date.now()<oauthExpiry) return true;
-  oauthToken=null; oauthExpiry=0;
+  if(state.oauthToken && Date.now()<state.oauthExpiry) return true;
+  state.oauthToken=null; state.oauthExpiry=0;
   await doOAuth(false);
-  if(!oauthToken){
+  if(!state.oauthToken){
     await doOAuth(true);
-    if(!oauthToken) return false;
+    if(!state.oauthToken) return false;
   }
-  if(currentUserEmail) return true;
+  if(state.currentUserEmail) return true;
   const email=await fetchUserEmail();
-  if(!email||!ALLOWED_EMAILS.includes(email.toLowerCase())){oauthToken=null;oauthExpiry=0;return false}
-  currentUserEmail=email;
+  if(!email||!ALLOWED_EMAILS.includes(email.toLowerCase())){state.oauthToken=null;state.oauthExpiry=0;return false}
+  state.currentUserEmail=email;
   sessionStorage.setItem('currentUserEmail',email);
   return true;
 }
@@ -2167,16 +2144,16 @@ function renderOntw(){
     if(c==='Alles') cnt=openItems.length;
     else if(c==='Afgerond') cnt=doneItems.length;
     else cnt=openItems.filter(r=>r.categorie===c).length;
-    const activeStyle = c===activeOntw
+    const activeStyle = c===state.activeOntw
       ? (c==='Afgerond' ? '--sec:var(--gn);--sec-l:var(--gn-l);--sec-b:var(--gn-b)' : '--sec:var(--pk);--sec-l:var(--pk-l);--sec-b:var(--pk-b)')
       : '';
-    return`<div class="tab ${c===activeOntw?'on':''}" style="${activeStyle}" onclick="setOntw('${c.replace(/'/g,"\\'")}')">${c}<span class="cnt">${cnt}</span></div>`;
+    return`<div class="tab ${c===state.activeOntw?'on':''}" style="${activeStyle}" onclick="setOntw('${c.replace(/'/g,"\\'")}')">${c}<span class="cnt">${cnt}</span></div>`;
   }).join('');
 
   let rows;
-  if(activeOntw==='Afgerond') rows=doneItems;
-  else if(activeOntw==='Alles') rows=openItems;
-  else rows=openItems.filter(r=>r.categorie===activeOntw);
+  if(state.activeOntw==='Afgerond') rows=doneItems;
+  else if(state.activeOntw==='Alles') rows=openItems;
+  else rows=openItems.filter(r=>r.categorie===state.activeOntw);
   if(q) rows=rows.filter(r=>`${r.titel} ${r.inhoud} ${r.categorie} ${r.door}`.toLowerCase().includes(q));
 
   renderThead('ontw-thead',['Titel','Categorie','Inhoud','Door','Datum','Status',''],'--sec:var(--pk);--sec-l:var(--pk-l);--sec-b:var(--pk-b)');
@@ -2184,7 +2161,7 @@ function renderOntw(){
   const el=document.getElementById('ontw-tbody');
   if(!sl.length){el.innerHTML=`<tr><td colspan="7">${emptyRow(7,true)}</td></tr>`;return}
   el.innerHTML=sl.map(r=>{
-    const rid=_rowCache.length;_rowCache.push(Object.assign({},r,{_sec:'ONTW'}));
+    const rid=state._rowCache.length;state._rowCache.push(Object.assign({},r,{_sec:'ONTW'}));
     const clr=ONTW_CAT_COLORS[r.categorie]||'var(--mut)';
     return`<tr>
       <td class="cell-name">${esc(r.titel)}</td>
@@ -2198,12 +2175,11 @@ function renderOntw(){
   }).join('');
   renderPag('ontw-pag',rows.length,pgs.ontw,p=>{pgs.ontw=p;renderOntw()});
 }
-function setOntw(c){activeOntw=c;pgs.ontw=1;renderOntw()}
+function setOntw(c){state.activeOntw=c;pgs.ontw=1;renderOntw()}
 
-let ontwEditMode=false, ontwEditRow=null;
 function openOntwModal(isEdit, rowData){
-  ontwEditMode=!!isEdit;
-  ontwEditRow=rowData||null;
+  state.ontwEditMode=!!isEdit;
+  state.ontwEditRow=rowData||null;
   document.getElementById('ontw-m-title').textContent=isEdit?'Item bewerken':'Nieuw item';
   document.getElementById('ontw-m-submit-lbl').textContent=isEdit?'Opslaan':'Toevoegen';
   document.getElementById('ontw-m-del').style.display=isEdit?'inline-flex':'none';
@@ -2220,7 +2196,7 @@ function openOntwModal(isEdit, rowData){
 function closeOntwModal(){document.getElementById('ontw-modal-bg').classList.remove('open')}
 
 window.editOntwItem=function(idx){
-  const r=_rowCache[idx];
+  const r=state._rowCache[idx];
   if(r) openOntwModal(true,r);
 };
 
@@ -2237,8 +2213,8 @@ async function submitOntwItem(){
   const today=`${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;
   const values=[titel,cat,inhoud,who,today,status];
   try{
-    if(ontwEditMode&&ontwEditRow?._row){
-      await writeRange(`'Ontwikkeling'!A${ontwEditRow._row}:F${ontwEditRow._row}`,values);
+    if(state.ontwEditMode&&state.ontwEditRow?._row){
+      await writeRange(`'Ontwikkeling'!A${state.ontwEditRow._row}:F${state.ontwEditRow._row}`,values);
     } else {
       await appendRange("'Ontwikkeling'!A:F",values);
     }
@@ -2248,7 +2224,7 @@ async function submitOntwItem(){
 }
 
 async function deleteOntwItem(){
-  if(!ontwEditRow) return;
+  if(!state.ontwEditRow) return;
   if(!confirm('Dit item verwijderen?')) return;
   if(!await ensureToken()){alert('Inloggen mislukt.');return}
   try{
@@ -2257,8 +2233,8 @@ async function deleteOntwItem(){
     if(sheetId==null) throw new Error('Sheet "Ontwikkeling" niet gevonden');
     await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
       method:'POST',
-      headers:{Authorization:`Bearer ${oauthToken}`,'Content-Type':'application/json'},
-      body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:ontwEditRow._row-1,endIndex:ontwEditRow._row}}}]})
+      headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
+      body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:state.ontwEditRow._row-1,endIndex:state.ontwEditRow._row}}}]})
     });
     closeOntwModal();
     await loadAll();
@@ -2307,7 +2283,6 @@ function actieBadge(actie){
 }
 
 // Filterstatus voor de tijdlijn (leeg = alles)
-let logWho='', logAct='';
 
 const _LOG_AVKLEUR={Jer:'var(--ac)',Cihad:'var(--pu)',Gabos:'var(--pk)',Cihan:'var(--am)'};
 function avatarKleur(naam){ return _LOG_AVKLEUR[naam] || 'var(--nv)'; }
@@ -2351,9 +2326,9 @@ function logTijd(iso){
 function renderLogboek(){
   const q=(document.getElementById('s-logboek')?.value||'').toLowerCase();
   const rows=D.logboek.filter(r=>{
-    if(logWho && displayName(r.gebruiker)!==logWho) return false;
-    if(logAct){
-      const m = r.actie===logAct || (logAct==='Aangemaakt' && (r.actie||'').indexOf('Aangemaakt')===0);
+    if(state.logWho && displayName(r.gebruiker)!==state.logWho) return false;
+    if(state.logAct){
+      const m = r.actie===state.logAct || (state.logAct==='Aangemaakt' && (r.actie||'').indexOf('Aangemaakt')===0);
       if(!m) return false;
     }
     if(q&&!`${r.timestamp} ${r.code} ${r.sectie} ${r.actie} ${r.veld} ${r.oudeWaarde} ${r.nieuweWaarde} ${r.gebruiker} ${displayName(r.gebruiker)}`.toLowerCase().includes(q)) return false;
@@ -2442,7 +2417,7 @@ async function addTaskNote(){
 
 async function logEvent(code, sec, actie, veld, oudeWaarde, nieuweWaarde) {
   try {
-    if (!oauthToken) return;
+    if (!state.oauthToken) return;
     const who = getCurrentWho() || '?';
     const ts = new Date().toISOString();
     await appendRange("'Logboek'!A:H", [ts, code||'', sec||'', actie||'', veld||'', oudeWaarde||'', nieuweWaarde||'', who]);
@@ -2581,7 +2556,7 @@ async function undoComplete(undoData) {
     if (lastAf && lastAf.code === undoData.code) {
       await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${oauthToken}`, 'Content-Type': 'application/json' },
+        headers: { Authorization: `Bearer ${state.oauthToken}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ requests: [{ deleteDimension: { range: { sheetId: afId, dimension: 'ROWS', startIndex: lastAf._row - 1, endIndex: lastAf._row } } }] })
       });
     }
@@ -2621,20 +2596,20 @@ async function pollNotifsForToast() {
     const prefs = getNotifPrefs();
     const typeToPrefs = { n_newtask:'newtask', n_assigned:'assigned', n_deadline:'deadline', n_alv:'alv', n_daily:'daily' };
 
-    const newRows = rows.filter(n => n.ts > _lastNotifTs);
+    const newRows = rows.filter(n => n.ts > state._lastNotifTs);
     for (const n of newRows) {
       if (n.voor !== 'allen' && n.voor && who && n.voor !== who) continue;
       const prefKey = typeToPrefs[n.type];
       if (prefKey && prefs[prefKey] === false) continue;
       showToast(n.title, n.body, TOAST_COLORS[n.type] || 'var(--ac)');
     }
-    if (newRows.length) _lastNotifTs = rows[0].ts;
+    if (newRows.length) state._lastNotifTs = rows[0].ts;
   } catch(e) { /* stil falen */ }
 }
 
 function startNotifPoll() {
   pollNotifsForToast();
-  _notifPollTimer = setInterval(pollNotifsForToast, 10000);
+  state._notifPollTimer = setInterval(pollNotifsForToast, 10000);
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) { pollNotifsForToast(); loadAll(true); }
   });
@@ -2669,10 +2644,10 @@ function closeNotifModal() {
 }
 
 function refreshNotifUI() {
-  document.getElementById('notif-subscribe-section').style.display = isSubscribed ? 'none' : 'block';
-  document.getElementById('notif-settings-section').style.display  = isSubscribed ? 'block' : 'none';
+  document.getElementById('notif-subscribe-section').style.display = state.isSubscribed ? 'none' : 'block';
+  document.getElementById('notif-settings-section').style.display  = state.isSubscribed ? 'block' : 'none';
   const dot = document.getElementById('notif-dot');
-  if (dot) dot.style.display = isSubscribed ? 'none' : 'block';
+  if (dot) dot.style.display = state.isSubscribed ? 'none' : 'block';
 }
 
 function onWhoChange() {
@@ -2690,7 +2665,7 @@ function getCurrentWho() {
   }
   const stored = localStorage.getItem('notif_who');
   if (stored) return stored;
-  if (currentUserEmail) return displayName(currentUserEmail);
+  if (state.currentUserEmail) return displayName(state.currentUserEmail);
   return '';
 }
 
@@ -2708,7 +2683,7 @@ async function saveNotifPrefs(forceInit) {
   const deadlineHours = document.getElementById('notif-deadline-hours').value || '1';
   Object.entries(prefs).forEach(([k, v]) => localStorage.setItem('notif_' + k, v));
   localStorage.setItem('notif_deadline_hours', deadlineHours);
-  if (oneSignalReady && isSubscribed) {
+  if (state.oneSignalReady && state.isSubscribed) {
     try {
       await OneSignal.User.addTags({
         behandelaar: who,
@@ -2727,10 +2702,10 @@ async function saveNotifPrefs(forceInit) {
 async function waitForOneSignal(timeoutMs) {
   timeoutMs = timeoutMs || 10000;
   const start = Date.now();
-  while (!oneSignalReady && (Date.now() - start) < timeoutMs) {
+  while (!state.oneSignalReady && (Date.now() - start) < timeoutMs) {
     await new Promise(r => setTimeout(r, 150));
   }
-  return oneSignalReady;
+  return state.oneSignalReady;
 }
 
 async function subscribeNotifs() {
@@ -2759,7 +2734,7 @@ async function subscribeNotifs() {
     if (!localStorage.getItem('notif_deadline_hours')) localStorage.setItem('notif_deadline_hours', '1');
     localStorage.setItem('notif_who', who);
     await saveNotifPrefs(true);
-    isSubscribed = true;
+    state.isSubscribed = true;
     refreshNotifUI();
     sendTestNotif(who, 'Notificaties zijn aan! 🔔', 'Je ontvangt voortaan meldingen op dit apparaat.');
   } catch(e) {
@@ -2773,11 +2748,11 @@ async function subscribeNotifs() {
 async function unsubscribeNotifs() {
   if (!confirm('Push-meldingen uitzetten op dit apparaat?')) return;
   try {
-    if (oneSignalReady) {
+    if (state.oneSignalReady) {
       await OneSignal.User.PushSubscription.optOut();
       await OneSignal.logout();
     }
-    isSubscribed = false;
+    state.isSubscribed = false;
     refreshNotifUI();
   } catch(e) { alert('Uitzetten mislukt: ' + e.message); }
 }
@@ -2803,11 +2778,11 @@ OneSignalDeferred.push(async function(OneSignal) {
       notifyButton: { enable: false },
       allowLocalhostAsSecureOrigin: true,
     });
-    oneSignalReady = true;
-    isSubscribed   = OneSignal.User.PushSubscription.optedIn === true;
+    state.oneSignalReady = true;
+    state.isSubscribed   = OneSignal.User.PushSubscription.optedIn === true;
     refreshNotifUI();
     OneSignal.User.PushSubscription.addEventListener('change', e => {
-      isSubscribed = e.current.optedIn === true;
+      state.isSubscribed = e.current.optedIn === true;
       refreshNotifUI();
     });
   } catch(e) {

@@ -1,0 +1,441 @@
+// ══════════════════════════════════════
+//  RENDER-LIJSTEN — Nog-te-doen, Afgerond, ALV's + tabel/paginering
+// ══════════════════════════════════════
+import { esc, filt, prioBadge, persBadges, ibBadge, subBadge, offProg, emptyRow, berekenPrioriteit, parseDt, STIL_DREMPEL_DAGEN } from "./util.js";
+import { SID, SECS, SKEYS, PG } from "./config.js";
+import { state, D, pgs } from "./state.js";
+import { ensureToken } from "./auth.js";
+import { showToast, logEvent, getSheetIds } from "./main.js";
+
+// ══════════════════════════════════════
+//  NTD STATS
+// ══════════════════════════════════════
+const SEC_ICONS={
+  // Klembord met vinkje — taken oppakken
+  OPPAKKEN:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2" fill="currentColor" fill-opacity="0.18"/><rect x="9" y="2.5" width="6" height="3.5" rx="1" fill="currentColor" fill-opacity="0.35"/><path d="M9 13l2 2 4-4.2"/></svg>`,
+  // Groep van drie mensen — vergaderen
+  VERGADERVERZOEKEN:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3" fill="currentColor" fill-opacity="0.25"/><circle cx="5.5" cy="10" r="2.2" fill="currentColor" fill-opacity="0.18"/><circle cx="18.5" cy="10" r="2.2" fill="currentColor" fill-opacity="0.18"/><path d="M6.5 20c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><path d="M2 19c.3-2 1.7-3.3 3.5-3.6"/><path d="M22 19c-.3-2-1.7-3.3-3.5-3.6"/></svg>`,
+  // Document met eurosymbool — offerte
+  'OFFERTE-TRAJECTEN':`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l4 4v13a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 016 20V4.5A1.5 1.5 0 017.5 3z" fill="currentColor" fill-opacity="0.18"/><path d="M14 3v4h4"/><path d="M15 12c-.7-.9-1.8-1.4-3-1.4-2.2 0-4 1.9-4 4.2s1.8 4.2 4 4.2c1.2 0 2.3-.5 3-1.4"/><path d="M8.5 14h4.2M8.5 16.2h4.2"/></svg>`,
+  // Map met klok/uitroep — openstaande dossiers (LOD)
+  LOD:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" fill="currentColor" fill-opacity="0.18"/><circle cx="15.5" cy="14" r="3.2" fill="currentColor" fill-opacity="0.3"/><path d="M15.5 12.2v2l1.3.8" stroke-width="1.6"/></svg>`
+};
+const SEC_THEMES={
+  OPPAKKEN:'--sec:var(--ac);--sec-l:var(--ac-l)',
+  VERGADERVERZOEKEN:'--sec:var(--am);--sec-l:var(--am-l)',
+  'OFFERTE-TRAJECTEN':'--sec:var(--pu);--sec-l:var(--pu-l)',
+  LOD:'--sec:var(--rd);--sec-l:var(--rd-l)',
+};
+function renderNtdStats(){
+  document.getElementById('ntd-stats').innerHTML=SKEYS.map(s=>`
+    <div class="stat" style="${SEC_THEMES[s]}">
+      <div class="stat-top"><div class="stat-lbl">${SECS[s].label}</div><div class="stat-ico">${SEC_ICONS[s]}</div></div>
+      <div class="stat-num">${D.ntd[s]?.length||0}</div>
+      <div class="stat-sub">open ${s==='OFFERTE-TRAJECTEN'?'trajecten':s==='LOD'?'dossiers':'taken'}</div>
+    </div>`).join('');
+  renderNtdDonut();
+}
+
+// NTD: voortgangsbalk uitgeschreven vergaderingen (alvo: uitnodiging=TRUE → uitnodiging verzonden)
+function renderNtdDonut(){
+  const track=document.getElementById('ntd-progress-track');
+  if(!track) return;
+  const done=(D.alvo||[]).filter(r=>r.uitnodiging).length;
+  const total=(D.alvo||[]).length;
+  const pct=total?Math.round(done/total*100):0;
+  const txt=`${done} / ${total}`;
+  document.getElementById('ntd-progress-val-base').textContent=txt;
+  document.getElementById('ntd-progress-val-rev').textContent=txt;
+  document.getElementById('ntd-progress-sub').textContent=`${pct}% van de vergaderingen uitgeschreven`;
+  // vollopend effect + reveal: witte cijfers worden onthuld over het gevulde deel,
+  // donkere cijfers blijven leesbaar over het lichte deel (beide identiek gecentreerd)
+  requestAnimationFrame(()=>{
+    document.getElementById('ntd-progress-fill').style.width=pct+'%';
+    document.getElementById('ntd-progress-val-rev').style.clipPath=`inset(0 ${100-pct}% 0 0)`;
+  });
+}
+
+// Helper: ligt date d in (current period - offset) gerekend vanaf ref?
+function _inPeriod(d,ref,period,offset){
+  if(period==='week'){
+    // ISO-week-index
+    const w1=_weekIndex(d), w2=_weekIndex(ref);
+    return (w2-w1)===offset;
+  }
+  if(period==='maand'){
+    const idx=(ref.getFullYear()*12+ref.getMonth())-(d.getFullYear()*12+d.getMonth());
+    return idx===offset;
+  }
+  if(period==='kwartaal'){
+    const qR=Math.floor(ref.getMonth()/3), qD=Math.floor(d.getMonth()/3);
+    const idx=(ref.getFullYear()*4+qR)-(d.getFullYear()*4+qD);
+    return idx===offset;
+  }
+  if(period==='jaar'){
+    return (ref.getFullYear()-d.getFullYear())===offset;
+  }
+  return false;
+}
+function _weekIndex(d){
+  // dagen-sinds-epoch / 7 als grove index
+  const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+  const day=t.getUTCDay()||7;
+  t.setUTCDate(t.getUTCDate()+4-day);
+  return Math.floor(t.getTime()/(7*86400000));
+}
+
+// ══════════════════════════════════════
+//  NOG TE DOEN
+// ══════════════════════════════════════
+function renderNtd(){
+  const q=document.getElementById('s-ntd').value.toLowerCase();
+  const fCode=document.getElementById('f-code-ntd').value.toLowerCase();
+  const fBeh=document.getElementById('f-beh-ntd').value;
+  const fPrio=document.getElementById('f-prio-ntd').value;
+
+  // Tabs
+  document.getElementById('ntd-tabs').innerHTML=SKEYS.map(s=>{
+    const rows=filterNtd(D.ntd[s]||[],q,fCode,fBeh,fPrio,s);
+    return`<div class="tab ${s===state.activeNtd?'on':''}" style="${s===state.activeNtd?SECS[s].css:''}" onclick="setNtd('${s}')">${SECS[s].label}<span class="cnt">${rows.length}</span></div>`;
+  }).join('');
+
+  document.getElementById('ntd-title').textContent=SECS[state.activeNtd].label;
+  // Apply card theme
+  const card=document.getElementById('ntd-card');
+  SECS[state.activeNtd].css.split(';').forEach(p=>{const[k,v]=p.split(':');if(k&&v)card.style.setProperty(k.trim(),v.trim())});
+
+  const rows=filterNtd(D.ntd[state.activeNtd]||[],q,fCode,fBeh,fPrio,state.activeNtd);
+  renderThead('ntd-thead',[...SECS[state.activeNtd].cols,''],SECS[state.activeNtd].css);
+  renderTbody('ntd-tbody',rows,state.activeNtd,pgs.ntd,false);
+  renderPag('ntd-pag',rows.length,pgs.ntd,p=>{pgs.ntd=p;renderNtd()});
+}
+function setNtd(s){state.activeNtd=s;pgs.ntd=1;renderNtd()}
+function filterNtd(rows,q,fCode,beh,prio,sec){
+  return rows.filter(r=>{
+    if(q&&!SECS[sec].keys.some(k=>(r[k]||'').toLowerCase().includes(q))) return false;
+    if(fCode&&!(r.code||'').toLowerCase().includes(fCode)) return false;
+    if(beh&&!(r.behandelaar||'').toLowerCase().includes(beh.toLowerCase())) return false;
+    if(prio){
+      const berekend = berekenPrioriteit(r.deadline, sec).prioriteit;
+      if (berekend !== prio) return false;
+    }
+    return true;
+  }).sort((a,b)=>{
+    const ibA = a.inBehandeling==='TRUE'?1:0, ibB = b.inBehandeling==='TRUE'?1:0;
+    if (ibA !== ibB) return ibA - ibB;
+    const pa = berekenPrioriteit(a.deadline, sec);
+    const pb = berekenPrioriteit(b.deadline, sec);
+    // 1. Te laat altijd bovenaan
+    if (pa.teLaat !== pb.teLaat) return pa.teLaat ? -1 : 1;
+    // 2. Prioriteit-rang
+    const rang = { 'Hoog':0, 'Midden':1, 'Laag':2, '':3 };
+    if (rang[pa.prioriteit] !== rang[pb.prioriteit]) return rang[pa.prioriteit] - rang[pb.prioriteit];
+    // 3. Deadline oplopend (vroegste eerst)
+    const dA = parseDt(a.deadline), dB = parseDt(b.deadline);
+    if (dA && dB && dA !== dB) return dA - dB;
+    if (dA && !dB) return -1;
+    if (dB && !dA) return 1;
+    // 4. VvE-code alfabetisch
+    return (a.code || '').localeCompare(b.code || '');
+  });
+}
+
+// ══════════════════════════════════════
+//  AFGEROND
+// ══════════════════════════════════════
+function renderAf(){
+  const q=document.getElementById('s-af').value.toLowerCase();
+  document.getElementById('af-tabs').innerHTML=SKEYS.map(s=>{
+    const rows=filt(D.af[s]||[],q);
+    return`<div class="tab ${s===state.activeAf?'on':''}" style="${s===state.activeAf?SECS[s].css:''}" onclick="setAf('${s}')">${SECS[s].label}<span class="cnt">${rows.length}</span></div>`;
+  }).join('');
+  const cols=['VvE Code','VvE','Categorie','Subcategorie','Afgerond op','Opmerking'];
+  renderThead('af-thead',cols,SECS[state.activeAf].css);
+  const rows=filt(D.af[state.activeAf]||[],q);
+  renderTbody('af-tbody',rows,state.activeAf,pgs.af,true);
+  renderPag('af-pag',rows.length,pgs.af,p=>{pgs.af=p;renderAf()});
+}
+function setAf(s){state.activeAf=s;pgs.af=1;renderAf()}
+
+// ══════════════════════════════════════
+//  ALV OVERZICHT
+// ══════════════════════════════════════
+// Duotone-stijl inline SVG-iconen voor de stat-tegels (zelfde stijl als DASH_ICONS,
+// kleur volgt --sec via currentColor). Inline i.p.v. Phosphor-font voor betrouwbare weergave.
+const ALVO_ICONS={
+  totaal:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="8" height="13" rx="1" fill="currentColor" fill-opacity="0.18"/><rect x="11" y="4" width="10" height="17" rx="1" fill="currentColor" fill-opacity="0.18"/><path d="M2 21h20M6 12h2M6 15.5h2M15 8h2M15 11.5h2M15 15h2"/></svg>`,
+  afgerond:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="currentColor" fill-opacity="0.18"/><path d="M8 12.5l2.7 2.7L16 9.8"/></svg>`,
+  gepland:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="16" rx="2" fill="currentColor" fill-opacity="0.18"/><path d="M3.5 9.5h17M8 3v4M16 3v4M7.5 14h2M11 14h2M14.5 14h2"/></svg>`,
+  open:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3c0 5 5 6 5 9s-5 4-5 9M17 3c0 5-5 6-5 9s5 4 5 9" fill="currentColor" fill-opacity="0.18"/><path d="M6 3h12M6 21h12"/></svg>`
+};
+function renderAlvo(){
+  // Stats
+  const tot=D.alvo.length;
+  const afd=D.alvo.filter(r=>r.status==='Afgerond').length;
+  const gep=D.alvo.filter(r=>r.status==='Gepland').length;
+  const opn=D.alvo.filter(r=>r.status==='Open').length;
+  document.getElementById('alvo-stats').innerHTML=`
+    <div class="stat" style="--sec:var(--ac);--sec-l:var(--ac-l)"><div class="stat-top"><div class="stat-lbl">Totaal VvE's</div><div class="stat-ico">${ALVO_ICONS.totaal}</div></div><div class="stat-num">${tot}</div><div class="stat-sub">in beheer</div></div>
+    <div class="stat" style="--sec:var(--gn);--sec-l:var(--gn-l)"><div class="stat-top"><div class="stat-lbl">Afgerond</div><div class="stat-ico">${ALVO_ICONS.afgerond}</div></div><div class="stat-num">${afd}</div><div class="stat-sub">notulen verstuurd</div></div>
+    <div class="stat" style="--sec:var(--am);--sec-l:var(--am-l)"><div class="stat-top"><div class="stat-lbl">Gepland</div><div class="stat-ico">${ALVO_ICONS.gepland}</div></div><div class="stat-num">${gep}</div><div class="stat-sub">uitnodiging verstuurd</div></div>
+    <div class="stat" style="--sec:var(--rd);--sec-l:var(--rd-l)"><div class="stat-top"><div class="stat-lbl">Open</div><div class="stat-ico">${ALVO_ICONS.open}</div></div><div class="stat-num">${opn}</div><div class="stat-sub">nog te plannen</div></div>`;
+
+  const q=document.getElementById('s-alvo').value.toLowerCase();
+  const fs=document.getElementById('f-status-alvo').value;
+  const rows=D.alvo.filter(r=>{
+    if(q&&!`${r.code} ${r.naam}`.toLowerCase().includes(q)) return false;
+    if(fs&&r.status!==fs) return false;
+    return true;
+  });
+  const sl=rows.slice((pgs.alvo-1)*PG,pgs.alvo*PG);
+  document.getElementById('alvo-tbody').innerHTML=sl.length
+    ?sl.map(r=>{
+      const idx=D.alvo.indexOf(r);
+      return`<tr>
+        <td><span class="code" style="--sec:var(--ac);--sec-l:var(--ac-l)">${esc(r.code)}</span></td>
+        <td class="cell-name">${esc(r.naam)}</td>
+        <td>${flagPill(idx,'uitnodiging',r.uitnodiging)}</td>
+        <td>${flagPill(idx,'notulen',r.notulen)}</td>
+        <td>${flagPill(idx,'begroting',r.begroting)}</td>
+        <td><span class="badge status-${r.status.toLowerCase()}">${statusIco(r.status)} ${r.status}</span></td>
+      </tr>`;
+    }).join('')
+    :emptyRow(6);
+  renderPag('alvo-pag',rows.length,pgs.alvo,p=>{pgs.alvo=p;renderAlvo()});
+}
+
+const ALVO_COLS={uitnodiging:2,notulen:3,begroting:4};
+const ALVO_LABELS={uitnodiging:'Uitnodiging',notulen:'Notulen',begroting:'Begroting'};
+
+function flagPill(idx,field,val){
+  const cls=val?'on':'off';
+  const lbl=val?'✓ Ja':'–';
+  const aria=val?'true':'false';
+  const title=`Klik om ${ALVO_LABELS[field]} ${val?'uit':'aan'} te zetten`;
+  return`<button type="button" class="flag-toggle ${cls}" data-idx="${idx}" data-field="${field}" aria-pressed="${aria}" title="${title}" onclick="toggleAlvoFlag(${idx},'${field}')">${lbl}</button>`;
+}
+
+function _recomputeAlvoStatus(r){
+  r.status=r.notulen?'Afgerond':r.uitnodiging?'Gepland':'Open';
+}
+
+async function toggleAlvoFlag(idx,field){
+  const r=D.alvo[idx];
+  if(!r){console.warn('toggleAlvoFlag: rij niet gevonden',idx);return}
+  if(!await ensureToken()){showToast('Niet ingelogd','Kan wijziging niet opslaan','var(--rd)');return}
+
+  // Lock UI op de specifieke pill
+  const btn=document.querySelector(`.flag-toggle[data-idx="${idx}"][data-field="${field}"]`);
+  if(btn) btn.classList.add('toggling');
+
+  const oldVal=!!r[field];
+  const newVal=!oldVal;
+  const oldStatus=r.status;
+
+  // Optimistische update
+  r[field]=newVal;
+  _recomputeAlvoStatus(r);
+  renderAlvo();
+  renderNtdDonut(); // voortgangsbalk meteen mee laten lopen
+
+  try{
+    const ids=await getSheetIds();
+    const sheetId=ids["ALV's overzicht"]??ids["ALV's Overzicht"]??ids["ALV's overzicht "];
+    if(sheetId==null) throw new Error("Sheet 'ALV's overzicht' niet gevonden");
+    const col=ALVO_COLS[field];
+    const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+      method:'POST',
+      headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
+      body:JSON.stringify({requests:[{
+        updateCells:{
+          range:{sheetId,startRowIndex:r._row-1,endRowIndex:r._row,startColumnIndex:col,endColumnIndex:col+1},
+          rows:[{values:[{userEnteredValue:{boolValue:newVal}}]}],
+          fields:'userEnteredValue'
+        }
+      }]})
+    });
+    if(!resp.ok){const t=await resp.text();throw new Error(`HTTP ${resp.status}: ${t.slice(0,120)}`)}
+
+    logEvent(r.code,'ALVS',newVal?'Aangevinkt':'Uitgevinkt',ALVO_LABELS[field],oldVal?'TRUE':'FALSE',newVal?'TRUE':'FALSE');
+    showToast(`${newVal?'✓':'○'} ${ALVO_LABELS[field]} ${newVal?'aan':'uit'}`,`${r.code} – ${r.naam}`,newVal?'var(--gn)':'var(--mut)');
+  }catch(e){
+    // Revert
+    r[field]=oldVal;
+    r.status=oldStatus;
+    renderAlvo();
+    renderNtdDonut();
+    showToast('Opslaan mislukt',e.message||'Onbekende fout','var(--rd)');
+    console.error('toggleAlvoFlag fout:',e);
+  }finally{
+    const btn2=document.querySelector(`.flag-toggle[data-idx="${idx}"][data-field="${field}"]`);
+    if(btn2) btn2.classList.remove('toggling');
+  }
+}
+function statusIco(s){return{Open:'⏳',Gepland:'📅',Afgerond:'✅'}[s]||''}
+
+// ══════════════════════════════════════
+//  ALV AFGEROND
+// ══════════════════════════════════════
+function renderAlfa(){
+  const q=document.getElementById('s-alfa').value.toLowerCase();
+  const rows=D.alfa.filter(r=>`${r.code} ${r.naam} ${r.datum}`.toLowerCase().includes(q));
+  const sl=rows.slice((pgs.alfa-1)*PG,pgs.alfa*PG);
+  document.getElementById('alfa-tbody').innerHTML=sl.length
+    ?sl.map(r=>`<tr>
+        <td><span class="code" style="--sec:var(--gn);--sec-l:var(--gn-l)">${esc(r.code)}</span></td>
+        <td class="cell-name">${esc(r.naam)}</td>
+        <td class="cell-sm">${esc(r.datum)}</td>
+      </tr>`).join('')
+    :emptyRow(3);
+  renderPag('alfa-pag',rows.length,pgs.alfa,p=>{pgs.alfa=p;renderAlfa()});
+}
+
+// ══════════════════════════════════════
+//  TABLE HELPERS
+// ══════════════════════════════════════
+function renderThead(id,cols,css){
+  document.getElementById(id).innerHTML=`<tr>${cols.map(c=>`<th style="${css}">${c}</th>`).join('')}</tr>`;
+}
+
+function renderTbody(tbodyId,rows,sec,page,isAf){
+  const sl=rows.slice((page-1)*PG,page*PG);
+  const el=document.getElementById(tbodyId);
+  if(!sl.length){el.innerHTML=`<tr><td colspan="10">${emptyRow(10,true)}</td></tr>`;return}
+  if(isAf){el.innerHTML=sl.map(r=>rowAf(r,sec)).join('');return}
+  const main=sl.filter(r=>r.inBehandeling!=='TRUE');
+  const ib=sl.filter(r=>r.inBehandeling==='TRUE');
+  let html=main.map(r=>rowNtd(r,sec)).join('');
+  if(ib.length){
+    const cols=SECS[sec].cols.length+1;
+    html+=`<tr><td colspan="${cols}" style="background:var(--ac-l);padding:8px 13px;font-size:11px;font-weight:700;color:var(--ac);text-transform:uppercase;letter-spacing:.05em;border:none">⟳ In behandeling (${ib.length})</td></tr>`;
+    html+=ib.map(r=>rowNtd(r,sec)).join('');
+  }
+  el.innerHTML=html;
+}
+
+function bepaalStil(r, sec){
+  if (r.inBehandeling !== 'TRUE') return null;
+  const entries = (D.logboek || []).filter(e => e.code === r.code && (!sec || e.sectie === sec));
+  if (!entries.length) return null; // geen activiteit-data → niet markeren
+  let laatst = null;
+  entries.forEach(e => {
+    const t = e.timestamp ? new Date(e.timestamp) : null;
+    if (t && !isNaN(t) && (!laatst || t > laatst)) laatst = t;
+  });
+  if (!laatst) return null;
+  const dagen = _verschilInKalenderdagen(_vandaagAmsterdam(), laatst);
+  return dagen >= STIL_DREMPEL_DAGEN ? dagen : null;
+}
+
+function deadlineCel(r, sec){
+  if (!r.deadline) return `<td class="cell-sm"><span class="warn-geen-deadline">Geen deadline</span></td>`;
+  const { teLaat, dagenTot } = berekenPrioriteit(r.deadline, sec);
+  const pill = teLaat ? ` <span class="pill-telaat">Te laat (${Math.abs(dagenTot)}d)</span>` : '';
+  return `<td class="cell-sm">${esc(r.deadline)}${pill}</td>`;
+}
+
+function rowNtd(r,sec){
+  const css=SECS[sec].css;
+  const rid=state._rowCache.length; state._rowCache.push(r);
+  const editBtn=`<button class="btn-edit" onclick="editRow(${rid})" title="Bewerken"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><button class="btn-done" onclick="completeTask(${rid})" title="Afgehandeld"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></button>`;
+  let cells='';
+  const _stilDagen = bepaalStil(r, sec);
+  const stilPill = _stilDagen !== null
+    ? `<span class="pill-stil" onclick="event.stopPropagation(); editRow(${rid})" title="Geen activiteit in ${_stilDagen} dagen">Stil ${_stilDagen}d</span>`
+    : '';
+  switch(sec){
+    case'OPPAKKEN':
+      cells=`<td><span class="code" style="${css}">${esc(r.code)}</span></td>
+        <td class="cell-name">${esc(r.naam)}${subBadge(r.subcategorie)}</td>
+        <td class="cell-txt">${esc(r.actiepunt)}${stilPill}</td>
+        ${deadlineCel(r, 'OPPAKKEN')}
+        <td>${persBadges(r.behandelaar)}</td>
+        <td>${prioBadge(r, 'OPPAKKEN')}</td>
+        <td class="cell-txt">${r.opmerkingen?`<span style="font-size:12px">${esc(r.opmerkingen)}</span>`:''}</td>
+        <td>${ibBadge(r.inBehandeling)}</td>
+        <td>${editBtn}</td>`;
+      break;
+    case'VERGADERVERZOEKEN':
+      cells=`<td><span class="code" style="${css}">${esc(r.code)}</span></td>
+        <td class="cell-name">${esc(r.naam)}${subBadge(r.subcategorie)}</td>
+        <td><span class="badge" style="background:var(--am-l);color:var(--am)">${esc(r.periode||r.agendapunten||'')}</span></td>
+        <td class="cell-txt">${esc(r.agendapunten||r.actiepunt||'')}${stilPill}</td>
+        <td>${persBadges(r.behandelaar)}</td>
+        ${deadlineCel(r, 'VERGADERVERZOEKEN')}
+        <td>${prioBadge(r, 'VERGADERVERZOEKEN')}</td>
+        <td class="cell-txt">${r.opmerkingen?`<span style="font-size:12px">${esc(r.opmerkingen)}</span>`:''}</td>
+        <td>${ibBadge(r.inBehandeling)}</td>
+        <td>${editBtn}</td>`;
+      break;
+    case'OFFERTE-TRAJECTEN':
+      cells=`<td><span class="code" style="${css}">${esc(r.code)}</span></td>
+        <td class="cell-name">${esc(r.naam)}${subBadge(r.subcategorie)}</td>
+        <td class="cell-sm">${esc(r.datumAangevraagd||'')}</td>
+        <td>${offProg(r.offertes)}</td>
+        <td>${persBadges(r.behandelaar)}</td>
+        ${deadlineCel(r, 'OFFERTE-TRAJECTEN')}
+        <td>${prioBadge(r, 'OFFERTE-TRAJECTEN')}</td>
+        <td class="cell-txt">${r.opmerkingen?`<span style="font-size:12px">${esc(r.opmerkingen)}</span>`:''}${stilPill}</td>
+        <td>${editBtn}</td>`;
+      break;
+    case'LOD':
+      cells=`<td><span class="code" style="${css}">${esc(r.code)}</span></td>
+        <td class="cell-name">${esc(r.naam)}${subBadge(r.subcategorie)}</td>
+        <td class="cell-txt">${esc(r.actiepunt||'')}${stilPill}</td>
+        <td class="cell-txt" style="font-style:italic;font-size:12px">${esc(r.status||'')}</td>
+        <td>${persBadges(r.behandelaar)}</td>
+        ${deadlineCel(r, 'LOD')}
+        <td>${prioBadge(r, 'LOD')}</td>
+        <td class="cell-txt">${r.opmerkingen?`<span style="font-size:12px">${esc(r.opmerkingen)}</span>`:''}</td>
+        <td>${ibBadge(r.inBehandeling)}</td>
+        <td>${editBtn}</td>`;
+      break;
+  }
+  const { teLaat: rowTeLaat } = berekenPrioriteit(r.deadline, sec);
+  const rowCls = [
+    r.inBehandeling === 'TRUE' ? 'ib-row' : '',
+    rowTeLaat ? 'row-telaat' : ''
+  ].filter(Boolean).join(' ');
+  return `<tr class="${rowCls}">${cells}</tr>`;
+}
+
+function rowAf(r,sec){
+  const css=SECS[sec].css;
+  return`<tr>
+    <td><span class="code" style="${css}">${esc(r.code)}</span></td>
+    <td class="cell-name">${esc(r.naam)}</td>
+    <td class="cell-txt">${esc(r.actiepunt||r.periode||r.agendapunten||'')}</td>
+    <td class="cell-sm">${esc(r.subcategorie||'')}</td>
+    <td class="cell-sm">${esc(r.datum||'')}</td>
+    <td class="cell-txt">${r.opmerking?`<span style="font-size:12px">${esc(r.opmerking)}</span>`:''}</td>
+  </tr>`;
+}
+
+// ══════════════════════════════════════
+//  PAGINATION
+// ══════════════════════════════════════
+function renderPag(id,total,cur,cb){
+  const el=document.getElementById(id);if(!el)return;
+  const tp=Math.ceil(total/PG);
+  if(tp<=1){el.innerHTML='';return}
+  const s=(cur-1)*PG+1,e=Math.min(cur*PG,total);
+  const rng=tp<=7?[...Array(tp).keys()].map(i=>i+1)
+    :cur<=4?[1,2,3,4,5,'…',tp]
+    :cur>=tp-3?[1,'…',tp-4,tp-3,tp-2,tp-1,tp]
+    :[1,'…',cur-1,cur,cur+1,'…',tp];
+  el.innerHTML=`<div class="pag-info">Toont ${s}–${e} van ${total}</div>
+    <div class="pag-btns">
+      <button class="pb" onclick="(${cb})(${cur-1})" ${cur<=1?'disabled':''}>‹</button>
+      ${rng.map(p=>p==='…'?`<span class="pb" style="border:none;cursor:default">…</span>`
+        :`<button class="pb ${p===cur?'on':''}" onclick="(${cb})(${p})">${p}</button>`).join('')}
+      <button class="pb" onclick="(${cb})(${cur+1})" ${cur>=tp?'disabled':''}>›</button>
+    </div>`;
+}
+
+
+export {
+  SEC_ICONS, SEC_THEMES, renderNtdStats, renderNtdDonut, _inPeriod, _weekIndex, renderNtd, setNtd,
+  filterNtd, renderAf, setAf, ALVO_ICONS, renderAlvo, ALVO_COLS, ALVO_LABELS, flagPill,
+  _recomputeAlvoStatus, toggleAlvoFlag, statusIco, renderAlfa, renderThead, renderTbody, bepaalStil,
+  deadlineCel, rowNtd, rowAf, renderPag,
+};

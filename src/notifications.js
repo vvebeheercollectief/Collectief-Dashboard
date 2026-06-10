@@ -8,7 +8,7 @@ import { ensureToken } from "./auth.js";
 import { fetchSheet, appendRange } from "./api.js";
 import { logEvent } from "./render-overig.js";
 import { getSheetIds, insertAndWriteRow, getInsertRow } from "./crud.js";
-import { loadAll } from "./main.js";
+import { loadAll } from "./data.js";
 
 //  NOTIF — enqueuet event in de Notif-wachtrij én toont directe in-app toast
 // ══════════════════════════════════════

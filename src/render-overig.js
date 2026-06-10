@@ -8,7 +8,7 @@ import { ensureToken } from "./auth.js";
 import { writeRange, appendRange } from "./api.js";
 import { renderThead, renderPag } from "./render-lijsten.js";
 import { getSheetIds } from "./crud.js";
-import { loadAll } from "./main.js";
+import { loadAll } from "./data.js";
 
 // ══════════════════════════════════════
 //  ONTWIKKELING

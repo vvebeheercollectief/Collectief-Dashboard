@@ -3,7 +3,7 @@
 // ══════════════════════════════════════
 import { clientId, ALLOWED_EMAILS } from "./config.js";
 import { state } from "./state.js";
-import { loadAll } from "./main.js";
+import { loadAll } from "./data.js";
 
 function doOAuth(forcePrompt){
   return new Promise(resolve=>{

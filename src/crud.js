@@ -8,7 +8,8 @@ import { writeRange, _shiftNtdRows } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { showToast, showUndoToast, fireNotifEvent } from "./notifications.js";
 import { logEvent } from "./render-overig.js";
-import { backgroundWrite, loadAll, renderAll } from "./main.js";
+import { backgroundWrite, loadAll } from "./data.js";
+import { renderAll } from "./main.js";
 
 //  MODAL — Open / Close
 // ══════════════════════════════════════

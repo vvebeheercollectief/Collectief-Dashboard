@@ -15,6 +15,7 @@ import { copyAiPrompt, aiOvernemen, aiActieTaak, aiKopieerConcept } from './ai.j
 import { dismissToast, saveNotifPrefs } from './notifications.js';
 import { doLogin } from './auth.js';
 import { openSnoozeModal, snoozeKies } from './snooze.js';
+import { openHerhaalModal, toggleHerhaalStatus, deleteHerhaal } from './render-herhaal.js';
 
 const PAG_RENDER = { ntd:renderNtd, af:renderAf, alvo:renderAlvo, alfa:renderAlfa, ontw:renderOntw, logboek:renderLogboek };
 
@@ -40,6 +41,9 @@ export const ACTIONS = {
   'toast-sluiten':         (el) => dismissToast(el.closest('.toast')),
   'taak-wegleggen':        (el) => openSnoozeModal(+el.dataset.rid),
   'snooze-kies':           (el) => snoozeKies(+el.dataset.dagen),
+  'herhaal-bewerken':      (el) => openHerhaalModal(+el.dataset.hid),
+  'herhaal-status':        (el) => toggleHerhaalStatus(+el.dataset.hid),
+  'herhaal-verwijderen':   ()   => deleteHerhaal(),
 };
 
 export function initActions() {

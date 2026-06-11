@@ -22,6 +22,7 @@ import { loadAll } from './data.js';
 import { initActions } from './actions.js';
 import { initVveZoekveld } from './vve-zoekveld.js';
 import { closeSnoozeModal, snoozeOpslaan, snoozeWis } from './snooze.js';
+import { renderHerhaal, openHerhaalModal, closeHerhaalModal, syncHerhaalVelden, submitHerhaal } from './render-herhaal.js';
 
 // ══════════════════════════════════════
 //  BOOT
@@ -121,6 +122,25 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('ontw-modal-bg').addEventListener('click',e=>{if(e.target.id==='ontw-modal-bg'&&_ontwMouseDown?.id==='ontw-modal-bg')closeOntwModal()});
   setupSearch('s-ontw',()=>{pgs.ontw=1;renderOntw()});
 
+  // Herhaalregel-modal (Fase 4)
+  document.getElementById('btn-add-herhaal').onclick=()=>openHerhaalModal(null);
+  document.getElementById('hh-close').onclick=closeHerhaalModal;
+  document.getElementById('hh-cancel').onclick=closeHerhaalModal;
+  document.getElementById('hh-submit').onclick=submitHerhaal;
+  document.getElementById('hh-type').onchange=syncHerhaalVelden;
+  let _hhMouseDown=null;
+  document.getElementById('hh-bg').addEventListener('mousedown',e=>{_hhMouseDown=e.target});
+  document.getElementById('hh-bg').addEventListener('click',e=>{if(e.target.id==='hh-bg'&&_hhMouseDown?.id==='hh-bg')closeHerhaalModal()});
+  initVveZoekveld({
+    input: document.getElementById('hh-code'),
+    lijstEl: document.getElementById('hh-vve-sug'),
+    minTekens: 2, maxItems: 8,
+    onSelect: ({code,naam}) => {
+      document.getElementById('hh-code').value = code;
+      document.getElementById('hh-naam').value = naam;
+    },
+  });
+
   // Wegleggen-modal (Fase 4)
   document.getElementById('snooze-close').onclick=closeSnoozeModal;
   document.getElementById('snooze-cancel').onclick=closeSnoozeModal;
@@ -171,6 +191,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(document.getElementById('complete-bg').classList.contains('open')) return;
     if(document.getElementById('ontw-modal-bg').classList.contains('open')) return;
     if(document.getElementById('snooze-bg').classList.contains('open')) return;
+    if(document.getElementById('hh-bg').classList.contains('open')) return;
     if(document.getElementById('dot').classList.contains('loading')) return;
     if(state.pendingWrites>0) return;
     if(state._animBusy) return;
@@ -215,6 +236,7 @@ export function renderAll(){
   renderAlfa();
   renderOntw();
   renderLogboek();
+  renderHerhaal();
 }
 
 // ══════════════════════════════════════

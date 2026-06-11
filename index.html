@@ -64,6 +64,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
       Logboek
     </div>
+    <div class="ni" data-page="herhaal">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+      Herhaalregels
+    </div>
     <div class="sb-lbl">Analyse</div>
     <div class="ni" data-page="analytics">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
@@ -305,6 +309,23 @@
         <p class="log-count" id="logboek-count"></p>
         <div id="logboek-feed" class="log-feed"></div>
         <div class="pag" id="logboek-pag"></div>
+      </div>
+    </div>
+
+    <!-- ══ HERHAALREGELS (Fase 4) ══ -->
+    <div class="page" id="page-herhaal">
+      <div class="card">
+        <div class="card-hdr">
+          <h2>Herhaalregels</h2>
+          <div class="filter-bar">
+            <span id="herhaal-sub" style="font-size:12px;color:var(--mut)"></span>
+            <button class="btn btn-pri btn-sm" id="btn-add-herhaal"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Nieuwe herhaalregel</button>
+          </div>
+        </div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th>Taak</th><th>VvE</th><th>Wie</th><th>Herhaling</th><th>Volgende keer</th><th>Status</th><th></th></tr></thead>
+          <tbody id="herhaal-tbody"></tbody>
+        </table></div>
       </div>
     </div>
 
@@ -572,6 +593,50 @@
     <div class="modal-ft">
       <button class="btn btn-sec" id="complete-cancel">Annuleren</button>
       <button class="btn btn-pri" id="complete-confirm" style="background:var(--gn)">✓ Afhandelen</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ HERHAALREGEL MODAL — Fase 4 ═══════ -->
+<div class="modal-bg" id="hh-bg">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-hdr">
+      <h2 id="hh-title">Nieuwe herhaalregel</h2>
+      <button class="modal-close" id="hh-close">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="fld"><label>Taakomschrijving *</label><input type="text" id="hh-omschrijving" placeholder="bijv. Servicekosten controleren"/></div>
+      <div class="fld-row">
+        <div class="fld">
+          <label>VvE Code *</label>
+          <div class="vve-wrap">
+            <input type="text" id="hh-code" placeholder="Typ code of naam…" autocomplete="off"/>
+            <div class="vve-suggestions" id="hh-vve-sug"></div>
+          </div>
+        </div>
+        <div class="fld"><label>VvE Naam</label><input type="text" id="hh-naam" placeholder="Automatisch ingevuld" readonly style="opacity:.7"/></div>
+      </div>
+      <div class="fld-row">
+        <div class="fld"><label>Sectie</label><select id="hh-sectie"><option>OPPAKKEN</option><option>LOD</option></select></div>
+        <div class="fld"><label>Behandelaar</label><select id="hh-beh"><option value="">–</option><option>Jer</option><option>Cihad</option><option>Gabos</option><option>Cihad, Jer</option></select></div>
+      </div>
+      <div class="fld-row">
+        <div class="fld"><label>Herhaling</label><select id="hh-type">
+          <option value="week">Elke week</option><option value="maand">Elke maand</option>
+          <option value="kwartaal" selected>Elk kwartaal</option><option value="halfjaar">Elk half jaar</option>
+          <option value="jaar">Elk jaar</option><option value="na-afronden">X maanden na afronden</option>
+        </select></div>
+        <div class="fld" id="hh-interval-fld" style="display:none"><label>Aantal maanden</label><input type="number" id="hh-interval" min="1" value="6"/></div>
+      </div>
+      <div class="fld-row">
+        <div class="fld" id="hh-deadline-fld"><label>Eerstvolgende deadline *</label><input type="date" id="hh-deadline"/></div>
+        <div class="fld"><label>Dagen vooraf zichtbaar</label><input type="number" id="hh-vooraf" min="0" value="14"/></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-sec" id="hh-cancel">Annuleren</button>
+      <button class="btn btn-del" id="hh-del" style="display:none" data-action="herhaal-verwijderen">🗑️ Verwijder</button>
+      <button class="btn btn-pri" id="hh-submit"><span id="hh-submit-lbl">Toevoegen</span></button>
     </div>
   </div>
 </div>

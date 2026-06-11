@@ -5,6 +5,7 @@ import { PAGE_META } from "./config.js";
 import { state } from "./state.js";
 import { buildAnalytics, buildDash } from "./render-analytics.js";
 import { renderOntw, renderLogboek } from "./render-overig.js";
+import { renderHerhaal } from "./render-herhaal.js";
 import { showToast } from "./notifications.js";
 
 function goTo(page){
@@ -16,6 +17,7 @@ function goTo(page){
   document.getElementById('btn-add').style.display=page==='ntd'?'inline-flex':'none';
   if(page==='ontw') renderOntw();
   if(page==='logboek') renderLogboek();
+  if(page==='herhaal') renderHerhaal();
   closeSb();
   if(page==='analytics') buildAnalytics();
   if(page==='dash') buildDash();

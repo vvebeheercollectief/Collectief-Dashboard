@@ -8,6 +8,7 @@ import { ensureToken } from "./auth.js";
 import { getSheetIds } from "./crud.js";
 import { logEvent } from "./render-overig.js";
 import { showToast } from "./notifications.js";
+import { bulkGeselecteerd, bulkWis, renderBulkUi } from "./bulk.js";
 
 // ══════════════════════════════════════
 //  NTD STATS
@@ -107,11 +108,11 @@ function renderNtd(){
   SECS[state.activeNtd].css.split(';').forEach(p=>{const[k,v]=p.split(':');if(k&&v)card.style.setProperty(k.trim(),v.trim())});
 
   const rows=filterNtd(D.ntd[state.activeNtd]||[],q,fCode,fBeh,fPrio,state.activeNtd);
-  renderThead('ntd-thead',[...SECS[state.activeNtd].cols,''],SECS[state.activeNtd].css);
+  renderThead('ntd-thead',[...(state.bulkMode?['']:[]),...SECS[state.activeNtd].cols,''],SECS[state.activeNtd].css);
   renderTbody('ntd-tbody',rows,state.activeNtd,pgs.ntd,false);
   renderPag('ntd-pag',rows.length,pgs.ntd,'ntd');
 }
-function setNtd(s){state.activeNtd=s;pgs.ntd=1;renderNtd()}
+function setNtd(s){state.activeNtd=s;pgs.ntd=1;bulkWis();renderNtd();renderBulkUi()}
 function filterNtd(rows,q,fCode,beh,prio,sec){
   return rows.filter(r=>{
     if(q&&!SECS[sec].keys.some(k=>(r[k]||'').toLowerCase().includes(q))) return false;
@@ -318,7 +319,7 @@ function renderTbody(tbodyId,rows,sec,page,isAf){
   const main=sl.filter(r=>grpOf(r)===0);
   const ib=sl.filter(r=>grpOf(r)===1);
   const wg=sl.filter(r=>grpOf(r)===2);
-  const cols=SECS[sec].cols.length+1;
+  const cols=SECS[sec].cols.length+1+(state.bulkMode?1:0);
   let html=main.map(r=>rowNtd(r,sec)).join('');
   if(ib.length){
     html+=`<tr><td colspan="${cols}" style="background:var(--ac-l);padding:8px 13px;font-size:11px;font-weight:700;color:var(--ac);text-transform:uppercase;letter-spacing:.05em;border:none">⟳ In behandeling (${ib.length})</td></tr>`;
@@ -356,6 +357,9 @@ function deadlineCel(r, sec){
 function rowNtd(r,sec){
   const css=SECS[sec].css;
   const rid=state._rowCache.length; state._rowCache.push(r);
+  const bulkCel=state.bulkMode
+    ?`<td class="bulk-cel"><span class="cb${bulkGeselecteerd(r)?' aan':''}" data-action="bulk-vink" data-rid="${rid}" role="checkbox" aria-checked="${bulkGeselecteerd(r)}"></span></td>`
+    :'';
   const editBtn=`<button class="btn-edit" data-action="taak-bewerken" data-rid="${rid}" title="Bewerken"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><button class="btn-edit" data-action="taak-wegleggen" data-rid="${rid}" title="Wegleggen / opvolgdatum"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 13.5"/></svg></button><button class="btn-done" data-action="taak-afronden" data-rid="${rid}" title="Afgehandeld"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></button>`;
   let cells='';
   const _stilDagen = bepaalStil(r, sec);
@@ -423,7 +427,7 @@ function rowNtd(r,sec){
     rowTeLaat ? 'row-telaat' : '',
     ov.weggelegd ? 'snooze-row' : ''
   ].filter(Boolean).join(' ');
-  return `<tr class="${rowCls}" data-row="${r._row}">${cells}</tr>`;
+  return `<tr class="${rowCls}" data-row="${r._row}">${bulkCel}${cells}</tr>`;
 }
 
 function rowAf(r,sec){

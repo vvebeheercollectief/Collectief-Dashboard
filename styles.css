@@ -531,3 +531,26 @@
     .pal-voet{display:flex;gap:16px;padding:8px 17px;border-top:1px solid var(--bor);background:var(--sur2);font-size:11px;color:var(--mut)}
     .pal-voet b{font-weight:700;border:1px solid var(--bor);background:var(--sur);border-radius:4px;padding:0 5px;font-size:10px}
     .pal-leeg{padding:22px;text-align:center;color:var(--mut);font-size:13px}
+
+    /* ── Bulk-acties (Fase 5) ── */
+    .bulk-teller{font-size:12px;font-weight:800;color:var(--ac);background:var(--ac-l);border:1px solid var(--ac-b);border-radius:20px;padding:4px 12px;white-space:nowrap}
+    #bulk-btn.on{background:var(--ac-l);border-color:var(--ac-b);color:var(--ac)}
+    .bulk-cel{width:34px}
+    .cb{width:16px;height:16px;border:2px solid var(--bor);border-radius:4px;display:inline-block;vertical-align:middle;background:var(--sur);cursor:pointer;position:relative;transition:all var(--tr)}
+    .cb:hover{border-color:var(--ac)}
+    .cb.aan{background:var(--ac);border-color:var(--ac)}
+    .cb.aan::after{content:'✓';position:absolute;color:#fff;font-size:11px;font-weight:800;left:2px;top:-3px}
+    #bulk-balk{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:600;background:var(--nv);color:#fff;border-radius:14px;box-shadow:var(--shl);display:flex;align-items:center;gap:4px;padding:9px 13px}
+    .bb-knop{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:#fff;border-radius:8px;padding:7px 11px;background:transparent;white-space:nowrap;transition:background var(--tr)}
+    .bb-knop:hover{background:rgba(255,255,255,.12)}
+    .bb-groen{background:var(--gn)}
+    .bb-rood{color:#FCA5A5}
+    .bb-x{margin-left:4px;opacity:.7;font-size:15px;padding:7px 8px}
+    .bb-wrap{position:relative}
+    .bb-menu{display:none;position:absolute;bottom:calc(100% + 8px);left:0;background:var(--sur);color:var(--txt);border:1px solid var(--bor);border-radius:10px;box-shadow:var(--shm);padding:6px;min-width:170px;flex-direction:column;gap:2px}
+    .bb-menu.open{display:flex}
+    .bb-menu > button{text-align:left;font-size:13px;font-weight:600;padding:7px 10px;border-radius:7px;color:var(--txt)}
+    .bb-menu > button:hover{background:var(--sur2)}
+    .bb-datum{display:flex;gap:6px;padding:6px 4px 2px;border-top:1px solid var(--bor);margin-top:4px}
+    .bb-datum input{flex:1;border:1px solid var(--bor);border-radius:7px;padding:5px 7px;font-size:12px;background:var(--sur2);color:var(--txt)}
+    .bb-datum button{font-size:12px;font-weight:700;background:var(--ac);color:#fff;border-radius:7px;padding:5px 11px}

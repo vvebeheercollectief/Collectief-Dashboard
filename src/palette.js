@@ -8,6 +8,7 @@ import { goTo } from "./ui.js";
 import { openModal } from "./crud.js";
 import { openVvePagina, vveOverzicht } from "./render-vve.js";
 import { logZin } from "./render-overig.js";
+import { toggleBulkMode } from "./bulk.js";
 
 const PAL_MAX = { vves:3, taken:5, afgerond:3, logboek:3 };
 
@@ -123,6 +124,7 @@ function initPalette(){
   document.addEventListener('keydown',e=>{
     if((e.ctrlKey||e.metaKey)&&(e.key==='k'||e.key==='K')){ e.preventDefault(); palOpen()?closePalette():openPalette(); }
     else if(e.key==='Escape'&&palOpen()){ closePalette(); }
+    else if(e.key==='Escape'&&state.bulkMode){ toggleBulkMode(); }
   });
 }
 

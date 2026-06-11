@@ -142,6 +142,8 @@
             </div>
             <select class="filter-select" id="f-beh-ntd"><option value="">Alle behandelaars</option><option>Jer</option><option>Cihad</option><option>Gabos</option></select>
             <select class="filter-select" id="f-prio-ntd"><option value="">Alle prioriteiten</option><option>Hoog</option><option>Midden</option><option>Laag</option></select>
+            <span id="bulk-teller" class="bulk-teller" style="display:none">0 geselecteerd</span>
+            <button class="btn btn-sec btn-sm" id="bulk-btn" data-action="bulk-toggle" title="Meerdere taken selecteren">☑ Selecteren</button>
             <button class="btn btn-pri btn-sm" id="btn-add"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Toevoegen</button>
           </div>
         </div>
@@ -669,6 +671,37 @@
       <button class="btn btn-pri" id="snooze-opslaan">⏸ Wegleggen</button>
     </div>
   </div>
+</div>
+
+<!-- ═══════ BULK-ACTIEBALK (Fase 5) ═══════ -->
+<div id="bulk-balk" style="display:none">
+  <button class="bb-knop bb-groen" data-action="bulk-doe" data-wat="afronden">✓ Afronden</button>
+  <div class="bb-wrap">
+    <button class="bb-knop" data-action="bulk-menu" data-menu="geven">👤 Aan iemand geven ▾</button>
+    <div class="bb-menu" id="bb-menu-geven">
+      <button data-action="bulk-doe" data-wat="geven" data-naam="Jer">Jer</button>
+      <button data-action="bulk-doe" data-wat="geven" data-naam="Cihad">Cihad</button>
+      <button data-action="bulk-doe" data-wat="geven" data-naam="Gabos">Gabos</button>
+      <button data-action="bulk-doe" data-wat="geven" data-naam="Cihan">Cihan</button>
+    </div>
+  </div>
+  <div class="bb-wrap">
+    <button class="bb-knop" data-action="bulk-menu" data-menu="wegleggen">🔕 Wegleggen ▾</button>
+    <div class="bb-menu" id="bb-menu-wegleggen">
+      <button data-action="bulk-doe" data-wat="wegleggen" data-dagen="3">+3 dagen</button>
+      <button data-action="bulk-doe" data-wat="wegleggen" data-dagen="7">+1 week</button>
+      <button data-action="bulk-doe" data-wat="wegleggen" data-dagen="14">+2 weken</button>
+      <div class="bb-datum"><input type="date" id="bb-datum-weg"><button data-action="bulk-doe" data-wat="wegleggen">OK</button></div>
+    </div>
+  </div>
+  <div class="bb-wrap">
+    <button class="bb-knop" data-action="bulk-menu" data-menu="deadline">📅 Deadline ▾</button>
+    <div class="bb-menu" id="bb-menu-deadline">
+      <div class="bb-datum"><input type="date" id="bb-datum-dl"><button data-action="bulk-doe" data-wat="deadline">OK</button></div>
+    </div>
+  </div>
+  <button class="bb-knop bb-rood" data-action="bulk-doe" data-wat="verwijderen">🗑 Verwijderen</button>
+  <button class="bb-knop bb-x" data-action="bulk-toggle" title="Selecteren uit">✕</button>
 </div>
 
 <!-- ═══════ COMMANDOCENTRUM (Fase 5) ═══════ -->

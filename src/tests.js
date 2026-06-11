@@ -178,6 +178,9 @@ import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
   eq('bulk deadline-kolom OFF',      BULK_DEADLINE_KOLOM['OFFERTE-TRAJECTEN'], 'F');
   eq('bulk deadline-kolom LOD',      BULK_DEADLINE_KOLOM['LOD'], 'F');
 
+  // ── chart.js lazy-load ── (Fase 5: niet meer vooraf geladen)
+  truthy('chart.js niet vooraf geladen', typeof window.Chart === 'undefined');
+
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');
   window._testResult = `${totOk} OK, ${totFail} FAIL`; // uitleesbaar voor test-automatisering

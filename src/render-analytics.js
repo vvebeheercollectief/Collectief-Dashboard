@@ -8,6 +8,21 @@ import { state, D } from "./state.js";
 // ══════════════════════════════════════
 //  ANALYTICS — Productiviteits-tracker
 // ══════════════════════════════════════
+// ── Chart.js lazy-load (Fase 5): pas laden bij eerste bezoek statistiek/dashboard ──
+let _chartJsPromise=null;
+function ensureChartJs(){
+  if(window.Chart) return Promise.resolve();
+  if(_chartJsPromise) return _chartJsPromise;
+  _chartJsPromise=new Promise((res,rej)=>{
+    const s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+    s.onload=res;
+    s.onerror=()=>{ _chartJsPromise=null; rej(new Error('Chart.js laden mislukt')); };
+    document.head.appendChild(s);
+  });
+  return _chartJsPromise;
+}
+
 const PERIODS=['dag','week','maand','kwartaal'];
 const MAAND_KORT=['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
 const PERIODE_LABEL_NU={dag:'vandaag',week:'deze week',maand:'deze maand',kwartaal:'dit kwartaal'};
@@ -302,6 +317,7 @@ function renderMetricToggle(){
 function _try(label,fn){try{fn()}catch(e){console.error('[Analytics]',label,e)}}
 
 function buildAnalytics(){
+  if(!window.Chart){ ensureChartJs().then(buildAnalytics).catch(e=>console.warn(e)); return; }
   _try('periode-bar',()=>renderPeriodBar());
   _try('metric-toggle',()=>renderMetricToggle());
 
@@ -535,6 +551,7 @@ function renderHeroDonut(){
 }
 
 function buildDash(){
+  if(!window.Chart){ ensureChartJs().then(buildDash).catch(e=>console.warn(e)); return; }
   const uitnD=D.alvo.filter(r=>r.uitnodiging).length;
   const notulenD=D.alvo.filter(r=>r.notulen).length;
   const ntdTotal=SKEYS.reduce((s,k)=>s+(D.ntd[k]?.length||0),0);

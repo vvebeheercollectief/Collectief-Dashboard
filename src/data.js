@@ -115,10 +115,10 @@ function parseSections(rows){
     const afOff=Math.max(keys.length,8);
     entry.datum=(row[afOff]||'').trim();
     entry.opmerking=(row[afOff+1]||'').trim();
-    entry.subcategorie=(row[afOff+2]||'').trim();
-    // L/M/N — Fase 4. Checkbox-erfenis (rijen erven TRUE/FALSE-validatie) telt als leeg.
+    // Checkbox-erfenis (rijen erven TRUE/FALSE-validatie in K/L/M/N) telt als leeg.
     const _f4v=v=>{v=((v||'')+'').trim();return (v.toUpperCase()==='FALSE'||v.toUpperCase()==='TRUE')?'':v;};
-    entry.opvolgdatum=_f4v(row[11]);  // L
+    entry.subcategorie=_f4v(row[afOff+2]);
+    entry.opvolgdatum=_f4v(row[11]);  // L — Fase 4
     entry.herhaalId  =_f4v(row[12]);  // M
     entry.esc        =_f4v(row[13]);  // N (alleen door Apps Script geschreven)
     if(entry.code) out[cur].push(entry);

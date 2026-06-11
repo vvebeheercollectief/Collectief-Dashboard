@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup — Ctrl+K commandocentrum (Fase 5)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F0F2F5;--sur:#fff;--sur2:#F7F8FA;--bor:#e2e8f0;
+    --txt:#0f172a;--mut:#64748b;
+    --r:12px;--rs:8px;--sh:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.05);
+    --am:#B45309;--am-l:#fef3c7;--pu:#6D5BD0;--pu-l:#EEEAFD;
+    --rd:#B91C1C;--rd-l:#fee2e2;--gn:#047857;--gn-l:#d1fae5;
+    --bl:#1D4ED8;--bl-l:#dbeafe;
+    --ac:#0D7377;--ac-l:#CCFBF1;--ac-b:#5EEAD4;
+    --navy:#2B3544;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);line-height:1.5;font-size:14px}
+  .wrap{max-width:1100px;margin:0 auto;padding:28px 20px 90px}
+  .top{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+  .logo-dot{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,var(--navy),var(--ac));flex-shrink:0}
+  h1{font-size:22px;font-weight:800;margin:0;letter-spacing:-.01em}
+  .lead{color:var(--mut);font-size:14px;margin:2px 0 28px;max-width:760px}
+
+  .panel{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);box-shadow:var(--sh);margin-bottom:34px;overflow:hidden}
+  .panel-hd{padding:15px 20px;border-bottom:1px solid var(--bor);background:var(--sur2)}
+  .panel-hd h2{font-size:16px;font-weight:800;margin:0}
+  .panel-hd p{margin:6px 0 0;font-size:13px;color:var(--mut)}
+  .panel-bd{padding:24px 20px;background:linear-gradient(180deg,#3b4658 0%,#2B3544 100%)}
+
+  /* het palette zelf */
+  .pal{max-width:620px;margin:0 auto;background:var(--sur);border-radius:14px;box-shadow:0 24px 60px rgba(0,0,0,.35);overflow:hidden}
+  .pal-zoek{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--bor)}
+  .pal-zoek .lens{width:18px;height:18px;border:2.5px solid var(--mut);border-radius:50%;position:relative;flex-shrink:0}
+  .pal-zoek .lens:after{content:"";position:absolute;width:7px;height:2.5px;background:var(--mut);transform:rotate(45deg);bottom:-3px;right:-5px;border-radius:2px}
+  .pal-zoek input{border:none;outline:none;font-family:inherit;font-size:16px;flex:1;color:var(--txt)}
+  .pal-zoek .esc{font-size:10.5px;font-weight:700;color:var(--mut);border:1px solid var(--bor);border-radius:5px;padding:2px 6px;background:var(--sur2)}
+  .pal-bd{max-height:430px;overflow:hidden;padding-bottom:6px}
+  .groep{padding:10px 8px 2px}
+  .groep-kop{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--mut);padding:0 12px 4px}
+  .res{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:9px;font-size:13.5px}
+  .res.actief{background:var(--ac-l);outline:1.5px solid var(--ac-b)}
+  .res .ico{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0}
+  .ico-vve{background:var(--ac-l);color:var(--ac);font-size:10.5px}
+  .ico-taak{background:var(--bl-l);color:var(--bl)}
+  .ico-af{background:var(--gn-l);color:var(--gn)}
+  .ico-log{background:var(--sur2);color:var(--mut);border:1px solid var(--bor)}
+  .ico-act{background:var(--navy);color:#fff}
+  .res .tekst{flex:1;min-width:0}
+  .res .tekst b{display:block;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .res .tekst span{font-size:11.5px;color:var(--mut);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .res .hint{font-size:11px;color:var(--mut);white-space:nowrap}
+  .badge{display:inline-flex;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:700;white-space:nowrap}
+  .b-telaat{background:var(--rd-l);color:var(--rd)} .b-af{background:var(--gn-l);color:var(--gn)}
+  .pal-voet{display:flex;gap:16px;padding:9px 18px;border-top:1px solid var(--bor);background:var(--sur2);font-size:11px;color:var(--mut)}
+  .pal-voet b{font-weight:700;border:1px solid var(--bor);background:var(--sur);border-radius:4px;padding:0 5px;font-size:10px}
+
+  .uitleg{font-size:12.5px;color:#cbd5e1;text-align:center;margin:14px auto 0;max-width:560px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="logo-dot"></div>
+    <h1>Mockup — Ctrl+K commandocentrum</h1>
+  </div>
+  <p class="lead">Druk op <b>Ctrl+K</b> (of klik op de zoekknop in de bovenbalk) → dit venster verschijnt midden op het scherm. Typ iets en de resultaten verschijnen direct, gegroepeerd per soort. Pijltjestoetsen + Enter, of gewoon klikken. Hieronder twee voorbeeldsituaties.</p>
+
+  <!-- ===== Situatie 1: VvE-code ===== -->
+  <div class="panel">
+    <div class="panel-hd">
+      <h2>Situatie 1 — Iemand belt: je typt de VvE-code "2114"</h2>
+      <p>Bovenaan de VvE zelf (Enter = per-VvE-pagina), daaronder alles wat bij die VvE speelt.</p>
+    </div>
+    <div class="panel-bd">
+      <div class="pal">
+        <div class="pal-zoek"><span class="lens"></span><input value="2114"><span class="esc">ESC</span></div>
+        <div class="pal-bd">
+          <div class="groep">
+            <div class="groep-kop">VvE</div>
+            <div class="res actief"><span class="ico ico-vve">2114</span><div class="tekst"><b>VvE Lindenhof — Wateringen</b><span>4 open · 1 te laat · laatste activiteit 2 d geleden</span></div><span class="hint">Enter → VvE-pagina</span></div>
+          </div>
+          <div class="groep">
+            <div class="groep-kop">Open taken van 2114</div>
+            <div class="res"><span class="ico ico-taak">○</span><div class="tekst"><b>Offerte dakrenovatie beoordelen</b><span>Jer · Offerte-traject</span></div><span class="badge b-telaat">Te laat (3d)</span></div>
+            <div class="res"><span class="ico ico-taak">○</span><div class="tekst"><b>Lekkage parkeergarage opvolgen</b><span>Jer · Oppakken · 30 jun</span></div></div>
+          </div>
+          <div class="groep">
+            <div class="groep-kop">Laatste logboek-regel</div>
+            <div class="res"><span class="ico ico-log">✎</span><div class="tekst"><b>Cihad: "loodgieter komt di langs"</b><span>bij "Lekkage parkeergarage" · 4 d geleden</span></div></div>
+          </div>
+        </div>
+        <div class="pal-voet"><span><b>↑↓</b> kiezen</span><span><b>Enter</b> openen</span><span><b>Esc</b> sluiten</span></div>
+      </div>
+      <p class="uitleg">Je ziet hier in één klap: wie de VvE is, wat er open staat, en wat de laatste handeling was — nog vóór je doorklikt.</p>
+    </div>
+  </div>
+
+  <!-- ===== Situatie 2: zoekwoord ===== -->
+  <div class="panel">
+    <div class="panel-hd">
+      <h2>Situatie 2 — Je zoekt op een woord: "dak"</h2>
+      <p>Resultaten uit álle hoeken: open taken, afgerond werk, logboek én acties. De groepjes houden het overzichtelijk.</p>
+    </div>
+    <div class="panel-bd">
+      <div class="pal">
+        <div class="pal-zoek"><span class="lens"></span><input value="dak"><span class="esc">ESC</span></div>
+        <div class="pal-bd">
+          <div class="groep">
+            <div class="groep-kop">Open taken</div>
+            <div class="res actief"><span class="ico ico-taak">○</span><div class="tekst"><b>Offerte <u>dak</u>renovatie beoordelen</b><span>2114 Lindenhof · Jer</span></div><span class="badge b-telaat">Te laat (3d)</span></div>
+            <div class="res"><span class="ico ico-taak">○</span><div class="tekst"><b><u>Dak</u>inspectie inplannen na storm</b><span>3007 Parkzicht · Cihad · 2 jul</span></div></div>
+          </div>
+          <div class="groep">
+            <div class="groep-kop">Afgerond</div>
+            <div class="res"><span class="ico ico-af">✓</span><div class="tekst"><b><u>Dak</u>goot reiniging geaccordeerd</b><span>1820 De Vliet · afgerond 14 apr door Jer</span></div><span class="badge b-af">✓ 14 apr</span></div>
+          </div>
+          <div class="groep">
+            <div class="groep-kop">Logboek</div>
+            <div class="res"><span class="ico ico-log">✎</span><div class="tekst"><b>Jer: "<u>dak</u>dekker gebeld, offerte volgt"</b><span>bij 2114 · 8 d geleden</span></div></div>
+          </div>
+          <div class="groep">
+            <div class="groep-kop">Acties</div>
+            <div class="res"><span class="ico ico-act">+</span><div class="tekst"><b>Nieuwe taak aanmaken met "dak"…</b></div><span class="hint">opent invulscherm</span></div>
+          </div>
+        </div>
+        <div class="pal-voet"><span><b>↑↓</b> kiezen</span><span><b>Enter</b> openen</span><span><b>Esc</b> sluiten</span></div>
+      </div>
+      <p class="uitleg">Leeg venster (nog niets getypt) toont straks snelkoppelingen: "Nieuwe taak", "Ga naar statistieken", "Ga naar herhaalregels", plus je 3 laatst bezochte VvE's.</p>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

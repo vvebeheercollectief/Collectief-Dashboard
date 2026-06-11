@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup — Per-VvE overzichtspagina (Fase 5)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F0F2F5;--sur:#fff;--sur2:#F7F8FA;--bor:#e2e8f0;
+    --txt:#0f172a;--mut:#64748b;
+    --r:12px;--rs:8px;--sh:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.05);
+    --am:#B45309;--am-l:#fef3c7;--pu:#6D5BD0;--pu-l:#EEEAFD;
+    --rd:#B91C1C;--rd-l:#fee2e2;--gn:#047857;--gn-l:#d1fae5;
+    --bl:#1D4ED8;--bl-l:#dbeafe;
+    --ac:#0D7377;--ac-l:#CCFBF1;--ac-b:#5EEAD4;--ac-900:#064E50;
+    --navy:#2B3544;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--txt);line-height:1.5;font-size:14px}
+  .wrap{max-width:1100px;margin:0 auto;padding:28px 20px 90px}
+  .top{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+  .logo-dot{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,var(--navy),var(--ac));flex-shrink:0}
+  h1{font-size:22px;font-weight:800;margin:0;letter-spacing:-.01em}
+  .lead{color:var(--mut);font-size:14px;margin:2px 0 28px;max-width:720px}
+
+  .panel{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);box-shadow:var(--sh);margin-bottom:34px;overflow:hidden}
+  .panel-hd{padding:15px 20px;border-bottom:1px solid var(--bor);background:var(--sur2)}
+  .panel-hd h2{font-size:16px;font-weight:800;margin:0;display:flex;align-items:center;gap:9px}
+  .tag{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:3px 9px;border-radius:20px}
+  .tag-a{background:var(--ac-l);color:var(--ac)}
+  .tag-b{background:var(--pu-l);color:var(--pu)}
+  .panel-hd p{margin:6px 0 0;font-size:13px;color:var(--mut)}
+  .panel-bd{padding:20px}
+
+  /* ====== gedeelde dashboard-elementen ====== */
+  .vve-kop{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:16px}
+  .vve-naam{display:flex;align-items:center;gap:12px}
+  .vve-naam .code{font-size:15px;font-weight:800;color:var(--ac);background:var(--ac-l);padding:5px 11px;border-radius:8px;letter-spacing:.02em}
+  .vve-naam h3{margin:0;font-size:19px;font-weight:800}
+  .vve-naam .sub{font-size:12.5px;color:var(--mut);margin-top:1px}
+  .kerncijfers{display:flex;gap:10px;flex-wrap:wrap}
+  .kc{background:var(--sur);border:1px solid var(--bor);border-radius:10px;padding:8px 14px;text-align:center;min-width:84px}
+  .kc b{display:block;font-size:19px;font-weight:800;line-height:1.2}
+  .kc span{font-size:11px;color:var(--mut);font-weight:600}
+  .kc.rood b{color:var(--rd)} .kc.teal b{color:var(--ac)} .kc.grijs b{color:var(--mut)}
+
+  .sectie-kop{font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:18px 0 8px;display:flex;align-items:center;gap:8px}
+  .sectie-kop .n{background:var(--sur2);border:1px solid var(--bor);border-radius:20px;padding:0 8px;font-size:11px;color:var(--txt)}
+
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  thead th{background:var(--ac-l);padding:7px 10px;text-align:left;font-size:10.5px;font-weight:700;color:var(--ac);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--ac-b);white-space:nowrap}
+  tbody tr{border-bottom:1px solid var(--bor)}
+  tbody tr:last-child{border-bottom:none}
+  td{padding:8px 10px;vertical-align:middle}
+  .badge{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:700;white-space:nowrap}
+  .b-opp{background:var(--bl-l);color:var(--bl)} .b-verg{background:var(--am-l);color:var(--am)}
+  .b-off{background:var(--pu-l);color:var(--pu)} .b-lod{background:var(--rd-l);color:var(--rd)}
+  .b-telaat{background:var(--rd-l);color:var(--rd)} .b-weg{background:var(--sur2);color:var(--mut);border:1px solid var(--bor)}
+  .b-af{background:var(--gn-l);color:var(--gn)}
+  .wie{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:12px}
+  .av{width:20px;height:20px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:800;color:#fff}
+  .av-j{background:var(--ac)} .av-c{background:var(--pu)}
+  .mutc{color:var(--mut);font-size:12px;white-space:nowrap}
+
+  /* tijdlijn */
+  .tl{list-style:none;margin:0;padding:0}
+  .tl li{display:flex;gap:10px;padding:7px 0;border-bottom:1px dashed var(--bor);font-size:12.5px}
+  .tl li:last-child{border-bottom:none}
+  .tl .av{flex-shrink:0;margin-top:1px}
+  .tl .t{color:var(--mut);font-size:11px;white-space:nowrap;margin-left:auto;padding-left:8px}
+
+  /* Variant A: twee kolommen */
+  .grid-a{display:grid;grid-template-columns:1.6fr 1fr;gap:20px}
+  .kaart{background:var(--sur);border:1px solid var(--bor);border-radius:10px;padding:14px 16px}
+  .kaart h4{margin:0 0 4px;font-size:13.5px;font-weight:800}
+
+  /* Variant B: tabbladen */
+  .tabs{display:flex;gap:4px;border-bottom:2px solid var(--bor);margin:14px 0 0}
+  .tab{padding:9px 16px;font-size:13px;font-weight:700;color:var(--mut);border-radius:8px 8px 0 0;cursor:default;position:relative}
+  .tab.actief{color:var(--ac);background:var(--ac-l)}
+  .tab.actief:after{content:"";position:absolute;left:0;right:0;bottom:-2px;height:2px;background:var(--ac)}
+  .tab .n{font-size:11px;background:var(--sur2);border:1px solid var(--bor);border-radius:20px;padding:0 7px;margin-left:5px;color:var(--txt)}
+
+  .alv-rij{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px dashed var(--bor);font-size:12.5px}
+  .alv-rij:last-child{border-bottom:none}
+  .alv-dat{background:var(--navy);color:#fff;border-radius:8px;padding:4px 9px;font-size:11px;font-weight:800;text-align:center;line-height:1.25;min-width:46px}
+  .alv-dat span{display:block;font-size:9.5px;font-weight:600;opacity:.75}
+
+  .voetnoot{font-size:12px;color:var(--mut);background:var(--am-l);border:1px solid #fde68a;border-radius:8px;padding:8px 12px;margin-top:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="logo-dot"></div>
+    <h1>Mockup — Per-VvE overzichtspagina</h1>
+  </div>
+  <p class="lead">Fase 5: alles van één VvE op één scherm. Hieronder twee indelingsvarianten met dezelfde (fictieve) inhoud voor VvE 2114. <b>Welke werkt voor jou het prettigst?</b></p>
+
+  <!-- ============ VARIANT A ============ -->
+  <div class="panel">
+    <div class="panel-hd">
+      <h2>Variant A — Alles in één oogopslag <span class="tag tag-a">twee kolommen</span></h2>
+      <p>Links het werk (open, weggelegd, afgerond), rechts het dossier (ALV's + recente activiteit). Geen klik nodig: bij een telefoontje zie je álles direct staan.</p>
+    </div>
+    <div class="panel-bd">
+
+      <div class="vve-kop">
+        <div class="vve-naam">
+          <span class="code">2114</span>
+          <div>
+            <h3>VvE Lindenhof</h3>
+            <div class="sub">Wateringen · behandelaars: Jer &amp; Cihad</div>
+          </div>
+        </div>
+        <div class="kerncijfers">
+          <div class="kc teal"><b>4</b><span>open taken</span></div>
+          <div class="kc rood"><b>1</b><span>te laat</span></div>
+          <div class="kc grijs"><b>1</b><span>weggelegd</span></div>
+          <div class="kc"><b>2 d</b><span>laatste activiteit</span></div>
+        </div>
+      </div>
+
+      <div class="grid-a">
+        <div>
+          <div class="sectie-kop">Open taken <span class="n">4</span></div>
+          <table>
+            <thead><tr><th>Taak</th><th>Cat.</th><th>Wie</th><th>Deadline</th></tr></thead>
+            <tbody>
+              <tr><td>Offerte dakrenovatie beoordelen</td><td><span class="badge b-off">Offerte</span></td><td><span class="wie"><span class="av av-j">J</span>Jer</span></td><td><span class="badge b-telaat">Te laat (3d)</span></td></tr>
+              <tr><td>Vergaderverzoek najaars-ALV inplannen</td><td><span class="badge b-verg">Verg.</span></td><td><span class="wie"><span class="av av-c">C</span>Cihad</span></td><td class="mutc">24 jun</td></tr>
+              <tr><td>Lekkage parkeergarage opvolgen</td><td><span class="badge b-opp">Oppakken</span></td><td><span class="wie"><span class="av av-j">J</span>Jer</span></td><td class="mutc">30 jun</td></tr>
+              <tr><td>Ingebrekestelling schilder versturen</td><td><span class="badge b-lod">LOD</span></td><td><span class="wie"><span class="av av-c">C</span>Cihad</span></td><td class="mutc">15 aug</td></tr>
+            </tbody>
+          </table>
+
+          <div class="sectie-kop">Weggelegd <span class="n">1</span></div>
+          <table>
+            <tbody>
+              <tr><td style="color:var(--mut)">Reservefonds-advies bespreken</td><td><span class="badge b-weg">🔕 terug op 1 sep</span></td></tr>
+            </tbody>
+          </table>
+
+          <div class="sectie-kop">Laatst afgerond <span class="n">23</span></div>
+          <table>
+            <tbody>
+              <tr><td>Jaarstukken 2025 verstuurd</td><td><span class="badge b-af">✓ 5 jun</span></td><td class="mutc">Cihad</td></tr>
+              <tr><td>Offerte schoonmaak geaccordeerd</td><td><span class="badge b-af">✓ 28 mei</span></td><td class="mutc">Jer</td></tr>
+              <tr><td class="mutc" colspan="2">… alle 23 tonen</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div>
+          <div class="sectie-kop">ALV's</div>
+          <div class="kaart">
+            <div class="alv-rij"><div class="alv-dat">17<span>SEP</span></div><div>Najaars-ALV · 19:30<br><span class="mutc">Verenigingsgebouw De Linde</span></div></div>
+            <div class="alv-rij"><div class="alv-dat" style="background:var(--bor);color:var(--mut)">12<span>MRT</span></div><div style="color:var(--mut)">Voorjaars-ALV · geweest</div></div>
+          </div>
+
+          <div class="sectie-kop">Recente activiteit</div>
+          <div class="kaart">
+            <ul class="tl">
+              <li><span class="av av-j">J</span><div>Jer rondde <b>"Jaarstukken 2025"</b> af</div><span class="t">2 d</span></li>
+              <li><span class="av av-c">C</span><div>Cihad zette notitie bij <b>"Lekkage garage"</b>: <i>"loodgieter komt di langs"</i></div><span class="t">4 d</span></li>
+              <li><span class="av av-j">J</span><div>Jer maakte <b>"Offerte dakrenovatie"</b> aan</div><span class="t">8 d</span></li>
+              <li><span class="av av-c">C</span><div>Cihad legde <b>"Reservefonds-advies"</b> weg tot 1 sep</div><span class="t">12 d</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ============ VARIANT B ============ -->
+  <div class="panel">
+    <div class="panel-hd">
+      <h2>Variant B — Compacte kop met tabbladen <span class="tag tag-b">tabbladen</span></h2>
+      <p>Zelfde kop met kerncijfers, daaronder tabbladen: standaard zie je alleen de open taken, en je klikt voor afgerond / ALV's / activiteit. Rustiger beeld, maar één klik extra.</p>
+    </div>
+    <div class="panel-bd">
+
+      <div class="vve-kop">
+        <div class="vve-naam">
+          <span class="code">2114</span>
+          <div>
+            <h3>VvE Lindenhof</h3>
+            <div class="sub">Wateringen · behandelaars: Jer &amp; Cihad</div>
+          </div>
+        </div>
+        <div class="kerncijfers">
+          <div class="kc teal"><b>4</b><span>open taken</span></div>
+          <div class="kc rood"><b>1</b><span>te laat</span></div>
+          <div class="kc grijs"><b>1</b><span>weggelegd</span></div>
+          <div class="kc"><b>2 d</b><span>laatste activiteit</span></div>
+        </div>
+      </div>
+
+      <div class="tabs">
+        <div class="tab actief">Open taken <span class="n">4</span></div>
+        <div class="tab">Weggelegd <span class="n">1</span></div>
+        <div class="tab">Afgerond <span class="n">23</span></div>
+        <div class="tab">ALV's <span class="n">2</span></div>
+        <div class="tab">Activiteit</div>
+      </div>
+      <div style="border:1px solid var(--bor);border-top:none;border-radius:0 0 10px 10px;padding:4px 12px 10px">
+        <table>
+          <thead><tr><th>Taak</th><th>Cat.</th><th>Wie</th><th>Deadline</th></tr></thead>
+          <tbody>
+            <tr><td>Offerte dakrenovatie beoordelen</td><td><span class="badge b-off">Offerte</span></td><td><span class="wie"><span class="av av-j">J</span>Jer</span></td><td><span class="badge b-telaat">Te laat (3d)</span></td></tr>
+            <tr><td>Vergaderverzoek najaars-ALV inplannen</td><td><span class="badge b-verg">Verg.</span></td><td><span class="wie"><span class="av av-c">C</span>Cihad</span></td><td class="mutc">24 jun</td></tr>
+            <tr><td>Lekkage parkeergarage opvolgen</td><td><span class="badge b-opp">Oppakken</span></td><td><span class="wie"><span class="av av-j">J</span>Jer</span></td><td class="mutc">30 jun</td></tr>
+            <tr><td>Ingebrekestelling schilder versturen</td><td><span class="badge b-lod">LOD</span></td><td><span class="wie"><span class="av av-c">C</span>Cihad</span></td><td class="mutc">15 aug</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="voetnoot">💡 Bij Variant B zie je tijdens een telefoontje níet meteen de recente activiteit — daarvoor klik je eerst op het tabblad "Activiteit".</div>
+
+    </div>
+  </div>
+
+  <p class="lead" style="margin-top:-10px">In beide varianten: open taken aanklikken opent gewoon de bekende bewerk-popup, en de kop met kerncijfers is identiek. Het verschil zit puur in <b>alles tegelijk tonen (A)</b> versus <b>opgeruimd met tabbladen (B)</b>.</p>
+</div>
+</body>
+</html>

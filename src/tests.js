@@ -8,6 +8,7 @@ import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
 import { filterNtd } from "./render-lijsten.js";
 import { vveOverzicht } from "./render-vve.js";
+import { zoekAlles } from "./palette.js";
 
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
   // ── mini-assert helper (Fase 1 testnet) ──
@@ -148,6 +149,17 @@ import { vveOverzicht } from "./render-vve.js";
   eq('vve laatste act.',  _o5.cijfers.laatsteDagen, 2);
   eq('vve afgerond',      _o5.afgerond.length, 1);
   eq('vve onbekende code',vveOverzicht('ZZZ', _D5, TF).cijfers.open, 0);
+
+  // ── zoekAlles ── (Fase 5: commandocentrum — groepering & limieten)
+  eq('zoek taak op woord',   zoekAlles('dak',_D5).taken.map(r=>r.actiepunt), ['Dak nakijken']);
+  eq('zoek vve op naam',     zoekAlles('testhof',_D5).vves.map(r=>r.code), ['X1']);
+  eq('zoek vve op code',     zoekAlles('x1',_D5).vves.length, 1);
+  eq('zoek hoofdletters',    zoekAlles('DAK',_D5).taken.length, 1);
+  eq('zoek leeg → niets',    zoekAlles('',_D5).taken.length, 0);
+  eq('zoek afgerond',        zoekAlles('klusje',_D5).afgerond.length, 1);
+  eq('zoek logboek',         zoekAlles('bewerkt',_D5).logboek.length, 1);
+  eq('zoek logboek op naam', zoekAlles('jer',_D5).logboek.length, 1);
+  eq('zoek max vves (3)',    zoekAlles('x',Object.assign({},_D5,{alvo:[1,2,3,4,5].map(i=>({code:'X'+i,naam:''}))})).vves.length, 3);
 
   // ── Fase 5 rooktests: nieuwe DOM-ankers bestaan ──
   truthy('page-vve bestaat', !!document.getElementById('page-vve'));

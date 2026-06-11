@@ -149,6 +149,13 @@
     .warn-geen-deadline::before{content:'⚠'}
     .pill-stil{display:inline-block;background:rgba(107,114,128,0.15);color:#4b5563;font-size:11px;font-weight:600;padding:2px 7px;border-radius:10px;margin-left:6px;cursor:pointer}
     .pill-stil::before{content:'🔕 '}
+    /* Fase 4 — opvolging & herhaling */
+    .pill-opvolg{display:inline-block;background:#16a34a;color:#fff;font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;margin-left:6px;cursor:pointer}
+    .pill-snooze{display:inline-block;background:rgba(107,114,128,0.15);color:#4b5563;font-size:11px;font-weight:600;padding:2px 7px;border-radius:10px;margin-left:6px;cursor:pointer;white-space:nowrap}
+    .pill-snooze::before{content:'⏸ '}
+    [data-theme=dark] .pill-snooze{color:#9ca3af}
+    tr.snooze-row td{opacity:.55}
+    .grp-kop{background:var(--sur2);padding:8px 13px;font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;border:none}
     .status-open{background:var(--rd-l);color:var(--rd)}
     .status-gepland{background:var(--am-l);color:var(--am)}
     .status-afgerond{background:var(--gn-l);color:var(--gn)}

@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  RENDER-LIJSTEN — Nog-te-doen, Afgerond, ALV's + tabel/paginering
 // ══════════════════════════════════════
-import { esc, filt, prioBadge, persBadges, ibBadge, subBadge, offProg, emptyRow, berekenPrioriteit, parseDt, STIL_DREMPEL_DAGEN, _vandaagAmsterdam, _verschilInKalenderdagen } from "./util.js";
+import { esc, filt, prioBadge, persBadges, ibBadge, subBadge, offProg, emptyRow, berekenPrioriteit, parseDt, STIL_DREMPEL_DAGEN, _vandaagAmsterdam, _verschilInKalenderdagen, opvolgStatus } from "./util.js";
 import { SID, SECS, SKEYS, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { ensureToken } from "./auth.js";
@@ -123,21 +123,30 @@ function filterNtd(rows,q,fCode,beh,prio,sec){
     }
     return true;
   }).sort((a,b)=>{
-    const ibA = a.inBehandeling==='TRUE'?1:0, ibB = b.inBehandeling==='TRUE'?1:0;
-    if (ibA !== ibB) return ibA - ibB;
+    // Groepen (Fase 4): 0 = actief, 1 = in behandeling, 2 = weggelegd (opvolgdatum in toekomst)
+    const grp = r => opvolgStatus(r).weggelegd ? 2 : (r.inBehandeling==='TRUE' ? 1 : 0);
+    const gA = grp(a), gB = grp(b);
+    if (gA !== gB) return gA - gB;
+    if (gA === 2){ // binnen Weggelegd: vroegste opvolgdatum eerst
+      const oA = parseDt(a.opvolgdatum), oB = parseDt(b.opvolgdatum);
+      if (oA !== oB) return oA - oB;
+    }
     const pa = berekenPrioriteit(a.deadline, sec);
     const pb = berekenPrioriteit(b.deadline, sec);
     // 1. Te laat altijd bovenaan
     if (pa.teLaat !== pb.teLaat) return pa.teLaat ? -1 : 1;
-    // 2. Prioriteit-rang
+    // 2. Opvolgen-vandaag direct daarna (Fase 4)
+    const ovA = opvolgStatus(a).vandaag ? 0 : 1, ovB = opvolgStatus(b).vandaag ? 0 : 1;
+    if (ovA !== ovB) return ovA - ovB;
+    // 3. Prioriteit-rang
     const rang = { 'Hoog':0, 'Midden':1, 'Laag':2, '':3 };
     if (rang[pa.prioriteit] !== rang[pb.prioriteit]) return rang[pa.prioriteit] - rang[pb.prioriteit];
-    // 3. Deadline oplopend (vroegste eerst)
+    // 4. Deadline oplopend (vroegste eerst)
     const dA = parseDt(a.deadline), dB = parseDt(b.deadline);
     if (dA && dB && dA !== dB) return dA - dB;
     if (dA && !dB) return -1;
     if (dB && !dA) return 1;
-    // 4. VvE-code alfabetisch
+    // 5. VvE-code alfabetisch
     return (a.code || '').localeCompare(b.code || '');
   });
 }
@@ -304,18 +313,26 @@ function renderTbody(tbodyId,rows,sec,page,isAf){
   const el=document.getElementById(tbodyId);
   if(!sl.length){el.innerHTML=`<tr><td colspan="10">${emptyRow(10,true)}</td></tr>`;return}
   if(isAf){el.innerHTML=sl.map(r=>rowAf(r,sec)).join('');return}
-  const main=sl.filter(r=>r.inBehandeling!=='TRUE');
-  const ib=sl.filter(r=>r.inBehandeling==='TRUE');
+  // Drie groepen (Fase 4): actief / in behandeling / weggelegd
+  const grpOf = r => opvolgStatus(r).weggelegd ? 2 : (r.inBehandeling==='TRUE' ? 1 : 0);
+  const main=sl.filter(r=>grpOf(r)===0);
+  const ib=sl.filter(r=>grpOf(r)===1);
+  const wg=sl.filter(r=>grpOf(r)===2);
+  const cols=SECS[sec].cols.length+1;
   let html=main.map(r=>rowNtd(r,sec)).join('');
   if(ib.length){
-    const cols=SECS[sec].cols.length+1;
     html+=`<tr><td colspan="${cols}" style="background:var(--ac-l);padding:8px 13px;font-size:11px;font-weight:700;color:var(--ac);text-transform:uppercase;letter-spacing:.05em;border:none">⟳ In behandeling (${ib.length})</td></tr>`;
     html+=ib.map(r=>rowNtd(r,sec)).join('');
+  }
+  if(wg.length){
+    html+=`<tr><td colspan="${cols}" class="grp-kop">⏸ Weggelegd (${wg.length}) — komt terug op de opvolgdatum</td></tr>`;
+    html+=wg.map(r=>rowNtd(r,sec)).join('');
   }
   el.innerHTML=html;
 }
 
 function bepaalStil(r, sec){
+  if (opvolgStatus(r).weggelegd) return null; // weggelegd = bewust geparkeerd, niet stil (Fase 4)
   if (r.inBehandeling !== 'TRUE') return null;
   const entries = (D.logboek || []).filter(e => e.code === r.code && (!sec || e.sectie === sec));
   if (!entries.length) return null; // geen activiteit-data → niet markeren
@@ -339,17 +356,24 @@ function deadlineCel(r, sec){
 function rowNtd(r,sec){
   const css=SECS[sec].css;
   const rid=state._rowCache.length; state._rowCache.push(r);
-  const editBtn=`<button class="btn-edit" data-action="taak-bewerken" data-rid="${rid}" title="Bewerken"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><button class="btn-done" data-action="taak-afronden" data-rid="${rid}" title="Afgehandeld"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></button>`;
+  const editBtn=`<button class="btn-edit" data-action="taak-bewerken" data-rid="${rid}" title="Bewerken"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><button class="btn-edit" data-action="taak-wegleggen" data-rid="${rid}" title="Wegleggen / opvolgdatum"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 13.5"/></svg></button><button class="btn-done" data-action="taak-afronden" data-rid="${rid}" title="Afgehandeld"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></button>`;
   let cells='';
   const _stilDagen = bepaalStil(r, sec);
   const stilPill = _stilDagen !== null
     ? `<span class="pill-stil" data-action="taak-bewerken" data-rid="${rid}" title="Geen activiteit in ${_stilDagen} dagen">Stil ${_stilDagen}d</span>`
     : '';
+  const ov = opvolgStatus(r);
+  const opvolgPill = ov.vandaag
+    ? `<span class="pill-opvolg" data-action="taak-wegleggen" data-rid="${rid}" title="Opvolgdatum: ${esc(r.opvolgdatum)}">🔔 Opvolgen vandaag</span>`
+    : ov.weggelegd
+      ? `<span class="pill-snooze" data-action="taak-wegleggen" data-rid="${rid}" title="Weggelegd tot ${esc(r.opvolgdatum)}">${esc(r.opvolgdatum)}</span>`
+      : '';
+  const extraPills = stilPill + opvolgPill;
   switch(sec){
     case'OPPAKKEN':
       cells=`<td><span class="code" style="${css}">${esc(r.code)}</span></td>
         <td class="cell-name">${esc(r.naam)}${subBadge(r.subcategorie)}</td>
-        <td class="cell-txt">${esc(r.actiepunt)}${stilPill}</td>
+        <td class="cell-txt">${esc(r.actiepunt)}${extraPills}</td>
         ${deadlineCel(r, 'OPPAKKEN')}
         <td>${persBadges(r.behandelaar)}</td>
         <td>${prioBadge(r, 'OPPAKKEN')}</td>
@@ -361,7 +385,7 @@ function rowNtd(r,sec){
       cells=`<td><span class="code" style="${css}">${esc(r.code)}</span></td>
         <td class="cell-name">${esc(r.naam)}${subBadge(r.subcategorie)}</td>
         <td><span class="badge" style="background:var(--am-l);color:var(--am)">${esc(r.periode||r.agendapunten||'')}</span></td>
-        <td class="cell-txt">${esc(r.agendapunten||r.actiepunt||'')}${stilPill}</td>
+        <td class="cell-txt">${esc(r.agendapunten||r.actiepunt||'')}${extraPills}</td>
         <td>${persBadges(r.behandelaar)}</td>
         ${deadlineCel(r, 'VERGADERVERZOEKEN')}
         <td>${prioBadge(r, 'VERGADERVERZOEKEN')}</td>
@@ -377,13 +401,13 @@ function rowNtd(r,sec){
         <td>${persBadges(r.behandelaar)}</td>
         ${deadlineCel(r, 'OFFERTE-TRAJECTEN')}
         <td>${prioBadge(r, 'OFFERTE-TRAJECTEN')}</td>
-        <td class="cell-txt">${r.opmerkingen?`<span style="font-size:12px">${esc(r.opmerkingen)}</span>`:''}${stilPill}</td>
+        <td class="cell-txt">${r.opmerkingen?`<span style="font-size:12px">${esc(r.opmerkingen)}</span>`:''}${extraPills}</td>
         <td>${editBtn}</td>`;
       break;
     case'LOD':
       cells=`<td><span class="code" style="${css}">${esc(r.code)}</span></td>
         <td class="cell-name">${esc(r.naam)}${subBadge(r.subcategorie)}</td>
-        <td class="cell-txt">${esc(r.actiepunt||'')}${stilPill}</td>
+        <td class="cell-txt">${esc(r.actiepunt||'')}${extraPills}</td>
         <td class="cell-txt" style="font-style:italic;font-size:12px">${esc(r.status||'')}</td>
         <td>${persBadges(r.behandelaar)}</td>
         ${deadlineCel(r, 'LOD')}
@@ -396,7 +420,8 @@ function rowNtd(r,sec){
   const { teLaat: rowTeLaat } = berekenPrioriteit(r.deadline, sec);
   const rowCls = [
     r.inBehandeling === 'TRUE' ? 'ib-row' : '',
-    rowTeLaat ? 'row-telaat' : ''
+    rowTeLaat ? 'row-telaat' : '',
+    ov.weggelegd ? 'snooze-row' : ''
   ].filter(Boolean).join(' ');
   return `<tr class="${rowCls}" data-row="${r._row}">${cells}</tr>`;
 }

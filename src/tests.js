@@ -6,6 +6,7 @@ import { logZin } from "./render-overig.js";
 import { _isStagingHost } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
+import { filterNtd } from "./render-lijsten.js";
 
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
   // ── mini-assert helper (Fase 1 testnet) ──
@@ -104,6 +105,20 @@ import { filterVves } from "./vve-zoekveld.js";
   eq('opvolg toekomst', opvolgStatus({opvolgdatum:'16-06-2026'}, TV), {weggelegd:true,  vandaag:false});
   eq('opvolg vandaag',  opvolgStatus({opvolgdatum:'11-06-2026'}, TV), {weggelegd:false, vandaag:true});
   eq('opvolg verleden', opvolgStatus({opvolgdatum:'01-06-2026'}, TV), {weggelegd:false, vandaag:true});
+
+  // ── filterNtd ── volgorde: te laat → opvolgen-vandaag → prio/deadline → in behandeling → weggelegd
+  const _vd=new Date();
+  const _f=n=>{const d=new Date(_vd.getFullYear(),_vd.getMonth(),_vd.getDate()+n);
+    return `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`};
+  const _rows=[
+    {code:'NORM', deadline:_f(3),  inBehandeling:'FALSE', opvolgdatum:''},
+    {code:'WEG',  deadline:_f(2),  inBehandeling:'FALSE', opvolgdatum:_f(5)},
+    {code:'IB',   deadline:_f(1),  inBehandeling:'TRUE',  opvolgdatum:''},
+    {code:'OPV',  deadline:_f(9),  inBehandeling:'FALSE', opvolgdatum:_f(0)},
+    {code:'LAAT', deadline:_f(-2), inBehandeling:'FALSE', opvolgdatum:''},
+  ];
+  eq('ntd-sortering fase4', filterNtd(_rows,'','','','','OPPAKKEN').map(r=>r.code),
+     ['LAAT','OPV','NORM','IB','WEG']);
 
   // ── STIL_ESCALATIE_REGELS ── (per categorie, trap1 < trap2)
   truthy('esc-regels compleet', ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD']

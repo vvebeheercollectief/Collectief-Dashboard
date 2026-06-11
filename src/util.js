@@ -25,6 +25,45 @@ const PRIO_REGELS = {
 };
 const STIL_DREMPEL_DAGEN = 4;
 
+// ══════════════════════════════════════
+//  FASE 4 — OPVOLGING & HERHALING (zie docs/superpowers/specs/2026-06-11-fase4-opvolging-herhaling-design.md)
+// ══════════════════════════════════════
+// LET OP — SYNC: gelijk houden aan CD_STIL_ESCALATIE_REGELS in apps-script/Opvolging.gs
+const STIL_ESCALATIE_REGELS = {
+  'OPPAKKEN':          { trap1:  7, trap2: 14 },
+  'VERGADERVERZOEKEN': { trap1: 14, trap2: 21 },
+  'OFFERTE-TRAJECTEN': { trap1: 21, trap2: 35 },
+  'LOD':               { trap1: 30, trap2: 60 },
+};
+
+// Status van de opvolgdatum: weggelegd (toekomst) of opvolgen-vandaag (vandaag/verleden).
+function opvolgStatus(r, vandaag){
+  vandaag = vandaag || _vandaagAmsterdam();
+  const p = _parseAnyDate((r && r.opvolgdatum) || '');
+  if (!p) return { weggelegd:false, vandaag:false };
+  const d = new Date(p.y, p.m - 1, p.d);
+  const diff = _verschilInKalenderdagen(d, vandaag);
+  return { weggelegd: diff > 0, vandaag: diff <= 0 };
+}
+
+// Volgende deadline voor een herhaalregel. Types: week|maand|kwartaal|halfjaar|jaar|na-afronden.
+// LET OP — SYNC: zelfde logica als cd_volgendeDeadlineStr in apps-script/Opvolging.gs
+const HERHAAL_MAANDEN = { maand:1, kwartaal:3, halfjaar:6, jaar:12 };
+function volgendeDeadline(huidigStr, type, intervalMaanden){
+  const p = _parseAnyDate(huidigStr || '');
+  if (!p) return '';
+  const d = new Date(p.y, p.m - 1, p.d);
+  if (type === 'week'){ d.setDate(d.getDate() + 7); }
+  else {
+    const mnd = type === 'na-afronden' ? (parseInt(intervalMaanden) || 0) : HERHAAL_MAANDEN[type];
+    if (!mnd) return '';
+    const dag = d.getDate();
+    d.setMonth(d.getMonth() + mnd);
+    if (d.getDate() !== dag) d.setDate(0); // maandgrens: 31 jan +1m → 28/29 feb
+  }
+  return `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;
+}
+
 function _vandaagAmsterdam(){
   // Lokale datum (Europe/Amsterdam = browser-locale van de gebruiker), tijd op 00:00
   const d = new Date();
@@ -134,7 +173,8 @@ function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace
 function subBadge(v){return v?`<span class="badge" style="background:var(--sur2);color:var(--mut);font-size:10px;margin-left:4px">${esc(v)}</span>`:''}
 
 export {
-  displayName, filt, PRIO_REGELS, STIL_DREMPEL_DAGEN, _vandaagAmsterdam,
+  displayName, filt, PRIO_REGELS, STIL_DREMPEL_DAGEN, STIL_ESCALATIE_REGELS,
+  opvolgStatus, volgendeDeadline, HERHAAL_MAANDEN, _vandaagAmsterdam,
   _verschilInKalenderdagen, berekenPrioriteit, prioBadge, persBadges, ibBadge,
   adjOff, offProg, _MAANDEN, _parseAnyDate, parseDt, toISODate, toDutchDate,
   emptyRow, esc, subBadge,

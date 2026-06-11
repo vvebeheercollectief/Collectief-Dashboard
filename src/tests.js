@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { berekenPrioriteit, _parseAnyDate, displayName } from "./util.js";
+import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS } from "./util.js";
 import { logZin } from "./render-overig.js";
 import { _isStagingHost } from "./config.js";
 import { ACTIONS } from "./actions.js";
@@ -87,6 +87,27 @@ import { filterVves } from "./vve-zoekveld.js";
   // ── actions-registry ── (dekkings-test: elke verwachte data-action bestaat)
   const VERWACHTE_ACTIES = ['toggle','notif-toggle','off','notitie-toevoegen','taak-verwijder-modal','ai-kopieer','login','ntd-sectie','af-sectie','alvo-flag','taak-bewerken','taak-afronden','pagineer','ai-overnemen','ai-actie-taak','ai-kopieer-concept','ontw-cat','ontw-bewerken','toast-sluiten'];
   VERWACHTE_ACTIES.forEach(a => truthy(`actie '${a}' bestaat`, typeof ACTIONS[a] === 'function'));
+
+  // ── volgendeDeadline ── (herhaalregels; maandgrens-clamp)
+  eq('vd maand',            volgendeDeadline('15-01-2026','maand'),            '15-02-2026');
+  eq('vd maandgrens 31jan', volgendeDeadline('31-01-2026','maand'),            '28-02-2026');
+  eq('vd kwartaal clamp',   volgendeDeadline('30-11-2026','kwartaal'),         '28-02-2027');
+  eq('vd jaar schrikkel',   volgendeDeadline('29-02-2028','jaar'),             '28-02-2029');
+  eq('vd week',             volgendeDeadline('28-02-2026','week'),             '07-03-2026');
+  eq('vd na-afronden 6m',   volgendeDeadline('15-06-2026','na-afronden',6),    '15-12-2026');
+  eq('vd onbekend type',    volgendeDeadline('15-06-2026','dagelijks'),        '');
+  eq('vd lege datum',       volgendeDeadline('','maand'),                      '');
+
+  // ── opvolgStatus ── (weggelegd vs. opvolgen-vandaag)
+  const TV = new Date(2026, 5, 11); // 11 juni 2026
+  eq('opvolg leeg',     opvolgStatus({opvolgdatum:''}, TV),           {weggelegd:false, vandaag:false});
+  eq('opvolg toekomst', opvolgStatus({opvolgdatum:'16-06-2026'}, TV), {weggelegd:true,  vandaag:false});
+  eq('opvolg vandaag',  opvolgStatus({opvolgdatum:'11-06-2026'}, TV), {weggelegd:false, vandaag:true});
+  eq('opvolg verleden', opvolgStatus({opvolgdatum:'01-06-2026'}, TV), {weggelegd:false, vandaag:true});
+
+  // ── STIL_ESCALATIE_REGELS ── (per categorie, trap1 < trap2)
+  truthy('esc-regels compleet', ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD']
+    .every(s => STIL_ESCALATIE_REGELS[s] && STIL_ESCALATIE_REGELS[s].trap1 < STIL_ESCALATIE_REGELS[s].trap2));
 
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');

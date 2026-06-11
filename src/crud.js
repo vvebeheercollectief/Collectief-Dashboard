@@ -134,7 +134,9 @@ async function deleteTaskRow(r){
   const sec=r._sec;
   // undo-data vastleggen vóór de mutatie (zelfde serialisatie als afronden)
   const ntdKeys=SECS[sec].keys;
-  const ntdValues=ntdKeys.map(k=>r[k]||''); ntdValues.push(r.subcategorie||'');
+  const ntdValues=ntdKeys.map(k=>r[k]||'');
+  while(ntdValues.length<8) ntdValues.push('');                  // OFFERTE heeft 7 velden
+  ntdValues.push('', r.subcategorie||'', '', r.opvolgdatum||'', r.herhaalId||''); // I, J=sub, K, L, M (Fase 4)
   const undoData={sec,code:r.code,ntdValues};
   const oudeRow=r._row;
   const tr=document.querySelector(`#ntd-tbody tr[data-row="${oudeRow}"]`);
@@ -213,6 +215,7 @@ async function doCompleteTask(){
         values=[r.code,r.naam,r.actiepunt||'',r.status||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'',r.inBehandeling||'',today,comment,r.subcategorie||''];break;
       default: throw new Error('Onbekende sectie: '+sec);
     }
+    values.push(r.herhaalId||''); // L in 'Afgerond': Herhaal-ID — de motor herkent afgeronde terugkerende taken (Fase 4)
     const ids=await getSheetIds();
     const afSheetId=ids['Afgerond'];
     const ntdSheetId=ids['Nog Te Doen'];
@@ -227,7 +230,9 @@ async function doCompleteTask(){
     ]};
     // undo-data vastleggen vóór de mutatie
     const ntdKeys=SECS[sec].keys;
-    const ntdValues=ntdKeys.map(k=>r[k]||''); ntdValues.push(r.subcategorie||'');
+    const ntdValues=ntdKeys.map(k=>r[k]||'');
+    while(ntdValues.length<8) ntdValues.push('');                  // OFFERTE heeft 7 velden
+    ntdValues.push('', r.subcategorie||'', '', r.opvolgdatum||'', r.herhaalId||''); // I, J=sub, K, L, M (Fase 4)
     const undoData={sec,code:r.code,ntdValues,ntdRow:r._row};
     // 1) optimistisch: meteen uit de lokale lijst + indexen meeschuiven;
     //    de oude DOM-rij pulst groen en pas daarná hertekenen we (anim.js)

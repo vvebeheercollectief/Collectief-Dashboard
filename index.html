@@ -576,6 +576,30 @@
   </div>
 </div>
 
+<!-- ═══════ WEGLEGGEN (SNOOZE) MODAL — Fase 4 ═══════ -->
+<div class="modal-bg" id="snooze-bg">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-hdr">
+      <h2 id="snooze-title">Taak wegleggen</h2>
+      <button class="modal-close" id="snooze-close">×</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--mut);margin:0 0 10px">De taak zakt gedempt naar "Weggelegd" onderaan de lijst en komt op de opvolgdatum vanzelf terug.</p>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sec" data-action="snooze-kies" data-dagen="3">+3 dagen</button>
+        <button class="btn btn-sec" data-action="snooze-kies" data-dagen="7">+1 week</button>
+        <button class="btn btn-sec" data-action="snooze-kies" data-dagen="14">+2 weken</button>
+      </div>
+      <div class="fld" style="margin-top:12px"><label>Of kies een datum</label><input type="date" id="snooze-datum"/></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-sec" id="snooze-cancel">Annuleren</button>
+      <button class="btn btn-del" id="snooze-wis" style="display:none">🔔 Wissen</button>
+      <button class="btn btn-pri" id="snooze-opslaan">⏸ Wegleggen</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast-container"></div>
 
 <!-- ═══════ NOTIFICATIE INSTELLINGEN ═══════ -->

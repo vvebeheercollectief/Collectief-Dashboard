@@ -14,6 +14,7 @@ import { adjOff } from './util.js';
 import { copyAiPrompt, aiOvernemen, aiActieTaak, aiKopieerConcept } from './ai.js';
 import { dismissToast, saveNotifPrefs } from './notifications.js';
 import { doLogin } from './auth.js';
+import { openSnoozeModal, snoozeKies } from './snooze.js';
 
 const PAG_RENDER = { ntd:renderNtd, af:renderAf, alvo:renderAlvo, alfa:renderAlfa, ontw:renderOntw, logboek:renderLogboek };
 
@@ -37,6 +38,8 @@ export const ACTIONS = {
   'ontw-cat':              (el) => setOntw(el.dataset.cat),
   'ontw-bewerken':         (el) => editOntwItem(+el.dataset.rid),
   'toast-sluiten':         (el) => dismissToast(el.closest('.toast')),
+  'taak-wegleggen':        (el) => openSnoozeModal(+el.dataset.rid),
+  'snooze-kies':           (el) => snoozeKies(+el.dataset.dagen),
 };
 
 export function initActions() {

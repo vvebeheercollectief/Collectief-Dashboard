@@ -21,6 +21,7 @@ import {
 import { loadAll } from './data.js';
 import { initActions } from './actions.js';
 import { initVveZoekveld } from './vve-zoekveld.js';
+import { closeSnoozeModal, snoozeOpslaan, snoozeWis } from './snooze.js';
 
 // ══════════════════════════════════════
 //  BOOT
@@ -120,6 +121,15 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('ontw-modal-bg').addEventListener('click',e=>{if(e.target.id==='ontw-modal-bg'&&_ontwMouseDown?.id==='ontw-modal-bg')closeOntwModal()});
   setupSearch('s-ontw',()=>{pgs.ontw=1;renderOntw()});
 
+  // Wegleggen-modal (Fase 4)
+  document.getElementById('snooze-close').onclick=closeSnoozeModal;
+  document.getElementById('snooze-cancel').onclick=closeSnoozeModal;
+  document.getElementById('snooze-opslaan').onclick=snoozeOpslaan;
+  document.getElementById('snooze-wis').onclick=snoozeWis;
+  let _snoozeMouseDown=null;
+  document.getElementById('snooze-bg').addEventListener('mousedown',e=>{_snoozeMouseDown=e.target});
+  document.getElementById('snooze-bg').addEventListener('click',e=>{if(e.target.id==='snooze-bg'&&_snoozeMouseDown?.id==='snooze-bg')closeSnoozeModal()});
+
   // Afgerond modal
   document.getElementById('complete-close').onclick=closeCompleteModal;
   document.getElementById('complete-cancel').onclick=closeCompleteModal;
@@ -160,6 +170,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(document.getElementById('modal-bg').classList.contains('open')) return;
     if(document.getElementById('complete-bg').classList.contains('open')) return;
     if(document.getElementById('ontw-modal-bg').classList.contains('open')) return;
+    if(document.getElementById('snooze-bg').classList.contains('open')) return;
     if(document.getElementById('dot').classList.contains('loading')) return;
     if(state.pendingWrites>0) return;
     if(state._animBusy) return;

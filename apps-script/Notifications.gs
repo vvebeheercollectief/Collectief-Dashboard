@@ -260,6 +260,9 @@ function cd_dailySummary() {
     let curSec = null;
     const SKEYS = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD'];
     const BEH_COL = { 'OPPAKKEN': 4, 'VERGADERVERZOEKEN': 4, 'OFFERTE-TRAJECTEN': 4, 'LOD': 4 };
+    const DEADLINE_COL = { 'OPPAKKEN': 3, 'VERGADERVERZOEKEN': 5, 'OFFERTE-TRAJECTEN': 5, 'LOD': 5 };
+    const today = new Date(); today.setHours(0,0,0,0);
+    const stilMap = cd_laatsteActiviteitMap(); // Opvolging.gs (Fase 4)
 
     const perPerson = {};
     for (let i = 0; i < data.length; i++) {
@@ -268,23 +271,43 @@ function cd_dailySummary() {
       if (!curSec || !data[i][0]) continue;
       if ((data[i][0] + '').trim() === 'VvE Code' || (data[i][0] + '').trim() === 'VvE-Code') continue;
 
+      const code = (data[i][0] || '').toString().trim();
       const beh = (data[i][BEH_COL[curSec]] || '').toString().trim();
       if (!beh) continue;
+      const opvolg = cd_parseDate(data[i][11]);   // L = Opvolgdatum (Fase 4)
+      const weggelegd = !!(opvolg && opvolg.getTime() > today.getTime());
+      const dl = cd_parseDate(data[i][DEADLINE_COL[curSec]]);
+      const ib = ((data[i][7] || '') + '').toString().toUpperCase() === 'TRUE';
+      const sec = curSec;
       cd_splitBehandelaar(beh).forEach(name => {
-        if (!perPerson[name]) perPerson[name] = {};
-        perPerson[name][curSec] = (perPerson[name][curSec] || 0) + 1;
+        if (!perPerson[name]) perPerson[name] = { secs:{}, telaat:0, opvolgen:0, stil:0 };
+        const p = perPerson[name];
+        p.secs[sec] = (p.secs[sec] || 0) + 1;
+        if (!weggelegd && dl && dl.getTime() < today.getTime()) p.telaat++;
+        if (opvolg && opvolg.getTime() <= today.getTime()) p.opvolgen++;
+        const regels = CD_STIL_ESCALATIE_REGELS[sec];
+        if (!weggelegd && regels && (ib || sec === 'OFFERTE-TRAJECTEN')) {
+          const laatst = stilMap[code + '|' + sec];
+          if (laatst) {
+            const dagen = Math.floor((today.getTime() - new Date(laatst.getFullYear(), laatst.getMonth(), laatst.getDate()).getTime()) / 86400000);
+            if (dagen >= regels.trap1) p.stil++;
+          }
+        }
       });
     }
 
     Object.keys(perPerson).forEach(name => {
       try {
-        const tots = perPerson[name];
-        const total = Object.values(tots).reduce((a,b) => a+b, 0);
+        const p = perPerson[name];
+        const total = Object.values(p.secs).reduce((a,b) => a+b, 0);
         const parts = [];
-        if (tots['OPPAKKEN']) parts.push(tots['OPPAKKEN'] + ' oppakken');
-        if (tots['VERGADERVERZOEKEN']) parts.push(tots['VERGADERVERZOEKEN'] + ' vergaderverzoek' + (tots['VERGADERVERZOEKEN']>1?'en':''));
-        if (tots['OFFERTE-TRAJECTEN']) parts.push(tots['OFFERTE-TRAJECTEN'] + ' offerte-traject' + (tots['OFFERTE-TRAJECTEN']>1?'en':''));
-        if (tots['LOD']) parts.push(tots['LOD'] + ' LOD');
+        if (p.telaat)   parts.push('⚠ ' + p.telaat + ' te laat');
+        if (p.opvolgen) parts.push('🔔 ' + p.opvolgen + ' opvolgen');
+        if (p.stil)     parts.push('🔕 ' + p.stil + ' stil');
+        if (p.secs['OPPAKKEN']) parts.push(p.secs['OPPAKKEN'] + ' oppakken');
+        if (p.secs['VERGADERVERZOEKEN']) parts.push(p.secs['VERGADERVERZOEKEN'] + ' vergaderverzoek' + (p.secs['VERGADERVERZOEKEN']>1?'en':''));
+        if (p.secs['OFFERTE-TRAJECTEN']) parts.push(p.secs['OFFERTE-TRAJECTEN'] + ' offerte-traject' + (p.secs['OFFERTE-TRAJECTEN']>1?'en':''));
+        if (p.secs['LOD']) parts.push(p.secs['LOD'] + ' LOD');
 
         cd_notifyByExternalId(name, 'n_daily', '1', {
           title: '☀️ Goedemorgen — ' + total + ' open ' + (total===1?'taak':'taken'),
@@ -544,7 +567,7 @@ function cd_drainNotifQueue() {
 // ════════════════════════════════════════════════════════════
 const CD_NTD_SECTIES = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD'];
 
-function cd_createTaskRow(categorie, code, naam, actiepunt, behandelaar, deadline) {
+function cd_createTaskRow(categorie, code, naam, actiepunt, behandelaar, deadline, herhaalId) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(NTD_SHEET); // 'Nog Te Doen'
   if (!sheet) throw new Error('Sheet "' + NTD_SHEET + '" niet gevonden');
@@ -579,6 +602,7 @@ function cd_createTaskRow(categorie, code, naam, actiepunt, behandelaar, deadlin
   sheet.getRange(insertRow, 5).setValue(behandelaar || ''); // E = behandelaar
   const deadlineCol = (sectie === 'OPPAKKEN') ? 4 : 6;      // D voor Oppakken, F voor rest
   if (deadline) sheet.getRange(insertRow, deadlineCol).setValue(deadline);
+  if (herhaalId) sheet.getRange(insertRow, 13).setValue(herhaalId);  // M = Herhaal-ID (Fase 4)
   return insertRow;
 }
 

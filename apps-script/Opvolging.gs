@@ -27,6 +27,13 @@ function cd_ddmmyyyy(d) {
   return ('0' + d.getDate()).slice(-2) + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + d.getFullYear();
 }
 
+// Checkbox-erfenis in kolommen L/M/N (rijen erven TRUE/FALSE-validatie) telt als leeg.
+function cd_f4val(v) {
+  if (v === true || v === false) return '';
+  v = (v || '').toString().trim();
+  return (v.toUpperCase() === 'FALSE' || v.toUpperCase() === 'TRUE') ? '' : v;
+}
+
 // LET OP — SYNC: zelfde logica als volgendeDeadline() in src/util.js (incl. maandgrens-clamp)
 const CD_HERHAAL_MAANDEN = { maand: 1, kwartaal: 3, halfjaar: 6, jaar: 12 };
 function cd_volgendeDeadlineStr(huidig, type, intervalMnd) {
@@ -108,7 +115,7 @@ function cd_hr_verwerkAfrondingen() {
   const afData = af.getDataRange().getValues();
   const hrData = hr.getDataRange().getValues();
   for (let i = 0; i < afData.length; i++) {
-    const herhaalId = (afData[i][11] || '').toString().trim();   // L in 'Afgerond'
+    const herhaalId = cd_f4val(afData[i][11]);   // L in 'Afgerond'
     if (!herhaalId) continue;
     try {
       for (let j = 1; j < hrData.length; j++) {
@@ -185,7 +192,7 @@ function cd_escaleerStilleDossiers() {
       const laatst = stilMap[code + '|' + curSec];
       if (!laatst) continue; // geen activiteit-data → niet escaleren (zelfde keuze als bepaalStil)
       const dagen = Math.floor((today.getTime() - new Date(laatst.getFullYear(), laatst.getMonth(), laatst.getDate()).getTime()) / 86400000);
-      const esc = (data[i][13] || '').toString();   // N = Esc-stempel
+      const esc = cd_f4val(data[i][13]);            // N = Esc-stempel
       const cel = sheet.getRange(i + 1, 14);
       if (dagen < regels.trap1) { if (esc) cel.setValue(''); continue; } // activiteit hervat → reset
       if (dagen >= regels.trap2 && esc.indexOf('T2') === -1) {

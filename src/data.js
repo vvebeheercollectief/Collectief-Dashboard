@@ -116,9 +116,11 @@ function parseSections(rows){
     entry.datum=(row[afOff]||'').trim();
     entry.opmerking=(row[afOff+1]||'').trim();
     entry.subcategorie=(row[afOff+2]||'').trim();
-    entry.opvolgdatum=((row[11]||'')+'').trim();  // L — Fase 4
-    entry.herhaalId  =((row[12]||'')+'').trim();  // M
-    entry.esc        =((row[13]||'')+'').trim();  // N (alleen door Apps Script geschreven)
+    // L/M/N — Fase 4. Checkbox-erfenis (rijen erven TRUE/FALSE-validatie) telt als leeg.
+    const _f4v=v=>{v=((v||'')+'').trim();return (v.toUpperCase()==='FALSE'||v.toUpperCase()==='TRUE')?'':v;};
+    entry.opvolgdatum=_f4v(row[11]);  // L
+    entry.herhaalId  =_f4v(row[12]);  // M
+    entry.esc        =_f4v(row[13]);  // N (alleen door Apps Script geschreven)
     if(entry.code) out[cur].push(entry);
   }
   return {data:out,secInfo};

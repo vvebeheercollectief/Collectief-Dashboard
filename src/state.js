@@ -52,6 +52,9 @@ export const state = {
   _sheetIds: null,
   _completeIdx: null,
   _snoozeRow: null,        // taak waarvoor de wegleggen-modal open staat (Fase 4)
+  vveCode: null,           // VvE op de per-VvE-pagina (Fase 5)
+  _vveAfAlles: false,      // per-VvE: alle afgeronde taken uitgeklapt
+  bulkMode: false,         // bulk-selecteerstand op de NTD-lijst (Fase 5)
   herhaalEditRow: null,    // herhaalregel in de bewerkmodal (Fase 4)
   _aiLastCode: '',
   _aiLastNaam: '',

@@ -7,6 +7,7 @@ import { _isStagingHost } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
 import { filterNtd } from "./render-lijsten.js";
+import { vveOverzicht } from "./render-vve.js";
 
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
   // ── mini-assert helper (Fase 1 testnet) ──
@@ -124,5 +125,30 @@ import { filterNtd } from "./render-lijsten.js";
   truthy('esc-regels compleet', ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD']
     .every(s => STIL_ESCALATIE_REGELS[s] && STIL_ESCALATIE_REGELS[s].trap1 < STIL_ESCALATIE_REGELS[s].trap2));
 
+  // ── vveOverzicht ── (Fase 5: per-VvE-pagina — kerncijfers & verzameling)
+  const TF = new Date(2026, 5, 11); // 11 juni 2026
+  const _D5 = {
+    ntd:{OPPAKKEN:[
+      {code:'X1',naam:'Testhof',actiepunt:'Dak nakijken',deadline:'01-06-2026',behandelaar:'Jer',inBehandeling:'FALSE',opvolgdatum:'',_sec:'OPPAKKEN',_row:3},
+      {code:'X1',naam:'Testhof',actiepunt:'Brief sturen',deadline:'20-06-2026',behandelaar:'Cihad',inBehandeling:'FALSE',opvolgdatum:'20-07-2026',_sec:'OPPAKKEN',_row:4},
+      {code:'X2',naam:'Ander',actiepunt:'Niets',deadline:'',behandelaar:'',inBehandeling:'FALSE',opvolgdatum:'',_sec:'OPPAKKEN',_row:5}],
+      VERGADERVERZOEKEN:[],'OFFERTE-TRAJECTEN':[],LOD:[]},
+    af:{OPPAKKEN:[{code:'X1',naam:'Testhof',actiepunt:'Oud klusje',datum:'01-05-2026',_sec:'OPPAKKEN',_row:2}],
+      VERGADERVERZOEKEN:[],'OFFERTE-TRAJECTEN':[],LOD:[]},
+    alvo:[{code:'X1',naam:'Testhof',uitnodiging:true,notulen:false,begroting:false,status:'Gepland'}],
+    alfa:[],
+    logboek:[{timestamp:'2026-06-09T10:00:00',code:'X1',actie:'Bewerkt',gebruiker:'info@vvebeheercollectief.nl'}],
+  };
+  const _o5 = vveOverzicht('X1', _D5, TF);
+  eq('vve open',          _o5.cijfers.open, 1);
+  eq('vve te laat',       _o5.cijfers.teLaat, 1);
+  eq('vve weggelegd',     _o5.cijfers.weggelegd, 1);
+  eq('vve naam',          _o5.naam, 'Testhof');
+  eq('vve behandelaars',  _o5.behandelaars, ['Jer','Cihad']);
+  eq('vve laatste act.',  _o5.cijfers.laatsteDagen, 2);
+  eq('vve afgerond',      _o5.afgerond.length, 1);
+  eq('vve onbekende code',vveOverzicht('ZZZ', _D5, TF).cijfers.open, 0);
+
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');
+  window._testResult = `${totOk} OK, ${totFail} FAIL`; // uitleesbaar voor test-automatisering

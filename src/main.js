@@ -23,6 +23,7 @@ import { initActions } from './actions.js';
 import { initVveZoekveld } from './vve-zoekveld.js';
 import { closeSnoozeModal, snoozeOpslaan, snoozeWis } from './snooze.js';
 import { renderHerhaal, openHerhaalModal, closeHerhaalModal, syncHerhaalVelden, submitHerhaal } from './render-herhaal.js';
+import { renderVve } from './render-vve.js';
 
 // ══════════════════════════════════════
 //  BOOT
@@ -237,6 +238,7 @@ export function renderAll(){
   renderOntw();
   renderLogboek();
   renderHerhaal();
+  renderVve();
 }
 
 // ══════════════════════════════════════

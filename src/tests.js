@@ -149,6 +149,9 @@ import { vveOverzicht } from "./render-vve.js";
   eq('vve afgerond',      _o5.afgerond.length, 1);
   eq('vve onbekende code',vveOverzicht('ZZZ', _D5, TF).cijfers.open, 0);
 
+  // ── Fase 5 rooktests: nieuwe DOM-ankers bestaan ──
+  truthy('page-vve bestaat', !!document.getElementById('page-vve'));
+
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');
   window._testResult = `${totOk} OK, ${totFail} FAIL`; // uitleesbaar voor test-automatisering

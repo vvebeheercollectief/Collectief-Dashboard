@@ -163,6 +163,8 @@ import { zoekAlles } from "./palette.js";
 
   // ── Fase 5 rooktests: nieuwe DOM-ankers bestaan ──
   truthy('page-vve bestaat', !!document.getElementById('page-vve'));
+  truthy('pal-bg bestaat', !!document.getElementById('pal-bg'));
+  truthy('zoek-btn bestaat', !!document.getElementById('zoek-btn'));
 
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');

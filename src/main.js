@@ -24,6 +24,7 @@ import { initVveZoekveld } from './vve-zoekveld.js';
 import { closeSnoozeModal, snoozeOpslaan, snoozeWis } from './snooze.js';
 import { renderHerhaal, openHerhaalModal, closeHerhaalModal, syncHerhaalVelden, submitHerhaal } from './render-herhaal.js';
 import { renderVve } from './render-vve.js';
+import { initPalette } from './palette.js';
 
 // ══════════════════════════════════════
 //  BOOT
@@ -31,6 +32,7 @@ import { renderVve } from './render-vve.js';
 document.addEventListener('DOMContentLoaded',()=>{
   // Centraal klik-systeem: één delegatie-listener voor alle data-action-elementen
   initActions();
+  initPalette();
 
   // Zichtbare waarschuwingsbalk in de testomgeving
   if (IS_STAGING) {
@@ -193,6 +195,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(document.getElementById('ontw-modal-bg').classList.contains('open')) return;
     if(document.getElementById('snooze-bg').classList.contains('open')) return;
     if(document.getElementById('hh-bg').classList.contains('open')) return;
+    if(document.getElementById('pal-bg').classList.contains('open')) return;
     if(document.getElementById('dot').classList.contains('loading')) return;
     if(state.pendingWrites>0) return;
     if(state._animBusy) return;

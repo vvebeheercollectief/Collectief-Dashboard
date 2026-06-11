@@ -17,6 +17,7 @@ import { doLogin } from './auth.js';
 import { openSnoozeModal, snoozeKies } from './snooze.js';
 import { openHerhaalModal, toggleHerhaalStatus, deleteHerhaal } from './render-herhaal.js';
 import { openVvePagina, renderVve } from './render-vve.js';
+import { palKies } from './palette.js';
 
 const PAG_RENDER = { ntd:renderNtd, af:renderAf, alvo:renderAlvo, alfa:renderAlfa, ontw:renderOntw, logboek:renderLogboek };
 
@@ -47,6 +48,7 @@ export const ACTIONS = {
   'herhaal-verwijderen':   ()   => deleteHerhaal(),
   'vve-open':              (el) => openVvePagina(el.dataset.code),
   'vve-af-alles':          ()   => { state._vveAfAlles=true; renderVve(); },
+  'pal-kies':              (el) => palKies(+el.dataset.idx),
 };
 
 export function initActions() {

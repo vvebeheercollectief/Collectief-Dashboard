@@ -18,7 +18,7 @@ import { openSnoozeModal, snoozeKies } from './snooze.js';
 import { openHerhaalModal, toggleHerhaalStatus, deleteHerhaal } from './render-herhaal.js';
 import { openVvePagina, renderVve } from './render-vve.js';
 import { palKies } from './palette.js';
-import { toggleBulkMode, bulkVink, toggleBulkMenu } from './bulk.js';
+import { toggleBulkMode, bulkVink, toggleBulkMenu, bulkDoe } from './bulk.js';
 
 const PAG_RENDER = { ntd:renderNtd, af:renderAf, alvo:renderAlvo, alfa:renderAlfa, ontw:renderOntw, logboek:renderLogboek };
 
@@ -53,6 +53,7 @@ export const ACTIONS = {
   'bulk-toggle':           ()   => toggleBulkMode(),
   'bulk-vink':             (el) => bulkVink(+el.dataset.rid),
   'bulk-menu':             (el) => toggleBulkMenu(el.dataset.menu),
+  'bulk-doe':              (el) => bulkDoe(el),
 };
 
 export function initActions() {

@@ -9,7 +9,7 @@ import { filterVves } from "./vve-zoekveld.js";
 import { filterNtd } from "./render-lijsten.js";
 import { vveOverzicht } from "./render-vve.js";
 import { zoekAlles } from "./palette.js";
-import { _bulkVolgorde } from "./bulk.js";
+import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
 
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
   // ── mini-assert helper (Fase 1 testnet) ──
@@ -171,6 +171,12 @@ import { _bulkVolgorde } from "./bulk.js";
   eq('bulk volgorde hoog→laag', _bulkVolgorde([{_row:3},{_row:9},{_row:5}]).map(r=>r._row), [9,5,3]);
   eq('bulk volgorde leeg', _bulkVolgorde([]), []);
   truthy('bulk-balk bestaat', !!document.getElementById('bulk-balk'));
+
+  // ── bulk kolom-mapping ── (behandelaar=E overal; deadline D/F per sectie)
+  eq('bulk deadline-kolom OPPAKKEN', BULK_DEADLINE_KOLOM['OPPAKKEN'], 'D');
+  eq('bulk deadline-kolom VERG',     BULK_DEADLINE_KOLOM['VERGADERVERZOEKEN'], 'F');
+  eq('bulk deadline-kolom OFF',      BULK_DEADLINE_KOLOM['OFFERTE-TRAJECTEN'], 'F');
+  eq('bulk deadline-kolom LOD',      BULK_DEADLINE_KOLOM['LOD'], 'F');
 
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');

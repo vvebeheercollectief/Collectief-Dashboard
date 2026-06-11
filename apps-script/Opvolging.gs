@@ -250,5 +250,6 @@ function cd_installeerOpvolgingTrigger() {
   Logger.log('✓ Dagelijkse opvolging-motor (±06:30) ingesteld.');
 }
 
-// Handmatige test vanuit de editor: draait de motor direct.
+// Handmatige tests vanuit de editor: draait de motor / digest direct.
 function cd_testMotor() { cd_opvolgingMotor(); }
+function cd_testDigest() { cd_dailySummary(); }

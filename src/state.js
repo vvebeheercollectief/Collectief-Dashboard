@@ -8,7 +8,7 @@
 //     andere module ze kan herzetten via state.X = ... (imports zijn read-only).
 
 // ── Groep 1: ín-plaats gemuteerde objecten (direct export) ──────────────
-export const D = {ntd:{},af:{},alvo:[],alfa:[],ontw:[],logboek:[],ntdSecInfo:{},afSecInfo:{}};
+export const D = {ntd:{},af:{},alvo:[],alfa:[],ontw:[],logboek:[],herhaal:[],ntdSecInfo:{},afSecInfo:{}};
 export const pgs = {ntd:1,af:1,alvo:1,alfa:1,ontw:1,logboek:1};
 export const _shownToasts = new Set();
 export const _undoStack = [];
@@ -51,6 +51,8 @@ export const state = {
   // diversen
   _sheetIds: null,
   _completeIdx: null,
+  _snoozeRow: null,        // taak waarvoor de wegleggen-modal open staat (Fase 4)
+  herhaalEditRow: null,    // herhaalregel in de bewerkmodal (Fase 4)
   _aiLastCode: '',
   _aiLastNaam: '',
   _aiVveCode: '',

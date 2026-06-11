@@ -56,11 +56,12 @@ async function loadAll(silent){
       if(!await ensureToken()){setSyncErr();return}
     }
     if(!silent) setSyncing();
-    const[ntdR,afR,alvoR,alfaR,ontwR,logR]=await Promise.all([
+    const[ntdR,afR,alvoR,alfaR,ontwR,logR,hhR]=await Promise.all([
       fetchSheet("Nog Te Doen"),fetchSheet("Afgerond"),
       fetchSheet("ALV's overzicht"),fetchSheet("ALV's afgerond"),
       fetchSheet("Ontwikkeling").catch(()=>[]),
       fetchSheet("Logboek").catch(()=>[]),
+      fetchSheet("Herhaalregels").catch(()=>[]),
     ]);
     // Kwam er tijdens het lezen een schrijfactie tussen? Dan is de lokale (optimistische)
     // staat leidend; de eigen resync van die schrijfactie haalt zo de verse data op.
@@ -72,8 +73,9 @@ async function loadAll(silent){
     D.alfa=parseAlfa(alfaR);
     D.ontw=parseOntw(ontwR);
     D.logboek=parseLogboek(logR);
+    D.herhaal=parseHerhaal(hhR);
     setSynced();
-    const hash=JSON.stringify([D.ntd,D.af,D.alvo,D.alfa,D.ontw,D.logboek]);
+    const hash=JSON.stringify([D.ntd,D.af,D.alvo,D.alfa,D.ontw,D.logboek,D.herhaal]);
     if(hash!==state._lastDHash){
       state._lastDHash=hash;
       renderAll();
@@ -114,9 +116,29 @@ function parseSections(rows){
     entry.datum=(row[afOff]||'').trim();
     entry.opmerking=(row[afOff+1]||'').trim();
     entry.subcategorie=(row[afOff+2]||'').trim();
+    entry.opvolgdatum=((row[11]||'')+'').trim();  // L — Fase 4
+    entry.herhaalId  =((row[12]||'')+'').trim();  // M
+    entry.esc        =((row[13]||'')+'').trim();  // N (alleen door Apps Script geschreven)
     if(entry.code) out[cur].push(entry);
   }
   return {data:out,secInfo};
+}
+
+// Herhaalregels-tab (Fase 4): A=ID B=Omschrijving C=Sectie D=Code E=Naam F=Behandelaar
+// G=Type H=IntervalMnd I=DagenVooraf J=VolgendeDeadline K=Status L=LaatstKlaargezet
+function parseHerhaal(rows){
+  if(!rows||rows.length<2) return [];
+  return rows.slice(1).map((r,i)=>({
+    _row:i+2,
+    id:((r[0]||'')+'').trim(), omschrijving:((r[1]||'')+'').trim(),
+    sectie:((r[2]||'')+'').trim().toUpperCase(),
+    code:((r[3]||'')+'').trim(), naam:((r[4]||'')+'').trim(),
+    behandelaar:((r[5]||'')+'').trim(), type:((r[6]||'')+'').trim().toLowerCase(),
+    interval:((r[7]||'')+'').trim(), dagenVooraf:parseInt(r[8])||14,
+    volgendeDeadline:((r[9]||'')+'').trim(),
+    status:((r[10]||'ACTIEF')+'').trim().toUpperCase(),
+    laatstKlaargezet:((r[11]||'')+'').trim(),
+  })).filter(r=>r.id);
 }
 
 function parseAlvo(rows){

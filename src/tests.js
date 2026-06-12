@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, offerteBalBij, _verschilInWerkdagen, offerteNuOpvolgen, offerteSorteerScore } from "./util.js";
+import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, offerteBalBij, _verschilInWerkdagen, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten } from "./util.js";
 import { logZin } from "./render-overig.js";
 import { _isStagingHost } from "./config.js";
 import { ACTIONS } from "./actions.js";
@@ -239,6 +239,19 @@ import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
   // deadline overschreden → altijd nodig
   eq('nu-opvolgen deadline te laat',
      offerteNuOpvolgen({offertes:'2/2', datumAangevraagd:'11 juni 2026', deadline:'1 juni 2026'}, VANDAAG_OFF).nodig, true);
+
+  // ── offerte-motor: briefing-feiten (regel-gebaseerde kern) ──
+  const RIJEN_OFF = [
+    {code:'A', naam:'VvA Lekstraat 15', offertes:'0/2', datumAangevraagd:'1 mei 2026'},   // aannemer, lang stil
+    {code:'B', naam:'VvE Hoofdstraat 22', offertes:'2/2', datumAangevraagd:'3 juni 2026'},// ons (doorsturen)
+    {code:'C', naam:'VvE Parkweg 8', offertes:'1/1', fase:'bij_vve', datumAangevraagd:'1 juni 2026'}, // bij vve
+    {code:'D', naam:'VvE Verswijk', offertes:'0/1', datumAangevraagd:'11 juni 2026'},      // vers → niet nodig
+  ];
+  const FEITEN = offerteBriefingFeiten(RIJEN_OFF, VANDAAG_OFF);
+  eq('briefing nuOpvolgen telt 3', FEITEN.nuOpvolgen, 3);
+  eq('briefing balBijOns telt 1',  FEITEN.balBijOns, 1);
+  eq('briefing klaarTeGunnen telt 1', FEITEN.klaarTeGunnen, 1);
+  truthy('briefing urgentste is A (langst stil)', FEITEN.urgentste && FEITEN.urgentste.code === 'A');
 
   // ── offerte-motor: sorteerscore (hoger = urgenter) ──
   truthy('score: deadline-te-laat > gewoon',

@@ -196,6 +196,26 @@ function offerteBalBij(r){
   return 'aannemer';
 }
 
+// Regel-gebaseerde kern voor de briefing: telt en kiest het urgentste traject.
+function offerteBriefingFeiten(rijen, vandaag, termijnen){
+  vandaag = vandaag || _vandaagAmsterdam();
+  rijen = rijen || [];
+  const trap1 = STIL_ESCALATIE_REGELS['OFFERTE-TRAJECTEN'].trap1;
+  let nuOpvolgen = 0, langStil = 0, balBijOns = 0, klaarTeGunnen = 0;
+  let urgentste = null, urgScore = -1;
+  rijen.forEach(r => {
+    if (offerteFase(r) === 'bij_vve') klaarTeGunnen++;
+    const s = offerteNuOpvolgen(r, vandaag, termijnen);
+    if (!s.nodig) return;
+    nuOpvolgen++;
+    if ((s.dagen || 0) >= trap1) langStil++;
+    if (s.balBij === 'ons') balBijOns++;
+    const sc = offerteSorteerScore(r, vandaag);
+    if (sc > urgScore){ urgScore = sc; urgentste = { code:(r.code||''), naam:(r.naam||''), dagen:s.dagen, balBij:s.balBij }; }
+  });
+  return { nuOpvolgen, langStil, balBijOns, klaarTeGunnen, urgentste };
+}
+
 // Sorteerscore voor "Nu opvolgen": hoger = urgenter (sorteer aflopend).
 function offerteSorteerScore(r, vandaag){
   const s = offerteNuOpvolgen(r, vandaag);
@@ -260,5 +280,5 @@ export {
   adjOff, offProg, _MAANDEN, _parseAnyDate, parseDt, toISODate, toDutchDate,
   emptyRow, esc, subBadge,
   parseOff, offerteFase, offerteBalBij, _verschilInWerkdagen,
-  offerteStilBasis, offerteNuOpvolgen, offerteSorteerScore,
+  offerteStilBasis, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten,
 };

@@ -553,6 +553,19 @@
     .kmk-knoppen{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
     #kmk-bron{width:100%;border:1px solid var(--bor);border-radius:8px;padding:7px 9px;font:inherit;font-size:12.5px;resize:vertical;background:var(--sur)}
     .kmk-rij select{font-size:12.5px;padding:4px 7px;border:1px solid var(--bor);border-radius:7px;background:var(--sur);color:var(--txt)}
+    /* Dossier-logboek (VvE-pagina) */
+    .dossier-card{padding:14px 16px}
+    .dos-composer{background:var(--sur2);border:1px solid var(--bor);border-radius:10px;padding:10px;margin-bottom:12px}
+    .dos-composer textarea{width:100%;border:1px solid var(--bor);border-radius:8px;padding:8px 10px;font:inherit;font-size:13px;resize:vertical;min-height:44px;background:var(--sur);color:var(--txt)}
+    .dos-rij{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}
+    .dos-chips{display:flex;gap:6px;flex-wrap:wrap}
+    .soort-chip{border:1px solid var(--bor);background:var(--sur);color:var(--mut);border-radius:20px;padding:4px 11px;font-size:12px;font-weight:600;cursor:pointer;transition:all var(--tr)}
+    .soort-chip.aan{background:var(--ac-l);border-color:var(--ac-b);color:var(--ac)}
+    #dos-wie{margin-left:auto;font-size:12.5px;padding:6px 8px;border:1px solid var(--bor);border-radius:8px;background:var(--sur);color:var(--txt)}
+    .dos-filters{margin-left:auto;display:inline-flex;gap:5px}
+    .dos-filter{border:1px solid var(--bor);background:var(--sur);color:var(--mut);border-radius:20px;padding:2px 10px;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:0;text-transform:none;transition:all var(--tr)}
+    .dos-filter.aan{background:var(--ac-l);border-color:var(--ac-b);color:var(--ac)}
+    @media(max-width:700px){#dos-wie{margin-left:0}}
 
     /* ── Commandocentrum (Fase 5) ── */
     #pal-bg.open{align-items:flex-start;padding-top:10vh}

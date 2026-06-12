@@ -7,7 +7,7 @@ import { _isStagingHost } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
 import { filterNtd } from "./render-lijsten.js";
-import { vveOverzicht } from "./render-vve.js";
+import { vveOverzicht, filterDossierLog } from "./render-vve.js";
 import { parseKenmerken, vveKenmerken } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
@@ -95,7 +95,8 @@ import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
   // ── actions-registry ── (dekkings-test: elke verwachte data-action bestaat)
   const VERWACHTE_ACTIES = ['toggle','notif-toggle','off','notitie-toevoegen','taak-verwijder-modal','ai-kopieer','login','ntd-sectie','af-sectie','alvo-flag','taak-bewerken','taak-afronden','pagineer','ai-overnemen','ai-actie-taak','ai-kopieer-concept','ontw-cat','ontw-bewerken','toast-sluiten','taak-wegleggen','snooze-kies','herhaal-bewerken','herhaal-status','herhaal-verwijderen',
 'vve-open','vve-af-alles','pal-kies','bulk-toggle','bulk-vink','bulk-menu','bulk-doe',
-'kenmerken-bewerken','kenmerken-opslaan','kenmerken-annuleren'];
+'kenmerken-bewerken','kenmerken-opslaan','kenmerken-annuleren',
+'contact-soort','contact-vastleggen','vve-log-filter','vve-log-alles'];
   VERWACHTE_ACTIES.forEach(a => truthy(`actie '${a}' bestaat`, typeof ACTIONS[a] === 'function'));
 
   // ── volgendeDeadline ── (herhaalregels; maandgrens-clamp)
@@ -156,6 +157,11 @@ import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
   eq('vve laatste act.',  _o5.cijfers.laatsteDagen, 2);
   eq('vve afgerond',      _o5.afgerond.length, 1);
   eq('vve onbekende code',vveOverzicht('ZZZ', _D5, TF).cijfers.open, 0);
+
+  // ── filterDossierLog ── (dossier-feed: 'contact' toont alleen handmatige contactmomenten)
+  const _dosLog=[{actie:'Contact'},{actie:'Afgerond'},{actie:'Contact'},{actie:'Kenmerk'}];
+  eq('dossierfilter alles',   filterDossierLog(_dosLog,'alles').length, 4);
+  eq('dossierfilter contact', filterDossierLog(_dosLog,'contact').length, 2);
 
   // ── kenmerken ── (VvE-dossier: tab 'Kenmerken' A:F, laatste rij per code wint)
   const _kmkRows=[

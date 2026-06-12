@@ -16,7 +16,7 @@ import { dismissToast, saveNotifPrefs } from './notifications.js';
 import { doLogin } from './auth.js';
 import { openSnoozeModal, snoozeKies } from './snooze.js';
 import { openHerhaalModal, toggleHerhaalStatus, deleteHerhaal } from './render-herhaal.js';
-import { openVvePagina, renderVve } from './render-vve.js';
+import { openVvePagina, renderVve, addContactLog } from './render-vve.js';
 import { saveKenmerken } from './kenmerken.js';
 import { palKies } from './palette.js';
 import { toggleBulkMode, bulkVink, toggleBulkMenu, bulkDoe } from './bulk.js';
@@ -58,6 +58,11 @@ export const ACTIONS = {
   'kenmerken-bewerken':    ()   => { state.kenmerkenEdit=true; renderVve(); },
   'kenmerken-opslaan':     ()   => saveKenmerken(),
   'kenmerken-annuleren':   ()   => { state.kenmerkenEdit=false; renderVve(); },
+  'contact-soort':         (el) => { state._contactSoort=el.dataset.soort;
+    document.querySelectorAll('.soort-chip').forEach(c=>c.classList.toggle('aan',c.dataset.soort===el.dataset.soort)); },
+  'contact-vastleggen':    ()   => addContactLog(),
+  'vve-log-filter':        (el) => { state.vveLogFilter=el.dataset.modus; state._vveLogAlles=false; renderVve(); },
+  'vve-log-alles':         ()   => { state._vveLogAlles=true; renderVve(); },
 };
 
 export function initActions() {
@@ -66,5 +71,12 @@ export function initActions() {
     if (!el) return;
     const fn = ACTIONS[el.dataset.action];
     if (fn) fn(el, e);
+  });
+  // Ctrl/Cmd+Enter in de dossier-composer = contactmoment vastleggen
+  // (delegatie op document-niveau: het element wordt bij elke render opnieuw aangemaakt)
+  document.addEventListener('keydown', (e) => {
+    if (e.target && e.target.id === 'dos-tekst' && (e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault(); addContactLog();
+    }
   });
 }

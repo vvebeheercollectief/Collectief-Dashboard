@@ -9,6 +9,8 @@ import { ensureToken } from "./auth.js";
 import { buildAnalytics, buildDash } from "./render-analytics.js";
 import { renderNtdDonut } from "./render-lijsten.js";
 import { parseOntw, parseLogboek } from "./render-overig.js";
+import { parseKenmerken } from "./kenmerken.js";
+// (kringverwijzing data ⇄ kenmerken: aanroepen gebeuren op runtime — live bindings, veilig)
 import { showToast } from "./notifications.js";
 import { renderAll } from "./main.js";
 
@@ -56,12 +58,13 @@ async function loadAll(silent){
       if(!await ensureToken()){setSyncErr();return}
     }
     if(!silent) setSyncing();
-    const[ntdR,afR,alvoR,alfaR,ontwR,logR,hhR]=await Promise.all([
+    const[ntdR,afR,alvoR,alfaR,ontwR,logR,hhR,kmkR]=await Promise.all([
       fetchSheet("Nog Te Doen"),fetchSheet("Afgerond"),
       fetchSheet("ALV's overzicht"),fetchSheet("ALV's afgerond"),
       fetchSheet("Ontwikkeling").catch(()=>[]),
       fetchSheet("Logboek").catch(()=>[]),
       fetchSheet("Herhaalregels").catch(()=>[]),
+      fetchSheet("Kenmerken").catch(()=>[]),
     ]);
     // Kwam er tijdens het lezen een schrijfactie tussen? Dan is de lokale (optimistische)
     // staat leidend; de eigen resync van die schrijfactie haalt zo de verse data op.
@@ -74,8 +77,9 @@ async function loadAll(silent){
     D.ontw=parseOntw(ontwR);
     D.logboek=parseLogboek(logR);
     D.herhaal=parseHerhaal(hhR);
+    D.kenmerken=parseKenmerken(kmkR);
     setSynced();
-    const hash=JSON.stringify([D.ntd,D.af,D.alvo,D.alfa,D.ontw,D.logboek,D.herhaal]);
+    const hash=JSON.stringify([D.ntd,D.af,D.alvo,D.alfa,D.ontw,D.logboek,D.herhaal,D.kenmerken]);
     if(hash!==state._lastDHash){
       state._lastDHash=hash;
       renderAll();

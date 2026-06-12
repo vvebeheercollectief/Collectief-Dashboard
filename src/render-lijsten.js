@@ -9,6 +9,7 @@ import { getSheetIds } from "./crud.js";
 import { logEvent } from "./render-overig.js";
 import { showToast } from "./notifications.js";
 import { bulkGeselecteerd, bulkWis, renderBulkUi } from "./bulk.js";
+import { flipOfferteRijen } from "./anim.js";
 
 // ══════════════════════════════════════
 //  NTD STATS
@@ -370,7 +371,8 @@ function renderTbody(tbodyId,rows,sec,page,isAf){
       html+=`<tr><td colspan="${colsOff}" class="grp-kop">Lopend (${lopend.length})</td></tr>`;
       html+=lopend.map(r=>rowNtd(r,sec)).join('');
     }
-    el.innerHTML=html;
+    // FLIP: rijen zweven zichtbaar naar hun nieuwe plek bij her-render (Task 2.3)
+    flipOfferteRijen(el,()=>{el.innerHTML=html});
     return;
   }
   // Drie groepen (Fase 4): actief / in behandeling / weggelegd
@@ -497,7 +499,9 @@ function rowNtd(r,sec){
     rowTeLaat ? 'row-telaat' : '',
     ov.weggelegd ? 'snooze-row' : ''
   ].filter(Boolean).join(' ');
-  return `<tr class="${rowCls}" data-row="${r._row}">${bulkCel}${cells}</tr>`;
+  // Stabiel FLIP-anker per offerte-traject (code + aanvraagdatum), voor de zweefanimatie
+  const flipAttr = sec==='OFFERTE-TRAJECTEN' ? ` data-flip="${esc(r.code)}|${esc(r.datumAangevraagd||'')}"` : '';
+  return `<tr class="${rowCls}" data-row="${r._row}"${flipAttr}>${bulkCel}${cells}</tr>`;
 }
 
 function rowAf(r,sec){

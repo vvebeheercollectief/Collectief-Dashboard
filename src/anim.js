@@ -29,4 +29,22 @@ function flashRow(tbodyId, row, cls = 'rij-flits'){
   setTimeout(opruimen, 1500);   // vangnet: animationend vuurt niet altijd (throttled tab)
 }
 
-export { animateRowOut, flashRow };
+// FLIP: laat offerte-rijen zichtbaar naar hun nieuwe plek zweven na her-render.
+function flipOfferteRijen(container, doRender){
+  const reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const before={};
+  if(!reduce) container.querySelectorAll('tr[data-flip]').forEach(el=>before[el.getAttribute('data-flip')]=el.getBoundingClientRect().top);
+  doRender();
+  if(reduce) return;
+  container.querySelectorAll('tr[data-flip]').forEach(el=>{
+    const oud=before[el.getAttribute('data-flip')];
+    if(oud==null) return;
+    const dy=oud-el.getBoundingClientRect().top;
+    if(!dy) return;
+    el.style.transform=`translateY(${dy}px)`;el.style.transition='none';
+    el.getBoundingClientRect();
+    el.style.transition='transform .35s ease';el.style.transform='';
+  });
+}
+
+export { animateRowOut, flashRow, flipOfferteRijen };

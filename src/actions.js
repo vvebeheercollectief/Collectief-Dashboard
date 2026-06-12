@@ -15,6 +15,7 @@ import { copyAiPrompt, aiOvernemen, aiActieTaak, aiKopieerConcept } from './ai.j
 import { dismissToast, saveNotifPrefs } from './notifications.js';
 import { doLogin } from './auth.js';
 import { openSnoozeModal, snoozeKies } from './snooze.js';
+import { openOfferteActieModal, offerteActieVastleggen } from './offerte-acties.js';
 import { openHerhaalModal, toggleHerhaalStatus, deleteHerhaal } from './render-herhaal.js';
 import { openVvePagina, renderVve, addContactLog } from './render-vve.js';
 import { saveKenmerken } from './kenmerken.js';
@@ -45,6 +46,9 @@ export const ACTIONS = {
   'toast-sluiten':         (el) => dismissToast(el.closest('.toast')),
   'taak-wegleggen':        (el) => openSnoozeModal(+el.dataset.rid),
   'snooze-kies':           (el) => snoozeKies(+el.dataset.dagen),
+  'offerte-nabellen':       (el) => openOfferteActieModal(+el.dataset.rid,'nabellen'),
+  'offerte-doorsturen':     (el) => openOfferteActieModal(+el.dataset.rid,'doorsturen'),
+  'offerte-actie-vastleggen': ()  => offerteActieVastleggen(),
   'herhaal-bewerken':      (el) => openHerhaalModal(+el.dataset.hid),
   'herhaal-status':        (el) => toggleHerhaalStatus(+el.dataset.hid),
   'herhaal-verwijderen':   ()   => deleteHerhaal(),

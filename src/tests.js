@@ -308,6 +308,9 @@ import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
        {code:'A',sectie:'OPPAKKEN',timestamp:'2026-06-11T10:00:00.000Z'},
      ]);const t=m.get('A');return t && t.getTime()===new Date('2026-06-10T10:00:00.000Z').getTime();})());
 
+  // ── offerte-acties: modal aanwezig ──
+  truthy('offerte-actie-modal bestaat', !!document.getElementById('off-actie-bg'));
+
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');
   window._testResult = `${totOk} OK, ${totFail} FAIL`; // uitleesbaar voor test-automatisering

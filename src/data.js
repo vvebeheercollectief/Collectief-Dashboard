@@ -125,6 +125,7 @@ function parseSections(rows){
     entry.opvolgdatum=_f4v(row[11]);  // L — Fase 4
     entry.herhaalId  =_f4v(row[12]);  // M
     entry.esc        =_f4v(row[13]);  // N (alleen door Apps Script geschreven)
+    entry.fase       =_f4v(row[14]);  // O — offerte-fase (offerte-motor)
     if(entry.code) out[cur].push(entry);
   }
   return {data:out,secInfo};

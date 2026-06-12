@@ -22,6 +22,7 @@ import { loadAll } from './data.js';
 import { initActions } from './actions.js';
 import { initVveZoekveld } from './vve-zoekveld.js';
 import { closeSnoozeModal, snoozeOpslaan, snoozeWis } from './snooze.js';
+import { sluitOfferteActieModal } from './offerte-acties.js';
 import { renderHerhaal, openHerhaalModal, closeHerhaalModal, syncHerhaalVelden, submitHerhaal } from './render-herhaal.js';
 import { renderVve } from './render-vve.js';
 import { initPalette } from './palette.js';
@@ -153,6 +154,14 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('snooze-bg').addEventListener('mousedown',e=>{_snoozeMouseDown=e.target});
   document.getElementById('snooze-bg').addEventListener('click',e=>{if(e.target.id==='snooze-bg'&&_snoozeMouseDown?.id==='snooze-bg')closeSnoozeModal()});
 
+  // Offerte opvolg-actie-modal (offerte-motor Fase 3) — zelfde patroon als snooze
+  document.getElementById('off-actie-close').onclick=sluitOfferteActieModal;
+  document.getElementById('off-actie-cancel').onclick=sluitOfferteActieModal;
+  let _offActieMouseDown=null;
+  document.getElementById('off-actie-bg').addEventListener('mousedown',e=>{_offActieMouseDown=e.target});
+  document.getElementById('off-actie-bg').addEventListener('click',e=>{if(e.target.id==='off-actie-bg'&&_offActieMouseDown?.id==='off-actie-bg')sluitOfferteActieModal()});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElementById('off-actie-bg').classList.contains('open'))sluitOfferteActieModal()});
+
   // Afgerond modal
   document.getElementById('complete-close').onclick=closeCompleteModal;
   document.getElementById('complete-cancel').onclick=closeCompleteModal;
@@ -194,6 +203,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(document.getElementById('complete-bg').classList.contains('open')) return;
     if(document.getElementById('ontw-modal-bg').classList.contains('open')) return;
     if(document.getElementById('snooze-bg').classList.contains('open')) return;
+    if(document.getElementById('off-actie-bg').classList.contains('open')) return;
     if(document.getElementById('hh-bg').classList.contains('open')) return;
     if(document.getElementById('pal-bg').classList.contains('open')) return;
     if(document.getElementById('dot').classList.contains('loading')) return;

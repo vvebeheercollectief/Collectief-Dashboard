@@ -44,8 +44,10 @@ function flipOfferteRijen(container, doRender){
     el.style.transform=`translateY(${dy}px)`;el.style.transition='none';
     el.getBoundingClientRect();
     el.style.transition='transform .35s ease';el.style.transform='';
-    const opruimen=()=>{el.style.transition='';};
-    el.addEventListener('transitionend',opruimen,{once:true});
+    // niet {once:true}: een gebubbelde kind-transitie zou de listener te vroeg verbruiken
+    const opruimen=()=>{el.style.transition='';el.removeEventListener('transitionend',h);};
+    const h=e=>{if(e.target===el)opruimen();};
+    el.addEventListener('transitionend',h);
     setTimeout(opruimen,500); // vangnet (throttled tab)
   });
 }

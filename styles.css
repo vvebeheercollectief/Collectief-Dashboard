@@ -609,3 +609,9 @@
     .bb-datum{display:flex;gap:6px;padding:6px 4px 2px;border-top:1px solid var(--bor);margin-top:4px}
     .bb-datum input{flex:1;border:1px solid var(--bor);border-radius:7px;padding:5px 7px;font-size:12px;background:var(--sur2);color:var(--txt)}
     .bb-datum button{font-size:12px;font-weight:700;background:var(--ac);color:#fff;border-radius:7px;padding:5px 11px}
+
+    /* ── Offerte-motor: fase-balk ── */
+    .fase-balk{display:flex;gap:3px;min-width:80px;margin-top:4px}
+    .fase-stap{flex:1;height:4px;border-radius:99px;background:var(--sur2)}
+    .fase-stap.done{background:var(--ac)}
+    .fase-stap.nu{background:var(--am)}

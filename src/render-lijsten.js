@@ -406,6 +406,15 @@ function bepaalStil(r, sec){
   return dagen >= STIL_DREMPEL_DAGEN ? dagen : null;
 }
 
+// Offerte-motor: mini fase-balk (4 mijlpalen) voor in de offerte-rij.
+function faseBalk(r){
+  const fases=['aangevraagd','ontvangen','bij_vve','gegund'];
+  const labels={aangevraagd:'Aangevraagd',ontvangen:'Ontvangen',bij_vve:'Bij VvE',gegund:'Gegund'};
+  const idx=fases.indexOf(offerteFase(r));
+  return `<div class="fase-balk" title="${labels[fases[idx]]}">`+fases.map((f,i)=>
+    `<span class="fase-stap ${i<idx?'done':i===idx?'nu':'todo'}"></span>`).join('')+`</div>`;
+}
+
 function deadlineCel(r, sec){
   if (!r.deadline) return `<td class="cell-sm"><span class="warn-geen-deadline">Geen deadline</span></td>`;
   const { teLaat, dagenTot } = berekenPrioriteit(r.deadline, sec);
@@ -462,7 +471,7 @@ function rowNtd(r,sec){
       cells=`<td><span class="code code-klik" style="${css}" data-action="vve-open" data-code="${esc(r.code)}" title="Open VvE-dossier">${esc(r.code)}</span></td>
         <td class="cell-name">${esc(r.naam)}${subBadge(r.subcategorie)}</td>
         <td class="cell-sm">${esc(r.datumAangevraagd||'')}</td>
-        <td>${offProg(r.offertes)}</td>
+        <td>${offProg(r.offertes)}${faseBalk(r)}</td>
         <td>${persBadges(r.behandelaar)}</td>
         ${deadlineCel(r, 'OFFERTE-TRAJECTEN')}
         <td>${prioBadge(r, 'OFFERTE-TRAJECTEN')}</td>

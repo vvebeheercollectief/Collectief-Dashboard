@@ -136,6 +136,15 @@ function offerteFase(r){
   return recv > 0 ? 'ontvangen' : 'aangevraagd';
 }
 
+// Bij wie ligt de bal? 'aannemer' | 'ons' | 'vve' | null (gegund).
+function offerteBalBij(r){
+  const fase = offerteFase(r);
+  if (fase === 'gegund')    return null;
+  if (fase === 'bij_vve')   return 'vve';
+  if (fase === 'ontvangen') return 'ons';
+  return 'aannemer';
+}
+
 function offProg(v){
   if(!v)return'';
   const[recv,req]=(v+'').split('/').map(s=>parseInt(s)||0);
@@ -192,5 +201,5 @@ export {
   _verschilInKalenderdagen, berekenPrioriteit, prioBadge, persBadges, ibBadge,
   adjOff, offProg, _MAANDEN, _parseAnyDate, parseDt, toISODate, toDutchDate,
   emptyRow, esc, subBadge,
-  parseOff, offerteFase,
+  parseOff, offerteFase, offerteBalBij,
 };

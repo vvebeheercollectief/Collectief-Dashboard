@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase } from "./util.js";
+import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, offerteBalBij } from "./util.js";
 import { logZin } from "./render-overig.js";
 import { _isStagingHost } from "./config.js";
 import { ACTIONS } from "./actions.js";
@@ -217,6 +217,12 @@ import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
   eq('fase expliciet bij_vve',  offerteFase({offertes:'3/3', fase:'bij_vve'}), 'bij_vve');
   eq('fase expliciet "Bij VvE"',offerteFase({fase:'Bij VvE'}), 'bij_vve');
   eq('fase gegund',             offerteFase({fase:'gegund'}), 'gegund');
+
+  // ── offerte-motor: bal bij wie ──
+  eq('balBij aangevraagd → aannemer', offerteBalBij({offertes:'0/2'}), 'aannemer');
+  eq('balBij ontvangen → ons',        offerteBalBij({offertes:'2/2'}), 'ons');
+  eq('balBij bij_vve → vve',          offerteBalBij({fase:'bij_vve'}), 'vve');
+  eq('balBij gegund → null',          offerteBalBij({fase:'gegund'}), null);
 
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');

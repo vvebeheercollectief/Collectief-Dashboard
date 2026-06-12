@@ -160,17 +160,18 @@ Respecteer `prefers-reduced-motion` (direct verspringen).
 - Altijd **opnieuw te openen** via een knop bovenin de sectie (`✦ Briefing`); `↻` ververst,
   `✕` klapt dicht.
 
-### Inhoud — regel-gebaseerde kern + AI-toon
+### Inhoud — regel-gebaseerde kern met natuurlijke sjablonen
 
-Twee lagen, zodat hij altijd werkt:
+> **Bouwnotitie (2026-06-12):** de oorspronkelijk bedachte "AI-toonlaag via `src/ai.js`" is
+> vervallen — `ai.js` blijkt een kopieer-plak-hulp zonder API-aanroep, en een API-sleutel hoort
+> niet in deze publieke frontend. De regel-gebaseerde kern (die toch al de altijd-werkende basis
+> was) ís daarom de briefing, met rijk geformuleerde sjabloon-zinnen voor de assistent-toon.
 
 1. **Regel-gebaseerde kern** (deterministisch, snel, gratis): berekent de feiten — aantal
-   nu-opvolgen, hoeveel langer dan trap2 stil, hoeveel "bal bij ons", hoeveel klaar om te
+   nu-opvolgen, hoeveel lang stil, hoeveel "bal bij ons", hoeveel klaar om te
    gunnen, en het urgentste traject met naam + dagen + bal-bij-wie.
-2. **AI-laag voor de toon** (via `src/ai.js`, die al per-VvE live context kan ophalen): giet die
-   feiten in 2–4 natuurlijke Nederlandse zinnen, assistent-toon. **Fallback**: lukt de
-   AI-aanroep niet, dan toont de briefing dezelfde feiten via een vast tekstsjabloon. De kern is
-   nooit afhankelijk van de AI.
+2. **Natuurlijke formulering** via sjabloon-zinnen met enkelvoud/meervoud-varianten
+   (`offerteBriefingTekst`), zodat de briefing als een assistent leest zonder AI-afhankelijkheid.
 
 De briefing eindigt met enkele highlight-chips ("2 lang stil" · "1 wacht op jou" · "3 klaar om
 te gunnen").

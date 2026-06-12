@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, offerteBalBij, _verschilInWerkdagen, offerteNuOpvolgen } from "./util.js";
+import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, offerteBalBij, _verschilInWerkdagen, offerteNuOpvolgen, offerteSorteerScore } from "./util.js";
 import { logZin } from "./render-overig.js";
 import { _isStagingHost } from "./config.js";
 import { ACTIONS } from "./actions.js";
@@ -239,6 +239,14 @@ import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
   // deadline overschreden → altijd nodig
   eq('nu-opvolgen deadline te laat',
      offerteNuOpvolgen({offertes:'2/2', datumAangevraagd:'11 juni 2026', deadline:'1 juni 2026'}, VANDAAG_OFF).nodig, true);
+
+  // ── offerte-motor: sorteerscore (hoger = urgenter) ──
+  truthy('score: deadline-te-laat > gewoon',
+     offerteSorteerScore({offertes:'2/2', datumAangevraagd:'11 juni 2026', deadline:'1 juni 2026', prioriteit:'Laag'}, VANDAAG_OFF)
+     > offerteSorteerScore({offertes:'0/2', datumAangevraagd:'1 juni 2026', prioriteit:'Hoog'}, VANDAAG_OFF));
+  truthy('score: langer stil > korter stil',
+     offerteSorteerScore({offertes:'0/2', datumAangevraagd:'1 mei 2026', prioriteit:'Midden'}, VANDAAG_OFF)
+     > offerteSorteerScore({offertes:'0/2', datumAangevraagd:'10 juni 2026', prioriteit:'Midden'}, VANDAAG_OFF));
 
   // ── offerte-motor: werkdagen-verschil (vr→ma = 1, weekend telt niet) ──
   eq('werkdagen vr→ma', _verschilInWerkdagen(new Date(2026,5,5), new Date(2026,5,8)), 1);

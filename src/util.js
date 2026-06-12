@@ -196,6 +196,13 @@ function offerteBalBij(r){
   return 'aannemer';
 }
 
+// Sorteerscore voor "Nu opvolgen": hoger = urgenter (sorteer aflopend).
+function offerteSorteerScore(r, vandaag){
+  const s = offerteNuOpvolgen(r, vandaag);
+  const prioRank = { hoog:2, midden:1, laag:0 }[(((r&&r.prioriteit)||'')+'').trim().toLowerCase()];
+  return (s.deadlineTeLaat ? 1e6 : 0) + ((s.dagen || 0) * 100) + (prioRank == null ? 1 : prioRank);
+}
+
 function offProg(v){
   if(!v)return'';
   const[recv,req]=(v+'').split('/').map(s=>parseInt(s)||0);
@@ -253,5 +260,5 @@ export {
   adjOff, offProg, _MAANDEN, _parseAnyDate, parseDt, toISODate, toDutchDate,
   emptyRow, esc, subBadge,
   parseOff, offerteFase, offerteBalBij, _verschilInWerkdagen,
-  offerteStilBasis, offerteNuOpvolgen,
+  offerteStilBasis, offerteNuOpvolgen, offerteSorteerScore,
 };

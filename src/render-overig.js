@@ -196,6 +196,8 @@ function actieBadge(actie){
     'Behandelaar gewijzigd':['--sec:var(--ac);--sec-l:var(--ac-l)','👤'],
     'Aangemaakt (sheet)':['--sec:var(--pu);--sec-l:var(--pu-l)','+'],
     'Opmerking':['--sec:var(--am);--sec-l:var(--am-l)','💬'],
+    'Contact':['--sec:var(--ac);--sec-l:var(--ac-l)','📞'],
+    'Kenmerk':['--sec:var(--pu);--sec-l:var(--pu-l)','📋'],
   };
   const[css,ico]=map[actie]||['',''];
   return css?`<span class="badge" style="background:var(--sec-l);color:var(--sec);${css}">${ico} ${esc(actie)}</span>`:`<span class="badge">${esc(actie)}</span>`;
@@ -232,6 +234,8 @@ function logZin(r){
     case'Aangemaakt':
     case'Aangemaakt (sheet)':  return A('maakte','var(--pu)')+'een nieuwe taak bij '+chip+(r.nieuweWaarde?` <span style="color:var(--mut)">→ ${esc(r.nieuweWaarde)}</span>`:'');
     case'Bewerkt':             return A('bewerkte','var(--ac)')+chip+(r.veld?` <span style="color:var(--mut)">— ${esc(r.veld)}</span>`:'');
+    case'Contact':             return A('sprak','var(--ac)')+`met ${esc(r.oudeWaarde||'—')} bij `+chip+` <span style="color:var(--mut)">· ${esc(r.veld||'')}</span>`;
+    case'Kenmerk':             return A('wijzigde','var(--pu)')+`kenmerk <b>${esc(r.veld||'')}</b> bij `+chip;
     default:                   return `<b>${naam}</b> — ${esc(r.actie||'')} `+chip;
   }
 }
@@ -240,6 +244,23 @@ function logTijd(iso){
   const d=new Date(iso);
   if(isNaN(d)) return '';
   return d.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
+}
+
+// Eén logregel als HTML (gedeeld door Logboek-pagina en VvE-dossier-feed)
+function logItemHtml(r){
+  let extra='';
+  if((r.actie==='Behandelaar gewijzigd'||r.actie==='Bewerkt'||r.actie==='Kenmerk') && r.veld && (r.oudeWaarde||r.nieuweWaarde)){
+    extra=`<div class="log-change"><span class="old">${esc(r.oudeWaarde||'—')}</span><span class="arr">→</span><span class="new">${esc(r.nieuweWaarde||'—')}</span></div>`;
+  }
+  if((r.actie==='Opmerking'||r.actie==='Contact') && r.nieuweWaarde){
+    extra=`<div class="log-note">"${esc(r.nieuweWaarde)}"</div>`;
+  }
+  const init=(displayName(r.gebruiker)||'?').charAt(0).toUpperCase();
+  return `<div class="log-item">
+    <span class="log-av" style="background:${avatarKleur(displayName(r.gebruiker))}">${esc(init)}</span>
+    <div class="log-body"><div class="log-line">${logZin(r)}</div>${extra}</div>
+    <span class="log-time">${esc(logTijd(r.timestamp))}</span>
+  </div>`;
 }
 
 function renderLogboek(){
@@ -268,19 +289,7 @@ function renderLogboek(){
     sl.forEach(r=>{
       const dag=logDayLabel(r.timestamp);
       if(dag!==lastDay){ html+=`<div class="log-day">${dag}</div>`; lastDay=dag; }
-      let extra='';
-      if((r.actie==='Behandelaar gewijzigd'||r.actie==='Bewerkt') && r.veld && (r.oudeWaarde||r.nieuweWaarde)){
-        extra=`<div class="log-change"><span class="old">${esc(r.oudeWaarde||'—')}</span><span class="arr">→</span><span class="new">${esc(r.nieuweWaarde||'—')}</span></div>`;
-      }
-      if(r.actie==='Opmerking' && r.nieuweWaarde){
-        extra=`<div class="log-note">"${esc(r.nieuweWaarde)}"</div>`;
-      }
-      const init=(displayName(r.gebruiker)||'?').charAt(0).toUpperCase();
-      html+=`<div class="log-item">
-        <span class="log-av" style="background:${avatarKleur(displayName(r.gebruiker))}">${esc(init)}</span>
-        <div class="log-body"><div class="log-line">${logZin(r)}</div>${extra}</div>
-        <span class="log-time">${esc(logTijd(r.timestamp))}</span>
-      </div>`;
+      html+=logItemHtml(r);
     });
     el.innerHTML=html;
   }
@@ -347,5 +356,5 @@ async function logEvent(code, sec, actie, veld, oudeWaarde, nieuweWaarde) {
 export {
   ONTW_CATS, ONTW_CAT_COLORS, parseOntw, renderOntw, setOntw, openOntwModal, closeOntwModal,
   submitOntwItem, deleteOntwItem, editOntwItem, parseLogboek, fmtLogTs, actieBadge, _LOG_AVKLEUR, avatarKleur,
-  logDayLabel, logZin, logTijd, renderLogboek, histNoteKey, renderTaskHistory, addTaskNote, logEvent,
+  logDayLabel, logZin, logTijd, logItemHtml, renderLogboek, histNoteKey, renderTaskHistory, addTaskNote, logEvent,
 };

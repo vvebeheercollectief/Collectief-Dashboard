@@ -5,8 +5,9 @@ import { esc, displayName, persBadges, berekenPrioriteit, opvolgStatus, parseDt,
 import { SECS, SKEYS } from "./config.js";
 import { state, D } from "./state.js";
 import { goTo } from "./ui.js";
-import { avatarKleur, logZin, logTijd } from "./render-overig.js";
-// (kringverwijzing render-vve ⇄ ui is hetzelfde patroon als crud ⇄ main:
+import { avatarKleur, logZin, logTijd, fmtLogTs, logItemHtml, logDayLabel } from "./render-overig.js";
+import { vveKenmerken, KENMERK_WAARDEN } from "./kenmerken.js";
+// (kringverwijzing render-vve ⇄ ui/kenmerken is hetzelfde patroon als crud ⇄ main:
 //  live bindings, de aanroep gebeurt pas op runtime)
 
 // Pure helper (testbaar zonder DOM): verzamelt alles van één VvE uit de D-data.
@@ -46,10 +47,36 @@ function vveOverzicht(code, data, vandaag){
            cijfers:{ open:open.length, teLaat, weggelegd:weggelegd.length, laatsteDagen } };
 }
 
+// Kenmerken-kaart: weergave- of bewerkmodus (Beheerderskenmerken)
+const KMK_PIL={'Ja':'background:var(--gn-l);color:var(--gn)','Nee':'background:var(--rd-l);color:var(--rd)','Deels':'background:var(--am-l);color:var(--am)'};
+const kmkPil=v=>{const w=v||'Onbekend';return `<span class="badge" style="${KMK_PIL[w]||'background:var(--sur2);color:var(--mut)'}">${esc(w)}</span>`;};
+function kenmerkenKaart(code){
+  const k=vveKenmerken(code,D);
+  if(state.kenmerkenEdit){
+    const sel=(id,val)=>`<select id="${id}">${KENMERK_WAARDEN.map(w=>`<option${(val||'Onbekend')===w?' selected':''}>${w}</option>`).join('')}</select>`;
+    return `<div class="kmk-rij"><span>Balkons gemeenschappelijk</span>${sel('kmk-balkons',k.balkons)}</div>
+      <div class="kmk-rij"><span>Kozijnen gemeenschappelijk</span>${sel('kmk-kozijnen',k.kozijnen)}</div>
+      <div class="kmk-bron-lbl">Bron</div>
+      <textarea id="kmk-bron" rows="2" placeholder="bv. splitsingsakte art. 17, mail gemeente 03-2024">${esc(k.bron)}</textarea>
+      <div class="kmk-knoppen">
+        <button class="btn btn-sec btn-sm" data-action="kenmerken-annuleren">Annuleren</button>
+        <button class="btn btn-pri btn-sm" data-action="kenmerken-opslaan">Opslaan</button>
+      </div>`;
+  }
+  const wijz=k.gewijzigdOp?`<div class="kmk-wijz">laatst gewijzigd door ${esc(displayName(k.gewijzigdDoor)||'?')} · ${esc(fmtLogTs(k.gewijzigdOp))}</div>`:'';
+  return `<div class="kmk-rij"><span>Balkons gemeenschappelijk</span>${kmkPil(k.balkons)}</div>
+    <div class="kmk-rij"><span>Kozijnen gemeenschappelijk</span>${kmkPil(k.kozijnen)}</div>
+    <div class="kmk-bron-lbl">Bron</div>
+    <div class="kmk-bron">${k.bron?esc(k.bron):'<span style="color:var(--mut)">Nog geen bron vastgelegd</span>'}</div>${wijz}`;
+}
+
 // Navigeer naar het dossier van een VvE (en onthoud 'm voor het commandocentrum)
 function openVvePagina(code){
   state.vveCode=code;
   state._vveAfAlles=false;
+  state.kenmerkenEdit=false;
+  state.vveLogFilter='alles';
+  state._vveLogAlles=false;
   try{
     const lijst=JSON.parse(localStorage.getItem('recentVves')||'[]').filter(c=>c!==code);
     lijst.unshift(code);
@@ -104,14 +131,6 @@ function renderVve(){
     return html||'<span style="color:var(--mut);font-size:12.5px">Geen ALV-gegevens</span>';
   };
 
-  const actiKaart=o.logboek.slice(0,10).map(e=>{
-    const naam=displayName(e.gebruiker)||'—';
-    const dagen=_verschilInKalenderdagen(_vandaagAmsterdam(),new Date(e.timestamp));
-    const wanneer=dagen==null||isNaN(dagen)?'':dagen<=0?`vandaag ${logTijd(e.timestamp)}`:dagen===1?'gisteren':`${dagen} d`;
-    return `<li><span class="log-av" style="background:${avatarKleur(naam)}">${esc(naam.charAt(0))}</span>
-      <div class="vve-tl-zin">${logZin(e)}</div><span class="t">${esc(wanneer)}</span></li>`;
-  }).join('')||'<li style="color:var(--mut)">Nog geen activiteit in het logboek</li>';
-
   const kc=(n,lbl,cls)=>`<div class="kc ${cls}"><b>${n}</b><span>${lbl}</span></div>`;
   wrap.innerHTML=`
     <div class="vve-kop">
@@ -144,8 +163,10 @@ function renderVve(){
       <div>
         <div class="vve-sectie">ALV's</div>
         <div class="vve-kaart">${alvKaart()}</div>
-        <div class="vve-sectie">Recente activiteit</div>
-        <div class="vve-kaart"><ul class="vve-tl">${actiKaart}</ul></div>
+        <div class="vve-sectie" style="margin-top:18px">Beheerderskenmerken
+          ${state.kenmerkenEdit?'':'<button class="btn btn-sec btn-sm" data-action="kenmerken-bewerken" style="margin-left:auto">✎ Bewerken</button>'}
+        </div>
+        <div class="vve-kaart">${kenmerkenKaart(code)}</div>
       </div>
     </div>`;
 }

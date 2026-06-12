@@ -545,6 +545,14 @@
     .vve-tl-zin{min-width:0}
     .code-klik{cursor:pointer;transition:filter var(--tr)}
     .code-klik:hover{filter:brightness(.9);text-decoration:underline}
+    /* Beheerderskenmerken (VvE-pagina) */
+    .kmk-rij{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--bor);font-size:13px}
+    .kmk-bron-lbl{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);margin:10px 0 4px}
+    .kmk-bron{font-size:12.5px;line-height:1.5;word-break:break-word}
+    .kmk-wijz{font-size:11px;color:var(--mut);margin-top:8px}
+    .kmk-knoppen{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
+    #kmk-bron{width:100%;border:1px solid var(--bor);border-radius:8px;padding:7px 9px;font:inherit;font-size:12.5px;resize:vertical;background:var(--sur)}
+    .kmk-rij select{font-size:12.5px;padding:4px 7px;border:1px solid var(--bor);border-radius:7px;background:var(--sur);color:var(--txt)}
 
     /* ── Commandocentrum (Fase 5) ── */
     #pal-bg.open{align-items:flex-start;padding-top:10vh}

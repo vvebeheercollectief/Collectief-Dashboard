@@ -17,6 +17,7 @@ import { doLogin } from './auth.js';
 import { openSnoozeModal, snoozeKies } from './snooze.js';
 import { openHerhaalModal, toggleHerhaalStatus, deleteHerhaal } from './render-herhaal.js';
 import { openVvePagina, renderVve } from './render-vve.js';
+import { saveKenmerken } from './kenmerken.js';
 import { palKies } from './palette.js';
 import { toggleBulkMode, bulkVink, toggleBulkMenu, bulkDoe } from './bulk.js';
 
@@ -54,6 +55,9 @@ export const ACTIONS = {
   'bulk-vink':             (el) => bulkVink(+el.dataset.rid),
   'bulk-menu':             (el) => toggleBulkMenu(el.dataset.menu),
   'bulk-doe':              (el) => bulkDoe(el),
+  'kenmerken-bewerken':    ()   => { state.kenmerkenEdit=true; renderVve(); },
+  'kenmerken-opslaan':     ()   => saveKenmerken(),
+  'kenmerken-annuleren':   ()   => { state.kenmerkenEdit=false; renderVve(); },
 };
 
 export function initActions() {

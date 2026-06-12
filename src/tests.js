@@ -6,7 +6,7 @@ import { logZin } from "./render-overig.js";
 import { _isStagingHost } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
-import { filterNtd } from "./render-lijsten.js";
+import { filterNtd, offerteGroepen } from "./render-lijsten.js";
 import { vveOverzicht, filterDossierLog } from "./render-vve.js";
 import { parseKenmerken, vveKenmerken } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
@@ -281,6 +281,16 @@ import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
   eq('briefing langStil telt 1', offerteBriefingFeiten([
      {code:'A', naam:'VvA Lekstraat 15', offertes:'0/2', datumAangevraagd:'1 mei 2026'},
   ], VANDAAG_OFF).langStil, 1);
+  // ── offerte-motor: groepen (render-laag) ──
+  const GRP = offerteGroepen([
+    {code:'X1', offertes:'0/2', datumAangevraagd:'1 mei 2026', prioriteit:'Midden'},
+    {code:'X2', offertes:'0/2', datumAangevraagd:'10 juni 2026'},
+    {code:'X3', offertes:'2/2', datumAangevraagd:'3 juni 2026', prioriteit:'Hoog'},
+  ], new Date(2026,5,12));
+  eq('groepen: nu telt 2', GRP.nu.length, 2);
+  eq('groepen: lopend telt 1', GRP.lopend.length, 1);
+  eq('groepen: langst stil eerst', GRP.nu[0].code, 'X1');
+
   eq('parseOff normaal', parseOff('2/3'), [2,3]);
   eq('parseOff half',    parseOff('3/'),  [3,0]);
   eq('parseOff rommel',  parseOff('abc'), [0,0]);

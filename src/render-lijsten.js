@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  RENDER-LIJSTEN — Nog-te-doen, Afgerond, ALV's + tabel/paginering
 // ══════════════════════════════════════
-import { esc, filt, prioBadge, persBadges, ibBadge, subBadge, offProg, emptyRow, berekenPrioriteit, parseDt, STIL_DREMPEL_DAGEN, _vandaagAmsterdam, _verschilInKalenderdagen, opvolgStatus, toISODate } from "./util.js";
+import { esc, filt, prioBadge, persBadges, ibBadge, subBadge, offProg, emptyRow, berekenPrioriteit, parseDt, STIL_DREMPEL_DAGEN, _vandaagAmsterdam, _verschilInKalenderdagen, opvolgStatus, toISODate, offerteFase, offerteNuOpvolgen, offerteSorteerScore } from "./util.js";
 import { SID, SECS, SKEYS, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { ensureToken } from "./auth.js";
@@ -126,8 +126,25 @@ function renderNtd(){
   renderPag('ntd-pag',rows.length,pgs.ntd,'ntd');
 }
 function setNtd(s){state.activeNtd=s;pgs.ntd=1;bulkWis();renderNtd();renderBulkUi()}
+// Offerte-motor: zet de jongste logboek-activiteit op de rij (voedt offerteStilBasis).
+function _verrijkOfferteRij(r){
+  const entries=(D.logboek||[]).filter(e=>e.code===r.code && e.sectie==='OFFERTE-TRAJECTEN');
+  let laatst=null;
+  entries.forEach(e=>{const t=e.timestamp?new Date(e.timestamp):null;if(t&&!isNaN(t)&&(!laatst||t>laatst))laatst=t;});
+  r.laatsteActiviteit=laatst?laatst.toISOString():'';
+  return r;
+}
+
+// Offerte-motor: splits rijen in {nu, lopend}; 'nu' aflopend op urgentie gesorteerd.
+function offerteGroepen(rijen, vandaag){
+  const nu=rijen.filter(r=>offerteNuOpvolgen(r,vandaag).nodig)
+                .sort((a,b)=>offerteSorteerScore(b,vandaag)-offerteSorteerScore(a,vandaag));
+  const lopend=rijen.filter(r=>!offerteNuOpvolgen(r,vandaag).nodig);
+  return {nu, lopend};
+}
+
 function filterNtd(rows,q,fCode,beh,prio,sec){
-  return rows.filter(r=>{
+  const out=rows.filter(r=>{
     if(q&&!SECS[sec].keys.some(k=>(r[k]||'').toLowerCase().includes(q))) return false;
     if(fCode&&!(r.code||'').toLowerCase().includes(fCode)) return false;
     if(beh&&!(r.behandelaar||'').toLowerCase().includes(beh.toLowerCase())) return false;
@@ -136,7 +153,14 @@ function filterNtd(rows,q,fCode,beh,prio,sec){
       if (berekend !== prio) return false;
     }
     return true;
-  }).sort((a,b)=>{
+  });
+  // Offerte-motor (Fase 2): eigen groepering "Nu opvolgen" → "Lopend" i.p.v. de generieke groeps-sortering
+  if(sec==='OFFERTE-TRAJECTEN'){
+    out.forEach(_verrijkOfferteRij);
+    const g=offerteGroepen(out,_vandaagAmsterdam());
+    return [...g.nu,...g.lopend];
+  }
+  return out.sort((a,b)=>{
     // Groepen (Fase 4): 0 = actief, 1 = in behandeling, 2 = weggelegd (opvolgdatum in toekomst)
     const grp = r => opvolgStatus(r).weggelegd ? 2 : (r.inBehandeling==='TRUE' ? 1 : 0);
     const gA = grp(a), gB = grp(b);
@@ -328,6 +352,27 @@ function renderTbody(tbodyId,rows,sec,page,isAf){
   const el=document.getElementById(tbodyId);
   if(!sl.length){el.innerHTML=`<tr><td colspan="10">${emptyRow(10,true)}</td></tr>`;return}
   if(isAf){el.innerHTML=sl.map(r=>rowAf(r,sec)).join('');return}
+  // Offerte-motor (Fase 2): eigen groepkoppen "Nu opvolgen" / "Lopend"
+  // (rijen komen al verrijkt + in nu→lopend-volgorde uit filterNtd; zelfde slice-mechaniek als Weggelegd)
+  if(sec==='OFFERTE-TRAJECTEN'){
+    const vandaag=_vandaagAmsterdam();
+    const nodig=r=>offerteNuOpvolgen(r,vandaag).nodig;
+    const nu=sl.filter(nodig), lopend=sl.filter(r=>!nodig(r));
+    const colsOff=SECS[sec].cols.length+1+(state.bulkMode?1:0);
+    let html='';
+    if(nu.length||page===1){
+      html+=`<tr><td colspan="${colsOff}" class="grp-kop grp-nu">🔔 Nu opvolgen (${nu.length})</td></tr>`;
+      html+=nu.length
+        ?nu.map(r=>rowNtd(r,sec)).join('')
+        :`<tr><td colspan="${colsOff}"><div class="empty"><div class="empty-ico">🎉</div>Niets dat nu opvolging vraagt</div></td></tr>`;
+    }
+    if(lopend.length){
+      html+=`<tr><td colspan="${colsOff}" class="grp-kop">Lopend (${lopend.length})</td></tr>`;
+      html+=lopend.map(r=>rowNtd(r,sec)).join('');
+    }
+    el.innerHTML=html;
+    return;
+  }
   // Drie groepen (Fase 4): actief / in behandeling / weggelegd
   const grpOf = r => opvolgStatus(r).weggelegd ? 2 : (r.inBehandeling==='TRUE' ? 1 : 0);
   const main=sl.filter(r=>grpOf(r)===0);
@@ -482,7 +527,7 @@ function renderPag(id,total,cur,doel){
 
 export {
   SEC_ICONS, SEC_THEMES, renderNtdStats, renderNtdDonut, _inPeriod, _weekIndex, renderNtd, setNtd,
-  filterNtd, renderAf, setAf, ALVO_ICONS, renderAlvo, ALVO_COLS, ALVO_LABELS, flagPill,
+  filterNtd, offerteGroepen, renderAf, setAf, ALVO_ICONS, renderAlvo, ALVO_COLS, ALVO_LABELS, flagPill,
   _recomputeAlvoStatus, toggleAlvoFlag, statusIco, renderAlfa, renderThead, renderTbody, bepaalStil,
   deadlineCel, rowNtd, rowAf, renderPag,
 };

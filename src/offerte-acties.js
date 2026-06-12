@@ -42,12 +42,17 @@ async function offerteActieVastleggen(){
   const who=getCurrentWho()||'?', ts=new Date().toISOString();
   const doorsturen=soort==='doorsturen';
   const veld=doorsturen?'E-mail':'Telefoon';
-  const wie=doorsturen?'Bewoner/eigenaar':'Aannemer';
+  // Fix B: als de bal bij de VvE lag (nabellen = eigenaren herinneren), is de contactpartij ook Bewoner/eigenaar
+  const balBij=(r._offStatus&&r._offStatus.balBij)||'aannemer';
+  const wie=(doorsturen||balBij==='vve')?'Bewoner/eigenaar':'Aannemer';
   const tekst=(doorsturen?'Offerte gedeeld met de eigenaren':'Nagebeld voor opvolging offerte')+(notitie?' — '+notitie:'');
   const entry={_row:0,timestamp:ts,code:r.code,sectie:'OFFERTE-TRAJECTEN',actie:'Contact',veld,oudeWaarde:wie,nieuweWaarde:tekst,gebruiker:who};
   const faseOud=r.fase||'';
+  // Fix A: snapshot opvolgdatum vóór optimistische wijziging
+  const opvolgdatumOud=r.opvolgdatum||'';
   D.logboek.unshift(entry);                 // optimistisch: stil-teller reset direct
   if(doorsturen) r.fase='bij_vve';
+  if(r.opvolgdatum) r.opvolgdatum='';      // verstreken opvolgdatum is afgehandeld door deze actie
   renderNtd();
   // F2: logGedaan-vlag overleeft _withRetry-herkansingen (closure);
   // voorkomt dat een geslaagde append bij een latere retry nogmaals wordt uitgevoerd.
@@ -56,8 +61,9 @@ async function offerteActieVastleggen(){
     async()=>{
       if(!logGedaan){ await appendRange("'Logboek'!A:H",[ts,r.code,'OFFERTE-TRAJECTEN','Contact',veld,wie,tekst,who]); logGedaan=true; }
       if(doorsturen&&r._row) await writeRange(`'Nog Te Doen'!O${r._row}`,['bij_vve']); // zonder _row geen O-write; resync zet de fase dan terug (zeldzaam, geaccepteerd)
+      if(opvolgdatumOud&&r._row) await writeRange(`'Nog Te Doen'!L${r._row}`,['']); // Fix A: verstreken opvolgdatum wissen in Sheet
     },
-    ()=>{ if(!logGedaan){ const i=D.logboek.indexOf(entry); if(i>-1)D.logboek.splice(i,1); } r.fase=faseOud; },
+    ()=>{ if(!logGedaan){ const i=D.logboek.indexOf(entry); if(i>-1)D.logboek.splice(i,1); } r.fase=faseOud; r.opvolgdatum=opvolgdatumOud; }, // Fix A: rollback opvolgdatum
     doorsturen?'Doorsturen vastleggen':'Nabellen vastleggen'
   );
 }

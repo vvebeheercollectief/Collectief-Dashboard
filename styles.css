@@ -616,3 +616,7 @@
     .fase-stap{flex:1;height:4px;border-radius:99px;background:var(--bor)}
     .fase-stap.done{background:var(--ac)}
     .fase-stap.nu{background:var(--am)}
+
+    /* ── Offerte-motor: opvolg-actieknop Nabellen/Doorsturen (spiegelt .act-af, paarstint) ── */
+    .off-actie{background:var(--pu-l);border-color:var(--pu-b);color:var(--pu);font-weight:800}
+    .off-actie:hover{background:var(--pu);border-color:var(--pu);color:#fff}

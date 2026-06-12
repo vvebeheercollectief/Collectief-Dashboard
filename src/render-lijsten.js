@@ -147,7 +147,7 @@ function _verrijkOfferteRij(r, actMap){
 // Offerte-motor: splits rijen in {nu, lopend}; 'nu' aflopend op urgentie gesorteerd.
 // Zet r._offNu als die nog niet bepaald is (zodat directe aanroepen uit tests ook werken).
 function offerteGroepen(rijen, vandaag){
-  const nodig=r=>{ if(r._offNu===undefined) r._offNu=offerteNuOpvolgen(r,vandaag).nodig; return r._offNu; };
+  const nodig=r=>{ if(r._offNu===undefined){ const st=offerteNuOpvolgen(r,vandaag); r._offStatus=st; r._offNu=st.nodig; } return r._offNu; };
   const nu=rijen.filter(nodig)
                 .sort((a,b)=>offerteSorteerScore(b,vandaag)-offerteSorteerScore(a,vandaag));
   const lopend=rijen.filter(r=>!nodig(r));
@@ -170,7 +170,7 @@ function filterNtd(rows,q,fCode,beh,prio,sec){
     const vandaag=_vandaagAmsterdam();
     const actMap=_offerteActiviteitMap(D.logboek);
     out.forEach(r=>_verrijkOfferteRij(r,actMap));
-    out.forEach(r=>{ r._offNu=offerteNuOpvolgen(r,vandaag).nodig; });
+    out.forEach(r=>{ const st=offerteNuOpvolgen(r,vandaag); r._offStatus=st; r._offNu=st.nodig; });
     const g=offerteGroepen(out,vandaag);
     return [...g.nu,...g.lopend];
   }
@@ -444,7 +444,9 @@ function rowNtd(r,sec){
   const bulkCel=state.bulkMode
     ?`<td class="bulk-cel"><span class="cb${bulkGeselecteerd(r)?' aan':''}" data-action="bulk-vink" data-rid="${rid}" role="checkbox" aria-checked="${bulkGeselecteerd(r)}"></span></td>`
     :'';
-  const editBtn=`<div class="acts"><button class="act-bw act-ico" data-action="taak-bewerken" data-rid="${rid}" title="Bewerken"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><button class="act-bw act-ico" data-action="taak-wegleggen" data-rid="${rid}" title="Wegleggen / opvolgdatum"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 13.5"/></svg></button><button class="act-af" data-action="taak-afronden" data-rid="${rid}" title="Afgehandeld"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 12 4 4 10-10"/></svg>Afronden</button></div>`;
+  // acts-cel met optionele extra knop vooraan (offerte-motor: contextuele opvolg-actie)
+  const actsCel=extra=>`<div class="acts">${extra||''}<button class="act-bw act-ico" data-action="taak-bewerken" data-rid="${rid}" title="Bewerken"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><button class="act-bw act-ico" data-action="taak-wegleggen" data-rid="${rid}" title="Wegleggen / opvolgdatum"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 13.5"/></svg></button><button class="act-af" data-action="taak-afronden" data-rid="${rid}" title="Afgehandeld"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 12 4 4 10-10"/></svg>Afronden</button></div>`;
+  const editBtn=actsCel('');
   let cells='';
   const _stilDagen = bepaalStil(r, sec);
   const stilPill = _stilDagen !== null
@@ -481,7 +483,12 @@ function rowNtd(r,sec){
         <td>${ibBadge(r.inBehandeling)}</td>
         <td>${editBtn}</td>`;
       break;
-    case'OFFERTE-TRAJECTEN':
+    case'OFFERTE-TRAJECTEN':{
+      // Offerte-motor (Fase 3): contextuele opvolg-actie alleen in "Nu opvolgen"-rijen
+      const st=r._offStatus||{};
+      const actieBtn=r._offNu&&st.actie
+        ? `<button class="act-bw off-actie" data-action="${st.actie==='Doorsturen'?'offerte-doorsturen':'offerte-nabellen'}" data-rid="${rid}" title="${st.actie==='Doorsturen'?'Offerte delen met de eigenaren + vastleggen':'Opvolging vastleggen (gebeld/gemaild)'}">${st.actie==='Doorsturen'?'📤 Doorsturen':'📞 Nabellen'}</button>`
+        : '';
       cells=`<td><span class="code code-klik" style="${css}" data-action="vve-open" data-code="${esc(r.code)}" title="Open VvE-dossier">${esc(r.code)}</span></td>
         <td class="cell-name">${esc(r.naam)}${subBadge(r.subcategorie)}</td>
         <td class="cell-sm">${esc(r.datumAangevraagd||'')}</td>
@@ -490,8 +497,8 @@ function rowNtd(r,sec){
         ${deadlineCel(r, 'OFFERTE-TRAJECTEN')}
         <td>${prioBadge(r, 'OFFERTE-TRAJECTEN')}</td>
         <td class="cell-txt">${r.opmerkingen?`<span style="font-size:12px">${esc(r.opmerkingen)}</span>`:''}${extraPills}</td>
-        <td>${editBtn}</td>`;
-      break;
+        <td>${actsCel(actieBtn)}</td>`;
+      break;}
     case'LOD':
       cells=`<td><span class="code code-klik" style="${css}" data-action="vve-open" data-code="${esc(r.code)}" title="Open VvE-dossier">${esc(r.code)}</span></td>
         <td class="cell-name">${esc(r.naam)}${subBadge(r.subcategorie)}</td>

@@ -131,8 +131,9 @@ function setNtd(s){
   state.activeNtd=s;pgs.ntd=1;bulkWis();
   // Briefing (Fase 4): bij het eerste offerte-tab-bezoek van de dag automatisch openen
   if(s==='OFFERTE-TRAJECTEN'){
-    const sleutel='offerteBriefing_'+toISODate(_vandaagAmsterdam());
-    if(localStorage.getItem(sleutel)!=='1'){ state.offerteBriefingOpen=true; try{localStorage.setItem(sleutel,'1');}catch(_){ } }
+    const tv=_vandaagAmsterdam();
+    const sleutel='offerteBriefing_'+tv.getFullYear()+'-'+String(tv.getMonth()+1).padStart(2,'0')+'-'+String(tv.getDate()).padStart(2,'0');
+    try{ if(localStorage.getItem(sleutel)!=='1'){ state.offerteBriefingOpen=true; localStorage.setItem(sleutel,'1'); } }catch(_){ }
   }
   renderNtd();renderBulkUi();
 }

@@ -6,7 +6,8 @@ import { logZin } from "./render-overig.js";
 import { _isStagingHost } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
-import { filterNtd, offerteGroepen, _offerteActiviteitMap, offerteBriefingTekst } from "./render-lijsten.js";
+import { filterNtd, offerteGroepen, _offerteActiviteitMap, offerteBriefingTekst, setNtd } from "./render-lijsten.js";
+import { state } from "./state.js";
 import { vveOverzicht, filterDossierLog } from "./render-vve.js";
 import { parseKenmerken, vveKenmerken } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
@@ -319,6 +320,18 @@ import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
            return t.includes('4 trajecten')&&t.includes('VvA Lekstraat 15')&&t.includes('8 dagen');})());
   // ── offerte-briefing: DOM-rooktest ──
   truthy('off-briefing-slot bestaat', !!document.getElementById('off-briefing-slot'));
+
+  // ── offerte-briefing: setNtd-pad (regressietest op toISODate-crash) ──
+  truthy('setNtd offerte-tab crasht niet en opent briefing', (()=>{
+    try{
+      Object.keys(localStorage).filter(k=>k.startsWith('offerteBriefing_')).forEach(k=>localStorage.removeItem(k));
+      const vorige=state.activeNtd;
+      setNtd('OFFERTE-TRAJECTEN');
+      const ok=state.activeNtd==='OFFERTE-TRAJECTEN'&&state.offerteBriefingOpen===true;
+      setNtd(vorige); state.offerteBriefingOpen=false;
+      return ok;
+    }catch(e){ console.error('setNtd-test:',e); return false; }
+  })());
 
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');

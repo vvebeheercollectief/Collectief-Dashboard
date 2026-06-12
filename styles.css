@@ -12,9 +12,12 @@
       --pk:#BE185D;--pk-l:#fce7f3;--pk-b:#fbcfe8;
       --ac:#0D7377;--ac-l:#CCFBF1;--ac-b:#5EEAD4;--ac-900:#064E50;--ac-500:#14B8A6;
       --nv:#2B3544;--nv-d:#1E2530;
+      /* V3 — teal zijbalk + accenten */
+      --sbbg:#08353a;--sbedge:#0f5c62;--sbglow:#4dd9d5;
     }
     [data-theme=dark]{
-      --bg:#141B24;--sur:#212B38;--sur2:#1A222D;--bor:#36414F;
+      --bg:#0d1417;--sur:#13211f;--sur2:#0f1b1a;--bor:#24383a;
+      --sbbg:#06272b;--sbedge:#0a4248;--sbglow:#2dd4bf;
       --txt:#EAF0F6;--mut:#9AA7B6;--fnt:#5E6C7D;
       --sh:0 1px 3px rgba(0,0,0,.45),0 1px 2px rgba(0,0,0,.35);
       --shm:0 6px 20px rgba(0,0,0,.5);--shl:0 24px 64px rgba(0,0,0,.65);
@@ -27,7 +30,7 @@
       --ac:#0E9089;--ac-l:#0A332F;--ac-b:#13615B;--ac-900:#0B6F69;--ac-500:#2DD4BF;
     }
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    html,body{height:100%;font-family:'DM Sans',sans-serif;font-size:14px;background:var(--bg);color:var(--txt);line-height:1.5}
+    html,body{height:100%;font-family:'Manrope',sans-serif;font-size:14px;background:var(--bg);color:var(--txt);line-height:1.5;-webkit-font-smoothing:antialiased}
     button{cursor:pointer;border:none;background:none;font:inherit;color:inherit}
     input,select,textarea{font:inherit}
     ul{list-style:none}
@@ -37,34 +40,41 @@
     #overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100}
     #overlay.on{display:block}
 
-    /* Sidebar */
-    #sb{width:var(--sb);background:linear-gradient(180deg,#2B3544 0%,#243040 100%);border-right:1px solid var(--bor);display:flex;flex-direction:column;flex-shrink:0;z-index:200;transition:transform var(--tr);color:#e2e8f0}
-    .sb-logo{padding:15px 16px;border-bottom:1px solid #3A4553;display:flex;align-items:center;gap:10px}
-    .sb-logo img{height:30px;width:auto;object-fit:contain}
-    .sb-logo-fb{width:30px;height:30px;background:linear-gradient(135deg,#0D7377,#14B8A6);border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:11px;flex-shrink:0}
-    .sb-brand{font-size:12.5px;font-weight:700;line-height:1.25}
-    .sb-brand span{display:block;font-size:11px;font-weight:400;color:#94a3b8}
-    .sb-nav{flex:1;padding:8px 8px;overflow-y:auto}
-    .sb-lbl{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:#64748b;padding:13px 10px 5px}
-    .ni{display:flex;align-items:center;gap:9px;padding:8px 11px;border-radius:var(--rs);color:#94a3b8;font-weight:500;font-size:13px;cursor:pointer;transition:background var(--tr),color var(--tr),border var(--tr);user-select:none;border-left:3px solid transparent;margin-left:0}
-    .ni:hover{background:rgba(255,255,255,.08);color:#f1f5f9}
-    .ni.on{background:linear-gradient(135deg,rgba(13,115,119,.35),rgba(20,184,166,.12));color:#5EEAD4;border-left:3px solid #14B8A6;font-weight:600}
-    .ni svg{width:15px;height:15px;flex-shrink:0}
-    .ni-badge{margin-left:auto;padding:2px 7px;border-radius:20px;font-size:11px;font-weight:700;background:linear-gradient(135deg,#0D7377,#14B8A6);color:#fff}
-    .ni.on .ni-badge{background:var(--sec,var(--ac))}
-    .sb-foot{padding:12px 16px;border-top:1px solid #3A4553;display:flex;align-items:center;justify-content:space-between}
-    .sync-row{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--mut)}
-    .dot{width:7px;height:7px;border-radius:50%;background:var(--gn);animation:pulse 2s infinite;flex-shrink:0}
+    /* Sidebar — V3 teal */
+    #sb{width:var(--sb);background:var(--sbbg);display:flex;flex-direction:column;flex-shrink:0;z-index:200;transition:transform var(--tr);color:#e2e8f0;position:relative}
+    #sb::after{content:'';position:absolute;right:0;top:0;bottom:0;width:3px;background:linear-gradient(180deg,var(--sbedge) 0%,var(--sbbg) 55%,transparent 100%);pointer-events:none}
+    .sb-logo{padding:17px 16px 14px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:10px}
+    .sb-logo img{height:28px;width:auto;object-fit:contain;max-width:130px;filter:brightness(0) invert(1) opacity(.9)}
+    .sb-logo-fb{width:30px;height:30px;background:var(--sbedge);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--sbglow);font-weight:900;font-size:11px;flex-shrink:0}
+    .sb-brand{font-size:12px;font-weight:700;line-height:1.3;color:rgba(255,255,255,.85)}
+    .sb-brand span{display:block;font-size:10.5px;font-weight:500;color:rgba(255,255,255,.32)}
+    .sb-nav{flex:1;padding:10px 10px;overflow-y:auto}
+    .sb-lbl{font-size:9.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.22);padding:13px 9px 4px}
+    .sb-lbl:first-child{padding-top:4px}
+    .ni{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:6px;color:rgba(255,255,255,.42);font-weight:600;font-size:12.5px;letter-spacing:-.01em;cursor:pointer;transition:background var(--tr),color var(--tr);user-select:none;position:relative;margin-bottom:1px}
+    .ni:hover{background:rgba(255,255,255,.06);color:rgba(255,255,255,.72)}
+    .ni.on{background:rgba(255,255,255,.1);color:#fff;font-weight:700}
+    .ni.on::before{content:'';position:absolute;left:-10px;top:50%;transform:translateY(-50%);width:3px;height:16px;background:var(--sbglow);border-radius:0 3px 3px 0}
+    .ni svg{width:15px;height:15px;flex-shrink:0;opacity:.62}
+    .ni.on svg{opacity:1}
+    .ni-badge{margin-left:auto;font-size:10.5px;font-weight:800;letter-spacing:.02em;color:var(--sbglow)}
+    .ni.on .ni-badge{color:var(--sbglow)}
+    .sb-foot{padding:11px 16px;border-top:1px solid rgba(255,255,255,.07);display:flex;align-items:center;justify-content:space-between}
+    .sync-row{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:500;color:rgba(255,255,255,.3)}
+    .sb-foot .ico-btn{width:28px;height:28px;border:1px solid rgba(255,255,255,.12);background:transparent;color:rgba(255,255,255,.4)}
+    .sb-foot .ico-btn:hover{background:rgba(255,255,255,.08);color:rgba(255,255,255,.7)}
+    .dot{width:7px;height:7px;border-radius:50%;background:var(--sbglow);animation:pulse 2s infinite;flex-shrink:0}
     .dot.loading{background:var(--am)}
     .dot.err{background:var(--rd);animation:none}
     @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 
     /* Header */
     #main{flex:1;display:flex;flex-direction:column;overflow:hidden}
-    #hdr{height:var(--hh);background:var(--sur);border-bottom:1px solid var(--bor);display:flex;align-items:center;padding:0 20px;gap:12px;flex-shrink:0}
-    .hdr-info{flex:1}
-    .hdr-info h1{font-size:15px;font-weight:700;line-height:1.2}
-    .hdr-info p{font-size:11px;color:var(--mut)}
+    #hdr{height:var(--hh);background:var(--sur);border-bottom:2px solid var(--bor);display:flex;align-items:center;padding:0 22px;gap:8px;flex-shrink:0}
+    .hdr-info{flex:1;display:flex;align-items:baseline;gap:9px;min-width:0}
+    .hdr-info h1{font-size:18px;font-weight:900;line-height:1.2;letter-spacing:-.04em;color:var(--txt);white-space:nowrap;flex-shrink:0}
+    .hdr-info h1::after{content:'';display:inline-block;width:4px;height:4px;border-radius:50%;background:var(--ac-500);margin-left:9px;vertical-align:middle}
+    .hdr-info p{font-size:12px;font-weight:500;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .ico-btn{width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:var(--rs);border:1px solid var(--bor);color:var(--mut);background:var(--sur);transition:all var(--tr);flex-shrink:0}
     .ico-btn:hover{background:var(--sur2);color:var(--txt)}
     .ico-btn svg{width:15px;height:15px}
@@ -78,6 +88,15 @@
     .btn-del:hover{background:var(--rd);color:#fff;border-color:var(--rd)}
     .btn-done{width:28px;height:28px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid var(--gn-b);background:var(--gn-l);color:var(--gn);transition:all var(--tr);flex-shrink:0;margin-left:4px}
     .btn-done:hover{background:var(--gn);color:#fff;border-color:var(--gn)}
+    /* V3 — lichte, menselijke actieknoppen (Afronden / Bewerken) */
+    .acts{display:flex;gap:5px;align-items:center}
+    .act-af{height:26px;padding:0 11px;border-radius:6px;background:var(--ac-l);border:1px solid var(--ac-b);color:var(--ac-900);font-family:inherit;font-size:11px;font-weight:800;letter-spacing:-.01em;cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;transition:all var(--tr)}
+    .act-af:hover{background:var(--ac);border-color:var(--ac);color:#fff}
+    .act-af svg{width:13px;height:13px}
+    .act-bw{height:26px;padding:0 11px;border-radius:6px;background:transparent;border:1px solid var(--bor);color:var(--mut);font-family:inherit;font-size:11px;font-weight:700;letter-spacing:-.01em;cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;transition:all var(--tr)}
+    .act-bw:hover{background:var(--sur2);color:var(--txt);border-color:var(--fnt)}
+    .act-bw svg{width:13px;height:13px}
+    .act-ico{padding:0;width:26px;justify-content:center}
     tr.ib-row td{background:#f0fdfa!important;border-color:#5EEAD4!important}
     tr.ib-row .code{background:#CCFBF1!important;color:#064E50!important}
     [data-theme=dark] tr.ib-row td{background:#0C3633!important;border-color:#13615B!important}
@@ -126,7 +145,7 @@
     tbody tr:last-child{border-bottom:none}
     tbody tr:hover{background:var(--sur2)}
     td{padding:var(--row-py,9px) var(--row-px,13px);vertical-align:middle;font-size:var(--row-fs,13px);line-height:var(--row-lh,1.4)}
-    .code{font-family:'SF Mono','Fira Code',monospace;font-size:12px;font-weight:700;color:var(--sec,var(--ac));background:var(--sec-l,var(--ac-l));padding:3px 8px;border-radius:6px;white-space:nowrap}
+    .code{font-family:'Manrope',sans-serif;font-size:12.5px;font-weight:900;letter-spacing:.02em;color:var(--sec,var(--ac-900));background:none;padding:0;white-space:nowrap}
     .cell-name{font-weight:500;max-width:200px;line-height:var(--row-lh,1.4)}
     .cell-txt{color:var(--mut);max-width:240px;line-height:var(--row-lh,1.4);font-size:calc(var(--row-fs,13px) - .5px)}
     .cell-sm{font-size:12px;color:var(--mut);white-space:nowrap}

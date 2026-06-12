@@ -150,6 +150,43 @@ function offerteFase(r){
   return recv > 0 ? 'ontvangen' : 'aangevraagd';
 }
 
+// Laatste "aanraak"-datum van een traject (voor de stil-teller): jongste van
+// laatsteActiviteit, opvolgdatum, datumAangevraagd.
+function offerteStilBasis(r){
+  const kandidaten = [r && r.laatsteActiviteit, r && r.opvolgdatum, r && r.datumAangevraagd];
+  let laatst = null;
+  kandidaten.forEach(s => {
+    const p = _parseAnyDate(s || '');
+    if (p){ const d = new Date(p.y, p.m - 1, p.d); if (!laatst || d > laatst) laatst = d; }
+  });
+  return laatst;
+}
+
+// Heeft dit traject vandaag opvolging nodig? + context (bal-bij-wie, dagen, actie).
+function offerteNuOpvolgen(r, vandaag, termijnen){
+  vandaag  = vandaag   || _vandaagAmsterdam();
+  termijnen = termijnen || OFFERTE_TERMIJNEN;
+  const fase   = offerteFase(r);
+  const balBij = offerteBalBij(r);
+  const ov     = opvolgStatus(r, vandaag);
+  const basis  = offerteStilBasis(r);
+  const dagen     = basis ? _verschilInKalenderdagen(vandaag, basis) : null;
+  const werkdagen = basis ? _verschilInWerkdagen(basis, vandaag)     : null;
+  const dlp = _parseAnyDate((r && r.deadline) || '');
+  const deadlineTeLaat = dlp ? (_verschilInKalenderdagen(new Date(dlp.y, dlp.m - 1, dlp.d), vandaag) < 0) : false;
+  const opvolgenVandaag = ov.vandaag && !!_parseAnyDate((r && r.opvolgdatum) || '');
+  const actie = balBij === 'ons' ? 'Doorsturen' : 'Nabellen';
+  if (fase === 'gegund' || ov.weggelegd){
+    return { nodig:false, fase, balBij, dagen, werkdagen, deadlineTeLaat, actie };
+  }
+  const termijn = balBij === 'aannemer' ? termijnen.aannemer
+                : balBij === 'ons'      ? termijnen.delen
+                : balBij === 'vve'      ? termijnen.eigenaren : Infinity;
+  const meting = balBij === 'aannemer' ? werkdagen : dagen;
+  const nodig = (meting != null && meting >= termijn) || deadlineTeLaat || opvolgenVandaag;
+  return { nodig: !!nodig, fase, balBij, dagen, werkdagen, deadlineTeLaat, actie };
+}
+
 // Bij wie ligt de bal? 'aannemer' | 'ons' | 'vve' | null (gegund).
 function offerteBalBij(r){
   const fase = offerteFase(r);
@@ -216,4 +253,5 @@ export {
   adjOff, offProg, _MAANDEN, _parseAnyDate, parseDt, toISODate, toDutchDate,
   emptyRow, esc, subBadge,
   parseOff, offerteFase, offerteBalBij, _verschilInWerkdagen,
+  offerteStilBasis, offerteNuOpvolgen,
 };

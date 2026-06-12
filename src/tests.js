@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, offerteBalBij, _verschilInWerkdagen } from "./util.js";
+import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, offerteBalBij, _verschilInWerkdagen, offerteNuOpvolgen } from "./util.js";
 import { logZin } from "./render-overig.js";
 import { _isStagingHost } from "./config.js";
 import { ACTIONS } from "./actions.js";
@@ -217,6 +217,28 @@ import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
   eq('fase expliciet bij_vve',  offerteFase({offertes:'3/3', fase:'bij_vve'}), 'bij_vve');
   eq('fase expliciet "Bij VvE"',offerteFase({fase:'Bij VvE'}), 'bij_vve');
   eq('fase gegund',             offerteFase({fase:'gegund'}), 'gegund');
+
+  // ── offerte-motor: nu-opvolgen ──
+  const VANDAAG_OFF = new Date(2026, 5, 12); // vr 12 juni 2026
+  // aannemer 10 werkdagen stil (aangevraagd 29 mei) → nodig
+  eq('nu-opvolgen aannemer te lang stil',
+     offerteNuOpvolgen({offertes:'0/2', datumAangevraagd:'29 mei 2026'}, VANDAAG_OFF).nodig, true);
+  // aannemer pas 2 dagen geleden aangevraagd → niet nodig
+  eq('nu-opvolgen aannemer nog vers',
+     offerteNuOpvolgen({offertes:'0/2', datumAangevraagd:'10 juni 2026'}, VANDAAG_OFF).nodig, false);
+  // ontvangen, 9 dagen niet gedeeld → nodig, bal bij ons, actie Doorsturen
+  truthy('nu-opvolgen ontvangen → doorsturen',
+     (()=>{const s=offerteNuOpvolgen({offertes:'2/2', datumAangevraagd:'3 juni 2026'}, VANDAAG_OFF);
+           return s.nodig && s.balBij==='ons' && s.actie==='Doorsturen';})());
+  // gegund → nooit nodig
+  eq('nu-opvolgen gegund nooit',
+     offerteNuOpvolgen({fase:'gegund', datumAangevraagd:'1 jan 2026'}, VANDAAG_OFF).nodig, false);
+  // weggelegd (opvolgdatum in toekomst) → niet nodig
+  eq('nu-opvolgen weggelegd',
+     offerteNuOpvolgen({offertes:'0/2', datumAangevraagd:'1 mei 2026', opvolgdatum:'1 juli 2026'}, VANDAAG_OFF).nodig, false);
+  // deadline overschreden → altijd nodig
+  eq('nu-opvolgen deadline te laat',
+     offerteNuOpvolgen({offertes:'2/2', datumAangevraagd:'11 juni 2026', deadline:'1 juni 2026'}, VANDAAG_OFF).nodig, true);
 
   // ── offerte-motor: werkdagen-verschil (vr→ma = 1, weekend telt niet) ──
   eq('werkdagen vr→ma', _verschilInWerkdagen(new Date(2026,5,5), new Date(2026,5,8)), 1);

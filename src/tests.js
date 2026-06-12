@@ -8,6 +8,7 @@ import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
 import { filterNtd } from "./render-lijsten.js";
 import { vveOverzicht } from "./render-vve.js";
+import { parseKenmerken, vveKenmerken } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
 
@@ -151,6 +152,24 @@ import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
   eq('vve laatste act.',  _o5.cijfers.laatsteDagen, 2);
   eq('vve afgerond',      _o5.afgerond.length, 1);
   eq('vve onbekende code',vveOverzicht('ZZZ', _D5, TF).cijfers.open, 0);
+
+  // ── kenmerken ── (VvE-dossier: tab 'Kenmerken' A:F, laatste rij per code wint)
+  const _kmkRows=[
+    ['Code','Balkons','Kozijnen','Bron','GewijzigdDoor','GewijzigdOp'],
+    ['X1','Ja','Nee','akte art. 17','info@vvebeheercollectief.nl','2026-06-12T10:00:00.000Z'],
+    ['X2','','Deels','','',''],
+    ['',  'Ja','','','',''],                 // lege code → genegeerd
+    ['X1','Deels','Nee','akte art. 18','info@vvebeheercollectief.nl','2026-06-12T11:00:00.000Z'], // dubbel → laatste wint
+  ];
+  const _kmk=parseKenmerken(_kmkRows);
+  eq('kenmerken aantal (dedupe)', _kmk.length, 2);
+  eq('kenmerken laatste wint', _kmk.find(k=>k.code==='X1').balkons, 'Deels');
+  eq('kenmerken _row laatste', _kmk.find(k=>k.code==='X1')._row, 5);
+  eq('kenmerken leeg blad', parseKenmerken([]), []);
+  eq('kenmerken alleen kop', parseKenmerken([_kmkRows[0]]), []);
+  eq('vveKenmerken gevonden', vveKenmerken('X2',{kenmerken:_kmk}).kozijnen, 'Deels');
+  eq('vveKenmerken default', vveKenmerken('ZZZ',{kenmerken:_kmk}).balkons, '');
+  eq('vveKenmerken default row', vveKenmerken('ZZZ',{kenmerken:_kmk})._row, 0);
 
   // ── zoekAlles ── (Fase 5: commandocentrum — groepering & limieten)
   eq('zoek taak op woord',   zoekAlles('dak',_D5).taken.map(r=>r.actiepunt), ['Dak nakijken']);

@@ -620,3 +620,16 @@
     /* ── Offerte-motor: opvolg-actieknop Nabellen/Doorsturen (spiegelt .act-af, paarstint) ── */
     .off-actie{background:var(--pu-l);border-color:var(--pu-b);color:var(--pu);font-weight:800}
     .off-actie:hover{background:var(--pu);border-color:var(--pu);color:#fff}
+
+    /* ── Offerte-briefing (Fase 4): dagelijkse samenvattings-banner op de offerte-tab ── */
+    .off-briefing{background:var(--pu-l);border:1px solid var(--pu-b);border-radius:12px;padding:14px 16px;margin:14px 16px 0}
+    .off-briefing-kop{display:flex;align-items:center;justify-content:space-between;color:var(--pu);font-weight:600;font-size:13px}
+    .off-briefing p{margin:6px 0 0;font-size:14px;line-height:1.6;color:var(--pu)}
+    .off-briefing-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+    .off-briefing-chips span{background:var(--sur);font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;border:1px solid var(--bor)}
+    .off-briefing-chips .chip-stil{color:var(--rd);background:var(--rd-l);border-color:var(--rd-b)}
+    .off-briefing-chips .chip-ons{color:var(--am);background:var(--am-l);border-color:var(--am-b)}
+    .off-briefing-chips .chip-gun{color:var(--ac);background:var(--ac-l);border-color:var(--ac-b)}
+    .off-briefing-x{background:none;border:none;cursor:pointer;color:var(--pu);font-size:14px;padding:2px 4px;line-height:1}
+    .off-briefing-knop{margin:14px 16px 0;background:var(--sur);border:1px solid var(--pu-b);color:var(--pu);font-size:12px;font-weight:700;padding:5px 12px;border-radius:999px;cursor:pointer;transition:all var(--tr)}
+    .off-briefing-knop:hover{background:var(--pu-l)}

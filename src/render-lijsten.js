@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  RENDER-LIJSTEN — Nog-te-doen, Afgerond, ALV's + tabel/paginering
 // ══════════════════════════════════════
-import { esc, filt, prioBadge, persBadges, ibBadge, subBadge, offProg, emptyRow, berekenPrioriteit, parseDt, STIL_DREMPEL_DAGEN, _vandaagAmsterdam, _verschilInKalenderdagen, opvolgStatus, toISODate, offerteFase, offerteNuOpvolgen, offerteSorteerScore } from "./util.js";
+import { esc, filt, prioBadge, persBadges, ibBadge, subBadge, offProg, emptyRow, berekenPrioriteit, parseDt, STIL_DREMPEL_DAGEN, _vandaagAmsterdam, _verschilInKalenderdagen, opvolgStatus, toISODate, offerteFase, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten } from "./util.js";
 import { SID, SECS, SKEYS, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { ensureToken } from "./auth.js";
@@ -125,8 +125,64 @@ function renderNtd(){
   renderThead('ntd-thead',[...(state.bulkMode?['']:[]),...SECS[state.activeNtd].cols,''],SECS[state.activeNtd].css);
   renderTbody('ntd-tbody',rows,state.activeNtd,pgs.ntd,false);
   renderPag('ntd-pag',rows.length,pgs.ntd,'ntd');
+  renderOfferteBriefing();
 }
-function setNtd(s){state.activeNtd=s;pgs.ntd=1;bulkWis();renderNtd();renderBulkUi()}
+function setNtd(s){
+  state.activeNtd=s;pgs.ntd=1;bulkWis();
+  // Briefing (Fase 4): bij het eerste offerte-tab-bezoek van de dag automatisch openen
+  if(s==='OFFERTE-TRAJECTEN'){
+    const sleutel='offerteBriefing_'+toISODate(_vandaagAmsterdam());
+    if(localStorage.getItem(sleutel)!=='1'){ state.offerteBriefingOpen=true; try{localStorage.setItem(sleutel,'1');}catch(_){ } }
+  }
+  renderNtd();renderBulkUi();
+}
+
+// ══════════════════════════════════════
+//  OFFERTE-BRIEFING (Fase 4) — dagelijkse samenvatting bovenaan de offerte-tab
+// ══════════════════════════════════════
+// Offerte-briefing: feiten → natuurlijke NL-zinnen (regel-gebaseerd, geen AI nodig).
+function offerteBriefingTekst(f){
+  if(!f.nuOpvolgen){
+    let t='Niets dat nu opvolging vraagt — alle lopende trajecten zitten binnen hun termijn.';
+    if(f.klaarTeGunnen) t+=` Wel wachten ${f.klaarTeGunnen===1?'er één traject':f.klaarTeGunnen+' trajecten'} op akkoord van de VvE.`;
+    return t;
+  }
+  let t=`Vandaag ${f.nuOpvolgen===1?'heeft 1 traject':'hebben '+f.nuOpvolgen+' trajecten'} aandacht nodig`;
+  if(f.langStil) t+=`, waarvan ${f.langStil===1?'één al opvallend lang stil ligt':f.langStil+' al opvallend lang stil liggen'}`;
+  t+='. ';
+  if(f.urgentste){
+    const bal={aannemer:'de bal ligt bij de aannemer',ons:'de bal ligt bij ons',vve:'de bal ligt bij de eigenaren'}[f.urgentste.balBij]||'';
+    t+=`Het urgentst: ${f.urgentste.naam||f.urgentste.code}${f.urgentste.dagen!=null?` (${f.urgentste.dagen} dagen stil${bal?', '+bal:''})`:''}. `;
+  }
+  if(f.balBijOns) t+=`${f.balBijOns===1?'Eén offerte wacht':f.balBijOns+' offertes wachten'} op doorsturen naar de eigenaren. `;
+  if(f.klaarTeGunnen) t+=`${f.klaarTeGunnen===1?'Eén traject ligt':f.klaarTeGunnen+' trajecten liggen'} bij de VvE voor akkoord.`;
+  return t.trim();
+}
+// Vult de briefing-slot: banner (open) of klein knopje (dicht); leeg op andere tabs.
+function renderOfferteBriefing(){
+  const slot=document.getElementById('off-briefing-slot');
+  if(!slot) return;
+  if(state.activeNtd!=='OFFERTE-TRAJECTEN'){ slot.innerHTML=''; return; }
+  // Feiten over ÁLLE offerte-rijen (bewust niet zoek-gefilterd: de briefing gaat over het hele speelveld)
+  const rijen=D.ntd['OFFERTE-TRAJECTEN']||[];
+  const actMap=_offerteActiviteitMap(D.logboek);
+  rijen.forEach(r=>_verrijkOfferteRij(r,actMap));
+  const f=offerteBriefingFeiten(rijen);
+  const datumLabel=new Date().toLocaleDateString('nl-NL',{weekday:'long',day:'numeric',month:'long'});
+  slot.innerHTML = state.offerteBriefingOpen ? `
+    <div class="off-briefing">
+      <div class="off-briefing-kop">
+        <span>✦ Briefing · ${datumLabel}</span>
+        <button class="off-briefing-x" data-action="offerte-briefing-sluiten" title="Sluiten">✕</button>
+      </div>
+      <p>${esc(offerteBriefingTekst(f))}</p>
+      <div class="off-briefing-chips">
+        ${f.langStil?`<span class="chip-stil">${f.langStil} lang stil</span>`:''}
+        ${f.balBijOns?`<span class="chip-ons">${f.balBijOns} wacht op jou</span>`:''}
+        ${f.klaarTeGunnen?`<span class="chip-gun">${f.klaarTeGunnen} bij de VvE</span>`:''}
+      </div>
+    </div>` : `<button class="off-briefing-knop" data-action="offerte-briefing-openen">✦ Briefing</button>`;
+}
 // Offerte-motor: jongste logboek-activiteit per VvE-code (één pass over het logboek).
 function _offerteActiviteitMap(logboek){
   const map=new Map();
@@ -564,7 +620,7 @@ function renderPag(id,total,cur,doel){
 
 export {
   SEC_ICONS, SEC_THEMES, renderNtdStats, renderNtdDonut, _inPeriod, _weekIndex, renderNtd, setNtd,
-  filterNtd, offerteGroepen, _offerteActiviteitMap, renderAf, setAf, ALVO_ICONS, renderAlvo, ALVO_COLS, ALVO_LABELS, flagPill,
+  filterNtd, offerteGroepen, _offerteActiviteitMap, offerteBriefingTekst, renderAf, setAf, ALVO_ICONS, renderAlvo, ALVO_COLS, ALVO_LABELS, flagPill,
   _recomputeAlvoStatus, toggleAlvoFlag, statusIco, renderAlfa, renderThead, renderTbody, bepaalStil,
   deadlineCel, rowNtd, rowAf, renderPag,
 };

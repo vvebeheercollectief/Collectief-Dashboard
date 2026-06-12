@@ -6,7 +6,7 @@ import { logZin } from "./render-overig.js";
 import { _isStagingHost } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
-import { filterNtd, offerteGroepen, _offerteActiviteitMap } from "./render-lijsten.js";
+import { filterNtd, offerteGroepen, _offerteActiviteitMap, offerteBriefingTekst } from "./render-lijsten.js";
 import { vveOverzicht, filterDossierLog } from "./render-vve.js";
 import { parseKenmerken, vveKenmerken } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
@@ -310,6 +310,15 @@ import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
 
   // ── offerte-acties: modal aanwezig ──
   truthy('offerte-actie-modal bestaat', !!document.getElementById('off-actie-bg'));
+
+  // ── offerte-briefing: tekstsjabloon ──
+  truthy('briefing-tekst rustig bevat "binnen hun termijn"',
+     offerteBriefingTekst({nuOpvolgen:0,langStil:0,balBijOns:0,klaarTeGunnen:0,urgentste:null}).includes('binnen hun termijn'));
+  truthy('briefing-tekst druk noemt aantal en urgentste',
+     (()=>{const t=offerteBriefingTekst({nuOpvolgen:4,langStil:2,balBijOns:1,klaarTeGunnen:3,urgentste:{code:'A',naam:'VvA Lekstraat 15',dagen:8,balBij:'aannemer'}});
+           return t.includes('4 trajecten')&&t.includes('VvA Lekstraat 15')&&t.includes('8 dagen');})());
+  // ── offerte-briefing: DOM-rooktest ──
+  truthy('off-briefing-slot bestaat', !!document.getElementById('off-briefing-slot'));
 
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');

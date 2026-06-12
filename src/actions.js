@@ -49,6 +49,8 @@ export const ACTIONS = {
   'offerte-nabellen':       (el) => openOfferteActieModal(+el.dataset.rid,'nabellen'),
   'offerte-doorsturen':     (el) => openOfferteActieModal(+el.dataset.rid,'doorsturen'),
   'offerte-actie-vastleggen': ()  => offerteActieVastleggen(),
+  'offerte-briefing-sluiten': () => { state.offerteBriefingOpen=false; renderNtd(); },
+  'offerte-briefing-openen':  () => { state.offerteBriefingOpen=true;  renderNtd(); },
   'herhaal-bewerken':      (el) => openHerhaalModal(+el.dataset.hid),
   'herhaal-status':        (el) => toggleHerhaalStatus(+el.dataset.hid),
   'herhaal-verwijderen':   ()   => deleteHerhaal(),

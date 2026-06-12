@@ -6,7 +6,7 @@ import { logZin } from "./render-overig.js";
 import { _isStagingHost } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
-import { filterNtd, offerteGroepen } from "./render-lijsten.js";
+import { filterNtd, offerteGroepen, _offerteActiviteitMap } from "./render-lijsten.js";
 import { vveOverzicht, filterDossierLog } from "./render-vve.js";
 import { parseKenmerken, vveKenmerken } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
@@ -295,6 +295,18 @@ import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
   eq('parseOff half',    parseOff('3/'),  [3,0]);
   eq('parseOff rommel',  parseOff('abc'), [0,0]);
   eq('parseOff leeg',    parseOff(null),  [0,0]);
+
+  // ── offerte-motor: groepen randgevallen + activiteit-map ──
+  eq('groepen: leeg → beide leeg',
+     (()=>{const g=offerteGroepen([], new Date(2026,5,12));return [g.nu.length,g.lopend.length];})(), [0,0]);
+  eq('groepen: alles in nu',
+     (()=>{const g=offerteGroepen([{code:'Y1', offertes:'0/2', datumAangevraagd:'1 mei 2026'}], new Date(2026,5,12));return [g.nu.length,g.lopend.length];})(), [1,0]);
+  truthy('activiteit-map pakt jongste offerte-entry',
+     (()=>{const m=_offerteActiviteitMap([
+       {code:'A',sectie:'OFFERTE-TRAJECTEN',timestamp:'2026-06-01T10:00:00.000Z'},
+       {code:'A',sectie:'OFFERTE-TRAJECTEN',timestamp:'2026-06-10T10:00:00.000Z'},
+       {code:'A',sectie:'OPPAKKEN',timestamp:'2026-06-11T10:00:00.000Z'},
+     ]);const t=m.get('A');return t && t.getTime()===new Date('2026-06-10T10:00:00.000Z').getTime();})());
 
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');

@@ -127,20 +127,30 @@ function renderNtd(){
   renderPag('ntd-pag',rows.length,pgs.ntd,'ntd');
 }
 function setNtd(s){state.activeNtd=s;pgs.ntd=1;bulkWis();renderNtd();renderBulkUi()}
-// Offerte-motor: zet de jongste logboek-activiteit op de rij (voedt offerteStilBasis).
-function _verrijkOfferteRij(r){
-  const entries=(D.logboek||[]).filter(e=>e.code===r.code && e.sectie==='OFFERTE-TRAJECTEN');
-  let laatst=null;
-  entries.forEach(e=>{const t=e.timestamp?new Date(e.timestamp):null;if(t&&!isNaN(t)&&(!laatst||t>laatst))laatst=t;});
-  r.laatsteActiviteit=laatst?laatst.toISOString():'';
+// Offerte-motor: jongste logboek-activiteit per VvE-code (één pass over het logboek).
+function _offerteActiviteitMap(logboek){
+  const map=new Map();
+  (logboek||[]).forEach(e=>{
+    if(e.sectie!=='OFFERTE-TRAJECTEN'||!e.code||!e.timestamp) return;
+    const t=new Date(e.timestamp); if(isNaN(t)) return;
+    const cur=map.get(e.code); if(!cur||t>cur) map.set(e.code,t);
+  });
+  return map;
+}
+// Offerte-motor: zet de jongste activiteit op de rij als LOKALE datum (voedt offerteStilBasis).
+function _verrijkOfferteRij(r, actMap){
+  const t=actMap.get(r.code)||null;
+  r.laatsteActiviteit=t?`${t.getFullYear()}-${t.getMonth()+1}-${t.getDate()}`:'';
   return r;
 }
 
 // Offerte-motor: splits rijen in {nu, lopend}; 'nu' aflopend op urgentie gesorteerd.
+// Zet r._offNu als die nog niet bepaald is (zodat directe aanroepen uit tests ook werken).
 function offerteGroepen(rijen, vandaag){
-  const nu=rijen.filter(r=>offerteNuOpvolgen(r,vandaag).nodig)
+  const nodig=r=>{ if(r._offNu===undefined) r._offNu=offerteNuOpvolgen(r,vandaag).nodig; return r._offNu; };
+  const nu=rijen.filter(nodig)
                 .sort((a,b)=>offerteSorteerScore(b,vandaag)-offerteSorteerScore(a,vandaag));
-  const lopend=rijen.filter(r=>!offerteNuOpvolgen(r,vandaag).nodig);
+  const lopend=rijen.filter(r=>!nodig(r));
   return {nu, lopend};
 }
 
@@ -157,8 +167,11 @@ function filterNtd(rows,q,fCode,beh,prio,sec){
   });
   // Offerte-motor (Fase 2): eigen groepering "Nu opvolgen" → "Lopend" i.p.v. de generieke groeps-sortering
   if(sec==='OFFERTE-TRAJECTEN'){
-    out.forEach(_verrijkOfferteRij);
-    const g=offerteGroepen(out,_vandaagAmsterdam());
+    const vandaag=_vandaagAmsterdam();
+    const actMap=_offerteActiviteitMap(D.logboek);
+    out.forEach(r=>_verrijkOfferteRij(r,actMap));
+    out.forEach(r=>{ r._offNu=offerteNuOpvolgen(r,vandaag).nodig; });
+    const g=offerteGroepen(out,vandaag);
     return [...g.nu,...g.lopend];
   }
   return out.sort((a,b)=>{
@@ -356,9 +369,8 @@ function renderTbody(tbodyId,rows,sec,page,isAf){
   // Offerte-motor (Fase 2): eigen groepkoppen "Nu opvolgen" / "Lopend"
   // (rijen komen al verrijkt + in nu→lopend-volgorde uit filterNtd; zelfde slice-mechaniek als Weggelegd)
   if(sec==='OFFERTE-TRAJECTEN'){
-    const vandaag=_vandaagAmsterdam();
-    const nodig=r=>offerteNuOpvolgen(r,vandaag).nodig;
-    const nu=sl.filter(nodig), lopend=sl.filter(r=>!nodig(r));
+    // rijen zijn al getagd met r._offNu in filterNtd (één klok, geen nieuwe aanroepen)
+    const nu=sl.filter(r=>r._offNu), lopend=sl.filter(r=>!r._offNu);
     const colsOff=SECS[sec].cols.length+1+(state.bulkMode?1:0);
     let html='';
     if(nu.length||page===1){
@@ -500,6 +512,7 @@ function rowNtd(r,sec){
     ov.weggelegd ? 'snooze-row' : ''
   ].filter(Boolean).join(' ');
   // Stabiel FLIP-anker per offerte-traject (code + aanvraagdatum), voor de zweefanimatie
+  // sleutel niet gegarandeerd uniek bij zelfde code+datum — cosmetisch risico, geaccepteerd
   const flipAttr = sec==='OFFERTE-TRAJECTEN' ? ` data-flip="${esc(r.code)}|${esc(r.datumAangevraagd||'')}"` : '';
   return `<tr class="${rowCls}" data-row="${r._row}"${flipAttr}>${bulkCel}${cells}</tr>`;
 }
@@ -540,7 +553,7 @@ function renderPag(id,total,cur,doel){
 
 export {
   SEC_ICONS, SEC_THEMES, renderNtdStats, renderNtdDonut, _inPeriod, _weekIndex, renderNtd, setNtd,
-  filterNtd, offerteGroepen, renderAf, setAf, ALVO_ICONS, renderAlvo, ALVO_COLS, ALVO_LABELS, flagPill,
+  filterNtd, offerteGroepen, _offerteActiviteitMap, renderAf, setAf, ALVO_ICONS, renderAlvo, ALVO_COLS, ALVO_LABELS, flagPill,
   _recomputeAlvoStatus, toggleAlvoFlag, statusIco, renderAlfa, renderThead, renderTbody, bepaalStil,
   deadlineCel, rowNtd, rowAf, renderPag,
 };

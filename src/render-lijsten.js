@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  RENDER-LIJSTEN — Nog-te-doen, Afgerond, ALV's + tabel/paginering
 // ══════════════════════════════════════
-import { esc, filt, prioBadge, persBadges, ibBadge, subBadge, offProg, emptyRow, berekenPrioriteit, parseDt, STIL_DREMPEL_DAGEN, _vandaagAmsterdam, _verschilInKalenderdagen, opvolgStatus } from "./util.js";
+import { esc, filt, prioBadge, persBadges, ibBadge, subBadge, offProg, emptyRow, berekenPrioriteit, parseDt, STIL_DREMPEL_DAGEN, _vandaagAmsterdam, _verschilInKalenderdagen, opvolgStatus, toISODate } from "./util.js";
 import { SID, SECS, SKEYS, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { ensureToken } from "./auth.js";
@@ -30,12 +30,25 @@ const SEC_THEMES={
   LOD:'--sec:var(--rd);--sec-l:var(--rd-l)',
 };
 function renderNtdStats(){
-  document.getElementById('ntd-stats').innerHTML=SKEYS.map(s=>`
-    <div class="stat" style="${SEC_THEMES[s]}">
-      <div class="stat-top"><div class="stat-lbl">${SECS[s].label}</div><div class="stat-ico">${SEC_ICONS[s]}</div></div>
-      <div class="stat-num">${D.ntd[s]?.length||0}</div>
-      <div class="stat-sub">open ${s==='OFFERTE-TRAJECTEN'?'trajecten':s==='LOD'?'dossiers':'taken'}</div>
-    </div>`).join('');
+  // V3-stat-strip: aggregaten i.p.v. per-sectie-tegels (per-sectie staat al in de tabs)
+  let open=0, telaat=0, weg=0;
+  SKEYS.forEach(s=>{
+    (D.ntd[s]||[]).forEach(r=>{
+      open++;
+      if(berekenPrioriteit(r.deadline,s).teLaat) telaat++;
+      if(opvolgStatus(r).weggelegd) weg++;
+    });
+  });
+  const tv=_vandaagAmsterdam();
+  const todayISO=`${tv.getFullYear()}-${String(tv.getMonth()+1).padStart(2,'0')}-${String(tv.getDate()).padStart(2,'0')}`;
+  let afVandaag=0;
+  SKEYS.forEach(s=>{(D.af?.[s]||[]).forEach(r=>{ if(toISODate(r.datum||'')===todayISO) afVandaag++; })});
+  const item=(val,cls,cap,hint)=>`<div class="stat-item"><span class="stat-val ${cls}">${val}</span><div class="stat-meta"><span class="stat-cap">${cap}</span>${hint?`<span class="stat-hint">${hint}</span>`:''}</div></div>`;
+  document.getElementById('ntd-stats').innerHTML=
+    item(open,'','Open taken','')+
+    item(telaat,telaat?'red':'muted','Te laat','')+
+    item(weg,weg?'amber':'muted','Weggelegd','')+
+    item(afVandaag,'muted','Afgerond vandaag','');
   renderNtdDonut();
 }
 
@@ -186,11 +199,12 @@ function renderAlvo(){
   const afd=D.alvo.filter(r=>r.status==='Afgerond').length;
   const gep=D.alvo.filter(r=>r.status==='Gepland').length;
   const opn=D.alvo.filter(r=>r.status==='Open').length;
-  document.getElementById('alvo-stats').innerHTML=`
-    <div class="stat" style="--sec:var(--ac);--sec-l:var(--ac-l)"><div class="stat-top"><div class="stat-lbl">Totaal VvE's</div><div class="stat-ico">${ALVO_ICONS.totaal}</div></div><div class="stat-num">${tot}</div><div class="stat-sub">in beheer</div></div>
-    <div class="stat" style="--sec:var(--gn);--sec-l:var(--gn-l)"><div class="stat-top"><div class="stat-lbl">Afgerond</div><div class="stat-ico">${ALVO_ICONS.afgerond}</div></div><div class="stat-num">${afd}</div><div class="stat-sub">notulen verstuurd</div></div>
-    <div class="stat" style="--sec:var(--am);--sec-l:var(--am-l)"><div class="stat-top"><div class="stat-lbl">Gepland</div><div class="stat-ico">${ALVO_ICONS.gepland}</div></div><div class="stat-num">${gep}</div><div class="stat-sub">uitnodiging verstuurd</div></div>
-    <div class="stat" style="--sec:var(--rd);--sec-l:var(--rd-l)"><div class="stat-top"><div class="stat-lbl">Open</div><div class="stat-ico">${ALVO_ICONS.open}</div></div><div class="stat-num">${opn}</div><div class="stat-sub">nog te plannen</div></div>`;
+  const aItem=(val,cls,cap)=>`<div class="stat-item"><span class="stat-val ${cls}">${val}</span><div class="stat-meta"><span class="stat-cap">${cap}</span></div></div>`;
+  document.getElementById('alvo-stats').innerHTML=
+    aItem(tot,'',"Totaal VvE's")+
+    aItem(afd,'green','Afgerond')+
+    aItem(gep,'amber','Gepland')+
+    aItem(opn,opn?'red':'muted','Open');
 
   const q=document.getElementById('s-alvo').value.toLowerCase();
   const fs=document.getElementById('f-status-alvo').value;

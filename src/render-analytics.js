@@ -557,11 +557,12 @@ function buildDash(){
   const ntdTotal=SKEYS.reduce((s,k)=>s+(D.ntd[k]?.length||0),0);
   const afTotal=SKEYS.reduce((s,k)=>s+(D.af[k]?.length||0),0);
 
-  document.getElementById('dash-stats').innerHTML=`
-    <div class="stat" style="--sec:var(--ac);--sec-l:var(--ac-l)"><div class="stat-top"><div class="stat-lbl">Open taken</div><div class="stat-ico">${DASH_ICONS.open}</div></div><div class="stat-num">${ntdTotal}</div><div class="stat-sub">nog op te pakken</div></div>
-    <div class="stat" style="--sec:var(--gn);--sec-l:var(--gn-l)"><div class="stat-top"><div class="stat-lbl">Taken afgerond</div><div class="stat-ico">${DASH_ICONS.done}</div></div><div class="stat-num">${afTotal}</div><div class="stat-sub">afgeronde taken</div></div>
-    <div class="stat" style="--sec:var(--am);--sec-l:var(--am-l)"><div class="stat-top"><div class="stat-lbl">ALV's uitgeschreven</div><div class="stat-ico">${DASH_ICONS.alv}</div></div><div class="stat-num">${uitnD}</div><div class="stat-sub">uitnodiging verstuurd</div></div>
-    <div class="stat" style="--sec:var(--gn);--sec-l:var(--gn-l)"><div class="stat-top"><div class="stat-lbl">Notulen verstuurd</div><div class="stat-ico">${DASH_ICONS.notes}</div></div><div class="stat-num">${notulenD}</div><div class="stat-sub">van ${uitnD} uitgeschreven</div></div>`;
+  const dItem=(val,cls,cap,hint)=>`<div class="stat-item"><span class="stat-val ${cls}">${val}</span><div class="stat-meta"><span class="stat-cap">${cap}</span>${hint?`<span class="stat-hint">${hint}</span>`:''}</div></div>`;
+  document.getElementById('dash-stats').innerHTML=
+    dItem(ntdTotal,'teal','Open taken','')+
+    dItem(afTotal,'green','Taken afgerond','')+
+    dItem(uitnD,'amber',"ALV's uitgeschreven",'')+
+    dItem(notulenD,'green','Notulen verstuurd',`van ${uitnD}`);
 
   renderHeroDonut();
 

@@ -12,9 +12,12 @@
       --pk:#BE185D;--pk-l:#fce7f3;--pk-b:#fbcfe8;
       --ac:#0D7377;--ac-l:#CCFBF1;--ac-b:#5EEAD4;--ac-900:#064E50;--ac-500:#14B8A6;
       --nv:#2B3544;--nv-d:#1E2530;
+      /* Zijbalk — navy (zoals voorheen) met teal accent */
+      --sbbg:#243040;--sbedge:#3a4a5e;--sbglow:#5EEAD4;
     }
     [data-theme=dark]{
-      --bg:#141B24;--sur:#212B38;--sur2:#1A222D;--bor:#36414F;
+      --bg:#0d1417;--sur:#13211f;--sur2:#0f1b1a;--bor:#24383a;
+      --sbbg:#1e2530;--sbedge:#36414f;--sbglow:#5EEAD4;
       --txt:#EAF0F6;--mut:#9AA7B6;--fnt:#5E6C7D;
       --sh:0 1px 3px rgba(0,0,0,.45),0 1px 2px rgba(0,0,0,.35);
       --shm:0 6px 20px rgba(0,0,0,.5);--shl:0 24px 64px rgba(0,0,0,.65);
@@ -27,7 +30,7 @@
       --ac:#0E9089;--ac-l:#0A332F;--ac-b:#13615B;--ac-900:#0B6F69;--ac-500:#2DD4BF;
     }
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    html,body{height:100%;font-family:'DM Sans',sans-serif;font-size:14px;background:var(--bg);color:var(--txt);line-height:1.5}
+    html,body{height:100%;font-family:'Manrope',sans-serif;font-size:14px;background:var(--bg);color:var(--txt);line-height:1.5;-webkit-font-smoothing:antialiased}
     button{cursor:pointer;border:none;background:none;font:inherit;color:inherit}
     input,select,textarea{font:inherit}
     ul{list-style:none}
@@ -37,7 +40,7 @@
     #overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100}
     #overlay.on{display:block}
 
-    /* Sidebar */
+    /* Sidebar — bewust oud gehouden (gebruikersvoorkeur 2026-06-12) */
     #sb{width:var(--sb);background:linear-gradient(180deg,#2B3544 0%,#243040 100%);border-right:1px solid var(--bor);display:flex;flex-direction:column;flex-shrink:0;z-index:200;transition:transform var(--tr);color:#e2e8f0}
     .sb-logo{padding:15px 16px;border-bottom:1px solid #3A4553;display:flex;align-items:center;gap:10px}
     .sb-logo img{height:30px;width:auto;object-fit:contain}
@@ -61,10 +64,11 @@
 
     /* Header */
     #main{flex:1;display:flex;flex-direction:column;overflow:hidden}
-    #hdr{height:var(--hh);background:var(--sur);border-bottom:1px solid var(--bor);display:flex;align-items:center;padding:0 20px;gap:12px;flex-shrink:0}
-    .hdr-info{flex:1}
-    .hdr-info h1{font-size:15px;font-weight:700;line-height:1.2}
-    .hdr-info p{font-size:11px;color:var(--mut)}
+    #hdr{height:var(--hh);background:var(--sur);border-bottom:2px solid var(--bor);display:flex;align-items:center;padding:0 22px;gap:8px;flex-shrink:0}
+    .hdr-info{flex:1;display:flex;align-items:baseline;gap:9px;min-width:0}
+    .hdr-info h1{font-size:18px;font-weight:900;line-height:1.2;letter-spacing:-.04em;color:var(--txt);white-space:nowrap;flex-shrink:0}
+    .hdr-info h1::after{content:'';display:inline-block;width:4px;height:4px;border-radius:50%;background:var(--ac-500);margin-left:9px;vertical-align:middle}
+    .hdr-info p{font-size:12px;font-weight:500;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .ico-btn{width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:var(--rs);border:1px solid var(--bor);color:var(--mut);background:var(--sur);transition:all var(--tr);flex-shrink:0}
     .ico-btn:hover{background:var(--sur2);color:var(--txt)}
     .ico-btn svg{width:15px;height:15px}
@@ -78,6 +82,15 @@
     .btn-del:hover{background:var(--rd);color:#fff;border-color:var(--rd)}
     .btn-done{width:28px;height:28px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid var(--gn-b);background:var(--gn-l);color:var(--gn);transition:all var(--tr);flex-shrink:0;margin-left:4px}
     .btn-done:hover{background:var(--gn);color:#fff;border-color:var(--gn)}
+    /* V3 — lichte, menselijke actieknoppen (Afronden / Bewerken) */
+    .acts{display:flex;gap:5px;align-items:center}
+    .act-af{height:26px;padding:0 11px;border-radius:6px;background:var(--ac-l);border:1px solid var(--ac-b);color:var(--ac-900);font-family:inherit;font-size:11px;font-weight:800;letter-spacing:-.01em;cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;transition:all var(--tr)}
+    .act-af:hover{background:var(--ac);border-color:var(--ac);color:#fff}
+    .act-af svg{width:13px;height:13px}
+    .act-bw{height:26px;padding:0 11px;border-radius:6px;background:transparent;border:1px solid var(--bor);color:var(--mut);font-family:inherit;font-size:11px;font-weight:700;letter-spacing:-.01em;cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;transition:all var(--tr)}
+    .act-bw:hover{background:var(--sur2);color:var(--txt);border-color:var(--fnt)}
+    .act-bw svg{width:13px;height:13px}
+    .act-ico{padding:0;width:26px;justify-content:center}
     tr.ib-row td{background:#f0fdfa!important;border-color:#5EEAD4!important}
     tr.ib-row .code{background:#CCFBF1!important;color:#064E50!important}
     [data-theme=dark] tr.ib-row td{background:#0C3633!important;border-color:#13615B!important}
@@ -142,7 +155,7 @@
     tbody tr:last-child{border-bottom:none}
     tbody tr:hover{background:var(--sur2)}
     td{padding:var(--row-py,9px) var(--row-px,13px);vertical-align:middle;font-size:var(--row-fs,13px);line-height:var(--row-lh,1.4)}
-    .code{font-family:'SF Mono','Fira Code',monospace;font-size:12px;font-weight:700;color:var(--sec,var(--ac));background:var(--sec-l,var(--ac-l));padding:3px 8px;border-radius:6px;white-space:nowrap}
+    .code{font-family:'Manrope',sans-serif;font-size:12.5px;font-weight:900;letter-spacing:.02em;color:var(--sec,var(--ac-900));background:none;padding:0;white-space:nowrap}
     .cell-name{font-weight:500;max-width:200px;line-height:var(--row-lh,1.4)}
     .cell-txt{color:var(--mut);max-width:240px;line-height:var(--row-lh,1.4);font-size:calc(var(--row-fs,13px) - .5px)}
     .cell-sm{font-size:12px;color:var(--mut);white-space:nowrap}
@@ -163,6 +176,10 @@
     .pill-telaat{display:inline-block;background:#dc2626;color:#fff;font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;margin-left:6px;letter-spacing:.02em}
     .warn-geen-deadline{display:inline-flex;align-items:center;gap:4px;color:#d97706;font-size:12px;font-weight:600}
     .warn-geen-deadline::before{content:'⚠'}
+    /* V3 — deadline/status als gewone tekst (geen pill) */
+    .s-telaat{font-size:12px;font-weight:800;color:var(--rd);white-space:nowrap}
+    .s-soon{font-size:12px;font-weight:700;color:var(--am);white-space:nowrap}
+    .s-normal{font-size:12px;font-weight:600;color:var(--mut);white-space:nowrap}
     .pill-stil{display:inline-block;background:rgba(107,114,128,0.15);color:#4b5563;font-size:11px;font-weight:600;padding:2px 7px;border-radius:10px;margin-left:6px;cursor:pointer}
     .pill-stil::before{content:'🔕 '}
     /* Fase 4 — opvolging & herhaling */

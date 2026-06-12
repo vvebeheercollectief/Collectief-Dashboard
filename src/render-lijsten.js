@@ -364,8 +364,10 @@ function bepaalStil(r, sec){
 function deadlineCel(r, sec){
   if (!r.deadline) return `<td class="cell-sm"><span class="warn-geen-deadline">Geen deadline</span></td>`;
   const { teLaat, dagenTot } = berekenPrioriteit(r.deadline, sec);
-  const pill = teLaat ? ` <span class="pill-telaat">Te laat (${Math.abs(dagenTot)}d)</span>` : '';
-  return `<td class="cell-sm">${esc(r.deadline)}${pill}</td>`;
+  // V3: status als gewoon vetgedrukt woord, geen pill
+  if (teLaat) return `<td><span class="s-telaat">Te laat (${Math.abs(dagenTot)}d)</span></td>`;
+  const soon = dagenTot !== null && dagenTot <= 7;
+  return `<td><span class="${soon ? 's-soon' : 's-normal'}">${esc(r.deadline)}</span></td>`;
 }
 
 function rowNtd(r,sec){
@@ -374,7 +376,7 @@ function rowNtd(r,sec){
   const bulkCel=state.bulkMode
     ?`<td class="bulk-cel"><span class="cb${bulkGeselecteerd(r)?' aan':''}" data-action="bulk-vink" data-rid="${rid}" role="checkbox" aria-checked="${bulkGeselecteerd(r)}"></span></td>`
     :'';
-  const editBtn=`<button class="btn-edit" data-action="taak-bewerken" data-rid="${rid}" title="Bewerken"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><button class="btn-edit" data-action="taak-wegleggen" data-rid="${rid}" title="Wegleggen / opvolgdatum"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 13.5"/></svg></button><button class="btn-done" data-action="taak-afronden" data-rid="${rid}" title="Afgehandeld"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg></button>`;
+  const editBtn=`<div class="acts"><button class="act-bw act-ico" data-action="taak-bewerken" data-rid="${rid}" title="Bewerken"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><button class="act-bw act-ico" data-action="taak-wegleggen" data-rid="${rid}" title="Wegleggen / opvolgdatum"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 13.5"/></svg></button><button class="act-af" data-action="taak-afronden" data-rid="${rid}" title="Afgehandeld"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 12 4 4 10-10"/></svg>Afronden</button></div>`;
   let cells='';
   const _stilDagen = bepaalStil(r, sec);
   const stilPill = _stilDagen !== null

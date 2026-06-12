@@ -124,7 +124,11 @@ function initPalette(){
   document.addEventListener('keydown',e=>{
     if((e.ctrlKey||e.metaKey)&&(e.key==='k'||e.key==='K')){ e.preventDefault(); palOpen()?closePalette():openPalette(); }
     else if(e.key==='Escape'&&palOpen()){ closePalette(); }
-    else if(e.key==='Escape'&&state.bulkMode){ toggleBulkMode(); }
+    else if(e.key==='Escape'&&state.bulkMode){
+      // F3: geen bulk-toggle als er een modal open staat (off-actie, snooze, edit, etc.)
+      if(document.querySelector('.modal-bg.open')) return;
+      toggleBulkMode();
+    }
   });
 }
 

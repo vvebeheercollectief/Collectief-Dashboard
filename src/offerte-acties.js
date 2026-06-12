@@ -32,10 +32,13 @@ function sluitOfferteActieModal(){
 
 // Eén-klik opvolging: logboek-regel + (bij doorsturen) fase → bij_vve in kolom O.
 async function offerteActieVastleggen(){
+  // F1: snapshot state + notitie lokaal, sluit modal synchroon VÓÓR de await;
+  // een tweede klik strandt dan op de lege state (zelfde immuniteit als snooze-patroon).
   const r=state._offerteActieRow, soort=state._offerteActieSoort;
   if(!r||!r.code){ sluitOfferteActieModal(); return; }
-  if(!await ensureToken()){ alert('Inloggen mislukt.'); return; }
   const notitie=(document.getElementById('off-actie-notitie')?.value||'').trim();
+  sluitOfferteActieModal(); // synchroon sluiten vóór eerste await (bij token-faal: modal al dicht — geaccepteerd)
+  if(!await ensureToken()){ alert('Inloggen mislukt.'); return; }
   const who=getCurrentWho()||'?', ts=new Date().toISOString();
   const doorsturen=soort==='doorsturen';
   const veld=doorsturen?'E-mail':'Telefoon';
@@ -45,14 +48,16 @@ async function offerteActieVastleggen(){
   const faseOud=r.fase||'';
   D.logboek.unshift(entry);                 // optimistisch: stil-teller reset direct
   if(doorsturen) r.fase='bij_vve';
-  sluitOfferteActieModal();
   renderNtd();
+  // F2: logGedaan-vlag overleeft _withRetry-herkansingen (closure);
+  // voorkomt dat een geslaagde append bij een latere retry nogmaals wordt uitgevoerd.
+  let logGedaan=false;
   backgroundWrite(
     async()=>{
-      await appendRange("'Logboek'!A:H",[ts,r.code,'OFFERTE-TRAJECTEN','Contact',veld,wie,tekst,who]);
-      if(doorsturen&&r._row) await writeRange(`'Nog Te Doen'!O${r._row}`,['bij_vve']);
+      if(!logGedaan){ await appendRange("'Logboek'!A:H",[ts,r.code,'OFFERTE-TRAJECTEN','Contact',veld,wie,tekst,who]); logGedaan=true; }
+      if(doorsturen&&r._row) await writeRange(`'Nog Te Doen'!O${r._row}`,['bij_vve']); // zonder _row geen O-write; resync zet de fase dan terug (zeldzaam, geaccepteerd)
     },
-    ()=>{ const i=D.logboek.indexOf(entry); if(i>-1)D.logboek.splice(i,1); r.fase=faseOud; },
+    ()=>{ if(!logGedaan){ const i=D.logboek.indexOf(entry); if(i>-1)D.logboek.splice(i,1); } r.fase=faseOud; },
     doorsturen?'Doorsturen vastleggen':'Nabellen vastleggen'
   );
 }

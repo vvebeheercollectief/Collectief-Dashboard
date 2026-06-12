@@ -445,8 +445,8 @@ function rowNtd(r,sec){
     ?`<td class="bulk-cel"><span class="cb${bulkGeselecteerd(r)?' aan':''}" data-action="bulk-vink" data-rid="${rid}" role="checkbox" aria-checked="${bulkGeselecteerd(r)}"></span></td>`
     :'';
   // acts-cel met optionele extra knop vooraan (offerte-motor: contextuele opvolg-actie)
-  const actsCel=extra=>`<div class="acts">${extra||''}<button class="act-bw act-ico" data-action="taak-bewerken" data-rid="${rid}" title="Bewerken"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><button class="act-bw act-ico" data-action="taak-wegleggen" data-rid="${rid}" title="Wegleggen / opvolgdatum"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 13.5"/></svg></button><button class="act-af" data-action="taak-afronden" data-rid="${rid}" title="Afgehandeld"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 12 4 4 10-10"/></svg>Afronden</button></div>`;
-  const editBtn=actsCel('');
+  const actsHtml=extra=>`<div class="acts">${extra||''}<button class="act-bw act-ico" data-action="taak-bewerken" data-rid="${rid}" title="Bewerken"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><button class="act-bw act-ico" data-action="taak-wegleggen" data-rid="${rid}" title="Wegleggen / opvolgdatum"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 13.5"/></svg></button><button class="act-af" data-action="taak-afronden" data-rid="${rid}" title="Afgehandeld"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 12 4 4 10-10"/></svg>Afronden</button></div>`;
+  const editBtn=actsHtml('');
   let cells='';
   const _stilDagen = bepaalStil(r, sec);
   const stilPill = _stilDagen !== null
@@ -486,8 +486,12 @@ function rowNtd(r,sec){
     case'OFFERTE-TRAJECTEN':{
       // Offerte-motor (Fase 3): contextuele opvolg-actie alleen in "Nu opvolgen"-rijen
       const st=r._offStatus||{};
+      // F5: inline SVG i.p.v. emoji (iconenbeleid: geen emoji in knoppen, zelfde lijn-stijl als buurknoppen)
       const actieBtn=r._offNu&&st.actie
-        ? `<button class="act-bw off-actie" data-action="${st.actie==='Doorsturen'?'offerte-doorsturen':'offerte-nabellen'}" data-rid="${rid}" title="${st.actie==='Doorsturen'?'Offerte delen met de eigenaren + vastleggen':'Opvolging vastleggen (gebeld/gemaild)'}">${st.actie==='Doorsturen'?'📤 Doorsturen':'📞 Nabellen'}</button>`
+        ? `<button class="act-bw off-actie" data-action="${st.actie==='Doorsturen'?'offerte-doorsturen':'offerte-nabellen'}" data-rid="${rid}" title="${st.actie==='Doorsturen'?'Offerte delen met de eigenaren + vastleggen':'Opvolging vastleggen (gebeld/gemaild)'}">${st.actie==='Doorsturen'
+          ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></svg>Doorsturen`
+          : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>Nabellen`
+        }</button>`
         : '';
       cells=`<td><span class="code code-klik" style="${css}" data-action="vve-open" data-code="${esc(r.code)}" title="Open VvE-dossier">${esc(r.code)}</span></td>
         <td class="cell-name">${esc(r.naam)}${subBadge(r.subcategorie)}</td>
@@ -497,7 +501,7 @@ function rowNtd(r,sec){
         ${deadlineCel(r, 'OFFERTE-TRAJECTEN')}
         <td>${prioBadge(r, 'OFFERTE-TRAJECTEN')}</td>
         <td class="cell-txt">${r.opmerkingen?`<span style="font-size:12px">${esc(r.opmerkingen)}</span>`:''}${extraPills}</td>
-        <td>${actsCel(actieBtn)}</td>`;
+        <td>${actsHtml(actieBtn)}</td>`;
       break;}
     case'LOD':
       cells=`<td><span class="code code-klik" style="${css}" data-action="vve-open" data-code="${esc(r.code)}" title="Open VvE-dossier">${esc(r.code)}</span></td>

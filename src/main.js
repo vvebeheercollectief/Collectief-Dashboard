@@ -199,13 +199,9 @@ document.addEventListener('DOMContentLoaded',()=>{
   // Live updates — auto-refresh elke 8 seconden (smart diff voorkomt onnodige re-renders)
   setInterval(async ()=>{
     if(document.hidden) return;
-    if(document.getElementById('modal-bg').classList.contains('open')) return;
-    if(document.getElementById('complete-bg').classList.contains('open')) return;
-    if(document.getElementById('ontw-modal-bg').classList.contains('open')) return;
-    if(document.getElementById('snooze-bg').classList.contains('open')) return;
-    if(document.getElementById('off-actie-bg').classList.contains('open')) return;
-    if(document.getElementById('hh-bg').classList.contains('open')) return;
-    if(document.getElementById('pal-bg').classList.contains('open')) return;
+    // F4: alle modal-achtergronden delen class 'modal-bg' (index.html); één check volstaat.
+    // Nieuwe modals hoeven hier niet meer te worden toegevoegd zolang ze .modal-bg gebruiken.
+    if(document.querySelector('.modal-bg.open')) return;
     if(document.getElementById('dot').classList.contains('loading')) return;
     if(state.pendingWrites>0) return;
     if(state.bulkMode) return;

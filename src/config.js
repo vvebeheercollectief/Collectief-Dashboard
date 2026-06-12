@@ -64,7 +64,7 @@ export const PAGE_META = {
   alfa:["ALV's Afgerond","Afgeronde jaarvergaderingen"],
   ontw:['Ontwikkeling','Interne notities, verbeteringen en ideeën'],
   logboek:['Logboek','Wijzigingshistorie van alle taken'],
-  herhaal:['Herhaalregels','Terugkerende taken — automatisch klaargezet'],
+  herhaal:['Terugkerende taken','Automatisch klaargezette terugkerende taken'],
   vve:['VvE-dossier','Alles van één VvE op één scherm'],
   analytics:['Analytics','Statistieken en grafieken'],
   dash:['Dashboard','Totaaloverzicht'],

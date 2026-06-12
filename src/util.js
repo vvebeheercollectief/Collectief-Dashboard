@@ -170,13 +170,13 @@ function offerteNuOpvolgen(r, vandaag, termijnen){
   const balBij = offerteBalBij(r);
   const ov     = opvolgStatus(r, vandaag);
   const basis  = offerteStilBasis(r);
-  const dagen     = basis ? _verschilInKalenderdagen(vandaag, basis) : null;
+  const dagen     = basis ? _verschilInKalenderdagen(vandaag, basis) : null; // (vandaag, basis): positief = dagen stil
   const werkdagen = basis ? _verschilInWerkdagen(basis, vandaag)     : null;
   const dlp = _parseAnyDate((r && r.deadline) || '');
   const deadlineTeLaat = dlp ? (_verschilInKalenderdagen(new Date(dlp.y, dlp.m - 1, dlp.d), vandaag) < 0) : false;
   const opvolgenVandaag = ov.vandaag && !!_parseAnyDate((r && r.opvolgdatum) || '');
-  const actie = balBij === 'ons' ? 'Doorsturen' : 'Nabellen';
-  if (fase === 'gegund' || ov.weggelegd){
+  const actie = balBij === 'ons' ? 'Doorsturen' : balBij ? 'Nabellen' : null;
+  if (fase === 'gegund' || ov.weggelegd){ // weggelegd wint bewust óók van deadlineTeLaat (bewust geparkeerd, Fase 4)
     return { nodig:false, fase, balBij, dagen, werkdagen, deadlineTeLaat, actie };
   }
   const termijn = balBij === 'aannemer' ? termijnen.aannemer
@@ -210,22 +210,22 @@ function offerteBriefingFeiten(rijen, vandaag, termijnen){
     nuOpvolgen++;
     if ((s.dagen || 0) >= trap1) langStil++;
     if (s.balBij === 'ons') balBijOns++;
-    const sc = offerteSorteerScore(r, vandaag);
+    const sc = offerteSorteerScore(r, vandaag, termijnen);
     if (sc > urgScore){ urgScore = sc; urgentste = { code:(r.code||''), naam:(r.naam||''), dagen:s.dagen, balBij:s.balBij }; }
   });
   return { nuOpvolgen, langStil, balBijOns, klaarTeGunnen, urgentste };
 }
 
 // Sorteerscore voor "Nu opvolgen": hoger = urgenter (sorteer aflopend).
-function offerteSorteerScore(r, vandaag){
-  const s = offerteNuOpvolgen(r, vandaag);
+function offerteSorteerScore(r, vandaag, termijnen){
+  const s = offerteNuOpvolgen(r, vandaag, termijnen);
   const prioRank = { hoog:2, midden:1, laag:0 }[(((r&&r.prioriteit)||'')+'').trim().toLowerCase()];
   return (s.deadlineTeLaat ? 1e6 : 0) + ((s.dagen || 0) * 100) + (prioRank == null ? 1 : prioRank);
 }
 
 function offProg(v){
   if(!v)return'';
-  const[recv,req]=(v+'').split('/').map(s=>parseInt(s)||0);
+  const [recv,req]=parseOff(v);
   const pct=req>0?Math.min(100,Math.round(recv/req*100)):0;
   return`<div class="prog-wrap"><span style="font-size:12px;font-weight:700;color:var(--pu)">${esc(v)}</span>
     <div class="prog-bar"><div class="prog-fill" style="width:${pct}%;background:var(--pu)"></div></div></div>`;
@@ -237,8 +237,8 @@ const _MAANDEN={jan:1,feb:2,mrt:3,maa:3,apr:4,mei:5,jun:6,jul:7,aug:8,sep:9,sept
 function _parseAnyDate(s){
   if(!s)return null;
   s=s.trim();
-  // yyyy-mm-dd (ISO)
-  let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  // yyyy-mm-dd of yyyy-mm-ddT... (ISO, met of zonder tijdgedeelte)
+  let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(T.*)?$/);
   if(m)return{y:+m[1],m:+m[2],d:+m[3]};
   // dd-mm-yyyy
   m=s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);

@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, offerteBalBij, _verschilInWerkdagen, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten } from "./util.js";
+import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, offerteBalBij, _verschilInWerkdagen, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten, parseOff } from "./util.js";
 import { logZin } from "./render-overig.js";
 import { _isStagingHost } from "./config.js";
 import { ACTIONS } from "./actions.js";
@@ -272,6 +272,19 @@ import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
   eq('balBij ontvangen → ons',        offerteBalBij({offertes:'2/2'}), 'ons');
   eq('balBij bij_vve → vve',          offerteBalBij({fase:'bij_vve'}), 'vve');
   eq('balBij gegund → null',          offerteBalBij({fase:'gegund'}), null);
+
+  // ── offerte-motor: review-aanvullingen ──
+  eq('weggelegd wint van deadline',
+     offerteNuOpvolgen({offertes:'2/2', datumAangevraagd:'1 mei 2026', deadline:'1 juni 2026', opvolgdatum:'1 juli 2026'}, VANDAAG_OFF).nodig, false);
+  eq('recente activiteit reset stil-teller',
+     offerteNuOpvolgen({offertes:'0/2', datumAangevraagd:'1 mei 2026', laatsteActiviteit:'2026-06-11T10:00:00.000Z'}, VANDAAG_OFF).nodig, false);
+  eq('briefing langStil telt 1', offerteBriefingFeiten([
+     {code:'A', naam:'VvA Lekstraat 15', offertes:'0/2', datumAangevraagd:'1 mei 2026'},
+  ], VANDAAG_OFF).langStil, 1);
+  eq('parseOff normaal', parseOff('2/3'), [2,3]);
+  eq('parseOff half',    parseOff('3/'),  [3,0]);
+  eq('parseOff rommel',  parseOff('abc'), [0,0]);
+  eq('parseOff leeg',    parseOff(null),  [0,0]);
 
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');

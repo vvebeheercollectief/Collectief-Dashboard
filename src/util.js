@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  UTIL — gedeelde pure helpers (datums, prioriteit, tekst, badges)
 // ══════════════════════════════════════
-import { EMAIL_NAMES } from './config.js';
+import { EMAIL_NAMES, OFFERTE_FASES, OFFERTE_TERMIJNEN } from './config.js';
 
 function displayName(s){
   if(!s) return '';
@@ -122,6 +122,20 @@ function adjOff(id,delta){
   el.value=Math.max(0,(parseInt(el.value)||0)+delta);
 }
 
+// "X/N" → [ontvangen, aangevraagd]
+function parseOff(v){
+  const [recv, req] = ((v||'')+'').split('/').map(s => parseInt(s)||0);
+  return [recv||0, req||0];
+}
+
+// Fase van een offerte-traject. Expliciet `fase`-veld wint; anders afgeleid uit X/N.
+function offerteFase(r){
+  const f = (((r&&r.fase)||'')+'').trim().toLowerCase().replace(/\s+/g,'_');
+  if (OFFERTE_FASES.includes(f)) return f;
+  const [recv] = parseOff(r && r.offertes);
+  return recv > 0 ? 'ontvangen' : 'aangevraagd';
+}
+
 function offProg(v){
   if(!v)return'';
   const[recv,req]=(v+'').split('/').map(s=>parseInt(s)||0);
@@ -178,4 +192,5 @@ export {
   _verschilInKalenderdagen, berekenPrioriteit, prioBadge, persBadges, ibBadge,
   adjOff, offProg, _MAANDEN, _parseAnyDate, parseDt, toISODate, toDutchDate,
   emptyRow, esc, subBadge,
+  parseOff, offerteFase,
 };

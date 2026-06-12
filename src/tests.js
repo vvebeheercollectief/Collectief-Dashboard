@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS } from "./util.js";
+import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase } from "./util.js";
 import { logZin } from "./render-overig.js";
 import { _isStagingHost } from "./config.js";
 import { ACTIONS } from "./actions.js";
@@ -210,6 +210,13 @@ import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
 
   // ── chart.js lazy-load ── (Fase 5: niet meer vooraf geladen)
   truthy('chart.js niet vooraf geladen', typeof window.Chart === 'undefined');
+
+  // ── offerte-motor: fase-afleiding ──
+  eq('fase leeg → aangevraagd', offerteFase({offertes:'0/3'}), 'aangevraagd');
+  eq('fase X>0 → ontvangen',    offerteFase({offertes:'2/3'}), 'ontvangen');
+  eq('fase expliciet bij_vve',  offerteFase({offertes:'3/3', fase:'bij_vve'}), 'bij_vve');
+  eq('fase expliciet "Bij VvE"',offerteFase({fase:'Bij VvE'}), 'bij_vve');
+  eq('fase gegund',             offerteFase({fase:'gegund'}), 'gegund');
 
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');

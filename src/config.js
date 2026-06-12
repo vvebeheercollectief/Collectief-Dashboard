@@ -57,6 +57,11 @@ export const SECS = {
 };
 export const SKEYS = Object.keys(SECS);
 
+// Opvolg-termijnen voor de offerte-motor (Fase: offerte-opvolgsysteem).
+// aannemer = werkdagen; delen/eigenaren = kalenderdagen.
+export const OFFERTE_TERMIJNEN = { aannemer: 5, delen: 7, eigenaren: 7 };
+export const OFFERTE_FASES = ['aangevraagd', 'ontvangen', 'bij_vve', 'gegund'];
+
 export const PAGE_META = {
   ntd:['Nog Te Doen','Openstaande taken en actiepunten'],
   af:['Afgerond','Afgeronde taken per categorie'],

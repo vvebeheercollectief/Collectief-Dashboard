@@ -12,12 +12,12 @@
       --pk:#BE185D;--pk-l:#fce7f3;--pk-b:#fbcfe8;
       --ac:#0D7377;--ac-l:#CCFBF1;--ac-b:#5EEAD4;--ac-900:#064E50;--ac-500:#14B8A6;
       --nv:#2B3544;--nv-d:#1E2530;
-      /* V3 — teal zijbalk + accenten */
-      --sbbg:#08353a;--sbedge:#0f5c62;--sbglow:#4dd9d5;
+      /* Zijbalk — navy (zoals voorheen) met teal accent */
+      --sbbg:#243040;--sbedge:#3a4a5e;--sbglow:#5EEAD4;
     }
     [data-theme=dark]{
       --bg:#0d1417;--sur:#13211f;--sur2:#0f1b1a;--bor:#24383a;
-      --sbbg:#06272b;--sbedge:#0a4248;--sbglow:#2dd4bf;
+      --sbbg:#1e2530;--sbedge:#36414f;--sbglow:#5EEAD4;
       --txt:#EAF0F6;--mut:#9AA7B6;--fnt:#5E6C7D;
       --sh:0 1px 3px rgba(0,0,0,.45),0 1px 2px rgba(0,0,0,.35);
       --shm:0 6px 20px rgba(0,0,0,.5);--shl:0 24px 64px rgba(0,0,0,.65);
@@ -41,7 +41,7 @@
     #overlay.on{display:block}
 
     /* Sidebar — V3 teal */
-    #sb{width:var(--sb);background:var(--sbbg);display:flex;flex-direction:column;flex-shrink:0;z-index:200;transition:transform var(--tr);color:#e2e8f0;position:relative}
+    #sb{width:var(--sb);background:linear-gradient(180deg,#2B3544 0%,#243040 100%);display:flex;flex-direction:column;flex-shrink:0;z-index:200;transition:transform var(--tr);color:#e2e8f0;position:relative}
     #sb::after{content:'';position:absolute;right:0;top:0;bottom:0;width:3px;background:linear-gradient(180deg,var(--sbedge) 0%,var(--sbbg) 55%,transparent 100%);pointer-events:none}
     .sb-logo{padding:17px 16px 14px;border-bottom:1px solid rgba(255,255,255,.07);display:flex;align-items:center;gap:10px}
     .sb-logo img{height:28px;width:auto;object-fit:contain;max-width:130px;filter:brightness(0) invert(1) opacity(.9)}

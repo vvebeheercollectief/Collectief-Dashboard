@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, offerteBalBij } from "./util.js";
+import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, offerteBalBij, _verschilInWerkdagen } from "./util.js";
 import { logZin } from "./render-overig.js";
 import { _isStagingHost } from "./config.js";
 import { ACTIONS } from "./actions.js";
@@ -217,6 +217,12 @@ import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
   eq('fase expliciet bij_vve',  offerteFase({offertes:'3/3', fase:'bij_vve'}), 'bij_vve');
   eq('fase expliciet "Bij VvE"',offerteFase({fase:'Bij VvE'}), 'bij_vve');
   eq('fase gegund',             offerteFase({fase:'gegund'}), 'gegund');
+
+  // ── offerte-motor: werkdagen-verschil (vr→ma = 1, weekend telt niet) ──
+  eq('werkdagen vr→ma', _verschilInWerkdagen(new Date(2026,5,5), new Date(2026,5,8)), 1);
+  eq('werkdagen vr→di', _verschilInWerkdagen(new Date(2026,5,5), new Date(2026,5,9)), 2);
+  eq('werkdagen ma→do', _verschilInWerkdagen(new Date(2026,5,1), new Date(2026,5,4)), 3);
+  eq('werkdagen zelfde dag', _verschilInWerkdagen(new Date(2026,5,8), new Date(2026,5,8)), 0);
 
   // ── offerte-motor: bal bij wie ──
   eq('balBij aangevraagd → aannemer', offerteBalBij({offertes:'0/2'}), 'aannemer');

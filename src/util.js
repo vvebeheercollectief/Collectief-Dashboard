@@ -71,6 +71,20 @@ function _vandaagAmsterdam(){
   return d;
 }
 
+// Aantal werkdagen (ma–vr) ná `van` t/m `tot`. Negatief/gelijk → 0.
+function _verschilInWerkdagen(van, tot){
+  if (!(van instanceof Date) || !(tot instanceof Date) || isNaN(van) || isNaN(tot)) return null;
+  let a = new Date(van.getFullYear(), van.getMonth(), van.getDate());
+  const b = new Date(tot.getFullYear(), tot.getMonth(), tot.getDate());
+  let n = 0;
+  while (a < b){
+    a.setDate(a.getDate() + 1);
+    const wd = a.getDay();
+    if (wd !== 0 && wd !== 6) n++;
+  }
+  return n;
+}
+
 function _verschilInKalenderdagen(deadline, vandaag){
   if (!(deadline instanceof Date) || isNaN(deadline)) return null;
   const d = new Date(deadline.getFullYear(), deadline.getMonth(), deadline.getDate());
@@ -201,5 +215,5 @@ export {
   _verschilInKalenderdagen, berekenPrioriteit, prioBadge, persBadges, ibBadge,
   adjOff, offProg, _MAANDEN, _parseAnyDate, parseDt, toISODate, toDutchDate,
   emptyRow, esc, subBadge,
-  parseOff, offerteFase, offerteBalBij,
+  parseOff, offerteFase, offerteBalBij, _verschilInWerkdagen,
 };

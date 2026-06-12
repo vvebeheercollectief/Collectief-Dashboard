@@ -7,7 +7,8 @@ import { _isStagingHost } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
 import { filterNtd } from "./render-lijsten.js";
-import { vveOverzicht } from "./render-vve.js";
+import { vveOverzicht, filterDossierLog } from "./render-vve.js";
+import { parseKenmerken, vveKenmerken } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
 
@@ -69,6 +70,9 @@ import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
   // ── logZin ── (natuurlijke zin per logboek-actie; bevat juiste werkwoord)
   truthy('logZin Afgerond bevat "rondde"',  logZin({actie:'Afgerond', code:'TEST01', gebruiker:'info@vvebeheercollectief.nl'}).includes('rondde'));
   truthy('logZin Verwijderd bevat "verwijderde"', logZin({actie:'Verwijderd', code:'TEST01', gebruiker:'info@vvebeheercollectief.nl'}).includes('verwijderde'));
+  truthy('logZin Contact bevat "sprak"', logZin({actie:'Contact', code:'TEST01', veld:'Telefoon', oudeWaarde:'Bewoner/eigenaar', gebruiker:'info@vvebeheercollectief.nl'}).includes('sprak'));
+  truthy('logZin Contact toont soort', logZin({actie:'Contact', code:'TEST01', veld:'Telefoon', oudeWaarde:'Bestuur', gebruiker:'info@vvebeheercollectief.nl'}).includes('Telefoon'));
+  truthy('logZin Kenmerk bevat "kenmerk"', logZin({actie:'Kenmerk', code:'TEST01', veld:'Balkons', gebruiker:'info@vvebeheercollectief.nl'}).includes('kenmerk'));
 
   // ── _isStagingHost ── (fail-safe: alleen bekende productie-hosts = productie)
   truthy('prod host = geen staging',     _isStagingHost('collectief-dashboard.vercel.app') === false);
@@ -90,7 +94,9 @@ import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
 
   // ── actions-registry ── (dekkings-test: elke verwachte data-action bestaat)
   const VERWACHTE_ACTIES = ['toggle','notif-toggle','off','notitie-toevoegen','taak-verwijder-modal','ai-kopieer','login','ntd-sectie','af-sectie','alvo-flag','taak-bewerken','taak-afronden','pagineer','ai-overnemen','ai-actie-taak','ai-kopieer-concept','ontw-cat','ontw-bewerken','toast-sluiten','taak-wegleggen','snooze-kies','herhaal-bewerken','herhaal-status','herhaal-verwijderen',
-'vve-open','vve-af-alles','pal-kies','bulk-toggle','bulk-vink','bulk-menu','bulk-doe'];
+'vve-open','vve-af-alles','pal-kies','bulk-toggle','bulk-vink','bulk-menu','bulk-doe',
+'kenmerken-bewerken','kenmerken-opslaan','kenmerken-annuleren',
+'contact-soort','contact-vastleggen','vve-log-filter','vve-log-alles'];
   VERWACHTE_ACTIES.forEach(a => truthy(`actie '${a}' bestaat`, typeof ACTIONS[a] === 'function'));
 
   // ── volgendeDeadline ── (herhaalregels; maandgrens-clamp)
@@ -151,6 +157,29 @@ import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
   eq('vve laatste act.',  _o5.cijfers.laatsteDagen, 2);
   eq('vve afgerond',      _o5.afgerond.length, 1);
   eq('vve onbekende code',vveOverzicht('ZZZ', _D5, TF).cijfers.open, 0);
+
+  // ── filterDossierLog ── (dossier-feed: 'contact' toont alleen handmatige contactmomenten)
+  const _dosLog=[{actie:'Contact'},{actie:'Afgerond'},{actie:'Contact'},{actie:'Kenmerk'}];
+  eq('dossierfilter alles',   filterDossierLog(_dosLog,'alles').length, 4);
+  eq('dossierfilter contact', filterDossierLog(_dosLog,'contact').length, 2);
+
+  // ── kenmerken ── (VvE-dossier: tab 'Kenmerken' A:F, laatste rij per code wint)
+  const _kmkRows=[
+    ['Code','Balkons','Kozijnen','Bron','GewijzigdDoor','GewijzigdOp'],
+    ['X1','Ja','Nee','akte art. 17','info@vvebeheercollectief.nl','2026-06-12T10:00:00.000Z'],
+    ['X2','','Deels','','',''],
+    ['',  'Ja','','','',''],                 // lege code → genegeerd
+    ['X1','Deels','Nee','akte art. 18','info@vvebeheercollectief.nl','2026-06-12T11:00:00.000Z'], // dubbel → laatste wint
+  ];
+  const _kmk=parseKenmerken(_kmkRows);
+  eq('kenmerken aantal (dedupe)', _kmk.length, 2);
+  eq('kenmerken laatste wint', _kmk.find(k=>k.code==='X1').balkons, 'Deels');
+  eq('kenmerken _row laatste', _kmk.find(k=>k.code==='X1')._row, 5);
+  eq('kenmerken leeg blad', parseKenmerken([]), []);
+  eq('kenmerken alleen kop', parseKenmerken([_kmkRows[0]]), []);
+  eq('vveKenmerken gevonden', vveKenmerken('X2',{kenmerken:_kmk}).kozijnen, 'Deels');
+  eq('vveKenmerken default', vveKenmerken('ZZZ',{kenmerken:_kmk}).balkons, '');
+  eq('vveKenmerken default row', vveKenmerken('ZZZ',{kenmerken:_kmk})._row, 0);
 
   // ── zoekAlles ── (Fase 5: commandocentrum — groepering & limieten)
   eq('zoek taak op woord',   zoekAlles('dak',_D5).taken.map(r=>r.actiepunt), ['Dak nakijken']);

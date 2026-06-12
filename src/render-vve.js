@@ -5,8 +5,13 @@ import { esc, displayName, persBadges, berekenPrioriteit, opvolgStatus, parseDt,
 import { SECS, SKEYS } from "./config.js";
 import { state, D } from "./state.js";
 import { goTo } from "./ui.js";
-import { avatarKleur, logZin, logTijd } from "./render-overig.js";
-// (kringverwijzing render-vve ⇄ ui is hetzelfde patroon als crud ⇄ main:
+import { fmtLogTs, logItemHtml, logDayLabel } from "./render-overig.js";
+import { vveKenmerken, KENMERK_WAARDEN } from "./kenmerken.js";
+import { backgroundWrite } from "./data.js";
+import { appendRange } from "./api.js";
+import { ensureToken } from "./auth.js";
+import { getCurrentWho } from "./notifications.js";
+// (kringverwijzing render-vve ⇄ ui/kenmerken is hetzelfde patroon als crud ⇄ main:
 //  live bindings, de aanroep gebeurt pas op runtime)
 
 // Pure helper (testbaar zonder DOM): verzamelt alles van één VvE uit de D-data.
@@ -46,10 +51,76 @@ function vveOverzicht(code, data, vandaag){
            cijfers:{ open:open.length, teLaat, weggelegd:weggelegd.length, laatsteDagen } };
 }
 
+// Dossier-logboek: contactsoorten, filter en feed-opbouw
+const CONTACT_SOORTEN=[['Telefoon','📞'],['E-mail','✉️'],['Gesprek','🤝'],['Notitie','📝']];
+
+// Pure helper (testbaar): 'contact' = alleen handmatige contactmomenten
+function filterDossierLog(entries, modus){
+  return modus==='contact' ? entries.filter(e=>e.actie==='Contact') : entries;
+}
+
+function dossierFeed(entries){
+  if(!entries.length) return '<div class="log-empty">Nog geen gebeurtenissen in dit dossier.</div>';
+  let html='',lastDay='';
+  entries.forEach(r=>{
+    const dag=logDayLabel(r.timestamp);
+    if(dag!==lastDay){ html+=`<div class="log-day">${dag}</div>`; lastDay=dag; }
+    html+=logItemHtml(r);
+  });
+  return html;
+}
+
+// Handmatig contactmoment vastleggen (composer op de VvE-pagina)
+async function addContactLog(){
+  const tekst=(document.getElementById('dos-tekst')?.value||'').trim();
+  if(!tekst){ alert('Typ eerst wat er gebeurd is.'); return; }
+  const code=state.vveCode;
+  if(!code) return;
+  if(!await ensureToken()){ alert('Inloggen mislukt.'); return; }
+  const soort=state._contactSoort||'Telefoon';
+  const wie=document.getElementById('dos-wie')?.value||'Overig';
+  const who=getCurrentWho()||'?', ts=new Date().toISOString();
+  const entry={_row:0,timestamp:ts,code,sectie:'',actie:'Contact',veld:soort,oudeWaarde:wie,nieuweWaarde:tekst,gebruiker:who};
+  D.logboek.unshift(entry);
+  const t=document.getElementById('dos-tekst'); if(t) t.value='';
+  renderVve();
+  backgroundWrite(
+    ()=>appendRange("'Logboek'!A:H",[ts,code,'','Contact',soort,wie,tekst,who]),
+    ()=>{ const i=D.logboek.indexOf(entry); if(i>-1) D.logboek.splice(i,1); },
+    'Contactmoment vastleggen'
+  );
+}
+
+// Kenmerken-kaart: weergave- of bewerkmodus (Beheerderskenmerken)
+const KMK_PIL={'Ja':'background:var(--gn-l);color:var(--gn)','Nee':'background:var(--rd-l);color:var(--rd)','Deels':'background:var(--am-l);color:var(--am)'};
+const kmkPil=v=>{const w=v||'Onbekend';return `<span class="badge" style="${KMK_PIL[w]||'background:var(--sur2);color:var(--mut)'}">${esc(w)}</span>`;};
+function kenmerkenKaart(code){
+  const k=vveKenmerken(code,D);
+  if(state.kenmerkenEdit){
+    const sel=(id,val)=>`<select id="${id}">${KENMERK_WAARDEN.map(w=>`<option${(val||'Onbekend')===w?' selected':''}>${w}</option>`).join('')}</select>`;
+    return `<div class="kmk-rij"><span>Balkons gemeenschappelijk</span>${sel('kmk-balkons',k.balkons)}</div>
+      <div class="kmk-rij"><span>Kozijnen gemeenschappelijk</span>${sel('kmk-kozijnen',k.kozijnen)}</div>
+      <div class="kmk-bron-lbl">Bron</div>
+      <textarea id="kmk-bron" rows="2" placeholder="bv. splitsingsakte art. 17, mail gemeente 03-2024">${esc(k.bron)}</textarea>
+      <div class="kmk-knoppen">
+        <button class="btn btn-sec btn-sm" data-action="kenmerken-annuleren">Annuleren</button>
+        <button class="btn btn-pri btn-sm" data-action="kenmerken-opslaan">Opslaan</button>
+      </div>`;
+  }
+  const wijz=k.gewijzigdOp?`<div class="kmk-wijz">laatst gewijzigd door ${esc(displayName(k.gewijzigdDoor)||'?')} · ${esc(fmtLogTs(k.gewijzigdOp))}</div>`:'';
+  return `<div class="kmk-rij"><span>Balkons gemeenschappelijk</span>${kmkPil(k.balkons)}</div>
+    <div class="kmk-rij"><span>Kozijnen gemeenschappelijk</span>${kmkPil(k.kozijnen)}</div>
+    <div class="kmk-bron-lbl">Bron</div>
+    <div class="kmk-bron">${k.bron?esc(k.bron):'<span style="color:var(--mut)">Nog geen bron vastgelegd</span>'}</div>${wijz}`;
+}
+
 // Navigeer naar het dossier van een VvE (en onthoud 'm voor het commandocentrum)
 function openVvePagina(code){
   state.vveCode=code;
   state._vveAfAlles=false;
+  state.kenmerkenEdit=false;
+  state.vveLogFilter='alles';
+  state._vveLogAlles=false;
   try{
     const lijst=JSON.parse(localStorage.getItem('recentVves')||'[]').filter(c=>c!==code);
     lijst.unshift(code);
@@ -64,6 +135,10 @@ function renderVve(){
   const code=state.vveCode;
   if(!code){ wrap.innerHTML='<div class="empty"><div class="empty-ico">🏢</div>Zoek een VvE via Ctrl+K of klik op een VvE-code</div>'; return; }
   const o=vveOverzicht(code,D);
+  // Composer-behoud: de 8s-poll re-rendert deze pagina; half getypte tekst mag
+  // niet verdwijnen — alleen bewaren als het om dezelfde VvE gaat.
+  const _oudT=document.getElementById('dos-tekst');
+  const _bewaar=(_oudT&&_oudT.dataset.code===code)?{tekst:_oudT.value,wie:document.getElementById('dos-wie')?.value}:null;
   if(document.getElementById('page-vve').classList.contains('active')){
     document.getElementById('page-title').textContent=`${o.code} — ${o.naam||'VvE'}`;
     document.getElementById('page-sub').textContent='VvE-dossier · alles op één scherm';
@@ -104,13 +179,10 @@ function renderVve(){
     return html||'<span style="color:var(--mut);font-size:12.5px">Geen ALV-gegevens</span>';
   };
 
-  const actiKaart=o.logboek.slice(0,10).map(e=>{
-    const naam=displayName(e.gebruiker)||'—';
-    const dagen=_verschilInKalenderdagen(_vandaagAmsterdam(),new Date(e.timestamp));
-    const wanneer=dagen==null||isNaN(dagen)?'':dagen<=0?`vandaag ${logTijd(e.timestamp)}`:dagen===1?'gisteren':`${dagen} d`;
-    return `<li><span class="log-av" style="background:${avatarKleur(naam)}">${esc(naam.charAt(0))}</span>
-      <div class="vve-tl-zin">${logZin(e)}</div><span class="t">${esc(wanneer)}</span></li>`;
-  }).join('')||'<li style="color:var(--mut)">Nog geen activiteit in het logboek</li>';
+  const dosEntries=filterDossierLog(o.logboek,state.vveLogFilter);
+  const dosLimiet=state._vveLogAlles?dosEntries.length:30;
+  const dosMeer=(!state._vveLogAlles&&dosEntries.length>30)
+    ?`<button class="btn btn-sec btn-sm" data-action="vve-log-alles" style="margin:10px auto 2px;display:block">Alle ${dosEntries.length} tonen</button>`:'';
 
   const kc=(n,lbl,cls)=>`<div class="kc ${cls}"><b>${n}</b><span>${lbl}</span></div>`;
   wrap.innerHTML=`
@@ -144,10 +216,36 @@ function renderVve(){
       <div>
         <div class="vve-sectie">ALV's</div>
         <div class="vve-kaart">${alvKaart()}</div>
-        <div class="vve-sectie">Recente activiteit</div>
-        <div class="vve-kaart"><ul class="vve-tl">${actiKaart}</ul></div>
+        <div class="vve-sectie" style="margin-top:18px">Beheerderskenmerken
+          ${state.kenmerkenEdit?'':'<button class="btn btn-sec btn-sm" data-action="kenmerken-bewerken" style="margin-left:auto">✎ Bewerken</button>'}
+        </div>
+        <div class="vve-kaart">${kenmerkenKaart(code)}</div>
       </div>
+    </div>
+    <div class="vve-sectie" style="margin-top:22px">Dossier-logboek <span class="n">${o.logboek.length}</span>
+      <span class="dos-filters">
+        <button class="dos-filter${state.vveLogFilter!=='contact'?' aan':''}" data-action="vve-log-filter" data-modus="alles">Alles</button>
+        <button class="dos-filter${state.vveLogFilter==='contact'?' aan':''}" data-action="vve-log-filter" data-modus="contact">Alleen contactmomenten</button>
+      </span>
+    </div>
+    <div class="card dossier-card">
+      <div class="dos-composer">
+        <textarea id="dos-tekst" data-code="${esc(o.code)}" rows="2" placeholder="Leg vast wat er gebeurd is — bv. zojuist gebeld met een eigenaar… (Ctrl+Enter = vastleggen)"></textarea>
+        <div class="dos-rij">
+          <div class="dos-chips">${CONTACT_SOORTEN.map(([s,ico])=>
+            `<button class="soort-chip${(state._contactSoort||'Telefoon')===s?' aan':''}" data-action="contact-soort" data-soort="${s}">${ico} ${s}</button>`).join('')}</div>
+          <select id="dos-wie" title="Met wie was het contact?">
+            <option>Bewoner/eigenaar</option><option>Bestuur</option><option>Leverancier</option><option>Overig</option>
+          </select>
+          <button class="btn btn-pri btn-sm" data-action="contact-vastleggen">Vastleggen</button>
+        </div>
+      </div>
+      <div class="dos-feed">${dossierFeed(dosEntries.slice(0,dosLimiet))}${dosMeer}</div>
     </div>`;
+  if(_bewaar){
+    const t=document.getElementById('dos-tekst'); if(t) t.value=_bewaar.tekst;
+    const w=document.getElementById('dos-wie'); if(w&&_bewaar.wie) w.value=_bewaar.wie;
+  }
 }
 
-export { vveOverzicht, openVvePagina, renderVve };
+export { vveOverzicht, openVvePagina, renderVve, filterDossierLog, addContactLog };

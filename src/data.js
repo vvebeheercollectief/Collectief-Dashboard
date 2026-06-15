@@ -126,6 +126,7 @@ function parseSections(rows){
     entry.herhaalId  =_f4v(row[12]);  // M
     entry.esc        =_f4v(row[13]);  // N (alleen door Apps Script geschreven)
     entry.fase       =_f4v(row[14]);  // O — offerte-fase (offerte-motor)
+    entry.aannemers  =_f4v(row[15]);  // P — aannemerslijst (naam|0/1 per regel)
     if(entry.code) out[cur].push(entry);
   }
   return {data:out,secInfo};

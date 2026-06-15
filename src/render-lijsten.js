@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  RENDER-LIJSTEN — Nog-te-doen, Afgerond, ALV's + tabel/paginering
 // ══════════════════════════════════════
-import { esc, filt, prioBadge, persBadges, ibBadge, subBadge, offProg, emptyRow, berekenPrioriteit, parseDt, STIL_DREMPEL_DAGEN, _vandaagAmsterdam, _verschilInKalenderdagen, opvolgStatus, toISODate, offerteFase, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten } from "./util.js";
+import { esc, filt, prioBadge, persBadges, ibBadge, subBadge, offProg, emptyRow, berekenPrioriteit, parseDt, STIL_DREMPEL_DAGEN, _vandaagAmsterdam, _verschilInKalenderdagen, opvolgStatus, toISODate, offerteFase, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten, offerteNabelTeller, parseOff } from "./util.js";
 import { SID, SECS, SKEYS, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { ensureToken } from "./auth.js";
@@ -126,6 +126,11 @@ function renderNtd(){
   renderTbody('ntd-tbody',rows,state.activeNtd,pgs.ntd,false);
   renderPag('ntd-pag',rows.length,pgs.ntd,'ntd');
   renderOfferteBriefing();
+  // Vandaag-focus: op de offerte-tab staat de volledige tabel standaard ingeklapt.
+  const tblWrap=document.getElementById('ntd-tbl-wrap'), pag=document.getElementById('ntd-pag');
+  const verberg=state.activeNtd==='OFFERTE-TRAJECTEN' && !state.offerteTabelOpen;
+  if(tblWrap) tblWrap.style.display=verberg?'none':'';
+  if(pag) pag.style.display=verberg?'none':'';
 }
 function setNtd(s){
   state.activeNtd=s;pgs.ntd=1;bulkWis();
@@ -140,37 +145,66 @@ function offerteBalBijTekst(balBij){
   return {aannemer:'bal bij de aannemer', ons:'bal bij ons', vve:'bal bij de eigenaren'}[balBij] || '';
 }
 // Vult de briefing-slot met de C2-kop (altijd zichtbaar op de offerte-tab); leeg op andere tabs.
+// Het "Vandaag"-focuspaneel: cijfer-strip + Doorsturen/Nabellen-blokken + inklap-voet.
 function renderOfferteBriefing(){
   const slot=document.getElementById('off-briefing-slot');
   if(!slot) return;
   if(state.activeNtd!=='OFFERTE-TRAJECTEN'){ slot.innerHTML=''; return; }
-  // Feiten over ÁLLE offerte-rijen (bewust niet zoek-gefilterd: de briefing gaat over het hele speelveld)
   const rijen=D.ntd['OFFERTE-TRAJECTEN']||[];
   const actMap=_offerteActiviteitMap(D.logboek);
   rijen.forEach(r=>_verrijkOfferteRij(r,actMap));
+  const vandaag=_vandaagAmsterdam();
+  const nu=[];
+  rijen.forEach(r=>{ const st=offerteNuOpvolgen(r,vandaag); r._offStatus=st; r._offNu=st.nodig; if(st.nodig) nu.push(r); });
+  nu.sort((a,b)=>offerteSorteerScore(b,vandaag)-offerteSorteerScore(a,vandaag));
+  const doorsturen=nu.filter(r=>r._offStatus.actie==='Doorsturen');
+  const nabellen=nu.filter(r=>r._offStatus.actie!=='Doorsturen');
+  const vastgelopen=nabellen.filter(r=>offerteNabelTeller(r.code,D.logboek)>=3).length;
   const f=offerteBriefingFeiten(rijen);
   const datumLabel=new Date().toLocaleDateString('nl-NL',{weekday:'long',day:'numeric',month:'long'});
-  let urgHtml;
-  if(f.urgentste){
-    const u=f.urgentste, bal=offerteBalBijTekst(u.balBij);
-    const meta=`${u.dagen!=null?`${u.dagen} dagen stil`:''}${bal?`${u.dagen!=null?' · ':''}${bal}`:''}`;
-    urgHtml=`<div class="ob-urg"><div class="ob-uk">Urgentst</div>
-      <div class="ob-uh">${esc(u.naam||u.code)}</div>
-      <div class="ob-um">${esc(meta)}</div></div>`;
+  const DCAP=3, NCAP=5;
+  const dShow=state.offerteDoorsturenOpen?doorsturen:doorsturen.slice(0,DCAP);
+  const nShow=state.offerteNabellenOpen?nabellen:nabellen.slice(0,NCAP);
+  const stat=(val,cls,cap)=>`<div class="of-stat"><span class="of-num ${cls}">${val}</span><span class="of-cap">${cap}</span></div>`;
+  const blok=(titel,cnt,sub,rows,soort,meer,actie)=>
+    `<div class="of-sec-h ${soort==='doorsturen'?'send':'call'}"><span>${titel}</span><span class="of-cnt">· ${cnt}</span><span class="of-sub">— ${sub}</span></div>`
+    +(rows.length?rows.map(r=>offerteFocusRij(r,soort)).join('')
+      :`<div class="of-leeg">Niets ${soort==='doorsturen'?'klaar om te versturen':'om na te bellen'}</div>`)
+    +(meer>0?`<button class="of-meer" data-action="${actie}">Toon ${meer} meer ▾</button>`:'');
+  slot.innerHTML=`<div class="of-pan">
+    <div class="of-top"><span class="of-kick">Vandaag</span><span class="of-date">${esc(datumLabel)}</span></div>
+    <div class="of-strip">
+      ${stat(nu.length,'','Te doen')}
+      ${stat(vastgelopen,vastgelopen?'red':'muted','Vastgelopen')}
+      ${stat(doorsturen.length,'','Klaar te versturen')}
+      ${stat(f.klaarTeGunnen,f.klaarTeGunnen?'':'muted','Bij de VvE')}
+    </div>
+    ${blok('Doorsturen',doorsturen.length,'offerte binnen, klaar voor de eigenaren · kun je nu afmaken',dShow,'doorsturen',state.offerteDoorsturenOpen?0:doorsturen.length-dShow.length,'offerte-meer-d')}
+    ${blok('Nabellen',nabellen.length,'langst stil eerst, bal bij de aannemer',nShow,'nabellen',state.offerteNabellenOpen?0:nabellen.length-nShow.length,'offerte-meer-n')}
+    <div class="of-voet"><span class="of-voet-lbl">Hele lijst · ${rijen.length} trajecten</span>
+      <button class="of-voet-tog" data-action="offerte-tabel-toggle">${state.offerteTabelOpen?'Tabel verbergen ▴':'Volledige tabel tonen ▾'}</button></div>
+  </div>`;
+}
+
+// Eén mini-rij in het Vandaag-paneel (krijgt een eigen rid in _rowCache voor de knoppen).
+function offerteFocusRij(r, soort){
+  const rid=state._rowCache.length; state._rowCache.push(r);
+  const omschr=esc(((r.opmerkingen||'').split('\n')[0]||'').slice(0,60));
+  let ctx, knop;
+  if(soort==='doorsturen'){
+    const [recv,req]=parseOff(r.offertes||'');
+    ctx=`<span class="of-recv">${recv}/${req} binnen</span>${omschr?` · ${omschr}`:''}`;
+    knop=`<button class="of-btn-send" data-action="offerte-doorsturen" data-rid="${rid}">Doorsturen</button>`;
   } else {
-    const extra=f.klaarTeGunnen?` ${f.klaarTeGunnen===1?'Eén traject ligt':f.klaarTeGunnen+' trajecten liggen'} bij de VvE voor akkoord.`:'';
-    urgHtml=`<div class="ob-urg ob-rust"><div class="ob-uh">Niets dat nu opvolging vraagt.</div>
-      <div class="ob-um">Alle lopende trajecten zitten binnen hun termijn.${extra}</div></div>`;
+    const dagen=r._offStatus&&r._offStatus.dagen;
+    const t=offerteNabelTeller(r.code,D.logboek);
+    const vast=t>=3?` · <span class="of-vast">${t}× nagebeld</span>`:'';
+    ctx=`<span class="of-stil">${dagen!=null?dagen+' dagen stil':'opvolgen'}</span>${vast}${omschr?` · ${omschr}`:''}`;
+    knop=`<button class="of-btn-call" data-action="offerte-nabellen" data-rid="${rid}">Nabellen</button>`;
   }
-  slot.innerHTML=`<div class="off-brief">
-    <div class="ob-top"><span class="ob-kick">Vandaag</span><span class="ob-date">${esc(datumLabel)}</span></div>
-    ${urgHtml}
-    <div class="ob-strip">
-      <div class="ob-stat"><span class="ob-num">${f.nuOpvolgen}</span><span class="ob-cap">Nu opvolgen</span></div>
-      <div class="ob-stat"><span class="ob-num red">${f.langStil}</span><span class="ob-cap">Lang stil</span></div>
-      <div class="ob-stat"><span class="ob-num amber">${f.balBijOns}</span><span class="ob-cap">Wacht op jou</span></div>
-      <div class="ob-stat"><span class="ob-num teal">${f.klaarTeGunnen}</span><span class="ob-cap">Bij de VvE</span></div>
-    </div></div>`;
+  return `<div class="of-r"><span class="of-code" style="color:var(--sec)">${esc(r.code)}</span>
+    <div class="of-mid"><div class="of-naam">${esc(r.naam||'')}</div><div class="of-ctx">${ctx}</div></div>
+    <div class="of-act"><span class="of-later" data-action="offerte-later" data-rid="${rid}" title="Tot morgen wegleggen">later</span>${knop}</div></div>`;
 }
 // Offerte-motor: jongste logboek-activiteit per VvE-code (één pass over het logboek).
 function _offerteActiviteitMap(logboek){

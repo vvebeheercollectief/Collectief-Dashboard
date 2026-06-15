@@ -246,7 +246,9 @@ function deriveOffertes(lijst){
 function offerteSorteerScore(r, vandaag, termijnen){
   const s = offerteNuOpvolgen(r, vandaag, termijnen);
   const prioRank = { hoog:2, midden:1, laag:0 }[(((r&&r.prioriteit)||'')+'').trim().toLowerCase()];
-  return (s.deadlineTeLaat ? 1e6 : 0) + ((s.dagen || 0) * 100) + (prioRank == null ? 1 : prioRank);
+  return (s.deadlineTeLaat ? 1e6 : 0) + ((s.dagen || 0) * 100)
+       + (s.balBij === 'ons' ? 10 : 0)            // tiebreak: snel af te ronden (bal bij ons) eerst
+       + (prioRank == null ? 1 : prioRank);
 }
 
 function offProg(v){

@@ -7,7 +7,7 @@ import { _isStagingHost } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
 import { filterNtd, offerteGroepen, _offerteActiviteitMap, offerteBalBijTekst, setNtd, offerteAannemerPaneel, offerteAannSamenvatting } from "./render-lijsten.js";
-import { state } from "./state.js";
+import { state, D } from "./state.js";
 import { vveOverzicht, filterDossierLog } from "./render-vve.js";
 import { parseKenmerken, vveKenmerken } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
@@ -355,6 +355,15 @@ import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
     const row={code:'ZZ-ONS',naam:'Test',offertes:'',aannemers:'A|1\nB|1',_row:9997};
     filterNtd([row],'','','','','OFFERTE-TRAJECTEN');
     return offerteBalBij(row)==='ons';
+  })());
+
+  // ── offerte: sorteer-tiebreak — bal bij ons (snel af te ronden) wint bij gelijke dagen ──
+  truthy('sorteer-tiebreak: bal bij ons > bal bij aannemer bij gelijke dagen', (()=>{
+    const vandaag=new Date(2026,5,15);
+    const basis={ datumAangevraagd:'1 mei 2026', opvolgdatum:'', laatsteActiviteit:'', aannemers:'' };
+    const rOns ={ ...basis, code:'TIE-ONS', offertes:'1/1' }; // recv>0 → ontvangen → ons
+    const rAann={ ...basis, code:'TIE-AAN', offertes:'0/1' }; // recv=0 → aangevraagd → aannemer
+    return offerteSorteerScore(rOns,vandaag) > offerteSorteerScore(rAann,vandaag);
   })());
 
   // ── offerte-aannemers: paneel- en samenvatting-component ──

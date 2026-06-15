@@ -36,9 +36,15 @@ i.p.v. gevulde vlakken).
 **Buiten scope:** de motor/logica (`util.js`), de actie-flow (`offerte-acties.js`), de data,
 en de feiten-berekening. Die blijven byte-voor-byte zoals ze zijn.
 
-**Harde regel:** geen paars meer in de *inhoud*. Paars (`--pu` `#6D5BD0`) blijft uitsluitend
-de **tab-kleur** van de offerte-subcategorie (die mag bewust niet wijzigen — zie
-[[project_collectief_dashboard]]). Ink + teal (`#0D7377`/`#0a5c60`) doen het werk.
+**Kleurregel (genuanceerd na code-verkenning):** paars (`--pu` `#6D5BD0`) blijft het
+**systematische sectie-accent** van de offerte-tab — net zoals Oppakken-codes teal zijn,
+Vergaderverzoeken amber en LOD rood. Concreet: de VvE-codes en de `offProg` X/N-teller gebruiken
+`var(--sec)` (= paars op deze tab) en blijven **ongewijzigd** (die per-sectie-kleuren mogen
+bewust niet wijzigen — zie [[project_collectief_dashboard]]).
+
+Wat we wél weghalen is het **loud/gratuite paars dat "kinderlijk/AI" oogt**: het getinte
+briefing-kader, de gekleurde chips en de gevulde candy-actieknop. De briefing (C2) gebruikt
+geen paars; ink + teal (`#0D7377`/`#0a5c60`) doen daar het werk.
 
 ## Gekozen ontwerp (C2)
 
@@ -101,10 +107,10 @@ zodat de exacte fase leesbaar is zonder kleur-raden.
 ### 6. Status-tekst & X/N-teller
 
 - Deadlinestatus blijft als vetgedrukt woord (al V3): "12d stil" rood, "6d" amber, "binnen"/"3d"
-  grijs — geen pills.
-- De `offProg` X/N-teller (bv. "2/3" ontvangen offertes) staat nu in **paars** (`var(--pu)` voor
-  zowel tekst als balkvulling). Dat wordt ink/gedempt met een **teal** vulling, conform de
-  geen-paars-in-inhoud-regel.
+  grijs — geen pills. Ongewijzigd.
+- De `offProg` X/N-teller (bv. "2/3" ontvangen offertes) blijft **ongewijzigd** in `var(--sec)`
+  (paars), zodat hij consistent meekleurt met de VvE-codes. Dit is het systematische sectie-accent,
+  geen "snoep" — buiten scope van dit herontwerp.
 
 ### 7. Contextuele actieknop (Nabellen/Doorsturen)
 
@@ -123,7 +129,6 @@ duidelijk de "volgende stap", zonder te botsen met de licht-teal-gevulde "Afrond
   - `.off-actie`: paars → teal-outline.
   - `.grp-kop`/`.grp-nu`: amber-vlak eruit, teal/grijs-onderscheid.
   - Verwijderen: `.off-briefing*` (banner, kop, chips, x, knop).
-  - `offProg`-inline-stijl (in `util.js`): paars → ink/teal.
 - **`src/render-lijsten.js`**:
   - `renderOfferteBriefing()` — nieuwe markup (datumregel + urgentst-blok + cijfer-strip),
     altijd zichtbaar; open/dicht-takken + localStorage-auto-open eruit.
@@ -135,8 +140,8 @@ duidelijk de "volgende stap", zonder te botsen met de licht-teal-gevulde "Afrond
   - Contextuele-actie-markup (rond regel 547–551) — klasse naar teal-outline (iconen behouden).
 - **`src/state.js` / handlers** — `offerteBriefingOpen` + de twee briefing-`data-action`-handlers
   verwijderen.
-- **`src/util.js`** — alleen de inline-stijl in `offProg` (paars → ink/teal). De
-  *logica* (`offerteBriefingFeiten`, `offerteNuOpvolgen`, `offerteFase`, scores) blijft ongewijzigd.
+- **`src/util.js`** — **niet gewijzigd.** De logica (`offerteBriefingFeiten`, `offerteNuOpvolgen`,
+  `offerteFase`, scores) én `offProg` (blijft section-paars) blijven zoals ze zijn.
 - **`sw.js`** — cacheversie ophogen.
 
 ## Wat NIET verandert
@@ -154,8 +159,8 @@ duidelijk de "volgende stap", zonder te botsen met de licht-teal-gevulde "Afrond
   `off-briefing`-klassen) worden bijgewerkt naar de nieuwe markup.
 - Visuele verificatie op de staging-URL in **licht én donker** (de offerte-tab heeft eigen
   donkere-modus-tokens — `--pu`/`--ac` etc. — die mee moeten kleuren).
-- Controle: geen paars meer zichtbaar in de inhoud van de offerte-tab; paars alleen nog als
-  tab-indicator.
+- Controle: geen paarse tint-kaders, chips of gevulde candy-knop meer; de VvE-codes en
+  `offProg` blijven wél section-paars (consistent met de andere subcategorie-tabs).
 
 ## Open punten
 

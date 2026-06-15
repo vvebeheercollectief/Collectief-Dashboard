@@ -67,4 +67,11 @@ async function schrijfOpvolgdatum(r, nieuw, actie){
     'Wegleggen mislukt'
   );
 }
-export { openSnoozeModal, closeSnoozeModal, snoozeKies, snoozeOpslaan, snoozeWis };
+// "Later" uit de Vandaag-focus: leg het traject weg tot morgen (één tik, geen modal).
+function snoozeMorgen(rid){
+  const r = state._rowCache[rid]; if(!r) return;
+  const d = new Date(); d.setDate(d.getDate()+1);
+  const iso = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  schrijfOpvolgdatum(r, toDutchDate(iso), 'Weggelegd tot morgen');
+}
+export { openSnoozeModal, closeSnoozeModal, snoozeKies, snoozeOpslaan, snoozeWis, snoozeMorgen };

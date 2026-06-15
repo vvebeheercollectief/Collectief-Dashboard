@@ -54,6 +54,9 @@ export const state = {
   _snoozeRow: null,        // taak waarvoor de wegleggen-modal open staat (Fase 4)
   _offerteActieRow: null,  // offerte-rij waarvoor de opvolg-actie-modal open staat (offerte-motor)
   _offerteActieSoort: null,// soort opvolg-actie: 'nabellen' | 'doorsturen' (offerte-motor)
+  offerteDoorsturenOpen: false, // Vandaag-focus: Doorsturen-blok volledig uitgeklapt?
+  offerteNabellenOpen: false,   // Vandaag-focus: Nabellen-blok volledig uitgeklapt?
+  offerteTabelOpen: false,      // Vandaag-focus: volledige offerte-tabel zichtbaar?
   vveCode: null,           // VvE op de per-VvE-pagina (Fase 5)
   _vveAfAlles: false,      // per-VvE: alle afgeronde taken uitgeklapt
   bulkMode: false,         // bulk-selecteerstand op de NTD-lijst (Fase 5)

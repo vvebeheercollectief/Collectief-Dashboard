@@ -129,37 +129,17 @@ function renderNtd(){
 }
 function setNtd(s){
   state.activeNtd=s;pgs.ntd=1;bulkWis();
-  // Briefing (Fase 4): bij het eerste offerte-tab-bezoek van de dag automatisch openen
-  if(s==='OFFERTE-TRAJECTEN'){
-    const tv=_vandaagAmsterdam();
-    const sleutel='offerteBriefing_'+tv.getFullYear()+'-'+String(tv.getMonth()+1).padStart(2,'0')+'-'+String(tv.getDate()).padStart(2,'0');
-    try{ if(localStorage.getItem(sleutel)!=='1'){ state.offerteBriefingOpen=true; localStorage.setItem(sleutel,'1'); } }catch(_){ }
-  }
   renderNtd();renderBulkUi();
 }
 
 // ══════════════════════════════════════
 //  OFFERTE-BRIEFING (Fase 4) — dagelijkse samenvatting bovenaan de offerte-tab
 // ══════════════════════════════════════
-// Offerte-briefing: feiten → natuurlijke NL-zinnen (regel-gebaseerd, geen AI nodig).
-function offerteBriefingTekst(f){
-  if(!f.nuOpvolgen){
-    let t='Niets dat nu opvolging vraagt — alle lopende trajecten zitten binnen hun termijn.';
-    if(f.klaarTeGunnen) t+=` Wel wachten ${f.klaarTeGunnen===1?'er één traject':f.klaarTeGunnen+' trajecten'} op akkoord van de VvE.`;
-    return t;
-  }
-  let t=`Vandaag ${f.nuOpvolgen===1?'heeft 1 traject':'hebben '+f.nuOpvolgen+' trajecten'} aandacht nodig`;
-  if(f.langStil) t+=`, waarvan ${f.langStil===1?'één al opvallend lang stil ligt':f.langStil+' al opvallend lang stil liggen'}`;
-  t+='. ';
-  if(f.urgentste){
-    const bal={aannemer:'de bal ligt bij de aannemer',ons:'de bal ligt bij ons',vve:'de bal ligt bij de eigenaren'}[f.urgentste.balBij]||'';
-    t+=`Het urgentst: ${f.urgentste.naam||f.urgentste.code}${f.urgentste.dagen!=null?` (${f.urgentste.dagen} dagen stil${bal?', '+bal:''})`:''}. `;
-  }
-  if(f.balBijOns) t+=`${f.balBijOns===1?'Eén offerte wacht':f.balBijOns+' offertes wachten'} op doorsturen naar de eigenaren. `;
-  if(f.klaarTeGunnen) t+=`${f.klaarTeGunnen===1?'Eén traject ligt':f.klaarTeGunnen+' trajecten liggen'} bij de VvE voor akkoord.`;
-  return t.trim();
+// Offerte-briefing: balBij → natuurlijke NL-tekst.
+function offerteBalBijTekst(balBij){
+  return {aannemer:'bal bij de aannemer', ons:'bal bij ons', vve:'bal bij de eigenaren'}[balBij] || '';
 }
-// Vult de briefing-slot: banner (open) of klein knopje (dicht); leeg op andere tabs.
+// Vult de briefing-slot met de C2-kop (altijd zichtbaar op de offerte-tab); leeg op andere tabs.
 function renderOfferteBriefing(){
   const slot=document.getElementById('off-briefing-slot');
   if(!slot) return;
@@ -170,19 +150,27 @@ function renderOfferteBriefing(){
   rijen.forEach(r=>_verrijkOfferteRij(r,actMap));
   const f=offerteBriefingFeiten(rijen);
   const datumLabel=new Date().toLocaleDateString('nl-NL',{weekday:'long',day:'numeric',month:'long'});
-  slot.innerHTML = state.offerteBriefingOpen ? `
-    <div class="off-briefing">
-      <div class="off-briefing-kop">
-        <span>✦ Briefing · ${datumLabel}</span>
-        <button class="off-briefing-x" data-action="offerte-briefing-sluiten" title="Sluiten">✕</button>
-      </div>
-      <p>${esc(offerteBriefingTekst(f))}</p>
-      <div class="off-briefing-chips">
-        ${f.langStil?`<span class="chip-stil">${f.langStil} lang stil</span>`:''}
-        ${f.balBijOns?`<span class="chip-ons">${f.balBijOns} wacht op jou</span>`:''}
-        ${f.klaarTeGunnen?`<span class="chip-gun">${f.klaarTeGunnen} bij de VvE</span>`:''}
-      </div>
-    </div>` : `<button class="off-briefing-knop" data-action="offerte-briefing-openen">✦ Briefing</button>`;
+  let urgHtml;
+  if(f.urgentste){
+    const u=f.urgentste, bal=offerteBalBijTekst(u.balBij);
+    const meta=`${u.dagen!=null?`${u.dagen} dagen stil`:''}${bal?`${u.dagen!=null?' · ':''}${bal}`:''}`;
+    urgHtml=`<div class="ob-urg"><div class="ob-uk">Urgentst</div>
+      <div class="ob-uh">${esc(u.naam||u.code)}</div>
+      <div class="ob-um">${esc(meta)}</div></div>`;
+  } else {
+    const extra=f.klaarTeGunnen?` ${f.klaarTeGunnen===1?'Eén traject ligt':f.klaarTeGunnen+' trajecten liggen'} bij de VvE voor akkoord.`:'';
+    urgHtml=`<div class="ob-urg ob-rust"><div class="ob-uh">Niets dat nu opvolging vraagt.</div>
+      <div class="ob-um">Alle lopende trajecten zitten binnen hun termijn.${extra}</div></div>`;
+  }
+  slot.innerHTML=`<div class="off-brief">
+    <div class="ob-top"><span class="ob-kick">Vandaag</span><span class="ob-date">${esc(datumLabel)}</span></div>
+    ${urgHtml}
+    <div class="ob-strip">
+      <div class="ob-stat"><span class="ob-num">${f.nuOpvolgen}</span><span class="ob-cap">Nu opvolgen</span></div>
+      <div class="ob-stat"><span class="ob-num red">${f.langStil}</span><span class="ob-cap">Lang stil</span></div>
+      <div class="ob-stat"><span class="ob-num amber">${f.balBijOns}</span><span class="ob-cap">Wacht op jou</span></div>
+      <div class="ob-stat"><span class="ob-num teal">${f.klaarTeGunnen}</span><span class="ob-cap">Bij de VvE</span></div>
+    </div></div>`;
 }
 // Offerte-motor: jongste logboek-activiteit per VvE-code (één pass over het logboek).
 function _offerteActiviteitMap(logboek){
@@ -431,13 +419,13 @@ function renderTbody(tbodyId,rows,sec,page,isAf){
     const colsOff=SECS[sec].cols.length+1+(state.bulkMode?1:0);
     let html='';
     if(nu.length||page===1){
-      html+=`<tr><td colspan="${colsOff}" class="grp-kop grp-nu">🔔 Nu opvolgen (${nu.length})</td></tr>`;
+      html+=`<tr><td colspan="${colsOff}" class="grp-kop grp-nu">Nu opvolgen <span class="grp-n">· ${nu.length}</span></td></tr>`;
       html+=nu.length
         ?nu.map(r=>rowNtd(r,sec)).join('')
-        :`<tr><td colspan="${colsOff}"><div class="empty"><div class="empty-ico">🎉</div>Niets dat nu opvolging vraagt</div></td></tr>`;
+        :`<tr><td colspan="${colsOff}"><div class="empty-rust">Niets dat nu opvolging vraagt</div></td></tr>`;
     }
     if(lopend.length){
-      html+=`<tr><td colspan="${colsOff}" class="grp-kop">Lopend (${lopend.length})</td></tr>`;
+      html+=`<tr><td colspan="${colsOff}" class="grp-kop">Lopend <span class="grp-n">· ${lopend.length}</span></td></tr>`;
       html+=lopend.map(r=>rowNtd(r,sec)).join('');
     }
     // FLIP: rijen zweven zichtbaar naar hun nieuwe plek bij her-render (Task 2.3)
@@ -477,13 +465,13 @@ function bepaalStil(r, sec){
   return dagen >= STIL_DREMPEL_DAGEN ? dagen : null;
 }
 
-// Offerte-motor: mini fase-balk (4 mijlpalen) voor in de offerte-rij.
+// Offerte-motor: verfijnde fase-balk (4 mijlpalen) + fasenaam-label.
 function faseBalk(r){
   const fases=['aangevraagd','ontvangen','bij_vve','gegund'];
-  const labels={aangevraagd:'Aangevraagd',ontvangen:'Ontvangen',bij_vve:'Bij VvE',gegund:'Gegund'};
+  const kort={aangevraagd:'Aangevr.',ontvangen:'Ontvangen',bij_vve:'Bij VvE',gegund:'Gegund'};
   const idx=fases.indexOf(offerteFase(r));
-  return `<div class="fase-balk" title="${labels[fases[idx]]}">`+fases.map((f,i)=>
-    `<span class="fase-stap ${i<idx?'done':i===idx?'nu':'todo'}"></span>`).join('')+`</div>`;
+  const segs=fases.map((f,i)=>`<span class="fase-stap ${i<=idx?'done':''}"></span>`).join('');
+  return `<div class="fase-wrap"><div class="fase-balk">${segs}</div><span class="fase-label">${kort[fases[idx]]||''}</span></div>`;
 }
 
 function deadlineCel(r, sec){
@@ -621,7 +609,7 @@ function renderPag(id,total,cur,doel){
 
 export {
   SEC_ICONS, SEC_THEMES, renderNtdStats, renderNtdDonut, _inPeriod, _weekIndex, renderNtd, setNtd,
-  filterNtd, offerteGroepen, _offerteActiviteitMap, offerteBriefingTekst, renderAf, setAf, ALVO_ICONS, renderAlvo, ALVO_COLS, ALVO_LABELS, flagPill,
+  filterNtd, offerteGroepen, _offerteActiviteitMap, offerteBalBijTekst, renderAf, setAf, ALVO_ICONS, renderAlvo, ALVO_COLS, ALVO_LABELS, flagPill,
   _recomputeAlvoStatus, toggleAlvoFlag, statusIco, renderAlfa, renderThead, renderTbody, bepaalStil,
   deadlineCel, rowNtd, rowAf, renderPag,
 };

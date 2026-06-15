@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, offerteBalBij, _verschilInWerkdagen, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten, parseOff } from "./util.js";
+import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, offerteBalBij, _verschilInWerkdagen, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten, offerteNabelTeller, parseOff } from "./util.js";
 import { logZin } from "./render-overig.js";
 import { _isStagingHost } from "./config.js";
 import { ACTIONS } from "./actions.js";
@@ -316,16 +316,24 @@ import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
   eq('balBijTekst aannemer', offerteBalBijTekst('aannemer'), 'bal bij de aannemer');
   eq('balBijTekst ons',      offerteBalBijTekst('ons'),      'bal bij ons');
   eq('balBijTekst vve',      offerteBalBijTekst('vve'),      'bal bij de eigenaren');
+  // ── offerte: vastgelopen-teller (Nabellen-logregels per code) ──
+  eq('nabelteller telt 2 nabel-acties', offerteNabelTeller('A', [
+    {sectie:'OFFERTE-TRAJECTEN',code:'A',veld:'Telefoon'},
+    {sectie:'OFFERTE-TRAJECTEN',code:'A',veld:'E-mail'},
+    {sectie:'OFFERTE-TRAJECTEN',code:'A',veld:'Telefoon'},
+    {sectie:'OFFERTE-TRAJECTEN',code:'B',veld:'Telefoon'},
+  ]), 2);
   // ── offerte-briefing: DOM-rooktest (C2-markup, geen emoji; setNtd-pad crasht niet) ──
   truthy('off-briefing-slot bestaat', !!document.getElementById('off-briefing-slot'));
-  truthy('briefing rendert C2-cijfer-strip zonder emoji', (()=>{
+  truthy('Vandaag-paneel rendert strip + beide blokken', (()=>{
     try{
       const vorige=state.activeNtd;
       setNtd('OFFERTE-TRAJECTEN');
       const html=document.getElementById('off-briefing-slot').innerHTML;
       setNtd(vorige);
-      return html.includes('ob-strip')&&html.includes('Nu opvolgen')&&!html.includes('✦')&&!html.includes('🔔')&&!html.includes('🎉');
-    }catch(e){ console.error('briefing-markup-test:',e); return false; }
+      return html.includes('of-strip')&&html.includes('Doorsturen')&&html.includes('Nabellen')
+        &&html.includes('Volledige tabel')&&!html.includes('✦');
+    }catch(e){ console.error('vandaag-paneel-test:',e); return false; }
   })());
 
   const totOk = ok + _tOk, totFail = fail + _tFail;

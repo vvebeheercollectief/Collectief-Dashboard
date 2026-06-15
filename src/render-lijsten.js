@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  RENDER-LIJSTEN — Nog-te-doen, Afgerond, ALV's + tabel/paginering
 // ══════════════════════════════════════
-import { esc, filt, prioBadge, persBadges, ibBadge, subBadge, offProg, emptyRow, berekenPrioriteit, parseDt, STIL_DREMPEL_DAGEN, _vandaagAmsterdam, _verschilInKalenderdagen, opvolgStatus, toISODate, offerteFase, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten, offerteNabelTeller, parseOff } from "./util.js";
+import { esc, filt, prioBadge, persBadges, ibBadge, subBadge, offProg, emptyRow, berekenPrioriteit, parseDt, STIL_DREMPEL_DAGEN, _vandaagAmsterdam, _verschilInKalenderdagen, opvolgStatus, toISODate, offerteFase, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten, offerteNabelTeller, parseOff, parseAannemers, deriveOffertes } from "./util.js";
 import { SID, SECS, SKEYS, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { ensureToken } from "./auth.js";
@@ -220,6 +220,11 @@ function _offerteActiviteitMap(logboek){
 function _verrijkOfferteRij(r, actMap){
   const t=actMap.get(r.code)||null;
   r.laatsteActiviteit=t?`${t.getFullYear()}-${t.getMonth()+1}-${t.getDate()}`:'';
+  // Aannemerslijst (kolom P) stuurt de X/N-teller: leg de echte D-waarde éénmalig vast,
+  // override alleen in het geheugen wanneer er aannemers zijn. Kolom D blijft ongewijzigd.
+  if(r._offertesManual===undefined) r._offertesManual=r.offertes;
+  r._aannemers=parseAannemers(r.aannemers);
+  r.offertes=r._aannemers.length ? deriveOffertes(r._aannemers) : r._offertesManual;
   return r;
 }
 

@@ -6,7 +6,7 @@ import { logZin } from "./render-overig.js";
 import { _isStagingHost } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
-import { filterNtd, offerteGroepen, _offerteActiviteitMap, offerteBriefingTekst, setNtd } from "./render-lijsten.js";
+import { filterNtd, offerteGroepen, _offerteActiviteitMap, offerteBalBijTekst, setNtd } from "./render-lijsten.js";
 import { state } from "./state.js";
 import { vveOverzicht, filterDossierLog } from "./render-vve.js";
 import { parseKenmerken, vveKenmerken } from "./kenmerken.js";
@@ -312,25 +312,20 @@ import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
   // ── offerte-acties: modal aanwezig ──
   truthy('offerte-actie-modal bestaat', !!document.getElementById('off-actie-bg'));
 
-  // ── offerte-briefing: tekstsjabloon ──
-  truthy('briefing-tekst rustig bevat "binnen hun termijn"',
-     offerteBriefingTekst({nuOpvolgen:0,langStil:0,balBijOns:0,klaarTeGunnen:0,urgentste:null}).includes('binnen hun termijn'));
-  truthy('briefing-tekst druk noemt aantal en urgentste',
-     (()=>{const t=offerteBriefingTekst({nuOpvolgen:4,langStil:2,balBijOns:1,klaarTeGunnen:3,urgentste:{code:'A',naam:'VvA Lekstraat 15',dagen:8,balBij:'aannemer'}});
-           return t.includes('4 trajecten')&&t.includes('VvA Lekstraat 15')&&t.includes('8 dagen');})());
-  // ── offerte-briefing: DOM-rooktest ──
+  // ── offerte-briefing: balBij → NL-tekst ──
+  eq('balBijTekst aannemer', offerteBalBijTekst('aannemer'), 'bal bij de aannemer');
+  eq('balBijTekst ons',      offerteBalBijTekst('ons'),      'bal bij ons');
+  eq('balBijTekst vve',      offerteBalBijTekst('vve'),      'bal bij de eigenaren');
+  // ── offerte-briefing: DOM-rooktest (C2-markup, geen emoji; setNtd-pad crasht niet) ──
   truthy('off-briefing-slot bestaat', !!document.getElementById('off-briefing-slot'));
-
-  // ── offerte-briefing: setNtd-pad (regressietest op toISODate-crash) ──
-  truthy('setNtd offerte-tab crasht niet en opent briefing', (()=>{
+  truthy('briefing rendert C2-cijfer-strip zonder emoji', (()=>{
     try{
-      Object.keys(localStorage).filter(k=>k.startsWith('offerteBriefing_')).forEach(k=>localStorage.removeItem(k));
       const vorige=state.activeNtd;
       setNtd('OFFERTE-TRAJECTEN');
-      const ok=state.activeNtd==='OFFERTE-TRAJECTEN'&&state.offerteBriefingOpen===true;
-      setNtd(vorige); state.offerteBriefingOpen=false;
-      return ok;
-    }catch(e){ console.error('setNtd-test:',e); return false; }
+      const html=document.getElementById('off-briefing-slot').innerHTML;
+      setNtd(vorige);
+      return html.includes('ob-strip')&&html.includes('Nu opvolgen')&&!html.includes('✦')&&!html.includes('🔔')&&!html.includes('🎉');
+    }catch(e){ console.error('briefing-markup-test:',e); return false; }
   })());
 
   const totOk = ok + _tOk, totFail = fail + _tFail;

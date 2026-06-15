@@ -680,3 +680,4 @@
     .of-aann-input:focus{outline:none;border-color:var(--ac-b);box-shadow:0 0 0 2px var(--ac-l)}
     .of-aann-tbl-tog{margin-top:4px}
     .of-aann-tr>td{padding:0 14px 12px!important;background:var(--sur)}
+    .of-aann-tr .of-aann-paneel{max-width:580px;margin:0}

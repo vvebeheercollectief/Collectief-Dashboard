@@ -607,7 +607,7 @@ function rowNtd(r,sec){
       cells=`<td><span class="code code-klik" style="${css}" data-action="vve-open" data-code="${esc(r.code)}" title="Open VvE-dossier">${esc(r.code)}</span></td>
         <td class="cell-name">${esc(r.naam)}${subBadge(r.subcategorie)}</td>
         <td class="cell-sm">${esc(r.datumAangevraagd||'')}</td>
-        <td>${offProg(r.offertes)}${faseBalk(r)}</td>
+        <td>${offProg(r.offertes)}${faseBalk(r)}<div class="of-aann-tbl-tog">${offerteAannSamenvatting(r)}</div></td>
         <td>${persBadges(r.behandelaar)}</td>
         ${deadlineCel(r, 'OFFERTE-TRAJECTEN')}
         <td>${prioBadge(r, 'OFFERTE-TRAJECTEN')}</td>
@@ -636,7 +636,10 @@ function rowNtd(r,sec){
   // Stabiel FLIP-anker per offerte-traject (code + aanvraagdatum), voor de zweefanimatie
   // sleutel niet gegarandeerd uniek bij zelfde code+datum — cosmetisch risico, geaccepteerd
   const flipAttr = sec==='OFFERTE-TRAJECTEN' ? ` data-flip="${esc(r.code)}|${esc(r.datumAangevraagd||'')}"` : '';
-  return `<tr class="${rowCls}" data-row="${r._row}"${flipAttr}>${bulkCel}${cells}</tr>`;
+  const aannRow = (sec==='OFFERTE-TRAJECTEN' && state.offerteAannOpen.has(r.code))
+    ? `<tr class="of-aann-tr"><td colspan="${(state.bulkMode?1:0)+SECS[sec].cols.length+1}">${offerteAannemerPaneel(r)}</td></tr>`
+    : '';
+  return `<tr class="${rowCls}" data-row="${r._row}"${flipAttr}>${bulkCel}${cells}</tr>${aannRow}`;
 }
 
 function rowAf(r,sec){

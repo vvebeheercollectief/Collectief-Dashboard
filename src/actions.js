@@ -16,6 +16,7 @@ import { dismissToast, saveNotifPrefs } from './notifications.js';
 import { doLogin } from './auth.js';
 import { openSnoozeModal, snoozeKies, snoozeMorgen } from './snooze.js';
 import { openOfferteActieModal, offerteActieVastleggen } from './offerte-acties.js';
+import { addAannemer, toggleAannemerBinnen, verwijderAannemer } from './offerte-aannemers.js';
 import { openHerhaalModal, toggleHerhaalStatus, deleteHerhaal } from './render-herhaal.js';
 import { openVvePagina, renderVve, addContactLog } from './render-vve.js';
 import { saveKenmerken } from './kenmerken.js';
@@ -53,6 +54,9 @@ export const ACTIONS = {
   'offerte-meer-d':        ()   => { state.offerteDoorsturenOpen=true; renderNtd(); },
   'offerte-meer-n':        ()   => { state.offerteNabellenOpen=true;   renderNtd(); },
   'offerte-tabel-toggle':  ()   => { state.offerteTabelOpen=!state.offerteTabelOpen; renderNtd(); },
+  'offerte-aann-open':     (el) => { const c=el.dataset.code; if(state.offerteAannOpen.has(c)) state.offerteAannOpen.delete(c); else state.offerteAannOpen.add(c); renderNtd(); },
+  'offerte-aann-binnen':   (el) => toggleAannemerBinnen(el.dataset.code, +el.dataset.idx),
+  'offerte-aann-verwijder':(el) => verwijderAannemer(el.dataset.code, +el.dataset.idx),
   'herhaal-bewerken':      (el) => openHerhaalModal(+el.dataset.hid),
   'herhaal-status':        (el) => toggleHerhaalStatus(+el.dataset.hid),
   'herhaal-verwijderen':   ()   => deleteHerhaal(),
@@ -85,6 +89,13 @@ export function initActions() {
   document.addEventListener('keydown', (e) => {
     if (e.target && e.target.id === 'dos-tekst' && (e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault(); addContactLog();
+    }
+    // Offerte-aannemer toevoegen: Enter in het inline invoerveld (delegatie: veld leeft kort)
+    if (e.target && e.target.classList && e.target.classList.contains('of-aann-input') && e.key === 'Enter') {
+      e.preventDefault();
+      const code = e.target.dataset.code, val = e.target.value;
+      e.target.value = '';
+      addAannemer(code, val);
     }
   });
 }

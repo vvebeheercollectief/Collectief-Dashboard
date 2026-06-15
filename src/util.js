@@ -223,6 +223,25 @@ function offerteNabelTeller(code, logboek){
   return n;
 }
 
+// ── Aannemers per offerte-traject (kolom P 'Nog Te Doen') ──────────────────
+// Eén aannemer per regel; naam en 'binnen'-vlag gescheiden door '|':  "Naam|1".
+// '|1' = offerte binnen, anders nog niet. Lege/whitespace-regels worden genegeerd.
+function parseAannemers(cel){
+  return ((cel||'')+'').split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{
+    const i=l.lastIndexOf('|');
+    if(i<0) return {naam:l, binnen:false};
+    return {naam:l.slice(0,i).trim(), binnen:l.slice(i+1).trim()==='1'};
+  }).filter(a=>a.naam);
+}
+function serializeAannemers(lijst){
+  return (lijst||[]).map(a=>`${(a.naam||'').replace(/[|\n]/g,' ').trim()}|${a.binnen?1:0}`).join('\n');
+}
+// Afgeleide "X/N binnen": N = aantal aannemers, X = aantal met offerte binnen. Leeg → ''.
+function deriveOffertes(lijst){
+  if(!lijst||!lijst.length) return '';
+  return `${lijst.filter(a=>a.binnen).length}/${lijst.length}`;
+}
+
 // Sorteerscore voor "Nu opvolgen": hoger = urgenter (sorteer aflopend).
 function offerteSorteerScore(r, vandaag, termijnen){
   const s = offerteNuOpvolgen(r, vandaag, termijnen);
@@ -288,4 +307,5 @@ export {
   emptyRow, esc, subBadge,
   parseOff, offerteFase, offerteBalBij, _verschilInWerkdagen,
   offerteStilBasis, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten, offerteNabelTeller,
+  parseAannemers, serializeAannemers, deriveOffertes,
 };

@@ -1,12 +1,12 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, offerteBalBij, _verschilInWerkdagen, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten, offerteNabelTeller, parseOff } from "./util.js";
+import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, offerteBalBij, _verschilInWerkdagen, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten, offerteNabelTeller, parseOff, parseAannemers, serializeAannemers, deriveOffertes } from "./util.js";
 import { logZin } from "./render-overig.js";
 import { _isStagingHost } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
-import { filterNtd, offerteGroepen, _offerteActiviteitMap, offerteBalBijTekst, setNtd } from "./render-lijsten.js";
+import { filterNtd, offerteGroepen, _offerteActiviteitMap, offerteBalBijTekst, setNtd, offerteAannemerPaneel, offerteAannSamenvatting } from "./render-lijsten.js";
 import { state } from "./state.js";
 import { vveOverzicht, filterDossierLog } from "./render-vve.js";
 import { parseKenmerken, vveKenmerken } from "./kenmerken.js";
@@ -323,6 +323,55 @@ import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
     {sectie:'OFFERTE-TRAJECTEN',code:'A',veld:'Telefoon'},
     {sectie:'OFFERTE-TRAJECTEN',code:'B',veld:'Telefoon'},
   ]), 2);
+  // ── offerte-aannemers: parse / serialize / derive ──
+  eq('parseAannemers leeg', parseAannemers(''), []);
+  eq('parseAannemers naam zonder vlag', parseAannemers('Klusbouw Meesters'),
+     [{naam:'Klusbouw Meesters', binnen:false}]);
+  eq('parseAannemers met binnen-vlag', parseAannemers('Zegwaard en Motec|1'),
+     [{naam:'Zegwaard en Motec', binnen:true}]);
+  eq('parseAannemers meerdere regels + lege regel', parseAannemers('A|1\n\nB|0\nC'),
+     [{naam:'A',binnen:true},{naam:'B',binnen:false},{naam:'C',binnen:false}]);
+  eq('serialize ↔ parse round-trip',
+     parseAannemers(serializeAannemers([{naam:'Heijstek en Klus',binnen:true},{naam:'Alvin Lin',binnen:false}])),
+     [{naam:'Heijstek en Klus',binnen:true},{naam:'Alvin Lin',binnen:false}]);
+  eq('serialize stript pipe/newline uit naam',
+     serializeAannemers([{naam:'A|B\nC',binnen:false}]), 'A B C|0');
+  eq('deriveOffertes leeg', deriveOffertes([]), '');
+  eq('deriveOffertes 1 van 3',
+     deriveOffertes([{naam:'a',binnen:true},{naam:'b',binnen:false},{naam:'c',binnen:false}]), '1/3');
+
+  // ── offerte: aannemerslijst stuurt de X/N-teller (via filterNtd-verrijking) ──
+  truthy('verrijking leidt X/N af uit aannemerslijst', (()=>{
+    const row={code:'ZZ-TEST',naam:'Test',offertes:'5/5',aannemers:'A|1\nB|0',_row:9999};
+    filterNtd([row],'','','','','OFFERTE-TRAJECTEN');
+    return row.offertes==='1/2';
+  })());
+  truthy('lege aannemerslijst laat handmatige X/N staan', (()=>{
+    const row={code:'ZZ-LEEG',naam:'Test',offertes:'2/4',aannemers:'',_row:9998};
+    filterNtd([row],'','','','','OFFERTE-TRAJECTEN');
+    return row.offertes==='2/4';
+  })());
+  truthy('2/2 uit lijst → bal bij ons', (()=>{
+    const row={code:'ZZ-ONS',naam:'Test',offertes:'',aannemers:'A|1\nB|1',_row:9997};
+    filterNtd([row],'','','','','OFFERTE-TRAJECTEN');
+    return offerteBalBij(row)==='ons';
+  })());
+
+  // ── offerte-aannemers: paneel- en samenvatting-component ──
+  truthy('aannemer-paneel heeft toevoeg-veld',
+    offerteAannemerPaneel({code:'Q',_aannemers:[{naam:'X',binnen:true}]}).includes('of-aann-add'));
+  truthy('aannemer-paneel toont binnen-actie',
+    offerteAannemerPaneel({code:'Q',_aannemers:[{naam:'X',binnen:true}]}).includes('offerte-aann-binnen'));
+  truthy('aannemer-paneel toont verwijder-actie',
+    offerteAannemerPaneel({code:'Q',_aannemers:[{naam:'X',binnen:false}]}).includes('offerte-aann-verwijder'));
+  truthy('aannemer-samenvatting heeft open-actie',
+    offerteAannSamenvatting({code:'Q',_aannemers:[]}).includes('offerte-aann-open'));
+
+  // ── offerte-aannemers: actie-handlers bedraad ──
+  truthy('actie offerte-aann-open bestaat', typeof ACTIONS['offerte-aann-open']==='function');
+  truthy('actie offerte-aann-binnen bestaat', typeof ACTIONS['offerte-aann-binnen']==='function');
+  truthy('actie offerte-aann-verwijder bestaat', typeof ACTIONS['offerte-aann-verwijder']==='function');
+
   // ── offerte-briefing: DOM-rooktest (C2-markup, geen emoji; setNtd-pad crasht niet) ──
   truthy('off-briefing-slot bestaat', !!document.getElementById('off-briefing-slot'));
   truthy('Vandaag-paneel rendert strip + beide blokken', (()=>{

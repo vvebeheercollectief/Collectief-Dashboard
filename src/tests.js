@@ -381,6 +381,11 @@ import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
   truthy('actie offerte-aann-binnen bestaat', typeof ACTIONS['offerte-aann-binnen']==='function');
   truthy('actie offerte-aann-verwijder bestaat', typeof ACTIONS['offerte-aann-verwijder']==='function');
 
+  // ── offerte-aannemers: zichtbare Toevoegen-knop + actie ──
+  truthy('aannemer-paneel heeft Toevoegen-knop',
+    offerteAannemerPaneel({code:'Q',_aannemers:[]}).includes('offerte-aann-add'));
+  truthy('actie offerte-aann-add bestaat', typeof ACTIONS['offerte-aann-add']==='function');
+
   // ── offerte-briefing: DOM-rooktest (C2-markup, geen emoji; setNtd-pad crasht niet) ──
   truthy('off-briefing-slot bestaat', !!document.getElementById('off-briefing-slot'));
   truthy('Vandaag-paneel rendert strip + beide blokken', (()=>{

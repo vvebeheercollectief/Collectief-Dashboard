@@ -204,8 +204,10 @@ function offerteAannemerPaneel(r){
       <button class="of-aann-x" data-action="offerte-aann-verwijder" data-code="${code}" data-idx="${i}" title="Verwijderen" aria-label="Verwijderen">×</button>
     </div>`).join('');
   return `<div class="of-aann-paneel">${rijen}
-    <div class="of-aann-add"><span class="of-aann-plus" aria-hidden="true">+</span>
-      <input class="of-aann-input" data-code="${code}" placeholder="Aannemer toevoegen…" autocomplete="off" aria-label="Aannemer toevoegen"></div>
+    <div class="of-aann-add">
+      <input class="of-aann-input" data-code="${code}" placeholder="Aannemer toevoegen…" autocomplete="off" aria-label="Aannemer toevoegen">
+      <button class="of-aann-toevoeg" data-action="offerte-aann-add" data-code="${code}">+ Toevoegen</button>
+    </div>
   </div>`;
 }
 

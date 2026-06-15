@@ -678,6 +678,8 @@
     .of-aann-plus{color:var(--ac);font-weight:800;font-size:15px}
     .of-aann-input{flex:1;height:30px;font-family:inherit;font-size:13px;color:var(--txt);background:var(--sur);border:1px solid var(--bor);border-radius:7px;padding:0 10px}
     .of-aann-input:focus{outline:none;border-color:var(--ac-b);box-shadow:0 0 0 2px var(--ac-l)}
+    .of-aann-toevoeg{flex-shrink:0;font-family:inherit;font-size:12px;font-weight:800;color:#fff;background:var(--ac);border:1px solid var(--ac);border-radius:7px;padding:0 12px;height:30px;cursor:pointer;white-space:nowrap}
+    .of-aann-toevoeg:hover{background:var(--ac-b)}
     .of-aann-tbl-tog{margin-top:4px}
     .of-aann-tr>td{padding:0 14px 12px!important;background:var(--sur)}
     .of-aann-tr .of-aann-paneel{max-width:580px;margin:0}

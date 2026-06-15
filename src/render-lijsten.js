@@ -186,6 +186,29 @@ function renderOfferteBriefing(){
   </div>`;
 }
 
+// Klikbare samenvatting boven het aannemers-paneel (gedeeld: Vandaag + tabel).
+function offerteAannSamenvatting(r){
+  const lijst=r._aannemers||[];
+  const open=state.offerteAannOpen.has(r.code);
+  const lbl=lijst.length
+    ? `Aannemers · ${lijst.filter(a=>a.binnen).length} van ${lijst.length} binnen`
+    : 'Aannemers toevoegen';
+  return `<span class="of-aann-tog" data-action="offerte-aann-open" data-code="${esc(r.code)}">${open?'▾':'▸'} ${lbl}</span>`;
+}
+// Uitklapbaar aannemers-lijstje voor één traject (gedeeld: Vandaag-focusrij + tabelrij).
+function offerteAannemerPaneel(r){
+  const code=esc(r.code);
+  const rijen=(r._aannemers||[]).map((a,i)=>`<div class="of-aann-rij">
+      <span class="of-aann-naam">${esc(a.naam)}</span>
+      <button class="of-aann-st ${a.binnen?'in':''}" data-action="offerte-aann-binnen" data-code="${code}" data-idx="${i}">${a.binnen?'✓ binnen':'nog niet'}</button>
+      <button class="of-aann-x" data-action="offerte-aann-verwijder" data-code="${code}" data-idx="${i}" title="Verwijderen" aria-label="Verwijderen">×</button>
+    </div>`).join('');
+  return `<div class="of-aann-paneel">${rijen}
+    <div class="of-aann-add"><span class="of-aann-plus" aria-hidden="true">+</span>
+      <input class="of-aann-input" data-code="${code}" placeholder="Aannemer toevoegen…" autocomplete="off" aria-label="Aannemer toevoegen"></div>
+  </div>`;
+}
+
 // Eén mini-rij in het Vandaag-paneel (krijgt een eigen rid in _rowCache voor de knoppen).
 function offerteFocusRij(r, soort){
   const rid=state._rowCache.length; state._rowCache.push(r);
@@ -202,9 +225,13 @@ function offerteFocusRij(r, soort){
     ctx=`<span class="of-stil">${dagen!=null?dagen+' dagen stil':'opvolgen'}</span>${vast}${omschr?` · ${omschr}`:''}`;
     knop=`<button class="of-btn-call" data-action="offerte-nabellen" data-rid="${rid}">Nabellen</button>`;
   }
-  return `<div class="of-r"><span class="of-code" style="color:var(--sec)">${esc(r.code)}</span>
-    <div class="of-mid"><div class="of-naam">${esc(r.naam||'')}</div><div class="of-ctx">${ctx}</div></div>
-    <div class="of-act"><span class="of-later" data-action="offerte-later" data-rid="${rid}" title="Tot morgen wegleggen">later</span>${knop}</div></div>`;
+  const open=state.offerteAannOpen.has(r.code);
+  return `<div class="of-rij-wrap${open?' open':''}">
+    <div class="of-r"><span class="of-code" style="color:var(--sec)">${esc(r.code)}</span>
+      <div class="of-mid"><div class="of-naam">${esc(r.naam||'')}</div><div class="of-ctx">${ctx}</div>${offerteAannSamenvatting(r)}</div>
+      <div class="of-act"><button class="of-edit" data-action="taak-bewerken" data-rid="${rid}" title="Bewerken" aria-label="Bewerken"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><span class="of-later" data-action="offerte-later" data-rid="${rid}" title="Tot morgen wegleggen">later</span>${knop}</div></div>
+    ${open?offerteAannemerPaneel(r):''}
+  </div>`;
 }
 // Offerte-motor: jongste logboek-activiteit per VvE-code (één pass over het logboek).
 function _offerteActiviteitMap(logboek){
@@ -648,7 +675,7 @@ function renderPag(id,total,cur,doel){
 
 export {
   SEC_ICONS, SEC_THEMES, renderNtdStats, renderNtdDonut, _inPeriod, _weekIndex, renderNtd, setNtd,
-  filterNtd, offerteGroepen, _offerteActiviteitMap, offerteBalBijTekst, renderAf, setAf, ALVO_ICONS, renderAlvo, ALVO_COLS, ALVO_LABELS, flagPill,
+  filterNtd, offerteGroepen, _offerteActiviteitMap, offerteBalBijTekst, offerteAannemerPaneel, offerteAannSamenvatting, renderAf, setAf, ALVO_ICONS, renderAlvo, ALVO_COLS, ALVO_LABELS, flagPill,
   _recomputeAlvoStatus, toggleAlvoFlag, statusIco, renderAlfa, renderThead, renderTbody, bepaalStil,
   deadlineCel, rowNtd, rowAf, renderPag,
 };

@@ -399,6 +399,47 @@ import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
     }catch(e){ console.error('vandaag-paneel-test:',e); return false; }
   })());
 
+  // ── offerte-briefing: 'Nu dit'-kaart + gepinde bewerk-rij (regressie wegspringen) ──
+  truthy('Nu-dit-kaart toont de urgentste taak', (()=>{
+    try{
+      const vA=state.activeNtd, vR=D.ntd['OFFERTE-TRAJECTEN'], vO=new Set(state.offerteAannOpen);
+      state.offerteAannOpen.clear();
+      D.ntd['OFFERTE-TRAJECTEN']=[
+        {code:'HERO-1',naam:'VvE Urgentst',offertes:'0/1',aannemers:'',fase:'',datumAangevraagd:'1 mei 2026',_row:9101},
+        {code:'HERO-2',naam:'VvE Tweede', offertes:'0/1',aannemers:'',fase:'',datumAangevraagd:'20 mei 2026',_row:9102},
+      ];
+      setNtd('OFFERTE-TRAJECTEN');
+      const html=document.getElementById('off-briefing-slot').innerHTML;
+      D.ntd['OFFERTE-TRAJECTEN']=vR; state.offerteAannOpen=vO; setNtd(vA);
+      return html.includes('of-hero')&&html.includes('VvE Urgentst')&&html.includes('Begin hier');
+    }catch(e){ console.error('nu-dit-test:',e); return false; }
+  })());
+
+  truthy('bewerkte rij blijft zichtbaar + gepind (springt niet weg)', (()=>{
+    try{
+      const vA=state.activeNtd, vR=D.ntd['OFFERTE-TRAJECTEN'], vO=new Set(state.offerteAannOpen);
+      const rows=[];
+      for(let i=0;i<8;i++) rows.push({code:'NB-'+i,naam:'VvE Na '+i,offertes:'0/1',aannemers:'',fase:'',datumAangevraagd:'1 mei 2026',_row:9200+i});
+      D.ntd['OFFERTE-TRAJECTEN']=rows;
+      state.offerteAannOpen.clear(); state.offerteAannOpen.add('NB-7'); // minst urgente, zou onder de cap vallen
+      setNtd('OFFERTE-TRAJECTEN');
+      const html=document.getElementById('off-briefing-slot').innerHTML;
+      D.ntd['OFFERTE-TRAJECTEN']=vR; state.offerteAannOpen=vO; setNtd(vA);
+      return html.includes('of-pin')&&html.includes('NB-7');
+    }catch(e){ console.error('pin-test:',e); return false; }
+  })());
+
+  truthy('lege nu-lijst → rustige leeg-staat', (()=>{
+    try{
+      const vA=state.activeNtd, vR=D.ntd['OFFERTE-TRAJECTEN'];
+      D.ntd['OFFERTE-TRAJECTEN']=[];
+      setNtd('OFFERTE-TRAJECTEN');
+      const html=document.getElementById('off-briefing-slot').innerHTML;
+      D.ntd['OFFERTE-TRAJECTEN']=vR; setNtd(vA);
+      return html.includes('Niets dringends');
+    }catch(e){ console.error('leeg-test:',e); return false; }
+  })());
+
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');
   window._testResult = `${totOk} OK, ${totFail} FAIL`; // uitleesbaar voor test-automatisering

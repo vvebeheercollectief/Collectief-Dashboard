@@ -146,6 +146,34 @@ function offerteBalBijTekst(balBij){
 }
 // Vult de briefing-slot met de C2-kop (altijd zichtbaar op de offerte-tab); leeg op andere tabs.
 // Het "Vandaag"-focuspaneel: cijfer-strip + Doorsturen/Nabellen-blokken + inklap-voet.
+// 'Nu dit'-kaart: de urgentste taak van dit moment, met reden en directe actieknop.
+function offerteHeroKaart(r, daarna, nuLen){
+  const rid=state._rowCache.length; state._rowCache.push(r);
+  const st=r._offStatus||{};
+  const dagen=st.dagen;
+  const omschr=esc(((r.opmerkingen||'').split('\n')[0]||'').slice(0,70));
+  const isSend=st.actie==='Doorsturen';
+  const reden=st.deadlineTeLaat
+    ? `<span class="of-hero-reden laat">Deadline verlopen</span>`
+    : (dagen!=null?`<span class="of-hero-reden">${dagen} dagen stil</span>`:`<span class="of-hero-reden">opvolgen</span>`);
+  const ctx=[dagen!=null?`${dagen} dagen geen reactie`:'opvolgen', offerteBalBijTekst(st.balBij), omschr].filter(Boolean).join(' · ');
+  const knop=isSend
+    ? `<button class="of-btn-send" data-action="offerte-doorsturen" data-rid="${rid}">Doorsturen</button>`
+    : `<button class="of-btn-call" data-action="offerte-nabellen" data-rid="${rid}">Nabellen</button>`;
+  const voet=`<div class="of-hero-voet"><span>${daarna?`Daarna: <b>${esc(daarna.naam||'')}</b>`:''}</span><span>${nuLen} te doen vandaag</span></div>`;
+  return `<div class="of-hero">
+    <div class="of-hero-kick">Begin hier</div>
+    <div class="of-hero-body">
+      <div class="of-hero-mid">
+        <div class="of-hero-line">${reden}<span class="of-hero-code">${esc(r.code)}</span></div>
+        <div class="of-hero-naam">${esc(r.naam||'')}</div>
+        <div class="of-hero-ctx">${ctx}</div>
+      </div>
+      <div class="of-hero-act">${knop}</div>
+    </div>
+    ${voet}
+  </div>`;
+}
 function renderOfferteBriefing(){
   const slot=document.getElementById('off-briefing-slot');
   if(!slot) return;
@@ -157,28 +185,48 @@ function renderOfferteBriefing(){
   const nu=[];
   rijen.forEach(r=>{ const st=offerteNuOpvolgen(r,vandaag); r._offStatus=st; r._offNu=st.nodig; if(st.nodig) nu.push(r); });
   nu.sort((a,b)=>offerteSorteerScore(b,vandaag)-offerteSorteerScore(a,vandaag));
-  const doorsturen=nu.filter(r=>r._offStatus.actie==='Doorsturen');
-  const nabellen=nu.filter(r=>r._offStatus.actie!=='Doorsturen');
-  const vastgelopen=nabellen.filter(r=>offerteNabelTeller(r.code,D.logboek)>=3).length;
+  // Rijen met open aannemer-paneel pinnen we bovenaan: niet in de secties, niet onder de cap,
+  // zodat ze tijdens het bewerken niet wegspringen of verdwijnen.
+  const bewerkt=r=>state.offerteAannOpen.has(r.code);
+  const bewerken=nu.filter(bewerkt);
+  // 'Nu dit'-kaart = urgentste taak die NIET in bewerking is.
+  const hero=nu.find(r=>!bewerkt(r))||null;
+  const inSectie=r=>r!==hero && !bewerkt(r);
+  const doorsturenAll=nu.filter(r=>r._offStatus.actie==='Doorsturen');
+  const nabellenAll=nu.filter(r=>r._offStatus.actie!=='Doorsturen');
+  const doorsturen=doorsturenAll.filter(inSectie);
+  const nabellen=nabellenAll.filter(inSectie);
+  const vastgelopen=nabellenAll.filter(r=>offerteNabelTeller(r.code,D.logboek)>=3).length;
   const f=offerteBriefingFeiten(rijen);
   const datumLabel=new Date().toLocaleDateString('nl-NL',{weekday:'long',day:'numeric',month:'long'});
   const DCAP=3, NCAP=5;
   const dShow=state.offerteDoorsturenOpen?doorsturen:doorsturen.slice(0,DCAP);
   const nShow=state.offerteNabellenOpen?nabellen:nabellen.slice(0,NCAP);
+  // 'Daarna'-vooruitblik = de urgentste taak in de secties (na hero + bewerken).
+  const daarna=[...doorsturen,...nabellen].sort((a,b)=>offerteSorteerScore(b,vandaag)-offerteSorteerScore(a,vandaag))[0]||null;
   const stat=(val,cls,cap)=>`<div class="of-stat"><span class="of-num ${cls}">${val}</span><span class="of-cap">${cap}</span></div>`;
   const blok=(titel,cnt,sub,rows,soort,meer,actie)=>
     `<div class="of-sec-h ${soort==='doorsturen'?'send':'call'}"><span>${titel}</span><span class="of-cnt">· ${cnt}</span><span class="of-sub">— ${sub}</span></div>`
     +(rows.length?rows.map(r=>offerteFocusRij(r,soort)).join('')
       :`<div class="of-leeg">Niets ${soort==='doorsturen'?'klaar om te versturen':'om na te bellen'}</div>`)
     +(meer>0?`<button class="of-meer" data-action="${actie}">Toon ${meer} meer ▾</button>`:'');
+  const heroHtml = hero ? offerteHeroKaart(hero, daarna, nu.length)
+                 : (nu.length ? '' : `<div class="of-hero leeg">Niets dringends vandaag — mooi bezig.</div>`);
+  const pinHtml = bewerken.length
+    ? `<div class="of-pin"><div class="of-sec-h pin"><span>Aan het bijwerken</span></div>`
+      + bewerken.map(r=>offerteFocusRij(r, r._offStatus.actie==='Doorsturen'?'doorsturen':'nabellen')).join('')
+      + `</div>`
+    : '';
   slot.innerHTML=`<div class="of-pan">
     <div class="of-top"><span class="of-kick">Vandaag</span><span class="of-date">${esc(datumLabel)}</span></div>
+    ${heroHtml}
     <div class="of-strip">
       ${stat(nu.length,'','Te doen')}
       ${stat(vastgelopen,vastgelopen?'red':'muted','Vastgelopen')}
-      ${stat(doorsturen.length,'','Klaar te versturen')}
+      ${stat(doorsturenAll.length,'','Klaar te versturen')}
       ${stat(f.klaarTeGunnen,f.klaarTeGunnen?'':'muted','Bij de VvE')}
     </div>
+    ${pinHtml}
     ${blok('Doorsturen',doorsturen.length,'offerte binnen, klaar voor de eigenaren · kun je nu afmaken',dShow,'doorsturen',state.offerteDoorsturenOpen?0:doorsturen.length-dShow.length,'offerte-meer-d')}
     ${blok('Nabellen',nabellen.length,'langst stil eerst, bal bij de aannemer',nShow,'nabellen',state.offerteNabellenOpen?0:nabellen.length-nShow.length,'offerte-meer-n')}
     <div class="of-voet"><span class="of-voet-lbl">Hele lijst · ${rijen.length} trajecten</span>

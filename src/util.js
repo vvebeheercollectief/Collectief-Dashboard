@@ -216,6 +216,13 @@ function offerteBriefingFeiten(rijen, vandaag, termijnen){
   return { nuOpvolgen, langStil, balBijOns, klaarTeGunnen, urgentste };
 }
 
+// Aantal keren dat een offerte-traject is nagebeld (Contact-logregels met veld 'Telefoon').
+function offerteNabelTeller(code, logboek){
+  let n = 0;
+  (logboek || []).forEach(e => { if (e.sectie === 'OFFERTE-TRAJECTEN' && e.code === code && e.veld === 'Telefoon') n++; });
+  return n;
+}
+
 // Sorteerscore voor "Nu opvolgen": hoger = urgenter (sorteer aflopend).
 function offerteSorteerScore(r, vandaag, termijnen){
   const s = offerteNuOpvolgen(r, vandaag, termijnen);
@@ -280,5 +287,5 @@ export {
   adjOff, offProg, _MAANDEN, _parseAnyDate, parseDt, toISODate, toDutchDate,
   emptyRow, esc, subBadge,
   parseOff, offerteFase, offerteBalBij, _verschilInWerkdagen,
-  offerteStilBasis, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten,
+  offerteStilBasis, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten, offerteNabelTeller,
 };

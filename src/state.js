@@ -58,6 +58,7 @@ export const state = {
   offerteNabellenOpen: false,   // Vandaag-focus: Nabellen-blok volledig uitgeklapt?
   offerteTabelOpen: false,      // Vandaag-focus: volledige offerte-tabel zichtbaar?
   offerteAannOpen: new Set(),   // codes van trajecten met uitgeklapt aannemers-paneel
+  offerteAannSnap: {},          // code → bevroren sectie zolang het paneel open is (geen sprong tijdens bewerken)
   vveCode: null,           // VvE op de per-VvE-pagina (Fase 5)
   _vveAfAlles: false,      // per-VvE: alle afgeronde taken uitgeklapt
   bulkMode: false,         // bulk-selecteerstand op de NTD-lijst (Fase 5)

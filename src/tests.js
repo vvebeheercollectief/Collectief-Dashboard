@@ -415,18 +415,19 @@ import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
     }catch(e){ console.error('nu-dit-test:',e); return false; }
   })());
 
-  truthy('bewerkte rij blijft zichtbaar + gepind (springt niet weg)', (()=>{
+  truthy('bewerkte rij blijft in z\'n sectie zichtbaar (geen pin-zone, geen sprong omhoog)', (()=>{
     try{
-      const vA=state.activeNtd, vR=D.ntd['OFFERTE-TRAJECTEN'], vO=new Set(state.offerteAannOpen);
+      const vA=state.activeNtd, vR=D.ntd['OFFERTE-TRAJECTEN'], vO=new Set(state.offerteAannOpen), vS={...state.offerteAannSnap};
       const rows=[];
       for(let i=0;i<8;i++) rows.push({code:'NB-'+i,naam:'VvE Na '+i,offertes:'0/1',aannemers:'',fase:'',datumAangevraagd:'1 mei 2026',_row:9200+i});
       D.ntd['OFFERTE-TRAJECTEN']=rows;
       state.offerteAannOpen.clear(); state.offerteAannOpen.add('NB-7'); // minst urgente, zou onder de cap vallen
       setNtd('OFFERTE-TRAJECTEN');
       const html=document.getElementById('off-briefing-slot').innerHTML;
-      D.ntd['OFFERTE-TRAJECTEN']=vR; state.offerteAannOpen=vO; setNtd(vA);
-      return html.includes('of-pin')&&html.includes('NB-7');
-    }catch(e){ console.error('pin-test:',e); return false; }
+      D.ntd['OFFERTE-TRAJECTEN']=vR; state.offerteAannOpen=vO; state.offerteAannSnap=vS; setNtd(vA);
+      // open rij blijft zichtbaar (cap-exempt) én er is géén losse 'Aan het bijwerken'-pin-zone meer
+      return html.includes('NB-7') && !html.includes('of-pin') && !html.includes('Aan het bijwerken');
+    }catch(e){ console.error('inplace-test:',e); return false; }
   })());
 
   truthy('lege nu-lijst → rustige leeg-staat', (()=>{

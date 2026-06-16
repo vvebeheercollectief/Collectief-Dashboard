@@ -131,6 +131,47 @@ function renderNtd(){
   const verberg=state.activeNtd==='OFFERTE-TRAJECTEN' && !state.offerteTabelOpen;
   if(tblWrap) tblWrap.style.display=verberg?'none':'';
   if(pag) pag.style.display=verberg?'none':'';
+  renderNtdCrossList(state.activeNtd);
+}
+// Cross-list (bug #2): taken die fysiek in een ándere sectie staan maar via hun
+// Subcategorie-veld óók bij dit scherm horen. We tonen ze als apart lijstje onderaan
+// ("Ook hier"), met een herkomst-tag en een bewerk-knop die de eigen-sectie-modal opent.
+// De taak blijft gewoon in z'n eigen scherm staan (geen verplaatsing).
+function renderNtdCrossList(sec){
+  const host=document.getElementById('ntd-crosslist'); if(!host) return;
+  const label=((SECS[sec]?.label)||'').trim().toLowerCase();
+  const q=(document.getElementById('s-ntd')?.value||'').toLowerCase();
+  const fCode=(document.getElementById('f-code-ntd')?.value||'').toLowerCase();
+  const fBeh=(document.getElementById('f-beh-ntd')?.value||'').toLowerCase();
+  const treffers=[];
+  if(label){
+    SKEYS.forEach(s=>{ if(s===sec) return;
+      (D.ntd[s]||[]).forEach(r=>{
+        if(((r.subcategorie||'')+'').trim().toLowerCase()!==label) return;
+        if(q && !(`${r.code||''} ${r.naam||''} ${r.opmerkingen||''}`.toLowerCase().includes(q))) return;
+        if(fCode && !((r.code||'').toLowerCase().includes(fCode))) return;
+        if(fBeh && !((r.behandelaar||'').toLowerCase().includes(fBeh))) return;
+        treffers.push(r);
+      });
+    });
+  }
+  if(!treffers.length){ host.innerHTML=''; return; }
+  const rij=r=>{
+    const rid=state._rowCache.length; state._rowCache.push(r);
+    const herkomst=esc((SECS[r._sec]?.label)||r._sec||'');
+    const dl=r.deadline?` · ${esc(r.deadline)}`:'';
+    const opm=esc(((r.opmerkingen||'').split('\n')[0]||'').slice(0,60));
+    return `<div class="xl-rij">
+      <span class="xl-code">${esc(r.code)}</span>
+      <div class="xl-mid"><div class="xl-naam">${esc(r.naam||'')}</div>
+        <div class="xl-ctx"><span class="xl-herk">${herkomst}</span>${dl}${opm?` · ${opm}`:''}</div></div>
+      <button class="xl-edit" data-action="taak-bewerken" data-rid="${rid}" title="Bewerken" aria-label="Bewerken"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+    </div>`;
+  };
+  host.innerHTML=`<div class="xl-blok">
+    <div class="xl-kop">Ook hier <span class="xl-sub">· via subcategorie · ${treffers.length}</span></div>
+    ${treffers.map(rij).join('')}
+  </div>`;
 }
 function setNtd(s){
   state.activeNtd=s;pgs.ntd=1;bulkWis();
@@ -185,14 +226,17 @@ function renderOfferteBriefing(){
   const nu=[];
   rijen.forEach(r=>{ const st=offerteNuOpvolgen(r,vandaag); r._offStatus=st; r._offNu=st.nodig; if(st.nodig) nu.push(r); });
   nu.sort((a,b)=>offerteSorteerScore(b,vandaag)-offerteSorteerScore(a,vandaag));
-  // Een rij met open aannemer-paneel klapt IN PLAATS open (springt niet naar boven) en blijft
-  // altijd zichtbaar. We bevriezen de sectie bij openen, zodat de teller-herberekening de rij
-  // tijdens het typen niet naar een andere sectie verschuift.
+  // Een rij met open aannemer-paneel — of die je deze sessie bewerkt hebt — blijft op z'n plek
+  // en zichtbaar (cap-exempt) en wordt niet naar de 'Nu dit'-kaart getrokken. We bevriezen de
+  // sectie bij openen; voor een bewerkte rij blijft die bevriezing staan tot de pagina ververst,
+  // zodat de teller-herberekening (aannemer toevoegen → andere fase) de rij niet onder je
+  // vandaan naar een andere groep schuift of onder de "Toon meer"-vouw laat vallen (bug #1).
   const open=r=>state.offerteAannOpen.has(r.code);
+  const pinned=r=>open(r)||state.offerteAannMut.has(r.code);
   nu.forEach(r=>{ if(open(r) && !state.offerteAannSnap[r.code]) state.offerteAannSnap[r.code]=r._offStatus.actie; });
-  const sectie=r=> open(r) && state.offerteAannSnap[r.code] ? state.offerteAannSnap[r.code] : r._offStatus.actie;
-  // 'Nu dit'-kaart = urgentste taak die NIET open staat (een open rij wordt nooit naar de kaart getrokken).
-  const hero=nu.find(r=>!open(r))||null;
+  const sectie=r=> (pinned(r) && state.offerteAannSnap[r.code]) ? state.offerteAannSnap[r.code] : r._offStatus.actie;
+  // 'Nu dit'-kaart = urgentste taak die niet open/bewerkt is (zo'n rij wordt nooit naar de kaart getrokken).
+  const hero=nu.find(r=>!pinned(r))||null;
   const rest=nu.filter(r=>r!==hero);
   const doorsturenAll=nu.filter(r=>r._offStatus.actie==='Doorsturen');
   const nabellenAll=nu.filter(r=>r._offStatus.actie!=='Doorsturen');
@@ -202,11 +246,11 @@ function renderOfferteBriefing(){
   const f=offerteBriefingFeiten(rijen);
   const datumLabel=new Date().toLocaleDateString('nl-NL',{weekday:'long',day:'numeric',month:'long'});
   const DCAP=3, NCAP=5;
-  // Cap, maar een open rij blijft altijd zichtbaar (verdwijnt niet onder de vouw).
-  const dShow=state.offerteDoorsturenOpen?doorsturen:doorsturen.filter((r,i)=>i<DCAP||open(r));
-  const nShow=state.offerteNabellenOpen?nabellen:nabellen.filter((r,i)=>i<NCAP||open(r));
-  // 'Daarna'-vooruitblik = de urgentste niet-open taak in de secties.
-  const daarna=[...doorsturen,...nabellen].sort((a,b)=>offerteSorteerScore(b,vandaag)-offerteSorteerScore(a,vandaag)).find(r=>!open(r))||null;
+  // Cap, maar een open/bewerkte rij blijft altijd zichtbaar (verdwijnt niet onder de vouw).
+  const dShow=state.offerteDoorsturenOpen?doorsturen:doorsturen.filter((r,i)=>i<DCAP||pinned(r));
+  const nShow=state.offerteNabellenOpen?nabellen:nabellen.filter((r,i)=>i<NCAP||pinned(r));
+  // 'Daarna'-vooruitblik = de urgentste niet-open/bewerkte taak in de secties.
+  const daarna=[...doorsturen,...nabellen].sort((a,b)=>offerteSorteerScore(b,vandaag)-offerteSorteerScore(a,vandaag)).find(r=>!pinned(r))||null;
   const stat=(val,cls,cap)=>`<div class="of-stat"><span class="of-num ${cls}">${val}</span><span class="of-cap">${cap}</span></div>`;
   const blok=(titel,cnt,sub,rows,soort,meer,actie)=>
     `<div class="of-sec-h ${soort==='doorsturen'?'send':'call'}"><span>${titel}</span><span class="of-cnt">· ${cnt}</span><span class="of-sub">— ${sub}</span></div>`

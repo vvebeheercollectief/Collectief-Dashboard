@@ -54,7 +54,7 @@ export const ACTIONS = {
   'offerte-meer-d':        ()   => { state.offerteDoorsturenOpen=true; renderNtd(); },
   'offerte-meer-n':        ()   => { state.offerteNabellenOpen=true;   renderNtd(); },
   'offerte-tabel-toggle':  ()   => { state.offerteTabelOpen=!state.offerteTabelOpen; renderNtd(); },
-  'offerte-aann-open':     (el) => { const c=el.dataset.code; if(state.offerteAannOpen.has(c)){ state.offerteAannOpen.delete(c); delete state.offerteAannSnap[c]; } else state.offerteAannOpen.add(c); renderNtd(); },
+  'offerte-aann-open':     (el) => { const c=el.dataset.code; if(state.offerteAannOpen.has(c)){ state.offerteAannOpen.delete(c); if(!state.offerteAannMut.has(c)) delete state.offerteAannSnap[c]; } else state.offerteAannOpen.add(c); renderNtd(); },
   'offerte-aann-binnen':   (el) => toggleAannemerBinnen(el.dataset.code, +el.dataset.idx),
   'offerte-aann-verwijder':(el) => verwijderAannemer(el.dataset.code, +el.dataset.idx),
   'offerte-aann-add':      (el) => { const inp=el.closest('.of-aann-add')?.querySelector('.of-aann-input'); if(!inp) return; const v=inp.value; inp.value=''; addAannemer(el.dataset.code, v); },

@@ -18,6 +18,7 @@ function _vindRij(code){
 // Render direct (optimistisch) en schrijf de al-gemuteerde r.aannemers weg naar kolom P.
 // backgroundWrite rolt terug + her-rendert bij falen (zie data.js).
 async function _bewaar(r, vorige){
+  state.offerteAannMut.add(r.code); // net bewerkt → blijft op z'n plek/zichtbaar tot refresh (bug #1)
   renderNtd();
   if(!r._row) return; // zonder rijnummer geen schrijfdoel (zeldzaam) — alleen lokaal
   if(!await ensureToken()){ r.aannemers=vorige; renderNtd(); return; }

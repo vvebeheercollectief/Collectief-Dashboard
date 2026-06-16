@@ -696,3 +696,17 @@
     .of-aann-tbl-tog{margin-top:4px}
     .of-aann-tr>td{padding:0 14px 12px!important;background:var(--sur)}
     .of-aann-tr .of-aann-paneel{max-width:580px;margin:0}
+
+    /* Cross-list "Ook hier" (bug #2): taken die via Subcategorie óók in dit scherm horen */
+    .xl-blok{margin-top:18px;border-top:1px solid var(--bor);padding-top:14px}
+    .xl-kop{font-size:13px;font-weight:700;color:var(--sec);margin-bottom:10px}
+    .xl-sub{font-weight:500;color:var(--mut)}
+    .xl-rij{display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--bor);border-radius:10px;margin-bottom:7px;background:var(--sur)}
+    .xl-code{font-weight:700;color:var(--sec);font-size:13px;min-width:62px}
+    .xl-mid{flex:1;min-width:0}
+    .xl-naam{font-weight:600;font-size:14px;color:var(--txt)}
+    .xl-ctx{font-size:12px;color:var(--mut);display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:2px}
+    .xl-herk{background:var(--sec-l);color:var(--sec);border-radius:6px;padding:1px 8px;font-weight:600;font-size:11px}
+    .xl-edit{background:none;border:none;cursor:pointer;color:var(--mut);padding:6px;border-radius:8px;display:flex}
+    .xl-edit:hover{background:var(--sec-l);color:var(--sec)}
+    .xl-edit svg{width:18px;height:18px;display:block}

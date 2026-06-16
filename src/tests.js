@@ -430,6 +430,48 @@ import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
     }catch(e){ console.error('inplace-test:',e); return false; }
   })());
 
+  // ── offerte-aannemers: net-bewerkte rij blijft staan ná sluiten paneel (bug #1) ──
+  truthy('net-bewerkte offerte-rij blijft zichtbaar ná sluiten paneel (pin tot refresh)', (()=>{
+    try{
+      const vA=state.activeNtd, vR=D.ntd['OFFERTE-TRAJECTEN'], vO=new Set(state.offerteAannOpen),
+            vS={...state.offerteAannSnap}, vM=new Set(state.offerteAannMut||[]);
+      const rows=[];
+      for(let i=0;i<8;i++) rows.push({code:'PIN-'+i,naam:'VvE Pin '+i,offertes:'0/1',aannemers:'',fase:'',datumAangevraagd:'1 mei 2026',_row:9300+i});
+      D.ntd['OFFERTE-TRAJECTEN']=rows;
+      state.offerteAannOpen.clear();                       // paneel DICHT
+      state.offerteAannSnap={'PIN-7':'Nabellen'};          // maar net bewerkt → gepind
+      state.offerteAannMut=new Set(['PIN-7']);
+      setNtd('OFFERTE-TRAJECTEN');
+      const html=document.getElementById('off-briefing-slot').innerHTML;
+      D.ntd['OFFERTE-TRAJECTEN']=vR; state.offerteAannOpen=vO; state.offerteAannSnap=vS; state.offerteAannMut=vM; setNtd(vA);
+      return html.includes('PIN-7'); // minst urgente; zónder pin valt 'ie onder de cap → uit beeld
+    }catch(e){ console.error('pin-na-sluiten-test:',e); return false; }
+  })());
+
+  // ── subcategorie cross-list: taak óók in het gekozen scherm tonen (bug #2) ──
+  truthy('subcategorie cross-list: taak verschijnt in het gekozen scherm', (()=>{
+    try{
+      const vA=state.activeNtd, vOpp=D.ntd['OPPAKKEN'], vOff=D.ntd['OFFERTE-TRAJECTEN'];
+      D.ntd['OFFERTE-TRAJECTEN']=[];
+      D.ntd['OPPAKKEN']=[{code:'XL-1',naam:'VvE Cross',actiepunt:'x',deadline:'',subcategorie:'Offerte-trajecten',_sec:'OPPAKKEN',_row:9400}];
+      setNtd('OFFERTE-TRAJECTEN');
+      const html=document.getElementById('ntd-crosslist').innerHTML;
+      D.ntd['OPPAKKEN']=vOpp; D.ntd['OFFERTE-TRAJECTEN']=vOff; setNtd(vA);
+      return html.includes('XL-1') && html.toLowerCase().includes('ook hier');
+    }catch(e){ console.error('crosslist-test:',e); return false; }
+  })());
+  truthy('subcategorie cross-list: niet in een niet-passend scherm', (()=>{
+    try{
+      const vA=state.activeNtd, vOpp=D.ntd['OPPAKKEN'], vLod=D.ntd['LOD'];
+      D.ntd['LOD']=[];
+      D.ntd['OPPAKKEN']=[{code:'XL-2',naam:'VvE Cross2',actiepunt:'x',subcategorie:'Offerte-trajecten',_sec:'OPPAKKEN',_row:9401}];
+      setNtd('LOD');
+      const html=document.getElementById('ntd-crosslist').innerHTML;
+      D.ntd['OPPAKKEN']=vOpp; D.ntd['LOD']=vLod; setNtd(vA);
+      return !html.includes('XL-2');
+    }catch(e){ console.error('crosslist-neg-test:',e); return false; }
+  })());
+
   truthy('lege nu-lijst → rustige leeg-staat', (()=>{
     try{
       const vA=state.activeNtd, vR=D.ntd['OFFERTE-TRAJECTEN'];

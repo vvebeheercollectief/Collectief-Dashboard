@@ -15,6 +15,7 @@ import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk
 import { _isTransient } from "./api.js";
 import { parseSections } from "./data.js";
 import { setv } from "./crud.js";
+import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
   // ── mini-assert helper (Fase 1 testnet) ──
@@ -55,6 +56,32 @@ import { setv } from "./crud.js";
   });
   const leeg = berekenPrioriteit('', 'OPPAKKEN', T);
   if (leeg.prioriteit === '' && leeg.teLaat === false) ok++; else { fail++; console.error('FAIL: lege deadline →', leeg); }
+
+  // ── Urgentie-motor (Dagstart-cockpit) ──
+  const uOpp = (d, extra={}) => ({ deadline: d, ...extra });
+  truthy('urg: OPPAKKEN 3d te laat → label vandaag', urgentieScore(uOpp(plus(-3)), 'OPPAKKEN', {vandaag:T}).label === 'vandaag');
+  truthy('urg: OPPAKKEN 3d te laat → score >= 80', urgentieScore(uOpp(plus(-3)), 'OPPAKKEN', {vandaag:T}).score >= 80);
+  eq('urg: OPPAKKEN +30d → label later', urgentieScore(uOpp(plus(30)), 'OPPAKKEN', {vandaag:T}).label, 'later');
+  eq('urg: LOD +2d → label deze-week', urgentieScore(uOpp(plus(2)), 'LOD', {vandaag:T}).label, 'deze-week');
+  const uOv = urgentieScore({deadline:'', opvolgdatum:plus(0)}, 'OPPAKKEN', {vandaag:T});
+  eq('urg: opvolgen vandaag → score 15', uOv.score, 15);
+  eq('urg: opvolgen vandaag → reden', uOv.reden, 'opvolgafspraak voor vandaag');
+  const stilTaak = {code:'X1', inBehandeling:'TRUE', deadline:''};
+  const stilLog = [{code:'X1', sectie:'OPPAKKEN', timestamp:'2026-05-23T09:00:00'}];
+  eq('stil: 10 dagen sinds laatste log', dagenStil(stilTaak, 'OPPAKKEN', stilLog, T), 10);
+  eq('urg: 10d stil → score 16', urgentieScore(stilTaak, 'OPPAKKEN', {vandaag:T, logboek:stilLog}).score, 16);
+  eq('stil: niet in behandeling → null', dagenStil({code:'X1', inBehandeling:''}, 'OPPAKKEN', stilLog, T), null);
+  truthy('mij: behandelaar "Jer, Cihad" matcht Jer', isVanMij({behandelaar:'Jer, Cihad'}, 'Jer'));
+  truthy('mij: behandelaar matcht niet Gabos', !isVanMij({behandelaar:'Jer, Cihad'}, 'Gabos'));
+  truthy('mij: lege behandelaar → false', !isVanMij({behandelaar:''}, 'Jer'));
+  const Dlos = {
+    'OPPAKKEN':[], 'VERGADERVERZOEKEN':[],
+    'OFFERTE-TRAJECTEN':[{code:'A', offertes:'1/1', fase:'bij_vve', deadline:''}],
+    'LOD':[{code:'L1', naam:'De Linden', deadline:plus(2)}],
+  };
+  const sig = letOpSignalen(Dlos, {vandaag:T, logboek:[]});
+  truthy('let-op: levert minstens 1 LOD-signaal', sig.some(s => /LOD/i.test(s.tekst)));
+  truthy('let-op: elk signaal heeft soort+tekst', sig.every(s => s.soort && s.tekst));
 
   // ── _parseAnyDate ──
   eq('ISO yyyy-mm-dd',  _parseAnyDate('2026-05-21'),  {y:2026,m:5,d:21});

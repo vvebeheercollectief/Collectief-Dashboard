@@ -175,9 +175,18 @@
     tbody tr[data-prio=midden]{--prio-bar:#b88a32}
     tbody tr[data-prio=laag],tbody tr[data-prio=geen]{--prio-bar:#cbd0d8}
     .code{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12.5px;font-weight:500;letter-spacing:0;color:#6b7280;background:none;padding:0;white-space:nowrap}
-    .cell-name{font-weight:600;color:var(--txt);max-width:200px;line-height:var(--row-lh,1.4)}
-    .cell-txt{color:#48505c;max-width:300px;line-height:var(--row-lh,1.4);font-size:calc(var(--row-fs,13px) - .5px)}
-    .cell-note{color:var(--fnt);max-width:260px;line-height:var(--row-lh,1.4);font-size:12px}
+    /* Inklapbare tekstcellen — Operator: 1 regel met …; klik op de rij klapt uit.
+       Clamp zit op een inline-block .ct (td blijft table-cell, zodat kolommen netjes uitlijnen). */
+    .cell-name{font-weight:600;color:var(--txt)}
+    .cell-txt{color:#48505c;font-size:calc(var(--row-fs,13px) - .5px)}
+    .cell-note{color:var(--fnt);font-size:12px}
+    .cell-name,.cell-txt,.cell-note{line-height:var(--row-lh,1.4);cursor:pointer;white-space:nowrap}
+    .cell-name>.ct,.cell-txt>.ct,.cell-note>.ct{display:inline-block;vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .cell-name>.ct{max-width:200px}
+    .cell-txt>.ct{max-width:320px}
+    .cell-note>.ct{max-width:240px}
+    tr.expanded .cell-name,tr.expanded .cell-txt,tr.expanded .cell-note{white-space:normal}
+    tr.expanded .cell-name>.ct,tr.expanded .cell-txt>.ct,tr.expanded .cell-note>.ct{display:inline;max-width:none;white-space:normal;overflow:visible;text-overflow:clip}
     .cell-sm{font-size:12.5px;color:#48505c;white-space:nowrap}
     /* Dichtheid (per collega, onthouden in localStorage) */
     html[data-density="compact"]{--row-py:5px;--row-px:10px;--row-fs:12.5px;--row-lh:1.3}
@@ -324,7 +333,7 @@
     .ntd-progress-card{background:var(--sur);border-radius:14px;padding:16px 20px;box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 12px color-mix(in srgb,var(--ac) 18%,transparent);flex:1 1 0;width:auto;min-width:280px;max-width:560px;display:flex;flex-direction:column;justify-content:center;gap:10px}
     .ntd-progress-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--txt);opacity:.7;line-height:1.2}
     .ntd-progress-track{position:relative;height:32px;border-radius:999px;background:var(--sur2);overflow:hidden}
-    .ntd-progress-fill{position:absolute;inset:0 auto 0 0;width:0;border-radius:999px;background:linear-gradient(135deg,#0D7377,#14B8A6);transition:width .9s cubic-bezier(.22,1,.36,1)}
+    .ntd-progress-fill{position:absolute;inset:0 auto 0 0;width:0;border-radius:999px;background:linear-gradient(135deg,#4a5b7a,#6f81a3);transition:width .9s cubic-bezier(.22,1,.36,1)}
     .ntd-progress-val{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;letter-spacing:-.01em;white-space:nowrap;pointer-events:none;font-variant-numeric:tabular-nums}
     .ntd-progress-val-base{color:var(--txt)}
     .ntd-progress-val-rev{color:#fff;clip-path:inset(0 100% 0 0);transition:clip-path .9s cubic-bezier(.22,1,.36,1)}
@@ -494,7 +503,7 @@
     .ai-ctx ul{margin:5px 0 0;padding-left:17px}
     .ai-ctx li{margin:2px 0}
     .ai-prompt{background:#0f1b1c;color:#cdeae9;border-radius:var(--rs);padding:12px 13px;font-size:11.5px;line-height:1.55;white-space:pre-wrap;font-family:'SF Mono',ui-monospace,monospace;max-height:240px;overflow-y:auto;border:1px solid #16302f}
-    .ai-prompt .k{color:#5EEAD4;font-weight:700}
+    .ai-prompt .k{color:#7f9ce0;font-weight:700}
     .ai-prompt .empty{color:#6f8a89;font-style:italic}
     .ai-send{display:flex;gap:8px;margin-top:11px;flex-wrap:wrap}
     .ai-claude{background:#C96442;color:#fff}

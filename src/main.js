@@ -66,6 +66,14 @@ document.addEventListener('DOMContentLoaded',()=>{
   setupSearch('f-code-ntd',()=>{pgs.ntd=1;renderNtd()});
   document.getElementById('f-beh-ntd').onchange=()=>{pgs.ntd=1;renderNtd()};
   document.getElementById('f-prio-ntd').onchange=()=>{pgs.ntd=1;renderNtd()};
+  // Operator: klik op een taakrij klapt de volledige tekst uit/in (negeer knoppen, code-link, checkbox)
+  document.getElementById('ntd-tbody').addEventListener('click',e=>{
+    if(e.target.closest('button,a,input,select,textarea,[data-action],.code-klik,.of-aann-tbl-tog')) return;
+    const tr=e.target.closest('tr[data-row]'); if(!tr) return;
+    const id=tr.getAttribute('data-row');
+    if(state.expandedRows.has(id)){state.expandedRows.delete(id);tr.classList.remove('expanded');}
+    else{state.expandedRows.add(id);tr.classList.add('expanded');}
+  });
   document.getElementById('f-status-alvo').onchange=()=>{pgs.alvo=1;renderAlvo()};
   setupSearch('s-logboek',()=>{pgs.logboek=1;renderLogboek()});
   document.getElementById('logboek-who').addEventListener('click',e=>{

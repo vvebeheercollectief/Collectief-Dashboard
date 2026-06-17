@@ -66,6 +66,7 @@ export const state = {
   vveCode: null,           // VvE op de per-VvE-pagina (Fase 5)
   _vveAfAlles: false,      // per-VvE: alle afgeronde taken uitgeklapt
   bulkMode: false,         // bulk-selecteerstand op de NTD-lijst (Fase 5)
+  expandedRows: new Set(), // _row-id's van NTD-rijen die de gebruiker uitklapte (Operator: 1-regel → volledige tekst)
   // VvE-dossier (logboek + kenmerken)
   kenmerkenEdit: false,    // kenmerken-paneel in bewerkmodus
   vveLogFilter: 'alles',   // 'alles' | 'contact'

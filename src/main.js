@@ -25,6 +25,7 @@ import { closeSnoozeModal, snoozeOpslaan, snoozeWis } from './snooze.js';
 import { sluitOfferteActieModal } from './offerte-acties.js';
 import { renderHerhaal, openHerhaalModal, closeHerhaalModal, syncHerhaalVelden, submitHerhaal } from './render-herhaal.js';
 import { renderVve } from './render-vve.js';
+import { renderVandaag } from './render-vandaag.js';
 import { initPalette } from './palette.js';
 
 // ══════════════════════════════════════
@@ -239,7 +240,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     loadAll();
   }
 
-  goTo('ntd');
+  goTo('vandaag');
 });
 
 
@@ -261,6 +262,7 @@ export function renderAll(){
   renderLogboek();
   renderHerhaal();
   renderVve();
+  renderVandaag();
 }
 
 // ══════════════════════════════════════

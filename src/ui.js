@@ -23,7 +23,8 @@ function goTo(page){
   if(page==='vve') renderVve();
   closeSb();
   if(page==='analytics') buildAnalytics();
-  if(page==='dash'){ renderVandaag(); buildDash(); }
+  if(page==='dash') buildDash();
+  if(page==='vandaag') renderVandaag();
 }
 function closeSb(){document.getElementById('sb').classList.remove('open');document.getElementById('overlay').classList.remove('on')}
 
@@ -38,7 +39,7 @@ function applyTheme(t){
   Object.values(state.charts).forEach(c=>{try{c.destroy()}catch(e){}});
   state.charts={};
   if(document.getElementById('page-analytics').classList.contains('active')) buildAnalytics();
-  if(document.getElementById('page-dash').classList.contains('active')){ renderVandaag(); buildDash(); }
+  if(document.getElementById('page-dash').classList.contains('active')) buildDash();
 }
 
 // ══════════════════════════════════════

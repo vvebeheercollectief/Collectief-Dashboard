@@ -7,7 +7,6 @@ import { SKEYS, SECS } from "./config.js";
 import { fetchSheet, _withRetry } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { buildAnalytics, buildDash } from "./render-analytics.js";
-import { renderVandaag } from "./render-vandaag.js";
 import { renderNtdDonut } from "./render-lijsten.js";
 import { parseOntw, parseLogboek } from "./render-overig.js";
 import { parseKenmerken } from "./kenmerken.js";
@@ -90,7 +89,7 @@ async function loadAll(silent){
       renderAll();
       // Re-render actieve detailpagina's met nieuwe data
       if(document.getElementById('page-analytics')?.classList.contains('active')) buildAnalytics();
-      if(document.getElementById('page-dash')?.classList.contains('active')){ renderVandaag(); buildDash(); }
+      if(document.getElementById('page-dash')?.classList.contains('active')) buildDash();
       if(document.getElementById('page-ntd')?.classList.contains('active')) renderNtdDonut();
     }
   }catch(e){

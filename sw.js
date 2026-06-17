@@ -1,7 +1,7 @@
 // Collectief Dashboard — Service Worker
 // Verhoog versie bij elke nieuwe deploy zodat clients de nieuwe cache pakken.
 
-const CACHE_VERSION = 'cd-v27';
+const CACHE_VERSION = 'cd-v28';
 const APP_SHELL = [
   './',
   './index.html',
@@ -15,6 +15,8 @@ const APP_SHELL = [
   './src/config.js',
   './src/state.js',
   './src/util.js',
+  './src/urgentie.js',
+  './src/render-vandaag.js',
   './src/api.js',
   './src/auth.js',
   './src/data.js',

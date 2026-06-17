@@ -61,10 +61,17 @@ async function saveKenmerken(){
   });
   renderVve();
   const waarden=[code,rec.balkons,rec.kozijnen,rec.bron,who,ts];
-  const rij=sn._row;                        // 0 = nog geen rij → append
   backgroundWrite(
-    ()=> rij>0 ? writeRange(`'Kenmerken'!A${rij}:F${rij}`,waarden)
-               : appendRange("'Kenmerken'!A:F",waarden),
+    async ()=>{
+      // Beslis append-vs-update BINNEN de schrijf-keten: een eerdere append heeft rec._row
+      // dan al gezet, zodat een snelle tweede opslag niet nóg een rij toevoegt.
+      if(rec._row>0){ await writeRange(`'Kenmerken'!A${rec._row}:F${rec._row}`,waarden); }
+      else{
+        const resp=await appendRange("'Kenmerken'!A:F",waarden);
+        const m=(resp&&resp.updates&&resp.updates.updatedRange||'').match(/!A(\d+):/i);
+        if(m) rec._row=+m[1];   // nieuw rijnummer onthouden → volgende opslag wordt een update
+      }
+    },
     ()=>{ Object.assign(rec,sn); },
     'Kenmerken opslaan'
   );

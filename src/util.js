@@ -248,7 +248,7 @@ function offerteSorteerScore(r, vandaag, termijnen){
   const prioRank = { hoog:2, midden:1, laag:0 }[(((r&&r.prioriteit)||'')+'').trim().toLowerCase()];
   return (s.deadlineTeLaat ? 1e6 : 0) + ((s.dagen || 0) * 100)
        + (s.balBij === 'ons' ? 10 : 0)            // tiebreak: snel af te ronden (bal bij ons) eerst
-       + (prioRank == null ? 1 : prioRank);
+       + (prioRank == null ? -1 : prioRank);      // geen prioriteit → onder 'Laag' (0), niet erboven
 }
 
 function offProg(v){
@@ -268,12 +268,9 @@ function _parseAnyDate(s){
   // yyyy-mm-dd of yyyy-mm-ddT... (ISO, met of zonder tijdgedeelte)
   let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(T.*)?$/);
   if(m)return{y:+m[1],m:+m[2],d:+m[3]};
-  // dd-mm-yyyy
-  m=s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
-  if(m)return{y:+m[3],m:+m[2],d:+m[1]};
-  // dd/mm/yyyy
-  m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if(m)return{y:+m[3],m:+m[2],d:+m[1]};
+  // dd-mm-yyyy / dd/mm/yyyy / dd-mm-yy (2-cijferig jaar → 20xx)
+  m=s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})$/);
+  if(m){let y=+m[3];if(y<100)y+=2000;return{y,m:+m[2],d:+m[1]};}
   // "21 mei 2026" / "3 jan. 2025" / "21 mei '26"
   m=s.match(/^(\d{1,2})\s+([a-zA-Z]+)\.?\s+'?(\d{2,4})$/);
   if(m){const mn=_MAANDEN[m[2].toLowerCase()];if(mn){let y=+m[3];if(y<100)y+=2000;return{y,m:mn,d:+m[1]}}}

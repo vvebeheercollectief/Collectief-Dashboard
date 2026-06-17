@@ -48,7 +48,7 @@ export const state = {
   _loadInFlight: false,
   _loadAgain: false,
   _syncFails: 0,           // opeenvolgende mislukte sync-rondes; 'Fout' pas na 2 (transient-tolerantie)
-  _animBusy: false,
+  _animBusy: 0,            // teller van lopende rij-animaties (>0 = poll pauzeren)
   // diversen
   _sheetIds: null,
   _completeIdx: null,

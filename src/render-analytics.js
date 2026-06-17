@@ -222,7 +222,7 @@ function renderHeroChart(metric,period){
   const fullN=n*2;
   let rows,dateField,color,title;
   if(metric==='vergader'){
-    rows=D.alfa; dateField='datum'; color='#0D7377'; title='Vergaderingen uitgeschreven';
+    rows=D.alfa||[]; dateField='datum'; color='#0D7377'; title='Vergaderingen uitgeschreven';
   }else{
     rows=SKEYS.flatMap(s=>D.af[s]||[]); dateField='datum'; color='#047857'; title='Taken afgerond';
   }

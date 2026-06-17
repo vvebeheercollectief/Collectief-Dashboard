@@ -206,7 +206,9 @@ async function pollNotifsForToast() {
 
     const newRows = rows.filter(n => n.ts > state._lastNotifTs);
     for (const n of newRows) {
-      if (n.voor !== 'allen' && n.voor && who && n.voor !== who) continue;
+      // Persoonsgerichte melding alleen tonen aan de juiste persoon. Op een apparaat zonder
+      // ingestelde naam (who==='') NIET tonen (geen 'who &&'-kortsluiting → anders lekt het).
+      if (n.voor && n.voor !== 'allen' && n.voor !== who) continue;
       const prefKey = typeToPrefs[n.type];
       if (prefKey && prefs[prefKey] === false) continue;
       showToast(n.title, n.body, TOAST_COLORS[n.type] || 'var(--ac)');

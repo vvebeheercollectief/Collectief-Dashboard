@@ -85,6 +85,7 @@ async function submitHerhaal(){
   const values=[id,oms,sectie,code,naam,beh,type,type==='na-afronden'?interval:'',String(vooraf),volgende,r?r.status:'ACTIEF',r?r.laatstKlaargezet:''];
   closeHerhaalModal();
   if(r){
+    const oud={...r}; // vastleggen vóór de optimistische mutatie, voor rollback bij schrijffout
     Object.assign(r,{omschrijving:oms,sectie,code,naam,behandelaar:beh,type,
       interval:type==='na-afronden'?interval:'',dagenVooraf:vooraf,volgendeDeadline:volgende});
     renderHerhaal();
@@ -92,7 +93,7 @@ async function submitHerhaal(){
     backgroundWrite(async()=>{
       await writeRange(`'Herhaalregels'!A${r._row}:L${r._row}`,values);
       logEvent(code,sectie,'Herhaalregel bewerkt','','',oms);
-    },()=>{},'Opslaan mislukt');
+    },()=>{Object.assign(r,oud);},'Opslaan mislukt');
   }else{
     showToast('➕ Herhaalregel toegevoegd',oms,null);
     backgroundWrite(async()=>{
@@ -131,7 +132,9 @@ async function deleteHerhaal(){
       body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:r._row-1,endIndex:r._row}}}]})});
     if(!resp.ok){const e=await resp.json();const err=new Error(e.error?.message||'Verwijderfout');err.status=resp.status;throw err}
     logEvent(r.code,r.sectie,'Herhaalregel verwijderd','','',r.omschrijving);
-  },()=>{},'Verwijderen mislukt');
+  },()=>{ // rollback: rij terugzetten + _row-indexen herstellen
+    if((D.herhaal||[]).indexOf(r)===-1){ (D.herhaal||[]).forEach(x=>{if(x._row>=r._row)x._row++;}); D.herhaal.splice(Math.min(pos<0?D.herhaal.length:pos,D.herhaal.length),0,r); }
+  },'Verwijderen mislukt');
 }
 
 export { renderHerhaal, openHerhaalModal, closeHerhaalModal, syncHerhaalVelden, submitHerhaal, toggleHerhaalStatus, deleteHerhaal };

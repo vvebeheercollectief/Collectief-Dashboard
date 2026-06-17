@@ -9,11 +9,11 @@ const motionOk = () => window.matchMedia('(prefers-reduced-motion: no-preference
 // (meestal renderAll). Zonder tr of bij 'verminder beweging': direct klaar().
 function animateRowOut(tr, pulsClass, klaar){
   if(!tr || !motionOk()){ klaar(); return; }
-  state._animBusy = true;
+  state._animBusy = (state._animBusy||0) + 1; // teller i.p.v. boolean: overlappende animaties tellen apart
   tr.classList.add(pulsClass);
   setTimeout(()=>{
     tr.classList.add('rij-fade-weg');
-    setTimeout(()=>{ state._animBusy = false; klaar(); }, 420);
+    setTimeout(()=>{ state._animBusy = Math.max(0,(state._animBusy||0)-1); klaar(); }, 420);
   }, 750);
 }
 
@@ -36,11 +36,13 @@ function flipOfferteRijen(container, doRender){
   if(animeren) container.querySelectorAll('tr[data-flip]').forEach(el=>before.set(el.getAttribute('data-flip'),el.getBoundingClientRect().top));
   doRender();
   if(!animeren) return;
+  let bezig=false;
   container.querySelectorAll('tr[data-flip]').forEach(el=>{
     const oud=before.get(el.getAttribute('data-flip'));
     if(oud==null) return;
     const dy=oud-el.getBoundingClientRect().top;
     if(!dy) return;
+    bezig=true;
     el.style.transform=`translateY(${dy}px)`;el.style.transition='none';
     el.getBoundingClientRect();
     el.style.transition='transform .35s ease';el.style.transform='';
@@ -50,6 +52,11 @@ function flipOfferteRijen(container, doRender){
     el.addEventListener('transitionend',h);
     setTimeout(opruimen,500); // vangnet (throttled tab)
   });
+  // Pauzeer de 8s-poll zolang de zweef-animatie loopt, anders knipt een re-render hem af.
+  if(bezig){
+    state._animBusy=(state._animBusy||0)+1;
+    setTimeout(()=>{ state._animBusy=Math.max(0,(state._animBusy||0)-1); }, 500);
+  }
 }
 
 export { animateRowOut, flashRow, flipOfferteRijen };

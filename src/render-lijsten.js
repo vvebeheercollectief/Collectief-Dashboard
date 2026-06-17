@@ -460,6 +460,7 @@ function renderAlvo(){
     if(fs&&r.status!==fs) return false;
     return true;
   });
+  pgs.alvo=Math.min(Math.max(1,pgs.alvo),Math.max(1,Math.ceil(rows.length/PG))); // clamp: geen lege pagina
   const sl=rows.slice((pgs.alvo-1)*PG,pgs.alvo*PG);
   document.getElementById('alvo-tbody').innerHTML=sl.length
     ?sl.map(r=>{
@@ -552,6 +553,7 @@ function statusIco(s){return{Open:'⏳',Gepland:'📅',Afgerond:'✅'}[s]||''}
 function renderAlfa(){
   const q=document.getElementById('s-alfa').value.toLowerCase();
   const rows=D.alfa.filter(r=>`${r.code} ${r.naam} ${r.datum}`.toLowerCase().includes(q));
+  pgs.alfa=Math.min(Math.max(1,pgs.alfa),Math.max(1,Math.ceil(rows.length/PG))); // clamp: geen lege pagina
   const sl=rows.slice((pgs.alfa-1)*PG,pgs.alfa*PG);
   document.getElementById('alfa-tbody').innerHTML=sl.length
     ?sl.map(r=>`<tr>
@@ -571,25 +573,32 @@ function renderThead(id,cols,css){
 }
 
 function renderTbody(tbodyId,rows,sec,page,isAf){
-  const sl=rows.slice((page-1)*PG,page*PG);
+  // Clamp de pagina: krimpt de dataset (bv. collega haalt rijen weg) tot onder het
+  // huidige paginanummer, dan toonden we anders een lege lijst terwijl er wél data is.
+  const p=Math.min(Math.max(1,page),Math.max(1,Math.ceil(rows.length/PG)));
+  const sl=rows.slice((p-1)*PG,p*PG);
   const el=document.getElementById(tbodyId);
-  if(!sl.length){el.innerHTML=`<tr><td colspan="10">${emptyRow(10,true)}</td></tr>`;return}
+  // Lege-rij colspan dynamisch: af-tabel heeft 6 kolommen, NTD = cols+1 (+1 in bulk).
+  const leegCols=isAf?6:(SECS[sec].cols.length+1+(state.bulkMode?1:0));
+  if(!sl.length){el.innerHTML=`<tr><td colspan="${leegCols}">${emptyRow(leegCols,true)}</td></tr>`;return}
   if(isAf){el.innerHTML=sl.map(r=>rowAf(r,sec)).join('');return}
   // Offerte-motor (Fase 2): eigen groepkoppen "Nu opvolgen" / "Lopend"
   // (rijen komen al verrijkt + in nu→lopend-volgorde uit filterNtd; zelfde slice-mechaniek als Weggelegd)
   if(sec==='OFFERTE-TRAJECTEN'){
     // rijen zijn al getagd met r._offNu in filterNtd (één klok, geen nieuwe aanroepen)
     const nu=sl.filter(r=>r._offNu), lopend=sl.filter(r=>!r._offNu);
+    // Groeptellingen over álle pagina's (niet alleen de huidige slice), anders klopt het cijfer niet.
+    const nuAll=rows.filter(r=>r._offNu).length, lopendAll=rows.length-nuAll;
     const colsOff=SECS[sec].cols.length+1+(state.bulkMode?1:0);
     let html='';
-    if(nu.length||page===1){
-      html+=`<tr><td colspan="${colsOff}" class="grp-kop grp-nu">Nu opvolgen <span class="grp-n">· ${nu.length}</span></td></tr>`;
+    if(nu.length||p===1){
+      html+=`<tr><td colspan="${colsOff}" class="grp-kop grp-nu">Nu opvolgen <span class="grp-n">· ${nuAll}</span></td></tr>`;
       html+=nu.length
         ?nu.map(r=>rowNtd(r,sec)).join('')
         :`<tr><td colspan="${colsOff}"><div class="empty-rust">Niets dat nu opvolging vraagt</div></td></tr>`;
     }
     if(lopend.length){
-      html+=`<tr><td colspan="${colsOff}" class="grp-kop">Lopend <span class="grp-n">· ${lopend.length}</span></td></tr>`;
+      html+=`<tr><td colspan="${colsOff}" class="grp-kop">Lopend <span class="grp-n">· ${lopendAll}</span></td></tr>`;
       html+=lopend.map(r=>rowNtd(r,sec)).join('');
     }
     // FLIP: rijen zweven zichtbaar naar hun nieuwe plek bij her-render (Task 2.3)
@@ -601,14 +610,16 @@ function renderTbody(tbodyId,rows,sec,page,isAf){
   const main=sl.filter(r=>grpOf(r)===0);
   const ib=sl.filter(r=>grpOf(r)===1);
   const wg=sl.filter(r=>grpOf(r)===2);
+  // Groeptellingen over álle pagina's i.p.v. alleen de huidige slice.
+  const ibAll=rows.filter(r=>grpOf(r)===1).length, wgAll=rows.filter(r=>grpOf(r)===2).length;
   const cols=SECS[sec].cols.length+1+(state.bulkMode?1:0);
   let html=main.map(r=>rowNtd(r,sec)).join('');
   if(ib.length){
-    html+=`<tr><td colspan="${cols}" style="background:var(--ac-l);padding:8px 13px;font-size:11px;font-weight:700;color:var(--ac);text-transform:uppercase;letter-spacing:.05em;border:none">⟳ In behandeling (${ib.length})</td></tr>`;
+    html+=`<tr><td colspan="${cols}" style="background:var(--ac-l);padding:8px 13px;font-size:11px;font-weight:700;color:var(--ac);text-transform:uppercase;letter-spacing:.05em;border:none">⟳ In behandeling (${ibAll})</td></tr>`;
     html+=ib.map(r=>rowNtd(r,sec)).join('');
   }
   if(wg.length){
-    html+=`<tr><td colspan="${cols}" class="grp-kop">⏸ Weggelegd (${wg.length}) — komt terug op de opvolgdatum</td></tr>`;
+    html+=`<tr><td colspan="${cols}" class="grp-kop">⏸ Weggelegd (${wgAll}) — komt terug op de opvolgdatum</td></tr>`;
     html+=wg.map(r=>rowNtd(r,sec)).join('');
   }
   el.innerHTML=html;
@@ -758,7 +769,10 @@ function rowAf(r,sec){
 function renderPag(id,total,cur,doel){
   const el=document.getElementById(id);if(!el)return;
   const tp=Math.ceil(total/PG);
-  if(tp<=1){el.innerHTML='';return}
+  if(tp<=1){pgs[doel]=1;el.innerHTML='';return}
+  // Clamp + persisteer: na het krimpen van de dataset blijft een te hoog paginanummer
+  // anders hangen (lege lijst). Zo corrigeert het zich vanzelf.
+  cur=Math.min(Math.max(1,cur),tp); pgs[doel]=cur;
   const s=(cur-1)*PG+1,e=Math.min(cur*PG,total);
   const rng=tp<=7?[...Array(tp).keys()].map(i=>i+1)
     :cur<=4?[1,2,3,4,5,'…',tp]

@@ -7,13 +7,14 @@ import { _isStagingHost } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
 import { filterNtd, offerteGroepen, _offerteActiviteitMap, offerteBalBijTekst, setNtd, renderNtd, offerteAannemerPaneel, offerteAannSamenvatting } from "./render-lijsten.js";
-import { state, D } from "./state.js";
+import { state, D, pgs } from "./state.js";
 import { vveOverzicht, filterDossierLog } from "./render-vve.js";
 import { parseKenmerken, vveKenmerken } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
 import { _isTransient } from "./api.js";
 import { parseSections } from "./data.js";
+import { setv } from "./crud.js";
 
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
   // ── mini-assert helper (Fase 1 testnet) ──
@@ -536,6 +537,44 @@ import { parseSections } from "./data.js";
       document.getElementById('s-ntd').value=vS; D.ntd['OFFERTE-TRAJECTEN']=vR; state.offerteTabelOpen=vOpen; setNtd(vA);
       return briefingGevuld;
     }catch(e){ console.error('offerte-geen-zoek-test:',e); return false; }
+  })());
+
+  // ══════════════════════════════════════
+  //  FUNCTIECHECK-FIXES — BATCH 2 (juni 2026)
+  // ══════════════════════════════════════
+  // #16 _parseAnyDate accepteert 2-cijferige jaartallen (numeriek)
+  eq('parseAnyDate dd-mm-yy', _parseAnyDate('21-05-26'), {y:2026,m:5,d:21});
+  eq('parseAnyDate dd/mm/yy', _parseAnyDate('1/2/27'), {y:2027,m:2,d:1});
+  eq('parseAnyDate dd-mm-yyyy blijft werken', _parseAnyDate('21-05-2026'), {y:2026,m:5,d:21});
+
+  // #15 lege prioriteit sorteert ONDER 'Laag' (niet erboven)
+  truthy('offerteSorteerScore: lege prio < Laag', (()=>{
+    const basis={naam:'x',offertes:'0/1',aannemers:'',datumAangevraagd:'1 mei 2026',deadline:''};
+    const rowL={...basis,code:'P-L',prioriteit:'Laag'};
+    const rowE={...basis,code:'P-E',prioriteit:''};
+    return offerteSorteerScore(rowL,T) > offerteSorteerScore(rowE,T);
+  })());
+
+  // #19 setv toont 0 i.p.v. een leeg veld
+  truthy('setv: 0 blijft "0"', (()=>{
+    const el=document.getElementById('m-off-recv'); if(!el) return true; // alleen als veld bestaat
+    const v=el.value; setv('m-off-recv',0); const got=el.value; el.value=v;
+    return got==='0';
+  })());
+
+  // #7 paginering clampt: te hoog paginanummer toont data i.p.v. lege lijst
+  truthy('paginering: te hoge pagina valt terug + toont data', (()=>{
+    try{
+      const vA=state.activeNtd, vR=D.ntd['OPPAKKEN'], vP=pgs.ntd, vS=document.getElementById('s-ntd').value;
+      document.getElementById('s-ntd').value='';
+      D.ntd['OPPAKKEN']=[{code:'PG-1',naam:'VvE Pag',actiepunt:'x',deadline:'',_sec:'OPPAKKEN',_row:9600}];
+      pgs.ntd=7; // ver buiten bereik (1 rij = 1 pagina)
+      setNtd('OPPAKKEN');
+      const tbody=document.getElementById('ntd-tbody').innerHTML;
+      const geclampt=pgs.ntd===1;
+      document.getElementById('s-ntd').value=vS; D.ntd['OPPAKKEN']=vR; pgs.ntd=vP; setNtd(vA);
+      return tbody.includes('PG-1') && geclampt;
+    }catch(e){ console.error('paginering-test:',e); return false; }
   })());
 
   const totOk = ok + _tOk, totFail = fail + _tFail;

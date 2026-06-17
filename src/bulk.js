@@ -3,7 +3,7 @@
 // ══════════════════════════════════════
 import { state, D } from "./state.js";
 import { renderNtd } from "./render-lijsten.js";
-import { toDutchDate } from "./util.js";
+import { toDutchDate, berekenPrioriteit, _parseAnyDate, _vandaagAmsterdam, _verschilInKalenderdagen, parseDt } from "./util.js";
 import { SECS, SID } from "./config.js";
 import { ensureToken } from "./auth.js";
 import { writeRange, _shiftNtdRows } from "./api.js";
@@ -86,7 +86,13 @@ async function bulkDoe(el){
     if(el.dataset.dagen){ const d=new Date(); d.setDate(d.getDate()+ +el.dataset.dagen);
       iso=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
     if(!iso){ alert('Kies een datum.'); return; }
-    bulkVeld(rows,'wegleggen',toDutchDate(iso));
+    // Zelfde guards als de losse snooze: geen verleden-datum, en waarschuw bij ná-deadline.
+    const nieuw=toDutchDate(iso);
+    const p=_parseAnyDate(nieuw); const dWeg=p?new Date(p.y,p.m-1,p.d):null;
+    if(!dWeg||_verschilInKalenderdagen(dWeg,_vandaagAmsterdam())<=0){ alert('Kies een datum in de toekomst.'); return; }
+    const naDeadline=rows.filter(r=>{ const dl=parseDt(r.deadline); return dl && dWeg.getTime()>dl; });
+    if(naDeadline.length && !confirm(`Let op: voor ${naDeadline.length} van de ${rows.length} ${rows.length===1?'taak':'taken'} ligt deze opvolgdatum ná de deadline.\nDie ${naDeadline.length===1?'taak wordt':'taken worden'} op de deadline gewoon "Te laat". Toch wegleggen?`)) return;
+    bulkVeld(rows,'wegleggen',nieuw);
   }
   else if(wat==='deadline'){
     const iso=document.getElementById('bb-datum-dl').value;
@@ -150,6 +156,7 @@ async function bulkUndoAfronden(items){
     await state._writeChain;
     await loadAll(true);
     const ids=await getSheetIds();
+    const offset={}; // per sectie: elke re-insert één rij later (getInsertRow verandert niet tussendoor)
     for(const it of items){
       // verwijder de zojuist toegevoegde Afgerond-rij als die aan de staart staat
       const afEntries=D.af[it.sec]||[];
@@ -160,7 +167,8 @@ async function bulkUndoAfronden(items){
           body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId:ids['Afgerond'],dimension:'ROWS',startIndex:lastAf._row-1,endIndex:lastAf._row}}}]})});
         afEntries.pop();
       }
-      await insertAndWriteRow('Nog Te Doen',getInsertRow(it.sec),it.ntdValues);
+      await insertAndWriteRow('Nog Te Doen',getInsertRow(it.sec)+(offset[it.sec]||0),it.ntdValues);
+      offset[it.sec]=(offset[it.sec]||0)+1;
       logEvent(it.code,it.sec,'Teruggezet','status','Afgerond','Nog Te Doen (bulk-undo)');
     }
     showToast('↩ Ongedaan gemaakt',`${items.length} taken terug in Nog Te Doen`,'var(--am)');
@@ -200,7 +208,13 @@ async function bulkUndoVerwijderen(items){
   if(!await ensureToken()){ alert('Inloggen mislukt.'); return; }
   try{
     await state._writeChain;
-    for(const it of items) await insertAndWriteRow('Nog Te Doen',getInsertRow(it.sec),it.ntdValues);
+    // Offset per sectie: getInsertRow leest D.ntd (verandert niet tussen inserts), dus zonder
+    // offset belanden alle rijen op dezelfde positie en stapelen ze in omgekeerde volgorde.
+    const offset={};
+    for(const it of items){
+      await insertAndWriteRow('Nog Te Doen',getInsertRow(it.sec)+(offset[it.sec]||0),it.ntdValues);
+      offset[it.sec]=(offset[it.sec]||0)+1;
+    }
     items.forEach(it=>logEvent(it.code,it.sec,'Teruggezet','status','Verwijderd','Nog Te Doen (bulk-undo)'));
     showToast('↩ Ongedaan gemaakt',`${items.length} taken terug in Nog Te Doen`,'var(--am)');
     await loadAll();
@@ -214,25 +228,35 @@ function bulkVeld(rows,soort,waarde){
     wegleggen:{ veld:'opvolgdatum', kolom:()=> OPVOLG_KOLOM,               titel:`🔕 ${rows.length} taken weggelegd tot ${waarde}`, log:'Weggelegd' },
     deadline: { veld:'deadline',    kolom:(r)=>BULK_DEADLINE_KOLOM[r._sec],titel:`📅 ${rows.length} deadlines → ${waarde}`,        log:'Deadline gewijzigd' },
   }[soort];
-  const items=rows.map(r=>({r,sec:r._sec,code:r.code,oud:r[conf.veld]||''}));
-  items.forEach(it=>{ it.r[conf.veld]=waarde; });
+  // OPPAKKEN: een nieuwe deadline herberekent de opgeslagen prioriteit-kolom F mee
+  // (zoals de losse bewerk-flow). Anders blijft F stale voor externe lezers.
+  const oppDl = soort==='deadline';
+  const items=rows.map(r=>({r,sec:r._sec,code:r.code,oud:r[conf.veld]||'',oudPrio:r.prioriteit||''}));
+  items.forEach(it=>{
+    it.r[conf.veld]=waarde;
+    if(oppDl && it.sec==='OPPAKKEN') it.r.prioriteit=berekenPrioriteit(waarde,'OPPAKKEN').prioriteit;
+  });
   _eindBulk();
   const schrijf=(welkeWaarde)=>async()=>{
     for(const it of items){
       const kol=conf.kolom(it.r);
       const val=welkeWaarde==='oud'?it.oud:waarde;
       await writeRange(`'Nog Te Doen'!${kol}${it.r._row}:${kol}${it.r._row}`,[val]);
+      if(oppDl && it.sec==='OPPAKKEN'){
+        const prio=welkeWaarde==='oud'?it.oudPrio:berekenPrioriteit(waarde,'OPPAKKEN').prioriteit;
+        await writeRange(`'Nog Te Doen'!F${it.r._row}:F${it.r._row}`,[prio]);
+      }
       logEvent(it.code,it.sec,conf.log,conf.veld,welkeWaarde==='oud'?waarde:it.oud,val);
     }
   };
   showUndoToast(conf.titel,items.map(i=>i.code).join(', '),async()=>{
     await state._writeChain;
-    items.forEach(it=>{ it.r[conf.veld]=it.oud; });
+    items.forEach(it=>{ it.r[conf.veld]=it.oud; if(oppDl && it.sec==='OPPAKKEN') it.r.prioriteit=it.oudPrio; });
     renderAll();
     backgroundWrite(schrijf('oud'),()=>{},'Undo mislukt');
   });
   backgroundWrite(schrijf('nieuw'),
-    ()=>{ items.forEach(it=>{ it.r[conf.veld]=it.oud; }); },
+    ()=>{ items.forEach(it=>{ it.r[conf.veld]=it.oud; if(oppDl && it.sec==='OPPAKKEN') it.r.prioriteit=it.oudPrio; }); },
     'Bulk-actie mislukt');
 }
 

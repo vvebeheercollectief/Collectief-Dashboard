@@ -72,7 +72,7 @@ function fillModalFields(sec,r){
       document.getElementById('tog-ib-l').classList.toggle('on',r.inBehandeling==='TRUE');break;
   }
 }
-function setv(id,v){const el=document.getElementById(id);if(el)el.value=v||''}
+function setv(id,v){const el=document.getElementById(id);if(el)el.value=(v===undefined||v===null)?'':v} // 0 blijft '0' (geen falsy-coercie)
 
 function clearModal(){
   document.querySelectorAll('.modal-body input,.modal-body select,.modal-body textarea').forEach(el=>{if(!el.readOnly)el.value=''});

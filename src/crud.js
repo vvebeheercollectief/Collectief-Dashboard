@@ -112,7 +112,20 @@ async function insertAndWriteRow(sheetName,afterRow,values){
   });
   if(!insResp.ok){const e=await insResp.json();if(insResp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Invoegfout');err.status=insResp.status;throw err}
   const endCol=String.fromCharCode(64+Math.max(values.length,9));
-  await writeRange(`'${sheetName}'!A${afterRow+1}:${endCol}${afterRow+1}`,values);
+  try{
+    await writeRange(`'${sheetName}'!A${afterRow+1}:${endCol}${afterRow+1}`,values);
+  }catch(e){
+    // De rij is wél ingevoegd maar niet gevuld → ruim de lege rij weer op zodat de Sheet niet
+    // vervuilt met een ghost-rij. Schrijfacties zijn geserialiseerd, dus deze delete is veilig.
+    try{
+      await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+        method:'POST',
+        headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
+        body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:afterRow,endIndex:afterRow+1}}}]})
+      });
+    }catch(_){ /* opruimen mislukte; de stille resync (loadAll) negeert de lege rij toch */ }
+    throw e;
+  }
 }
 
 async function deleteTask(idx){

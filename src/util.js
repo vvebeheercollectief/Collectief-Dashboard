@@ -262,18 +262,24 @@ function offProg(v){
 const _MAANDEN={jan:1,feb:2,mrt:3,maa:3,apr:4,mei:5,jun:6,jul:7,aug:8,sep:9,sept:9,okt:10,nov:11,dec:12,
   januari:1,februari:2,maart:3,april:4,juni:6,juli:7,augustus:8,september:9,oktober:10,november:11,december:12};
 
+// Round-trip-check: een onmogelijke datum (32-13, 31 feb) rolt in JS stil door naar een
+// verkeerde dag. Door terug te vergelijken met new Date() vangen we die en geven we null.
+function _valDate(y,mn,d){
+  const dt=new Date(y,mn-1,d);
+  return (dt.getFullYear()===y && dt.getMonth()===mn-1 && dt.getDate()===d) ? {y,m:mn,d} : null;
+}
 function _parseAnyDate(s){
   if(!s)return null;
   s=s.trim();
   // yyyy-mm-dd of yyyy-mm-ddT... (ISO, met of zonder tijdgedeelte)
   let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(T.*)?$/);
-  if(m)return{y:+m[1],m:+m[2],d:+m[3]};
+  if(m)return _valDate(+m[1],+m[2],+m[3]);
   // dd-mm-yyyy / dd/mm/yyyy / dd-mm-yy (2-cijferig jaar → 20xx)
   m=s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})$/);
-  if(m){let y=+m[3];if(y<100)y+=2000;return{y,m:+m[2],d:+m[1]};}
+  if(m){let y=+m[3];if(y<100)y+=2000;return _valDate(y,+m[2],+m[1]);}
   // "21 mei 2026" / "3 jan. 2025" / "21 mei '26"
   m=s.match(/^(\d{1,2})\s+([a-zA-Z]+)\.?\s+'?(\d{2,4})$/);
-  if(m){const mn=_MAANDEN[m[2].toLowerCase()];if(mn){let y=+m[3];if(y<100)y+=2000;return{y,m:mn,d:+m[1]}}}
+  if(m){const mn=_MAANDEN[m[2].toLowerCase()];if(mn){let y=+m[3];if(y<100)y+=2000;return _valDate(y,mn,+m[1]);}}
   return null;
 }
 
@@ -295,7 +301,7 @@ function emptyRow(cols,inline){
   return`<tr><td colspan="${cols}"><div class="empty"><div class="empty-ico">📭</div>Geen resultaten</div></td></tr>`;
 }
 
-function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 function subBadge(v){return v?`<span class="badge" style="background:var(--sur2);color:var(--mut);font-size:10px;margin-left:4px">${esc(v)}</span>`:''}
 
 export {

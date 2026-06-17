@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, offerteBalBij, _verschilInWerkdagen, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten, offerteNabelTeller, parseOff, parseAannemers, serializeAannemers, deriveOffertes } from "./util.js";
+import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, offerteBalBij, _verschilInWerkdagen, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten, offerteNabelTeller, parseOff, parseAannemers, serializeAannemers, deriveOffertes, esc } from "./util.js";
 import { logZin } from "./render-overig.js";
 import { _isStagingHost } from "./config.js";
 import { ACTIONS } from "./actions.js";
@@ -66,6 +66,31 @@ import { setv } from "./crud.js";
   eq('2-cijfer jaar "21 mei \'26"', _parseAnyDate("21 mei '26"), {y:2026,m:5,d:21});
   eq('leeg → null',     _parseAnyDate(''),            null);
   eq('onzin → null',    _parseAnyDate('geen datum'),  null);
+  // bereik-validatie: onmogelijke datums → null (niet stil doorrollen naar verkeerde dag)
+  eq('dag 32 → null',       _parseAnyDate('32-05-2026'), null);
+  eq('maand 13 → null',     _parseAnyDate('32-13-2026'), null);
+  eq('31 feb → null',       _parseAnyDate('31-02-2026'), null);
+  eq('dag 0 → null',        _parseAnyDate('00-01-2026'), null);
+  eq('ISO maand 13 → null', _parseAnyDate('2026-13-01'), null);
+  eq('ISO 30 feb → null',   _parseAnyDate('2026-02-30'), null);
+  eq('geldig schrikkel 29 feb 2028', _parseAnyDate('29-02-2028'), {y:2028,m:2,d:29});
+
+  // ── esc() — HTML-escaping incl. single-quote (XSS-hardening) ──
+  eq('esc single-quote', esc("O'Brien"),        'O&#39;Brien');
+  eq('esc dubbele aanh.', esc('zeg "hoi"'),     'zeg &quot;hoi&quot;');
+  eq('esc < > &',         esc('<a> & b'),        '&lt;a&gt; &amp; b');
+  eq('esc leeg → leeg',   esc(''),               '');
+
+  // ── vveOverzicht: "laatst gehouden ALV" = de NIEUWSTE, ongeacht rijvolgorde in de Sheet ──
+  truthy('vveOverzicht: laatst-gehouden ALV = nieuwste afgeronde ALV', (()=>{
+    const data={ ntd:{}, af:{}, alvo:[], logboek:[], alfa:[
+      {code:'TST', datum:'1 jan 2024'},
+      {code:'TST', datum:'15 mei 2026'},   // nieuwste — moet als "laatst gehouden" gelden
+      {code:'TST', datum:'3 mrt 2025'},
+    ]};
+    const o=vveOverzicht('TST', data, new Date(2026,5,2));
+    return o.alfa.length===3 && o.alfa[0].datum==='15 mei 2026';
+  })());
 
   // ── displayName ── (EMAIL_NAMES-lookup, anders ruwe invoer terug)
   eq('displayName leeg', displayName(''), '');

@@ -3,7 +3,7 @@
 // ══════════════════════════════════════
 import { IS_STAGING, ALLOWED_EMAILS, SKEYS } from './config.js';
 import { D, pgs, state } from './state.js';
-import { ensureToken } from './auth.js';
+import { ensureToken, doOAuth } from './auth.js';
 import { goTo, closeSb, applyTheme, applyDensity, cycleDensity, setupSearch } from './ui.js';
 import { renderNtd, renderAf, renderAlvo, renderAlfa, renderNtdStats } from './render-lijsten.js';
 import {
@@ -206,15 +206,19 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(state.pendingWrites>0) return;
     if(state.bulkMode) return;
     if(state._animBusy) return;
+    if(state._undoInFlight) return;
     if(!await ensureToken()) return;
     loadAll(true);
   },8000);
 
-  // Token-refresh heartbeat — elke 4 min proactief vernieuwen vóór expiry
-  setInterval(()=>{
+  // Token-refresh heartbeat — elke 4 min proactief vernieuwen vóór expiry.
+  // Via doOAuth(false) i.p.v. de client direct: dan wordt de callback correct (her)gebonden,
+  // zodat een heartbeat geen lopende ensureToken-refresh kapot maakt (gedeelde-callback-race).
+  // Id bewaard zodat logout() de heartbeat kan stoppen.
+  state._heartbeatTimer=setInterval(()=>{
     if(!state.oauthToken) return;
     if(state.oauthExpiry - Date.now() > 5*60*1000) return;
-    try{ state._gsiTokenClient && state._gsiTokenClient.requestAccessToken({prompt:''}); }catch(e){}
+    doOAuth(false);
   },4*60*1000);
 
   // Sessie herstellen uit sessionStorage

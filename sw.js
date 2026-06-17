@@ -1,19 +1,50 @@
 // Collectief Dashboard — Service Worker
 // Verhoog versie bij elke nieuwe deploy zodat clients de nieuwe cache pakken.
 
-const CACHE_VERSION = 'cd-v22';
+const CACHE_VERSION = 'cd-v23';
 const APP_SHELL = [
   './',
   './index.html',
+  './styles.css',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
   './apple-touch-icon.png',
+  // ES-modulegraaf (zonder tests.js — alleen dev) zodat de app-shell ook offline laadt.
+  './src/main.js',
+  './src/config.js',
+  './src/state.js',
+  './src/util.js',
+  './src/api.js',
+  './src/auth.js',
+  './src/data.js',
+  './src/actions.js',
+  './src/ui.js',
+  './src/anim.js',
+  './src/palette.js',
+  './src/crud.js',
+  './src/bulk.js',
+  './src/snooze.js',
+  './src/kenmerken.js',
+  './src/ai.js',
+  './src/notifications.js',
+  './src/render-lijsten.js',
+  './src/render-vve.js',
+  './src/render-herhaal.js',
+  './src/render-overig.js',
+  './src/render-analytics.js',
+  './src/offerte-aannemers.js',
+  './src/offerte-acties.js',
+  './src/vve-zoekveld.js',
 ];
 
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE_VERSION).then(c => c.addAll(APP_SHELL)).then(() => self.skipWaiting())
+    // Per-resource cachen: één gemiste/hernoemd bestand mag de hele install niet laten falen
+    // (anders blijft de oude SW hangen en komt een release nooit door).
+    caches.open(CACHE_VERSION)
+      .then(c => Promise.all(APP_SHELL.map(u => c.add(u).catch(() => {}))))
+      .then(() => self.skipWaiting())
   );
 });
 

@@ -166,6 +166,7 @@ function _bulkUndoAfDoelRijen(items, afPerSec){
 
 async function bulkUndoAfronden(items){
   if(!await ensureToken()){ alert('Inloggen mislukt.'); return; }
+  state._undoInFlight=true; // pauzeer de 8s-poll; deze undo doet z'n eigen loadAll
   try{
     await state._writeChain;
     await loadAll(true);                       // verse D.af zodat we de zojuist afgeronde rijen vinden
@@ -190,6 +191,7 @@ async function bulkUndoAfronden(items){
     showToast('↩ Ongedaan gemaakt',`${items.length} taken terug in Nog Te Doen`,'var(--am)');
     await loadAll();
   }catch(e){ alert('Undo fout: '+e.message); }
+  finally{ state._undoInFlight=false; }
 }
 
 // ── Verwijderen ─────────────────────────────────────────────────────────
@@ -222,6 +224,7 @@ function bulkVerwijderen(rows){
 }
 async function bulkUndoVerwijderen(items){
   if(!await ensureToken()){ alert('Inloggen mislukt.'); return; }
+  state._undoInFlight=true; // pauzeer de 8s-poll; deze undo doet z'n eigen loadAll
   try{
     await state._writeChain;
     // Offset per sectie: getInsertRow leest D.ntd (verandert niet tussen inserts), dus zonder
@@ -235,6 +238,7 @@ async function bulkUndoVerwijderen(items){
     showToast('↩ Ongedaan gemaakt',`${items.length} taken terug in Nog Te Doen`,'var(--am)');
     await loadAll();
   }catch(e){ alert('Undo fout: '+e.message); }
+  finally{ state._undoInFlight=false; }
 }
 
 // ── Veld-acties: geven / wegleggen / deadline (cel-schrijfacties) ───────

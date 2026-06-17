@@ -43,7 +43,8 @@ function vveOverzicht(code, data, vandaag){
     if(!isNaN(t)) laatsteDagen=_verschilInKalenderdagen(vandaag,t);
   }
   const alvo=(data.alvo||[]).find(r=>r.code===code)||null;
-  const alfa=(data.alfa||[]).filter(r=>r.code===code);
+  const alfa=(data.alfa||[]).filter(r=>r.code===code)
+    .sort((a,b)=>parseDt(b.datum)-parseDt(a.datum)); // nieuwste eerst → alfa[0] = laatst gehouden
   const naam=(open[0]?.naam)||(weggelegd[0]?.naam)||(alvo?.naam)||(afgerond[0]?.naam)||'';
   const behandelaars=[...new Set(open.concat(weggelegd)
     .flatMap(r=>(r.behandelaar||'').split(/[,\/]/).map(s=>s.trim()).filter(Boolean)))];
@@ -173,7 +174,7 @@ function renderVve(){
           `<span class="badge" style="background:${o.alvo[f]?'var(--gn-l)':'var(--sur2)'};color:${o.alvo[f]?'var(--gn)':'var(--mut)'}">${o.alvo[f]?'✓':'–'} ${f.charAt(0).toUpperCase()+f.slice(1)}</span>`).join('')}</div>`;
     }
     if(o.alfa.length){
-      const l=o.alfa[o.alfa.length-1];
+      const l=o.alfa[0]; // nieuwste eerst (gesorteerd in vveOverzicht)
       html+=`<div class="vve-alv-rij" style="color:var(--mut)">Laatst gehouden: ${esc(l.datum||'')}</div>`;
     }
     return html||'<span style="color:var(--mut);font-size:12.5px">Geen ALV-gegevens</span>';

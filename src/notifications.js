@@ -134,6 +134,7 @@ function showUndoToast(title, msg, undoFn) {
 async function undoComplete(undoData) {
   if (!await ensureToken()) { alert('Inloggen mislukt.'); return; }
   const { sec, ntdValues, ntdRow } = undoData;
+  state._undoInFlight = true; // pauzeer de 8s-poll; deze undo doet z'n eigen loadAll
   try {
     await state._writeChain; // de afronding-write moet eerst klaar zijn vóór we de rij zoeken
     const ids = await getSheetIds();
@@ -159,10 +160,12 @@ async function undoComplete(undoData) {
     const terug=(D.ntd[sec]||[]).filter(x=>x.code===undoData.code).pop();
     if(terug) flashRow('ntd-tbody', terug._row, 'rij-flits-amber');
   } catch(e) { alert('Undo fout: ' + e.message); }
+  finally { state._undoInFlight = false; }
 }
 
 async function undoDelete(undoData) {
   if (!await ensureToken()) { alert('Inloggen mislukt.'); return; }
+  state._undoInFlight = true; // pauzeer de 8s-poll; deze undo doet z'n eigen loadAll
   try {
     await state._writeChain;            // delete-write gegarandeerd vóór de re-insert
     const { sec, ntdValues } = undoData;
@@ -174,6 +177,7 @@ async function undoDelete(undoData) {
     const terug=(D.ntd[sec]||[]).filter(x=>x.code===undoData.code).pop();
     if(terug) flashRow('ntd-tbody', terug._row, 'rij-flits-amber');
   } catch(e) { alert('Undo fout: ' + e.message); }
+  finally { state._undoInFlight = false; }
 }
 
 // ══════════════════════════════════════
@@ -221,7 +225,13 @@ function startNotifPoll() {
   pollNotifsForToast();
   state._notifPollTimer = setInterval(pollNotifsForToast, 10000);
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) { pollNotifsForToast(); loadAll(true); }
+    if (document.hidden) return;
+    pollNotifsForToast();
+    // Zelfde guards als de 8s-poll: een loadAll mag geen open modal / bulk-selectie / lopende
+    // animatie / undo onder de gebruiker vandaan trekken (resync gooit _rowCache + D om).
+    if (document.querySelector('.modal-bg.open')) return;
+    if (state.bulkMode || state._animBusy || state._undoInFlight || state.pendingWrites > 0) return;
+    loadAll(true);
   });
 }
 
@@ -230,7 +240,7 @@ function startNotifPoll() {
 // ══════════════════════════════════════
 function openNotifModal() {
   const who = localStorage.getItem('notif_who') || '';
-  const known = ['Jer','Cihad','Gabos',''];
+  const known = ['Jer','Cihad','Gabos','Cihan',''];
   if (known.includes(who)) {
     document.getElementById('notif-who').value = who;
     document.getElementById('notif-who-other').style.display = 'none';

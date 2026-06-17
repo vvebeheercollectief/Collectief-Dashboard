@@ -337,19 +337,25 @@ async function addTaskNote(){
   const code=container.dataset.code;
   const sec=container.dataset.sec;
   if(!code)return;
-  await logEvent(code,sec,'Opmerking','','',note);
+  // Eerst écht wegschrijven; pas bij succes optimistisch tonen + veld legen. Zo "verdwijnt"
+  // een opmerking nooit stil bij een schrijffout — de tekst blijft staan om te herproberen.
+  const ok=await logEvent(code,sec,'Opmerking','','',note);
+  if(!ok){ alert('Opmerking kon niet worden opgeslagen. Controleer je verbinding en probeer het opnieuw.'); return; }
   document.getElementById('hist-note').value='';
   D.logboek.unshift({_row:0,timestamp:new Date().toISOString(),code,sectie:sec,actie:'Opmerking',veld:'',oudeWaarde:'',nieuweWaarde:note,gebruiker:getCurrentWho()||'?'});
   renderTaskHistory(code,sec);
 }
 
+// Geeft true terug bij succes, false bij falen (geen token of schrijffout). Fire-and-forget-
+// aanroepers negeren de return; addTaskNote gebruikt 'm om stille notitie-verdwijning te voorkomen.
 async function logEvent(code, sec, actie, veld, oudeWaarde, nieuweWaarde) {
   try {
-    if (!state.oauthToken) return;
+    if (!state.oauthToken) return false;
     const who = getCurrentWho() || '?';
     const ts = new Date().toISOString();
     await appendRange("'Logboek'!A:H", [ts, code||'', sec||'', actie||'', veld||'', oudeWaarde||'', nieuweWaarde||'', who]);
-  } catch(e) { console.warn('Logboek schrijffout:', e); }
+    return true;
+  } catch(e) { console.warn('Logboek schrijffout:', e); return false; }
 }
 
 

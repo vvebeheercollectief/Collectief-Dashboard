@@ -22,6 +22,7 @@ export const state = {
   isSubscribed: false,
   _lastNotifTs: new Date().toISOString(),
   _notifPollTimer: null,
+  _heartbeatTimer: null,   // token-refresh heartbeat-interval (stopbaar bij logout)
   // actieve secties / tabs
   activeOntw: 'Alles',
   activeNtd: 'OPPAKKEN',
@@ -49,6 +50,7 @@ export const state = {
   _loadAgain: false,
   _syncFails: 0,           // opeenvolgende mislukte sync-rondes; 'Fout' pas na 2 (transient-tolerantie)
   _animBusy: 0,            // teller van lopende rij-animaties (>0 = poll pauzeren)
+  _undoInFlight: false,    // een undo-actie (afronden/verwijderen/bulk) loopt → poll pauzeren (undo doet eigen loadAll)
   // diversen
   _sheetIds: null,
   _completeIdx: null,

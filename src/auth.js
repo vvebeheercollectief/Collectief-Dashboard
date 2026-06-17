@@ -71,10 +71,26 @@ async function ensureToken(){
   }
   if(state.currentUserEmail) return true;
   const email=await fetchUserEmail();
-  if(!email||!ALLOWED_EMAILS.includes(email.toLowerCase())){state.oauthToken=null;state.oauthExpiry=0;return false}
+  if(!email){ state.oauthToken=null;state.oauthExpiry=0;return false; } // mogelijk tijdelijk → sessie laten staan, later opnieuw
+  if(!ALLOWED_EMAILS.includes(email.toLowerCase())){ logout('Geen toegang met dit account. Log in met je VvE Beheer Collectief-account.'); return false; }
   state.currentUserEmail=email;
   sessionStorage.setItem('currentUserEmail',email);
   return true;
 }
 
-export { doOAuth, fetchUserEmail, doLogin, ensureToken };
+// Schone uitlog: stopt poll + heartbeat, wist de sessie en toont de login-gate weer.
+// Aangeroepen wanneer een token wél geldig is maar het account niet (meer) is toegestaan;
+// ook bruikbaar achter een uitlog-knop. Voorkomt dat timers eindeloos blijven draaien.
+function logout(reden){
+  state.oauthToken=null; state.oauthExpiry=0; state.currentUserEmail=null;
+  try{ ['oauthToken','oauthExpiry','currentUserEmail'].forEach(k=>sessionStorage.removeItem(k)); }catch(_){}
+  if(state._notifPollTimer){ clearInterval(state._notifPollTimer); state._notifPollTimer=null; }
+  if(state._heartbeatTimer){ clearInterval(state._heartbeatTimer); state._heartbeatTimer=null; }
+  try{ if(window.OneSignal && OneSignal.logout) OneSignal.logout(); }catch(_){}
+  const gate=document.getElementById('login-gate'); if(gate) gate.style.display='';
+  const btn=document.getElementById('login-btn'); if(btn){ btn.textContent='Inloggen met Google'; btn.disabled=false; }
+  const errEl=document.getElementById('login-error');
+  if(errEl && reden){ errEl.textContent=reden; errEl.style.display='block'; }
+}
+
+export { doOAuth, fetchUserEmail, doLogin, ensureToken, logout };

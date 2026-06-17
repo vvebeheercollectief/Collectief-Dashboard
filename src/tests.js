@@ -2,7 +2,7 @@
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
 import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, offerteBalBij, _verschilInWerkdagen, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten, offerteNabelTeller, parseOff, parseAannemers, serializeAannemers, deriveOffertes, esc } from "./util.js";
-import { logZin } from "./render-overig.js";
+import { logZin, logPaginaSoort } from "./render-overig.js";
 import { _isStagingHost } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
@@ -102,6 +102,19 @@ import { setv } from "./crud.js";
   truthy('logZin Contact bevat "sprak"', logZin({actie:'Contact', code:'TEST01', veld:'Telefoon', oudeWaarde:'Bewoner/eigenaar', gebruiker:'info@vvebeheercollectief.nl'}).includes('sprak'));
   truthy('logZin Contact toont soort', logZin({actie:'Contact', code:'TEST01', veld:'Telefoon', oudeWaarde:'Bestuur', gebruiker:'info@vvebeheercollectief.nl'}).includes('Telefoon'));
   truthy('logZin Kenmerk bevat "kenmerk"', logZin({actie:'Kenmerk', code:'TEST01', veld:'Balkons', gebruiker:'info@vvebeheercollectief.nl'}).includes('kenmerk'));
+
+  // ── logPaginaSoort ── (welke logregels horen op de Logboek-pagina: notities/contact=normaal, afgerond/aangemaakt=subtiel, rest=ruis)
+  eq('logPaginaSoort Opmerking → normaal', logPaginaSoort('Opmerking'), 'normaal');
+  eq('logPaginaSoort Contact → normaal',   logPaginaSoort('Contact'),   'normaal');
+  eq('logPaginaSoort Afgerond → subtiel',  logPaginaSoort('Afgerond'),  'subtiel');
+  eq('logPaginaSoort Aangemaakt → subtiel', logPaginaSoort('Aangemaakt'), 'subtiel');
+  eq('logPaginaSoort "Aangemaakt (sheet)" → subtiel', logPaginaSoort('Aangemaakt (sheet)'), 'subtiel');
+  eq('logPaginaSoort Bewerkt → ruis (null)',   logPaginaSoort('Bewerkt'),   null);
+  eq('logPaginaSoort Teruggezet → ruis',       logPaginaSoort('Teruggezet'), null);
+  eq('logPaginaSoort Behandelaar gewijzigd → ruis', logPaginaSoort('Behandelaar gewijzigd'), null);
+  eq('logPaginaSoort Kenmerk → ruis',          logPaginaSoort('Kenmerk'),   null);
+  eq('logPaginaSoort Herhaalregel → ruis',     logPaginaSoort('Herhaalregel bewerkt'), null);
+  eq('logPaginaSoort leeg → ruis',             logPaginaSoort(''),          null);
 
   // ── _isStagingHost ── (fail-safe: alleen bekende productie-hosts = productie)
   truthy('prod host = geen staging',     _isStagingHost('collectief-dashboard.vercel.app') === false);

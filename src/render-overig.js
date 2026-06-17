@@ -246,14 +246,38 @@ function logTijd(iso){
   return d.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
 }
 
-// Eén logregel als HTML (gedeeld door Logboek-pagina en VvE-dossier-feed)
-function logItemHtml(r){
+// Bepaalt of een logregel op de Logboek-pagina thuishoort, en zo ja hoe prominent.
+// 'normaal' = onze eigen notities/contacten (volwaardig), 'subtiel' = automatische
+// afgerond/aangemaakt (dunne regel), null = ruis (alleen in taak-geschiedenis/VvE-dossier).
+function logPaginaSoort(actie){
+  const a=(actie||'').trim();
+  if(a==='Opmerking'||a==='Contact') return 'normaal';
+  if(a==='Afgerond'||a.indexOf('Aangemaakt')===0) return 'subtiel';
+  return null;
+}
+
+// Eén logregel als HTML (gedeeld door Logboek-pagina en VvE-dossier-feed).
+// subtiel=true → compacte grijze regel (alleen Logboek-pagina, voor Afgerond/Aangemaakt).
+function logItemHtml(r,subtiel){
+  if(subtiel){
+    const naam=esc(displayName(r.gebruiker)||'Iemand');
+    const code=`<b>${esc(r.code||'—')}</b>`;
+    const isAf=r.actie==='Afgerond';
+    const zin=isAf
+      ? `${naam} rondde ${code} af`
+      : `${naam} maakte ${code} aan${r.nieuweWaarde?` <span class="log-mini-meta">→ ${esc(r.nieuweWaarde)}</span>`:''}`;
+    return `<div class="log-mini">
+      <span class="log-mini-dot" style="background:${isAf?'var(--gn)':'var(--pu)'}"></span>
+      <span class="log-mini-txt">${zin}</span>
+      <span class="log-time">${esc(logTijd(r.timestamp))}</span>
+    </div>`;
+  }
   let extra='';
   if((r.actie==='Behandelaar gewijzigd'||r.actie==='Bewerkt'||r.actie==='Kenmerk') && r.veld && (r.oudeWaarde||r.nieuweWaarde)){
     extra=`<div class="log-change"><span class="old">${esc(r.oudeWaarde||'—')}</span><span class="arr">→</span><span class="new">${esc(r.nieuweWaarde||'—')}</span></div>`;
   }
   if((r.actie==='Opmerking'||r.actie==='Contact') && r.nieuweWaarde){
-    extra=`<div class="log-note">"${esc(r.nieuweWaarde)}"</div>`;
+    extra=`<div class="log-note">${esc(r.nieuweWaarde)}</div>`;
   }
   const init=(displayName(r.gebruiker)||'?').charAt(0).toUpperCase();
   return `<div class="log-item">
@@ -266,6 +290,7 @@ function logItemHtml(r){
 function renderLogboek(){
   const q=(document.getElementById('s-logboek')?.value||'').toLowerCase();
   const rows=D.logboek.filter(r=>{
+    if(!logPaginaSoort(r.actie)) return false;   // ruis weren — alleen notities/contact + afgerond/aangemaakt
     if(state.logWho && displayName(r.gebruiker)!==state.logWho) return false;
     if(state.logAct){
       const m = r.actie===state.logAct || (state.logAct==='Aangemaakt' && (r.actie||'').indexOf('Aangemaakt')===0);
@@ -289,7 +314,7 @@ function renderLogboek(){
     sl.forEach(r=>{
       const dag=logDayLabel(r.timestamp);
       if(dag!==lastDay){ html+=`<div class="log-day">${dag}</div>`; lastDay=dag; }
-      html+=logItemHtml(r);
+      html+=logItemHtml(r,logPaginaSoort(r.actie)==='subtiel');
     });
     el.innerHTML=html;
   }
@@ -362,5 +387,5 @@ async function logEvent(code, sec, actie, veld, oudeWaarde, nieuweWaarde) {
 export {
   ONTW_CATS, ONTW_CAT_COLORS, parseOntw, renderOntw, setOntw, openOntwModal, closeOntwModal,
   submitOntwItem, deleteOntwItem, editOntwItem, parseLogboek, fmtLogTs, actieBadge, _LOG_AVKLEUR, avatarKleur,
-  logDayLabel, logZin, logTijd, logItemHtml, renderLogboek, histNoteKey, renderTaskHistory, addTaskNote, logEvent,
+  logDayLabel, logZin, logTijd, logItemHtml, logPaginaSoort, renderLogboek, histNoteKey, renderTaskHistory, addTaskNote, logEvent,
 };

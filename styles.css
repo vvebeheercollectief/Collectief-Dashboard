@@ -441,6 +441,8 @@
     .log-item:hover{background:var(--sur2)}
     .log-item::before{content:'';position:absolute;left:27px;top:44px;bottom:-10px;width:2px;background:var(--bor)}
     .log-item:last-child::before{display:none}
+    .log-item:has(+ .log-mini)::before{display:none}
+    .log-item:has(+ .log-day)::before{display:none}
     .log-av{width:32px;height:32px;border-radius:50%;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800;color:#fff;position:relative;z-index:1}
     .log-body{flex:1;min-width:0}
     .log-line{font-size:13.5px;line-height:1.45;color:var(--txt)}
@@ -450,7 +452,12 @@
     .log-change .old{text-decoration:line-through;opacity:.7}
     .log-change .arr{color:var(--ac);font-weight:800;margin:0 5px}
     .log-change .new{color:var(--txt);font-weight:600}
-    .log-note{margin-top:5px;font-size:12.5px;color:var(--txt);background:var(--am-l);border-left:3px solid var(--am);border-radius:6px;padding:7px 11px;font-style:italic}
+    .log-note{margin-top:4px;font-size:13px;color:var(--txt);line-height:1.55;white-space:pre-wrap;word-break:break-word}
+    .log-mini{display:flex;align-items:center;gap:9px;padding:3px 10px 3px 13px;font-size:12px;color:var(--mut);line-height:1.4}
+    .log-mini-dot{flex:none;width:6px;height:6px;border-radius:50%}
+    .log-mini-txt{flex:1;min-width:0}
+    .log-mini-txt b{color:var(--txt);font-weight:600}
+    .log-mini-meta{color:var(--fnt)}
     .log-time{font-size:11.5px;color:var(--mut);white-space:nowrap;flex-shrink:0;padding-top:3px}
     .log-empty{text-align:center;color:var(--mut);padding:40px;font-style:italic}
 

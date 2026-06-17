@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  DATA — laden, parsen, achtergrond-schrijven, sync-indicator
 // ══════════════════════════════════════
-import { parseDt } from "./util.js";
+import { parseDt, _parseAnyDate } from "./util.js";
 import { state, D } from "./state.js";
 import { SKEYS, SECS } from "./config.js";
 import { fetchSheet, _withRetry } from "./api.js";
@@ -138,6 +138,16 @@ function parseSections(rows){
     entry.esc        =_f4v(row[13]);  // N (alleen door Apps Script geschreven)
     entry.fase       =_f4v(row[14]);  // O — offerte-fase (offerte-motor)
     entry.aannemers  =_f4v(row[15]);  // P — aannemerslijst (naam|0/1 per regel)
+    // Legacy 'Afgerond'-rijen (oude onEdit-vinkjes, vóór juni): 5-koloms vorm
+    // [code,naam,actiepunt,behandelaar,datum] met de afronddatum op kolom E i.p.v. I.
+    // Herken ze — geen datum op I, maar kolom E (in entry.behandelaar) is wél een datum —
+    // en herstel datum + behandelaar zodat ze mét datum tonen. Moderne 12-kol rijen hebben
+    // datum op I en kolom E = behandelaar (een naam), dus deze guard raakt ze niet.
+    if(!entry.datum && _parseAnyDate(entry.behandelaar||'')){
+      entry.datum=entry.behandelaar;
+      entry.behandelaar=(row[3]||'').trim();
+      entry.deadline='';
+    }
     if(entry.code) out[cur].push(entry);
   }
   return {data:out,secInfo};

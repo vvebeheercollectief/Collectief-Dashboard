@@ -622,6 +622,26 @@ import { setv } from "./crud.js";
     return _bulkUndoAfDoelRijen([{sec:'OPPAKKEN',code:'A'}],afPerSec).length===0;
   })());
 
+  // ── parseSections: legacy 5-koloms Afgerond-rijen (oude onEdit-vinkjes, datum op kolom E) ──
+  truthy('parseSections: legacy 5-kol Afgerond-rij → datum uit kolom E, behandelaar uit D', (()=>{
+    const rows=[
+      ['OPPAKKEN'],
+      ['VvE-Code','VvE','Actiepunt','Behandelaar','Afgerond op'],
+      ['91022','VvE Westduinweg','Overzicht stappen','Jer','1-5-2026'], // 5-kol legacy
+    ];
+    const r=parseSections(rows).data['OPPAKKEN'][0];
+    return r.datum==='1-5-2026' && r.behandelaar==='Jer';
+  })());
+  truthy('parseSections: moderne 12-kol Afgerond-rij houdt datum uit kolom I (regressie-guard)', (()=>{
+    const rows=[
+      ['OPPAKKEN'],
+      ['VvE-Code','VvE','Actiepunt','Deadline','Behandelaar','Prio','Opm','InBeh','Afgerond op'],
+      ['311062','VvE Lunteren','CRM','19-06-2026','Jer','Hoog','','FALSE','17-06-2026'], // 12-kol modern
+    ];
+    const r=parseSections(rows).data['OPPAKKEN'][0];
+    return r.datum==='17-06-2026' && r.behandelaar==='Jer' && r.deadline==='19-06-2026';
+  })());
+
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');
   window._testResult = `${totOk} OK, ${totFail} FAIL`; // uitleesbaar voor test-automatisering

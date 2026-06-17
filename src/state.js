@@ -47,6 +47,7 @@ export const state = {
   _lastDHash: null,
   _loadInFlight: false,
   _loadAgain: false,
+  _syncFails: 0,           // opeenvolgende mislukte sync-rondes; 'Fout' pas na 2 (transient-tolerantie)
   _animBusy: false,
   // diversen
   _sheetIds: null,

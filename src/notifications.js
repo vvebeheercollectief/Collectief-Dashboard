@@ -1,14 +1,14 @@
 // ══════════════════════════════════════
 //  NOTIFICATIONS — meldingen (wachtrij/push) + in-app toasts
 // ══════════════════════════════════════
-import { esc, displayName } from "./util.js";
+import { esc, displayName, parseDt } from "./util.js";
 import { state, D, _shownToasts } from "./state.js";
 import { SID, ONESIGNAL_APP_ID } from "./config.js";
 import { ensureToken } from "./auth.js";
 import { fetchSheet, appendRange } from "./api.js";
 import { logEvent } from "./render-overig.js";
 import { getSheetIds, insertAndWriteRow, getInsertRow } from "./crud.js";
-import { loadAll } from "./data.js";
+import { loadAll, parseSections } from "./data.js";
 import { flashRow } from "./anim.js";
 
 //  NOTIF — enqueuet event in de Notif-wachtrij én toont directe in-app toast
@@ -135,15 +135,20 @@ async function undoComplete(undoData) {
   if (!await ensureToken()) { alert('Inloggen mislukt.'); return; }
   const { sec, ntdValues, ntdRow } = undoData;
   try {
+    await state._writeChain; // de afronding-write moet eerst klaar zijn vóór we de rij zoeken
     const ids = await getSheetIds();
     const afId = ids['Afgerond'];
-    const afEntries = D.af[sec] || [];
-    const lastAf = afEntries.length > 0 ? afEntries[afEntries.length - 1] : null;
-    if (lastAf && lastAf.code === undoData.code) {
+    // Verse Afgerond-data en de ZOJUIST afgeronde rij zoeken (nieuwste datum eerst, zelfde
+    // sortering als D.af). D.af kan nog verouderd zijn; we matchen op code én pakken de
+    // nieuwste, zodat we niet per ongeluk een óúdere afronding met dezelfde code wissen.
+    const afData = (parseSections(await fetchSheet('Afgerond')).data[sec] || [])
+      .slice().sort((a, b) => parseDt(b.datum) - parseDt(a.datum));
+    const doelAf = afData.find(x => x.code === undoData.code) || null;
+    if (doelAf) {
       await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${state.oauthToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requests: [{ deleteDimension: { range: { sheetId: afId, dimension: 'ROWS', startIndex: lastAf._row - 1, endIndex: lastAf._row } } }] })
+        body: JSON.stringify({ requests: [{ deleteDimension: { range: { sheetId: afId, dimension: 'ROWS', startIndex: doelAf._row - 1, endIndex: doelAf._row } } }] })
       });
     }
     const insertRow = getInsertRow(sec);

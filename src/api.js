@@ -7,7 +7,7 @@ async function fetchSheet(name){
     cache:'no-store',
     headers:{Authorization:`Bearer ${state.oauthToken}`}
   });
-  if(!r.ok){const e=await r.json();if(r.status===401){state.oauthToken=null;state.oauthExpiry=0}throw new Error(e.error?.message||'API fout')}
+  if(!r.ok){const e=await r.json().catch(()=>({}));if(r.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'API fout');err.status=r.status;throw err}
   return (await r.json()).values||[];
 }
 async function writeRange(range,values,method='PUT'){

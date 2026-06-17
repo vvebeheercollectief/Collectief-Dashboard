@@ -13,16 +13,20 @@ function doOAuth(forcePrompt){
         state._gsiTokenClient=google.accounts.oauth2.initTokenClient({
           client_id:clientId,
           scope:'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.email',
-          callback:resp=>{
-            if(resp.error){console.warn('OAuth fout:',resp.error);state.oauthToken=null;state.oauthExpiry=0;resolve(null);return}
-            state.oauthToken=resp.access_token;
-            state.oauthExpiry=Date.now()+((resp.expires_in||3600)-120)*1000;
-            sessionStorage.setItem('oauthToken',state.oauthToken);
-            sessionStorage.setItem('oauthExpiry',String(state.oauthExpiry));
-            resolve(state.oauthToken);
-          }
+          callback:()=>{}, // wordt per aanvraag overschreven (zie hieronder)
         });
       }
+      // De callback (en dus de resolve van DEZE aanroep) bij elke aanvraag opnieuw binden.
+      // Anders bleef een tweede doOAuth (bv. token-refresh na expiry) hangen: de client
+      // riep de eerste, al-afgehandelde resolve aan i.p.v. die van de nieuwe Promise.
+      state._gsiTokenClient.callback=resp=>{
+        if(resp.error){console.warn('OAuth fout:',resp.error);state.oauthToken=null;state.oauthExpiry=0;resolve(null);return}
+        state.oauthToken=resp.access_token;
+        state.oauthExpiry=Date.now()+((resp.expires_in||3600)-120)*1000;
+        sessionStorage.setItem('oauthToken',state.oauthToken);
+        sessionStorage.setItem('oauthExpiry',String(state.oauthExpiry));
+        resolve(state.oauthToken);
+      };
       state._gsiTokenClient.requestAccessToken(forcePrompt?{}:{prompt:''});
     }catch(e){console.error('OAuth:',e);resolve(null)}
   });

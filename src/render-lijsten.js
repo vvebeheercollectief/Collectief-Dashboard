@@ -125,10 +125,15 @@ function renderNtd(){
   renderThead('ntd-thead',[...(state.bulkMode?['']:[]),...SECS[state.activeNtd].cols,''],SECS[state.activeNtd].css);
   renderTbody('ntd-tbody',rows,state.activeNtd,pgs.ntd,false);
   renderPag('ntd-pag',rows.length,pgs.ntd,'ntd');
-  renderOfferteBriefing();
-  // Vandaag-focus: op de offerte-tab staat de volledige tabel standaard ingeklapt.
+  // Zoekt/filtert de gebruiker? Dan tonen we op de offerte-tab de gefilterde tabel i.p.v.
+  // het Vandaag-blok (dat bewust álle trajecten samenvat). Anders zou zoeken geen zichtbaar
+  // effect hebben omdat de tabel daar standaard is ingeklapt.
+  const zoekActief=!!(q||fCode||fBeh||fPrio);
+  renderOfferteBriefing(zoekActief);
+  // Vandaag-focus: op de offerte-tab staat de volledige tabel standaard ingeklapt
+  // (tenzij je hem zelf openklapt óf aan het zoeken/filteren bent).
   const tblWrap=document.getElementById('ntd-tbl-wrap'), pag=document.getElementById('ntd-pag');
-  const verberg=state.activeNtd==='OFFERTE-TRAJECTEN' && !state.offerteTabelOpen;
+  const verberg=state.activeNtd==='OFFERTE-TRAJECTEN' && !state.offerteTabelOpen && !zoekActief;
   if(tblWrap) tblWrap.style.display=verberg?'none':'';
   if(pag) pag.style.display=verberg?'none':'';
   renderNtdCrossList(state.activeNtd);
@@ -215,10 +220,12 @@ function offerteHeroKaart(r, daarna, nuLen){
     ${voet}
   </div>`;
 }
-function renderOfferteBriefing(){
+function renderOfferteBriefing(zoekActief){
   const slot=document.getElementById('off-briefing-slot');
   if(!slot) return;
-  if(state.activeNtd!=='OFFERTE-TRAJECTEN'){ slot.innerHTML=''; return; }
+  // Niet op de offerte-tab, óf de gebruiker zoekt/filtert: geen Vandaag-blok tonen
+  // (tijdens zoeken laat renderNtd de gefilterde tabel zien).
+  if(state.activeNtd!=='OFFERTE-TRAJECTEN' || zoekActief){ slot.innerHTML=''; return; }
   const rijen=D.ntd['OFFERTE-TRAJECTEN']||[];
   const actMap=_offerteActiviteitMap(D.logboek);
   rijen.forEach(r=>_verrijkOfferteRij(r,actMap));

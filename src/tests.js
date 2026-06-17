@@ -6,12 +6,14 @@ import { logZin } from "./render-overig.js";
 import { _isStagingHost } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
-import { filterNtd, offerteGroepen, _offerteActiviteitMap, offerteBalBijTekst, setNtd, offerteAannemerPaneel, offerteAannSamenvatting } from "./render-lijsten.js";
+import { filterNtd, offerteGroepen, _offerteActiviteitMap, offerteBalBijTekst, setNtd, renderNtd, offerteAannemerPaneel, offerteAannSamenvatting } from "./render-lijsten.js";
 import { state, D } from "./state.js";
 import { vveOverzicht, filterDossierLog } from "./render-vve.js";
 import { parseKenmerken, vveKenmerken } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
+import { _isTransient } from "./api.js";
+import { parseSections } from "./data.js";
 
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
   // ── mini-assert helper (Fase 1 testnet) ──
@@ -481,6 +483,59 @@ import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
       D.ntd['OFFERTE-TRAJECTEN']=vR; setNtd(vA);
       return html.includes('Niets dringends');
     }catch(e){ console.error('leeg-test:',e); return false; }
+  })());
+
+  // ══════════════════════════════════════
+  //  FUNCTIECHECK-FIXES (juni 2026)
+  // ══════════════════════════════════════
+  // Subcategorie hoort op kolom K (index 10) — schrijf (crud/bulk) gelijk aan parser/backend.
+  eq('subcategorie leest uit kolom K', (()=>{
+    const raw=[['OPPAKKEN'],['VvE-Code'],
+      ['T-K','VvE K','actie','','beh','Hoog','opm','FALSE','','','SubK']]; // index 10 = kolom K
+    return parseSections(raw).data['OPPAKKEN'][0].subcategorie;
+  })(), 'SubK');
+  eq('oude bug: waarde in kolom J is NIET de subcategorie', (()=>{
+    const raw=[['OPPAKKEN'],['VvE-Code'],
+      ['T-J','VvE J','actie','','beh','Hoog','opm','FALSE','','SubJ']]; // index 9 = kolom J
+    return parseSections(raw).data['OPPAKKEN'][0].subcategorie;
+  })(), '');
+
+  // Transient-detectie onderbouwt de read-herkansing (minder onnodige 'Fout').
+  truthy('_isTransient: 429 (rate-limit)', _isTransient({status:429}));
+  truthy('_isTransient: 503 (serverfout)', _isTransient({status:503}));
+  truthy('_isTransient: quota-bericht', _isTransient({message:'Quota exceeded for reads'}));
+  truthy('_isTransient: 400 is NIET transient', !_isTransient({status:400}));
+
+  // Zoeken op de offerte-tab toont de gefilterde tabel en verbergt het Vandaag-blok.
+  truthy('offerte-zoek: tabel zichtbaar + briefing leeg + alleen treffer', (()=>{
+    try{
+      const vA=state.activeNtd, vR=D.ntd['OFFERTE-TRAJECTEN'], vS=document.getElementById('s-ntd').value, vOpen=state.offerteTabelOpen;
+      D.ntd['OFFERTE-TRAJECTEN']=[
+        {code:'ZK-1',naam:'VvE Zoek Een',offertes:'0/1',aannemers:'',fase:'',datumAangevraagd:'1 mei 2026',opmerkingen:'',behandelaar:'',deadline:'',_sec:'OFFERTE-TRAJECTEN',_row:9500},
+        {code:'ZK-2',naam:'VvE Zoek Twee',offertes:'0/1',aannemers:'',fase:'',datumAangevraagd:'1 mei 2026',opmerkingen:'',behandelaar:'',deadline:'',_sec:'OFFERTE-TRAJECTEN',_row:9501},
+      ];
+      state.offerteTabelOpen=false;
+      setNtd('OFFERTE-TRAJECTEN');
+      document.getElementById('s-ntd').value='zoek een';
+      renderNtd();
+      const briefingLeeg=document.getElementById('off-briefing-slot').innerHTML==='';
+      const tabelZichtbaar=document.getElementById('ntd-tbl-wrap').style.display!=='none';
+      const tbody=document.getElementById('ntd-tbody').innerHTML;
+      document.getElementById('s-ntd').value=vS; D.ntd['OFFERTE-TRAJECTEN']=vR; state.offerteTabelOpen=vOpen; setNtd(vA);
+      return briefingLeeg && tabelZichtbaar && tbody.includes('ZK-1') && !tbody.includes('ZK-2');
+    }catch(e){ console.error('offerte-zoek-test:',e); return false; }
+  })());
+  truthy('offerte zonder zoek: Vandaag-blok zichtbaar', (()=>{
+    try{
+      const vA=state.activeNtd, vR=D.ntd['OFFERTE-TRAJECTEN'], vS=document.getElementById('s-ntd').value, vOpen=state.offerteTabelOpen;
+      D.ntd['OFFERTE-TRAJECTEN']=[{code:'ZK-3',naam:'VvE Drie',offertes:'0/1',aannemers:'',fase:'',datumAangevraagd:'1 mei 2026',opmerkingen:'',behandelaar:'',deadline:'',_sec:'OFFERTE-TRAJECTEN',_row:9502}];
+      state.offerteTabelOpen=false;
+      document.getElementById('s-ntd').value='';
+      setNtd('OFFERTE-TRAJECTEN');
+      const briefingGevuld=document.getElementById('off-briefing-slot').innerHTML.length>0;
+      document.getElementById('s-ntd').value=vS; D.ntd['OFFERTE-TRAJECTEN']=vR; state.offerteTabelOpen=vOpen; setNtd(vA);
+      return briefingGevuld;
+    }catch(e){ console.error('offerte-geen-zoek-test:',e); return false; }
   })());
 
   const totOk = ok + _tOk, totFail = fail + _tFail;

@@ -63,7 +63,7 @@ const OPVOLG_KOLOM='L';
 function _ntdValues(r){
   const v=SECS[r._sec].keys.map(k=>r[k]||'');
   while(v.length<8) v.push('');
-  v.push('', r.subcategorie||'', '', r.opvolgdatum||'', r.herhaalId||''); // I, J=sub, K, L, M
+  v.push('', '', r.subcategorie||'', r.opvolgdatum||'', r.herhaalId||''); // I, J, K=sub, L, M
   return v;
 }
 

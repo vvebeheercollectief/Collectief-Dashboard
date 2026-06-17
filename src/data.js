@@ -54,18 +54,22 @@ async function loadAll(silent){
   if(state._loadInFlight){ state._loadAgain=true; return; }
   state._loadInFlight=true;
   try{
-    if(!state.oauthToken){
-      if(!await ensureToken()){setSyncErr();return}
-    }
+    // Altijd een geldige token garanderen (ook bij Vernieuwen-knop / schrijf-resync):
+    // een verlopen-maar-niet-null token gaf anders een 401 → onnodige 'Fout'.
+    if(!await ensureToken()){setSyncErr();return}
     if(!silent) setSyncing();
+    // Reads met herkansing bij tijdelijke API-fouten (429 / 5xx / netwerk-blip), zodat
+    // één hapering niet meteen de hele ronde laat falen en 'Fout' toont.
+    const lees=(naam)=>_withRetry(()=>fetchSheet(naam));
     const[ntdR,afR,alvoR,alfaR,ontwR,logR,hhR,kmkR]=await Promise.all([
-      fetchSheet("Nog Te Doen"),fetchSheet("Afgerond"),
-      fetchSheet("ALV's overzicht"),fetchSheet("ALV's afgerond"),
-      fetchSheet("Ontwikkeling").catch(()=>[]),
-      fetchSheet("Logboek").catch(()=>[]),
-      fetchSheet("Herhaalregels").catch(()=>[]),
-      fetchSheet("Kenmerken").catch(()=>[]),
+      lees("Nog Te Doen"),lees("Afgerond"),
+      lees("ALV's overzicht"),lees("ALV's afgerond"),
+      lees("Ontwikkeling").catch(()=>[]),
+      lees("Logboek").catch(()=>[]),
+      lees("Herhaalregels").catch(()=>[]),
+      lees("Kenmerken").catch(()=>[]),
     ]);
+    state._syncFails=0; // alle reads geslaagd
     // Kwam er tijdens het lezen een schrijfactie tussen? Dan is de lokale (optimistische)
     // staat leidend; de eigen resync van die schrijfactie haalt zo de verse data op.
     if(state.pendingWrites>0){ if(!silent) setSynced(); return; }
@@ -88,7 +92,14 @@ async function loadAll(silent){
       if(document.getElementById('page-dash')?.classList.contains('active')) buildDash();
       if(document.getElementById('page-ntd')?.classList.contains('active')) renderNtdDonut();
     }
-  }catch(e){setSyncErr();console.error(e)}
+  }catch(e){
+    // Eén mislukte stille poll mag de indicator niet meteen op 'Fout' zetten — die
+    // herstelt zich vaak vanzelf bij de volgende ronde. Pas na 2 mislukkingen op rij
+    // (of bij een handmatige, niet-stille verversing) tonen we 'Fout'.
+    state._syncFails=(state._syncFails||0)+1;
+    if(!silent || state._syncFails>=2) setSyncErr();
+    console.error(e);
+  }
   finally{
     state._loadInFlight=false;
     if(state._loadAgain){ state._loadAgain=false; loadAll(true); } // een onderdrukte aanroep alsnog uitvoeren

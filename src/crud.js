@@ -136,7 +136,7 @@ async function deleteTaskRow(r){
   const ntdKeys=SECS[sec].keys;
   const ntdValues=ntdKeys.map(k=>r[k]||'');
   while(ntdValues.length<8) ntdValues.push('');                  // OFFERTE heeft 7 velden
-  ntdValues.push('', r.subcategorie||'', '', r.opvolgdatum||'', r.herhaalId||''); // I, J=sub, K, L, M (Fase 4)
+  ntdValues.push('', '', r.subcategorie||'', r.opvolgdatum||'', r.herhaalId||''); // I, J, K=sub, L, M (Fase 4)
   const undoData={sec,code:r.code,ntdValues};
   const oudeRow=r._row;
   const tr=document.querySelector(`#ntd-tbody tr[data-row="${oudeRow}"]`);
@@ -232,7 +232,7 @@ async function doCompleteTask(){
     const ntdKeys=SECS[sec].keys;
     const ntdValues=ntdKeys.map(k=>r[k]||'');
     while(ntdValues.length<8) ntdValues.push('');                  // OFFERTE heeft 7 velden
-    ntdValues.push('', r.subcategorie||'', '', r.opvolgdatum||'', r.herhaalId||''); // I, J=sub, K, L, M (Fase 4)
+    ntdValues.push('', '', r.subcategorie||'', r.opvolgdatum||'', r.herhaalId||''); // I, J, K=sub, L, M (Fase 4)
     const undoData={sec,code:r.code,ntdValues,ntdRow:r._row};
     // 1) optimistisch: meteen uit de lokale lijst + indexen meeschuiven;
     //    de oude DOM-rij pulst groen en pas daarná hertekenen we (anim.js)
@@ -277,22 +277,25 @@ async function submitTask(){
   try{
     const subId={OPPAKKEN:'m-sub-opp',VERGADERVERZOEKEN:'m-sub-verg','OFFERTE-TRAJECTEN':'m-sub-off',LOD:'m-sub-lod'}[sec];
     const sub=gv(subId);
+    // Kolomvolgorde 'Nog Te Doen': … H=InBeh, I=Afgerond, J=(leeg), K=Subcategorie, L=Opvolg, …
+    // De subcategorie moet dus op kolom K (index 10) staan — gelijk aan parseSections en de
+    // Apps Script-backend. Daarom twee lege kolommen (I + J) vóór `sub`.
     switch(sec){
       case'OPPAKKEN':{
         const _berekend = berekenPrioriteit(toDutchDate(gv('m-dl')), 'OPPAKKEN').prioriteit;
         values=[code,naam,gv('m-actie'),toDutchDate(gv('m-dl')),gv('m-beh'),_berekend,gv('m-opm'),
-          document.getElementById('tog-ib').classList.contains('on'),'',sub];break;}
+          document.getElementById('tog-ib').classList.contains('on'),'','',sub];break;}
       case'VERGADERVERZOEKEN':
         values=[code,naam,gv('m-per'),gv('m-agenda'),gv('m-beh-v'),toDutchDate(gv('m-dl-v')),gv('m-opm-v'),
-          document.getElementById('tog-ib-v').classList.contains('on'),'',sub];break;
+          document.getElementById('tog-ib-v').classList.contains('on'),'','',sub];break;
       case'OFFERTE-TRAJECTEN':{
         const recv=parseInt(gv('m-off-recv'))||0;
         const total=parseInt(gv('m-off-total'))||0;
         const offStr=total>0?`${recv}/${total}`:'';
-        values=[code,naam,toDutchDate(gv('m-daang')),offStr,gv('m-beh-o'),toDutchDate(gv('m-dl-o')),gv('m-opm-o'),'','',sub];break;}
+        values=[code,naam,toDutchDate(gv('m-daang')),offStr,gv('m-beh-o'),toDutchDate(gv('m-dl-o')),gv('m-opm-o'),'','','',sub];break;}
       case'LOD':
         values=[code,naam,gv('m-actie-l'),gv('m-stat-l'),gv('m-beh-l'),toDutchDate(gv('m-dl-l')),gv('m-opm-l'),
-          document.getElementById('tog-ib-l').classList.contains('on'),'',sub];break;
+          document.getElementById('tog-ib-l').classList.contains('on'),'','',sub];break;
     }
 
     const endCol=String.fromCharCode(64+Math.max(values.length,9));

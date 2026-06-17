@@ -10,6 +10,16 @@
 
 **Ontwerp:** `docs/superpowers/specs/2026-06-17-dagstart-cockpit-vandaag-design.md`
 
+> **Herziening 2026-06-17 (na eerste staging-test).** Op verzoek van de beheerder is "Vandaag"
+> géén onderdeel van de Dashboard-pagina meer, maar een **eigen pagina** bovenaan de navigatie
+> (boven "Nog Te Doen") en de **standaard-landingspagina**; de Dashboard-pagina blijft een eigen
+> pagina, ongewijzigd. Dit vervangt de plaatsing uit Task 4 hieronder. Concreet zoals gebouwd:
+> eigen `#page-vandaag` (container `#dash-vandaag`) + nav-item `data-page="vandaag"`;
+> `ui.js`: `goTo('vandaag')→renderVandaag()`, `goTo('dash')→buildDash()` (gescheiden);
+> `renderVandaag()` zit in `renderAll()` (cockpit altijd vers); `main.js` landt op `goTo('vandaag')`;
+> `PAGE_META` heeft losse `dash`- en `vandaag`-entries. De urgentie-motor en cockpit-opbouw
+> (Tasks 1–3, 5–7) zijn ongewijzigd.
+
 ---
 
 ## File Structure

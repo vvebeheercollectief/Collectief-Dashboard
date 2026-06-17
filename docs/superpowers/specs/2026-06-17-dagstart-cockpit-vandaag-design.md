@@ -34,8 +34,13 @@ alle vier de teamleden, elke dag (niet alleen maandag).
 **Kernkeuzes (brainstorm 2026-06-17, door beheerder bevestigd via mockups):**
 - Richting **A** ("Dagstart-cockpit") gekozen boven B (alleen motor) en C (communicatie); C volgt
   als losse fase 2.
-- De cockpit komt op de **bestaande Dashboard-pagina**: cockpit bovenaan, de huidige
-  kantoor-totalen + "recent afgerond" schuiven eronder (niets gaat verloren).
+- De cockpit is een **eigen pagina "Vandaag"**, bovenaan de navigatie (boven "Nog Te Doen") en
+  de **standaard-landingspagina**. De Dashboard-pagina blijft een eigen pagina, ongewijzigd
+  (kantoor-totalen + ALV-donut + "recent afgerond").
+  > **Herziening 2026-06-17 (na eerste staging-test):** oorspronkelijk stond de cockpit *bovenop*
+  > de Dashboard-pagina. Op verzoek van de beheerder is Vandaag losgetrokken tot een eigen
+  > toppagina en blijft Dashboard zoals het was. De rest van dit ontwerp (motor, opbouw, toggle)
+  > is ongewijzigd; lees "op de Dashboard-pagina" hieronder als "op de Vandaag-pagina".
 - Persoonlijk én kantoorbreed: kleine toggle **"Mijn / Iedereen"**, met een **"Niet
   toegewezen"**-bak voor taken zonder behandelaar.
 - Geen Sheet- of Apps Script-wijzigingen: puur frontend, hergebruik van bestaande velden.
@@ -79,18 +84,22 @@ Bestaande hergebruikte helpers: `berekenPrioriteit`, `bepaalStil` (dagen-stil ui
 4. **"Verder vandaag · jouw lijst"** — de rest van jouw taken, op urgentie aflopend gesorteerd.
 5. **Toggle "Mijn / Iedereen"** — schakelt naar het kantoorbrede beeld, inclusief een
    "Niet toegewezen"-bak.
-6. **Daaronder (ongewijzigd)** — de bestaande kantoor-totalen (`dash-stats`), hero-donut en
-   "recent afgerond"-tabel uit `buildDash`.
+6. De kantoor-totalen (`dash-stats`), hero-donut en "recent afgerond" blijven op de **aparte
+   Dashboard-pagina** (ongewijzigd) — niet op Vandaag.
 
 "Mijn taak" = `behandelaar` bevat `displayName(currentUserEmail)` (behandelaar kan meerdere
 namen bevatten, gesplitst op `,` of `/`).
 
-### 3. Wiring
+### 3. Wiring (herzien 2026-06-17 — aparte pagina)
 
-- `main.js`-routing: de Dashboard-pagina rendert eerst `renderVandaag()`, daarna de bestaande
-  `buildDash()`-inhoud eronder.
-- `loadAll()` ververst de actieve Dashboard-pagina al via `buildDash()`; daar `renderVandaag()`
-  naast hangen, zodat de cockpit live meebeweegt met nieuwe data.
+- `index.html`: eigen `#page-vandaag` met container `#dash-vandaag`; nav-item `data-page="vandaag"`
+  bovenaan; Dashboard (`#page-dash`) hersteld naar origineel.
+- `ui.js`-routing: `goTo('vandaag') → renderVandaag()`; `goTo('dash') → buildDash()` (gescheiden).
+- `renderVandaag()` zit in `renderAll()` (zoals de lijst-renders), zodat de cockpit-DOM altijd
+  meebeweegt met nieuwe data; navigatie roept hem ook aan via `goTo`.
+- `main.js`: standaard-landing is `goTo('vandaag')`.
+- Thema: de cockpit gebruikt CSS-variabelen en past zich vanzelf aan; geen re-render in
+  `applyTheme` nodig (anders dan de chart-pagina's).
 
 ## Eerlijke kanttekeningen (vastgelegd, geen verrassingen achteraf)
 

@@ -755,3 +755,33 @@
     [data-theme=dark] .act-af{background:#12302a;border-color:#1f4a3c;color:#34d39a}
     [data-theme=dark] .act-af:hover{background:#34d39a;border-color:#34d39a;color:#0f1b1a}
     [data-theme=dark] tbody tr[data-prio=laag]{--prio-bar:#3a414d}
+
+    /* ── Dagstart-cockpit (Vandaag) ── */
+    #dash-vandaag{margin-bottom:22px}
+    .vd-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:14px}
+    .vd-groet{font-size:20px;font-weight:600;color:var(--txt)}
+    .vd-datum{font-size:13px;color:var(--mut);margin-top:2px}
+    .vd-toggle{display:inline-flex;border:1px solid var(--bor);border-radius:8px;overflow:hidden;font-size:12px;flex-shrink:0}
+    .vd-toggle span{padding:6px 12px;cursor:pointer;color:var(--mut)}
+    .vd-toggle span.on{background:var(--ac);color:#fff}
+    .vd-lo-strip{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+    .vd-lo{display:inline-flex;align-items:center;font-size:12px;font-weight:600;padding:5px 10px;border-radius:8px}
+    .vd-lo.lo-danger{background:var(--rd-l);color:var(--rd)}
+    .vd-lo.lo-warning{background:var(--am-l);color:var(--am)}
+    .vd-lo.lo-info{background:var(--bl-l);color:var(--bl)}
+    .vd-eerst-lbl,.vd-sub{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);margin:0 0 8px}
+    .vd-sub{margin:14px 0 8px}
+    .vd-lijst{display:flex;flex-direction:column;gap:8px}
+    .vd-rest{margin-top:14px}
+    .vd-row{display:flex;background:var(--sur);border:1px solid var(--bor);border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color var(--tr,.15s)}
+    .vd-row:hover{border-color:var(--ac)}
+    .vd-bar{width:4px;flex-shrink:0;background:var(--bl)}
+    .vd-row.u-vandaag .vd-bar{background:var(--rd)}
+    .vd-row.u-week .vd-bar{background:var(--am)}
+    .vd-body{padding:9px 12px;flex:1;min-width:0}
+    .vd-top{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+    .vd-actie{font-size:13.5px;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .vd-reden{font-size:11.5px;color:var(--mut);white-space:nowrap;flex-shrink:0}
+    .vd-meta{font-size:11.5px;color:var(--mut);margin-top:3px}
+    .vd-leeg{padding:14px;text-align:center;color:var(--mut);font-size:13px;background:var(--sur);border:1px solid var(--bor);border-radius:8px}
+    .kantoor-lbl{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);margin:0 0 12px;padding-top:16px;border-top:1px solid var(--bor)}

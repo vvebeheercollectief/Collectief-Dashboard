@@ -4,6 +4,7 @@
 import { PAGE_META } from "./config.js";
 import { state } from "./state.js";
 import { buildAnalytics, buildDash } from "./render-analytics.js";
+import { renderVandaag } from "./render-vandaag.js";
 import { renderOntw, renderLogboek } from "./render-overig.js";
 import { renderHerhaal } from "./render-herhaal.js";
 import { renderVve } from "./render-vve.js";
@@ -22,7 +23,7 @@ function goTo(page){
   if(page==='vve') renderVve();
   closeSb();
   if(page==='analytics') buildAnalytics();
-  if(page==='dash') buildDash();
+  if(page==='dash'){ renderVandaag(); buildDash(); }
 }
 function closeSb(){document.getElementById('sb').classList.remove('open');document.getElementById('overlay').classList.remove('on')}
 
@@ -37,7 +38,7 @@ function applyTheme(t){
   Object.values(state.charts).forEach(c=>{try{c.destroy()}catch(e){}});
   state.charts={};
   if(document.getElementById('page-analytics').classList.contains('active')) buildAnalytics();
-  if(document.getElementById('page-dash').classList.contains('active')) buildDash();
+  if(document.getElementById('page-dash').classList.contains('active')){ renderVandaag(); buildDash(); }
 }
 
 // ══════════════════════════════════════

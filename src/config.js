@@ -72,5 +72,5 @@ export const PAGE_META = {
   herhaal:['Herhaalregels','Terugkerende taken — automatisch klaargezet'],
   vve:['VvE-dossier','Alles van één VvE op één scherm'],
   analytics:['Analytics','Statistieken en grafieken'],
-  dash:['Dashboard','Totaaloverzicht'],
+  dash:['Vandaag','Jouw dagstart en kantooroverzicht'],
 };

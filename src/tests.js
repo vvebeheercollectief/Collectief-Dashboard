@@ -11,7 +11,7 @@ import { state, D, pgs } from "./state.js";
 import { vveOverzicht, filterDossierLog } from "./render-vve.js";
 import { parseKenmerken, vveKenmerken } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
-import { _bulkVolgorde, BULK_DEADLINE_KOLOM } from "./bulk.js";
+import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk.js";
 import { _isTransient } from "./api.js";
 import { parseSections } from "./data.js";
 import { setv } from "./crud.js";
@@ -575,6 +575,26 @@ import { setv } from "./crud.js";
       document.getElementById('s-ntd').value=vS; D.ntd['OPPAKKEN']=vR; pgs.ntd=vP; setNtd(vA);
       return tbody.includes('PG-1') && geclampt;
     }catch(e){ console.error('paginering-test:',e); return false; }
+  })());
+
+  // ── bulkUndoAfronden kiest de JUISTE Afgerond-rij (nieuwste op code, hoog→laag _row) ──
+  truthy('bulkUndoAf: nieuwste rij per code, hoog→laag', (()=>{
+    const afPerSec={OPPAKKEN:[
+      {code:'A',_row:10,datum:'3 jun 2026'}, // nieuwste A (D.af is nieuwste-eerst)
+      {code:'A',_row:3, datum:'1 jan 2026'}, // oudere A — moet NIET gekozen worden
+      {code:'B',_row:8, datum:'2 jun 2026'},
+    ]};
+    const doel=_bulkUndoAfDoelRijen([{sec:'OPPAKKEN',code:'A'},{sec:'OPPAKKEN',code:'B'}],afPerSec);
+    return doel.length===2 && doel[0]._row===10 && doel[1]._row===8;
+  })());
+  truthy('bulkUndoAf: twee items zelfde code → twee verschillende rijen', (()=>{
+    const afPerSec={OPPAKKEN:[{code:'A',_row:10},{code:'A',_row:5}]};
+    const doel=_bulkUndoAfDoelRijen([{sec:'OPPAKKEN',code:'A'},{sec:'OPPAKKEN',code:'A'}],afPerSec);
+    return doel.length===2 && doel[0]._row===10 && doel[1]._row===5;
+  })());
+  truthy('bulkUndoAf: geen match → geen doelrij', (()=>{
+    const afPerSec={OPPAKKEN:[{code:'X',_row:4}]};
+    return _bulkUndoAfDoelRijen([{sec:'OPPAKKEN',code:'A'}],afPerSec).length===0;
   })());
 
   const totOk = ok + _tOk, totFail = fail + _tFail;

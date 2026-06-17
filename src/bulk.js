@@ -150,23 +150,39 @@ function bulkAfronden(rows){
     });
   },'Bulk-afronden mislukt');
 }
+// Pure helper (testbaar): kies per item de ZOJUIST afgeronde Afgerond-rij — de nieuwste op
+// code. afPerSec[sec] is nieuwste-eerst gesorteerd (zoals D.af in data.js), dus de eerste
+// code-match is de nieuwste. Claim per rij zodat twee items met dezelfde code verschillende
+// rijen pakken. Resultaat hoog→laag _row, zodat verwijderen de indexen niet door elkaar schuift.
+function _bulkUndoAfDoelRijen(items, afPerSec){
+  const claimed=new Set(), doel=[];
+  for(const it of items){
+    const entries=afPerSec[it.sec]||[];
+    const r=entries.find(x=>x.code===it.code && !claimed.has(x));
+    if(r){ claimed.add(r); doel.push(r); }
+  }
+  return doel.sort((a,b)=>b._row-a._row);
+}
+
 async function bulkUndoAfronden(items){
   if(!await ensureToken()){ alert('Inloggen mislukt.'); return; }
   try{
     await state._writeChain;
-    await loadAll(true);
+    await loadAll(true);                       // verse D.af zodat we de zojuist afgeronde rijen vinden
     const ids=await getSheetIds();
-    const offset={}; // per sectie: elke re-insert één rij later (getInsertRow verandert niet tussendoor)
+    // 1) Bepaal welke Afgerond-rijen weg moeten (nieuwste per code), hoog→laag _row.
+    const teVerwijderen=_bulkUndoAfDoelRijen(items, D.af);
+    // 2) Verwijder ze in één batch in aflopende _row-volgorde, zodat de delete-indexen
+    //    elkaar niet verschuiven (i.t.t. de oude code die de oudste rij koos).
+    if(teVerwijderen.length){
+      const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+        method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
+        body:JSON.stringify({requests:teVerwijderen.map(af=>({deleteDimension:{range:{sheetId:ids['Afgerond'],dimension:'ROWS',startIndex:af._row-1,endIndex:af._row}}}))})});
+      if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Bulk-undo verwijderfout');err.status=resp.status;throw err}
+    }
+    // 3) Zet de taken terug in Nog Te Doen (per-sectie offset, getInsertRow verandert niet tussendoor).
+    const offset={};
     for(const it of items){
-      // verwijder de zojuist toegevoegde Afgerond-rij als die aan de staart staat
-      const afEntries=D.af[it.sec]||[];
-      const lastAf=afEntries.length?afEntries[afEntries.length-1]:null;
-      if(lastAf&&lastAf.code===it.code){
-        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
-          method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
-          body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId:ids['Afgerond'],dimension:'ROWS',startIndex:lastAf._row-1,endIndex:lastAf._row}}}]})});
-        afEntries.pop();
-      }
       await insertAndWriteRow('Nog Te Doen',getInsertRow(it.sec)+(offset[it.sec]||0),it.ntdValues);
       offset[it.sec]=(offset[it.sec]||0)+1;
       logEvent(it.code,it.sec,'Teruggezet','status','Afgerond','Nog Te Doen (bulk-undo)');
@@ -261,4 +277,4 @@ function bulkVeld(rows,soort,waarde){
 }
 
 export { _bulkVolgorde, bulkGeselecteerd, bulkSelectie, toggleBulkMode, bulkVink, bulkWis,
-         renderBulkUi, toggleBulkMenu, _sluitMenus, bulkDoe, BULK_DEADLINE_KOLOM };
+         renderBulkUi, toggleBulkMenu, _sluitMenus, bulkDoe, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen };

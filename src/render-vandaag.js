@@ -6,7 +6,8 @@ import { SKEYS } from './config.js';
 import { displayName, esc } from './util.js';
 import { urgentieScore, isVanMij, letOpSignalen } from './urgentie.js';
 
-let _scope = 'mijn'; // 'mijn' | 'iedereen'
+let _scope = 'mijn';      // 'mijn' | 'iedereen'
+let _scopeVoorEmail = null; // e-mail waarvoor _scope geldt — reset bij gebruikerswissel/uitloggen
 
 const SOORT_CLS = { danger:'lo-danger', warning:'lo-warning', info:'lo-info' };
 const LABEL_CLS = { 'vandaag':'u-vandaag', 'deze-week':'u-week', 'later':'u-later' };
@@ -33,7 +34,9 @@ function rowHtml(item){
 export function renderVandaag(){
   const host = document.getElementById('dash-vandaag');
   if (!host) return;
-  const naam = displayName(state.currentUserEmail || '') || '';
+  const email = state.currentUserEmail || '';
+  if (email !== _scopeVoorEmail) { _scope = 'mijn'; _scopeVoorEmail = email; } // andere/uitgelogde gebruiker → terug naar eigen lijst
+  const naam = displayName(email) || '';
   const opts = { logboek: D.logboek || [] };
 
   let items = alleTaken().map(it => ({ ...it, u: urgentieScore(it.r, it.sec, opts) }));

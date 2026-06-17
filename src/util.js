@@ -113,8 +113,7 @@ function prioBadge(r, sec){
   const { prioriteit } = berekenPrioriteit(r.deadline, sec);
   if(!prioriteit)return'';
   const cls={Hoog:'prio-hoog',Midden:'prio-mid',Laag:'prio-laag'}[prioriteit]||'prio-mid';
-  const ico={Hoog:'↑',Midden:'→',Laag:'↓'}[prioriteit]||'';
-  return`<span class="badge ${cls}">${ico} ${esc(prioriteit)}</span>`;
+  return`<span class="badge ${cls}">${esc(prioriteit)}</span>`;
 }
 
 function persBadges(v){

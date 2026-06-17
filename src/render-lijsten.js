@@ -615,7 +615,7 @@ function renderTbody(tbodyId,rows,sec,page,isAf){
   const cols=SECS[sec].cols.length+1+(state.bulkMode?1:0);
   let html=main.map(r=>rowNtd(r,sec)).join('');
   if(ib.length){
-    html+=`<tr><td colspan="${cols}" style="background:var(--ac-l);padding:8px 13px;font-size:11px;font-weight:700;color:var(--ac);text-transform:uppercase;letter-spacing:.05em;border:none">⟳ In behandeling (${ibAll})</td></tr>`;
+    html+=`<tr><td colspan="${cols}" class="grp-kop">▸ In behandeling (${ibAll})</td></tr>`;
     html+=ib.map(r=>rowNtd(r,sec)).join('');
   }
   if(wg.length){
@@ -687,7 +687,7 @@ function rowNtd(r,sec){
         ${deadlineCel(r, 'OPPAKKEN')}
         <td>${persBadges(r.behandelaar)}</td>
         <td>${prioBadge(r, 'OPPAKKEN')}</td>
-        <td class="cell-txt">${r.opmerkingen?`<span style="font-size:12px">${esc(r.opmerkingen)}</span>`:''}</td>
+        <td class="cell-note">${r.opmerkingen?`<span>${esc(r.opmerkingen)}</span>`:''}</td>
         <td>${ibBadge(r.inBehandeling)}</td>
         <td>${editBtn}</td>`;
       break;
@@ -699,7 +699,7 @@ function rowNtd(r,sec){
         <td>${persBadges(r.behandelaar)}</td>
         ${deadlineCel(r, 'VERGADERVERZOEKEN')}
         <td>${prioBadge(r, 'VERGADERVERZOEKEN')}</td>
-        <td class="cell-txt">${r.opmerkingen?`<span style="font-size:12px">${esc(r.opmerkingen)}</span>`:''}</td>
+        <td class="cell-note">${r.opmerkingen?`<span>${esc(r.opmerkingen)}</span>`:''}</td>
         <td>${ibBadge(r.inBehandeling)}</td>
         <td>${editBtn}</td>`;
       break;
@@ -720,7 +720,7 @@ function rowNtd(r,sec){
         <td>${persBadges(r.behandelaar)}</td>
         ${deadlineCel(r, 'OFFERTE-TRAJECTEN')}
         <td>${prioBadge(r, 'OFFERTE-TRAJECTEN')}</td>
-        <td class="cell-txt">${r.opmerkingen?`<span style="font-size:12px">${esc(r.opmerkingen)}</span>`:''}${extraPills}</td>
+        <td class="cell-note">${r.opmerkingen?`<span>${esc(r.opmerkingen)}</span>`:''}${extraPills}</td>
         <td>${actsHtml(actieBtn)}</td>`;
       break;}
     case'LOD':
@@ -731,12 +731,13 @@ function rowNtd(r,sec){
         <td>${persBadges(r.behandelaar)}</td>
         ${deadlineCel(r, 'LOD')}
         <td>${prioBadge(r, 'LOD')}</td>
-        <td class="cell-txt">${r.opmerkingen?`<span style="font-size:12px">${esc(r.opmerkingen)}</span>`:''}</td>
+        <td class="cell-note">${r.opmerkingen?`<span>${esc(r.opmerkingen)}</span>`:''}</td>
         <td>${ibBadge(r.inBehandeling)}</td>
         <td>${editBtn}</td>`;
       break;
   }
-  const { teLaat: rowTeLaat } = berekenPrioriteit(r.deadline, sec);
+  const { teLaat: rowTeLaat, prioriteit: rowPrio } = berekenPrioriteit(r.deadline, sec);
+  const prioAttr = ` data-prio="${(rowPrio||'geen').toLowerCase()}"`;
   const rowCls = [
     r.inBehandeling === 'TRUE' ? 'ib-row' : '',
     rowTeLaat ? 'row-telaat' : '',
@@ -748,7 +749,7 @@ function rowNtd(r,sec){
   const aannRow = (sec==='OFFERTE-TRAJECTEN' && state.offerteAannOpen.has(r.code))
     ? `<tr class="of-aann-tr"><td colspan="${(state.bulkMode?1:0)+SECS[sec].cols.length+1}">${offerteAannemerPaneel(r)}</td></tr>`
     : '';
-  return `<tr class="${rowCls}" data-row="${r._row}"${flipAttr}>${bulkCel}${cells}</tr>${aannRow}`;
+  return `<tr class="${rowCls}" data-row="${r._row}"${prioAttr}${flipAttr}>${bulkCel}${cells}</tr>${aannRow}`;
 }
 
 function rowAf(r,sec){

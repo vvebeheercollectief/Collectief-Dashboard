@@ -784,3 +784,29 @@
     .vd-reden{font-size:11.5px;color:var(--mut);white-space:nowrap;flex-shrink:0}
     .vd-meta{font-size:11.5px;color:var(--mut);margin-top:3px}
     .vd-leeg{padding:14px;text-align:center;color:var(--mut);font-size:13px;background:var(--sur);border:1px solid var(--bor);border-radius:8px}
+
+/* ── VvE-dossier chat-agent ── */
+#chat-fab{position:fixed;right:20px;bottom:20px;width:56px;height:56px;border-radius:50%;
+  border:none;background:var(--sur);box-shadow:var(--shm);cursor:pointer;z-index:900;
+  display:flex;align-items:center;justify-content:center;padding:0;overflow:hidden}
+#chat-fab img{width:100%;height:100%;object-fit:cover}
+#chat-bg{position:fixed;right:20px;bottom:88px;z-index:901;display:none}
+#chat-bg.open{display:block}
+#chat-paneel{width:380px;max-width:calc(100vw - 40px);max-height:70vh;display:flex;flex-direction:column;
+  background:var(--sur);border:1px solid var(--bor);border-radius:16px;box-shadow:var(--shm);overflow:hidden}
+.chat-hdr{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px;border-bottom:1px solid var(--bor)}
+.chat-hdr-l{display:flex;flex-direction:column;gap:1px}
+.chat-titel{font-size:14px;font-weight:600}
+.chat-vve-label{font-size:12px;color:var(--mut)}
+.chat-vve-wrap{position:relative;padding:8px 12px;border-bottom:1px solid var(--bor)}
+.chat-vve-wrap input{width:100%;font-size:12.5px}
+.chat-bubbles{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;background:var(--bg)}
+.chat-bub{max-width:85%;padding:9px 12px;border-radius:14px;font-size:13.5px;line-height:1.5;white-space:pre-wrap}
+.chat-bub.user{align-self:flex-end;background:var(--ac);color:#fff}
+.chat-bub.ai{align-self:flex-start;background:var(--sur);border:1px solid var(--bor)}
+.chat-bub.bezig{align-self:flex-start;color:var(--mut);font-style:italic}
+.chat-leeg{color:var(--mut);font-size:12.5px;text-align:center;margin:auto}
+.chat-invoer{display:flex;gap:8px;align-items:center;padding:10px 12px;border-top:1px solid var(--bor)}
+.chat-invoer input{flex:1;font-size:13px}
+#chat-send{flex:none;width:36px;height:36px;border-radius:9px;border:none;background:var(--ac);color:#fff;font-size:18px;cursor:pointer}
+.chat-foot{padding:8px 12px;font-size:11px;color:var(--mut);border-top:1px solid var(--bor)}

@@ -8,7 +8,7 @@
   <!-- PWA manifest -->
   <link rel="manifest" href="manifest.json"/>
   <meta name="theme-color" content="#243040"/>
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://accounts.google.com https://cdn.onesignal.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://sheets.googleapis.com https://www.googleapis.com https://script.google.com https://accounts.google.com https://onesignal.com https://*.onesignal.com; img-src 'self' data: https:; frame-src https://accounts.google.com;"/>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://accounts.google.com https://cdn.onesignal.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://sheets.googleapis.com https://www.googleapis.com https://script.google.com https://accounts.google.com https://onesignal.com https://*.onesignal.com https://collectief-dashboard.vercel.app; img-src 'self' data: https:; frame-src https://accounts.google.com;"/>
 
   <!-- iOS / Safari -->
   <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -859,6 +859,31 @@
         </div>
       </div>
     </div>
+  </div>
+</div>
+
+<button id="chat-fab" title="Vraag over een VvE" aria-label="Vraag over een VvE">
+  <img src="icon-192.png" alt=""/>
+</button>
+<div id="chat-bg">
+  <div id="chat-paneel">
+    <div class="chat-hdr">
+      <div class="chat-hdr-l">
+        <span class="chat-titel">Vraag over deze VvE</span>
+        <span id="chat-vve-label" class="chat-vve-label">—</span>
+      </div>
+      <button class="modal-close" id="chat-close" aria-label="Sluiten">×</button>
+    </div>
+    <div class="chat-vve-wrap">
+      <input type="text" id="chat-vve-zoek" placeholder="Andere VvE kiezen… (code of naam)" autocomplete="off"/>
+      <div class="vve-suggestions" id="chat-vve-sug"></div>
+    </div>
+    <div id="chat-bubbles" class="chat-bubbles"></div>
+    <div class="chat-invoer">
+      <input type="text" id="chat-input" placeholder="Stel een vraag…" autocomplete="off"/>
+      <button id="chat-send" data-action="chat-send" aria-label="Versturen">↑</button>
+    </div>
+    <div class="chat-foot">👁 Leest alleen mee · verandert niets · via Claude (Haiku)</div>
   </div>
 </div>
 

@@ -26,10 +26,13 @@ informeert, hij verandert niets.
 
 1. **Echte AI-agent** (geen regelgebaseerde vraagbaak, geen gratis kopieer-plak). De beheerder
    accepteert de kleine kosten die daarbij horen.
-2. **Model: Gemini 3.5 Flash** (`gemini-3.5-flash`, Google AI Studio / Gemini API). Gekozen om de
-   **gratis laag**: bij dit volume (enkele vragen/dag) geen kosten. Snel, sterke Nederlandse
-   formulering. Eén AI-aanroep per vraag — Q&A, geen agent-loop, geen tools. (Op 2026-06-18 gewisseld
-   van Claude Haiku naar Gemini om de gratis laag; de beheerder wilde geen betaalde sleutel.)
+2. **Model: Claude Haiku 4.5** (`claude-haiku-4-5`). Goedkoop (centen/maand bij dit volume, met een
+   spend-limit als hard dak), snel, sterke Nederlandse formulering. **Belangrijk (AVG):** Anthropic
+   gebruikt API-data **niet** voor modeltraining — passend voor dossier-/persoonsgegevens van
+   eigenaren. Eén AI-aanroep per vraag — Q&A, geen agent-loop, geen tools (zie [[claude-api]]).
+   (Op 2026-06-18 kort naar Gemini overwogen voor de gratis laag, maar terug naar Claude omdat
+   Gemini's gratis laag de verstuurde tekst voor training mág gebruiken — onwenselijk voor
+   persoonsgegevens.)
 3. **Eén VvE per gesprek.** Je kiest een VvE (standaard de VvE-pagina waar je al bent) en alle
    vragen gaan over dát dossier. Géén overkoepelende vragen over alle 500+ VvE's — die passen niet
    in één prompt en worden al door de dashboard-filters/analyse gedekt.
@@ -76,9 +79,8 @@ als serverless functions, regelt CORS/JSON netjes, en **deployt automatisch bij 
 handmatige herimplementatie, anders dan een Apps Script Web App).
 
 - Bestand `api/chat.js` (Node serverless function). Vercel serveert dit op `/api/chat`.
-- Sleutel `GEMINI_API_KEY` (Google-AI-Studio-sleutel) als **Vercel environment variable**
-  (Vercel-dashboard → Project → Settings → Environment Variables). Nooit in de publieke pagina,
-  nooit in git. `process.env.GEMINI_API_KEY`.
+- Sleutel `ANTHROPIC_API_KEY` als **Vercel environment variable** (Vercel-dashboard → Project →
+  Settings → Environment Variables). Nooit in de publieke pagina, nooit in git. `process.env.ANTHROPIC_API_KEY`.
 - **Toegang afgeschermd tot ingelogde, toegestane gebruikers:** de frontend stuurt het Google-OAuth-
   token van de ingelogde gebruiker mee (`Authorization: Bearer <state.oauthToken>`); de functie
   valideert dat token server-side bij Google (`https://www.googleapis.com/oauth2/v3/userinfo`) en
@@ -88,15 +90,13 @@ handmatige herimplementatie, anders dan een Apps Script Web App).
   staging-origin + beantwoordt de `OPTIONS`-preflight. Op staging draait de app op dezelfde Vercel-
   deploy (same-origin, geen CORS nodig); op productie (GitHub Pages) is het cross-origin → CORS-
   headers nodig.
-- Roept de Gemini API aan (server-side `fetch`):
-  `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=<sleutel>`,
-  body `{systemInstruction:{parts:[{text:system}]}, contents:[...], generationConfig:{maxOutputTokens:1024}}`.
-  De `{system, messages}` van de frontend worden vertaald naar de Gemini-vorm (`assistant`→`model`).
-  Geen tools, geen streaming. Geeft de tekst uit `candidates[0].content.parts[].text` terug als
-  `{antwoord: "..."}`.
-- **Kosten:** de **gratis laag** van de Gemini API dekt dit volume; geen kosten binnen de limiet.
-  De OAuth-allowlist is de toegangspoort; een eigen dagteller is niet nodig (serverless = stateless)
-  en bewust buiten scope.
+- Roept `https://api.anthropic.com/v1/messages` aan (server-side `fetch`) met: `model:"claude-haiku-4-5"`,
+  `max_tokens: 1024`, headers `x-api-key` (uit env) + `anthropic-version: 2023-06-01`, body
+  `{model, max_tokens, system, messages}`. Geen tools, geen streaming. Geeft de tekst uit
+  `content[].text` terug als `{antwoord: "..."}`.
+- **Kosten:** een **spend limit op de API-sleutel in de Anthropic Console** is de harde backstop
+  (centen/maand bij dit volume). De OAuth-allowlist is de toegangspoort; een eigen dagteller is niet
+  nodig (serverless = stateless) en bewust buiten scope.
 
 De frontend roept de functie aan via een nieuwe helper `askChat(systeem, messages)` in `src/api.js`,
 naar een proxy-URL uit `src/config.js`: op staging de relatieve `/api/chat` (same-origin), op
@@ -145,9 +145,10 @@ beantwoord).
   branch) + `./src/dossier-chat.js` in de precache-lijst.
 - **Backend (Vercel-functie):** `api/chat.js` deployt **automatisch** met de push mee (Vercel is aan
   de repo gekoppeld) — geen handmatige herimplementatie. De beheerder doet eenmalig: een
-  **Google-AI-Studio-sleutel** aanmaken (aistudio.google.com, gratis laag) en die als
-  `GEMINI_API_KEY` Environment Variable in het Vercel-dashboard zetten (Production én Preview).
-  Claude levert de code + een stap-voor-stap-instructie. **Binnen de gratis laag geen kosten.**
+  **Anthropic API-sleutel** aanmaken (console.anthropic.com) + een spend-limit zetten, en die als
+  `ANTHROPIC_API_KEY` Environment Variable in het Vercel-dashboard zetten (Production én Preview).
+  Claude levert de code + een stap-voor-stap-instructie. **Eerste feature met API-kosten** (centen/
+  maand, begrensd door het spend-limit) — bewust geaccepteerd voor de AVG-vriendelijkheid.
 
 ## Verhouding tot de bestuursupdate-assistent
 
@@ -160,4 +161,6 @@ bestuursupdate-knop laten vallen, óf later terugbrengen als één ding dat je d
 
 - Acties uitvoeren (taken aanmaken, contact loggen, mail opstellen).
 - Overkoepelende vragen over meerdere/alle VvE's.
+- Gemini als motor (kort overwogen voor de gratis laag; afgewezen omdat de gratis laag op data traint
+  — AVG-onwenselijk voor persoonsgegevens).
 - Streaming-antwoorden (token-voor-token) en PDF/export.

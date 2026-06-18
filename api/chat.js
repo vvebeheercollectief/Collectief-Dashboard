@@ -1,5 +1,5 @@
-// api/chat.js — Vercel serverless proxy naar Claude (sleutel server-side).
-// Controleert de ingelogde Google-gebruiker tegen de allowlist; proxyt dan naar Anthropic.
+// api/chat.js — Vercel serverless proxy naar Gemini (sleutel server-side).
+// Controleert de ingelogde Google-gebruiker tegen de allowlist; proxyt dan naar de Gemini API.
 const ALLOWED_EMAILS = [
   'info@vvebeheercollectief.nl',
   'djiowchico@gmail.com',
@@ -42,17 +42,31 @@ export default async function handler(req, res){
     if (!system || !Array.isArray(messages) || !messages.length) {
       res.status(400).json({ error: 'ongeldige invoer' }); return;
     }
-    const key = process.env.ANTHROPIC_API_KEY;
+    const key = process.env.GEMINI_API_KEY;
     if (!key) { res.status(500).json({ error: 'sleutel niet ingesteld' }); return; }
 
-    const r = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: 'claude-haiku-4-5', max_tokens: 1024, system, messages }),
-    });
+    // Vertaal het {system, messages}-contract naar de Gemini-vorm (assistant → model).
+    const contents = messages.map(m => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: String(m.content || '') }],
+    }));
+    const r = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=' + encodeURIComponent(key),
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: system }] },
+          contents,
+          generationConfig: { maxOutputTokens: 1024 },
+        }),
+      }
+    );
     const data = await r.json().catch(() => ({}));
     if (!r.ok) { res.status(502).json({ error: (data.error && data.error.message) || 'AI-fout' }); return; }
-    const antwoord = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+    const antwoord = (((data.candidates || [])[0] || {}).content || {}).parts
+      ? data.candidates[0].content.parts.map(p => p.text || '').join('').trim()
+      : '';
     res.status(200).json({ antwoord });
   } catch (e) {
     res.status(500).json({ error: 'serverfout' });

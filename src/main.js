@@ -25,6 +25,7 @@ import { closeSnoozeModal, snoozeOpslaan, snoozeWis } from './snooze.js';
 import { sluitOfferteActieModal } from './offerte-acties.js';
 import { renderHerhaal, openHerhaalModal, closeHerhaalModal, syncHerhaalVelden, submitHerhaal } from './render-herhaal.js';
 import { renderVve } from './render-vve.js';
+import { openChat, closeChat, chatVveSuggesties } from './dossier-chat.js';
 import { renderVandaag } from './render-vandaag.js';
 import { initPalette } from './palette.js';
 
@@ -96,6 +97,9 @@ document.addEventListener('DOMContentLoaded',()=>{
   let _aiMouseDown=null;
   document.getElementById('ai-bg').addEventListener('mousedown',e=>{_aiMouseDown=e.target});
   document.getElementById('ai-bg').addEventListener('click',e=>{if(e.target.id==='ai-bg'&&_aiMouseDown?.id==='ai-bg')closeAiHelp()});
+  document.getElementById('chat-fab').onclick=openChat;
+  document.getElementById('chat-close').onclick=closeChat;
+  document.getElementById('chat-vve-zoek').addEventListener('input',e=>chatVveSuggesties(e.target.value));
   document.getElementById('ai-chips').addEventListener('click',e=>{const b=e.target.closest('.ai-chip');if(!b)return;b.classList.toggle('on');buildAiPrompt();parseAiAnswer();});
   document.getElementById('ai-mail').addEventListener('input',buildAiPrompt);
   const aiVveInput=document.getElementById('ai-vve-input');

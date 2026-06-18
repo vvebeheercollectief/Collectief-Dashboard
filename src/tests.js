@@ -16,6 +16,7 @@ import { _isTransient } from "./api.js";
 import { parseSections } from "./data.js";
 import { setv } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
+import { dossierContextTekst, buildChatSysteemPrompt } from "./dossier-chat.js";
 
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
   // ── mini-assert helper (Fase 1 testnet) ──
@@ -681,6 +682,39 @@ import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js
     const r=parseSections(rows).data['OPPAKKEN'][0];
     return r.datum==='17-06-2026' && r.behandelaar==='Jer' && r.deadline==='19-06-2026';
   })());
+
+  // ── VvE-dossier AI-agent (chat) ──
+  console.log('%c[TESTS] Dossier-chat', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+  const _Tchat = new Date(2026, 5, 2);
+  const _Dchat = {
+    ntd: {
+      OPPAKKEN: [{ code:'CH1', naam:'VvE Chattest', actiepunt:'Lekkage dak blok B herstellen',
+        behandelaar:'Cihad', deadline:'20 mei 2026', _sec:'OPPAKKEN' }],
+      VERGADERVERZOEKEN: [], 'OFFERTE-TRAJECTEN': [], LOD: [],
+    },
+    af: { OPPAKKEN: [{ code:'CH1', actiepunt:'Lift-onderhoudscontract verlengd', datum:'18 mei 2026' }],
+      VERGADERVERZOEKEN: [], 'OFFERTE-TRAJECTEN': [], LOD: [] },
+    alvo: [{ code:'CH1', naam:'VvE Chattest', uitnodiging:true, notulen:false, begroting:false, status:'Gepland' }],
+    alfa: [],
+    logboek: [{ code:'CH1', timestamp:'2026-05-30T10:00:00.000Z', actie:'Contact', veld:'Telefoon',
+      oudeWaarde:'Bestuur', nieuweWaarde:'voorzitter gebeld over schilderwerk', gebruiker:'info@vvebeheercollectief.nl' }],
+  };
+
+  const _ctx = dossierContextTekst('CH1', _Dchat, _Tchat);
+  truthy('chat: context bevat VvE-naam', _ctx.includes('VvE Chattest'));
+  truthy('chat: context bevat lopende taak', _ctx.includes('Lekkage dak blok B herstellen'));
+  truthy('chat: context bevat afgerond punt', _ctx.includes('Lift-onderhoudscontract verlengd'));
+  truthy('chat: context bevat ALV-status', /ALV/i.test(_ctx));
+  truthy('chat: context bevat laatste contact', _ctx.includes('voorzitter gebeld over schilderwerk'));
+
+  const _ctxLeeg = dossierContextTekst('ZZZ', _Dchat, _Tchat);
+  truthy('chat: onbekende code geeft geldige (niet-lege) tekst', typeof _ctxLeeg === 'string' && _ctxLeeg.includes('ZZZ'));
+  truthy('chat: onbekende code zonder verzonnen taken', !_ctxLeeg.includes('Lekkage'));
+
+  const _sys = buildChatSysteemPrompt(_ctx);
+  truthy('chat: systeem-instructie bevat harde regel "alleen op basis van"', /alleen op basis van/i.test(_sys));
+  truthy('chat: systeem-instructie bevat "verzin niets"', /verzin niets/i.test(_sys));
+  truthy('chat: systeem-instructie bevat de context-tekst', _sys.includes('VvE Chattest'));
 
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');

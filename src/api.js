@@ -1,5 +1,5 @@
 import { state, D } from "./state.js";
-import { SID, SKEYS } from "./config.js";
+import { SID, SKEYS, PROXY_URL } from "./config.js";
 
 async function fetchSheet(name){
   if(!state.oauthToken) throw new Error('Niet ingelogd');
@@ -56,4 +56,19 @@ async function _withRetry(fn){
   }
 }
 
-export { fetchSheet, writeRange, appendRange, _shiftNtdRows, _isTransient, _withRetry };
+// Stuurt de systeem-instructie + gespreksgeschiedenis naar de Vercel-proxy, die
+// server-side Claude aanroept. Geeft de antwoordtekst terug. Vereist een ingelogde
+// gebruiker (OAuth-token gaat mee voor de allowlist-check in de proxy).
+async function askChat(system, messages){
+  if(!state.oauthToken) throw new Error('Niet ingelogd');
+  const r = await fetch(PROXY_URL, {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${state.oauthToken}` },
+    body: JSON.stringify({ system, messages }),
+  });
+  const data = await r.json().catch(()=>({}));
+  if(!r.ok){ const e=new Error(data.error||'AI-fout'); e.status=r.status; throw e; }
+  return (data.antwoord || '').trim();
+}
+
+export { fetchSheet, writeRange, appendRange, _shiftNtdRows, _isTransient, _withRetry, askChat };

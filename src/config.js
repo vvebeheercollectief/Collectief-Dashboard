@@ -18,6 +18,8 @@ export const SID_PROD = '1fnUsbwb4nDMNttWym9FWBw1CMMMAVTuZ3v88b35isUw';
 export const SID_TEST = '1-6Q36CrwB0szX2DS2eLjPwfiY-jAw8lK9JOPDSlljm4';   // test-Sheet "Collectief Dashboard - Kopie" (Taak 3)
 export const SID = IS_STAGING ? SID_TEST : SID_PROD;
 export const PG   = 25;
+// AI-proxy: op staging same-origin (/api/chat); op productie de vaste Vercel-functie-URL.
+export const PROXY_URL = IS_STAGING ? '/api/chat' : 'https://collectief-dashboard.vercel.app/api/chat';
 // Meldingen lopen via de 'Notif-wachtrij'-tab (OAuth-append vanuit de ingelogde
 // gebruiker) — een Apps Script-trigger verstuurt de push. Geen webhook-URL of
 // secret meer nodig in deze (publieke) frontend.

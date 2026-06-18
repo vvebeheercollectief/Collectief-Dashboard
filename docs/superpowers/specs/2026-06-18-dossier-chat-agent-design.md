@@ -64,30 +64,46 @@ informeert, hij verandert niets.
 - `vraagChat()` — leest het invoerveld, voegt de gebruikersvraag toe aan de historie, roept de proxy
   aan via `src/api.js`, voegt het antwoord toe, re-rendert de bubbels.
 
-### Backend — proxy in Apps Script (`apps-script/`)
+### Backend — proxy als Vercel serverless function (`api/chat.js`)
 
 Een endpoint dat de **Anthropic-sleutel veilig server-side houdt** en namens de gebruiker Claude
-aanroept. Het is een Web App (`doPost`); de bestaande webhook is óók een Web App, dus dit haakt aan
-bij dat patroon.
+aanroept. **Waarom Vercel i.p.v. Apps Script:** de frontend praat nu nergens met een Apps Script
+Web App (notificaties lopen via een Sheet-tab), en een Apps Script Web App kan een browser-`POST`
+géén leesbaar JSON-antwoord teruggeven (geen CORS-headers op het antwoord) — precies wat we hier
+nodig hebben. Vercel hosten we al (staging + main zijn gekoppeld), serveert `api/*.js` zonder config
+als serverless functions, regelt CORS/JSON netjes, en **deployt automatisch bij elke push** (geen
+handmatige herimplementatie, anders dan een Apps Script Web App).
 
-- Sleutel `ANTHROPIC_API_KEY` in **Script Properties** (zelfde patroon als het webhook-secret —
-  nooit in de publieke pagina, nooit in git).
+- Bestand `api/chat.js` (Node serverless function). Vercel serveert dit op `/api/chat`.
+- Sleutel `ANTHROPIC_API_KEY` als **Vercel environment variable** (Vercel-dashboard → Project →
+  Settings → Environment Variables). Nooit in de publieke pagina, nooit in git. `process.env.ANTHROPIC_API_KEY`.
 - **Toegang afgeschermd tot ingelogde, toegestane gebruikers:** de frontend stuurt het Google-OAuth-
-  token van de ingelogde gebruiker mee; de proxy valideert dat token bij Google (tokeninfo:
-  is het een levend token, uitgegeven aan onze OAuth-client) en controleert of het bijbehorende
-  account in de `ALLOWED_EMAILS`-allowlist staat. Pas dan roept de proxy Claude aan.
-- **Kostenrem (defense-in-depth):** een harde dag-limiet in de proxy (teller in een Script Property,
-  bv. max N aanroepen/dag) zodat de kosten begrensd zijn, ook als er ooit misbruik zou zijn.
-- Roept `https://api.anthropic.com/v1/messages` aan via `UrlFetchApp` met: `model:"claude-haiku-4-5"`,
-  `max_tokens: ~1024`, header `x-api-key` (uit Properties) + `anthropic-version: 2023-06-01`,
-  body `{model, max_tokens, system, messages}`. Geen tools, geen streaming. Geeft de tekst uit
-  `content[].text` terug aan de frontend.
+  token van de ingelogde gebruiker mee (`Authorization: Bearer <state.oauthToken>`); de functie
+  valideert dat token server-side bij Google (`https://www.googleapis.com/oauth2/v3/userinfo`) en
+  controleert of het e-mailadres in de `ALLOWED_EMAILS`-allowlist staat. Pas dan roept de functie
+  Claude aan. (De allowlist staat als constante in `api/chat.js`, spiegel van de frontend-lijst.)
+- **CORS:** de functie zet `Access-Control-Allow-Origin` voor de productie- (GitHub Pages) en
+  staging-origin + beantwoordt de `OPTIONS`-preflight. Op staging draait de app op dezelfde Vercel-
+  deploy (same-origin, geen CORS nodig); op productie (GitHub Pages) is het cross-origin → CORS-
+  headers nodig.
+- Roept `https://api.anthropic.com/v1/messages` aan (server-side `fetch`) met: `model:"claude-haiku-4-5"`,
+  `max_tokens: 1024`, headers `x-api-key` (uit env) + `anthropic-version: 2023-06-01`, body
+  `{model, max_tokens, system, messages}`. Geen tools, geen streaming. Geeft de tekst uit
+  `content[].text` terug aan de frontend als `{antwoord: "..."}`.
+- **Kostenrem:** een **spend limit op de API-sleutel in de Anthropic Console** is de echte backstop
+  (begrenst de maandkosten hard). De OAuth-allowlist is de toegangspoort; een eigen dagteller is niet
+  nodig (serverless = stateless) en bewust buiten scope.
+
+De frontend roept de functie aan via een nieuwe helper `askChat(systeem, messages)` in `src/api.js`,
+naar een proxy-URL uit `src/config.js`: op staging de relatieve `/api/chat` (same-origin), op
+productie de absolute Vercel-productie-URL van het project (één keer vastleggen in `config.js`).
 
 ### CSP / netwerk
 
-`connect-src` in `index.html` staat `https://script.google.com` al toe → de frontend mag de proxy
-aanroepen. De proxy → Anthropic gebeurt **server-side** (Apps Script), dus `api.anthropic.com` hoeft
-**niet** in de CSP. Geen CSP-wijziging nodig.
+De proxy → Anthropic gebeurt **server-side** (Vercel), dus `api.anthropic.com` hoeft **niet** in de
+CSP. Wél moet de productie-frontend (GitHub Pages) naar de Vercel-functie kunnen verbinden: voeg de
+Vercel-productie-origin van het project toe aan `connect-src` in `index.html`. Op staging is het
+same-origin (geen wijziging nodig), maar de CSP geldt voor beide, dus de toevoeging is veilig.
 
 ## Datastroom
 
@@ -123,12 +139,11 @@ beantwoord).
 - **Frontend:** vaste route — bouwen + zelftests op `feat/dossier-chat`, daarna naar `staging`
   (Vercel-testlink), na GO fast-forward naar `main` (GitHub Pages). SW-cache bumpen (cd-v31 op deze
   branch) + `./src/dossier-chat.js` in de precache-lijst.
-- **Backend (handmatig, doet de CI bewust niet — zie [[project_collectief_dashboard]] DEPLOY-nuance):**
-  1. `ANTHROPIC_API_KEY` als Script Property zetten (Apps Script-editor).
-  2. De proxy-code komt via clasp-CI mee, maar de Web App moet **opnieuw geïmplementeerd** worden
-     ("Deploy → Beheer implementaties → Nieuwe versie") voordat het endpoint live is.
-  Claude levert de code + een stap-voor-stap-instructie; deze twee handelingen doet de beheerder
-  (of Claude begeleidt live). **Dit is de eerste feature met API-kosten** — bewust geaccepteerd.
+- **Backend (Vercel-functie):** `api/chat.js` deployt **automatisch** met de push mee (Vercel is aan
+  de repo gekoppeld) — geen handmatige herimplementatie. De beheerder doet eenmalig in het Vercel-
+  dashboard: `ANTHROPIC_API_KEY` als Environment Variable zetten (voor staging én productie), en in
+  de **Anthropic Console** een spend limit op de sleutel zetten als kostenrem. Claude levert de code
+  + een stap-voor-stap-instructie. **Dit is de eerste feature met API-kosten** — bewust geaccepteerd.
 
 ## Verhouding tot de bestuursupdate-assistent
 

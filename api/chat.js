@@ -44,7 +44,10 @@ export default async function handler(req, res){
       res.status(400).json({ error: 'ongeldige invoer' }); return;
     }
     const key = process.env.ANTHROPIC_API_KEY;
-    if (!key) { res.status(500).json({ error: 'sleutel niet ingesteld' }); return; }
+    if (!key) {
+      console.error('chat: ANTHROPIC_API_KEY ontbreekt in deze omgeving (env-var niet aan voor Preview/Production?)');
+      res.status(500).json({ error: 'sleutel niet ingesteld' }); return;
+    }
 
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -52,10 +55,14 @@ export default async function handler(req, res){
       body: JSON.stringify({ model: 'claude-haiku-4-5', max_tokens: 1024, system, messages }),
     });
     const data = await r.json().catch(() => ({}));
-    if (!r.ok) { res.status(502).json({ error: (data.error && data.error.message) || 'AI-fout' }); return; }
+    if (!r.ok) {
+      console.error('chat: Anthropic-fout', r.status, (data.error && data.error.message) || '');
+      res.status(502).json({ error: (data.error && data.error.message) || 'AI-fout' }); return;
+    }
     const antwoord = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
     res.status(200).json({ antwoord });
   } catch (e) {
+    console.error('chat: serverfout', (e && e.message) || e);
     res.status(500).json({ error: 'serverfout' });
   }
 }

@@ -25,6 +25,12 @@ function setCors(req, res){
 export default async function handler(req, res){
   setCors(req, res);
   if (req.method === 'OPTIONS') { res.status(204).end(); return; }
+  // TIJDELIJKE diagnose (alleen namen, nooit waarden) — verwijderen na het oplossen van de env-var.
+  if (req.method === 'GET' && req.query && req.query.diag === '1') {
+    const names = Object.keys(process.env).filter(k => /anthropic|gemini|api.?key/i.test(k));
+    res.status(200).json({ relevanteEnvKeys: names });
+    return;
+  }
   if (req.method !== 'POST') { res.status(405).json({ error: 'method not allowed' }); return; }
   try {
     const auth = req.headers.authorization || '';

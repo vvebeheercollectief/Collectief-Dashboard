@@ -124,16 +124,4 @@ async function vraagChat(){
   }
 }
 
-// VvE-suggesties (hergebruikt het zoekpatroon op D.alvo)
-function chatVveSuggesties(q){
-  const box = document.getElementById('chat-vve-sug'); if(!box) return;
-  const term = (q||'').trim();
-  if(!term){ box.innerHTML=''; box.classList.remove('show'); return; }
-  const hits = (D.alvo||[]).filter(r => `${r.code} ${r.naam}`.toLowerCase().includes(term.toLowerCase())).slice(0,8);
-  box.innerHTML = hits.map(r =>
-    `<div class="vve-sug-item" data-action="chat-setvve" data-code="${esc(r.code)}">${esc(r.code)} — ${esc(r.naam||'')}</div>`).join('')
-    || '<div class="vve-sug-item" style="color:var(--mut)">geen resultaten</div>';
-  box.classList.add('show');
-}
-
-export { dossierContextTekst, buildChatSysteemPrompt, openChat, closeChat, setChatVve, renderChat, vraagChat, chatVveSuggesties };
+export { dossierContextTekst, buildChatSysteemPrompt, openChat, closeChat, setChatVve, renderChat, vraagChat };

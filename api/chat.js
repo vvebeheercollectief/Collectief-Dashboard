@@ -25,12 +25,6 @@ function setCors(req, res){
 export default async function handler(req, res){
   setCors(req, res);
   if (req.method === 'OPTIONS') { res.status(204).end(); return; }
-  // TIJDELIJKE diagnose (alleen namen, nooit waarden) — verwijderen na het oplossen van de env-var.
-  if (req.method === 'GET' && req.query && req.query.diag === '1') {
-    const names = Object.keys(process.env).filter(k => /anthropic|gemini|api.?key/i.test(k));
-    res.status(200).json({ relevanteEnvKeys: names });
-    return;
-  }
   if (req.method !== 'POST') { res.status(405).json({ error: 'method not allowed' }); return; }
   try {
     const auth = req.headers.authorization || '';
@@ -49,9 +43,11 @@ export default async function handler(req, res){
     if (!system || !Array.isArray(messages) || !messages.length) {
       res.status(400).json({ error: 'ongeldige invoer' }); return;
     }
-    const key = process.env.ANTHROPIC_API_KEY;
+    // Vercel-env-var: accepteer zowel de conventie ANTHROPIC_API_KEY als de bij deze klant
+    // ingevoerde casing Anthropic_API_KEY (env-namen zijn hoofdlettergevoelig).
+    const key = process.env.ANTHROPIC_API_KEY || process.env.Anthropic_API_KEY;
     if (!key) {
-      console.error('chat: ANTHROPIC_API_KEY ontbreekt in deze omgeving (env-var niet aan voor Preview/Production?)');
+      console.error('chat: API-sleutel ontbreekt in deze omgeving (env-var niet aan voor Preview/Production?)');
       res.status(500).json({ error: 'sleutel niet ingesteld' }); return;
     }
 

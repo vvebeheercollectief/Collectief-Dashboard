@@ -28,6 +28,7 @@ import { renderVve } from './render-vve.js';
 import { openChat, closeChat, setChatVve } from './dossier-chat.js';
 import { renderVandaag } from './render-vandaag.js';
 import { initPalette } from './palette.js';
+import { initSwUpdate } from './sw-update.js';
 
 // ══════════════════════════════════════
 //  BOOT
@@ -47,13 +48,8 @@ document.addEventListener('DOMContentLoaded',()=>{
       + '<div style="height:34px"></div>');
   }
 
-  // Service worker registreren (PWA-ondersteuning)
-  if('serviceWorker' in navigator){
-    window.addEventListener('load',()=>{
-      const _swBase=location.pathname.replace(/\/[^/]*$/,'')||'';
-      navigator.serviceWorker.register(_swBase+'/sw.js',{scope:_swBase+'/'}).catch(e=>console.warn('SW registratie mislukt:',e));
-    });
-  }
+  // Service worker registreren + "nieuwe versie"-balk (PWA-ondersteuning)
+  initSwUpdate();
 
   if(localStorage.getItem('theme')==='dark') applyTheme('dark');
   applyDensity(localStorage.getItem('density')||'standaard');

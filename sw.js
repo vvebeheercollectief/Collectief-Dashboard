@@ -12,6 +12,7 @@ const APP_SHELL = [
   './apple-touch-icon.png',
   // ES-modulegraaf (zonder tests.js — alleen dev) zodat de app-shell ook offline laadt.
   './src/main.js',
+  './src/sw-update.js',
   './src/config.js',
   './src/state.js',
   './src/util.js',
@@ -47,8 +48,12 @@ self.addEventListener('install', e => {
     // (anders blijft de oude SW hangen en komt een release nooit door).
     caches.open(CACHE_VERSION)
       .then(c => Promise.all(APP_SHELL.map(u => c.add(u).catch(() => {}))))
-      .then(() => self.skipWaiting())
   );
+});
+
+// De client vraagt de wachtende versie om actief te worden ("Herladen"-knop).
+self.addEventListener('message', e => {
+  if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', e => {

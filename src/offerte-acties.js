@@ -8,7 +8,8 @@ import { state, D } from "./state.js";
 import { appendRange, writeRange, assertRowMatch } from "./api.js";
 import { backgroundWrite } from "./data.js";
 import { ensureToken } from "./auth.js";
-import { getCurrentWho } from "./notifications.js";
+import { getCurrentWho, showToast } from "./notifications.js";
+import { OFFERTE_FASES } from "./config.js";
 import { renderNtd } from "./render-lijsten.js";
 
 // Open de bevestigingsmodal voor een rij uit de rij-cache (soort: 'nabellen' | 'doorsturen').
@@ -69,4 +70,30 @@ async function offerteActieVastleggen(){
   );
 }
 
-export { openOfferteActieModal, sluitOfferteActieModal, offerteActieVastleggen };
+// Eén-klik fase zetten (Ontvangen / Gegund): schrijft kolom O van 'Nog Te Doen'.
+// 'gegund' haalt het traject uit "Nu opvolgen" (offerteNuOpvolgen → nodig:false).
+async function offerteFaseZetten(rid, fase){
+  const r = state._rowCache[rid];
+  if(!r || !r.code) return;
+  if(!OFFERTE_FASES.includes(fase)) return;
+  const faseOud = r.fase || '';
+  if(faseOud === fase) return; // niets te doen
+  if(!await ensureToken()){ alert('Inloggen mislukt.'); return; }
+  r.fase = fase;
+  renderNtd();
+  showToast(fase==='gegund' ? '🏆 Offerte gegund' : '📥 Offerte ontvangen',
+            `${r.code} — ${r.naam||''}`, null);
+  let gedaan=false;
+  backgroundWrite(
+    async()=>{
+      if(!gedaan){
+        if(r._row){ await assertRowMatch(r._row, r.code); await writeRange(`'Nog Te Doen'!O${r._row}`,[fase]); }
+        gedaan=true;
+      }
+    },
+    ()=>{ r.fase = faseOud; },
+    fase==='gegund' ? 'Gunnen vastleggen' : 'Ontvangen vastleggen'
+  );
+}
+
+export { openOfferteActieModal, sluitOfferteActieModal, offerteActieVastleggen, offerteFaseZetten };

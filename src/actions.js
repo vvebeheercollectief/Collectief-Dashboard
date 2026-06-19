@@ -15,7 +15,7 @@ import { copyAiPrompt, aiOvernemen, aiActieTaak, aiKopieerConcept } from './ai.j
 import { dismissToast, saveNotifPrefs } from './notifications.js';
 import { doLogin } from './auth.js';
 import { openSnoozeModal, snoozeKies, snoozeMorgen } from './snooze.js';
-import { openOfferteActieModal, offerteActieVastleggen } from './offerte-acties.js';
+import { openOfferteActieModal, offerteActieVastleggen, offerteFaseZetten } from './offerte-acties.js';
 import { addAannemer, toggleAannemerBinnen, verwijderAannemer } from './offerte-aannemers.js';
 import { openHerhaalModal, toggleHerhaalStatus, deleteHerhaal } from './render-herhaal.js';
 import { openVvePagina, renderVve, addContactLog } from './render-vve.js';
@@ -51,6 +51,8 @@ export const ACTIONS = {
   'offerte-nabellen':       (el) => openOfferteActieModal(+el.dataset.rid,'nabellen'),
   'offerte-doorsturen':     (el) => openOfferteActieModal(+el.dataset.rid,'doorsturen'),
   'offerte-actie-vastleggen': ()  => offerteActieVastleggen(),
+  'offerte-gegund':        (el) => offerteFaseZetten(+el.dataset.rid,'gegund'),
+  'offerte-ontvangen':     (el) => offerteFaseZetten(+el.dataset.rid,'ontvangen'),
   'offerte-later':         (el) => snoozeMorgen(+el.dataset.rid),
   'offerte-meer-d':        ()   => { state.offerteDoorsturenOpen=true; renderNtd(); },
   'offerte-meer-n':        ()   => { state.offerteNabellenOpen=true;   renderNtd(); },

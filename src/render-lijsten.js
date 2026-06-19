@@ -327,7 +327,7 @@ function offerteFocusRij(r, soort){
   return `<div class="of-rij-wrap${open?' open':''}">
     <div class="of-r"><span class="of-code" style="color:var(--sec)">${esc(r.code)}</span>
       <div class="of-mid"><div class="of-naam">${esc(r.naam||'')}</div><div class="of-ctx">${ctx}</div>${offerteAannSamenvatting(r)}</div>
-      <div class="of-act"><button class="of-edit" data-action="taak-bewerken" data-rid="${rid}" title="Bewerken" aria-label="Bewerken"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><span class="of-later" data-action="offerte-later" data-rid="${rid}" title="Tot morgen wegleggen">later</span>${knop}</div></div>
+      <div class="of-act"><button class="of-edit" data-action="taak-bewerken" data-rid="${rid}" title="Bewerken" aria-label="Bewerken"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>${soort==='nabellen'?`<span class="of-later" data-action="offerte-ontvangen" data-rid="${rid}" title="Offerte ontvangen van aannemer">ontvangen</span>`:''}<span class="of-later" data-action="offerte-gegund" data-rid="${rid}" title="Markeer als gegund (uit opvolging)">gegund</span><span class="of-later" data-action="offerte-later" data-rid="${rid}" title="Tot morgen wegleggen">later</span>${knop}</div></div>
     ${open?offerteAannemerPaneel(r):''}
   </div>`;
 }

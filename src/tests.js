@@ -17,6 +17,7 @@ import { parseSections } from "./data.js";
 import { setv } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt } from "./dossier-chat.js";
+import { shouldPromptReload } from "./sw-update.js";
 
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
   // ── mini-assert helper (Fase 1 testnet) ──
@@ -721,6 +722,11 @@ import { dossierContextTekst, buildChatSysteemPrompt } from "./dossier-chat.js";
   truthy('chat: systeem verbiedt nog-te-doen omdraaien naar voltooid', /nog-te-doen actie nooit om/i.test(_sys));
   truthy('chat: systeem-instructie verwijst naar het terugkoppeling-voorbeeld', /betekent NIET/i.test(_sys) && /terugkoppeling gegeven/i.test(_sys));
   truthy('chat: systeem instrueert acties letterlijk weergeven/citeren', /letterlijk/i.test(_sys));
+
+  // ── SW-update: balk alleen bij echte update, niet bij eerste installatie ──
+  eq('sw: geen balk bij eerste installatie (geen controller)', shouldPromptReload(null), false);
+  eq('sw: geen balk bij undefined controller', shouldPromptReload(undefined), false);
+  truthy('sw: wel balk bij bestaande controller (update)', shouldPromptReload({ scriptURL: 'x' }));
 
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');

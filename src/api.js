@@ -81,17 +81,22 @@ function _rowMismatch(vals, minRow, checks){
   }
   return null;
 }
+// Bouwt de A1-range voor kolom A; escapet apostrofs in de tabblad-naam
+// (bv. "ALV's overzicht" → 'ALV''s overzicht'!A..). Testbaar gehouden.
+function _a1ColA(sheetName, minR, maxR){
+  return `'${(sheetName||'').replace(/'/g,"''")}'!A${minR}:A${maxR}`;
+}
 // Leest kolom A van de doelrij(en) terug en gooit een ROW_MISMATCH-fout als een
-// rij niet meer de verwachte VvE-code bevat (de Sheet verschoof sinds de render).
-// Eén GET dekt het hele rijbereik. backgroundWrite vangt de fout: rollback + resync.
+// rij niet meer de verwachte sleutel (VvE-code/ID/titel) bevat (de Sheet verschoof
+// sinds de render). Eén GET dekt het hele rijbereik. backgroundWrite vangt de fout.
 async function assertRowsMatch(checks, sheetName='Nog Te Doen'){
   checks=(checks||[]).filter(c=>c&&c.row);
   if(!checks.length) return;
   const rows=checks.map(c=>c.row), minR=Math.min(...rows), maxR=Math.max(...rows);
-  const vals=await fetchSheet(`'${sheetName}'!A${minR}:A${maxR}`);
+  const vals=await fetchSheet(_a1ColA(sheetName, minR, maxR));
   const mm=_rowMismatch(vals, minR, checks);
   if(mm){ const err=new Error('De lijst was net gewijzigd — opnieuw geladen.'); err.rowMismatch=true; err.detail=mm; throw err; }
 }
 const assertRowMatch=(row, code, sheetName)=>assertRowsMatch([{ row, code }], sheetName);
 
-export { fetchSheet, writeRange, appendRange, _shiftNtdRows, _isTransient, _withRetry, askChat, _rowMismatch, assertRowsMatch, assertRowMatch };
+export { fetchSheet, writeRange, appendRange, _shiftNtdRows, _isTransient, _withRetry, askChat, _rowMismatch, _a1ColA, assertRowsMatch, assertRowMatch };

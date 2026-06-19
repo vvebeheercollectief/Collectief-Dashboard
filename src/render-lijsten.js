@@ -6,6 +6,7 @@ import { SID, SECS, SKEYS, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { ensureToken } from "./auth.js";
 import { getSheetIds } from "./crud.js";
+import { assertRowMatch } from "./api.js";
 import { logEvent } from "./render-overig.js";
 import { showToast } from "./notifications.js";
 import { bulkGeselecteerd, bulkWis, renderBulkUi } from "./bulk.js";
@@ -516,6 +517,7 @@ async function toggleAlvoFlag(idx,field){
     const ids=await getSheetIds();
     const sheetId=ids["ALV's overzicht"]??ids["ALV's Overzicht"]??ids["ALV's overzicht "];
     if(sheetId==null) throw new Error("Sheet 'ALV's overzicht' niet gevonden");
+    await assertRowMatch(r._row, r.code, "ALV's overzicht"); // bescherming: rij nog van deze VvE vóór flag-write
     const col=ALVO_COLS[field];
     const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
       method:'POST',

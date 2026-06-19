@@ -3,7 +3,7 @@
 //  A=code  B=balkons  C=kozijnen  D=bron  E=gewijzigdDoor  F=gewijzigdOp
 // ══════════════════════════════════════
 import { state, D } from "./state.js";
-import { writeRange, appendRange } from "./api.js";
+import { writeRange, appendRange, assertRowMatch } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { backgroundWrite } from "./data.js";
 import { logEvent } from "./render-overig.js";
@@ -65,7 +65,7 @@ async function saveKenmerken(){
     async ()=>{
       // Beslis append-vs-update BINNEN de schrijf-keten: een eerdere append heeft rec._row
       // dan al gezet, zodat een snelle tweede opslag niet nóg een rij toevoegt.
-      if(rec._row>0){ await writeRange(`'Kenmerken'!A${rec._row}:F${rec._row}`,waarden); }
+      if(rec._row>0){ await assertRowMatch(rec._row, code, 'Kenmerken'); await writeRange(`'Kenmerken'!A${rec._row}:F${rec._row}`,waarden); }
       else{
         const resp=await appendRange("'Kenmerken'!A:F",waarden);
         const m=(resp&&resp.updates&&resp.updates.updatedRange||'').match(/!A(\d+):/i);

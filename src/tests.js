@@ -12,7 +12,7 @@ import { vveOverzicht, filterDossierLog } from "./render-vve.js";
 import { parseKenmerken, vveKenmerken } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk.js";
-import { _isTransient, _rowMismatch } from "./api.js";
+import { _isTransient, _rowMismatch, _a1ColA } from "./api.js";
 import { parseSections } from "./data.js";
 import { setv } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
@@ -734,6 +734,9 @@ import { shouldPromptReload } from "./sw-update.js";
   truthy('rij-guard: verschoven rij → mismatch', !!_rowMismatch([['CH1'],['ANDERS']], 5, [{row:6,code:'BX2'}]));
   eq('rij-guard: ontbrekende rij telt als mismatch (got leeg)', (_rowMismatch([], 5, [{row:5,code:'CH1'}])||{}).got, '');
   eq('rij-guard: whitespace-tolerant → null', _rowMismatch([[' CH1 ']], 5, [{row:5,code:'CH1'}]), null);
+  // ── Rij-guard A1-range: apostrof in tabblad-naam escapen ──
+  eq('a1: gewone tabblad-naam', _a1ColA('Nog Te Doen',5,5), "'Nog Te Doen'!A5:A5");
+  eq('a1: apostrof wordt geëscaped (ALV)', _a1ColA("ALV's overzicht",3,7), "'ALV''s overzicht'!A3:A7");
   // ── AI-chat kostenrem: _chatMessages begrenst + start met user ──
   eq('chat: korte historie ongewijzigd (2)', _chatMessages([{rol:'user',tekst:'a'},{rol:'assistant',tekst:'b'}]).length, 2);
   eq('chat: lange historie begrensd tot max', _chatMessages(Array.from({length:30},(_,i)=>({rol:i%2?'assistant':'user',tekst:String(i)})),10).length <= 10, true);

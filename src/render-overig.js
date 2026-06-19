@@ -5,7 +5,7 @@ import { esc, displayName, persBadges, emptyRow, _vandaagAmsterdam } from "./uti
 import { PG, SID } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { ensureToken } from "./auth.js";
-import { writeRange, appendRange } from "./api.js";
+import { writeRange, appendRange, assertRowMatch } from "./api.js";
 import { renderThead, renderPag } from "./render-lijsten.js";
 import { getSheetIds, setv, gv } from "./crud.js";
 import { loadAll, backgroundWrite } from "./data.js";
@@ -107,6 +107,7 @@ async function submitOntwItem(){
   const values=[titel,cat,inhoud,who,today,status];
   try{
     if(state.ontwEditMode&&state.ontwEditRow?._row){
+      await assertRowMatch(state.ontwEditRow._row, state.ontwEditRow.titel, 'Ontwikkeling'); // bescherming: rij nog hetzelfde item vóór overschrijven
       await writeRange(`'Ontwikkeling'!A${state.ontwEditRow._row}:F${state.ontwEditRow._row}`,values);
     } else {
       await appendRange("'Ontwikkeling'!A:F",values);
@@ -136,6 +137,7 @@ async function deleteOntwItem(){
       const ids=await getSheetIds();
       const sheetId=ids['Ontwikkeling'];
       if(sheetId==null) throw new Error('Sheet "Ontwikkeling" niet gevonden');
+      await assertRowMatch(oudeRow, r.titel, 'Ontwikkeling'); // bescherming: rij nog hetzelfde item vóór verwijderen
       const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
         method:'POST',
         headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},

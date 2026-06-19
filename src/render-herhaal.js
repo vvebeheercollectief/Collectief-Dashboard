@@ -5,7 +5,7 @@
 import { esc, emptyRow, toISODate, toDutchDate, _parseAnyDate } from "./util.js";
 import { state, D } from "./state.js";
 import { SID } from "./config.js";
-import { appendRange, writeRange } from "./api.js";
+import { appendRange, writeRange, assertRowMatch } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { getSheetIds } from "./crud.js";
 import { showToast } from "./notifications.js";
@@ -91,6 +91,7 @@ async function submitHerhaal(){
     renderHerhaal();
     showToast('💾 Herhaalregel opgeslagen',oms,null);
     backgroundWrite(async()=>{
+      await assertRowMatch(r._row, r.id, 'Herhaalregels'); // bescherming: rij nog dezelfde regel vóór overschrijven
       await writeRange(`'Herhaalregels'!A${r._row}:L${r._row}`,values);
       logEvent(code,sectie,'Herhaalregel bewerkt','','',oms);
     },()=>{Object.assign(r,oud);},'Opslaan mislukt');
@@ -109,6 +110,7 @@ function toggleHerhaalStatus(hid){
   r.status=nieuw; renderHerhaal();
   showToast(nieuw==='ACTIEF'?'▶ Regel geactiveerd':'⏸ Regel gepauzeerd',r.omschrijving,null);
   backgroundWrite(async()=>{
+    await assertRowMatch(r._row, r.id, 'Herhaalregels'); // bescherming: rij nog dezelfde regel vóór status-write
     await writeRange(`'Herhaalregels'!K${r._row}:K${r._row}`,[nieuw]);
     logEvent(r.code,r.sectie,'Herhaalregel '+(nieuw==='ACTIEF'?'geactiveerd':'gepauzeerd'),'','',r.omschrijving);
   },()=>{r.status=oud;},'Status wijzigen mislukt');
@@ -127,6 +129,7 @@ async function deleteHerhaal(){
     const ids=await getSheetIds();
     const sheetId=ids['Herhaalregels'];
     if(sheetId==null) throw new Error('Sheet "Herhaalregels" niet gevonden');
+    await assertRowMatch(r._row, r.id, 'Herhaalregels'); // bescherming: rij nog dezelfde regel vóór verwijderen
     const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
       method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
       body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:r._row-1,endIndex:r._row}}}]})});

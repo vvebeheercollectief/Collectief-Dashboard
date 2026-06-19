@@ -257,6 +257,12 @@
     .toast-close{background:none;border:none;font-size:17px;color:var(--fnt);cursor:pointer;padding:0;line-height:1;flex-shrink:0;transition:color var(--tr)}
     .toast-close:hover{color:var(--txt)}
     .toast-bar{height:3px;background:var(--toast-clr,var(--ac));border-radius:0 0 2px 2px;position:absolute;bottom:0;left:0;animation:toast-bar linear forwards}
+    /* ── "Nieuwe versie"-balk ── */
+    .sw-update-bar{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:100001;background:var(--sur);color:var(--txt);border:1px solid var(--bor);border-left:4px solid var(--ac);border-radius:var(--r);box-shadow:var(--shl);padding:10px 12px;display:flex;align-items:center;gap:12px;font:500 13px/1.3 system-ui,sans-serif;max-width:calc(100vw - 32px);animation:toast-in .25s ease}
+    .sw-update-btn{background:var(--ac);color:#fff;border:none;border-radius:8px;padding:6px 14px;font:600 13px system-ui,sans-serif;cursor:pointer;white-space:nowrap}
+    .sw-update-btn:hover{filter:brightness(1.05)}
+    .sw-update-x{background:none;border:none;color:var(--mut);font-size:18px;line-height:1;cursor:pointer;padding:0 2px}
+    .sw-update-x:hover{color:var(--txt)}
     @keyframes toast-in{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:translateX(0)}}
     @keyframes toast-out{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(24px)}}
     @keyframes toast-bar{from{width:100%}to{width:0%}}

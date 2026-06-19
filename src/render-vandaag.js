@@ -21,12 +21,18 @@ const SEC_FALLBACK = { 'OFFERTE-TRAJECTEN':'Offerte-traject', 'VERGADERVERZOEKEN
 
 function rowHtml(item){
   const { r, sec, u } = item;
+  // Eigen rid in _rowCache zodat de afhandel-knoppen de bestaande acties hergebruiken.
+  const rid = state._rowCache.length; state._rowCache.push(r);
   const titel = r.actiepunt || r.agendapunten || r.periode || SEC_FALLBACK[sec] || '—';
   return `<div class="vd-row ${LABEL_CLS[u.label]||''}" data-action="vve-open" data-code="${esc(r.code)}" title="Open VvE-dossier">
     <span class="vd-bar"></span>
     <div class="vd-body">
       <div class="vd-top"><span class="vd-actie">${esc(titel)}</span><span class="vd-reden">${esc(u.reden)}</span></div>
       <div class="vd-meta">${esc(r.code)}${r.naam?` · ${esc(r.naam)}`:''}</div>
+    </div>
+    <div class="vd-acts">
+      <button class="act-bw act-ico" data-action="taak-wegleggen" data-rid="${rid}" title="Wegleggen / opvolgdatum"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 13.5"/></svg></button>
+      <button class="act-af act-ico" data-action="taak-afronden" data-rid="${rid}" title="Afronden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 12 4 4 10-10"/></svg></button>
     </div>
   </div>`;
 }

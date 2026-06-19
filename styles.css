@@ -790,6 +790,12 @@
     .vd-reden{font-size:11.5px;color:var(--mut);white-space:nowrap;flex-shrink:0}
     .vd-meta{font-size:11.5px;color:var(--mut);margin-top:3px}
     .vd-leeg{padding:14px;text-align:center;color:var(--mut);font-size:13px;background:var(--sur);border:1px solid var(--bor);border-radius:8px}
+    .vd-acts{display:flex;align-items:center;gap:4px;padding-right:8px;flex-shrink:0}
+    @media(max-width:560px){
+      .vd-top{flex-direction:column;align-items:flex-start;gap:2px}
+      .vd-actie{white-space:normal}
+      .vd-reden{white-space:normal}
+    }
 
 /* ── VvE-dossier chat-agent ── */
 #chat-fab{position:fixed;right:20px;bottom:20px;width:56px;height:56px;border-radius:50%;

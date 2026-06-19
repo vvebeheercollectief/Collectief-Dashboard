@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  MAIN — boot/orchestrator
 // ══════════════════════════════════════
-import { IS_STAGING, ALLOWED_EMAILS, SKEYS } from './config.js';
+import { IS_STAGING, ALLOWED_EMAILS, SKEYS, APP_VERSION } from './config.js';
 import { D, pgs, state } from './state.js';
 import { ensureToken, doOAuth } from './auth.js';
 import { goTo, closeSb, applyTheme, applyDensity, cycleDensity, setupSearch } from './ui.js';
@@ -37,6 +37,9 @@ document.addEventListener('DOMContentLoaded',()=>{
   // Centraal klik-systeem: één delegatie-listener voor alle data-action-elementen
   initActions();
   initPalette();
+
+  // Zichtbaar versienummer overal gelijk zetten (één bron: APP_VERSION)
+  document.querySelectorAll('#app-version, #app-version-login').forEach(el => el.textContent = APP_VERSION);
 
   // Zichtbare waarschuwingsbalk in de testomgeving
   if (IS_STAGING) {

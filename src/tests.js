@@ -3,7 +3,7 @@
 // ══════════════════════════════════════
 import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, offerteBalBij, _verschilInWerkdagen, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten, offerteNabelTeller, parseOff, parseAannemers, serializeAannemers, deriveOffertes, esc } from "./util.js";
 import { logZin, logPaginaSoort } from "./render-overig.js";
-import { _isStagingHost } from "./config.js";
+import { _isStagingHost, APP_VERSION } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
 import { filterNtd, offerteGroepen, _offerteActiviteitMap, offerteBalBijTekst, setNtd, renderNtd, offerteAannemerPaneel, offerteAannSamenvatting } from "./render-lijsten.js";
@@ -727,6 +727,8 @@ import { shouldPromptReload } from "./sw-update.js";
   eq('sw: geen balk bij eerste installatie (geen controller)', shouldPromptReload(null), false);
   eq('sw: geen balk bij undefined controller', shouldPromptReload(undefined), false);
   truthy('sw: wel balk bij bestaande controller (update)', shouldPromptReload({ scriptURL: 'x' }));
+  // ── Zichtbaar versienummer: vast formaat X.Y ──
+  truthy('versie: APP_VERSION heeft formaat X.Y', /^\d+\.\d+$/.test(APP_VERSION));
 
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');

@@ -322,6 +322,9 @@ async function submitTask(){
       const doelRow=state.editRowData, oudeWaarden={...state.editRowData};
       keys.forEach((k,i)=>{ doelRow[k]=norm(values[i]); });
       doelRow.subcategorie=values[values.length-1];
+      // Offerte: gooi de gecachete handmatige X/N weg zodat de net-bewerkte kolom-D-waarde
+      // meteen wordt herkend (anders pas zichtbaar ná de stille resync). Harmloos elders.
+      delete doelRow._offertesManual;
       renderAll();
       flashRow('ntd-tbody', doelRow._row);
       closeModal();clearModal();
@@ -336,7 +339,7 @@ async function submitTask(){
           }
           logEvent(code,sec,'Bewerkt','','','');
         },
-        ()=>{ keys.forEach(k=>{ doelRow[k]=oudeWaarden[k]; }); doelRow.subcategorie=oudeWaarden.subcategorie; },
+        ()=>{ keys.forEach(k=>{ doelRow[k]=oudeWaarden[k]; }); doelRow.subcategorie=oudeWaarden.subcategorie; delete doelRow._offertesManual; },
         'Opslaan mislukt'
       );
     } else {

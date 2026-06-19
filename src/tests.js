@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, offerteBalBij, _verschilInWerkdagen, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten, offerteNabelTeller, parseOff, parseAannemers, serializeAannemers, deriveOffertes, esc } from "./util.js";
+import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, offerteBalBij, _verschilInWerkdagen, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten, offerteNabelTeller, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc } from "./util.js";
 import { logZin, logPaginaSoort } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION } from "./config.js";
 import { ACTIONS } from "./actions.js";
@@ -410,9 +410,35 @@ import { shouldPromptReload } from "./sw-update.js";
   eq('deriveOffertes 1 van 3',
      deriveOffertes([{naam:'a',binnen:true},{naam:'b',binnen:false},{naam:'c',binnen:false}]), '1/3');
 
+  // ── offerte: reconcileOffertes — handmatige D-waarde is ondergrens, vinkjes hogen op ──
+  eq('reconcile lege lijst → handmatig blijft', reconcileOffertes('2/4', []), '2/4');
+  eq('reconcile lege lijst + leeg handmatig → leeg', reconcileOffertes('', []), '');
+  eq('reconcile leeg handmatig → afgeleid uit lijst',
+     reconcileOffertes('', [{naam:'a',binnen:true},{naam:'b',binnen:false}]), '1/2');
+  // De bug-regressie: gebruiker gaf handmatig "1/3" op, alle aannemers nog op "nog niet".
+  // Vroeger werd dat "0/3"; nu blijft de handmatige ondergrens staan → "1/3".
+  eq('reconcile handmatig wint als vinkjes lager staan (bug-regressie)',
+     reconcileOffertes('1/3', [{naam:'De Lange',binnen:false},{naam:'Zegwaard',binnen:false},{naam:'Rioolservice West',binnen:false}]), '1/3');
+  eq('reconcile vinkje hoogt handmatig op',
+     reconcileOffertes('0/3', [{naam:'a',binnen:true},{naam:'b',binnen:false},{naam:'c',binnen:false}]), '1/3');
+  eq('reconcile total = max(handmatig, aantal aannemers)',
+     reconcileOffertes('1/5', [{naam:'a',binnen:true},{naam:'b',binnen:false}]), '1/5');
+
   // ── offerte: aannemerslijst stuurt de X/N-teller (via filterNtd-verrijking) ──
-  truthy('verrijking leidt X/N af uit aannemerslijst', (()=>{
-    const row={code:'ZZ-TEST',naam:'Test',offertes:'5/5',aannemers:'A|1\nB|0',_row:9999};
+  // Exacte live-bug 381109: kolom D "1/3", 3 aannemers allen "nog niet" → moet "1/3" tonen
+  // (en recv>0 → fase 'ontvangen'), niet "0/3".
+  truthy('381109-regressie: handmatige 1/3 blijft staan bij nog-niet-aannemers', (()=>{
+    const row={code:'ZZ-381109',naam:'Test',offertes:'1/3',aannemers:'De Lange|0\nZegwaard|0\nRioolservice West|0',_row:9996};
+    filterNtd([row],'','','','','OFFERTE-TRAJECTEN');
+    return row.offertes==='1/3' && offerteFase(row)==='ontvangen';
+  })());
+  truthy('verrijking leidt X/N af uit aannemerslijst (leeg handmatig)', (()=>{
+    const row={code:'ZZ-TEST',naam:'Test',offertes:'',aannemers:'A|1\nB|0',_row:9999};
+    filterNtd([row],'','','','','OFFERTE-TRAJECTEN');
+    return row.offertes==='1/2';
+  })());
+  truthy('aannemer-vinkje hoogt handmatige X/N op', (()=>{
+    const row={code:'ZZ-OPHOOG',naam:'Test',offertes:'0/2',aannemers:'A|1\nB|0',_row:9995};
     filterNtd([row],'','','','','OFFERTE-TRAJECTEN');
     return row.offertes==='1/2';
   })());

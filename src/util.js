@@ -240,6 +240,17 @@ function deriveOffertes(lijst){
   if(!lijst||!lijst.length) return '';
   return `${lijst.filter(a=>a.binnen).length}/${lijst.length}`;
 }
+// Effectieve "X/N": de handmatige kolom-D-waarde is de ondergrens; de aannemer-vinkjes
+// (kolom P) kunnen 'm alleen óphogen. Zo overschrijft een nog-niet-aangevinkte
+// aannemerslijst nooit een handmatig ingevuld aantal — de bug "ik gaf 1 ontvangen op
+// maar de teller bleef op 0" kan hierdoor niet meer voorkomen. Lege lijst → handmatig blijft.
+function reconcileOffertes(manual, lijst){
+  if(!lijst||!lijst.length) return manual||'';
+  const [mRecv,mReq]=parseOff(manual);
+  const recv=Math.max(mRecv, lijst.filter(a=>a.binnen).length);
+  const req =Math.max(mReq,  lijst.length);
+  return `${recv}/${req}`;
+}
 
 // Sorteerscore voor "Nu opvolgen": hoger = urgenter (sorteer aflopend).
 function offerteSorteerScore(r, vandaag, termijnen){
@@ -311,5 +322,5 @@ export {
   emptyRow, esc, subBadge,
   parseOff, offerteFase, offerteBalBij, _verschilInWerkdagen,
   offerteStilBasis, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten, offerteNabelTeller,
-  parseAannemers, serializeAannemers, deriveOffertes,
+  parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes,
 };

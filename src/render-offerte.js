@@ -2,7 +2,7 @@
 //  RENDER-OFFERTE — offerte-motor (Vandaag-paneel, hero, aannemers, fase, groepen)
 //  Verplaatst uit render-lijsten.js (Batch D / punt 11) — zuivere refactor, geen gedragswijziging.
 // ══════════════════════════════════════
-import { esc, parseOff, parseAannemers, deriveOffertes, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten, offerteNabelTeller, _vandaagAmsterdam } from "./util.js";
+import { esc, parseOff, parseAannemers, reconcileOffertes, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten, offerteNabelTeller, _vandaagAmsterdam } from "./util.js";
 import { state, D } from "./state.js";
 
 // ══════════════════════════════════════
@@ -171,7 +171,9 @@ function _verrijkOfferteRij(r, actMap){
   // override alleen in het geheugen wanneer er aannemers zijn. Kolom D blijft ongewijzigd.
   if(r._offertesManual===undefined) r._offertesManual=r.offertes;
   r._aannemers=parseAannemers(r.aannemers);
-  r.offertes=r._aannemers.length ? deriveOffertes(r._aannemers) : r._offertesManual;
+  // Handmatige D-waarde = ondergrens, aannemer-vinkjes kunnen 'm alleen ophogen (reconcileOffertes).
+  // Voorheen overschreef de aannemerslijst de D-waarde blind → een handmatig "1/3" werd "0/3".
+  r.offertes=reconcileOffertes(r._offertesManual, r._aannemers);
   return r;
 }
 

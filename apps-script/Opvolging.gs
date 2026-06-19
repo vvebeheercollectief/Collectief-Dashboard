@@ -197,7 +197,9 @@ function cd_escaleerStilleDossiers() {
       if (dagen < regels.trap1) { if (esc) cel.setValue(''); continue; } // activiteit hervat → reset
       if (dagen >= regels.trap2 && esc.indexOf('T2') === -1) {
         cel.setValue((esc ? esc + '|' : '') + 'T2:' + cd_ddmmyyyy(today));
-        cd_notifyByExternalId('Jer', 'n_assigned', '1', {
+        // Trap-2 = teambrede escalatie: behandelaar én alle collega's via de
+        // team-tag n_newtask (zelfde audience als een nieuwe taak).
+        cd_notifyByTag('n_newtask', '1', {
           title: '⚠️ Stil dossier — escalatie',
           body: code + (naam ? ' · ' + naam : '') + ' — ' + dagen + ' dagen geen activiteit (' + (beh || 'geen behandelaar') + ')',
           url: APP_URL, dedupKey: 'esc2-' + code + '-' + cd_ddmmyyyy(today)

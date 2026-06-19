@@ -336,14 +336,40 @@ function cd_splitBehandelaar(s) {
   return (s || '').split(/[,\/]/).map(p => p.trim()).filter(Boolean);
 }
 
+// Maandnamen-tabel — gelijk aan _MAANDEN in src/util.js. Google Sheets geeft
+// datums vaak terug als Nederlandse long-date ("21 mei 2026"); zonder dit werd
+// zo'n deadline stil overgeslagen in cd_checkDeadlines / cd_dailySummary.
+var CD_MAANDEN = { jan:1,feb:2,mrt:3,maa:3,apr:4,mei:5,jun:6,jul:7,aug:8,sep:9,sept:9,okt:10,nov:11,dec:12,
+  januari:1,februari:2,maart:3,april:4,juni:6,juli:7,augustus:8,september:9,oktober:10,november:11,december:12 };
+
 function cd_parseDate(v) {
   if (!v) return null;
   if (v instanceof Date) return v;
   const s = v.toString().trim();
-  const m = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/);
+  // dd-mm-yyyy / dd/mm/yyyy
+  let m = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/);
   if (m) return new Date(+m[3], +m[2] - 1, +m[1]);
+  // "21 mei 2026" / "3 jan. 2025" / "21 mei '26"
+  m = s.match(/^(\d{1,2})\s+([a-zA-Z]+)\.?\s+'?(\d{2,4})$/);
+  if (m) { const mn = CD_MAANDEN[m[2].toLowerCase()]; if (mn) { let y = +m[3]; if (y < 100) y += 2000; return new Date(y, mn - 1, +m[1]); } }
   const d = new Date(s);
   return isNaN(d) ? null : d;
+}
+
+// Handmatig draaibaar in de editor: controleert de maandnaam-parsing.
+function test_cd_parseDate() {
+  const cases = [
+    ['21 mei 2026',  2026, 4, 21],
+    ['3 jan. 2025',  2025, 0, 3],
+    ['1 december 2026', 2026, 11, 1],
+    ['01-06-2026',   2026, 5, 1],
+    ['2026-06-21',   2026, 5, 21],
+  ];
+  cases.forEach(function (t) {
+    const d = cd_parseDate(t[0]);
+    const ok = d && d.getFullYear() === t[1] && d.getMonth() === t[2] && d.getDate() === t[3];
+    Logger.log((ok ? 'OK   ' : 'FAIL ') + t[0] + ' → ' + (d ? d.toDateString() : 'null'));
+  });
 }
 
 // ════════════════════════════════════════════════════════════

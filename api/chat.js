@@ -1,12 +1,7 @@
 // api/chat.js — Vercel serverless proxy naar Claude (sleutel server-side).
 // Anthropic gebruikt API-data niet voor training → AVG-vriendelijk voor dossiergegevens.
 // Controleert de ingelogde Google-gebruiker tegen de allowlist; proxyt dan naar Anthropic.
-const ALLOWED_EMAILS = [
-  'info@vvebeheercollectief.nl',
-  'djiowchico@gmail.com',
-  'gabrielateterycz1616@gmail.com',
-  'giocan175@gmail.com',
-];
+import { ALLOWED_EMAILS } from '../allowed-emails.js'; // één bron, gedeeld met src/config.js
 const ALLOWED_ORIGINS = [
   'https://vvebeheercollectief.github.io',
   'https://collectief-dashboard.vercel.app',

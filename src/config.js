@@ -1,9 +1,11 @@
 // ══════════════════════════════════════
 //  CONFIG — constanten (omgeving, ids, secties)
 // ══════════════════════════════════════
+import { ALLOWED_EMAILS } from '../allowed-emails.js';
+
 // ── Versie (zichtbaar in de UI) ────────────────────────────────────────
 // Ophogen bij ELKE wijziging: 4.1, 4.2, … 5.0 voor grote sprongen.
-export const APP_VERSION = '4.4';
+export const APP_VERSION = '4.5';
 
 // ── Omgeving (productie vs. testomgeving) ──────────────────────────────
 // Fail-safe: alleen deze exacte hosts zijn PRODUCTIE; al het andere
@@ -34,12 +36,7 @@ export const ONESIGNAL_APP_ID      = IS_STAGING ? ONESIGNAL_APP_ID_TEST : ONESIG
 // Google OAuth client-id (vaste constante)
 export const clientId = '560046984985-1371r4bbt28umi6uslims6mlkucn1278.apps.googleusercontent.com';
 
-export const ALLOWED_EMAILS = [
-  'info@vvebeheercollectief.nl',
-  'djiowchico@gmail.com',
-  'gabrielateterycz1616@gmail.com',
-  'giocan175@gmail.com',
-];
+export { ALLOWED_EMAILS }; // één bron: ../allowed-emails.js (ook door api/chat.js gebruikt)
 export const EMAIL_NAMES = {
   'info@vvebeheercollectief.nl':'Jer',
   'djiowchico@gmail.com':'Cihad',

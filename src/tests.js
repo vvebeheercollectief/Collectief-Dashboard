@@ -16,7 +16,7 @@ import { _isTransient, _rowMismatch } from "./api.js";
 import { parseSections } from "./data.js";
 import { setv } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
-import { dossierContextTekst, buildChatSysteemPrompt } from "./dossier-chat.js";
+import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages } from "./dossier-chat.js";
 import { shouldPromptReload } from "./sw-update.js";
 
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
@@ -734,6 +734,11 @@ import { shouldPromptReload } from "./sw-update.js";
   truthy('rij-guard: verschoven rij → mismatch', !!_rowMismatch([['CH1'],['ANDERS']], 5, [{row:6,code:'BX2'}]));
   eq('rij-guard: ontbrekende rij telt als mismatch (got leeg)', (_rowMismatch([], 5, [{row:5,code:'CH1'}])||{}).got, '');
   eq('rij-guard: whitespace-tolerant → null', _rowMismatch([[' CH1 ']], 5, [{row:5,code:'CH1'}]), null);
+  // ── AI-chat kostenrem: _chatMessages begrenst + start met user ──
+  eq('chat: korte historie ongewijzigd (2)', _chatMessages([{rol:'user',tekst:'a'},{rol:'assistant',tekst:'b'}]).length, 2);
+  eq('chat: lange historie begrensd tot max', _chatMessages(Array.from({length:30},(_,i)=>({rol:i%2?'assistant':'user',tekst:String(i)})),10).length <= 10, true);
+  eq('chat: eerste bericht is altijd user (leidende assistant gedropt)', _chatMessages([{rol:'assistant',tekst:'x'},{rol:'user',tekst:'y'}],10)[0].role, 'user');
+  eq('chat: rolmapping klopt', _chatMessages([{rol:'user',tekst:'q'}])[0].role, 'user');
 
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');

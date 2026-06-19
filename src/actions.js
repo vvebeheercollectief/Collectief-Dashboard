@@ -19,7 +19,7 @@ import { openOfferteActieModal, offerteActieVastleggen, offerteFaseZetten } from
 import { addAannemer, toggleAannemerBinnen, verwijderAannemer } from './offerte-aannemers.js';
 import { openHerhaalModal, toggleHerhaalStatus, deleteHerhaal } from './render-herhaal.js';
 import { openVvePagina, renderVve, addContactLog } from './render-vve.js';
-import { vraagChat } from './dossier-chat.js';
+import { vraagChat, chatSuggestie } from './dossier-chat.js';
 import { saveKenmerken } from './kenmerken.js';
 import { palKies } from './palette.js';
 import { toggleBulkMode, bulkVink, toggleBulkMenu, bulkDoe } from './bulk.js';
@@ -80,6 +80,7 @@ export const ACTIONS = {
   'vve-log-filter':        (el) => { state.vveLogFilter=el.dataset.modus; state._vveLogAlles=false; renderVve(); },
   'vve-log-alles':         ()   => { state._vveLogAlles=true; renderVve(); },
   'chat-send':             ()   => vraagChat(),
+  'chat-suggest':          (el) => chatSuggestie(el.dataset.q),
 };
 
 export function initActions() {

@@ -73,6 +73,18 @@ function buildChatSysteemPrompt(contextTekst){
   ].join('\n');
 }
 
+// Pure helper (testbaar): bouwt de te versturen messages — begrensd tot de laatste
+// `max` berichten (kostenrem: voorkomt dat een lang gesprek elke beurt groeit) en
+// startend met een user-bericht (Anthropic-eis).
+function _chatMessages(historie, max=10){
+  let h = (historie||[]).slice(-max);
+  if(h.length && h[0].rol !== 'user') h = h.slice(1);
+  return h.map(m => ({ role: m.rol==='user'?'user':'assistant', content: m.tekst }));
+}
+
+// Voorbeeldvragen voor de lege chat (klikbaar).
+const CHAT_SUGGESTIES = ['Wat staat er nog open?', 'Wanneer was de laatste ALV?', 'Welke offertes lopen er?'];
+
 // ── UI ──
 function openChat(){
   if(!state._chatHistorie) state._chatHistorie = [];
@@ -101,7 +113,10 @@ function renderChat(){
   if(!code){ box.innerHTML = '<div class="chat-leeg">Kies eerst een VvE om vragen over te stellen.</div>'; return; }
   let html = (state._chatHistorie||[]).map(m =>
     `<div class="chat-bub ${m.rol==='user'?'user':'ai'}">${esc(m.tekst)}</div>`).join('');
-  if(!html) html = `<div class="chat-leeg">Stel een vraag over ${esc(code)}${naam?' ('+esc(naam)+')':''}.</div>`;
+  if(!html){
+    const chips = CHAT_SUGGESTIES.map(q=>`<button class="chat-suggest" data-action="chat-suggest" data-q="${esc(q)}">${esc(q)}</button>`).join('');
+    html = `<div class="chat-leeg">Stel een vraag over ${esc(code)}${naam?' ('+esc(naam)+')':''}.</div><div class="chat-suggesties">${chips}</div>`;
+  }
   if(state._chatBezig) html += '<div class="chat-bub bezig">aan het typen…</div>';
   box.innerHTML = html;
   box.scrollTop = box.scrollHeight;
@@ -118,7 +133,7 @@ async function vraagChat(){
   try{
     if(!await ensureToken()) throw new Error('Niet ingelogd');
     const systeem = buildChatSysteemPrompt(dossierContextTekst(code, D));
-    const messages = state._chatHistorie.map(m => ({ role: m.rol==='user'?'user':'assistant', content: m.tekst }));
+    const messages = _chatMessages(state._chatHistorie);
     const antwoord = await askChat(systeem, messages);
     state._chatHistorie.push({ rol:'assistant', tekst: antwoord || '(leeg antwoord)' });
   }catch(e){
@@ -129,4 +144,11 @@ async function vraagChat(){
   }
 }
 
-export { dossierContextTekst, buildChatSysteemPrompt, openChat, closeChat, setChatVve, renderChat, vraagChat };
+// Voorbeeldvraag aangeklikt → in het invoerveld zetten en direct versturen.
+function chatSuggestie(q){
+  const inp = document.getElementById('chat-input');
+  if(inp) inp.value = q;
+  vraagChat();
+}
+
+export { dossierContextTekst, buildChatSysteemPrompt, openChat, closeChat, setChatVve, renderChat, vraagChat, _chatMessages, chatSuggestie };

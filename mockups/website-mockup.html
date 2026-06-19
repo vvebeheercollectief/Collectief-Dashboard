@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VvE Beheer Collectief — Professioneel VvE-beheer</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+  :root{
+    --navy:#2B3544;--navy-d:#1E2530;--navy-dd:#161D27;
+    --teal:#0D7377;--teal-l:#E6F5F5;--teal-d:#0a5c5f;
+    --txt:#2B3544;--txt-s:#5a6673;--txt-m:#7a8694;
+    --bg:#ffffff;--bg-warm:#f9fafb;--bg-cream:#f5f6f8;
+    --bor:#e2e5ea;--bor-l:#eef0f3;
+    --gold:#C9961A;
+    --radius:8px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'DM Sans',sans-serif;color:var(--txt);line-height:1.7;background:var(--bg);-webkit-font-smoothing:antialiased}
+  img{max-width:100%;display:block}
+  a{text-decoration:none;color:inherit}
+  .wrap{max-width:1080px;margin:0 auto}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:12px 28px;border-radius:var(--radius);font-size:14px;font-weight:600;cursor:pointer;border:none;font-family:inherit;transition:all .2s}
+  .btn-pri{background:var(--navy);color:#fff}
+  .btn-pri:hover{background:var(--navy-d);transform:translateY(-1px);box-shadow:0 4px 12px rgba(43,53,68,.2)}
+  .btn-teal{background:var(--teal);color:#fff}
+  .btn-teal:hover{background:var(--teal-d);transform:translateY(-1px);box-shadow:0 4px 12px rgba(13,115,119,.25)}
+  .btn-sec{background:var(--bg);color:var(--txt);border:1px solid var(--bor)}
+  .btn-sec:hover{background:var(--bg-warm);border-color:#ccd0d6}
+  .btn-ghost{background:transparent;color:var(--txt-s);padding:12px 16px}
+  .btn-ghost:hover{color:var(--txt)}
+  .btn i{font-size:18px}
+
+  /* ── Topbar (vertrouwenstrip) ── */
+  .topbar{background:var(--navy);color:rgba(255,255,255,.7);font-size:12px;padding:8px 48px;display:flex;justify-content:space-between;align-items:center}
+  .topbar a{color:rgba(255,255,255,.85);transition:color .2s}
+  .topbar a:hover{color:#fff}
+  .topbar-left{display:flex;gap:20px;align-items:center}
+  .topbar-left i{font-size:14px;vertical-align:middle;margin-right:3px}
+  @media(max-width:800px){.topbar{display:none}}
+
+  /* ── Navbar ── */
+  .nav{position:sticky;top:0;z-index:100;background:#fff;border-bottom:1px solid var(--bor);padding:0 48px;height:70px;display:flex;align-items:center;justify-content:space-between}
+  .nav-logo{display:flex;align-items:center;gap:10px}
+  .nav-logo img{height:38px;width:auto}
+  .nav-logo-text{font-size:14px;font-weight:700;color:var(--navy);line-height:1.15}
+  .nav-logo-text span{display:block;font-size:11px;font-weight:400;color:var(--txt-m)}
+  .nav-center{display:flex;gap:4px;align-items:center}
+  .nav-link{font-size:13.5px;font-weight:500;color:var(--txt-s);padding:8px 14px;border-radius:6px;transition:all .15s}
+  .nav-link:hover{color:var(--txt);background:var(--bg-warm)}
+  .nav-right{display:flex;gap:8px;align-items:center}
+  .nav-phone{font-size:13px;font-weight:600;color:var(--txt);margin-right:4px}
+  .nav-phone i{color:var(--teal);font-size:16px;vertical-align:middle;margin-right:3px}
+  @media(max-width:960px){.nav-center{display:none}.nav-phone{display:none}}
+  @media(max-width:800px){.nav{padding:0 20px}}
+
+  /* ── Hero ── */
+  .hero{position:relative;background:var(--bg-warm);border-bottom:1px solid var(--bor-l);overflow:hidden;min-height:500px;display:flex;align-items:center}
+  .hero-content{position:relative;z-index:2;width:50%;max-width:540px;margin-left:max(48px, calc((100vw - 1080px)/2));padding:64px 48px 64px 0}
+  .hero-kicker{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--teal);margin-bottom:16px}
+  .hero-kicker i{font-size:14px}
+  .hero h1{font-size:40px;font-weight:700;line-height:1.18;letter-spacing:-.025em;margin-bottom:16px;color:var(--navy)}
+  .hero p{font-size:16px;color:var(--txt-s);max-width:460px;margin-bottom:28px}
+  .hero-btns{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:32px}
+  .hero-social-proof{display:flex;align-items:center;gap:16px;padding-top:24px;border-top:1px solid var(--bor-l)}
+  .hero-avatars{display:flex}
+  .hero-avatars span{width:32px;height:32px;border-radius:50%;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;border:2px solid var(--bg-warm);margin-left:-8px}
+  .hero-avatars span:first-child{margin-left:0}
+  .hero-sp-text{font-size:13px;color:var(--txt-s);line-height:1.4}
+  .hero-sp-text strong{color:var(--txt);font-weight:600}
+  .hero-sp-stars{color:var(--gold);font-size:13px;display:flex;gap:1px}
+  /* Foto: absolute positioned, vult rechterhelft tot aan viewport rand */
+  .hero-photo{position:absolute;top:0;bottom:0;right:0;width:48%;overflow:hidden}
+  .hero-photo-placeholder{width:100%;height:100%;background:linear-gradient(135deg,#c8d0d8 0%,#a0aab5 40%,#8895a2 100%);display:flex;align-items:center;justify-content:center;flex-direction:column;color:#fff;font-size:13px;gap:6px}
+  .hero-photo-placeholder i{font-size:56px;opacity:.5}
+  .hero-photo-placeholder span{opacity:.6;max-width:200px;text-align:center;line-height:1.5}
+  /* Gradient overlay: bg-warm vloeit over naar foto */
+  .hero-photo::before{content:'';position:absolute;top:0;left:0;bottom:0;width:140px;z-index:1;background:linear-gradient(90deg,var(--bg-warm) 0%,transparent 100%)}
+  .hero-photo::after{content:'';position:absolute;bottom:0;left:0;right:0;height:60px;z-index:1;background:linear-gradient(0deg,var(--bg-warm) 0%,transparent 100%)}
+  /* Wanneer echte foto: gebruik img.hero-photo-img */
+  .hero-photo-img{width:100%;height:100%;object-fit:cover;display:block}
+  @media(max-width:800px){
+    .hero{flex-direction:column;min-height:auto}
+    .hero-content{width:100%;max-width:100%;margin-left:0;padding:40px 20px 32px}
+    .hero-photo{position:relative;width:100%;height:220px}
+    .hero-photo::before{display:none}
+    .hero h1{font-size:30px}
+  }
+
+  /* ── Sections ── */
+  .section{padding:80px 48px}
+  .section-warm{background:var(--bg-warm)}
+  .sec-head{margin-bottom:48px}
+  .sec-head.center{text-align:center}
+  .sec-kicker{font-size:12px;font-weight:600;color:var(--teal);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+  .sec-h2{font-size:30px;font-weight:700;line-height:1.2;letter-spacing:-.015em;color:var(--navy)}
+  .sec-p{font-size:15px;color:var(--txt-s);max-width:520px;margin-top:8px;line-height:1.7}
+  .sec-head.center .sec-p{margin-left:auto;margin-right:auto}
+  @media(max-width:800px){.section{padding:52px 20px}.sec-h2{font-size:24px}}
+
+  /* ── Vertrouwensbalk ── */
+  .trust{background:var(--bg);border-bottom:1px solid var(--bor-l)}
+  .trust-inner{display:grid;grid-template-columns:repeat(4,1fr);max-width:1080px;margin:0 auto}
+  .trust-item{padding:28px 20px;text-align:center;border-right:1px solid var(--bor-l);display:flex;flex-direction:column;align-items:center;gap:4px}
+  .trust-item:last-child{border-right:none}
+  .trust-ico{font-size:22px;color:var(--teal);margin-bottom:2px}
+  .trust-val{font-size:28px;font-weight:700;color:var(--navy)}
+  .trust-lbl{font-size:12px;color:var(--txt-m)}
+  @media(max-width:800px){
+    .trust-inner{grid-template-columns:1fr 1fr}
+    .trust-item{padding:20px 12px}
+    .trust-item:nth-child(2){border-right:none}
+    .trust-item:nth-child(1),.trust-item:nth-child(2){border-bottom:1px solid var(--bor-l)}
+    .trust-val{font-size:24px}
+  }
+
+  /* ── Diensten ── */
+  .diensten{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+  .dienst{background:var(--bg);border:1px solid var(--bor);border-radius:10px;padding:28px 24px;transition:all .25s;position:relative;overflow:hidden}
+  .dienst::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--teal);transform:scaleX(0);transition:transform .3s;transform-origin:left}
+  .dienst:hover{border-color:var(--teal);box-shadow:0 4px 20px rgba(13,115,119,.08)}
+  .dienst:hover::before{transform:scaleX(1)}
+  .dienst-ico{width:42px;height:42px;border-radius:8px;background:var(--teal-l);color:var(--teal);display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:14px}
+  .dienst h3{font-size:15px;font-weight:700;margin-bottom:6px;color:var(--navy)}
+  .dienst p{font-size:13px;color:var(--txt-s);line-height:1.65}
+  .dienst-link{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--teal);margin-top:12px;transition:gap .2s;cursor:pointer}
+  .dienst-link:hover{gap:8px}
+  .dienst-link i{font-size:14px}
+  @media(max-width:800px){.diensten{grid-template-columns:1fr}}
+
+  /* ── Waarom wij ── */
+  .why-grid{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center}
+  .why-photo{background:var(--bg-cream);border:1px solid var(--bor);border-radius:12px;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+  .why-photo-inner{text-align:center;color:var(--txt-m);font-size:13px}
+  .why-photo-inner i{font-size:48px;color:var(--bor);display:block;margin-bottom:6px}
+  .why-photo-badge{position:absolute;bottom:16px;left:16px;background:var(--navy);color:#fff;padding:10px 16px;border-radius:8px;font-size:24px;font-weight:700;line-height:1}
+  .why-photo-badge span{display:block;font-size:10px;font-weight:500;color:rgba(255,255,255,.6);margin-top:2px}
+  .why-list{display:flex;flex-direction:column;gap:20px}
+  .why-item{display:flex;gap:14px;align-items:flex-start}
+  .why-check{width:24px;height:24px;border-radius:50%;background:var(--teal-l);color:var(--teal);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;margin-top:2px}
+  .why-item h4{font-size:14px;font-weight:700;margin-bottom:2px;color:var(--navy)}
+  .why-item p{font-size:13px;color:var(--txt-s);line-height:1.6}
+  @media(max-width:800px){.why-grid{grid-template-columns:1fr}.why-photo{display:none}}
+
+  /* ── Werkwijze ── */
+  .stappen{display:grid;grid-template-columns:repeat(4,1fr);gap:0;background:var(--bg);border:1px solid var(--bor);border-radius:12px;overflow:hidden}
+  .stap{padding:32px 24px;text-align:center;border-right:1px solid var(--bor);position:relative;transition:background .2s}
+  .stap:last-child{border-right:none}
+  .stap:hover{background:var(--bg-warm)}
+  .stap-nr{width:36px;height:36px;border-radius:50%;background:var(--navy);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;margin-bottom:14px}
+  .stap-arrow{position:absolute;top:46px;right:-10px;z-index:2;width:20px;height:20px;background:var(--bg);border-right:1px solid var(--bor);border-bottom:1px solid var(--bor);transform:rotate(-45deg);border-radius:0 0 3px 0}
+  .stap:last-child .stap-arrow{display:none}
+  .stap h3{font-size:14px;font-weight:700;margin-bottom:6px;color:var(--navy)}
+  .stap p{font-size:12.5px;color:var(--txt-s);line-height:1.6}
+  @media(max-width:800px){
+    .stappen{grid-template-columns:1fr 1fr}
+    .stap{border-bottom:1px solid var(--bor)}
+    .stap-arrow{display:none}
+  }
+  @media(max-width:480px){.stappen{grid-template-columns:1fr}}
+
+  /* ── Referenties ── */
+  .refs{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+  .ref{background:var(--bg);border:1px solid var(--bor);border-radius:10px;padding:28px 24px;transition:box-shadow .2s}
+  .ref:hover{box-shadow:0 4px 16px rgba(0,0,0,.05)}
+  .ref-stars{color:var(--gold);font-size:14px;margin-bottom:12px;display:flex;gap:1px}
+  .ref-quote{font-size:13.5px;color:var(--txt-s);line-height:1.7;margin-bottom:18px}
+  .ref-author{display:flex;align-items:center;gap:10px;padding-top:14px;border-top:1px solid var(--bor-l)}
+  .ref-avatar{width:36px;height:36px;border-radius:50%;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+  .ref-name{font-size:13px;font-weight:600;color:var(--navy)}
+  .ref-role{font-size:11px;color:var(--txt-m)}
+  @media(max-width:800px){.refs{grid-template-columns:1fr}}
+
+  /* ── Klantenportaal sectie ── */
+  .portaal{background:var(--navy);color:#fff}
+  .portaal-grid{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center}
+  .portaal .sec-kicker{color:rgba(255,255,255,.4)}
+  .portaal .sec-h2{color:#fff}
+  .portaal .sec-p{color:rgba(255,255,255,.5)}
+  .portaal-features{display:flex;flex-direction:column;gap:16px;margin-top:28px}
+  .portaal-feat{display:flex;align-items:center;gap:10px;font-size:13px;color:rgba(255,255,255,.7)}
+  .portaal-feat i{font-size:18px;color:var(--teal);flex-shrink:0}
+  .portaal-mockup{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:24px;text-align:center;color:rgba(255,255,255,.3);font-size:13px}
+  .portaal-mockup i{font-size:48px;display:block;margin-bottom:8px;color:rgba(255,255,255,.15)}
+  @media(max-width:800px){.portaal-grid{grid-template-columns:1fr}.portaal-mockup{display:none}}
+
+  /* ── CTA ── */
+  .cta{padding:72px 48px;text-align:center;background:var(--bg-warm);border-top:1px solid var(--bor-l);border-bottom:1px solid var(--bor-l)}
+  .cta h2{font-size:28px;font-weight:700;color:var(--navy);margin-bottom:8px}
+  .cta p{font-size:15px;color:var(--txt-s);max-width:460px;margin:0 auto 24px}
+  .cta-btns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+  .cta-note{font-size:12px;color:var(--txt-m);margin-top:14px}
+  @media(max-width:800px){.cta{padding:48px 20px}.cta h2{font-size:24px}}
+
+  /* ── Footer ── */
+  .footer{background:var(--navy-dd);color:#7a8694;padding:56px 48px 36px}
+  .footer-top{display:grid;grid-template-columns:auto 1fr 1fr 1fr 1fr;gap:36px;max-width:1080px;margin:0 auto;align-items:start}
+  .footer-logo-col{display:flex;align-items:flex-start;justify-content:center;padding-right:16px}
+  .footer-logo-col img{height:110px;width:auto;opacity:.85}
+  .footer-about{padding-top:2px}
+  .footer-about-title{font-size:14px;font-weight:700;color:#fff;margin-bottom:6px}
+  .footer-desc{font-size:13px;line-height:1.6;color:#5a6673}
+  .footer h4{font-size:11px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px}
+  .footer ul{list-style:none}
+  .footer li{margin-bottom:7px}
+  .footer li a{font-size:13px;color:#5a6673;transition:color .2s}
+  .footer li a:hover{color:#fff}
+  .footer-bottom{max-width:1080px;margin:36px auto 0;padding-top:20px;border-top:1px solid rgba(255,255,255,.06);display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#5a6673}
+  @media(max-width:800px){
+    .footer{padding:36px 20px 28px}
+    .footer-logo-col{display:none}
+    .footer-top{grid-template-columns:1fr 1fr;gap:20px}
+    .footer-bottom{flex-direction:column;gap:6px;text-align:center}
+  }
+
+  /* ── Scroll animations ── */
+  .fade-up{opacity:0;transform:translateY(20px);transition:opacity .5s ease,transform .5s ease}
+  .fade-up.visible{opacity:1;transform:translateY(0)}
+
+  /* ── Mockup label ── */
+  .mockup-ribbon{position:fixed;bottom:16px;right:16px;z-index:999;background:var(--navy);color:#fff;padding:6px 14px;border-radius:6px;font-size:11px;font-weight:500;box-shadow:0 2px 8px rgba(0,0,0,.15);opacity:.65}
+
+  /* ── Smooth scroll ── */
+  html{scroll-behavior:smooth}
+</style>
+</head>
+<body>
+
+<div class="mockup-ribbon">Website mockup v4</div>
+
+<!-- ═══ TOPBAR ═══ -->
+<div class="topbar">
+  <div class="topbar-left">
+    <a href="mailto:info@vvebeheercollectief.nl"><i class="ph ph-envelope"></i> info@vvebeheercollectief.nl</a>
+    <span><i class="ph ph-map-pin"></i> Wateringen, Zuid-Holland</span>
+  </div>
+  <div>Al 17+ jaar vertrouwd VvE-beheer</div>
+</div>
+
+<!-- ═══ NAVBAR ═══ -->
+<nav class="nav">
+  <a href="#" class="nav-logo">
+    <img src="logo-pakket/app-icon-128.png" alt="VvE Beheer Collectief">
+  </a>
+  <div class="nav-center">
+    <a href="#diensten" class="nav-link">Diensten</a>
+    <a href="#waarom" class="nav-link">Over ons</a>
+    <a href="#werkwijze" class="nav-link">Werkwijze</a>
+    <a href="#portaal" class="nav-link">Klantenportaal</a>
+    <a href="#referenties" class="nav-link">Referenties</a>
+    <a href="#contact" class="nav-link">Contact</a>
+  </div>
+  <div class="nav-right">
+    <button class="btn btn-teal" onclick="document.getElementById('contact').scrollIntoView({behavior:'smooth'})">
+      <i class="ph ph-chat-dots"></i> Kennismaken
+    </button>
+  </div>
+</nav>
+
+<!-- ═══ HERO ═══ -->
+<section class="hero">
+  <div class="hero-content">
+      <div class="hero-kicker"><i class="ph-duotone ph-shield-check"></i> Administratief, financieel &amp; technisch beheer</div>
+      <h1>Uw VvE verdient beheer waar u op kunt vertrouwen</h1>
+      <p>Al meer dan 17 jaar beheren wij VvE's met persoonlijke aandacht, transparante financien en vakkundige ondersteuning. Meer dan 500 verenigingen gingen u voor.</p>
+      <div class="hero-btns">
+        <button class="btn btn-pri" onclick="document.getElementById('contact').scrollIntoView({behavior:'smooth'})"><i class="ph ph-handshake"></i> Vrijblijvend kennismaken</button>
+        <a href="#werkwijze" class="btn btn-sec"><i class="ph ph-arrow-down"></i> Bekijk onze werkwijze</a>
+      </div>
+      <div class="hero-social-proof">
+        <div class="hero-avatars">
+          <span>MK</span><span>JB</span><span>SV</span><span>+</span>
+        </div>
+        <div>
+          <div class="hero-sp-stars">
+            <i class="ph-fill ph-star"></i><i class="ph-fill ph-star"></i><i class="ph-fill ph-star"></i><i class="ph-fill ph-star"></i><i class="ph-fill ph-star"></i>
+          </div>
+          <div class="hero-sp-text"><strong>500+ VvE's</strong> vertrouwen op ons beheer</div>
+        </div>
+      </div>
+  </div>
+  <div class="hero-photo">
+    <!-- Vervang placeholder met echte foto: bijv. appartementencomplex of teamoverleg -->
+    <div class="hero-photo-placeholder">
+      <i class="ph-duotone ph-buildings"></i>
+      <span>Hier komt een foto van bijv. een appartementencomplex of teamoverleg</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ VERTROUWENSBALK ═══ -->
+<div class="trust">
+  <div class="trust-inner">
+    <div class="trust-item"><i class="ph-duotone ph-buildings trust-ico"></i><div class="trust-val">500+</div><div class="trust-lbl">VvE's in beheer</div></div>
+    <div class="trust-item"><i class="ph-duotone ph-calendar-check trust-ico"></i><div class="trust-val">17+</div><div class="trust-lbl">Jaar ervaring</div></div>
+    <div class="trust-item"><i class="ph-duotone ph-heart trust-ico"></i><div class="trust-val">98%</div><div class="trust-lbl">Klanttevredenheid</div></div>
+    <div class="trust-item"><i class="ph-duotone ph-clock trust-ico"></i><div class="trust-val">24u</div><div class="trust-lbl">Gemiddelde reactietijd</div></div>
+  </div>
+</div>
+
+<!-- ═══ DIENSTEN ═══ -->
+<section class="section" id="diensten">
+  <div class="wrap">
+    <div class="sec-head fade-up">
+      <div class="sec-kicker">Onze diensten</div>
+      <div class="sec-h2">Compleet VvE-beheer, alles onder een dak</div>
+      <div class="sec-p">Administratief, financieel en technisch — wij ontzorgen uw VvE zodat het bestuur en eigenaren nergens naar om hoeven te kijken.</div>
+    </div>
+
+    <div class="diensten">
+      <div class="dienst fade-up">
+        <div class="dienst-ico"><i class="ph-duotone ph-clipboard-text"></i></div>
+        <h3>Administratief beheer</h3>
+        <p>Ledenadministratie, correspondentie en bestuurlijke ondersteuning. Alles netjes en overzichtelijk geregeld.</p>
+        <div class="dienst-link">Meer informatie <i class="ph ph-arrow-right"></i></div>
+      </div>
+      <div class="dienst fade-up">
+        <div class="dienst-ico"><i class="ph-duotone ph-coins"></i></div>
+        <h3>Financieel beheer</h3>
+        <p>Transparante boekhouding, begrotingen, jaarrekeningen en zorgvuldig beheer van het reservefonds.</p>
+        <div class="dienst-link">Meer informatie <i class="ph ph-arrow-right"></i></div>
+      </div>
+      <div class="dienst fade-up">
+        <div class="dienst-ico"><i class="ph-duotone ph-wrench"></i></div>
+        <h3>Technisch beheer</h3>
+        <p>Onderhoud coordineren, MJOP opstellen en offertes aanvragen bij betrouwbare vakmensen uit de regio.</p>
+        <div class="dienst-link">Meer informatie <i class="ph ph-arrow-right"></i></div>
+      </div>
+      <div class="dienst fade-up">
+        <div class="dienst-ico"><i class="ph-duotone ph-users-three"></i></div>
+        <h3>ALV organisatie</h3>
+        <p>Van uitnodiging tot notulen en besluitenlijst — wij verzorgen de volledige vergadering voor u.</p>
+        <div class="dienst-link">Meer informatie <i class="ph ph-arrow-right"></i></div>
+      </div>
+      <div class="dienst fade-up">
+        <div class="dienst-ico"><i class="ph-duotone ph-shield-check"></i></div>
+        <h3>Verzekeringen</h3>
+        <p>Advies over opstal- en aansprakelijkheidsverzekeringen. Wij handelen schades namens de VvE af.</p>
+        <div class="dienst-link">Meer informatie <i class="ph ph-arrow-right"></i></div>
+      </div>
+      <div class="dienst fade-up">
+        <div class="dienst-ico"><i class="ph-duotone ph-monitor"></i></div>
+        <h3>Online klantenportaal</h3>
+        <p>Eigenaren volgen alles realtime: taken, financien en besluitvorming via ons beveiligde portaal.</p>
+        <div class="dienst-link">Meer informatie <i class="ph ph-arrow-right"></i></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ WAAROM WIJ ═══ -->
+<section class="section section-warm" id="waarom">
+  <div class="wrap">
+    <div class="why-grid">
+      <div class="why-photo fade-up">
+        <div class="why-photo-inner">
+          <i class="ph-duotone ph-handshake"></i>
+          <div>Foto: persoonlijk overleg met VvE-bestuur</div>
+        </div>
+        <div class="why-photo-badge">17+<span>jaar ervaring</span></div>
+      </div>
+      <div class="fade-up">
+        <div class="sec-kicker">Waarom VvE Beheer Collectief</div>
+        <div class="sec-h2" style="margin-bottom:24px">Beheer met een persoonlijke aanpak</div>
+        <div class="why-list">
+          <div class="why-item">
+            <div class="why-check"><i class="ph-bold ph-check"></i></div>
+            <div>
+              <h4>Altijd een vast aanspreekpunt</h4>
+              <p>Geen wachtrij of callcenter. U spreekt direct met uw vaste beheerder die uw VvE door en door kent.</p>
+            </div>
+          </div>
+          <div class="why-item">
+            <div class="why-check"><i class="ph-bold ph-check"></i></div>
+            <div>
+              <h4>Volledig transparant</h4>
+              <p>Inzicht in alle financien en werkzaamheden via het klantenportaal. Geen verborgen kosten, geen verrassingen.</p>
+            </div>
+          </div>
+          <div class="why-item">
+            <div class="why-check"><i class="ph-bold ph-check"></i></div>
+            <div>
+              <h4>Regionale expertise</h4>
+              <p>17+ jaar ervaring in de regio Haaglanden. Wij kennen de lokale markt, bouwstijlen en vakmensen.</p>
+            </div>
+          </div>
+          <div class="why-item">
+            <div class="why-check"><i class="ph-bold ph-check"></i></div>
+            <div>
+              <h4>Proactief onderhoud</h4>
+              <p>Wij wachten niet tot er problemen zijn. Met het MJOP plannen wij onderhoud vooruit en voorkomen wij onverwachte kosten.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ WERKWIJZE ═══ -->
+<section class="section" id="werkwijze">
+  <div class="wrap">
+    <div class="sec-head center fade-up">
+      <div class="sec-kicker">Werkwijze</div>
+      <div class="sec-h2">In 4 stappen goed geregeld</div>
+      <div class="sec-p">Van kennismaking tot volledig beheer — wij maken de overstap eenvoudig en zorgeloos.</div>
+    </div>
+
+    <div class="stappen fade-up">
+      <div class="stap">
+        <div class="stap-arrow"></div>
+        <div class="stap-nr">1</div>
+        <h3>Kennismaking</h3>
+        <p>Gratis gesprek om uw VvE en wensen te leren kennen.</p>
+      </div>
+      <div class="stap">
+        <div class="stap-arrow"></div>
+        <div class="stap-nr">2</div>
+        <h3>Voorstel op maat</h3>
+        <p>Een helder aanbod afgestemd op de grootte en behoeften van uw VvE.</p>
+      </div>
+      <div class="stap">
+        <div class="stap-arrow"></div>
+        <div class="stap-nr">3</div>
+        <h3>Soepele overname</h3>
+        <p>Wij regelen de overdracht van de vorige beheerder, inclusief alle documenten.</p>
+      </div>
+      <div class="stap">
+        <div class="stap-nr">4</div>
+        <h3>Actief beheer</h3>
+        <p>Uw VvE is in goede handen. U volgt alles via het klantenportaal.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ KLANTENPORTAAL ═══ -->
+<section class="section portaal" id="portaal">
+  <div class="wrap">
+    <div class="portaal-grid fade-up">
+      <div>
+        <div class="sec-kicker">Klantenportaal</div>
+        <div class="sec-h2">Altijd en overal inzicht in uw VvE</div>
+        <div class="sec-p">Via ons beveiligde online klantenportaal heeft u als eigenaar of bestuurslid direct toegang tot alles wat er speelt.</div>
+        <div class="portaal-features">
+          <div class="portaal-feat"><i class="ph-duotone ph-clipboard-text"></i> Openstaande taken en actiepunten</div>
+          <div class="portaal-feat"><i class="ph-duotone ph-coins"></i> Financieel overzicht en begrotingen</div>
+          <div class="portaal-feat"><i class="ph-duotone ph-calendar-dots"></i> Vergaderdata en notulen</div>
+          <div class="portaal-feat"><i class="ph-duotone ph-bell"></i> Meldingen en updates</div>
+          <div class="portaal-feat"><i class="ph-duotone ph-file-text"></i> Documenten en besluitenlijsten</div>
+        </div>
+        <div style="margin-top:28px">
+          <button class="btn btn-teal"><i class="ph ph-sign-in"></i> Naar het klantenportaal</button>
+        </div>
+      </div>
+      <div class="portaal-mockup">
+        <i class="ph-duotone ph-monitor"></i>
+        <div>Screenshot klantenportaal</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ REFERENTIES ═══ -->
+<section class="section section-warm" id="referenties">
+  <div class="wrap">
+    <div class="sec-head center fade-up">
+      <div class="sec-kicker">Referenties</div>
+      <div class="sec-h2">Wat onze VvE's zeggen</div>
+      <div class="sec-p">Wij laten ons werk het liefst spreken — maar onze klanten doen dat ook graag.</div>
+    </div>
+
+    <div class="refs fade-up">
+      <div class="ref">
+        <div class="ref-stars">
+          <i class="ph-fill ph-star"></i><i class="ph-fill ph-star"></i><i class="ph-fill ph-star"></i><i class="ph-fill ph-star"></i><i class="ph-fill ph-star"></i>
+        </div>
+        <div class="ref-quote">"Eindelijk een beheerder die echt bereikbaar is. Onze vergaderingen zijn goed voorbereid en de financien zijn altijd op orde."</div>
+        <div class="ref-author">
+          <div class="ref-avatar">MK</div>
+          <div><div class="ref-name">M. de Koning</div><div class="ref-role">Voorzitter VvE Parkzicht</div></div>
+        </div>
+      </div>
+      <div class="ref">
+        <div class="ref-stars">
+          <i class="ph-fill ph-star"></i><i class="ph-fill ph-star"></i><i class="ph-fill ph-star"></i><i class="ph-fill ph-star"></i><i class="ph-fill ph-star"></i>
+        </div>
+        <div class="ref-quote">"Het online klantenportaal is fantastisch. Ik kan als bestuurslid precies zien wat er speelt zonder steeds te hoeven bellen."</div>
+        <div class="ref-author">
+          <div class="ref-avatar">JB</div>
+          <div><div class="ref-name">J. Bakker</div><div class="ref-role">Bestuurslid VvE De Linden</div></div>
+        </div>
+      </div>
+      <div class="ref">
+        <div class="ref-stars">
+          <i class="ph-fill ph-star"></i><i class="ph-fill ph-star"></i><i class="ph-fill ph-star"></i><i class="ph-fill ph-star"></i><i class="ph-fill ph-star"></i>
+        </div>
+        <div class="ref-quote">"Na jaren met een onbereikbare beheerder is VvE Beheer Collectief een verademing. Persoonlijk, professioneel en proactief."</div>
+        <div class="ref-author">
+          <div class="ref-avatar">SV</div>
+          <div><div class="ref-name">S. Vermeer</div><div class="ref-role">Voorzitter VvE Rivierstaete</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ CTA ═══ -->
+<section class="cta" id="contact">
+  <div class="sec-kicker" style="text-align:center">Samenwerken?</div>
+  <h2>Benieuwd wat wij voor uw VvE kunnen betekenen?</h2>
+  <p>Plan een vrijblijvend kennismakingsgesprek. Wij nemen de tijd om uw situatie te bespreken en een passend voorstel te doen.</p>
+  <div class="cta-btns">
+    <button class="btn btn-pri"><i class="ph ph-calendar-dots"></i> Plan een afspraak</button>
+    <a href="mailto:info@vvebeheercollectief.nl" class="btn btn-sec"><i class="ph ph-envelope"></i> info@vvebeheercollectief.nl</a>
+  </div>
+  <div class="cta-note">Vrijblijvend en zonder verplichtingen. Wij reageren binnen 24 uur.</div>
+</section>
+
+<!-- ═══ FOOTER ═══ -->
+<footer class="footer">
+  <div class="footer-top">
+    <div class="footer-logo-col">
+      <img src="logo-sidebar.png" alt="VvE Beheer Collectief">
+    </div>
+    <div class="footer-about">
+      <div class="footer-about-title">VvE Beheer Collectief</div>
+      <div class="footer-desc">Al 17+ jaar administratief, financieel en technisch beheer voor VvE's in de regio Haaglanden en omstreken.</div>
+    </div>
+    <div>
+      <h4>Diensten</h4>
+      <ul>
+        <li><a href="#diensten">Administratief beheer</a></li>
+        <li><a href="#diensten">Financieel beheer</a></li>
+        <li><a href="#diensten">Technisch beheer</a></li>
+        <li><a href="#diensten">Verzekeringen</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Informatie</h4>
+      <ul>
+        <li><a href="#waarom">Over ons</a></li>
+        <li><a href="#werkwijze">Werkwijze</a></li>
+        <li><a href="#referenties">Referenties</a></li>
+        <li><a href="#portaal">Klantenportaal</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Contact</h4>
+      <ul>
+        <li><a href="mailto:info@vvebeheercollectief.nl"><i class="ph ph-envelope" style="font-size:13px;margin-right:4px;vertical-align:middle"></i> info@vvebeheercollectief.nl</a></li>
+        <li><a href="#"><i class="ph ph-map-pin" style="font-size:13px;margin-right:4px;vertical-align:middle"></i> Wateringen, Zuid-Holland</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div>&copy; 2026 VvE Beheer Collectief. Alle rechten voorbehouden.</div>
+    <div><a href="#" style="color:#5a6673">Privacy</a> &middot; <a href="#" style="color:#5a6673">Voorwaarden</a></div>
+  </div>
+</footer>
+
+<!-- ═══ Scroll animations ═══ -->
+<script>
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible') });
+  }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+  document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+</script>
+
+</body>
+</html>

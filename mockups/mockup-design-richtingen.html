@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<title>Dashboard Design Richtingen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', sans-serif; background: #0f1117; color: #fff; padding: 40px 32px; min-height: 100vh; }
+
+h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px; color: #f1f5f9; letter-spacing: -.02em; }
+.intro { font-size: 14px; color: #64748b; margin-bottom: 40px; }
+
+.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+
+.variant { border-radius: 16px; overflow: hidden; border: 2px solid transparent; cursor: pointer; transition: all .2s; }
+.variant:hover { transform: translateY(-3px); }
+.variant.selected { border-color: #6366f1; box-shadow: 0 0 0 4px rgba(99,102,241,.2); }
+
+.variant-label { padding: 16px 20px 12px; }
+.variant-letter { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; font-weight: 800; font-size: 13px; margin-bottom: 8px; }
+.variant-label h2 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+.variant-label p { font-size: 12.5px; opacity: .7; line-height: 1.4; }
+
+/* Mockup shell */
+.mockup-shell { display: flex; height: 380px; }
+
+/* ===== VARIANT A: Slate Pro ===== */
+.va { background: #1e2330; }
+.va .variant-label { background: #1e2330; }
+.va .variant-label h2 { color: #e2e8f0; }
+.va .variant-letter { background: rgba(99,102,241,.15); color: #818cf8; }
+
+.va .sidebar { width: 210px; background: #131720; flex-shrink: 0; display: flex; flex-direction: column; border-right: 1px solid rgba(255,255,255,.06); }
+.va .sb-top { padding: 16px 14px; border-bottom: 1px solid rgba(255,255,255,.06); }
+.va .logo-row { display: flex; align-items: center; gap: 9px; }
+.va .logo-sq { width: 28px; height: 28px; border-radius: 7px; background: #6366f1; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; color: #fff; flex-shrink: 0; }
+.va .brand { font-size: 12px; font-weight: 700; color: #e2e8f0; font-family: 'Inter', sans-serif; letter-spacing: -.01em; }
+.va .brand span { display: block; font-size: 10px; font-weight: 400; color: #475569; margin-top: 1px; }
+.va .sb-nav { padding: 10px 8px; flex: 1; }
+.va .lbl { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #334155; padding: 10px 8px 4px; font-family: 'Inter', sans-serif; }
+.va .ni { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 7px; color: #64748b; font-size: 12.5px; font-weight: 500; font-family: 'Inter', sans-serif; margin-bottom: 1px; border-left: 2px solid transparent; }
+.va .ni:hover { background: rgba(255,255,255,.04); color: #94a3b8; }
+.va .ni.on { background: rgba(99,102,241,.1); color: #a5b4fc; border-left-color: #6366f1; font-weight: 600; }
+.va .ni-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .5; flex-shrink: 0; }
+.va .ni-badge { margin-left: auto; background: rgba(99,102,241,.2); color: #a5b4fc; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 20px; }
+.va .ni.on .ni-badge { background: #6366f1; color: #fff; }
+
+.va .main { flex: 1; background: #1a1f2e; display: flex; flex-direction: column; font-family: 'Inter', sans-serif; }
+.va .hdr { height: 50px; background: #1a1f2e; border-bottom: 1px solid rgba(255,255,255,.06); display: flex; align-items: center; padding: 0 18px; gap: 10px; }
+.va .hdr h1 { font-size: 14px; font-weight: 600; color: #e2e8f0; flex: 1; letter-spacing: -.01em; }
+.va .hdr-sub { font-size: 11px; color: #475569; }
+.va .hdr-btn { height: 28px; padding: 0 12px; border-radius: 6px; background: #6366f1; color: #fff; font-size: 12px; font-weight: 600; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+.va .ico-btn { width: 28px; height: 28px; border-radius: 6px; border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.03); display: flex; align-items: center; justify-content: center; color: #475569; font-size: 12px; }
+
+.va .content { padding: 16px; flex: 1; overflow: hidden; }
+.va .stats { display: flex; gap: 10px; margin-bottom: 14px; }
+.va .stat { flex: 1; background: #212840; border: 1px solid rgba(255,255,255,.07); border-radius: 10px; padding: 12px 14px; }
+.va .stat-n { font-size: 22px; font-weight: 800; letter-spacing: -.04em; color: #a5b4fc; }
+.va .stat-n.rd { color: #f87171; }
+.va .stat-n.gn { color: #4ade80; }
+.va .stat-l { font-size: 10px; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: .06em; margin-top: 2px; }
+.va .card { background: #212840; border: 1px solid rgba(255,255,255,.07); border-radius: 10px; overflow: hidden; }
+.va .card-hdr { padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,.06); display: flex; align-items: center; gap: 8px; }
+.va .card-hdr h3 { font-size: 12.5px; font-weight: 600; color: #94a3b8; flex: 1; }
+.va table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.va thead th { padding: 7px 12px; text-align: left; font-size: 10px; font-weight: 600; color: #334155; text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid rgba(255,255,255,.05); }
+.va tbody tr { border-bottom: 1px solid rgba(255,255,255,.04); }
+.va tbody tr:last-child { border: none; }
+.va td { padding: 8px 12px; color: #94a3b8; vertical-align: middle; }
+.va .code-pill { font-size: 10.5px; font-weight: 700; color: #a5b4fc; background: rgba(99,102,241,.12); padding: 2px 7px; border-radius: 5px; font-family: 'SF Mono', monospace; }
+.va .badge-rd { background: rgba(248,113,113,.1); color: #f87171; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 20px; }
+.va .badge-am { background: rgba(251,191,36,.1); color: #fbbf24; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 20px; }
+.va .name-cell { color: #cbd5e1; font-weight: 500; }
+
+
+/* ===== VARIANT B: Warm Authority ===== */
+.vb { background: #faf9f7; }
+.vb .variant-label { background: #faf9f7; }
+.vb .variant-label h2 { color: #1a1a2e; }
+.vb .variant-letter { background: rgba(37,99,235,.1); color: #2563eb; }
+
+.vb .sidebar { width: 210px; background: #1c2333; flex-shrink: 0; display: flex; flex-direction: column; border-right: 1px solid #e4e4e7; }
+.vb .sb-top { padding: 16px 14px; border-bottom: 1px solid rgba(255,255,255,.07); }
+.vb .logo-row { display: flex; align-items: center; gap: 9px; }
+.vb .logo-sq { width: 28px; height: 28px; border-radius: 7px; background: #2563eb; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; color: #fff; flex-shrink: 0; }
+.vb .brand { font-size: 12px; font-weight: 700; color: #f1f5f9; font-family: 'IBM Plex Sans', sans-serif; letter-spacing: -.01em; }
+.vb .brand span { display: block; font-size: 10px; font-weight: 400; color: #64748b; margin-top: 1px; }
+.vb .sb-nav { padding: 10px 8px; flex: 1; }
+.vb .lbl { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #3d4d65; padding: 10px 8px 4px; font-family: 'IBM Plex Sans', sans-serif; }
+.vb .ni { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 7px; color: #64748b; font-size: 12.5px; font-weight: 500; font-family: 'IBM Plex Sans', sans-serif; margin-bottom: 1px; }
+.vb .ni:hover { background: rgba(255,255,255,.05); color: #94a3b8; }
+.vb .ni.on { background: rgba(37,99,235,.15); color: #93c5fd; font-weight: 600; }
+.vb .ni-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .4; flex-shrink: 0; }
+.vb .ni-badge { margin-left: auto; background: rgba(37,99,235,.2); color: #93c5fd; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 20px; }
+.vb .ni.on .ni-badge { background: #2563eb; color: #fff; }
+
+.vb .main { flex: 1; background: #faf9f7; display: flex; flex-direction: column; font-family: 'IBM Plex Sans', sans-serif; }
+.vb .hdr { height: 52px; background: #fff; border-bottom: 1px solid #e7e5e4; display: flex; align-items: center; padding: 0 20px; gap: 12px; box-shadow: 0 1px 0 #e7e5e4; }
+.vb .hdr h1 { font-size: 14px; font-weight: 600; color: #1c1917; flex: 1; letter-spacing: -.01em; }
+.vb .hdr-btn { height: 30px; padding: 0 14px; border-radius: 6px; background: #2563eb; color: #fff; font-size: 12px; font-weight: 600; border: none; cursor: pointer; }
+.vb .ico-btn { width: 30px; height: 30px; border-radius: 6px; border: 1px solid #e7e5e4; background: #fff; display: flex; align-items: center; justify-content: center; color: #78716c; font-size: 12px; }
+
+.vb .content { padding: 18px; flex: 1; overflow: hidden; }
+.vb .stats { display: flex; gap: 10px; margin-bottom: 14px; }
+.vb .stat { flex: 1; background: #fff; border: 1px solid #e7e5e4; border-radius: 10px; padding: 12px 14px; border-top: 3px solid #2563eb; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+.vb .stat-n { font-size: 22px; font-weight: 800; letter-spacing: -.04em; color: #2563eb; }
+.vb .stat-n.rd { color: #dc2626; border-top-color: #dc2626 !important; }
+.vb .stat-n.gn { color: #16a34a; }
+.vb .stat-l { font-size: 10px; font-weight: 600; color: #a8a29e; text-transform: uppercase; letter-spacing: .06em; margin-top: 3px; }
+.vb .card { background: #fff; border: 1px solid #e7e5e4; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+.vb .card-hdr { padding: 10px 14px; border-bottom: 1px solid #f5f5f4; display: flex; align-items: center; gap: 8px; }
+.vb .card-hdr h3 { font-size: 12.5px; font-weight: 600; color: #57534e; flex: 1; }
+.vb table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.vb thead th { padding: 7px 12px; text-align: left; font-size: 10px; font-weight: 600; color: #a8a29e; text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid #f5f5f4; background: #fafaf9; }
+.vb tbody tr { border-bottom: 1px solid #f5f5f4; }
+.vb tbody tr:last-child { border: none; }
+.vb td { padding: 8px 12px; color: #78716c; vertical-align: middle; }
+.vb .code-pill { font-size: 10.5px; font-weight: 700; color: #2563eb; background: #eff6ff; padding: 2px 7px; border-radius: 5px; font-family: 'SF Mono', monospace; border: 1px solid #bfdbfe; }
+.vb .badge-rd { background: #fef2f2; color: #dc2626; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 20px; border: 1px solid #fecaca; }
+.vb .badge-am { background: #fffbeb; color: #d97706; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 20px; border: 1px solid #fde68a; }
+.vb .name-cell { color: #292524; font-weight: 500; }
+
+
+/* ===== VARIANT C: Refined Teal (evolution huidig) ===== */
+.vc { background: #f8f9fc; }
+.vc .variant-label { background: #f8f9fc; }
+.vc .variant-label h2 { color: #0f172a; }
+.vc .variant-letter { background: rgba(13,115,119,.1); color: #0d7377; }
+
+.vc .sidebar { width: 210px; background: #18222f; flex-shrink: 0; display: flex; flex-direction: column; border-right: 1px solid #e2e8f0; }
+.vc .sb-top { padding: 16px 14px; border-bottom: 1px solid rgba(255,255,255,.07); }
+.vc .logo-row { display: flex; align-items: center; gap: 9px; }
+.vc .logo-sq { width: 28px; height: 28px; border-radius: 7px; background: linear-gradient(135deg, #0d7377, #14b8a6); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; color: #fff; flex-shrink: 0; }
+.vc .brand { font-size: 12px; font-weight: 700; color: #f1f5f9; font-family: 'DM Sans', sans-serif; letter-spacing: -.01em; }
+.vc .brand span { display: block; font-size: 10px; font-weight: 400; color: #64748b; margin-top: 1px; }
+.vc .sb-nav { padding: 10px 8px; flex: 1; }
+.vc .lbl { font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: #334155; padding: 10px 8px 4px; font-family: 'DM Sans', sans-serif; }
+.vc .ni { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 7px; color: #64748b; font-size: 12.5px; font-weight: 500; font-family: 'DM Sans', sans-serif; margin-bottom: 1px; border-left: 2.5px solid transparent; }
+.vc .ni:hover { background: rgba(255,255,255,.06); color: #94a3b8; }
+.vc .ni.on { background: rgba(13,115,119,.2); color: #5eead4; border-left-color: #14b8a6; font-weight: 600; }
+.vc .ni-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .4; flex-shrink: 0; }
+.vc .ni-badge { margin-left: auto; background: rgba(13,115,119,.25); color: #5eead4; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 20px; }
+.vc .ni.on .ni-badge { background: #0d7377; color: #ccfbf1; }
+
+.vc .main { flex: 1; background: #f8f9fc; display: flex; flex-direction: column; font-family: 'DM Sans', sans-serif; }
+.vc .hdr { height: 52px; background: #fff; border-bottom: 1px solid #e8edf3; display: flex; align-items: center; padding: 0 20px; gap: 12px; box-shadow: 0 1px 4px rgba(15,23,42,.05); }
+.vc .hdr h1 { font-size: 14.5px; font-weight: 700; color: #0f172a; flex: 1; letter-spacing: -.02em; }
+.vc .hdr-btn { height: 30px; padding: 0 14px; border-radius: 8px; background: #0d7377; color: #fff; font-size: 12.5px; font-weight: 600; border: none; cursor: pointer; letter-spacing: -.01em; }
+.vc .ico-btn { width: 30px; height: 30px; border-radius: 7px; border: 1px solid #e2e8f0; background: #fff; display: flex; align-items: center; justify-content: center; color: #64748b; font-size: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+
+.vc .content { padding: 18px; flex: 1; overflow: hidden; }
+.vc .stats { display: flex; gap: 10px; margin-bottom: 14px; }
+.vc .stat { flex: 1; background: #fff; border: 1px solid #e8edf3; border-radius: 11px; padding: 12px 14px; box-shadow: 0 1px 3px rgba(15,23,42,.05), 0 2px 8px rgba(13,115,119,.06); border-top: 3px solid #14b8a6; }
+.vc .stat-n { font-size: 22px; font-weight: 800; letter-spacing: -.04em; color: #0d7377; }
+.vc .stat-n.rd { color: #b91c1c; }
+.vc .stat-n.gn { color: #047857; }
+.vc .stat-l { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .06em; margin-top: 3px; }
+.vc .card { background: #fff; border: 1px solid #e8edf3; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(15,23,42,.05); }
+.vc .card-hdr { padding: 11px 14px; border-bottom: 1px solid #f0f4f8; display: flex; align-items: center; gap: 8px; background: #fcfcfd; }
+.vc .card-hdr h3 { font-size: 13px; font-weight: 700; color: #334155; flex: 1; }
+.vc table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.vc thead th { padding: 7px 12px; text-align: left; font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid #f0f4f8; background: #fcfcfd; }
+.vc tbody tr { border-bottom: 1px solid #f4f6f9; }
+.vc tbody tr:last-child { border: none; }
+.vc td { padding: 8px 12px; color: #64748b; vertical-align: middle; }
+.vc .code-pill { font-size: 10.5px; font-weight: 700; color: #0d7377; background: #ccfbf1; padding: 2px 7px; border-radius: 5px; font-family: 'SF Mono', monospace; cursor: pointer; }
+.vc .code-pill:hover { background: #99f6e4; }
+.vc .badge-rd { background: #fee2e2; color: #b91c1c; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px; }
+.vc .badge-am { background: #fef3c7; color: #b45309; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px; }
+.vc .name-cell { color: #1e293b; font-weight: 500; }
+
+/* Selection */
+.selected-bar { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #6366f1; color: #fff; padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 600; display: none; gap: 8px; align-items: center; box-shadow: 0 4px 20px rgba(99,102,241,.4); }
+.selected-bar.show { display: flex; }
+</style>
+</head>
+<body>
+
+<h1>Dashboard Design Richtingen</h1>
+<p class="intro">Klik op een variant om te selecteren. Elk laat de zijbalk, header, statistieken en tabelrijen zien.</p>
+
+<div class="grid">
+
+  <!-- VARIANT A -->
+  <div class="variant va" onclick="select('a', this)">
+    <div class="variant-label">
+      <div class="variant-letter">A</div>
+      <h2>Slate Pro — Dark UI</h2>
+      <p>Volledig donker dashboard, paars-blauw accent. Denk Linear / Vercel. Verfijnd en technisch.</p>
+    </div>
+    <div class="mockup-shell">
+      <div class="sidebar">
+        <div class="sb-top">
+          <div class="logo-row">
+            <div class="logo-sq">VC</div>
+            <div class="brand">VvE Collectief<span>Beheer dashboard</span></div>
+          </div>
+        </div>
+        <div class="sb-nav">
+          <div class="lbl">Werklijsten</div>
+          <div class="ni on">
+            <div class="ni-dot"></div> NTD-lijst
+            <span class="ni-badge">12</span>
+          </div>
+          <div class="ni">
+            <div class="ni-dot"></div> Afgerond
+          </div>
+          <div class="ni">
+            <div class="ni-dot"></div> ALV's
+          </div>
+          <div class="lbl">Beheer</div>
+          <div class="ni">
+            <div class="ni-dot"></div> Statistieken
+          </div>
+          <div class="ni">
+            <div class="ni-dot"></div> Herhaalregels
+          </div>
+        </div>
+      </div>
+      <div class="main">
+        <div class="hdr">
+          <h1>NTD-lijst</h1>
+          <div class="ico-btn">⌘K</div>
+          <div class="ico-btn">🔔</div>
+          <button class="hdr-btn">+ Taak</button>
+        </div>
+        <div class="content">
+          <div class="stats">
+            <div class="stat"><div class="stat-n">23</div><div class="stat-l">Open taken</div></div>
+            <div class="stat"><div class="stat-n rd">4</div><div class="stat-l">Te laat</div></div>
+            <div class="stat"><div class="stat-n gn">8</div><div class="stat-l">Weggelegd</div></div>
+          </div>
+          <div class="card">
+            <div class="card-hdr"><h3>OPPAKKEN</h3></div>
+            <table>
+              <thead><tr><th>Code</th><th>VvE-naam</th><th>Omschrijving</th><th>Deadline</th></tr></thead>
+              <tbody>
+                <tr><td><span class="code-pill">AMS001</span></td><td class="name-cell">Amstelveen Centraal</td><td>Lekkage dak repareren</td><td><span class="badge-rd">Te laat</span></td></tr>
+                <tr><td><span class="code-pill">RTD045</span></td><td class="name-cell">Rotterdam Haven</td><td>Offerte schilderwerk</td><td><span class="badge-am">14 jun</span></td></tr>
+                <tr><td><span class="code-pill">UTR012</span></td><td class="name-cell">Utrecht Midden</td><td>ALV notulen verwerken</td><td>—</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VARIANT B -->
+  <div class="variant vb" onclick="select('b', this)">
+    <div class="variant-label">
+      <div class="variant-letter">B</div>
+      <h2>Warm Authority — Licht + Blauw</h2>
+      <p>Warme witte achtergrond, IBM Plex Sans, koningsblauw accent. Denk Notion / Basecamp. Zakelijk en helder.</p>
+    </div>
+    <div class="mockup-shell">
+      <div class="sidebar">
+        <div class="sb-top">
+          <div class="logo-row">
+            <div class="logo-sq">VC</div>
+            <div class="brand">VvE Collectief<span>Beheer dashboard</span></div>
+          </div>
+        </div>
+        <div class="sb-nav">
+          <div class="lbl">Werklijsten</div>
+          <div class="ni on">
+            <div class="ni-dot"></div> NTD-lijst
+            <span class="ni-badge">12</span>
+          </div>
+          <div class="ni">
+            <div class="ni-dot"></div> Afgerond
+          </div>
+          <div class="ni">
+            <div class="ni-dot"></div> ALV's
+          </div>
+          <div class="lbl">Beheer</div>
+          <div class="ni">
+            <div class="ni-dot"></div> Statistieken
+          </div>
+          <div class="ni">
+            <div class="ni-dot"></div> Herhaalregels
+          </div>
+        </div>
+      </div>
+      <div class="main">
+        <div class="hdr">
+          <h1>NTD-lijst</h1>
+          <div class="ico-btn">⌘K</div>
+          <div class="ico-btn">🔔</div>
+          <button class="hdr-btn">+ Taak</button>
+        </div>
+        <div class="content">
+          <div class="stats">
+            <div class="stat"><div class="stat-n">23</div><div class="stat-l">Open taken</div></div>
+            <div class="stat" style="border-top-color:#dc2626"><div class="stat-n rd">4</div><div class="stat-l">Te laat</div></div>
+            <div class="stat" style="border-top-color:#16a34a"><div class="stat-n gn">8</div><div class="stat-l">Weggelegd</div></div>
+          </div>
+          <div class="card">
+            <div class="card-hdr"><h3>OPPAKKEN</h3></div>
+            <table>
+              <thead><tr><th>Code</th><th>VvE-naam</th><th>Omschrijving</th><th>Deadline</th></tr></thead>
+              <tbody>
+                <tr><td><span class="code-pill">AMS001</span></td><td class="name-cell">Amstelveen Centraal</td><td>Lekkage dak repareren</td><td><span class="badge-rd">Te laat</span></td></tr>
+                <tr><td><span class="code-pill">RTD045</span></td><td class="name-cell">Rotterdam Haven</td><td>Offerte schilderwerk</td><td><span class="badge-am">14 jun</span></td></tr>
+                <tr><td><span class="code-pill">UTR012</span></td><td class="name-cell">Utrecht Midden</td><td>ALV notulen verwerken</td><td>—</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VARIANT C -->
+  <div class="variant vc" onclick="select('c', this)">
+    <div class="variant-label">
+      <div class="variant-letter">C</div>
+      <h2>Refined Teal — Huidige stijl geperfectioneerd</h2>
+      <p>Hetzelfde teal-merk, maar scherpere typografie, cleaner witte oppervlakken en betere kleurbalans. Minste breuk.</p>
+    </div>
+    <div class="mockup-shell">
+      <div class="sidebar">
+        <div class="sb-top">
+          <div class="logo-row">
+            <div class="logo-sq">VC</div>
+            <div class="brand">VvE Collectief<span>Beheer dashboard</span></div>
+          </div>
+        </div>
+        <div class="sb-nav">
+          <div class="lbl">Werklijsten</div>
+          <div class="ni on">
+            <div class="ni-dot"></div> NTD-lijst
+            <span class="ni-badge">12</span>
+          </div>
+          <div class="ni">
+            <div class="ni-dot"></div> Afgerond
+          </div>
+          <div class="ni">
+            <div class="ni-dot"></div> ALV's
+          </div>
+          <div class="lbl">Beheer</div>
+          <div class="ni">
+            <div class="ni-dot"></div> Statistieken
+          </div>
+          <div class="ni">
+            <div class="ni-dot"></div> Herhaalregels
+          </div>
+        </div>
+      </div>
+      <div class="main">
+        <div class="hdr">
+          <h1>NTD-lijst</h1>
+          <div class="ico-btn">⌘K</div>
+          <div class="ico-btn">🔔</div>
+          <button class="hdr-btn">+ Taak</button>
+        </div>
+        <div class="content">
+          <div class="stats">
+            <div class="stat"><div class="stat-n">23</div><div class="stat-l">Open taken</div></div>
+            <div class="stat" style="border-top-color:#b91c1c"><div class="stat-n rd">4</div><div class="stat-l">Te laat</div></div>
+            <div class="stat" style="border-top-color:#047857"><div class="stat-n gn">8</div><div class="stat-l">Weggelegd</div></div>
+          </div>
+          <div class="card">
+            <div class="card-hdr"><h3>OPPAKKEN</h3></div>
+            <table>
+              <thead><tr><th>Code</th><th>VvE-naam</th><th>Omschrijving</th><th>Deadline</th></tr></thead>
+              <tbody>
+                <tr><td><span class="code-pill">AMS001</span></td><td class="name-cell">Amstelveen Centraal</td><td>Lekkage dak repareren</td><td><span class="badge-rd">Te laat</span></td></tr>
+                <tr><td><span class="code-pill">RTD045</span></td><td class="name-cell">Rotterdam Haven</td><td>Offerte schilderwerk</td><td><span class="badge-am">14 jun</span></td></tr>
+                <tr><td><span class="code-pill">UTR012</span></td><td class="name-cell">Utrecht Midden</td><td>ALV notulen verwerken</td><td>—</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="selected-bar" id="bar">
+  <span id="bar-text">Niets geselecteerd</span>
+</div>
+
+<script>
+let selected = null;
+function select(choice, el) {
+  document.querySelectorAll('.variant').forEach(v => v.classList.remove('selected'));
+  el.classList.add('selected');
+  selected = choice;
+  const names = { a: 'A — Slate Pro (Dark)', b: 'B — Warm Authority (Licht + Blauw)', c: 'C — Refined Teal (Huidige stijl)' };
+  document.getElementById('bar-text').textContent = '✓ Geselecteerd: Variant ' + names[choice];
+  document.getElementById('bar').classList.add('show');
+}
+</script>
+</body>
+</html>

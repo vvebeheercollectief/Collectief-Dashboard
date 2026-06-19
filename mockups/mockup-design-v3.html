@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<title>Dashboard — V3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; font-family: 'Manrope', sans-serif; background: #0d1117; -webkit-font-smoothing: antialiased; }
+
+.outer { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+.pg-title { font-size: 18px; font-weight: 800; color: #f1f5f9; letter-spacing: -.03em; margin-bottom: 4px; }
+.pg-sub   { font-size: 13px; color: #475569; margin-bottom: 20px; }
+
+/* ── APP ── */
+#app {
+  display: flex; height: 640px;
+  border-radius: 12px; overflow: hidden;
+  border: 1px solid #1e293b;
+  box-shadow: 0 32px 80px rgba(0,0,0,.55);
+}
+
+/* ─────────────────── SIDEBAR ─────────────────── */
+#sb {
+  width: 226px; flex-shrink: 0;
+  background: #08353a;
+  display: flex; flex-direction: column;
+  position: relative;
+}
+#sb::after {
+  content: ''; position: absolute;
+  right: 0; top: 0; bottom: 0; width: 3px;
+  background: linear-gradient(180deg, #0f5c62 0%, #062e33 55%, transparent 100%);
+}
+
+.sb-logo {
+  padding: 18px 18px 15px;
+  border-bottom: 1px solid rgba(255,255,255,.07);
+  display: flex; align-items: center; gap: 9px;
+}
+.sb-logo img {
+  height: 28px; width: auto; object-fit: contain; max-width: 130px;
+  filter: brightness(0) invert(1) opacity(.88);
+}
+.sb-brand {
+  font-size: 10.5px; font-weight: 600;
+  color: rgba(255,255,255,.3); line-height: 1.35; letter-spacing: -.01em;
+}
+
+.sb-nav { flex: 1; padding: 10px 10px; overflow-y: auto; }
+
+.sb-lbl {
+  font-size: 9.5px; font-weight: 800;
+  letter-spacing: .1em; text-transform: uppercase;
+  color: rgba(255,255,255,.2);
+  padding: 12px 8px 4px;
+}
+.sb-lbl:first-child { padding-top: 4px; }
+
+.ni {
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 9px; border-radius: 6px;
+  color: rgba(255,255,255,.4);
+  font-size: 12.5px; font-weight: 600; letter-spacing: -.01em;
+  cursor: pointer; margin-bottom: 1px; position: relative;
+  transition: background .13s, color .13s;
+}
+.ni:hover { background: rgba(255,255,255,.06); color: rgba(255,255,255,.7); }
+.ni.on    { background: rgba(255,255,255,.1);  color: #fff; }
+.ni.on::before {
+  content: ''; position: absolute;
+  left: -10px; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 16px;
+  background: #4dd9d5; border-radius: 0 3px 3px 0;
+}
+.ni svg { width: 15px; height: 15px; flex-shrink: 0; opacity: .6; }
+.ni.on svg { opacity: 1; }
+.ni-badge {
+  margin-left: auto; font-size: 10px; font-weight: 800;
+  color: #4dd9d5; letter-spacing: .02em;
+}
+
+.sb-foot {
+  padding: 11px 16px;
+  border-top: 1px solid rgba(255,255,255,.07);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.sync-row { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 500; color: rgba(255,255,255,.27); }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: #4dd9d5; flex-shrink: 0; }
+.sb-refresh {
+  width: 26px; height: 26px; border-radius: 5px;
+  border: 1px solid rgba(255,255,255,.1); background: transparent;
+  display: flex; align-items: center; justify-content: center;
+  color: rgba(255,255,255,.28); cursor: pointer;
+}
+.sb-refresh svg { width: 12px; height: 12px; }
+
+/* ─────────────────── MAIN ─────────────────── */
+#main { flex: 1; background: #f0f3f5; display: flex; flex-direction: column; overflow: hidden; }
+
+/* Header */
+#hdr {
+  background: #fff; border-bottom: 2px solid #e2e7ec;
+  padding: 0 22px; height: 54px;
+  display: flex; align-items: center; gap: 7px;
+  flex-shrink: 0;
+}
+.hdr-info { flex: 1; display: flex; align-items: baseline; gap: 9px; }
+.hdr-title { font-size: 18px; font-weight: 900; color: #0c1c27; letter-spacing: -.045em; }
+.hdr-sep   { width: 4px; height: 4px; border-radius: 50%; background: #4dd9d5; margin-bottom: 2px; flex-shrink: 0; }
+.hdr-sub   { font-size: 12px; font-weight: 500; color: #98aab8; }
+
+.ico-btn {
+  width: 32px; height: 32px; border-radius: 7px;
+  border: 1px solid #e2e7ec; background: #fff;
+  display: flex; align-items: center; justify-content: center;
+  color: #98aab8; cursor: pointer; flex-shrink: 0;
+  transition: all .13s;
+}
+.ico-btn:hover { background: #f5f7f9; color: #4a6070; border-color: #ccd4dc; }
+.ico-btn svg { width: 14px; height: 14px; }
+
+/* ─── STAT STRIP ─── */
+/* Horizontale strip — geen losse kaartjes, geen icoontjes. Gewoon grote getallen. */
+.stat-strip {
+  background: #fff;
+  border-bottom: 1px solid #e2e7ec;
+  display: flex; padding: 0 22px;
+  flex-shrink: 0;
+}
+.stat-item {
+  display: flex; align-items: baseline; gap: 9px;
+  padding: 13px 28px 13px 0;
+  margin-right: 28px;
+  border-right: 1px solid #eceff2;
+}
+.stat-item:last-child { border-right: none; margin-right: 0; }
+
+.stat-num {
+  font-size: 30px; font-weight: 900;
+  letter-spacing: -.07em; line-height: 1;
+  color: #0c1c27;
+}
+.stat-num.red    { color: #b91c1c; }
+.stat-num.amber  { color: #b45309; }
+.stat-num.muted  { color: #c2cdd6; }
+
+.stat-meta { display: flex; flex-direction: column; gap: 1px; padding-bottom: 2px; }
+.stat-lbl  { font-size: 11px; font-weight: 700; color: #98aab8; white-space: nowrap; }
+.stat-hint { font-size: 10px; font-weight: 700; color: #4dd9d5; }
+
+/* ─── CONTENT ─── */
+#content { flex: 1; overflow-y: auto; padding: 18px 22px; }
+
+/* Tabs */
+.tabs {
+  display: flex; gap: 0;
+  border-bottom: 2px solid #e2e7ec;
+  margin-bottom: 14px;
+}
+.tab {
+  padding: 9px 15px;
+  font-size: 12.5px; font-weight: 700; letter-spacing: -.01em;
+  color: #98aab8; cursor: pointer;
+  border-bottom: 2px solid transparent; margin-bottom: -2px;
+  display: flex; align-items: center; gap: 5px;
+  transition: color .13s; white-space: nowrap;
+}
+.tab:hover { color: #4a6070; }
+.tab.on    { color: #08353a; border-bottom-color: #08353a; }
+.tab-n { font-size: 11px; font-weight: 800; opacity: .4; }
+.tab.on .tab-n { opacity: 1; color: #4dd9d5; }
+
+/* Filter-bar */
+.filter-bar {
+  display: flex; align-items: center; gap: 7px;
+  margin-bottom: 12px; flex-wrap: wrap;
+}
+.search-wrap {
+  display: flex; align-items: center; gap: 6px;
+  background: #fff; border: 1px solid #e2e7ec;
+  border-radius: 7px; padding: 6px 11px;
+}
+.search-wrap svg { width: 12px; height: 12px; color: #b0bfcb; flex-shrink: 0; }
+.search-wrap input {
+  background: none; border: none; outline: none;
+  font-family: 'Manrope', sans-serif; font-size: 12px; font-weight: 500;
+  color: #0c1c27; width: 160px;
+}
+.search-wrap input::placeholder { color: #b0bfcb; }
+.filter-sel {
+  background: #fff; border: 1px solid #e2e7ec;
+  border-radius: 7px; padding: 6px 9px;
+  font-family: 'Manrope', sans-serif; font-size: 12px; font-weight: 500;
+  color: #4a6070; outline: none; cursor: pointer;
+}
+.fb-sep { width: 1px; height: 20px; background: #e2e7ec; margin: 0 1px; }
+.btn-sel {
+  height: 28px; padding: 0 11px;
+  border-radius: 6px; border: 1px solid #e2e7ec;
+  background: #fff; color: #4a6070;
+  font-family: 'Manrope', sans-serif; font-size: 11.5px; font-weight: 700;
+  cursor: pointer; letter-spacing: -.01em; transition: all .12s;
+}
+.btn-sel:hover { background: #f0f3f5; color: #0c1c27; }
+.btn-add {
+  height: 28px; padding: 0 13px;
+  border-radius: 6px; border: none;
+  background: #0f766e; color: #fff;
+  font-family: 'Manrope', sans-serif; font-size: 11.5px; font-weight: 700;
+  cursor: pointer; letter-spacing: -.01em;
+  display: inline-flex; align-items: center; gap: 5px;
+  transition: background .12s;
+}
+.btn-add:hover { background: #0d9488; }
+.btn-add svg { width: 11px; height: 11px; }
+
+/* ─── TABEL ─── */
+.tbl-wrap {
+  background: #fff; border: 1px solid #e2e7ec;
+  border-radius: 10px; overflow: hidden;
+}
+table { width: 100%; border-collapse: collapse; }
+
+thead th {
+  padding: 9px 14px; text-align: left;
+  font-size: 11px; font-weight: 800; letter-spacing: -.01em;
+  color: #5a8282;
+  background: #edf8f8;
+  border-bottom: 2px solid #c5e6e6;
+  white-space: nowrap;
+}
+thead th:first-child { color: #0a5c60; }
+
+tbody tr { border-bottom: 1px solid #f0f3f5; transition: background .1s; }
+tbody tr:last-child { border: none; }
+tbody tr:hover { background: #f8fafb; }
+td { padding: 9px 14px; vertical-align: middle; }
+
+/* VvE-code: primair ID, gedurfd */
+.code {
+  font-family: 'Manrope', monospace;
+  font-size: 12px; font-weight: 900; letter-spacing: .02em;
+  color: #08353a; cursor: pointer; white-space: nowrap;
+}
+.code:hover { color: #0f766e; }
+
+.cell-naam { font-weight: 700; color: #182434; font-size: 12.5px; }
+.cell-oms  { color: #7a8f9e; font-weight: 500; font-size: 12px; max-width: 205px; }
+.cell-wie  { color: #98aab8; font-weight: 600; font-size: 12px; }
+
+/* Status als gewone tekst — geen pill */
+.s-telaat  { font-size: 11.5px; font-weight: 800; color: #b91c1c; }
+.s-soon    { font-size: 11.5px; font-weight: 700; color: #b45309; }
+.s-normal  { font-size: 11.5px; font-weight: 600; color: #98aab8; }
+.s-snoozed { font-size: 11px;   font-weight: 600; color: #b0bfcb; }
+
+/* Urgente rij */
+tr.urgent td:first-child { box-shadow: inset 3px 0 0 #b91c1c; }
+tr.urgent { background: rgba(185,28,28,.02); }
+
+/* ─── ACTIEKNOPPEN ───
+   Licht en menselijk: teal tekstkleur met subtiel teal kader.
+   Geen donkere achtergrond, geen abstracte iconen.       */
+.acts { display: flex; gap: 5px; }
+
+.act-af {
+  height: 25px; padding: 0 10px;
+  border-radius: 5px;
+  background: #e8f7f6; border: 1px solid #9ed5d2;
+  color: #0a5c60;
+  font-family: 'Manrope', sans-serif; font-size: 10.5px; font-weight: 800;
+  cursor: pointer; letter-spacing: -.01em;
+  transition: all .12s;
+}
+.act-af:hover { background: #d0eeec; border-color: #6bbfbb; color: #064e50; }
+
+.act-bw {
+  height: 25px; padding: 0 10px;
+  border-radius: 5px;
+  background: transparent; border: 1px solid #dde5ea;
+  color: #98aab8;
+  font-family: 'Manrope', sans-serif; font-size: 10.5px; font-weight: 700;
+  cursor: pointer; letter-spacing: -.01em;
+  transition: all .12s;
+}
+.act-bw:hover { background: #f0f3f5; color: #4a6070; border-color: #c8d0d8; }
+
+/* ─── WEGGELEGD SECTIE ─── */
+tr.grp-hdr td {
+  padding: 6px 14px;
+  font-size: 10px; font-weight: 800; letter-spacing: .08em;
+  text-transform: uppercase; color: #0a5c60;
+  background: #d4eeee;
+  border-top: 1px solid #b5dede;
+  border-bottom: 1px solid #b5dede;
+}
+tr.row-snoozed td { opacity: .58; }
+
+.snooze-lbl {
+  font-size: 11px; font-weight: 700; color: #b45309;
+}
+</style>
+</head>
+<body>
+<div class="outer">
+
+<p class="pg-title">Dashboard Redesign — V3</p>
+<p class="pg-sub">Juiste indeling + het menselijke gevoel terug: stat-strip, lichte actieknoppen, teal sectionering.</p>
+
+<div id="app">
+
+  <!-- SIDEBAR -->
+  <aside id="sb">
+    <div class="sb-logo">
+      <img src="logo-sidebar.png" alt="VvE Beheer Collectief">
+      <span class="sb-brand">Collectief<br>Dashboard 4.0</span>
+    </div>
+    <nav class="sb-nav">
+
+      <div class="sb-lbl">Taken</div>
+      <div class="ni on">
+        <!-- Nog Te Doen: klembord met regels -->
+        <svg viewBox="0 0 16 16" fill="currentColor" width="15" height="15">
+          <rect x="2" y="2.5" width="12" height="11" rx="2" opacity=".18"/>
+          <line x1="4.5" y1="6"   x2="11.5" y2="6"   stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+          <line x1="4.5" y1="8.5" x2="11.5" y2="8.5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+          <line x1="4.5" y1="11"  x2="8.5"  y2="11"  stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+        </svg>
+        Nog Te Doen <span class="ni-badge">17</span>
+      </div>
+      <div class="ni">
+        <!-- Afgerond: cirkel + vinkje -->
+        <svg viewBox="0 0 16 16" fill="currentColor" width="15" height="15">
+          <circle cx="8" cy="8" r="5.5" opacity=".18"/>
+          <polyline points="5.5,8 7,9.5 10.5,6.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Afgerond
+      </div>
+
+      <div class="sb-lbl">ALV's</div>
+      <div class="ni">
+        <!-- ALV's Overzicht: klembord -->
+        <svg viewBox="0 0 16 16" fill="currentColor" width="15" height="15">
+          <rect x="2.5" y="4" width="11" height="9.5" rx="1.5" opacity=".18"/>
+          <rect x="5.5" y="2" width="5" height="3" rx="1" opacity=".45"/>
+          <line x1="5" y1="7.5" x2="11" y2="7.5" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+          <line x1="5" y1="10" x2="9"  y2="10"  stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+        </svg>
+        ALV's Overzicht
+      </div>
+      <div class="ni">
+        <!-- ALV's Afgerond: kalender + vinkje -->
+        <svg viewBox="0 0 16 16" fill="currentColor" width="15" height="15">
+          <rect x="2" y="3.5" width="12" height="10" rx="1.5" opacity=".18"/>
+          <line x1="2" y1="6.5" x2="14" y2="6.5" stroke="currentColor" stroke-width="1.3" fill="none"/>
+          <line x1="5.5" y1="2" x2="5.5" y2="5"  stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+          <line x1="10.5" y1="2" x2="10.5" y2="5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+          <polyline points="6,10 7.5,11.5 10.5,8.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        ALV's Afgerond
+      </div>
+
+      <div class="sb-lbl">Intern</div>
+      <div class="ni">
+        <!-- Ontwikkeling: penseel/pen -->
+        <svg viewBox="0 0 16 16" fill="currentColor" width="15" height="15">
+          <path d="M10.5 2.5l3 3-7.5 7.5-3 .5.5-3z" opacity=".2"/>
+          <path d="M10.5 2.5l3 3-7.5 7.5-3 .5.5-3z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          <line x1="8.5" y1="4.5" x2="11.5" y2="7.5" stroke="currentColor" stroke-width="1.3" fill="none"/>
+        </svg>
+        Ontwikkeling
+      </div>
+      <div class="ni">
+        <!-- Logboek: klok -->
+        <svg viewBox="0 0 16 16" fill="currentColor" width="15" height="15">
+          <circle cx="8" cy="8" r="5.5" opacity=".18"/>
+          <polyline points="8,5 8,8.5 10.5,10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Logboek
+      </div>
+      <div class="ni">
+        <!-- Terugkerende taken: kalender met herhaalmarkering -->
+        <svg viewBox="0 0 16 16" fill="currentColor" width="15" height="15">
+          <rect x="2" y="3.5" width="12" height="10" rx="1.5" opacity=".18"/>
+          <line x1="2" y1="6.5" x2="14" y2="6.5" stroke="currentColor" stroke-width="1.3" fill="none"/>
+          <line x1="5.5" y1="2" x2="5.5" y2="5"  stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+          <line x1="10.5" y1="2" x2="10.5" y2="5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+          <path d="M6 10.5 A2.2 2.2 0 0 1 10.2 9.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          <polyline points="9.5,8.5 10.5,9.5 9.5,10.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Terugkerende taken
+      </div>
+
+      <div class="sb-lbl">Analyse</div>
+      <div class="ni">
+        <!-- Analytics: staafjes + lijn -->
+        <svg viewBox="0 0 16 16" fill="currentColor" width="15" height="15">
+          <rect x="2"   y="9"   width="3" height="5" rx="1" opacity=".45"/>
+          <rect x="6.5" y="5.5" width="3" height="8.5" rx="1" opacity=".45"/>
+          <rect x="11"  y="2"   width="3" height="12" rx="1" opacity=".45"/>
+          <polyline points="2.5,12 5.5,8.5 8,10 13,4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Analytics
+      </div>
+      <div class="ni">
+        <!-- Dashboard: 4 blokken -->
+        <svg viewBox="0 0 16 16" fill="currentColor" width="15" height="15">
+          <rect x="2"   y="2"   width="5.5" height="5.5" rx="1.5" opacity=".45"/>
+          <rect x="8.5" y="2"   width="5.5" height="5.5" rx="1.5" opacity=".18"/>
+          <rect x="2"   y="8.5" width="5.5" height="5.5" rx="1.5" opacity=".18"/>
+          <rect x="8.5" y="8.5" width="5.5" height="5.5" rx="1.5" opacity=".45"/>
+        </svg>
+        Dashboard
+      </div>
+
+    </nav>
+    <div class="sb-foot">
+      <div class="sync-row">
+        <div class="dot"></div>
+        <span>Gesynchroniseerd</span>
+      </div>
+      <button class="sb-refresh">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0115-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 01-15 6.7L3 16"/></svg>
+      </button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div id="main">
+
+    <header id="hdr">
+      <div class="hdr-info">
+        <span class="hdr-title">Nog Te Doen</span>
+        <div class="hdr-sep"></div>
+        <span class="hdr-sub">Openstaande taken</span>
+      </div>
+      <button class="ico-btn" title="Zoeken (Ctrl+K)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      </button>
+      <button class="ico-btn" title="Meldingen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      </button>
+      <button class="ico-btn" title="AI-hulp">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" fill="currentColor" fill-opacity="0.15"/></svg>
+      </button>
+      <button class="ico-btn" title="Dichtheid">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <button class="ico-btn" title="Thema">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+      </button>
+    </header>
+
+    <!-- STAT STRIP — grote getallen, geen tegels, geen icoontjes -->
+    <div class="stat-strip">
+      <div class="stat-item">
+        <span class="stat-num">17</span>
+        <div class="stat-meta">
+          <span class="stat-lbl">Open taken</span>
+          <span class="stat-hint">↑ 3 nieuw</span>
+        </div>
+      </div>
+      <div class="stat-item">
+        <span class="stat-num red">3</span>
+        <div class="stat-meta">
+          <span class="stat-lbl">Te laat</span>
+        </div>
+      </div>
+      <div class="stat-item">
+        <span class="stat-num amber">5</span>
+        <div class="stat-meta">
+          <span class="stat-lbl">Weggelegd</span>
+        </div>
+      </div>
+      <div class="stat-item">
+        <span class="stat-num muted">8</span>
+        <div class="stat-meta">
+          <span class="stat-lbl">Afgerond vandaag</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="content">
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <div class="tab on">Oppakken <span class="tab-n">8</span></div>
+        <div class="tab">Vergaderverzoeken <span class="tab-n">4</span></div>
+        <div class="tab">Offerte-trajecten <span class="tab-n">3</span></div>
+        <div class="tab">LOD <span class="tab-n">2</span></div>
+      </div>
+
+      <!-- Filter-bar -->
+      <div class="filter-bar">
+        <div class="search-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input placeholder="Zoek op VvE of omschrijving…">
+        </div>
+        <select class="filter-sel">
+          <option>Alle behandelaars</option>
+          <option>Jer</option>
+          <option>Cihad</option>
+        </select>
+        <div class="fb-sep"></div>
+        <button class="btn-sel">☑ Selecteren</button>
+        <button class="btn-add">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Toevoegen
+        </button>
+      </div>
+
+      <!-- Tabel -->
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>VvE</th>
+              <th>Naam</th>
+              <th>Omschrijving</th>
+              <th>Behandelaar</th>
+              <th>Deadline</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="urgent">
+              <td><span class="code">AMS001</span></td>
+              <td class="cell-naam">Amstelveen Centraal</td>
+              <td class="cell-oms">Lekkage dak — offerte aanvragen bij aannemer</td>
+              <td class="cell-wie">Jer</td>
+              <td><span class="s-telaat">Te laat</span></td>
+              <td><div class="acts">
+                <button class="act-af">Afronden</button>
+                <button class="act-bw">Bewerken</button>
+              </div></td>
+            </tr>
+            <tr>
+              <td><span class="code">RTD045</span></td>
+              <td class="cell-naam">Rotterdam Havenblok</td>
+              <td class="cell-oms">Schilderwerk gevel — offerte verwerken en voorstellen</td>
+              <td class="cell-wie">Cihad</td>
+              <td><span class="s-soon">14 jun</span></td>
+              <td><div class="acts">
+                <button class="act-af">Afronden</button>
+                <button class="act-bw">Bewerken</button>
+              </div></td>
+            </tr>
+            <tr>
+              <td><span class="code">UTR012</span></td>
+              <td class="cell-naam">Utrecht Midden Noord</td>
+              <td class="cell-oms">ALV notulen verwerken en naar bestuur sturen</td>
+              <td class="cell-wie">Jer</td>
+              <td><span class="s-normal">22 jun</span></td>
+              <td><div class="acts">
+                <button class="act-af">Afronden</button>
+                <button class="act-bw">Bewerken</button>
+              </div></td>
+            </tr>
+            <tr>
+              <td><span class="code">DEN078</span></td>
+              <td class="cell-naam">Den Haag Centrum VvE</td>
+              <td class="cell-oms">Jaarrekening controleren en goedkeuren</td>
+              <td class="cell-wie">Cihad</td>
+              <td><span class="s-normal">30 jun</span></td>
+              <td><div class="acts">
+                <button class="act-af">Afronden</button>
+                <button class="act-bw">Bewerken</button>
+              </div></td>
+            </tr>
+            <tr>
+              <td><span class="code">HAR091</span></td>
+              <td class="cell-naam">Haarlem Schalkwijk</td>
+              <td class="cell-oms">Renovatievoorstel bespreken met bestuur</td>
+              <td class="cell-wie">Jer</td>
+              <td><span class="s-normal">5 jul</span></td>
+              <td><div class="acts">
+                <button class="act-af">Afronden</button>
+                <button class="act-bw">Bewerken</button>
+              </div></td>
+            </tr>
+            <tr class="grp-hdr"><td colspan="6">Weggelegd — hervat 18 juni</td></tr>
+            <tr class="row-snoozed">
+              <td><span class="code">EIN033</span></td>
+              <td class="cell-naam">Eindhoven Strijp</td>
+              <td class="cell-oms">Verzekering doorlopen na waterschade</td>
+              <td class="cell-wie">Jer</td>
+              <td><span class="snooze-lbl">18 jun</span></td>
+              <td><div class="acts">
+                <button class="act-af">Afronden</button>
+                <button class="act-bw">Bewerken</button>
+              </div></td>
+            </tr>
+            <tr class="row-snoozed">
+              <td><span class="code">GRN022</span></td>
+              <td class="cell-naam">Groningen Centrum</td>
+              <td class="cell-oms">Reactie afwachten gemeente parkeerplaats</td>
+              <td class="cell-wie">Cihad</td>
+              <td><span class="snooze-lbl">25 jun</span></td>
+              <td><div class="acts">
+                <button class="act-af">Afronden</button>
+                <button class="act-bw">Bewerken</button>
+              </div></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+</div>
+</body>
+</html>

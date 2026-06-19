@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<title>Design C — Verfijning: Typografie + Iconen + Kleur</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0d1117; color: #fff; padding: 36px 32px 60px; font-family: 'Plus Jakarta Sans', sans-serif; }
+
+h1 { font-size: 21px; font-weight: 700; margin-bottom: 4px; color: #f1f5f9; letter-spacing: -.02em; }
+.intro { font-size: 13.5px; color: #475569; margin-bottom: 10px; line-height: 1.5; }
+.section-title { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #334155; margin: 28px 0 12px; }
+
+/* Grid */
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+
+/* Card wrapper */
+.vk { border-radius: 14px; overflow: hidden; border: 2px solid rgba(255,255,255,.06); cursor: pointer; transition: all .18s; background: #f8f9fc; }
+.vk:hover { transform: translateY(-2px); border-color: rgba(255,255,255,.15); }
+.vk.selected { border-color: #14b8a6; box-shadow: 0 0 0 4px rgba(20,184,166,.15); }
+
+/* Label */
+.vk-lbl { padding: 14px 18px 10px; }
+.vk-letter { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 7px; font-weight: 800; font-size: 12px; margin-bottom: 7px; background: rgba(13,115,119,.12); color: #0d7377; }
+.vk-lbl h2 { font-size: 15px; font-weight: 700; color: #0f172a; margin-bottom: 3px; }
+.vk-lbl p { font-size: 12px; color: #64748b; line-height: 1.4; }
+
+/* Shell */
+.shell { display: flex; height: 310px; }
+
+/* Sidebar (shared dark) */
+.sb { width: 196px; flex-shrink: 0; display: flex; flex-direction: column; }
+.sb-top { padding: 14px 12px; }
+.logo-row { display: flex; align-items: center; gap: 8px; }
+.logo-sq { width: 26px; height: 26px; border-radius: 6px; background: linear-gradient(135deg,#0d7377,#14b8a6); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; color: #fff; flex-shrink: 0; }
+.brand-txt { font-size: 11.5px; font-weight: 700; color: #f1f5f9; letter-spacing: -.01em; }
+.brand-sub { font-size: 10px; font-weight: 400; color: #475569; display: block; margin-top: 1px; }
+
+.sb-nav { flex: 1; padding: 8px 8px; }
+.sb-lbl { font-size: 9.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #334155; padding: 8px 8px 3px; }
+
+/* Main area */
+.main { flex: 1; background: #f8f9fc; display: flex; flex-direction: column; overflow: hidden; }
+.hdr { height: 46px; background: #fff; display: flex; align-items: center; padding: 0 16px; gap: 10px; flex-shrink: 0; }
+.hdr h1 { font-size: 14px; font-weight: 700; color: #0f172a; flex: 1; letter-spacing: -.02em; }
+.content { padding: 14px; flex: 1; overflow: hidden; }
+
+/* Stats */
+.stats { display: flex; gap: 8px; margin-bottom: 12px; }
+.stat { flex: 1; background: #fff; border: 1px solid #e8edf3; border-radius: 10px; padding: 10px 12px; border-top: 3px solid currentColor; }
+.stat-n { font-size: 20px; font-weight: 800; letter-spacing: -.04em; }
+.stat-l { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .05em; margin-top: 2px; }
+
+/* Table */
+.card { background: #fff; border: 1px solid #e8edf3; border-radius: 10px; overflow: hidden; }
+.card-hdr { padding: 9px 12px; border-bottom: 1px solid #f0f4f8; background: #fcfcfd; display: flex; align-items: center; gap: 8px; }
+table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+thead th { padding: 6px 10px; text-align: left; font-size: 9.5px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid #f0f4f8; }
+tbody tr { border-bottom: 1px solid #f5f7fa; }
+tbody tr:last-child { border: none; }
+td { padding: 7px 10px; vertical-align: middle; color: #64748b; }
+.name-c { color: #1e293b; font-weight: 500; }
+
+/* Selected bar */
+.sel-bar { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #0d7377; color: #fff; padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 600; display: none; gap: 8px; align-items: center; box-shadow: 0 4px 20px rgba(13,115,119,.4); z-index:999; }
+.sel-bar.show { display: flex; }
+
+
+/* ══════════════════════════════
+   VARIANT 1: Plus Jakarta Sans + Phosphor icons + Gedempte teal
+   ══════════════════════════════ */
+.v1 { font-family: 'Plus Jakarta Sans', sans-serif; }
+.v1 .sb { background: #182331; border-right: 1px solid rgba(255,255,255,.06); }
+.v1 .sb-top { border-bottom: 1px solid rgba(255,255,255,.06); }
+.v1 .ni { display: flex; align-items: center; gap: 8px; padding: 6px 9px; border-radius: 7px; color: #5a6e86; font-size: 12px; font-weight: 500; margin-bottom: 1px; border-left: 2px solid transparent; font-family: 'Plus Jakarta Sans', sans-serif; }
+.v1 .ni.on { background: rgba(13,115,119,.16); color: #5eead4; border-left-color: #0d9488; font-weight: 600; }
+.v1 .ni-ico { width: 15px; height: 15px; flex-shrink: 0; opacity: .7; }
+.v1 .ni.on .ni-ico { opacity: 1; }
+.v1 .ni-badge { margin-left: auto; background: rgba(13,115,119,.22); color: #5eead4; font-size: 9.5px; font-weight: 700; padding: 1px 5px; border-radius: 20px; }
+.v1 .card-hdr h3 { font-size: 12px; font-weight: 700; color: #475569; font-family: 'Plus Jakarta Sans', sans-serif; }
+.v1 .hdr { border-bottom: 1px solid #edf0f5; box-shadow: 0 1px 3px rgba(15,23,42,.04); }
+.v1 .hdr h1 { font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; }
+.v1 .stat { border-top-color: #0d9488; box-shadow: 0 1px 3px rgba(15,23,42,.05); }
+.v1 .stat-n { color: #0d7377; font-family: 'Plus Jakarta Sans', sans-serif; }
+.v1 .stat-n.rd { color: #b91c1c; }
+.v1 .code-pill { font-size: 10.5px; font-weight: 700; color: #0d7377; background: #f0fdfa; padding: 2px 7px; border-radius: 5px; font-family: 'SF Mono', monospace; border: 1px solid #99f6e4; }
+.v1 .badge-rd { background: #fef2f2; color: #b91c1c; font-size: 9.5px; font-weight: 700; padding: 2px 7px; border-radius: 20px; }
+.v1 .badge-am { background: #fffbeb; color: #b45309; font-size: 9.5px; font-weight: 700; padding: 2px 7px; border-radius: 20px; }
+.v1 .hdr-btn { height: 28px; padding: 0 12px; border-radius: 7px; background: #0d7377; color: #fff; font-size: 12px; font-weight: 600; border: none; cursor: pointer; font-family: 'Plus Jakarta Sans', sans-serif; }
+.v1 .ico-btn { width: 28px; height: 28px; border-radius: 6px; border: 1px solid #e2e8f0; background: #fff; display: flex; align-items: center; justify-content: center; color: #64748b; }
+.v1 table { font-family: 'Plus Jakarta Sans', sans-serif; }
+.v1 .main { font-family: 'Plus Jakarta Sans', sans-serif; }
+
+
+/* ══════════════════════════════
+   VARIANT 2: Outfit + Outline-iconen + Warme teal
+   ══════════════════════════════ */
+.v2 { font-family: 'Outfit', sans-serif; }
+.v2 .sb { background: #1a2535; border-right: 1px solid rgba(255,255,255,.06); }
+.v2 .sb-top { border-bottom: 1px solid rgba(255,255,255,.07); }
+.v2 .logo-sq { background: #0d7377; }
+.v2 .ni { display: flex; align-items: center; gap: 9px; padding: 7px 10px; border-radius: 8px; color: #536178; font-size: 12.5px; font-weight: 500; margin-bottom: 2px; font-family: 'Outfit', sans-serif; }
+.v2 .ni.on { background: linear-gradient(90deg, rgba(13,115,119,.18), rgba(20,184,166,.08)); color: #2dd4bf; font-weight: 600; }
+.v2 .ni-ico { width: 16px; height: 16px; flex-shrink: 0; }
+.v2 .ni-badge { margin-left: auto; background: rgba(45,212,191,.15); color: #2dd4bf; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 20px; }
+.v2 .card-hdr h3 { font-size: 12px; font-weight: 600; color: #64748b; font-family: 'Outfit', sans-serif; letter-spacing: .01em; }
+.v2 .hdr { border-bottom: 1px solid #eff2f7; }
+.v2 .hdr h1 { font-family: 'Outfit', sans-serif; font-weight: 700; letter-spacing: -.01em; }
+.v2 .stat { border-top-color: #14b8a6; }
+.v2 .stat-n { color: #0f766e; font-family: 'Outfit', sans-serif; }
+.v2 .stat-n.rd { color: #dc2626; }
+.v2 .code-pill { font-size: 10.5px; font-weight: 700; color: #0f766e; background: #f0fdf9; padding: 2px 7px; border-radius: 20px; font-family: 'SF Mono', monospace; }
+.v2 .badge-rd { background: #fef2f2; color: #dc2626; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
+.v2 .badge-am { background: #fffbeb; color: #d97706; font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
+.v2 .hdr-btn { height: 28px; padding: 0 12px; border-radius: 8px; background: #0f766e; color: #fff; font-size: 12.5px; font-weight: 600; border: none; cursor: pointer; font-family: 'Outfit', sans-serif; }
+.v2 .ico-btn { width: 28px; height: 28px; border-radius: 7px; border: 1px solid #e5eaf2; background: #fff; display: flex; align-items: center; justify-content: center; color: #94a3b8; }
+.v2 table { font-family: 'Outfit', sans-serif; }
+.v2 .main { font-family: 'Outfit', sans-serif; }
+
+
+/* ══════════════════════════════
+   VARIANT 3: Manrope + Gevulde iconen + Diep teal
+   ══════════════════════════════ */
+.v3 { font-family: 'Manrope', sans-serif; }
+.v3 .sb { background: #111b27; border-right: 1px solid rgba(255,255,255,.05); }
+.v3 .sb-top { border-bottom: 1px solid rgba(255,255,255,.05); }
+.v3 .logo-sq { background: #0a5c60; border: 1px solid rgba(20,184,166,.3); }
+.v3 .ni { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 7px; color: #4a6070; font-size: 12px; font-weight: 600; margin-bottom: 1px; font-family: 'Manrope', sans-serif; letter-spacing: -.01em; }
+.v3 .ni.on { background: rgba(13,115,119,.14); color: #5eead4; }
+.v3 .ni-ico { width: 15px; height: 15px; flex-shrink: 0; }
+.v3 .ni-badge { margin-left: auto; background: #0a5c60; color: #99f6e4; font-size: 9.5px; font-weight: 700; padding: 1px 5px; border-radius: 4px; }
+.v3 .card-hdr h3 { font-size: 11.5px; font-weight: 700; color: #334155; font-family: 'Manrope', sans-serif; letter-spacing: .01em; text-transform: uppercase; }
+.v3 .hdr { border-bottom: 2px solid #eef2f7; }
+.v3 .hdr h1 { font-family: 'Manrope', sans-serif; font-weight: 800; letter-spacing: -.03em; }
+.v3 .stat { border-top: none; border-left: 3px solid #0a5c60; border-radius: 8px; }
+.v3 .stat-n { color: #0a5c60; font-family: 'Manrope', sans-serif; font-weight: 800; }
+.v3 .stat-n.rd { color: #9b1c1c; }
+.v3 .code-pill { font-size: 10px; font-weight: 800; color: #fff; background: #0a5c60; padding: 2px 7px; border-radius: 4px; font-family: 'SF Mono', monospace; letter-spacing: .03em; }
+.v3 .badge-rd { background: #b91c1c; color: #fff; font-size: 9.5px; font-weight: 700; padding: 2px 7px; border-radius: 4px; }
+.v3 .badge-am { background: #b45309; color: #fff; font-size: 9.5px; font-weight: 700; padding: 2px 7px; border-radius: 4px; }
+.v3 .hdr-btn { height: 28px; padding: 0 12px; border-radius: 6px; background: #0a5c60; color: #fff; font-size: 12px; font-weight: 700; border: none; cursor: pointer; font-family: 'Manrope', sans-serif; letter-spacing: -.01em; }
+.v3 .ico-btn { width: 28px; height: 28px; border-radius: 5px; border: 1px solid #dde3eb; background: #fff; display: flex; align-items: center; justify-content: center; color: #64748b; }
+.v3 table { font-family: 'Manrope', sans-serif; font-size: 11px; }
+.v3 .main { font-family: 'Manrope', sans-serif; }
+
+/* Swatch previews */
+.swatches { display: flex; gap: 4px; padding: 8px 18px 12px; }
+.sw { width: 18px; height: 18px; border-radius: 5px; }
+</style>
+</head>
+<body>
+
+<h1>Design C — Verfijning</h1>
+<p class="intro">Alle drie behouden de donkere zijbalk + teal accent van het huidige dashboard.<br>Het verschil zit in het lettertype, de icoonvorm en de kleurbalans. Klik om te selecteren.</p>
+
+<div class="section-title">Kies je voorkeur</div>
+
+<div class="grid3">
+
+  <!-- VARIANT C1: Plus Jakarta Sans -->
+  <div class="vk v1" onclick="sel('c1', this)">
+    <div class="vk-lbl">
+      <div class="vk-letter">C1</div>
+      <h2>Plus Jakarta Sans</h2>
+      <p>Warm humanistisch lettertype. Iconen als nette lijntjes. Gedempte teal — minder schreeuwerig, meer zakelijk.</p>
+    </div>
+    <div class="swatches">
+      <div class="sw" style="background:#182331" title="Sidebar"></div>
+      <div class="sw" style="background:#0d7377" title="Accent"></div>
+      <div class="sw" style="background:#5eead4" title="Licht accent"></div>
+      <div class="sw" style="background:#f0fdfa" title="Surfacelight"></div>
+      <div class="sw" style="background:#b91c1c" title="Rood"></div>
+      <div class="sw" style="background:#b45309" title="Amber"></div>
+    </div>
+    <div class="shell v1">
+      <div class="sb v1">
+        <div class="sb-top">
+          <div class="logo-row">
+            <div class="logo-sq">VC</div>
+            <div>
+              <div class="brand-txt" style="font-family:'Plus Jakarta Sans',sans-serif">VvE Collectief</div>
+              <span class="brand-sub" style="font-family:'Plus Jakarta Sans',sans-serif">Beheer dashboard</span>
+            </div>
+          </div>
+        </div>
+        <div class="sb-nav">
+          <div class="sb-lbl" style="font-family:'Plus Jakarta Sans',sans-serif">Werklijsten</div>
+          <div class="ni on v1">
+            <!-- List icon -->
+            <svg class="ni-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="2" width="12" height="12" rx="2"/><line x1="5" y1="5.5" x2="11" y2="5.5"/><line x1="5" y1="8" x2="11" y2="8"/><line x1="5" y1="10.5" x2="9" y2="10.5"/></svg>
+            NTD-lijst <span class="ni-badge">12</span>
+          </div>
+          <div class="ni v1">
+            <svg class="ni-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="5.5"/><polyline points="6,8 7.5,9.5 10.5,6.5"/></svg>
+            Afgerond
+          </div>
+          <div class="ni v1">
+            <svg class="ni-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="4" width="12" height="9" rx="1.5"/><polyline points="5,4 5,2.5 11,2.5 11,4"/></svg>
+            ALV's
+          </div>
+          <div class="sb-lbl" style="font-family:'Plus Jakarta Sans',sans-serif">Beheer</div>
+          <div class="ni v1">
+            <svg class="ni-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="2,11 5,7 8,9 11,5 14,3"/></svg>
+            Statistieken
+          </div>
+          <div class="ni v1">
+            <svg class="ni-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="2.5"/><path d="M8 2v1.5M8 12.5V14M2 8h1.5M12.5 8H14"/></svg>
+            Herhaalregels
+          </div>
+        </div>
+      </div>
+      <div class="main v1">
+        <div class="hdr v1">
+          <h1 style="font-family:'Plus Jakarta Sans',sans-serif">NTD-lijst</h1>
+          <div class="ico-btn"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="7" cy="7" r="4.5"/><line x1="10.2" y1="10.2" x2="13.5" y2="13.5"/></svg></div>
+          <div class="ico-btn"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 2.5C5.5 2.5 3.5 4.5 3.5 7v3L2 12h12l-1.5-2V7c0-2.5-2-4.5-4.5-4.5z"/><line x1="8" y1="13.5" x2="8" y2="15"/></svg></div>
+          <button class="hdr-btn v1">+ Taak</button>
+        </div>
+        <div class="content v1">
+          <div class="stats">
+            <div class="stat v1" style="border-top-color:#0d9488"><div class="stat-n" style="color:#0d7377;font-family:'Plus Jakarta Sans',sans-serif">23</div><div class="stat-l">Open taken</div></div>
+            <div class="stat v1" style="border-top-color:#b91c1c"><div class="stat-n rd" style="font-family:'Plus Jakarta Sans',sans-serif">4</div><div class="stat-l">Te laat</div></div>
+            <div class="stat v1" style="border-top-color:#047857"><div class="stat-n" style="color:#047857;font-family:'Plus Jakarta Sans',sans-serif">8</div><div class="stat-l">Weggelegd</div></div>
+          </div>
+          <div class="card v1">
+            <div class="card-hdr v1"><h3 style="font-family:'Plus Jakarta Sans',sans-serif">Oppakken</h3></div>
+            <table>
+              <thead><tr><th>Code</th><th>VvE-naam</th><th>Omschrijving</th><th>Deadline</th></tr></thead>
+              <tbody>
+                <tr><td><span class="code-pill">AMS001</span></td><td class="name-c" style="font-family:'Plus Jakarta Sans',sans-serif">Amstelveen Centraal</td><td>Lekkage dak</td><td><span class="badge-rd">Te laat</span></td></tr>
+                <tr><td><span class="code-pill">RTD045</span></td><td class="name-c" style="font-family:'Plus Jakarta Sans',sans-serif">Rotterdam Haven</td><td>Offerte schilder</td><td><span class="badge-am">14 jun</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VARIANT C2: Outfit -->
+  <div class="vk v2" onclick="sel('c2', this)">
+    <div class="vk-lbl">
+      <div class="vk-letter">C2</div>
+      <h2>Outfit</h2>
+      <p>Vriendelijk maar strak. Rondere code-pills, zachte iconen. Teal iets helderder — energieker maar nog steeds professioneel.</p>
+    </div>
+    <div class="swatches">
+      <div class="sw" style="background:#1a2535"></div>
+      <div class="sw" style="background:#0f766e"></div>
+      <div class="sw" style="background:#2dd4bf"></div>
+      <div class="sw" style="background:#f0fdf9"></div>
+      <div class="sw" style="background:#dc2626"></div>
+      <div class="sw" style="background:#d97706"></div>
+    </div>
+    <div class="shell v2">
+      <div class="sb v2">
+        <div class="sb-top">
+          <div class="logo-row">
+            <div class="logo-sq v2">VC</div>
+            <div>
+              <div class="brand-txt" style="font-family:'Outfit',sans-serif">VvE Collectief</div>
+              <span class="brand-sub" style="font-family:'Outfit',sans-serif">Beheer dashboard</span>
+            </div>
+          </div>
+        </div>
+        <div class="sb-nav">
+          <div class="sb-lbl" style="font-family:'Outfit',sans-serif">Werklijsten</div>
+          <div class="ni on v2">
+            <svg class="ni-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="3" width="13" height="10" rx="2"/><line x1="4.5" y1="6" x2="11.5" y2="6"/><line x1="4.5" y1="8.5" x2="9" y2="8.5"/></svg>
+            NTD-lijst <span class="ni-badge">12</span>
+          </div>
+          <div class="ni v2">
+            <svg class="ni-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8a5 5 0 1 0 10 0 5 5 0 0 0-10 0z"/><polyline points="5.5,8 7,9.5 10.5,6"/></svg>
+            Afgerond
+          </div>
+          <div class="ni v2">
+            <svg class="ni-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 5.5A1.5 1.5 0 0 1 3.5 4h9A1.5 1.5 0 0 1 14 5.5v7A1.5 1.5 0 0 1 12.5 14h-9A1.5 1.5 0 0 1 2 12.5z"/><polyline points="5,4 5,2.5 11,2.5 11,4"/></svg>
+            ALV's
+          </div>
+          <div class="sb-lbl" style="font-family:'Outfit',sans-serif">Beheer</div>
+          <div class="ni v2">
+            <svg class="ni-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1.5,12 5,7.5 8,9.5 11,5 14.5,2.5"/></svg>
+            Statistieken
+          </div>
+          <div class="ni v2">
+            <svg class="ni-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="8,2 8,14"/><polyline points="2,8 14,8"/><circle cx="8" cy="8" r="3"/></svg>
+            Herhaalregels
+          </div>
+        </div>
+      </div>
+      <div class="main v2">
+        <div class="hdr v2">
+          <h1 style="font-family:'Outfit',sans-serif">NTD-lijst</h1>
+          <div class="ico-btn"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="7" cy="7" r="4"/><line x1="10" y1="10" x2="14" y2="14"/></svg></div>
+          <div class="ico-btn"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 2C5.8 2 4 3.8 4 6v3.5L3 11h10l-1-1.5V6c0-2.2-1.8-4-4-4z"/><line x1="8" y1="13" x2="8" y2="14.5"/></svg></div>
+          <button class="hdr-btn v2">+ Taak</button>
+        </div>
+        <div class="content v2">
+          <div class="stats">
+            <div class="stat v2"><div class="stat-n" style="color:#0f766e;font-family:'Outfit',sans-serif">23</div><div class="stat-l">Open taken</div></div>
+            <div class="stat v2" style="border-top-color:#dc2626"><div class="stat-n rd" style="font-family:'Outfit',sans-serif">4</div><div class="stat-l">Te laat</div></div>
+            <div class="stat v2" style="border-top-color:#15803d"><div class="stat-n" style="color:#15803d;font-family:'Outfit',sans-serif">8</div><div class="stat-l">Weggelegd</div></div>
+          </div>
+          <div class="card v2">
+            <div class="card-hdr v2"><h3 style="font-family:'Outfit',sans-serif">Oppakken</h3></div>
+            <table>
+              <thead><tr><th>Code</th><th>VvE-naam</th><th>Omschrijving</th><th>Deadline</th></tr></thead>
+              <tbody>
+                <tr><td><span class="code-pill">AMS001</span></td><td class="name-c" style="font-family:'Outfit',sans-serif">Amstelveen Centraal</td><td>Lekkage dak</td><td><span class="badge-rd">Te laat</span></td></tr>
+                <tr><td><span class="code-pill">RTD045</span></td><td class="name-c" style="font-family:'Outfit',sans-serif">Rotterdam Haven</td><td>Offerte schilder</td><td><span class="badge-am">14 jun</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VARIANT C3: Manrope -->
+  <div class="vk v3" onclick="sel('c3', this)">
+    <div class="vk-lbl">
+      <div class="vk-letter">C3</div>
+      <h2>Manrope</h2>
+      <p>Strak geometrisch lettertype. Gevulde iconen + vierkantige accenten. Diepe, donkere teal — meest gezaghebbend.</p>
+    </div>
+    <div class="swatches">
+      <div class="sw" style="background:#111b27"></div>
+      <div class="sw" style="background:#0a5c60"></div>
+      <div class="sw" style="background:#99f6e4"></div>
+      <div class="sw" style="background:#f8fafb"></div>
+      <div class="sw" style="background:#9b1c1c"></div>
+      <div class="sw" style="background:#b45309"></div>
+    </div>
+    <div class="shell v3">
+      <div class="sb v3">
+        <div class="sb-top">
+          <div class="logo-row">
+            <div class="logo-sq v3">VC</div>
+            <div>
+              <div class="brand-txt" style="font-family:'Manrope',sans-serif">VvE Collectief</div>
+              <span class="brand-sub" style="font-family:'Manrope',sans-serif">Beheer dashboard</span>
+            </div>
+          </div>
+        </div>
+        <div class="sb-nav">
+          <div class="sb-lbl" style="font-family:'Manrope',sans-serif">Werklijsten</div>
+          <div class="ni on v3">
+            <svg class="ni-ico" viewBox="0 0 16 16" fill="currentColor"><rect x="1.5" y="2.5" width="13" height="11" rx="2" opacity=".2"/><line x1="4" y1="5.5" x2="12" y2="5.5" stroke="currentColor" stroke-width="1.5" fill="none"/><line x1="4" y1="8" x2="12" y2="8" stroke="currentColor" stroke-width="1.5" fill="none"/><line x1="4" y1="10.5" x2="9" y2="10.5" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+            NTD-lijst <span class="ni-badge">12</span>
+          </div>
+          <div class="ni v3">
+            <svg class="ni-ico" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="5.5" opacity=".2"/><polyline points="5.5,8 7,9.5 10.5,6.5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+            Afgerond
+          </div>
+          <div class="ni v3">
+            <svg class="ni-ico" viewBox="0 0 16 16" fill="currentColor"><rect x="1.5" y="4" width="13" height="9.5" rx="2" opacity=".2"/><rect x="5" y="2" width="6" height="3" rx="1" opacity=".5"/></svg>
+            ALV's
+          </div>
+          <div class="sb-lbl" style="font-family:'Manrope',sans-serif">Beheer</div>
+          <div class="ni v3">
+            <svg class="ni-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><polyline points="1.5,13 5,8 8,10 11,5.5 14.5,2.5"/></svg>
+            Statistieken
+          </div>
+          <div class="ni v3">
+            <svg class="ni-ico" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="5.5" opacity=".18"/><circle cx="8" cy="8" r="2.5"/></svg>
+            Herhaalregels
+          </div>
+        </div>
+      </div>
+      <div class="main v3" style="background:#f8fafb">
+        <div class="hdr v3" style="background:#fff">
+          <h1 style="font-family:'Manrope',sans-serif;font-weight:800">NTD-lijst</h1>
+          <div class="ico-btn"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="7" r="4.5"/><line x1="10.5" y1="10.5" x2="14" y2="14"/></svg></div>
+          <div class="ico-btn"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2C5.5 2 3.5 4 3.5 6.5V10L2 11.5h12L12.5 10V6.5C12.5 4 10.5 2 8 2z"/><line x1="8" y1="14" x2="8" y2="15"/></svg></div>
+          <button class="hdr-btn v3">+ Taak</button>
+        </div>
+        <div class="content v3">
+          <div class="stats">
+            <div class="stat v3"><div class="stat-n" style="color:#0a5c60;font-family:'Manrope',sans-serif;font-weight:800">23</div><div class="stat-l">Open taken</div></div>
+            <div class="stat v3" style="border-left-color:#9b1c1c"><div class="stat-n rd" style="color:#9b1c1c;font-family:'Manrope',sans-serif;font-weight:800">4</div><div class="stat-l">Te laat</div></div>
+            <div class="stat v3" style="border-left-color:#065f46"><div class="stat-n" style="color:#065f46;font-family:'Manrope',sans-serif;font-weight:800">8</div><div class="stat-l">Weggelegd</div></div>
+          </div>
+          <div class="card v3">
+            <div class="card-hdr v3" style="background:#f4f7fa"><h3 style="font-family:'Manrope',sans-serif">Oppakken</h3></div>
+            <table>
+              <thead><tr><th>Code</th><th>VvE-naam</th><th>Omschrijving</th><th>Deadline</th></tr></thead>
+              <tbody>
+                <tr><td><span class="code-pill">AMS001</span></td><td class="name-c" style="font-family:'Manrope',sans-serif;font-weight:600">Amstelveen Centraal</td><td>Lekkage dak</td><td><span class="badge-rd">Te laat</span></td></tr>
+                <tr><td><span class="code-pill">RTD045</span></td><td class="name-c" style="font-family:'Manrope',sans-serif;font-weight:600">Rotterdam Haven</td><td>Offerte schilder</td><td><span class="badge-am">14 jun</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="sel-bar" id="bar">
+  <span id="bar-txt">Niets geselecteerd</span>
+</div>
+
+<script>
+function sel(choice, el) {
+  document.querySelectorAll('.vk').forEach(v => v.classList.remove('selected'));
+  el.classList.add('selected');
+  const n = { c1:'C1 — Plus Jakarta Sans (warm)', c2:'C2 — Outfit (vriendelijk+strak)', c3:'C3 — Manrope (gezaghebbend)' };
+  document.getElementById('bar-txt').textContent = '✓ ' + n[choice];
+  document.getElementById('bar').classList.add('show');
+}
+</script>
+</body>
+</html>

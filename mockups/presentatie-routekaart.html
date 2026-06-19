@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verbeterplan Dashboard — Routekaart | VvE Beheer Collectief</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#2B3544; --navy-dark:#1E2530; --white:#fff; --gray-bg:#F0F2F5;
+  --teal-900:#064E50; --teal-700:#0D7377; --teal-500:#14B8A6; --teal-300:#5EEAD4; --teal-100:#CCFBF1;
+  --green:#059669; --amber:#D97706; --red:#DC2626; --muted:#64748B;
+  --ink:#334155; --line:#E2E8F0;
+  --font:'DM Sans',system-ui,sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{font-family:var(--font);color:var(--ink);background:var(--navy-dark);overflow:hidden}
+
+/* ---------- Deck frame ---------- */
+.deck{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+.slide{position:absolute;inset:0;display:none;padding:6vh 7vw 9vh;flex-direction:column;justify-content:center;animation:fade .45s ease both}
+.slide.active{display:flex}
+.slide.scroll{justify-content:flex-start;overflow-y:auto}
+@keyframes fade{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.slide.light{background:var(--gray-bg);color:var(--ink)}
+.slide.dark{background:
+  radial-gradient(1200px 600px at 85% -10%, rgba(20,184,166,.20), transparent 60%),
+  radial-gradient(900px 500px at -10% 110%, rgba(13,115,119,.28), transparent 55%),
+  linear-gradient(135deg,var(--navy) 0%,var(--navy-dark) 100%);
+  color:#fff;}
+
+/* ---------- Chrome ---------- */
+.progress{position:fixed;top:0;left:0;height:4px;background:var(--teal-500);z-index:30;transition:width .35s ease}
+.pager{position:fixed;bottom:22px;right:34px;z-index:30;font-size:13px;font-weight:600;letter-spacing:.04em;color:var(--muted)}
+.brandmark{position:fixed;bottom:20px;left:34px;z-index:30;display:flex;align-items:center;gap:10px;font-weight:800;font-size:12px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase}
+.brandmark .logo{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--teal-700),var(--teal-500));display:grid;place-items:center;color:#fff}
+.brandmark .logo svg{width:16px;height:16px}
+.nav{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:30;display:flex;gap:8px}
+.nav button{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:#fff;color:var(--navy);cursor:pointer;font-size:16px;display:grid;place-items:center;transition:.2s;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.nav button:hover{background:var(--teal-700);color:#fff;border-color:var(--teal-700)}
+.dots{position:fixed;top:24px;left:50%;transform:translateX(-50%);z-index:30;display:flex;gap:7px}
+.dots i{width:8px;height:8px;border-radius:50%;background:#cbd5e1;cursor:pointer;transition:.25s;display:block}
+.dots i.on{background:var(--teal-500);width:24px;border-radius:4px}
+.hint{position:fixed;bottom:70px;left:50%;transform:translateX(-50%);z-index:30;font-size:12px;color:var(--muted);opacity:.8}
+
+/* ---------- Typography ---------- */
+.kicker{font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--teal-700);margin-bottom:16px}
+.slide.dark .kicker{color:var(--teal-300)}
+h1{font-size:clamp(34px,5.4vw,66px);font-weight:800;line-height:1.05;letter-spacing:-.02em}
+h2{font-size:clamp(26px,3.4vw,42px);font-weight:800;line-height:1.1;letter-spacing:-.01em;color:var(--navy);display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.slide.dark h2{color:#fff}
+.lead{font-size:clamp(15px,1.45vw,20px);font-weight:400;color:var(--muted);max-width:66ch;margin-top:16px;line-height:1.55}
+.slide.dark .lead{color:rgba(255,255,255,.78)}
+
+/* ---------- Title slide ---------- */
+.title-wrap{max-width:min(92%,780px)}
+.title-sub{margin-top:22px;font-size:clamp(16px,1.6vw,22px);font-weight:500;color:rgba(255,255,255,.82);max-width:46ch;line-height:1.5}
+.title-meta{margin-top:34px;display:flex;gap:13px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:9px;padding:10px 16px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);font-weight:600;font-size:14px;color:#fff}
+.chip svg{width:17px;height:17px}
+
+/* ---------- Size pills ---------- */
+.pill{display:inline-flex;align-items:center;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:5px 11px;border-radius:999px}
+.pill.klein{background:#D1FAE5;color:var(--green)}
+.pill.groot{background:#FEF3C7;color:var(--amber)}
+.pill.middel{background:var(--teal-100);color:var(--teal-900)}
+.pill.door{background:#E2E8F0;color:var(--navy)}
+
+/* ---------- feat grid ---------- */
+.grid4{display:grid;grid-template-columns:repeat(2,1fr);gap:18px;margin-top:30px}
+.feat{background:#fff;border:1px solid var(--line);border-radius:16px;padding:22px 24px;display:flex;gap:16px;align-items:flex-start;box-shadow:0 6px 20px rgba(30,37,48,.05)}
+.feat .ic{width:44px;height:44px;flex:0 0 44px;border-radius:12px;background:var(--teal-100);color:var(--teal-700);display:grid;place-items:center}
+.feat .ic svg{width:24px;height:24px}
+.feat h4{font-size:16.5px;font-weight:700;color:var(--navy);margin-bottom:4px}
+.feat p{font-size:14px;color:var(--muted);line-height:1.45}
+
+/* ---------- duo good / attention ---------- */
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:26px;margin-top:30px}
+.col{border-radius:20px;padding:30px 30px;background:#fff;box-shadow:0 10px 34px rgba(30,37,48,.08);display:flex;flex-direction:column}
+.col.good{border:1px solid var(--teal-300);background:linear-gradient(180deg,#F0FDFA,#fff 55%)}
+.col.attn{border:1px solid #FCD34D;background:linear-gradient(180deg,#FFFBEB,#fff 55%)}
+.col .tag{display:inline-flex;align-items:center;gap:9px;align-self:flex-start;padding:7px 14px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;margin-bottom:18px}
+.col .tag svg{width:15px;height:15px}
+.col.good .tag{background:var(--teal-100);color:var(--teal-900)}
+.col.attn .tag{background:#FEF3C7;color:var(--amber)}
+.col h3{font-size:clamp(17px,1.6vw,21px);font-weight:700;color:var(--navy);margin-bottom:6px}
+.col ul{list-style:none;margin-top:8px;display:flex;flex-direction:column;gap:12px}
+.col li{display:flex;gap:11px;font-size:clamp(13.5px,1.2vw,15.5px);line-height:1.45;color:var(--ink)}
+.col li svg{width:19px;height:19px;flex:0 0 19px;margin-top:1px}
+.col.good li svg{color:var(--green)}
+.col.attn li svg{color:var(--amber)}
+
+/* ---------- timeline (routekaart overzicht) ---------- */
+.timeline{margin-top:26px;display:flex;flex-direction:column}
+.tl-row{display:flex;gap:22px;align-items:flex-start}
+.tl-rail{display:flex;flex-direction:column;align-items:center;align-self:stretch}
+.tl-num{width:46px;height:46px;flex:0 0 46px;border-radius:50%;background:linear-gradient(135deg,var(--teal-700),var(--teal-500));color:#fff;display:grid;place-items:center;font-weight:800;font-size:19px;box-shadow:0 6px 16px rgba(13,115,119,.28)}
+.tl-line{flex:1;width:2px;background:var(--line);margin:4px 0}
+.tl-row:last-child .tl-line{display:none}
+.tl-body{padding-bottom:20px;padding-top:9px}
+.tl-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.tl-head h3{font-size:clamp(17px,1.7vw,22px);font-weight:700;color:var(--navy)}
+.tl-body p{margin-top:4px;font-size:clamp(13.5px,1.2vw,15.5px);color:var(--muted);line-height:1.4}
+.tl-cap{margin-top:8px;font-size:14px;color:var(--teal-700);font-weight:600;display:flex;align-items:center;gap:9px}
+.tl-cap svg{width:17px;height:17px}
+
+/* ---------- phase detail ---------- */
+.points{margin-top:22px;display:flex;flex-direction:column;gap:14px;max-width:80ch}
+.point{display:flex;gap:15px;align-items:flex-start}
+.point .ic{width:44px;height:44px;flex:0 0 44px;border-radius:12px;background:var(--teal-100);color:var(--teal-700);display:grid;place-items:center}
+.point .ic svg{width:24px;height:24px}
+.point p{font-size:clamp(14px,1.25vw,16.5px);line-height:1.45;color:var(--ink);padding-top:9px}
+.point p b{color:var(--navy);font-weight:700}
+.deliver{margin-top:24px;display:inline-flex;gap:11px;align-items:center;align-self:flex-start;background:var(--teal-100);color:var(--teal-900);padding:13px 19px;border-radius:13px;font-weight:600;font-size:clamp(14px,1.25vw,16px)}
+.deliver svg{width:20px;height:20px;color:var(--teal-700);flex:0 0 20px}
+.callout{margin-top:20px;display:flex;gap:13px;align-items:flex-start;background:#FFFBEB;border:1px solid #FCD34D;border-left:5px solid var(--amber);border-radius:12px;padding:16px 18px;max-width:80ch}
+.callout svg{width:22px;height:22px;color:var(--amber);flex:0 0 22px;margin-top:1px}
+.callout p{font-size:14.5px;line-height:1.45;color:var(--ink)}
+.callout b{color:#92400E;font-weight:700}
+
+/* ---------- split (waarom volgorde) ---------- */
+.split{display:grid;grid-template-columns:1.25fr 1fr;gap:30px;margin-top:28px;align-items:start}
+.lowprio{background:#fff;border:1px solid var(--line);border-radius:16px;padding:24px 26px;box-shadow:0 8px 24px rgba(30,37,48,.06)}
+.lowprio h4{font-size:16px;font-weight:700;color:var(--navy);margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.lowprio h4 svg{width:19px;height:19px;color:var(--muted)}
+.lowprio ul{list-style:none;display:flex;flex-direction:column;gap:10px}
+.lowprio li{display:flex;gap:10px;font-size:14.5px;color:var(--ink);align-items:center}
+.lowprio li::before{content:"";width:6px;height:6px;border-radius:50%;background:#cbd5e1;flex:0 0 6px}
+.lowprio .why{margin-top:16px;font-size:13.5px;color:var(--muted);font-style:italic;line-height:1.45}
+
+/* ---------- closing ---------- */
+.close-points{margin-top:32px;display:flex;flex-direction:column;gap:17px;max-width:62ch}
+.close-points div.cp{display:flex;gap:15px;align-items:flex-start;font-size:clamp(15px,1.45vw,19px);line-height:1.4}
+.close-points .ic{width:40px;height:40px;flex:0 0 40px;border-radius:11px;background:rgba(94,234,212,.16);color:var(--teal-300);display:grid;place-items:center}
+.close-points .ic svg{width:22px;height:22px}
+.close-points b{color:#fff;font-weight:700}
+.close-points span{color:rgba(255,255,255,.8)}
+.close-cta{margin-top:34px;font-size:clamp(15px,1.4vw,18px);color:#fff;font-weight:600;display:inline-flex;align-items:center;gap:11px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);padding:14px 20px;border-radius:13px}
+.close-cta svg{width:20px;height:20px;color:var(--teal-300)}
+
+@media(max-width:900px){
+  .grid4{grid-template-columns:1fr}
+  .duo{grid-template-columns:1fr;gap:18px}
+  .split{grid-template-columns:1fr;gap:20px}
+  .slide{padding:5vh 6vw 10vh;justify-content:flex-start;overflow-y:auto}
+}
+</style>
+</head>
+<body>
+<div class="progress" id="bar"></div>
+<div class="dots" id="dots"></div>
+
+<div class="deck" id="deck">
+
+  <!-- 1. TITLE -->
+  <section class="slide dark active">
+    <div class="title-wrap">
+      <div class="kicker">Verbeterplan · 8 juni 2026</div>
+      <h1>Het dashboard naar<br>een hoger niveau</h1>
+      <div class="title-sub">Een plan in vijf fases — van een steviger fundament naar dagelijkse winst in je werk.</div>
+      <div class="title-meta">
+        <span class="chip">{{SHIELD}} Veiligheid</span>
+        <span class="chip">{{CODE}} Code</span>
+        <span class="chip">{{BOLT}} Werkwijze</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. UITGANGSPUNT -->
+  <section class="slide light">
+    <div class="kicker">Het uitgangspunt</div>
+    <h2>Het dashboard werkt al goed — dit is de volgende stap</h2>
+    <p class="lead">De makkelijke winst is binnen (recent nog een veiligheidsronde). Dit plan verstevigt eerst het fundament en bouwt daar zichtbare verbeteringen in je werk op. Twee keuzes van jou sturen het plan:</p>
+    <div class="grid4">
+      <div class="feat"><div class="ic">{{MONITOR}}</div><div><h4>Desktop-first</h4><p>Jullie werken vooral achter de computer. Mobiel- en offline-extra's zetten we daarom bewust láág.</p></div></div>
+      <div class="feat"><div class="ic">{{MAIL}}</div><div><h4>Pijnpunt #1 — overtypen</h4><p>Mail handmatig overtypen naar taken is de grootste dagelijkse tijdvreter.</p></div></div>
+      <div class="feat"><div class="ic">{{REPEAT}}</div><div><h4>Pijnpunt #2 — opvolging</h4><p>Terugkerende taken en stille dossiers bewaken kost steeds aandacht.</p></div></div>
+      <div class="feat"><div class="ic">{{LAYERS}}</div><div><h4>Eén groot plan</h4><p>Over meerdere sessies, in fases — elke fase een afgerond stukje.</p></div></div>
+    </div>
+  </section>
+
+  <!-- 3. ONDERZOEK -->
+  <section class="slide light">
+    <div class="kicker">Wat het code-onderzoek liet zien</div>
+    <h2>Je data is veilig — het aandachtspunt zit elders</h2>
+    <div class="duo">
+      <div class="col good">
+        <span class="tag">{{CHECK}} Goed nieuws</span>
+        <h3>Je gegevens zijn goed beschermd</h3>
+        <ul>
+          <li>{{V}} Lezen én opslaan gaat via je eigen Google-login. Google zelf bewaakt wie erbij mag.</li>
+          <li>{{V}} De e-maillijst in de code is alleen een nette voordeur — niet het echte slot.</li>
+          <li>{{V}} Inbraak via geplakte tekst is netjes afgevangen.</li>
+        </ul>
+      </div>
+      <div class="col attn">
+        <span class="tag">{{WARN}} Aandachtspunt</span>
+        <h3>Het meldingen-kanaal</h3>
+        <ul>
+          <li>{{WARN}} Het 'wachtwoord' van de meldingen staat in openbaar leesbare code.</li>
+          <li>{{WARN}} Dat kanaal controleert niet wíe je bent — alleen of je het wachtwoord kent.</li>
+          <li>{{WARN}} Daardoor zou een buitenstaander meldingen of taken kunnen aanmaken. Dit dichten we in Fase 1.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. ROUTEKAART OVERZICHT -->
+  <section class="slide light">
+    <div class="kicker">De routekaart</div>
+    <h2>Vijf fases, bewust op volgorde</h2>
+    <div class="timeline">
+      <div class="tl-row"><div class="tl-rail"><div class="tl-num">1</div><div class="tl-line"></div></div>
+        <div class="tl-body"><div class="tl-head"><h3>Vangnet &amp; veiligheid</h3><span class="pill klein">klein</span></div><p>Het meldingen-lek dichten en een testnet leggen vóór de verbouwing.</p></div></div>
+      <div class="tl-row"><div class="tl-rail"><div class="tl-num">2</div><div class="tl-line"></div></div>
+        <div class="tl-body"><div class="tl-head"><h3>Onderhoudbaarheid</h3><span class="pill groot">groot</span></div><p>De code opsplitsen en de uitrol automatiseren — de motor onder de motorkap.</p></div></div>
+      <div class="tl-row"><div class="tl-rail"><div class="tl-num">3</div><div class="tl-line"></div></div>
+        <div class="tl-body"><div class="tl-head"><h3>Minder overtypen</h3><span class="pill middel">middel</span><span style="font-size:12px;color:var(--muted);font-weight:600">pijnpunt #1</span></div><p>Mail wordt automatisch een taak in het dashboard.</p></div></div>
+      <div class="tl-row"><div class="tl-rail"><div class="tl-num">4</div><div class="tl-line"></div></div>
+        <div class="tl-body"><div class="tl-head"><h3>Opvolging &amp; herhaling</h3><span class="pill middel">middel</span><span style="font-size:12px;color:var(--muted);font-weight:600">pijnpunt #2</span></div><p>Terugkerende taken en herinneringen, zodat niets er doorheen glipt.</p></div></div>
+      <div class="tl-row"><div class="tl-rail"><div class="tl-num">5</div><div class="tl-line"></div></div>
+        <div class="tl-body"><div class="tl-head"><h3>Desktop-kracht &amp; overzicht</h3><span class="pill door">doorlopend</span></div><p>Per-VvE overzicht, globaal zoeken, bulk-acties en sneltoetsen.</p></div></div>
+    </div>
+    <div class="tl-cap">{{ARROW}} Eerst het fundament (1–2), dan de zichtbare winst in je dagelijkse werk (3–5).</div>
+  </section>
+
+  <!-- 5. FASE 1 -->
+  <section class="slide light">
+    <div class="kicker">Fase 1 · eerst</div>
+    <h2>Vangnet &amp; veiligheid <span class="pill klein">klein</span></h2>
+    <p class="lead">Het live lek in het meldingen-kanaal dichten, en een testnet leggen vóór de grote verbouwing.</p>
+    <div class="points">
+      <div class="point"><div class="ic">{{LOCK}}</div><p><b>Meldingen loskoppelen van het openbare wachtwoord.</b> Het dashboard verstuurt meldingen voortaan veilig via je eigen login, zodat dat wachtwoord niet meer in de code hoeft te staan.</p></div>
+      <div class="point"><div class="ic">{{SHIELD}}</div><p><b>Controle wie er meldingen mag sturen</b> aan de serverkant, plus het gelekte wachtwoord intrekken.</p></div>
+      <div class="point"><div class="ic">{{FLASK}}</div><p><b>Een echt testnet.</b> De bestaande zelftest uitbouwen zodat de huidige werking is vastgelegd — vóór we gaan verbouwen.</p></div>
+    </div>
+    <div class="deliver">{{CHECK}} Levert op: het lek dicht én een vangnet dat fouten vangt vóór de verbouwing.</div>
+  </section>
+
+  <!-- 6. FASE 2 -->
+  <section class="slide light">
+    <div class="kicker">Fase 2 · de kernverbouwing</div>
+    <h2>Onderhoudbaarheid <span class="pill groot">groot</span></h2>
+    <p class="lead">De motor onder de motorkap: elke toekomstige wijziging sneller, veiliger en automatisch uitrolbaar maken.</p>
+    <div class="points">
+      <div class="point"><div class="ic">{{STACK}}</div><p><b>Het bestand van 4.000 regels opsplitsen</b> in logische stukken. Een onzichtbare 'samenvoeg'-stap zorgt dat uitrollen één druk op de knop blijft.</p></div>
+      <div class="point"><div class="ic">{{ROCKET}}</div><p><b>De achterkant automatisch uitrollen.</b> Einde handmatig plakken en het risico op verouderde kopieën.</p></div>
+      <div class="point"><div class="ic">{{MONITOR}}</div><p><b>Een test-omgeving.</b> Wijzigingen uitproberen zonder het live dashboard te raken.</p></div>
+    </div>
+    <div class="deliver">{{CHECK}} Levert op: een schone, veilige basis waarop alle volgende verbeteringen sneller te bouwen zijn.</div>
+  </section>
+
+  <!-- 7. FASE 3 -->
+  <section class="slide light">
+    <div class="kicker">Fase 3 · pijnpunt #1</div>
+    <h2>Minder overtypen <span class="pill middel">middel</span></h2>
+    <p class="lead">Mail het dashboard in krijgen zonder handwerk.</p>
+    <div class="points">
+      <div class="point"><div class="ic">{{MAIL}}</div><p><b>Mail op info@ wordt automatisch een taak</b> — met samenvatting, categorie en actiepunten erbij.</p></div>
+      <div class="point"><div class="ic">{{PLUS}}</div><p><b>Sjablonen voor terugkerende taaksoorten</b> en een slimmere snelinvoer.</p></div>
+    </div>
+    <div class="callout">{{WARN}}<p><b>Nog te beslissen:</b> bouwen we dit met een aparte dienst (n8n) of helemaal binnen Google (waarschijnlijk simpeler)? n8n draait nog niet — die keuze maken we vóór we beginnen.</p></div>
+    <div class="deliver">{{CHECK}} Levert op: mail wordt vanzelf een taak — de grootste tijdvreter weg.</div>
+  </section>
+
+  <!-- 8. FASE 4 -->
+  <section class="slide light">
+    <div class="kicker">Fase 4 · pijnpunt #2</div>
+    <h2>Opvolging &amp; herhaling <span class="pill middel">middel</span></h2>
+    <p class="lead">Zorgen dat niets er meer doorheen glipt.</p>
+    <div class="points">
+      <div class="point"><div class="ic">{{REPEAT}}</div><p><b>Terugkerende taken</b> met automatische herhaalregels.</p></div>
+      <div class="point"><div class="ic">{{CLOCK}}</div><p><b>Opvolg- en snooze-datums</b>, plus stille dossiers die vanzelf weer opveren als er te lang niets gebeurt.</p></div>
+      <div class="point"><div class="ic">{{BELL}}</div><p><b>Korte herinneringen per persoon</b> — sluit aan op de bestaande maandagbriefing.</p></div>
+    </div>
+    <div class="deliver">{{CHECK}} Levert op: opvolging gebeurt vanzelf, niet meer uit je hoofd.</div>
+  </section>
+
+  <!-- 9. FASE 5 -->
+  <section class="slide light">
+    <div class="kicker">Fase 5 · optioneel</div>
+    <h2>Desktop-kracht &amp; overzicht <span class="pill door">doorlopend</span></h2>
+    <p class="lead">Sneller werken en beter overzicht op de computer.</p>
+    <div class="points">
+      <div class="point"><div class="ic">{{BUILDING}}</div><p><b>Eén overzichtspagina per VvE</b>: alle taken, ALV's en logboek bij elkaar op één scherm.</p></div>
+      <div class="point"><div class="ic">{{SEARCH}}</div><p><b>Globaal zoeken</b> over alles, plus meerdere taken tegelijk afronden of herverdelen.</p></div>
+      <div class="point"><div class="ic">{{KEYBOARD}}</div><p><b>Sneltoetsen en een commandopalet</b> voor wie snel wil werken.</p></div>
+    </div>
+    <div class="deliver">{{CHECK}} Levert op: losse verbeteringen die je dagelijks tijd besparen.</div>
+  </section>
+
+  <!-- 10. WAAROM DEZE VOLGORDE -->
+  <section class="slide light">
+    <div class="kicker">Waarom deze volgorde</div>
+    <h2>Eerst fundament, dan winst</h2>
+    <div class="split">
+      <div class="points" style="margin-top:6px">
+        <div class="point"><div class="ic">{{SHIELD}}</div><p><b>Fase 1</b> dicht een live lek en legt het vangnet — zodat de rest veilig kan.</p></div>
+        <div class="point"><div class="ic">{{STACK}}</div><p><b>Fase 2</b> maakt de code schoon, zodat fases 3–5 er snel en veilig op kunnen.</p></div>
+        <div class="point"><div class="ic">{{BOLT}}</div><p><b>Fase 3–5</b> leveren de zichtbare winst in je dagelijkse werk.</p></div>
+      </div>
+      <div class="lowprio">
+        <h4>{{EYE}} Bewust láág gezet</h4>
+        <ul>
+          <li>Live 'pingen' i.p.v. elke 8s verversen</li>
+          <li>Offline kunnen opslaan</li>
+          <li>Mobiel-specifieke extra's</li>
+        </ul>
+        <div class="why">Niet nutteloos — maar levert bij desktop-gebruik nu te weinig op om voorrang te krijgen.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 11. CLOSING -->
+  <section class="slide dark">
+    <div class="kicker">Volgende stap</div>
+    <h1 style="font-size:clamp(30px,4.4vw,56px)">Klaar om te beginnen<br>bij Fase 1</h1>
+    <div class="close-points">
+      <div class="cp"><div class="ic">{{SHIELD}}</div><div><b>We starten met veiligheid.</b> <span>Het meldingen-lek dichten en het testnet leggen.</span></div></div>
+      <div class="cp"><div class="ic">{{FLASK}}</div><div><b>Elke fase apart.</b> <span>Eigen ontwerp → plan → bouwen, stap voor stap.</span></div></div>
+      <div class="cp"><div class="ic">{{CHECK}}</div><div><b>Jij houdt de regie.</b> <span>Na elke fase beslis jij of we doorgaan.</span></div></div>
+    </div>
+    <div class="close-cta">{{ARROW}} Geef je akkoord, dan werk ik Fase 1 in detail uit.</div>
+  </section>
+
+</div>
+
+<div class="brandmark"><span class="logo">{{HOUSE}}</span> VvE Beheer Collectief</div>
+<div class="pager"><span id="cur">1</span> / <span id="tot">11</span></div>
+<div class="nav">
+  <button id="prev" aria-label="Vorige">‹</button>
+  <button id="next" aria-label="Volgende">›</button>
+</div>
+<div class="hint">Gebruik ← → toetsen of klik onderaan</div>
+
+<script>
+/* ---- inline SVG icon set (Phosphor-achtig, currentColor) ---- */
+const I = {
+  SHIELD:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>',
+  CODE:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>',
+  BOLT:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg>',
+  LAYERS:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/></svg>',
+  MONITOR:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>',
+  MAIL:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>',
+  REPEAT:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>',
+  STACK:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg>',
+  ROCKET:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 15c-1.2 1-1.8 4.5-1.8 4.5S6.7 19 7.7 17.8"/><path d="M9 11.5C9 7 12 3.5 17 3.5c2 0 3.5.4 3.5.4s.4 1.5.4 3.5c0 5-3.5 8-8 8l-3 1-2-2 1.6-2.9z"/><circle cx="15" cy="9" r="1.3"/></svg>',
+  FLASK:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6M10 3v6l-5.2 9.3A2 2 0 006.5 21h11a2 2 0 001.7-2.7L14 9V3"/><path d="M7.5 14h9"/></svg>',
+  BELL:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>',
+  CLOCK:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  BUILDING:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M9 7h0M12 7h0M15 7h0M9 11h0M12 11h0M15 11h0M9 15h0M12 15h0M15 15h0M10 21v-3h4v3"/></svg>',
+  KEYBOARD:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h0M10 10h0M14 10h0M18 10h0M7 14h10"/></svg>',
+  SEARCH:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>',
+  PLUS:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>',
+  EYE:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>',
+  LOCK:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>',
+  WARN:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l9 16H3l9-16z"/><path d="M12 10v4M12 17.5v.5"/></svg>',
+  CHECK:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>',
+  V:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>',
+  ARROW:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15M13 6l6 6-6 6"/></svg>',
+  HOUSE:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-6 8 6"/><path d="M6 10v9h12v-9"/><path d="M9.5 15.5c1-1 3.5-1 5 0"/></svg>'
+};
+document.body.innerHTML = document.body.innerHTML.replace(/\{\{(\w+)\}\}/g, (m,k)=> I[k]||m);
+
+/* ---- deck navigation ---- */
+const slides=[...document.querySelectorAll('.slide')];
+const tot=slides.length, bar=document.getElementById('bar');
+const dotsEl=document.getElementById('dots');
+slides.forEach((_,i)=>{const d=document.createElement('i');d.onclick=()=>go(i);dotsEl.appendChild(d)});
+const dots=[...dotsEl.children];
+document.getElementById('tot').textContent=tot;
+let idx=0;
+function go(n){
+  idx=Math.max(0,Math.min(tot-1,n));
+  slides.forEach((s,i)=>s.classList.toggle('active',i===idx));
+  dots.forEach((d,i)=>d.classList.toggle('on',i===idx));
+  bar.style.width=((idx+1)/tot*100)+'%';
+  document.getElementById('cur').textContent=idx+1;
+  const dark=slides[idx].classList.contains('dark');
+  document.querySelector('.pager').style.color=dark?'#fff':'';
+  document.querySelector('.brandmark').style.color=dark?'rgba(255,255,255,.7)':'';
+}
+document.getElementById('next').onclick=()=>go(idx+1);
+document.getElementById('prev').onclick=()=>go(idx-1);
+addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){go(idx+1);e.preventDefault();}
+  if(e.key==='ArrowLeft'||e.key==='PageUp'){go(idx-1);e.preventDefault();}
+  if(e.key==='Home')go(0); if(e.key==='End')go(tot-1);
+  if(e.key==='f'||e.key==='F'){if(!document.fullscreenElement)document.documentElement.requestFullscreen();else document.exitFullscreen();}
+});
+go(0);
+</script>
+</body>
+</html>

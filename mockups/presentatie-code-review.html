@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Code Review Dashboard — Resultaten | VvE Beheer Collectief</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#2B3544; --navy-dark:#1E2530; --white:#fff; --gray-bg:#F0F2F5;
+  --teal-900:#064E50; --teal-700:#0D7377; --teal-500:#14B8A6; --teal-300:#5EEAD4; --teal-100:#CCFBF1;
+  --green:#059669; --amber:#D97706; --red:#DC2626; --muted:#64748B;
+  --ink:#334155; --line:#E2E8F0;
+  --font:'DM Sans',system-ui,sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  font-family:var(--font); color:var(--ink); background:var(--navy-dark);
+  overflow:hidden;
+}
+
+/* ---------- Deck frame ---------- */
+.deck{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+.slide{
+  position:absolute;inset:0;display:none;
+  padding:6vh 7vw 9vh;
+  flex-direction:column;justify-content:center;
+  animation:fade .45s ease both;
+}
+.slide.active{display:flex}
+@keyframes fade{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+/* light vs dark slides */
+.slide.light{background:var(--gray-bg);color:var(--ink)}
+.slide.dark{background:
+  radial-gradient(1200px 600px at 85% -10%, rgba(20,184,166,.20), transparent 60%),
+  radial-gradient(900px 500px at -10% 110%, rgba(13,115,119,.28), transparent 55%),
+  linear-gradient(135deg,var(--navy) 0%,var(--navy-dark) 100%);
+  color:#fff;
+}
+
+/* ---------- Progress + chrome ---------- */
+.progress{position:fixed;top:0;left:0;height:4px;background:var(--teal-500);z-index:30;transition:width .35s ease}
+.pager{position:fixed;bottom:22px;right:34px;z-index:30;font-size:13px;font-weight:600;letter-spacing:.04em;color:var(--muted)}
+.slide.dark ~ .pager{color:#fff}
+.brandmark{position:fixed;bottom:20px;left:34px;z-index:30;display:flex;align-items:center;gap:10px;font-weight:800;font-size:12px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase}
+.brandmark .logo{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--teal-700),var(--teal-500));display:grid;place-items:center;color:#fff}
+.nav{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:30;display:flex;gap:8px}
+.nav button{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:#fff;color:var(--navy);cursor:pointer;font-size:16px;display:grid;place-items:center;transition:.2s;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.nav button:hover{background:var(--teal-700);color:#fff;border-color:var(--teal-700)}
+.dots{position:fixed;top:24px;left:50%;transform:translateX(-50%);z-index:30;display:flex;gap:7px}
+.dots i{width:8px;height:8px;border-radius:50%;background:#cbd5e1;cursor:pointer;transition:.25s;display:block}
+.dots i.on{background:var(--teal-500);width:24px;border-radius:4px}
+
+/* ---------- Typography ---------- */
+.kicker{font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--teal-700);margin-bottom:18px}
+.slide.dark .kicker{color:var(--teal-300)}
+h1{font-size:clamp(34px,5.4vw,68px);font-weight:800;line-height:1.04;letter-spacing:-.02em}
+h2{font-size:clamp(26px,3.6vw,44px);font-weight:800;line-height:1.08;letter-spacing:-.01em;color:var(--navy)}
+.slide.dark h2{color:#fff}
+.lead{font-size:clamp(16px,1.5vw,21px);font-weight:400;color:var(--muted);max-width:60ch;margin-top:18px;line-height:1.55}
+.slide.dark .lead{color:rgba(255,255,255,.78)}
+
+/* ---------- Title slide ---------- */
+.title-wrap{max-width:18ch}
+.title-sub{margin-top:26px;font-size:clamp(17px,1.7vw,23px);font-weight:500;color:rgba(255,255,255,.82)}
+.title-meta{margin-top:46px;display:flex;gap:14px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:9px;padding:10px 16px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);font-weight:600;font-size:14px;color:#fff}
+.chip svg{width:17px;height:17px}
+
+/* ---------- Scorecard ---------- */
+.scorecards{display:grid;grid-template-columns:repeat(4,1fr);gap:22px;margin-top:42px}
+.scard{background:#fff;border-radius:18px;padding:30px 26px;box-shadow:0 10px 30px rgba(30,37,48,.07);border-top:5px solid var(--teal-500);position:relative;overflow:hidden}
+.scard .ic{width:42px;height:42px;border-radius:11px;background:var(--teal-100);color:var(--teal-700);display:grid;place-items:center;margin-bottom:18px}
+.scard .ic svg{width:24px;height:24px}
+.scard .num{font-size:clamp(38px,4.2vw,56px);font-weight:800;color:var(--navy);line-height:1}
+.scard .lbl{margin-top:10px;font-size:14px;font-weight:600;color:var(--muted);line-height:1.35}
+.scard.accent{border-top-color:var(--green)}.scard.accent .ic{background:#D1FAE5;color:var(--green)}
+.scard.warn{border-top-color:var(--amber)}.scard.warn .ic{background:#FEF3C7;color:var(--amber)}
+.scard.zero{border-top-color:var(--navy)}.scard.zero .ic{background:#E2E8F0;color:var(--navy)}
+
+/* ---------- Before / After ---------- */
+.ba{display:grid;grid-template-columns:1fr 64px 1fr;align-items:stretch;gap:0;margin-top:38px}
+.col{border-radius:20px;padding:34px 32px;background:#fff;box-shadow:0 10px 34px rgba(30,37,48,.08);display:flex;flex-direction:column}
+.col.before{border:1px solid #FECACA;background:linear-gradient(180deg,#FFF5F5,#fff 55%)}
+.col.after{border:1px solid var(--teal-300);background:linear-gradient(180deg,#F0FDFA,#fff 55%)}
+.col .tag{display:inline-flex;align-items:center;gap:9px;align-self:flex-start;padding:7px 14px;border-radius:999px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:20px}
+.col.before .tag{background:#FEE2E2;color:var(--red)}
+.col.after .tag{background:var(--teal-100);color:var(--teal-900)}
+.col .tag svg{width:15px;height:15px}
+.col h3{font-size:clamp(18px,1.7vw,23px);font-weight:700;color:var(--navy);margin-bottom:8px}
+.col ul{list-style:none;margin-top:14px;display:flex;flex-direction:column;gap:13px}
+.col li{display:flex;gap:11px;font-size:clamp(14px,1.25vw,16px);line-height:1.45;color:var(--ink)}
+.col li svg{width:19px;height:19px;flex:0 0 19px;margin-top:1px}
+.col.before li svg{color:var(--red)}
+.col.after li svg{color:var(--green)}
+.arrow{display:grid;place-items:center;color:var(--teal-500)}
+.arrow svg{width:34px;height:34px}
+
+/* ---------- Robustness grid ---------- */
+.grid4{display:grid;grid-template-columns:repeat(2,1fr);gap:20px;margin-top:34px}
+.feat{background:#fff;border:1px solid var(--line);border-radius:16px;padding:24px 26px;display:flex;gap:18px;align-items:flex-start;box-shadow:0 6px 20px rgba(30,37,48,.05)}
+.feat .ic{width:46px;height:46px;flex:0 0 46px;border-radius:12px;background:var(--teal-100);color:var(--teal-700);display:grid;place-items:center}
+.feat .ic svg{width:25px;height:25px}
+.feat h4{font-size:17px;font-weight:700;color:var(--navy);margin-bottom:5px}
+.feat p{font-size:14.5px;color:var(--muted);line-height:1.45}
+.feat .ba-mini{margin-top:10px;font-size:13px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.feat .ba-mini b{color:var(--red);font-weight:600}
+.feat .ba-mini i{color:var(--muted)}
+.feat .ba-mini s{color:var(--red);opacity:.7}
+.feat .ba-mini em{color:var(--green);font-weight:700;font-style:normal}
+
+/* ---------- Summary table ---------- */
+.tbl{margin-top:32px;width:100%;border-collapse:separate;border-spacing:0;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(30,37,48,.07)}
+.tbl th,.tbl td{padding:16px 22px;text-align:left;font-size:15px}
+.tbl thead th{background:var(--navy);color:#fff;font-weight:700;font-size:13px;letter-spacing:.06em;text-transform:uppercase}
+.tbl tbody tr+tr td{border-top:1px solid var(--line)}
+.tbl td.area{font-weight:700;color:var(--navy);width:24%}
+.tbl td.was{color:var(--red);font-weight:500}
+.tbl td.now{color:var(--green);font-weight:600}
+.tbl td .mk{display:inline-flex;align-items:center;gap:8px}
+.tbl td .mk svg{width:16px;height:16px}
+
+/* ---------- Closing ---------- */
+.close-points{margin-top:34px;display:flex;flex-direction:column;gap:18px;max-width:60ch}
+.close-points div{display:flex;gap:15px;align-items:flex-start;font-size:clamp(16px,1.5vw,20px);line-height:1.4}
+.close-points .ic{width:40px;height:40px;flex:0 0 40px;border-radius:11px;background:rgba(94,234,212,.16);color:var(--teal-300);display:grid;place-items:center}
+.close-points .ic svg{width:22px;height:22px}
+.close-points b{color:#fff;font-weight:700}
+.close-points span{color:rgba(255,255,255,.8)}
+
+.hint{position:fixed;bottom:70px;left:50%;transform:translateX(-50%);z-index:30;font-size:12px;color:var(--muted);opacity:.8}
+@media(max-width:900px){
+  .scorecards{grid-template-columns:repeat(2,1fr)}
+  .ba{grid-template-columns:1fr;gap:18px}
+  .arrow{transform:rotate(90deg)}
+  .grid4{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="progress" id="bar"></div>
+<div class="dots" id="dots"></div>
+
+<div class="deck" id="deck">
+
+  <!-- 1. TITLE -->
+  <section class="slide dark active">
+    <div class="title-wrap">
+      <div class="kicker">Code Review · 8 juni 2026</div>
+      <h1>Het dashboard:<br>veiliger &amp; steviger</h1>
+      <div class="title-sub">Resultaten van de grote technische controle — wat was er, en wat is er nu beter.</div>
+      <div class="title-meta">
+        <span class="chip">{{SHIELD}} Beveiliging</span>
+        <span class="chip">{{PULSE}} Betrouwbaarheid</span>
+        <span class="chip">{{LAYERS}} Stevigheid</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. AANLEIDING -->
+  <section class="slide light">
+    <div class="kicker">Wat hebben we gedaan</div>
+    <h2>Een grondige controle van het hele dashboard</h2>
+    <p class="lead">We hebben het volledige dashboard, de ingebouwde hulpjes (AI-hulp, logboek, meldingen) én de motor erachter (de koppeling met Google Sheets) regel voor regel nagekeken op fouten en zwakke plekken — en de belangrijkste meteen opgelost en live gezet.</p>
+    <div class="grid4" style="margin-top:40px">
+      <div class="feat"><div class="ic">{{SEARCH}}</div><div><h4>Volledige doorlichting</h4><p>Dashboard, tools én de Google Sheets-koppeling in één keer onder de loep.</p></div></div>
+      <div class="feat"><div class="ic">{{TARGET}}</div><div><h4>2 echte risico's gevonden</h4><p>Een beveiligingslek en een databug — allebei nu verholpen.</p></div></div>
+      <div class="feat"><div class="ic">{{WRENCH}}</div><div><h4>10 verbeteringen doorgevoerd</h4><p>Zes aan de voorkant, vier aan de motor erachter.</p></div></div>
+      <div class="feat"><div class="ic">{{EYE}}</div><div><h4>0 zichtbare wijzigingen</h4><p>Zelfde uiterlijk, zelfde werking — alleen sterker eronder.</p></div></div>
+    </div>
+  </section>
+
+  <!-- 3. SCORECARD -->
+  <section class="slide light">
+    <div class="kicker">In cijfers</div>
+    <h2>De oogst van deze ronde</h2>
+    <div class="scorecards">
+      <div class="scard warn"><div class="ic">{{TARGET}}</div><div class="num">2</div><div class="lbl">echte risico's weggenomen</div></div>
+      <div class="scard"><div class="ic">{{WRENCH}}</div><div class="num">10</div><div class="lbl">verbeteringen doorgevoerd</div></div>
+      <div class="scard accent"><div class="ic">{{KEY}}</div><div class="num">1</div><div class="lbl">wachtwoord vervangen &amp; afgeschermd</div></div>
+      <div class="scard zero"><div class="ic">{{EYE}}</div><div class="num">0</div><div class="lbl">veranderingen voor de gebruiker</div></div>
+    </div>
+    <p class="lead" style="margin-top:38px">Kort gezegd: het dashboard wérkte al goed — deze ronde ging volledig over de fundering: veiliger, betrouwbaarder en bestendiger tegen storingen.</p>
+  </section>
+
+  <!-- 4. BEFORE/AFTER — SECURITY -->
+  <section class="slide light">
+    <div class="kicker">Verbetering 1 · Beveiliging</div>
+    <h2>Het slot op de meldingen</h2>
+    <div class="ba">
+      <div class="col before">
+        <span class="tag">{{WARN}} Voorheen</span>
+        <h3>Sleutel lag op straat</h3>
+        <ul>
+          <li>{{X}} Het wachtwoord voor de pushmeldingen stond openbaar in de code.</li>
+          <li>{{X}} Het systeem liet berichten dóór, óók als er geen geldig wachtwoord was.</li>
+          <li>{{X}} In theorie kon een buitenstaander nepmeldingen sturen.</li>
+        </ul>
+      </div>
+      <div class="arrow">{{ARROW}}</div>
+      <div class="col after">
+        <span class="tag">{{CHECK}} Nu</span>
+        <h3>Op slot, nieuw wachtwoord</h3>
+        <ul>
+          <li>{{V}} Een nieuw, geheim wachtwoord ingesteld — het oude werkt niet meer.</li>
+          <li>{{V}} Geen geldig wachtwoord? Dan wordt het bericht meteen geweigerd.</li>
+          <li>{{V}} Alleen het echte dashboard kan nog meldingen versturen.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. BEFORE/AFTER — RELIABILITY -->
+  <section class="slide light">
+    <div class="kicker">Verbetering 2 · Betrouwbaarheid</div>
+    <h2>Snel klikken zonder verrassingen</h2>
+    <div class="ba">
+      <div class="col before">
+        <span class="tag">{{WARN}} Voorheen</span>
+        <h3>Verkeerde regel-risico</h3>
+        <ul>
+          <li>{{X}} Bij snel achter elkaar afronden of toevoegen kon in een zeldzaam geval de verkeerde regel worden aangepast.</li>
+          <li>{{X}} Bij een hapering van Google ging een wijziging soms verloren.</li>
+        </ul>
+      </div>
+      <div class="arrow">{{ARROW}}</div>
+      <div class="col after">
+        <span class="tag">{{CHECK}} Nu</span>
+        <h3>Waterdicht &amp; zelfherstellend</h3>
+        <ul>
+          <li>{{V}} Wijzigingen worden netjes op volgorde verwerkt — altijd de juiste regel.</li>
+          <li>{{V}} Hapert Google even? Dan probeert het dashboard het vanzelf opnieuw.</li>
+          <li>{{V}} Het razendsnelle gevoel blijft — nu met een vangnet eronder.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. ROBUSTNESS GRID -->
+  <section class="slide light">
+    <div class="kicker">Verbetering 3 · Stevigheid onder de motorkap</div>
+    <h2>Vier kleinere, slimme versterkingen</h2>
+    <div class="grid4">
+      <div class="feat"><div class="ic">{{RETRY}}</div><div><h4>Automatisch opnieuw proberen</h4><p>Bij een drukke of hikkende server.</p><div class="ba-mini"><s>wijziging weg</s><i>→</i><em>vanzelf hersteld</em></div></div></div>
+      <div class="feat"><div class="ic">{{SHIELD}}</div><div><h4>Vangnet rond meldingen</h4><p>Eén foute regel sloopt niet meer alles.</p><div class="ba-mini"><s>alles stopt</s><i>→</i><em>rest draait door</em></div></div></div>
+      <div class="feat"><div class="ic">{{LOCK}}</div><div><h4>Geen botsingen meer</h4><p>Twee acties tegelijk lopen elkaar niet in de weg.</p><div class="ba-mini"><s>kans op botsing</s><i>→</i><em>netjes op slot</em></div></div></div>
+      <div class="feat"><div class="ic">{{CAL}}</div><div><h4>Datums beter gelezen</h4><p>Meer schrijfwijzes worden herkend.</p><div class="ba-mini"><s>"sept" gemist</s><i>→</i><em>correct verwerkt</em></div></div></div>
+    </div>
+  </section>
+
+  <!-- 7. SUMMARY TABLE -->
+  <section class="slide light">
+    <div class="kicker">Samengevat</div>
+    <h2>Voorheen &nbsp;→&nbsp; Nu</h2>
+    <table class="tbl">
+      <thead><tr><th>Onderdeel</th><th>Voorheen</th><th>Nu</th></tr></thead>
+      <tbody>
+        <tr><td class="area">Meldingen-sleutel</td><td class="was">openbaar zichtbaar</td><td class="now"><span class="mk">{{CHECK}} geheim &amp; vervangen</span></td></tr>
+        <tr><td class="area">Toegang meldingen</td><td class="was">liet alles door</td><td class="now"><span class="mk">{{CHECK}} weigert zonder sleutel</span></td></tr>
+        <tr><td class="area">Snel taken bijwerken</td><td class="was">kans op verkeerde regel</td><td class="now"><span class="mk">{{CHECK}} altijd de juiste</span></td></tr>
+        <tr><td class="area">Storing bij Google</td><td class="was">wijziging kon wegvallen</td><td class="now"><span class="mk">{{CHECK}} probeert zelf opnieuw</span></td></tr>
+        <tr><td class="area">Eén foute regel</td><td class="was">kon meldingen stoppen</td><td class="now"><span class="mk">{{CHECK}} rest blijft werken</span></td></tr>
+        <tr><td class="area">Uiterlijk &amp; bediening</td><td class="was">—</td><td class="now"><span class="mk">{{CHECK}} ongewijzigd</span></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 8. CLOSING -->
+  <section class="slide dark">
+    <div class="kicker">Resultaat</div>
+    <h1 style="font-size:clamp(30px,4.4vw,56px)">Hetzelfde dashboard,<br>een sterkere fundering</h1>
+    <div class="close-points">
+      <div><div class="ic">{{SHIELD}}</div><div><b>Veiliger.</b> <span>Het lek is gedicht en de meldingen zitten op slot.</span></div></div>
+      <div><div class="ic">{{PULSE}}</div><div><b>Betrouwbaarder.</b> <span>Snel klikken kan geen rare fouten meer veroorzaken.</span></div></div>
+      <div><div class="ic">{{LAYERS}}</div><div><b>Bestendiger.</b> <span>Storingen en haperingen vangt het dashboard nu zelf op.</span></div></div>
+      <div><div class="ic">{{CHECK}}</div><div><b>Alles staat live.</b> <span>Zonder dat de bediening of het uiterlijk veranderde.</span></div></div>
+    </div>
+  </section>
+
+</div>
+
+<div class="brandmark"><span class="logo">{{HOUSE}}</span> VvE Beheer Collectief</div>
+<div class="pager"><span id="cur">1</span> / <span id="tot">8</span></div>
+<div class="nav">
+  <button id="prev" aria-label="Vorige">‹</button>
+  <button id="next" aria-label="Volgende">›</button>
+</div>
+<div class="hint">Gebruik ← → toetsen of klik onderaan</div>
+
+<script>
+/* ---- inline SVG icon set (Phosphor-achtig, currentColor) ---- */
+const I = {
+  SHIELD:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>',
+  PULSE:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-6 4 12 2-6h6"/></svg>',
+  LAYERS:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/></svg>',
+  SEARCH:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>',
+  TARGET:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>',
+  WRENCH:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6a4 4 0 00-5 5L4 17l3 3 6-6a4 4 0 005-5l-3 3-2-2 3-3a4 4 0 00-1-1z"/></svg>',
+  EYE:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>',
+  KEY:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="4"/><path d="M11 11l9 9M17 17l2-2M14 14l2-2"/></svg>',
+  WARN:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l9 16H3l9-16z"/><path d="M12 10v4M12 17.5v.5"/></svg>',
+  CHECK:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>',
+  X:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg>',
+  V:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>',
+  ARROW:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15M13 6l6 6-6 6"/></svg>',
+  RETRY:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v6h6"/><path d="M20 20v-6h-6"/><path d="M5 10a8 8 0 0114-3M19 14a8 8 0 01-14 3"/></svg>',
+  LOCK:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>',
+  CAL:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M4 9h16M8 3v4M16 3v4"/></svg>',
+  HOUSE:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-6 8 6"/><path d="M6 10v9h12v-9"/><path d="M9.5 15.5c1-1 3.5-1 5 0"/></svg>'
+};
+document.body.innerHTML = document.body.innerHTML.replace(/\{\{(\w+)\}\}/g, (m,k)=> I[k]||m);
+
+/* ---- deck navigation ---- */
+const slides=[...document.querySelectorAll('.slide')];
+const tot=slides.length, bar=document.getElementById('bar');
+const dotsEl=document.getElementById('dots');
+slides.forEach((_,i)=>{const d=document.createElement('i');d.onclick=()=>go(i);dotsEl.appendChild(d)});
+const dots=[...dotsEl.children];
+document.getElementById('tot').textContent=tot;
+let idx=0;
+function go(n){
+  idx=Math.max(0,Math.min(tot-1,n));
+  slides.forEach((s,i)=>s.classList.toggle('active',i===idx));
+  dots.forEach((d,i)=>d.classList.toggle('on',i===idx));
+  bar.style.width=((idx+1)/tot*100)+'%';
+  document.getElementById('cur').textContent=idx+1;
+  // pager colour vs dark slide
+  const dark=slides[idx].classList.contains('dark');
+  document.querySelector('.pager').style.color=dark?'#fff':'';
+  document.querySelector('.brandmark').style.color=dark?'rgba(255,255,255,.7)':'';
+}
+document.getElementById('next').onclick=()=>go(idx+1);
+document.getElementById('prev').onclick=()=>go(idx-1);
+addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){go(idx+1);e.preventDefault();}
+  if(e.key==='ArrowLeft'||e.key==='PageUp'){go(idx-1);e.preventDefault();}
+  if(e.key==='Home')go(0); if(e.key==='End')go(tot-1);
+  if(e.key==='f'||e.key==='F'){if(!document.fullscreenElement)document.documentElement.requestFullscreen();else document.exitFullscreen();}
+});
+go(0);
+</script>
+</body>
+</html>

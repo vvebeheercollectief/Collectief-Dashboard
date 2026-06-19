@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<title>Dashboard — Design V2 (exacte indeling)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; font-family: 'Manrope', sans-serif; background: #0d1117; -webkit-font-smoothing: antialiased; }
+
+.outer { max-width: 1180px; margin: 0 auto; padding: 28px 24px 56px; }
+.pg-title { font-size: 19px; font-weight: 800; color: #f1f5f9; letter-spacing: -.03em; margin-bottom: 4px; }
+.pg-sub { font-size: 13px; color: #475569; margin-bottom: 20px; }
+
+/* ── APP SHELL ── */
+#app {
+  display: flex; height: 640px;
+  border-radius: 12px; overflow: hidden;
+  border: 1px solid #1e293b;
+  box-shadow: 0 32px 80px rgba(0,0,0,.55);
+}
+
+/* ── SIDEBAR ── */
+#sb {
+  width: 226px;
+  background: #08353a;
+  display: flex; flex-direction: column;
+  flex-shrink: 0; position: relative;
+}
+#sb::after {
+  content: '';
+  position: absolute; right: 0; top: 0; bottom: 0; width: 3px;
+  background: linear-gradient(180deg, #0f5c62 0%, #062e33 55%, transparent 100%);
+}
+
+.sb-logo {
+  padding: 18px 18px 15px;
+  border-bottom: 1px solid rgba(255,255,255,.07);
+  display: flex; align-items: center; gap: 9px;
+}
+.sb-logo img {
+  height: 28px; width: auto; object-fit: contain; max-width: 130px;
+  filter: brightness(0) invert(1) opacity(.88);
+}
+.sb-brand { font-size: 11px; font-weight: 600; color: rgba(255,255,255,.35); line-height: 1.3; letter-spacing: -.01em; }
+
+.sb-nav { flex: 1; padding: 10px 10px; overflow-y: auto; }
+
+.sb-lbl {
+  font-size: 9.5px; font-weight: 800;
+  letter-spacing: .1em; text-transform: uppercase;
+  color: rgba(255,255,255,.22);
+  padding: 12px 8px 4px;
+}
+.sb-lbl:first-child { padding-top: 4px; }
+
+.ni {
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 9px;
+  border-radius: 6px;
+  color: rgba(255,255,255,.42);
+  font-size: 12.5px; font-weight: 600;
+  cursor: pointer;
+  transition: background .14s, color .14s;
+  margin-bottom: 1px; position: relative;
+  letter-spacing: -.01em;
+}
+.ni:hover { background: rgba(255,255,255,.06); color: rgba(255,255,255,.72); }
+.ni.on { background: rgba(255,255,255,.1); color: #fff; }
+.ni.on::before {
+  content: '';
+  position: absolute; left: -10px; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 16px;
+  background: #4dd9d5; border-radius: 0 3px 3px 0;
+}
+.ni svg { width: 15px; height: 15px; flex-shrink: 0; opacity: .65; }
+.ni.on svg { opacity: 1; }
+.ni-badge {
+  margin-left: auto;
+  font-size: 10px; font-weight: 800;
+  color: #4dd9d5; letter-spacing: .02em;
+}
+
+.sb-foot {
+  padding: 11px 16px;
+  border-top: 1px solid rgba(255,255,255,.07);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.sync-row { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 500; color: rgba(255,255,255,.28); }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: #4dd9d5; flex-shrink: 0; }
+.sb-refresh {
+  width: 26px; height: 26px; border-radius: 5px;
+  border: 1px solid rgba(255,255,255,.1);
+  background: transparent;
+  display: flex; align-items: center; justify-content: center;
+  color: rgba(255,255,255,.3); cursor: pointer;
+}
+.sb-refresh:hover { background: rgba(255,255,255,.07); color: rgba(255,255,255,.6); }
+.sb-refresh svg { width: 12px; height: 12px; }
+
+/* ── MAIN ── */
+#main { flex: 1; background: #f3f5f7; display: flex; flex-direction: column; overflow: hidden; }
+
+/* Header — exacte volgorde knoppen: zoek, notif, AI, dichtheid, thema */
+#hdr {
+  background: #fff;
+  border-bottom: 2px solid #e4e8ed;
+  padding: 0 20px;
+  display: flex; align-items: center;
+  height: 54px; gap: 6px;
+  flex-shrink: 0;
+}
+.hdr-info { flex: 1; }
+.hdr-info h1 { font-size: 17px; font-weight: 900; color: #0d1f2b; letter-spacing: -.04em; line-height: 1.2; }
+.hdr-info p  { font-size: 11px; font-weight: 500; color: #9baab8; }
+
+.ico-btn {
+  width: 32px; height: 32px; border-radius: 7px;
+  border: 1px solid #e4e8ed; background: #fff;
+  display: flex; align-items: center; justify-content: center;
+  color: #9baab8; cursor: pointer; flex-shrink: 0;
+  transition: all .14s;
+}
+.ico-btn:hover { background: #f3f5f7; color: #4c6478; border-color: #d0d8e0; }
+.ico-btn svg { width: 14px; height: 14px; }
+
+/* ── CONTENT ── */
+#content { flex: 1; overflow-y: auto; }
+
+/* Stat-kaartjes — exacte grid zoals in het echte dashboard */
+.ntd-top { padding: 16px 20px 0; }
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px; margin-bottom: 16px;
+}
+.stat {
+  background: #fff;
+  border: 1px solid #e4e8ed;
+  border-left: 3px solid #0a5c60;
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.stat.telaat { border-left-color: #b91c1c; }
+.stat.weggelegd { border-left-color: #b45309; }
+.stat.vandaag { border-left-color: #047857; }
+.stat-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 6px; }
+.stat-lbl { font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; color: #9baab8; }
+.stat-ico {
+  width: 28px; height: 28px; border-radius: 6px;
+  background: #e6f4f4; display: flex; align-items: center; justify-content: center;
+  color: #0a5c60;
+}
+.stat.telaat .stat-ico { background: #fef3f3; color: #b91c1c; }
+.stat.weggelegd .stat-ico { background: #fffbf0; color: #b45309; }
+.stat.vandaag .stat-ico { background: #f0fdf9; color: #047857; }
+.stat-ico svg { width: 14px; height: 14px; }
+.stat-num { font-size: 26px; font-weight: 900; letter-spacing: -.05em; color: #0a5c60; line-height: 1; }
+.stat.telaat .stat-num { color: #b91c1c; }
+.stat.weggelegd .stat-num { color: #b45309; }
+.stat.vandaag .stat-num { color: #047857; }
+.stat-sub { font-size: 10px; font-weight: 600; color: #b0bec9; margin-top: 2px; }
+
+/* Card */
+.card { background: #fff; border: 1px solid #e4e8ed; border-radius: 10px; overflow: hidden; margin: 0 20px 16px; }
+
+/* Filter-bar — exacte volgorde: zoek, behandelaar, | bulk-teller, selecteren, toevoegen */
+.filter-bar {
+  padding: 10px 16px;
+  border-bottom: 1px solid #edf0f3;
+  display: flex; align-items: center; gap: 7px;
+  flex-wrap: wrap;
+}
+.search-wrap {
+  display: flex; align-items: center; gap: 6px;
+  background: #f7f9fb; border: 1px solid #e4e8ed;
+  border-radius: 7px; padding: 6px 10px;
+}
+.search-wrap svg { width: 12px; height: 12px; color: #b0bec9; flex-shrink: 0; }
+.search-wrap input {
+  background: none; border: none; outline: none;
+  font-family: 'Manrope', sans-serif; font-size: 12px; font-weight: 500;
+  color: #0d1f2b; width: 155px;
+}
+.search-wrap input::placeholder { color: #b0bec9; }
+.filter-sel {
+  background: #f7f9fb; border: 1px solid #e4e8ed;
+  border-radius: 7px; padding: 6px 9px;
+  font-family: 'Manrope', sans-serif; font-size: 12px; font-weight: 500;
+  color: #4c6478; outline: none; cursor: pointer;
+}
+.fb-sep { width: 1px; height: 20px; background: #e4e8ed; margin: 0 2px; }
+.btn-selecteren {
+  height: 28px; padding: 0 10px;
+  border-radius: 6px;
+  background: #f7f9fb; border: 1px solid #e4e8ed;
+  font-family: 'Manrope', sans-serif; font-size: 11.5px; font-weight: 700;
+  color: #4c6478; cursor: pointer; letter-spacing: -.01em;
+  transition: all .12s;
+}
+.btn-selecteren:hover { background: #edf0f3; color: #1a2e3b; }
+.btn-toevoegen {
+  height: 28px; padding: 0 12px;
+  border-radius: 6px;
+  background: #08353a; color: #4dd9d5;
+  font-family: 'Manrope', sans-serif; font-size: 11.5px; font-weight: 700;
+  border: none; cursor: pointer; letter-spacing: -.01em;
+  display: inline-flex; align-items: center; gap: 5px;
+  transition: background .12s;
+}
+.btn-toevoegen:hover { background: #0a5c60; }
+.btn-toevoegen svg { width: 11px; height: 11px; }
+
+/* Tabs */
+.tabs {
+  display: flex; border-bottom: 2px solid #edf0f3;
+}
+.tab {
+  padding: 10px 15px;
+  font-size: 12.5px; font-weight: 700; letter-spacing: -.01em;
+  color: #9baab8; cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  display: flex; align-items: center; gap: 5px;
+  transition: color .14s; white-space: nowrap;
+}
+.tab:hover { color: #4c6478; }
+.tab.on { color: #08353a; border-bottom-color: #08353a; }
+.tab-n { font-size: 11px; font-weight: 800; opacity: .45; }
+.tab.on .tab-n { opacity: 1; color: #4dd9d5; }
+
+/* Tabel */
+.tbl-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+
+thead th {
+  padding: 9px 14px;
+  text-align: left;
+  font-size: 11px; font-weight: 800; letter-spacing: -.01em;
+  color: #5a8080;
+  border-bottom: 2px solid #c8e8e8;
+  background: #edf8f8;
+  white-space: nowrap;
+}
+thead th:first-child { color: #0a5c60; }
+
+tbody tr { border-bottom: 1px solid #f2f5f7; transition: background .1s; }
+tbody tr:last-child { border: none; }
+tbody tr:hover { background: #f8fafb; }
+td { padding: 9px 14px; vertical-align: middle; }
+
+.code {
+  font-family: 'Manrope', monospace;
+  font-size: 12px; font-weight: 900;
+  color: #08353a; letter-spacing: .02em;
+  white-space: nowrap; cursor: pointer;
+}
+.code:hover { color: #4dd9d5; }
+
+.cell-naam { font-weight: 700; color: #1a2e3b; font-size: 12.5px; }
+.cell-oms  { color: #7a8fa0; font-weight: 500; font-size: 12px; max-width: 200px; }
+.cell-wie  { color: #9baab8; font-weight: 600; font-size: 12px; }
+
+.status-telaat  { font-size: 11.5px; font-weight: 800; color: #b91c1c; }
+.status-soon    { font-size: 11.5px; font-weight: 700; color: #b45309; }
+.status-normal  { font-size: 11.5px; font-weight: 600; color: #9baab8; }
+.status-snoozed { font-size: 11.5px; font-weight: 600; color: #b0bec9; }
+
+tr.urgent td:first-child { box-shadow: inset 3px 0 0 #b91c1c; }
+tr.urgent { background: rgba(185,28,28,.025); }
+
+/* Actieknoppen: gekleurde tekst, geen abstracte icons */
+.acts { display: flex; gap: 5px; }
+.act-done {
+  height: 25px; padding: 0 10px;
+  border-radius: 5px; border: none;
+  background: #08353a; color: #4dd9d5;
+  font-family: 'Manrope', sans-serif; font-size: 10.5px; font-weight: 700;
+  cursor: pointer; letter-spacing: -.01em;
+  transition: background .12s;
+}
+.act-done:hover { background: #0a5c60; }
+.act-edit {
+  height: 25px; padding: 0 10px;
+  border-radius: 5px;
+  background: #e6f4f4; border: 1px solid #b8dde0;
+  color: #0a5c60;
+  font-family: 'Manrope', sans-serif; font-size: 10.5px; font-weight: 700;
+  cursor: pointer; letter-spacing: -.01em;
+  transition: all .12s;
+}
+.act-edit:hover { background: #d0ecec; border-color: #8fcdd0; }
+
+/* Weggelegd sectie-header */
+tr.grp-hdr td {
+  padding: 6px 14px;
+  font-size: 10.5px; font-weight: 800; letter-spacing: .07em;
+  text-transform: uppercase;
+  color: #0a5c60;
+  background: #d4eeee;
+  border-top: 1px solid #b8dde0;
+  border-bottom: 1px solid #b8dde0;
+}
+tr.row-snoozed td { opacity: .6; }
+
+/* Snooze-pill (opvolgen-datum) */
+.snooze-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10.5px; font-weight: 700;
+  color: #b45309; background: #fffbf0;
+  border: 1px solid #fde68a; border-radius: 5px;
+  padding: 1px 8px;
+}
+</style>
+</head>
+<body>
+<div class="outer">
+
+<p class="pg-title">Dashboard Redesign V2 — exacte indeling</p>
+<p class="pg-sub">Zelfde design als "Kantoor", nu met de juiste navigatiestructuur, alle headerknopjes en de echte filterrij.</p>
+
+<div id="app">
+
+  <!-- ── SIDEBAR ── -->
+  <aside id="sb">
+    <div class="sb-logo">
+      <img src="logo-sidebar.png" alt="VvE Beheer Collectief">
+      <span class="sb-brand">Collectief<br>Dashboard 4.0</span>
+    </div>
+    <nav class="sb-nav">
+
+      <div class="sb-lbl">Taken</div>
+      <div class="ni on">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+        Nog Te Doen <span class="ni-badge">17</span>
+      </div>
+      <div class="ni">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+        Afgerond
+      </div>
+
+      <div class="sb-lbl">ALV's</div>
+      <div class="ni">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+        ALV's Overzicht
+      </div>
+      <div class="ni">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        ALV's Afgerond
+      </div>
+
+      <div class="sb-lbl">Intern</div>
+      <div class="ni">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        Ontwikkeling
+      </div>
+      <div class="ni">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Logboek
+      </div>
+      <div class="ni">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+        Herhaalregels
+      </div>
+
+      <div class="sb-lbl">Analyse</div>
+      <div class="ni">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Analytics
+      </div>
+      <div class="ni">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Dashboard
+      </div>
+
+    </nav>
+    <div class="sb-foot">
+      <div class="sync-row">
+        <div class="dot"></div>
+        <span>Gesynchroniseerd</span>
+      </div>
+      <button class="sb-refresh">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0115-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 01-15 6.7L3 16"/></svg>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <div id="main">
+
+    <!-- Header: zelfde knoppenrij als het echte dashboard -->
+    <header id="hdr">
+      <div class="hdr-info">
+        <h1>Nog Te Doen</h1>
+        <p>Openstaande taken</p>
+      </div>
+      <!-- Zoeken -->
+      <button class="ico-btn" title="Zoeken (Ctrl+K)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      </button>
+      <!-- Meldingen -->
+      <button class="ico-btn" title="Meldingen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      </button>
+      <!-- AI-hulp -->
+      <button class="ico-btn" title="AI-hulp">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" fill="currentColor" fill-opacity="0.18"/><path d="M18.5 14.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" fill="currentColor" fill-opacity="0.18"/></svg>
+      </button>
+      <!-- Dichtheid -->
+      <button class="ico-btn" title="Weergave dichtheid">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <!-- Thema -->
+      <button class="ico-btn" title="Thema">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+      </button>
+    </header>
+
+    <div id="content">
+
+      <!-- Stat-kaartjes — exacte 4-kolomgrid -->
+      <div class="ntd-top">
+        <div class="stats-grid">
+          <div class="stat">
+            <div class="stat-top">
+              <span class="stat-lbl">Open taken</span>
+              <div class="stat-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div>
+            </div>
+            <div class="stat-num">17</div>
+            <div class="stat-sub">verspreid over 4 secties</div>
+          </div>
+          <div class="stat telaat">
+            <div class="stat-top">
+              <span class="stat-lbl">Te laat</span>
+              <div class="stat-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+            </div>
+            <div class="stat-num">3</div>
+            <div class="stat-sub">actie vereist</div>
+          </div>
+          <div class="stat weggelegd">
+            <div class="stat-top">
+              <span class="stat-lbl">Weggelegd</span>
+              <div class="stat-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+            </div>
+            <div class="stat-num">5</div>
+            <div class="stat-sub">hervat binnenkort</div>
+          </div>
+          <div class="stat vandaag">
+            <div class="stat-top">
+              <span class="stat-lbl">Afgerond vandaag</span>
+              <div class="stat-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div>
+            </div>
+            <div class="stat-num">8</div>
+            <div class="stat-sub">goede dag</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card met tabs + filter + tabel -->
+      <div class="card">
+
+        <!-- Tabs — exacte sectienamen -->
+        <div class="tabs">
+          <div class="tab on">Oppakken <span class="tab-n">8</span></div>
+          <div class="tab">Vergaderverzoeken <span class="tab-n">4</span></div>
+          <div class="tab">Offerte-trajecten <span class="tab-n">3</span></div>
+          <div class="tab">LOD <span class="tab-n">2</span></div>
+        </div>
+
+        <!-- Filter-bar — exacte volgorde: zoek, behandelaar, separator, selecteren, toevoegen -->
+        <div class="filter-bar">
+          <div class="search-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <input placeholder="Zoek op VvE of omschrijving…">
+          </div>
+          <select class="filter-sel">
+            <option>Alle behandelaars</option>
+            <option>Jer</option>
+            <option>Cihad</option>
+          </select>
+          <div class="fb-sep"></div>
+          <button class="btn-selecteren">☑ Selecteren</button>
+          <button class="btn-toevoegen">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Toevoegen
+          </button>
+        </div>
+
+        <!-- Tabel -->
+        <div class="tbl-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>VvE</th>
+                <th>Naam</th>
+                <th>Omschrijving</th>
+                <th>Behandelaar</th>
+                <th>Deadline</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="urgent">
+                <td><span class="code">AMS001</span></td>
+                <td class="cell-naam">Amstelveen Centraal</td>
+                <td class="cell-oms">Lekkage dak — offerte aanvragen bij aannemer</td>
+                <td class="cell-wie">Jer</td>
+                <td><span class="status-telaat">Te laat</span></td>
+                <td><div class="acts">
+                  <button class="act-done">Afronden</button>
+                  <button class="act-edit">Bewerken</button>
+                </div></td>
+              </tr>
+              <tr>
+                <td><span class="code">RTD045</span></td>
+                <td class="cell-naam">Rotterdam Havenblok</td>
+                <td class="cell-oms">Schilderwerk gevel — offerte verwerken en voorstellen</td>
+                <td class="cell-wie">Cihad</td>
+                <td><span class="status-soon">14 jun</span></td>
+                <td><div class="acts">
+                  <button class="act-done">Afronden</button>
+                  <button class="act-edit">Bewerken</button>
+                </div></td>
+              </tr>
+              <tr>
+                <td><span class="code">UTR012</span></td>
+                <td class="cell-naam">Utrecht Midden Noord</td>
+                <td class="cell-oms">ALV notulen verwerken en naar bestuur sturen</td>
+                <td class="cell-wie">Jer</td>
+                <td><span class="status-normal">22 jun</span></td>
+                <td><div class="acts">
+                  <button class="act-done">Afronden</button>
+                  <button class="act-edit">Bewerken</button>
+                </div></td>
+              </tr>
+              <tr>
+                <td><span class="code">DEN078</span></td>
+                <td class="cell-naam">Den Haag Centrum VvE</td>
+                <td class="cell-oms">Jaarrekening controleren en goedkeuren</td>
+                <td class="cell-wie">Cihad</td>
+                <td><span class="status-normal">30 jun</span></td>
+                <td><div class="acts">
+                  <button class="act-done">Afronden</button>
+                  <button class="act-edit">Bewerken</button>
+                </div></td>
+              </tr>
+              <tr>
+                <td><span class="code">HAR091</span></td>
+                <td class="cell-naam">Haarlem Schalkwijk</td>
+                <td class="cell-oms">Renovatievoorstel bespreken met bestuur</td>
+                <td class="cell-wie">Jer</td>
+                <td><span class="status-normal">5 jul</span></td>
+                <td><div class="acts">
+                  <button class="act-done">Afronden</button>
+                  <button class="act-edit">Bewerken</button>
+                </div></td>
+              </tr>
+
+              <!-- Weggelegd groep -->
+              <tr class="grp-hdr"><td colspan="6">Weggelegd — hervat 18 juni</td></tr>
+              <tr class="row-snoozed">
+                <td><span class="code">EIN033</span></td>
+                <td class="cell-naam">Eindhoven Strijp</td>
+                <td class="cell-oms">Verzekering doorlopen na waterschade</td>
+                <td class="cell-wie">Jer</td>
+                <td><span class="snooze-pill">18 jun</span></td>
+                <td><div class="acts">
+                  <button class="act-done">Afronden</button>
+                  <button class="act-edit">Bewerken</button>
+                </div></td>
+              </tr>
+              <tr class="row-snoozed">
+                <td><span class="code">GRN022</span></td>
+                <td class="cell-naam">Groningen Centrum</td>
+                <td class="cell-oms">Reactie afwachten gemeente parkeerplaats</td>
+                <td class="cell-wie">Cihad</td>
+                <td><span class="snooze-pill">25 jun</span></td>
+                <td><div class="acts">
+                  <button class="act-done">Afronden</button>
+                  <button class="act-edit">Bewerken</button>
+                </div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+</div>
+</body>
+</html>

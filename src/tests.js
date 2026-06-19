@@ -739,6 +739,7 @@ import { shouldPromptReload } from "./sw-update.js";
   eq('chat: lange historie begrensd tot max', _chatMessages(Array.from({length:30},(_,i)=>({rol:i%2?'assistant':'user',tekst:String(i)})),10).length <= 10, true);
   eq('chat: eerste bericht is altijd user (leidende assistant gedropt)', _chatMessages([{rol:'assistant',tekst:'x'},{rol:'user',tekst:'y'}],10)[0].role, 'user');
   eq('chat: rolmapping klopt', _chatMessages([{rol:'user',tekst:'q'}])[0].role, 'user');
+  eq('chat: laatste user-vraag blijft behouden bij slice-grens', (()=>{ const h=Array.from({length:13},(_,i)=>({rol:i%2?'assistant':'user',tekst:String(i)})); const m=_chatMessages(h,10); return m[0].role==='user' && m[m.length-1].content==='12'; })(), true);
 
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');

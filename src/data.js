@@ -28,7 +28,10 @@ function backgroundWrite(writeFn, rollback, foutTitel){
     }catch(e){
       try{ rollback(); renderAll(); }catch(_){}
       const msg=(e.message||'').toLowerCase();
-      if(msg.includes('authentication')||msg.includes('unauthenticated')||msg.includes('unauthorized')){
+      if(e&&e.rowMismatch){
+        // De doelrij was verschoven (Sheet tussentijds gewijzigd) → niet geschreven, teruggedraaid.
+        showToast(foutTitel,'De lijst was net gewijzigd — opnieuw geladen, probeer nog eens.','#dc2626');
+      }else if(msg.includes('authentication')||msg.includes('unauthenticated')||msg.includes('unauthorized')){
         state.oauthToken=null;state.oauthExpiry=0;
         showToast(foutTitel,'Sessie verlopen — wijziging teruggezet. Probeer opnieuw.','#dc2626');
       }else{

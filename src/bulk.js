@@ -6,7 +6,7 @@ import { renderNtd } from "./render-lijsten.js";
 import { toDutchDate, berekenPrioriteit, _parseAnyDate, _vandaagAmsterdam, _verschilInKalenderdagen, parseDt } from "./util.js";
 import { SECS, SID } from "./config.js";
 import { ensureToken } from "./auth.js";
-import { writeRange, _shiftNtdRows } from "./api.js";
+import { writeRange, _shiftNtdRows, assertRowsMatch } from "./api.js";
 import { getSheetIds, getAfInsertRow, getInsertRow, insertAndWriteRow } from "./crud.js";
 import { backgroundWrite, loadAll } from "./data.js";
 import { showToast, showUndoToast } from "./notifications.js";
@@ -130,6 +130,7 @@ function bulkAfronden(rows){
     const ids=await getSheetIds();
     const afSheetId=ids['Afgerond'], ntdSheetId=ids['Nog Te Doen'];
     if(afSheetId==null||ntdSheetId==null) throw new Error('Sheet niet gevonden');
+    await assertRowsMatch(items.map(it=>({row:it.origRow, code:it.code}))); // bescherming: alle rijen nog van hun VvE vóór bulk-afronden
     for(const it of items){            // hoog→laag: deletes verschuiven elkaars rijen niet
       const afAfterRow=getAfInsertRow(it.sec);
       const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
@@ -210,6 +211,7 @@ function bulkVerwijderen(rows){
     const ids=await getSheetIds();
     const sheetId=ids['Nog Te Doen'];
     if(sheetId==null) throw new Error('Sheet "Nog Te Doen" niet gevonden');
+    await assertRowsMatch(items.map(it=>({row:it.origRow, code:it.code}))); // bescherming: alle rijen nog van hun VvE vóór bulk-verwijderen
     const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
       method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
       body:JSON.stringify({requests:items.map(it=>({deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:it.origRow-1,endIndex:it.origRow}}}))})});
@@ -258,6 +260,7 @@ function bulkVeld(rows,soort,waarde){
   });
   _eindBulk();
   const schrijf=(welkeWaarde)=>async()=>{
+    await assertRowsMatch(items.map(it=>({row:it.r._row, code:it.code}))); // bescherming: alle rijen nog van hun VvE vóór bulk-celschrijf
     for(const it of items){
       const kol=conf.kolom(it.r);
       const val=welkeWaarde==='oud'?it.oud:waarde;

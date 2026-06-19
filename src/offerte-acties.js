@@ -5,7 +5,7 @@
 //  gepersisteerd: 'bij_vve' in kolom O van 'Nog Te Doen'.
 // ══════════════════════════════════════
 import { state, D } from "./state.js";
-import { appendRange, writeRange } from "./api.js";
+import { appendRange, writeRange, assertRowMatch } from "./api.js";
 import { backgroundWrite } from "./data.js";
 import { ensureToken } from "./auth.js";
 import { getCurrentWho } from "./notifications.js";
@@ -60,6 +60,7 @@ async function offerteActieVastleggen(){
   backgroundWrite(
     async()=>{
       if(!logGedaan){ await appendRange("'Logboek'!A:H",[ts,r.code,'OFFERTE-TRAJECTEN','Contact',veld,wie,tekst,who]); logGedaan=true; }
+      if(r._row && (doorsturen||opvolgdatumOud)) await assertRowMatch(r._row, r.code); // bescherming: rij nog van deze VvE vóór O/L-write
       if(doorsturen&&r._row) await writeRange(`'Nog Te Doen'!O${r._row}`,['bij_vve']); // zonder _row geen O-write; resync zet de fase dan terug (zeldzaam, geaccepteerd)
       if(opvolgdatumOud&&r._row) await writeRange(`'Nog Te Doen'!L${r._row}`,['']); // Fix A: verstreken opvolgdatum wissen in Sheet
     },

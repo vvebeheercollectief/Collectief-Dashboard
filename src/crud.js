@@ -4,7 +4,7 @@
 import { esc, berekenPrioriteit, toISODate, toDutchDate } from "./util.js";
 import { state, D } from "./state.js";
 import { SECS, SKEYS, SID } from "./config.js";
-import { writeRange, _shiftNtdRows } from "./api.js";
+import { writeRange, _shiftNtdRows, assertRowMatch } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { showToast, showUndoToast, fireNotifEvent, undoComplete, undoDelete } from "./notifications.js";
 import { animateRowOut, flashRow } from "./anim.js";
@@ -164,6 +164,7 @@ async function deleteTaskRow(r){
       const ids=await getSheetIds();
       const sheetId=ids['Nog Te Doen'];
       if(sheetId==null) throw new Error('Sheet "Nog Te Doen" niet gevonden');
+      await assertRowMatch(oudeRow, r.code); // bescherming: rij nog van deze VvE vóór verwijderen
       const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
         method:'POST',
         headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
@@ -259,6 +260,7 @@ async function doCompleteTask(){
     // 2) op de achtergrond wegschrijven; bij fout de taak terugzetten
     backgroundWrite(
       async ()=>{
+        await assertRowMatch(r._row, r.code); // bescherming: rij nog van deze VvE vóór afronden
         const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
           method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
           body:JSON.stringify(batchBody)});
@@ -326,6 +328,7 @@ async function submitTask(){
       showToast('💾 Opgeslagen',`${code} — ${naam||''}`,null);
       backgroundWrite(
         async ()=>{
+          await assertRowMatch(doelRow._row, oudeWaarden.code); // bescherming: rij nog dezelfde VvE vóór overschrijven
           await writeRange(`'Nog Te Doen'!A${doelRow._row}:${endCol}${doelRow._row}`,values);
           if(newBeh && newBeh!==(oudeWaarden.behandelaar||'')){
             fireNotifEvent('assigned',{sec,code,naam,behandelaar:newBeh});

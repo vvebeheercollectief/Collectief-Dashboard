@@ -4,7 +4,7 @@
 // ══════════════════════════════════════
 import { state } from "./state.js";
 import { toDutchDate, toISODate, _parseAnyDate, _vandaagAmsterdam, _verschilInKalenderdagen, parseDt } from "./util.js";
-import { writeRange } from "./api.js";
+import { writeRange, assertRowMatch } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { backgroundWrite } from "./data.js";
 import { renderAll } from "./main.js";
@@ -60,6 +60,7 @@ async function schrijfOpvolgdatum(r, nieuw, actie){
             `${r.code} — ${r.actiepunt||r.periode||r.naam||''}`, null);
   backgroundWrite(
     async ()=>{
+      await assertRowMatch(r._row, r.code); // bescherming: rij nog van deze VvE vóór L-write
       await writeRange(`'Nog Te Doen'!${OPVOLG_KOLOM}${r._row}:${OPVOLG_KOLOM}${r._row}`, [nieuw]);
       logEvent(r.code, r._sec, actie, 'opvolgdatum', oud, nieuw);
     },

@@ -71,4 +71,27 @@ async function askChat(system, messages){
   return (data.antwoord || '').trim();
 }
 
-export { fetchSheet, writeRange, appendRange, _shiftNtdRows, _isTransient, _withRetry, askChat };
+// ── Bescherming tegen schrijven naar de verkeerde rij ──────────────────────
+// Pure (testbaar): gegeven de teruggelezen kolom-A-waarden (vanaf minRow) en de
+// verwachte {row,code}-checks → geef de eerste mismatch terug, of null als alles klopt.
+function _rowMismatch(vals, minRow, checks){
+  for(const c of checks){
+    const got=(((vals[c.row-minRow]||[])[0])||'').toString().trim();
+    if(got!==(c.code||'').toString().trim()) return { row:c.row, expected:(c.code||'').toString().trim(), got };
+  }
+  return null;
+}
+// Leest kolom A van de doelrij(en) terug en gooit een ROW_MISMATCH-fout als een
+// rij niet meer de verwachte VvE-code bevat (de Sheet verschoof sinds de render).
+// Eén GET dekt het hele rijbereik. backgroundWrite vangt de fout: rollback + resync.
+async function assertRowsMatch(checks, sheetName='Nog Te Doen'){
+  checks=(checks||[]).filter(c=>c&&c.row);
+  if(!checks.length) return;
+  const rows=checks.map(c=>c.row), minR=Math.min(...rows), maxR=Math.max(...rows);
+  const vals=await fetchSheet(`'${sheetName}'!A${minR}:A${maxR}`);
+  const mm=_rowMismatch(vals, minR, checks);
+  if(mm){ const err=new Error('De lijst was net gewijzigd — opnieuw geladen.'); err.rowMismatch=true; err.detail=mm; throw err; }
+}
+const assertRowMatch=(row, code, sheetName)=>assertRowsMatch([{ row, code }], sheetName);
+
+export { fetchSheet, writeRange, appendRange, _shiftNtdRows, _isTransient, _withRetry, askChat, _rowMismatch, assertRowsMatch, assertRowMatch };

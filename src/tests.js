@@ -12,7 +12,7 @@ import { vveOverzicht, filterDossierLog } from "./render-vve.js";
 import { parseKenmerken, vveKenmerken } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk.js";
-import { _isTransient } from "./api.js";
+import { _isTransient, _rowMismatch } from "./api.js";
 import { parseSections } from "./data.js";
 import { setv } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
@@ -729,6 +729,11 @@ import { shouldPromptReload } from "./sw-update.js";
   truthy('sw: wel balk bij bestaande controller (update)', shouldPromptReload({ scriptURL: 'x' }));
   // ── Zichtbaar versienummer: vast formaat X.Y ──
   truthy('versie: APP_VERSION heeft formaat X.Y', /^\d+\.\d+$/.test(APP_VERSION));
+  // ── Rij-bescherming: _rowMismatch (schrijf-guard kern) ──
+  eq('rij-guard: alles klopt → null', _rowMismatch([['CH1'],['BX2']], 5, [{row:5,code:'CH1'},{row:6,code:'BX2'}]), null);
+  truthy('rij-guard: verschoven rij → mismatch', !!_rowMismatch([['CH1'],['ANDERS']], 5, [{row:6,code:'BX2'}]));
+  eq('rij-guard: ontbrekende rij telt als mismatch (got leeg)', (_rowMismatch([], 5, [{row:5,code:'CH1'}])||{}).got, '');
+  eq('rij-guard: whitespace-tolerant → null', _rowMismatch([[' CH1 ']], 5, [{row:5,code:'CH1'}]), null);
 
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');

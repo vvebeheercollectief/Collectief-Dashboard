@@ -49,7 +49,7 @@ function closePalette(){ document.getElementById('pal-bg').classList.remove('ope
 function palOpen(){ return document.getElementById('pal-bg').classList.contains('open'); }
 
 function _item(html,doe){ const idx=_palItems.length; _palItems.push({doe});
-  return `<div class="pal-res${idx===_palSel?' actief':''}" data-action="pal-kies" data-idx="${idx}">${html}</div>`; }
+  return `<div class="pal-res${idx===_palSel?' actief':''}" role="option" id="pal-opt-${idx}" aria-selected="${idx===_palSel}" data-action="pal-kies" data-idx="${idx}">${html}</div>`; }
 function _groep(kop,inhoud){ return inhoud?`<div class="pal-groep"><div class="pal-groep-kop">${kop}</div>${inhoud}</div>`:''; }
 
 function renderPal(q){
@@ -112,7 +112,8 @@ function palToets(e){
 function _palMarkeer(){
   document.querySelectorAll('#pal-bd .pal-res').forEach((el,i)=>{
     el.classList.toggle('actief',i===_palSel);
-    if(i===_palSel) el.scrollIntoView({block:'nearest'});
+    el.setAttribute('aria-selected',i===_palSel);
+    if(i===_palSel){ el.scrollIntoView({block:'nearest'}); document.getElementById('pal-input')?.setAttribute('aria-activedescendant','pal-opt-'+i); }
   });
 }
 function initPalette(){

@@ -40,7 +40,7 @@ function renderOntw(){
     const activeStyle = c===state.activeOntw
       ? (c==='Afgerond' ? '--sec:var(--gn);--sec-l:var(--gn-l);--sec-b:var(--gn-b)' : '--sec:var(--pk);--sec-l:var(--pk-l);--sec-b:var(--pk-b)')
       : '';
-    return`<div class="tab ${c===state.activeOntw?'on':''}" style="${activeStyle}" data-action="ontw-cat" data-cat="${esc(c)}">${c}<span class="cnt">${cnt}</span></div>`;
+    return`<button type="button" class="tab ${c===state.activeOntw?'on':''}" role="tab" aria-selected="${c===state.activeOntw}" style="${activeStyle}" data-action="ontw-cat" data-cat="${esc(c)}">${c}<span class="cnt">${cnt}</span></button>`;
   }).join('');
 
   let rows;

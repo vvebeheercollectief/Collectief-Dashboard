@@ -5,6 +5,14 @@ import { esc, displayName, persBadges, emptyRow, parseDt, _parseAnyDate } from "
 import { SECS, SKEYS } from "./config.js";
 import { state, D } from "./state.js";
 
+// Leiblauwe accentkleur uitlezen op render-moment (Chart.js kan geen CSS-var-strings
+// renderen). Volgt zo de huisstijl én het licht/donker-thema, want de grafieken worden
+// opnieuw getekend bij een themawissel (applyTheme in ui.js).
+function acColor(){ return (getComputedStyle(document.documentElement).getPropertyValue('--ac')||'').trim()||'#4a5b7a'; }
+// Leeg/onbenut donut-segment: licht in lichte modus, donkergrijs in donkere modus
+// (zodat het niet als felle witte vlek op een donkere kaart blijft staan).
+function emptyDonutClr(){ return document.documentElement.dataset.theme==='dark'?'#343a44':'#E5E'+'7EB'; }
+
 // ══════════════════════════════════════
 //  ANALYTICS — Productiviteits-tracker
 // ══════════════════════════════════════
@@ -184,7 +192,7 @@ function renderKpiTile(id,opts){
     subEl.innerHTML=`${trendHtml}${subText?'&nbsp;&nbsp;'+subText:''}`;
   }
   if(opts.sparkId&&opts.sparkValues){
-    renderSparkline(opts.sparkId,opts.sparkValues,opts.sparkColor||'#0D7377');
+    renderSparkline(opts.sparkId,opts.sparkValues,opts.sparkColor||acColor());
   }
 }
 
@@ -222,7 +230,7 @@ function renderHeroChart(metric,period){
   const fullN=n*2;
   let rows,dateField,color,title;
   if(metric==='vergader'){
-    rows=D.alfa||[]; dateField='datum'; color='#0D7377'; title='Vergaderingen uitgeschreven';
+    rows=D.alfa||[]; dateField='datum'; color=acColor(); title='Vergaderingen uitgeschreven';
   }else{
     rows=SKEYS.flatMap(s=>D.af[s]||[]); dateField='datum'; color='#047857'; title='Taken afgerond';
   }
@@ -273,10 +281,17 @@ function renderLeaderboard(period){
 
   const tbody=document.getElementById('lb-tbody');
   const medalCls=['gold','silver','bronze',''];
+  const totaal=data.reduce((a,b)=>a+b.huidig,0);
+  if(totaal===0){
+    tbody.innerHTML=`<tr><td colspan="5" class="empty"><div class="empty-ico">🏁</div>Nog geen afgeronde taken in deze periode</td></tr>`;
+    return;
+  }
   tbody.innerHTML=data.map((r,i)=>{
     const arrow=r.trend.dir==='up'?'▲':r.trend.dir==='down'?'▼':'■';
+    // Geen medaille toekennen aan een score van 0 (anders 'goud' voor wie niets deed)
+    const medal=r.huidig>0?(medalCls[i]||''):'';
     return`<tr>
-      <td class="lb-rank ${medalCls[i]||''}">${i+1}</td>
+      <td class="lb-rank ${medal}">${i+1}</td>
       <td class="lb-name">${esc(r.name)}</td>
       <td class="lb-now">${r.huidig}</td>
       <td class="lb-prev">${r.vorig}</td>
@@ -331,7 +346,7 @@ function buildAnalytics(){
       trend:vTrend,
       sparkId:'spark-vergader',
       sparkValues:vSeries.map(b=>b.count),
-      sparkColor:'#0D7377'
+      sparkColor:acColor()
     });
   });
 
@@ -488,13 +503,13 @@ const DASH_ICONS={
 const HERO_VIEWS=[
   {
     key:'alv', label:'ALV Voortgang', icon:'tabAlv',
-    color:'#0D7377',
+    color:'#4a5b7a',
     title:'ALV Voortgang — Uitnodigingen',
     sub:'Hoeveel uitnodigingen zijn de deur uit',
     build:()=>{
       const u=D.alvo.filter(r=>r.uitnodiging).length;
       const t=D.alvo.length;
-      return{labels:['Uitgeschreven','Nog uitschrijven'],data:[u,t-u],colors:['#0D7377','#E5E7EB'],centerVal:`${u}/${t}`,centerLbl:'Uitgeschreven'};
+      return{labels:['Uitgeschreven','Nog uitschrijven'],data:[u,t-u],colors:[acColor(),emptyDonutClr()],centerVal:`${u}/${t}`,centerLbl:'Uitgeschreven'};
     }
   },
   {
@@ -505,7 +520,7 @@ const HERO_VIEWS=[
     build:()=>{
       const u=D.alvo.filter(r=>r.uitnodiging).length;
       const n=D.alvo.filter(r=>r.notulen).length;
-      return{labels:['Notulen verstuurd','Nog te versturen'],data:[n,Math.max(0,u-n)],colors:['#15803D','#E5E7EB'],centerVal:`${n}/${u}`,centerLbl:'Verstuurd'};
+      return{labels:['Notulen verstuurd','Nog te versturen'],data:[n,Math.max(0,u-n)],colors:['#15803D',emptyDonutClr()],centerVal:`${n}/${u}`,centerLbl:'Verstuurd'};
     }
   },
   {
@@ -516,7 +531,7 @@ const HERO_VIEWS=[
     build:()=>{
       const b=D.alvo.filter(r=>r.begroting).length;
       const t=D.alvo.length;
-      return{labels:['Doorgezet','Niet doorgezet'],data:[b,t-b],colors:['#6D5BD0','#E5E7EB'],centerVal:`${b}/${t}`,centerLbl:'Doorgezet'};
+      return{labels:['Doorgezet','Niet doorgezet'],data:[b,t-b],colors:['#6D5BD0',emptyDonutClr()],centerVal:`${b}/${t}`,centerLbl:'Doorgezet'};
     }
   },
   {
@@ -527,7 +542,7 @@ const HERO_VIEWS=[
     build:()=>{
       const data=SKEYS.map(s=>D.ntd[s]?.length||0);
       const tot=data.reduce((a,b)=>a+b,0);
-      return{labels:SKEYS.map(s=>SECS[s].label),data,colors:['#0D7377','#B45309','#6D5BD0','#B91C1C'],centerVal:`${tot}`,centerLbl:'Open Taken'};
+      return{labels:SKEYS.map(s=>SECS[s].label),data,colors:[acColor(),'#B45309','#6D5BD0','#B91C1C'],centerVal:`${tot}`,centerLbl:'Open Taken'};
     }
   },
 ];

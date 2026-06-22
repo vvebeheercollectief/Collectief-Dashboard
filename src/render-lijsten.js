@@ -92,7 +92,7 @@ function renderNtd(){
   // Tabs
   document.getElementById('ntd-tabs').innerHTML=SKEYS.map(s=>{
     const rows=filterNtd(D.ntd[s]||[],q,fCode,fBeh,fPrio,s);
-    return`<div class="tab ${s===state.activeNtd?'on':''}" style="${s===state.activeNtd?SECS[s].css:''}" data-action="ntd-sectie" data-sec="${s}">${SECS[s].label}<span class="cnt">${rows.length}</span></div>`;
+    return`<button type="button" class="tab ${s===state.activeNtd?'on':''}" role="tab" aria-selected="${s===state.activeNtd}" style="${s===state.activeNtd?SECS[s].css:''}" data-action="ntd-sectie" data-sec="${s}">${SECS[s].label}<span class="cnt">${rows.length}</span></button>`;
   }).join('');
 
   document.getElementById('ntd-title').textContent=SECS[state.activeNtd].label;
@@ -102,7 +102,7 @@ function renderNtd(){
 
   const rows=filterNtd(D.ntd[state.activeNtd]||[],q,fCode,fBeh,fPrio,state.activeNtd);
   renderThead('ntd-thead',[...(state.bulkMode?['']:[]),...SECS[state.activeNtd].cols,''],SECS[state.activeNtd].css);
-  renderTbody('ntd-tbody',rows,state.activeNtd,pgs.ntd,false);
+  renderTbody('ntd-tbody',rows,state.activeNtd,pgs.ntd,false,!!(q||fCode||fBeh||fPrio));
   renderPag('ntd-pag',rows.length,pgs.ntd,'ntd');
   // Zoekt/filtert de gebruiker? Dan tonen we op de offerte-tab de gefilterde tabel i.p.v.
   // het Vandaag-blok (dat bewust álle trajecten samenvat). Anders zou zoeken geen zichtbaar
@@ -218,12 +218,12 @@ function renderAf(){
   const q=document.getElementById('s-af').value.toLowerCase();
   document.getElementById('af-tabs').innerHTML=SKEYS.map(s=>{
     const rows=filt(D.af[s]||[],q);
-    return`<div class="tab ${s===state.activeAf?'on':''}" style="${s===state.activeAf?SECS[s].css:''}" data-action="af-sectie" data-sec="${s}">${SECS[s].label}<span class="cnt">${rows.length}</span></div>`;
+    return`<button type="button" class="tab ${s===state.activeAf?'on':''}" role="tab" aria-selected="${s===state.activeAf}" style="${s===state.activeAf?SECS[s].css:''}" data-action="af-sectie" data-sec="${s}">${SECS[s].label}<span class="cnt">${rows.length}</span></button>`;
   }).join('');
   const cols=['VvE Code','VvE','Categorie','Subcategorie','Afgerond op','Opmerking'];
   renderThead('af-thead',cols,SECS[state.activeAf].css);
   const rows=filt(D.af[state.activeAf]||[],q);
-  renderTbody('af-tbody',rows,state.activeAf,pgs.af,true);
+  renderTbody('af-tbody',rows,state.activeAf,pgs.af,true,!!q);
   renderPag('af-pag',rows.length,pgs.af,'af');
 }
 function setAf(s){state.activeAf=s;pgs.af=1;renderAf()}

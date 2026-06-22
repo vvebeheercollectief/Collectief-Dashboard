@@ -27,8 +27,8 @@ import { toggleBulkMode, bulkVink, toggleBulkMenu, bulkDoe } from './bulk.js';
 const PAG_RENDER = { ntd:renderNtd, af:renderAf, alvo:renderAlvo, alfa:renderAlfa, ontw:renderOntw, logboek:renderLogboek };
 
 export const ACTIONS = {
-  'toggle':                (el) => el.classList.toggle('on'),
-  'notif-toggle':          (el) => { el.classList.toggle('on'); saveNotifPrefs(); },
+  'toggle':                (el) => { el.setAttribute('aria-checked', el.classList.toggle('on')); },
+  'notif-toggle':          (el) => { el.setAttribute('aria-checked', el.classList.toggle('on')); saveNotifPrefs(); },
   'off':                   (el) => adjOff(el.dataset.off, +el.dataset.delta),
   'notitie-toevoegen':     ()   => addTaskNote(),
   'taak-verwijder-modal':  ()   => deleteCurrentEditTask(),

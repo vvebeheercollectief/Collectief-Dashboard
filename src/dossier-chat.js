@@ -95,9 +95,14 @@ function openChat(){
   if(!state._chatVve) state._chatVve = state.vveCode || '';
   renderChat();
   document.getElementById('chat-bg').classList.add('open');
+  document.getElementById('chat-fab')?.setAttribute('aria-expanded','true');
   const inp = document.getElementById('chat-input'); if(inp) setTimeout(()=>inp.focus(), 30);
 }
-function closeChat(){ document.getElementById('chat-bg')?.classList.remove('open'); }
+function closeChat(){
+  document.getElementById('chat-bg')?.classList.remove('open');
+  const fab=document.getElementById('chat-fab');
+  if(fab){ fab.setAttribute('aria-expanded','false'); try{fab.focus()}catch(_){} }
+}
 
 function setChatVve(code){
   state._chatVve = code;

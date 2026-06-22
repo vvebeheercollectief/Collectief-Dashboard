@@ -52,15 +52,16 @@ function editRow(r){ openModal(true,r); }
 function closeModal(){document.getElementById('modal-bg').classList.remove('open')}
 
 function fillModalFields(sec,r){
+  const tog=(id,on)=>{const e=document.getElementById(id);if(e){e.classList.toggle('on',!!on);e.setAttribute('aria-checked',!!on);}};
   switch(sec){
     case'OPPAKKEN':
       setv('m-actie',r.actiepunt);setv('m-dl',toISODate(r.deadline));setv('m-beh',r.behandelaar);
       setv('m-opm',r.opmerkingen);setv('m-sub-opp',r.subcategorie);
-      document.getElementById('tog-ib').classList.toggle('on',r.inBehandeling==='TRUE');break;
+      tog('tog-ib',r.inBehandeling==='TRUE');break;
     case'VERGADERVERZOEKEN':
       setv('m-per',r.periode);setv('m-beh-v',r.behandelaar);setv('m-agenda',r.agendapunten||r.actiepunt);
       setv('m-dl-v',toISODate(r.deadline));setv('m-opm-v',r.opmerkingen);setv('m-sub-verg',r.subcategorie);
-      document.getElementById('tog-ib-v').classList.toggle('on',r.inBehandeling==='TRUE');break;
+      tog('tog-ib-v',r.inBehandeling==='TRUE');break;
     case'OFFERTE-TRAJECTEN':
       setv('m-daang',toISODate(r.datumAangevraagd));setv('m-beh-o',r.behandelaar);
       {const[ор,от]=(r.offertes||'').split('/').map(s=>parseInt(s)||0);
@@ -69,7 +70,7 @@ function fillModalFields(sec,r){
     case'LOD':
       setv('m-actie-l',r.actiepunt);setv('m-stat-l',r.status);setv('m-beh-l',r.behandelaar);
       setv('m-dl-l',toISODate(r.deadline));setv('m-opm-l',r.opmerkingen);setv('m-sub-lod',r.subcategorie);
-      document.getElementById('tog-ib-l').classList.toggle('on',r.inBehandeling==='TRUE');break;
+      tog('tog-ib-l',r.inBehandeling==='TRUE');break;
   }
 }
 function setv(id,v){const el=document.getElementById(id);if(el)el.value=(v===undefined||v===null)?'':v} // 0 blijft '0' (geen falsy-coercie)

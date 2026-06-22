@@ -30,12 +30,12 @@ function backgroundWrite(writeFn, rollback, foutTitel){
       const msg=(e.message||'').toLowerCase();
       if(e&&e.rowMismatch){
         // De doelrij was verschoven (Sheet tussentijds gewijzigd) → niet geschreven, teruggedraaid.
-        showToast(foutTitel,'De lijst was net gewijzigd — opnieuw geladen, probeer nog eens.','#dc2626');
+        showToast(foutTitel,'De lijst was net gewijzigd — opnieuw geladen, probeer nog eens.','var(--rd)');
       }else if(msg.includes('authentication')||msg.includes('unauthenticated')||msg.includes('unauthorized')){
         state.oauthToken=null;state.oauthExpiry=0;
-        showToast(foutTitel,'Sessie verlopen — wijziging teruggezet. Probeer opnieuw.','#dc2626');
+        showToast(foutTitel,'Sessie verlopen — wijziging teruggezet. Probeer opnieuw.','var(--rd)');
       }else{
-        showToast(foutTitel,'Niet opgeslagen — wijziging teruggezet.','#dc2626');
+        showToast(foutTitel,'Niet opgeslagen — wijziging teruggezet.','var(--rd)');
       }
       console.error(foutTitel,e);
     }finally{
@@ -47,9 +47,23 @@ function backgroundWrite(writeFn, rollback, foutTitel){
 }
 
 function setSyncing(){dot('loading');document.getElementById('sync-lbl').textContent='Laden…'}
-function setSynced(){dot('');document.getElementById('sync-lbl').textContent='Live · '+new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'})}
+function setSynced(){dot('');document.getElementById('sync-lbl').textContent='Live · '+new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});clearLoadError()}
 function setSyncErr(){dot('err');document.getElementById('sync-lbl').textContent='Fout'}
 function dot(cls){const d=document.getElementById('dot');d.className='dot'+(cls?' '+cls:'')}
+
+// Nette foutmelding in beeld bij een harde laadfout (niet de zwijgende achtergrond-polls).
+// Een verlopen sessie wordt elders al via het inlogscherm afgevangen; dit vangt
+// netwerk-/API-fouten zodat de gebruiker geen blanco scherm ziet maar uitleg + actie.
+function showLoadError(){
+  if(document.getElementById('load-err-banner')) return;
+  const b=document.createElement('div');
+  b.id='load-err-banner'; b.className='load-err'; b.setAttribute('role','alert');
+  b.innerHTML='<span>⚠ Kon de gegevens niet laden — controleer je verbinding.</span>'
+    +'<button class="btn btn-pri btn-sm" id="load-err-retry">Opnieuw proberen</button>';
+  document.body.appendChild(b);
+  b.querySelector('#load-err-retry').onclick=()=>{ clearLoadError(); loadAll(); };
+}
+function clearLoadError(){ document.getElementById('load-err-banner')?.remove(); }
 
 // Herhaal-slot: voorkomt dat twee loadAll-aanroepen tegelijk lopen en elkaars data
 // overschrijven (8s-poll, schrijf-resync, refresh-knop, handmatige awaits).
@@ -101,6 +115,7 @@ async function loadAll(silent){
     // (of bij een handmatige, niet-stille verversing) tonen we 'Fout'.
     state._syncFails=(state._syncFails||0)+1;
     if(!silent || state._syncFails>=2) setSyncErr();
+    if(!silent) showLoadError(); // alleen bij eerste/handmatige lading, niet bij zwijgende polls
     console.error(e);
   }
   finally{

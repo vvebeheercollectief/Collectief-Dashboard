@@ -29,6 +29,20 @@ import { openChat, closeChat, setChatVve } from './dossier-chat.js';
 import { renderVandaag } from './render-vandaag.js';
 import { initPalette } from './palette.js';
 import { initSwUpdate } from './sw-update.js';
+import { initModalA11y } from './modal-a11y.js';
+
+// Centrale Escape-sluiting: per venster de juiste sluitfunctie (met opruimlogica),
+// i.p.v. alleen de .open-class te verwijderen zodat er geen toestand achterblijft.
+const MODAL_SLUITERS = {
+  'modal-bg': closeModal,
+  'complete-bg': closeCompleteModal,
+  'ontw-modal-bg': closeOntwModal,
+  'hh-bg': closeHerhaalModal,
+  'snooze-bg': closeSnoozeModal,
+  'off-actie-bg': sluitOfferteActieModal,
+  'notif-bg': closeNotifModal,
+  'ai-bg': closeAiHelp,
+};
 
 // ── Clickjacking-bescherming (frame-buster) ────────────────────────────
 // De echte productie draait op GitHub Pages; daar kunnen geen X-Frame-Options/
@@ -46,6 +60,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   // Centraal klik-systeem: één delegatie-listener voor alle data-action-elementen
   initActions();
   initPalette();
+  initModalA11y();
 
   // Zichtbaar versienummer overal gelijk zetten (één bron: APP_VERSION)
   document.querySelectorAll('#app-version, #app-version-login').forEach(el => el.textContent = APP_VERSION);
@@ -63,7 +78,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   if (IS_STAGING) {
     document.title = '[TEST] ' + document.title;
     document.body.insertAdjacentHTML('afterbegin',
-      '<div style="position:fixed;top:0;left:0;right:0;z-index:100000;background:#B45309;color:#fff;'
+      '<div style="position:fixed;top:0;left:0;right:0;z-index:100000;background:var(--am);color:#fff;'
       + 'text-align:center;font:600 13px/2.4 system-ui,sans-serif;letter-spacing:.3px">'
       + '⚠ TESTOMGEVING — dit is niet het echte dashboard</div>'
       + '<div style="height:34px"></div>');
@@ -135,7 +150,11 @@ document.addEventListener('DOMContentLoaded',()=>{
   });
   aiVveWis.onclick=()=>zetAiVve('','');
   document.getElementById('ai-answer').addEventListener('input',parseAiAnswer);
-  document.getElementById('hamburger').onclick=()=>{document.getElementById('sb').classList.toggle('open');document.getElementById('overlay').classList.toggle('on')};
+  document.getElementById('hamburger').onclick=()=>{
+    const open=document.getElementById('sb').classList.toggle('open');
+    document.getElementById('overlay').classList.toggle('on');
+    document.getElementById('hamburger').setAttribute('aria-expanded',open);
+  };
   document.getElementById('overlay').onclick=closeSb;
 
   document.getElementById('btn-add').onclick=()=>openModal(false);
@@ -191,7 +210,15 @@ document.addEventListener('DOMContentLoaded',()=>{
   let _offActieMouseDown=null;
   document.getElementById('off-actie-bg').addEventListener('mousedown',e=>{_offActieMouseDown=e.target});
   document.getElementById('off-actie-bg').addEventListener('click',e=>{if(e.target.id==='off-actie-bg'&&_offActieMouseDown?.id==='off-actie-bg')sluitOfferteActieModal()});
-  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.getElementById('off-actie-bg').classList.contains('open'))sluitOfferteActieModal()});
+  // Centrale Escape-handler: sluit chat → zijbalk-lade → bovenste open venster.
+  // (Het commandopalet sluit zichzelf al met Escape in palette.js.)
+  document.addEventListener('keydown',e=>{
+    if(e.key!=='Escape') return;
+    if(document.getElementById('chat-bg')?.classList.contains('open')){ closeChat(); return; }
+    if(document.getElementById('sb').classList.contains('open')){ closeSb(); return; }
+    const open=document.querySelector('.modal-bg.open');
+    if(open && open.id!=='pal-bg'){ const fn=MODAL_SLUITERS[open.id]; fn?fn():open.classList.remove('open'); }
+  });
 
   // Afgerond modal
   document.getElementById('complete-close').onclick=closeCompleteModal;
@@ -219,7 +246,9 @@ document.addEventListener('DOMContentLoaded',()=>{
   // Notificatie-modal handlers
   document.getElementById('notif-btn').onclick = openNotifModal;
   document.getElementById('notif-close').onclick = closeNotifModal;
-  document.getElementById('notif-bg').onclick = e => { if (e.target.id === 'notif-bg') closeNotifModal(); };
+  let _notifMouseDown=null;
+  document.getElementById('notif-bg').addEventListener('mousedown', e => { _notifMouseDown = e.target; });
+  document.getElementById('notif-bg').addEventListener('click', e => { if (e.target.id === 'notif-bg' && _notifMouseDown?.id === 'notif-bg') closeNotifModal(); });
   document.getElementById('notif-who').onchange = () => { onWhoChange(); saveNotifPrefs(); };
   document.getElementById('notif-who-other').oninput = () => saveNotifPrefs();
   document.getElementById('notif-subscribe-btn').onclick = subscribeNotifs;

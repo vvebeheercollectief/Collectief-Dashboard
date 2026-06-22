@@ -11,7 +11,11 @@ import { renderVve } from "./render-vve.js";
 import { showToast } from "./notifications.js";
 
 function goTo(page){
-  document.querySelectorAll('.ni[data-page]').forEach(el=>el.classList.toggle('on',el.dataset.page===page));
+  document.querySelectorAll('.ni[data-page]').forEach(el=>{
+    const actief=el.dataset.page===page;
+    el.classList.toggle('on',actief);
+    el.setAttribute('aria-current',actief?'page':'false');
+  });
   document.querySelectorAll('.page').forEach(el=>el.classList.toggle('active',el.id==='page-'+page));
   const[t,s]=PAGE_META[page]||['',''];
   document.getElementById('page-title').textContent=t;
@@ -26,7 +30,7 @@ function goTo(page){
   if(page==='dash') buildDash();
   if(page==='vandaag') renderVandaag();
 }
-function closeSb(){document.getElementById('sb').classList.remove('open');document.getElementById('overlay').classList.remove('on')}
+function closeSb(){document.getElementById('sb').classList.remove('open');document.getElementById('overlay').classList.remove('on');document.getElementById('hamburger')?.setAttribute('aria-expanded','false')}
 
 // ══════════════════════════════════════
 //  THEME
@@ -36,6 +40,7 @@ function applyTheme(t){
   localStorage.setItem('theme',t);
   document.getElementById('ico-sun').style.display=t==='dark'?'none':'';
   document.getElementById('ico-moon').style.display=t==='dark'?'':'none';
+  document.getElementById('theme-btn')?.setAttribute('aria-pressed',t==='dark');
   Object.values(state.charts).forEach(c=>{try{c.destroy()}catch(e){}});
   state.charts={};
   if(document.getElementById('page-analytics').classList.contains('active')) buildAnalytics();

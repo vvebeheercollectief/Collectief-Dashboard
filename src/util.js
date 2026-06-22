@@ -356,9 +356,11 @@ function toDutchDate(s){
   return d?`${String(d.d).padStart(2,'0')}-${String(d.m).padStart(2,'0')}-${d.y}`:'';
 }
 
-function emptyRow(cols,inline){
-  if(inline)return`<div class="empty"><div class="empty-ico">📭</div>Geen resultaten</div>`;
-  return`<tr><td colspan="${cols}"><div class="empty"><div class="empty-ico">📭</div>Geen resultaten</div></td></tr>`;
+function emptyRow(cols,inline,filtered){
+  const ico=filtered?'🔍':'📭';
+  const txt=filtered?'Niets gevonden — pas je filter of zoekopdracht aan':'Geen resultaten';
+  if(inline)return`<div class="empty"><div class="empty-ico">${ico}</div>${txt}</div>`;
+  return`<tr><td colspan="${cols}"><div class="empty"><div class="empty-ico">${ico}</div>${txt}</div></td></tr>`;
 }
 
 function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}

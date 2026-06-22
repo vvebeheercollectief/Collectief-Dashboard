@@ -263,7 +263,7 @@ function openNotifModal() {
   ['newtask','assigned','deadline','alv','daily'].forEach(k => {
     const v  = localStorage.getItem('notif_' + k);
     const el = document.getElementById('tog-notif-' + k);
-    if (el) el.classList.toggle('on', v === null ? true : v === 'true');
+    if (el) { const on = v === null ? true : v === 'true'; el.classList.toggle('on', on); el.setAttribute('aria-checked', on); }
   });
   document.getElementById('notif-deadline-hours').value = localStorage.getItem('notif_deadline_hours') || '1';
   refreshNotifUI();

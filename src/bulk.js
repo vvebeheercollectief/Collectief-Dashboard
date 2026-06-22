@@ -42,6 +42,7 @@ function renderBulkUi(){
   teller.style.display=state.bulkMode?'':'none';
   teller.textContent=`${_sel.size} geselecteerd`;
   balk.style.display=(state.bulkMode&&_sel.size>0)?'flex':'none';
+  document.body.classList.toggle('bulk', state.bulkMode); // zwevende chat-knop wijkt voor de bulk-balk
   if(!state.bulkMode) _sluitMenus();
 }
 function toggleBulkMenu(menu){

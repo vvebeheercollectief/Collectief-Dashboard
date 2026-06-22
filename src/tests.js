@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, offerteBalBij, _verschilInWerkdagen, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten, offerteNabelTeller, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc } from "./util.js";
+import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, offerteBalBij, _verschilInWerkdagen, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten, offerteNabelTeller, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, isoWeek } from "./util.js";
 import { logZin, logPaginaSoort } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION } from "./config.js";
 import { ACTIONS } from "./actions.js";
@@ -769,6 +769,14 @@ import { shouldPromptReload } from "./sw-update.js";
   eq('chat: eerste bericht is altijd user (leidende assistant gedropt)', _chatMessages([{rol:'assistant',tekst:'x'},{rol:'user',tekst:'y'}],10)[0].role, 'user');
   eq('chat: rolmapping klopt', _chatMessages([{rol:'user',tekst:'q'}])[0].role, 'user');
   eq('chat: laatste user-vraag blijft behouden bij slice-grens', (()=>{ const h=Array.from({length:13},(_,i)=>({rol:i%2?'assistant':'user',tekst:String(i)})); const m=_chatMessages(h,10); return m[0].role==='user' && m[m.length-1].content==='12'; })(), true);
+
+  // ── ISO-weeknummer (ma-start, week 1 = week met eerste donderdag) ──
+  eq('isoWeek: ma 22 jun 2026 → week 26', isoWeek(new Date(2026,5,22)), 26);
+  eq('isoWeek: zo 28 jun 2026 (zelfde week) → 26', isoWeek(new Date(2026,5,28)), 26);
+  eq('isoWeek: do 1 jan 2026 → week 1', isoWeek(new Date(2026,0,1)), 1);
+  eq('isoWeek: ma 29 dec 2025 hoort al bij week 1 van 2026', isoWeek(new Date(2025,11,29)), 1);
+  eq('isoWeek: ma 30 dec 2024 hoort al bij week 1 van 2025', isoWeek(new Date(2024,11,30)), 1);
+  eq('isoWeek: 31 dec 2026 (do) → week 53', isoWeek(new Date(2026,11,31)), 53);
 
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');

@@ -71,6 +71,20 @@ function _vandaagAmsterdam(){
   return d;
 }
 
+// ISO-8601 weeknummer (Nederlandse weektelling: ma-start, week 1 = de week met
+// de eerste donderdag van het jaar). Geeft een geheel getal 1–53 terug.
+function isoWeek(datum){
+  const d = datum || _vandaagAmsterdam();
+  // Donderdag van déze week bepaalt in welk ISO-jaar/week we vallen.
+  const don = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const dag = (don.getDay() + 6) % 7;          // ma=0 … zo=6
+  don.setDate(don.getDate() - dag + 3);        // → donderdag van deze week
+  // Donderdag van week 1 = de donderdag in de week van 4 januari.
+  const week1Don = new Date(don.getFullYear(), 0, 4);
+  week1Don.setDate(week1Don.getDate() - ((week1Don.getDay() + 6) % 7) + 3);
+  return 1 + Math.round((don - week1Don) / (7 * 864e5));
+}
+
 // Aantal werkdagen (ma–vr) ná `van` t/m `tot`. Negatief/gelijk → 0.
 function _verschilInWerkdagen(van, tot){
   if (!(van instanceof Date) || !(tot instanceof Date) || isNaN(van) || isNaN(tot)) return null;
@@ -316,7 +330,7 @@ function subBadge(v){return v?`<span class="badge" style="background:var(--sur2)
 
 export {
   displayName, filt, PRIO_REGELS, STIL_DREMPEL_DAGEN, STIL_ESCALATIE_REGELS,
-  opvolgStatus, volgendeDeadline, HERHAAL_MAANDEN, _vandaagAmsterdam,
+  opvolgStatus, volgendeDeadline, HERHAAL_MAANDEN, _vandaagAmsterdam, isoWeek,
   _verschilInKalenderdagen, berekenPrioriteit, prioBadge, persBadges, ibBadge,
   adjOff, offProg, _MAANDEN, _parseAnyDate, parseDt, toISODate, toDutchDate,
   emptyRow, esc, subBadge,

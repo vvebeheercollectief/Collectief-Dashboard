@@ -126,11 +126,17 @@
     .stat-strip{display:flex;align-items:center;flex-wrap:wrap;background:var(--sur);border:1px solid var(--bor);border-radius:14px;padding:4px 22px;box-shadow:var(--sh);margin-bottom:18px}
     .stat-item{display:flex;align-items:baseline;gap:10px;padding:14px 26px 14px 0;margin-right:26px;border-right:1px solid var(--bor)}
     .stat-item:last-child{border-right:none;margin-right:0;padding-right:0}
+    /* tel-item dat vlak vóór het weekblok staat hoeft geen scheidingslijn (anders zweeft 'ie in de lege ruimte) */
+    .stat-item:has(+ .stat-week){border-right:none;margin-right:0;padding-right:0}
     .stat-val{font-size:30px;font-weight:900;letter-spacing:-.06em;line-height:1;color:var(--txt);font-variant-numeric:tabular-nums}
     .stat-val.red{color:var(--rd)} .stat-val.amber{color:var(--am)} .stat-val.green{color:var(--gn)} .stat-val.teal{color:var(--ac)} .stat-val.muted{color:var(--fnt)}
     .stat-meta{display:flex;flex-direction:column;gap:1px;padding-bottom:2px}
     .stat-cap{font-size:11px;font-weight:700;color:var(--mut);white-space:nowrap}
     .stat-hint{font-size:10px;font-weight:700;color:var(--ac-500);white-space:nowrap}
+    /* Huidige weeknummer: rechts in de balk, eigen accent zodat 't niet als telling leest */
+    .stat-week{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:1px;padding:10px 0 10px 26px;border-left:1px solid var(--bor)}
+    .stat-week-cap{font-size:11px;font-weight:700;color:var(--mut);white-space:nowrap}
+    .stat-week-val{font-size:26px;font-weight:900;letter-spacing:-.05em;line-height:1;color:var(--ac);font-variant-numeric:tabular-nums}
 
     /* Card */
     .card{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;margin-bottom:18px}

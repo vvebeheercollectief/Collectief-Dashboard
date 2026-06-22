@@ -3,7 +3,7 @@
 //  + re-export van render-offerte / render-alv / render-tabel (publieke interface stabiel).
 //  Batch D / punt 11: offerte/ALV/tabel-render zijn naar eigen modules verplaatst.
 // ══════════════════════════════════════
-import { esc, filt, berekenPrioriteit, parseDt, opvolgStatus, _vandaagAmsterdam, toISODate, offerteNuOpvolgen } from "./util.js";
+import { esc, filt, berekenPrioriteit, parseDt, opvolgStatus, _vandaagAmsterdam, toISODate, offerteNuOpvolgen, isoWeek } from "./util.js";
 import { SECS, SKEYS } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { bulkWis, renderBulkUi } from "./bulk.js";
@@ -45,11 +45,19 @@ function renderNtdStats(){
   let afVandaag=0;
   SKEYS.forEach(s=>{(D.af?.[s]||[]).forEach(r=>{ if(toISODate(r.datum||'')===todayISO) afVandaag++; })});
   const item=(val,cls,cap,hint)=>`<div class="stat-item"><span class="stat-val ${cls}">${val}</span><div class="stat-meta"><span class="stat-cap">${cap}</span>${hint?`<span class="stat-hint">${hint}</span>`:''}</div></div>`;
+  // Huidige ISO-weeknummer, rechts in de balk (ma-start; tooltip = ma–zo datumbereik)
+  const MND=['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
+  const wk=isoWeek(tv);
+  const ma=new Date(tv); ma.setDate(tv.getDate()-((tv.getDay()+6)%7));
+  const zo=new Date(ma); zo.setDate(ma.getDate()+6);
+  const range=`${ma.getDate()} ${MND[ma.getMonth()]} – ${zo.getDate()} ${MND[zo.getMonth()]} ${zo.getFullYear()}`;
+  const weekBlok=`<div class="stat-week" title="ISO-week ${wk} · ${range}"><span class="stat-week-cap">Week</span><span class="stat-week-val">${wk}</span></div>`;
   document.getElementById('ntd-stats').innerHTML=
     item(open,'','Open taken','')+
     item(telaat,telaat?'red':'muted','Te laat','')+
     item(weg,weg?'amber':'muted','Weggelegd','')+
-    item(afVandaag,'muted','Afgerond vandaag','');
+    item(afVandaag,'muted','Afgerond vandaag','')+
+    weekBlok;
   renderNtdDonut();
 }
 

@@ -2,7 +2,7 @@
 //  HERHAALREGELS — beheerpagina voor terugkerende taken (Fase 4)
 //  De dagelijkse Apps Script-motor zet de taken klaar; hier alleen regel-CRUD.
 // ══════════════════════════════════════
-import { esc, emptyRow, toISODate, toDutchDate, _parseAnyDate } from "./util.js";
+import { esc, emptyRow, toISODate, toDutchDate, _parseAnyDate, coerceDagenVooraf } from "./util.js";
 import { state, D } from "./state.js";
 import { SID } from "./config.js";
 import { appendRange, writeRange, assertRowMatch } from "./api.js";
@@ -17,7 +17,7 @@ const TYPE_LABELS = { week:'Elke week', maand:'Elke maand', kwartaal:'Elk kwarta
 
 function zichtbaarVanaf(r){
   const p=_parseAnyDate(r.volgendeDeadline); if(!p) return '';
-  const d=new Date(p.y,p.m-1,p.d); d.setDate(d.getDate()-(r.dagenVooraf||14));
+  const d=new Date(p.y,p.m-1,p.d); d.setDate(d.getDate()-coerceDagenVooraf(r.dagenVooraf));
   return `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;
 }
 
@@ -73,7 +73,7 @@ async function submitHerhaal(){
   if(!await ensureToken()){alert('Inloggen mislukt. Probeer het opnieuw.');return}
   const oms=gvh('hh-omschrijving'), code=gvh('hh-code'), naam=gvh('hh-naam');
   const sectie=gvh('hh-sectie'), beh=gvh('hh-beh'), type=gvh('hh-type');
-  const interval=gvh('hh-interval'), vooraf=parseInt(gvh('hh-vooraf'))||14;
+  const interval=gvh('hh-interval'), vooraf=coerceDagenVooraf(gvh('hh-vooraf'));
   const dlIso=gvh('hh-deadline');
   if(!oms||!code){alert('Omschrijving en VvE Code zijn verplicht.');return}
   if(type==='na-afronden'&&(parseInt(interval)||0)<1){alert('Vul het aantal maanden na afronden in.');return}

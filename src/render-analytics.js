@@ -2,7 +2,7 @@
 //  RENDER-ANALYTICS — grafieken, KPI's, dashboard
 // ══════════════════════════════════════
 import { esc, displayName, persBadges, emptyRow, parseDt, _parseAnyDate } from "./util.js";
-import { SECS, SKEYS } from "./config.js";
+import { SECS, SKEYS, TEAM } from "./config.js";
 import { state, D } from "./state.js";
 
 // Leiblauwe accentkleur uitlezen op render-moment (Chart.js kan geen CSS-var-strings
@@ -204,19 +204,22 @@ function renderKpiPersonTile(period){
   const curKey=keys[0];
   const allTaken=SKEYS.flatMap(s=>D.af[s]||[]);
   const tally={};
-  ['Jer','Cihad','Gabos','Cihan'].forEach(n=>tally[n]=0);
+  TEAM.forEach(n=>tally[n]=0);
   allTaken.forEach(r=>{
     const k=bucketKey(r.datum,period);
     if(k!==curKey) return;
     _splitBeh(r.behandelaar).forEach(name=>{
-      if(tally[name]!==undefined) tally[name]++;
+      if(!name) return;
+      tally[name]=(tally[name]||0)+1; // óók namen buiten het vaste team tellen mee (niet stil droppen)
     });
   });
   const max=Math.max(1,...Object.values(tally));
-  rowsEl.innerHTML=['Jer','Cihad','Gabos','Cihan'].map(name=>{
+  // Vast team in config-volgorde eerst, daarna eventuele extra namen uit de data.
+  const namen=[...TEAM, ...Object.keys(tally).filter(n=>!TEAM.includes(n))];
+  rowsEl.innerHTML=namen.map(name=>{
     const v=tally[name];
     const pct=Math.round(v/max*100);
-    return`<div class="kpi-person-row"><div class="kpi-person-name">${name}</div><div class="kpi-person-bar"><div class="kpi-person-fill" style="width:${pct}%"></div></div><div class="kpi-person-num">${v}</div></div>`;
+    return`<div class="kpi-person-row"><div class="kpi-person-name">${esc(name)}</div><div class="kpi-person-bar"><div class="kpi-person-fill" style="width:${pct}%"></div></div><div class="kpi-person-num">${v}</div></div>`;
   }).join('');
 }
 
@@ -266,7 +269,9 @@ function renderHeroChart(metric,period){
 function renderLeaderboard(period){
   const rows=SKEYS.flatMap(s=>D.af[s]||[]);
   const series=seriesPerPersonByPeriod(rows,'datum','behandelaar',period,2);
-  const team=['Jer','Cihad','Gabos','Cihan'];
+  // Vast team + iedereen die in de data afgeronde taken heeft (zo valt een collega/stagiair
+  // buiten EMAIL_NAMES niet stil uit het leaderboard).
+  const team=[...new Set([...TEAM, ...Object.keys(series)])];
   const data=team.map(name=>{
     const s=series[name]||[{count:0},{count:0}];
     const huidig=s[s.length-1].count;
@@ -520,7 +525,10 @@ const HERO_VIEWS=[
     build:()=>{
       const u=D.alvo.filter(r=>r.uitnodiging).length;
       const n=D.alvo.filter(r=>r.notulen).length;
-      return{labels:['Notulen verstuurd','Nog te versturen'],data:[n,Math.max(0,u-n)],colors:['#15803D',emptyDonutClr()],centerVal:`${n}/${u}`,centerLbl:'Verstuurd'};
+      // Noemer = max(u,n): bij losse vlaggen kan notulen>uitnodiging zijn; zonder clamp toont
+      // het centercijfer dan een onmogelijke breuk >1 (bv. '3/2'). Met max leest het 'n/n' = vol,
+      // consistent met de reeds-geklemde donut-data. Normale geval (u>=n) blijft ongewijzigd.
+      return{labels:['Notulen verstuurd','Nog te versturen'],data:[n,Math.max(0,u-n)],colors:['#15803D',emptyDonutClr()],centerVal:`${n}/${Math.max(u,n)}`,centerLbl:'Verstuurd'};
     }
   },
   {

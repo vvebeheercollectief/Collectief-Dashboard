@@ -50,6 +50,7 @@ export const state = {
   _lastDHash: null,
   _loadInFlight: false,
   _loadAgain: false,
+  _loadAgainLoud: false,   // werd de onderdrukte aanroep door een NIET-stille (handmatige) verversing getriggerd? → herstart luid, zodat de fout-banner/spinner zichtbaar blijft
   _syncFails: 0,           // opeenvolgende mislukte sync-rondes; 'Fout' pas na 2 (transient-tolerantie)
   _animBusy: 0,            // teller van lopende rij-animaties (>0 = poll pauzeren)
   _undoInFlight: false,    // een undo-actie (afronden/verwijderen/bulk) loopt → poll pauzeren (undo doet eigen loadAll)

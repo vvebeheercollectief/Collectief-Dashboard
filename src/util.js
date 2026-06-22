@@ -219,8 +219,11 @@ function offerteNuOpvolgen(r, vandaag, termijnen){
   const balBij = offerteBalBij(r);
   const ov     = opvolgStatus(r, vandaag);
   const basis  = offerteStilBasis(r);
-  const dagen     = basis ? _verschilInKalenderdagen(vandaag, basis) : null; // (vandaag, basis): positief = dagen stil
-  const werkdagen = basis ? _verschilInWerkdagen(basis, vandaag)     : null;
+  // Clamp aan de bron op 0: een per ongeluk in de TOEKOMST ingevoerde laatsteActiviteit/
+  // datumAangevraagd (niet afgevangen door 'weggelegd') zou anders negatieve 'dagen stil'
+  // geven en een urgent traject onderaan de sorteer-lijst duwen. null blijft null ('geen datum').
+  const dagen     = basis ? Math.max(0, _verschilInKalenderdagen(vandaag, basis)) : null; // (vandaag, basis): positief = dagen stil
+  const werkdagen = basis ? Math.max(0, _verschilInWerkdagen(basis, vandaag))     : null;
   const dlp = _parseAnyDate((r && r.deadline) || '');
   const deadlineTeLaat = dlp ? (_verschilInKalenderdagen(new Date(dlp.y, dlp.m - 1, dlp.d), vandaag) < 0) : false;
   const opvolgenVandaag = ov.vandaag && !!_parseAnyDate((r && r.opvolgdatum) || '');
@@ -363,15 +366,25 @@ function emptyRow(cols,inline,filtered){
   return`<tr><td colspan="${cols}"><div class="empty"><div class="empty-ico">${ico}</div>${txt}</div></td></tr>`;
 }
 
-function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+// String(s??'') i.p.v. (s||''): `??` vangt alleen null/undefined, zodat 0/false correct
+// als "0"/"false" worden geëscaped i.p.v. stil te verdwijnen, en een niet-string (number/Date)
+// veilig wordt gecoerced i.p.v. een TypeError op .replace te gooien.
+function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 function subBadge(v){return v?`<span class="badge" style="background:var(--sur2);color:var(--mut);font-size:10px;margin-left:4px">${esc(v)}</span>`:''}
+// 'Dagen vooraf zichtbaar' (herhaalregels): bewust 0 toestaan (taak pas op de deadline-dag
+// zichtbaar). Alleen terugvallen op `def` bij een echt lege/ongeldige waarde, niet bij 0 —
+// anders wordt een bewuste 0 stil overschreven. Op alle drie de lagen gebruikt (invoer/parse/zichtbaar).
+function coerceDagenVooraf(v, def=14){
+  const n=parseInt(v,10);
+  return Number.isFinite(n)&&n>=0 ? n : def;
+}
 
 export {
   displayName, filt, PRIO_REGELS, STIL_DREMPEL_DAGEN, STIL_ESCALATIE_REGELS,
   opvolgStatus, volgendeDeadline, HERHAAL_MAANDEN, _vandaagAmsterdam, isoWeek,
   _verschilInKalenderdagen, berekenPrioriteit, prioBadge, persBadges, ibBadge,
   adjOff, offProg, _MAANDEN, _parseAnyDate, parseDt, toISODate, toDutchDate,
-  emptyRow, esc, subBadge,
+  emptyRow, esc, subBadge, coerceDagenVooraf,
   parseOff, offerteFase, offerteBalBij, _verschilInWerkdagen,
   offerteStilBasis, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten, offerteNabelTeller,
   parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes,

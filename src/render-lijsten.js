@@ -89,6 +89,13 @@ function renderNtd(){
   const fBeh=document.getElementById('f-beh-ntd').value;
   const fPrio=document.getElementById('f-prio-ntd').value;
 
+  // Snoei de uitklap-Set tot rij-id's die nog bestaan: na verwijderen/afronden schuiven de
+  // _row-nummers mee, dus verdwenen id's mogen niet blijven hangen (anders staat een verkeerde
+  // rij uitgeklapt tot de gebruiker er zelf op klikt).
+  if(state.expandedRows.size){
+    state.expandedRows=new Set([...state.expandedRows].filter(id=>SKEYS.some(s=>(D.ntd[s]||[]).some(r=>''+r._row===id))));
+  }
+
   // Tabs
   document.getElementById('ntd-tabs').innerHTML=SKEYS.map(s=>{
     const rows=filterNtd(D.ntd[s]||[],q,fCode,fBeh,fPrio,s);
@@ -127,14 +134,19 @@ function renderNtdCrossList(sec){
   const q=(document.getElementById('s-ntd')?.value||'').toLowerCase();
   const fCode=(document.getElementById('f-code-ntd')?.value||'').toLowerCase();
   const fBeh=(document.getElementById('f-beh-ntd')?.value||'').toLowerCase();
+  const fPrio=(document.getElementById('f-prio-ntd')?.value||''); // exacte waarde (niet lowercasen), net als filterNtd
   const treffers=[];
   if(label){
     SKEYS.forEach(s=>{ if(s===sec) return;
       (D.ntd[s]||[]).forEach(r=>{
         if(((r.subcategorie||'')+'').trim().toLowerCase()!==label) return;
-        if(q && !(`${r.code||''} ${r.naam||''} ${r.opmerkingen||''}`.toLowerCase().includes(q))) return;
+        // Zelfde filterdefinitie als de hoofdtabel (filterNtd): zoek over de sectie-keys van de
+        // herkomst-sectie en pas óók het prioriteitsfilter toe — anders toont 'Ook hier' items
+        // van álle prioriteiten terwijl de hoofdtabel netjes filtert.
+        if(q && !SECS[s].keys.some(k=>(r[k]||'').toLowerCase().includes(q))) return;
         if(fCode && !((r.code||'').toLowerCase().includes(fCode))) return;
         if(fBeh && !((r.behandelaar||'').toLowerCase().includes(fBeh))) return;
+        if(fPrio && berekenPrioriteit(r.deadline,s).prioriteit!==fPrio) return;
         treffers.push(r);
       });
     });

@@ -148,6 +148,7 @@ function renderVve(){
   const taakRij=(r,weg)=>{
     const rid=state._rowCache.length; state._rowCache.push(r);
     const sec=r._sec, p=berekenPrioriteit(r.deadline,sec);
+    const meta=SECS[sec]||{css:'',label:(sec||'?')}; // vangnet: één rij zonder geldige sectie mag niet de hele dossierpagina blanco maken
     const dl=weg
       ? `<span class="pill-snooze" data-action="taak-wegleggen" data-rid="${rid}">terug op ${esc(r.opvolgdatum)}</span>`
       : r.deadline
@@ -155,7 +156,7 @@ function renderVve(){
         : '<span class="warn-geen-deadline">Geen deadline</span>';
     return `<tr class="${weg?'snooze-row':''}" data-action="taak-bewerken" data-rid="${rid}" style="cursor:pointer">
       <td class="cell-txt">${esc(r.actiepunt||r.periode||r.agendapunten||r.status||'')}</td>
-      <td><span class="badge" style="${SECS[sec].css};background:var(--sec-l);color:var(--sec)">${esc(SECS[sec].label)}</span></td>
+      <td><span class="badge" style="${meta.css};background:var(--sec-l);color:var(--sec)">${esc(meta.label)}</span></td>
       <td>${persBadges(r.behandelaar)}</td>
       <td class="cell-sm">${dl}</td></tr>`;
   };

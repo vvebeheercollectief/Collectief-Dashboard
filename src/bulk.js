@@ -6,8 +6,8 @@ import { renderNtd } from "./render-lijsten.js";
 import { toDutchDate, berekenPrioriteit, _parseAnyDate, _vandaagAmsterdam, _verschilInKalenderdagen, parseDt } from "./util.js";
 import { SECS, SID } from "./config.js";
 import { ensureToken } from "./auth.js";
-import { writeRange, _shiftNtdRows, assertRowsMatch } from "./api.js";
-import { getSheetIds, getAfInsertRow, getInsertRow, insertAndWriteRow } from "./crud.js";
+import { _shiftNtdRows, assertRowsMatch } from "./api.js";
+import { getSheetIds, getAfInsertRow, getInsertRow, insertAndWriteRow, serializeNtdUndo } from "./crud.js";
 import { backgroundWrite, loadAll } from "./data.js";
 import { showToast, showUndoToast } from "./notifications.js";
 import { logEvent } from "./render-overig.js";
@@ -60,13 +60,9 @@ const BULK_BEH_KOLOM='E';
 const BULK_DEADLINE_KOLOM={OPPAKKEN:'D',VERGADERVERZOEKEN:'F','OFFERTE-TRAJECTEN':'F',LOD:'F'};
 const OPVOLG_KOLOM='L';
 
-// Serialiseer een taakrij naar de NTD-kolomwaarden (zelfde vorm als crud.js)
-function _ntdValues(r){
-  const v=SECS[r._sec].keys.map(k=>r[k]||'');
-  while(v.length<8) v.push('');
-  v.push('', '', r.subcategorie||'', r.opvolgdatum||'', r.herhaalId||''); // I, J, K=sub, L, M
-  return v;
-}
+// Serialiseer een taakrij naar de NTD-kolomwaarden — gedeelde bron in crud.js
+// (serializeNtdUndo: kolommen A..P incl. offerte-fase O + aannemers P).
+const _ntdValues=serializeNtdUndo;
 
 function _eindBulk(){
   state.bulkMode=false; bulkWis();
@@ -267,24 +263,36 @@ function bulkVeld(rows,soort,waarde){
     if(oppDl && it.sec==='OPPAKKEN') it.r.prioriteit=berekenPrioriteit(waarde,'OPPAKKEN').prioriteit;
   });
   _eindBulk();
-  // Per-item 'gelogd'-vlag overleeft _withRetry-herkansingen (closure). De cel-writes zijn
-  // idempotent (vaste waarde overschrijven), maar logEvent is een append: zonder vlag zou een
-  // retry na een transient fout dubbele logboekregels maken voor de reeds-geschreven items.
+  // Atomair: ALLE cel-writes in één Sheets-batchUpdate (alles-of-niets), net als bulkAfronden.
+  // Voorheen liep dit per item in losse writeRange-calls; faalde item k halverwege na een
+  // niet-transient fout, dan stonden 0..k-1 al server-side terwijl de lokale rollback ze terugzette
+  // → de Sheet liep vóór op het scherm tot de resync (en bij OPPAKKEN kon F/prio uit de pas lopen).
+  // De `gelogd`-vlag (één voor de hele batch) overleeft _withRetry-herkansingen en houdt logEvent
+  // (een append) idempotent: de updateCells zelf zijn idempotent (vaste waarde overschrijven).
   const schrijf=(welkeWaarde)=>{
-    const gelogd=new Array(items.length).fill(false);
+    let gelogd=false;
     return async()=>{
       await assertRowsMatch(items.map(it=>({row:it.r._row, code:it.code}))); // bescherming: alle rijen nog van hun VvE vóór bulk-celschrijf
-      for(let i=0;i<items.length;i++){
-        const it=items[i];
+      const ids=await getSheetIds();
+      const ntdSheetId=ids['Nog Te Doen'];
+      if(ntdSheetId==null) throw new Error('Sheet niet gevonden');
+      const cel=v=>({userEnteredValue:{stringValue:String(v)}});
+      const requests=[];
+      for(const it of items){
         const kol=conf.kolom(it.r);
+        const colIdx=kol.charCodeAt(0)-65;                  // 'A'→0; alle veldkolommen zijn enkele letters
         const val=welkeWaarde==='oud'?it.oud:waarde;
-        await writeRange(`'Nog Te Doen'!${kol}${it.r._row}:${kol}${it.r._row}`,[val]);
+        requests.push({updateCells:{range:{sheetId:ntdSheetId,startRowIndex:it.r._row-1,endRowIndex:it.r._row,startColumnIndex:colIdx,endColumnIndex:colIdx+1},rows:[{values:[cel(val)]}],fields:'userEnteredValue'}});
         if(oppDl && it.sec==='OPPAKKEN'){
           const prio=welkeWaarde==='oud'?it.oudPrio:berekenPrioriteit(waarde,'OPPAKKEN').prioriteit;
-          await writeRange(`'Nog Te Doen'!F${it.r._row}:F${it.r._row}`,[prio]);
+          requests.push({updateCells:{range:{sheetId:ntdSheetId,startRowIndex:it.r._row-1,endRowIndex:it.r._row,startColumnIndex:5,endColumnIndex:6},rows:[{values:[cel(prio)]}],fields:'userEnteredValue'}}); // F=prio (index 5)
         }
-        if(!gelogd[i]){ logEvent(it.code,it.sec,conf.log,conf.veld,welkeWaarde==='oud'?waarde:it.oud,val); gelogd[i]=true; }
       }
+      const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+        method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
+        body:JSON.stringify({requests})});
+      if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Bulk-actie fout');err.status=resp.status;throw err}
+      if(!gelogd){ items.forEach(it=>logEvent(it.code,it.sec,conf.log,conf.veld,welkeWaarde==='oud'?waarde:it.oud,welkeWaarde==='oud'?it.oud:waarde)); gelogd=true; }
     };
   };
   showUndoToast(conf.titel,items.map(i=>i.code).join(', '),async()=>{

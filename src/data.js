@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  DATA — laden, parsen, achtergrond-schrijven, sync-indicator
 // ══════════════════════════════════════
-import { parseDt, _parseAnyDate } from "./util.js";
+import { parseDt, _parseAnyDate, coerceDagenVooraf } from "./util.js";
 import { state, D } from "./state.js";
 import { SKEYS, SECS } from "./config.js";
 import { fetchSheet, _withRetry } from "./api.js";
@@ -68,7 +68,7 @@ function clearLoadError(){ document.getElementById('load-err-banner')?.remove();
 // Herhaal-slot: voorkomt dat twee loadAll-aanroepen tegelijk lopen en elkaars data
 // overschrijven (8s-poll, schrijf-resync, refresh-knop, handmatige awaits).
 async function loadAll(silent){
-  if(state._loadInFlight){ state._loadAgain=true; return; }
+  if(state._loadInFlight){ state._loadAgain=true; if(!silent) state._loadAgainLoud=true; return; }
   state._loadInFlight=true;
   try{
     // Altijd een geldige token garanderen (ook bij Vernieuwen-knop / schrijf-resync):
@@ -120,7 +120,7 @@ async function loadAll(silent){
   }
   finally{
     state._loadInFlight=false;
-    if(state._loadAgain){ state._loadAgain=false; loadAll(true); } // een onderdrukte aanroep alsnog uitvoeren
+    if(state._loadAgain){ const loud=state._loadAgainLoud; state._loadAgain=false; state._loadAgainLoud=false; loadAll(!loud); } // onderdrukte aanroep alsnog uitvoeren; luid als er een handmatige verversing tussen zat
   }
 }
 
@@ -181,17 +181,21 @@ function parseHerhaal(rows){
     sectie:((r[2]||'')+'').trim().toUpperCase(),
     code:((r[3]||'')+'').trim(), naam:((r[4]||'')+'').trim(),
     behandelaar:((r[5]||'')+'').trim(), type:((r[6]||'')+'').trim().toLowerCase(),
-    interval:((r[7]||'')+'').trim(), dagenVooraf:parseInt(r[8])||14,
+    interval:((r[7]||'')+'').trim(), dagenVooraf:coerceDagenVooraf(r[8]),
     volgendeDeadline:((r[9]||'')+'').trim(),
     status:((r[10]||'ACTIEF')+'').trim().toUpperCase(),
     laatstKlaargezet:((r[11]||'')+'').trim(),
   })).filter(r=>r.id);
 }
 
+// Samenvattings-/statregels onderaan het ALV-overzicht hebben in kolom A een hele zin
+// ('Totaal …', 'Uitnodigingen …') i.p.v. een korte VvE-code. Een echte code is kort;
+// alles langer dan deze grens is zo'n statregel en hoort niet als VvE in het overzicht.
+const MAX_VVE_CODE_LEN = 20;
 function parseAlvo(rows){
   return rows.slice(2).map((r,i)=>{
     const code=(r[0]||'').trim();
-    if(!code||code.length>20) return null;
+    if(!code||code.length>MAX_VVE_CODE_LEN) return null;
     // Skip stat rows
     if(['Totaal','Uitnodigingen','Notulen','Nog'].some(p=>code.startsWith(p))) return null;
     const uitn=(r[2]||'').trim()==='TRUE';

@@ -5,7 +5,7 @@ import { ALLOWED_EMAILS } from '../allowed-emails.js';
 
 // ── Versie (zichtbaar in de UI) ────────────────────────────────────────
 // Ophogen bij ELKE wijziging: 4.1, 4.2, … 5.0 voor grote sprongen.
-export const APP_VERSION = '5.5';
+export const APP_VERSION = '5.6';
 
 // ── Omgeving (productie vs. testomgeving) ──────────────────────────────
 // Fail-safe: alleen deze exacte hosts zijn PRODUCTIE; al het andere
@@ -43,6 +43,11 @@ export const EMAIL_NAMES = {
   'gabrielateterycz1616@gmail.com':'Gabos',
   'giocan175@gmail.com':'Cihan',
 };
+// Het vaste team, afgeleid uit EMAIL_NAMES — één bron. Analytics (KPI-tegels, leaderboard)
+// gebruikt dit i.p.v. losse literals, zodat een nieuwe collega in EMAIL_NAMES automatisch
+// meetelt. De cijfers vullen dit bovendien aan met namen die in de data voorkomen maar hier
+// (nog) niet staan, zodat werk van een stagiair/variant niet stil uit de tellingen valt.
+export const TEAM = [...new Set(Object.values(EMAIL_NAMES))];
 
 export const SECS = {
   OPPAKKEN:{label:'Oppakken',css:'--sec:var(--ac);--sec-l:var(--ac-l);--sec-b:var(--ac-b)',color:'#0D7377',

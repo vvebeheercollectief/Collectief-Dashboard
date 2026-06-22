@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, offerteBalBij, _verschilInWerkdagen, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten, offerteNabelTeller, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, isoWeek } from "./util.js";
+import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, offerteBalBij, _verschilInWerkdagen, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten, offerteNabelTeller, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, isoWeek, coerceDagenVooraf } from "./util.js";
 import { logZin, logPaginaSoort } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION } from "./config.js";
 import { ACTIONS } from "./actions.js";
@@ -14,7 +14,7 @@ import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk.js";
 import { _isTransient, _rowMismatch, _a1ColA } from "./api.js";
 import { parseSections } from "./data.js";
-import { setv } from "./crud.js";
+import { setv, serializeNtdUndo } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages } from "./dossier-chat.js";
 import { shouldPromptReload } from "./sw-update.js";
@@ -785,6 +785,51 @@ import { shouldPromptReload } from "./sw-update.js";
   eq('isoWeek: ma 29 dec 2025 hoort al bij week 1 van 2026', isoWeek(new Date(2025,11,29)), 1);
   eq('isoWeek: ma 30 dec 2024 hoort al bij week 1 van 2025', isoWeek(new Date(2024,11,30)), 1);
   eq('isoWeek: 31 dec 2026 (do) → week 53', isoWeek(new Date(2026,11,31)), 53);
+
+  // ══════════════════════════════════════
+  //  NALOOP-FIXES 2026-06-22 (correctheid)
+  // ══════════════════════════════════════
+  // #1 undo-serialisatie neemt offerte-fase (O) + aannemers (P) mee → geen stil verlies bij undo
+  (()=>{
+    const off={_sec:'OFFERTE-TRAJECTEN',code:'CH1',naam:'VvE 1',datumAangevraagd:'1 jun 2026',offertes:'2/3',behandelaar:'Jer',deadline:'10 jun 2026',opmerkingen:'x',subcategorie:'dak',opvolgdatum:'',herhaalId:'',fase:'bij_vve',aannemers:'Bakker|1\nDe Vries|0'};
+    const v=serializeNtdUndo(off);
+    eq('undo-serialisatie offerte: 16 kolommen (A..P)', v.length, 16);
+    eq('undo-serialisatie offerte: fase op kolom O (idx 14)', v[14], 'bij_vve');
+    eq('undo-serialisatie offerte: aannemers op kolom P (idx 15)', v[15], 'Bakker|1\nDe Vries|0');
+    eq('undo-serialisatie offerte: subcategorie blijft kolom K (idx 10)', v[10], 'dak');
+  })();
+  (()=>{
+    const opp={_sec:'OPPAKKEN',code:'CH2',naam:'VvE2',actiepunt:'iets',deadline:'5 jun 2026',behandelaar:'Cihad',prioriteit:'Hoog',opmerkingen:'',inBehandeling:'FALSE',subcategorie:'',opvolgdatum:'',herhaalId:''};
+    const v=serializeNtdUndo(opp);
+    eq('undo-serialisatie OPPAKKEN: 16 kolommen', v.length, 16);
+    eq('undo-serialisatie OPPAKKEN: O leeg (geen offerte-velden)', v[14], '');
+    eq('undo-serialisatie OPPAKKEN: P leeg', v[15], '');
+  })();
+  // #21 coerceDagenVooraf: bewuste 0 blijft 0; leeg/ongeldig/negatief → 14
+  eq('coerceDagenVooraf: "0" blijft 0', coerceDagenVooraf('0'), 0);
+  eq('coerceDagenVooraf: 0 (number) blijft 0', coerceDagenVooraf(0), 0);
+  eq('coerceDagenVooraf: leeg → 14', coerceDagenVooraf(''), 14);
+  eq('coerceDagenVooraf: rommel → 14', coerceDagenVooraf('abc'), 14);
+  eq('coerceDagenVooraf: "7" → 7', coerceDagenVooraf('7'), 7);
+  eq('coerceDagenVooraf: negatief → 14', coerceDagenVooraf('-3'), 14);
+  // #30 esc: niet-string veilig coercen; 0/false verdwijnen niet stil
+  eq('esc: number 5 → "5"', esc(5), '5');
+  eq('esc: 0 → "0"', esc(0), '0');
+  eq('esc: false → "false"', esc(false), 'false');
+  eq('esc: null → ""', esc(null), '');
+  eq('esc: undefined → ""', esc(undefined), '');
+  eq('esc: html-tekens geëscaped', esc('<b>&"\''), '&lt;b&gt;&amp;&quot;&#39;');
+  // #20 palette: sterk-matchende latere secties (LOD/offerte) niet weggedrukt door de cap
+  (()=>{
+    const data={alvo:[],af:{},logboek:[],ntd:{
+      OPPAKKEN:[{_sec:'OPPAKKEN',code:'A1',naam:'zoekterm',deadline:'30 jun 2026'},{_sec:'OPPAKKEN',code:'A2',naam:'zoekterm',deadline:'29 jun 2026'}],
+      VERGADERVERZOEKEN:[{_sec:'VERGADERVERZOEKEN',code:'V1',naam:'zoekterm',deadline:'28 jun 2026'}],
+      'OFFERTE-TRAJECTEN':[{_sec:'OFFERTE-TRAJECTEN',code:'O1',naam:'zoekterm',deadline:'1 jun 2026'}],
+      LOD:[{_sec:'LOD',code:'L1',naam:'zoekterm',deadline:'2 jun 2026'}],
+    }};
+    const r=zoekAlles('zoekterm',data,{vves:3,taken:2,afgerond:3,logboek:3});
+    truthy('palette: meest-urgente LOD+offerte komen bovenaan ondanks cap', r.taken.some(t=>t.code==='O1') && r.taken.some(t=>t.code==='L1'));
+  })();
 
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');

@@ -20,9 +20,20 @@ function zoekAlles(q, data, max){
   if(!z) return res;
   const hit=(...velden)=>velden.some(v=>String(v||'').toLowerCase().includes(z));
   res.vves=(data.alvo||[]).filter(r=>hit(r.code,r.naam)).slice(0,max.vves);
+  // Eerst alle taak-treffers over álle secties verzamelen, dán cappen op relevantie. Anders vult
+  // de cap zich met OPPAKKEN/VERGADER (eerste secties) en komen sterk-matchende LOD/offerte-taken
+  // er nooit bij. Relevantie: exacte code-match eerst, daarna op urgentie (te laat = meest negatief).
+  const alleTaken=[];
   SKEYS.forEach(s=>(data.ntd[s]||[]).forEach(r=>{
-    if(res.taken.length<max.taken && hit(r.code,r.naam,r.actiepunt,r.periode,r.agendapunten,r.status,r.opmerkingen)) res.taken.push(r);
+    if(hit(r.code,r.naam,r.actiepunt,r.periode,r.agendapunten,r.status,r.opmerkingen)) alleTaken.push(r);
   }));
+  const _dt=r=>{const p=berekenPrioriteit(r.deadline,r._sec).dagenTot; return p==null?Infinity:p;};
+  alleTaken.sort((a,b)=>{
+    const ax=(a.code||'').toLowerCase()===z?0:1, bx=(b.code||'').toLowerCase()===z?0:1;
+    if(ax!==bx) return ax-bx;
+    return _dt(a)-_dt(b);
+  });
+  res.taken=alleTaken.slice(0,max.taken);
   SKEYS.forEach(s=>(data.af[s]||[]).forEach(r=>{
     if(res.afgerond.length<max.afgerond && hit(r.code,r.naam,r.actiepunt,r.periode,r.agendapunten,r.opmerking)) res.afgerond.push(r);
   }));

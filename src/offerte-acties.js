@@ -60,8 +60,11 @@ async function offerteActieVastleggen(){
   let logGedaan=false;
   backgroundWrite(
     async()=>{
+      // Guard EERST (vóór de Logboek-append) wanneer er een O/L-write volgt: anders blijft bij een
+      // rij-mismatch een logregel 'offerte gedeeld' staan terwijl de fase wordt teruggedraaid.
+      // Zo aborteert een mismatch de hele actie vóórdat er iets is gelogd → rollback klopt weer.
+      if(r._row && (doorsturen||opvolgdatumOud)) await assertRowMatch(r._row, r.code);
       if(!logGedaan){ await appendRange("'Logboek'!A:H",[ts,r.code,'OFFERTE-TRAJECTEN','Contact',veld,wie,tekst,who]); logGedaan=true; }
-      if(r._row && (doorsturen||opvolgdatumOud)) await assertRowMatch(r._row, r.code); // bescherming: rij nog van deze VvE vóór O/L-write
       if(doorsturen&&r._row) await writeRange(`'Nog Te Doen'!O${r._row}`,['bij_vve']); // zonder _row geen O-write; resync zet de fase dan terug (zeldzaam, geaccepteerd)
       if(opvolgdatumOud&&r._row) await writeRange(`'Nog Te Doen'!L${r._row}`,['']); // Fix A: verstreken opvolgdatum wissen in Sheet
     },

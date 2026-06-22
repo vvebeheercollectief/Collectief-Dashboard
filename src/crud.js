@@ -101,6 +101,19 @@ function getInsertRow(sec){
   return info?.colHeaderRow||2;
 }
 
+// Gedeelde undo-serialisatie van een NTD-taakrij → kolomwaarden A..P.
+// N (placeholder), O (offerte-fase) en P (aannemerslijst) horen erbij: zo verliest een
+// undo van een afgerond/verwijderd OFFERTE-traject niet stil de opgebouwde aannemerslijst
+// + de expliciete fase. Voor niet-offerte secties zijn r.fase/r.aannemers leeg (harmloos).
+// Eén bron voor de drie callsites (deleteTaskRow, doCompleteTask, bulk-afronden/-verwijderen),
+// zodat de kolombreedte nooit meer per plek uit elkaar loopt.
+export function serializeNtdUndo(r){
+  const v=SECS[r._sec].keys.map(k=>r[k]||'');
+  while(v.length<8) v.push('');                  // OFFERTE heeft 7 velden → vul tot H
+  v.push('', '', r.subcategorie||'', r.opvolgdatum||'', r.herhaalId||'', '', r.fase||'', r.aannemers||''); // I, J, K=sub, L, M, N, O=fase, P=aannemers
+  return v;
+}
+
 async function insertAndWriteRow(sheetName,afterRow,values){
   if(!state.oauthToken) throw new Error('Niet ingelogd');
   const ids=await getSheetIds();
@@ -147,10 +160,7 @@ async function deleteTaskRow(r){
   if(!await ensureToken()){alert('Inloggen mislukt. Probeer het opnieuw.');return}
   const sec=r._sec;
   // undo-data vastleggen vóór de mutatie (zelfde serialisatie als afronden)
-  const ntdKeys=SECS[sec].keys;
-  const ntdValues=ntdKeys.map(k=>r[k]||'');
-  while(ntdValues.length<8) ntdValues.push('');                  // OFFERTE heeft 7 velden
-  ntdValues.push('', '', r.subcategorie||'', r.opvolgdatum||'', r.herhaalId||''); // I, J, K=sub, L, M (Fase 4)
+  const ntdValues=serializeNtdUndo(r);
   const undoData={sec,code:r.code,ntdValues};
   const oudeRow=r._row;
   const tr=document.querySelector(`#ntd-tbody tr[data-row="${oudeRow}"]`);
@@ -251,10 +261,7 @@ async function doCompleteTask(){
       {deleteDimension:{range:{sheetId:ntdSheetId,dimension:'ROWS',startIndex:r._row-1,endIndex:r._row}}}
     ]};
     // undo-data vastleggen vóór de mutatie
-    const ntdKeys=SECS[sec].keys;
-    const ntdValues=ntdKeys.map(k=>r[k]||'');
-    while(ntdValues.length<8) ntdValues.push('');                  // OFFERTE heeft 7 velden
-    ntdValues.push('', '', r.subcategorie||'', r.opvolgdatum||'', r.herhaalId||''); // I, J, K=sub, L, M (Fase 4)
+    const ntdValues=serializeNtdUndo(r);
     const undoData={sec,code:r.code,ntdValues,ntdRow:r._row};
     // 1) optimistisch: meteen uit de lokale lijst + indexen meeschuiven;
     //    de oude DOM-rij pulst groen en pas daarná hertekenen we (anim.js)

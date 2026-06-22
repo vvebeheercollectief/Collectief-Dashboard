@@ -273,24 +273,22 @@ function bulkVeld(rows,soort,waarde){
     let gelogd=false;
     return async()=>{
       await assertRowsMatch(items.map(it=>({row:it.r._row, code:it.code}))); // bescherming: alle rijen nog van hun VvE vóór bulk-celschrijf
-      const ids=await getSheetIds();
-      const ntdSheetId=ids['Nog Te Doen'];
-      if(ntdSheetId==null) throw new Error('Sheet niet gevonden');
-      const cel=v=>({userEnteredValue:{stringValue:String(v)}});
-      const requests=[];
+      // values:batchUpdate met USER_ENTERED — één atomaire POST (alles-of-niets) én zelfde
+      // invoer-parsing als de modal-flow (writeRange): een datum-string wordt zo óók via bulk
+      // een echte datum-waarde, niet platte tekst. (updateCells/stringValue zou RAW opslaan.)
+      const data=[];
       for(const it of items){
         const kol=conf.kolom(it.r);
-        const colIdx=kol.charCodeAt(0)-65;                  // 'A'→0; alle veldkolommen zijn enkele letters
         const val=welkeWaarde==='oud'?it.oud:waarde;
-        requests.push({updateCells:{range:{sheetId:ntdSheetId,startRowIndex:it.r._row-1,endRowIndex:it.r._row,startColumnIndex:colIdx,endColumnIndex:colIdx+1},rows:[{values:[cel(val)]}],fields:'userEnteredValue'}});
+        data.push({range:`'Nog Te Doen'!${kol}${it.r._row}`, values:[[val]]});
         if(oppDl && it.sec==='OPPAKKEN'){
           const prio=welkeWaarde==='oud'?it.oudPrio:berekenPrioriteit(waarde,'OPPAKKEN').prioriteit;
-          requests.push({updateCells:{range:{sheetId:ntdSheetId,startRowIndex:it.r._row-1,endRowIndex:it.r._row,startColumnIndex:5,endColumnIndex:6},rows:[{values:[cel(prio)]}],fields:'userEnteredValue'}}); // F=prio (index 5)
+          data.push({range:`'Nog Te Doen'!F${it.r._row}`, values:[[prio]]}); // F=prioriteit, herberekend bij nieuwe deadline
         }
       }
-      const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+      const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values:batchUpdate`,{
         method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
-        body:JSON.stringify({requests})});
+        body:JSON.stringify({valueInputOption:'USER_ENTERED', data})});
       if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Bulk-actie fout');err.status=resp.status;throw err}
       if(!gelogd){ items.forEach(it=>logEvent(it.code,it.sec,conf.log,conf.veld,welkeWaarde==='oud'?waarde:it.oud,welkeWaarde==='oud'?it.oud:waarde)); gelogd=true; }
     };

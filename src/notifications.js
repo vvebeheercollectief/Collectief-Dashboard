@@ -53,12 +53,17 @@ const TOAST_ICONS  = {
 };
 const TOAST_COLORS = { n_newtask:'var(--ac)', n_assigned:'var(--gn)', n_deadline:'var(--am)', n_alv:'var(--pu)', n_daily:'var(--am)', test:'var(--ac)' };
 const TOAST_DURATION = 5000;
+// Dedup-venster: vangt de dubbele toast (zelfde event via directe fire én via de 10s-poll), die
+// binnen ~10s arriveert. Bewust korter dan voorheen (30s) zodat twee échte, snel-opeenvolgende
+// acties met toevallig identieke titel+tekst niet onnodig lang worden onderdrukt; ruim boven de
+// poll-cadans van 10s zodat de cross-pad-dedup intact blijft.
+const TOAST_DEDUP_MS = 15000;
 
 function showToast(title, msg, color) {
   const key = title + '|' + msg;
   if (_shownToasts.has(key)) return;
   _shownToasts.add(key);
-  setTimeout(() => _shownToasts.delete(key), 30000);
+  setTimeout(() => _shownToasts.delete(key), TOAST_DEDUP_MS);
 
   const el = document.createElement('div');
   el.className = 'toast';

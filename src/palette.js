@@ -111,6 +111,10 @@ function renderPal(q){
   }
   bd.innerHTML=html||'<div class="pal-leeg">Geen resultaten</div>';
   if(_palSel>=_palItems.length) _palSel=Math.max(0,_palItems.length-1);
+  // aria-activedescendant meteen synchroniseren (niet pas bij de eerste pijltoets), en wissen bij
+  // een lege lijst — anders kondigt de schermlezer niets aan of wijst hij naar een verdwenen optie.
+  const inp=document.getElementById('pal-input');
+  if(inp){ if(_palItems.length) inp.setAttribute('aria-activedescendant','pal-opt-'+_palSel); else inp.removeAttribute('aria-activedescendant'); }
 }
 
 function palKies(idx){ const it=_palItems[idx]; if(it) it.doe(); }

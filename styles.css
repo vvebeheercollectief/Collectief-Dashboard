@@ -159,7 +159,7 @@
     .search-box:focus-within{border-color:var(--ac);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 14%,transparent)}
     .search-box svg{width:14px;height:14px;color:var(--fnt);flex-shrink:0}
     .search-box input{background:none;border:none;outline:none;color:var(--txt);font-size:13px;font-weight:500;width:155px}
-    .search-box input::placeholder{color:var(--fnt)}
+    .search-box input::placeholder{color:var(--mut)} /* leesbare instructietekst → --mut (WCAG AA), niet de te-lichte --fnt */
     .filter-select{height:36px;background:var(--sur);border:1px solid var(--bor);border-radius:9px;padding:0 34px 0 12px;color:var(--txt);font-size:13px;font-weight:600;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;transition:border var(--tr),box-shadow var(--tr)}
     .filter-select:hover{border-color:var(--ac-b)}
     .filter-select:focus{border-color:var(--ac);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 14%,transparent)}
@@ -173,7 +173,7 @@
     .tab{padding:11px 11px;font-size:13px;font-weight:500;color:var(--mut);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color var(--tr),border-color var(--tr);display:flex;align-items:center;gap:5px;white-space:nowrap;flex-shrink:0}
     .tab:hover{color:var(--txt)}
     .tab.on{color:var(--txt);border-bottom-color:var(--ac);font-weight:600}
-    .tab .cnt{min-width:auto;height:auto;padding:0;border-radius:0;font-size:12px;font-weight:500;background:none;color:var(--fnt);display:inline-flex;align-items:center;justify-content:center}
+    .tab .cnt{min-width:auto;height:auto;padding:0;border-radius:0;font-size:12px;font-weight:500;background:none;color:var(--mut);display:inline-flex;align-items:center;justify-content:center}
     .tab.on .cnt{color:var(--mut)}
 
     /* Table */
@@ -243,9 +243,9 @@
     .pers{padding:2px 7px;border-radius:5px;font-size:11.5px;font-weight:600;margin:1px 2px 1px 0;display:inline-flex;align-items:center;background:#eef1f4;color:#5b6675}
     .pers-jer,.pers-cihad,.pers-gabos,.pers-default{background:#eef1f4;color:#5b6675}
     .ib-yes{background:#eef1f4;color:#5b6675;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:600}
-    .ib-no{color:var(--fnt);font-size:12px}
+    .ib-no{color:var(--mut);font-size:12px}
     .check-yes{color:var(--gn);font-weight:700}
-    .check-no{color:var(--fnt)}
+    .check-no{color:var(--mut)}
 
     /* Aanvinkbare ALV-flag pills */
     .flag-toggle{display:inline-flex;align-items:center;gap:5px;padding:4px 11px;border-radius:20px;font-size:12px;font-weight:700;border:1px solid transparent;cursor:pointer;font-family:inherit;transition:transform var(--tr),box-shadow var(--tr),background var(--tr),color var(--tr);user-select:none;line-height:1}
@@ -270,7 +270,7 @@
     .toast-body{flex:1;min-width:0}
     .toast-title{font-size:13px;font-weight:600;line-height:1.3}
     .toast-msg{font-size:12px;color:var(--mut);margin-top:3px;line-height:1.4}
-    .toast-close{background:none;border:none;font-size:17px;color:var(--fnt);cursor:pointer;padding:0;line-height:1;flex-shrink:0;transition:color var(--tr)}
+    .toast-close{background:none;border:none;font-size:17px;color:var(--mut);cursor:pointer;padding:0;line-height:1;flex-shrink:0;transition:color var(--tr)}
     .toast-close:hover{color:var(--txt)}
     .toast-bar{height:3px;background:var(--toast-clr,var(--ac));border-radius:0 0 2px 2px;position:absolute;bottom:0;left:0;animation:toast-bar linear forwards}
     /* ── "Nieuwe versie"-balk ── */
@@ -429,6 +429,9 @@
     .tog.on{background:var(--modal-sec,var(--ac))}
     .tog::after{content:'';width:16px;height:16px;background:#fff;border-radius:50%;position:absolute;top:2px;left:2px;transition:left var(--tr);box-shadow:0 1px 2px rgba(0,0,0,.2)}
     .tog.on::after{left:18px}
+    /* Duidelijke toetsenbord-focus op de pill-toggle: een ring met offset valt beter op dan de
+       2px-outline die rond de kleine 36×20px-pill (ook binnen modals) makkelijk wegvalt. */
+    .tog:focus-visible{outline:none;box-shadow:0 0 0 2px var(--sur),0 0 0 4px var(--ac)}
     .auth-box{background:var(--am-l);border:1px solid var(--am-b);border-radius:var(--rs);padding:11px 13px;font-size:12.5px;color:var(--am);margin-bottom:13px;display:none}
     .auth-box.show{display:block}
     .auth-box a{color:var(--am);font-weight:700;text-decoration:underline}
@@ -459,7 +462,7 @@
     .hist-entry:last-child{border-bottom:none}
     .hist-ts{color:var(--mut);white-space:nowrap;flex-shrink:0;min-width:110px}
     .hist-detail{flex:1}
-    .hist-change{color:var(--fnt);font-size:11px;margin-top:2px}
+    .hist-change{color:var(--mut);font-size:11px;margin-top:2px}
     .logboek-box{margin-top:18px;background:linear-gradient(180deg,var(--ac-l),color-mix(in srgb,var(--ac-l) 25%,transparent));border:1px solid var(--ac-b);border-radius:var(--r);padding:14px 15px}
     .logboek-hdr{display:flex;align-items:center;gap:9px;margin-bottom:4px}
     .logboek-hdr svg{width:21px;height:21px;color:var(--ac);flex-shrink:0}
@@ -505,7 +508,7 @@
     .log-mini-dot{flex:none;width:6px;height:6px;border-radius:50%}
     .log-mini-txt{flex:1;min-width:0}
     .log-mini-txt b{color:var(--txt);font-weight:600}
-    .log-mini-meta{color:var(--fnt)}
+    .log-mini-meta{color:var(--mut)}
     .log-time{font-size:11.5px;color:var(--mut);white-space:nowrap;flex-shrink:0;padding-top:3px}
     .log-empty{text-align:center;color:var(--mut);padding:40px;font-style:italic}
 

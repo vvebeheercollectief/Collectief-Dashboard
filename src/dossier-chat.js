@@ -93,6 +93,10 @@ function _chatMessages(historie, max=10){
 const CHAT_SUGGESTIES = ['Wat staat er nog open?', 'Wanneer was de laatste ALV?', 'Welke offertes lopen er?'];
 
 // ── UI ──
+// A11y-keuze: het chat-paneel is een PERSISTENT, zwevend hulpvenster dat de pagina NIET afdekt.
+// Daarom bewust niet-modaal (#chat-bg heeft role=dialog + aria-modal=false in index.html) en
+// GEEN Tab-focus-trap: de gebruiker mag bewust naar de achtergrond tabben terwijl de chat openblijft.
+// (modal-a11y.js trapt alleen .modal-bg-vensters; de chat valt daar terecht buiten.)
 function openChat(){
   if(!state._chatHistorie) state._chatHistorie = [];
   if(!state._chatVve) state._chatVve = state.vveCode || '';

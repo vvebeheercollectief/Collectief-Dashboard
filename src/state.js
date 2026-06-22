@@ -11,7 +11,6 @@
 export const D = {ntd:{},af:{},alvo:[],alfa:[],ontw:[],logboek:[],herhaal:[],kenmerken:[],ntdSecInfo:{},afSecInfo:{}};
 export const pgs = {ntd:1,af:1,alvo:1,alfa:1,ontw:1,logboek:1};
 export const _shownToasts = new Set();
-export const _undoStack = [];
 
 // ── Groep 2: hertoegekende waarden (state.X) ────────────────────────────
 export const state = {

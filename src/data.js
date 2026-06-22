@@ -12,6 +12,8 @@ import { parseOntw, parseLogboek } from "./render-overig.js";
 import { parseKenmerken } from "./kenmerken.js";
 // (kringverwijzing data ⇄ kenmerken: aanroepen gebeuren op runtime — live bindings, veilig)
 import { showToast } from "./notifications.js";
+// (kringverwijzing data ⇄ main: renderAll wordt pas op runtime aangeroepen — live binding, veilig.
+//  Bewust niet ontvlochten: een aparte render-orchestrator zou puur cosmetisch zijn, geen bug.)
 import { renderAll } from "./main.js";
 
 //  API
@@ -215,5 +217,5 @@ function parseAlfa(rows){
 // ══════════════════════════════════════
 
 export {
-  backgroundWrite, setSyncing, setSynced, setSyncErr, dot, loadAll, parseSections, parseAlvo, parseAlfa,
+  backgroundWrite, setSyncing, setSynced, setSyncErr, dot, loadAll, parseSections, parseAlvo, parseAlfa, parseHerhaal,
 };

@@ -13,7 +13,7 @@ import { parseKenmerken, vveKenmerken } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk.js";
 import { _isTransient, _rowMismatch, _a1ColA } from "./api.js";
-import { parseSections } from "./data.js";
+import { parseSections, parseAlvo, parseAlfa, parseHerhaal } from "./data.js";
 import { setv, serializeNtdUndo } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages } from "./dossier-chat.js";
@@ -830,6 +830,51 @@ import { shouldPromptReload } from "./sw-update.js";
     }};
     const r=zoekAlles('zoekterm',data,{vves:3,taken:2,afgerond:3,logboek:3});
     truthy('palette: meest-urgente LOD+offerte komen bovenaan ondanks cap', r.taken.some(t=>t.code==='O1') && r.taken.some(t=>t.code==='L1'));
+  })();
+
+  // ══════════════════════════════════════
+  //  DATALAAG-PARSERS (#11 — voorheen ongetest)
+  // ══════════════════════════════════════
+  // parseAlvo: slice(2) skipt 2 koprijen; stat-/lange-coderijen vallen weg; status afgeleid.
+  (()=>{
+    const rows=[
+      ['kop A','kop B'],['sub A','sub B'],
+      ['CH1','VvE 1','TRUE','FALSE','TRUE','opm'],   // uitn=TRUE,notu=FALSE → Gepland
+      ['CH2','VvE 2','FALSE','TRUE','FALSE',''],      // notu=TRUE → Afgerond
+      ['CH3','VvE 3','FALSE','FALSE','FALSE',''],     // → Open
+      ['Totaal: 12 VvEs','','','',''],                // statregel (prefix Totaal) → weg
+      ['X'.repeat(25),'lang','','',''],               // code > MAX_VVE_CODE_LEN → weg
+    ];
+    const av=parseAlvo(rows);
+    eq('parseAlvo: alleen 3 geldige VvE-rijen (stat/lang weg)', av.length, 3);
+    eq('parseAlvo: uitn→Gepland', av[0].status, 'Gepland');
+    eq('parseAlvo: notu→Afgerond', av[1].status, 'Afgerond');
+    eq('parseAlvo: geen vlag→Open', av[2].status, 'Open');
+    eq('parseAlvo: begroting-vlag gelezen', av[0].begroting, true);
+    eq('parseAlvo: _row offset (eerste = rij 3)', av[0]._row, 3);
+  })();
+  // parseAlfa: slice(1); rij zonder code valt weg.
+  (()=>{
+    const rows=[['Code','Naam','Datum'],['CH1','VvE 1','2026-05-01'],['','geen code','x'],['CH2','VvE 2','']];
+    const af=parseAlfa(rows);
+    eq('parseAlfa: lege code gefilterd → 2', af.length, 2);
+    eq('parseAlfa: velden gemapt', [af[0].code,af[0].naam,af[0].datum].join('|'), 'CH1|VvE 1|2026-05-01');
+  })();
+  // parseHerhaal: slice(1); lege id valt weg; dagenVooraf 0 blijft 0 (#21 end-to-end via parse).
+  (()=>{
+    const rows=[
+      ['ID','Oms','Sectie','Code','Naam','Beh','Type','Interval','Vooraf','Deadline','Status','Laatst'],
+      ['HR-1','Onderhoud','oppakken','CH1','VvE1','Jer','maand','','0','1 jul 2026','ACTIEF',''],
+      ['HR-2','Check','lod','CH2','VvE2','Cihad','week','','7','','ACTIEF',''],
+      ['','geen id','',''],
+    ];
+    const hh=parseHerhaal(rows);
+    eq('parseHerhaal: lege id gefilterd → 2', hh.length, 2);
+    eq('parseHerhaal: dagenVooraf 0 blijft 0 (geen stille 14)', hh[0].dagenVooraf, 0);
+    eq('parseHerhaal: dagenVooraf 7 gelezen', hh[1].dagenVooraf, 7);
+    eq('parseHerhaal: sectie geüppercased', hh[0].sectie, 'OPPAKKEN');
+    eq('parseHerhaal: type lowercased', hh[0].type, 'maand');
+    eq('parseHerhaal: _row offset (eerste = rij 2)', hh[0]._row, 2);
   })();
 
   const totOk = ok + _tOk, totFail = fail + _tFail;

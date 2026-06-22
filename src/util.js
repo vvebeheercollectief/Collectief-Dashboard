@@ -175,9 +175,6 @@ function persBadges(v){
   }).join('');
 }
 
-function ibBadge(v){
-  return(v==='TRUE'||v===true)?'<span class="ib-yes">⟳ Loopt</span>':'<span class="ib-no">–</span>';
-}
 
 function adjOff(id,delta){
   const el=document.getElementById(id);
@@ -382,7 +379,7 @@ function coerceDagenVooraf(v, def=14){
 export {
   displayName, filt, PRIO_REGELS, STIL_DREMPEL_DAGEN, STIL_ESCALATIE_REGELS,
   opvolgStatus, volgendeDeadline, HERHAAL_MAANDEN, _vandaagAmsterdam, isoWeek,
-  _verschilInKalenderdagen, berekenPrioriteit, prioBadge, persBadges, ibBadge,
+  _verschilInKalenderdagen, berekenPrioriteit, prioBadge, persBadges,
   adjOff, offProg, _MAANDEN, _parseAnyDate, parseDt, toISODate, toDutchDate,
   emptyRow, esc, subBadge, coerceDagenVooraf,
   parseOff, offerteFase, offerteBalBij, _verschilInWerkdagen,

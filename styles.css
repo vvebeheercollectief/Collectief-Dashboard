@@ -136,7 +136,7 @@
     .stat-hint{font-size:10px;font-weight:700;color:var(--ac-500);white-space:nowrap}
     /* Huidige weeknummer: rekt uit en vult de lege ruimte rechts; "Week 26" naast elkaar, gecentreerd, eigen accent zodat 't niet als telling leest */
     .stat-week{flex:1 1 auto;display:flex;flex-direction:row;align-items:baseline;justify-content:center;gap:8px;padding:10px 26px;border-left:1px solid var(--bor)}
-    .stat-week-cap{font-size:11px;font-weight:700;color:var(--mut);white-space:nowrap}
+    .stat-week-cap{font-size:26px;font-weight:900;letter-spacing:-.05em;line-height:1;color:var(--txt);white-space:nowrap}
     .stat-week-val{font-size:26px;font-weight:900;letter-spacing:-.05em;line-height:1;color:var(--ac);font-variant-numeric:tabular-nums}
 
     /* Card */

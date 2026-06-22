@@ -20,8 +20,10 @@ export const state = {
   // notificaties
   oneSignalReady: false,
   isSubscribed: false,
-  _lastNotifTs: new Date().toISOString(),
+  _lastNotifTs: null,      // basislijn wordt op de eerste poll op de echte sheet-timestamp gezet (niet op de browserklok)
   _notifPollTimer: null,
+  _notifVisibilityHandler: null, // visibilitychange-listener; logout() koppelt 'm los
+  _resyncTimer: null,      // 8s live-resync-interval (stopbaar bij logout)
   _heartbeatTimer: null,   // token-refresh heartbeat-interval (stopbaar bij logout)
   // actieve secties / tabs
   activeOntw: 'Alles',

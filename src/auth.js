@@ -85,7 +85,9 @@ function logout(reden){
   state.oauthToken=null; state.oauthExpiry=0; state.currentUserEmail=null;
   try{ ['oauthToken','oauthExpiry','currentUserEmail'].forEach(k=>sessionStorage.removeItem(k)); }catch(_){}
   if(state._notifPollTimer){ clearInterval(state._notifPollTimer); state._notifPollTimer=null; }
+  if(state._resyncTimer){ clearInterval(state._resyncTimer); state._resyncTimer=null; }
   if(state._heartbeatTimer){ clearInterval(state._heartbeatTimer); state._heartbeatTimer=null; }
+  if(state._notifVisibilityHandler){ document.removeEventListener('visibilitychange', state._notifVisibilityHandler); state._notifVisibilityHandler=null; }
   try{ if(window.OneSignal && OneSignal.logout) OneSignal.logout(); }catch(_){}
   const gate=document.getElementById('login-gate'); if(gate) gate.style.display='';
   const btn=document.getElementById('login-btn'); if(btn){ btn.textContent='Inloggen met Google'; btn.disabled=false; }

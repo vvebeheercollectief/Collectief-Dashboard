@@ -55,7 +55,7 @@ function renderAlvo(){
         <td>${flagPill(idx,'uitnodiging',r.uitnodiging)}</td>
         <td>${flagPill(idx,'notulen',r.notulen)}</td>
         <td>${flagPill(idx,'begroting',r.begroting)}</td>
-        <td><span class="badge status-${r.status.toLowerCase()}">${statusIco(r.status)} ${r.status}</span></td>
+        <td><span class="badge status-${esc((r.status||'').toLowerCase().replace(/[^a-z0-9]+/g,'-'))}">${statusIco(r.status)} ${esc(r.status)}</span></td>
       </tr>`;
     }).join('')
     :emptyRow(6);

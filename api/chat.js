@@ -2,15 +2,31 @@
 // Anthropic gebruikt API-data niet voor training → AVG-vriendelijk voor dossiergegevens.
 // Controleert de ingelogde Google-gebruiker tegen de allowlist; proxyt dan naar Anthropic.
 import { ALLOWED_EMAILS } from '../allowed-emails.js'; // één bron, gedeeld met src/config.js
+
+// Alleen de eigen frontends mogen cross-origin de proxy aanroepen.
 const ALLOWED_ORIGINS = [
   'https://vvebeheercollectief.github.io',
   'https://collectief-dashboard.vercel.app',
 ];
+// Preview-deploys van DIT project (collectief-dashboard-*.vercel.app). Bewust géén
+// open `*.vercel.app`: anders mag elke door een vreemde gedeployde Vercel-site de proxy aanroepen.
+const PREVIEW_ORIGIN_RE = /^https:\/\/collectief-dashboard[a-z0-9-]*\.vercel\.app$/;
+
+// De Google OAuth-client van DIT dashboard. De access-token MOET voor deze client zijn
+// uitgegeven (audience-check), anders kan een token van een andere/kwaadwillende OAuth-app
+// met hetzelfde e-mailadres de proxy misbruiken (confused-deputy). Env-var wint zodat de
+// id niet hoeft te worden gehardcodeerd, met de bekende waarde als fallback.
+const EXPECTED_AUD = process.env.GOOGLE_CLIENT_ID
+  || '560046984985-1371r4bbt28umi6uslims6mlkucn1278.apps.googleusercontent.com';
+
+// Invoer-grenzen (kostenrem + misbruikrem): te grote payloads worden geweigerd vóór Anthropic.
+const MAX_SYSTEM_CHARS = 20000;
+const MAX_MESSAGES = 16;
+const MAX_MSG_CHARS = 8000;
 
 function setCors(req, res){
   const origin = req.headers.origin || '';
-  let ok = ALLOWED_ORIGINS.includes(origin);
-  try { ok = ok || /\.vercel\.app$/.test(new URL(origin).hostname); } catch (e) {}
+  const ok = ALLOWED_ORIGINS.includes(origin) || PREVIEW_ORIGIN_RE.test(origin);
   if (ok) res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -26,18 +42,29 @@ export default async function handler(req, res){
     const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
     if (!token) { res.status(401).json({ error: 'geen token' }); return; }
 
-    const ui = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!ui.ok) { res.status(401).json({ error: 'token ongeldig' }); return; }
-    const info = await ui.json();
-    const email = (info.email || '').toLowerCase();
+    // tokeninfo levert in één call zowel de audience (aud) als het e-mailadres en weigert
+    // (HTTP 400) een verlopen/ongeldig token. Userinfo alléén zou élke geldige Google-token
+    // accepteren ongeacht welke OAuth-app hem uitgaf → audience-check is hier de echte slot.
+    const ti = await fetch('https://oauth2.googleapis.com/tokeninfo?access_token=' + encodeURIComponent(token));
+    if (!ti.ok) { res.status(401).json({ error: 'token ongeldig' }); return; }
+    const info = await ti.json().catch(() => ({}));
+    if (info.aud !== EXPECTED_AUD) { res.status(401).json({ error: 'verkeerde audience' }); return; }
+    const email = (info.email || '').trim().toLowerCase();
     if (!email || !ALLOWED_EMAILS.includes(email)) { res.status(403).json({ error: 'geen toegang' }); return; }
 
     const { system, messages } = req.body || {};
-    if (!system || !Array.isArray(messages) || !messages.length) {
+    if (typeof system !== 'string' || !system.length || system.length > MAX_SYSTEM_CHARS) {
       res.status(400).json({ error: 'ongeldige invoer' }); return;
     }
+    if (!Array.isArray(messages) || !messages.length || messages.length > MAX_MESSAGES) {
+      res.status(400).json({ error: 'ongeldige invoer' }); return;
+    }
+    for (const m of messages) {
+      if (!m || (m.role !== 'user' && m.role !== 'assistant') || typeof m.content !== 'string' || m.content.length > MAX_MSG_CHARS) {
+        res.status(400).json({ error: 'ongeldige invoer' }); return;
+      }
+    }
+
     // Vercel-env-var: accepteer zowel de conventie ANTHROPIC_API_KEY als de bij deze klant
     // ingevoerde casing Anthropic_API_KEY (env-namen zijn hoofdlettergevoelig).
     const key = process.env.ANTHROPIC_API_KEY || process.env.Anthropic_API_KEY;

@@ -159,18 +159,25 @@ async function deleteTaskRow(r){
   if(pos>-1) arr.splice(pos,1);
   _shiftNtdRows(oudeRow,-1);
   showUndoToast('🗑️ Taak verwijderd',`${r.code} — ${omschrijving}`,()=>undoDelete(undoData));
+  // Idempotentie-vlag: een deleteDimension is positie-gebaseerd en NIET idempotent. Zonder
+  // deze vlag zou een _withRetry-herkansing (na een transient 429/5xx) de rij eronder — die
+  // door de eerste delete naar boven schoof — kunnen verwijderen. (patroon: offerte-acties.js)
+  let verwijderd=false;
   backgroundWrite(
     async ()=>{
       const ids=await getSheetIds();
       const sheetId=ids['Nog Te Doen'];
       if(sheetId==null) throw new Error('Sheet "Nog Te Doen" niet gevonden');
-      await assertRowMatch(oudeRow, r.code); // bescherming: rij nog van deze VvE vóór verwijderen
-      const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
-        method:'POST',
-        headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
-        body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:oudeRow-1,endIndex:oudeRow}}}]})
-      });
-      if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Verwijderfout');err.status=resp.status;throw err}
+      if(!verwijderd){
+        await assertRowMatch(oudeRow, r.code); // bescherming: rij nog van deze VvE vóór verwijderen
+        const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+          method:'POST',
+          headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
+          body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:oudeRow-1,endIndex:oudeRow}}}]})
+        });
+        if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Verwijderfout');err.status=resp.status;throw err}
+        verwijderd=true;
+      }
       logEvent(r.code, sec, 'Verwijderd', '', r.actiepunt||r.periode||'', '');
     },
     ()=>{ if(arr.indexOf(r)===-1){ _shiftNtdRows(oudeRow,+1); arr.splice(Math.min(pos<0?arr.length:pos,arr.length),0,r); } },
@@ -258,13 +265,20 @@ async function doCompleteTask(){
     closeCompleteModal();
     showUndoToast('✅ Taak afgerond',`${r.code} — ${r.actiepunt||r.naam||''}`,()=>undoComplete(undoData));
     // 2) op de achtergrond wegschrijven; bij fout de taak terugzetten
+    // Idempotentie-vlag: de batch (insert+update+delete) is positie-gebaseerd en NIET
+    // idempotent — een retry na een transient fout zou dubbel kunnen afronden / de verkeerde
+    // rij verwijderen. De vlag zorgt dat de batch maar één keer echt uitgevoerd wordt.
+    let afgerond=false;
     backgroundWrite(
       async ()=>{
-        await assertRowMatch(r._row, r.code); // bescherming: rij nog van deze VvE vóór afronden
-        const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
-          method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
-          body:JSON.stringify(batchBody)});
-        if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Fout bij afhandelen taak');err.status=resp.status;throw err}
+        if(!afgerond){
+          await assertRowMatch(r._row, r.code); // bescherming: rij nog van deze VvE vóór afronden
+          const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+            method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
+            body:JSON.stringify(batchBody)});
+          if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Fout bij afhandelen taak');err.status=resp.status;throw err}
+          afgerond=true;
+        }
         logEvent(r.code, sec, 'Afgerond', 'status', 'Nog Te Doen', 'Afgerond op ' + today + (comment ? ' — ' + comment : ''));
       },
       ()=>{ const a=(D.ntd[sec]=D.ntd[sec]||[]); if(a.indexOf(r)===-1){ _shiftNtdRows(r._row,+1); a.splice(Math.min(pos<0?a.length:pos,a.length),0,r); } },

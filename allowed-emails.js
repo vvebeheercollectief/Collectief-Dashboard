@@ -6,4 +6,4 @@ export const ALLOWED_EMAILS = [
   'djiowchico@gmail.com',
   'gabrielateterycz1616@gmail.com',
   'giocan175@gmail.com',
-];
+].map(e => e.trim().toLowerCase()); // defensief normaliseren: één bron leest zo overal hetzelfde

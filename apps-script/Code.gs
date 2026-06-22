@@ -13,6 +13,13 @@ function verplaatsAfgerond(e) {
   var lastCol = 9;
   var rowData = sheet.getRange(row, 1, 1, lastCol).getValues()[0];
 
+  // Herverifieer binnen de lock dat de afvink-checkbox (kolom 9) op rij `row` NOG aan staat.
+  // `row` komt uit het onEdit-event (vastgelegd vóór de lock); een frontend-write via de
+  // Sheets-API loopt buiten de Apps Script-lock en kan in dat venster rijen verschoven hebben,
+  // waardoor `row` nu een ándere taak aanwijst. Staat kolom 9 daar niet (meer) op TRUE, dan is
+  // dit niet de zojuist-afgevinkte rij → niet kopiëren/verwijderen (resync corrigeert).
+  if (rowData[lastCol - 1] !== true) return;
+
   if (rowData[0] === "" && rowData[1] === "") return;
 
   // Bepaal in welke sectie de rij zit
@@ -132,6 +139,11 @@ function verplaatsALV(e) {
  });
 }
 function sorteerOfferteTrajecten(e) {
+  // Serialiseer t.o.v. de andere mutatie-triggers (verplaatsAfgerond/-ALV, opvolg-motor,
+  // queue-drain) via dezelfde document-lock. Voorheen liep deze sort als enige zónder lock.
+  cd_lockedRun('sorteerOfferteTrajecten', function() { _sorteerOfferteTrajectenImpl(e); });
+}
+function _sorteerOfferteTrajectenImpl(e) {
   var ss = e ? e.source : SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName("Nog Te Doen");
 
@@ -139,6 +151,7 @@ function sorteerOfferteTrajecten(e) {
   if (e && e.source.getActiveSheet().getName() !== "Nog Te Doen") return;
 
   var lastRow = sheet.getLastRow();
+  if (lastRow < 1) return;                 // lege sheet: getRange(1,1,0,1) zou crashen
   var allValues = sheet.getRange(1, 1, lastRow, 1).getValues();
 
   var oppakkenHeader = -1;

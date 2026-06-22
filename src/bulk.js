@@ -131,19 +131,26 @@ function bulkAfronden(rows){
     const afSheetId=ids['Afgerond'], ntdSheetId=ids['Nog Te Doen'];
     if(afSheetId==null||ntdSheetId==null) throw new Error('Sheet niet gevonden');
     await assertRowsMatch(items.map(it=>({row:it.origRow, code:it.code}))); // bescherming: alle rijen nog van hun VvE vóór bulk-afronden
-    for(const it of items){            // hoog→laag: deletes verschuiven elkaars rijen niet
+    // Atomair: ALLE items in één batchUpdate (Sheets past die alles-of-niets toe). Voorheen
+    // liep dit per item in aparte fetches; faalde item 3, dan stonden 1 en 2 al server-side
+    // afgerond terwijl de lokale rollback ze terugzette → spook-dubbels na de resync.
+    // Verwerkvolgorde hoog→laag _row (deletes verschuiven elkaar niet); Afgerond-inserts op
+    // dezelfde index stapelen correct binnen één batch.
+    const requests=[];
+    for(const it of items){
       const afAfterRow=getAfInsertRow(it.sec);
-      const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
-        method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
-        body:JSON.stringify({requests:[
-          {insertDimension:{range:{sheetId:afSheetId,dimension:'ROWS',startIndex:afAfterRow,endIndex:afAfterRow+1},inheritFromBefore:true}},
-          {updateCells:{range:{sheetId:afSheetId,startRowIndex:afAfterRow,endRowIndex:afAfterRow+1,startColumnIndex:0,endColumnIndex:it.afValues.length},
-            rows:[{values:it.afValues.map(v=>({userEnteredValue:{stringValue:String(v)}}))}],fields:'userEnteredValue'}},
-          {deleteDimension:{range:{sheetId:ntdSheetId,dimension:'ROWS',startIndex:it.origRow-1,endIndex:it.origRow}}}
-        ]})});
-      if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Bulk-afronden fout');err.status=resp.status;throw err}
-      logEvent(it.code,it.sec,'Afgerond','status','Nog Te Doen','Afgerond op '+vandaag+' (bulk)');
+      requests.push(
+        {insertDimension:{range:{sheetId:afSheetId,dimension:'ROWS',startIndex:afAfterRow,endIndex:afAfterRow+1},inheritFromBefore:true}},
+        {updateCells:{range:{sheetId:afSheetId,startRowIndex:afAfterRow,endRowIndex:afAfterRow+1,startColumnIndex:0,endColumnIndex:it.afValues.length},
+          rows:[{values:it.afValues.map(v=>({userEnteredValue:{stringValue:String(v)}}))}],fields:'userEnteredValue'}},
+        {deleteDimension:{range:{sheetId:ntdSheetId,dimension:'ROWS',startIndex:it.origRow-1,endIndex:it.origRow}}}
+      );
     }
+    const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+      method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
+      body:JSON.stringify({requests})});
+    if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Bulk-afronden fout');err.status=resp.status;throw err}
+    items.forEach(it=>logEvent(it.code,it.sec,'Afgerond','status','Nog Te Doen','Afgerond op '+vandaag+' (bulk)'));
   },()=>{ // rollback: laag→hoog terugzetten
     [...items].reverse().forEach(it=>{
       const a=(D.ntd[it.sec]=D.ntd[it.sec]||[]);
@@ -259,18 +266,25 @@ function bulkVeld(rows,soort,waarde){
     if(oppDl && it.sec==='OPPAKKEN') it.r.prioriteit=berekenPrioriteit(waarde,'OPPAKKEN').prioriteit;
   });
   _eindBulk();
-  const schrijf=(welkeWaarde)=>async()=>{
-    await assertRowsMatch(items.map(it=>({row:it.r._row, code:it.code}))); // bescherming: alle rijen nog van hun VvE vóór bulk-celschrijf
-    for(const it of items){
-      const kol=conf.kolom(it.r);
-      const val=welkeWaarde==='oud'?it.oud:waarde;
-      await writeRange(`'Nog Te Doen'!${kol}${it.r._row}:${kol}${it.r._row}`,[val]);
-      if(oppDl && it.sec==='OPPAKKEN'){
-        const prio=welkeWaarde==='oud'?it.oudPrio:berekenPrioriteit(waarde,'OPPAKKEN').prioriteit;
-        await writeRange(`'Nog Te Doen'!F${it.r._row}:F${it.r._row}`,[prio]);
+  // Per-item 'gelogd'-vlag overleeft _withRetry-herkansingen (closure). De cel-writes zijn
+  // idempotent (vaste waarde overschrijven), maar logEvent is een append: zonder vlag zou een
+  // retry na een transient fout dubbele logboekregels maken voor de reeds-geschreven items.
+  const schrijf=(welkeWaarde)=>{
+    const gelogd=new Array(items.length).fill(false);
+    return async()=>{
+      await assertRowsMatch(items.map(it=>({row:it.r._row, code:it.code}))); // bescherming: alle rijen nog van hun VvE vóór bulk-celschrijf
+      for(let i=0;i<items.length;i++){
+        const it=items[i];
+        const kol=conf.kolom(it.r);
+        const val=welkeWaarde==='oud'?it.oud:waarde;
+        await writeRange(`'Nog Te Doen'!${kol}${it.r._row}:${kol}${it.r._row}`,[val]);
+        if(oppDl && it.sec==='OPPAKKEN'){
+          const prio=welkeWaarde==='oud'?it.oudPrio:berekenPrioriteit(waarde,'OPPAKKEN').prioriteit;
+          await writeRange(`'Nog Te Doen'!F${it.r._row}:F${it.r._row}`,[prio]);
+        }
+        if(!gelogd[i]){ logEvent(it.code,it.sec,conf.log,conf.veld,welkeWaarde==='oud'?waarde:it.oud,val); gelogd[i]=true; }
       }
-      logEvent(it.code,it.sec,conf.log,conf.veld,welkeWaarde==='oud'?waarde:it.oud,val);
-    }
+    };
   };
   showUndoToast(conf.titel,items.map(i=>i.code).join(', '),async()=>{
     await state._writeChain;

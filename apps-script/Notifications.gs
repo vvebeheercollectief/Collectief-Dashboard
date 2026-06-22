@@ -173,7 +173,9 @@ function cd_handleAlvoEdit(sheet, row, e) {
   if (!code) return;
 
   const col = e.range.getColumn();
-  const newVal = (e.value || '').toString().toUpperCase();
+  // e.value bestaat alléén bij een single-cell edit. Bij plakken/fill is e.value undefined;
+  // val dan terug op de werkelijke celwaarde uit rowData zodat de ALV-melding tóch afgaat.
+  const newVal = (e.value !== undefined ? e.value : rowData[col - 1]).toString().toUpperCase();
   const oldVal = (e.oldValue || '').toString().toUpperCase();
   if (newVal === oldVal) return;
 
@@ -444,12 +446,17 @@ function cd_processNotifEvent(data) {
   const categorie = (data.categorie || '').toString();
   const actiepunt = (data.actiepunt || '').toString();
   const deadline  = (data.deadline || '').toString();
+  // Stabiele dedup-sleutel: de wachtrij-wachter zet data._uid op de rij-timestamp. Daardoor
+  // krijgt dezélfde wachtrij-rij bij herverwerking (onChange + 5-min sweep) hetzelfde
+  // web_push_topic en collapset de dubbele push; verschillende rijen blijven los. Voorheen
+  // maakte Date.now() élke verwerking uniek → dedup deed niets.
+  const uid = (data._uid || Date.now());
 
   if (ev === 'newtask') {
     cd_notifyByTag('n_newtask', '1', {
       title: '📋 Nieuwe taak — ' + sec.toLowerCase(),
       body: code + (naam ? ' · ' + naam : '') + (beh ? ' → ' + beh : ''),
-      url: APP_URL, dedupKey: 'new-' + code + '-' + Date.now()
+      url: APP_URL, dedupKey: 'new-' + code + '-' + uid
     });
     if (beh) {
       cd_splitBehandelaar(beh).forEach(name => {
@@ -457,7 +464,7 @@ function cd_processNotifEvent(data) {
           cd_notifyByExternalId(name, 'n_assigned', '1', {
             title: '➕ Toegewezen aan jou',
             body: code + (naam ? ' · ' + naam : ''),
-            url: APP_URL, dedupKey: 'assign-' + code + '-' + name + '-' + Date.now()
+            url: APP_URL, dedupKey: 'assign-' + code + '-' + name + '-' + uid
           });
         }
       });
@@ -469,7 +476,7 @@ function cd_processNotifEvent(data) {
           cd_notifyByExternalId(name, 'n_assigned', '1', {
             title: '➕ Toegewezen aan jou',
             body: code + (naam ? ' · ' + naam : ''),
-            url: APP_URL, dedupKey: 'reassign-' + code + '-' + name + '-' + Date.now()
+            url: APP_URL, dedupKey: 'reassign-' + code + '-' + name + '-' + uid
           });
         }
       });
@@ -480,7 +487,7 @@ function cd_processNotifEvent(data) {
     cd_notifyByTag('n_alv', '1', {
       title: data.title || '🏢 ALV-status verandert',
       body: code + (naam ? ' · ' + naam : ''),
-      url: APP_URL, dedupKey: 'alv-' + code + '-' + Date.now()
+      url: APP_URL, dedupKey: 'alv-' + code + '-' + uid
     });
   } else if (ev === 'logboek') {
     cd_schrijfLogboek(code, sec, data.actie, data.veld, data.oudeWaarde, data.nieuweWaarde, actor);
@@ -495,7 +502,7 @@ function cd_processNotifEvent(data) {
     cd_notifyByTag('n_newtask', '1', {
       title: '📋 Nieuwe taak — ' + (categorie || '').toLowerCase(),
       body: code + (naam ? ' · ' + naam : '') + (beh ? ' → ' + beh : ''),
-      url: APP_URL, dedupKey: 'mailnew-' + code + '-' + Date.now()
+      url: APP_URL, dedupKey: 'mailnew-' + code + '-' + uid
     });
     if (beh) {
       cd_splitBehandelaar(beh).forEach(name => {
@@ -503,7 +510,7 @@ function cd_processNotifEvent(data) {
           cd_notifyByExternalId(name, 'n_assigned', '1', {
             title: '➕ Toegewezen aan jou',
             body: code + (naam ? ' · ' + naam : ''),
-            url: APP_URL, dedupKey: 'mailassign-' + code + '-' + name + '-' + Date.now()
+            url: APP_URL, dedupKey: 'mailassign-' + code + '-' + name + '-' + uid
           });
         }
       });
@@ -560,6 +567,12 @@ function cd_onNotifQueueChange(e) { cd_drainNotifQueue(); }
 // Vangnet: pakt rijen op die een gemiste onChange anders zou laten liggen.
 function cd_sweepNotifQueue() { cd_drainNotifQueue(); }
 
+// Alleen push-only events mogen via de (semi-vertrouwde, OAuth-append) Notif-wachtrij. Privileged
+// schrijf-events — create_task (maakt een echte taak aan) en logboek (schrijft logregels) — moeten
+// uitsluitend via doPost mét geldig CD_WEBHOOK_SECRET. Voorheen verwerkte de wachtrij élk event
+// blind: wie naar de Sheet kon schrijven kon zo de privileged backend aansturen (confused deputy).
+const CD_QUEUE_ALLOWED = { newtask: 1, assigned: 1, alv_update: 1, test: 1, completed: 1, ping: 1 };
+
 function cd_drainNotifQueue() {
   cd_lockedRun('cd_drainNotifQueue', function() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -574,6 +587,11 @@ function cd_drainNotifQueue() {
       let data;
       try { data = JSON.parse(payload); }
       catch (err) { sheet.getRange(i + 2, 4).setValue('FOUT: ' + err); continue; }
+      if (!data || !CD_QUEUE_ALLOWED[data.event]) {
+        sheet.getRange(i + 2, 4).setValue('GEWEIGERD: ' + (data && data.event)); // niet-toegestaan via wachtrij
+        continue;
+      }
+      data._uid = rows[i][0]; // rij-timestamp → stabiele dedup-sleutel (zie cd_processNotifEvent)
       try {
         cd_processNotifEvent(data);
         sheet.getRange(i + 2, 4).setValue(new Date().toISOString());
@@ -592,6 +610,13 @@ function cd_drainNotifQueue() {
 //  D=deadline E=behandelaar F=prioriteit. Data start op kop+2.
 // ════════════════════════════════════════════════════════════
 const CD_NTD_SECTIES = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD'];
+
+// Formule-injectie-rem: waarden uit een onvertrouwde bron (mail-intake) die met = + - @ (of een
+// stuur-teken) beginnen, zou Sheets als formule uitvoeren. Een apostrof-prefix forceert platte tekst.
+function cd_safeCell(s) {
+  s = (s == null ? '' : s).toString();
+  return /^[=+\-@\t\r]/.test(s) ? "'" + s : s;
+}
 
 function cd_createTaskRow(categorie, code, naam, actiepunt, behandelaar, deadline, herhaalId) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -624,10 +649,10 @@ function cd_createTaskRow(categorie, code, naam, actiepunt, behandelaar, deadlin
   //    Deadline verschilt per sectie: OPPAKKEN→D(4), overige→F(6) — zie
   //    DEADLINE_COL in cd_checkDeadlines.
   sheet.insertRowBefore(insertRow);
-  sheet.getRange(insertRow, 1, 1, 3).setValues([[code || '', naam || '', actiepunt || '']]);
-  sheet.getRange(insertRow, 5).setValue(behandelaar || ''); // E = behandelaar
+  sheet.getRange(insertRow, 1, 1, 3).setValues([[cd_safeCell(code), cd_safeCell(naam), cd_safeCell(actiepunt)]]);
+  sheet.getRange(insertRow, 5).setValue(cd_safeCell(behandelaar)); // E = behandelaar
   const deadlineCol = (sectie === 'OPPAKKEN') ? 4 : 6;      // D voor Oppakken, F voor rest
-  if (deadline) sheet.getRange(insertRow, deadlineCol).setValue(deadline);
+  if (deadline) sheet.getRange(insertRow, deadlineCol).setValue(cd_safeCell(deadline));
   if (herhaalId) sheet.getRange(insertRow, 13).setValue(herhaalId);  // M = Herhaal-ID (Fase 4)
   return insertRow;
 }

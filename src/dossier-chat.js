@@ -46,7 +46,11 @@ function dossierContextTekst(code, data, vandaag){
       L.push(`- ${fmtLogTs(r.timestamp)} (${wie}) ${wat}`);
     });
   }
-  return L.join('\n');
+  // Prompt-injectie-hardening: de dossier-context is onvertrouwde data en wordt straks
+  // tussen """ … """ in de system-prompt geplakt. Een notitie die zélf """ bevat zou dat
+  // blok kunnen sluiten en daarna instructies aan het model kunnen geven. Door elke reeks
+  // van 3+ dubbele aanhalingstekens te verkorten kan niets de afbakening doorbreken.
+  return L.join('\n').replace(/"{3,}/g, '"');
 }
 
 // Pure helper (testbaar): systeem-instructie met harde regels + context.

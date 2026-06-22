@@ -30,6 +30,15 @@ import { renderVandaag } from './render-vandaag.js';
 import { initPalette } from './palette.js';
 import { initSwUpdate } from './sw-update.js';
 
+// ── Clickjacking-bescherming (frame-buster) ────────────────────────────
+// De echte productie draait op GitHub Pages; daar kunnen geen X-Frame-Options/
+// frame-ancestors-headers gezet worden. Daarom hier in JS: als het dashboard in
+// een iframe geladen wordt (bv. een phishing-overlay), breken we eruit.
+if (window.top !== window.self) {
+  try { window.top.location = window.self.location; }
+  catch (_) { document.documentElement.style.display = 'none'; }
+}
+
 // ══════════════════════════════════════
 //  BOOT
 // ══════════════════════════════════════
@@ -40,6 +49,15 @@ document.addEventListener('DOMContentLoaded',()=>{
 
   // Zichtbaar versienummer overal gelijk zetten (één bron: APP_VERSION)
   document.querySelectorAll('#app-version, #app-version-login').forEach(el => el.textContent = APP_VERSION);
+
+  // Logo-fallback (CSP-veilig; verving de inline onerror= die de strakke CSP blokkeert):
+  // toont 'VBC' als het logo-bestand niet laadt.
+  const _logo = document.getElementById('logo');
+  if (_logo) {
+    const _logoFb = () => { _logo.style.display = 'none'; const fb = document.getElementById('logo-fb'); if (fb) fb.style.display = 'flex'; };
+    _logo.addEventListener('error', _logoFb);
+    if (_logo.complete && _logo.naturalWidth === 0) _logoFb(); // al gefaald vóór de listener (uit cache)
+  }
 
   // Zichtbare waarschuwingsbalk in de testomgeving
   if (IS_STAGING) {
@@ -210,7 +228,8 @@ document.addEventListener('DOMContentLoaded',()=>{
   startNotifPoll();
 
   // Live updates — auto-refresh elke 8 seconden (smart diff voorkomt onnodige re-renders)
-  setInterval(async ()=>{
+  // Id bewaard zodat logout() de poll kan stoppen (anders blijft hij na uitloggen doordraaien).
+  state._resyncTimer=setInterval(async ()=>{
     if(document.hidden) return;
     // F4: alle modal-achtergronden delen class 'modal-bg' (index.html); één check volstaat.
     // Nieuwe modals hoeven hier niet meer te worden toegevoegd zolang ze .modal-bg gebruiken.

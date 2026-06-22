@@ -208,7 +208,11 @@ async function pollNotifsForToast() {
     const prefs = getNotifPrefs();
     const typeToPrefs = { n_newtask:'newtask', n_assigned:'assigned', n_deadline:'deadline', n_alv:'alv', n_daily:'daily' };
 
-    const newRows = rows.filter(n => n.ts > state._lastNotifTs);
+    // Bij cold-start (_lastNotifTs === null) tonen we GEEN toasts voor al bestaande meldingen;
+    // we zetten alleen de basislijn op de echte (server-)timestamp van de nieuwste rij. Voorheen
+    // werd die basislijn op de BROWSERklok gezet (state.js), wat bij klokscheef oude meldingen
+    // als nieuw toonde of juist nieuwe miste.
+    const newRows = state._lastNotifTs == null ? [] : rows.filter(n => n.ts > state._lastNotifTs);
     for (const n of newRows) {
       // Persoonsgerichte melding alleen tonen aan de juiste persoon. Op een apparaat zonder
       // ingestelde naam (who==='') NIET tonen (geen 'who &&'-kortsluiting → anders lekt het).
@@ -217,22 +221,29 @@ async function pollNotifsForToast() {
       if (prefKey && prefs[prefKey] === false) continue;
       showToast(n.title, n.body, TOAST_COLORS[n.type] || 'var(--ac)');
     }
-    if (newRows.length) state._lastNotifTs = rows[0].ts;
+    if (state._lastNotifTs == null || newRows.length) state._lastNotifTs = rows[0].ts;
   } catch(e) { /* stil falen */ }
+}
+
+// Benoemde handler (i.p.v. anoniem) zodat logout() 'm netjes kan loskoppelen, met een
+// token-guard zodat een uitgelogde tab niet alsnog gaat pollen/laden.
+function onNotifVisibility() {
+  if (document.hidden || !state.oauthToken) return;
+  pollNotifsForToast();
+  // Zelfde guards als de 8s-poll: een loadAll mag geen open modal / bulk-selectie / lopende
+  // animatie / undo onder de gebruiker vandaan trekken (resync gooit _rowCache + D om).
+  if (document.querySelector('.modal-bg.open')) return;
+  if (state.bulkMode || state._animBusy || state._undoInFlight || state.pendingWrites > 0) return;
+  loadAll(true);
 }
 
 function startNotifPoll() {
   pollNotifsForToast();
+  if (state._notifPollTimer) clearInterval(state._notifPollTimer); // idempotent: geen dubbele poll
   state._notifPollTimer = setInterval(pollNotifsForToast, 10000);
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden) return;
-    pollNotifsForToast();
-    // Zelfde guards als de 8s-poll: een loadAll mag geen open modal / bulk-selectie / lopende
-    // animatie / undo onder de gebruiker vandaan trekken (resync gooit _rowCache + D om).
-    if (document.querySelector('.modal-bg.open')) return;
-    if (state.bulkMode || state._animBusy || state._undoInFlight || state.pendingWrites > 0) return;
-    loadAll(true);
-  });
+  document.removeEventListener('visibilitychange', onNotifVisibility);
+  document.addEventListener('visibilitychange', onNotifVisibility);
+  state._notifVisibilityHandler = onNotifVisibility; // logout() koppelt 'm via state los
 }
 
 // ══════════════════════════════════════

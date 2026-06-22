@@ -85,7 +85,43 @@ function isoWeek(datum){
   return 1 + Math.round((don - week1Don) / (7 * 864e5));
 }
 
-// Aantal werkdagen (ma–vr) ná `van` t/m `tot`. Negatief/gelijk → 0.
+// Eerste paasdag (Anonymous Gregorian / Meeus-Jones-Butcher-algoritme).
+function _paasDatum(jaar){
+  const a=jaar%19, b=Math.floor(jaar/100), c=jaar%100, d=Math.floor(b/4), e=b%4,
+        f=Math.floor((b+8)/25), g=Math.floor((b-f+1)/3), h=(19*a+b-d-g+15)%30,
+        i=Math.floor(c/4), k=c%4, l=(32+2*e+2*i-h-k)%7, m=Math.floor((a+11*h+22*l)/451),
+        maand=Math.floor((h+l-7*m+114)/31), dag=((h+l-7*m+114)%31)+1;
+  return new Date(jaar, maand-1, dag);
+}
+// Nederlandse algemeen erkende feestdagen per jaar als Set 'Y-M-D' (M is 0-geteld).
+// Gecached per kalenderjaar. Gebruikt om werkdagen (aannemer-opvolgtermijn) correct te tellen.
+const _feestCache = new Map();
+function _nlFeestdagen(jaar){
+  if (_feestCache.has(jaar)) return _feestCache.get(jaar);
+  const pasen = _paasDatum(jaar);
+  const plus = (dt, n) => { const x = new Date(dt); x.setDate(x.getDate() + n); return x; };
+  const koningsdag = new Date(jaar, 3, 27);
+  if (koningsdag.getDay() === 0) koningsdag.setDate(26); // valt op zondag → 26 april
+  const dagen = [
+    new Date(jaar, 0, 1),   // Nieuwjaarsdag
+    plus(pasen, -2),        // Goede Vrijdag
+    plus(pasen, 1),         // Tweede Paasdag
+    koningsdag,             // Koningsdag
+    new Date(jaar, 4, 5),   // Bevrijdingsdag
+    plus(pasen, 39),        // Hemelvaartsdag
+    plus(pasen, 50),        // Tweede Pinksterdag
+    new Date(jaar, 11, 25), // Eerste Kerstdag
+    new Date(jaar, 11, 26), // Tweede Kerstdag
+  ];
+  const set = new Set(dagen.map(d => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`));
+  _feestCache.set(jaar, set);
+  return set;
+}
+function _isFeestdag(d){
+  return _nlFeestdagen(d.getFullYear()).has(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`);
+}
+
+// Aantal werkdagen (ma–vr, excl. NL-feestdagen) ná `van` t/m `tot`. Negatief/gelijk → 0.
 function _verschilInWerkdagen(van, tot){
   if (!(van instanceof Date) || !(tot instanceof Date) || isNaN(van) || isNaN(tot)) return null;
   let a = new Date(van.getFullYear(), van.getMonth(), van.getDate());
@@ -94,7 +130,7 @@ function _verschilInWerkdagen(van, tot){
   while (a < b){
     a.setDate(a.getDate() + 1);
     const wd = a.getDay();
-    if (wd !== 0 && wd !== 6) n++;
+    if (wd !== 0 && wd !== 6 && !_isFeestdag(a)) n++;
   }
   return n;
 }

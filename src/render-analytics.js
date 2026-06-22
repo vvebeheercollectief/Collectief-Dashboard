@@ -563,11 +563,22 @@ function renderHeroDonut(){
   if(card) card.style.setProperty('--hero-color',view.color);
   document.getElementById('hero-donut-title').textContent=view.title;
   document.getElementById('hero-donut-sub').textContent=view.sub;
-  document.getElementById('hero-donut-tabs').innerHTML=HERO_VIEWS.map(v=>
-    `<button class="hdt-tab ${v.key===state.activeHeroView?'on':''}" data-key="${v.key}" style="${v.key===state.activeHeroView?`--hero-color:${v.color}`:''}">${DASH_ICONS[v.icon]||''}<span>${v.label}</span></button>`
-  ).join('');
-  document.querySelectorAll('#hero-donut-tabs .hdt-tab').forEach(btn=>{
-    btn.onclick=()=>{state.activeHeroView=btn.dataset.key;renderHeroDonut();};
+  const tabsEl=document.getElementById('hero-donut-tabs');
+  // Bouw de tab-knoppen ÉÉN keer (incl. SVG-iconen + onclick); daarna bij een tabwissel alleen de
+  // actieve-staat bijwerken. Voorheen werd per klik de hele tab-DOM herbouwd + iconen herparsed +
+  // handlers herbonden, plus een vroege-return ontbrak zodat her-klikken de 900ms-donut herhaalde.
+  if(tabsEl && !tabsEl.children.length){
+    tabsEl.innerHTML=HERO_VIEWS.map(v=>
+      `<button class="hdt-tab" data-key="${v.key}">${DASH_ICONS[v.icon]||''}<span>${v.label}</span></button>`
+    ).join('');
+    tabsEl.querySelectorAll('.hdt-tab').forEach(btn=>{
+      btn.onclick=()=>{ if(btn.dataset.key===state.activeHeroView) return; state.activeHeroView=btn.dataset.key; renderHeroDonut(); };
+    });
+  }
+  if(tabsEl) tabsEl.querySelectorAll('.hdt-tab').forEach(btn=>{
+    const on=btn.dataset.key===state.activeHeroView;
+    btn.classList.toggle('on',on);
+    btn.style.setProperty('--hero-color', on?view.color:'');
   });
   const cfg=view.build();
   buildDonut('chart-hero-donut',cfg.labels,cfg.data,cfg.colors,tc,cfg.centerVal,cfg.centerLbl);

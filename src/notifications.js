@@ -234,13 +234,15 @@ function onNotifVisibility() {
   // animatie / undo onder de gebruiker vandaan trekken (resync gooit _rowCache + D om).
   if (document.querySelector('.modal-bg.open')) return;
   if (state.bulkMode || state._animBusy || state._undoInFlight || state.pendingWrites > 0) return;
+  if (state._loadInFlight) return; // een lopende/ingeplande poll levert toch verse data → geen extra loadAll erbovenop stapelen bij elke tabwissel
   loadAll(true);
 }
 
 function startNotifPoll() {
   pollNotifsForToast();
   if (state._notifPollTimer) clearInterval(state._notifPollTimer); // idempotent: geen dubbele poll
-  state._notifPollTimer = setInterval(pollNotifsForToast, 10000);
+  // hidden-guard: een verborgen tab hoeft de 'Meldingen'-sheet niet elke 10s te lezen (quota/batterij)
+  state._notifPollTimer = setInterval(() => { if (document.hidden) return; pollNotifsForToast(); }, 10000);
   document.removeEventListener('visibilitychange', onNotifVisibility);
   document.addEventListener('visibilitychange', onNotifVisibility);
   state._notifVisibilityHandler = onNotifVisibility; // logout() koppelt 'm via state los

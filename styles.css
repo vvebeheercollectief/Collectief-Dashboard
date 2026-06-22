@@ -123,7 +123,7 @@
     .stat-sub{font-size:11px;color:var(--mut);margin-top:3px}
 
     /* V3 — horizontale stat-strip (grote getallen, geen tegels) */
-    .stat-strip{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--sur);border:1px solid var(--bor);border-radius:14px;padding:4px 22px;box-shadow:var(--sh);margin-bottom:18px}
+    .stat-strip{display:flex;align-items:center;flex-wrap:wrap;background:var(--sur);border:1px solid var(--bor);border-radius:14px;padding:4px 22px;box-shadow:var(--sh);margin-bottom:18px}
     .stat-item{display:flex;align-items:baseline;gap:10px;padding:14px 26px 14px 0;margin-right:26px;border-right:1px solid var(--bor)}
     .stat-item:last-child{border-right:none;margin-right:0;padding-right:0}
     /* tel-item dat vlak vóór het weekblok staat hoeft geen scheidingslijn (anders zweeft 'ie in de lege ruimte) */
@@ -133,8 +133,8 @@
     .stat-meta{display:flex;flex-direction:column;gap:1px;padding-bottom:2px}
     .stat-cap{font-size:11px;font-weight:700;color:var(--mut);white-space:nowrap}
     .stat-hint{font-size:10px;font-weight:700;color:var(--ac-500);white-space:nowrap}
-    /* Huidige weeknummer: rechts in de balk, eigen accent zodat 't niet als telling leest */
-    .stat-week{display:flex;flex-direction:column;align-items:flex-end;gap:1px;padding:10px 0 10px 26px;border-left:1px solid var(--bor)}
+    /* Huidige weeknummer: rekt uit en vult de lege ruimte rechts; getal gecentreerd, eigen accent zodat 't niet als telling leest */
+    .stat-week{flex:1 1 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:10px 26px;border-left:1px solid var(--bor)}
     .stat-week-cap{font-size:11px;font-weight:700;color:var(--mut);white-space:nowrap}
     .stat-week-val{font-size:26px;font-weight:900;letter-spacing:-.05em;line-height:1;color:var(--ac);font-variant-numeric:tabular-nums}
 

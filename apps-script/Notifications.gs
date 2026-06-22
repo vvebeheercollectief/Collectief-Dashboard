@@ -529,16 +529,20 @@ function cd_processNotifEvent(data) {
 // ════════════════════════════════════════════════════════════
 function doPost(e) {
   try {
-    const data = JSON.parse(e.postData.contents);
     const secret = PropertiesService.getScriptProperties().getProperty('CD_WEBHOOK_SECRET');
-    // FAIL CLOSED: ontbreekt het server-secret of klopt het niet, dan weigeren we.
-    if (!secret || data.secret !== secret) {
+    // Body defensief parsen ná het ophalen van het secret: een ongeldige JSON-body van een
+    // anonieme caller mag geen rauwe parse-fout terugkrijgen en geen werk vóór auth uitlokken.
+    let data = null;
+    try { data = JSON.parse(e && e.postData && e.postData.contents); } catch (_) { data = null; }
+    // FAIL CLOSED: geen/ongeldige body, of ontbrekend/fout server-secret → generiek weigeren.
+    if (!secret || !data || data.secret !== secret) {
       return ContentService.createTextOutput(JSON.stringify({error:'forbidden'})).setMimeType(ContentService.MimeType.JSON);
     }
     const result = cd_processNotifEvent(data);
     return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({error: String(err)})).setMimeType(ContentService.MimeType.JSON);
+    Logger.log('doPost fout: ' + err);                      // echte fout alleen server-side, niet naar de caller lekken
+    return ContentService.createTextOutput(JSON.stringify({error:'serverfout'})).setMimeType(ContentService.MimeType.JSON);
   }
 }
 

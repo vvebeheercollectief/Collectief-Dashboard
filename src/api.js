@@ -83,9 +83,13 @@ async function askChat(system, messages){
 async function callMemoLoket(action, payload){
   if(!state.oauthToken) throw new Error('Niet ingelogd');
   return _withRetry(async ()=>{
+    // BELANGRIJK: 'text/plain' i.p.v. 'application/json'. Een JSON-content-type maakt dit een
+    // CORS-"preflight" (OPTIONS) — en een Apps Script web-app beantwoordt OPTIONS met 405, dus
+    // de browser blokkeert de POST ("Failed to fetch"). text/plain is een "simple request" → geen
+    // preflight; de server leest de body toch rauw uit (e.postData.contents → JSON.parse).
     const r=await fetch(APPS_SCRIPT_URL,{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
       body:JSON.stringify(Object.assign({action,token:state.oauthToken},payload||{})),
     });
     const data=await r.json().catch(()=>({}));

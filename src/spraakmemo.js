@@ -233,9 +233,9 @@ async function openMemoRecorder(item, list, anchorEl){
     const optim={ memoId:'M-pending-'+Date.now().toString(36), list, code:item.code||'',
       sectie:item._sec||'', itemId, snapshot, door:who, fileId:'', duur:durationSec,
       mime:recMime, ts:new Date().toISOString(), _row:0, _pending:true };
-    // De net opgenomen audio meteen lokaal cachen → afspelen werkt DIRECT (geen trage
-    // getmemo) én betrouwbaar (play() valt binnen de klik, geen 'autoplay geblokkeerd').
-    let _localUrl=''; try{ _localUrl=URL.createObjectURL(blob); _memoUrlCache.set(optim.memoId, _localUrl); }catch(_){}
+    // De net opgenomen audio meteen lokaal cachen (base64+mime) → afspelen werkt DIRECT
+    // (geen trage getmemo) en via Web Audio betrouwbaar, ook op Safari.
+    _memoSrcCache.set(optim.memoId, { b64:audioB64, mime:recMime });
     D.memos=D.memos||{};
     (D.memos[list+'|'+itemId]=D.memos[list+'|'+itemId]||[]).unshift(optim);
     _herrenderMemoUI(list, itemId);
@@ -247,12 +247,12 @@ async function openMemoRecorder(item, list, anchorEl){
         Object.assign({}, item, {itemId}), list, item._sec||'', durationSec, recMime, audioB64));
       optim.memoId=res.memoId||optim.memoId; optim.fileId=res.fileId||optim.fileId;
       optim.ts=res.timestamp||optim.ts; optim._pending=false;
-      if(_localUrl && res.memoId) _memoUrlCache.set(res.memoId, _localUrl); // lokale audio ook onder het echte ID
+      if(res.memoId){ _memoSrcCache.set(res.memoId, { b64:audioB64, mime:recMime }); } // ook onder het echte ID
       showToast('Memo opgeslagen', (item.code||'')+' · '+durationSec+'s', 'var(--ac)');
     }catch(e){
       const arr=D.memos[list+'|'+itemId]||[];
       const i=arr.indexOf(optim); if(i>-1) arr.splice(i,1);
-      if(_localUrl){ _memoUrlCache.delete(optim.memoId); try{ URL.revokeObjectURL(_localUrl); }catch(_){} }
+      _memoSrcCache.delete(optim.memoId);
       showToast('Niet verzonden', 'Probeer opnieuw — '+(e.message||''), 'var(--rd)');
     }finally{
       state.pendingWrites--;
@@ -282,15 +282,33 @@ function _herrenderMemoUI(list, itemId){
   });
 }
 
-// ── Afspelen ─────────────────────────────────────────────────────────────
+// ── Afspelen via Web Audio (decodeAudioData) ─────────────────────────────────
+// Safari (vooral op de iPhone) speelt een blob:-URL in een <audio>-element
+// onbetrouwbaar af en weigert vaak MediaRecorder-mp4. Daarom decoderen we de bytes
+// zélf met de Web Audio API (AAC/opus) en spelen we af via de AudioContext — dat is
+// robuust op Safari (desktop + iPhone) én Chrome. Valt terug op <audio> + data-URL.
+const _memoSrcCache=new Map();   // memoId → { b64, mime }  (net opgenomen of opgehaald)
+const _bufCache=new Map();       // memoId → AudioBuffer (1x gedecodeerd)
+let _audioCtx=null, _huidigeBtn=null;
 
-const _memoUrlCache=new Map();
-let _huidigeAudio=null, _huidigeBtn=null;
-
-function _b64NaarBlob(b64, mime){
-  const bin=atob(b64), len=bin.length, bytes=new Uint8Array(len);
+function _ctx(){
+  if(_audioCtx===null){ const AC=window.AudioContext||window.webkitAudioContext; _audioCtx=AC?new AC():false; }
+  return _audioCtx||null;
+}
+function _b64ToBytes(b64){
+  const bin=atob(b64||''), len=bin.length, bytes=new Uint8Array(len);
   for(let i=0;i<len;i++) bytes[i]=bin.charCodeAt(i);
-  return new Blob([bytes],{type:mime||'audio/webm'});
+  return bytes;
+}
+// decodeAudioData: nieuwere browsers geven een promise, oudere Safari gebruikt callbacks.
+function _decode(ctx, arrBuf){
+  return new Promise((resolve,reject)=>{
+    let done=false;
+    try{
+      const p=ctx.decodeAudioData(arrBuf, b=>{done=true;resolve(b);}, e=>{done=true;reject(e||new Error('decode-fout'));});
+      if(p&&p.then) p.then(b=>{if(!done)resolve(b);}, e=>{if(!done)reject(e);});
+    }catch(e){ reject(e); }
+  });
 }
 const MEMO_PLAY_SVG='<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
 const MEMO_PAUSE_SVG='<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M7 5h3v14H7zM14 5h3v14h-3z"/></svg>';
@@ -299,43 +317,74 @@ function _zetSpeelIcoon(btnEl, spelend){
   btnEl.setAttribute('aria-label', spelend?'Pauzeer':'Speel af');
   btnEl.innerHTML=spelend?MEMO_PAUSE_SVG:MEMO_PLAY_SVG;
 }
+function _memoStop(btnEl){
+  if(!btnEl) return;
+  if(btnEl._raf){ cancelAnimationFrame(btnEl._raf); btnEl._raf=0; }
+  if(btnEl._src){ try{ btnEl._src.onended=null; btnEl._src.stop(); }catch(_){} btnEl._src=null; }
+  if(btnEl._audio){ try{ btnEl._audio.pause(); }catch(_){} btnEl._audio=null; }
+  _zetSpeelIcoon(btnEl,false);
+  const bar=btnEl.closest('.memo-item')?.querySelector('.memo-prog-fill'); if(bar) bar.style.width='0%';
+}
+// Audio-bytes (base64 + mime) van een memo: eerst de lokale cache (net opgenomen),
+// anders via het loket (getmemo). Resultaat wordt gecachet.
+async function _memoBron(memoId){
+  const loc=_memoSrcCache.get(memoId);
+  if(loc) return loc;
+  const res=await callMemoLoket('getmemo',{memoId});
+  const bron={ b64:res.audioB64||'', mime:res.mime||'audio/mp4' };
+  _memoSrcCache.set(memoId, bron);
+  return bron;
+}
 
-// Speelt/pauzeert een memo. Eerste keer: getmemo → Blob → object-URL (gecachet).
+// Speelt/stopt een memo (tik = afspelen vanaf begin, nogmaals tikken = stoppen).
 async function playMemo(memoId, btnEl){
-  if(_huidigeAudio && _huidigeBtn && _huidigeBtn!==btnEl){ _huidigeAudio.pause(); _zetSpeelIcoon(_huidigeBtn,false); }
-  if(btnEl._audio && !btnEl._audio.paused){ btnEl._audio.pause(); _zetSpeelIcoon(btnEl,false); return; }
-  if(btnEl._audio && btnEl._audio.paused && btnEl._audio.currentTime>0){
-    btnEl._audio.play(); _zetSpeelIcoon(btnEl,true); _huidigeAudio=btnEl._audio; _huidigeBtn=btnEl; return;
-  }
-  const oudHtml=btnEl.innerHTML;
-  btnEl.disabled=true; btnEl.innerHTML='…';
-  try{
-    let url=_memoUrlCache.get(memoId);
-    if(!url){
-      const res=await callMemoLoket('getmemo',{memoId});
-      url=URL.createObjectURL(_b64NaarBlob(res.audioB64, res.mime));
-      _memoUrlCache.set(memoId, url);
+  const ctx=_ctx();
+  if(!ctx) return _playMemoAudioEl(memoId, btnEl);     // geen Web Audio → <audio>+data-URL
+  try{ if(ctx.state==='suspended') await ctx.resume(); }catch(_){}
+  if(btnEl._src){ _memoStop(btnEl); return; }            // speelt al → stoppen
+  if(_huidigeBtn && _huidigeBtn!==btnEl) _memoStop(_huidigeBtn);
+  let buffer=_bufCache.get(memoId);
+  if(!buffer){
+    const oud=btnEl.innerHTML; btnEl.disabled=true; btnEl.innerHTML='…';
+    try{
+      const bron=await _memoBron(memoId);
+      buffer=await _decode(ctx, _b64ToBytes(bron.b64).buffer);
+      _bufCache.set(memoId, buffer);
+      btnEl.disabled=false; btnEl.innerHTML=oud;
+    }catch(e){
+      btnEl.disabled=false; btnEl.innerHTML=oud;
+      return _playMemoAudioEl(memoId, btnEl);            // decode mislukt → laatste redmiddel
     }
-    const audio=new Audio(url);
-    btnEl._audio=audio;
+  }
+  const src=ctx.createBufferSource(); src.buffer=buffer; src.connect(ctx.destination);
+  btnEl._src=src; _huidigeBtn=btnEl;
+  const bar=btnEl.closest('.memo-item')?.querySelector('.memo-prog-fill');
+  const t0=ctx.currentTime;
+  src.onended=()=>{ if(btnEl._src===src) _memoStop(btnEl); };
+  try{ src.start(); }catch(_){ btnEl._src=null; return; }
+  _zetSpeelIcoon(btnEl,true);
+  const tick=()=>{ if(btnEl._src!==src) return; const t=ctx.currentTime-t0; if(bar&&buffer.duration) bar.style.width=Math.min(100,t/buffer.duration*100)+'%'; btnEl._raf=requestAnimationFrame(tick); };
+  btnEl._raf=requestAnimationFrame(tick);
+}
+
+// Terugval: <audio> met een DATA-URL (geen blob:-URL → minder kieskeurig op iOS Safari).
+async function _playMemoAudioEl(memoId, btnEl){
+  if(btnEl._audio){ _memoStop(btnEl); return; }
+  if(_huidigeBtn && _huidigeBtn!==btnEl) _memoStop(_huidigeBtn);
+  const oud=btnEl.innerHTML; btnEl.disabled=true; btnEl.innerHTML='…';
+  try{
+    const bron=await _memoBron(memoId);
+    const audio=new Audio('data:'+(bron.mime||'audio/mp4')+';base64,'+bron.b64);
+    btnEl._audio=audio; _huidigeBtn=btnEl;
     const bar=btnEl.closest('.memo-item')?.querySelector('.memo-prog-fill');
     audio.ontimeupdate=()=>{ if(bar&&audio.duration) bar.style.width=(audio.currentTime/audio.duration*100)+'%'; };
-    audio.onended=()=>{ _zetSpeelIcoon(btnEl,false); if(bar) bar.style.width='0%'; };
-    audio.onerror=()=>{ _zetSpeelIcoon(btnEl,false); showToast('Afspelen mislukt','Dit audioformaat wordt door deze browser niet ondersteund.','var(--rd)'); };
-    btnEl.disabled=false; btnEl.innerHTML=oudHtml;
-    // play() kan door de browser geweigerd worden als de klik-toestemming verlopen is
-    // (bv. na een trage getmemo). Dan netjes terugzetten; de audio is nu ingeladen, dus
-    // een tweede tik speelt 'm direct af (geen wachttijd meer).
-    try{
-      await audio.play();
-      _zetSpeelIcoon(btnEl,true); _huidigeAudio=audio; _huidigeBtn=btnEl;
-    }catch(playErr){
-      _zetSpeelIcoon(btnEl,false);
-      showToast('Tik nogmaals om af te spelen','De memo is ingeladen.','var(--ac)');
-    }
+    audio.onended=()=>{ if(btnEl._audio===audio) _memoStop(btnEl); };
+    audio.onerror=()=>{ if(btnEl._audio===audio){ btnEl._audio=null; _zetSpeelIcoon(btnEl,false); } showToast('Afspelen mislukt','De opname kon niet worden afgespeeld.','var(--rd)'); };
+    btnEl.disabled=false; btnEl.innerHTML=oud;
+    await audio.play(); _zetSpeelIcoon(btnEl,true);
   }catch(e){
-    btnEl.disabled=false; btnEl.innerHTML=oudHtml;
-    showToast('Afspelen mislukt', e.message||'Loket onbereikbaar', 'var(--rd)');
+    btnEl.disabled=false; btnEl.innerHTML=oud; _zetSpeelIcoon(btnEl,false);
+    showToast('Afspelen mislukt', (e&&e.message)||'Loket onbereikbaar', 'var(--rd)');
   }
 }
 
@@ -420,7 +469,7 @@ async function verwijderMemo(memoId, list, itemId){
   const arr=(D.memos||{})[list+'|'+itemId]||[];
   const i=arr.findIndex(m=>m.memoId===memoId);
   const verwijderd=i>-1?arr.splice(i,1)[0]:null;
-  _memoUrlCache.delete(memoId);
+  _memoSrcCache.delete(memoId); _bufCache.delete(memoId);
   _herrenderMemoUI(list, itemId);
   try{ await callMemoLoket('deletememo',{memoId}); showToast('Memo verwijderd','', 'var(--ac)'); }
   catch(e){ if(verwijderd){ arr.splice(Math.min(i,arr.length),0,verwijderd); _herrenderMemoUI(list, itemId); } showToast('Verwijderen mislukt', e.message||'', 'var(--rd)'); }

@@ -6,3 +6,6 @@
 .clasp.json
 .clasprc.json
 node_modules/
+
+# Superpowers brainstorm-scratch (mockups/sessies)
+.superpowers/

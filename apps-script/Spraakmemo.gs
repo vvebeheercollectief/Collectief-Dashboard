@@ -6,11 +6,14 @@
  *  allowlist. Staat NAAST de bestaande CD_WEBHOOK_SECRET-route *
  *  (mail-intake) in Notifications.gs, die ongewijzigd blijft.  *
  *                                                              *
- *  Eénmalige setup (in deze volgorde, in de editor draaien):   *
- *   1. cd_memoSetupFolder()      → Drive-map + property         *
- *   2. cd_memoSheet()            → metadata-tab (lazy)          *
- *   3. cd_setupMemoCleanup()     → dagelijkse opruim-trigger    *
+ *  Eénmalige setup (in de editor draaien):                      *
+ *   1. cd_memoSetupAll()         → grids + tab + Drive-map       *
+ *      (één keer; idempotent; doet stap 1+2 hieronder ineens)   *
+ *   2. cd_setupMemoCleanup()     → dagelijkse opruim-trigger    *
  *      (PAS draaien NADAT cd_cleanupMemos bestaat)              *
+ *  Losse helpers (door cd_memoSetupAll hergebruikt):            *
+ *   • cd_memoSetupFolder()  → Drive-map + property              *
+ *   • cd_memoSheet()        → metadata-tab (lazy)               *
  ****************************************************************/
 
 // Dezelfde Google OAuth-client als api/chat.js EXPECTED_AUD en src/config.js clientId.
@@ -101,6 +104,48 @@ function cd_memoSetupFolder() {
   props.setProperty('CD_MEMO_FOLDER_ID', map.getId());
   Logger.log('Drive-map "Spraakmemo\'s" aangemaakt — ID = ' + map.getId());
   return map.getId();
+}
+
+// EENMALIG (aanrader): zet de hele spraakmemo-omgeving klaar in de ACTIEVE spreadsheet
+// (TEST of PROD — afhankelijk van waaraan dit script gebonden is). Idempotent: meermaals
+// draaien is veilig. Doet server-side, zodat de echte grid-breedte leesbaar is:
+//   1. Verbreedt de werk-lijst-grids zodat de verborgen ID-kolom past. Leest de echte breedte
+//      via getMaxColumns() en voegt ALLEEN RECHTS kolommen toe (insertColumnsAfter) — bestaande
+//      data in A..P/A..F verschuift dus nooit (i.t.t. een midden-insert).
+//   2. Borgt de metadata-tab "Spraakmemo's" (via cd_memoSheet).
+//   3. Maakt de centrale Drive-map + slaat het ID op (via cd_memoSetupFolder).
+function cd_memoSetupAll() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  // Doel-breedtes per werk-lijst: de verborgen ID-kolom (LIST_ID_COL in src/config.js, 0-based)
+  // moet bestaan → kolomtelling ≥ index+1: NTD Q=17, ALVO G=7, ALFA D=4, ONTW G=7.
+  var doelBreedte = { 'Nog Te Doen': 17, "ALV's overzicht": 7, "ALV's afgerond": 4, 'Ontwikkeling': 7 };
+  var log = [];
+
+  // 1. Grids verbreden — alleen waar te smal; altijd rechts aanvullen (geen verschuiving).
+  Object.keys(doelBreedte).forEach(function (naam) {
+    var sheet = ss.getSheetByName(naam);
+    if (!sheet) { log.push('grid "' + naam + '": tab niet gevonden — overgeslagen'); return; }
+    var huidig = sheet.getMaxColumns();
+    var doel = doelBreedte[naam];
+    if (huidig < doel) {
+      sheet.insertColumnsAfter(huidig, doel - huidig);
+      log.push('grid "' + naam + '": ' + huidig + ' -> ' + sheet.getMaxColumns() + ' kolommen');
+    } else {
+      log.push('grid "' + naam + '": al ' + huidig + ' kolommen (>= ' + doel + ') — ongewijzigd');
+    }
+  });
+
+  // 2. Metadata-tab borgen (maakt 'm met A..L-kop + bevroren kop als die mist).
+  var tab = cd_memoSheet();
+  log.push('tab "' + MEMO_SHEET + '": klaar (' + tab.getLastColumn() + ' koppen)');
+
+  // 3. Drive-map + property borgen.
+  var mapId = cd_memoSetupFolder();
+  log.push('Drive-map: CD_MEMO_FOLDER_ID = ' + mapId);
+
+  var samenvatting = 'cd_memoSetupAll klaar:\n - ' + log.join('\n - ');
+  Logger.log(samenvatting);
+  return samenvatting;
 }
 
 // memoId volgens gedeeld contract: "M-" + base36-tijd + "-" + 4 random base36.

@@ -19,12 +19,20 @@ import { openOfferteActieModal, offerteActieVastleggen, offerteFaseZetten } from
 import { addAannemer, toggleAannemerBinnen, verwijderAannemer } from './offerte-aannemers.js';
 import { openHerhaalModal, toggleHerhaalStatus, deleteHerhaal } from './render-herhaal.js';
 import { openVvePagina, renderVve, addContactLog } from './render-vve.js';
+import { openMemoRecorder, playMemo, toggleMemoSectie, verwijderMemo } from './spraakmemo.js';
 import { vraagChat, chatSuggestie } from './dossier-chat.js';
 import { saveKenmerken } from './kenmerken.js';
 import { palKies } from './palette.js';
 import { toggleBulkMode, bulkVink, toggleBulkMenu, bulkDoe } from './bulk.js';
 
 const PAG_RENDER = { ntd:renderNtd, af:renderAf, alvo:renderAlvo, alfa:renderAlfa, ontw:renderOntw, logboek:renderLogboek };
+
+// Het item-object hangt aan de memo-sectie-container (gezet door renderMemoList).
+function _memoItemUitEl(el){
+  const sec=el.closest('.memo-sectie');
+  if(sec&&sec._memoItem) return sec._memoItem;
+  return { itemId:el.dataset.itemid, code:'', _sec:'' };
+}
 
 export const ACTIONS = {
   'toggle':                (el) => { el.setAttribute('aria-checked', el.classList.toggle('on')); },
@@ -81,6 +89,10 @@ export const ACTIONS = {
   'vve-log-alles':         ()   => { state._vveLogAlles=true; renderVve(); },
   'chat-send':             ()   => vraagChat(),
   'chat-suggest':          (el) => chatSuggestie(el.dataset.q),
+  'memo-open':        (el) => toggleMemoSectie(el.dataset.list, el.dataset.itemid, el),
+  'memo-inspreken':   (el) => { const it=_memoItemUitEl(el); if(it) openMemoRecorder(it, el.dataset.list, el); },
+  'memo-afspelen':    (el) => playMemo(el.dataset.memoid, el),
+  'memo-verwijderen': (el) => verwijderMemo(el.dataset.memoid, el.dataset.list, el.dataset.itemid),
 };
 
 export function initActions() {

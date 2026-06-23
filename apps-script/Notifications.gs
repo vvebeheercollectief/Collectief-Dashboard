@@ -529,11 +529,32 @@ function cd_processNotifEvent(data) {
 // ════════════════════════════════════════════════════════════
 function doPost(e) {
   try {
-    const secret = PropertiesService.getScriptProperties().getProperty('CD_WEBHOOK_SECRET');
-    // Body defensief parsen ná het ophalen van het secret: een ongeldige JSON-body van een
-    // anonieme caller mag geen rauwe parse-fout terugkrijgen en geen werk vóór auth uitlokken.
+    // Body defensief parsen: een ongeldige JSON-body van een anonieme caller mag geen rauwe
+    // parse-fout terugkrijgen en geen werk vóór auth uitlokken.
     let data = null;
     try { data = JSON.parse(e && e.postData && e.postData.contents); } catch (_) { data = null; }
+
+    // ── NIEUW: token-geauthenticeerd spraakmemo-loket (staat NAAST de secret-route hieronder).
+    // Web-app-auth: Apps Script geeft request-headers niet door, dus het OAuth access-token komt
+    // in de body. cd_memoAuth (Spraakmemo.gs) doet tokeninfo → aud-check → allowlist; pas daarna
+    // de Drive-/metadata-actie. _door = teamnaam uit de geverifieerde e-mail (niet uit de body).
+    var MEMO_ACTIONS = { uploadmemo: 1, getmemo: 1, deletememo: 1, deleteitemmemos: 1 };
+    if (data && MEMO_ACTIONS[data.action]) {
+      var auth = cd_memoAuth(data.token);
+      if (!auth.ok) {
+        return ContentService.createTextOutput(JSON.stringify({error:'forbidden'})).setMimeType(ContentService.MimeType.JSON);
+      }
+      data._door = (CD_EMAIL_NAMES[auth.email] || auth.email);
+      var memoResult;
+      if (data.action === 'uploadmemo')           memoResult = cd_uploadMemo(data);
+      else if (data.action === 'getmemo')         memoResult = cd_getMemo(data);
+      else if (data.action === 'deletememo')      memoResult = cd_deleteMemo(data);
+      else if (data.action === 'deleteitemmemos') memoResult = cd_deleteItemMemos(data);
+      return ContentService.createTextOutput(JSON.stringify(memoResult)).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // ── BESTAAND: server-to-server webhook (mail-intake) via gedeeld secret — ONGEWIJZIGD.
+    const secret = PropertiesService.getScriptProperties().getProperty('CD_WEBHOOK_SECRET');
     // FAIL CLOSED: geen/ongeldige body, of ontbrekend/fout server-secret → generiek weigeren.
     if (!secret || !data || data.secret !== secret) {
       return ContentService.createTextOutput(JSON.stringify({error:'forbidden'})).setMimeType(ContentService.MimeType.JSON);

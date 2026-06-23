@@ -187,12 +187,20 @@ function _blobNaarB64(blob){
 async function openMemoRecorder(item, list, anchorEl){
   document.querySelector('.memo-recorder')?.remove();
   let stream;
-  try{ stream=await navigator.mediaDevices.getUserMedia({audio:true}); }
-  catch(e){ showToast('Microfoon geblokkeerd','Geef toestemming voor de microfoon en probeer opnieuw.','var(--rd)'); return; }
+  // Microfoon met spraak-vriendelijke verwerking (ruisonderdrukking, echo-/gain-correctie aan).
+  try{ stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}}); }
+  catch(e){
+    try{ stream=await navigator.mediaDevices.getUserMedia({audio:true}); }
+    catch(e2){ showToast('Microfoon geblokkeerd','Geef toestemming voor de microfoon en probeer opnieuw.','var(--rd)'); return; }
+  }
   const mime=pickMimeType();
   let rec;
-  try{ rec=mime?new MediaRecorder(stream,{mimeType:mime}):new MediaRecorder(stream); }
-  catch(e){ rec=new MediaRecorder(stream); }
+  // Hogere bitrate dan de (lage) standaard → duidelijk betere spraakkwaliteit. 96 kbps is ruim
+  // voldoende voor spraak en houdt de bestanden klein (snelle, betrouwbare upload).
+  const recOpts={ audioBitsPerSecond:96000 };
+  if(mime) recOpts.mimeType=mime;
+  try{ rec=new MediaRecorder(stream, recOpts); }
+  catch(e){ try{ rec=mime?new MediaRecorder(stream,{mimeType:mime}):new MediaRecorder(stream); }catch(e2){ rec=new MediaRecorder(stream); } }
   const brokken=[];
   rec.ondataavailable=e=>{ if(e.data&&e.data.size) brokken.push(e.data); };
 

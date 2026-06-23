@@ -31,7 +31,7 @@ export const PROXY_URL = IS_STAGING ? '/api/chat' : 'https://collectief-dashboar
 // Token-beveiligd endpoint dat audio in Drive opslaat + metadata bijwerkt.
 // Vul de exec-URL's in NÁ de web-app-deploy (clasp/CI), per omgeving.
 export const APPS_SCRIPT_URL_PROD = '<<WEB-APP EXEC-URL NA DEPLOY INVULLEN>>';
-export const APPS_SCRIPT_URL_TEST = '<<TEST WEB-APP EXEC-URL>>';
+export const APPS_SCRIPT_URL_TEST = 'https://script.google.com/macros/s/AKfycbwpsgWAPFIxx0zOGjFzC2ZJuoP6Uu3lOBNcFCrEgwM09x6yKmm4dwGkKzgqYOGBtDBykQ/exec';
 export const APPS_SCRIPT_URL = IS_STAGING ? APPS_SCRIPT_URL_TEST : APPS_SCRIPT_URL_PROD;
 
 // ── Spraakmemo-constanten ─────────────────────────────────────────────

@@ -26,6 +26,22 @@ export const SID = IS_STAGING ? SID_TEST : SID_PROD;
 export const PG   = 25;
 // AI-proxy: op staging same-origin (/api/chat); op productie de vaste Vercel-functie-URL.
 export const PROXY_URL = IS_STAGING ? '/api/chat' : 'https://collectief-dashboard.vercel.app/api/chat';
+
+// ── Spraakmemo-loket (Apps Script web-app) ────────────────────────────
+// Token-beveiligd endpoint dat audio in Drive opslaat + metadata bijwerkt.
+// Vul de exec-URL's in NÁ de web-app-deploy (clasp/CI), per omgeving.
+export const APPS_SCRIPT_URL_PROD = '<<WEB-APP EXEC-URL NA DEPLOY INVULLEN>>';
+export const APPS_SCRIPT_URL_TEST = '<<TEST WEB-APP EXEC-URL>>';
+export const APPS_SCRIPT_URL = IS_STAGING ? APPS_SCRIPT_URL_TEST : APPS_SCRIPT_URL_PROD;
+
+// ── Spraakmemo-constanten ─────────────────────────────────────────────
+export const MEMO_SHEET = "Spraakmemo's";   // metadata-tab (A..L)
+export const MEMO_MAX_SEC = 120;             // max opnameduur per memo (s)
+export const MEMO_RETENTIE_DAGEN = 30;       // auto-opruimen na N dagen
+// Per werk-lijst: het tabblad én de 0-based kolomindex van het verborgen item-ID.
+// Sleutels: 'NTD','ALVO','ALFA','ONTW'. Grid moet deze kolom bevatten (zie infra-taken).
+export const LIST_SHEET  = { NTD:'Nog Te Doen', ALVO:"ALV's overzicht", ALFA:"ALV's afgerond", ONTW:'Ontwikkeling' };
+export const LIST_ID_COL = { NTD:16, ALVO:6, ALFA:3, ONTW:6 };
 // Meldingen lopen via de 'Notif-wachtrij'-tab (OAuth-append vanuit de ingelogde
 // gebruiker) — een Apps Script-trigger verstuurt de push. Geen webhook-URL of
 // secret meer nodig in deze (publieke) frontend.

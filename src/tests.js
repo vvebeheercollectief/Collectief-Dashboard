@@ -3,7 +3,7 @@
 // ══════════════════════════════════════
 import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, offerteBalBij, _verschilInWerkdagen, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten, offerteNabelTeller, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, isoWeek, coerceDagenVooraf } from "./util.js";
 import { logZin, logPaginaSoort } from "./render-overig.js";
-import { _isStagingHost, APP_VERSION } from "./config.js";
+import { _isStagingHost, APP_VERSION, MEMO_SHEET, MEMO_MAX_SEC, MEMO_RETENTIE_DAGEN, LIST_ID_COL, LIST_SHEET } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
 import { filterNtd, offerteGroepen, _offerteActiviteitMap, offerteBalBijTekst, setNtd, renderNtd, offerteAannemerPaneel, offerteAannSamenvatting } from "./render-lijsten.js";
@@ -876,6 +876,20 @@ import { shouldPromptReload } from "./sw-update.js";
     eq('parseHerhaal: type lowercased', hh[0].type, 'maand');
     eq('parseHerhaal: _row offset (eerste = rij 2)', hh[0]._row, 2);
   })();
+
+  // ── Spraakmemo-infrastructuur: config-contract ──
+  console.log('%c[TESTS] Spraakmemo config', 'background:#4a5b7a;color:white;padding:2px 6px;border-radius:3px');
+  eq('memo: MEMO_SHEET',        MEMO_SHEET,        "Spraakmemo's");
+  eq('memo: MEMO_MAX_SEC',      MEMO_MAX_SEC,      120);
+  eq('memo: MEMO_RETENTIE',     MEMO_RETENTIE_DAGEN, 30);
+  eq('memo: LIST_ID_COL.NTD',   LIST_ID_COL.NTD,   16);
+  eq('memo: LIST_ID_COL.ALVO',  LIST_ID_COL.ALVO,  6);
+  eq('memo: LIST_ID_COL.ALFA',  LIST_ID_COL.ALFA,  3);
+  eq('memo: LIST_ID_COL.ONTW',  LIST_ID_COL.ONTW,  6);
+  eq('memo: LIST_SHEET.NTD',    LIST_SHEET.NTD,    'Nog Te Doen');
+  eq('memo: LIST_SHEET.ALVO',   LIST_SHEET.ALVO,   "ALV's overzicht");
+  eq('memo: LIST_SHEET.ALFA',   LIST_SHEET.ALFA,   "ALV's afgerond");
+  eq('memo: LIST_SHEET.ONTW',   LIST_SHEET.ONTW,   'Ontwikkeling');
 
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');

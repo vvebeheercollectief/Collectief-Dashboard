@@ -9,6 +9,7 @@ import { filterVves } from "./vve-zoekveld.js";
 import { filterNtd, offerteGroepen, _offerteActiviteitMap, offerteBalBijTekst, setNtd, renderNtd, offerteAannemerPaneel, offerteAannSamenvatting } from "./render-lijsten.js";
 import { state, D, pgs } from "./state.js";
 import { vveOverzicht, filterDossierLog } from "./render-vve.js";
+import { genItemId, idCellA1, parseMemos, memoCount, memoBadgeHtml, pickMimeType, buildUploadPayload, memoAfrondHelp, memoIsVerlopen } from "./spraakmemo.js";
 import { parseKenmerken, vveKenmerken } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk.js";
@@ -890,6 +891,89 @@ import { shouldPromptReload } from "./sw-update.js";
   eq('memo: LIST_SHEET.ALVO',   LIST_SHEET.ALVO,   "ALV's overzicht");
   eq('memo: LIST_SHEET.ALFA',   LIST_SHEET.ALFA,   "ALV's afgerond");
   eq('memo: LIST_SHEET.ONTW',   LIST_SHEET.ONTW,   'Ontwikkeling');
+
+  // ── Spraakmemo: pure helpers ──
+  console.log('%c[TESTS] Spraakmemo', 'background:#4a5b7a;color:white;padding:2px 6px;border-radius:3px');
+  (()=>{
+    const id=genItemId();
+    truthy('genItemId: vorm IT-<t36>-<4>', /^IT-[0-9a-z]+-[0-9a-z]{4}$/.test(id));
+    const set=new Set(); for(let i=0;i<200;i++) set.add(genItemId());
+    eq('genItemId: 200x uniek', set.size, 200);
+    eq("idCellA1: NTD rij 5 → kol Q",       idCellA1('NTD',5),  "'Nog Te Doen'!Q5");
+    eq("idCellA1: ALVO rij 3 → kol G + ''",  idCellA1('ALVO',3), "'ALV''s overzicht'!G3");
+    eq("idCellA1: ALFA rij 2 → kol D",      idCellA1('ALFA',2), "'ALV''s afgerond'!D2");
+    eq("idCellA1: ONTW rij 7 → kol G",      idCellA1('ONTW',7), "'Ontwikkeling'!G7");
+  })();
+  // — memoIsVerlopen (datumselectie 30-dagen-opruiming, spiegel van cd_cleanupMemos, Taak 15) —
+  const _nu = new Date('2026-06-23T12:00:00.000Z').getTime();
+  eq('memoIsVerlopen: ISO ouder dan retentie',          memoIsVerlopen('2026-05-10T09:00:00.000Z', 30, _nu), true);
+  eq('memoIsVerlopen: ISO binnen retentie',             memoIsVerlopen('2026-06-20T09:00:00.000Z', 30, _nu), false);
+  eq('memoIsVerlopen: exact op de grens (30 dagen)',    memoIsVerlopen(new Date(_nu - 30 * 86400000).toISOString(), 30, _nu), false);
+  eq('memoIsVerlopen: net over de grens',               memoIsVerlopen(new Date(_nu - 30 * 86400000 - 1000).toISOString(), 30, _nu), true);
+  eq('memoIsVerlopen: lege timestamp → niet verlopen',  memoIsVerlopen('', 30, _nu), false);
+  eq('memoIsVerlopen: ongeldige timestamp → niet verlopen', memoIsVerlopen('geen-datum', 30, _nu), false);
+  (()=>{
+    const rows=[
+      ['Timestamp','MemoID','Lijst','VvECode','Sectie','ItemID','Snapshot','Door','DriveFileID','DuurSec','Mime','Status'],
+      ['2026-06-20T09:00:00.000Z','M-1','NTD','CH1','OPPAKKEN','IT-a','Lekkage','Jer','file-1','7','audio/webm',''],
+      ['2026-06-22T09:00:00.000Z','M-2','NTD','CH1','OPPAKKEN','IT-a','Lekkage','Cihad','file-2','5','audio/webm',''],
+      ['2026-06-21T09:00:00.000Z','M-3','NTD','CH1','OPPAKKEN','IT-a','Lekkage','Jer','file-3','9','audio/webm','VERWIJDERD'],
+      ['2026-06-19T09:00:00.000Z','M-4','ALVO','CH9','','IT-b','ALV plannen','Gabos','file-4','3','audio/mp4',''],
+    ];
+    const m=parseMemos(rows);
+    eq('parseMemos: 2 sleutels', Object.keys(m).length, 2);
+    eq('parseMemos: actieve NTD|IT-a (VERWIJDERD weg) → 2', (m['NTD|IT-a']||[]).length, 2);
+    eq('parseMemos: nieuwste eerst (M-2)', m['NTD|IT-a'][0].memoId, 'M-2');
+    eq('parseMemos: velden gemapt', [m['NTD|IT-a'][0].duur, m['NTD|IT-a'][0].mime].join('|'), '5|audio/webm');
+    eq('parseMemos: _row offset (M-2 op rij 3)', m['NTD|IT-a'][0]._row, 3);
+    eq('parseMemos: ALVO-tak', m['ALVO|IT-b'][0].door, 'Gabos');
+    const oud=D.memos; D.memos=m;
+    eq('memoCount: NTD|IT-a → 2', memoCount('NTD','IT-a'), 2);
+    eq('memoCount: onbekend item → 0', memoCount('NTD','IT-zzz'), 0);
+    eq('memoCount: leeg itemId → 0', memoCount('NTD',''), 0);
+    D.memos=oud;
+  })();
+  (()=>{
+    const orig=window.MediaRecorder;
+    window.MediaRecorder={ isTypeSupported:(t)=>t==='audio/webm;codecs=opus' };
+    eq('pickMimeType: webm/opus', pickMimeType(), 'audio/webm;codecs=opus');
+    window.MediaRecorder={ isTypeSupported:(t)=>t==='audio/webm' };
+    eq('pickMimeType: audio/webm', pickMimeType(), 'audio/webm');
+    window.MediaRecorder={ isTypeSupported:(t)=>t==='audio/mp4' };
+    eq('pickMimeType: iOS mp4', pickMimeType(), 'audio/mp4');
+    window.MediaRecorder={ isTypeSupported:()=>false };
+    eq('pickMimeType: niets → leeg', pickMimeType(), '');
+    window.MediaRecorder=orig;
+    const oud=D.memos;
+    D.memos={'NTD|IT-x':[{memoId:'M-1'},{memoId:'M-2'},{memoId:'M-3'}]};
+    const h=memoBadgeHtml('NTD','IT-x');
+    truthy('memoBadge: bevat aantal 3', /\b3\b/.test(h));
+    truthy('memoBadge: bevat <svg', h.indexOf('<svg')>-1);
+    truthy('memoBadge: <button>', h.indexOf('<button')>-1);
+    truthy('memoBadge: data-action memo-open', h.indexOf('data-action="memo-open"')>-1);
+    eq('memoBadge: leeg item → ""', memoBadgeHtml('NTD','IT-leeg'), '');
+    eq('memoBadge: leeg itemId → ""', memoBadgeHtml('NTD',''), '');
+    D.memos=oud;
+  })();
+  (()=>{
+    const item = { code:'VVE-0142', itemId:'IT-lt3x9-a4f2', actiepunt:'Lekkage kelder onderzoeken' };
+    const p = buildUploadPayload(item, 'NTD', 'OPPAKKEN', 7.6, 'audio/webm', 'QUJD');
+    eq('payload: list', p.list, 'NTD');
+    eq('payload: code', p.code, 'VVE-0142');
+    eq('payload: sectie', p.sectie, 'OPPAKKEN');
+    eq('payload: itemId', p.itemId, 'IT-lt3x9-a4f2');
+    eq('payload: snapshot uit actiepunt', p.snapshot, 'Lekkage kelder onderzoeken');
+    eq('payload: durationSec afgerond', p.durationSec, 8);
+    eq('payload: mime', p.mime, 'audio/webm');
+    eq('payload: audioB64', p.audioB64, 'QUJD');
+    eq('payload: precies 8 sleutels', Object.keys(p).sort().join(','), 'audioB64,code,durationSec,itemId,list,mime,sectie,snapshot');
+    eq('payload: snapshot fallback periode', buildUploadPayload({code:'VVE-9',periode:'Q3 2026'},'NTD','VERGADERVERZOEKEN',3,'','x').snapshot, 'Q3 2026');
+    eq('payload: snapshot fallback code', buildUploadPayload({code:'VVE-9'},'NTD','OPPAKKEN',3,'','x').snapshot, 'VVE-9');
+  })();
+  eq('memo-help: uitgevinkt → 30 dagen-tekst',
+    memoAfrondHelp(false), 'Memo’s blijven nog 30 dagen bewaard en worden daarna automatisch verwijderd.');
+  eq('memo-help: aangevinkt → direct-weg-tekst',
+    memoAfrondHelp(true), 'Memo’s van deze taak worden direct verwijderd.');
 
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');

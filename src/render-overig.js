@@ -23,7 +23,7 @@ function parseOntw(rows){
   return rows.slice(1).map((r,i)=>{
     const titel=(r[0]||'').trim();
     if(!titel) return null;
-    return{titel,categorie:(r[1]||'').trim(),inhoud:(r[2]||'').trim(),door:(r[3]||'').trim(),datum:(r[4]||'').trim(),status:(r[5]||'').trim()||'Open',_row:i+2};
+    return{titel,categorie:(r[1]||'').trim(),inhoud:(r[2]||'').trim(),door:(r[3]||'').trim(),datum:(r[4]||'').trim(),status:(r[5]||'').trim()||'Open',itemId:(r[6]||'').trim(),_row:i+2};
   }).filter(Boolean);
 }
 

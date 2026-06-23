@@ -2,7 +2,7 @@
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
 import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, offerteBalBij, _verschilInWerkdagen, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten, offerteNabelTeller, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, isoWeek, coerceDagenVooraf } from "./util.js";
-import { logZin, logPaginaSoort } from "./render-overig.js";
+import { logZin, logPaginaSoort, parseOntw } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, MEMO_SHEET, MEMO_MAX_SEC, MEMO_RETENTIE_DAGEN, LIST_ID_COL, LIST_SHEET } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
@@ -860,6 +860,27 @@ import { shouldPromptReload } from "./sw-update.js";
     const af=parseAlfa(rows);
     eq('parseAlfa: lege code gefilterd → 2', af.length, 2);
     eq('parseAlfa: velden gemapt', [af[0].code,af[0].naam,af[0].datum].join('|'), 'CH1|VvE 1|2026-05-01');
+  })();
+  // parsers: verborgen item-ID (NTD Q / ALVO G / ALFA D / ONTW G)
+  (()=>{
+    const ntdRows=[
+      ['OPPAKKEN'],
+      ['VvE Code','VvE','Actiepunt','Deadline','Behandelaar','Prioriteit','Opmerkingen'],
+      ['CH1','VvE 1','Lekkage','30 jun 2026','Jer','Hoog','', '','','','','','','','','','IT-abc-1234'],
+      ['CH2','VvE 2','Dak','29 jun 2026','Cihad','Midden','', '','','','','','','','','',''],
+    ];
+    const ntd=parseSections(ntdRows).data.OPPAKKEN;
+    eq('parseSections: itemId uit kol Q', ntd[0].itemId, 'IT-abc-1234');
+    eq('parseSections: lege ID-kolom → ""', ntd[1].itemId, '');
+    const ntdFalse=parseSections([['OPPAKKEN'],['VvE Code'],['CH3','VvE 3','x','30 jun 2026','Jer','Hoog','', '','','','','','','','','','FALSE']]).data.OPPAKKEN;
+    eq('parseSections: FALSE-erfenis → ""', ntdFalse[0].itemId, '');
+    const av=parseAlvo([['k'],['s'],['CH1','VvE 1','TRUE','FALSE','TRUE','opm','IT-alvo-1']]);
+    eq('parseAlvo: itemId uit kol G', av[0].itemId, 'IT-alvo-1');
+    const af=parseAlfa([['Code','Naam','Datum','ItemID'],['CH1','VvE 1','2026-05-01','IT-alfa-1']]);
+    eq('parseAlfa: itemId uit kol D', af[0].itemId, 'IT-alfa-1');
+    eq('parseAlfa: _row offset (eerste = rij 2)', af[0]._row, 2);
+    const on=parseOntw([['Titel','Cat','Inhoud','Door','Datum','Status','ItemID'],['Idee','Ideeën','x','Jer','1-6-2026','Open','IT-ontw-1']]);
+    eq('parseOntw: itemId uit kol G', on[0].itemId, 'IT-ontw-1');
   })();
   // parseHerhaal: slice(1); lege id valt weg; dagenVooraf 0 blijft 0 (#21 end-to-end via parse).
   (()=>{

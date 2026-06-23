@@ -3,13 +3,14 @@
 // ══════════════════════════════════════
 import { parseDt, _parseAnyDate, coerceDagenVooraf } from "./util.js";
 import { state, D } from "./state.js";
-import { SKEYS, SECS } from "./config.js";
+import { SKEYS, SECS, MEMO_SHEET } from "./config.js";
 import { fetchSheet, _withRetry } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { buildAnalytics, buildDash } from "./render-analytics.js";
 import { renderNtdDonut } from "./render-lijsten.js";
 import { parseOntw, parseLogboek } from "./render-overig.js";
 import { parseKenmerken } from "./kenmerken.js";
+import { parseMemos } from "./spraakmemo.js";
 // (kringverwijzing data ⇄ kenmerken: aanroepen gebeuren op runtime — live bindings, veilig)
 import { showToast } from "./notifications.js";
 // (kringverwijzing data ⇄ main: renderAll wordt pas op runtime aangeroepen — live binding, veilig.
@@ -80,13 +81,14 @@ async function loadAll(silent){
     // Reads met herkansing bij tijdelijke API-fouten (429 / 5xx / netwerk-blip), zodat
     // één hapering niet meteen de hele ronde laat falen en 'Fout' toont.
     const lees=(naam)=>_withRetry(()=>fetchSheet(naam));
-    const[ntdR,afR,alvoR,alfaR,ontwR,logR,hhR,kmkR]=await Promise.all([
+    const[ntdR,afR,alvoR,alfaR,ontwR,logR,hhR,kmkR,memoR]=await Promise.all([
       lees("Nog Te Doen"),lees("Afgerond"),
       lees("ALV's overzicht"),lees("ALV's afgerond"),
       lees("Ontwikkeling").catch(()=>[]),
       lees("Logboek").catch(()=>[]),
       lees("Herhaalregels").catch(()=>[]),
       lees("Kenmerken").catch(()=>[]),
+      lees(MEMO_SHEET).catch(()=>[]),
     ]);
     state._syncFails=0; // alle reads geslaagd
     // Kwam er tijdens het lezen een schrijfactie tussen? Dan is de lokale (optimistische)
@@ -101,8 +103,9 @@ async function loadAll(silent){
     D.logboek=parseLogboek(logR);
     D.herhaal=parseHerhaal(hhR);
     D.kenmerken=parseKenmerken(kmkR);
+    D.memos=parseMemos(memoR);
     setSynced();
-    const hash=JSON.stringify([D.ntd,D.af,D.alvo,D.alfa,D.ontw,D.logboek,D.herhaal,D.kenmerken]);
+    const hash=JSON.stringify([D.ntd,D.af,D.alvo,D.alfa,D.ontw,D.logboek,D.herhaal,D.kenmerken,D.memos]);
     if(hash!==state._lastDHash){
       state._lastDHash=hash;
       renderAll();
@@ -158,6 +161,7 @@ function parseSections(rows){
     entry.esc        =_f4v(row[13]);  // N (alleen door Apps Script geschreven)
     entry.fase       =_f4v(row[14]);  // O — offerte-fase (offerte-motor)
     entry.aannemers  =_f4v(row[15]);  // P — aannemerslijst (naam|0/1 per regel)
+    entry.itemId     =_f4v(row[16]);  // Q — verborgen item-ID (spraakmemo, lazy toegekend)
     // Legacy 'Afgerond'-rijen (oude onEdit-vinkjes, vóór juni): 5-koloms vorm
     // [code,naam,actiepunt,behandelaar,datum] met de afronddatum op kolom E i.p.v. I.
     // Herken ze — geen datum op I, maar kolom E (in entry.behandelaar) is wél een datum —
@@ -204,13 +208,13 @@ function parseAlvo(rows){
     const notu=(r[3]||'').trim()==='TRUE';
     const begr=(r[4]||'').trim()==='TRUE';
     const status=notu?'Afgerond':uitn?'Gepland':'Open';
-    return{code,naam:(r[1]||'').trim(),uitnodiging:uitn,notulen:notu,begroting:begr,opmerkingen:(r[5]||'').trim(),status,_row:i+3};
+    return{code,naam:(r[1]||'').trim(),uitnodiging:uitn,notulen:notu,begroting:begr,opmerkingen:(r[5]||'').trim(),status,itemId:(r[6]||'').trim(),_row:i+3};
   }).filter(Boolean);
 }
 
 function parseAlfa(rows){
-  return rows.slice(1).map(r=>({
-    code:(r[0]||'').trim(),naam:(r[1]||'').trim(),datum:(r[2]||'').trim()
+  return rows.slice(1).map((r,i)=>({
+    code:(r[0]||'').trim(),naam:(r[1]||'').trim(),datum:(r[2]||'').trim(),itemId:(r[3]||'').trim(),_row:i+2
   })).filter(r=>r.code);
 }
 

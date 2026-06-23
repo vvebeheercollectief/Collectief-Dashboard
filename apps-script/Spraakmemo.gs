@@ -183,34 +183,37 @@ function cd_uploadMemo(data) {
   var snapshot = (data.snapshot || '').toString();
   var door     = (data._door || '').toString().trim();   // ingevuld door doPost uit de auth-email
 
-  var res = cd_withLock(function () {
-    var memoId = cd_genMemoId();
-    var ts = new Date().toISOString();
+  // Het ZWARE werk (Drive-bestand schrijven) BUITEN de lock: elke upload heeft een eigen,
+  // collision-vrije memoId (cd_genMemoId = tijd+random) en een eigen bestand → geen race.
+  // Vroeger zat dit ín de lock, waardoor de lock ~5s werd vastgehouden; een retry vanaf een
+  // (mobiel) haperende verbinding viel dan op 'Loket bezig' terwijl de eerste poging al slaagde.
+  var memoId = cd_genMemoId();
+  var ts = new Date().toISOString();
+  var bytes = Utilities.base64Decode(b64);
+  var blob = Utilities.newBlob(bytes, mime, memoId + ext);
+  var file = cd_memoFolder().createFile(blob);
+  var fileId = file.getId();
 
-    // base64 → Blob → Drive-bestand in de centrale map.
-    var bytes = Utilities.base64Decode(b64);
-    var blob = Utilities.newBlob(bytes, mime, memoId + ext);
-    var file = cd_memoFolder().createFile(blob);
-    var fileId = file.getId();
-
-    // Metadata-rij A..L (Status leeg = actief). cd_safeCell (Notifications.gs) neutraliseert
-    // formule-prefixen in van-buiten-komende tekst (snapshot/code/door).
+  // Alléén de korte sheet-append in de lock (millisecondenwerk) → minimale kans op contentie.
+  // cd_safeCell (Notifications.gs) neutraliseert formule-prefixen in tekst (snapshot/code/door).
+  var appended = cd_withLock(function () {
     cd_memoSheet().appendRow([
       ts, memoId, list, cd_safeCell(code), cd_safeCell(sectie),
       itemId, cd_safeCell(snapshot), cd_safeCell(door), fileId, durationSec, mime, ''
     ]);
-
-    // Push naar de behandelaar(s) van het item; niet naar de inspreker (actor=door).
-    try { cd_notifyNewMemo(code, snapshot, cd_memoBehandelaar(list, code, itemId), sectie, door, snapshot); }
-    catch (e) { Logger.log('cd_notifyNewMemo fout (memo wél opgeslagen): ' + e); }
-
-    return { ok: true, memoId: memoId, fileId: fileId, timestamp: ts };
+    return true;
   });
-  // cd_withLock geeft undefined terug als de lock niet binnen 10s verkregen wordt
-  // (Notifications.gs:48). Dan zou doPost JSON.stringify(undefined) → 'null' versturen
-  // en de front-end vaag falen; vang het hier af met een nette fout.
-  if (!res) return { ok: false, error: 'Loket bezig, probeer opnieuw.' };
-  return res;
+  if (!appended) {
+    // Lock niet verkregen: het Drive-bestand bestaat al → opruimen zodat er geen wees blijft.
+    try { file.setTrashed(true); } catch (_) {}
+    return { ok: false, error: 'Loket bezig, probeer opnieuw.' };
+  }
+
+  // Melding BUITEN de lock + best-effort (mag de upload-respons nooit vertragen/blokkeren).
+  try { cd_notifyNewMemo(code, snapshot, cd_memoBehandelaar(list, code, itemId), sectie, door, snapshot); }
+  catch (e) { Logger.log('cd_notifyNewMemo fout (memo wél opgeslagen): ' + e); }
+
+  return { ok: true, memoId: memoId, fileId: fileId, timestamp: ts };
 }
 
 // Lees één memo terug als base64 (op aanvraag, voor afspelen). Read-only.

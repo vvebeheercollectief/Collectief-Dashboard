@@ -50,6 +50,9 @@ export default async function handler(req, res){
     // voorkomt elke preflight-discussie. Server-side volgt fetch de 302→echo-redirect
     // schoon (zonder Content-Type op de GET), dus we krijgen de JSON terug.
     const body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body || {});
+    const action = (req.body && req.body.action) || '?';
+    const bytes = body.length;
+    const t0 = Date.now();
     const r = await fetch(loket, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -57,8 +60,13 @@ export default async function handler(req, res){
       redirect: 'follow',
     });
     const text = await r.text();
+    const ms = Date.now() - t0;
     let data = null;
     try { data = JSON.parse(text); } catch (_) { data = null; }
+    // Diagnostiek (geen PII — alleen actie/status/tijd/grootte): zichtbaar in de Vercel-logs
+    // zodat een mislukte upload exact te herleiden is zonder de gebruiker iets te vragen.
+    console.log('memo ' + action + ' loket=' + r.status + ' ' + ms + 'ms in=' + bytes + 'B ' +
+      (data ? (data.error ? ('ERR:' + data.error) : (data.ok ? 'ok' : 'no-ok')) : 'NON-JSON'));
     if (!data) {
       console.error('memo-proxy: loket gaf geen JSON', r.status, text.slice(0, 200));
       res.status(502).json({ error: 'loket gaf geen geldig antwoord (status ' + r.status + ')' });

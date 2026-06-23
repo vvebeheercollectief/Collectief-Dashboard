@@ -3,6 +3,7 @@
 //  Verplaatst uit render-lijsten.js (Batch D / punt 11) — zuivere refactor, geen gedragswijziging.
 // ══════════════════════════════════════
 import { esc, emptyRow } from "./util.js";
+import { memoBadgeHtml } from "./spraakmemo.js";
 import { SID, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { getSheetIds } from "./crud.js";
@@ -51,7 +52,7 @@ function renderAlvo(){
       const idx=D.alvo.indexOf(r);
       return`<tr>
         <td><span class="code" style="--sec:var(--ac);--sec-l:var(--ac-l)">${esc(r.code)}</span></td>
-        <td class="cell-name">${esc(r.naam)}</td>
+        <td class="cell-name">${esc(r.naam)}${memoBadgeHtml('ALVO', r.itemId)}</td>
         <td>${flagPill(idx,'uitnodiging',r.uitnodiging)}</td>
         <td>${flagPill(idx,'notulen',r.notulen)}</td>
         <td>${flagPill(idx,'begroting',r.begroting)}</td>
@@ -143,7 +144,7 @@ function renderAlfa(){
   document.getElementById('alfa-tbody').innerHTML=sl.length
     ?sl.map(r=>`<tr>
         <td><span class="code" style="--sec:var(--gn);--sec-l:var(--gn-l)">${esc(r.code)}</span></td>
-        <td class="cell-name">${esc(r.naam)}</td>
+        <td class="cell-name">${esc(r.naam)}${memoBadgeHtml('ALFA', r.itemId)}</td>
         <td class="cell-sm">${esc(r.datum)}</td>
       </tr>`).join('')
     :emptyRow(3);

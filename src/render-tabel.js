@@ -8,6 +8,7 @@ import { state, D, pgs } from "./state.js";
 import { bulkGeselecteerd } from "./bulk.js";
 import { flipOfferteRijen } from "./anim.js";
 import { offerteAannSamenvatting, offerteAannemerPaneel } from "./render-offerte.js";
+import { memoBadgeHtml } from "./spraakmemo.js";
 
 // ══════════════════════════════════════
 //  TABLE HELPERS
@@ -122,7 +123,8 @@ function rowNtd(r,sec){
     : ov.weggelegd
       ? `<span class="pill-snooze" data-action="taak-wegleggen" data-rid="${rid}" title="Weggelegd tot ${esc(r.opvolgdatum)}">${esc(r.opvolgdatum)}</span>`
       : '';
-  const extraPills = stilPill + opvolgPill;
+  const memoBadge = memoBadgeHtml('NTD', r.itemId);
+  const extraPills = stilPill + opvolgPill + memoBadge;
   switch(sec){
     case'OPPAKKEN':
       cells=`<td><span class="code code-klik" style="${css}" data-action="vve-open" data-code="${esc(r.code)}" title="Open VvE-dossier">${esc(r.code)}</span></td>

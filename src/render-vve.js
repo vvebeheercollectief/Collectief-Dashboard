@@ -11,6 +11,7 @@ import { backgroundWrite } from "./data.js";
 import { appendRange } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { getCurrentWho } from "./notifications.js";
+import { memoBadgeHtml } from "./spraakmemo.js";
 // (kringverwijzing render-vve ⇄ ui/kenmerken is hetzelfde patroon als crud ⇄ main:
 //  live bindings, de aanroep gebeurt pas op runtime)
 
@@ -157,7 +158,7 @@ function renderVve(){
     return `<tr class="${weg?'snooze-row':''}" data-action="taak-bewerken" data-rid="${rid}" style="cursor:pointer">
       <td class="cell-txt">${esc(r.actiepunt||r.periode||r.agendapunten||r.status||'')}</td>
       <td><span class="badge" style="${meta.css};background:var(--sec-l);color:var(--sec)">${esc(meta.label)}</span></td>
-      <td>${persBadges(r.behandelaar)}</td>
+      <td>${persBadges(r.behandelaar)}${memoBadgeHtml('NTD', r.itemId)}</td>
       <td class="cell-sm">${dl}</td></tr>`;
   };
   const afLimiet=state._vveAfAlles?o.afgerond.length:5;

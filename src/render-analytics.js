@@ -2,6 +2,7 @@
 //  RENDER-ANALYTICS — grafieken, KPI's, dashboard
 // ══════════════════════════════════════
 import { esc, displayName, persBadges, emptyRow, parseDt, _parseAnyDate } from "./util.js";
+import { memoBadgeHtml } from "./spraakmemo.js";
 import { SECS, SKEYS, TEAM } from "./config.js";
 import { state, D } from "./state.js";
 
@@ -612,7 +613,7 @@ function buildDash(){
   document.getElementById('recent-tbody').innerHTML=all.slice(0,10).map(r=>`<tr>
     <td>${secPill[r._sec]||''}</td>
     <td><span class="code" style="${SECS[r._sec].css}">${esc(r.code)}</span></td>
-    <td class="cell-name">${esc(r.naam)}</td>
+    <td class="cell-name">${esc(r.naam)}${memoBadgeHtml('NTD', r.itemId)}</td>
     <td class="cell-txt">${esc(r.actiepunt||r.periode||'')}</td>
     <td>${persBadges(r.behandelaar)}</td>
     <td class="cell-sm">${esc(r.datum||'')}</td>

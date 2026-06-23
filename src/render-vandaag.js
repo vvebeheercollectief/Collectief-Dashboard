@@ -5,6 +5,7 @@ import { D, state } from './state.js';
 import { SKEYS } from './config.js';
 import { displayName, esc } from './util.js';
 import { urgentieScore, isVanMij, letOpSignalen } from './urgentie.js';
+import { memoBadgeHtml } from './spraakmemo.js';
 
 let _scope = 'mijn';      // 'mijn' | 'iedereen'
 let _scopeVoorEmail = null; // e-mail waarvoor _scope geldt — reset bij gebruikerswissel/uitloggen
@@ -27,7 +28,7 @@ function rowHtml(item){
   return `<div class="vd-row ${LABEL_CLS[u.label]||''}" data-action="vve-open" data-code="${esc(r.code)}" title="Open VvE-dossier">
     <span class="vd-bar"></span>
     <div class="vd-body">
-      <div class="vd-top"><span class="vd-actie">${esc(titel)}</span><span class="vd-reden">${esc(u.reden)}</span></div>
+      <div class="vd-top"><span class="vd-actie">${esc(titel)}</span><span class="vd-reden">${esc(u.reden)}</span>${memoBadgeHtml('NTD', r.itemId)}</div>
       <div class="vd-meta">${esc(r.code)}${r.naam?` · ${esc(r.naam)}`:''}</div>
     </div>
     <div class="vd-acts">

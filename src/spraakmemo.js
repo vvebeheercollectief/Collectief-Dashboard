@@ -233,19 +233,29 @@ async function openMemoRecorder(item, list, anchorEl){
     const optim={ memoId:'M-pending-'+Date.now().toString(36), list, code:item.code||'',
       sectie:item._sec||'', itemId, snapshot, door:who, fileId:'', duur:durationSec,
       mime:recMime, ts:new Date().toISOString(), _row:0, _pending:true };
+    // De net opgenomen audio meteen lokaal cachen → afspelen werkt DIRECT (geen trage
+    // getmemo) én betrouwbaar (play() valt binnen de klik, geen 'autoplay geblokkeerd').
+    let _localUrl=''; try{ _localUrl=URL.createObjectURL(blob); _memoUrlCache.set(optim.memoId, _localUrl); }catch(_){}
     D.memos=D.memos||{};
     (D.memos[list+'|'+itemId]=D.memos[list+'|'+itemId]||[]).unshift(optim);
     _herrenderMemoUI(list, itemId);
+    // De upload kan op Apps Script enkele seconden duren. Markeer 'm als lopende schrijf zodat
+    // de 8s-resync de optimistische memo niet tussentijds wegveegt (die staat nog niet in de Sheet).
+    state.pendingWrites++;
     try{
       const res=await callMemoLoket('uploadmemo', buildUploadPayload(
         Object.assign({}, item, {itemId}), list, item._sec||'', durationSec, recMime, audioB64));
       optim.memoId=res.memoId||optim.memoId; optim.fileId=res.fileId||optim.fileId;
       optim.ts=res.timestamp||optim.ts; optim._pending=false;
-      showToast('Memo verstuurd', (item.code||'')+' · '+durationSec+'s', 'var(--ac)');
+      if(_localUrl && res.memoId) _memoUrlCache.set(res.memoId, _localUrl); // lokale audio ook onder het echte ID
+      showToast('Memo opgeslagen', (item.code||'')+' · '+durationSec+'s', 'var(--ac)');
     }catch(e){
       const arr=D.memos[list+'|'+itemId]||[];
       const i=arr.indexOf(optim); if(i>-1) arr.splice(i,1);
+      if(_localUrl){ _memoUrlCache.delete(optim.memoId); try{ URL.revokeObjectURL(_localUrl); }catch(_){} }
       showToast('Niet verzonden', 'Probeer opnieuw — '+(e.message||''), 'var(--rd)');
+    }finally{
+      state.pendingWrites--;
     }
     _herrenderMemoUI(list, itemId);
   }
@@ -311,9 +321,18 @@ async function playMemo(memoId, btnEl){
     const bar=btnEl.closest('.memo-item')?.querySelector('.memo-prog-fill');
     audio.ontimeupdate=()=>{ if(bar&&audio.duration) bar.style.width=(audio.currentTime/audio.duration*100)+'%'; };
     audio.onended=()=>{ _zetSpeelIcoon(btnEl,false); if(bar) bar.style.width='0%'; };
+    audio.onerror=()=>{ _zetSpeelIcoon(btnEl,false); showToast('Afspelen mislukt','Dit audioformaat wordt door deze browser niet ondersteund.','var(--rd)'); };
     btnEl.disabled=false; btnEl.innerHTML=oudHtml;
-    audio.play(); _zetSpeelIcoon(btnEl,true);
-    _huidigeAudio=audio; _huidigeBtn=btnEl;
+    // play() kan door de browser geweigerd worden als de klik-toestemming verlopen is
+    // (bv. na een trage getmemo). Dan netjes terugzetten; de audio is nu ingeladen, dus
+    // een tweede tik speelt 'm direct af (geen wachttijd meer).
+    try{
+      await audio.play();
+      _zetSpeelIcoon(btnEl,true); _huidigeAudio=audio; _huidigeBtn=btnEl;
+    }catch(playErr){
+      _zetSpeelIcoon(btnEl,false);
+      showToast('Tik nogmaals om af te spelen','De memo is ingeladen.','var(--ac)');
+    }
   }catch(e){
     btnEl.disabled=false; btnEl.innerHTML=oudHtml;
     showToast('Afspelen mislukt', e.message||'Loket onbereikbaar', 'var(--rd)');
@@ -351,7 +370,7 @@ function renderMemoList(container, item, list){
       <div class="memo-mid">
         <div class="memo-meta"><b>${naam}</b> <span class="memo-dt">${esc(_memoDatum(m.ts))}</span></div>
         <div class="memo-speler">
-          <button type="button" class="memo-play" data-action="memo-afspelen" data-memoid="${esc(m.memoId)}" aria-label="Speel af"${m._pending?' disabled':''}>${MEMO_PLAY_SVG}</button>
+          <button type="button" class="memo-play" data-action="memo-afspelen" data-memoid="${esc(m.memoId)}" aria-label="Speel af">${MEMO_PLAY_SVG}</button>
           <div class="memo-prog"><div class="memo-prog-fill"></div></div>
           <span class="memo-duur">${esc(_duurLbl(m.duur||0))}</span>
         </div>

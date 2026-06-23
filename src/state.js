@@ -8,7 +8,7 @@
 //     andere module ze kan herzetten via state.X = ... (imports zijn read-only).
 
 // ── Groep 1: ín-plaats gemuteerde objecten (direct export) ──────────────
-export const D = {ntd:{},af:{},alvo:[],alfa:[],ontw:[],logboek:[],herhaal:[],kenmerken:[],ntdSecInfo:{},afSecInfo:{}};
+export const D = {ntd:{},af:{},alvo:[],alfa:[],ontw:[],logboek:[],herhaal:[],kenmerken:[],memos:{},ntdSecInfo:{},afSecInfo:{}};
 export const pgs = {ntd:1,af:1,alvo:1,alfa:1,ontw:1,logboek:1};
 export const _shownToasts = new Set();
 

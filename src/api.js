@@ -1,5 +1,5 @@
 import { state, D } from "./state.js";
-import { SID, SKEYS, PROXY_URL } from "./config.js";
+import { SID, SKEYS, PROXY_URL, APPS_SCRIPT_URL } from "./config.js";
 
 async function fetchSheet(name){
   if(!state.oauthToken) throw new Error('Niet ingelogd');
@@ -71,6 +71,33 @@ async function askChat(system, messages){
   return (data.antwoord || '').trim();
 }
 
+// ── Spraakmemo-loket ───────────────────────────────────────────────────
+// POST naar het token-beveiligde Apps Script web-app-endpoint. Het OAuth-token
+// gaat mee in de body (Apps Script geeft request-headers niet door). _withRetry
+// vangt transient fouten (429/5xx/netwerk-blip) net als de Sheets-schrijfacties.
+// Acties + payload (zie contract §Loket-API):
+//   'uploadmemo'      {list,code,sectie,itemId,snapshot,durationSec,mime,audioB64} -> {ok,memoId,fileId,timestamp}
+//   'getmemo'         {memoId}            -> {ok,mime,audioB64}
+//   'deletememo'      {memoId}            -> {ok}
+//   'deleteitemmemos' {list,itemId}       -> {ok,removed}
+async function callMemoLoket(action, payload){
+  if(!state.oauthToken) throw new Error('Niet ingelogd');
+  return _withRetry(async ()=>{
+    const r=await fetch(APPS_SCRIPT_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(Object.assign({action,token:state.oauthToken},payload||{})),
+    });
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok || data.error){
+      const err=new Error(data.error||('Memo-loket fout ('+action+')'));
+      err.status=r.status;
+      throw err;
+    }
+    return data;
+  });
+}
+
 // ── Bescherming tegen schrijven naar de verkeerde rij ──────────────────────
 // Pure (testbaar): gegeven de teruggelezen kolom-A-waarden (vanaf minRow) en de
 // verwachte {row,code}-checks → geef de eerste mismatch terug, of null als alles klopt.
@@ -99,4 +126,4 @@ async function assertRowsMatch(checks, sheetName='Nog Te Doen'){
 }
 const assertRowMatch=(row, code, sheetName)=>assertRowsMatch([{ row, code }], sheetName);
 
-export { fetchSheet, writeRange, appendRange, _shiftNtdRows, _isTransient, _withRetry, askChat, _rowMismatch, _a1ColA, assertRowsMatch, assertRowMatch };
+export { fetchSheet, writeRange, appendRange, _shiftNtdRows, _isTransient, _withRetry, askChat, callMemoLoket, _rowMismatch, _a1ColA, assertRowsMatch, assertRowMatch };

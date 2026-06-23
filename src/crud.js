@@ -11,6 +11,8 @@ import { animateRowOut, flashRow } from "./anim.js";
 import { logEvent, renderTaskHistory } from "./render-overig.js";
 import { backgroundWrite, loadAll } from "./data.js";
 import { renderAll } from "./main.js";
+import { callMemoLoket } from "./api.js";
+import { memoCount, memoAfrondHelp } from "./spraakmemo.js";
 
 //  MODAL — Open / Close
 // ══════════════════════════════════════
@@ -220,6 +222,14 @@ async function completeTask(idx){
   document.getElementById('complete-date').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   document.getElementById('complete-comment').value='';
   document.getElementById('complete-title').textContent=`Taak afhandelen — ${r.actiepunt||r.periode||r.code||''}`;
+  // Spraakmemo-vinkje: alléén tonen als deze taak memo's heeft (NTD-lijst, op itemId).
+  const _delMemo=document.getElementById('afrond-del-memo');
+  const _delMemoRow=document.getElementById('afrond-del-memo-row');
+  const _delMemoHelp=document.getElementById('afrond-del-memo-help');
+  const _heeftMemos=r.itemId && memoCount('NTD',r.itemId)>0;
+  if(_delMemo){ _delMemo.classList.remove('on'); _delMemo.setAttribute('aria-checked','false'); }
+  if(_delMemoRow) _delMemoRow.style.display=_heeftMemos?'':'none';
+  if(_delMemoHelp){ _delMemoHelp.style.display=_heeftMemos?'':'none'; _delMemoHelp.textContent=memoAfrondHelp(false); }
   document.getElementById('complete-bg').classList.add('open');
 }
 
@@ -227,6 +237,7 @@ async function doCompleteTask(){
   const idx=state._completeIdx;
   const r=state._rowCache[idx];
   if(!r){alert('Taak niet gevonden.');closeCompleteModal();return}
+  const _delMemos=document.getElementById('afrond-del-memo')?.classList.contains('on')===true;
   const dateVal=document.getElementById('complete-date').value;
   const comment=document.getElementById('complete-comment').value.trim();
   if(!dateVal){alert('Datum is verplicht.');return}
@@ -288,6 +299,12 @@ async function doCompleteTask(){
           afgerond=true;
         }
         logEvent(r.code, sec, 'Afgerond', 'status', 'Nog Te Doen', 'Afgerond op ' + today + (comment ? ' — ' + comment : ''));
+        // Bij aangevinkt vinkje: ná de geslaagde afronding de spraakmemo's van dit item wissen.
+        // Faalt dit, dan ruimt de 30-dagen-trigger ze later alsnog op → geen harde fout tonen.
+        if(_delMemos && r.itemId){
+          try{ await callMemoLoket('deleteitemmemos',{list:'NTD',itemId:r.itemId}); }
+          catch(e){ console.warn('deleteitemmemos faalde (cleanup-trigger ruimt later op):',e); }
+        }
       },
       ()=>{ const a=(D.ntd[sec]=D.ntd[sec]||[]); if(a.indexOf(r)===-1){ _shiftNtdRows(r._row,+1); a.splice(Math.min(pos<0?a.length:pos,a.length),0,r); } },
       'Afronden mislukt'
@@ -298,6 +315,20 @@ async function doCompleteTask(){
 }
 
 function closeCompleteModal(){document.getElementById('complete-bg').classList.remove('open');state._completeIdx=null}
+
+// Afrond-modal memo-toggle: schakelt 'on' + wisselt de helptekst (30 dagen ↔ direct weg).
+function bindAfrondMemoToggle(){
+  const t=document.getElementById('afrond-del-memo');
+  if(!t || t._memoBound) return;
+  t._memoBound=true;
+  t.addEventListener('click',()=>{
+    const on=!t.classList.contains('on');
+    t.classList.toggle('on',on); t.setAttribute('aria-checked',on?'true':'false');
+    const h=document.getElementById('afrond-del-memo-help');
+    if(h) h.textContent=memoAfrondHelp(on);
+  });
+}
+bindAfrondMemoToggle();
 
 // ══════════════════════════════════════
 //  SUBMIT TASK (Add + Edit)

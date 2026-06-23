@@ -49,9 +49,10 @@ const TOAST_ICONS  = {
   n_deadline:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8" fill="currentColor" fill-opacity="0.18"/><path d="M12 9v4l2.5 2"/><path d="M4.5 5.5l3-2M19.5 5.5l-3-2"/></svg>',
   n_alv:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="8" height="13" rx="1" fill="currentColor" fill-opacity="0.18"/><rect x="11" y="4" width="10" height="17" rx="1" fill="currentColor" fill-opacity="0.18"/><path d="M2 21h20M6 12h2M6 15.5h2M15 8h2M15 11.5h2M15 15h2"/></svg>',
   n_daily:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.5" fill="currentColor" fill-opacity="0.18"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.2 5.2l1.8 1.8M17 17l1.8 1.8M18.8 5.2L17 7M7 17l-1.8 1.8"/></svg>',
+  n_memo:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2.5" width="6" height="11" rx="3" fill="currentColor" fill-opacity="0.18"/><path d="M5.5 11a6.5 6.5 0 0013 0M12 17.5V21M9 21h6"/></svg>',
   test:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 0112 0c0 5 2 6 2 6H4s2-1 2-6z" fill="currentColor" fill-opacity="0.18"/><path d="M10 19a2 2 0 004 0"/></svg>'
 };
-const TOAST_COLORS = { n_newtask:'var(--ac)', n_assigned:'var(--gn)', n_deadline:'var(--am)', n_alv:'var(--pu)', n_daily:'var(--am)', test:'var(--ac)' };
+const TOAST_COLORS = { n_newtask:'var(--ac)', n_assigned:'var(--gn)', n_deadline:'var(--am)', n_alv:'var(--pu)', n_daily:'var(--am)', n_memo:'var(--ac)', test:'var(--ac)' };
 const TOAST_DURATION = 5000;
 // Dedup-venster: vangt de dubbele toast (zelfde event via directe fire én via de 10s-poll), die
 // binnen ~10s arriveert. Bewust korter dan voorheen (30s) zodat twee échte, snel-opeenvolgende
@@ -195,6 +196,7 @@ function getNotifPrefs() {
     deadline: localStorage.getItem('notif_deadline') !== 'false',
     alv:      localStorage.getItem('notif_alv')      !== 'false',
     daily:    localStorage.getItem('notif_daily')    !== 'false',
+    memo:     localStorage.getItem('notif_memo')     !== 'false',
   };
 }
 
@@ -211,7 +213,7 @@ async function pollNotifsForToast() {
 
     const who   = getCurrentWho();
     const prefs = getNotifPrefs();
-    const typeToPrefs = { n_newtask:'newtask', n_assigned:'assigned', n_deadline:'deadline', n_alv:'alv', n_daily:'daily' };
+    const typeToPrefs = { n_newtask:'newtask', n_assigned:'assigned', n_deadline:'deadline', n_alv:'alv', n_daily:'daily', n_memo:'memo' };
 
     // Bij cold-start (_lastNotifTs === null) tonen we GEEN toasts voor al bestaande meldingen;
     // we zetten alleen de basislijn op de echte (server-)timestamp van de nieuwste rij. Voorheen
@@ -267,7 +269,7 @@ function openNotifModal() {
     document.getElementById('notif-who-other').style.display = '';
     document.getElementById('notif-who-other').value = who;
   }
-  ['newtask','assigned','deadline','alv','daily'].forEach(k => {
+  ['newtask','assigned','deadline','alv','daily','memo'].forEach(k => {
     const v  = localStorage.getItem('notif_' + k);
     const el = document.getElementById('tog-notif-' + k);
     if (el) { const on = v === null ? true : v === 'true'; el.classList.toggle('on', on); el.setAttribute('aria-checked', on); }
@@ -317,6 +319,7 @@ async function saveNotifPrefs(forceInit) {
     deadline: document.getElementById('tog-notif-deadline').classList.contains('on'),
     alv:      document.getElementById('tog-notif-alv').classList.contains('on'),
     daily:    document.getElementById('tog-notif-daily').classList.contains('on'),
+    memo:     document.getElementById('tog-notif-memo').classList.contains('on'),
   };
   const deadlineHours = document.getElementById('notif-deadline-hours').value || '1';
   Object.entries(prefs).forEach(([k, v]) => localStorage.setItem('notif_' + k, v));
@@ -330,6 +333,7 @@ async function saveNotifPrefs(forceInit) {
         n_deadline: prefs.deadline ? '1' : '0',
         n_alv:      prefs.alv      ? '1' : '0',
         n_daily:    prefs.daily    ? '1' : '0',
+        n_memo:     prefs.memo     ? '1' : '0',
         deadline_h: deadlineHours,
       });
       if (who) await OneSignal.login(who);
@@ -366,7 +370,7 @@ async function subscribeNotifs() {
     }
     await OneSignal.User.PushSubscription.optIn();
     await OneSignal.login(who);
-    ['newtask','assigned','deadline','alv','daily'].forEach(k => {
+    ['newtask','assigned','deadline','alv','daily','memo'].forEach(k => {
       if (localStorage.getItem('notif_' + k) === null) localStorage.setItem('notif_' + k, 'true');
     });
     if (!localStorage.getItem('notif_deadline_hours')) localStorage.setItem('notif_deadline_hours', '1');

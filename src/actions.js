@@ -89,7 +89,7 @@ export const ACTIONS = {
   'vve-log-alles':         ()   => { state._vveLogAlles=true; renderVve(); },
   'chat-send':             ()   => vraagChat(),
   'chat-suggest':          (el) => chatSuggestie(el.dataset.q),
-  'memo-open':        (el) => toggleMemoSectie(el.dataset.list, el.dataset.itemid, el),
+  'memo-open':        (el) => toggleMemoSectie(el.dataset.list, el),
   'memo-inspreken':   (el) => { const it=_memoItemUitEl(el); if(it) openMemoRecorder(it, el.dataset.list, el); },
   'memo-afspelen':    (el) => playMemo(el.dataset.memoid, el),
   'memo-verwijderen': (el) => verwijderMemo(el.dataset.memoid, el.dataset.list, el.dataset.itemid),
@@ -99,6 +99,11 @@ export function initActions() {
   document.addEventListener('click', (e) => {
     const el = e.target.closest('[data-action]');
     if (!el) return;
+    // Een klik op lege ruimte in een open memo-paneel mag niet 'doorvallen' naar de
+    // actie van de rij/kaart eronder (taak-bewerken / vve-open). Eigen knoppen in het
+    // paneel (afspelen/inspreken/verwijderen) zitten zélf in de .memo-sectie en werken wel.
+    const sec = e.target.closest('.memo-sectie');
+    if (sec && !sec.contains(el)) return;
     const fn = ACTIONS[el.dataset.action];
     if (fn) fn(el, e);
   });

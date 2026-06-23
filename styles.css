@@ -911,6 +911,42 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,.search-box inpu
 }
 @media(max-width:380px){.stats-grid{grid-template-columns:1fr}}
 
+/* ── Telefoon: de "Nog Te Doen"-tabel als kaarten i.p.v. een brede tabel die je       ── */
+/* ── zijwaarts moet scrollen. Alleen mobiel + alleen .cards-mobile (desktop ongemoeid). ── */
+@media(max-width:680px){
+  .cards-mobile{overflow-x:visible}
+  .cards-mobile table,.cards-mobile tbody,.cards-mobile tr,.cards-mobile td{display:block;width:auto}
+  /* Kolomkoppen verbergen (waarden krijgen op de kaart hun eigen label via data-label). */
+  .cards-mobile thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  /* Elke gewone datarij = een kaart; volle-breedte rijen (groepkoppen, memo-paneel, aannemers) niet. */
+  .cards-mobile tbody tr:not(:has(td[colspan])){
+    position:relative;background:var(--sur);border:1px solid var(--bor);
+    border-left:4px solid var(--prio-bar,var(--bor-input));border-radius:12px;
+    box-shadow:0 1px 2px rgba(0,0,0,.06);padding:11px 14px 9px;margin:0 0 10px}
+  .cards-mobile tbody tr[data-prio=hoog]{--prio-bar:var(--prio)}
+  .cards-mobile tbody tr[data-prio=midden]{--prio-bar:#b88a32}
+  .cards-mobile tbody tr[data-prio=laag],.cards-mobile tbody tr[data-prio=geen]{--prio-bar:var(--bor-input)}
+  .cards-mobile tbody tr:not(:has(td[colspan]))>td{padding:2px 0;border:none}
+  .cards-mobile tbody tr:not(:has(td[colspan]))>td:first-child{padding-left:0}
+  .cards-mobile tbody tr[data-prio]>td:first-child::before{display:none} /* desktop prio-streep uit; zit nu op kaartrand */
+  /* Kop + primaire tekst: groot en mag afbreken (niet meer afkappen) */
+  .cards-mobile .code{font-size:13px}
+  .cards-mobile .cell-name{font-size:15px;font-weight:600;white-space:normal}
+  .cards-mobile .cell-name>.ct,.cards-mobile .cell-txt>.ct,.cards-mobile .cell-note>.ct{display:inline;white-space:normal;overflow:visible;text-overflow:clip;max-width:none}
+  .cards-mobile .cell-txt,.cards-mobile .cell-note,.cards-mobile .cell-sm{white-space:normal}
+  /* Gelabelde meta-velden krijgen een klein bovenschrift; lege velden verdwijnen. */
+  .cards-mobile td[data-label]::before{content:attr(data-label);display:block;font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mut);margin:7px 0 1px}
+  .cards-mobile td[data-label]:empty{display:none}
+  /* Leeg meta-veld verbergen — maar NIET als de cel ook pillen/mic draagt (offerte-opmerking-cel). */
+  .cards-mobile td[data-label]:has(>.ct:empty):not(:has(.memo-badge,.pill-stil,.pill-opvolg,.pill-snooze)){display:none}
+  /* Bulk-selecteren: het selectievakje als nette regel bovenaan de kaart i.p.v. los blokje. */
+  .cards-mobile td.bulk-cel{display:flex;align-items:center;gap:7px;margin-bottom:4px}
+  .cards-mobile td.bulk-cel::before{content:"Selecteren";font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mut)}
+  /* Actieknoppen onderaan de kaart, rechts uitgelijnd, met een fijne scheidslijn. */
+  .cards-mobile tbody tr:not(:has(td[colspan]))>td:last-child{display:flex;justify-content:flex-end;margin-top:9px;padding-top:9px;border-top:1px solid var(--bor)}
+  .cards-mobile .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+}
+
 /* ── Zwevende elementen: stapeling & overlap (z-index, modal/bulk) ── */
 #toast-container{z-index:700}
 #toast-container>*{pointer-events:all}
@@ -925,6 +961,10 @@ body.bulk #chat-fab{display:none}
 .memo-badge{display:inline-flex;align-items:center;gap:3px;margin-left:6px;padding:1px 6px;border:1px solid var(--ac);background:var(--ac-l);color:var(--ac);border-radius:11px;font-size:11px;font-weight:700;cursor:pointer;vertical-align:middle}
 .memo-badge:hover{background:var(--ac);color:#fff}
 .memo-badge svg{flex:none}
+/* Leeg item (nog geen memo's): subtiele icoon-knop om de eerste memo in te spreken — */
+/* aanwezig op elke taak, maar rustig zodat het de lijst niet overheerst. */
+.memo-badge-leeg{border-color:transparent;background:transparent;color:var(--mut);padding:2px 4px}
+.memo-badge-leeg:hover{border-color:var(--ac);background:var(--ac-l);color:var(--ac)}
 .memo-tr>td{background:var(--sur2);padding:0}
 .memo-sectie{padding:12px 14px}
 .memo-lijst{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}

@@ -95,12 +95,12 @@ function faseBalk(r){
 }
 
 function deadlineCel(r, sec){
-  if (!r.deadline) return `<td class="cell-sm"><span class="warn-geen-deadline">Geen deadline</span></td>`;
+  if (!r.deadline) return `<td class="cell-sm" data-label="Deadline"><span class="warn-geen-deadline">Geen deadline</span></td>`;
   const { teLaat, dagenTot } = berekenPrioriteit(r.deadline, sec);
   // V3: status als gewoon vetgedrukt woord, geen pill
-  if (teLaat) return `<td><span class="s-telaat">Te laat (${Math.abs(dagenTot)}d)</span></td>`;
+  if (teLaat) return `<td data-label="Deadline"><span class="s-telaat">Te laat (${Math.abs(dagenTot)}d)</span></td>`;
   const soon = dagenTot !== null && dagenTot <= 7;
-  return `<td><span class="${soon ? 's-soon' : 's-normal'}">${esc(r.deadline)}</span></td>`;
+  return `<td data-label="Deadline"><span class="${soon ? 's-soon' : 's-normal'}">${esc(r.deadline)}</span></td>`;
 }
 
 function rowNtd(r,sec){
@@ -123,7 +123,7 @@ function rowNtd(r,sec){
     : ov.weggelegd
       ? `<span class="pill-snooze" data-action="taak-wegleggen" data-rid="${rid}" title="Weggelegd tot ${esc(r.opvolgdatum)}">${esc(r.opvolgdatum)}</span>`
       : '';
-  const memoBadge = memoBadgeHtml('NTD', r.itemId);
+  const memoBadge = memoBadgeHtml('NTD', r);
   const extraPills = stilPill + opvolgPill + memoBadge;
   switch(sec){
     case'OPPAKKEN':
@@ -131,20 +131,20 @@ function rowNtd(r,sec){
         <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}</td>
         <td class="cell-txt"><span class="ct" title="${esc(r.actiepunt)}">${esc(r.actiepunt)}</span>${extraPills}</td>
         ${deadlineCel(r, 'OPPAKKEN')}
-        <td>${persBadges(r.behandelaar)}</td>
+        <td data-label="Behandelaar">${persBadges(r.behandelaar)}</td>
         <td>${prioBadge(r, 'OPPAKKEN')}</td>
-        <td class="cell-note"><span class="ct" title="${esc(r.opmerkingen||'')}">${esc(r.opmerkingen||'')}</span></td>
+        <td class="cell-note" data-label="Opmerking"><span class="ct" title="${esc(r.opmerkingen||'')}">${esc(r.opmerkingen||'')}</span></td>
         <td>${editBtn}</td>`;
       break;
     case'VERGADERVERZOEKEN':
       cells=`<td><span class="code code-klik" style="${css}" data-action="vve-open" data-code="${esc(r.code)}" title="Open VvE-dossier">${esc(r.code)}</span></td>
         <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}</td>
-        <td><span class="badge" style="background:var(--am-l);color:var(--am)">${esc(r.periode||r.agendapunten||'')}</span></td>
+        <td data-label="Periode"><span class="badge" style="background:var(--am-l);color:var(--am)">${esc(r.periode||r.agendapunten||'')}</span></td>
         <td class="cell-txt"><span class="ct" title="${esc(r.agendapunten||r.actiepunt||'')}">${esc(r.agendapunten||r.actiepunt||'')}</span>${extraPills}</td>
-        <td>${persBadges(r.behandelaar)}</td>
+        <td data-label="Behandelaar">${persBadges(r.behandelaar)}</td>
         ${deadlineCel(r, 'VERGADERVERZOEKEN')}
         <td>${prioBadge(r, 'VERGADERVERZOEKEN')}</td>
-        <td class="cell-note"><span class="ct" title="${esc(r.opmerkingen||'')}">${esc(r.opmerkingen||'')}</span></td>
+        <td class="cell-note" data-label="Opmerking"><span class="ct" title="${esc(r.opmerkingen||'')}">${esc(r.opmerkingen||'')}</span></td>
         <td>${editBtn}</td>`;
       break;
     case'OFFERTE-TRAJECTEN':{
@@ -159,23 +159,23 @@ function rowNtd(r,sec){
         : '';
       cells=`<td><span class="code code-klik" style="${css}" data-action="vve-open" data-code="${esc(r.code)}" title="Open VvE-dossier">${esc(r.code)}</span></td>
         <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}</td>
-        <td class="cell-sm">${esc(r.datumAangevraagd||'')}</td>
-        <td>${offProg(r.offertes)}${faseBalk(r)}<div class="of-aann-tbl-tog">${offerteAannSamenvatting(r)}</div></td>
-        <td>${persBadges(r.behandelaar)}</td>
+        <td class="cell-sm" data-label="Aangevraagd">${esc(r.datumAangevraagd||'')}</td>
+        <td data-label="Offertes">${offProg(r.offertes)}${faseBalk(r)}<div class="of-aann-tbl-tog">${offerteAannSamenvatting(r)}</div></td>
+        <td data-label="Behandelaar">${persBadges(r.behandelaar)}</td>
         ${deadlineCel(r, 'OFFERTE-TRAJECTEN')}
         <td>${prioBadge(r, 'OFFERTE-TRAJECTEN')}</td>
-        <td class="cell-note"><span class="ct" title="${esc(r.opmerkingen||'')}">${esc(r.opmerkingen||'')}</span>${extraPills}</td>
+        <td class="cell-note" data-label="Opmerking"><span class="ct" title="${esc(r.opmerkingen||'')}">${esc(r.opmerkingen||'')}</span>${extraPills}</td>
         <td>${actsHtml(actieBtn)}</td>`;
       break;}
     case'LOD':
       cells=`<td><span class="code code-klik" style="${css}" data-action="vve-open" data-code="${esc(r.code)}" title="Open VvE-dossier">${esc(r.code)}</span></td>
         <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}</td>
         <td class="cell-txt"><span class="ct" title="${esc(r.actiepunt||'')}">${esc(r.actiepunt||'')}</span>${extraPills}</td>
-        <td class="cell-txt" style="font-style:italic"><span class="ct" title="${esc(r.status||'')}">${esc(r.status||'')}</span></td>
-        <td>${persBadges(r.behandelaar)}</td>
+        <td class="cell-txt" style="font-style:italic" data-label="Status"><span class="ct" title="${esc(r.status||'')}">${esc(r.status||'')}</span></td>
+        <td data-label="Behandelaar">${persBadges(r.behandelaar)}</td>
         ${deadlineCel(r, 'LOD')}
         <td>${prioBadge(r, 'LOD')}</td>
-        <td class="cell-note"><span class="ct" title="${esc(r.opmerkingen||'')}">${esc(r.opmerkingen||'')}</span></td>
+        <td class="cell-note" data-label="Opmerking"><span class="ct" title="${esc(r.opmerkingen||'')}">${esc(r.opmerkingen||'')}</span></td>
         <td>${editBtn}</td>`;
       break;
   }

@@ -28,7 +28,7 @@ function rowHtml(item){
   return `<div class="vd-row ${LABEL_CLS[u.label]||''}" data-action="vve-open" data-code="${esc(r.code)}" title="Open VvE-dossier">
     <span class="vd-bar"></span>
     <div class="vd-body">
-      <div class="vd-top"><span class="vd-actie">${esc(titel)}</span><span class="vd-reden">${esc(u.reden)}</span>${memoBadgeHtml('NTD', r.itemId)}</div>
+      <div class="vd-top"><span class="vd-actie">${esc(titel)}</span><span class="vd-reden">${esc(u.reden)}</span>${memoBadgeHtml('NTD', r)}</div>
       <div class="vd-meta">${esc(r.code)}${r.naam?` · ${esc(r.naam)}`:''}</div>
     </div>
     <div class="vd-acts">

@@ -113,11 +113,36 @@ function pickMimeType(){
 // Mic-icoon (inline SVG, DASH_ICONS-stijl) — gedeeld door badge en knoppen.
 const MIC_SVG='<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2.5" width="6" height="11" rx="3" fill="currentColor" fill-opacity="0.18"/><path d="M5.5 11a6.5 6.5 0 0013 0"/><path d="M12 17.5V21M8.5 21h7"/></svg>';
 
-// Teller-badge op een item met memo's. Echte <button> met aria-label; klik → memo-open.
-function memoBadgeHtml(list, itemId){
+// Mic-badge/opnameknop op een item. Op de werk-lijsten ALTIJD zichtbaar (ook zonder memo's),
+// zodat de eerste memo ingesproken kan worden: mic-only bij 0, mic + aantal zodra er memo's zijn.
+// `item` = het hele rij-object — we hebben zowel itemId als _row nodig (lazy ID-toekenning).
+// opts.record===false → read-only weergave (analytics/afgerond): géén opnameknop bij 0 én géén
+// data-row (de _row daar verwijst naar een ánder tabblad → recorden zou de verkeerde rij raken).
+function memoBadgeHtml(list, item, opts){
+  const itemId=(item&&item.itemId)||'';
   const n=memoCount(list, itemId);
-  if(!n) return '';
-  return `<button type="button" class="memo-badge" data-action="memo-open" data-list="${esc(list)}" data-itemid="${esc(itemId)}" title="${n} spraakmemo${n===1?'':"'s"}" aria-label="${n} spraakmemo${n===1?'':"'s"} — open">${MIC_SVG}<span class="memo-badge-n">${n}</span></button>`;
+  const record=!(opts&&opts.record===false);
+  if(!n && !record) return '';                 // read-only én nog geen memo's → niets tonen
+  const rowAttr=record ? ` data-row="${esc(((item&&item._row)||'')+'')}"` : '';
+  const cls='memo-badge'+(n?'':' memo-badge-leeg');
+  const titel=n ? `${n} spraakmemo${n===1?'':"'s"}` : 'Spraakmemo inspreken';
+  const aria =n ? `${n} spraakmemo${n===1?'':"'s"} — open` : 'Spraakmemo inspreken';
+  const teller=n ? `<span class="memo-badge-n">${n}</span>` : '';
+  return `<button type="button" class="${cls}" data-action="memo-open" data-list="${esc(list)}" data-itemid="${esc(itemId)}"${rowAttr} title="${titel}" aria-label="${aria}">${MIC_SVG}${teller}</button>`;
+}
+
+// Zoekt de échte rij-referentie op via (lijst, _row) in D. Het _row-nummer is uniek bínnen één
+// tabblad, dus per lijst exact één treffer. Nodig zodat de recorder een vers item lazy een ID kan
+// toekennen op het juiste, gedeelde object (zodat een latere render het ID/aantal meeneemt).
+function _findRealItem(list, row){
+  row=+row||0; if(!row) return null;
+  if(list==='NTD'){
+    const groepen=D.ntd||{};
+    for(const sec in groepen){ const hit=(groepen[sec]||[]).find(r=>r&&r._row===row); if(hit) return hit; }
+    return null;
+  }
+  const arr = list==='ALVO'?D.alvo : list==='ALFA'?D.alfa : list==='ONTW'?D.ontw : null;
+  return arr ? (arr.find(r=>r&&r._row===row)||null) : null;
 }
 
 // Bouwt de exacte upload-payload voor callMemoLoket('uploadmemo', …). Eén bron zodat de
@@ -194,6 +219,10 @@ async function openMemoRecorder(item, list, anchorEl){
 
   async function verstuur(blob){
     const itemId=await ensureItemId(item, list);
+    // Vers item kreeg net (lazy) een ID; de open sectie droeg nog data-itemid="" → bijwerken
+    // zodat _herrenderMemoUI (zoekt op data-itemid) deze sectie straks terugvindt.
+    const _sectie=(anchorEl&&anchorEl.closest)?anchorEl.closest('.memo-sectie'):null;
+    if(_sectie) _sectie.dataset.itemid=itemId;
     const durationSec=Math.max(1, Math.min(MEMO_MAX_SEC, duurSec||1));
     const recMime=(rec.mimeType||mime||blob.type||'audio/webm');
     let audioB64;
@@ -308,6 +337,7 @@ function renderMemoList(container, item, list){
   container._memoItem=item;
   container.classList.add('memo-sectie');
   container.dataset.list=list; container.dataset.itemid=itemId;
+  container.dataset.row=((item._row!=null?item._row:'')+'');   // stabiele open/dicht-sleutel
   container.dataset.code=item.code||''; container.dataset.sec=item._sec||'';
   const memos=itemId?((D.memos||{})[list+'|'+itemId]||[]):[];
   const rij=m=>{
@@ -336,13 +366,21 @@ function renderMemoList(container, item, list){
 }
 
 // Klik op de badge: open/sluit een memo-sectie net ná de itemrij/-knop.
-function toggleMemoSectie(list, itemId, anchorEl){
-  const bestaand=document.querySelector(`.memo-sectie[data-list="${list}"][data-itemid="${itemId}"]`);
-  if(bestaand){ bestaand.closest('.memo-tr')?.remove(); if(bestaand.parentNode) bestaand.remove(); return; }
-  let item=null;
+function toggleMemoSectie(list, anchorEl){
+  const row=anchorEl.dataset.row||'';
+  const itemId=anchorEl.dataset.itemid||'';
   const tr=anchorEl.closest('tr[data-row]');
-  if(tr){ item=(state._rowCache||[]).find(r=>r&&r.itemId===itemId)||null; }
-  if(!item) item={ itemId, code:anchorEl.dataset.code||'', _sec:anchorEl.dataset.sec||'' };
+  // Al open? Kijk LOKAAL naast de geklikte badge (niet document-breed): zo sluit dezelfde
+  // taak, getoond op twee weergaven (bv. offerte-hero én -tabel), niet elkaars paneel.
+  // Het paneel staat altijd direct ná de rij (memo-tr) of ná de knop (memo-sectie).
+  let bestaand=null;
+  if(tr){ const nx=tr.nextElementSibling; if(nx&&nx.classList.contains('memo-tr')) bestaand=nx.querySelector('.memo-sectie'); }
+  else { const nx=anchorEl.nextElementSibling; if(nx&&nx.classList.contains('memo-sectie')) bestaand=nx; }
+  if(bestaand){ bestaand.closest('.memo-tr')?.remove(); if(bestaand.parentNode) bestaand.remove(); return; }
+  // Echte rij-referentie opzoeken zodat een vers item lazy een ID krijgt op het juiste object.
+  let item = row ? _findRealItem(list, row) : null;
+  if(!item) item = (state._rowCache||[]).find(r=>r&&itemId&&r.itemId===itemId) || null;
+  if(!item) item = { itemId, _row: row?+row:0, code:anchorEl.dataset.code||'', _sec:anchorEl.dataset.sec||'' };
   const sectie=document.createElement('div');
   if(tr){
     const nieuweTr=document.createElement('tr');
@@ -377,4 +415,4 @@ async function deleteItemMemos(list, itemId){
   if(D.memos) delete D.memos[list+'|'+itemId];
 }
 
-export { genItemId, idCellA1, ensureItemId, parseMemos, memoCount, pickMimeType, memoBadgeHtml, MIC_SVG, buildUploadPayload, memoAfrondHelp, memoIsVerlopen, openMemoRecorder, playMemo, renderMemoList, toggleMemoSectie, verwijderMemo, deleteItemMemos, _herrenderMemoUI };
+export { genItemId, idCellA1, ensureItemId, parseMemos, memoCount, pickMimeType, memoBadgeHtml, MIC_SVG, buildUploadPayload, memoAfrondHelp, memoIsVerlopen, openMemoRecorder, playMemo, renderMemoList, toggleMemoSectie, verwijderMemo, deleteItemMemos, _herrenderMemoUI, _findRealItem };

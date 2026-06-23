@@ -9,7 +9,7 @@ import { filterVves } from "./vve-zoekveld.js";
 import { filterNtd, offerteGroepen, _offerteActiviteitMap, offerteBalBijTekst, setNtd, renderNtd, offerteAannemerPaneel, offerteAannSamenvatting } from "./render-lijsten.js";
 import { state, D, pgs } from "./state.js";
 import { vveOverzicht, filterDossierLog } from "./render-vve.js";
-import { genItemId, idCellA1, parseMemos, memoCount, memoBadgeHtml, pickMimeType, buildUploadPayload, memoAfrondHelp, memoIsVerlopen } from "./spraakmemo.js";
+import { genItemId, idCellA1, parseMemos, memoCount, memoBadgeHtml, pickMimeType, buildUploadPayload, memoAfrondHelp, memoIsVerlopen, _findRealItem } from "./spraakmemo.js";
 import { parseKenmerken, vveKenmerken } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk.js";
@@ -967,14 +967,47 @@ import { shouldPromptReload } from "./sw-update.js";
     window.MediaRecorder=orig;
     const oud=D.memos;
     D.memos={'NTD|IT-x':[{memoId:'M-1'},{memoId:'M-2'},{memoId:'M-3'}]};
-    const h=memoBadgeHtml('NTD','IT-x');
+    // Item MÉT memo's → mic + aantal, met stabiele rij-verwijzing (data-row) voor de recorder.
+    const h=memoBadgeHtml('NTD',{itemId:'IT-x',_row:7});
     truthy('memoBadge: bevat aantal 3', /\b3\b/.test(h));
     truthy('memoBadge: bevat <svg', h.indexOf('<svg')>-1);
     truthy('memoBadge: <button>', h.indexOf('<button')>-1);
     truthy('memoBadge: data-action memo-open', h.indexOf('data-action="memo-open"')>-1);
-    eq('memoBadge: leeg item → ""', memoBadgeHtml('NTD','IT-leeg'), '');
-    eq('memoBadge: leeg itemId → ""', memoBadgeHtml('NTD',''), '');
+    truthy('memoBadge: data-row meegegeven', h.indexOf('data-row="7"')>-1);
+    truthy('memoBadge: data-itemid meegegeven', h.indexOf('data-itemid="IT-x"')>-1);
+    // NIEUW GEDRAG (root-cause fix): item ZONDER memo's geeft tóch een opnameknop terug
+    // (mic-only, geen aantal) zodat de eerste memo ingesproken kan worden. Vroeger: "".
+    const hLeeg=memoBadgeHtml('NTD',{itemId:'',_row:9});
+    truthy('memoBadge: leeg item → knop (niet leeg)', hLeeg.indexOf('<button')>-1);
+    truthy('memoBadge: leeg item → mic-icoon', hLeeg.indexOf('<svg')>-1);
+    truthy('memoBadge: leeg item → data-row voor lazy ID', hLeeg.indexOf('data-row="9"')>-1);
+    truthy('memoBadge: leeg item → geen aantal-span', hLeeg.indexOf('memo-badge-n')===-1);
+    truthy('memoBadge: leeg item → leeg-klasse (subtiel)', hLeeg.indexOf('memo-badge-leeg')>-1);
+    // READ-ONLY weergave (analytics/afgerond): leeg → "" (geen opnameknop, want verkeerd tabblad),
+    // mét memo's → telbadge zónder data-row (voorkomt rij-botsing met de NTD-sheet).
+    eq('memoBadge: read-only leeg → ""', memoBadgeHtml('NTD',{itemId:'IT-ro',_row:3},{record:false}), '');
+    const hRo=memoBadgeHtml('NTD',{itemId:'IT-x',_row:3},{record:false});
+    truthy('memoBadge: read-only met memo\'s → telbadge', hRo.indexOf('data-action="memo-open"')>-1);
+    truthy('memoBadge: read-only bevat aantal 3', /\b3\b/.test(hRo));
+    truthy('memoBadge: read-only badge bevat GEEN data-row', hRo.indexOf('data-row=')===-1);
     D.memos=oud;
+  })();
+  (()=>{
+    // _findRealItem: lost de échte rij-referentie op via (lijst,_row) in D, zodat de recorder
+    // een vers item lazy een ID kan toekennen op het juiste object/tabblad.
+    const oudNtd=D.ntd, oudAlvo=D.alvo, oudAlfa=D.alfa, oudOntw=D.ontw;
+    D.ntd={ OPPAKKEN:[{code:'A1',_row:5,_sec:'OPPAKKEN',itemId:''}], LOD:[{code:'B2',_row:8,_sec:'LOD',itemId:'IT-q'}] };
+    D.alvo=[{code:'C3',_row:4,itemId:''}];
+    D.alfa=[{code:'D4',_row:6,itemId:''}];
+    D.ontw=[{titel:'Idee',_row:2,itemId:''}];
+    eq('_findRealItem: NTD over secties heen', _findRealItem('NTD',8)?.code, 'B2');
+    eq('_findRealItem: NTD eerste sectie', _findRealItem('NTD',5)?.code, 'A1');
+    eq('_findRealItem: ALVO', _findRealItem('ALVO',4)?.code, 'C3');
+    eq('_findRealItem: ALFA', _findRealItem('ALFA',6)?.code, 'D4');
+    eq('_findRealItem: ONTW', _findRealItem('ONTW',2)?.titel, 'Idee');
+    eq('_findRealItem: onbekende rij → null', _findRealItem('NTD',999), null);
+    eq('_findRealItem: rij 0 → null', _findRealItem('NTD',0), null);
+    D.ntd=oudNtd; D.alvo=oudAlvo; D.alfa=oudAlfa; D.ontw=oudOntw;
   })();
   (()=>{
     const item = { code:'VVE-0142', itemId:'IT-lt3x9-a4f2', actiepunt:'Lekkage kelder onderzoeken' };

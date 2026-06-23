@@ -155,10 +155,10 @@ function renderVve(){
       : r.deadline
         ? `${esc(r.deadline)}${p.teLaat?` <span class="pill-telaat">Te laat (${Math.abs(p.dagenTot)}d)</span>`:''}`
         : '<span class="warn-geen-deadline">Geen deadline</span>';
-    return `<tr class="${weg?'snooze-row':''}" data-action="taak-bewerken" data-rid="${rid}" style="cursor:pointer">
+    return `<tr class="${weg?'snooze-row':''}" data-action="taak-bewerken" data-rid="${rid}" data-row="${r._row}" style="cursor:pointer">
       <td class="cell-txt">${esc(r.actiepunt||r.periode||r.agendapunten||r.status||'')}</td>
       <td><span class="badge" style="${meta.css};background:var(--sec-l);color:var(--sec)">${esc(meta.label)}</span></td>
-      <td>${persBadges(r.behandelaar)}${memoBadgeHtml('NTD', r.itemId)}</td>
+      <td>${persBadges(r.behandelaar)}${memoBadgeHtml('NTD', r)}</td>
       <td class="cell-sm">${dl}</td></tr>`;
   };
   const afLimiet=state._vveAfAlles?o.afgerond.length:5;

@@ -52,7 +52,7 @@ function renderAlvo(){
       const idx=D.alvo.indexOf(r);
       return`<tr>
         <td><span class="code" style="--sec:var(--ac);--sec-l:var(--ac-l)">${esc(r.code)}</span></td>
-        <td class="cell-name">${esc(r.naam)}${memoBadgeHtml('ALVO', r.itemId)}</td>
+        <td class="cell-name">${esc(r.naam)}${memoBadgeHtml('ALVO', r)}</td>
         <td>${flagPill(idx,'uitnodiging',r.uitnodiging)}</td>
         <td>${flagPill(idx,'notulen',r.notulen)}</td>
         <td>${flagPill(idx,'begroting',r.begroting)}</td>
@@ -144,7 +144,7 @@ function renderAlfa(){
   document.getElementById('alfa-tbody').innerHTML=sl.length
     ?sl.map(r=>`<tr>
         <td><span class="code" style="--sec:var(--gn);--sec-l:var(--gn-l)">${esc(r.code)}</span></td>
-        <td class="cell-name">${esc(r.naam)}${memoBadgeHtml('ALFA', r.itemId)}</td>
+        <td class="cell-name">${esc(r.naam)}${memoBadgeHtml('ALFA', r)}</td>
         <td class="cell-sm">${esc(r.datum)}</td>
       </tr>`).join('')
     :emptyRow(3);

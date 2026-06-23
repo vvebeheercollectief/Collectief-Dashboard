@@ -1,5 +1,5 @@
 import { state, D } from "./state.js";
-import { SID, SKEYS, PROXY_URL, APPS_SCRIPT_URL } from "./config.js";
+import { SID, SKEYS, PROXY_URL, MEMO_PROXY_URL } from "./config.js";
 
 async function fetchSheet(name){
   if(!state.oauthToken) throw new Error('Niet ingelogd');
@@ -83,18 +83,22 @@ async function askChat(system, messages){
 async function callMemoLoket(action, payload){
   if(!state.oauthToken) throw new Error('Niet ingelogd');
   return _withRetry(async ()=>{
-    // BELANGRIJK: 'text/plain' i.p.v. 'application/json'. Een JSON-content-type maakt dit een
-    // CORS-"preflight" (OPTIONS) — en een Apps Script web-app beantwoordt OPTIONS met 405, dus
-    // de browser blokkeert de POST ("Failed to fetch"). text/plain is een "simple request" → geen
-    // preflight; de server leest de body toch rauw uit (e.postData.contents → JSON.parse).
-    const r=await fetch(APPS_SCRIPT_URL,{
-      method:'POST',
-      headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body:JSON.stringify(Object.assign({action,token:state.oauthToken},payload||{})),
-    });
+    // Via de same-origin Vercel-proxy /api/memo (zie config.MEMO_PROXY_URL). Een DIRECTE
+    // browser→Apps Script POST faalt op CORS (preflight bij JSON; Safari blokkeert de
+    // redirect van het antwoord). De proxy stuurt server-side door en geeft JSON terug.
+    let r;
+    try{
+      r=await fetch(MEMO_PROXY_URL,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(Object.assign({action,token:state.oauthToken},payload||{})),
+      });
+    }catch(netErr){
+      throw new Error('Geen verbinding met de memo-server ('+(netErr.message||'netwerkfout')+')');
+    }
     const data=await r.json().catch(()=>({}));
     if(!r.ok || data.error){
-      const err=new Error(data.error||('Memo-loket fout ('+action+')'));
+      const err=new Error(data.error||('Memo-loket fout '+r.status+' ('+action+')'));
       err.status=r.status;
       throw err;
     }

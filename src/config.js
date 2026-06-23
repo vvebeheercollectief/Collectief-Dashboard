@@ -5,7 +5,7 @@ import { ALLOWED_EMAILS } from '../allowed-emails.js';
 
 // ── Versie (zichtbaar in de UI) ────────────────────────────────────────
 // Ophogen bij ELKE wijziging: 4.1, 4.2, … 5.0 voor grote sprongen.
-export const APP_VERSION = '6.3';
+export const APP_VERSION = '6.4';
 
 // ── Omgeving (productie vs. testomgeving) ──────────────────────────────
 // Fail-safe: alleen deze exacte hosts zijn PRODUCTIE; al het andere
@@ -33,6 +33,11 @@ export const PROXY_URL = IS_STAGING ? '/api/chat' : 'https://collectief-dashboar
 export const APPS_SCRIPT_URL_PROD = '<<WEB-APP EXEC-URL NA DEPLOY INVULLEN>>';
 export const APPS_SCRIPT_URL_TEST = 'https://script.google.com/macros/s/AKfycbwpsgWAPFIxx0zOGjFzC2ZJuoP6Uu3lOBNcFCrEgwM09x6yKmm4dwGkKzgqYOGBtDBykQ/exec';
 export const APPS_SCRIPT_URL = IS_STAGING ? APPS_SCRIPT_URL_TEST : APPS_SCRIPT_URL_PROD;
+// De browser belt het loket NIET direct (CORS: preflight bij JSON + Safari blokkeert de
+// Apps Script-redirect). In plaats daarvan via de same-origin Vercel-proxy /api/memo, die
+// server-side doorstuurt — zelfde aanpak als de AI-chat (/api/chat). Op productie (GitHub
+// Pages) is dat de vaste Vercel-functie-URL.
+export const MEMO_PROXY_URL = IS_STAGING ? '/api/memo' : 'https://collectief-dashboard.vercel.app/api/memo';
 
 // ── Spraakmemo-constanten ─────────────────────────────────────────────
 export const MEMO_SHEET = "Spraakmemo's";   // metadata-tab (A..L)

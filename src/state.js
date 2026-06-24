@@ -83,4 +83,7 @@ export const state = {
   // logboek-filters
   logWho: '',
   logAct: '',
+  // logboek bewerken
+  logEdit: null,        // _row van de logregel die nu inline bewerkt wordt (of null)
+  logEditSoort: null,   // gekozen contactsoort tijdens bewerken
 };

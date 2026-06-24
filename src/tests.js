@@ -2,7 +2,7 @@
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
 import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, offerteBalBij, _verschilInWerkdagen, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten, offerteNabelTeller, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, isoWeek, coerceDagenVooraf } from "./util.js";
-import { logZin, logPaginaSoort, parseOntw } from "./render-overig.js";
+import { logZin, logPaginaSoort, parseOntw, _shiftRows, logEditWrite } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, MEMO_SHEET, MEMO_MAX_SEC, MEMO_RETENTIE_DAGEN, LIST_ID_COL, LIST_SHEET } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
@@ -145,6 +145,24 @@ import { shouldPromptReload } from "./sw-update.js";
   eq('logPaginaSoort Kenmerk → ruis',          logPaginaSoort('Kenmerk'),   null);
   eq('logPaginaSoort Herhaalregel → ruis',     logPaginaSoort('Herhaalregel bewerkt'), null);
   eq('logPaginaSoort leeg → ruis',             logPaginaSoort(''),          null);
+
+  // ── Logboek bewerken/verwijderen (pure helpers) ──
+  (()=>{
+    const arr=[{_row:2},{_row:5},{_row:8}];
+    _shiftRows(arr,5,-1);
+    eq('_shiftRows: rij 2 (boven) blijft', arr[0]._row, 2);
+    eq('_shiftRows: rij 5 (==from) blijft', arr[1]._row, 5);
+    eq('_shiftRows: rij 8 (onder) schuift -1', arr[2]._row, 7);
+    _shiftRows(arr,5,+1);
+    eq('_shiftRows: +1 herstelt rij 8', arr[2]._row, 8);
+
+    const op=logEditWrite('Opmerking',12,'','','nieuwe tekst');
+    eq('logEditWrite Opmerking range = G12', op.range, "'Logboek'!G12");
+    eq('logEditWrite Opmerking values', op.values, ['nieuwe tekst']);
+    const co=logEditWrite('Contact',7,'E-mail','Bestuur','gebeld');
+    eq('logEditWrite Contact range = E7:G7', co.range, "'Logboek'!E7:G7");
+    eq('logEditWrite Contact values', co.values, ['E-mail','Bestuur','gebeld']);
+  })();
 
   // ── _isStagingHost ── (fail-safe: alleen bekende productie-hosts = productie)
   truthy('prod host = geen staging',     _isStagingHost('collectief-dashboard.vercel.app') === false);

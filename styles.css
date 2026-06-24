@@ -511,6 +511,21 @@
     .log-mini-meta{color:var(--mut)}
     .log-time{font-size:11.5px;color:var(--mut);white-space:nowrap;flex-shrink:0;padding-top:3px}
     .log-empty{text-align:center;color:var(--mut);padding:40px;font-style:italic}
+    /* ── Logboek: bewerken/verwijderen ── */
+    .log-acts{display:flex;gap:1px;align-items:flex-start;flex-shrink:0;opacity:0;transition:opacity var(--tr)}
+    .log-item:hover .log-acts,.log-mini:hover .log-acts{opacity:1}
+    .log-act-btn{border:none;background:transparent;color:var(--mut);cursor:pointer;font-size:13px;line-height:1;padding:4px 5px;border-radius:6px;transition:background var(--tr),color var(--tr)}
+    .log-act-btn:hover{background:var(--sur2);color:var(--txt)}
+    .log-act-btn.del:hover{background:var(--rd-l);color:var(--rd)}
+    .log-mini .log-act-btn{font-size:12px;padding:2px 4px}
+    @media(hover:none){.log-acts{opacity:.5}}
+    .log-edit{flex:1;display:flex;flex-direction:column;gap:8px;padding:10px;border:1px solid var(--ac-b);border-radius:10px;background:var(--sur2)}
+    .log-edit-tekst{width:100%;resize:vertical;font:inherit;font-size:13px;line-height:1.5;padding:8px;border:1px solid var(--bor);border-radius:8px;background:var(--sur);color:var(--txt)}
+    .log-edit-rij{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .log-edit-wie{margin-left:auto;font-size:12.5px;padding:6px 8px;border:1px solid var(--bor);border-radius:8px;background:var(--sur);color:var(--txt)}
+    .log-edit-knoppen{display:flex;gap:8px;justify-content:flex-end}
+    .log-edit-tekst:focus,.log-edit-wie:focus{outline:none;border-color:var(--ac);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 14%,transparent)}
+    @media(max-width:700px){.log-edit-wie{margin-left:0}}
 
     /* ── AI-hulp ── */
     .ai-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}

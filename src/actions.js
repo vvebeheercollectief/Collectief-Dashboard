@@ -8,6 +8,7 @@ import {
 } from './render-lijsten.js';
 import {
   setOntw, renderOntw, editOntwItem, addTaskNote, renderLogboek,
+  editLogboek, saveLogboek, cancelLogboek, setLogSoort, deleteLogboek,
 } from './render-overig.js';
 import { openModal, completeTask, deleteCurrentEditTask } from './crud.js';
 import { adjOff } from './util.js';
@@ -81,6 +82,11 @@ export const ACTIONS = {
   'vve-log-alles':         ()   => { state._vveLogAlles=true; renderVve(); },
   'chat-send':             ()   => vraagChat(),
   'chat-suggest':          (el) => chatSuggestie(el.dataset.q),
+  'log-bewerken':          (el) => editLogboek(+el.dataset.row),
+  'log-opslaan':           (el) => saveLogboek(+el.dataset.row),
+  'log-annuleren':         ()   => cancelLogboek(),
+  'log-soort':             (el) => setLogSoort(el.dataset.soort),
+  'log-verwijderen':       (el) => deleteLogboek(+el.dataset.row),
 };
 
 export function initActions() {
@@ -107,6 +113,12 @@ export function initActions() {
     if (e.target && e.target.id === 'chat-input' && e.key === 'Enter') {
       e.preventDefault();
       vraagChat();
+    }
+    // Logboek bewerken: Ctrl/Cmd+Enter in de edit-textarea = opslaan
+    if (e.target && e.target.id === 'log-edit-tekst' && (e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      const box = e.target.closest('.log-edit');
+      if (box) saveLogboek(+box.dataset.row);
     }
   });
 }

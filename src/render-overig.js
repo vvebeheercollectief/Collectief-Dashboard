@@ -7,7 +7,7 @@ import { state, D, pgs } from "./state.js";
 import { ensureToken } from "./auth.js";
 import { writeRange, appendRange, assertRowMatch } from "./api.js";
 import { renderThead, renderPag } from "./render-lijsten.js";
-import { getSheetIds, setv, gv } from "./crud.js";
+import { getSheetIds, setv, gv, insertAndWriteRow } from "./crud.js";
 import { loadAll, backgroundWrite } from "./data.js";
 import { getCurrentWho, showToast, showUndoToast } from "./notifications.js";
 import { animateRowOut } from "./anim.js";
@@ -260,7 +260,7 @@ function logPaginaSoort(actie){
 
 // Eén logregel als HTML (gedeeld door Logboek-pagina en VvE-dossier-feed).
 // subtiel=true → compacte grijze regel (alleen Logboek-pagina, voor Afgerond/Aangemaakt).
-function logItemHtml(r,subtiel){
+function logItemHtml(r,subtiel,acties){
   if(subtiel){
     const naam=esc(displayName(r.gebruiker)||'Iemand');
     const code=`<b>${esc(r.code||'—')}</b>`;
@@ -268,12 +268,15 @@ function logItemHtml(r,subtiel){
     const zin=isAf
       ? `${naam} rondde ${code} af`
       : `${naam} maakte ${code} aan${r.nieuweWaarde?` <span class="log-mini-meta">→ ${esc(r.nieuweWaarde)}</span>`:''}`;
+    const acts=acties?`<span class="log-acts"><button class="log-act-btn del" data-action="log-verwijderen" data-row="${r._row}" title="Verwijderen" aria-label="Regel verwijderen">🗑</button></span>`:'';
     return `<div class="log-mini">
       <span class="log-mini-dot" style="background:${isAf?'var(--gn)':'var(--pu)'}"></span>
       <span class="log-mini-txt">${zin}</span>
       <span class="log-time">${esc(logTijd(r.timestamp))}</span>
+      ${acts}
     </div>`;
   }
+  if(acties && state.logEdit===r._row) return logEditForm(r);
   let extra='';
   if((r.actie==='Behandelaar gewijzigd'||r.actie==='Bewerkt'||r.actie==='Kenmerk') && r.veld && (r.oudeWaarde||r.nieuweWaarde)){
     extra=`<div class="log-change"><span class="old">${esc(r.oudeWaarde||'—')}</span><span class="arr">→</span><span class="new">${esc(r.nieuweWaarde||'—')}</span></div>`;
@@ -282,14 +285,159 @@ function logItemHtml(r,subtiel){
     extra=`<div class="log-note">${esc(r.nieuweWaarde)}</div>`;
   }
   const init=(displayName(r.gebruiker)||'?').charAt(0).toUpperCase();
+  const acts=acties?`<span class="log-acts">
+    <button class="log-act-btn" data-action="log-bewerken" data-row="${r._row}" title="Bewerken" aria-label="Regel bewerken">✎</button>
+    <button class="log-act-btn del" data-action="log-verwijderen" data-row="${r._row}" title="Verwijderen" aria-label="Regel verwijderen">🗑</button>
+  </span>`:'';
   return `<div class="log-item">
     <span class="log-av" style="background:${avatarKleur(displayName(r.gebruiker))}">${esc(init)}</span>
     <div class="log-body"><div class="log-line">${logZin(r)}</div>${extra}</div>
     <span class="log-time">${esc(logTijd(r.timestamp))}</span>
+    ${acts}
   </div>`;
 }
 
+// Pure (testbaar): verschuif _row van entries ONDER fromRow met delta.
+// Gebruikt na invoegen/verwijderen van een Sheet-rij, zodat een volgende
+// optimistische actie de juiste rij raakt (analoog aan _shiftNtdRows).
+function _shiftRows(entries, fromRow, delta){
+  (entries||[]).forEach(e=>{ if(e._row>fromRow) e._row+=delta; });
+}
+function _shiftLogboekRows(fromRow, delta){ _shiftRows(D.logboek, fromRow, delta); }
+
+// Pure (testbaar): welke Sheet-cellen worden geschreven bij het bewerken van een
+// logregel. Opmerking → alleen tekst (kol G). Contact → soort (E), wie (F), tekst (G).
+function logEditWrite(actie, row, soort, wie, tekst){
+  return actie==='Contact'
+    ? { range:`'Logboek'!E${row}:G${row}`, values:[soort, wie, tekst] }
+    : { range:`'Logboek'!G${row}`,        values:[tekst] };
+}
+
+// Korte omschrijving voor de verwijder-undo-toast.
+function logDeleteLabel(r){
+  const t=(r.nieuweWaarde||r.actie||'').toString();
+  return `${r.code||'—'} · ${t.length>40?t.slice(0,40)+'…':t}`;
+}
+
+// Spiegelt de contact-composer op de VvE-pagina (lokaal gehouden om een
+// circulaire import render-overig ↔ render-vve te vermijden).
+const LOG_CONTACT_SOORTEN=[['Telefoon','📞'],['E-mail','✉️'],['Gesprek','🤝'],['Notitie','📝']];
+const LOG_WIE_OPTIES=['Bewoner/eigenaar','Bestuur','Leverancier','Overig'];
+
+function logEditForm(r){
+  const isContact=r.actie==='Contact';
+  const sel=state.logEditSoort||r.veld||'Telefoon';
+  const contactRij=isContact?`<div class="log-edit-rij">
+    <div class="dos-chips">${LOG_CONTACT_SOORTEN.map(([s,ico])=>
+      `<button type="button" class="soort-chip${sel===s?' aan':''}" data-action="log-soort" data-soort="${esc(s)}">${ico} ${esc(s)}</button>`).join('')}</div>
+    <select id="log-edit-wie" class="log-edit-wie" title="Met wie?">${LOG_WIE_OPTIES.map(w=>
+      `<option${(r.oudeWaarde||'Overig')===w?' selected':''}>${esc(w)}</option>`).join('')}</select>
+  </div>`:'';
+  return `<div class="log-item"><div class="log-edit" data-row="${r._row}">
+    <textarea id="log-edit-tekst" class="log-edit-tekst" rows="2">${esc(r.nieuweWaarde||'')}</textarea>
+    ${contactRij}
+    <div class="log-edit-knoppen">
+      <button class="btn btn-sec btn-sm" data-action="log-annuleren">Annuleren</button>
+      <button class="btn btn-pri btn-sm" data-action="log-opslaan" data-row="${r._row}">Opslaan</button>
+    </div>
+  </div></div>`;
+}
+
+function editLogboek(row){
+  state.logEdit=row;
+  const e=(D.logboek||[]).find(x=>x._row===row);
+  state.logEditSoort=e?e.veld:null;
+  renderLogboek();
+  setTimeout(()=>{ const t=document.getElementById('log-edit-tekst'); if(t){ t.focus(); t.setSelectionRange(t.value.length,t.value.length); } },0);
+}
+
+function cancelLogboek(){ state.logEdit=null; state.logEditSoort=null; renderLogboek(); }
+
+function setLogSoort(soort){
+  state.logEditSoort=soort;
+  document.querySelectorAll('.log-edit .soort-chip').forEach(c=>c.classList.toggle('aan', c.dataset.soort===soort));
+}
+
+async function saveLogboek(row){
+  const entry=(D.logboek||[]).find(e=>e._row===row);
+  if(!entry) return;
+  const tekst=(document.getElementById('log-edit-tekst')?.value||'').trim();
+  if(!tekst){ alert('De tekst mag niet leeg zijn.'); return; }
+  if(!await ensureToken()){ alert('Inloggen mislukt.'); return; }
+  const isContact=entry.actie==='Contact';
+  const soort=isContact ? (state.logEditSoort||entry.veld||'Telefoon') : entry.veld;
+  const wie=isContact ? (document.getElementById('log-edit-wie')?.value||entry.oudeWaarde||'Overig') : entry.oudeWaarde;
+  const oud={veld:entry.veld, oudeWaarde:entry.oudeWaarde, nieuweWaarde:entry.nieuweWaarde};
+  // optimistisch bijwerken + sluiten
+  if(isContact){ entry.veld=soort; entry.oudeWaarde=wie; }
+  entry.nieuweWaarde=tekst;
+  state.logEdit=null; state.logEditSoort=null;
+  renderLogboek();
+  const w=logEditWrite(entry.actie, row, soort, wie, tekst);
+  backgroundWrite(
+    async ()=>{ await assertRowMatch(row, entry.timestamp, 'Logboek'); await writeRange(w.range, w.values); },
+    ()=>{ entry.veld=oud.veld; entry.oudeWaarde=oud.oudeWaarde; entry.nieuweWaarde=oud.nieuweWaarde; },
+    'Bewerken mislukt'
+  );
+}
+
+async function deleteLogboek(row){
+  const entries=D.logboek||[];
+  const idx=entries.findIndex(e=>e._row===row);
+  if(idx<0) return;
+  const entry=entries[idx];
+  if(!await ensureToken()){ alert('Inloggen mislukt.'); return; }
+  const vals=[entry.timestamp, entry.code, entry.sectie, entry.actie, entry.veld, entry.oudeWaarde, entry.nieuweWaarde, entry.gebruiker];
+  const oudeRow=entry._row;
+  // optimistisch: lokaal weg + rij-indexen meeschuiven + edit sluiten
+  entries.splice(idx,1);
+  _shiftLogboekRows(oudeRow,-1);
+  if(state.logEdit===row){ state.logEdit=null; state.logEditSoort=null; }
+  renderLogboek();
+  showUndoToast('🗑️ Logregel verwijderd', logDeleteLabel(entry), ()=>undoDeleteLog(vals, oudeRow));
+  // Idempotentie-vlag: deleteDimension is positie-gebaseerd en NIET idempotent (zie deleteTaskRow).
+  let verwijderd=false;
+  backgroundWrite(
+    async ()=>{
+      const ids=await getSheetIds();
+      const sheetId=ids['Logboek'];
+      if(sheetId==null) throw new Error('Sheet "Logboek" niet gevonden');
+      if(!verwijderd){
+        await assertRowMatch(oudeRow, entry.timestamp, 'Logboek'); // rij nog de juiste vóór verwijderen
+        const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+          method:'POST',
+          headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
+          body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:oudeRow-1,endIndex:oudeRow}}}]})
+        });
+        if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Verwijderfout');err.status=resp.status;throw err}
+        verwijderd=true;
+      }
+    },
+    ()=>{ if(entries.indexOf(entry)===-1){ _shiftLogboekRows(oudeRow,+1); entries.splice(Math.min(idx,entries.length),0,entry); } },
+    'Verwijderen mislukt'
+  );
+}
+
+// Undo: rij terugzetten op de oude positie en lokaal vers herladen (zoals taak-undo).
+async function undoDeleteLog(vals, oudeRow){
+  if(!await ensureToken()){ alert('Inloggen mislukt.'); return; }
+  state._undoInFlight=true; // pauzeer de 8s-poll; deze undo doet z'n eigen loadAll
+  try{
+    await state._writeChain;                         // delete gegarandeerd vóór de re-insert
+    await insertAndWriteRow('Logboek', oudeRow-1, vals);
+    showToast('↩ Ongedaan gemaakt','Logregel teruggezet','var(--am)');
+    await loadAll();                                 // _row-indexen vers uit de Sheet
+  }catch(e){ alert('Undo fout: '+e.message); }
+  finally{ state._undoInFlight=false; }
+}
+
 function renderLogboek(){
+  // Bescherm half-getypte bewerktekst tegen de 8s-poll (analoog aan de VvE-composer).
+  const _editEl=document.getElementById('log-edit-tekst');
+  const _editBewaar=(state.logEdit && _editEl)?{
+    tekst:_editEl.value,
+    wie:document.getElementById('log-edit-wie')?.value
+  }:null;
   const q=(document.getElementById('s-logboek')?.value||'').toLowerCase();
   const rows=D.logboek.filter(r=>{
     if(!logPaginaSoort(r.actie)) return false;   // ruis weren — alleen notities/contact + afgerond/aangemaakt
@@ -316,9 +464,13 @@ function renderLogboek(){
     sl.forEach(r=>{
       const dag=logDayLabel(r.timestamp);
       if(dag!==lastDay){ html+=`<div class="log-day">${dag}</div>`; lastDay=dag; }
-      html+=logItemHtml(r,logPaginaSoort(r.actie)==='subtiel');
+      html+=logItemHtml(r,logPaginaSoort(r.actie)==='subtiel',true);
     });
     el.innerHTML=html;
+  }
+  if(_editBewaar){
+    const t=document.getElementById('log-edit-tekst'); if(t) t.value=_editBewaar.tekst;
+    const w=document.getElementById('log-edit-wie'); if(w&&_editBewaar.wie) w.value=_editBewaar.wie;
   }
   renderPag('logboek-pag',rows.length,pgs.logboek,'logboek');
 }
@@ -390,4 +542,6 @@ export {
   ONTW_CATS, ONTW_CAT_COLORS, parseOntw, renderOntw, setOntw, openOntwModal, closeOntwModal,
   submitOntwItem, deleteOntwItem, editOntwItem, parseLogboek, fmtLogTs, actieBadge, _LOG_AVKLEUR, avatarKleur,
   logDayLabel, logZin, logTijd, logItemHtml, logPaginaSoort, renderLogboek, histNoteKey, renderTaskHistory, addTaskNote, logEvent,
+  _shiftRows, _shiftLogboekRows, logEditWrite, logDeleteLabel,
+  logEditForm, editLogboek, saveLogboek, cancelLogboek, setLogSoort, deleteLogboek, undoDeleteLog,
 };

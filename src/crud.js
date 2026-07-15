@@ -359,7 +359,6 @@ async function submitTask(){
             fireNotifEvent('assigned',{sec,code,naam,behandelaar:newBeh});
             logEvent(code,sec,'Behandelaar gewijzigd','behandelaar',oudeWaarden.behandelaar,newBeh);
           }
-          logEvent(code,sec,'Bewerkt','','','');
         },
         ()=>{ keys.forEach(k=>{ doelRow[k]=oudeWaarden[k]; }); doelRow.subcategorie=oudeWaarden.subcategorie; delete doelRow._offertesManual; },
         'Opslaan mislukt'

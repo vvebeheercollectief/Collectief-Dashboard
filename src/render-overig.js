@@ -165,19 +165,24 @@ async function undoOntwDelete(values, titel){
 // ══════════════════════════════════════
 //  LOGBOEK — parse, render & schrijf
 // ══════════════════════════════════════
+// 'Bewerkt' is ruis: elke taak-opslag schreef er één (395 van de 1177 regels). Sinds v6.3
+// schrijven we ze niet meer; dit filter houdt de bestaande regels — en alles wat nog via de
+// webhook binnen kan komen — uit álle weergaves én uit de activiteitsberekening van
+// bepaalStil/dagenStil.
+const LOG_VERBORGEN = new Set(['Bewerkt']);
+
 function parseLogboek(rows){
   if(!rows||rows.length<2) return [];
-  return rows.slice(1).filter(r=>r&&r.length&&(r[0]||'').trim()).map((r,i)=>({
-    _row:i+2,
-    timestamp:(r[0]||'').trim(),
-    code:(r[1]||'').trim(),
-    sectie:(r[2]||'').trim(),
-    actie:(r[3]||'').trim(),
-    veld:(r[4]||'').trim(),
-    oudeWaarde:(r[5]||'').trim(),
-    nieuweWaarde:(r[6]||'').trim(),
-    gebruiker:(r[7]||'').trim()
-  })).reverse();
+  // _row komt uit de RUWE index: het filter hieronder mag het Sheet-rijnummer niet laten
+  // opschuiven, want daar hangt bewerken/verwijderen op de Logboek-pagina aan.
+  return rows.slice(1).map((r,i)=>{
+    const c=j=>((r&&r[j])||'').trim();
+    return {
+      _row:i+2,
+      timestamp:c(0), code:c(1), sectie:c(2), actie:c(3),
+      veld:c(4), oudeWaarde:c(5), nieuweWaarde:c(6), gebruiker:c(7)
+    };
+  }).filter(o=>o.timestamp&&!LOG_VERBORGEN.has(o.actie)).reverse();
 }
 
 function fmtLogTs(iso){

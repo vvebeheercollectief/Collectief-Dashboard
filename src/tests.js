@@ -2,7 +2,7 @@
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
 import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, isoWeek, coerceDagenVooraf } from "./util.js";
-import { logZin, logPaginaSoort, _shiftRows, logEditWrite } from "./render-overig.js";
+import { logZin, logPaginaSoort, parseLogboek, _shiftRows, logEditWrite } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
@@ -139,6 +139,46 @@ import { shouldPromptReload } from "./sw-update.js";
   eq('logPaginaSoort Aangemaakt → subtiel', logPaginaSoort('Aangemaakt'), 'subtiel');
   eq('logPaginaSoort "Aangemaakt (sheet)" → subtiel', logPaginaSoort('Aangemaakt (sheet)'), 'subtiel');
   eq('logPaginaSoort Bewerkt → ruis (null)',   logPaginaSoort('Bewerkt'),   null);
+
+  // ── parseLogboek ── ('Bewerkt' was 1 op de 3 logregels en is pure ruis: elke taak-opslag
+  //    schreef er één. Sinds v6.3 loggen we ze niet meer én filteren we ze bij het inlezen weg.
+  //    _row moet het ECHTE Sheet-rijnummer blijven — daar hangt bewerken/verwijderen aan.)
+  const _lbRows = [
+    ['Timestamp','VvE Code','Sectie','Actie','Veld','Oude Waarde','Nieuwe Waarde','Gebruiker'],
+    ['2026-07-01T10:00:00.000Z','381158','OPPAKKEN','Opmerking','','','Gebeld met Zuiderwijk','Cihad'],
+    ['2026-07-01T10:05:00.000Z','381158','OPPAKKEN','Bewerkt','','','','Cihad'],
+    ['2026-07-01T10:10:00.000Z','381158','OPPAKKEN','Herhaalregel bewerkt','','','maandelijks','Cihad'],
+    ['2026-07-01T10:15:00.000Z','381158','OPPAKKEN','Afgerond','status','Nog Te Doen','Afgerond op 1 juli','Jer'],
+  ];
+  const _lb = parseLogboek(_lbRows);
+  eq('parseLogboek laat Bewerkt vallen', _lb.filter(r => r.actie === 'Bewerkt').length, 0);
+  eq('parseLogboek houdt "Herhaalregel bewerkt" (exact-match)', _lb.filter(r => r.actie === 'Herhaalregel bewerkt').length, 1);
+  eq('parseLogboek houdt de overige regels', _lb.length, 3);
+  eq('parseLogboek _row Opmerking = 2', _lb.find(r => r.actie === 'Opmerking')._row, 2);
+  eq('parseLogboek _row Herhaalregel = 4 (schuift niet op door de gefilterde Bewerkt)', _lb.find(r => r.actie === 'Herhaalregel bewerkt')._row, 4);
+  eq('parseLogboek _row Afgerond = 5 (schuift niet op)', _lb.find(r => r.actie === 'Afgerond')._row, 5);
+  eq('parseLogboek nieuwste eerst', _lb[0].actie, 'Afgerond');
+  // Lege rij tussendoor mag _row evenmin laten opschuiven
+  const _lbGap = parseLogboek([
+    ['Timestamp','VvE Code','Sectie','Actie','Veld','Oude Waarde','Nieuwe Waarde','Gebruiker'],
+    ['2026-07-01T10:00:00.000Z','381158','OPPAKKEN','Opmerking','','','eerste','Cihad'],
+    [],
+    ['2026-07-01T10:20:00.000Z','381158','OPPAKKEN','Opmerking','','','tweede','Cihad'],
+  ]);
+  eq('parseLogboek negeert lege rij', _lbGap.length, 2);
+  eq('parseLogboek _row na lege rij = 4', _lbGap.find(r => r.nieuweWaarde === 'tweede')._row, 4);
+  eq('parseLogboek _row vóór lege rij = 2', _lbGap.find(r => r.nieuweWaarde === 'eerste')._row, 2);
+  // De stil-berekening leunt hierna op écht werk (de notitie) i.p.v. op een taak-opslag.
+  // Dit is wat vooraf gemeten is: 'Opmerking' en 'Bewerkt' staan vrijwel altijd op dezelfde
+  // dag, dus het wegvallen van 'Bewerkt' verschuift de stil-dagen niet.
+  const _stilLogT = new Date(2026, 6, 15); // 15 juli 2026
+  const _stilLogB = parseLogboek([
+    ['Timestamp','VvE Code','Sectie','Actie','Veld','Oude Waarde','Nieuwe Waarde','Gebruiker'],
+    ['2026-07-10T09:00:00','381158','OPPAKKEN','Opmerking','','','Gebeld met Zuiderwijk','Cihad'],
+    ['2026-07-10T09:01:00','381158','OPPAKKEN','Bewerkt','','','','Cihad'],
+  ]);
+  eq('stil: rekent vanaf de notitie, Bewerkt is weggefilterd',
+     dagenStil({code:'381158', inBehandeling:'TRUE', deadline:''}, 'OPPAKKEN', _stilLogB, _stilLogT), 5);
   eq('logPaginaSoort Teruggezet → ruis',       logPaginaSoort('Teruggezet'), null);
   eq('logPaginaSoort Behandelaar gewijzigd → ruis', logPaginaSoort('Behandelaar gewijzigd'), null);
   eq('logPaginaSoort Kenmerk → ruis',          logPaginaSoort('Kenmerk'),   null);

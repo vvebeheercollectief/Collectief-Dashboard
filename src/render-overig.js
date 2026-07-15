@@ -197,7 +197,6 @@ function actieBadge(actie){
   const map={
     'Afgerond':['--sec:var(--gn);--sec-l:var(--gn-l)','✓'],
     'Verwijderd':['--sec:var(--rd);--sec-l:var(--rd-l)','✕'],
-    'Bewerkt':['--sec:var(--ac);--sec-l:var(--ac-l)','✎'],
     'Aangemaakt':['--sec:var(--pu);--sec-l:var(--pu-l)','+'],
     'Teruggezet':['--sec:var(--am);--sec-l:var(--am-l)','↩'],
     'Behandelaar gewijzigd':['--sec:var(--ac);--sec-l:var(--ac-l)','👤'],
@@ -240,7 +239,6 @@ function logZin(r){
     case'Behandelaar gewijzigd':return A('wees','var(--ac)')+chip+' toe';
     case'Aangemaakt':
     case'Aangemaakt (sheet)':  return A('maakte','var(--pu)')+'een nieuwe taak bij '+chip+(r.nieuweWaarde?` <span style="color:var(--mut)">→ ${esc(r.nieuweWaarde)}</span>`:'');
-    case'Bewerkt':             return A('bewerkte','var(--ac)')+chip+(r.veld?` <span style="color:var(--mut)">— ${esc(r.veld)}</span>`:'');
     case'Contact':             return A('sprak','var(--ac)')+`met ${esc(r.oudeWaarde||'—')} bij `+chip+` <span style="color:var(--mut)">· ${esc(r.veld||'')}</span>`;
     case'Kenmerk':             return A('wijzigde','var(--pu)')+`kenmerk <b>${esc(r.veld||'')}</b> bij `+chip;
     default:                   return `<b>${naam}</b> — ${esc(r.actie||'')} `+chip;
@@ -283,7 +281,7 @@ function logItemHtml(r,subtiel,acties){
   }
   if(acties && state.logEdit===r._row) return logEditForm(r);
   let extra='';
-  if((r.actie==='Behandelaar gewijzigd'||r.actie==='Bewerkt'||r.actie==='Kenmerk') && r.veld && (r.oudeWaarde||r.nieuweWaarde)){
+  if((r.actie==='Behandelaar gewijzigd'||r.actie==='Kenmerk') && r.veld && (r.oudeWaarde||r.nieuweWaarde)){
     extra=`<div class="log-change"><span class="old">${esc(r.oudeWaarde||'—')}</span><span class="arr">→</span><span class="new">${esc(r.nieuweWaarde||'—')}</span></div>`;
   }
   if((r.actie==='Opmerking'||r.actie==='Contact') && r.nieuweWaarde){

@@ -6,10 +6,10 @@ import { logZin, logPaginaSoort, parseLogboek, _shiftRows, logEditWrite } from "
 import { _isStagingHost, APP_VERSION } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
-import { filterNtd, setNtd, renderNtd, offerteAannemerPaneel, offerteAannSamenvatting } from "./render-lijsten.js";
+import { filterNtd, setNtd, renderNtd, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey } from "./render-lijsten.js";
 import { state, D, pgs } from "./state.js";
 import { vveOverzicht, filterDossierLog } from "./render-vve.js";
-import { parseKenmerken, vveKenmerken } from "./kenmerken.js";
+import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk.js";
 import { _isTransient, _rowMismatch, _a1ColA } from "./api.js";
@@ -225,7 +225,7 @@ import { shouldPromptReload } from "./sw-update.js";
   const VERWACHTE_ACTIES = ['toggle','notif-toggle','off','notitie-toevoegen','taak-verwijder-modal','ai-kopieer','login','ntd-sectie','af-sectie','alvo-flag','taak-bewerken','taak-afronden','pagineer','ai-overnemen','ai-actie-taak','ai-kopieer-concept','ontw-cat','ontw-bewerken','toast-sluiten','taak-wegleggen','snooze-kies','herhaal-bewerken','herhaal-status','herhaal-verwijderen',
 'vve-open','vve-af-alles','pal-kies','bulk-toggle','bulk-vink','bulk-menu','bulk-doe',
 'kenmerken-bewerken','kenmerken-opslaan','kenmerken-annuleren',
-'contact-soort','contact-vastleggen','vve-log-filter','vve-log-alles'];
+'contact-soort','contact-vastleggen','vve-log-filter','vve-log-alles','ntd-sorteer'];
   VERWACHTE_ACTIES.forEach(a => truthy(`actie '${a}' bestaat`, typeof ACTIONS[a] === 'function'));
 
   // ── volgendeDeadline ── (herhaalregels; maandgrens-clamp)
@@ -258,6 +258,27 @@ import { shouldPromptReload } from "./sw-update.js";
   ];
   eq('ntd-sortering fase4', filterNtd(_rows,'','','','','OPPAKKEN').map(r=>r.code),
      ['LAAT','OPV','NORM','IB','WEG']);
+
+  // ── sorteerNtd ── (kolomkop-klik: groep blijft leidend, binnen de groep op key; stabiel)
+  const _srt=[
+    {code:'B20', deadline:_f(5), inBehandeling:'FALSE', opvolgdatum:''},
+    {code:'A3',  deadline:_f(1), inBehandeling:'FALSE', opvolgdatum:''},
+    {code:'C1',  deadline:'',    inBehandeling:'FALSE', opvolgdatum:''},
+    {code:'A10', deadline:_f(3), inBehandeling:'TRUE',  opvolgdatum:''},
+  ];
+  eq('sorteer uit = zelfde volgorde', sorteerNtd(_srt,{key:null,asc:true}).map(r=>r.code), ['B20','A3','C1','A10']);
+  eq('sorteer code oplopend',  sorteerNtd(_srt,{key:'code',asc:true}).map(r=>r.code),  ['A3','B20','C1','A10']);
+  eq('sorteer code aflopend',  sorteerNtd(_srt,{key:'code',asc:false}).map(r=>r.code), ['C1','B20','A3','A10']);
+  eq('sorteer deadline oplopend (leeg onderaan)', sorteerNtd(_srt,{key:'deadline',asc:true}).map(r=>r.code),  ['A3','B20','C1','A10']);
+  eq('sorteer deadline aflopend (leeg onderaan)', sorteerNtd(_srt,{key:'deadline',asc:false}).map(r=>r.code), ['B20','A3','C1','A10']);
+  eq('sorteer code natuurlijk 2<10', sorteerNtd([
+    {code:'10',inBehandeling:'FALSE',opvolgdatum:''},{code:'2',inBehandeling:'FALSE',opvolgdatum:''}
+  ],{key:'code',asc:true}).map(r=>r.code), ['2','10']);
+  eq('sorteer muteert origineel niet', (()=>{const a=[..._srt];sorteerNtd(a,{key:'code',asc:true});return a.map(r=>r.code);})(), ['B20','A3','C1','A10']);
+  eq('ntdSorteerKey VvE Code',  ntdSorteerKey('VvE Code'), 'code');
+  eq('ntdSorteerKey Deadline',  ntdSorteerKey('Deadline'), 'deadline');
+  eq('ntdSorteerKey Deadline uitschr.', ntdSorteerKey('Deadline uitschr.'), 'deadline');
+  eq('ntdSorteerKey overige kop', ntdSorteerKey('Behandelaar'), null);
 
   // ── STIL_ESCALATIE_REGELS ── (per categorie, trap1 < trap2)
   truthy('esc-regels compleet', ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD']
@@ -292,21 +313,26 @@ import { shouldPromptReload } from "./sw-update.js";
   eq('dossierfilter alles',   filterDossierLog(_dosLog,'alles').length, 4);
   eq('dossierfilter contact', filterDossierLog(_dosLog,'contact').length, 2);
 
-  // ── kenmerken ── (VvE-dossier: tab 'Kenmerken' A:F, laatste rij per code wint)
+  // ── kenmerken ── (VvE-dossier: tab 'Kenmerken' A:F, laatste rij per code wint;
+  //    oude Ja/Nee-waarden worden bij inlezen genormaliseerd naar Gemeenschappelijk/Individueel)
   const _kmkRows=[
     ['Code','Balkons','Kozijnen','Bron','GewijzigdDoor','GewijzigdOp'],
     ['X1','Ja','Nee','akte art. 17','info@vvebeheercollectief.nl','2026-06-12T10:00:00.000Z'],
-    ['X2','','Deels','','',''],
+    ['X2','','Individueel','','',''],
     ['',  'Ja','','','',''],                 // lege code → genegeerd
-    ['X1','Deels','Nee','akte art. 18','info@vvebeheercollectief.nl','2026-06-12T11:00:00.000Z'], // dubbel → laatste wint
+    ['X1','Gemeenschappelijk','Nee','akte art. 18','info@vvebeheercollectief.nl','2026-06-12T11:00:00.000Z'], // dubbel → laatste wint
   ];
   const _kmk=parseKenmerken(_kmkRows);
+  eq('kenmerk-waarden dropdown', KENMERK_WAARDEN, ['Onbekend','Gemeenschappelijk','Individueel']);
   eq('kenmerken aantal (dedupe)', _kmk.length, 2);
-  eq('kenmerken laatste wint', _kmk.find(k=>k.code==='X1').balkons, 'Deels');
+  eq('kenmerken laatste wint', _kmk.find(k=>k.code==='X1').balkons, 'Gemeenschappelijk');
   eq('kenmerken _row laatste', _kmk.find(k=>k.code==='X1')._row, 5);
+  eq('kenmerken legacy Ja→Gemeenschappelijk',  parseKenmerken([[],['L1','Ja','','','','']])[0].balkons, 'Gemeenschappelijk');
+  eq('kenmerken legacy Nee→Individueel', parseKenmerken([[],['L2','','Nee','','','']])[0].kozijnen, 'Individueel');
+  eq('kenmerken nieuwe waarde blijft', parseKenmerken([[],['L3','Individueel','','','','']])[0].balkons, 'Individueel');
   eq('kenmerken leeg blad', parseKenmerken([]), []);
   eq('kenmerken alleen kop', parseKenmerken([_kmkRows[0]]), []);
-  eq('vveKenmerken gevonden', vveKenmerken('X2',{kenmerken:_kmk}).kozijnen, 'Deels');
+  eq('vveKenmerken gevonden', vveKenmerken('X2',{kenmerken:_kmk}).kozijnen, 'Individueel');
   eq('vveKenmerken default', vveKenmerken('ZZZ',{kenmerken:_kmk}).balkons, '');
   eq('vveKenmerken default row', vveKenmerken('ZZZ',{kenmerken:_kmk})._row, 0);
 

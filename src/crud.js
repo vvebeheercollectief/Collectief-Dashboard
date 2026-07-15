@@ -172,7 +172,7 @@ async function deleteTaskRow(r){
   showUndoToast('🗑️ Taak verwijderd',`${r.code} — ${omschrijving}`,()=>undoDelete(undoData));
   // Idempotentie-vlag: een deleteDimension is positie-gebaseerd en NIET idempotent. Zonder
   // deze vlag zou een _withRetry-herkansing (na een transient 429/5xx) de rij eronder — die
-  // door de eerste delete naar boven schoof — kunnen verwijderen. (patroon: offerte-acties.js)
+  // door de eerste delete naar boven schoof — kunnen verwijderen. (patroon: offerte-aannemers.js)
   let verwijderd=false;
   backgroundWrite(
     async ()=>{

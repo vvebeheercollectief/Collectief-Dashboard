@@ -5,7 +5,7 @@
 // met de zwaarst wegende reden. Gewichten zijn richtinggevend (afgestemd via tests.js).
 import {
   PRIO_REGELS, STIL_ESCALATIE_REGELS, berekenPrioriteit, opvolgStatus,
-  offerteBriefingFeiten, _vandaagAmsterdam, _verschilInKalenderdagen,
+  _vandaagAmsterdam, _verschilInKalenderdagen,
 } from './util.js';
 
 const STIL_DREMPEL = 4;
@@ -108,8 +108,5 @@ export function letOpSignalen(D, opts){
   }));
   if (langStil) out.push({ soort:'warning', icon:'clock', tekst:
     `${langStil} ${langStil===1?'taak ligt':'taken liggen'} lang stil` });
-  const offFeiten = offerteBriefingFeiten((D && D['OFFERTE-TRAJECTEN']) || [], vandaag);
-  if (offFeiten.klaarTeGunnen) out.push({ soort:'info', icon:'file', tekst:
-    `${offFeiten.klaarTeGunnen} ${offFeiten.klaarTeGunnen===1?'offerte wacht':'offertes wachten'} op gunning` });
   return out;
 }

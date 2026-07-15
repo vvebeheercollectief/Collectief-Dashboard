@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  UTIL — gedeelde pure helpers (datums, prioriteit, tekst, badges)
 // ══════════════════════════════════════
-import { EMAIL_NAMES, OFFERTE_FASES, OFFERTE_TERMIJNEN } from './config.js';
+import { EMAIL_NAMES, OFFERTE_FASES } from './config.js';
 
 function displayName(s){
   if(!s) return '';
@@ -85,56 +85,6 @@ function isoWeek(datum){
   return 1 + Math.round((don - week1Don) / (7 * 864e5));
 }
 
-// Eerste paasdag (Anonymous Gregorian / Meeus-Jones-Butcher-algoritme).
-function _paasDatum(jaar){
-  const a=jaar%19, b=Math.floor(jaar/100), c=jaar%100, d=Math.floor(b/4), e=b%4,
-        f=Math.floor((b+8)/25), g=Math.floor((b-f+1)/3), h=(19*a+b-d-g+15)%30,
-        i=Math.floor(c/4), k=c%4, l=(32+2*e+2*i-h-k)%7, m=Math.floor((a+11*h+22*l)/451),
-        maand=Math.floor((h+l-7*m+114)/31), dag=((h+l-7*m+114)%31)+1;
-  return new Date(jaar, maand-1, dag);
-}
-// Nederlandse algemeen erkende feestdagen per jaar als Set 'Y-M-D' (M is 0-geteld).
-// Gecached per kalenderjaar. Gebruikt om werkdagen (aannemer-opvolgtermijn) correct te tellen.
-const _feestCache = new Map();
-function _nlFeestdagen(jaar){
-  if (_feestCache.has(jaar)) return _feestCache.get(jaar);
-  const pasen = _paasDatum(jaar);
-  const plus = (dt, n) => { const x = new Date(dt); x.setDate(x.getDate() + n); return x; };
-  const koningsdag = new Date(jaar, 3, 27);
-  if (koningsdag.getDay() === 0) koningsdag.setDate(26); // valt op zondag → 26 april
-  const dagen = [
-    new Date(jaar, 0, 1),   // Nieuwjaarsdag
-    plus(pasen, -2),        // Goede Vrijdag
-    plus(pasen, 1),         // Tweede Paasdag
-    koningsdag,             // Koningsdag
-    new Date(jaar, 4, 5),   // Bevrijdingsdag
-    plus(pasen, 39),        // Hemelvaartsdag
-    plus(pasen, 50),        // Tweede Pinksterdag
-    new Date(jaar, 11, 25), // Eerste Kerstdag
-    new Date(jaar, 11, 26), // Tweede Kerstdag
-  ];
-  const set = new Set(dagen.map(d => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`));
-  _feestCache.set(jaar, set);
-  return set;
-}
-function _isFeestdag(d){
-  return _nlFeestdagen(d.getFullYear()).has(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`);
-}
-
-// Aantal werkdagen (ma–vr, excl. NL-feestdagen) ná `van` t/m `tot`. Negatief/gelijk → 0.
-function _verschilInWerkdagen(van, tot){
-  if (!(van instanceof Date) || !(tot instanceof Date) || isNaN(van) || isNaN(tot)) return null;
-  let a = new Date(van.getFullYear(), van.getMonth(), van.getDate());
-  const b = new Date(tot.getFullYear(), tot.getMonth(), tot.getDate());
-  let n = 0;
-  while (a < b){
-    a.setDate(a.getDate() + 1);
-    const wd = a.getDay();
-    if (wd !== 0 && wd !== 6 && !_isFeestdag(a)) n++;
-  }
-  return n;
-}
-
 function _verschilInKalenderdagen(deadline, vandaag){
   if (!(deadline instanceof Date) || isNaN(deadline)) return null;
   const d = new Date(deadline.getFullYear(), deadline.getMonth(), deadline.getDate());
@@ -196,82 +146,6 @@ function offerteFase(r){
   return recv > 0 ? 'ontvangen' : 'aangevraagd';
 }
 
-// Laatste "aanraak"-datum van een traject (voor de stil-teller): jongste van
-// laatsteActiviteit, opvolgdatum, datumAangevraagd.
-function offerteStilBasis(r){
-  const kandidaten = [r && r.laatsteActiviteit, r && r.opvolgdatum, r && r.datumAangevraagd];
-  let laatst = null;
-  kandidaten.forEach(s => {
-    const p = _parseAnyDate(s || '');
-    if (p){ const d = new Date(p.y, p.m - 1, p.d); if (!laatst || d > laatst) laatst = d; }
-  });
-  return laatst;
-}
-
-// Heeft dit traject vandaag opvolging nodig? + context (bal-bij-wie, dagen, actie).
-function offerteNuOpvolgen(r, vandaag, termijnen){
-  vandaag  = vandaag   || _vandaagAmsterdam();
-  termijnen = termijnen || OFFERTE_TERMIJNEN;
-  const fase   = offerteFase(r);
-  const balBij = offerteBalBij(r);
-  const ov     = opvolgStatus(r, vandaag);
-  const basis  = offerteStilBasis(r);
-  // Clamp aan de bron op 0: een per ongeluk in de TOEKOMST ingevoerde laatsteActiviteit/
-  // datumAangevraagd (niet afgevangen door 'weggelegd') zou anders negatieve 'dagen stil'
-  // geven en een urgent traject onderaan de sorteer-lijst duwen. null blijft null ('geen datum').
-  const dagen     = basis ? Math.max(0, _verschilInKalenderdagen(vandaag, basis)) : null; // (vandaag, basis): positief = dagen stil
-  const werkdagen = basis ? Math.max(0, _verschilInWerkdagen(basis, vandaag))     : null;
-  const dlp = _parseAnyDate((r && r.deadline) || '');
-  const deadlineTeLaat = dlp ? (_verschilInKalenderdagen(new Date(dlp.y, dlp.m - 1, dlp.d), vandaag) < 0) : false;
-  const opvolgenVandaag = ov.vandaag && !!_parseAnyDate((r && r.opvolgdatum) || '');
-  const actie = balBij === 'ons' ? 'Doorsturen' : balBij ? 'Nabellen' : null;
-  if (fase === 'gegund' || ov.weggelegd){ // weggelegd wint bewust óók van deadlineTeLaat (bewust geparkeerd, Fase 4)
-    return { nodig:false, fase, balBij, dagen, werkdagen, deadlineTeLaat, actie };
-  }
-  const termijn = balBij === 'aannemer' ? termijnen.aannemer
-                : balBij === 'ons'      ? termijnen.delen
-                : balBij === 'vve'      ? termijnen.eigenaren : Infinity;
-  const meting = balBij === 'aannemer' ? werkdagen : dagen;
-  const nodig = (meting != null && meting >= termijn) || deadlineTeLaat || opvolgenVandaag;
-  return { nodig: !!nodig, fase, balBij, dagen, werkdagen, deadlineTeLaat, actie };
-}
-
-// Bij wie ligt de bal? 'aannemer' | 'ons' | 'vve' | null (gegund).
-function offerteBalBij(r){
-  const fase = offerteFase(r);
-  if (fase === 'gegund')    return null;
-  if (fase === 'bij_vve')   return 'vve';
-  if (fase === 'ontvangen') return 'ons';
-  return 'aannemer';
-}
-
-// Regel-gebaseerde kern voor de briefing: telt en kiest het urgentste traject.
-function offerteBriefingFeiten(rijen, vandaag, termijnen){
-  vandaag = vandaag || _vandaagAmsterdam();
-  rijen = rijen || [];
-  const trap1 = STIL_ESCALATIE_REGELS['OFFERTE-TRAJECTEN'].trap1;
-  let nuOpvolgen = 0, langStil = 0, balBijOns = 0, klaarTeGunnen = 0;
-  let urgentste = null, urgScore = -1;
-  rijen.forEach(r => {
-    if (offerteFase(r) === 'bij_vve') klaarTeGunnen++;
-    const s = offerteNuOpvolgen(r, vandaag, termijnen);
-    if (!s.nodig) return;
-    nuOpvolgen++;
-    if ((s.dagen || 0) >= trap1) langStil++;
-    if (s.balBij === 'ons') balBijOns++;
-    const sc = offerteSorteerScore(r, vandaag, termijnen);
-    if (sc > urgScore){ urgScore = sc; urgentste = { code:(r.code||''), naam:(r.naam||''), dagen:s.dagen, balBij:s.balBij }; }
-  });
-  return { nuOpvolgen, langStil, balBijOns, klaarTeGunnen, urgentste };
-}
-
-// Aantal keren dat een offerte-traject is nagebeld (Contact-logregels met veld 'Telefoon').
-function offerteNabelTeller(code, logboek){
-  let n = 0;
-  (logboek || []).forEach(e => { if (e.sectie === 'OFFERTE-TRAJECTEN' && e.code === code && e.veld === 'Telefoon') n++; });
-  return n;
-}
-
 // ── Aannemers per offerte-traject (kolom P 'Nog Te Doen') ──────────────────
 // Eén aannemer per regel; naam en 'binnen'-vlag gescheiden door '|':  "Naam|1".
 // '|1' = offerte binnen, anders nog niet. Lege/whitespace-regels worden genegeerd.
@@ -300,15 +174,6 @@ function reconcileOffertes(manual, lijst){
   const recv=Math.max(mRecv, lijst.filter(a=>a.binnen).length);
   const req =Math.max(mReq,  lijst.length);
   return `${recv}/${req}`;
-}
-
-// Sorteerscore voor "Nu opvolgen": hoger = urgenter (sorteer aflopend).
-function offerteSorteerScore(r, vandaag, termijnen){
-  const s = offerteNuOpvolgen(r, vandaag, termijnen);
-  const prioRank = { hoog:2, midden:1, laag:0 }[(((r&&r.prioriteit)||'')+'').trim().toLowerCase()];
-  return (s.deadlineTeLaat ? 1e6 : 0) + ((s.dagen || 0) * 100)
-       + (s.balBij === 'ons' ? 10 : 0)            // tiebreak: snel af te ronden (bal bij ons) eerst
-       + (prioRank == null ? -1 : prioRank);      // geen prioriteit → onder 'Laag' (0), niet erboven
 }
 
 function offProg(v){
@@ -382,7 +247,6 @@ export {
   _verschilInKalenderdagen, berekenPrioriteit, prioBadge, persBadges,
   adjOff, offProg, _MAANDEN, _parseAnyDate, parseDt, toISODate, toDutchDate,
   emptyRow, esc, subBadge, coerceDagenVooraf,
-  parseOff, offerteFase, offerteBalBij, _verschilInWerkdagen,
-  offerteStilBasis, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten, offerteNabelTeller,
+  parseOff, offerteFase,
   parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes,
 };

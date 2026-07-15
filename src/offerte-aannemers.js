@@ -2,7 +2,7 @@
 //  OFFERTE-AANNEMERS — per-traject aannemerslijst (kolom P 'Nog Te Doen')
 //  Bron van waarheid = de rauwe kolom-P-string r.aannemers; de render-verrijking
 //  leidt daaruit r._aannemers én de "X/N binnen"-teller (r.offertes) af.
-//  Optimistisch schrijven met rollback, zelfde patroon als offerte-acties.js.
+//  Optimistisch schrijven met rollback (backgroundWrite).
 // ══════════════════════════════════════
 import { state, D } from "./state.js";
 import { parseAannemers, serializeAannemers } from "./util.js";
@@ -18,7 +18,6 @@ function _vindRij(code){
 // Render direct (optimistisch) en schrijf de al-gemuteerde r.aannemers weg naar kolom P.
 // backgroundWrite rolt terug + her-rendert bij falen (zie data.js).
 async function _bewaar(r, vorige){
-  state.offerteAannMut.add(r.code); // net bewerkt → blijft op z'n plek/zichtbaar tot refresh (bug #1)
   renderNtd();
   if(!r._row) return; // zonder rijnummer geen schrijfdoel (zeldzaam) — alleen lokaal
   if(!await ensureToken()){ r.aannemers=vorige; renderNtd(); return; }

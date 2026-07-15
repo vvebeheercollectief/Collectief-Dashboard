@@ -15,8 +15,7 @@ import { adjOff } from './util.js';
 import { copyAiPrompt, aiOvernemen, aiActieTaak, aiKopieerConcept } from './ai.js';
 import { dismissToast, saveNotifPrefs } from './notifications.js';
 import { doLogin } from './auth.js';
-import { openSnoozeModal, snoozeKies, snoozeMorgen } from './snooze.js';
-import { openOfferteActieModal, offerteActieVastleggen, offerteFaseZetten } from './offerte-acties.js';
+import { openSnoozeModal, snoozeKies } from './snooze.js';
 import { addAannemer, toggleAannemerBinnen, verwijderAannemer } from './offerte-aannemers.js';
 import { openHerhaalModal, toggleHerhaalStatus, deleteHerhaal } from './render-herhaal.js';
 import { openVvePagina, renderVve, addContactLog } from './render-vve.js';
@@ -49,16 +48,7 @@ export const ACTIONS = {
   'toast-sluiten':         (el) => dismissToast(el.closest('.toast')),
   'taak-wegleggen':        (el) => openSnoozeModal(+el.dataset.rid),
   'snooze-kies':           (el) => snoozeKies(+el.dataset.dagen),
-  'offerte-nabellen':       (el) => openOfferteActieModal(+el.dataset.rid,'nabellen'),
-  'offerte-doorsturen':     (el) => openOfferteActieModal(+el.dataset.rid,'doorsturen'),
-  'offerte-actie-vastleggen': ()  => offerteActieVastleggen(),
-  'offerte-gegund':        (el) => offerteFaseZetten(+el.dataset.rid,'gegund'),
-  'offerte-ontvangen':     (el) => offerteFaseZetten(+el.dataset.rid,'ontvangen'),
-  'offerte-later':         (el) => snoozeMorgen(+el.dataset.rid),
-  'offerte-meer-d':        ()   => { state.offerteDoorsturenOpen=true; renderNtd(); },
-  'offerte-meer-n':        ()   => { state.offerteNabellenOpen=true;   renderNtd(); },
-  'offerte-tabel-toggle':  ()   => { state.offerteTabelOpen=!state.offerteTabelOpen; renderNtd(); },
-  'offerte-aann-open':     (el) => { const c=el.dataset.code; if(state.offerteAannOpen.has(c)){ state.offerteAannOpen.delete(c); if(!state.offerteAannMut.has(c)) delete state.offerteAannSnap[c]; } else state.offerteAannOpen.add(c); renderNtd(); },
+  'offerte-aann-open':     (el) => { const c=el.dataset.code; if(state.offerteAannOpen.has(c)) state.offerteAannOpen.delete(c); else state.offerteAannOpen.add(c); renderNtd(); },
   'offerte-aann-binnen':   (el) => toggleAannemerBinnen(el.dataset.code, +el.dataset.idx),
   'offerte-aann-verwijder':(el) => verwijderAannemer(el.dataset.code, +el.dataset.idx),
   'offerte-aann-add':      (el) => { const inp=el.closest('.of-aann-add')?.querySelector('.of-aann-input'); if(!inp) return; const v=inp.value; inp.value=''; addAannemer(el.dataset.code, v); },

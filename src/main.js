@@ -22,7 +22,6 @@ import { loadAll } from './data.js';
 import { initActions } from './actions.js';
 import { initVveZoekveld } from './vve-zoekveld.js';
 import { closeSnoozeModal, snoozeOpslaan, snoozeWis } from './snooze.js';
-import { sluitOfferteActieModal } from './offerte-acties.js';
 import { renderHerhaal, openHerhaalModal, closeHerhaalModal, syncHerhaalVelden, submitHerhaal } from './render-herhaal.js';
 import { renderVve } from './render-vve.js';
 import { openChat, closeChat, setChatVve } from './dossier-chat.js';
@@ -39,7 +38,6 @@ const MODAL_SLUITERS = {
   'ontw-modal-bg': closeOntwModal,
   'hh-bg': closeHerhaalModal,
   'snooze-bg': closeSnoozeModal,
-  'off-actie-bg': sluitOfferteActieModal,
   'notif-bg': closeNotifModal,
   'ai-bg': closeAiHelp,
 };
@@ -204,12 +202,6 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('snooze-bg').addEventListener('mousedown',e=>{_snoozeMouseDown=e.target});
   document.getElementById('snooze-bg').addEventListener('click',e=>{if(e.target.id==='snooze-bg'&&_snoozeMouseDown?.id==='snooze-bg')closeSnoozeModal()});
 
-  // Offerte opvolg-actie-modal (offerte-motor Fase 3) — zelfde patroon als snooze
-  document.getElementById('off-actie-close').onclick=sluitOfferteActieModal;
-  document.getElementById('off-actie-cancel').onclick=sluitOfferteActieModal;
-  let _offActieMouseDown=null;
-  document.getElementById('off-actie-bg').addEventListener('mousedown',e=>{_offActieMouseDown=e.target});
-  document.getElementById('off-actie-bg').addEventListener('click',e=>{if(e.target.id==='off-actie-bg'&&_offActieMouseDown?.id==='off-actie-bg')sluitOfferteActieModal()});
   // Centrale Escape-handler: sluit chat → zijbalk-lade → bovenste open venster.
   // (Het commandopalet sluit zichzelf al met Escape in palette.js.)
   document.addEventListener('keydown',e=>{

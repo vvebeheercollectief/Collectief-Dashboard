@@ -3,12 +3,12 @@
 //  + re-export van render-offerte / render-alv / render-tabel (publieke interface stabiel).
 //  Batch D / punt 11: offerte/ALV/tabel-render zijn naar eigen modules verplaatst.
 // ══════════════════════════════════════
-import { esc, filt, berekenPrioriteit, parseDt, opvolgStatus, _vandaagAmsterdam, toISODate, offerteNuOpvolgen, isoWeek } from "./util.js";
+import { esc, filt, berekenPrioriteit, parseDt, opvolgStatus, _vandaagAmsterdam, toISODate, isoWeek } from "./util.js";
 import { SECS, SKEYS } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { bulkWis, renderBulkUi } from "./bulk.js";
 import { renderThead, renderTbody, renderPag, bepaalStil, deadlineCel, rowNtd, rowAf } from "./render-tabel.js";
-import { renderOfferteBriefing, _offerteActiviteitMap, _verrijkOfferteRij, offerteGroepen, offerteBalBijTekst, offerteAannemerPaneel, offerteAannSamenvatting } from "./render-offerte.js";
+import { _verrijkOfferteRij, offerteAannemerPaneel, offerteAannSamenvatting } from "./render-offerte.js";
 import { renderAlvo, renderAlfa, toggleAlvoFlag, ALVO_ICONS, ALVO_COLS, ALVO_LABELS, flagPill, _recomputeAlvoStatus, statusIco } from "./render-alv.js";
 
 // ══════════════════════════════════════
@@ -111,17 +111,6 @@ function renderNtd(){
   renderThead('ntd-thead',[...(state.bulkMode?['']:[]),...SECS[state.activeNtd].cols,''],SECS[state.activeNtd].css);
   renderTbody('ntd-tbody',rows,state.activeNtd,pgs.ntd,false,!!(q||fCode||fBeh||fPrio));
   renderPag('ntd-pag',rows.length,pgs.ntd,'ntd');
-  // Zoekt/filtert de gebruiker? Dan tonen we op de offerte-tab de gefilterde tabel i.p.v.
-  // het Vandaag-blok (dat bewust álle trajecten samenvat). Anders zou zoeken geen zichtbaar
-  // effect hebben omdat de tabel daar standaard is ingeklapt.
-  const zoekActief=!!(q||fCode||fBeh||fPrio);
-  renderOfferteBriefing(zoekActief);
-  // Vandaag-focus: op de offerte-tab staat de volledige tabel standaard ingeklapt
-  // (tenzij je hem zelf openklapt óf aan het zoeken/filteren bent).
-  const tblWrap=document.getElementById('ntd-tbl-wrap'), pag=document.getElementById('ntd-pag');
-  const verberg=state.activeNtd==='OFFERTE-TRAJECTEN' && !state.offerteTabelOpen && !zoekActief;
-  if(tblWrap) tblWrap.style.display=verberg?'none':'';
-  if(pag) pag.style.display=verberg?'none':'';
   renderNtdCrossList(state.activeNtd);
 }
 // Cross-list (bug #2): taken die fysiek in een ándere sectie staan maar via hun
@@ -185,15 +174,10 @@ function filterNtd(rows,q,fCode,beh,prio,sec){
     }
     return true;
   });
-  // Offerte-motor (Fase 2): eigen groepering "Nu opvolgen" → "Lopend" i.p.v. de generieke groeps-sortering
-  if(sec==='OFFERTE-TRAJECTEN'){
-    const vandaag=_vandaagAmsterdam();
-    const actMap=_offerteActiviteitMap(D.logboek);
-    out.forEach(r=>_verrijkOfferteRij(r,actMap));
-    out.forEach(r=>{ const st=offerteNuOpvolgen(r,vandaag); r._offStatus=st; r._offNu=st.nodig; });
-    const g=offerteGroepen(out,vandaag);
-    return [...g.nu,...g.lopend];
-  }
+  // Aannemerslijst (kolom P) op de rij zetten + de X/N-teller bijstellen. Moet vóór de
+  // render gebeuren, anders blijft het uitklap-paneel leeg en toont de teller de rauwe
+  // kolom D. Sortering loopt daarna via hetzelfde generieke pad als de andere secties.
+  if(sec==='OFFERTE-TRAJECTEN') out.forEach(r=>_verrijkOfferteRij(r));
   return out.sort((a,b)=>{
     // Groepen (Fase 4): 0 = actief, 1 = in behandeling, 2 = weggelegd (opvolgdatum in toekomst)
     const grp = r => opvolgStatus(r).weggelegd ? 2 : (r.inBehandeling==='TRUE' ? 1 : 0);
@@ -242,7 +226,7 @@ function setAf(s){state.activeAf=s;pgs.af=1;renderAf()}
 
 export {
   SEC_ICONS, SEC_THEMES, renderNtdStats, renderNtdDonut, renderNtd, setNtd, filterNtd, renderAf, setAf,
-  offerteGroepen, _offerteActiviteitMap, offerteBalBijTekst, offerteAannemerPaneel, offerteAannSamenvatting,
+  offerteAannemerPaneel, offerteAannSamenvatting,
   ALVO_ICONS, renderAlvo, ALVO_COLS, ALVO_LABELS, flagPill, _recomputeAlvoStatus, toggleAlvoFlag, statusIco, renderAlfa,
   renderThead, renderTbody, bepaalStil, deadlineCel, rowNtd, rowAf, renderPag,
 };

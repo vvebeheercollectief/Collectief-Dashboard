@@ -1,12 +1,12 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, offerteBalBij, _verschilInWerkdagen, offerteNuOpvolgen, offerteSorteerScore, offerteBriefingFeiten, offerteNabelTeller, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, isoWeek, coerceDagenVooraf } from "./util.js";
+import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, isoWeek, coerceDagenVooraf } from "./util.js";
 import { logZin, logPaginaSoort, _shiftRows, logEditWrite } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
-import { filterNtd, offerteGroepen, _offerteActiviteitMap, offerteBalBijTekst, setNtd, renderNtd, offerteAannemerPaneel, offerteAannSamenvatting } from "./render-lijsten.js";
+import { filterNtd, setNtd, renderNtd, offerteAannemerPaneel, offerteAannSamenvatting } from "./render-lijsten.js";
 import { state, D, pgs } from "./state.js";
 import { vveOverzicht, filterDossierLog } from "./render-vve.js";
 import { parseKenmerken, vveKenmerken } from "./kenmerken.js";
@@ -307,113 +307,11 @@ import { shouldPromptReload } from "./sw-update.js";
   eq('fase expliciet "Bij VvE"',offerteFase({fase:'Bij VvE'}), 'bij_vve');
   eq('fase gegund',             offerteFase({fase:'gegund'}), 'gegund');
 
-  // ── offerte-motor: nu-opvolgen ──
-  const VANDAAG_OFF = new Date(2026, 5, 12); // vr 12 juni 2026
-  // aannemer 10 werkdagen stil (aangevraagd 29 mei) → nodig
-  eq('nu-opvolgen aannemer te lang stil',
-     offerteNuOpvolgen({offertes:'0/2', datumAangevraagd:'29 mei 2026'}, VANDAAG_OFF).nodig, true);
-  // aannemer pas 2 dagen geleden aangevraagd → niet nodig
-  eq('nu-opvolgen aannemer nog vers',
-     offerteNuOpvolgen({offertes:'0/2', datumAangevraagd:'10 juni 2026'}, VANDAAG_OFF).nodig, false);
-  // ontvangen, 9 dagen niet gedeeld → nodig, bal bij ons, actie Doorsturen
-  truthy('nu-opvolgen ontvangen → doorsturen',
-     (()=>{const s=offerteNuOpvolgen({offertes:'2/2', datumAangevraagd:'3 juni 2026'}, VANDAAG_OFF);
-           return s.nodig && s.balBij==='ons' && s.actie==='Doorsturen';})());
-  // gegund → nooit nodig
-  eq('nu-opvolgen gegund nooit',
-     offerteNuOpvolgen({fase:'gegund', datumAangevraagd:'1 jan 2026'}, VANDAAG_OFF).nodig, false);
-  // weggelegd (opvolgdatum in toekomst) → niet nodig
-  eq('nu-opvolgen weggelegd',
-     offerteNuOpvolgen({offertes:'0/2', datumAangevraagd:'1 mei 2026', opvolgdatum:'1 juli 2026'}, VANDAAG_OFF).nodig, false);
-  // deadline overschreden → altijd nodig
-  eq('nu-opvolgen deadline te laat',
-     offerteNuOpvolgen({offertes:'2/2', datumAangevraagd:'11 juni 2026', deadline:'1 juni 2026'}, VANDAAG_OFF).nodig, true);
-
-  // ── offerte-motor: briefing-feiten (regel-gebaseerde kern) ──
-  const RIJEN_OFF = [
-    {code:'A', naam:'VvA Lekstraat 15', offertes:'0/2', datumAangevraagd:'1 mei 2026'},   // aannemer, lang stil
-    {code:'B', naam:'VvE Hoofdstraat 22', offertes:'2/2', datumAangevraagd:'3 juni 2026'},// ons (doorsturen)
-    {code:'C', naam:'VvE Parkweg 8', offertes:'1/1', fase:'bij_vve', datumAangevraagd:'1 juni 2026'}, // bij vve
-    {code:'D', naam:'VvE Verswijk', offertes:'0/1', datumAangevraagd:'11 juni 2026'},      // vers → niet nodig
-  ];
-  const FEITEN = offerteBriefingFeiten(RIJEN_OFF, VANDAAG_OFF);
-  eq('briefing nuOpvolgen telt 3', FEITEN.nuOpvolgen, 3);
-  eq('briefing balBijOns telt 1',  FEITEN.balBijOns, 1);
-  eq('briefing klaarTeGunnen telt 1', FEITEN.klaarTeGunnen, 1);
-  truthy('briefing urgentste is A (langst stil)', FEITEN.urgentste && FEITEN.urgentste.code === 'A');
-
-  // ── offerte-motor: sorteerscore (hoger = urgenter) ──
-  truthy('score: deadline-te-laat > gewoon',
-     offerteSorteerScore({offertes:'2/2', datumAangevraagd:'11 juni 2026', deadline:'1 juni 2026', prioriteit:'Laag'}, VANDAAG_OFF)
-     > offerteSorteerScore({offertes:'0/2', datumAangevraagd:'1 juni 2026', prioriteit:'Hoog'}, VANDAAG_OFF));
-  truthy('score: langer stil > korter stil',
-     offerteSorteerScore({offertes:'0/2', datumAangevraagd:'1 mei 2026', prioriteit:'Midden'}, VANDAAG_OFF)
-     > offerteSorteerScore({offertes:'0/2', datumAangevraagd:'10 juni 2026', prioriteit:'Midden'}, VANDAAG_OFF));
-
-  // ── offerte-motor: werkdagen-verschil (vr→ma = 1, weekend telt niet) ──
-  eq('werkdagen vr→ma', _verschilInWerkdagen(new Date(2026,5,5), new Date(2026,5,8)), 1);
-  eq('werkdagen vr→di', _verschilInWerkdagen(new Date(2026,5,5), new Date(2026,5,9)), 2);
-  eq('werkdagen ma→do', _verschilInWerkdagen(new Date(2026,5,1), new Date(2026,5,4)), 3);
-  eq('werkdagen zelfde dag', _verschilInWerkdagen(new Date(2026,5,8), new Date(2026,5,8)), 0);
-  // NL-feestdagen tellen niet als werkdag (aannemer-opvolgtermijn)
-  eq('werkdagen slaat Hemelvaart over (wo 13→vr 15 mei 2026, do 14 = Hemelvaart)', _verschilInWerkdagen(new Date(2026,4,13), new Date(2026,4,15)), 1);
-  eq('werkdagen slaat Eerste Kerstdag over (do 24→ma 28 dec 2026, vr 25 = Kerst)', _verschilInWerkdagen(new Date(2026,11,24), new Date(2026,11,28)), 1);
-
-  // ── offerte-motor: bal bij wie ──
-  eq('balBij aangevraagd → aannemer', offerteBalBij({offertes:'0/2'}), 'aannemer');
-  eq('balBij ontvangen → ons',        offerteBalBij({offertes:'2/2'}), 'ons');
-  eq('balBij bij_vve → vve',          offerteBalBij({fase:'bij_vve'}), 'vve');
-  eq('balBij gegund → null',          offerteBalBij({fase:'gegund'}), null);
-
-  // ── offerte-motor: review-aanvullingen ──
-  eq('weggelegd wint van deadline',
-     offerteNuOpvolgen({offertes:'2/2', datumAangevraagd:'1 mei 2026', deadline:'1 juni 2026', opvolgdatum:'1 juli 2026'}, VANDAAG_OFF).nodig, false);
-  eq('recente activiteit reset stil-teller',
-     offerteNuOpvolgen({offertes:'0/2', datumAangevraagd:'1 mei 2026', laatsteActiviteit:'2026-06-11T10:00:00.000Z'}, VANDAAG_OFF).nodig, false);
-  eq('briefing langStil telt 1', offerteBriefingFeiten([
-     {code:'A', naam:'VvA Lekstraat 15', offertes:'0/2', datumAangevraagd:'1 mei 2026'},
-  ], VANDAAG_OFF).langStil, 1);
-  // ── offerte-motor: groepen (render-laag) ──
-  const GRP = offerteGroepen([
-    {code:'X1', offertes:'0/2', datumAangevraagd:'1 mei 2026', prioriteit:'Midden'},
-    {code:'X2', offertes:'0/2', datumAangevraagd:'10 juni 2026'},
-    {code:'X3', offertes:'2/2', datumAangevraagd:'3 juni 2026', prioriteit:'Hoog'},
-  ], new Date(2026,5,12));
-  eq('groepen: nu telt 2', GRP.nu.length, 2);
-  eq('groepen: lopend telt 1', GRP.lopend.length, 1);
-  eq('groepen: langst stil eerst', GRP.nu[0].code, 'X1');
-
   eq('parseOff normaal', parseOff('2/3'), [2,3]);
   eq('parseOff half',    parseOff('3/'),  [3,0]);
   eq('parseOff rommel',  parseOff('abc'), [0,0]);
   eq('parseOff leeg',    parseOff(null),  [0,0]);
 
-  // ── offerte-motor: groepen randgevallen + activiteit-map ──
-  eq('groepen: leeg → beide leeg',
-     (()=>{const g=offerteGroepen([], new Date(2026,5,12));return [g.nu.length,g.lopend.length];})(), [0,0]);
-  eq('groepen: alles in nu',
-     (()=>{const g=offerteGroepen([{code:'Y1', offertes:'0/2', datumAangevraagd:'1 mei 2026'}], new Date(2026,5,12));return [g.nu.length,g.lopend.length];})(), [1,0]);
-  truthy('activiteit-map pakt jongste offerte-entry',
-     (()=>{const m=_offerteActiviteitMap([
-       {code:'A',sectie:'OFFERTE-TRAJECTEN',timestamp:'2026-06-01T10:00:00.000Z'},
-       {code:'A',sectie:'OFFERTE-TRAJECTEN',timestamp:'2026-06-10T10:00:00.000Z'},
-       {code:'A',sectie:'OPPAKKEN',timestamp:'2026-06-11T10:00:00.000Z'},
-     ]);const t=m.get('A');return t && t.getTime()===new Date('2026-06-10T10:00:00.000Z').getTime();})());
-
-  // ── offerte-acties: modal aanwezig ──
-  truthy('offerte-actie-modal bestaat', !!document.getElementById('off-actie-bg'));
-
-  // ── offerte-briefing: balBij → NL-tekst ──
-  eq('balBijTekst aannemer', offerteBalBijTekst('aannemer'), 'bal bij de aannemer');
-  eq('balBijTekst ons',      offerteBalBijTekst('ons'),      'bal bij ons');
-  eq('balBijTekst vve',      offerteBalBijTekst('vve'),      'bal bij de eigenaren');
-  // ── offerte: vastgelopen-teller (Nabellen-logregels per code) ──
-  eq('nabelteller telt 2 nabel-acties', offerteNabelTeller('A', [
-    {sectie:'OFFERTE-TRAJECTEN',code:'A',veld:'Telefoon'},
-    {sectie:'OFFERTE-TRAJECTEN',code:'A',veld:'E-mail'},
-    {sectie:'OFFERTE-TRAJECTEN',code:'A',veld:'Telefoon'},
-    {sectie:'OFFERTE-TRAJECTEN',code:'B',veld:'Telefoon'},
-  ]), 2);
   // ── offerte-aannemers: parse / serialize / derive ──
   eq('parseAannemers leeg', parseAannemers(''), []);
   eq('parseAannemers naam zonder vlag', parseAannemers('Klusbouw Meesters'),
@@ -468,19 +366,10 @@ import { shouldPromptReload } from "./sw-update.js";
     filterNtd([row],'','','','','OFFERTE-TRAJECTEN');
     return row.offertes==='2/4';
   })());
-  truthy('2/2 uit lijst → bal bij ons', (()=>{
+  truthy('2/2 uit lijst → fase ontvangen', (()=>{
     const row={code:'ZZ-ONS',naam:'Test',offertes:'',aannemers:'A|1\nB|1',_row:9997};
     filterNtd([row],'','','','','OFFERTE-TRAJECTEN');
-    return offerteBalBij(row)==='ons';
-  })());
-
-  // ── offerte: sorteer-tiebreak — bal bij ons (snel af te ronden) wint bij gelijke dagen ──
-  truthy('sorteer-tiebreak: bal bij ons > bal bij aannemer bij gelijke dagen', (()=>{
-    const vandaag=new Date(2026,5,15);
-    const basis={ datumAangevraagd:'1 mei 2026', opvolgdatum:'', laatsteActiviteit:'', aannemers:'' };
-    const rOns ={ ...basis, code:'TIE-ONS', offertes:'1/1' }; // recv>0 → ontvangen → ons
-    const rAann={ ...basis, code:'TIE-AAN', offertes:'0/1' }; // recv=0 → aangevraagd → aannemer
-    return offerteSorteerScore(rOns,vandaag) > offerteSorteerScore(rAann,vandaag);
+    return row.offertes==='2/2' && offerteFase(row)==='ontvangen';
   })());
 
   // ── offerte-aannemers: paneel- en samenvatting-component ──
@@ -503,66 +392,53 @@ import { shouldPromptReload } from "./sw-update.js";
     offerteAannemerPaneel({code:'Q',_aannemers:[]}).includes('offerte-aann-add'));
   truthy('actie offerte-aann-add bestaat', typeof ACTIONS['offerte-aann-add']==='function');
 
-  // ── offerte-briefing: DOM-rooktest (C2-markup, geen emoji; setNtd-pad crasht niet) ──
-  truthy('off-briefing-slot bestaat', !!document.getElementById('off-briefing-slot'));
-  truthy('Vandaag-paneel rendert strip + beide blokken', (()=>{
-    try{
-      const vorige=state.activeNtd;
-      setNtd('OFFERTE-TRAJECTEN');
-      const html=document.getElementById('off-briefing-slot').innerHTML;
-      setNtd(vorige);
-      return html.includes('of-strip')&&html.includes('Doorsturen')&&html.includes('Nabellen')
-        &&html.includes('Volledige tabel')&&!html.includes('✦');
-    }catch(e){ console.error('vandaag-paneel-test:',e); return false; }
-  })());
-
-  // ── offerte-briefing: 'Nu dit'-kaart + gepinde bewerk-rij (regressie wegspringen) ──
-  truthy('Nu-dit-kaart toont de urgentste taak', (()=>{
+  // ── offerte-tab is een platte tabel (v6.2): geen Vandaag-paneel, geen motor-markup ──
+  truthy('offerte-tab: geen briefing-slot meer in de DOM', !document.getElementById('off-briefing-slot'));
+  truthy('offerte-rij: kaal, met alleen de aannemers-toggle als extra', (()=>{
     try{
       const vA=state.activeNtd, vR=D.ntd['OFFERTE-TRAJECTEN'], vO=new Set(state.offerteAannOpen);
       state.offerteAannOpen.clear();
       D.ntd['OFFERTE-TRAJECTEN']=[
-        {code:'HERO-1',naam:'VvE Urgentst',offertes:'0/1',aannemers:'',fase:'',datumAangevraagd:'1 mei 2026',_row:9101},
-        {code:'HERO-2',naam:'VvE Tweede', offertes:'0/1',aannemers:'',fase:'',datumAangevraagd:'20 mei 2026',_row:9102},
+        {code:'PLAT-1',naam:'VvE Plat',offertes:'1/3',aannemers:'A|1\nB|0\nC|0',fase:'',datumAangevraagd:'1 mei 2026',opmerkingen:'',behandelaar:'',deadline:'',_sec:'OFFERTE-TRAJECTEN',_row:9101},
       ];
       setNtd('OFFERTE-TRAJECTEN');
-      const html=document.getElementById('off-briefing-slot').innerHTML;
+      const html=document.getElementById('ntd-tbody').innerHTML;
       D.ntd['OFFERTE-TRAJECTEN']=vR; state.offerteAannOpen=vO; setNtd(vA);
-      return html.includes('of-hero')&&html.includes('VvE Urgentst')&&html.includes('Begin hier');
-    }catch(e){ console.error('nu-dit-test:',e); return false; }
+      // wél: de rij + de aannemers-toggle. níét: hero/strip/fase-balk/opvolg-actieknop/groepkop.
+      return html.includes('PLAT-1') && html.includes('of-aann-tog')
+        && !html.includes('of-hero') && !html.includes('of-strip') && !html.includes('fase-balk')
+        && !html.includes('off-actie') && !html.includes('grp-nu');
+    }catch(e){ console.error('platte-offerte-test:',e); return false; }
   })());
-
-  truthy('bewerkte rij blijft in z\'n sectie zichtbaar (geen pin-zone, geen sprong omhoog)', (()=>{
+  truthy('offerte-tabel staat meteen open (geen inklap-vouw meer)', (()=>{
     try{
-      const vA=state.activeNtd, vR=D.ntd['OFFERTE-TRAJECTEN'], vO=new Set(state.offerteAannOpen), vS={...state.offerteAannSnap};
-      const rows=[];
-      for(let i=0;i<8;i++) rows.push({code:'NB-'+i,naam:'VvE Na '+i,offertes:'0/1',aannemers:'',fase:'',datumAangevraagd:'1 mei 2026',_row:9200+i});
-      D.ntd['OFFERTE-TRAJECTEN']=rows;
-      state.offerteAannOpen.clear(); state.offerteAannOpen.add('NB-7'); // minst urgente, zou onder de cap vallen
+      const vA=state.activeNtd, vR=D.ntd['OFFERTE-TRAJECTEN'];
+      D.ntd['OFFERTE-TRAJECTEN']=[{code:'OPEN-1',naam:'VvE Open',offertes:'0/1',aannemers:'',fase:'',datumAangevraagd:'1 mei 2026',opmerkingen:'',behandelaar:'',deadline:'',_sec:'OFFERTE-TRAJECTEN',_row:9103}];
       setNtd('OFFERTE-TRAJECTEN');
-      const html=document.getElementById('off-briefing-slot').innerHTML;
-      D.ntd['OFFERTE-TRAJECTEN']=vR; state.offerteAannOpen=vO; state.offerteAannSnap=vS; setNtd(vA);
-      // open rij blijft zichtbaar (cap-exempt) én er is géén losse 'Aan het bijwerken'-pin-zone meer
-      return html.includes('NB-7') && !html.includes('of-pin') && !html.includes('Aan het bijwerken');
-    }catch(e){ console.error('inplace-test:',e); return false; }
+      const zichtbaar=document.getElementById('ntd-tbl-wrap').style.display!=='none';
+      const html=document.getElementById('ntd-tbody').innerHTML;
+      D.ntd['OFFERTE-TRAJECTEN']=vR; setNtd(vA);
+      return zichtbaar && html.includes('OPEN-1');
+    }catch(e){ console.error('offerte-tabel-open-test:',e); return false; }
   })());
-
-  // ── offerte-aannemers: net-bewerkte rij blijft staan ná sluiten paneel (bug #1) ──
-  truthy('net-bewerkte offerte-rij blijft zichtbaar ná sluiten paneel (pin tot refresh)', (()=>{
+  // Het stil-label is bewust alleen op de offerte-tab weg; de andere secties houden 'm.
+  truthy('stil-label: weg bij offerte, blijft bij LOD', (()=>{
     try{
-      const vA=state.activeNtd, vR=D.ntd['OFFERTE-TRAJECTEN'], vO=new Set(state.offerteAannOpen),
-            vS={...state.offerteAannSnap}, vM=new Set(state.offerteAannMut||[]);
-      const rows=[];
-      for(let i=0;i<8;i++) rows.push({code:'PIN-'+i,naam:'VvE Pin '+i,offertes:'0/1',aannemers:'',fase:'',datumAangevraagd:'1 mei 2026',_row:9300+i});
-      D.ntd['OFFERTE-TRAJECTEN']=rows;
-      state.offerteAannOpen.clear();                       // paneel DICHT
-      state.offerteAannSnap={'PIN-7':'Nabellen'};          // maar net bewerkt → gepind
-      state.offerteAannMut=new Set(['PIN-7']);
+      const vA=state.activeNtd, vOff=D.ntd['OFFERTE-TRAJECTEN'], vLod=D.ntd['LOD'], vLog=D.logboek;
+      const oud=new Date(Date.now()-30*864e5).toISOString(); // ruim over elke stil-drempel
+      D.logboek=[
+        {code:'STIL-O',sectie:'OFFERTE-TRAJECTEN',timestamp:oud},
+        {code:'STIL-L',sectie:'LOD',timestamp:oud},
+      ];
+      D.ntd['OFFERTE-TRAJECTEN']=[{code:'STIL-O',naam:'VvE Stil Off',offertes:'0/1',aannemers:'',fase:'',datumAangevraagd:'1 mei 2026',opmerkingen:'',behandelaar:'',deadline:'',inBehandeling:'TRUE',_sec:'OFFERTE-TRAJECTEN',_row:9601}];
+      D.ntd['LOD']=[{code:'STIL-L',naam:'VvE Stil Lod',actiepunt:'x',status:'',opmerkingen:'',behandelaar:'',deadline:'',inBehandeling:'TRUE',_sec:'LOD',_row:9602}];
       setNtd('OFFERTE-TRAJECTEN');
-      const html=document.getElementById('off-briefing-slot').innerHTML;
-      D.ntd['OFFERTE-TRAJECTEN']=vR; state.offerteAannOpen=vO; state.offerteAannSnap=vS; state.offerteAannMut=vM; setNtd(vA);
-      return html.includes('PIN-7'); // minst urgente; zónder pin valt 'ie onder de cap → uit beeld
-    }catch(e){ console.error('pin-na-sluiten-test:',e); return false; }
+      const offHtml=document.getElementById('ntd-tbody').innerHTML;
+      setNtd('LOD');
+      const lodHtml=document.getElementById('ntd-tbody').innerHTML;
+      D.ntd['OFFERTE-TRAJECTEN']=vOff; D.ntd['LOD']=vLod; D.logboek=vLog; setNtd(vA);
+      return !offHtml.includes('pill-stil') && lodHtml.includes('pill-stil');
+    }catch(e){ console.error('stil-pill-test:',e); return false; }
   })());
 
   // ── subcategorie cross-list: taak óók in het gekozen scherm tonen (bug #2) ──
@@ -589,14 +465,14 @@ import { shouldPromptReload } from "./sw-update.js";
     }catch(e){ console.error('crosslist-neg-test:',e); return false; }
   })());
 
-  truthy('lege nu-lijst → rustige leeg-staat', (()=>{
+  truthy('lege offerte-lijst → generieke leeg-rij, geen crash', (()=>{
     try{
       const vA=state.activeNtd, vR=D.ntd['OFFERTE-TRAJECTEN'];
       D.ntd['OFFERTE-TRAJECTEN']=[];
       setNtd('OFFERTE-TRAJECTEN');
-      const html=document.getElementById('off-briefing-slot').innerHTML;
+      const html=document.getElementById('ntd-tbody').innerHTML;
       D.ntd['OFFERTE-TRAJECTEN']=vR; setNtd(vA);
-      return html.includes('Niets dringends');
+      return html.length>0 && !html.includes('of-hero');
     }catch(e){ console.error('leeg-test:',e); return false; }
   })());
 
@@ -621,36 +497,22 @@ import { shouldPromptReload } from "./sw-update.js";
   truthy('_isTransient: quota-bericht', _isTransient({message:'Quota exceeded for reads'}));
   truthy('_isTransient: 400 is NIET transient', !_isTransient({status:400}));
 
-  // Zoeken op de offerte-tab toont de gefilterde tabel en verbergt het Vandaag-blok.
-  truthy('offerte-zoek: tabel zichtbaar + briefing leeg + alleen treffer', (()=>{
+  // Zoeken op de offerte-tab filtert gewoon de tabel (die staat sinds v6.2 altijd open).
+  truthy('offerte-zoek: tabel zichtbaar + alleen de treffer', (()=>{
     try{
-      const vA=state.activeNtd, vR=D.ntd['OFFERTE-TRAJECTEN'], vS=document.getElementById('s-ntd').value, vOpen=state.offerteTabelOpen;
+      const vA=state.activeNtd, vR=D.ntd['OFFERTE-TRAJECTEN'], vS=document.getElementById('s-ntd').value;
       D.ntd['OFFERTE-TRAJECTEN']=[
         {code:'ZK-1',naam:'VvE Zoek Een',offertes:'0/1',aannemers:'',fase:'',datumAangevraagd:'1 mei 2026',opmerkingen:'',behandelaar:'',deadline:'',_sec:'OFFERTE-TRAJECTEN',_row:9500},
         {code:'ZK-2',naam:'VvE Zoek Twee',offertes:'0/1',aannemers:'',fase:'',datumAangevraagd:'1 mei 2026',opmerkingen:'',behandelaar:'',deadline:'',_sec:'OFFERTE-TRAJECTEN',_row:9501},
       ];
-      state.offerteTabelOpen=false;
       setNtd('OFFERTE-TRAJECTEN');
       document.getElementById('s-ntd').value='zoek een';
       renderNtd();
-      const briefingLeeg=document.getElementById('off-briefing-slot').innerHTML==='';
       const tabelZichtbaar=document.getElementById('ntd-tbl-wrap').style.display!=='none';
       const tbody=document.getElementById('ntd-tbody').innerHTML;
-      document.getElementById('s-ntd').value=vS; D.ntd['OFFERTE-TRAJECTEN']=vR; state.offerteTabelOpen=vOpen; setNtd(vA);
-      return briefingLeeg && tabelZichtbaar && tbody.includes('ZK-1') && !tbody.includes('ZK-2');
+      document.getElementById('s-ntd').value=vS; D.ntd['OFFERTE-TRAJECTEN']=vR; setNtd(vA);
+      return tabelZichtbaar && tbody.includes('ZK-1') && !tbody.includes('ZK-2');
     }catch(e){ console.error('offerte-zoek-test:',e); return false; }
-  })());
-  truthy('offerte zonder zoek: Vandaag-blok zichtbaar', (()=>{
-    try{
-      const vA=state.activeNtd, vR=D.ntd['OFFERTE-TRAJECTEN'], vS=document.getElementById('s-ntd').value, vOpen=state.offerteTabelOpen;
-      D.ntd['OFFERTE-TRAJECTEN']=[{code:'ZK-3',naam:'VvE Drie',offertes:'0/1',aannemers:'',fase:'',datumAangevraagd:'1 mei 2026',opmerkingen:'',behandelaar:'',deadline:'',_sec:'OFFERTE-TRAJECTEN',_row:9502}];
-      state.offerteTabelOpen=false;
-      document.getElementById('s-ntd').value='';
-      setNtd('OFFERTE-TRAJECTEN');
-      const briefingGevuld=document.getElementById('off-briefing-slot').innerHTML.length>0;
-      document.getElementById('s-ntd').value=vS; D.ntd['OFFERTE-TRAJECTEN']=vR; state.offerteTabelOpen=vOpen; setNtd(vA);
-      return briefingGevuld;
-    }catch(e){ console.error('offerte-geen-zoek-test:',e); return false; }
   })());
 
   // ══════════════════════════════════════
@@ -660,14 +522,6 @@ import { shouldPromptReload } from "./sw-update.js";
   eq('parseAnyDate dd-mm-yy', _parseAnyDate('21-05-26'), {y:2026,m:5,d:21});
   eq('parseAnyDate dd/mm/yy', _parseAnyDate('1/2/27'), {y:2027,m:2,d:1});
   eq('parseAnyDate dd-mm-yyyy blijft werken', _parseAnyDate('21-05-2026'), {y:2026,m:5,d:21});
-
-  // #15 lege prioriteit sorteert ONDER 'Laag' (niet erboven)
-  truthy('offerteSorteerScore: lege prio < Laag', (()=>{
-    const basis={naam:'x',offertes:'0/1',aannemers:'',datumAangevraagd:'1 mei 2026',deadline:''};
-    const rowL={...basis,code:'P-L',prioriteit:'Laag'};
-    const rowE={...basis,code:'P-E',prioriteit:''};
-    return offerteSorteerScore(rowL,T) > offerteSorteerScore(rowE,T);
-  })());
 
   // #19 setv toont 0 i.p.v. een leeg veld
   truthy('setv: 0 blijft "0"', (()=>{

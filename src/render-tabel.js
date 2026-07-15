@@ -2,11 +2,10 @@
 //  RENDER-TABEL — generieke tabel/paginering (thead, tbody, rij-render, paginatie)
 //  Verplaatst uit render-lijsten.js (Batch D / punt 11) — zuivere refactor, geen gedragswijziging.
 // ══════════════════════════════════════
-import { esc, prioBadge, persBadges, subBadge, offProg, emptyRow, berekenPrioriteit, opvolgStatus, offerteFase, _verschilInKalenderdagen, _vandaagAmsterdam, STIL_DREMPEL_DAGEN } from "./util.js";
+import { esc, prioBadge, persBadges, subBadge, offProg, emptyRow, berekenPrioriteit, opvolgStatus, _verschilInKalenderdagen, _vandaagAmsterdam, STIL_DREMPEL_DAGEN } from "./util.js";
 import { SECS, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { bulkGeselecteerd } from "./bulk.js";
-import { flipOfferteRijen } from "./anim.js";
 import { offerteAannSamenvatting, offerteAannemerPaneel } from "./render-offerte.js";
 
 // ══════════════════════════════════════
@@ -26,29 +25,6 @@ function renderTbody(tbodyId,rows,sec,page,isAf,filtered){
   const leegCols=isAf?6:(SECS[sec].cols.length+1+(state.bulkMode?1:0));
   if(!sl.length){el.innerHTML=`<tr><td colspan="${leegCols}">${emptyRow(leegCols,true,filtered)}</td></tr>`;return}
   if(isAf){el.innerHTML=sl.map(r=>rowAf(r,sec)).join('');return}
-  // Offerte-motor (Fase 2): eigen groepkoppen "Nu opvolgen" / "Lopend"
-  // (rijen komen al verrijkt + in nu→lopend-volgorde uit filterNtd; zelfde slice-mechaniek als Weggelegd)
-  if(sec==='OFFERTE-TRAJECTEN'){
-    // rijen zijn al getagd met r._offNu in filterNtd (één klok, geen nieuwe aanroepen)
-    const nu=sl.filter(r=>r._offNu), lopend=sl.filter(r=>!r._offNu);
-    // Groeptellingen over álle pagina's (niet alleen de huidige slice), anders klopt het cijfer niet.
-    const nuAll=rows.filter(r=>r._offNu).length, lopendAll=rows.length-nuAll;
-    const colsOff=SECS[sec].cols.length+1+(state.bulkMode?1:0);
-    let html='';
-    if(nu.length||p===1){
-      html+=`<tr><td colspan="${colsOff}" class="grp-kop grp-nu">Nu opvolgen <span class="grp-n">· ${nuAll}</span></td></tr>`;
-      html+=nu.length
-        ?nu.map(r=>rowNtd(r,sec)).join('')
-        :`<tr><td colspan="${colsOff}"><div class="empty-rust">Niets dat nu opvolging vraagt</div></td></tr>`;
-    }
-    if(lopend.length){
-      html+=`<tr><td colspan="${colsOff}" class="grp-kop">Lopend <span class="grp-n">· ${lopendAll}</span></td></tr>`;
-      html+=lopend.map(r=>rowNtd(r,sec)).join('');
-    }
-    // FLIP: rijen zweven zichtbaar naar hun nieuwe plek bij her-render (Task 2.3)
-    flipOfferteRijen(el,()=>{el.innerHTML=html});
-    return;
-  }
   // Drie groepen (Fase 4): actief / in behandeling / weggelegd
   const grpOf = r => opvolgStatus(r).weggelegd ? 2 : (r.inBehandeling==='TRUE' ? 1 : 0);
   const main=sl.filter(r=>grpOf(r)===0);
@@ -84,15 +60,6 @@ function bepaalStil(r, sec){
   return dagen >= STIL_DREMPEL_DAGEN ? dagen : null;
 }
 
-// Offerte-motor: verfijnde fase-balk (4 mijlpalen) + fasenaam-label.
-function faseBalk(r){
-  const fases=['aangevraagd','ontvangen','bij_vve','gegund'];
-  const kort={aangevraagd:'Aangevr.',ontvangen:'Ontvangen',bij_vve:'Bij VvE',gegund:'Gegund'};
-  const idx=fases.indexOf(offerteFase(r));
-  const segs=fases.map((f,i)=>`<span class="fase-stap ${i<=idx?'done':''}"></span>`).join('');
-  return `<div class="fase-wrap"><div class="fase-balk">${segs}</div><span class="fase-label">${kort[fases[idx]]||''}</span></div>`;
-}
-
 function deadlineCel(r, sec){
   if (!r.deadline) return `<td class="cell-sm"><span class="warn-geen-deadline">Geen deadline</span></td>`;
   const { teLaat, dagenTot } = berekenPrioriteit(r.deadline, sec);
@@ -108,12 +75,12 @@ function rowNtd(r,sec){
   const bulkCel=state.bulkMode
     ?`<td class="bulk-cel"><button type="button" class="cb${bulkGeselecteerd(r)?' aan':''}" data-action="bulk-vink" data-rid="${rid}" role="checkbox" aria-checked="${bulkGeselecteerd(r)}" aria-label="Selecteer rij"></button></td>`
     :'';
-  // acts-cel met optionele extra knop vooraan (offerte-motor: contextuele opvolg-actie)
-  const actsHtml=extra=>`<div class="acts">${extra||''}<button class="act-bw act-ico" data-action="taak-bewerken" data-rid="${rid}" title="Bewerken" aria-label="Bewerken"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><button class="act-bw act-ico" data-action="taak-wegleggen" data-rid="${rid}" title="Wegleggen / opvolgdatum" aria-label="Wegleggen of opvolgdatum"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 13.5"/></svg></button><button class="act-af act-ico" data-action="taak-afronden" data-rid="${rid}" title="Afronden" aria-label="Afronden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 12 4 4 10-10"/></svg></button></div>`;
-  const editBtn=actsHtml('');
+  const editBtn=`<div class="acts"><button class="act-bw act-ico" data-action="taak-bewerken" data-rid="${rid}" title="Bewerken" aria-label="Bewerken"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><button class="act-bw act-ico" data-action="taak-wegleggen" data-rid="${rid}" title="Wegleggen / opvolgdatum" aria-label="Wegleggen of opvolgdatum"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 13.5"/></svg></button><button class="act-af act-ico" data-action="taak-afronden" data-rid="${rid}" title="Afronden" aria-label="Afronden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 12 4 4 10-10"/></svg></button></div>`;
   let cells='';
   const _stilDagen = bepaalStil(r, sec);
-  const stilPill = _stilDagen !== null
+  // De offerte-tab is bewust kaal (v6.2): daar geen berekend stil-label. De andere secties
+  // houden 'm wél — daar is het hun signaal dat een taak stil blijft liggen.
+  const stilPill = (_stilDagen !== null && sec !== 'OFFERTE-TRAJECTEN')
     ? `<span class="pill-stil" data-action="taak-bewerken" data-rid="${rid}" title="Geen activiteit in ${_stilDagen} dagen">Stil ${_stilDagen}d</span>`
     : '';
   const ov = opvolgStatus(r);
@@ -145,26 +112,17 @@ function rowNtd(r,sec){
         <td class="cell-note"><span class="ct" title="${esc(r.opmerkingen||'')}">${esc(r.opmerkingen||'')}</span></td>
         <td>${editBtn}</td>`;
       break;
-    case'OFFERTE-TRAJECTEN':{
-      // Offerte-motor (Fase 3): contextuele opvolg-actie alleen in "Nu opvolgen"-rijen
-      const st=r._offStatus||{};
-      // F5: inline SVG i.p.v. emoji (iconenbeleid: geen emoji in knoppen, zelfde lijn-stijl als buurknoppen)
-      const actieBtn=r._offNu&&st.actie
-        ? `<button class="act-bw off-actie" data-action="${st.actie==='Doorsturen'?'offerte-doorsturen':'offerte-nabellen'}" data-rid="${rid}" title="${st.actie==='Doorsturen'?'Offerte delen met de eigenaren + vastleggen':'Opvolging vastleggen (gebeld/gemaild)'}">${st.actie==='Doorsturen'
-          ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></svg>Doorsturen`
-          : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>Nabellen`
-        }</button>`
-        : '';
+    case'OFFERTE-TRAJECTEN':
       cells=`<td><span class="code code-klik" style="${css}" data-action="vve-open" data-code="${esc(r.code)}" title="Open VvE-dossier">${esc(r.code)}</span></td>
         <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}</td>
         <td class="cell-sm">${esc(r.datumAangevraagd||'')}</td>
-        <td>${offProg(r.offertes)}${faseBalk(r)}<div class="of-aann-tbl-tog">${offerteAannSamenvatting(r)}</div></td>
+        <td>${offProg(r.offertes)}<div class="of-aann-tbl-tog">${offerteAannSamenvatting(r)}</div></td>
         <td>${persBadges(r.behandelaar)}</td>
         ${deadlineCel(r, 'OFFERTE-TRAJECTEN')}
         <td>${prioBadge(r, 'OFFERTE-TRAJECTEN')}</td>
         <td class="cell-note"><span class="ct" title="${esc(r.opmerkingen||'')}">${esc(r.opmerkingen||'')}</span>${extraPills}</td>
-        <td>${actsHtml(actieBtn)}</td>`;
-      break;}
+        <td>${editBtn}</td>`;
+      break;
     case'LOD':
       cells=`<td><span class="code code-klik" style="${css}" data-action="vve-open" data-code="${esc(r.code)}" title="Open VvE-dossier">${esc(r.code)}</span></td>
         <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}</td>
@@ -185,13 +143,10 @@ function rowNtd(r,sec){
     ov.weggelegd ? 'snooze-row' : '',
     state.expandedRows.has(''+r._row) ? 'expanded' : ''
   ].filter(Boolean).join(' ');
-  // Stabiel FLIP-anker per offerte-traject (code + aanvraagdatum), voor de zweefanimatie
-  // sleutel niet gegarandeerd uniek bij zelfde code+datum — cosmetisch risico, geaccepteerd
-  const flipAttr = sec==='OFFERTE-TRAJECTEN' ? ` data-flip="${esc(r.code)}|${esc(r.datumAangevraagd||'')}"` : '';
   const aannRow = (sec==='OFFERTE-TRAJECTEN' && state.offerteAannOpen.has(r.code))
     ? `<tr class="of-aann-tr"><td colspan="${(state.bulkMode?1:0)+SECS[sec].cols.length+1}">${offerteAannemerPaneel(r)}</td></tr>`
     : '';
-  return `<tr class="${rowCls}" data-row="${r._row}"${prioAttr}${flipAttr}>${bulkCel}${cells}</tr>${aannRow}`;
+  return `<tr class="${rowCls}" data-row="${r._row}"${prioAttr}>${bulkCel}${cells}</tr>${aannRow}`;
 }
 
 function rowAf(r,sec){

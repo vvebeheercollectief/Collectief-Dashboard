@@ -5,7 +5,7 @@ import { ALLOWED_EMAILS } from '../allowed-emails.js';
 
 // ── Versie (zichtbaar in de UI) ────────────────────────────────────────
 // Ophogen bij ELKE wijziging: 4.1, 4.2, … 5.0 voor grote sprongen.
-export const APP_VERSION = '6.1';
+export const APP_VERSION = '6.2';
 
 // ── Omgeving (productie vs. testomgeving) ──────────────────────────────
 // Fail-safe: alleen deze exacte hosts zijn PRODUCTIE; al het andere
@@ -65,9 +65,9 @@ export const SECS = {
 };
 export const SKEYS = Object.keys(SECS);
 
-// Opvolg-termijnen voor de offerte-motor (Fase: offerte-opvolgsysteem).
-// aannemer = werkdagen; delen/eigenaren = kalenderdagen.
-export const OFFERTE_TERMIJNEN = { aannemer: 5, delen: 7, eigenaren: 7 };
+// Fase van een offerte-traject (kolom O). Het dashboard schrijft deze kolom sinds v6.2 niet
+// meer — offerteFase() leidt 'aangevraagd'/'ontvangen' af uit de X/N-teller; 'bij_vve' en
+// 'gegund' worden alleen nog gelézen als ze handmatig in de Sheet staan.
 export const OFFERTE_FASES = ['aangevraagd', 'ontvangen', 'bij_vve', 'gegund'];
 
 export const PAGE_META = {

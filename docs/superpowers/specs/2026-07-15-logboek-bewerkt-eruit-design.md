@@ -149,7 +149,9 @@ Toevoegen aan `src/tests.js` (nu 345+ tests, moeten allemaal blijven slagen):
 - `parseLogboek` behoudt `'Herhaalregel bewerkt'` (exact-match-bewijs);
 - `parseLogboek` geeft correcte `_row` ná het filteren (regressietest op de valkuil);
 - `parseLogboek` geeft correcte `_row` bij een lege rij tussendoor;
-- `bepaalStil` negeert 'Bewerkt' zodra het gefilterd is.
+- `dagenStil` rekent vanaf de notitie zodra 'Bewerkt' weggefilterd is — dit pint het
+  gemeten gedrag vast. (`bepaalStil` zelf is niet los testbaar: die leest `D` rechtstreeks.
+  `dagenStil` uit `urgentie.js` is de pure spiegel ervan en krijgt het logboek als argument.)
 
 Verificatie los van de unittests: visueel in de preview (mail met witregels in taak-popup
 én dossier), en na de opschoning een telling op de Sheet (782 regels over, 0 × 'Bewerkt').

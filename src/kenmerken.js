@@ -11,7 +11,12 @@ import { getCurrentWho } from "./notifications.js";
 import { renderVve } from "./render-vve.js";
 // (kringverwijzing kenmerken ⇄ render-vve/data: zelfde live-bindings-patroon als crud ⇄ main)
 
-export const KENMERK_WAARDEN = ['Onbekend','Ja','Nee','Deels'];
+export const KENMERK_WAARDEN = ['Onbekend','Gemeenschappelijk','Individueel'];
+// Oude Ja/Nee-antwoorden (t/m v6.3, vraag was "… gemeenschappelijk?") lezen we als de
+// nieuwe woorden, zodat ook een niet-gemigreerde Sheet-rij meteen goed toont en de
+// eerstvolgende opslag de nieuwe waarde wegschrijft. (Sheet-data is eenmalig omgezet.)
+const KENMERK_OUD = {Ja:'Gemeenschappelijk', Nee:'Individueel'};
+const normKenmerk = v => KENMERK_OUD[v] || v;
 
 // Pure parser: laatste rij per code wint (vangnet tegen dubbele appends)
 function parseKenmerken(rows){
@@ -20,7 +25,7 @@ function parseKenmerken(rows){
   rows.slice(1).forEach((r,i)=>{
     const code=((r&&r[0])||'').trim();
     if(!code) return;
-    per[code]={_row:i+2,code,balkons:(r[1]||'').trim(),kozijnen:(r[2]||'').trim(),
+    per[code]={_row:i+2,code,balkons:normKenmerk((r[1]||'').trim()),kozijnen:normKenmerk((r[2]||'').trim()),
       bron:(r[3]||'').trim(),gewijzigdDoor:(r[4]||'').trim(),gewijzigdOp:(r[5]||'').trim()};
   });
   return Object.values(per);

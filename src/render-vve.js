@@ -93,14 +93,14 @@ async function addContactLog(){
 }
 
 // Kenmerken-kaart: weergave- of bewerkmodus (Beheerderskenmerken)
-const KMK_PIL={'Ja':'background:var(--gn-l);color:var(--gn)','Nee':'background:var(--rd-l);color:var(--rd)','Deels':'background:var(--am-l);color:var(--am)'};
+const KMK_PIL={'Gemeenschappelijk':'background:var(--gn-l);color:var(--gn)','Individueel':'background:var(--ac-l);color:var(--ac)'};
 const kmkPil=v=>{const w=v||'Onbekend';return `<span class="badge" style="${KMK_PIL[w]||'background:var(--sur2);color:var(--mut)'}">${esc(w)}</span>`;};
 function kenmerkenKaart(code){
   const k=vveKenmerken(code,D);
   if(state.kenmerkenEdit){
     const sel=(id,val)=>`<select id="${id}">${KENMERK_WAARDEN.map(w=>`<option${(val||'Onbekend')===w?' selected':''}>${w}</option>`).join('')}</select>`;
-    return `<div class="kmk-rij"><span>Balkons gemeenschappelijk</span>${sel('kmk-balkons',k.balkons)}</div>
-      <div class="kmk-rij"><span>Kozijnen gemeenschappelijk</span>${sel('kmk-kozijnen',k.kozijnen)}</div>
+    return `<div class="kmk-rij"><span>Balkons</span>${sel('kmk-balkons',k.balkons)}</div>
+      <div class="kmk-rij"><span>Kozijnen</span>${sel('kmk-kozijnen',k.kozijnen)}</div>
       <div class="kmk-bron-lbl">Bron</div>
       <textarea id="kmk-bron" rows="2" placeholder="bv. splitsingsakte art. 17, mail gemeente 03-2024">${esc(k.bron)}</textarea>
       <div class="kmk-knoppen">
@@ -109,8 +109,8 @@ function kenmerkenKaart(code){
       </div>`;
   }
   const wijz=k.gewijzigdOp?`<div class="kmk-wijz">laatst gewijzigd door ${esc(displayName(k.gewijzigdDoor)||'?')} · ${esc(fmtLogTs(k.gewijzigdOp))}</div>`:'';
-  return `<div class="kmk-rij"><span>Balkons gemeenschappelijk</span>${kmkPil(k.balkons)}</div>
-    <div class="kmk-rij"><span>Kozijnen gemeenschappelijk</span>${kmkPil(k.kozijnen)}</div>
+  return `<div class="kmk-rij"><span>Balkons</span>${kmkPil(k.balkons)}</div>
+    <div class="kmk-rij"><span>Kozijnen</span>${kmkPil(k.kozijnen)}</div>
     <div class="kmk-bron-lbl">Bron</div>
     <div class="kmk-bron">${k.bron?esc(k.bron):'<span style="color:var(--mut)">Nog geen bron vastgelegd</span>'}</div>${wijz}`;
 }

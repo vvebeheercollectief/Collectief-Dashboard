@@ -107,8 +107,9 @@ function renderNtd(){
   const card=document.getElementById('ntd-card');
   SECS[state.activeNtd].css.split(';').forEach(p=>{const[k,v]=p.split(':');if(k&&v)card.style.setProperty(k.trim(),v.trim())});
 
-  const rows=filterNtd(D.ntd[state.activeNtd]||[],q,fCode,fBeh,fPrio,state.activeNtd);
-  renderThead('ntd-thead',[...(state.bulkMode?['']:[]),...SECS[state.activeNtd].cols,''],SECS[state.activeNtd].css);
+  const rows=sorteerNtd(filterNtd(D.ntd[state.activeNtd]||[],q,fCode,fBeh,fPrio,state.activeNtd),state.ntdSort);
+  renderThead('ntd-thead',[...(state.bulkMode?['']:[]),...SECS[state.activeNtd].cols,''],SECS[state.activeNtd].css,
+    {active:state.ntdSort, keyFor:ntdSorteerKey});
   renderTbody('ntd-tbody',rows,state.activeNtd,pgs.ntd,false,!!(q||fCode||fBeh||fPrio));
   renderPag('ntd-pag',rows.length,pgs.ntd,'ntd');
   renderNtdCrossList(state.activeNtd);
@@ -207,6 +208,32 @@ function filterNtd(rows,q,fCode,beh,prio,sec){
   });
 }
 
+// Welke kolomkoppen zijn sorteerbaar? 'VvE Code' → code; elke 'Deadline…'-kop → deadline.
+function ntdSorteerKey(lbl){
+  return lbl==='VvE Code' ? 'code' : (String(lbl).startsWith('Deadline') ? 'deadline' : null);
+}
+
+// Kolomkop-sortering (klikcyclus ▲/▼/uit). key:null = standaardvolgorde uit filterNtd.
+// De groepsindeling (actief → in behandeling → weggelegd) blijft altijd leidend zodat de
+// blokken in de tabel intact blijven; er wordt bínnen de blokken gesorteerd. Stabiele sort:
+// gelijke waarden houden de slimme standaardvolgorde.
+function sorteerNtd(rows,sort){
+  if(!sort||!sort.key) return rows;
+  const dir=sort.asc?1:-1;
+  const grp=r=>opvolgStatus(r).weggelegd?2:(r.inBehandeling==='TRUE'?1:0);
+  return rows.slice().sort((a,b)=>{
+    const g=grp(a)-grp(b);
+    if(g) return g;
+    if(sort.key==='code')
+      return dir*String(a.code||'').localeCompare(String(b.code||''),undefined,{numeric:true,sensitivity:'base'});
+    const dA=parseDt(a.deadline),dB=parseDt(b.deadline);
+    if(!dA&&!dB) return 0;
+    if(!dA) return 1;              // zonder deadline altijd onderaan, in beide richtingen
+    if(!dB) return -1;
+    return dir*(dA-dB);
+  });
+}
+
 // ══════════════════════════════════════
 //  AFGEROND
 // ══════════════════════════════════════
@@ -225,7 +252,7 @@ function renderAf(){
 function setAf(s){state.activeAf=s;pgs.af=1;renderAf()}
 
 export {
-  SEC_ICONS, SEC_THEMES, renderNtdStats, renderNtdDonut, renderNtd, setNtd, filterNtd, renderAf, setAf,
+  SEC_ICONS, SEC_THEMES, renderNtdStats, renderNtdDonut, renderNtd, setNtd, filterNtd, sorteerNtd, ntdSorteerKey, renderAf, setAf,
   offerteAannemerPaneel, offerteAannSamenvatting,
   ALVO_ICONS, renderAlvo, ALVO_COLS, ALVO_LABELS, flagPill, _recomputeAlvoStatus, toggleAlvoFlag, statusIco, renderAlfa,
   renderThead, renderTbody, bepaalStil, deadlineCel, rowNtd, rowAf, renderPag,

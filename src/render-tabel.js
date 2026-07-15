@@ -11,8 +11,18 @@ import { offerteAannSamenvatting, offerteAannemerPaneel } from "./render-offerte
 // ══════════════════════════════════════
 //  TABLE HELPERS
 // ══════════════════════════════════════
-function renderThead(id,cols,css){
-  document.getElementById(id).innerHTML=`<tr>${cols.map(c=>`<th style="${css}">${c}</th>`).join('')}</tr>`;
+// Optionele 4e parameter maakt kolomkoppen sorteerbaar: {active:{key,asc}, keyFor:(label)=>key|null}.
+// Sorteerbare koppen worden een echte knop (toetsenbord-bedienbaar) met pijl + aria-sort op de th.
+function renderThead(id,cols,css,sort){
+  const kf=sort&&sort.keyFor;
+  document.getElementById(id).innerHTML=`<tr>${cols.map(c=>{
+    const key=kf?kf(c):null;
+    if(!key) return `<th style="${css}">${c}</th>`;
+    const aan=!!(sort.active&&sort.active.key===key);
+    const richting=aan?(sort.active.asc?'ascending':'descending'):'none';
+    const uitleg=aan?(sort.active.asc?'nu oplopend — klik voor aflopend':'nu aflopend — klik voor standaardvolgorde'):'klik om te sorteren';
+    return `<th style="${css}" aria-sort="${richting}"><button type="button" class="th-sort${aan?' aan':''}" data-action="ntd-sorteer" data-key="${key}" title="Sorteren op ${c} (${uitleg})">${c}<span class="th-pijl" aria-hidden="true">${aan?(sort.active.asc?'▲':'▼'):''}</span></button></th>`;
+  }).join('')}</tr>`;
 }
 
 function renderTbody(tbodyId,rows,sec,page,isAf,filtered){

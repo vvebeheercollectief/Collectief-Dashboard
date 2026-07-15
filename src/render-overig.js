@@ -505,7 +505,7 @@ function renderTaskHistory(code,sec){
         ${actieBadge(r.actie)}
         <span style="margin-left:6px;color:var(--mut)">${esc(displayName(r.gebruiker))}</span>
         ${r.veld?`<div class="hist-change">${esc(r.veld)}: ${esc(r.oudeWaarde)} → ${esc(r.nieuweWaarde)}</div>`:''}
-        ${r.actie==='Opmerking'&&r.nieuweWaarde?`<div class="hist-change">${esc(r.nieuweWaarde)}</div>`:''}
+        ${r.actie==='Opmerking'&&r.nieuweWaarde?`<div class="log-note">${esc(r.nieuweWaarde)}</div>`:''}
       </div>
     </div>`).join('');
   }

@@ -820,7 +820,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,.search-box inpu
 #sb :focus-visible{outline-color:var(--sbglow)}
 
 /* ── Druk-feedback op knoppen (vooral op touch) + chat-knop-feedback ── */
-.btn:active,.ico-btn:active,.bb-knop:active,#chat-send:active,.of-btn-send:active,.of-btn-call:active,.pb:active,.act-af:active,.act-bw:active,.ni:active,.tab:active,.cb:active{transform:scale(.97)}
+.btn:active,.ico-btn:active,.bb-knop:active,#chat-send:active,.pb:active,.act-af:active,.act-bw:active,.ni:active,.tab:active,.cb:active{transform:scale(.97)}
 #chat-fab{transition:transform var(--tr),box-shadow var(--tr)}
 #chat-fab:hover{transform:scale(1.06);box-shadow:var(--shl)}
 #chat-fab:active{transform:scale(.95)}
@@ -856,7 +856,6 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,.search-box inpu
   .stat-week{flex-basis:100%;border-left:none;border-top:1px solid var(--bor);justify-content:flex-start;padding:10px 0}
   .modal-bg{padding:8px}
   .modal-body{max-height:calc(100vh - 170px)}
-  .of-pan{margin:14px 8px 0}
 }
 @media(max-width:380px){.stats-grid{grid-template-columns:1fr}}
 

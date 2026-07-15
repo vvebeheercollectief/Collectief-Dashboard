@@ -1,59 +1,9 @@
 // ════════════════════════════════════════════════════════════
-//  EENMALIGE ONDERHOUDSFUNCTIES (2026-07-15)
-//  Bewust in een eigen bestand: zo staat cd_schrijfMelding (dat een melding wegschrijft)
-//  hier NIET in de functiekiezer, en kan een misklik in de editor die nooit per ongeluk
-//  draaien. De eerste functie hieronder is de standaard bij 'Uitvoeren'.
-//  Beide zijn one-offs en worden na gebruik weer verwijderd.
+//  EENMALIGE ONDERHOUDSFUNCTIE (2026-07-15)
+//  Bewust in een eigen bestand met maar één functie: die is dus altijd de standaard bij
+//  'Uitvoeren', zodat de editor-functiekiezer nooit per ongeluk een andere functie draait.
+//  One-off; wordt na gebruik weer verwijderd.
 // ════════════════════════════════════════════════════════════
-
-// ── 'Bewerkt'-regels opruimen (v6.3) ────────────────────────────────────────
-// Elke taak-opslag schreef vroeger een 'Bewerkt'-regel — 395 van de ~1180 logregels, pure
-// overzichtsvervuiling. De frontend logt ze sinds v6.3 niet meer en filtert ze bij het inlezen
-// weg; deze functie ruimt de bestaande regels op. Maakt eerst een backup-tab. Exact-match op
-// 'Bewerkt' zodat 'Herhaalregel bewerkt' blijft. Verwacht op PROD: ~395 verwijderd.
-function cd_opschonenBewerkt() {
-  return cd_withLock(function () {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName('Logboek');
-    if (!sheet) throw new Error("Tabblad 'Logboek' niet gevonden");
-
-    const laatste = sheet.getLastRow();
-    if (laatste < 2) { Logger.log('Logboek is leeg — niets te doen'); return; }
-
-    // 1. Backup vóórdat we ook maar iets aanraken.
-    const stempel = Utilities.formatDate(new Date(), 'Europe/Amsterdam', 'yyyy-MM-dd-HHmm');
-    const backupNaam = 'Logboek backup ' + stempel;
-    sheet.copyTo(ss).setName(backupNaam);
-    Logger.log('Backup gemaakt: ' + backupNaam);
-
-    // 2. Rijnummers van exact 'Bewerkt' verzamelen (kolom D = actie).
-    const acties = sheet.getRange(2, 4, laatste - 1, 1).getValues();
-    const teVerwijderen = [];
-    for (let i = 0; i < acties.length; i++) {
-      if (String(acties[i][0]).trim() === 'Bewerkt') teVerwijderen.push(i + 2);
-    }
-    Logger.log('Gevonden: ' + teVerwijderen.length + " regels 'Bewerkt' van " + (laatste - 1) + ' datarijen');
-    if (!teVerwijderen.length) return { verwijderd: 0, over: laatste - 1, backup: backupNaam };
-
-    // 3. Aaneengesloten blokken samenvoegen en van ONDER naar BOVEN verwijderen —
-    //    andersom schuiven de rijnummers onder je weg.
-    const blokken = [];
-    for (let i = 0; i < teVerwijderen.length; i++) {
-      const rij = teVerwijderen[i];
-      const laatstBlok = blokken[blokken.length - 1];
-      if (laatstBlok && rij === laatstBlok.start + laatstBlok.aantal) laatstBlok.aantal++;
-      else blokken.push({ start: rij, aantal: 1 });
-    }
-    for (let i = blokken.length - 1; i >= 0; i--) {
-      sheet.deleteRows(blokken[i].start, blokken[i].aantal);
-    }
-
-    const over = sheet.getLastRow() - 1;
-    const res = { verwijderd: teVerwijderen.length, over: over, backup: backupNaam };
-    Logger.log('Klaar: ' + JSON.stringify(res));
-    return res;
-  });
-}
 
 // ── Meldingen-reparatie ─────────────────────────────────────────────────────
 // Herstelt handmatige fouten waarbij per abuis lege 'algemeen'-meldingen zijn geschreven

@@ -2,7 +2,7 @@
 //  RENDER-TABEL — generieke tabel/paginering (thead, tbody, rij-render, paginatie)
 //  Verplaatst uit render-lijsten.js (Batch D / punt 11) — zuivere refactor, geen gedragswijziging.
 // ══════════════════════════════════════
-import { esc, prioBadge, persBadges, subBadge, offProg, emptyRow, berekenPrioriteit, opvolgStatus, _verschilInKalenderdagen, _vandaagAmsterdam, STIL_DREMPEL_DAGEN } from "./util.js";
+import { esc, vveCodeSpan, prioBadge, persBadges, subBadge, offProg, emptyRow, berekenPrioriteit, opvolgStatus, _verschilInKalenderdagen, _vandaagAmsterdam, STIL_DREMPEL_DAGEN } from "./util.js";
 import { SECS, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { bulkGeselecteerd } from "./bulk.js";
@@ -102,7 +102,7 @@ function rowNtd(r,sec){
   const extraPills = stilPill + opvolgPill;
   switch(sec){
     case'OPPAKKEN':
-      cells=`<td><span class="code code-klik" style="${css}" data-action="vve-open" data-code="${esc(r.code)}" title="Open VvE-dossier">${esc(r.code)}</span></td>
+      cells=`<td>${vveCodeSpan(r.code, css)}</td>
         <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}</td>
         <td class="cell-txt"><span class="ct" title="${esc(r.actiepunt)}">${esc(r.actiepunt)}</span>${extraPills}</td>
         ${deadlineCel(r, 'OPPAKKEN')}
@@ -112,7 +112,7 @@ function rowNtd(r,sec){
         <td>${editBtn}</td>`;
       break;
     case'VERGADERVERZOEKEN':
-      cells=`<td><span class="code code-klik" style="${css}" data-action="vve-open" data-code="${esc(r.code)}" title="Open VvE-dossier">${esc(r.code)}</span></td>
+      cells=`<td>${vveCodeSpan(r.code, css)}</td>
         <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}</td>
         <td><span class="badge" style="background:var(--am-l);color:var(--am)">${esc(r.periode||r.agendapunten||'')}</span></td>
         <td class="cell-txt"><span class="ct" title="${esc(r.agendapunten||r.actiepunt||'')}">${esc(r.agendapunten||r.actiepunt||'')}</span>${extraPills}</td>
@@ -123,7 +123,7 @@ function rowNtd(r,sec){
         <td>${editBtn}</td>`;
       break;
     case'OFFERTE-TRAJECTEN':
-      cells=`<td><span class="code code-klik" style="${css}" data-action="vve-open" data-code="${esc(r.code)}" title="Open VvE-dossier">${esc(r.code)}</span></td>
+      cells=`<td>${vveCodeSpan(r.code, css)}</td>
         <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}</td>
         <td class="cell-sm">${esc(r.datumAangevraagd||'')}</td>
         <td>${offProg(r.offertes)}<div class="of-aann-tbl-tog">${offerteAannSamenvatting(r)}</div></td>
@@ -134,7 +134,7 @@ function rowNtd(r,sec){
         <td>${editBtn}</td>`;
       break;
     case'LOD':
-      cells=`<td><span class="code code-klik" style="${css}" data-action="vve-open" data-code="${esc(r.code)}" title="Open VvE-dossier">${esc(r.code)}</span></td>
+      cells=`<td>${vveCodeSpan(r.code, css)}</td>
         <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}</td>
         <td class="cell-txt"><span class="ct" title="${esc(r.actiepunt||'')}">${esc(r.actiepunt||'')}</span>${extraPills}</td>
         <td class="cell-txt" style="font-style:italic"><span class="ct" title="${esc(r.status||'')}">${esc(r.status||'')}</span></td>
@@ -162,7 +162,7 @@ function rowNtd(r,sec){
 function rowAf(r,sec){
   const css=SECS[sec].css;
   return`<tr>
-    <td><span class="code code-klik" style="${css}" data-action="vve-open" data-code="${esc(r.code)}" title="Open VvE-dossier">${esc(r.code)}</span></td>
+    <td>${vveCodeSpan(r.code, css)}</td>
     <td class="cell-name">${esc(r.naam)}</td>
     <td class="cell-txt">${esc(r.actiepunt||r.periode||r.agendapunten||'')}</td>
     <td class="cell-sm">${esc(r.subcategorie||'')}</td>

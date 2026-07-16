@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, isoWeek, coerceDagenVooraf } from "./util.js";
+import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf } from "./util.js";
 import { logZin, logPaginaSoort, parseLogboek, _shiftRows, logEditWrite } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION } from "./config.js";
 import { ACTIONS } from "./actions.js";
@@ -312,6 +312,16 @@ import { shouldPromptReload } from "./sw-update.js";
   eq('vve budget=true bij alvo.budget',      vveOverzicht('B1', _Dbud, TF).budget, true);
   eq('vve budget=false zonder alvo.budget',  _o5.budget, false);
   eq('vve budget=false bij onbekende code',  vveOverzicht('ZZZ', _D5, TF).budget, false);
+
+  // vveCodeSpan: gedeelde klikbare VvE-code (dossier-navigatie via centrale 'vve-open'-delegatie)
+  eq('vveCodeSpan: klikbaar → data-action vve-open', /data-action="vve-open"/.test(vveCodeSpan('21004')), true);
+  eq('vveCodeSpan: klikbaar → data-code',            /data-code="21004"/.test(vveCodeSpan('21004')), true);
+  eq('vveCodeSpan: klikbaar → code-klik klasse',     /class="code code-klik"/.test(vveCodeSpan('21004')), true);
+  eq('vveCodeSpan: toont de code',                   vveCodeSpan('21004').includes('>21004<'), true);
+  eq('vveCodeSpan: style doorgegeven',               vveCodeSpan('21004','--sec:var(--gn)').includes('style="--sec:var(--gn)"'), true);
+  eq('vveCodeSpan: placeholder "—" niet klikbaar',   /data-action/.test(vveCodeSpan('—')), false);
+  eq('vveCodeSpan: lege code niet klikbaar',         /data-action/.test(vveCodeSpan('')), false);
+  eq('vveCodeSpan: code met < wordt geëscaped',      vveCodeSpan('<x>').includes('&lt;x&gt;'), true);
 
   // ── filterDossierLog ── (dossier-feed: 'contact' toont alleen handmatige contactmomenten)
   const _dosLog=[{actie:'Contact'},{actie:'Afgerond'},{actie:'Contact'},{actie:'Kenmerk'}];

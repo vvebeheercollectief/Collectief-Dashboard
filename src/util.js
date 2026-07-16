@@ -232,6 +232,15 @@ function emptyRow(cols,inline,filtered){
 // als "0"/"false" worden geëscaped i.p.v. stil te verdwijnen, en een niet-string (number/Date)
 // veilig wordt gecoerced i.p.v. een TypeError op .replace te gooien.
 function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+// Gedeelde VvE-code die naar het dossier navigeert. Eén bron voor álle lijsten,
+// zodat elke code overal identiek klikbaar is (centrale 'vve-open'-delegatie in actions.js).
+// Lege/placeholder-codes ('—') blijven bewust niet-klikbaar.
+function vveCodeSpan(code, style){
+  const c=((code==null?'':code)+'').trim();
+  const st=style?` style="${style}"`:'';
+  if(!c||c==='—') return `<span class="code"${st}>${esc(code||'—')}</span>`;
+  return `<span class="code code-klik"${st} data-action="vve-open" data-code="${esc(c)}" title="Open VvE-dossier">${esc(c)}</span>`;
+}
 function subBadge(v){return v?`<span class="badge" style="background:var(--sur2);color:var(--mut);font-size:10px;margin-left:4px">${esc(v)}</span>`:''}
 // 'Dagen vooraf zichtbaar' (herhaalregels): bewust 0 toestaan (taak pas op de deadline-dag
 // zichtbaar). Alleen terugvallen op `def` bij een echt lege/ongeldige waarde, niet bij 0 —
@@ -246,7 +255,7 @@ export {
   opvolgStatus, volgendeDeadline, HERHAAL_MAANDEN, _vandaagAmsterdam, isoWeek,
   _verschilInKalenderdagen, berekenPrioriteit, prioBadge, persBadges,
   adjOff, offProg, _MAANDEN, _parseAnyDate, parseDt, toISODate, toDutchDate,
-  emptyRow, esc, subBadge, coerceDagenVooraf,
+  emptyRow, esc, vveCodeSpan, subBadge, coerceDagenVooraf,
   parseOff, offerteFase,
   parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes,
 };

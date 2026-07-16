@@ -2,7 +2,7 @@
 //  RENDER-ALV — ALV-overzicht + ALV-afgerond + aanvink-schrijfactie ("ALV's overzicht")
 //  Verplaatst uit render-lijsten.js (Batch D / punt 11) — zuivere refactor, geen gedragswijziging.
 // ══════════════════════════════════════
-import { esc, emptyRow } from "./util.js";
+import { esc, emptyRow, vveCodeSpan } from "./util.js";
 import { SID, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { getSheetIds } from "./crud.js";
@@ -52,7 +52,7 @@ function renderAlvo(){
     ?sl.map(r=>{
       const idx=D.alvo.indexOf(r);
       return`<tr>
-        <td><span class="code" style="--sec:var(--ac);--sec-l:var(--ac-l)">${esc(r.code)}</span></td>
+        <td>${vveCodeSpan(r.code, '--sec:var(--ac);--sec-l:var(--ac-l)')}</td>
         <td class="cell-name">${esc(r.naam)}${r.budget?' <span class="badge budget-tag" title="Budgetpakket — vergadert zelf">Budget</span>':''}</td>
         <td>${flagPill(idx,'uitnodiging',r.uitnodiging)}</td>
         <td>${flagPill(idx,'notulen',r.notulen)}</td>
@@ -144,7 +144,7 @@ function renderAlfa(){
   const sl=rows.slice((pgs.alfa-1)*PG,pgs.alfa*PG);
   document.getElementById('alfa-tbody').innerHTML=sl.length
     ?sl.map(r=>`<tr>
-        <td><span class="code" style="--sec:var(--gn);--sec-l:var(--gn-l)">${esc(r.code)}</span></td>
+        <td>${vveCodeSpan(r.code, '--sec:var(--gn);--sec-l:var(--gn-l)')}</td>
         <td class="cell-name">${esc(r.naam)}</td>
         <td class="cell-sm">${esc(r.datum)}</td>
       </tr>`).join('')

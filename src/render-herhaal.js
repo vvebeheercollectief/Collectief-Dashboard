@@ -2,7 +2,7 @@
 //  HERHAALREGELS — beheerpagina voor terugkerende taken (Fase 4)
 //  De dagelijkse Apps Script-motor zet de taken klaar; hier alleen regel-CRUD.
 // ══════════════════════════════════════
-import { esc, emptyRow, toISODate, toDutchDate, _parseAnyDate, coerceDagenVooraf } from "./util.js";
+import { esc, emptyRow, vveCodeSpan, toISODate, toDutchDate, _parseAnyDate, coerceDagenVooraf } from "./util.js";
 import { state, D } from "./state.js";
 import { SID } from "./config.js";
 import { appendRange, writeRange, assertRowMatch } from "./api.js";
@@ -37,7 +37,7 @@ function renderHerhaal(){
       :'<span class="badge" style="background:var(--sur2);color:var(--mut)">Gepauzeerd</span>';
     return `<tr class="${r.status!=='ACTIEF'?'snooze-row':''}">
       <td class="cell-txt">${esc(r.omschrijving)}</td>
-      <td><span class="code">${esc(r.code)}</span></td>
+      <td>${vveCodeSpan(r.code)}</td>
       <td class="cell-sm">${esc(r.behandelaar)}</td>
       <td class="cell-sm">${typeLbl}</td>
       <td class="cell-sm">${vk}</td>

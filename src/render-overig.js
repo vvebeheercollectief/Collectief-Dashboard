@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  RENDER-OVERIG — Ontwikkeling + Logboek
 // ══════════════════════════════════════
-import { esc, displayName, persBadges, emptyRow, _vandaagAmsterdam } from "./util.js";
+import { esc, displayName, persBadges, emptyRow, _vandaagAmsterdam, vveCodeSpan } from "./util.js";
 import { PG, SID } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { ensureToken } from "./auth.js";
@@ -229,7 +229,7 @@ function logDayLabel(iso){
 // Natuurlijke zin per logboek-actie
 function logZin(r){
   const naam=esc(displayName(r.gebruiker)||'Iemand');
-  const chip=`<span class="code" style="--sec:var(--ac);--sec-l:var(--ac-l)">${esc(r.code||'—')}</span>`;
+  const chip=vveCodeSpan(r.code, '--sec:var(--ac);--sec-l:var(--ac-l)');
   const A=(verb,kleur)=>`<b>${naam}</b> <span class="log-act" style="color:${kleur}">${verb}</span> `;
   switch(r.actie){
     case'Afgerond':            return A('rondde','var(--gn)')+chip+' af';

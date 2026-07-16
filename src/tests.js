@@ -307,6 +307,11 @@ import { shouldPromptReload } from "./sw-update.js";
   eq('vve laatste act.',  _o5.cijfers.laatsteDagen, 2);
   eq('vve afgerond',      _o5.afgerond.length, 1);
   eq('vve onbekende code',vveOverzicht('ZZZ', _D5, TF).cijfers.open, 0);
+  // budget-vlag voor het dossierpagina-label — afgeleid uit het ALV-overzicht van die VvE
+  const _Dbud={ntd:{},af:{},alvo:[{code:'B1',naam:'VvE Budget',uitnodiging:true,notulen:true,begroting:false,budget:true,status:'Afgerond'}],alfa:[],logboek:[]};
+  eq('vve budget=true bij alvo.budget',      vveOverzicht('B1', _Dbud, TF).budget, true);
+  eq('vve budget=false zonder alvo.budget',  _o5.budget, false);
+  eq('vve budget=false bij onbekende code',  vveOverzicht('ZZZ', _D5, TF).budget, false);
 
   // ── filterDossierLog ── (dossier-feed: 'contact' toont alleen handmatige contactmomenten)
   const _dosLog=[{actie:'Contact'},{actie:'Afgerond'},{actie:'Contact'},{actie:'Kenmerk'}];

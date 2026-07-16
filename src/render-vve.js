@@ -49,6 +49,7 @@ function vveOverzicht(code, data, vandaag){
   const behandelaars=[...new Set(open.concat(weggelegd)
     .flatMap(r=>(r.behandelaar||'').split(/[,\/]/).map(s=>s.trim()).filter(Boolean)))];
   return { code, naam, behandelaars, open, weggelegd, afgerond, alvo, alfa, logboek,
+           budget: !!(alvo&&alvo.budget), // Budgetpakket-markering uit het ALV-overzicht (kolom F)
            cijfers:{ open:open.length, teLaat, weggelegd:weggelegd.length, laatsteDagen } };
 }
 
@@ -191,7 +192,7 @@ function renderVve(){
     <div class="vve-kop">
       <div class="vve-naam">
         <span class="code" style="--sec:var(--ac);--sec-l:var(--ac-l);font-size:15px;padding:5px 11px">${esc(o.code)}</span>
-        <div><h3>${esc(o.naam||'Onbekende VvE')}</h3>
+        <div><h3>${esc(o.naam||'Onbekende VvE')}${o.budget?' <span class="badge budget-tag" title="Budgetpakket — vergadert zelf">Budget</span>':''}</h3>
         <div class="sub">${o.behandelaars.length?'behandelaars: '+persBadges(o.behandelaars.join(', ')):'<span style="color:var(--mut)">geen lopende taken</span>'}</div></div>
       </div>
       <div class="kerncijfers">

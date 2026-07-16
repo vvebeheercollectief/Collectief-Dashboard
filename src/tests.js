@@ -791,6 +791,25 @@ import { shouldPromptReload } from "./sw-update.js";
     eq('parseAlvo: begroting-vlag gelezen', av[0].begroting, true);
     eq('parseAlvo: _row offset (eerste = rij 3)', av[0]._row, 3);
   })();
+  // parseAlvo: budgetpakket-vlag uit kolom F (Opmerkingen) — exact "Budget"/"Budgetpakket", hoofdletterongevoelig.
+  (()=>{
+    const rows=[
+      ['kop A','kop B'],['sub A','sub B'],
+      ['B1','VvE Budget','TRUE','TRUE','FALSE','Budget'],
+      ['B2','VvE budget-klein','TRUE','TRUE','FALSE','budget'],
+      ['B3','VvE Voluit','TRUE','TRUE','FALSE','Budgetpakket'],
+      ['B4','VvE Toekomst','TRUE','TRUE','TRUE','Naar budget per 1 april 2026'],
+      ['B5','VvE Anders','FALSE','FALSE','FALSE','Vergaderen zelf'],
+      ['B6','VvE Leeg','FALSE','FALSE','FALSE',''],
+    ];
+    const av=parseAlvo(rows);
+    eq('parseAlvo: "Budget" → budget=true', av[0].budget, true);
+    eq('parseAlvo: "budget" (kleine letter) → budget=true', av[1].budget, true);
+    eq('parseAlvo: "Budgetpakket" voluit → budget=true', av[2].budget, true);
+    eq('parseAlvo: "Naar budget per 1 april 2026" → budget=false (geen exacte match)', av[3].budget, false);
+    eq('parseAlvo: "Vergaderen zelf" → budget=false', av[4].budget, false);
+    eq('parseAlvo: lege opmerking → budget=false', av[5].budget, false);
+  })();
   // parseAlfa: slice(1); rij zonder code valt weg.
   (()=>{
     const rows=[['Code','Naam','Datum'],['CH1','VvE 1','2026-05-01'],['','geen code','x'],['CH2','VvE 2','']];

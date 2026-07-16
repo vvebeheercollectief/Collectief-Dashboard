@@ -107,6 +107,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     else{state.expandedRows.add(id);tr.classList.add('expanded');}
   });
   document.getElementById('f-status-alvo').onchange=()=>{pgs.alvo=1;renderAlvo()};
+  document.getElementById('f-budget-alvo').onchange=()=>{pgs.alvo=1;renderAlvo()};
   setupSearch('s-logboek',()=>{pgs.logboek=1;renderLogboek()});
   document.getElementById('logboek-who').addEventListener('click',e=>{
     const b=e.target.closest('.lchip'); if(!b)return;

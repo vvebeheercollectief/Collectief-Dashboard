@@ -39,9 +39,11 @@ function renderAlvo(){
 
   const q=document.getElementById('s-alvo').value.toLowerCase();
   const fs=document.getElementById('f-status-alvo').value;
+  const onlyBudget=document.getElementById('f-budget-alvo')?.checked;
   const rows=D.alvo.filter(r=>{
     if(q&&!`${r.code} ${r.naam}`.toLowerCase().includes(q)) return false;
     if(fs&&r.status!==fs) return false;
+    if(onlyBudget&&!r.budget) return false;
     return true;
   });
   pgs.alvo=Math.min(Math.max(1,pgs.alvo),Math.max(1,Math.ceil(rows.length/PG))); // clamp: geen lege pagina
@@ -51,7 +53,7 @@ function renderAlvo(){
       const idx=D.alvo.indexOf(r);
       return`<tr>
         <td><span class="code" style="--sec:var(--ac);--sec-l:var(--ac-l)">${esc(r.code)}</span></td>
-        <td class="cell-name">${esc(r.naam)}</td>
+        <td class="cell-name">${esc(r.naam)}${r.budget?' <span class="badge budget-tag" title="Budgetpakket — vergadert zelf">Budget</span>':''}</td>
         <td>${flagPill(idx,'uitnodiging',r.uitnodiging)}</td>
         <td>${flagPill(idx,'notulen',r.notulen)}</td>
         <td>${flagPill(idx,'begroting',r.begroting)}</td>

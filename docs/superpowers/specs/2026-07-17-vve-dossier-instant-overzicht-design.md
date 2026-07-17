@@ -90,20 +90,27 @@ Let op: de bestaande composer-behoud-logica in `renderVve()` (de 8s-poll re-rend
 
 **Ruis dempen:** handmatige regels (`Opmerking`, `Contact`) blijven volwaardige `.log-item`s met avatar, soort-label en de notitietekst. Alle automatische acties worden gedempte `.log-mini`-regels met gekleurd stipje.
 
-Dit vereist uitbreiding van `logItemHtml` in `render-overig.js`. De `subtiel`-tak kent nu maar twee zinnen: `isAf ? "rondde X af" : "maakte X aan"`. Voor andere acties zou daar dus ten onrechte "maakte X aan" komen te staan. Nodig zijn nette zinnen voor minimaal:
+**Echte oorzaak van "Cihad — Aangevinkt 121027"** (gevonden tijdens planning, 2026-07-17):
 
-| actie | zin |
-|---|---|
-| `Afgerond` | rondde *taak* af |
-| `Aangemaakt` | maakte een taak aan → *behandelaar* |
-| `Aangevinkt` / `Uitgevinkt` | vinkte *Notulen* aan / uit |
-| `Kenmerk` | wijzigde *Balkons* |
-| `Behandelaar gewijzigd` | wees *taak* toe aan *X* |
-| `Verwijderd` | verwijderde *taak* |
-| `Teruggezet` | zette *taak* terug |
-| onbekend | val terug op de bestaande volwaardige `.log-item` — nooit een verzonnen zin |
+Er bestaat al een pure helper `logZin(r)` in `render-overig.js` die per actie een nette zin maakt en die al getest is (tests.js:128-133). De volwaardige `.log-item`-tak van `logItemHtml` gebruikt die al. Maar `logZin` kent **geen** geval voor `Aangevinkt`/`Uitgevinkt` (die komen uit `render-alv.js:121`) en valt dus terug op zijn default:
 
-`logItemHtml` is gedeeld met de Logboek-pagina (`render-overig.js:481`). De uitbreiding mag het gedrag daar niet veranderen: die pagina roept aan met `subtiel = logPaginaSoort(actie)==='subtiel'`, wat alleen `Afgerond`/`Aangemaakt` raakt — precies de twee zinnen die al bestaan. De nieuwe zinnen komen er dus bij zonder de bestaande te wijzigen.
+```js
+default: return `<b>${naam}</b> — ${esc(r.actie||'')} `+chip;
+```
+
+Dat is letterlijk de lelijke regel uit de klacht. Het is dus geen opmaakprobleem maar een ontbrekend geval.
+
+Daarnaast dupliceert de `subtiel`-tak van `logItemHtml` de zin-logica met een eigen `isAf ? "rondde X af" : "maakte X aan"` — een tweede, armere zinnengenerator naast `logZin`.
+
+Aanpak (DRY — één zinnengenerator, geen tweede erbij):
+
+1. **`logZin` uitbreiden** met `Aangevinkt`/`Uitgevinkt` → "vinkte *Notulen* aan / uit" (veld = `ALVO_LABELS[field]`). Dit repareert de regel meteen óók op de Logboek-pagina.
+2. **`logZin(r, {zonderCode})`** — optie om de code-chip weg te laten. In het dossier is de VvE-code redundant (je zít in dat dossier); juist die chip maakt de regel lang en rommelig. Default blijft mét chip, zodat de Logboek-pagina onveranderd blijft.
+3. **De `subtiel`-tak van `logItemHtml` laten teruggrijpen op `logZin`** in plaats van eigen zinnen. Daarmee verdwijnt de duplicatie en kloppen alle acties automatisch.
+
+De onbekend-terugval van `logZin` blijft bestaan: nooit een verzonnen zin, wel de ruwe actienaam.
+
+`logItemHtml` is gedeeld met de Logboek-pagina (`render-overig.js:481`). Regressie-eis: die pagina moet er ná deze wijziging identiek uitzien, op de gerepareerde `Aangevinkt`-regel na.
 
 **Bewerken/verwijderen blijft per regel.** Meerdere regels samenvatten tot één ("vinkte 2 punten af") gaat expliciet **niet** door: dan is een losse regel niet meer te verwijderen, en dat kan sinds v6.8 juist wel.
 
@@ -128,11 +135,13 @@ Bij een VvE met weinig data (zoals 121027) zijn de panelen grotendeels leeg — 
 
 ## Testen
 
+Tests draaien in de browser, niet via node: server starten en `index.html?test=1` openen; het resultaat staat in `window._testResult` (`tests.js:867`) als `"<n> OK, <n> FAIL"`.
+
 - `vveOverzicht` is al puur en getest; de cijfers-logica verandert niet, alleen welke twee getoond worden.
-- Nieuwe pure helper voor de log-zinnen → unittest per actie-soort, inclusief de onbekend-terugval.
-- Terugval bij lege omschrijving → unittest op `afRij`-helper.
-- De bestaande dossiersuite moet groen blijven (357 tests bij v6.7).
-- Handmatig: bewerken/verwijderen van een logregel, composer-behoud tijdens de 8s-poll, kenmerken-bewerkmodus, klik op taakrij.
+- `logZin` uitbreiden → nieuwe asserts voor `Aangevinkt`/`Uitgevinkt`, voor `zonderCode`, en behoud van de bestaande asserts (tests.js:128-133).
+- Terugval bij lege omschrijving → unittest op een nieuwe pure helper `afOmschrijving(r)`.
+- De bestaande suite moet groen blijven (357 tests bij v6.7) — geen enkele bestaande assert mag sneuvelen.
+- Handmatig: bewerken/verwijderen van een logregel, composer-behoud tijdens de 8s-poll, kenmerken-bewerkmodus, klik op taakrij, én de Logboek-pagina op regressie.
 
 ## Versie
 

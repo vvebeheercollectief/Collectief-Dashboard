@@ -516,7 +516,6 @@
     .log-mini-dot{flex:none;width:6px;height:6px;border-radius:50%}
     .log-mini-txt{flex:1;min-width:0}
     .log-mini-txt b{color:var(--txt);font-weight:600}
-    .log-mini-meta{color:var(--mut)}
     .log-time{font-size:11.5px;color:var(--mut);white-space:nowrap;flex-shrink:0;padding-top:3px}
     .log-empty{text-align:center;color:var(--mut);padding:40px;font-style:italic}
     /* ── Logboek: bewerken/verwijderen ── */
@@ -612,18 +611,41 @@
     .kc-plus{background:var(--ac);border:1px solid var(--ac);border-radius:10px;box-shadow:var(--sh);color:#fff;min-width:52px;padding:8px;display:flex;align-items:center;justify-content:center;transition:background var(--tr)}
     .kc-plus:hover{background:var(--ac-900)}
     .kc-plus:focus-visible{outline:2px solid var(--ac-900);outline-offset:2px}
-    .vve-grid{display:grid;grid-template-columns:1.6fr 1fr;gap:20px;align-items:start}
-    @media(max-width:900px){.vve-grid{grid-template-columns:1fr}}
-    /* Dossier past altijd op het scherm: lange tekst breekt af i.p.v. de kolom op te rekken.
-       Zonder dit eist één lange opmerking de min-content-breedte van de tabel op (gemeten:
-       1499px in een scherm van 1280px), waardoor de rechterkolom eraf valt.
-       min-width:0 is het vangnet — dan krijgt de tabel zelf een schuifbalk i.p.v. de pagina. */
+    /* Dossier = schermvullend: kop vast, drie panelen vullen de rest en scrollen elk apart. */
+    #page-vve.active{display:flex;flex-direction:column;height:100%}
+    /* #vve-inhoud is de render-wrapper tussen pagina en kop/grid: laat 'm meedoen in de flex-keten */
+    #page-vve.active>#vve-inhoud{display:flex;flex-direction:column;flex:1;min-height:0}
+    .vve-kop{flex-shrink:0}
+    .vve-grid{display:grid;grid-template-columns:300px 330px 1fr;gap:16px;align-items:stretch;flex:1;min-height:380px}
+    /* Vangnet: grid-kinderen mogen krimpen — één lang onbreekbaar woord in echte
+       dossierdata mag de kolommen niet breder duwen dan het scherm. */
     #page-vve .vve-grid>*{min-width:0}
-    #page-vve .cell-txt,#page-vve .cell-sm{white-space:normal;overflow-wrap:anywhere}
+    .vve-paneel{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);box-shadow:var(--sh);padding:13px 15px;display:flex;flex-direction:column;min-height:0;overflow-y:auto}
+    .vve-paneel.tl-paneel{overflow:hidden}
+    .tl-scroll{overflow-y:auto;min-height:0;flex:1;margin-right:-5px;padding-right:5px}
+    /* Onder 1240px zijn drie kolommen niet vol te houden: terugval op twee met de
+       tijdlijn eronder over de volle breedte, en de pagina scrollt weer normaal. */
+    @media(max-width:1240px){
+      #page-vve.active{height:auto}
+      .vve-grid{grid-template-columns:1fr 1fr;min-height:0}
+      .vve-paneel{overflow:visible}
+      .vve-paneel.tl-paneel{overflow:visible;grid-column:1/-1}
+      .tl-scroll{overflow:visible}
+    }
+    @media(max-width:900px){.vve-grid{grid-template-columns:1fr}}
     .vve-sectie{font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:18px 0 8px;display:flex;align-items:center;gap:8px}
     .vve-sectie:first-child{margin-top:0}
     .vve-sectie .n{background:var(--sur2);border:1px solid var(--bor);border-radius:20px;padding:0 8px;font-size:11px;color:var(--txt)}
-    .vve-kaart{background:var(--sur);border:1px solid var(--bor);border-radius:10px;padding:12px 14px;box-shadow:var(--sh)}
+    /* Taak-/afgerond-rijen in de panelen (platte divs, geen tabel meer) */
+    .tk{display:flex;align-items:baseline;gap:10px;padding:8px 0;border-bottom:1px solid var(--row-divider);font-size:13px}
+    .tk:last-of-type{border-bottom:none}
+    .tk .nm{flex:1;min-width:0}
+    .tk .nm .mt{display:block;font-size:11px;color:var(--fnt);margin-top:2px}
+    .tk .dl{font-family:'IBM Plex Mono','SFMono-Regular',ui-monospace,monospace;font-size:11.5px;color:var(--mut);flex-shrink:0}
+    .tk .dl.af{color:var(--gn)}
+    .tk-leeg{padding:10px 0;color:var(--fnt);font-size:12.5px}
+    .geen-oms{color:var(--fnt);font-style:italic}
+    .vve-voet{font-size:12px;color:var(--fnt);border-top:1px solid var(--row-divider);padding-top:8px;margin-top:auto}
     .vve-alv-rij{display:flex;align-items:center;gap:10px;padding:4px 0;font-size:13px}
     .vve-alv-flags{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
     .vve-tl{list-style:none;margin:0;padding:0}
@@ -642,7 +664,6 @@
     #kmk-bron{width:100%;border:1px solid var(--bor);border-radius:8px;padding:7px 9px;font:inherit;font-size:12.5px;resize:vertical;background:var(--sur)}
     .kmk-rij select{font-size:12.5px;padding:4px 7px;border:1px solid var(--bor);border-radius:7px;background:var(--sur);color:var(--txt)}
     /* Dossier-logboek (VvE-pagina) */
-    .dossier-card{padding:14px 16px}
     .dos-composer{background:var(--sur2);border:1px solid var(--bor);border-radius:10px;padding:10px;margin-bottom:12px}
     .dos-composer textarea{width:100%;border:1px solid var(--bor);border-radius:8px;padding:8px 10px;font:inherit;font-size:13px;resize:vertical;min-height:44px;background:var(--sur);color:var(--txt)}
     .dos-rij{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}

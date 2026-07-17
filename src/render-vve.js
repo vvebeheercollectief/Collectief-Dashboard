@@ -166,18 +166,20 @@ function renderVve(){
       : r.deadline
         ? `${esc(r.deadline)}${p.teLaat?` <span class="pill-telaat">Te laat (${Math.abs(p.dagenTot)}d)</span>`:''}`
         : '<span class="warn-geen-deadline">Geen deadline</span>';
-    return `<tr class="${weg?'snooze-row':''}" data-action="taak-bewerken" data-rid="${rid}" style="cursor:pointer">
-      <td class="cell-txt">${esc(r.actiepunt||r.periode||r.agendapunten||r.status||'')}</td>
-      <td><span class="badge" style="${meta.css};background:var(--sec-l);color:var(--sec)">${esc(meta.label)}</span></td>
-      <td>${persBadges(r.behandelaar)}</td>
-      <td class="cell-sm">${dl}</td></tr>`;
+    return `<div class="tk${weg?' snooze-row':''}" data-action="taak-bewerken" data-rid="${rid}" style="cursor:pointer">
+      <span class="nm">${esc(r.actiepunt||r.periode||r.agendapunten||r.status||'')}
+        <span class="mt">${esc(meta.label)}${r.behandelaar?' · '+esc(r.behandelaar):''}</span></span>
+      <span class="dl">${dl}</span></div>`;
   };
   const afLimiet=state._vveAfAlles?o.afgerond.length:5;
-  const afRij=r=>`<tr><td class="cell-txt">${esc(r.actiepunt||r.periode||r.agendapunten||'')}</td>
-    <td><span class="badge" style="background:var(--gn-l);color:var(--gn)">✓ ${esc(r.datum||'')}</span></td>
-    <td class="cell-sm">${esc(r.opmerking||'')}</td></tr>`;
+  const afRij=r=>{
+    const om=afOmschrijving(r);
+    return `<div class="tk">
+      <span class="nm${om.leeg?' geen-oms':''}">${esc(om.tekst)}${r.opmerking?`<span class="mt">${esc(r.opmerking)}</span>`:''}</span>
+      <span class="dl af">${esc(r.datum||'')}</span></div>`;
+  };
   const meerKnop=(!state._vveAfAlles&&o.afgerond.length>5)
-    ?`<tr><td colspan="3"><button class="btn btn-sec btn-sm" data-action="vve-af-alles">Alle ${o.afgerond.length} tonen</button></td></tr>`:'';
+    ?`<button class="btn btn-sec btn-sm" data-action="vve-af-alles" style="margin-top:8px;align-self:flex-start">Alle ${o.afgerond.length} tonen</button>`:'';
 
   const alvKaart=()=>{
     let html='';
@@ -209,51 +211,52 @@ function renderVve(){
       <div class="kerncijfers">
         ${kc(o.cijfers.open,o.cijfers.open===1?'open taak':'open taken','teal')}
         ${kc(o.cijfers.laatsteDagen==null?'—':o.cijfers.laatsteDagen+' d','laatste activiteit','grijs')}
-        <button class="kc-plus" data-action="vve-taak-nieuw" data-code="${esc(o.code)}" data-naam="${esc(o.naam||'')}" title="Nieuwe taak voor deze VvE" aria-label="Nieuwe taak voor deze VvE"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+        <button class="kc-plus" data-action="vve-taak-nieuw" data-code="${esc(o.code)}" data-naam="${esc(o.naam||'')}" title="Nieuwe taak voor deze VvE" aria-label="Nieuwe taak voor deze VvE"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
       </div>
     </div>
     <div class="vve-grid">
-      <div>
-        <div class="vve-sectie">Open taken <span class="n">${o.open.length}</span></div>
-        <div class="card"><div class="tbl-wrap"><table>
-          <thead><tr><th>Taak</th><th>Categorie</th><th>Wie</th><th>Deadline</th></tr></thead>
-          <tbody>${o.open.map(r=>taakRij(r,false)).join('')||`<tr><td colspan="4" style="color:var(--mut);padding:14px">Geen open taken ${ico('feest',14).replace('<svg ','<svg style="vertical-align:-2.5px" ')}</td></tr>`}</tbody>
-        </table></div></div>
-        ${o.weggelegd.length?`<div class="vve-sectie">Weggelegd <span class="n">${o.weggelegd.length}</span></div>
-        <div class="card"><div class="tbl-wrap"><table><tbody>${o.weggelegd.map(r=>taakRij(r,true)).join('')}</tbody></table></div></div>`:''}
-        <div class="vve-sectie">Laatst afgerond <span class="n">${o.afgerond.length}</span></div>
-        <div class="card"><div class="tbl-wrap"><table>
-          <tbody>${o.afgerond.slice(0,afLimiet).map(afRij).join('')||'<tr><td style="color:var(--mut);padding:14px">Nog niets afgerond</td></tr>'}${meerKnop}</tbody>
-        </table></div></div>
-      </div>
-      <div>
-        <div class="vve-sectie">ALV's</div>
-        <div class="vve-kaart">${alvKaart()}</div>
-        <div class="vve-sectie" style="margin-top:18px">Beheerderskenmerken
+
+      <div class="vve-paneel">
+        <div class="vve-sectie">ALV</div>
+        ${alvKaart()}
+        <div class="vve-sectie" style="margin-top:20px">Beheerderskenmerken
           ${state.kenmerkenEdit?'':`<button class="btn btn-sec btn-sm" data-action="kenmerken-bewerken" style="margin-left:auto">${ico('potlood',12)} Bewerken</button>`}
         </div>
-        <div class="vve-kaart">${kenmerkenKaart(code)}</div>
+        ${kenmerkenKaart(code)}
       </div>
-    </div>
-    <div class="vve-sectie" style="margin-top:22px">Dossier-logboek <span class="n">${o.logboek.length}</span>
-      <span class="dos-filters">
-        <button class="dos-filter${state.vveLogFilter!=='contact'?' aan':''}" data-action="vve-log-filter" data-modus="alles">Alles</button>
-        <button class="dos-filter${state.vveLogFilter==='contact'?' aan':''}" data-action="vve-log-filter" data-modus="contact">Alleen contactmomenten</button>
-      </span>
-    </div>
-    <div class="card dossier-card">
-      <div class="dos-composer">
-        <textarea id="dos-tekst" data-code="${esc(o.code)}" rows="2" placeholder="Leg vast wat er gebeurd is — bv. zojuist gebeld met een eigenaar… (Ctrl+Enter = vastleggen)"></textarea>
-        <div class="dos-rij">
-          <div class="dos-chips">${CONTACT_SOORTEN.map(([s,sIco])=>
-            `<button class="soort-chip${(state._contactSoort||'Telefoon')===s?' aan':''}" data-action="contact-soort" data-soort="${s}">${sIco} ${s}</button>`).join('')}</div>
-          <select id="dos-wie" title="Met wie was het contact?">
-            <option>Bewoner/eigenaar</option><option>Bestuur</option><option>Leverancier</option><option>Overig</option>
-          </select>
-          <button class="btn btn-pri btn-sm" data-action="contact-vastleggen">Vastleggen</button>
+
+      <div class="vve-paneel">
+        <div class="vve-sectie">Open taken <span class="n">${o.open.length}</span></div>
+        ${o.open.map(r=>taakRij(r,false)).join('')||`<div class="tk-leeg">Geen open taken ${ico('feest',14).replace('<svg ','<svg style="vertical-align:-2.5px" ')}</div>`}
+        ${o.weggelegd.length?`<div class="vve-sectie" style="margin-top:20px">Weggelegd <span class="n">${o.weggelegd.length}</span></div>
+        ${o.weggelegd.map(r=>taakRij(r,true)).join('')}`:''}
+        <div class="vve-sectie" style="margin-top:20px">Laatst afgerond <span class="n">${o.afgerond.length}</span></div>
+        ${o.afgerond.slice(0,afLimiet).map(afRij).join('')||'<div class="tk-leeg">Nog niets afgerond</div>'}
+        ${meerKnop}
+        <div class="vve-voet">${o.cijfers.teLaat} te laat · ${o.cijfers.weggelegd} weggelegd</div>
+      </div>
+
+      <div class="vve-paneel tl-paneel">
+        <div class="vve-sectie">Geschiedenis <span class="n">${o.logboek.length}</span>
+          <span class="dos-filters">
+            <button class="dos-filter${state.vveLogFilter!=='contact'?' aan':''}" data-action="vve-log-filter" data-modus="alles">Alles</button>
+            <button class="dos-filter${state.vveLogFilter==='contact'?' aan':''}" data-action="vve-log-filter" data-modus="contact">Alleen contactmomenten</button>
+          </span>
         </div>
+        <div class="dos-composer">
+          <textarea id="dos-tekst" data-code="${esc(o.code)}" rows="2" placeholder="Leg vast wat er gebeurd is — bv. zojuist gebeld met een eigenaar… (Ctrl+Enter = vastleggen)"></textarea>
+          <div class="dos-rij">
+            <div class="dos-chips">${CONTACT_SOORTEN.map(([s,sIco])=>
+              `<button class="soort-chip${(state._contactSoort||'Telefoon')===s?' aan':''}" data-action="contact-soort" data-soort="${s}">${sIco} ${s}</button>`).join('')}</div>
+            <select id="dos-wie" title="Met wie was het contact?">
+              <option>Bewoner/eigenaar</option><option>Bestuur</option><option>Leverancier</option><option>Overig</option>
+            </select>
+            <button class="btn btn-pri btn-sm" data-action="contact-vastleggen">Vastleggen</button>
+          </div>
+        </div>
+        <div class="tl-scroll">${dossierFeed(dosEntries.slice(0,dosLimiet))}${dosMeer}</div>
       </div>
-      <div class="dos-feed">${dossierFeed(dosEntries.slice(0,dosLimiet))}${dosMeer}</div>
+
     </div>`;
   if(_bewaar){
     const t=document.getElementById('dos-tekst'); if(t) t.value=_bewaar.tekst;

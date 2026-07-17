@@ -136,6 +136,11 @@ import { shouldPromptReload } from "./sw-update.js";
   truthy('logZin Aangevinkt eindigt op "aan"', /\baan\b/.test(logZin({actie:'Aangevinkt', code:'TEST01', veld:'Notulen', gebruiker:'info@vvebeheercollectief.nl'})));
   truthy('logZin Uitgevinkt bevat "uit"', /\buit\b/.test(logZin({actie:'Uitgevinkt', code:'TEST01', veld:'Begroting', gebruiker:'info@vvebeheercollectief.nl'})));
   truthy('logZin Aangevinkt toont niet de ruwe actienaam', !logZin({actie:'Aangevinkt', code:'TEST01', veld:'Notulen', gebruiker:'info@vvebeheercollectief.nl'}).includes('— Aangevinkt'));
+  truthy('logZin default toont de code', logZin({actie:'Afgerond', code:'TEST01', gebruiker:'info@vvebeheercollectief.nl'}).includes('TEST01'));
+  truthy('logZin zonderCode verbergt de code', !logZin({actie:'Afgerond', code:'TEST01', gebruiker:'info@vvebeheercollectief.nl'}, {zonderCode:true}).includes('TEST01'));
+  truthy('logZin zonderCode houdt het werkwoord', logZin({actie:'Afgerond', code:'TEST01', gebruiker:'info@vvebeheercollectief.nl'}, {zonderCode:true}).includes('rondde'));
+  truthy('logZin zonderCode werkt ook bij Aangevinkt', logZin({actie:'Aangevinkt', code:'TEST01', veld:'Notulen', gebruiker:'info@vvebeheercollectief.nl'}, {zonderCode:true}).includes('Notulen'));
+  truthy('logZin zonderCode laat geen "bij" bungelen', !/\bbij\s*$/.test(logZin({actie:'Aangevinkt', code:'TEST01', veld:'Notulen', gebruiker:'info@vvebeheercollectief.nl'}, {zonderCode:true}).replace(/<[^>]*>/g,'').trim()));
 
   // ── logPaginaSoort ── (welke logregels horen op de Logboek-pagina: notities/contact=normaal, afgerond/aangemaakt=subtiel, rest=ruis)
   eq('logPaginaSoort Opmerking → normaal', logPaginaSoort('Opmerking'), 'normaal');

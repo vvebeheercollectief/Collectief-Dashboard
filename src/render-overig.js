@@ -230,24 +230,29 @@ function logDayLabel(iso){
   return s.charAt(0).toUpperCase()+s.slice(1);
 }
 
-// Natuurlijke zin per logboek-actie
-function logZin(r){
+// Eén zinnengenerator voor alle logregels (gedeeld door Logboek-pagina en VvE-dossier).
+// opts.zonderCode → laat de VvE-code weg; in een dossier is die redundant.
+function logZin(r, opts){
+  const zonderCode=!!(opts&&opts.zonderCode);
   const naam=esc(displayName(r.gebruiker)||'Iemand');
   const chip=vveCodeSpan(r.code, '--sec:var(--ac);--sec-l:var(--ac-l)');
+  // "… bij 121027" → in het dossier gewoon niets; anders blijft "bij" bungelen.
+  const bij=zonderCode?'':' bij '+chip;
+  const va =zonderCode?'':' '+chip;   // waar de code lijdend voorwerp is ("rondde X af")
   const A=(verb,kleur)=>`<b>${naam}</b> <span class="log-act" style="color:${kleur}">${verb}</span> `;
   switch(r.actie){
-    case'Afgerond':            return A('rondde','var(--gn)')+chip+' af';
-    case'Verwijderd':          return A('verwijderde','var(--rd)')+'een taak bij '+chip;
-    case'Teruggezet':          return A('zette','var(--am)')+chip+' terug';
-    case'Opmerking':           return A('noteerde','var(--am)')+'bij '+chip;
-    case'Behandelaar gewijzigd':return A('wees','var(--ac)')+chip+' toe';
+    case'Afgerond':            return A('rondde','var(--gn)')+(zonderCode?'deze taak':chip)+' af';
+    case'Verwijderd':          return A('verwijderde','var(--rd)')+'een taak'+bij;
+    case'Teruggezet':          return A('zette','var(--am)')+(zonderCode?'deze taak':chip)+' terug';
+    case'Opmerking':           return A('noteerde','var(--am)')+(zonderCode?'iets':'bij '+chip);
+    case'Behandelaar gewijzigd':return A('wees','var(--ac)')+(zonderCode?'deze taak':chip)+' toe';
     case'Aangemaakt':
-    case'Aangemaakt (sheet)':  return A('maakte','var(--pu)')+'een nieuwe taak bij '+chip+(r.nieuweWaarde?` <span style="color:var(--mut)">→ ${esc(r.nieuweWaarde)}</span>`:'');
-    case'Contact':             return A('sprak','var(--ac)')+`met ${esc(r.oudeWaarde||'—')} bij `+chip+` <span style="color:var(--mut)">· ${esc(r.veld||'')}</span>`;
-    case'Aangevinkt':          return A('vinkte','var(--gn)')+`<b>${esc(r.veld||'')}</b> aan bij `+chip;
-    case'Uitgevinkt':          return A('vinkte','var(--am)')+`<b>${esc(r.veld||'')}</b> uit bij `+chip;
-    case'Kenmerk':             return A('wijzigde','var(--pu)')+`kenmerk <b>${esc(r.veld||'')}</b> bij `+chip;
-    default:                   return `<b>${naam}</b> — ${esc(r.actie||'')} `+chip;
+    case'Aangemaakt (sheet)':  return A('maakte','var(--pu)')+'een nieuwe taak'+bij+(r.nieuweWaarde?` <span style="color:var(--mut)">→ ${esc(r.nieuweWaarde)}</span>`:'');
+    case'Contact':             return A('sprak','var(--ac)')+`met ${esc(r.oudeWaarde||'—')}`+bij+` <span style="color:var(--mut)">· ${esc(r.veld||'')}</span>`;
+    case'Aangevinkt':          return A('vinkte','var(--gn)')+`<b>${esc(r.veld||'')}</b> aan`+bij;
+    case'Uitgevinkt':          return A('vinkte','var(--am)')+`<b>${esc(r.veld||'')}</b> uit`+bij;
+    case'Kenmerk':             return A('wijzigde','var(--pu)')+`kenmerk <b>${esc(r.veld||'')}</b>`+bij;
+    default:                   return `<b>${naam}</b> — ${esc(r.actie||'')}`+va;
   }
 }
 

@@ -141,6 +141,7 @@ import { shouldPromptReload } from "./sw-update.js";
   truthy('logZin zonderCode houdt het werkwoord', logZin({actie:'Afgerond', code:'TEST01', gebruiker:'info@vvebeheercollectief.nl'}, {zonderCode:true}).includes('rondde'));
   truthy('logZin zonderCode werkt ook bij Aangevinkt', logZin({actie:'Aangevinkt', code:'TEST01', veld:'Notulen', gebruiker:'info@vvebeheercollectief.nl'}, {zonderCode:true}).includes('Notulen'));
   truthy('logZin zonderCode laat geen "bij" bungelen', !/\bbij\s*$/.test(logZin({actie:'Aangevinkt', code:'TEST01', veld:'Notulen', gebruiker:'info@vvebeheercollectief.nl'}, {zonderCode:true}).replace(/<[^>]*>/g,'').trim()));
+  truthy('logZin zonderCode Opmerking zonder "bij"', (()=>{const z=logZin({actie:'Opmerking', code:'TEST01', gebruiker:'info@vvebeheercollectief.nl'}, {zonderCode:true}).replace(/<[^>]*>/g,''); return z.includes('noteerde') && !/\bbij\b/.test(z);})());
 
   // ── logPaginaSoort ── (welke logregels horen op de Logboek-pagina: notities/contact=normaal, afgerond/aangemaakt=subtiel, rest=ruis)
   eq('logPaginaSoort Opmerking → normaal', logPaginaSoort('Opmerking'), 'normaal');

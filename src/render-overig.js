@@ -238,21 +238,21 @@ function logZin(r, opts){
   const chip=vveCodeSpan(r.code, '--sec:var(--ac);--sec-l:var(--ac-l)');
   // "… bij 121027" → in het dossier gewoon niets; anders blijft "bij" bungelen.
   const bij=zonderCode?'':' bij '+chip;
-  const va =zonderCode?'':' '+chip;   // waar de code lijdend voorwerp is ("rondde X af")
+  const staart=zonderCode?'':' '+chip;   // default-geval: chip los achter de ruwe actienaam
   const A=(verb,kleur)=>`<b>${naam}</b> <span class="log-act" style="color:${kleur}">${verb}</span> `;
   switch(r.actie){
-    case'Afgerond':            return A('rondde','var(--gn)')+(zonderCode?'deze taak':chip)+' af';
+    case'Afgerond':            return A('rondde','var(--gn)')+(zonderCode?'een taak':chip)+' af';
     case'Verwijderd':          return A('verwijderde','var(--rd)')+'een taak'+bij;
-    case'Teruggezet':          return A('zette','var(--am)')+(zonderCode?'deze taak':chip)+' terug';
+    case'Teruggezet':          return A('zette','var(--am)')+(zonderCode?'een taak':chip)+' terug';
     case'Opmerking':           return A('noteerde','var(--am)')+(zonderCode?'iets':'bij '+chip);
-    case'Behandelaar gewijzigd':return A('wees','var(--ac)')+(zonderCode?'deze taak':chip)+' toe';
+    case'Behandelaar gewijzigd':return A('wees','var(--ac)')+(zonderCode?'een taak':chip)+' toe';
     case'Aangemaakt':
     case'Aangemaakt (sheet)':  return A('maakte','var(--pu)')+'een nieuwe taak'+bij+(r.nieuweWaarde?` <span style="color:var(--mut)">→ ${esc(r.nieuweWaarde)}</span>`:'');
     case'Contact':             return A('sprak','var(--ac)')+`met ${esc(r.oudeWaarde||'—')}`+bij+` <span style="color:var(--mut)">· ${esc(r.veld||'')}</span>`;
     case'Aangevinkt':          return A('vinkte','var(--gn)')+`<b>${esc(r.veld||'')}</b> aan`+bij;
     case'Uitgevinkt':          return A('vinkte','var(--am)')+`<b>${esc(r.veld||'')}</b> uit`+bij;
     case'Kenmerk':             return A('wijzigde','var(--pu)')+`kenmerk <b>${esc(r.veld||'')}</b>`+bij;
-    default:                   return `<b>${naam}</b> — ${esc(r.actie||'')}`+va;
+    default:                   return `<b>${naam}</b> — ${esc(r.actie||'')}`+staart;
   }
 }
 

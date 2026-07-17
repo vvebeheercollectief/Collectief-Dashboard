@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VvE-dossier — richting C uitgewerkt</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f4f5f7;--sur:#ffffff;--sur2:#fbfcfd;--bor:#ebedf0;
+  --txt:#1b1e24;--mut:#5b6675;--fnt:#9aa1ad;
+  --bor-input:#e4e7ec;--row-divider:#f1f3f5;--row-hover:#f7f9fb;
+  --r:10px;--rs:7px;--sh:0 1px 2px rgba(16,22,34,.05);--shm:0 4px 16px rgba(16,22,34,.08);
+  --bl:#1D6AA5;--bl-l:#E0EEF9;
+  --pu:#6D5BD0;--pu-l:#EEEAFD;
+  --rd:#B91C1C;--rd-l:#fee2e2;
+  --gn:#047857;--gn-l:#d1fae5;
+  --ac:#4a5b7a;--ac-l:#eef1f6;--ac-b:#d6deea;--ac-900:#3a4a66;
+  --prio:#b5544b;--r-lg:14px;--tr:.17s ease;--hh:60px;--sb:240px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:14px;background:var(--bg);color:var(--txt);line-height:1.5;-webkit-font-smoothing:antialiased}
+.mono,.code{font-family:'IBM Plex Mono',ui-monospace,monospace}
+button{cursor:pointer;border:none;background:none;font:inherit;color:inherit}
+
+/* ——— app-frame (nagebootst, zodat de hoogte echt klopt) ——— */
+#app{display:flex;height:100vh;overflow:hidden}
+#sb{width:var(--sb);background:#1b1e24;border-right:1px solid #2a2e36;flex-shrink:0;color:#8b929e;padding:18px 14px}
+.sb-logo{font-weight:800;color:#e8ecf2;font-size:14px;letter-spacing:-.01em;padding:0 6px 16px;border-bottom:1px solid #2a2e36;margin-bottom:12px}
+.sb-i{padding:8px 10px;border-radius:7px;font-size:13px;font-weight:600;margin-bottom:2px}
+.sb-i.aan{background:rgba(127,156,224,.14);color:#cfd8e8}
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#hdr{height:var(--hh);background:var(--sur);border-bottom:1px solid var(--bor);display:flex;align-items:center;padding:0 26px;gap:10px;flex-shrink:0}
+#hdr h1{font-size:16px;font-weight:600;letter-spacing:-.01em}
+#hdr p{font-size:12px;color:var(--mut)}
+#content{flex:1;overflow-y:auto;padding:20px}
+
+/* ——— DE PAGINA (dit is het ontwerp) ——— */
+#page-vve{display:flex;flex-direction:column;height:100%}
+.vve-kop{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:16px;flex-shrink:0}
+.vve-naam{display:flex;align-items:center;gap:12px}
+.vve-naam h3{font-size:19px;font-weight:800;letter-spacing:-.01em}
+.vve-naam .sub{font-size:12.5px;color:var(--mut);margin-top:3px;display:flex;align-items:center;gap:6px}
+.code{background:var(--ac-l);color:var(--ac);border-radius:6px;padding:5px 11px;font-size:15px;font-weight:700}
+.badge{display:inline-flex;align-items:center;gap:4px;border-radius:20px;padding:2px 9px;font-size:11px;font-weight:700;white-space:nowrap}
+.budget-tag{background:var(--bl-l);color:var(--bl);font-size:10.5px;vertical-align:3px}
+.prs-l{display:inline-flex;align-items:center;gap:5px;background:var(--pu-l);color:var(--pu);border-radius:20px;padding:1px 9px 1px 2px;font-size:11px;font-weight:700}
+.prs{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:var(--pu);color:#fff;font-size:9px;font-weight:800}
+
+/* kerncijfers + de nieuwe + tegel */
+.kerncijfers{display:flex;gap:9px;align-items:stretch}
+.kc{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);padding:8px 14px;text-align:center;min-width:84px;box-shadow:var(--sh);display:flex;flex-direction:column;justify-content:center}
+.kc b{display:block;font-size:19px;font-weight:800;line-height:1.2}
+.kc span{font-size:11px;color:var(--mut);font-weight:600}
+.kc.ac b{color:var(--ac)}.kc.grijs b{color:var(--fnt)}
+.kc-plus{background:var(--ac);border:1px solid var(--ac);border-radius:var(--r);box-shadow:var(--sh);color:#fff;min-width:52px;padding:8px;display:flex;align-items:center;justify-content:center;transition:background var(--tr)}
+.kc-plus:hover{background:var(--ac-900)}
+.kc-plus:focus-visible{outline:2px solid var(--ac-900);outline-offset:2px}
+
+/* de drie panelen */
+.vve-grid{display:grid;grid-template-columns:300px 330px 1fr;gap:16px;flex:1;min-height:380px}
+.paneel{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);box-shadow:var(--sh);padding:13px 15px;display:flex;flex-direction:column;min-height:0;overflow-y:auto}
+.paneel.tl-paneel{overflow:hidden}
+@media(max-width:1240px){
+  #page-vve{height:auto}
+  .vve-grid{grid-template-columns:1fr 1fr;min-height:0}
+  .paneel{overflow:visible}
+  .tl-paneel{grid-column:1/-1}
+  .tl-scroll{overflow:visible!important}
+}
+@media(max-width:900px){.vve-grid{grid-template-columns:1fr}}
+
+.sec{font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:0 0 8px;display:flex;align-items:center;gap:8px;flex-shrink:0}
+.sec .n{background:var(--sur2);border:1px solid var(--bor);border-radius:20px;padding:0 8px;font-size:11px;color:var(--txt);font-weight:700}
+.btn{display:inline-flex;align-items:center;gap:6px;border-radius:var(--rs);padding:6px 11px;font-size:12.5px;font-weight:700;border:1px solid transparent;transition:all var(--tr)}
+.btn-pri{background:var(--ac);color:#fff}
+.btn-pri:hover{background:var(--ac-900)}
+.btn-sec{background:var(--sur);border-color:var(--bor-input);color:var(--mut);padding:3px 8px;font-size:11px}
+.btn-sec:hover{color:var(--txt)}
+
+/* feitenrijen */
+.f-rij{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--row-divider);font-size:13px}
+.f-rij:last-of-type{border-bottom:none}
+.f-rij .lbl{color:var(--mut)}
+.onbekend{background:var(--sur2);color:var(--fnt);border:1px dashed var(--bor-input)}
+.f-bron{font-size:12px;color:var(--fnt);padding-top:8px;line-height:1.45;border-top:1px solid var(--row-divider);margin-top:4px}
+.f-voet{font-size:12px;color:var(--fnt);border-top:1px solid var(--row-divider);padding-top:8px;margin-top:8px}
+
+/* taken */
+.tk{display:flex;align-items:baseline;gap:10px;padding:8px 0;border-bottom:1px solid var(--row-divider);font-size:13px}
+.tk:last-child{border-bottom:none}
+.tk .nm{flex:1;min-width:0}
+.tk .dl{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--mut);flex-shrink:0}
+.tk .dl.af{color:var(--gn)}
+.tk .mt{display:block;font-size:11px;color:var(--fnt);margin-top:2px}
+.tk-leeg{padding:10px 0;color:var(--fnt);font-size:12.5px}
+.geen-oms{color:var(--fnt);font-style:italic}
+
+/* tijdlijn */
+.tl-scroll{overflow-y:auto;min-height:0;flex:1;margin-right:-5px;padding-right:5px}
+.log-day{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--fnt);margin:14px 0 6px;position:sticky;top:0;background:var(--sur);padding:4px 0;z-index:2}
+.log-day:first-child{margin-top:0}
+/* handmatig = volwaardige regel */
+.log-item{display:flex;gap:11px;padding:8px 8px;border-radius:9px;position:relative}
+.log-item:hover{background:var(--sur2)}
+.log-av{width:26px;height:26px;border-radius:50%;background:var(--pu);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0}
+.log-body{flex:1;min-width:0}
+.log-zin{font-size:12.5px;color:var(--mut)}
+.log-zin b{color:var(--txt);font-weight:700}
+.log-soort{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--ac);background:var(--ac-l);border-radius:4px;padding:1px 5px;margin-right:4px}
+.log-note{font-size:13px;color:var(--txt);margin-top:3px;line-height:1.5}
+.log-time{font-size:11px;color:var(--fnt);font-family:'IBM Plex Mono',monospace;flex-shrink:0}
+/* automatisch = gedempte dunne regel */
+.log-mini{display:flex;align-items:center;gap:9px;padding:3px 8px 3px 12px;font-size:12px;color:var(--mut);border-radius:7px;position:relative}
+.log-mini:hover{background:var(--sur2)}
+.log-mini-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.log-mini-txt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.log-mini-txt b{color:var(--txt);font-weight:700}
+.log-acts{opacity:0;display:flex;gap:3px;transition:opacity var(--tr)}
+.log-item:hover .log-acts,.log-mini:hover .log-acts{opacity:1}
+.log-act-btn{width:22px;height:22px;border-radius:5px;border:1px solid var(--bor);background:var(--sur);color:var(--fnt);display:flex;align-items:center;justify-content:center}
+.log-act-btn:hover{background:var(--ac-l);color:var(--ac)}
+.log-act-btn.del:hover{background:var(--rd-l);color:var(--rd)}
+.log-act-btn svg{width:12px;height:12px}
+
+/* composer ingeklapt */
+.comp-dicht{display:flex;align-items:center;gap:8px;padding:8px 11px;border:1px dashed var(--bor-input);border-radius:var(--rs);color:var(--fnt);font-size:12.5px;cursor:text;background:var(--sur2);margin-bottom:10px;flex-shrink:0}
+.comp-dicht .btn{margin-left:auto;flex-shrink:0}
+.dos-filters{margin-left:auto;display:inline-flex;gap:5px}
+.dos-filter{border:1px solid var(--bor);background:var(--sur);color:var(--mut);border-radius:20px;padding:2px 9px;font-size:11px;font-weight:700;text-transform:none;letter-spacing:0}
+.dos-filter.aan{background:var(--ac-l);border-color:var(--ac-b);color:var(--ac)}
+
+/* toelichting onderaan */
+.note{max-width:1320px;margin:22px auto 0;background:var(--sur);border:1px solid var(--bor);border-radius:var(--r-lg);padding:18px 22px;box-shadow:var(--sh);font-size:13px;color:var(--mut)}
+.note h2{font-size:15px;font-weight:800;color:var(--txt);margin-bottom:8px}
+.note ul{margin:0 0 0 18px}.note li{margin:5px 0}
+.note b{color:var(--txt)}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="sb">
+    <div class="sb-logo">Collectief Dashboard</div>
+    <div class="sb-i">Vandaag</div>
+    <div class="sb-i">Overzicht</div>
+    <div class="sb-i">ALV's</div>
+    <div class="sb-i">Logboek</div>
+    <div class="sb-i aan">VvE-dossier</div>
+  </div>
+
+  <div id="main">
+    <div id="hdr">
+      <div>
+        <h1>VvE-dossier</h1>
+      </div>
+      <p style="margin-left:4px">Alles van één VvE op één scherm</p>
+    </div>
+
+    <div id="content">
+      <div id="page-vve">
+
+        <!-- kop -->
+        <div class="vve-kop">
+          <div class="vve-naam">
+            <span class="code mono">121027</span>
+            <div>
+              <h3>VvE Goudenregenstraat 142/144/146 <span class="badge budget-tag">Budget</span></h3>
+              <div class="sub">behandelaar <span class="prs-l"><span class="prs">C</span>Cihad</span></div>
+            </div>
+          </div>
+          <div class="kerncijfers">
+            <div class="kc ac"><b>1</b><span>open taak</span></div>
+            <div class="kc grijs"><b>2 d</b><span>laatste activiteit</span></div>
+            <button class="kc-plus" title="Nieuwe taak voor deze VvE" aria-label="Nieuwe taak voor deze VvE">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- drie panelen -->
+        <div class="vve-grid">
+
+          <!-- 1. paspoort -->
+          <div class="paneel">
+            <div class="sec">ALV</div>
+            <div class="f-rij"><span class="lbl">Komende ALV</span><span class="badge" style="background:var(--gn-l);color:var(--gn)">Afgerond</span></div>
+            <div style="display:flex;gap:5px;flex-wrap:wrap;margin:9px 0 0">
+              <span class="badge" style="background:var(--gn-l);color:var(--gn)">✓ Uitnodiging</span>
+              <span class="badge" style="background:var(--gn-l);color:var(--gn)">✓ Notulen</span>
+              <span class="badge" style="background:var(--gn-l);color:var(--gn)">✓ Begroting</span>
+            </div>
+            <div class="f-voet">Laatst gehouden: 8-5-2026</div>
+
+            <div class="sec" style="margin:20px 0 8px">Gebouw
+              <button class="btn btn-sec" style="margin-left:auto">Bewerken</button>
+            </div>
+            <div class="f-rij"><span class="lbl">Balkons</span><span class="badge onbekend">Onbekend</span></div>
+            <div class="f-rij"><span class="lbl">Kozijnen</span><span class="badge onbekend">Onbekend</span></div>
+            <div class="f-bron">Bron — nog niet vastgelegd</div>
+          </div>
+
+          <!-- 2. werk -->
+          <div class="paneel">
+            <div class="sec">Open taken <span class="n">1</span></div>
+            <div class="tk">
+              <span class="nm">Offertes opvragen totaalonderhoud, minimaal 2
+                <span class="mt">Oppakken · Cihad</span>
+              </span>
+              <span class="dl">24-07</span>
+            </div>
+
+            <div class="sec" style="margin:20px 0 8px">Laatst afgerond <span class="n">3</span></div>
+            <div class="tk"><span class="nm">juni/juli<span class="mt">Uitnodiging verstuurd.</span></span><span class="dl af">26-06</span></div>
+            <div class="tk"><span class="nm">CRM (baran)<span class="mt">Gereageerd via CRM</span></span><span class="dl af">01-06</span></div>
+            <div class="tk"><span class="nm geen-oms">ALV — geen omschrijving</span><span class="dl af">08-05</span></div>
+
+            <div class="f-voet">0 te laat · 0 weggelegd</div>
+          </div>
+
+          <!-- 3. geschiedenis -->
+          <div class="paneel tl-paneel">
+            <div class="sec">Geschiedenis <span class="n">8</span>
+              <span class="dos-filters">
+                <button class="dos-filter aan">Alles</button>
+                <button class="dos-filter">Alleen contact</button>
+              </span>
+            </div>
+            <div class="comp-dicht">
+              Leg vast wat er gebeurd is — bv. zojuist gebeld met een eigenaar…
+              <button class="btn btn-pri">Vastleggen</button>
+            </div>
+            <div class="tl-scroll">
+              <div class="log-day">Woensdag 15 juli</div>
+              <div class="log-item">
+                <span class="log-av">C</span>
+                <div class="log-body">
+                  <div class="log-zin"><b>Cihad</b> · Bewoner/eigenaar</div>
+                  <div class="log-note"><span class="log-soort">Notitie</span>Bestuur wil eerst offertes zien voor de ALV van september.</div>
+                </div>
+                <span class="log-time">12:52</span>
+                <span class="log-acts">
+                  <button class="log-act-btn" title="Bewerken"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+                  <button class="log-act-btn del" title="Verwijderen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button>
+                </span>
+              </div>
+              <div class="log-mini">
+                <span class="log-mini-dot" style="background:var(--pu)"></span>
+                <span class="log-mini-txt"><b>Cihad</b> maakte een taak aan → Cihad</span>
+                <span class="log-time">12:52</span>
+                <span class="log-acts"><button class="log-act-btn del" title="Verwijderen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button></span>
+              </div>
+              <div class="log-mini">
+                <span class="log-mini-dot" style="background:var(--gn)"></span>
+                <span class="log-mini-txt"><b>Cihad</b> vinkte Begroting aan</span>
+                <span class="log-time">12:41</span>
+                <span class="log-acts"><button class="log-act-btn del" title="Verwijderen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button></span>
+              </div>
+              <div class="log-mini">
+                <span class="log-mini-dot" style="background:var(--gn)"></span>
+                <span class="log-mini-txt"><b>Cihad</b> vinkte Notulen aan</span>
+                <span class="log-time">12:41</span>
+                <span class="log-acts"><button class="log-act-btn del" title="Verwijderen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button></span>
+              </div>
+
+              <div class="log-day">Vrijdag 26 juni</div>
+              <div class="log-item">
+                <span class="log-av">C</span>
+                <div class="log-body">
+                  <div class="log-zin"><b>Cihad</b> · Bestuur</div>
+                  <div class="log-note"><span class="log-soort">E-mail</span>Uitnodiging verstuurd.</div>
+                </div>
+                <span class="log-time">10:24</span>
+                <span class="log-acts">
+                  <button class="log-act-btn" title="Bewerken"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+                  <button class="log-act-btn del" title="Verwijderen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button>
+                </span>
+              </div>
+              <div class="log-mini">
+                <span class="log-mini-dot" style="background:var(--gn)"></span>
+                <span class="log-mini-txt"><b>Cihad</b> rondde juni/juli af</span>
+                <span class="log-time">10:24</span>
+                <span class="log-acts"><button class="log-act-btn del" title="Verwijderen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button></span>
+              </div>
+
+              <div class="log-day">Maandag 1 juni</div>
+              <div class="log-item">
+                <span class="log-av">C</span>
+                <div class="log-body">
+                  <div class="log-zin"><b>Cihad</b> · Bewoner/eigenaar</div>
+                  <div class="log-note"><span class="log-soort">Telefoon</span>Gereageerd via CRM (baran)</div>
+                </div>
+                <span class="log-time">09:12</span>
+                <span class="log-acts">
+                  <button class="log-act-btn" title="Bewerken"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+                  <button class="log-act-btn del" title="Verwijderen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button>
+                </span>
+              </div>
+              <div class="log-mini">
+                <span class="log-mini-dot" style="background:var(--pu)"></span>
+                <span class="log-mini-txt"><b>Cihad</b> maakte een taak aan</span>
+                <span class="log-time">09:10</span>
+                <span class="log-acts"><button class="log-act-btn del" title="Verwijderen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></button></span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

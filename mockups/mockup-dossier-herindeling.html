@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VvE-dossier — herindeling (3 richtingen)</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700;800&family=IBM+Plex+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f4f5f7;--sur:#ffffff;--sur2:#fbfcfd;--bor:#ebedf0;
+  --txt:#1b1e24;--mut:#5b6675;--fnt:#9aa1ad;
+  --bor-input:#e4e7ec;--row-divider:#f1f3f5;--row-hover:#f7f9fb;--group-bg:#f5f7f9;
+  --r:10px;--rs:7px;--sh:0 1px 2px rgba(16,22,34,.05);
+  --shm:0 4px 16px rgba(16,22,34,.08);
+  --bl:#1D6AA5;--bl-l:#E0EEF9;--bl-b:#B8D4EC;
+  --am:#B45309;--am-l:#fef3c7;--am-b:#FCD34D;
+  --pu:#6D5BD0;--pu-l:#EEEAFD;
+  --rd:#B91C1C;--rd-l:#fee2e2;
+  --gn:#047857;--gn-l:#d1fae5;--gn-b:#a7f3d0;
+  --ac:#4a5b7a;--ac-l:#eef1f6;--ac-b:#d6deea;--ac-900:#3a4a66;
+  --prio:#b5544b;--r-lg:14px;--tr:.17s ease;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'IBM Plex Sans',system-ui,sans-serif;font-size:14px;background:var(--bg);color:var(--txt);line-height:1.5;-webkit-font-smoothing:antialiased;padding:28px}
+.mono,.code,.cell-sm{font-family:'IBM Plex Mono',ui-monospace,monospace}
+button{cursor:pointer;border:none;background:none;font:inherit;color:inherit}
+
+/* ——— mockup-chroom (hoort niet bij de app) ——— */
+.mk{max-width:1320px;margin:0 auto 46px}
+.mk-h{margin-bottom:14px}
+.mk-h h2{font-size:20px;font-weight:800;letter-spacing:-.01em}
+.mk-h p{color:var(--mut);font-size:13px;max-width:820px;margin-top:5px}
+.mk-tag{display:inline-block;background:var(--ac-900);color:#fff;font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:5px;margin-bottom:8px}
+.mk-frame{background:var(--bg);border:1px solid var(--bor);border-radius:var(--r-lg);padding:22px;box-shadow:var(--shm)}
+.mk-intro{max-width:1320px;margin:0 auto 34px;background:var(--sur);border:1px solid var(--bor);border-radius:var(--r-lg);padding:22px 24px;box-shadow:var(--sh)}
+.mk-intro h1{font-size:24px;font-weight:800;letter-spacing:-.02em}
+.mk-intro p{color:var(--mut);font-size:13.5px;margin-top:8px;max-width:900px}
+.mk-intro ul{margin:10px 0 0 18px;color:var(--mut);font-size:13px}
+.mk-intro li{margin:3px 0}
+
+/* ——— gedeelde app-onderdelen ——— */
+.badge{display:inline-flex;align-items:center;gap:4px;border-radius:20px;padding:2px 9px;font-size:11px;font-weight:700;white-space:nowrap}
+.code{background:var(--ac-l);color:var(--ac);border-radius:6px;padding:5px 11px;font-size:15px;font-weight:700}
+.card{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);box-shadow:var(--sh)}
+.sec{font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:0 0 8px;display:flex;align-items:center;gap:8px}
+.sec .n{background:var(--sur2);border:1px solid var(--bor);border-radius:20px;padding:0 8px;font-size:11px;color:var(--txt);font-weight:700}
+.btn{display:inline-flex;align-items:center;gap:6px;border-radius:var(--rs);padding:6px 11px;font-size:12.5px;font-weight:700;border:1px solid transparent;transition:all var(--tr)}
+.btn-pri{background:var(--ac);color:#fff}
+.btn-pri:hover{background:var(--ac-900)}
+.btn-sec{background:var(--sur);border-color:var(--bor-input);color:var(--txt)}
+.prs{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--pu);color:#fff;font-size:10px;font-weight:800}
+.prs-l{display:inline-flex;align-items:center;gap:5px;background:var(--pu-l);color:var(--pu);border-radius:20px;padding:1px 9px 1px 2px;font-size:11px;font-weight:700}
+.prs-l .prs{width:17px;height:17px;font-size:9px}
+
+/* kop */
+.kop{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:18px}
+.kop-l{display:flex;align-items:center;gap:12px}
+.kop-l h3{font-size:19px;font-weight:800;letter-spacing:-.01em}
+.kop-l .sub{font-size:12.5px;color:var(--mut);margin-top:3px;display:flex;align-items:center;gap:6px}
+.budget-tag{background:var(--bl-l);color:var(--bl);font-size:10.5px;vertical-align:3px}
+
+/* DE KNOP — tegelstijl, alleen + */
+.kc-rij{display:flex;gap:9px;align-items:stretch}
+.kc{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);padding:8px 14px;text-align:center;min-width:84px;box-shadow:var(--sh);display:flex;flex-direction:column;justify-content:center}
+.kc b{display:block;font-size:19px;font-weight:800;line-height:1.2}
+.kc span{font-size:11px;color:var(--mut);font-weight:600}
+.kc.rood b{color:var(--prio)}.kc.ac b{color:var(--ac)}.kc.grijs b{color:var(--fnt)}
+.kc-plus{background:var(--ac);border-color:var(--ac);color:#fff;min-width:52px;padding:8px;align-items:center;transition:background var(--tr)}
+.kc-plus:hover{background:var(--ac-900)}
+.kc-plus svg{display:block}
+
+/* tijdlijn */
+.tl{position:relative;padding-left:26px}
+.tl::before{content:'';position:absolute;left:9px;top:6px;bottom:6px;width:2px;background:var(--bor)}
+.tl-dag{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--fnt);margin:14px 0 8px;position:relative}
+.tl-dag:first-child{margin-top:0}
+.tl-i{position:relative;display:flex;gap:9px;align-items:baseline;padding:4px 0;font-size:13px}
+.tl-i::before{content:'';position:absolute;left:-21px;top:9px;width:8px;height:8px;border-radius:50%;background:var(--bor);border:2px solid var(--sur)}
+.tl-i.hand::before{background:var(--ac)}
+.tl-i .t{margin-left:auto;font-size:11px;color:var(--fnt);font-family:'IBM Plex Mono',monospace;flex-shrink:0}
+.tl-i .tx{color:var(--txt)}
+.tl-i.auto .tx{color:var(--mut);font-size:12.5px}
+.tl-w{font-weight:700}
+.tl-soort{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--ac);background:var(--ac-l);border-radius:4px;padding:1px 5px;margin-right:2px}
+
+/* rustige takenlijst */
+.tk{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--row-divider);font-size:13px}
+.tk:last-child{border-bottom:none}
+.tk .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tk .dl{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--mut);flex-shrink:0}
+.tk-leeg{padding:12px;color:var(--fnt);font-size:12.5px}
+
+/* feitenrijen */
+.f-rij{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--row-divider);font-size:13px}
+.f-rij:last-child{border-bottom:none}
+.f-rij .lbl{color:var(--mut)}
+.onbekend{background:var(--sur2);color:var(--fnt);border:1px dashed var(--bor-input)}
+.f-bron{font-size:12px;color:var(--fnt);padding-top:8px;line-height:1.45}
+
+/* composer ingeklapt */
+.comp-dicht{display:flex;align-items:center;gap:8px;padding:9px 12px;border:1px dashed var(--bor-input);border-radius:var(--rs);color:var(--fnt);font-size:12.5px;cursor:text;background:var(--sur2)}
+.comp-dicht .btn{margin-left:auto}
+</style>
+</head>
+<body>
+
+<div class="mk-intro">
+  <h1>VvE-dossier — drie richtingen voor "instant overzicht"</h1>
+  <p>Uitgangspunt uit ons gesprek: het dossier is een <b>naslagscherm</b> ("vertel me alles over deze VvE"), geen werkbak — afvinken doe je op Vandaag. Daarom krijgen ALV-stand, geschiedenis en gebouwfeiten de hoofdrol, en worden open taken rustiger.</p>
+  <ul>
+    <li>De <b>+ knop</b> is in alle drie de richtingen een tegel in dezelfde stijl als de kerncijfers ernaast, in het huidige leiblauw, met alleen een + teken.</li>
+    <li>De <b>kerncijfers</b> gaan van vier tegels (waarvan er drie 0 of — tonen) terug naar wat er echt toe doet.</li>
+    <li>Het <b>logboek</b> wordt een tijdlijn: handmatige notities springen eruit, automatische regels ("Aangevinkt 121027") worden gedempt in plaats van dominant.</li>
+    <li>De <b>lege ruimte</b> rechts van de takentabel verdwijnt doordat de kolommen anders verdeeld worden.</li>
+  </ul>
+</div>
+
+
+<!-- ══════════════════════ RICHTING A ══════════════════════ -->
+<div class="mk">
+  <div class="mk-h">
+    <span class="mk-tag">Richting A</span>
+    <h2>Paspoort links, tijdlijn rechts</h2>
+    <p>Eén smalle kolom links bundelt alles wat "vast" is aan deze VvE — ALV, gebouwkenmerken, de paar open taken — als één doorlopend paspoort. De brede kolom rechts is volledig voor de geschiedenis. Je leest links wie deze VvE ís, rechts wat er gebeurd is. De invoerbalk staat ingeklapt tot je hem nodig hebt.</p>
+  </div>
+  <div class="mk-frame">
+
+    <div class="kop">
+      <div class="kop-l">
+        <span class="code mono">121027</span>
+        <div>
+          <h3>VvE Goudenregenstraat 142/144/146 <span class="badge budget-tag">Budget</span></h3>
+          <div class="sub">behandelaar <span class="prs-l"><span class="prs">C</span>Cihad</span></div>
+        </div>
+      </div>
+      <div class="kc-rij">
+        <div class="kc ac"><b>1</b><span>open taak</span></div>
+        <div class="kc grijs"><b>2 d</b><span>laatste activiteit</span></div>
+        <button class="kc kc-plus" title="Nieuwe taak voor deze VvE" aria-label="Nieuwe taak">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:360px 1fr;gap:20px;align-items:start">
+
+      <!-- paspoort -->
+      <div class="card" style="padding:14px 16px">
+        <div class="sec">ALV</div>
+        <div class="f-rij"><span class="lbl">Komende ALV</span><span class="badge" style="background:var(--gn-l);color:var(--gn)">Afgerond</span></div>
+        <div class="f-rij" style="border-bottom:none;padding-bottom:4px">
+          <span style="display:flex;gap:5px;flex-wrap:wrap">
+            <span class="badge" style="background:var(--gn-l);color:var(--gn)">✓ Uitnodiging</span>
+            <span class="badge" style="background:var(--gn-l);color:var(--gn)">✓ Notulen</span>
+            <span class="badge" style="background:var(--gn-l);color:var(--gn)">✓ Begroting</span>
+          </span>
+        </div>
+        <div style="font-size:12px;color:var(--fnt);border-top:1px solid var(--row-divider);padding-top:8px;margin-top:4px">Laatst gehouden: 8-5-2026</div>
+
+        <div class="sec" style="margin:18px 0 8px">Gebouw
+          <button class="btn btn-sec" style="margin-left:auto;padding:3px 8px;font-size:11px">Bewerken</button>
+        </div>
+        <div class="f-rij"><span class="lbl">Balkons</span><span class="badge onbekend">Onbekend</span></div>
+        <div class="f-rij"><span class="lbl">Kozijnen</span><span class="badge onbekend">Onbekend</span></div>
+        <div class="f-bron">Bron — nog niet vastgelegd</div>
+
+        <div class="sec" style="margin:18px 0 8px">Open taken <span class="n">1</span></div>
+        <div style="border:1px solid var(--bor);border-radius:var(--rs);overflow:hidden">
+          <div class="tk">
+            <span class="nm" title="Offertes opvragen totaalonderhoud, minimaal 2">Offertes opvragen totaalonderhoud, minimaal 2</span>
+            <span class="dl">24-07</span>
+          </div>
+        </div>
+        <div style="font-size:11.5px;color:var(--fnt);margin-top:7px">3 afgerond dit kwartaal · <a href="#" style="color:var(--ac)">tonen</a></div>
+      </div>
+
+      <!-- tijdlijn -->
+      <div class="card" style="padding:14px 16px">
+        <div class="sec">Geschiedenis <span class="n">8</span>
+          <span style="margin-left:auto;display:inline-flex;gap:5px">
+            <button class="badge" style="background:var(--ac-l);color:var(--ac);font-weight:800">Alles</button>
+            <button class="badge" style="background:var(--sur2);color:var(--mut);border:1px solid var(--bor)">Alleen contact</button>
+          </span>
+        </div>
+        <div class="comp-dicht" style="margin-bottom:14px">
+          Leg vast wat er gebeurd is — bv. zojuist gebeld met een eigenaar…
+          <button class="btn btn-pri">Vastleggen</button>
+        </div>
+        <div class="tl">
+          <div class="tl-dag">Woensdag 15 juli</div>
+          <div class="tl-i hand"><span class="tx"><span class="tl-soort">Notitie</span>Bestuur wil eerst offertes zien voor de ALV van september.</span><span class="t">12:52</span></div>
+          <div class="tl-i auto"><span class="tx"><b class="tl-w">Cihad</b> maakte een nieuwe taak → Cihad</span><span class="t">12:52</span></div>
+          <div class="tl-i auto"><span class="tx"><b class="tl-w">Cihad</b> vinkte 2 punten af</span><span class="t">12:41</span></div>
+          <div class="tl-dag">Vrijdag 26 juni</div>
+          <div class="tl-i hand"><span class="tx"><span class="tl-soort">E-mail</span>Uitnodiging verstuurd.</span><span class="t">10:24</span></div>
+          <div class="tl-i auto"><span class="tx"><b class="tl-w">Cihad</b> rondde een punt af · juni/juli</span><span class="t">10:24</span></div>
+          <div class="tl-dag">Maandag 1 juni</div>
+          <div class="tl-i hand"><span class="tx"><span class="tl-soort">Telefoon</span>Gereageerd via CRM (baran)</span><span class="t">09:12</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════ RICHTING B ══════════════════════ -->
+<div class="mk">
+  <div class="mk-h">
+    <span class="mk-tag">Richting B</span>
+    <h2>Feitenstrook boven, tijdlijn op volle breedte</h2>
+    <p>Bovenaan één strook van drie gelijke kaarten — ALV, Gebouw, Werk — die je in één horizontale blik leest. Daaronder krijgt de tijdlijn de volledige breedte, waardoor lange notities niet afbreken en er geen loze ruimte overblijft. Leest strikt van boven naar beneden: eerst de feiten, dan het verhaal.</p>
+  </div>
+  <div class="mk-frame">
+
+    <div class="kop">
+      <div class="kop-l">
+        <span class="code mono">121027</span>
+        <div>
+          <h3>VvE Goudenregenstraat 142/144/146 <span class="badge budget-tag">Budget</span></h3>
+          <div class="sub">behandelaar <span class="prs-l"><span class="prs">C</span>Cihad</span></div>
+        </div>
+      </div>
+      <div class="kc-rij">
+        <div class="kc ac"><b>1</b><span>open taak</span></div>
+        <div class="kc grijs"><b>2 d</b><span>laatste activiteit</span></div>
+        <button class="kc kc-plus" title="Nieuwe taak voor deze VvE" aria-label="Nieuwe taak">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px">
+      <div class="card" style="padding:13px 15px">
+        <div class="sec">ALV</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px">
+          <b style="font-size:14px">Komende ALV</b>
+          <span class="badge" style="background:var(--gn-l);color:var(--gn)">Afgerond</span>
+        </div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          <span class="badge" style="background:var(--gn-l);color:var(--gn)">✓ Uitnodiging</span>
+          <span class="badge" style="background:var(--gn-l);color:var(--gn)">✓ Notulen</span>
+          <span class="badge" style="background:var(--gn-l);color:var(--gn)">✓ Begroting</span>
+        </div>
+        <div style="font-size:12px;color:var(--fnt);border-top:1px solid var(--row-divider);padding-top:9px;margin-top:11px">Laatst gehouden: 8-5-2026</div>
+      </div>
+
+      <div class="card" style="padding:13px 15px">
+        <div class="sec">Gebouw
+          <button class="btn btn-sec" style="margin-left:auto;padding:3px 8px;font-size:11px">Bewerken</button>
+        </div>
+        <div class="f-rij"><span class="lbl">Balkons</span><span class="badge onbekend">Onbekend</span></div>
+        <div class="f-rij"><span class="lbl">Kozijnen</span><span class="badge onbekend">Onbekend</span></div>
+        <div class="f-bron">Bron — nog niet vastgelegd</div>
+      </div>
+
+      <div class="card" style="padding:13px 15px">
+        <div class="sec">Werk <span class="n">1</span></div>
+        <div class="tk" style="padding:7px 0">
+          <span class="nm" title="Offertes opvragen totaalonderhoud, minimaal 2">Offertes opvragen totaalonderhoud, minimaal 2</span>
+          <span class="dl">24-07</span>
+        </div>
+        <div style="font-size:12px;color:var(--fnt);border-top:1px solid var(--row-divider);padding-top:9px;margin-top:4px">0 te laat · 0 weggelegd · 3 afgerond</div>
+      </div>
+    </div>
+
+    <div class="card" style="padding:14px 16px">
+      <div class="sec">Geschiedenis <span class="n">8</span>
+        <span style="margin-left:auto;display:inline-flex;gap:5px">
+          <button class="badge" style="background:var(--ac-l);color:var(--ac);font-weight:800">Alles</button>
+          <button class="badge" style="background:var(--sur2);color:var(--mut);border:1px solid var(--bor)">Alleen contact</button>
+        </span>
+      </div>
+      <div class="comp-dicht" style="margin-bottom:14px">
+        Leg vast wat er gebeurd is — bv. zojuist gebeld met een eigenaar…
+        <button class="btn btn-pri">Vastleggen</button>
+      </div>
+      <div class="tl">
+        <div class="tl-dag">Woensdag 15 juli</div>
+        <div class="tl-i hand"><span class="tx"><span class="tl-soort">Notitie</span>Bestuur wil eerst offertes zien voor de ALV van september.</span><span class="t">12:52</span></div>
+        <div class="tl-i auto"><span class="tx"><b class="tl-w">Cihad</b> maakte een nieuwe taak → Cihad</span><span class="t">12:52</span></div>
+        <div class="tl-i auto"><span class="tx"><b class="tl-w">Cihad</b> vinkte 2 punten af</span><span class="t">12:41</span></div>
+        <div class="tl-dag">Vrijdag 26 juni</div>
+        <div class="tl-i hand"><span class="tx"><span class="tl-soort">E-mail</span>Uitnodiging verstuurd.</span><span class="t">10:24</span></div>
+        <div class="tl-i auto"><span class="tx"><b class="tl-w">Cihad</b> rondde een punt af · juni/juli</span><span class="t">10:24</span></div>
+        <div class="tl-dag">Maandag 1 juni</div>
+        <div class="tl-i hand"><span class="tx"><span class="tl-soort">Telefoon</span>Gereageerd via CRM (baran)</span><span class="t">09:12</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════ RICHTING C ══════════════════════ -->
+<div class="mk">
+  <div class="mk-h">
+    <span class="mk-tag">Richting C</span>
+    <h2>Drie panelen naast elkaar, geen paginascroll</h2>
+    <p>Paspoort, werk en geschiedenis staan naast elkaar en scrollen elk apart binnen hun eigen paneel. Je ziet letterlijk alles zonder te scrollen — het meest "instant" van de drie. Prijs: het is dichter en drukker, en op een smaller scherm of laptop vallen de kolommen onder elkaar terug op richting B.</p>
+  </div>
+  <div class="mk-frame">
+
+    <div class="kop">
+      <div class="kop-l">
+        <span class="code mono">121027</span>
+        <div>
+          <h3>VvE Goudenregenstraat 142/144/146 <span class="badge budget-tag">Budget</span></h3>
+          <div class="sub">behandelaar <span class="prs-l"><span class="prs">C</span>Cihad</span></div>
+        </div>
+      </div>
+      <div class="kc-rij">
+        <div class="kc ac"><b>1</b><span>open taak</span></div>
+        <div class="kc grijs"><b>2 d</b><span>laatste activiteit</span></div>
+        <button class="kc kc-plus" title="Nieuwe taak voor deze VvE" aria-label="Nieuwe taak">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:300px 320px 1fr;gap:16px;align-items:stretch;height:430px">
+
+      <div class="card" style="padding:13px 15px;overflow:auto">
+        <div class="sec">ALV</div>
+        <div class="f-rij"><span class="lbl">Komende ALV</span><span class="badge" style="background:var(--gn-l);color:var(--gn)">Afgerond</span></div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;margin:9px 0">
+          <span class="badge" style="background:var(--gn-l);color:var(--gn)">✓ Uitnodiging</span>
+          <span class="badge" style="background:var(--gn-l);color:var(--gn)">✓ Notulen</span>
+          <span class="badge" style="background:var(--gn-l);color:var(--gn)">✓ Begroting</span>
+        </div>
+        <div style="font-size:12px;color:var(--fnt);border-top:1px solid var(--row-divider);padding-top:8px">Laatst gehouden: 8-5-2026</div>
+
+        <div class="sec" style="margin:18px 0 8px">Gebouw
+          <button class="btn btn-sec" style="margin-left:auto;padding:3px 8px;font-size:11px">Bewerken</button>
+        </div>
+        <div class="f-rij"><span class="lbl">Balkons</span><span class="badge onbekend">Onbekend</span></div>
+        <div class="f-rij"><span class="lbl">Kozijnen</span><span class="badge onbekend">Onbekend</span></div>
+        <div class="f-bron">Bron — nog niet vastgelegd</div>
+      </div>
+
+      <div class="card" style="padding:13px 15px;overflow:auto">
+        <div class="sec">Open taken <span class="n">1</span></div>
+        <div class="tk" style="padding:7px 0">
+          <span class="nm" title="Offertes opvragen totaalonderhoud, minimaal 2">Offertes opvragen totaalonderhoud, minimaal 2</span>
+          <span class="dl">24-07</span>
+        </div>
+        <div class="sec" style="margin:18px 0 8px">Laatst afgerond <span class="n">3</span></div>
+        <div class="tk" style="padding:7px 0"><span class="nm">Uitnodiging verstuurd · juni/juli</span><span class="dl" style="color:var(--gn)">26-06</span></div>
+        <div class="tk" style="padding:7px 0"><span class="nm">Gereageerd via CRM (baran)</span><span class="dl" style="color:var(--gn)">01-06</span></div>
+        <div class="tk" style="padding:7px 0"><span class="nm" style="color:var(--fnt)">ALV gehouden</span><span class="dl" style="color:var(--gn)">08-05</span></div>
+      </div>
+
+      <div class="card" style="padding:13px 15px;display:flex;flex-direction:column;min-height:0">
+        <div class="sec">Geschiedenis <span class="n">8</span>
+          <span style="margin-left:auto;display:inline-flex;gap:5px">
+            <button class="badge" style="background:var(--ac-l);color:var(--ac);font-weight:800">Alles</button>
+            <button class="badge" style="background:var(--sur2);color:var(--mut);border:1px solid var(--bor)">Alleen contact</button>
+          </span>
+        </div>
+        <div class="comp-dicht" style="margin-bottom:12px">
+          Leg vast wat er gebeurd is…
+          <button class="btn btn-pri">Vastleggen</button>
+        </div>
+        <div class="tl" style="overflow:auto;min-height:0;flex:1">
+          <div class="tl-dag">Woensdag 15 juli</div>
+          <div class="tl-i hand"><span class="tx"><span class="tl-soort">Notitie</span>Bestuur wil eerst offertes zien voor de ALV van september.</span><span class="t">12:52</span></div>
+          <div class="tl-i auto"><span class="tx"><b class="tl-w">Cihad</b> maakte een nieuwe taak → Cihad</span><span class="t">12:52</span></div>
+          <div class="tl-i auto"><span class="tx"><b class="tl-w">Cihad</b> vinkte 2 punten af</span><span class="t">12:41</span></div>
+          <div class="tl-dag">Vrijdag 26 juni</div>
+          <div class="tl-i hand"><span class="tx"><span class="tl-soort">E-mail</span>Uitnodiging verstuurd.</span><span class="t">10:24</span></div>
+          <div class="tl-i auto"><span class="tx"><b class="tl-w">Cihad</b> rondde een punt af · juni/juli</span><span class="t">10:24</span></div>
+          <div class="tl-dag">Maandag 1 juni</div>
+          <div class="tl-i hand"><span class="tx"><span class="tl-soort">Telefoon</span>Gereageerd via CRM (baran)</span><span class="t">09:12</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

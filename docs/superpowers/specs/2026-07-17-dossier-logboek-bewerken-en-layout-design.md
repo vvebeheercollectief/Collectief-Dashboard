@@ -112,8 +112,10 @@ een gehoisde functiedeclaratie, dus bij aanroep gegarandeerd geïnitialiseerd.
 
 ### 4. Vindbaarheid (styles.css)
 
-`.log-act-btn` van `color:var(--mut)` / `font-size:13px` naar een donkerder kleur en
-iets groter. Hover-gedrag (`opacity:0` → `1`) blijft ongemoeid.
+`.log-act-btn` gaat van `color:var(--mut)` (#5b6675) / `font-size:13px` naar
+`color:var(--txt)` (#1b1e24) / `font-size:15px`. `--txt` is de gewone tekstkleur, die in
+donkere modus meebeweegt (#f2f4f7) — dus geen los kleurgeval. Hover-gedrag van de
+container (`opacity:0` → `1`) en de knop-hover zelf blijven ongemoeid.
 
 ## Datastroom (ongewijzigd, hergebruikt)
 

@@ -8,7 +8,7 @@ import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
 import { filterNtd, setNtd, renderNtd, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey } from "./render-lijsten.js";
 import { state, D, pgs } from "./state.js";
-import { vveOverzicht, filterDossierLog } from "./render-vve.js";
+import { vveOverzicht, filterDossierLog, dossierFeed } from "./render-vve.js";
 import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk.js";
@@ -327,6 +327,19 @@ import { shouldPromptReload } from "./sw-update.js";
   const _dosLog=[{actie:'Contact'},{actie:'Afgerond'},{actie:'Contact'},{actie:'Kenmerk'}];
   eq('dossierfilter alles',   filterDossierLog(_dosLog,'alles').length, 4);
   eq('dossierfilter contact', filterDossierLog(_dosLog,'contact').length, 2);
+
+  // ── dossierFeed: bewerk-/verwijderknoppen ── (alleen eigen notities/contactmomenten;
+  //    automatische regels zoals Afgerond/Kenmerk krijgen niets — keuze gebruiker 2026-07-17)
+  const _dosTs='2026-07-17T10:00:00.000Z';
+  const _dosRij=(actie,row)=>({_row:row,timestamp:_dosTs,code:'121015',sectie:'',actie,
+    veld:actie==='Contact'?'Telefoon':'',oudeWaarde:actie==='Contact'?'Bestuur':'',
+    nieuweWaarde:'tekst',gebruiker:'info@vvebeheercollectief.nl'});
+  const _dosHtml=dossierFeed([_dosRij('Opmerking',2),_dosRij('Contact',3),_dosRij('Afgerond',4),_dosRij('Kenmerk',5)]);
+  const _tel=(h,s)=>h.split(s).length-1;
+  eq('dossierFeed: potlood alleen bij notitie+contact', _tel(_dosHtml,'data-action="log-bewerken"'), 2);
+  eq('dossierFeed: prullenbak alleen bij notitie+contact', _tel(_dosHtml,'data-action="log-verwijderen"'), 2);
+  eq('dossierFeed: knoppen wijzen naar de juiste sheet-rij', _tel(_dosHtml,'data-row="2"'), 2);
+  truthy('dossierFeed: automatische regels tonen nog wel gewoon hun tekst', _dosHtml.includes('rondde'));
 
   // ── kenmerken ── (VvE-dossier: tab 'Kenmerken' A:F, laatste rij per code wint;
   //    oude Ja/Nee-waarden worden bij inlezen genormaliseerd naar Gemeenschappelijk/Individueel)

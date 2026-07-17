@@ -11,6 +11,9 @@ import { getSheetIds, setv, gv, insertAndWriteRow } from "./crud.js";
 import { loadAll, backgroundWrite } from "./data.js";
 import { getCurrentWho, showToast, showUndoToast } from "./notifications.js";
 import { animateRowOut } from "./anim.js";
+import { renderVve } from "./render-vve.js";
+// (kringverwijzing render-overig ⇄ render-vve: zelfde patroon als render-vve ⇄ ui/kenmerken —
+//  live bindings, en renderVve is een gehoisde functiedeclaratie die pas op runtime wordt aangeroepen)
 
 // ══════════════════════════════════════
 //  ONTWIKKELING
@@ -346,15 +349,22 @@ function logEditForm(r){
   </div></div>`;
 }
 
+// Bewerken/verwijderen kan vanaf twee plekken: de Logboek-pagina en het dossier-logboek
+// op de VvE-pagina. Ververs dus de pagina waar de gebruiker daadwerkelijk staat.
+function _rerenderLog(){
+  if(document.getElementById('page-vve')?.classList.contains('active')) renderVve();
+  else renderLogboek();
+}
+
 function editLogboek(row){
   state.logEdit=row;
   const e=(D.logboek||[]).find(x=>x._row===row);
   state.logEditSoort=e?e.veld:null;
-  renderLogboek();
+  _rerenderLog();
   setTimeout(()=>{ const t=document.getElementById('log-edit-tekst'); if(t){ t.focus(); t.setSelectionRange(t.value.length,t.value.length); } },0);
 }
 
-function cancelLogboek(){ state.logEdit=null; state.logEditSoort=null; renderLogboek(); }
+function cancelLogboek(){ state.logEdit=null; state.logEditSoort=null; _rerenderLog(); }
 
 function setLogSoort(soort){
   state.logEditSoort=soort;
@@ -375,7 +385,7 @@ async function saveLogboek(row){
   if(isContact){ entry.veld=soort; entry.oudeWaarde=wie; }
   entry.nieuweWaarde=tekst;
   state.logEdit=null; state.logEditSoort=null;
-  renderLogboek();
+  _rerenderLog();
   const w=logEditWrite(entry.actie, row, soort, wie, tekst);
   backgroundWrite(
     async ()=>{ await assertRowMatch(row, entry.timestamp, 'Logboek'); await writeRange(w.range, w.values); },
@@ -396,7 +406,7 @@ async function deleteLogboek(row){
   entries.splice(idx,1);
   _shiftLogboekRows(oudeRow,-1);
   if(state.logEdit===row){ state.logEdit=null; state.logEditSoort=null; }
-  renderLogboek();
+  _rerenderLog();
   showUndoToast('🗑️ Logregel verwijderd', logDeleteLabel(entry), ()=>undoDeleteLog(vals, oudeRow));
   // Idempotentie-vlag: deleteDimension is positie-gebaseerd en NIET idempotent (zie deleteTaskRow).
   let verwijderd=false;

@@ -5,7 +5,7 @@ import { esc, displayName, persBadges, berekenPrioriteit, opvolgStatus, parseDt,
 import { SECS, SKEYS } from "./config.js";
 import { state, D } from "./state.js";
 import { goTo } from "./ui.js";
-import { fmtLogTs, logItemHtml, logDayLabel } from "./render-overig.js";
+import { fmtLogTs, logItemHtml, logDayLabel, logPaginaSoort } from "./render-overig.js";
 import { vveKenmerken, KENMERK_WAARDEN } from "./kenmerken.js";
 import { backgroundWrite } from "./data.js";
 import { appendRange } from "./api.js";
@@ -67,7 +67,9 @@ function dossierFeed(entries){
   entries.forEach(r=>{
     const dag=logDayLabel(r.timestamp);
     if(dag!==lastDay){ html+=`<div class="log-day">${dag}</div>`; lastDay=dag; }
-    html+=logItemHtml(r);
+    // Alleen onze eigen notities/contactmomenten mogen bewerkt/verwijderd worden.
+    // Automatische regels (afgerond, aangemaakt, kenmerk…) hebben geen eigen tekst.
+    html+=logItemHtml(r, false, logPaginaSoort(r.actie)==='normaal');
   });
   return html;
 }
@@ -251,4 +253,4 @@ function renderVve(){
   }
 }
 
-export { vveOverzicht, openVvePagina, renderVve, filterDossierLog, addContactLog };
+export { vveOverzicht, openVvePagina, renderVve, filterDossierLog, dossierFeed, addContactLog };

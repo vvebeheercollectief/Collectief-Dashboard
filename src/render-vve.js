@@ -54,6 +54,16 @@ function vveOverzicht(code, data, vandaag){
            cijfers:{ open:open.length, teLaat, weggelegd:weggelegd.length, laatsteDagen } };
 }
 
+// Pure helper (testbaar): omschrijving van een afgeronde regel.
+// Een rij zonder tekst mag niet als kale datum in beeld komen (leest als een fout).
+// We verzinnen niets: we vallen terug op het sectielabel dat wél in de data zit.
+function afOmschrijving(r){
+  const tekst=(r.actiepunt||r.periode||r.agendapunten||'').trim();
+  if(tekst) return { tekst, leeg:false };
+  const label=(SECS[r._sec]||{}).label||'Onbekende sectie';
+  return { tekst:`${label} — geen omschrijving`, leeg:true };
+}
+
 // Dossier-logboek: contactsoorten, filter en feed-opbouw
 const CONTACT_SOORTEN=[['Telefoon',ico('telefoon')],['E-mail',ico('envelop')],['Gesprek',ico('gesprek')],['Notitie',ico('potlood')]];
 
@@ -255,4 +265,4 @@ function renderVve(){
   }
 }
 
-export { vveOverzicht, openVvePagina, renderVve, filterDossierLog, dossierFeed, addContactLog };
+export { vveOverzicht, openVvePagina, renderVve, filterDossierLog, dossierFeed, addContactLog, afOmschrijving };

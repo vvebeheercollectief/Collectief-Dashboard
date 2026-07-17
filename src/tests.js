@@ -8,7 +8,7 @@ import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
 import { filterNtd, setNtd, renderNtd, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey } from "./render-lijsten.js";
 import { state, D, pgs } from "./state.js";
-import { vveOverzicht, filterDossierLog, dossierFeed } from "./render-vve.js";
+import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving } from "./render-vve.js";
 import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk.js";
@@ -358,6 +358,14 @@ import { shouldPromptReload } from "./sw-update.js";
   eq('dossierFeed: prullenbak alleen bij notitie+contact', _tel(_dosHtml,'data-action="log-verwijderen"'), 2);
   eq('dossierFeed: knoppen wijzen naar de juiste sheet-rij', _tel(_dosHtml,'data-row="2"'), 2);
   truthy('dossierFeed: automatische regels tonen nog wel gewoon hun tekst', _dosHtml.includes('rondde'));
+
+  // ── afOmschrijving: nooit een lege regel, nooit een verzonnen omschrijving ──
+  eq('afOmschrijving neemt actiepunt',  afOmschrijving({actiepunt:'Offertes opvragen', _sec:'OPPAKKEN'}).tekst, 'Offertes opvragen');
+  eq('afOmschrijving valt terug op periode', afOmschrijving({actiepunt:'', periode:'juni/juli', _sec:'OPPAKKEN'}).tekst, 'juni/juli');
+  eq('afOmschrijving leeg → sectielabel', afOmschrijving({actiepunt:'', periode:'', agendapunten:'', _sec:'LOD'}).leeg, true);
+  truthy('afOmschrijving leeg noemt "geen omschrijving"', afOmschrijving({actiepunt:'', periode:'', agendapunten:'', _sec:'LOD'}).tekst.includes('geen omschrijving'));
+  eq('afOmschrijving onbekende sectie crasht niet', afOmschrijving({actiepunt:'', _sec:'bestaatniet'}).leeg, true);
+  eq('afOmschrijving whitespace = leeg', afOmschrijving({actiepunt:'  ', _sec:'OPPAKKEN'}).leeg, true);
 
   // ── kenmerken ── (VvE-dossier: tab 'Kenmerken' A:F, laatste rij per code wint;
   //    oude Ja/Nee-waarden worden bij inlezen genormaliseerd naar Gemeenschappelijk/Individueel)

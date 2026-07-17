@@ -143,10 +143,8 @@ function renderVve(){
   // niet verdwijnen — alleen bewaren als het om dezelfde VvE gaat.
   const _oudT=document.getElementById('dos-tekst');
   const _bewaar=(_oudT&&_oudT.dataset.code===code)?{tekst:_oudT.value,wie:document.getElementById('dos-wie')?.value}:null;
-  if(document.getElementById('page-vve').classList.contains('active')){
-    document.getElementById('page-title').textContent=`${o.code} — ${o.naam||'VvE'}`;
-    document.getElementById('page-sub').textContent='VvE-dossier · alles op één scherm';
-  }
+  // De topbar houdt de vaste paginatitel uit PAGE_META ("VvE-dossier");
+  // code + naam staan al groot in de kop hieronder — niet dubbel tonen.
 
   const taakRij=(r,weg)=>{
     const rid=state._rowCache.length; state._rowCache.push(r);
@@ -197,11 +195,14 @@ function renderVve(){
         <div><h3>${esc(o.naam||'Onbekende VvE')}${o.budget?' <span class="badge budget-tag" title="Budgetpakket — vergadert zelf">Budget</span>':''}</h3>
         <div class="sub">${o.behandelaars.length?'behandelaars: '+persBadges(o.behandelaars.join(', ')):'<span style="color:var(--mut)">geen lopende taken</span>'}</div></div>
       </div>
-      <div class="kerncijfers">
-        ${kc(o.cijfers.open,'open taken','teal')}
-        ${kc(o.cijfers.teLaat,'te laat',o.cijfers.teLaat?'rood':'grijs')}
-        ${kc(o.cijfers.weggelegd,'weggelegd','grijs')}
-        ${kc(o.cijfers.laatsteDagen==null?'—':o.cijfers.laatsteDagen+' d','laatste activiteit','')}
+      <div class="vve-kop-rechts">
+        <div class="kerncijfers">
+          ${kc(o.cijfers.open,'open taken','teal')}
+          ${kc(o.cijfers.teLaat,'te laat',o.cijfers.teLaat?'rood':'grijs')}
+          ${kc(o.cijfers.weggelegd,'weggelegd','grijs')}
+          ${kc(o.cijfers.laatsteDagen==null?'—':o.cijfers.laatsteDagen+' d','laatste activiteit','')}
+        </div>
+        <button class="btn btn-pri btn-sm" data-action="vve-taak-nieuw" data-code="${esc(o.code)}" data-naam="${esc(o.naam||'')}" title="Nieuwe taak voor deze VvE"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Nieuwe taak</button>
       </div>
     </div>
     <div class="vve-grid">

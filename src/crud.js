@@ -14,9 +14,9 @@ import { renderAll } from "./main.js";
 
 //  MODAL — Open / Close
 // ══════════════════════════════════════
-function openModal(isEdit,rowData){
+function openModal(isEdit,rowData,opts){
   state.editMode=!!isEdit;
-  const sec=isEdit?rowData._sec:state.activeNtd;
+  const sec=isEdit?rowData._sec:((opts&&opts.sec)||state.activeNtd);
   state.editSec=sec; state.editRowData=rowData||null;
 
   document.getElementById('m-title').textContent=(isEdit?'Taak bewerken — ':'Taak toevoegen — ')+SECS[sec].label;
@@ -42,6 +42,12 @@ function openModal(isEdit,rowData){
   } else {
     clearModal();
     document.getElementById('fg-history').style.display='none';
+    // Vooraf ingevulde VvE (bv. +-knop op de dossierpagina): code + naam zetten,
+    // net alsof de gebruiker 'm via het zoekveld had gekozen.
+    if(opts&&opts.code){
+      document.getElementById('m-code').value=opts.code;
+      document.getElementById('m-naam').value=opts.naam||'';
+    }
   }
 
   document.getElementById('modal-bg').classList.add('open');

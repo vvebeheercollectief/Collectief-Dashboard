@@ -59,6 +59,7 @@ export const ACTIONS = {
   'herhaal-status':        (el) => toggleHerhaalStatus(+el.dataset.hid),
   'herhaal-verwijderen':   ()   => deleteHerhaal(),
   'vve-open':              (el) => openVvePagina(el.dataset.code),
+  'vve-taak-nieuw':        (el) => openModal(false, null, {sec:'OPPAKKEN', code:el.dataset.code, naam:el.dataset.naam||''}),
   'vve-af-alles':          ()   => { state._vveAfAlles=true; renderVve(); },
   'pal-kies':              (el) => palKies(+el.dataset.idx),
   'bulk-toggle':           ()   => toggleBulkMode(),

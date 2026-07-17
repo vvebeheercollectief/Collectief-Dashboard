@@ -2,6 +2,7 @@
 //  RENDER-OVERIG — Ontwikkeling + Logboek
 // ══════════════════════════════════════
 import { esc, displayName, persBadges, emptyRow, _vandaagAmsterdam, vveCodeSpan } from "./util.js";
+import { ico } from "./icons.js";
 import { PG, SID } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { ensureToken } from "./auth.js";
@@ -65,7 +66,7 @@ function renderOntw(){
       <td class="cell-txt">${r.inhoud?`<span style="font-size:12px">${esc(r.inhoud.substring(0,80))}${r.inhoud.length>80?'…':''}</span>`:''}</td>
       <td>${persBadges(r.door)}</td>
       <td class="cell-sm">${esc(r.datum)}</td>
-      <td><span class="badge status-${esc((r.status||'').toLowerCase().replace(/[^a-z0-9]+/g,'-'))}">${r.status==='Afgerond'?'✅':'⏳'} ${esc(r.status)}</span></td>
+      <td><span class="badge status-${esc((r.status||'').toLowerCase().replace(/[^a-z0-9]+/g,'-'))}">${r.status==='Afgerond'?ico('vinkCirkel'):ico('zandloper')} ${esc(r.status)}</span></td>
       <td><button class="btn-edit" data-action="ontw-bewerken" data-rid="${rid}" title="Bewerken"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button></td>
     </tr>`;
   }).join('');
@@ -134,7 +135,7 @@ async function deleteOntwItem(){
   if(pos>-1) D.ontw.splice(pos,1);
   D.ontw.forEach(x=>{ if(x._row>oudeRow) x._row--; });
   closeOntwModal();
-  showUndoToast('🗑️ Item verwijderd', r.titel||'', ()=>undoOntwDelete(values, r.titel));
+  showUndoToast('Item verwijderd', r.titel||'', ()=>undoOntwDelete(values, r.titel), 'prullenbak');
   backgroundWrite(
     async ()=>{
       const ids=await getSheetIds();
@@ -160,7 +161,7 @@ async function undoOntwDelete(values, titel){
   try{
     await state._writeChain;
     await appendRange("'Ontwikkeling'!A:F", values);
-    showToast('↩ Ongedaan gemaakt', `"${titel||''}" teruggezet`, 'var(--am)');
+    showToast('Ongedaan gemaakt', `"${titel||''}" teruggezet`, 'var(--am)', 'ongedaan');
     await loadAll();
   }catch(e){alert('Undo fout: '+e.message)}
 }
@@ -198,18 +199,18 @@ function fmtLogTs(iso){
 
 function actieBadge(actie){
   const map={
-    'Afgerond':['--sec:var(--gn);--sec-l:var(--gn-l)','✓'],
-    'Verwijderd':['--sec:var(--rd);--sec-l:var(--rd-l)','✕'],
-    'Aangemaakt':['--sec:var(--pu);--sec-l:var(--pu-l)','+'],
-    'Teruggezet':['--sec:var(--am);--sec-l:var(--am-l)','↩'],
-    'Behandelaar gewijzigd':['--sec:var(--ac);--sec-l:var(--ac-l)','👤'],
-    'Aangemaakt (sheet)':['--sec:var(--pu);--sec-l:var(--pu-l)','+'],
-    'Opmerking':['--sec:var(--am);--sec-l:var(--am-l)','💬'],
-    'Contact':['--sec:var(--ac);--sec-l:var(--ac-l)','📞'],
-    'Kenmerk':['--sec:var(--pu);--sec-l:var(--pu-l)','📋'],
+    'Afgerond':['--sec:var(--gn);--sec-l:var(--gn-l)',ico('vink')],
+    'Verwijderd':['--sec:var(--rd);--sec-l:var(--rd-l)',ico('kruis')],
+    'Aangemaakt':['--sec:var(--pu);--sec-l:var(--pu-l)',ico('plus')],
+    'Teruggezet':['--sec:var(--am);--sec-l:var(--am-l)',ico('ongedaan')],
+    'Behandelaar gewijzigd':['--sec:var(--ac);--sec-l:var(--ac-l)',ico('persoon')],
+    'Aangemaakt (sheet)':['--sec:var(--pu);--sec-l:var(--pu-l)',ico('plus')],
+    'Opmerking':['--sec:var(--am);--sec-l:var(--am-l)',ico('chat')],
+    'Contact':['--sec:var(--ac);--sec-l:var(--ac-l)',ico('telefoon')],
+    'Kenmerk':['--sec:var(--pu);--sec-l:var(--pu-l)',ico('klembord')],
   };
-  const[css,ico]=map[actie]||['',''];
-  return css?`<span class="badge" style="background:var(--sec-l);color:var(--sec);${css}">${ico} ${esc(actie)}</span>`:`<span class="badge">${esc(actie)}</span>`;
+  const[css,badgeIco]=map[actie]||['',''];
+  return css?`<span class="badge" style="background:var(--sec-l);color:var(--sec);${css}">${badgeIco} ${esc(actie)}</span>`:`<span class="badge">${esc(actie)}</span>`;
 }
 
 // Filterstatus voor de tijdlijn (leeg = alles)
@@ -274,7 +275,7 @@ function logItemHtml(r,subtiel,acties){
     const zin=isAf
       ? `${naam} rondde ${code} af`
       : `${naam} maakte ${code} aan${r.nieuweWaarde?` <span class="log-mini-meta">→ ${esc(r.nieuweWaarde)}</span>`:''}`;
-    const acts=acties?`<span class="log-acts"><button class="log-act-btn del" data-action="log-verwijderen" data-row="${r._row}" title="Verwijderen" aria-label="Regel verwijderen">🗑</button></span>`:'';
+    const acts=acties?`<span class="log-acts"><button class="log-act-btn del" data-action="log-verwijderen" data-row="${r._row}" title="Verwijderen" aria-label="Regel verwijderen">${ico('prullenbak')}</button></span>`:'';
     return `<div class="log-mini">
       <span class="log-mini-dot" style="background:${isAf?'var(--gn)':'var(--pu)'}"></span>
       <span class="log-mini-txt">${zin}</span>
@@ -292,8 +293,8 @@ function logItemHtml(r,subtiel,acties){
   }
   const init=(displayName(r.gebruiker)||'?').charAt(0).toUpperCase();
   const acts=acties?`<span class="log-acts">
-    <button class="log-act-btn" data-action="log-bewerken" data-row="${r._row}" title="Bewerken" aria-label="Regel bewerken">✎</button>
-    <button class="log-act-btn del" data-action="log-verwijderen" data-row="${r._row}" title="Verwijderen" aria-label="Regel verwijderen">🗑</button>
+    <button class="log-act-btn" data-action="log-bewerken" data-row="${r._row}" title="Bewerken" aria-label="Regel bewerken">${ico('potlood')}</button>
+    <button class="log-act-btn del" data-action="log-verwijderen" data-row="${r._row}" title="Verwijderen" aria-label="Regel verwijderen">${ico('prullenbak')}</button>
   </span>`:'';
   return `<div class="log-item">
     <span class="log-av" style="background:${avatarKleur(displayName(r.gebruiker))}">${esc(init)}</span>
@@ -327,15 +328,15 @@ function logDeleteLabel(r){
 
 // Spiegelt de contact-composer op de VvE-pagina (lokaal gehouden om een
 // circulaire import render-overig ↔ render-vve te vermijden).
-const LOG_CONTACT_SOORTEN=[['Telefoon','📞'],['E-mail','✉️'],['Gesprek','🤝'],['Notitie','📝']];
+const LOG_CONTACT_SOORTEN=[['Telefoon',ico('telefoon')],['E-mail',ico('envelop')],['Gesprek',ico('gesprek')],['Notitie',ico('potlood')]];
 const LOG_WIE_OPTIES=['Bewoner/eigenaar','Bestuur','Leverancier','Overig'];
 
 function logEditForm(r){
   const isContact=r.actie==='Contact';
   const sel=state.logEditSoort||r.veld||'Telefoon';
   const contactRij=isContact?`<div class="log-edit-rij">
-    <div class="dos-chips">${LOG_CONTACT_SOORTEN.map(([s,ico])=>
-      `<button type="button" class="soort-chip${sel===s?' aan':''}" data-action="log-soort" data-soort="${esc(s)}">${ico} ${esc(s)}</button>`).join('')}</div>
+    <div class="dos-chips">${LOG_CONTACT_SOORTEN.map(([s,sIco])=>
+      `<button type="button" class="soort-chip${sel===s?' aan':''}" data-action="log-soort" data-soort="${esc(s)}">${sIco} ${esc(s)}</button>`).join('')}</div>
     <select id="log-edit-wie" class="log-edit-wie" title="Met wie?">${LOG_WIE_OPTIES.map(w=>
       `<option${(r.oudeWaarde||'Overig')===w?' selected':''}>${esc(w)}</option>`).join('')}</select>
   </div>`:'';
@@ -407,7 +408,7 @@ async function deleteLogboek(row){
   _shiftLogboekRows(oudeRow,-1);
   if(state.logEdit===row){ state.logEdit=null; state.logEditSoort=null; }
   _rerenderLog();
-  showUndoToast('🗑️ Logregel verwijderd', logDeleteLabel(entry), ()=>undoDeleteLog(vals, oudeRow));
+  showUndoToast('Logregel verwijderd', logDeleteLabel(entry), ()=>undoDeleteLog(vals, oudeRow), 'prullenbak');
   // Idempotentie-vlag: deleteDimension is positie-gebaseerd en NIET idempotent (zie deleteTaskRow).
   let verwijderd=false;
   backgroundWrite(
@@ -438,7 +439,7 @@ async function undoDeleteLog(vals, oudeRow){
   try{
     await state._writeChain;                         // delete gegarandeerd vóór de re-insert
     await insertAndWriteRow('Logboek', oudeRow-1, vals);
-    showToast('↩ Ongedaan gemaakt','Logregel teruggezet','var(--am)');
+    showToast('Ongedaan gemaakt','Logregel teruggezet','var(--am)','ongedaan');
     await loadAll();                                 // _row-indexen vers uit de Sheet
   }catch(e){ alert('Undo fout: '+e.message); }
   finally{ state._undoInFlight=false; }

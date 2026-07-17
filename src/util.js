@@ -2,6 +2,7 @@
 //  UTIL — gedeelde pure helpers (datums, prioriteit, tekst, badges)
 // ══════════════════════════════════════
 import { EMAIL_NAMES, OFFERTE_FASES } from './config.js';
+import { ICONS } from './icons.js';
 
 function displayName(s){
   if(!s) return '';
@@ -222,10 +223,10 @@ function toDutchDate(s){
 }
 
 function emptyRow(cols,inline,filtered){
-  const ico=filtered?'🔍':'📭';
+  const leegIco=filtered?ICONS.zoek:ICONS.postvakLeeg;
   const txt=filtered?'Niets gevonden — pas je filter of zoekopdracht aan':'Geen resultaten';
-  if(inline)return`<div class="empty"><div class="empty-ico">${ico}</div>${txt}</div>`;
-  return`<tr><td colspan="${cols}"><div class="empty"><div class="empty-ico">${ico}</div>${txt}</div></td></tr>`;
+  if(inline)return`<div class="empty"><div class="empty-ico">${leegIco}</div>${txt}</div>`;
+  return`<tr><td colspan="${cols}"><div class="empty"><div class="empty-ico">${leegIco}</div>${txt}</div></td></tr>`;
 }
 
 // String(s??'') i.p.v. (s||''): `??` vangt alleen null/undefined, zodat 0/false correct

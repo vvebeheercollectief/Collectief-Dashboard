@@ -10,6 +10,7 @@ import { buildAnalytics, buildDash } from "./render-analytics.js";
 import { renderNtdDonut } from "./render-lijsten.js";
 import { parseOntw, parseLogboek } from "./render-overig.js";
 import { parseKenmerken } from "./kenmerken.js";
+import { ico } from "./icons.js";
 // (kringverwijzing data ⇄ kenmerken: aanroepen gebeuren op runtime — live bindings, veilig)
 import { showToast } from "./notifications.js";
 // (kringverwijzing data ⇄ main: renderAll wordt pas op runtime aangeroepen — live binding, veilig.
@@ -60,7 +61,7 @@ function showLoadError(){
   if(document.getElementById('load-err-banner')) return;
   const b=document.createElement('div');
   b.id='load-err-banner'; b.className='load-err'; b.setAttribute('role','alert');
-  b.innerHTML='<span>⚠ Kon de gegevens niet laden — controleer je verbinding.</span>'
+  b.innerHTML='<span>'+ico('waarschuwing',15)+' Kon de gegevens niet laden — controleer je verbinding.</span>'
     +'<button class="btn btn-pri btn-sm" id="load-err-retry">Opnieuw proberen</button>';
   document.body.appendChild(b);
   b.querySelector('#load-err-retry').onclick=()=>{ clearLoadError(); loadAll(); };

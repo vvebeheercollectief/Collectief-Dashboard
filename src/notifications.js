@@ -10,6 +10,7 @@ import { logEvent } from "./render-overig.js";
 import { getSheetIds, insertAndWriteRow, getInsertRow } from "./crud.js";
 import { loadAll, parseSections } from "./data.js";
 import { flashRow } from "./anim.js";
+import { ico } from "./icons.js";
 
 //  NOTIF — enqueuet event in de Notif-wachtrij én toont directe in-app toast
 // ══════════════════════════════════════
@@ -23,11 +24,11 @@ async function fireNotifEvent(event, payload) {
 
   if (event === 'newtask' && prefs.newtask) {
     const msg = code + (naam ? ' · ' + naam : '') + (beh ? ' → ' + beh : '');
-    showToast('📋 Nieuwe taak — ' + sec, msg, 'var(--ac)');
+    showToast('Nieuwe taak — ' + sec, msg, 'var(--ac)', 'n_newtask');
   } else if (event === 'assigned' && prefs.assigned && who) {
     const behs = beh.split(/[,\/]/).map(s => s.trim());
     if (behs.includes(who)) {
-      showToast('➕ Toegewezen aan jou', code + (naam ? ' · ' + naam : ''), 'var(--gn)');
+      showToast('Toegewezen aan jou', code + (naam ? ' · ' + naam : ''), 'var(--gn)', 'n_assigned');
     }
   }
 
@@ -59,7 +60,14 @@ const TOAST_DURATION = 5000;
 // poll-cadans van 10s zodat de cross-pad-dedup intact blijft.
 const TOAST_DEDUP_MS = 15000;
 
-function showToast(title, msg, color) {
+// Icoon-vak links in de toast: kent zowel de notificatie-iconen (TOAST_ICONS)
+// als de algemene set (ICONS). Zonder (geldige) naam → geen vak, layout als vanouds.
+const toastIco = (naam) => {
+  const svg = naam ? (TOAST_ICONS[naam] || ico(naam, 18)) : '';
+  return svg ? `<span class="toast-ico">${svg}</span>` : '';
+};
+
+function showToast(title, msg, color, icoNaam) {
   const key = title + '|' + msg;
   if (_shownToasts.has(key)) return;
   _shownToasts.add(key);
@@ -71,6 +79,7 @@ function showToast(title, msg, color) {
   el.style.position = 'relative';
   el.style.overflow = 'hidden';
   el.innerHTML = `
+    ${toastIco(icoNaam)}
     <div class="toast-body">
       <div class="toast-title">${esc(title)}</div>
       ${msg ? `<div class="toast-msg">${esc(msg)}</div>` : ''}
@@ -101,7 +110,7 @@ function dismissToast(el) {
   setTimeout(() => el.remove(), 260);
 }
 
-function showUndoToast(title, msg, undoFn) {
+function showUndoToast(title, msg, undoFn, icoNaam) {
   const UNDO_DURATION = 8000;
   const key = 'undo|' + title + '|' + msg;
   if (_shownToasts.has(key)) return;
@@ -114,10 +123,11 @@ function showUndoToast(title, msg, undoFn) {
   el.style.position = 'relative';
   el.style.overflow = 'hidden';
   el.innerHTML = `
+    ${toastIco(icoNaam)}
     <div class="toast-body">
       <div class="toast-title">${esc(title)}</div>
       ${msg ? `<div class="toast-msg">${esc(msg)}</div>` : ''}
-      <button class="toast-undo" id="undo-btn-${Date.now()}">↩ Ongedaan maken</button>
+      <button class="toast-undo" id="undo-btn-${Date.now()}">${ico('ongedaan',12)} Ongedaan maken</button>
     </div>
     <button class="toast-close" data-action="toast-sluiten">×</button>
     <div class="toast-bar" style="animation-duration:${UNDO_DURATION}ms"></div>`;
@@ -128,7 +138,7 @@ function showUndoToast(title, msg, undoFn) {
   const undoBtn = el.querySelector('.toast-undo');
   undoBtn.onclick = async () => {
     undoBtn.disabled = true;
-    undoBtn.textContent = '⏳ Bezig…';
+    undoBtn.innerHTML = `${ico('zandloper',12)} Bezig…`;
     try { await undoFn(); } catch(e) { alert('Undo mislukt: ' + e.message); }
     dismissToast(el);
   };
@@ -160,7 +170,7 @@ async function undoComplete(undoData) {
     const insertRow = getInsertRow(sec);
     await insertAndWriteRow('Nog Te Doen', insertRow, ntdValues);
     logEvent(undoData.code, sec, 'Teruggezet', 'status', 'Afgerond', 'Nog Te Doen');
-    showToast('↩ Ongedaan gemaakt', `${undoData.code} terug in Nog Te Doen`, 'var(--am)');
+    showToast('Ongedaan gemaakt', `${undoData.code} terug in Nog Te Doen`, 'var(--am)', 'ongedaan');
     await loadAll();
     const terug=(D.ntd[sec]||[]).filter(x=>x.code===undoData.code).pop();
     if(terug) flashRow('ntd-tbody', terug._row, 'rij-flits-amber');
@@ -177,7 +187,7 @@ async function undoDelete(undoData) {
     const insertRow = getInsertRow(sec);
     await insertAndWriteRow('Nog Te Doen', insertRow, ntdValues);
     logEvent(undoData.code, sec, 'Teruggezet', 'status', 'Verwijderd', 'Nog Te Doen');
-    showToast('↩ Ongedaan gemaakt', `${undoData.code} terug in Nog Te Doen`, 'var(--am)');
+    showToast('Ongedaan gemaakt', `${undoData.code} terug in Nog Te Doen`, 'var(--am)', 'ongedaan');
     await loadAll();
     const terug=(D.ntd[sec]||[]).filter(x=>x.code===undoData.code).pop();
     if(terug) flashRow('ntd-tbody', terug._row, 'rij-flits-amber');
@@ -224,7 +234,7 @@ async function pollNotifsForToast() {
       if (n.voor && n.voor !== 'allen' && n.voor !== who) continue;
       const prefKey = typeToPrefs[n.type];
       if (prefKey && prefs[prefKey] === false) continue;
-      showToast(n.title, n.body, TOAST_COLORS[n.type] || 'var(--ac)');
+      showToast(n.title, n.body, TOAST_COLORS[n.type] || 'var(--ac)', n.type);
     }
     if (state._lastNotifTs == null || newRows.length) state._lastNotifTs = rows[0].ts;
   } catch(e) { /* stil falen */ }
@@ -351,7 +361,7 @@ async function subscribeNotifs() {
   if (!who) { alert('Selecteer of typ eerst je naam.'); return; }
   const btn = document.getElementById('notif-subscribe-btn');
   const orig = btn.innerHTML;
-  btn.disabled = true; btn.innerHTML = '⏳ Bezig…';
+  btn.disabled = true; btn.innerHTML = `${ico('zandloper',12)} Bezig…`;
   const ready = await waitForOneSignal();
   if (!ready) {
     btn.disabled = false; btn.innerHTML = orig;
@@ -374,7 +384,7 @@ async function subscribeNotifs() {
     await saveNotifPrefs(true);
     state.isSubscribed = true;
     refreshNotifUI();
-    sendTestNotif(who, 'Notificaties zijn aan! 🔔', 'Je ontvangt voortaan meldingen op dit apparaat.');
+    sendTestNotif(who, 'Notificaties zijn aan!', 'Je ontvangt voortaan meldingen op dit apparaat.');
   } catch(e) {
     console.error('subscribeNotifs error:', e);
     alert('Aanzetten mislukt: ' + (e.message || e));
@@ -396,7 +406,7 @@ async function unsubscribeNotifs() {
 }
 
 function sendTestNotif(who, title, body) {
-  showToast(title || '🧪 Test melding', body || 'Notificaties werken correct!', 'var(--ac)');
+  showToast(title || 'Test melding', body || 'Notificaties werken correct!', 'var(--ac)', 'kolf');
   try {
     appendRange("'Notif-wachtrij'!A:D", [new Date().toISOString(), 'test', JSON.stringify({ event:'test', who, title, body }), '']).catch(() => {});
   } catch (e) { console.warn('Notif-wachtrij faalde:', e); }

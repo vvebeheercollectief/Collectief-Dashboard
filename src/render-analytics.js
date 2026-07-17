@@ -4,6 +4,7 @@
 import { esc, displayName, persBadges, emptyRow, parseDt, _parseAnyDate, vveCodeSpan } from "./util.js";
 import { SECS, SKEYS, TEAM } from "./config.js";
 import { state, D } from "./state.js";
+import { ico } from "./icons.js";
 
 // Leiblauwe accentkleur uitlezen op render-moment (Chart.js kan geen CSS-var-strings
 // renderen). Volgt zo de huisstijl én het licht/donker-thema, want de grafieken worden
@@ -288,7 +289,7 @@ function renderLeaderboard(period){
   const medalCls=['gold','silver','bronze',''];
   const totaal=data.reduce((a,b)=>a+b.huidig,0);
   if(totaal===0){
-    tbody.innerHTML=`<tr><td colspan="5" class="empty"><div class="empty-ico">🏁</div>Nog geen afgeronde taken in deze periode</td></tr>`;
+    tbody.innerHTML=`<tr><td colspan="5" class="empty"><div class="empty-ico">${ico('vlag')}</div>Nog geen afgeronde taken in deze periode</td></tr>`;
     return;
   }
   tbody.innerHTML=data.map((r,i)=>{

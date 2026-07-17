@@ -122,7 +122,7 @@ function bulkAfronden(rows){
     it.pos=pos;
   });
   _eindBulk();
-  showUndoToast(`✅ ${items.length} taken afgerond`,items.map(i=>i.code).join(', '),()=>bulkUndoAfronden(items));
+  showUndoToast(`${items.length} taken afgerond`,items.map(i=>i.code).join(', '),()=>bulkUndoAfronden(items),'vinkCirkel');
   backgroundWrite(async()=>{
     const ids=await getSheetIds();
     const afSheetId=ids['Afgerond'], ntdSheetId=ids['Nog Te Doen'];
@@ -193,7 +193,7 @@ async function bulkUndoAfronden(items){
       offset[it.sec]=(offset[it.sec]||0)+1;
       logEvent(it.code,it.sec,'Teruggezet','status','Afgerond','Nog Te Doen (bulk-undo)');
     }
-    showToast('↩ Ongedaan gemaakt',`${items.length} taken terug in Nog Te Doen`,'var(--am)');
+    showToast('Ongedaan gemaakt',`${items.length} taken terug in Nog Te Doen`,'var(--am)','ongedaan');
     await loadAll();
   }catch(e){ alert('Undo fout: '+e.message); }
   finally{ state._undoInFlight=false; }
@@ -210,7 +210,7 @@ function bulkVerwijderen(rows){
     it.pos=pos;
   });
   _eindBulk();
-  showUndoToast(`🗑️ ${items.length} taken verwijderd`,items.map(i=>i.code).join(', '),()=>bulkUndoVerwijderen(items));
+  showUndoToast(`${items.length} taken verwijderd`,items.map(i=>i.code).join(', '),()=>bulkUndoVerwijderen(items),'prullenbak');
   backgroundWrite(async()=>{
     const ids=await getSheetIds();
     const sheetId=ids['Nog Te Doen'];
@@ -241,7 +241,7 @@ async function bulkUndoVerwijderen(items){
       offset[it.sec]=(offset[it.sec]||0)+1;
     }
     items.forEach(it=>logEvent(it.code,it.sec,'Teruggezet','status','Verwijderd','Nog Te Doen (bulk-undo)'));
-    showToast('↩ Ongedaan gemaakt',`${items.length} taken terug in Nog Te Doen`,'var(--am)');
+    showToast('Ongedaan gemaakt',`${items.length} taken terug in Nog Te Doen`,'var(--am)','ongedaan');
     await loadAll();
   }catch(e){ alert('Undo fout: '+e.message); }
   finally{ state._undoInFlight=false; }
@@ -250,9 +250,9 @@ async function bulkUndoVerwijderen(items){
 // ── Veld-acties: geven / wegleggen / deadline (cel-schrijfacties) ───────
 function bulkVeld(rows,soort,waarde){
   const conf={
-    geven:    { veld:'behandelaar', kolom:()=> BULK_BEH_KOLOM,             titel:`👤 ${rows.length} taken aan ${waarde} gegeven`,  log:'Behandelaar gewijzigd' },
-    wegleggen:{ veld:'opvolgdatum', kolom:()=> OPVOLG_KOLOM,               titel:`🔕 ${rows.length} taken weggelegd tot ${waarde}`, log:'Weggelegd' },
-    deadline: { veld:'deadline',    kolom:(r)=>BULK_DEADLINE_KOLOM[r._sec],titel:`📅 ${rows.length} deadlines → ${waarde}`,        log:'Deadline gewijzigd' },
+    geven:    { veld:'behandelaar', kolom:()=> BULK_BEH_KOLOM,             titel:`${rows.length} taken aan ${waarde} gegeven`,  icoon:'persoon',  log:'Behandelaar gewijzigd' },
+    wegleggen:{ veld:'opvolgdatum', kolom:()=> OPVOLG_KOLOM,               titel:`${rows.length} taken weggelegd tot ${waarde}`, icoon:'belUit',   log:'Weggelegd' },
+    deadline: { veld:'deadline',    kolom:(r)=>BULK_DEADLINE_KOLOM[r._sec],titel:`${rows.length} deadlines → ${waarde}`,        icoon:'kalender', log:'Deadline gewijzigd' },
   }[soort];
   // OPPAKKEN: een nieuwe deadline herberekent de opgeslagen prioriteit-kolom F mee
   // (zoals de losse bewerk-flow). Anders blijft F stale voor externe lezers.
@@ -298,7 +298,7 @@ function bulkVeld(rows,soort,waarde){
     items.forEach(it=>{ it.r[conf.veld]=it.oud; if(oppDl && it.sec==='OPPAKKEN') it.r.prioriteit=it.oudPrio; });
     renderAll();
     backgroundWrite(schrijf('oud'),()=>{},'Undo mislukt');
-  });
+  },conf.icoon);
   backgroundWrite(schrijf('nieuw'),
     ()=>{ items.forEach(it=>{ it.r[conf.veld]=it.oud; if(oppDl && it.sec==='OPPAKKEN') it.r.prioriteit=it.oudPrio; }); },
     'Bulk-actie mislukt');

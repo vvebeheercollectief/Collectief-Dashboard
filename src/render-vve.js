@@ -2,6 +2,7 @@
 //  PER-VVE-PAGINA — alles van één VvE op één scherm (Fase 5)
 // ══════════════════════════════════════
 import { esc, displayName, persBadges, berekenPrioriteit, opvolgStatus, parseDt, _vandaagAmsterdam, _verschilInKalenderdagen } from "./util.js";
+import { ico } from "./icons.js";
 import { SECS, SKEYS } from "./config.js";
 import { state, D } from "./state.js";
 import { goTo } from "./ui.js";
@@ -54,7 +55,7 @@ function vveOverzicht(code, data, vandaag){
 }
 
 // Dossier-logboek: contactsoorten, filter en feed-opbouw
-const CONTACT_SOORTEN=[['Telefoon','📞'],['E-mail','✉️'],['Gesprek','🤝'],['Notitie','📝']];
+const CONTACT_SOORTEN=[['Telefoon',ico('telefoon')],['E-mail',ico('envelop')],['Gesprek',ico('gesprek')],['Notitie',ico('potlood')]];
 
 // Pure helper (testbaar): 'contact' = alleen handmatige contactmomenten
 function filterDossierLog(entries, modus){
@@ -137,7 +138,7 @@ function renderVve(){
   const wrap=document.getElementById('vve-inhoud');
   if(!wrap) return;
   const code=state.vveCode;
-  if(!code){ wrap.innerHTML='<div class="empty"><div class="empty-ico">🏢</div>Zoek een VvE via Ctrl+K of klik op een VvE-code</div>'; return; }
+  if(!code){ wrap.innerHTML=`<div class="empty"><div class="empty-ico">${ico('gebouw')}</div>Zoek een VvE via Ctrl+K of klik op een VvE-code</div>`; return; }
   const o=vveOverzicht(code,D);
   // Composer-behoud: de 8s-poll re-rendert deze pagina; half getypte tekst mag
   // niet verdwijnen — alleen bewaren als het om dezelfde VvE gaat.
@@ -210,7 +211,7 @@ function renderVve(){
         <div class="vve-sectie">Open taken <span class="n">${o.open.length}</span></div>
         <div class="card"><div class="tbl-wrap"><table>
           <thead><tr><th>Taak</th><th>Categorie</th><th>Wie</th><th>Deadline</th></tr></thead>
-          <tbody>${o.open.map(r=>taakRij(r,false)).join('')||'<tr><td colspan="4" style="color:var(--mut);padding:14px">Geen open taken 🎉</td></tr>'}</tbody>
+          <tbody>${o.open.map(r=>taakRij(r,false)).join('')||`<tr><td colspan="4" style="color:var(--mut);padding:14px">Geen open taken ${ico('feest',14).replace('<svg ','<svg style="vertical-align:-2.5px" ')}</td></tr>`}</tbody>
         </table></div></div>
         ${o.weggelegd.length?`<div class="vve-sectie">Weggelegd <span class="n">${o.weggelegd.length}</span></div>
         <div class="card"><div class="tbl-wrap"><table><tbody>${o.weggelegd.map(r=>taakRij(r,true)).join('')}</tbody></table></div></div>`:''}
@@ -223,7 +224,7 @@ function renderVve(){
         <div class="vve-sectie">ALV's</div>
         <div class="vve-kaart">${alvKaart()}</div>
         <div class="vve-sectie" style="margin-top:18px">Beheerderskenmerken
-          ${state.kenmerkenEdit?'':'<button class="btn btn-sec btn-sm" data-action="kenmerken-bewerken" style="margin-left:auto">✎ Bewerken</button>'}
+          ${state.kenmerkenEdit?'':`<button class="btn btn-sec btn-sm" data-action="kenmerken-bewerken" style="margin-left:auto">${ico('potlood',12)} Bewerken</button>`}
         </div>
         <div class="vve-kaart">${kenmerkenKaart(code)}</div>
       </div>
@@ -238,8 +239,8 @@ function renderVve(){
       <div class="dos-composer">
         <textarea id="dos-tekst" data-code="${esc(o.code)}" rows="2" placeholder="Leg vast wat er gebeurd is — bv. zojuist gebeld met een eigenaar… (Ctrl+Enter = vastleggen)"></textarea>
         <div class="dos-rij">
-          <div class="dos-chips">${CONTACT_SOORTEN.map(([s,ico])=>
-            `<button class="soort-chip${(state._contactSoort||'Telefoon')===s?' aan':''}" data-action="contact-soort" data-soort="${s}">${ico} ${s}</button>`).join('')}</div>
+          <div class="dos-chips">${CONTACT_SOORTEN.map(([s,sIco])=>
+            `<button class="soort-chip${(state._contactSoort||'Telefoon')===s?' aan':''}" data-action="contact-soort" data-soort="${s}">${sIco} ${s}</button>`).join('')}</div>
           <select id="dos-wie" title="Met wie was het contact?">
             <option>Bewoner/eigenaar</option><option>Bestuur</option><option>Leverancier</option><option>Overig</option>
           </select>

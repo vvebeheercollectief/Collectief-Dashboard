@@ -29,6 +29,7 @@ import { renderVandaag } from './render-vandaag.js';
 import { initPalette } from './palette.js';
 import { initSwUpdate } from './sw-update.js';
 import { initModalA11y } from './modal-a11y.js';
+import { ico } from './icons.js';
 
 // Centrale Escape-sluiting: per venster de juiste sluitfunctie (met opruimlogica),
 // i.p.v. alleen de .open-class te verwijderen zodat er geen toestand achterblijft.
@@ -78,7 +79,8 @@ document.addEventListener('DOMContentLoaded',()=>{
     document.body.insertAdjacentHTML('afterbegin',
       '<div style="position:fixed;top:0;left:0;right:0;z-index:100000;background:var(--am);color:#fff;'
       + 'text-align:center;font:600 13px/2.4 system-ui,sans-serif;letter-spacing:.3px">'
-      + '⚠ TESTOMGEVING — dit is niet het echte dashboard</div>'
+      + ico('waarschuwing',14).replace('<svg ','<svg style="vertical-align:-2.5px;margin-right:4px" ')
+      + 'TESTOMGEVING — dit is niet het echte dashboard</div>'
       + '<div style="height:34px"></div>');
   }
 
@@ -246,7 +248,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('notif-who-other').oninput = () => saveNotifPrefs();
   document.getElementById('notif-subscribe-btn').onclick = subscribeNotifs;
   document.getElementById('notif-unsubscribe-btn').onclick = unsubscribeNotifs;
-  document.getElementById('notif-test-btn').onclick = () => sendTestNotif(getCurrentWho(), '🔔 Test melding', 'Notificaties werken correct op dit apparaat!');
+  document.getElementById('notif-test-btn').onclick = () => sendTestNotif(getCurrentWho(), 'Test melding', 'Notificaties werken correct op dit apparaat!');
   startNotifPoll();
 
   // Live updates — auto-refresh elke 8 seconden (smart diff voorkomt onnodige re-renders)

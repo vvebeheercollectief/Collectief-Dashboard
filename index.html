@@ -147,7 +147,7 @@
             <select class="filter-select" id="f-beh-ntd"><option value="">Alle behandelaars</option><option>Jer</option><option>Cihad</option><option>Gabos</option></select>
             <select class="filter-select" id="f-prio-ntd"><option value="">Alle prioriteiten</option><option>Hoog</option><option>Midden</option><option>Laag</option></select>
             <span id="bulk-teller" class="bulk-teller" style="display:none">0 geselecteerd</span>
-            <button class="btn btn-sec btn-sm" id="bulk-btn" data-action="bulk-toggle" title="Meerdere taken selecteren">☑ Selecteren</button>
+            <button class="btn btn-sec btn-sm" id="bulk-btn" data-action="bulk-toggle" title="Meerdere taken selecteren"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4.5" y="4.5" width="15" height="15" rx="3" fill="currentColor" fill-opacity="0.18"/><path d="M8.5 12.3l2.6 2.6 4.9-5.4"/></svg> Selecteren</button>
             <button class="btn btn-pri btn-sm" id="btn-add"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Toevoegen</button>
           </div>
         </div>
@@ -282,7 +282,7 @@
         </div>
         <div class="modal-foot">
           <button class="btn btn-sec" id="ontw-m-cancel">Annuleren</button>
-          <button class="btn btn-del" id="ontw-m-del" style="display:none">🗑️ Verwijder</button>
+          <button class="btn btn-del" id="ontw-m-del" style="display:none"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 7.5l.7 11.6a2 2 0 0 0 2 1.9h5.6a2 2 0 0 0 2-1.9l.7-11.6z" fill="currentColor" fill-opacity="0.18"/><path d="M4 7.5h16"/><path d="M9.5 7.5V6a1.8 1.8 0 0 1 1.8-1.8h1.4A1.8 1.8 0 0 1 14.5 6v1.5"/><path d="M10 11.5v5M14 11.5v5"/></svg> Verwijder</button>
           <button class="btn btn-pri" id="ontw-m-submit" style="background:var(--pk)">
             <span id="ontw-m-submit-lbl">Toevoegen</span>
           </button>
@@ -312,10 +312,10 @@
           </div>
           <div class="lchips" id="logboek-act">
             <button class="lchip on" data-act="">Alles</button>
-            <button class="lchip" data-act="Opmerking">💬 Notities</button>
-            <button class="lchip" data-act="Contact">📞 Contact</button>
-            <button class="lchip" data-act="Afgerond">✓ Afgerond</button>
-            <button class="lchip" data-act="Aangemaakt">+ Aangemaakt</button>
+            <button class="lchip" data-act="Opmerking"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7a2.5 2.5 0 0 1-2.5 2.5H10l-4.6 4v-4H6.5A2.5 2.5 0 0 1 4 13.5z" fill="currentColor" fill-opacity="0.18"/><path d="M8.5 9h7M8.5 12h4.5"/></svg> Notities</button>
+            <button class="lchip" data-act="Contact"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 16.6v2.6a1.7 1.7 0 0 1-1.9 1.7 17 17 0 0 1-7.4-2.6 16.7 16.7 0 0 1-5.1-5.1A17 17 0 0 1 3.5 5.7 1.7 1.7 0 0 1 5.2 3.8h2.6a1.7 1.7 0 0 1 1.7 1.5c.1.8.3 1.7.6 2.4a1.7 1.7 0 0 1-.4 1.8L8.6 10.6a13.6 13.6 0 0 0 5.1 5.1l1.1-1.1a1.7 1.7 0 0 1 1.8-.4c.7.3 1.6.5 2.4.6a1.7 1.7 0 0 1 1.5 1.8z" fill="currentColor" fill-opacity="0.18"/></svg> Contact</button>
+            <button class="lchip" data-act="Afgerond"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 13l5 5L19.5 6.5"/></svg> Afgerond</button>
+            <button class="lchip" data-act="Aangemaakt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg> Aangemaakt</button>
           </div>
         </div>
         <p class="log-count" id="logboek-count"></p>
@@ -589,7 +589,7 @@
     </div>
     <div class="modal-foot">
       <button class="btn btn-sec" id="m-cancel">Annuleren</button>
-      <button class="btn btn-del" id="m-del" style="display:none" data-action="taak-verwijder-modal">🗑️ Verwijder</button>
+      <button class="btn btn-del" id="m-del" style="display:none" data-action="taak-verwijder-modal"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 7.5l.7 11.6a2 2 0 0 0 2 1.9h5.6a2 2 0 0 0 2-1.9l.7-11.6z" fill="currentColor" fill-opacity="0.18"/><path d="M4 7.5h16"/><path d="M9.5 7.5V6a1.8 1.8 0 0 1 1.8-1.8h1.4A1.8 1.8 0 0 1 14.5 6v1.5"/><path d="M10 11.5v5M14 11.5v5"/></svg> Verwijder</button>
       <button class="btn btn-pri" id="m-submit">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         <span id="m-submit-lbl">Toevoegen</span>
@@ -612,7 +612,7 @@
     </div>
     <div class="modal-foot">
       <button class="btn btn-sec" id="complete-cancel">Annuleren</button>
-      <button class="btn btn-pri" id="complete-confirm" style="background:var(--gn)">✓ Afhandelen</button>
+      <button class="btn btn-pri" id="complete-confirm" style="background:var(--gn)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 13l5 5L19.5 6.5"/></svg> Afhandelen</button>
     </div>
   </div>
 </div>
@@ -655,7 +655,7 @@
     </div>
     <div class="modal-foot">
       <button class="btn btn-sec" id="hh-cancel">Annuleren</button>
-      <button class="btn btn-del" id="hh-del" style="display:none" data-action="herhaal-verwijderen">🗑️ Verwijder</button>
+      <button class="btn btn-del" id="hh-del" style="display:none" data-action="herhaal-verwijderen"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 7.5l.7 11.6a2 2 0 0 0 2 1.9h5.6a2 2 0 0 0 2-1.9l.7-11.6z" fill="currentColor" fill-opacity="0.18"/><path d="M4 7.5h16"/><path d="M9.5 7.5V6a1.8 1.8 0 0 1 1.8-1.8h1.4A1.8 1.8 0 0 1 14.5 6v1.5"/><path d="M10 11.5v5M14 11.5v5"/></svg> Verwijder</button>
       <button class="btn btn-pri" id="hh-submit"><span id="hh-submit-lbl">Toevoegen</span></button>
     </div>
   </div>
@@ -679,17 +679,17 @@
     </div>
     <div class="modal-foot">
       <button class="btn btn-sec" id="snooze-cancel">Annuleren</button>
-      <button class="btn btn-del" id="snooze-wis" style="display:none">🔔 Wissen</button>
-      <button class="btn btn-pri" id="snooze-opslaan">⏸ Wegleggen</button>
+      <button class="btn btn-del" id="snooze-wis" style="display:none"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6z" fill="currentColor" fill-opacity="0.18"/><path d="M10 19a2 2 0 0 0 4 0"/></svg> Wissen</button>
+      <button class="btn btn-pri" id="snooze-opslaan"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6.5" y="4.5" width="4" height="15" rx="1.2" fill="currentColor" fill-opacity="0.18"/><rect x="13.5" y="4.5" width="4" height="15" rx="1.2" fill="currentColor" fill-opacity="0.18"/></svg> Wegleggen</button>
     </div>
   </div>
 </div>
 
 <!-- ═══════ BULK-ACTIEBALK (Fase 5) ═══════ -->
 <div id="bulk-balk" style="display:none">
-  <button class="bb-knop bb-groen" data-action="bulk-doe" data-wat="afronden">✓ Afronden</button>
+  <button class="bb-knop bb-groen" data-action="bulk-doe" data-wat="afronden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 13l5 5L19.5 6.5"/></svg> Afronden</button>
   <div class="bb-wrap">
-    <button class="bb-knop" data-action="bulk-menu" data-menu="geven">👤 Aan iemand geven ▾</button>
+    <button class="bb-knop" data-action="bulk-menu" data-menu="geven"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.6" fill="currentColor" fill-opacity="0.18"/><path d="M4.8 20c.9-3.4 3.6-5.3 7.2-5.3s6.3 1.9 7.2 5.3" fill="currentColor" fill-opacity="0.18"/></svg> Aan iemand geven <svg class="caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
     <div class="bb-menu" id="bb-menu-geven">
       <button data-action="bulk-doe" data-wat="geven" data-naam="Jer">Jer</button>
       <button data-action="bulk-doe" data-wat="geven" data-naam="Cihad">Cihad</button>
@@ -698,7 +698,7 @@
     </div>
   </div>
   <div class="bb-wrap">
-    <button class="bb-knop" data-action="bulk-menu" data-menu="wegleggen">🔕 Wegleggen ▾</button>
+    <button class="bb-knop" data-action="bulk-menu" data-menu="wegleggen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.2 4.7A6 6 0 0 1 18 9c0 3.6 1 5.2 1.6 5.9M6.1 6.9C6 7.6 6 8.3 6 9c0 5-2 6-2 6h13" fill="currentColor" fill-opacity="0.18"/><path d="M10 19a2 2 0 0 0 4 0"/><path d="M4 3.5l16 16"/></svg> Wegleggen <svg class="caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
     <div class="bb-menu" id="bb-menu-wegleggen">
       <button data-action="bulk-doe" data-wat="wegleggen" data-dagen="3">+3 dagen</button>
       <button data-action="bulk-doe" data-wat="wegleggen" data-dagen="7">+1 week</button>
@@ -707,13 +707,13 @@
     </div>
   </div>
   <div class="bb-wrap">
-    <button class="bb-knop" data-action="bulk-menu" data-menu="deadline">📅 Deadline ▾</button>
+    <button class="bb-knop" data-action="bulk-menu" data-menu="deadline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="2" fill="currentColor" fill-opacity="0.18"/><path d="M4 9.5h16"/><path d="M8 3v4M16 3v4"/></svg> Deadline <svg class="caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
     <div class="bb-menu" id="bb-menu-deadline">
       <div class="bb-datum"><input type="date" id="bb-datum-dl"><button data-action="bulk-doe" data-wat="deadline">OK</button></div>
     </div>
   </div>
-  <button class="bb-knop bb-rood" data-action="bulk-doe" data-wat="verwijderen">🗑 Verwijderen</button>
-  <button class="bb-knop bb-x" data-action="bulk-toggle" title="Selecteren uit">✕</button>
+  <button class="bb-knop bb-rood" data-action="bulk-doe" data-wat="verwijderen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 7.5l.7 11.6a2 2 0 0 0 2 1.9h5.6a2 2 0 0 0 2-1.9l.7-11.6z" fill="currentColor" fill-opacity="0.18"/><path d="M4 7.5h16"/><path d="M9.5 7.5V6a1.8 1.8 0 0 1 1.8-1.8h1.4A1.8 1.8 0 0 1 14.5 6v1.5"/><path d="M10 11.5v5M14 11.5v5"/></svg> Verwijderen</button>
+  <button class="bb-knop bb-x" data-action="bulk-toggle" title="Selecteren uit" aria-label="Selecteren uit"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
 </div>
 
 <!-- ═══════ COMMANDOCENTRUM (Fase 5) ═══════ -->
@@ -735,7 +735,7 @@
 <div class="modal-bg" id="notif-bg">
   <div class="modal" style="max-width:420px">
     <div class="modal-hdr">
-      <h2>🔔 Notificatie-instellingen</h2>
+      <h2><svg width="17" height="17" style="vertical-align:-2.5px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6z" fill="currentColor" fill-opacity="0.18"/><path d="M10 19a2 2 0 0 0 4 0"/></svg> Notificatie-instellingen</h2>
       <button class="modal-close" id="notif-close">×</button>
     </div>
     <div class="modal-body">
@@ -772,15 +772,15 @@
       <div style="border-top:1px solid var(--bor);margin-top:20px;padding-top:16px">
         <div style="font-size:11.5px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px">Push-meldingen</div>
         <div id="notif-subscribe-section">
-          <button class="btn btn-pri" id="notif-subscribe-btn" style="width:100%;justify-content:center">🔔 Push-meldingen aanzetten</button>
+          <button class="btn btn-pri" id="notif-subscribe-btn" style="width:100%;justify-content:center"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6z" fill="currentColor" fill-opacity="0.18"/><path d="M10 19a2 2 0 0 0 4 0"/></svg> Push-meldingen aanzetten</button>
           <p style="font-size:12px;color:var(--mut);margin-top:8px;line-height:1.5">Eenmalige toestemming nodig — je browser vraagt om bevestiging.<br>In-app toasts werken altijd, ook zonder push.</p>
         </div>
         <div id="notif-settings-section" style="display:none">
           <div style="background:var(--gn-l);border:1px solid var(--gn-b);border-radius:var(--rs);padding:10px 13px;color:var(--gn);font-size:13px;font-weight:500;margin-bottom:12px">
-            ✓ <strong>Push-meldingen staan aan</strong> op dit apparaat.
+            <svg width="13" height="13" style="vertical-align:-2.5px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 13l5 5L19.5 6.5"/></svg> <strong>Push-meldingen staan aan</strong> op dit apparaat.
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn btn-sec" id="notif-test-btn" style="flex:1;justify-content:center">🧪 Test melding</button>
+            <button class="btn btn-sec" id="notif-test-btn" style="flex:1;justify-content:center"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.6 13.5h8.8l2.2 4.1a2.4 2.4 0 0 1-2.1 3.5h-9a2.4 2.4 0 0 1-2.1-3.5z" fill="currentColor" fill-opacity="0.18" stroke="none"/><path d="M10.8 3.5v5.2L5.4 17.6a2.4 2.4 0 0 0 2.1 3.5h9a2.4 2.4 0 0 0 2.1-3.5L13.2 8.7V3.5"/><path d="M9.5 3.5h5"/></svg> Test melding</button>
             <button class="btn btn-sec" id="notif-unsubscribe-btn" style="flex:1;justify-content:center;color:var(--rd);border-color:var(--rd-b)">Push uitzetten</button>
           </div>
         </div>
@@ -794,7 +794,7 @@
 <div class="modal-bg" id="ai-bg">
   <div class="modal" style="max-width:780px">
     <div class="modal-hdr">
-      <h2>✦ AI-hulp</h2>
+      <h2><svg width="16" height="16" style="vertical-align:-3px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l1.9 5.3L19 11.2l-5.1 1.9L12 18.4l-1.9-5.3L5 11.2l5.1-1.9z" fill="currentColor" fill-opacity="0.18"/></svg> AI-hulp</h2>
       <button class="modal-close" id="ai-close">×</button>
     </div>
     <div class="modal-body">
@@ -808,10 +808,10 @@
 
           <p class="ai-step" style="margin-top:16px"><span class="dot">2</span> Wat heb je nodig?</p>
           <div class="ai-chips" id="ai-chips">
-            <button class="ai-chip on" data-k="samenvatting">📝 Samenvatting</button>
-            <button class="ai-chip on" data-k="categorie">🏷️ Categorie &amp; VvE</button>
-            <button class="ai-chip on" data-k="acties">✅ Actiepunten</button>
-            <button class="ai-chip on" data-k="antwoord">✍️ Concept-antwoord</button>
+            <button class="ai-chip on" data-k="samenvatting"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3.5" width="14" height="17" rx="2" fill="currentColor" fill-opacity="0.18"/><path d="M9 3.5v17"/><path d="M12.5 8.5h3.5M12.5 12h3.5"/></svg> Samenvatting</button>
+            <button class="ai-chip on" data-k="categorie"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11.9V5.8A1.8 1.8 0 0 1 5.8 4h6.1a1.8 1.8 0 0 1 1.3.5l6.4 6.4a1.8 1.8 0 0 1 0 2.5l-6.2 6.2a1.8 1.8 0 0 1-2.5 0l-6.4-6.4A1.8 1.8 0 0 1 4 11.9z" fill="currentColor" fill-opacity="0.18"/><circle cx="8.3" cy="8.3" r="1.2"/></svg> Categorie &amp; VvE</button>
+            <button class="ai-chip on" data-k="acties"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="currentColor" fill-opacity="0.18"/><path d="M8 12.5l2.7 2.7L16 9.8"/></svg> Actiepunten</button>
+            <button class="ai-chip on" data-k="antwoord"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20l.9-4.1L15.6 5.2a1.9 1.9 0 0 1 2.7 0l.5.5a1.9 1.9 0 0 1 0 2.7L8.1 19.1z" fill="currentColor" fill-opacity="0.18"/><path d="M14.4 6.4l3.2 3.2"/></svg> Concept-antwoord</button>
           </div>
 
           <p class="ai-step" style="margin-top:16px"><span class="dot">3</span> Koppel een VvE <span style="font-weight:500;text-transform:none;letter-spacing:0;color:var(--mut)">— optioneel, geeft live context</span></p>
@@ -828,8 +828,8 @@
           <p class="ai-step"><span class="dot">4</span> De vraag die het dashboard bouwt</p>
           <div class="ai-prompt" id="ai-prompt"></div>
           <div class="ai-send">
-            <button class="btn ai-claude" data-action="ai-kopieer" data-waar="Claude">📎 Kopieer &amp; open Claude</button>
-            <button class="btn ai-gemini" data-action="ai-kopieer" data-waar="Gemini">📎 Kopieer &amp; open Gemini</button>
+            <button class="btn ai-claude" data-action="ai-kopieer" data-waar="Claude"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.2 11.6l-8 8a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg> Kopieer &amp; open Claude</button>
+            <button class="btn ai-gemini" data-action="ai-kopieer" data-waar="Gemini"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.2 11.6l-8 8a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg> Kopieer &amp; open Gemini</button>
           </div>
           <p style="font-size:11.5px;color:var(--mut);margin:9px 0 0">De vraag staat dan op je klembord — plak met <kbd>Ctrl/⌘+V</kbd>.</p>
 
@@ -861,9 +861,9 @@
     <div id="chat-bubbles" class="chat-bubbles"></div>
     <div class="chat-invoer">
       <input type="text" id="chat-input" placeholder="Stel een vraag…" autocomplete="off"/>
-      <button id="chat-send" data-action="chat-send" aria-label="Versturen">↑</button>
+      <button id="chat-send" data-action="chat-send" aria-label="Versturen"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5.5M5.5 12L12 5.5 18.5 12"/></svg></button>
     </div>
-    <div class="chat-foot">👁 Leest alleen mee · verandert niets · via Claude (Haiku)</div>
+    <div class="chat-foot"><svg width="13" height="13" style="vertical-align:-2.5px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.8 12S6.5 5.7 12 5.7 21.2 12 21.2 12 17.5 18.3 12 18.3 2.8 12 2.8 12z" fill="currentColor" fill-opacity="0.18"/><circle cx="12" cy="12" r="2.7"/></svg> Leest alleen mee · verandert niets · via Claude (Haiku)</div>
   </div>
 </div>
 

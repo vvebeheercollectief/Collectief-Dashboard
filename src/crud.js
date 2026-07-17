@@ -175,7 +175,7 @@ async function deleteTaskRow(r){
   const pos=arr.indexOf(r);
   if(pos>-1) arr.splice(pos,1);
   _shiftNtdRows(oudeRow,-1);
-  showUndoToast('🗑️ Taak verwijderd',`${r.code} — ${omschrijving}`,()=>undoDelete(undoData));
+  showUndoToast('Taak verwijderd',`${r.code} — ${omschrijving}`,()=>undoDelete(undoData),'prullenbak');
   // Idempotentie-vlag: een deleteDimension is positie-gebaseerd en NIET idempotent. Zonder
   // deze vlag zou een _withRetry-herkansing (na een transient 429/5xx) de rij eronder — die
   // door de eerste delete naar boven schoof — kunnen verwijderen. (patroon: offerte-aannemers.js)
@@ -277,7 +277,7 @@ async function doCompleteTask(){
     if(pos>-1) arr.splice(pos,1);
     _shiftNtdRows(r._row,-1);
     closeCompleteModal();
-    showUndoToast('✅ Taak afgerond',`${r.code} — ${r.actiepunt||r.naam||''}`,()=>undoComplete(undoData));
+    showUndoToast('Taak afgerond',`${r.code} — ${r.actiepunt||r.naam||''}`,()=>undoComplete(undoData),'vinkCirkel');
     // 2) op de achtergrond wegschrijven; bij fout de taak terugzetten
     // Idempotentie-vlag: de batch (insert+update+delete) is positie-gebaseerd en NIET
     // idempotent — een retry na een transient fout zou dubbel kunnen afronden / de verkeerde
@@ -356,7 +356,7 @@ async function submitTask(){
       renderAll();
       flashRow('ntd-tbody', doelRow._row);
       closeModal();clearModal();
-      showToast('💾 Opgeslagen',`${code} — ${naam||''}`,null);
+      showToast('Opgeslagen',`${code} — ${naam||''}`,null,'opslaan');
       backgroundWrite(
         async ()=>{
           await assertRowMatch(doelRow._row, oudeWaarden.code); // bescherming: rij nog dezelfde VvE vóór overschrijven
@@ -380,7 +380,7 @@ async function submitTask(){
       renderAll();
       flashRow('ntd-tbody', nieuw._row, 'rij-flits-groen');
       closeModal();clearModal();
-      showToast('➕ Taak toegevoegd',`${code} — ${naam||''}`,null);
+      showToast('Taak toegevoegd',`${code} — ${naam||''}`,null,'plus');
       backgroundWrite(
         async ()=>{
           await insertAndWriteRow('Nog Te Doen',afterRow,values);

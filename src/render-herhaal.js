@@ -89,14 +89,14 @@ async function submitHerhaal(){
     Object.assign(r,{omschrijving:oms,sectie,code,naam,behandelaar:beh,type,
       interval:type==='na-afronden'?interval:'',dagenVooraf:vooraf,volgendeDeadline:volgende});
     renderHerhaal();
-    showToast('💾 Herhaalregel opgeslagen',oms,null);
+    showToast('Herhaalregel opgeslagen',oms,null,'opslaan');
     backgroundWrite(async()=>{
       await assertRowMatch(r._row, r.id, 'Herhaalregels'); // bescherming: rij nog dezelfde regel vóór overschrijven
       await writeRange(`'Herhaalregels'!A${r._row}:L${r._row}`,values);
       logEvent(code,sectie,'Herhaalregel bewerkt','','',oms);
     },()=>{Object.assign(r,oud);},'Opslaan mislukt');
   }else{
-    showToast('➕ Herhaalregel toegevoegd',oms,null);
+    showToast('Herhaalregel toegevoegd',oms,null,'plus');
     backgroundWrite(async()=>{
       await appendRange("'Herhaalregels'!A:L",values);
       logEvent(code,sectie,'Herhaalregel aangemaakt','','',oms);
@@ -108,7 +108,7 @@ function toggleHerhaalStatus(hid){
   const r=(D.herhaal||[]).find(x=>x._row===hid); if(!r) return;
   const oud=r.status, nieuw=oud==='ACTIEF'?'GEPAUZEERD':'ACTIEF';
   r.status=nieuw; renderHerhaal();
-  showToast(nieuw==='ACTIEF'?'▶ Regel geactiveerd':'⏸ Regel gepauzeerd',r.omschrijving,null);
+  showToast(nieuw==='ACTIEF'?'Regel geactiveerd':'Regel gepauzeerd',r.omschrijving,null,nieuw==='ACTIEF'?'afspelen':'pauze');
   backgroundWrite(async()=>{
     await assertRowMatch(r._row, r.id, 'Herhaalregels'); // bescherming: rij nog dezelfde regel vóór status-write
     await writeRange(`'Herhaalregels'!K${r._row}:K${r._row}`,[nieuw]);
@@ -124,7 +124,7 @@ async function deleteHerhaal(){
   const pos=(D.herhaal||[]).indexOf(r); if(pos>-1)D.herhaal.splice(pos,1);
   (D.herhaal||[]).forEach(x=>{if(x._row>r._row)x._row--;});
   renderHerhaal();
-  showToast('🗑️ Herhaalregel verwijderd',r.omschrijving,null);
+  showToast('Herhaalregel verwijderd',r.omschrijving,null,'prullenbak');
   backgroundWrite(async()=>{
     const ids=await getSheetIds();
     const sheetId=ids['Herhaalregels'];

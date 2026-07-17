@@ -8,6 +8,7 @@ import { goTo } from "./ui.js";
 import { openModal } from "./crud.js";
 import { showToast } from "./notifications.js";
 import { fmtLogTs } from "./render-overig.js";
+import { ico } from "./icons.js";
 
 //  AI-HULP — plak mailtekst (slim kopieer-plak)
 // ══════════════════════════════════════
@@ -93,7 +94,7 @@ function buildAiPrompt(){
 function copyAiPrompt(waar){
   const txt=document.getElementById('ai-prompt').innerText;
   if(navigator.clipboard) navigator.clipboard.writeText(txt).catch(()=>{});
-  showToast('📎 Gekopieerd','Plak in '+waar+' met Ctrl/⌘+V','var(--ac)');
+  showToast('Gekopieerd','Plak in '+waar+' met Ctrl/⌘+V','var(--ac)','paperclip');
   const url=waar==='Claude'?'https://claude.ai/new':'https://gemini.google.com/app';
   try{ window.open(url,'_blank'); }catch(e){}
 }
@@ -126,21 +127,21 @@ function parseAiAnswer(){
   const ctx=code?aiVveContext(code):null;
   state._aiLastCode=code||''; state._aiLastNaam=ctx?(ctx.naam||''):'';
 
-  let html='<div class="ai-rhead">📥 Wat het dashboard eruit haalt</div>';
+  let html='<div class="ai-rhead">'+ico('postvakIn')+' Wat het dashboard eruit haalt</div>';
   if(wants.includes('samenvatting') && sec.samenvatting){
-    html+=`<div class="ai-card"><div class="ai-card-hd">📝 Samenvatting<span class="sp"></span></div><div class="ai-card-bd">${esc(sec.samenvatting)}</div></div>`;
+    html+=`<div class="ai-card"><div class="ai-card-hd">${ico('notitieboek')} Samenvatting<span class="sp"></span></div><div class="ai-card-bd">${esc(sec.samenvatting)}</div></div>`;
   }
   if(wants.includes('categorie') && sec.categorie){
     const catSec=aiGisCategorie(sec.categorie);
-    html+=`<div class="ai-card"><div class="ai-card-hd">🏷️ Categorie &amp; VvE<span class="sp"></span><button class="ai-mini" data-action="ai-overnemen" data-sec="${catSec}">Overnemen</button></div><div class="ai-card-bd">${esc(sec.categorie)}</div></div>`;
+    html+=`<div class="ai-card"><div class="ai-card-hd">${ico('label')} Categorie &amp; VvE<span class="sp"></span><button class="ai-mini" data-action="ai-overnemen" data-sec="${catSec}">Overnemen</button></div><div class="ai-card-bd">${esc(sec.categorie)}</div></div>`;
   }
   if(wants.includes('acties') && sec.acties){
     const items=sec.acties.split(/\r?\n/).map(s=>s.replace(/^[-*•\d.]+\s*/,'').trim()).filter(Boolean);
     const li=items.map(a=>`<li><span class="ck"></span><span class="atxt">${esc(a)}</span><button class="ai-mini plus" data-action="ai-actie-taak">+ Taak</button></li>`).join('');
-    html+=`<div class="ai-card"><div class="ai-card-hd">✅ Actiepunten<span class="sp"></span></div><div class="ai-card-bd"><ul class="ai-acts">${li||'<li><span class="atxt" style="color:var(--mut)">Geen losse punten gevonden.</span></li>'}</ul></div></div>`;
+    html+=`<div class="ai-card"><div class="ai-card-hd">${ico('vinkCirkel')} Actiepunten<span class="sp"></span></div><div class="ai-card-bd"><ul class="ai-acts">${li||'<li><span class="atxt" style="color:var(--mut)">Geen losse punten gevonden.</span></li>'}</ul></div></div>`;
   }
   if(wants.includes('antwoord') && sec.antwoord){
-    html+=`<div class="ai-card"><div class="ai-card-hd">✍️ Concept-antwoord<span class="sp"></span><button class="ai-mini" data-action="ai-kopieer-concept">Kopieer</button></div><div class="ai-card-bd"><div class="ai-reply">${esc(sec.antwoord)}</div></div></div>`;
+    html+=`<div class="ai-card"><div class="ai-card-hd">${ico('potlood')} Concept-antwoord<span class="sp"></span><button class="ai-mini" data-action="ai-kopieer-concept">Kopieer</button></div><div class="ai-card-bd"><div class="ai-reply">${esc(sec.antwoord)}</div></div></div>`;
   }
   const gevonden=Object.keys(sec).length;
   if(!gevonden){ html+=`<div class="ai-card"><div class="ai-card-bd" style="color:var(--mut)">Geen herkenbare kopjes gevonden. Plak het hele antwoord van de AI (met de kopjes Samenvatting:, Categorie:, Actiepunten:, Concept-antwoord:).</div></div>`; }
@@ -179,7 +180,7 @@ function aiActieTaak(btn){
 function aiKopieerConcept(btn){
   const txt=btn.closest('.ai-card').querySelector('.ai-reply').innerText;
   if(navigator.clipboard) navigator.clipboard.writeText(txt).catch(()=>{});
-  showToast('📋 Gekopieerd','Concept-antwoord klaar voor je mail','var(--gn)');
+  showToast('Gekopieerd','Concept-antwoord klaar voor je mail','var(--gn)','klembord');
 }
 
 

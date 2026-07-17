@@ -6,6 +6,7 @@
 // ══════════════════════════════════════
 import { esc, parseAannemers, reconcileOffertes } from "./util.js";
 import { state } from "./state.js";
+import { ico } from "./icons.js";
 
 // Klikbare samenvatting die het aannemers-paneel open/dicht klapt (staat in de teller-cel).
 function offerteAannSamenvatting(r){
@@ -14,7 +15,7 @@ function offerteAannSamenvatting(r){
   const lbl=lijst.length
     ? `Aannemers · ${lijst.filter(a=>a.binnen).length} van ${lijst.length} binnen`
     : 'Aannemers toevoegen';
-  return `<span class="of-aann-tog" data-action="offerte-aann-open" data-code="${esc(r.code)}">${open?'▾':'▸'} ${lbl}</span>`;
+  return `<span class="of-aann-tog" data-action="offerte-aann-open" data-code="${esc(r.code)}">${open?ico('chevronOnder',12):ico('chevronRechts',12)} ${lbl}</span>`;
 }
 
 // Uitklapbaar aannemers-lijstje voor één traject (gemount als extra <tr> onder de rij).

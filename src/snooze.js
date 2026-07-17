@@ -56,8 +56,8 @@ async function schrijfOpvolgdatum(r, nieuw, actie){
   const oud = r.opvolgdatum || '';
   r.opvolgdatum = nieuw;
   renderAll();
-  showToast(nieuw ? '⏸ Weggelegd tot '+nieuw : '🔔 Opvolgdatum gewist',
-            `${r.code} — ${r.actiepunt||r.periode||r.naam||''}`, null);
+  showToast(nieuw ? 'Weggelegd tot '+nieuw : 'Opvolgdatum gewist',
+            `${r.code} — ${r.actiepunt||r.periode||r.naam||''}`, null, nieuw ? 'pauze' : 'bel');
   backgroundWrite(
     async ()=>{
       await assertRowMatch(r._row, r.code); // bescherming: rij nog van deze VvE vóór L-write

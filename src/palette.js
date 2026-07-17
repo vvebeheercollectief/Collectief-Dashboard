@@ -9,6 +9,7 @@ import { openModal } from "./crud.js";
 import { openVvePagina, vveOverzicht } from "./render-vve.js";
 import { logZin } from "./render-overig.js";
 import { toggleBulkMode } from "./bulk.js";
+import { ico } from "./icons.js";
 
 const PAL_MAX = { vves:3, taken:5, afgerond:3, logboek:3 };
 
@@ -78,13 +79,13 @@ function renderPal(q){
     }).join('');
     html+=_groep("Laatst bezochte VvE's",rHtml);
     const acties=[
-      ['＋','Nieuwe taak aanmaken',()=>{ closePalette(); goTo('ntd'); openModal(false); }],
-      ['📊','Ga naar statistieken',()=>{ closePalette(); goTo('analytics'); }],
-      ['🔁','Ga naar herhaalregels',()=>{ closePalette(); goTo('herhaal'); }],
-      ['📒','Ga naar logboek',()=>{ closePalette(); goTo('logboek'); }],
+      [ico('plus'),'Nieuwe taak aanmaken',()=>{ closePalette(); goTo('ntd'); openModal(false); }],
+      [ico('grafiek'),'Ga naar statistieken',()=>{ closePalette(); goTo('analytics'); }],
+      [ico('herhaal'),'Ga naar herhaalregels',()=>{ closePalette(); goTo('herhaal'); }],
+      [ico('notitieboek'),'Ga naar logboek',()=>{ closePalette(); goTo('logboek'); }],
     ];
-    html+=_groep('Acties',acties.map(([ico,lbl,doe])=>
-      _item(`<span class="pal-ico pal-ico-act">${ico}</span><div class="pal-tekst"><b>${esc(lbl)}</b></div>`,doe)).join(''));
+    html+=_groep('Acties',acties.map(([icoSvg,lbl,doe])=>
+      _item(`<span class="pal-ico pal-ico-act">${icoSvg}</span><div class="pal-tekst"><b>${esc(lbl)}</b></div>`,doe)).join(''));
   }else{
     const res=zoekAlles(q,D);
     html+=_groep("VvE's",res.vves.map(v=>{
@@ -95,17 +96,17 @@ function renderPal(q){
     html+=_groep('Open taken',res.taken.map(r=>{
       const p=berekenPrioriteit(r.deadline,r._sec);
       const pill=p.teLaat?`<span class="pill-telaat">Te laat (${Math.abs(p.dagenTot)}d)</span>`:esc(r.deadline||'');
-      return _item(`<span class="pal-ico pal-ico-taak">○</span><div class="pal-tekst"><b>${esc(r.actiepunt||r.periode||r.agendapunten||r.status||'')}</b><span>${esc(r.code)} ${esc(r.naam||'')} · ${esc(SECS[r._sec].label)} · ${esc(r.behandelaar||'—')}</span></div><span class="pal-hint">${pill}</span>`,
+      return _item(`<span class="pal-ico pal-ico-taak">${ico('cirkelOpen')}</span><div class="pal-tekst"><b>${esc(r.actiepunt||r.periode||r.agendapunten||r.status||'')}</b><span>${esc(r.code)} ${esc(r.naam||'')} · ${esc(SECS[r._sec].label)} · ${esc(r.behandelaar||'—')}</span></div><span class="pal-hint">${pill}</span>`,
         ()=>{ closePalette(); openModal(true,r); });
     }).join(''));
     html+=_groep('Afgerond',res.afgerond.map(r=>
-      _item(`<span class="pal-ico pal-ico-af">✓</span><div class="pal-tekst"><b>${esc(r.actiepunt||r.periode||r.agendapunten||'')}</b><span>${esc(r.code)} · afgerond ${esc(r.datum||'')}</span></div>`,
+      _item(`<span class="pal-ico pal-ico-af">${ico('vink')}</span><div class="pal-tekst"><b>${esc(r.actiepunt||r.periode||r.agendapunten||'')}</b><span>${esc(r.code)} · afgerond ${esc(r.datum||'')}</span></div>`,
         ()=>{ closePalette(); openVvePagina(r.code); })).join(''));
     html+=_groep('Logboek',res.logboek.map(e=>
-      _item(`<span class="pal-ico pal-ico-log">✎</span><div class="pal-tekst"><b class="pal-logzin">${logZin(e)}</b></div>`,
+      _item(`<span class="pal-ico pal-ico-log">${ico('potlood')}</span><div class="pal-tekst"><b class="pal-logzin">${logZin(e)}</b></div>`,
         ()=>{ closePalette(); openVvePagina(e.code); })).join(''));
     html+=_groep('Acties',
-      _item(`<span class="pal-ico pal-ico-act">＋</span><div class="pal-tekst"><b>Nieuwe taak aanmaken met "${esc(q)}"</b></div><span class="pal-hint">opent invulscherm</span>`,
+      _item(`<span class="pal-ico pal-ico-act">${ico('plus')}</span><div class="pal-tekst"><b>Nieuwe taak aanmaken met "${esc(q)}"</b></div><span class="pal-hint">opent invulscherm</span>`,
         ()=>{ closePalette(); goTo('ntd'); openModal(false);
               const f=document.getElementById('m-actie'); if(f) f.value=q; }));
   }

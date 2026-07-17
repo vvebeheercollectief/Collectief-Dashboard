@@ -154,7 +154,7 @@ async function vraagChat(){
     state._chatHistorie.push({ rol:'assistant', tekst: antwoord || '(leeg antwoord)' });
   }catch(e){
     console.error('chat-fout', e);
-    state._chatHistorie.push({ rol:'assistant', tekst:'⚠️ Kon nu geen antwoord ophalen. Probeer het later opnieuw.' });
+    state._chatHistorie.push({ rol:'assistant', tekst:'Kon nu geen antwoord ophalen. Probeer het later opnieuw.' });
   }finally{
     state._chatBezig = false; renderChat();
   }

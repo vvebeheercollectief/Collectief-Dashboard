@@ -12,6 +12,7 @@ import { showToast } from "./notifications.js";
 import { ensureToken } from "./auth.js";
 import { renderPag } from "./render-tabel.js";
 import { renderNtdDonut } from "./render-lijsten.js";
+import { ico } from "./icons.js";
 
 // ══════════════════════════════════════
 //  ALV OVERZICHT
@@ -118,7 +119,7 @@ async function toggleAlvoFlag(idx,field){
     if(!resp.ok){const t=await resp.text();throw new Error(`HTTP ${resp.status}: ${t.slice(0,120)}`)}
 
     logEvent(r.code,'ALVS',newVal?'Aangevinkt':'Uitgevinkt',ALVO_LABELS[field],oldVal?'TRUE':'FALSE',newVal?'TRUE':'FALSE');
-    showToast(`${newVal?'✓':'○'} ${ALVO_LABELS[field]} ${newVal?'aan':'uit'}`,`${r.code} – ${r.naam}`,newVal?'var(--gn)':'var(--mut)');
+    showToast(`${ALVO_LABELS[field]} ${newVal?'aan':'uit'}`,`${r.code} – ${r.naam}`,newVal?'var(--gn)':'var(--mut)',newVal?'vink':'cirkelOpen');
   }catch(e){
     // Revert
     r[field]=oldVal;
@@ -132,7 +133,7 @@ async function toggleAlvoFlag(idx,field){
     if(btn2) btn2.classList.remove('toggling');
   }
 }
-function statusIco(s){return{Open:'⏳',Gepland:'📅',Afgerond:'✅'}[s]||''}
+function statusIco(s){return{Open:ico('zandloper'),Gepland:ico('kalender'),Afgerond:ico('vinkCirkel')}[s]||''}
 
 // ══════════════════════════════════════
 //  ALV AFGEROND

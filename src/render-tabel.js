@@ -7,6 +7,7 @@ import { SECS, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { bulkGeselecteerd } from "./bulk.js";
 import { offerteAannSamenvatting, offerteAannemerPaneel } from "./render-offerte.js";
+import { ico } from "./icons.js";
 
 // ══════════════════════════════════════
 //  TABLE HELPERS
@@ -45,11 +46,11 @@ function renderTbody(tbodyId,rows,sec,page,isAf,filtered){
   const cols=SECS[sec].cols.length+1+(state.bulkMode?1:0);
   let html=main.map(r=>rowNtd(r,sec)).join('');
   if(ib.length){
-    html+=`<tr><td colspan="${cols}" class="grp-kop">▸ In behandeling (${ibAll})</td></tr>`;
+    html+=`<tr><td colspan="${cols}" class="grp-kop">${ico('chevronRechts',12)} In behandeling (${ibAll})</td></tr>`;
     html+=ib.map(r=>rowNtd(r,sec)).join('');
   }
   if(wg.length){
-    html+=`<tr><td colspan="${cols}" class="grp-kop">⏸ Weggelegd (${wgAll}) — komt terug op de opvolgdatum</td></tr>`;
+    html+=`<tr><td colspan="${cols}" class="grp-kop">${ico('pauze',12)} Weggelegd (${wgAll}) — komt terug op de opvolgdatum</td></tr>`;
     html+=wg.map(r=>rowNtd(r,sec)).join('');
   }
   el.innerHTML=html;
@@ -95,7 +96,7 @@ function rowNtd(r,sec){
     : '';
   const ov = opvolgStatus(r);
   const opvolgPill = ov.vandaag
-    ? `<span class="pill-opvolg" data-action="taak-wegleggen" data-rid="${rid}" title="Opvolgdatum: ${esc(r.opvolgdatum)}">🔔 Opvolgen vandaag</span>`
+    ? `<span class="pill-opvolg" data-action="taak-wegleggen" data-rid="${rid}" title="Opvolgdatum: ${esc(r.opvolgdatum)}">${ico('bel')} Opvolgen vandaag</span>`
     : ov.weggelegd
       ? `<span class="pill-snooze" data-action="taak-wegleggen" data-rid="${rid}" title="Weggelegd tot ${esc(r.opvolgdatum)}">${esc(r.opvolgdatum)}</span>`
       : '';

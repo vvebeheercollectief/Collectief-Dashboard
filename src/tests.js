@@ -3,7 +3,7 @@
 // ══════════════════════════════════════
 import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf } from "./util.js";
 import { logZin, logPaginaSoort, parseLogboek, _shiftRows, logEditWrite, logItemHtml } from "./render-overig.js";
-import { _isStagingHost, APP_VERSION } from "./config.js";
+import { _isStagingHost, APP_VERSION, SECS } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
 import { filterNtd, setNtd, renderNtd, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey } from "./render-lijsten.js";
@@ -366,6 +366,9 @@ import { shouldPromptReload } from "./sw-update.js";
   truthy('afOmschrijving leeg noemt "geen omschrijving"', afOmschrijving({actiepunt:'', periode:'', agendapunten:'', _sec:'LOD'}).tekst.includes('geen omschrijving'));
   eq('afOmschrijving onbekende sectie crasht niet', afOmschrijving({actiepunt:'', _sec:'bestaatniet'}).leeg, true);
   eq('afOmschrijving whitespace = leeg', afOmschrijving({actiepunt:'  ', _sec:'OPPAKKEN'}).leeg, true);
+  eq('afOmschrijving valt terug op agendapunten', afOmschrijving({actiepunt:'', periode:'', agendapunten:'Dakrenovatie', _sec:'VERGADERVERZOEKEN'}).tekst, 'Dakrenovatie');
+  eq('afOmschrijving gevulde tekst → leeg:false', afOmschrijving({actiepunt:'Offertes opvragen', _sec:'OPPAKKEN'}).leeg, false);
+  truthy('afOmschrijving leeg noemt het sectielabel', afOmschrijving({actiepunt:'', periode:'', agendapunten:'', _sec:'LOD'}).tekst.includes(SECS['LOD'].label));
 
   // ── kenmerken ── (VvE-dossier: tab 'Kenmerken' A:F, laatste rij per code wint;
   //    oude Ja/Nee-waarden worden bij inlezen genormaliseerd naar Gemeenschappelijk/Individueel)

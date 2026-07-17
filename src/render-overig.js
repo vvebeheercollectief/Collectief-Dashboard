@@ -244,6 +244,8 @@ function logZin(r){
     case'Aangemaakt':
     case'Aangemaakt (sheet)':  return A('maakte','var(--pu)')+'een nieuwe taak bij '+chip+(r.nieuweWaarde?` <span style="color:var(--mut)">→ ${esc(r.nieuweWaarde)}</span>`:'');
     case'Contact':             return A('sprak','var(--ac)')+`met ${esc(r.oudeWaarde||'—')} bij `+chip+` <span style="color:var(--mut)">· ${esc(r.veld||'')}</span>`;
+    case'Aangevinkt':          return A('vinkte','var(--gn)')+`<b>${esc(r.veld||'')}</b> aan bij `+chip;
+    case'Uitgevinkt':          return A('vinkte','var(--am)')+`<b>${esc(r.veld||'')}</b> uit bij `+chip;
     case'Kenmerk':             return A('wijzigde','var(--pu)')+`kenmerk <b>${esc(r.veld||'')}</b> bij `+chip;
     default:                   return `<b>${naam}</b> — ${esc(r.actie||'')} `+chip;
   }

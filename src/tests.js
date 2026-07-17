@@ -131,6 +131,11 @@ import { shouldPromptReload } from "./sw-update.js";
   truthy('logZin Contact bevat "sprak"', logZin({actie:'Contact', code:'TEST01', veld:'Telefoon', oudeWaarde:'Bewoner/eigenaar', gebruiker:'info@vvebeheercollectief.nl'}).includes('sprak'));
   truthy('logZin Contact toont soort', logZin({actie:'Contact', code:'TEST01', veld:'Telefoon', oudeWaarde:'Bestuur', gebruiker:'info@vvebeheercollectief.nl'}).includes('Telefoon'));
   truthy('logZin Kenmerk bevat "kenmerk"', logZin({actie:'Kenmerk', code:'TEST01', veld:'Balkons', gebruiker:'info@vvebeheercollectief.nl'}).includes('kenmerk'));
+  truthy('logZin Aangevinkt bevat "vinkte"', logZin({actie:'Aangevinkt', code:'TEST01', veld:'Notulen', gebruiker:'info@vvebeheercollectief.nl'}).includes('vinkte'));
+  truthy('logZin Aangevinkt noemt het veld', logZin({actie:'Aangevinkt', code:'TEST01', veld:'Notulen', gebruiker:'info@vvebeheercollectief.nl'}).includes('Notulen'));
+  truthy('logZin Aangevinkt eindigt op "aan"', /\baan\b/.test(logZin({actie:'Aangevinkt', code:'TEST01', veld:'Notulen', gebruiker:'info@vvebeheercollectief.nl'})));
+  truthy('logZin Uitgevinkt bevat "uit"', /\buit\b/.test(logZin({actie:'Uitgevinkt', code:'TEST01', veld:'Begroting', gebruiker:'info@vvebeheercollectief.nl'})));
+  truthy('logZin Aangevinkt toont niet de ruwe actienaam', !logZin({actie:'Aangevinkt', code:'TEST01', veld:'Notulen', gebruiker:'info@vvebeheercollectief.nl'}).includes('— Aangevinkt'));
 
   // ── logPaginaSoort ── (welke logregels horen op de Logboek-pagina: notities/contact=normaal, afgerond/aangemaakt=subtiel, rest=ruis)
   eq('logPaginaSoort Opmerking → normaal', logPaginaSoort('Opmerking'), 'normaal');

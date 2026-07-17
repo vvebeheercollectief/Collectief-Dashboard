@@ -272,20 +272,16 @@ function logPaginaSoort(actie){
   return null;
 }
 
-// Eén logregel als HTML (gedeeld door Logboek-pagina en VvE-dossier-feed).
-// subtiel=true → compacte grijze regel (alleen Logboek-pagina, voor Afgerond/Aangemaakt).
-function logItemHtml(r,subtiel,acties){
+// Eén logregel als HTML (gedeeld door Logboek-pagina en VvE-dossier).
+// subtiel=true → gedempte dunne regel voor automatische acties.
+// opts.zonderCode → geef door aan logZin (dossier: code is redundant).
+function logItemHtml(r,subtiel,acties,opts){
   if(subtiel){
-    const naam=esc(displayName(r.gebruiker)||'Iemand');
-    const code=`<b>${esc(r.code||'—')}</b>`;
-    const isAf=r.actie==='Afgerond';
-    const zin=isAf
-      ? `${naam} rondde ${code} af`
-      : `${naam} maakte ${code} aan${r.nieuweWaarde?` <span class="log-mini-meta">→ ${esc(r.nieuweWaarde)}</span>`:''}`;
+    const kleur=r.actie==='Afgerond'?'var(--gn)':(r.actie==='Aangevinkt'||r.actie==='Uitgevinkt')?'var(--gn)':'var(--pu)';
     const acts=acties?`<span class="log-acts"><button class="log-act-btn del" data-action="log-verwijderen" data-row="${r._row}" title="Verwijderen" aria-label="Regel verwijderen">${ico('prullenbak')}</button></span>`:'';
     return `<div class="log-mini">
-      <span class="log-mini-dot" style="background:${isAf?'var(--gn)':'var(--pu)'}"></span>
-      <span class="log-mini-txt">${zin}</span>
+      <span class="log-mini-dot" style="background:${kleur}"></span>
+      <span class="log-mini-txt">${logZin(r,opts)}</span>
       <span class="log-time">${esc(logTijd(r.timestamp))}</span>
       ${acts}
     </div>`;
@@ -305,7 +301,7 @@ function logItemHtml(r,subtiel,acties){
   </span>`:'';
   return `<div class="log-item">
     <span class="log-av" style="background:${avatarKleur(displayName(r.gebruiker))}">${esc(init)}</span>
-    <div class="log-body"><div class="log-line">${logZin(r)}</div>${extra}</div>
+    <div class="log-body"><div class="log-line">${logZin(r,opts)}</div>${extra}</div>
     <span class="log-time">${esc(logTijd(r.timestamp))}</span>
     ${acts}
   </div>`;

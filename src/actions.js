@@ -66,6 +66,8 @@ export const ACTIONS = {
   'bulk-vink':             (el) => bulkVink(+el.dataset.rid),
   'bulk-menu':             (el) => toggleBulkMenu(el.dataset.menu),
   'bulk-doe':              (el) => bulkDoe(el),
+  'composer-openen':       ()   => { state.dosComposerOpen=true; renderVve();
+    setTimeout(()=>document.getElementById('dos-tekst')?.focus(),0); },
   'kenmerken-bewerken':    ()   => { state.kenmerkenEdit=true; renderVve(); },
   'kenmerken-opslaan':     ()   => saveKenmerken(),
   'kenmerken-annuleren':   ()   => { state.kenmerkenEdit=false; renderVve(); },

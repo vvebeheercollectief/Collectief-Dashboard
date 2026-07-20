@@ -136,12 +136,34 @@ function openVvePagina(code){
   state.kenmerkenEdit=false;
   state.vveLogFilter='alles';
   state._vveLogAlles=false;
+  state.dosComposerOpen=false;
   try{
     const lijst=JSON.parse(localStorage.getItem('recentVves')||'[]').filter(c=>c!==code);
     lijst.unshift(code);
     localStorage.setItem('recentVves',JSON.stringify(lijst.slice(0,3)));
   }catch(e){}
   goTo('vve');
+}
+
+// Composer: standaard ingeklapt tot één regel; opent bij klik en blijft open zolang er tekst staat.
+function composerHtml(code){
+  if(!state.dosComposerOpen){
+    return `<div class="comp-dicht" data-action="composer-openen">
+      Leg vast wat er gebeurd is — bv. zojuist gebeld met een eigenaar…
+      <span class="btn btn-pri btn-sm">Vastleggen</span>
+    </div>`;
+  }
+  return `<div class="dos-composer">
+    <textarea id="dos-tekst" data-code="${esc(code)}" rows="2" placeholder="Leg vast wat er gebeurd is — bv. zojuist gebeld met een eigenaar… (Ctrl+Enter = vastleggen)"></textarea>
+    <div class="dos-rij">
+      <div class="dos-chips">${CONTACT_SOORTEN.map(([s,sIco])=>
+        `<button class="soort-chip${(state._contactSoort||'Telefoon')===s?' aan':''}" data-action="contact-soort" data-soort="${s}">${sIco} ${s}</button>`).join('')}</div>
+      <select id="dos-wie" title="Met wie was het contact?">
+        <option>Bewoner/eigenaar</option><option>Bestuur</option><option>Leverancier</option><option>Overig</option>
+      </select>
+      <button class="btn btn-pri btn-sm" data-action="contact-vastleggen">Vastleggen</button>
+    </div>
+  </div>`;
 }
 
 function renderVve(){
@@ -154,6 +176,8 @@ function renderVve(){
   // niet verdwijnen — alleen bewaren als het om dezelfde VvE gaat.
   const _oudT=document.getElementById('dos-tekst');
   const _bewaar=(_oudT&&_oudT.dataset.code===code)?{tekst:_oudT.value,wie:document.getElementById('dos-wie')?.value}:null;
+  // Half getypte tekst mag de 8s-poll overleven én de composer niet dichtklappen.
+  if(_bewaar&&_bewaar.tekst.trim()) state.dosComposerOpen=true;
   // De topbar houdt de vaste paginatitel uit PAGE_META ("VvE-dossier");
   // code + naam staan al groot in de kop hieronder — niet dubbel tonen.
 
@@ -243,17 +267,7 @@ function renderVve(){
             <button class="dos-filter${state.vveLogFilter==='contact'?' aan':''}" data-action="vve-log-filter" data-modus="contact">Alleen contactmomenten</button>
           </span>
         </div>
-        <div class="dos-composer">
-          <textarea id="dos-tekst" data-code="${esc(o.code)}" rows="2" placeholder="Leg vast wat er gebeurd is — bv. zojuist gebeld met een eigenaar… (Ctrl+Enter = vastleggen)"></textarea>
-          <div class="dos-rij">
-            <div class="dos-chips">${CONTACT_SOORTEN.map(([s,sIco])=>
-              `<button class="soort-chip${(state._contactSoort||'Telefoon')===s?' aan':''}" data-action="contact-soort" data-soort="${s}">${sIco} ${s}</button>`).join('')}</div>
-            <select id="dos-wie" title="Met wie was het contact?">
-              <option>Bewoner/eigenaar</option><option>Bestuur</option><option>Leverancier</option><option>Overig</option>
-            </select>
-            <button class="btn btn-pri btn-sm" data-action="contact-vastleggen">Vastleggen</button>
-          </div>
-        </div>
+        ${composerHtml(o.code)}
         <div class="tl-scroll">${dossierFeed(dosEntries.slice(0,dosLimiet))}${dosMeer}</div>
       </div>
 

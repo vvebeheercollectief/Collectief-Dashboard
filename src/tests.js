@@ -348,8 +348,9 @@ import { shouldPromptReload } from "./sw-update.js";
   eq('dossierfilter alles',   filterDossierLog(_dosLog,'alles').length, 4);
   eq('dossierfilter contact', filterDossierLog(_dosLog,'contact').length, 2);
 
-  // ── dossierFeed: bewerk-/verwijderknoppen ── (alleen eigen notities/contactmomenten;
-  //    automatische regels zoals Afgerond/Kenmerk krijgen niets — keuze gebruiker 2026-07-17)
+  // ── dossierFeed: bewerk-/verwijderknoppen ── (potlood alleen bij eigen notities/contactmomenten;
+  //    prullenbak overal — ook de gedempte dunne automatische regels blijven individueel
+  //    verwijderbaar, want samenvatten zou dat onmogelijk maken — Task 9, 2026-07-20)
   const _dosTs='2026-07-17T10:00:00.000Z';
   const _dosRij=(actie,row)=>({_row:row,timestamp:_dosTs,code:'121015',sectie:'',actie,
     veld:actie==='Contact'?'Telefoon':'',oudeWaarde:actie==='Contact'?'Bestuur':'',
@@ -357,9 +358,20 @@ import { shouldPromptReload } from "./sw-update.js";
   const _dosHtml=dossierFeed([_dosRij('Opmerking',2),_dosRij('Contact',3),_dosRij('Afgerond',4),_dosRij('Kenmerk',5)]);
   const _tel=(h,s)=>h.split(s).length-1;
   eq('dossierFeed: potlood alleen bij notitie+contact', _tel(_dosHtml,'data-action="log-bewerken"'), 2);
-  eq('dossierFeed: prullenbak alleen bij notitie+contact', _tel(_dosHtml,'data-action="log-verwijderen"'), 2);
+  eq('dossierFeed: prullenbak overal, ook bij automatische regels', _tel(_dosHtml,'data-action="log-verwijderen"'), 4);
   eq('dossierFeed: knoppen wijzen naar de juiste sheet-rij', _tel(_dosHtml,'data-row="2"'), 2);
   truthy('dossierFeed: automatische regels tonen nog wel gewoon hun tekst', _dosHtml.includes('rondde'));
+
+  // ── dossierFeed: eigen notities blijven vol, automatische regels worden gedempt ──
+  const _dosMix=[
+    {actie:'Contact', code:'TST', veld:'Telefoon', oudeWaarde:'Bestuur', nieuweWaarde:'Gebeld over de ALV', timestamp:'2026-07-15T10:24:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:2},
+    {actie:'Aangevinkt', code:'TST', veld:'Notulen', timestamp:'2026-07-15T09:00:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:3},
+  ];
+  truthy('dossierFeed: contact is een volle regel', dossierFeed(_dosMix).includes('log-item'));
+  truthy('dossierFeed: aangevinkt is een dunne regel', dossierFeed(_dosMix).includes('log-mini'));
+  truthy('dossierFeed: aangevinkt toont nette zin', dossierFeed(_dosMix).includes('vinkte'));
+  truthy('dossierFeed: code-chip is weg in het dossier', !dossierFeed(_dosMix).includes('data-action="vve-open"'));
+  truthy('dossierFeed: dunne regel behoudt verwijderknop', dossierFeed(_dosMix).includes('log-verwijderen'));
 
   // ── afOmschrijving: nooit een lege regel, nooit een verzonnen omschrijving ──
   eq('afOmschrijving neemt actiepunt',  afOmschrijving({actiepunt:'Offertes opvragen', _sec:'OPPAKKEN'}).tekst, 'Offertes opvragen');

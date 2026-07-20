@@ -78,9 +78,11 @@ function dossierFeed(entries){
   entries.forEach(r=>{
     const dag=logDayLabel(r.timestamp);
     if(dag!==lastDay){ html+=`<div class="log-day">${dag}</div>`; lastDay=dag; }
-    // Alleen onze eigen notities/contactmomenten mogen bewerkt/verwijderd worden.
-    // Automatische regels (afgerond, aangemaakt, kenmerk…) hebben geen eigen tekst.
-    html+=logItemHtml(r, false, logPaginaSoort(r.actie)==='normaal');
+    // Eigen notities/contactmomenten blijven volwaardig en bewerkbaar. Alles wat de app
+    // zelf logt wordt een gedempte dunne regel — wel per stuk verwijderbaar, want ze
+    // samenvatten zou dat onmogelijk maken.
+    const eigen=logPaginaSoort(r.actie)==='normaal';
+    html+=logItemHtml(r, !eigen, true, {zonderCode:true});
   });
   return html;
 }

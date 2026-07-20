@@ -251,13 +251,13 @@ function logZin(r, opts){
     case'Verwijderd':          return A('verwijderde')+'een taak'+bij;
     case'Teruggezet':          return A('zette')+(zonderCode?'een taak':chip)+' terug';
     case'Opmerking':           return A('noteerde')+(zonderCode?'iets':'bij '+chip);
-    case'Behandelaar gewijzigd':return A('wees')+(zonderCode?'een taak':chip)+' toe';
+    case'Behandelaar gewijzigd':return A('wees')+(zonderCode?'een taak':chip)+' toe'+(r.nieuweWaarde?` aan <b>${esc(r.nieuweWaarde)}</b>`:'');
     case'Aangemaakt':
     case'Aangemaakt (sheet)':  return A('maakte')+'een nieuwe taak'+bij+(r.nieuweWaarde?` <span style="color:var(--mut)">→ ${esc(r.nieuweWaarde)}</span>`:'');
     case'Contact':             return A('sprak')+`met ${esc(r.oudeWaarde||'—')}`+bij+` <span style="color:var(--mut)">· ${esc(r.veld||'')}</span>`;
     case'Aangevinkt':          return A('vinkte')+`<b>${esc(r.veld||'')}</b> aan`+bij;
     case'Uitgevinkt':          return A('vinkte')+`<b>${esc(r.veld||'')}</b> uit`+bij;
-    case'Kenmerk':             return A('wijzigde')+`kenmerk <b>${esc(r.veld||'')}</b>`+bij;
+    case'Kenmerk':             return A('wijzigde')+`kenmerk <b>${esc(r.veld||'')}</b>`+bij+(r.nieuweWaarde?` <span style="color:var(--mut)">→ ${esc(r.nieuweWaarde)}</span>`:'');
     default:                   return `<b>${naam}</b> — ${esc(r.actie||'')}`+staart;
   }
 }
@@ -271,6 +271,7 @@ function logTijd(iso){
 // Bepaalt of een logregel op de Logboek-pagina thuishoort, en zo ja hoe prominent.
 // 'normaal' = onze eigen notities/contacten (volwaardig), 'subtiel' = automatische
 // afgerond/aangemaakt (dunne regel), null = ruis (alleen in taak-geschiedenis/VvE-dossier).
+// 'normaal' wordt óók gebruikt als eigen/bewerkbaar-criterium in dossierFeed.
 function logPaginaSoort(actie){
   const a=(actie||'').trim();
   if(a==='Opmerking'||a==='Contact') return 'normaal';

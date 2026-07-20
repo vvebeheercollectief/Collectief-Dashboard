@@ -142,6 +142,8 @@ import { shouldPromptReload } from "./sw-update.js";
   truthy('logZin zonderCode werkt ook bij Aangevinkt', logZin({actie:'Aangevinkt', code:'TEST01', veld:'Notulen', gebruiker:'info@vvebeheercollectief.nl'}, {zonderCode:true}).includes('Notulen'));
   truthy('logZin zonderCode laat geen "bij" bungelen', !/\bbij\s*$/.test(logZin({actie:'Aangevinkt', code:'TEST01', veld:'Notulen', gebruiker:'info@vvebeheercollectief.nl'}, {zonderCode:true}).replace(/<[^>]*>/g,'').trim()));
   truthy('logZin zonderCode Opmerking zonder "bij"', (()=>{const z=logZin({actie:'Opmerking', code:'TEST01', gebruiker:'info@vvebeheercollectief.nl'}, {zonderCode:true}).replace(/<[^>]*>/g,''); return z.includes('noteerde') && !/\bbij\b/.test(z);})());
+  truthy('logZin Kenmerk toont nieuwe waarde', logZin({actie:'Kenmerk', code:'TEST01', veld:'Balkons', oudeWaarde:'Onbekend', nieuweWaarde:'Gemeenschappelijk', gebruiker:'info@vvebeheercollectief.nl'}).includes('Gemeenschappelijk'));
+  truthy('logZin Behandelaar toont aan wie', logZin({actie:'Behandelaar gewijzigd', code:'TEST01', nieuweWaarde:'Cihad', gebruiker:'info@vvebeheercollectief.nl'}, {zonderCode:true}).includes('Cihad'));
 
   // ── logItemHtml: de dunne (subtiele) regel gebruikt dezelfde zinnengenerator als de volle regel ──
   truthy('logItemHtml subtiel Aangevinkt geeft nette zin', logItemHtml({actie:'Aangevinkt', code:'TEST01', veld:'Notulen', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, false).includes('vinkte'));
@@ -350,7 +352,8 @@ import { shouldPromptReload } from "./sw-update.js";
 
   // ── dossierFeed: bewerk-/verwijderknoppen ── (potlood alleen bij eigen notities/contactmomenten;
   //    prullenbak overal — ook de gedempte dunne automatische regels blijven individueel
-  //    verwijderbaar, want samenvatten zou dat onmogelijk maken — Task 9, 2026-07-20)
+  //    verwijderbaar, want samenvatten zou dat onmogelijk maken — Task 9, 2026-07-20
+  //    (vervangt de dossier-keuze van 2026-07-17))
   const _dosTs='2026-07-17T10:00:00.000Z';
   const _dosRij=(actie,row)=>({_row:row,timestamp:_dosTs,code:'121015',sectie:'',actie,
     veld:actie==='Contact'?'Telefoon':'',oudeWaarde:actie==='Contact'?'Bestuur':'',

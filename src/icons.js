@@ -49,6 +49,7 @@ const ICONS={
   cirkelOpen:_s+'<circle cx="12" cy="12" r="8" fill="currentColor" fill-opacity="0.18"/></svg>',
   klok:_s+'<circle cx="12" cy="13" r="8" fill="currentColor" fill-opacity="0.18"/><path d="M12 9v4l2.5 2"/><path d="M4.5 5.5l3-2M19.5 5.5l-3-2"/></svg>',
   pijlOmhoog:_s+'<path d="M12 19V5.5M5.5 12L12 5.5 18.5 12"/></svg>',
+  pijlLinks:_s+'<path d="M19 12H5.5M12 5.5L5.5 12 12 18.5"/></svg>',
 };
 // Vaste maat nodig (bv. in een knoplabel)? ico('naam', 13). Zonder maat schaalt CSS.
 const ico=(naam,maat)=>{

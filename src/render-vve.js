@@ -3,7 +3,7 @@
 // ══════════════════════════════════════
 import { esc, displayName, persBadges, berekenPrioriteit, opvolgStatus, parseDt, _vandaagAmsterdam, _verschilInKalenderdagen } from "./util.js";
 import { ico } from "./icons.js";
-import { SECS, SKEYS } from "./config.js";
+import { SECS, SKEYS, PAGE_META } from "./config.js";
 import { state, D } from "./state.js";
 import { goTo } from "./ui.js";
 import { fmtLogTs, logItemHtml, logDayLabel, logPaginaSoort } from "./render-overig.js";
@@ -131,8 +131,22 @@ function kenmerkenKaart(code){
     <div class="kmk-bron">${k.bron?esc(k.bron):'<span style="color:var(--mut)">Nog geen bron vastgelegd</span>'}</div>${wijz}`;
 }
 
+// Pure helper (testbaar zonder DOM): waar brengt het terug-pijltje je heen?
+// Alleen een echte, andere pagina telt; anders is Nog Te Doen het vangnet.
+function terugDoel(v){
+  return (v && v!=='vve' && PAGE_META[v]) ? v : 'ntd';
+}
+
+// Terug-pijltje in de dossier-kop: naar de pagina waar je vandaan kwam.
+function terugVanDossier(){
+  goTo(terugDoel(state.vveTerug));
+}
+
 // Navigeer naar het dossier van een VvE (en onthoud 'm voor het commandocentrum)
 function openVvePagina(code){
+  // Onthoud van welk scherm je kwam (dossier→dossier laat de oorsprong staan).
+  const huidig=document.querySelector('.page.active')?.id?.replace('page-','');
+  if(huidig&&huidig!=='vve') state.vveTerug=huidig;
   state.vveCode=code;
   state._vveAfAlles=false;
   state.kenmerkenEdit=false;
@@ -230,6 +244,7 @@ function renderVve(){
   wrap.innerHTML=`
     <div class="vve-kop">
       <div class="vve-naam">
+        <button class="vve-terug" data-action="vve-terug" title="Terug naar ${esc(PAGE_META[terugDoel(state.vveTerug)][0])}" aria-label="Terug naar ${esc(PAGE_META[terugDoel(state.vveTerug)][0])}">${ico('pijlLinks',18)}</button>
         <span class="code" style="--sec:var(--ac);--sec-l:var(--ac-l);font-size:15px;padding:5px 11px">${esc(o.code)}</span>
         <div><h3>${esc(o.naam||'Onbekende VvE')}${o.budget?' <span class="badge budget-tag" title="Budgetpakket — vergadert zelf">Budget</span>':''}</h3>
         <div class="sub">${o.behandelaars.length?'behandelaars: '+persBadges(o.behandelaars.join(', ')):'<span style="color:var(--mut)">geen lopende taken</span>'}</div></div>
@@ -280,4 +295,4 @@ function renderVve(){
   }
 }
 
-export { vveOverzicht, openVvePagina, renderVve, filterDossierLog, dossierFeed, addContactLog, afOmschrijving };
+export { vveOverzicht, openVvePagina, renderVve, filterDossierLog, dossierFeed, addContactLog, afOmschrijving, terugDoel, terugVanDossier };

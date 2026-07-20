@@ -18,7 +18,7 @@ import { doLogin } from './auth.js';
 import { openSnoozeModal, snoozeKies } from './snooze.js';
 import { addAannemer, toggleAannemerBinnen, verwijderAannemer } from './offerte-aannemers.js';
 import { openHerhaalModal, toggleHerhaalStatus, deleteHerhaal } from './render-herhaal.js';
-import { openVvePagina, renderVve, addContactLog } from './render-vve.js';
+import { openVvePagina, renderVve, addContactLog, terugVanDossier } from './render-vve.js';
 import { vraagChat, chatSuggestie } from './dossier-chat.js';
 import { saveKenmerken } from './kenmerken.js';
 import { palKies } from './palette.js';
@@ -59,6 +59,7 @@ export const ACTIONS = {
   'herhaal-status':        (el) => toggleHerhaalStatus(+el.dataset.hid),
   'herhaal-verwijderen':   ()   => deleteHerhaal(),
   'vve-open':              (el) => openVvePagina(el.dataset.code),
+  'vve-terug':             ()   => terugVanDossier(),
   'vve-taak-nieuw':        (el) => openModal(false, null, {sec:'OPPAKKEN', code:el.dataset.code, naam:el.dataset.naam||''}),
   'vve-af-alles':          ()   => { state._vveAfAlles=true; renderVve(); },
   'pal-kies':              (el) => palKies(+el.dataset.idx),

@@ -8,7 +8,7 @@ import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
 import { filterNtd, setNtd, renderNtd, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey } from "./render-lijsten.js";
 import { state, D, pgs } from "./state.js";
-import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving } from "./render-vve.js";
+import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel } from "./render-vve.js";
 import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk.js";
@@ -255,10 +255,17 @@ import { shouldPromptReload } from "./sw-update.js";
 
   // ── actions-registry ── (dekkings-test: elke verwachte data-action bestaat)
   const VERWACHTE_ACTIES = ['toggle','notif-toggle','off','notitie-toevoegen','taak-verwijder-modal','ai-kopieer','login','ntd-sectie','af-sectie','alvo-flag','taak-bewerken','taak-afronden','pagineer','ai-overnemen','ai-actie-taak','ai-kopieer-concept','ontw-cat','ontw-bewerken','toast-sluiten','taak-wegleggen','snooze-kies','herhaal-bewerken','herhaal-status','herhaal-verwijderen',
-'vve-open','vve-af-alles','pal-kies','bulk-toggle','bulk-vink','bulk-menu','bulk-doe',
+'vve-open','vve-terug','vve-af-alles','pal-kies','bulk-toggle','bulk-vink','bulk-menu','bulk-doe',
 'kenmerken-bewerken','kenmerken-opslaan','kenmerken-annuleren',
 'contact-soort','contact-vastleggen','vve-log-filter','vve-log-alles','ntd-sorteer'];
   VERWACHTE_ACTIES.forEach(a => truthy(`actie '${a}' bestaat`, typeof ACTIONS[a] === 'function'));
+
+  // ── terugDoel ── (terug-pijltje in de dossier-kop: waar kom je uit?)
+  eq('terugDoel: onthouden pagina',            terugDoel('vandaag'),      'vandaag');
+  eq('terugDoel: Nog Te Doen zelf',            terugDoel('ntd'),          'ntd');
+  eq('terugDoel: dossier telt niet als bron',  terugDoel('vve'),          'ntd');
+  eq('terugDoel: leeg → Nog Te Doen',          terugDoel(null),           'ntd');
+  eq('terugDoel: onbekende pagina → vangnet',  terugDoel('bestaat-niet'), 'ntd');
 
   // ── volgendeDeadline ── (herhaalregels; maandgrens-clamp)
   eq('vd maand',            volgendeDeadline('15-01-2026','maand'),            '15-02-2026');

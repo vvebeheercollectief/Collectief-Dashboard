@@ -600,6 +600,9 @@
     /* ── Per-VvE-dossier (Fase 5) ── */
     .vve-kop{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:16px}
     .vve-naam{display:flex;align-items:center;gap:12px}
+    .vve-terug{width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:10px;border:1px solid var(--bor);background:var(--sur);color:var(--mut);box-shadow:var(--sh);flex-shrink:0;transition:color var(--tr),border-color var(--tr),background var(--tr)}
+    .vve-terug:hover{color:var(--ac);border-color:var(--ac);background:var(--sur2)}
+    .vve-terug:focus-visible{outline:2px solid var(--ac-900);outline-offset:2px}
     .vve-naam h3{margin:0;font-size:19px;font-weight:800}
     .vve-naam .sub{font-size:12.5px;color:var(--mut);margin-top:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
     .kerncijfers{display:flex;gap:10px;flex-wrap:wrap;align-items:stretch}

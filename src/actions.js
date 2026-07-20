@@ -10,7 +10,7 @@ import {
   setOntw, renderOntw, editOntwItem, addTaskNote, renderLogboek,
   editLogboek, saveLogboek, cancelLogboek, setLogSoort, deleteLogboek,
 } from './render-overig.js';
-import { openModal, completeTask, deleteCurrentEditTask } from './crud.js';
+import { openModal, completeTask, completeCurrentEditTask, deleteCurrentEditTask } from './crud.js';
 import { adjOff } from './util.js';
 import { copyAiPrompt, aiOvernemen, aiActieTaak, aiKopieerConcept } from './ai.js';
 import { dismissToast, saveNotifPrefs } from './notifications.js';
@@ -32,6 +32,7 @@ export const ACTIONS = {
   'off':                   (el) => adjOff(el.dataset.off, +el.dataset.delta),
   'notitie-toevoegen':     ()   => addTaskNote(),
   'taak-verwijder-modal':  ()   => deleteCurrentEditTask(),
+  'taak-afronden-modal':   ()   => completeCurrentEditTask(),
   'ai-kopieer':            (el) => copyAiPrompt(el.dataset.waar),
   'login':                 ()   => doLogin(),
   'ntd-sectie':            (el) => setNtd(el.dataset.sec),

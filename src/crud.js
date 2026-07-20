@@ -22,6 +22,7 @@ function openModal(isEdit,rowData,opts){
   document.getElementById('m-title').textContent=(isEdit?'Taak bewerken — ':'Taak toevoegen — ')+SECS[sec].label;
   document.getElementById('m-submit-lbl').textContent=isEdit?'Opslaan':'Toevoegen';
   document.getElementById('m-del').style.display=isEdit?'inline-flex':'none';
+  document.getElementById('m-af').style.display=isEdit?'inline-flex':'none';
 
   // Section colour for focus rings
   document.documentElement.style.setProperty('--modal-sec',SECS[sec].color);
@@ -218,6 +219,16 @@ function getAfInsertRow(sec){
   return 2;
 }
 
+// Afronden vanuit de bewerk-modal: zelfde flow als de ✓-knop op een rij.
+// De modal kreeg de rij uit _rowCache, dus indexOf vindt dezelfde taak terug.
+async function completeCurrentEditTask(){
+  if(!state.editRowData) return;
+  const idx=state._rowCache.indexOf(state.editRowData);
+  if(idx<0){alert('Taak niet gevonden. Vernieuw de pagina en probeer opnieuw.');return}
+  closeModal();
+  completeTask(idx);
+}
+
 async function completeTask(idx){
   const r=state._rowCache[idx];
   if(!r){alert('Taak niet gevonden. Vernieuw de pagina en probeer opnieuw.');return}
@@ -271,7 +282,8 @@ async function doCompleteTask(){
     const undoData={sec,code:r.code,ntdValues,ntdRow:r._row};
     // 1) optimistisch: meteen uit de lokale lijst + indexen meeschuiven;
     //    de oude DOM-rij pulst groen en pas daarná hertekenen we (anim.js)
-    const tr=document.querySelector(`#ntd-tbody tr[data-row="${r._row}"]`);
+    // Rij voor de groene puls: NTD-tabel, of anders de taakrij op de dossierpagina
+    const tr=document.querySelector(`#ntd-tbody tr[data-row="${r._row}"]`)||document.querySelector(`.tk[data-rid="${idx}"]`);
     const arr=D.ntd[sec]||[];
     const pos=arr.indexOf(r);
     if(pos>-1) arr.splice(pos,1);
@@ -406,5 +418,5 @@ function gv(id){const el=document.getElementById(id);return el?el.value.trim():'
 export {
   openModal, editRow, closeModal, fillModalFields, setv, clearModal,
   getSheetIds, getInsertRow, insertAndWriteRow, deleteTask, deleteCurrentEditTask, deleteTaskRow,
-  getAfInsertRow, completeTask, doCompleteTask, closeCompleteModal, submitTask, gv,
+  getAfInsertRow, completeTask, completeCurrentEditTask, doCompleteTask, closeCompleteModal, submitTask, gv,
 };

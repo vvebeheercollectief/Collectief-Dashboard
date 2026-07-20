@@ -209,7 +209,8 @@ function renderVve(){
     return `<div class="tk${weg?' snooze-row':''}" data-action="taak-bewerken" data-rid="${rid}" style="cursor:pointer">
       <span class="nm">${esc(r.actiepunt||r.periode||r.agendapunten||r.status||'')}
         <span class="mt">${esc(meta.label)}${r.behandelaar?' · '+esc(r.behandelaar):''}</span></span>
-      <span class="dl">${dl}</span></div>`;
+      <span class="dl">${dl}</span>
+      <button class="act-af act-ico tk-af" data-action="taak-afronden" data-rid="${rid}" title="Afronden" aria-label="Afronden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 12 4 4 10-10"/></svg></button></div>`;
   };
   const afLimiet=state._vveAfAlles?o.afgerond.length:5;
   const afRij=r=>{

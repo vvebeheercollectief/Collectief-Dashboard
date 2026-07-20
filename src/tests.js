@@ -255,7 +255,7 @@ import { shouldPromptReload } from "./sw-update.js";
 
   // ── actions-registry ── (dekkings-test: elke verwachte data-action bestaat)
   const VERWACHTE_ACTIES = ['toggle','notif-toggle','off','notitie-toevoegen','taak-verwijder-modal','ai-kopieer','login','ntd-sectie','af-sectie','alvo-flag','taak-bewerken','taak-afronden','pagineer','ai-overnemen','ai-actie-taak','ai-kopieer-concept','ontw-cat','ontw-bewerken','toast-sluiten','taak-wegleggen','snooze-kies','herhaal-bewerken','herhaal-status','herhaal-verwijderen',
-'vve-open','vve-terug','vve-af-alles','pal-kies','bulk-toggle','bulk-vink','bulk-menu','bulk-doe',
+'vve-open','vve-terug','vve-af-alles','pal-kies','bulk-toggle','bulk-vink','bulk-menu','bulk-doe','taak-afronden-modal',
 'kenmerken-bewerken','kenmerken-opslaan','kenmerken-annuleren',
 'contact-soort','contact-vastleggen','vve-log-filter','vve-log-alles','ntd-sorteer'];
   VERWACHTE_ACTIES.forEach(a => truthy(`actie '${a}' bestaat`, typeof ACTIONS[a] === 'function'));

@@ -149,6 +149,8 @@ import { shouldPromptReload } from "./sw-update.js";
   truthy('logItemHtml subtiel gebruikt log-mini', logItemHtml({actie:'Afgerond', code:'TEST01', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, false).includes('log-mini'));
   truthy('logItemHtml subtiel Afgerond zegt nog "rondde"', logItemHtml({actie:'Afgerond', code:'TEST01', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, false).includes('rondde'));
   truthy('logItemHtml subtiel met acties heeft verwijderknop', logItemHtml({actie:'Afgerond', code:'TEST01', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, true).includes('log-verwijderen'));
+  truthy('logItemHtml stip volgt werkwoordkleur (Uitgevinkt=amber)', logItemHtml({actie:'Uitgevinkt', code:'TEST01', veld:'Notulen', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, false).includes('background:var(--am)'));
+  truthy('logItemHtml stip Verwijderd is rood', logItemHtml({actie:'Verwijderd', code:'TEST01', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, false).includes('background:var(--rd)'));
 
   // ── logPaginaSoort ── (welke logregels horen op de Logboek-pagina: notities/contact=normaal, afgerond/aangemaakt=subtiel, rest=ruis)
   eq('logPaginaSoort Opmerking → normaal', logPaginaSoort('Opmerking'), 'normaal');

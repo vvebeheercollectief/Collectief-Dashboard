@@ -230,6 +230,11 @@ function logDayLabel(iso){
   return s.charAt(0).toUpperCase()+s.slice(1);
 }
 
+// Eén kleurbron per logboek-actie: het werkwoord in de zin én de stip van de dunne
+// regel gebruiken dezelfde kleur, zodat ze elkaar nooit tegenspreken.
+const LOG_KLEUR={Afgerond:'var(--gn)',Aangevinkt:'var(--gn)',Uitgevinkt:'var(--am)',Teruggezet:'var(--am)',Opmerking:'var(--am)',Verwijderd:'var(--rd)','Behandelaar gewijzigd':'var(--ac)',Contact:'var(--ac)',Aangemaakt:'var(--pu)','Aangemaakt (sheet)':'var(--pu)',Kenmerk:'var(--pu)'};
+const logKleur=a=>LOG_KLEUR[a]||'var(--pu)';
+
 // Eén zinnengenerator voor alle logregels (gedeeld door Logboek-pagina en VvE-dossier).
 // opts.zonderCode → laat de VvE-code weg; in een dossier is die redundant.
 function logZin(r, opts){
@@ -239,19 +244,20 @@ function logZin(r, opts){
   // "… bij 121027" → in het dossier gewoon niets; anders blijft "bij" bungelen.
   const bij=zonderCode?'':' bij '+chip;
   const staart=zonderCode?'':' '+chip;   // default-geval: chip los achter de ruwe actienaam
-  const A=(verb,kleur)=>`<b>${naam}</b> <span class="log-act" style="color:${kleur}">${verb}</span> `;
+  const kleur=logKleur(r.actie);
+  const A=verb=>`<b>${naam}</b> <span class="log-act" style="color:${kleur}">${verb}</span> `;
   switch(r.actie){
-    case'Afgerond':            return A('rondde','var(--gn)')+(zonderCode?'een taak':chip)+' af';
-    case'Verwijderd':          return A('verwijderde','var(--rd)')+'een taak'+bij;
-    case'Teruggezet':          return A('zette','var(--am)')+(zonderCode?'een taak':chip)+' terug';
-    case'Opmerking':           return A('noteerde','var(--am)')+(zonderCode?'iets':'bij '+chip);
-    case'Behandelaar gewijzigd':return A('wees','var(--ac)')+(zonderCode?'een taak':chip)+' toe';
+    case'Afgerond':            return A('rondde')+(zonderCode?'een taak':chip)+' af';
+    case'Verwijderd':          return A('verwijderde')+'een taak'+bij;
+    case'Teruggezet':          return A('zette')+(zonderCode?'een taak':chip)+' terug';
+    case'Opmerking':           return A('noteerde')+(zonderCode?'iets':'bij '+chip);
+    case'Behandelaar gewijzigd':return A('wees')+(zonderCode?'een taak':chip)+' toe';
     case'Aangemaakt':
-    case'Aangemaakt (sheet)':  return A('maakte','var(--pu)')+'een nieuwe taak'+bij+(r.nieuweWaarde?` <span style="color:var(--mut)">→ ${esc(r.nieuweWaarde)}</span>`:'');
-    case'Contact':             return A('sprak','var(--ac)')+`met ${esc(r.oudeWaarde||'—')}`+bij+` <span style="color:var(--mut)">· ${esc(r.veld||'')}</span>`;
-    case'Aangevinkt':          return A('vinkte','var(--gn)')+`<b>${esc(r.veld||'')}</b> aan`+bij;
-    case'Uitgevinkt':          return A('vinkte','var(--am)')+`<b>${esc(r.veld||'')}</b> uit`+bij;
-    case'Kenmerk':             return A('wijzigde','var(--pu)')+`kenmerk <b>${esc(r.veld||'')}</b>`+bij;
+    case'Aangemaakt (sheet)':  return A('maakte')+'een nieuwe taak'+bij+(r.nieuweWaarde?` <span style="color:var(--mut)">→ ${esc(r.nieuweWaarde)}</span>`:'');
+    case'Contact':             return A('sprak')+`met ${esc(r.oudeWaarde||'—')}`+bij+` <span style="color:var(--mut)">· ${esc(r.veld||'')}</span>`;
+    case'Aangevinkt':          return A('vinkte')+`<b>${esc(r.veld||'')}</b> aan`+bij;
+    case'Uitgevinkt':          return A('vinkte')+`<b>${esc(r.veld||'')}</b> uit`+bij;
+    case'Kenmerk':             return A('wijzigde')+`kenmerk <b>${esc(r.veld||'')}</b>`+bij;
     default:                   return `<b>${naam}</b> — ${esc(r.actie||'')}`+staart;
   }
 }
@@ -277,7 +283,7 @@ function logPaginaSoort(actie){
 // opts.zonderCode → geef door aan logZin (dossier: code is redundant).
 function logItemHtml(r,subtiel,acties,opts){
   if(subtiel){
-    const kleur=r.actie==='Afgerond'?'var(--gn)':(r.actie==='Aangevinkt'||r.actie==='Uitgevinkt')?'var(--gn)':'var(--pu)';
+    const kleur=logKleur(r.actie);
     const acts=acties?`<span class="log-acts"><button class="log-act-btn del" data-action="log-verwijderen" data-row="${r._row}" title="Verwijderen" aria-label="Regel verwijderen">${ico('prullenbak')}</button></span>`:'';
     return `<div class="log-mini">
       <span class="log-mini-dot" style="background:${kleur}"></span>

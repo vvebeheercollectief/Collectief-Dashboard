@@ -232,7 +232,7 @@ function logDayLabel(iso){
 
 // Eén kleurbron per logboek-actie: het werkwoord in de zin én de stip van de dunne
 // regel gebruiken dezelfde kleur, zodat ze elkaar nooit tegenspreken.
-const LOG_KLEUR={Afgerond:'var(--gn)',Aangevinkt:'var(--gn)',Uitgevinkt:'var(--am)',Teruggezet:'var(--am)',Opmerking:'var(--am)',Verwijderd:'var(--rd)','Behandelaar gewijzigd':'var(--ac)',Contact:'var(--ac)',Aangemaakt:'var(--pu)','Aangemaakt (sheet)':'var(--pu)',Kenmerk:'var(--pu)'};
+const LOG_KLEUR={Afgerond:'var(--gn)',Aangevinkt:'var(--gn)',Uitgevinkt:'var(--am)',Teruggezet:'var(--am)',Opmerking:'var(--am)',Verwijderd:'var(--rd)','Behandelaar gewijzigd':'var(--ac)',Contact:'var(--ac)',Aangemaakt:'var(--pu)','Aangemaakt (sheet)':'var(--pu)',Kenmerk:'var(--pu)',Weggelegd:'var(--am)','Opvolgdatum gewist':'var(--am)','Auto-prioriteit':'var(--mut)'};
 const logKleur=a=>LOG_KLEUR[a]||'var(--pu)';
 
 // Eén zinnengenerator voor alle logregels (gedeeld door Logboek-pagina en VvE-dossier).
@@ -258,6 +258,9 @@ function logZin(r, opts){
     case'Aangevinkt':          return A('vinkte')+`<b>${esc(r.veld||'')}</b> aan`+bij;
     case'Uitgevinkt':          return A('vinkte')+`<b>${esc(r.veld||'')}</b> uit`+bij;
     case'Kenmerk':             return A('wijzigde')+`kenmerk <b>${esc(r.veld||'')}</b>`+bij+(r.nieuweWaarde?` <span style="color:var(--mut)">→ ${esc(r.nieuweWaarde)}</span>`:'');
+    case'Weggelegd':           return A('legde')+(zonderCode?'een taak':chip)+' weg'+(r.nieuweWaarde?` tot <b>${esc(r.nieuweWaarde)}</b>`:'');
+    case'Opvolgdatum gewist':  return A('haalde')+(zonderCode?'een taak':chip)+' terug uit weggelegd';
+    case'Auto-prioriteit':     return A('paste')+'de prioriteit automatisch aan'+(r.nieuweWaarde?` <span style="color:var(--mut)">· ${esc(r.nieuweWaarde)}</span>`:'');
     default:                   return `<b>${naam}</b> — ${esc(r.actie||'')}`+staart;
   }
 }

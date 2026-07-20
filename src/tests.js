@@ -144,6 +144,16 @@ import { shouldPromptReload } from "./sw-update.js";
   truthy('logZin zonderCode Opmerking zonder "bij"', (()=>{const z=logZin({actie:'Opmerking', code:'TEST01', gebruiker:'info@vvebeheercollectief.nl'}, {zonderCode:true}).replace(/<[^>]*>/g,''); return z.includes('noteerde') && !/\bbij\b/.test(z);})());
   truthy('logZin Kenmerk toont nieuwe waarde', logZin({actie:'Kenmerk', code:'TEST01', veld:'Balkons', oudeWaarde:'Onbekend', nieuweWaarde:'Gemeenschappelijk', gebruiker:'info@vvebeheercollectief.nl'}).includes('Gemeenschappelijk'));
   truthy('logZin Behandelaar toont aan wie', logZin({actie:'Behandelaar gewijzigd', code:'TEST01', nieuweWaarde:'Cihad', gebruiker:'info@vvebeheercollectief.nl'}, {zonderCode:true}).includes('Cihad'));
+  truthy('logZin Weggelegd bevat "legde … weg"', (()=>{const z=logZin({actie:'Weggelegd', code:'TEST01', veld:'opvolgdatum', oudeWaarde:'', nieuweWaarde:'24-07-2026', gebruiker:'info@vvebeheercollectief.nl'}).replace(/<[^>]*>/g,''); return z.includes('legde') && /\bweg\b/.test(z);})());
+  truthy('logZin Weggelegd toont de opvolgdatum', logZin({actie:'Weggelegd', code:'TEST01', veld:'opvolgdatum', nieuweWaarde:'24-07-2026', gebruiker:'info@vvebeheercollectief.nl'}).includes('24-07-2026'));
+  truthy('logZin Weggelegd kleurt amber', logZin({actie:'Weggelegd', code:'TEST01', nieuweWaarde:'24-07-2026', gebruiker:'info@vvebeheercollectief.nl'}).includes('var(--am)'));
+  truthy('logZin Weggelegd toont niet de ruwe actienaam', !logZin({actie:'Weggelegd', code:'TEST01', nieuweWaarde:'24-07-2026', gebruiker:'info@vvebeheercollectief.nl'}).includes('— Weggelegd'));
+  truthy('logZin Weggelegd zonderCode verbergt de code', (()=>{const z=logZin({actie:'Weggelegd', code:'TEST01', nieuweWaarde:'24-07-2026', gebruiker:'info@vvebeheercollectief.nl'}, {zonderCode:true}); return !z.includes('TEST01') && z.includes('legde');})());
+  truthy('logZin Opvolgdatum gewist bevat "haalde … terug"', (()=>{const z=logZin({actie:'Opvolgdatum gewist', code:'TEST01', veld:'opvolgdatum', oudeWaarde:'24-07-2026', nieuweWaarde:'', gebruiker:'info@vvebeheercollectief.nl'}).replace(/<[^>]*>/g,''); return z.includes('haalde') && z.includes('terug');})());
+  truthy('logZin Opvolgdatum gewist kleurt amber', logZin({actie:'Opvolgdatum gewist', code:'TEST01', gebruiker:'info@vvebeheercollectief.nl'}).includes('var(--am)'));
+  truthy('logZin Auto-prioriteit bevat "automatisch"', logZin({actie:'Auto-prioriteit', code:'', nieuweWaarde:'Bijgewerkt: 3', gebruiker:'systeem'}).includes('automatisch'));
+  truthy('logZin Auto-prioriteit kleurt gedempt', logZin({actie:'Auto-prioriteit', code:'', nieuweWaarde:'Bijgewerkt: 3', gebruiker:'systeem'}).includes('log-act" style="color:var(--mut)'));
+  truthy('logZin Auto-prioriteit toont niet de ruwe actienaam', !logZin({actie:'Auto-prioriteit', code:'', nieuweWaarde:'Bijgewerkt: 3', gebruiker:'systeem'}).includes('— Auto-prioriteit'));
 
   // ── logItemHtml: de dunne (subtiele) regel gebruikt dezelfde zinnengenerator als de volle regel ──
   truthy('logItemHtml subtiel Aangevinkt geeft nette zin', logItemHtml({actie:'Aangevinkt', code:'TEST01', veld:'Notulen', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, false).includes('vinkte'));

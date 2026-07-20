@@ -145,13 +145,13 @@ function openVvePagina(code){
   goTo('vve');
 }
 
-// Composer: standaard ingeklapt tot één regel; opent bij klik en blijft open zolang er tekst staat.
+// Composer: standaard ingeklapt tot één regel; opent bij klik en blijft open tot je een ander dossier opent.
 function composerHtml(code){
   if(!state.dosComposerOpen){
-    return `<div class="comp-dicht" data-action="composer-openen">
+    return `<button type="button" class="comp-dicht" data-action="composer-openen">
       Leg vast wat er gebeurd is — bv. zojuist gebeld met een eigenaar…
-      <span class="btn btn-pri btn-sm">Vastleggen</span>
-    </div>`;
+      <span class="btn btn-pri btn-sm" aria-hidden="true">Vastleggen</span>
+    </button>`;
   }
   return `<div class="dos-composer">
     <textarea id="dos-tekst" data-code="${esc(code)}" rows="2" placeholder="Leg vast wat er gebeurd is — bv. zojuist gebeld met een eigenaar… (Ctrl+Enter = vastleggen)"></textarea>

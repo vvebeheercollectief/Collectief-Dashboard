@@ -67,6 +67,7 @@ export const state = {
   kenmerkenEdit: false,    // kenmerken-paneel in bewerkmodus
   vveLogFilter: 'alles',   // 'alles' | 'contact'
   _vveLogAlles: false,     // dossier-feed volledig uitgeklapt
+  dosComposerOpen: false,  // composer uitgeklapt (blijft open tot een ander dossier opent)
   _contactSoort: 'Telefoon',
   herhaalEditRow: null,    // herhaalregel in de bewerkmodal (Fase 4)
   _aiLastCode: '',

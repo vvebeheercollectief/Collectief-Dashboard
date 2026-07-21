@@ -55,7 +55,8 @@ export const state = {
   _undoInFlight: false,    // een undo-actie (afronden/verwijderen/bulk) loopt → poll pauzeren (undo doet eigen loadAll)
   // diversen
   _sheetIds: null,
-  _completeIdx: null,
+  _completeRow: null,      // rij-OBJECT waarvoor de afhandel-modal open staat (identiteit, geen index)
+  _completeRid: null,      // geklikte data-rid, alléén voor de groene puls op de juiste DOM-rij
   _snoozeRow: null,        // taak waarvoor de wegleggen-modal open staat (Fase 4)
   offerteAannOpen: new Set(),   // codes van trajecten met uitgeklapt aannemers-paneel
   vveCode: null,           // VvE op de per-VvE-pagina (Fase 5)

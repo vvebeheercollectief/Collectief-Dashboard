@@ -229,10 +229,31 @@ async function completeCurrentEditTask(){
   completeTask(idx);
 }
 
+// Pure (testbaar): zoek het bewaarde rij-object vers op in de huidige _rowCache.
+// Bewust op identiteit (indexOf), geen veld-vergelijking: na een verse parse zijn het
+// nieuwe objecten en is -1 het veilige antwoord — niet gokken welke rij 'dezelfde' is.
+function _verseRijIdx(row, cache){ return row ? (cache||[]).indexOf(row) : -1; }
+
+// Pure (testbaar): her-anker een wees-rij op INHOUD nadat een verse parse alle
+// D.ntd-objecten verving (stille resync na een andere schrijfactie). Alleen bij exact
+// één inhoudelijk identieke rij in dezelfde sectie is her-ankeren veilig; bij nul of
+// meerdere kandidaten liever de gebruiker opnieuw laten klikken dan gokken.
+function _herankerRij(r, ntd){
+  if(!r||!SECS[r._sec]) return null;
+  const doel=serializeNtdUndo(r).join('\x1f');
+  const kandidaten=((ntd&&ntd[r._sec])||[]).filter(x=>serializeNtdUndo(x).join('\x1f')===doel);
+  return kandidaten.length===1?kandidaten[0]:null;
+}
+
 async function completeTask(idx){
   const r=state._rowCache[idx];
   if(!r){alert('Taak niet gevonden. Vernieuw de pagina en probeer opnieuw.');return}
-  state._completeIdx=idx;
+  // Rij-OBJECT bewaren, geen index: terwijl de modal open staat kan een vertraagde
+  // renderAll (animateRowOut, ~1,2s) of de stille resync _rowCache herbouwen — een
+  // bewaarde index wijst dan naar een ándere taak. Zelfde patroon als completeCurrentEditTask.
+  // Het geklikte rid gaat apart mee, alléén voor de groene puls op de juiste DOM-rij.
+  state._completeRow=r;
+  state._completeRid=idx;
   const d=new Date();
   document.getElementById('complete-date').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   document.getElementById('complete-comment').value='';
@@ -241,9 +262,15 @@ async function completeTask(idx){
 }
 
 async function doCompleteTask(){
-  const idx=state._completeIdx;
-  const r=state._rowCache[idx];
-  if(!r){alert('Taak niet gevonden.');closeCompleteModal();return}
+  let r=state._completeRow;
+  if(r && _verseRijIdx(r, state._rowCache)<0){
+    // De cache is herbouwd met verse parse-objecten (stille resync) terwijl de modal
+    // open stond. Her-anker op inhoud: staat de taak er ongewijzigd in, dan mag de
+    // afronding gewoon doorgaan en is de getypte toelichting niet voor niets geweest.
+    r=_herankerRij(r, D.ntd);
+    if(r) state._completeRow=r;
+  }
+  if(!r){alert('Taak niet gevonden. De lijst is intussen ververst — probeer opnieuw.');closeCompleteModal();return}
   const dateVal=document.getElementById('complete-date').value;
   const comment=document.getElementById('complete-comment').value.trim();
   if(!dateVal){alert('Datum is verplicht.');return}
@@ -282,8 +309,10 @@ async function doCompleteTask(){
     const undoData={sec,code:r.code,ntdValues,ntdRow:r._row};
     // 1) optimistisch: meteen uit de lokale lijst + indexen meeschuiven;
     //    de oude DOM-rij pulst groen en pas daarná hertekenen we (anim.js)
-    // Rij voor de groene puls: NTD-tabel, of anders de taakrij op de dossierpagina
-    const tr=document.querySelector(`#ntd-tbody tr[data-row="${r._row}"]`)||document.querySelector(`.tk[data-rid="${idx}"]`);
+    // Rij voor de groene puls: NTD-tabel, of anders de GEKLIKTE taakrij (bewaard rid)
+    // op de zichtbare pagina — niet een indexOf-treffer die op een verborgen kopie
+    // (dossier-DOM van een eerder bezocht dossier) kan landen.
+    const tr=document.querySelector(`#ntd-tbody tr[data-row="${r._row}"]`)||document.querySelector(`.page.active .tk[data-rid="${state._completeRid}"]`);
     const arr=D.ntd[sec]||[];
     const pos=arr.indexOf(r);
     if(pos>-1) arr.splice(pos,1);
@@ -315,7 +344,7 @@ async function doCompleteTask(){
   }catch(e){alert('Fout bij afhandelen: '+e.message)}
 }
 
-function closeCompleteModal(){document.getElementById('complete-bg').classList.remove('open');state._completeIdx=null}
+function closeCompleteModal(){document.getElementById('complete-bg').classList.remove('open');state._completeRow=null;state._completeRid=null}
 
 // ══════════════════════════════════════
 //  SUBMIT TASK (Add + Edit)
@@ -419,4 +448,5 @@ export {
   openModal, editRow, closeModal, fillModalFields, setv, clearModal,
   getSheetIds, getInsertRow, insertAndWriteRow, deleteTask, deleteCurrentEditTask, deleteTaskRow,
   getAfInsertRow, completeTask, completeCurrentEditTask, doCompleteTask, closeCompleteModal, submitTask, gv,
+  _verseRijIdx, _herankerRij,
 };

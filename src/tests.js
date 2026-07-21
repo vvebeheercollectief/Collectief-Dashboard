@@ -14,7 +14,7 @@ import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk.js";
 import { _isTransient, _rowMismatch, _a1ColA } from "./api.js";
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal } from "./data.js";
-import { setv, serializeNtdUndo } from "./crud.js";
+import { setv, serializeNtdUndo, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages } from "./dossier-chat.js";
 import { shouldPromptReload } from "./sw-update.js";
@@ -923,6 +923,76 @@ import { shouldPromptReload } from "./sw-update.js";
     eq('parseHerhaal: sectie geüppercased', hh[0].sectie, 'OPPAKKEN');
     eq('parseHerhaal: type lowercased', hh[0].type, 'maand');
     eq('parseHerhaal: _row offset (eerste = rij 2)', hh[0]._row, 2);
+  })();
+
+  // ── Afhandel-modal onthoudt het rij-OBJECT, niet de index: een herbouwde _rowCache
+  //    (vertraagde renderAll uit animateRowOut / stille resync) mag nooit een ándere
+  //    taak afronden. Vers opzoeken gebeurt op identiteit; weg = -1 = veilig stoppen. ──
+  (()=>{
+    const rA={_sec:'OPPAKKEN',code:'CT-A',_row:5,actiepunt:'taak A'};
+    const rB={_sec:'OPPAKKEN',code:'CT-B',_row:6,actiepunt:'taak B'};
+    eq('_verseRijIdx: zelfde object op verschoven plek gevonden', _verseRijIdx(rB,[rB,rA]), 0);
+    eq('_verseRijIdx: object weg na verse parse (kloon telt niet) → -1', _verseRijIdx(rB,[{...rB}]), -1);
+    eq('_verseRijIdx: geen bewaarde rij → -1', _verseRijIdx(null,[rA]), -1);
+    eq('_verseRijIdx: lege cache → -1', _verseRijIdx(rB,[]), -1);
+    // integratie: completeTask bewaart het object zelf; closeCompleteModal ruimt op
+    const cacheOud=state._rowCache;
+    state._rowCache=[rA,rB];
+    completeTask(1);
+    truthy('completeTask bewaart het rij-object (geen index)', state._completeRow===rB);
+    truthy('afhandel-modal is open', document.getElementById('complete-bg').classList.contains('open'));
+    // herbouwde cache in andere volgorde: het object wordt op de nieuwe plek teruggevonden
+    state._rowCache=[rB,rA];
+    eq('na cache-herbouw wijst verse lookup naar dezelfde taak', _verseRijIdx(state._completeRow,state._rowCache), 0);
+    closeCompleteModal();
+    eq('closeCompleteModal wist de bewaarde rij', state._completeRow, null);
+    eq('closeCompleteModal wist het bewaarde rid', state._completeRid, null);
+    state._rowCache=cacheOud;
+  })();
+  // ── _herankerRij: wees-rij (verse parse verving objecten) alleen her-ankeren bij
+  //    exact één inhoudelijk identieke rij — bij nul of twee kandidaten niet gokken ──
+  (()=>{
+    const oud={_sec:'OPPAKKEN',_row:5,code:'HA-1',naam:'VvE HA',actiepunt:'dak nakijken',deadline:'1 aug 2026',behandelaar:'Jer',prioriteit:'Hoog',opmerkingen:'',inBehandeling:''};
+    const vers={...oud,_row:6};              // zelfde inhoud (rijnummer telt niet mee in serializeNtdUndo)
+    const anders={...oud,actiepunt:'goot vegen'};
+    eq('_herankerRij: exact één identieke rij → her-ankeren', _herankerRij(oud,{OPPAKKEN:[anders,vers]})===vers, true);
+    eq('_herankerRij: geen identieke rij → null', _herankerRij(oud,{OPPAKKEN:[anders]}), null);
+    eq('_herankerRij: twee identieke rijen → null (ambigu, niet gokken)', _herankerRij(oud,{OPPAKKEN:[vers,{...oud}]}), null);
+    eq('_herankerRij: onbekende sectie → null', _herankerRij({_sec:'BESTAAT-NIET'},{}), null);
+    eq('_herankerRij: geen rij → null', _herankerRij(null,{}), null);
+  })();
+  // ── doCompleteTask zelf (de echte bug-site): vangnet bij verdwenen taak,
+  //    her-anker bij ongewijzigde taak — synchroon pad vóór de eerste await ──
+  (()=>{
+    const _alert=window.alert; let alerts=[]; window.alert=m=>alerts.push(m);
+    const cacheOud=state._rowCache, ntdOud=D.ntd;
+    try{
+      // 1) taak bestaat nergens meer → alert + modal dicht + opgeruimd
+      state._rowCache=[];
+      D.ntd={OPPAKKEN:[]};
+      state._completeRow={_sec:'OPPAKKEN',_row:9,code:'DC-WEG',naam:'VvE weg',actiepunt:'verdwenen taak',deadline:'',behandelaar:'',prioriteit:'',opmerkingen:'',inBehandeling:''};
+      document.getElementById('complete-bg').classList.add('open');
+      doCompleteTask();
+      eq('doCompleteTask: verdwenen taak → vangnet-alert', alerts.length, 1);
+      truthy('doCompleteTask: vangnet sluit de modal', !document.getElementById('complete-bg').classList.contains('open'));
+      eq('doCompleteTask: vangnet ruimt bewaarde rij op', state._completeRow, null);
+      // 2) taak bestaat ongewijzigd als vers object → her-anker, geen vangnet
+      alerts=[];
+      const oud={_sec:'OPPAKKEN',_row:5,code:'DC-1',naam:'VvE DC',actiepunt:'her-anker mij',deadline:'1 aug 2026',behandelaar:'Jer',prioriteit:'Hoog',opmerkingen:'',inBehandeling:''};
+      const vers={...oud,_row:4};
+      D.ntd={OPPAKKEN:[vers]};
+      state._rowCache=[];                       // herbouwde cache zonder het oude object
+      state._completeRow=oud;
+      document.getElementById('complete-date').value='';  // lege datum stopt de flow direct ná het her-ankeren
+      doCompleteTask();
+      truthy('doCompleteTask: wees-rij her-ankerd op het verse object', state._completeRow===vers);
+      eq('doCompleteTask: her-anker stopt op lege datum (geen vangnet-alert)', alerts.join('|').includes('Datum is verplicht'), true);
+    } finally {
+      window.alert=_alert;
+      state._rowCache=cacheOud; D.ntd=ntdOud;
+      state._completeRow=null; state._completeRid=null;
+      document.getElementById('complete-bg').classList.remove('open');
+    }
   })();
 
   const totOk = ok + _tOk, totFail = fail + _tFail;

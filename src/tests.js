@@ -12,7 +12,7 @@ import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel 
 import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk.js";
-import { _isTransient, _rowMismatch, _a1ColA, _herstelShift } from "./api.js";
+import { _isTransient, _rowMismatch, _a1ColA, _herstelShift, veiligeCel, _veiligeRij } from "./api.js";
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal } from "./data.js";
 import { setv, serializeNtdUndo, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
@@ -1063,6 +1063,54 @@ import { shouldPromptReload } from "./sw-update.js";
       state._rowCache=cacheOud; D.ntd=ntdOud;
       state._completeRow=null; state._completeRid=null;
       document.getElementById('complete-bg').classList.remove('open');
+    }
+  })();
+
+  // ── Formule-injectie-rem (veiligeCel, spiegel van cd_safeCell): geplakte tekst die
+  //    met =, +, -, @, tab of CR begint wordt tekst (apostrof-prefix); datums,
+  //    TRUE/FALSE, getallen en booleans blijven exact ongemoeid (USER_ENTERED-datumles) ──
+  (()=>{
+    eq('veiligeCel: =IMPORTDATA wordt tekst', veiligeCel('=IMPORTDATA("http://x")'), '\'=IMPORTDATA("http://x")');
+    eq('veiligeCel: telefoonnummer +31… wordt tekst', veiligeCel('+31 6 12345678'), "'+31 6 12345678");
+    eq('veiligeCel: -streepje-begin wordt tekst', veiligeCel('- actiepunt nabellen'), "'- actiepunt nabellen");
+    eq('veiligeCel: @-begin wordt tekst', veiligeCel('@iemand kijken'), "'@iemand kijken");
+    eq('veiligeCel: NL-datum blijft datum', veiligeCel('21-07-2026'), '21-07-2026');
+    eq('veiligeCel: lange datum blijft', veiligeCel('17 juli 2026'), '17 juli 2026');
+    eq('veiligeCel: TRUE-string blijft', veiligeCel('TRUE'), 'TRUE');
+    eq('veiligeCel: lege string blijft leeg', veiligeCel(''), '');
+    eq('veiligeCel: = middenin blijft ongemoeid', veiligeCel('a=b'), 'a=b');
+    eq('veiligeCel: boolean blijft boolean (checkbox)', veiligeCel(true), true);
+    eq('veiligeCel: getal blijft getal', veiligeCel(5), 5);
+    eq('_veiligeRij: alleen de riskante cel geprefixt', _veiligeRij(['=x','21-07-2026',true,5,'']), ["'=x",'21-07-2026',true,5,'']);
+    eq('_veiligeRij: null-invoer geeft lege rij', _veiligeRij(null), []);
+  })();
+  // ── Dubbelklik-rem op Afhandelen: met de vlag al gezet (eerste klik onderweg) mag
+  //    een tweede doCompleteTask NOOIT de schrijf-fase bereiken. We stubben fetch +
+  //    token zodat de guard de énige stopper is: zonder guard zou getSheetIds fetchen.
+  //    (Dit pint de guard vast — de assert faalt als iemand 'm weghaalt.) ──
+  await (async()=>{
+    const cacheOud=state._rowCache, sheetIdsOud=state._sheetIds;
+    const tokenOud=state.oauthToken, expiryOud=state.oauthExpiry;
+    const _fetch=window.fetch; let fetches=0; window.fetch=()=>{fetches++;return Promise.reject(new Error('geen echt netwerk in test'))};
+    const _alert=window.alert; let alerts=0; window.alert=()=>{alerts++};
+    try{
+      const rX={_sec:'OPPAKKEN',code:'DK-1',_row:4,naam:'VvE DK',actiepunt:'dubbelklik-test',deadline:'',behandelaar:'',prioriteit:'',opmerkingen:'',inBehandeling:''};
+      state._rowCache=[rX];
+      state._completeRow=rX;
+      state.oauthToken='nep-token'; state.oauthExpiry=Date.now()+3600e3; // ensureToken geeft synchroon true, géén popup
+      state._sheetIds=null;                  // zónder guard zou getSheetIds nu fetchen
+      document.getElementById('complete-date').value='2026-07-21';
+      state._completeBusy=true;              // eerste klik is 'onderweg'
+      await doCompleteTask();                // tweede klik
+      eq('dubbelklik: schrijf-fase niet bereikt (geen fetch)', fetches, 0);
+      eq('dubbelklik: geen alert, stil genegeerd', alerts, 0);
+      truthy('dubbelklik: bewaarde rij blijft staan (eerste klik rondt af)', state._completeRow===rX);
+    } finally {
+      window.fetch=_fetch; window.alert=_alert;
+      state._completeBusy=false; state._completeRow=null; state._completeRid=null;
+      state._rowCache=cacheOud; state._sheetIds=sheetIdsOud;
+      state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
+      document.getElementById('complete-date').value='';
     }
   })();
 

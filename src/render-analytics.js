@@ -24,7 +24,14 @@ function ensureChartJs(){
   if(_chartJsPromise) return _chartJsPromise;
   _chartJsPromise=new Promise((res,rej)=>{
     const s=document.createElement('script');
-    s.src='https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+    // Bewust het ORIGINELE npm-artefact (chart.umd.js), niet jsdelivr's gegenereerde
+    // .min.js-wrapper: alleen echte npm-bestanden zijn byte-stabiel en dus SRI-veilig
+    // (de wrapper waarschuwt daar zelf tegen). Al geminificeerd door Chart.js zelf.
+    s.src='https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js';
+    // SRI: een gecompromitteerd CDN kan dan geen ander script serveren dan exact
+    // deze gepubliceerde 4.4.0-build (hash zelf berekend over het CDN-bestand).
+    s.integrity='sha384-FcQlsUOd0TJjROrBxhJdUhXTUgNJQxTMcxZe6nHbaEfFL1zjQ+bq/uRoBQxb0KMo';
+    s.crossOrigin='anonymous';
     s.onload=res;
     s.onerror=()=>{ _chartJsPromise=null; rej(new Error('Chart.js laden mislukt')); };
     document.head.appendChild(s);

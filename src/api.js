@@ -10,10 +10,21 @@ async function fetchSheet(name){
   if(!r.ok){const e=await r.json().catch(()=>({}));if(r.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'API fout');err.status=r.status;throw err}
   return (await r.json()).values||[];
 }
+// Formule-injectie-rem op ALLE frontend-writes (spiegel van cd_safeCell in Apps
+// Script): een cel die met =, +, -, @, tab of CR begint zou via USER_ENTERED een
+// levende formule worden — geplakte mailtekst met =IMPORTDATA(...) is dan een
+// exfil-kanaal, en een telefoonnummer "+31 6…" een parse-fout. Een apostrof-prefix
+// maakt de cel gegarandeerd tekst; Sheets toont de apostrof niet.
+// Alleen STRINGS worden geraakt: datums ('21-07-2026'), TRUE/FALSE-strings,
+// booleans en getallen blijven exact zoals ze waren, zodat USER_ENTERED ze blijft
+// parsen zoals altijd (de datumles van v6.0 blijft intact).
+const veiligeCel=v=>(typeof v==='string'&&/^[=+\-@\t\r]/.test(v))?"'"+v:v;
+const _veiligeRij=values=>(values||[]).map(veiligeCel);
+
 async function writeRange(range,values,method='PUT'){
   if(!state.oauthToken) throw new Error('Niet ingelogd');
   const url=`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`;
-  const opts={method,headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},body:JSON.stringify({values:[values]})};
+  const opts={method,headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},body:JSON.stringify({values:[_veiligeRij(values)]})};
   const r=await fetch(url,opts);
   if(!r.ok){const e=await r.json();if(r.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Schrijffout');err.status=r.status;throw err}
   return r.json();
@@ -21,7 +32,7 @@ async function writeRange(range,values,method='PUT'){
 async function appendRange(range,values){
   if(!state.oauthToken) throw new Error('Niet ingelogd');
   const url=`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
-  const r=await fetch(url,{method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},body:JSON.stringify({values:[values]})});
+  const r=await fetch(url,{method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},body:JSON.stringify({values:[_veiligeRij(values)]})});
   if(!r.ok){const e=await r.json();if(r.status===401){state.oauthToken=null;state.oauthExpiry=0}throw new Error(e.error?.message||'Schrijffout')}
   return r.json();
 }
@@ -107,4 +118,4 @@ async function assertRowsMatch(checks, sheetName='Nog Te Doen'){
 }
 const assertRowMatch=(row, code, sheetName)=>assertRowsMatch([{ row, code }], sheetName);
 
-export { fetchSheet, writeRange, appendRange, _shiftNtdRows, _herstelShift, _isTransient, _withRetry, askChat, _rowMismatch, _a1ColA, assertRowsMatch, assertRowMatch };
+export { fetchSheet, writeRange, appendRange, veiligeCel, _veiligeRij, _shiftNtdRows, _herstelShift, _isTransient, _withRetry, askChat, _rowMismatch, _a1ColA, assertRowsMatch, assertRowMatch };

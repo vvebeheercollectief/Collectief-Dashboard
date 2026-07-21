@@ -277,6 +277,13 @@ async function doCompleteTask(){
   const dp=dateVal.split('-');
   const today=`${dp[2]}-${dp[1]}-${dp[0]}`;
   if(!await ensureToken()){alert('Inloggen mislukt. Probeer het opnieuw.');return}
+  // Dubbelklik-rem NÁ ensureToken: het gevaarlijke gat is tussen de token en de
+  // batch-write (getSheetIds is nog een await), waar een tweede klik de taak dubbel
+  // zou afronden. Bewust niet vóór ensureToken: een hangende/geblokkeerde OAuth-popup
+  // zou de vlag dan eeuwig op true laten staan; een tweede klik is daar juist een
+  // legitieme herkansing.
+  if(state._completeBusy) return;
+  state._completeBusy=true;
   try{
     const sec=r._sec;
     let values;
@@ -312,7 +319,9 @@ async function doCompleteTask(){
     // Rij voor de groene puls: NTD-tabel, of anders de GEKLIKTE taakrij (bewaard rid)
     // op de zichtbare pagina — niet een indexOf-treffer die op een verborgen kopie
     // (dossier-DOM van een eerder bezocht dossier) kan landen.
-    const tr=document.querySelector(`#ntd-tbody tr[data-row="${r._row}"]`)||document.querySelector(`.page.active .tk[data-rid="${state._completeRid}"]`);
+    // Beide clauses op de zichtbare pagina: bij afronden vanuit het dossier zou de
+    // eerste clause anders de verbórgen NTD-tabelrij matchen en de puls onzichtbaar spelen.
+    const tr=document.querySelector(`.page.active #ntd-tbody tr[data-row="${r._row}"]`)||document.querySelector(`.page.active .tk[data-rid="${state._completeRid}"]`);
     const arr=D.ntd[sec]||[];
     const pos=arr.indexOf(r);
     if(pos>-1) arr.splice(pos,1);
@@ -342,6 +351,7 @@ async function doCompleteTask(){
     // 3) groene puls + fade op de oude rij; daarná pas hertekenen
     animateRowOut(tr,'rij-puls-groen',renderAll);
   }catch(e){alert('Fout bij afhandelen: '+e.message)}
+  finally{ state._completeBusy=false; }
 }
 
 function closeCompleteModal(){document.getElementById('complete-bg').classList.remove('open');state._completeRow=null;state._completeRid=null}

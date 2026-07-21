@@ -4,7 +4,7 @@
 import { esc, berekenPrioriteit, toISODate, toDutchDate } from "./util.js";
 import { state, D } from "./state.js";
 import { SECS, SKEYS, SID } from "./config.js";
-import { writeRange, _shiftNtdRows, assertRowMatch } from "./api.js";
+import { writeRange, _shiftNtdRows, _herstelShift, assertRowMatch } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { showToast, showUndoToast, fireNotifEvent, undoComplete, undoDelete } from "./notifications.js";
 import { animateRowOut, flashRow } from "./anim.js";
@@ -198,7 +198,7 @@ async function deleteTaskRow(r){
       }
       logEvent(r.code, sec, 'Verwijderd', '', r.actiepunt||r.periode||'', '');
     },
-    ()=>{ if(arr.indexOf(r)===-1){ _shiftNtdRows(oudeRow,+1); arr.splice(Math.min(pos<0?arr.length:pos,arr.length),0,r); } },
+    ()=>{ if(arr.indexOf(r)===-1){ _herstelShift(_shiftNtdRows,oudeRow); arr.splice(Math.min(pos<0?arr.length:pos,arr.length),0,r); } },
     'Verwijderen mislukt'
   );
   // rode puls + fade op de oude rij; daarná pas hertekenen
@@ -336,7 +336,7 @@ async function doCompleteTask(){
         }
         logEvent(r.code, sec, 'Afgerond', 'status', 'Nog Te Doen', 'Afgerond op ' + today + (comment ? ' — ' + comment : ''));
       },
-      ()=>{ const a=(D.ntd[sec]=D.ntd[sec]||[]); if(a.indexOf(r)===-1){ _shiftNtdRows(r._row,+1); a.splice(Math.min(pos<0?a.length:pos,a.length),0,r); } },
+      ()=>{ const a=(D.ntd[sec]=D.ntd[sec]||[]); if(a.indexOf(r)===-1){ _herstelShift(_shiftNtdRows,r._row); a.splice(Math.min(pos<0?a.length:pos,a.length),0,r); } },
       'Afronden mislukt'
     );
     // 3) groene puls + fade op de oude rij; daarná pas hertekenen

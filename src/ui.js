@@ -11,6 +11,11 @@ import { renderVve } from "./render-vve.js";
 import { showToast } from "./notifications.js";
 
 function goTo(page){
+  // Een open logregel-bewerking hoort bij het scherm waar die begon; bij een ÉCHTE
+  // paginawissel sluiten we 'm, anders kan een verouderd formulier later opslaan.
+  // Nogmaals klikken op de huidige pagina telt niet — dat mag geen getypte tekst wissen.
+  const _huidige=document.querySelector('.page.active')?.id;
+  if(_huidige!=='page-'+page && state.logEdit!=null){ state.logEdit=null; state.logEditSoort=null; }
   document.querySelectorAll('.ni[data-page]').forEach(el=>{
     const actief=el.dataset.page===page;
     el.classList.toggle('on',actief);

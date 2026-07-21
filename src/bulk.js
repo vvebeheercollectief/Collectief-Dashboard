@@ -6,7 +6,7 @@ import { renderNtd } from "./render-lijsten.js";
 import { toDutchDate, berekenPrioriteit, _parseAnyDate, _vandaagAmsterdam, _verschilInKalenderdagen, parseDt } from "./util.js";
 import { SECS, SID } from "./config.js";
 import { ensureToken } from "./auth.js";
-import { _shiftNtdRows, assertRowsMatch } from "./api.js";
+import { _shiftNtdRows, _herstelShift, assertRowsMatch } from "./api.js";
 import { getSheetIds, getAfInsertRow, getInsertRow, insertAndWriteRow, serializeNtdUndo } from "./crud.js";
 import { backgroundWrite, loadAll } from "./data.js";
 import { showToast, showUndoToast } from "./notifications.js";
@@ -151,7 +151,7 @@ function bulkAfronden(rows){
   },()=>{ // rollback: laag→hoog terugzetten
     [...items].reverse().forEach(it=>{
       const a=(D.ntd[it.sec]=D.ntd[it.sec]||[]);
-      if(a.indexOf(it.r)===-1){ _shiftNtdRows(it.origRow,+1); a.splice(Math.min(it.pos<0?a.length:it.pos,a.length),0,it.r); }
+      if(a.indexOf(it.r)===-1){ _herstelShift(_shiftNtdRows,it.origRow); a.splice(Math.min(it.pos<0?a.length:it.pos,a.length),0,it.r); }
     });
   },'Bulk-afronden mislukt');
 }
@@ -224,7 +224,7 @@ function bulkVerwijderen(rows){
   },()=>{
     [...items].reverse().forEach(it=>{
       const a=(D.ntd[it.sec]=D.ntd[it.sec]||[]);
-      if(a.indexOf(it.r)===-1){ _shiftNtdRows(it.origRow,+1); a.splice(Math.min(it.pos<0?a.length:it.pos,a.length),0,it.r); }
+      if(a.indexOf(it.r)===-1){ _herstelShift(_shiftNtdRows,it.origRow); a.splice(Math.min(it.pos<0?a.length:it.pos,a.length),0,it.r); }
     });
   },'Bulk-verwijderen mislukt');
 }

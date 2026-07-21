@@ -74,14 +74,17 @@ export const ACTIONS = {
   'kenmerken-opslaan':     ()   => saveKenmerken(),
   'kenmerken-annuleren':   ()   => { state.kenmerkenEdit=false; renderVve(); },
   'contact-soort':         (el) => { state._contactSoort=el.dataset.soort;
-    document.querySelectorAll('.soort-chip').forEach(c=>c.classList.toggle('aan',c.dataset.soort===el.dataset.soort)); },
+    // Alleen de chips van de composer zelf: een open logregel-bewerkformulier heeft
+    // eigen soort-chips (log-soort) die hier niet mogen meekleuren.
+    el.closest('.dos-composer')?.querySelectorAll('.soort-chip')
+      .forEach(c=>c.classList.toggle('aan',c.dataset.soort===el.dataset.soort)); },
   'contact-vastleggen':    ()   => addContactLog(),
   'vve-log-filter':        (el) => { state.vveLogFilter=el.dataset.modus; state._vveLogAlles=false; renderVve(); },
   'vve-log-alles':         ()   => { state._vveLogAlles=true; renderVve(); },
   'chat-send':             ()   => vraagChat(),
   'chat-suggest':          (el) => chatSuggestie(el.dataset.q),
   'log-bewerken':          (el) => editLogboek(+el.dataset.row),
-  'log-opslaan':           (el) => saveLogboek(+el.dataset.row),
+  'log-opslaan':           (el) => saveLogboek(+el.dataset.row, el.closest('.log-edit')),
   'log-annuleren':         ()   => cancelLogboek(),
   'log-soort':             (el) => setLogSoort(el.dataset.soort),
   'log-verwijderen':       (el) => deleteLogboek(+el.dataset.row),
@@ -113,10 +116,11 @@ export function initActions() {
       vraagChat();
     }
     // Logboek bewerken: Ctrl/Cmd+Enter in de edit-textarea = opslaan
-    if (e.target && e.target.id === 'log-edit-tekst' && (e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    // (class-check: het veld heeft bewust geen id meer — het rendert op twee pagina's)
+    if (e.target && e.target.classList && e.target.classList.contains('log-edit-tekst') && (e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault();
       const box = e.target.closest('.log-edit');
-      if (box) saveLogboek(+box.dataset.row);
+      if (box) saveLogboek(+box.dataset.row, box);
     }
   });
 }

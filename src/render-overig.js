@@ -6,7 +6,7 @@ import { ico } from "./icons.js";
 import { PG, SID } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { ensureToken } from "./auth.js";
-import { writeRange, appendRange, assertRowMatch } from "./api.js";
+import { writeRange, appendRange, assertRowMatch, _herstelShift } from "./api.js";
 import { renderThead, renderPag } from "./render-lijsten.js";
 import { getSheetIds, setv, gv, insertAndWriteRow } from "./crud.js";
 import { loadAll, backgroundWrite } from "./data.js";
@@ -286,9 +286,13 @@ function logPaginaSoort(actie){
 // subtiel=true → gedempte dunne regel voor automatische acties.
 // opts.zonderCode → geef door aan logZin (dossier: code is redundant).
 function logItemHtml(r,subtiel,acties,opts){
+  // Optimistische regels (_row<=0: net toegevoegd, nog niet terug uit de Sheet) hebben
+  // geen echt rijnummer — bewerk-/verwijderknoppen zouden niets (of het verkeerde) doen.
+  // Na de stille resync krijgt de regel z'n echte _row en verschijnen de knoppen alsnog.
+  const magActies=!!acties&&r._row>0;
   if(subtiel){
     const kleur=logKleur(r.actie);
-    const acts=acties?`<span class="log-acts"><button class="log-act-btn del" data-action="log-verwijderen" data-row="${r._row}" title="Verwijderen" aria-label="Regel verwijderen">${ico('prullenbak')}</button></span>`:'';
+    const acts=magActies?`<span class="log-acts"><button class="log-act-btn del" data-action="log-verwijderen" data-row="${r._row}" title="Verwijderen" aria-label="Regel verwijderen">${ico('prullenbak')}</button></span>`:'';
     return `<div class="log-mini">
       <span class="log-mini-dot" style="background:${kleur}"></span>
       <span class="log-mini-txt">${logZin(r,opts)}</span>
@@ -296,7 +300,7 @@ function logItemHtml(r,subtiel,acties,opts){
       ${acts}
     </div>`;
   }
-  if(acties && state.logEdit===r._row) return logEditForm(r);
+  if(magActies && state.logEdit===r._row) return logEditForm(r);
   let extra='';
   if((r.actie==='Behandelaar gewijzigd'||r.actie==='Kenmerk') && r.veld && (r.oudeWaarde||r.nieuweWaarde)){
     extra=`<div class="log-change"><span class="old">${esc(r.oudeWaarde||'—')}</span><span class="arr">→</span><span class="new">${esc(r.nieuweWaarde||'—')}</span></div>`;
@@ -305,7 +309,7 @@ function logItemHtml(r,subtiel,acties,opts){
     extra=`<div class="log-note">${esc(r.nieuweWaarde)}</div>`;
   }
   const init=(displayName(r.gebruiker)||'?').charAt(0).toUpperCase();
-  const acts=acties?`<span class="log-acts">
+  const acts=magActies?`<span class="log-acts">
     <button class="log-act-btn" data-action="log-bewerken" data-row="${r._row}" title="Bewerken" aria-label="Regel bewerken">${ico('potlood')}</button>
     <button class="log-act-btn del" data-action="log-verwijderen" data-row="${r._row}" title="Verwijderen" aria-label="Regel verwijderen">${ico('prullenbak')}</button>
   </span>`:'';
@@ -324,6 +328,15 @@ function _shiftRows(entries, fromRow, delta){
   (entries||[]).forEach(e=>{ if(e._row>fromRow) e._row+=delta; });
 }
 function _shiftLogboekRows(fromRow, delta){ _shiftRows(D.logboek, fromRow, delta); }
+
+// Pure (testbaar): schuif een open bewerk-verwijzing (state.logEdit = _row) mee met een
+// rij-verwijdering/-herstel, zodat het open formulier bij dezelfde REGEL blijft horen.
+// delta -1 (delete): regels ónder fromRow schuiven omhoog; delta +1 (rollback/undo):
+// regels die op of onder de herstelde positie liggen schuiven terug omlaag.
+function _shiftLogEditRef(cur, fromRow, delta){
+  if(cur==null) return cur;
+  return (delta<0 ? cur>fromRow : cur>=fromRow) ? cur+delta : cur;
+}
 
 // Pure (testbaar): welke Sheet-cellen worden geschreven bij het bewerken van een
 // logregel. Opmerking → alleen tekst (kol G). Contact → soort (E), wie (F), tekst (G).
@@ -347,14 +360,17 @@ const LOG_WIE_OPTIES=['Bewoner/eigenaar','Bestuur','Leverancier','Overig'];
 function logEditForm(r){
   const isContact=r.actie==='Contact';
   const sel=state.logEditSoort||r.veld||'Telefoon';
+  // Bewust GEEN id's op tekst/wie: dit formulier rendert tegelijk op de Logboek-pagina
+  // én in het dossier (renderAll tekent verborgen pagina's mee). getElementById zou dan
+  // de verborgen eerste instantie pakken; alle lezers werken daarom class-gescoped.
   const contactRij=isContact?`<div class="log-edit-rij">
     <div class="dos-chips">${LOG_CONTACT_SOORTEN.map(([s,sIco])=>
       `<button type="button" class="soort-chip${sel===s?' aan':''}" data-action="log-soort" data-soort="${esc(s)}">${sIco} ${esc(s)}</button>`).join('')}</div>
-    <select id="log-edit-wie" class="log-edit-wie" title="Met wie?">${LOG_WIE_OPTIES.map(w=>
+    <select class="log-edit-wie" title="Met wie?">${LOG_WIE_OPTIES.map(w=>
       `<option${(r.oudeWaarde||'Overig')===w?' selected':''}>${esc(w)}</option>`).join('')}</select>
   </div>`:'';
-  return `<div class="log-item"><div class="log-edit" data-row="${r._row}">
-    <textarea id="log-edit-tekst" class="log-edit-tekst" rows="2">${esc(r.nieuweWaarde||'')}</textarea>
+  return `<div class="log-item"><div class="log-edit" data-row="${r._row}" data-ts="${esc(r.timestamp||'')}">
+    <textarea class="log-edit-tekst" rows="2">${esc(r.nieuweWaarde||'')}</textarea>
     ${contactRij}
     <div class="log-edit-knoppen">
       <button class="btn btn-sec btn-sm" data-action="log-annuleren">Annuleren</button>
@@ -375,7 +391,8 @@ function editLogboek(row){
   const e=(D.logboek||[]).find(x=>x._row===row);
   state.logEditSoort=e?e.veld:null;
   _rerenderLog();
-  setTimeout(()=>{ const t=document.getElementById('log-edit-tekst'); if(t){ t.focus(); t.setSelectionRange(t.value.length,t.value.length); } },0);
+  // Focus op de ZICHTBARE instantie (het formulier staat ook in de verborgen andere pagina)
+  setTimeout(()=>{ const t=document.querySelector('.page.active .log-edit-tekst'); if(t){ t.focus(); t.setSelectionRange(t.value.length,t.value.length); } },0);
 }
 
 function cancelLogboek(){ state.logEdit=null; state.logEditSoort=null; _rerenderLog(); }
@@ -385,15 +402,19 @@ function setLogSoort(soort){
   document.querySelectorAll('.log-edit .soort-chip').forEach(c=>c.classList.toggle('aan', c.dataset.soort===soort));
 }
 
-async function saveLogboek(row){
+async function saveLogboek(row, box){
   const entry=(D.logboek||[]).find(e=>e._row===row);
   if(!entry) return;
-  const tekst=(document.getElementById('log-edit-tekst')?.value||'').trim();
+  // Lees uit het formulier waarin daadwerkelijk geklikt/getypt is (class-gescoped):
+  // hetzelfde formulier staat óók op de verborgen andere pagina en zou via een
+  // document-brede lookup verouderde tekst kunnen leveren.
+  box=box||document.querySelector('.page.active .log-edit');
+  const tekst=(box?.querySelector('.log-edit-tekst')?.value||'').trim();
   if(!tekst){ alert('De tekst mag niet leeg zijn.'); return; }
   if(!await ensureToken()){ alert('Inloggen mislukt.'); return; }
   const isContact=entry.actie==='Contact';
   const soort=isContact ? (state.logEditSoort||entry.veld||'Telefoon') : entry.veld;
-  const wie=isContact ? (document.getElementById('log-edit-wie')?.value||entry.oudeWaarde||'Overig') : entry.oudeWaarde;
+  const wie=isContact ? (box?.querySelector('.log-edit-wie')?.value||entry.oudeWaarde||'Overig') : entry.oudeWaarde;
   const oud={veld:entry.veld, oudeWaarde:entry.oudeWaarde, nieuweWaarde:entry.nieuweWaarde};
   // optimistisch bijwerken + sluiten
   if(isContact){ entry.veld=soort; entry.oudeWaarde=wie; }
@@ -416,14 +437,20 @@ async function deleteLogboek(row){
   if(!await ensureToken()){ alert('Inloggen mislukt.'); return; }
   const vals=[entry.timestamp, entry.code, entry.sectie, entry.actie, entry.veld, entry.oudeWaarde, entry.nieuweWaarde, entry.gebruiker];
   const oudeRow=entry._row;
-  // optimistisch: lokaal weg + rij-indexen meeschuiven + edit sluiten
+  // optimistisch: lokaal weg + rij-indexen meeschuiven + edit sluiten óf meeschuiven
+  // (een open formulier op een regel erónder moet bij dezelfde regel blijven horen,
+  //  anders verspringt het en kan Opslaan de verkeerde logregel overschrijven)
   entries.splice(idx,1);
   _shiftLogboekRows(oudeRow,-1);
   if(state.logEdit===row){ state.logEdit=null; state.logEditSoort=null; }
+  else state.logEdit=_shiftLogEditRef(state.logEdit,oudeRow,-1);
   _rerenderLog();
-  showUndoToast('Logregel verwijderd', logDeleteLabel(entry), ()=>undoDeleteLog(vals, oudeRow), 'prullenbak');
-  // Idempotentie-vlag: deleteDimension is positie-gebaseerd en NIET idempotent (zie deleteTaskRow).
+  // Idempotentie-vlag: deleteDimension is positie-gebaseerd en NIET idempotent (zie
+  // deleteTaskRow). De undo-knop krijgt een kijkgaatje op deze vlag mee, zodat
+  // undoDeleteLog zéker weet of de delete doorging — géén timestamp-heuristiek,
+  // want bulk-acties schrijven meerdere logregels met exact dezelfde milliseconde.
   let verwijderd=false;
+  showUndoToast('Logregel verwijderd', logDeleteLabel(entry), ()=>undoDeleteLog(vals, oudeRow, ()=>verwijderd), 'prullenbak');
   backgroundWrite(
     async ()=>{
       const ids=await getSheetIds();
@@ -440,18 +467,33 @@ async function deleteLogboek(row){
         verwijderd=true;
       }
     },
-    ()=>{ if(entries.indexOf(entry)===-1){ _shiftLogboekRows(oudeRow,+1); entries.splice(Math.min(idx,entries.length),0,entry); } },
+    ()=>{ if(entries.indexOf(entry)===-1){
+      _herstelShift(_shiftLogboekRows,oudeRow);
+      state.logEdit=_shiftLogEditRef(state.logEdit,oudeRow,+1);
+      entries.splice(Math.min(idx,entries.length),0,entry);
+    } },
     'Verwijderen mislukt'
   );
 }
 
 // Undo: rij terugzetten op de oude positie en lokaal vers herladen (zoals taak-undo).
-async function undoDeleteLog(vals, oudeRow){
+// wasVerwijderd = kijkgaatje op de idempotentie-vlag van de delete-closure.
+async function undoDeleteLog(vals, oudeRow, wasVerwijderd){
   if(!await ensureToken()){ alert('Inloggen mislukt.'); return; }
   state._undoInFlight=true; // pauzeer de 8s-poll; deze undo doet z'n eigen loadAll
   try{
-    await state._writeChain;                         // delete gegarandeerd vóór de re-insert
+    await state._writeChain;                         // delete (of z'n rollback) gegarandeerd afgerond
+    // Was de delete mislukt, dan heeft de rollback de regel lokaal al teruggezet en is
+    // er in de Sheet niets verwijderd: een insert zou een duplicaatregel maken en een
+    // tweede logEdit-verschuiving zou het open formulier één regel te ver zetten.
+    if(wasVerwijderd && !wasVerwijderd()){
+      showToast('Niets te herstellen','De regel staat er nog — verwijderen was niet gelukt.','var(--am)','ongedaan');
+      return;
+    }
     await insertAndWriteRow('Logboek', oudeRow-1, vals);
+    // Open bewerkformulier op een regel die bij de delete omhoog schoof: terug omlaag,
+    // zodat het ná de verse loadAll (echte _row-nummers) weer bij dezelfde regel hoort.
+    state.logEdit=_shiftLogEditRef(state.logEdit,oudeRow,+1);
     showToast('Ongedaan gemaakt','Logregel teruggezet','var(--am)','ongedaan');
     await loadAll();                                 // _row-indexen vers uit de Sheet
   }catch(e){ alert('Undo fout: '+e.message); }
@@ -460,10 +502,16 @@ async function undoDeleteLog(vals, oudeRow){
 
 function renderLogboek(){
   // Bescherm half-getypte bewerktekst tegen de 8s-poll (analoog aan de VvE-composer).
-  const _editEl=document.getElementById('log-edit-tekst');
-  const _editBewaar=(state.logEdit && _editEl)?{
-    tekst:_editEl.value,
-    wie:document.getElementById('log-edit-wie')?.value
+  // Gescoped op de eigen feed (hetzelfde formulier staat óók in het dossier) én op
+  // REGEL-IDENTITEIT via de timestamp: bij wisselen van bewerkregel mag de tekst van
+  // de vórige regel niet in het verse formulier belanden. De timestamp is shift-
+  // bestendig (rijnummers verschuiven bij deletes, het tijdstip van de entry nooit).
+  const _editBox=document.querySelector('#logboek-feed .log-edit');
+  const _editTekstEl=_editBox?.querySelector('.log-edit-tekst');
+  const _editEntry=state.logEdit?(D.logboek||[]).find(x=>x._row===state.logEdit):null;
+  const _editBewaar=(_editTekstEl && _editEntry && _editBox.dataset.ts===(_editEntry.timestamp||''))?{
+    tekst:_editTekstEl.value,
+    wie:_editBox.querySelector('.log-edit-wie')?.value
   }:null;
   const q=(document.getElementById('s-logboek')?.value||'').toLowerCase();
   const rows=D.logboek.filter(r=>{
@@ -496,8 +544,8 @@ function renderLogboek(){
     el.innerHTML=html;
   }
   if(_editBewaar){
-    const t=document.getElementById('log-edit-tekst'); if(t) t.value=_editBewaar.tekst;
-    const w=document.getElementById('log-edit-wie'); if(w&&_editBewaar.wie) w.value=_editBewaar.wie;
+    const t=document.querySelector('#logboek-feed .log-edit-tekst'); if(t) t.value=_editBewaar.tekst;
+    const w=document.querySelector('#logboek-feed .log-edit-wie'); if(w&&_editBewaar.wie) w.value=_editBewaar.wie;
   }
   renderPag('logboek-pag',rows.length,pgs.logboek,'logboek');
 }
@@ -569,6 +617,6 @@ export {
   ONTW_CATS, ONTW_CAT_COLORS, parseOntw, renderOntw, setOntw, openOntwModal, closeOntwModal,
   submitOntwItem, deleteOntwItem, editOntwItem, parseLogboek, fmtLogTs, actieBadge, _LOG_AVKLEUR, avatarKleur,
   logDayLabel, logZin, logTijd, logItemHtml, logPaginaSoort, renderLogboek, histNoteKey, renderTaskHistory, addTaskNote, logEvent,
-  _shiftRows, _shiftLogboekRows, logEditWrite, logDeleteLabel,
+  _shiftRows, _shiftLogboekRows, _shiftLogEditRef, logEditWrite, logDeleteLabel,
   logEditForm, editLogboek, saveLogboek, cancelLogboek, setLogSoort, deleteLogboek, undoDeleteLog,
 };

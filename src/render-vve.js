@@ -153,6 +153,8 @@ function openVvePagina(code){
   state.vveLogFilter='alles';
   state._vveLogAlles=false;
   state.dosComposerOpen=false;
+  state.logEdit=null;          // open bewerkformulier hoort bij het vórige dossier/scherm
+  state.logEditSoort=null;
   try{
     const lijst=JSON.parse(localStorage.getItem('recentVves')||'[]').filter(c=>c!==code);
     lijst.unshift(code);
@@ -194,6 +196,14 @@ function renderVve(){
   const _bewaar=(_oudT&&_oudT.dataset.code===code)?{tekst:_oudT.value,wie:document.getElementById('dos-wie')?.value}:null;
   // Half getypte tekst mag de 8s-poll overleven én de composer niet dichtklappen.
   if(_bewaar&&_bewaar.tekst.trim()) state.dosComposerOpen=true;
+  // Ook een open logregel-bewerking overleeft de poll (zelfde mechaniek als renderLogboek,
+  // gescoped op dit paneel: hetzelfde formulier staat óók op de Logboek-pagina).
+  // De data-ts-vergelijking borgt regel-identiteit: bij wisselen van bewerkregel mag
+  // de tekst van de vórige regel niet meeverhuizen (timestamp is shift-bestendig).
+  const _leBox=document.querySelector('#vve-inhoud .log-edit');
+  const _leTekstEl=_leBox?.querySelector('.log-edit-tekst');
+  const _leEntry=state.logEdit?(D.logboek||[]).find(x=>x._row===state.logEdit):null;
+  const _leBewaar=(_leTekstEl && _leEntry && _leBox.dataset.ts===(_leEntry.timestamp||''))?{tekst:_leTekstEl.value,wie:_leBox.querySelector('.log-edit-wie')?.value}:null;
   // De topbar houdt de vaste paginatitel uit PAGE_META ("VvE-dossier");
   // code + naam staan al groot in de kop hieronder — niet dubbel tonen.
 
@@ -293,6 +303,10 @@ function renderVve(){
   if(_bewaar){
     const t=document.getElementById('dos-tekst'); if(t) t.value=_bewaar.tekst;
     const w=document.getElementById('dos-wie'); if(w&&_bewaar.wie) w.value=_bewaar.wie;
+  }
+  if(_leBewaar){
+    const t=document.querySelector('#vve-inhoud .log-edit-tekst'); if(t) t.value=_leBewaar.tekst;
+    const w=document.querySelector('#vve-inhoud .log-edit-wie'); if(w&&_leBewaar.wie) w.value=_leBewaar.wie;
   }
 }
 

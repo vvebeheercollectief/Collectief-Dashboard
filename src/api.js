@@ -38,6 +38,14 @@ function _shiftNtdRows(fromRow, delta){
   SKEYS.forEach(s=>{ (D.ntd[s]||[]).forEach(row=>{ if(row._row>fromRow) row._row+=delta; }); });
 }
 
+// Herstel-idioom voor de rollback van een mislukte rij-DELETE (pure, testbaar):
+// schuif alles wat op of onder de oude positie ligt terug omlaag, d.w.z. shiftFn met
+// (oudeRow-1, +1) — de shift-conditie is '>', dus fromRow-1 betekent 'vanaf oudeRow'.
+// Zonder de -1 bleef de buurregel die door de delete óp oudeRow was komen te staan
+// hangen (duplicaat-rijnummer). Eén naam voor álle rollback-closures (crud/bulk/logboek),
+// zodat het patroon nooit meer per plek kan verlopen.
+function _herstelShift(shiftFn, oudeRow){ shiftFn(oudeRow-1, +1); }
+
 // Herkent tijdelijke API-fouten (rate-limit 429 / serverfout 5xx) die een herkansing
 // rechtvaardigen — i.t.t. een echte fout (verkeerde data, geen rechten) die direct faalt.
 function _isTransient(e){
@@ -99,4 +107,4 @@ async function assertRowsMatch(checks, sheetName='Nog Te Doen'){
 }
 const assertRowMatch=(row, code, sheetName)=>assertRowsMatch([{ row, code }], sheetName);
 
-export { fetchSheet, writeRange, appendRange, _shiftNtdRows, _isTransient, _withRetry, askChat, _rowMismatch, _a1ColA, assertRowsMatch, assertRowMatch };
+export { fetchSheet, writeRange, appendRange, _shiftNtdRows, _herstelShift, _isTransient, _withRetry, askChat, _rowMismatch, _a1ColA, assertRowsMatch, assertRowMatch };

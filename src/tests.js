@@ -2,7 +2,7 @@
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
 import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf } from "./util.js";
-import { logZin, logPaginaSoort, parseLogboek, _shiftRows, logEditWrite, logItemHtml } from "./render-overig.js";
+import { logZin, logPaginaSoort, parseLogboek, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, SECS } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
@@ -12,7 +12,7 @@ import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel 
 import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk.js";
-import { _isTransient, _rowMismatch, _a1ColA } from "./api.js";
+import { _isTransient, _rowMismatch, _a1ColA, _herstelShift } from "./api.js";
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal } from "./data.js";
 import { setv, serializeNtdUndo, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
@@ -925,6 +925,77 @@ import { shouldPromptReload } from "./sw-update.js";
     eq('parseHerhaal: _row offset (eerste = rij 2)', hh[0]._row, 2);
   })();
 
+  // ── Open bewerkformulier (state.logEdit) schuift mee met een logregel-delete,
+  //    zodat het bij dezelfde REGEL blijft horen en Opslaan nooit de verkeerde raakt ──
+  (()=>{
+    eq('_shiftLogEditRef: regel onder de delete schuift mee omhoog', _shiftLogEditRef(50,30,-1), 49);
+    eq('_shiftLogEditRef: regel direct onder de delete', _shiftLogEditRef(31,30,-1), 30);
+    eq('_shiftLogEditRef: regel boven de delete blijft', _shiftLogEditRef(29,30,-1), 29);
+    eq('_shiftLogEditRef: de verwijderde regel zelf blijft (wordt elders gereset)', _shiftLogEditRef(30,30,-1), 30);
+    eq('_shiftLogEditRef: rollback/undo schuift terug omlaag', _shiftLogEditRef(49,30,+1), 50);
+    eq('_shiftLogEditRef: rollback herstelt ook de regel óp de herstelpositie', _shiftLogEditRef(30,30,+1), 31);
+    eq('_shiftLogEditRef: geen open bewerking → null blijft null', _shiftLogEditRef(null,30,-1), null);
+    eq('_shiftLogEditRef: -1 dan +1 is een exacte inverse', _shiftLogEditRef(_shiftLogEditRef(42,30,-1),30,+1), 42);
+  })();
+  // ── Rollback-symmetrie van rij-verschuivingen: _herstelShift is het gedeelde
+  //    herstel-idioom van álle vijf rollback-closures (crud×2, bulk×2, logboek).
+  //    Het moet óók de buurregel terugzetten die door de delete óp oudeRow kwam. ──
+  (()=>{
+    // contract: _herstelShift vertaalt 'herstel vanaf oudeRow' naar shiftFn(oudeRow-1,+1)
+    const calls=[];
+    _herstelShift((f,d)=>calls.push([f,d]), 30);
+    eq('_herstelShift: roept shiftFn met (oudeRow-1, +1)', calls, [[29,1]]);
+    // end-to-end door hetzelfde pad als de echte rollbacks: delete + _herstelShift
+    const arr=[{_row:2},{_row:5},{_row:6},{_row:8}];
+    const del=arr.splice(1,1)[0];            // verwijder rij 5
+    _shiftRows(arr,5,-1);
+    eq('delete: rij 6 schuift naar 5', arr[1]._row, 5);
+    eq('delete: rij 8 schuift naar 7', arr[2]._row, 7);
+    _herstelShift((f,d)=>_shiftRows(arr,f,d), 5);   // rollback via het echte idioom
+    arr.splice(1,0,del);
+    eq('rollback: rij 2 onaangeroerd', arr[0]._row, 2);
+    eq('rollback: verwijderde rij terug op 5', arr[1]._row, 5);
+    eq('rollback: buurregel terug op 6 (oude patroon liet die op 5 staan)', arr[2]._row, 6);
+    eq('rollback: rij 8 terug op 8', arr[3]._row, 8);
+  })();
+  // ── Optimistische logregels (_row<=0, nog niet terug uit de Sheet) krijgen geen
+  //    bewerk-/verwijderknoppen: die kunnen pas werken mét een echt rijnummer ──
+  (()=>{
+    const opt={actie:'Contact', code:'TEST01', veld:'Telefoon', oudeWaarde:'Bewoner/eigenaar', nieuweWaarde:'net gebeld', timestamp:'2026-07-21T09:00:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:0};
+    truthy('optimistische normale regel: geen bewerkknop', !logItemHtml(opt,false,true).includes('log-bewerken'));
+    truthy('optimistische normale regel: geen verwijderknop', !logItemHtml(opt,false,true).includes('log-verwijderen'));
+    truthy('optimistische subtiele regel: geen verwijderknop', !logItemHtml({...opt,actie:'Afgerond'},true,true).includes('log-verwijderen'));
+    truthy('echte regel (_row>0) houdt de knoppen', logItemHtml({...opt,_row:12},false,true).includes('log-bewerken'));
+  })();
+  // ── Het bewerkformulier rendert op twee pagina's tegelijk → geen dubbele DOM-id's ──
+  (()=>{
+    const _soortOud=state.logEditSoort; state.logEditSoort=null;
+    const html=logEditForm({actie:'Contact', _row:7, veld:'Telefoon', oudeWaarde:'Bestuur', nieuweWaarde:'tekst'});
+    truthy('logEditForm: geen id op de textarea', !html.includes('id="log-edit-tekst"'));
+    truthy('logEditForm: geen id op de wie-select', !html.includes('id="log-edit-wie"'));
+    truthy('logEditForm: class-gescoped textarea aanwezig', html.includes('class="log-edit-tekst"'));
+    truthy('logEditForm: data-row aanwezig voor opslaan', html.includes('data-row="7"'));
+    state.logEditSoort=_soortOud;
+  })();
+  // ── undoDeleteLog-guard: na een MISLUKTE delete (rollback heeft alles teruggezet)
+  //    geen duplicaat-insert en geen tweede logEdit-verschuiving. De vlag komt uit de
+  //    delete-closure zelf — geen timestamp-heuristiek (bulk = meerdere regels/ms). ──
+  await (async()=>{
+    const logboekOud=D.logboek, editOud=state.logEdit;
+    const tokenOud=state.oauthToken, expiryOud=state.oauthExpiry, mailOud=state.currentUserEmail;
+    try{
+      D.logboek=[{_row:30,timestamp:'2026-07-21T10:00:00Z',code:'UG-1',actie:'Opmerking',veld:'',oudeWaarde:'',nieuweWaarde:'staat er nog',gebruiker:'x'}];
+      state.logEdit=31;
+      state.oauthToken='nep-token'; state.oauthExpiry=Date.now()+3600e3; state.currentUserEmail='info@vvebeheercollectief.nl';
+      await undoDeleteLog(['2026-07-21T10:00:00Z','UG-1','','Opmerking','','','staat er nog','x'], 30, ()=>false);
+      eq('undo na mislukte delete: logEdit NIET nogmaals verschoven', state.logEdit, 31);
+      eq('undo na mislukte delete: geen regel bijgekomen (geen duplicaat-insert)', D.logboek.length, 1);
+      eq('undo na mislukte delete: poll-pauze weer vrijgegeven', state._undoInFlight, false);
+    } finally {
+      D.logboek=logboekOud; state.logEdit=editOud;
+      state.oauthToken=tokenOud; state.oauthExpiry=expiryOud; state.currentUserEmail=mailOud;
+    }
+  })();
   // ── Afhandel-modal onthoudt het rij-OBJECT, niet de index: een herbouwde _rowCache
   //    (vertraagde renderAll uit animateRowOut / stille resync) mag nooit een ándere
   //    taak afronden. Vers opzoeken gebeurt op identiteit; weg = -1 = veilig stoppen. ──

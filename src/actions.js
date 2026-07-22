@@ -16,7 +16,7 @@ import { copyAiPrompt, aiOvernemen, aiActieTaak, aiKopieerConcept } from './ai.j
 import { dismissToast, saveNotifPrefs } from './notifications.js';
 import { doLogin } from './auth.js';
 import { openSnoozeModal, snoozeKies } from './snooze.js';
-import { openResetModal, closeResetModal } from './alv-reset.js';
+import { openResetModal, closeResetModal, doeReset } from './alv-reset.js';
 import { addAannemer, toggleAannemerBinnen, verwijderAannemer } from './offerte-aannemers.js';
 import { openHerhaalModal, toggleHerhaalStatus, deleteHerhaal } from './render-herhaal.js';
 import { openVvePagina, renderVve, addContactLog, terugVanDossier } from './render-vve.js';
@@ -44,6 +44,7 @@ export const ACTIONS = {
   'alvo-flag':             (el) => toggleAlvoFlag(+el.dataset.idx, el.dataset.field),
   'alvo-reset-open':       ()   => openResetModal(),
   'alvo-reset-annuleer':   ()   => closeResetModal(),
+  'alvo-reset-doe':        ()   => doeReset(),
   'alvo-stat':             (el) => { const f=document.getElementById('f-status-alvo');
                                      f.value = f.value===el.dataset.status ? '' : el.dataset.status;
                                      pgs.alvo=1; renderAlvo(); },

@@ -15,7 +15,7 @@ import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk
 import { _isTransient, _rowMismatch, _a1ColA, _herstelShift, veiligeCel, _veiligeRij } from "./api.js";
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo } from "./render-alv.js";
-import { _resetBereik, _archiefNaam } from "./alv-reset.js";
+import { _resetBereik, _archiefNaam, doeReset } from "./alv-reset.js";
 import { setv, serializeNtdUndo, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages } from "./dossier-chat.js";
@@ -978,6 +978,69 @@ import { shouldPromptReload } from "./sw-update.js";
       D.alvo=alvoOud;
       document.getElementById('f-status-alvo').value=filterOud;
       pgs.alvo=pgOud;
+    }
+  })();
+  // De reset is de enige onomkeerbare actie in de app. Deze test draait 'm met een
+  // nagemaakte Sheet-API en controleert (a) dat alleen de VvE-rijen en alleen kolom
+  // C/D/E/G geraakt worden, en (b) dat elke beveiliging afbreekt vóór er iets gewist is.
+  await (async () => {
+    const _fetch=window.fetch, tokenOud=state.oauthToken, expiryOud=state.oauthExpiry, alvoOud=D.alvo;
+    const rijen=(codes)=>[['kop'],['Code','Naam','Uitnodiging','Notulen','Begroting','Opm','Klaargezet'],
+      ...codes.map(c=>[c,'VvE '+c,'TRUE','TRUE','TRUE','','TRUE'])];
+    async function draai({kolommen=7,kolomA=null,archiefStatus=200,gat=false}={}){
+      const verzoeken=[];
+      let blad=rijen(['V0','V1','V2']);
+      if(gat) blad.splice(3,0,['','','','','','','']);   // lege rij tussen de VvE-rijen
+      window.fetch=async(url,opt)=>{
+        const u=String(url), d=decodeURIComponent(u);
+        verzoeken.push({url:d, body:opt&&opt.body?JSON.parse(opt.body):null});
+        if(u.includes('?fields=sheets.properties'))
+          return new Response(JSON.stringify({sheets:[
+            {properties:{sheetId:22,title:"ALV's overzicht",index:0,gridProperties:{columnCount:kolommen}}},
+            {properties:{sheetId:44,title:"ALV's afgerond",index:1,gridProperties:{columnCount:3}}}]}),{status:200});
+        if(d.includes('!A')) return new Response(JSON.stringify({values:(kolomA||['V0','V1','V2']).map(c=>[c])}),{status:200});
+        if(d.includes("ALV's overzicht")) return new Response(JSON.stringify({values:blad}),{status:200});
+        if(u.includes(':batchUpdate')){
+          const b=JSON.parse(opt.body);
+          if(b.requests[0].duplicateSheet) return new Response('x',{status:archiefStatus});
+          return new Response(JSON.stringify({replies:[{}]}),{status:200});
+        }
+        return new Response(JSON.stringify({values:[]}),{status:200});
+      };
+      await doeReset();
+      document.querySelectorAll('.toast').forEach(t=>t.remove());
+      const batch=verzoeken.filter(v=>v.url.includes(':batchUpdate'));
+      return {
+        archief: batch.filter(b=>b.body.requests[0].duplicateSheet),
+        wis:     batch.filter(b=>b.body.requests[0].repeatCell),
+      };
+    }
+    try{
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
+
+      const gezond=await draai();
+      eq('reset: één archiefverzoek', gezond.archief.length, 1);
+      eq('reset: archief direct ná het overzicht (niet achteraan, anders slokt verplaatsALV het op)',
+         gezond.archief[0].body.requests[0].duplicateSheet.insertSheetIndex, 1);
+      eq('reset: één wisverzoek', gezond.wis.length, 1);
+      eq('reset: wist precies de vier vlagkolommen C/D/E/G',
+         gezond.wis[0].body.requests.map(r=>r.repeatCell.range.startColumnIndex), [2,3,4,6]);
+      eq('reset: raakt alleen de VvE-rijen 3 t/m 5, niet de samenvattingsregels',
+         gezond.wis[0].body.requests.map(r=>[r.repeatCell.range.startRowIndex,r.repeatCell.range.endRowIndex])[0], [2,5]);
+      eq('reset: schrijft FALSE', gezond.wis[0].body.requests[0].repeatCell.cell.userEnteredValue, {boolValue:false});
+
+      eq('reset: gat in de rijen → niets gearchiveerd', (await draai({gat:true})).archief.length, 0);
+      eq('reset: gat in de rijen → niets gewist',       (await draai({gat:true})).wis.length, 0);
+      eq('reset: verkeerde VvE-code in een rij → niets gewist', (await draai({kolomA:['V0','ANDERS','V2']})).wis.length, 0);
+      eq('reset: kolom G ontbreekt → niets gewist',     (await draai({kolommen:6})).wis.length, 0);
+      const mislukt=await draai({archiefStatus:500});
+      eq('reset: archiveren mislukt → wél geprobeerd', mislukt.archief.length, 1);
+      eq('reset: archiveren mislukt → NIETS gewist',   mislukt.wis.length, 0);
+    } finally {
+      window.fetch=_fetch;
+      state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
+      state._alvoResetBezig=false;
+      D.alvo=alvoOud;
     }
   })();
   // parseAlfa: slice(1); rij zonder code valt weg.

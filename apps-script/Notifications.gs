@@ -167,7 +167,9 @@ function cd_handleNtdEdit(sheet, row, e) {
 
 function cd_handleAlvoEdit(sheet, row, e) {
   if (row < 3) return;
-  const rowData = sheet.getRange(row, 1, 1, 6).getValues()[0];
+  // Zeven kolommen: A t/m G. Kolom G ('Klaargezet') moet meegelezen worden, anders is
+  // rowData[col-1] undefined bij een plak-actie in G en valt .toString() om.
+  const rowData = sheet.getRange(row, 1, 1, 7).getValues()[0];
   const code = (rowData[0] || '').toString().trim();
   const naam = (rowData[1] || '').toString().trim();
   if (!code) return;
@@ -175,7 +177,9 @@ function cd_handleAlvoEdit(sheet, row, e) {
   const col = e.range.getColumn();
   // e.value bestaat alléén bij een single-cell edit. Bij plakken/fill is e.value undefined;
   // val dan terug op de werkelijke celwaarde uit rowData zodat de ALV-melding tóch afgaat.
-  const newVal = (e.value !== undefined ? e.value : rowData[col - 1]).toString().toUpperCase();
+  const ruw = (e.value !== undefined ? e.value : rowData[col - 1]);
+  if (ruw === undefined || ruw === null) return;
+  const newVal = ruw.toString().toUpperCase();
   const oldVal = (e.oldValue || '').toString().toUpperCase();
   if (newVal === oldVal) return;
 
@@ -183,6 +187,8 @@ function cd_handleAlvoEdit(sheet, row, e) {
   if (col === 3 && newVal === 'TRUE') label = '📬 Uitnodiging verstuurd';
   else if (col === 4 && newVal === 'TRUE') label = '✅ Notulen verstuurd';
   else if (col === 5 && newVal === 'TRUE') label = '💰 Begroting doorgezet';
+  // Kolom 7 ('Klaargezet') geeft bewust géén melding: dat is eigen voorwerk, geen
+  // mijlpaal naar buiten waar het team op moet reageren.
   if (!label) return;
 
   cd_notifyByTag('n_alv', '1', {

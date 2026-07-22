@@ -22,6 +22,21 @@ function _resetBereik(alvo){
   return {start,eind,aaneengesloten:(eind-start+1)===rijen.length,aantal:rijen.length};
 }
 
+// Groepeert de VvE-rijen in aaneengesloten blokken. Zit er een lege of overgeslagen rij
+// tussen (parseAlvo filtert die weg), dan levert dat gewoon twee blokken op in plaats van
+// één — zo raakt de wisactie nooit een rij die géén VvE is, en hoeft de reset niet te
+// weigeren zodra het register één rommelige rij bevat.
+function _resetBlokken(alvo){
+  if(!alvo||!alvo.length) return [];
+  const rijen=[...new Set(alvo.map(r=>r._row))].sort((a,b)=>a-b);
+  const blokken=[{start:rijen[0],eind:rijen[0]}];
+  for(const r of rijen.slice(1)){
+    const laatste=blokken[blokken.length-1];
+    if(r===laatste.eind+1) laatste.eind=r; else blokken.push({start:r,eind:r});
+  }
+  return blokken;
+}
+
 // Wijkt uit naar '(2)', '(3)', … als er in hetzelfde jaar al een archief staat.
 function _archiefNaam(jaar,bestaandeNamen){
   const basis=`ALV-archief ${jaar}`;
@@ -73,8 +88,7 @@ async function doeReset(){
     await loadAll(true);                     // verse stand vóór een onomkeerbare bulkschrijfactie
     const bereik=_resetBereik(D.alvo||[]);
     if(!bereik.aantal) throw new Error('Geen VvE-rijen gevonden.');
-    if(!bereik.aaneengesloten)
-      throw new Error('De VvE-rijen zijn niet aaneengesloten — reset afgebroken uit voorzorg. Meld dit even.');
+    const blokken=_resetBlokken(D.alvo);
 
     // Rij-identiteit vóór een bulkschrijfactie: één GET over het hele bereik, gooit bij
     // de eerste rij die niet meer bij de verwachte VvE-code hoort. Niets geschreven.
@@ -101,17 +115,19 @@ async function doeReset(){
     });
     if(!arch.ok) throw new Error(`Archiveren mislukt: HTTP ${arch.status} — er is niets gewist.`);
 
-    // Wissen: vier repeatCell-verzoeken in één batchUpdate, alleen over het VvE-bereik,
-    // zodat de samenvattingsregels onderaan het tabblad ongemoeid blijven.
+    // Wissen: per blok × per vlagkolom één repeatCell, alles in één batchUpdate. Alleen
+    // echte VvE-rijen, dus samenvattingsregels en lege rijen blijven ongemoeid.
+    const verzoeken=[];
+    for(const blok of blokken) for(const col of RESET_KOLOMMEN) verzoeken.push({repeatCell:{
+      range:{sheetId:bron.sheetId,startRowIndex:blok.start-1,endRowIndex:blok.eind,
+             startColumnIndex:col,endColumnIndex:col+1},
+      cell:{userEnteredValue:{boolValue:false}},
+      fields:'userEnteredValue'
+    }});
     const wis=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
       method:'POST',
       headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
-      body:JSON.stringify({requests:RESET_KOLOMMEN.map(col=>({repeatCell:{
-        range:{sheetId:bron.sheetId,startRowIndex:bereik.start-1,endRowIndex:bereik.eind,
-               startColumnIndex:col,endColumnIndex:col+1},
-        cell:{userEnteredValue:{boolValue:false}},
-        fields:'userEnteredValue'
-      }}))})
+      body:JSON.stringify({requests:verzoeken})
     });
     if(!wis.ok) throw new Error(`Wissen mislukt: HTTP ${wis.status} — het archief '${naam}' is wel aangemaakt.`);
 
@@ -133,4 +149,4 @@ async function doeReset(){
   }
 }
 
-export { _resetBereik, _archiefNaam, openResetModal, closeResetModal, doeReset };
+export { _resetBereik, _resetBlokken, _archiefNaam, openResetModal, closeResetModal, doeReset };

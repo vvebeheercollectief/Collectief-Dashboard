@@ -15,7 +15,7 @@ import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk
 import { _isTransient, _rowMismatch, _a1ColA, _herstelShift, veiligeCel, _veiligeRij } from "./api.js";
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo } from "./render-alv.js";
-import { _resetBereik, _archiefNaam, doeReset } from "./alv-reset.js";
+import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
 import { setv, serializeNtdUndo, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages } from "./dossier-chat.js";
@@ -974,6 +974,15 @@ import { shouldPromptReload } from "./sw-update.js";
       eq('archiefnaam: vrij',              _archiefNaam(2026, ["ALV's overzicht",'Logboek']), 'ALV-archief 2026');
       eq('archiefnaam: bezet',             _archiefNaam(2026, ['ALV-archief 2026']), 'ALV-archief 2026 (2)');
       eq('archiefnaam: twee bezet',        _archiefNaam(2026, ['ALV-archief 2026','ALV-archief 2026 (2)']), 'ALV-archief 2026 (3)');
+      // Blokken: een gat in de rijnummers (lege/overgeslagen rij in het register) moet
+      // twee blokken opleveren, zodat de rij ertussen nooit overschreven wordt.
+      eq('resetblokken: aaneengesloten → één blok', _resetBlokken([{_row:3},{_row:4},{_row:5}]), [{start:3,eind:5}]);
+      eq('resetblokken: gat → twee blokken',        _resetBlokken([{_row:3},{_row:4},{_row:6}]), [{start:3,eind:4},{start:6,eind:6}]);
+      eq('resetblokken: twee gaten',                _resetBlokken([{_row:3},{_row:5},{_row:7},{_row:8}]), [{start:3,eind:3},{start:5,eind:5},{start:7,eind:8}]);
+      eq('resetblokken: ongesorteerd',              _resetBlokken([{_row:6},{_row:3},{_row:4}]), [{start:3,eind:4},{start:6,eind:6}]);
+      eq('resetblokken: leeg',                      _resetBlokken([]), []);
+      eq('resetblokken: echte omvang van het register (3 t/m 495) → één blok',
+         _resetBlokken(Array.from({length:493},(_,i)=>({_row:3+i}))), [{start:3,eind:495}]);
     } finally {
       D.alvo=alvoOud;
       document.getElementById('f-status-alvo').value=filterOud;
@@ -998,7 +1007,9 @@ import { shouldPromptReload } from "./sw-update.js";
           return new Response(JSON.stringify({sheets:[
             {properties:{sheetId:22,title:"ALV's overzicht",index:0,gridProperties:{columnCount:kolommen}}},
             {properties:{sheetId:44,title:"ALV's afgerond",index:1,gridProperties:{columnCount:3}}}]}),{status:200});
-        if(d.includes('!A')) return new Response(JSON.stringify({values:(kolomA||['V0','V1','V2']).map(c=>[c])}),{status:200});
+        // Kolom A voor de identiteitscontrole: standaard afgeleid uit hetzelfde blad,
+        // zodat een ingevoegde lege rij ook hier klopt en de blokkenlogica getest wordt.
+        if(d.includes('!A')) return new Response(JSON.stringify({values:(kolomA?kolomA.map(c=>[c]):blad.slice(2).map(r=>[r[0]]))}),{status:200});
         if(d.includes("ALV's overzicht")) return new Response(JSON.stringify({values:blad}),{status:200});
         if(u.includes(':batchUpdate')){
           const b=JSON.parse(opt.body);
@@ -1029,8 +1040,14 @@ import { shouldPromptReload } from "./sw-update.js";
          gezond.wis[0].body.requests.map(r=>[r.repeatCell.range.startRowIndex,r.repeatCell.range.endRowIndex])[0], [2,5]);
       eq('reset: schrijft FALSE', gezond.wis[0].body.requests[0].repeatCell.cell.userEnteredValue, {boolValue:false});
 
-      eq('reset: gat in de rijen → niets gearchiveerd', (await draai({gat:true})).archief.length, 0);
-      eq('reset: gat in de rijen → niets gewist',       (await draai({gat:true})).wis.length, 0);
+      // Gat in het register: geen weigering meer, maar twee blokken × vier kolommen,
+      // waarbij de lege rij ertussen NIET geraakt wordt.
+      const metGat=await draai({gat:true});
+      eq('reset met gat: toch gearchiveerd', metGat.archief.length, 1);
+      eq('reset met gat: acht deelverzoeken (2 blokken × 4 kolommen)', metGat.wis[0].body.requests.length, 8);
+      eq('reset met gat: slaat de lege rij over',
+         [...new Set(metGat.wis[0].body.requests.map(r=>`${r.repeatCell.range.startRowIndex}-${r.repeatCell.range.endRowIndex}`))].sort(),
+         ['2-3','4-6']);
       eq('reset: verkeerde VvE-code in een rij → niets gewist', (await draai({kolomA:['V0','ANDERS','V2']})).wis.length, 0);
       eq('reset: kolom G ontbreekt → niets gewist',     (await draai({kolommen:6})).wis.length, 0);
       const mislukt=await draai({archiefStatus:500});

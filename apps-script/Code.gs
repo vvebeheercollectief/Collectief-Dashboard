@@ -109,8 +109,9 @@ function verplaatsALV(e) {
   var sheet = e.source.getActiveSheet();
   var range = e.range;
 
-  var sheetName = sheet.getName();
-  if (sheetName === "Nog Te Doen" || sheetName === "Afgerond") return;
+  // Allowlist: alléén het ALV-overzicht zelf. Reset-archieven en backup-tabbladen
+  // hebben óók checkboxes in kolom D en mogen deze trigger niet raken.
+  if (sheet.getName().trim().toLowerCase() !== ALVO_SHEET.toLowerCase()) return;
 
   if (range.getColumn() !== 4) return;
 
@@ -124,11 +125,28 @@ function verplaatsALV(e) {
 
   if (vveCode === "" && vveNaam === "") return;
 
+  // Doeltabblad op naam — nooit "het laatste tabblad": de tabbladvolgorde is niet
+  // stabiel (reset-archieven, logboek-backups). Hoofdletterongevoelig + trim, in de
+  // stijl van _isAlvoTab in src/alv-reset.js.
+  var alleTabs = e.source.getSheets();
+  var targetSheet = null;
+  for (var t = 0; t < alleTabs.length; t++) {
+    if (alleTabs[t].getName().trim().toLowerCase() === ALFA_SHEET.toLowerCase()) {
+      targetSheet = alleTabs[t];
+      break;
+    }
+  }
+  if (!targetSheet) {
+    // Niets schrijven, niets aanmaken (een hernoemd tabblad zou anders een tweede,
+    // concurrerende lijst krijgen). Vinkje blijft staan; zichtbaar melden in Logboek.
+    Logger.log("verplaatsALV: tabblad '" + ALFA_SHEET + "' niet gevonden — ALV van " + vveCode + " niet gearchiveerd");
+    cd_schrijfLogboek(vveCode, 'ALVS', 'Fout', 'Notulen', '',
+      "Tabblad '" + ALFA_SHEET + "' niet gevonden — ALV niet gearchiveerd", 'systeem');
+    return;
+  }
+
   var datumAfgerond = new Date();
   var newRow = [vveCode, vveNaam, datumAfgerond];
-
-  var allSheets = e.source.getSheets();
-  var targetSheet = allSheets[allSheets.length - 1];
 
   var lastRow = targetSheet.getLastRow();
   if (lastRow === 0) {

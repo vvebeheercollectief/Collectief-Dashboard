@@ -26,6 +26,7 @@ function cd_oneSignalAppId(){
 }
 const NTD_SHEET   = 'Nog Te Doen';
 const ALVO_SHEET  = "ALV's overzicht";
+const ALFA_SHEET  = "ALV's afgerond"; // doeltabblad van verplaatsALV (Code.gs)
 const NOTIF_QUEUE_SHEET = 'Notif-wachtrij';
 const NOTIF_QUEUE_MAX = 200; // verwerkte rijen die we bewaren
 

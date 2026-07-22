@@ -65,8 +65,10 @@ function renderAlvo(){
   renderPag('alvo-pag',rows.length,pgs.alvo,'alvo');
 }
 
-const ALVO_COLS={uitnodiging:2,notulen:3,begroting:4};
-const ALVO_LABELS={uitnodiging:'Uitnodiging',notulen:'Notulen',begroting:'Begroting'};
+// 0-gebaseerde kolomindexen. Klaargezet staat op G (=6) en niet tussen B en C, omdat
+// kolom 3/4/5 hard gecodeerd zitten in cd_handleAlvoEdit en verplaatsALV (Apps Script).
+const ALVO_COLS={uitnodiging:2,notulen:3,begroting:4,klaargezet:6};
+const ALVO_LABELS={uitnodiging:'Uitnodiging',notulen:'Notulen',begroting:'Begroting',klaargezet:'Klaargezet'};
 
 function flagPill(idx,field,val){
   const cls=val?'on':'off';
@@ -77,7 +79,7 @@ function flagPill(idx,field,val){
 }
 
 function _recomputeAlvoStatus(r){
-  r.status=r.notulen?'Afgerond':r.uitnodiging?'Gepland':'Open';
+  r.status=r.notulen?'Afgerond':r.uitnodiging?'Gepland':r.klaargezet?'Klaargezet':'Open';
 }
 
 async function toggleAlvoFlag(idx,field){
@@ -133,7 +135,7 @@ async function toggleAlvoFlag(idx,field){
     if(btn2) btn2.classList.remove('toggling');
   }
 }
-function statusIco(s){return{Open:ico('zandloper'),Gepland:ico('kalender'),Afgerond:ico('vinkCirkel')}[s]||''}
+function statusIco(s){return{Open:ico('zandloper'),Klaargezet:ico('klembord'),Gepland:ico('kalender'),Afgerond:ico('vinkCirkel')}[s]||''}
 
 // ══════════════════════════════════════
 //  ALV AFGEROND

@@ -14,6 +14,7 @@ import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk.js";
 import { _isTransient, _rowMismatch, _a1ColA, _herstelShift, veiligeCel, _veiligeRij } from "./api.js";
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal } from "./data.js";
+import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo } from "./render-alv.js";
 import { setv, serializeNtdUndo, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages } from "./dossier-chat.js";
@@ -921,6 +922,23 @@ import { shouldPromptReload } from "./sw-update.js";
     eq('alvo: notulen wint van alles',          av[3].status, 'Afgerond');
     eq('alvo: budget nog steeds herkend',       av[4].budget, true);
     eq('alvo: rijnummer klopt nog',             av[0]._row, 3);
+  })();
+  // _recomputeAlvoStatus (optimistisch na een klik) moet exact hetzelfde antwoord geven als
+  // parseAlvo (na een verversing). Lopen die uiteen, dan springt de status terug bij de eerste poll.
+  (()=>{
+    const _st=(k,u,n)=>{ const r={klaargezet:k,uitnodiging:u,notulen:n}; _recomputeAlvoStatus(r); return r.status; };
+    eq('recompute: niets → Open',            _st(false,false,false), 'Open');
+    eq('recompute: klaargezet → Klaargezet', _st(true, false,false), 'Klaargezet');
+    eq('recompute: uitnodiging → Gepland',   _st(true, true, false), 'Gepland');
+    eq('recompute: notulen → Afgerond',      _st(true, true, true ), 'Afgerond');
+    eq('recompute: uitnodiging zonder klaargezet → Gepland', _st(false,true,false), 'Gepland');
+    eq('ALVO_COLS: klaargezet is kolom G',   ALVO_COLS.klaargezet, 6);
+    eq('ALVO_LABELS: klaargezet',            ALVO_LABELS.klaargezet, 'Klaargezet');
+    [[false,false,false],[true,false,false],[false,true,false],[true,true,false],[false,false,true],[true,true,true]]
+      .forEach(([k,u,n])=>{
+        const rij=['C1','Combi', u?'TRUE':'FALSE', n?'TRUE':'FALSE', 'FALSE', '', k?'TRUE':'FALSE'];
+        eq(`parse==recompute bij k=${k} u=${u} n=${n}`, parseAlvo([[],[],rij])[0].status, _st(k,u,n));
+      });
   })();
   // parseAlfa: slice(1); rij zonder code valt weg.
   (()=>{

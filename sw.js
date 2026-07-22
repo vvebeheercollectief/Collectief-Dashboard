@@ -41,6 +41,7 @@ const APP_SHELL = [
   './src/render-lijsten.js',
   './src/render-offerte.js',
   './src/render-alv.js',
+  './src/alv-reset.js',
   './src/render-tabel.js',
   './src/render-vve.js',
   './src/render-herhaal.js',

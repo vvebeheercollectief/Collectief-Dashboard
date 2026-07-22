@@ -15,6 +15,7 @@ import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk
 import { _isTransient, _rowMismatch, _a1ColA, _herstelShift, veiligeCel, _veiligeRij } from "./api.js";
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo } from "./render-alv.js";
+import { _resetBereik, _archiefNaam } from "./alv-reset.js";
 import { setv, serializeNtdUndo, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages } from "./dossier-chat.js";
@@ -963,6 +964,16 @@ import { shouldPromptReload } from "./sw-update.js";
       ACTIONS['alvo-stat'](tegel());
       eq('tweede klik wist het filter', document.getElementById('f-status-alvo').value, '');
       eq('tabel toont weer alles', document.querySelectorAll('#alvo-tbody tr').length, 3);
+      // De reset mag NOOIT de samenvattingsregels onderaan het tabblad raken; het bereik
+      // komt daarom uit de geparseerde VvE-rijen en niet uit de laatste rij van het blad.
+      eq('resetbereik: aaneengesloten',    _resetBereik([{_row:3},{_row:4},{_row:5}]), {start:3,eind:5,aaneengesloten:true, aantal:3});
+      eq('resetbereik: gat erin',          _resetBereik([{_row:3},{_row:5}]),          {start:3,eind:5,aaneengesloten:false,aantal:2});
+      eq('resetbereik: één rij',           _resetBereik([{_row:7}]),                   {start:7,eind:7,aaneengesloten:true, aantal:1});
+      eq('resetbereik: lege lijst',        _resetBereik([]),                           {start:0,eind:0,aaneengesloten:false,aantal:0});
+      eq('resetbereik: ongesorteerd',      _resetBereik([{_row:5},{_row:3},{_row:4}]), {start:3,eind:5,aaneengesloten:true, aantal:3});
+      eq('archiefnaam: vrij',              _archiefNaam(2026, ["ALV's overzicht",'Logboek']), 'ALV-archief 2026');
+      eq('archiefnaam: bezet',             _archiefNaam(2026, ['ALV-archief 2026']), 'ALV-archief 2026 (2)');
+      eq('archiefnaam: twee bezet',        _archiefNaam(2026, ['ALV-archief 2026','ALV-archief 2026 (2)']), 'ALV-archief 2026 (3)');
     } finally {
       D.alvo=alvoOud;
       document.getElementById('f-status-alvo').value=filterOud;

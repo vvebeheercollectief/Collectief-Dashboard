@@ -103,9 +103,9 @@ async function doeReset(){
     const laatsteVoor=props.slice().sort((a,b)=>a.index-b.index).pop().title;
     const naam=_archiefNaam(new Date().getFullYear(),props.map(p=>p.title));
 
-    // Archiveren. Het archief komt DIRECT NA 'ALV's overzicht', nooit achteraan:
-    // de oude verplaatsALV-trigger schrijft afgeronde ALV's naar het láátste tabblad,
-    // dus een archief achteraan zou die stil opslokken.
+    // Archiveren. Het archief komt DIRECT NA 'ALV's overzicht' — dat navigeert
+    // prettiger dan achteraan. (Historisch ook noodzaak: verplaatsALV schreef naar het
+    // láátste tabblad; sinds die op naam zoekt is de positie alleen nog voorkeur.)
     const arch=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
       method:'POST',
       headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},

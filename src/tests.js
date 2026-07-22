@@ -1031,7 +1031,7 @@ import { shouldPromptReload } from "./sw-update.js";
 
       const gezond=await draai();
       eq('reset: één archiefverzoek', gezond.archief.length, 1);
-      eq('reset: archief direct ná het overzicht (niet achteraan, anders slokt verplaatsALV het op)',
+      eq('reset: archief direct ná het overzicht (niet achteraan)',
          gezond.archief[0].body.requests[0].duplicateSheet.insertSheetIndex, 1);
       eq('reset: één wisverzoek', gezond.wis.length, 1);
       eq('reset: wist precies de vier vlagkolommen C/D/E/G',

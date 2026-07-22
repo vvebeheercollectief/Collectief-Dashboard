@@ -4,7 +4,7 @@
 import { parseDt, _parseAnyDate, coerceDagenVooraf } from "./util.js";
 import { state, D } from "./state.js";
 import { SKEYS, SECS } from "./config.js";
-import { fetchSheet, _withRetry } from "./api.js";
+import { fetchSheet, fetchSheets, _withRetry } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { buildAnalytics, buildDash } from "./render-analytics.js";
 import { renderNtdDonut } from "./render-lijsten.js";
@@ -70,6 +70,10 @@ function clearLoadError(){ document.getElementById('load-err-banner')?.remove();
 
 // Herhaal-slot: voorkomt dat twee loadAll-aanroepen tegelijk lopen en elkaars data
 // overschrijven (8s-poll, schrijf-resync, refresh-knop, handmatige awaits).
+// De acht tabbladen die elke poll gelezen worden, in de volgorde waarin loadAll ze uitpakt.
+const POLL_TABS=["Nog Te Doen","Afgerond","ALV's overzicht","ALV's afgerond",
+                 "Ontwikkeling","Logboek","Herhaalregels","Kenmerken"];
+
 async function loadAll(silent){
   if(state._loadInFlight){ state._loadAgain=true; if(!silent) state._loadAgainLoud=true; return; }
   state._loadInFlight=true;
@@ -81,14 +85,25 @@ async function loadAll(silent){
     // Reads met herkansing bij tijdelijke API-fouten (429 / 5xx / netwerk-blip), zodat
     // één hapering niet meteen de hele ronde laat falen en 'Fout' toont.
     const lees=(naam)=>_withRetry(()=>fetchSheet(naam));
-    const[ntdR,afR,alvoR,alfaR,ontwR,logR,hhR,kmkR]=await Promise.all([
-      lees("Nog Te Doen"),lees("Afgerond"),
-      lees("ALV's overzicht"),lees("ALV's afgerond"),
-      lees("Ontwikkeling").catch(()=>[]),
-      lees("Logboek").catch(()=>[]),
-      lees("Herhaalregels").catch(()=>[]),
-      lees("Kenmerken").catch(()=>[]),
-    ]);
+    let ntdR,afR,alvoR,alfaR,ontwR,logR,hhR,kmkR;
+    try{
+      // Eén batchGet i.p.v. acht losse reads — zie fetchSheets: acht aparte verzoeken
+      // per poll was precies de Google-leeslimiet van 60 per minuut, waardoor elke
+      // gebruikersactie erbovenop 'Quota exceeded' opleverde.
+      [ntdR,afR,alvoR,alfaR,ontwR,logR,hhR,kmkR]=await _withRetry(()=>fetchSheets(POLL_TABS));
+    }catch(e){
+      // Terugval op losse reads. batchGet faalt in z'n geheel als één tabblad ontbreekt;
+      // de oude weg levert de optionele tabbladen dan alsnog los aan (duurder, maar werkt).
+      console.warn('batchGet mislukt, terugval op losse reads:', e.message);
+      [ntdR,afR,alvoR,alfaR,ontwR,logR,hhR,kmkR]=await Promise.all([
+        lees("Nog Te Doen"),lees("Afgerond"),
+        lees("ALV's overzicht"),lees("ALV's afgerond"),
+        lees("Ontwikkeling").catch(()=>[]),
+        lees("Logboek").catch(()=>[]),
+        lees("Herhaalregels").catch(()=>[]),
+        lees("Kenmerken").catch(()=>[]),
+      ]);
+    }
     state._syncFails=0; // alle reads geslaagd
     // Kwam er tijdens het lezen een schrijfactie tussen? Dan is de lokale (optimistische)
     // staat leidend; de eigen resync van die schrijfactie haalt zo de verse data op.

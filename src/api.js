@@ -10,6 +10,25 @@ async function fetchSheet(name){
   if(!r.ok){const e=await r.json().catch(()=>({}));if(r.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'API fout');err.status=r.status;throw err}
   return (await r.json()).values||[];
 }
+// Meerdere tabbladen in ÉÉN leesverzoek (values:batchGet). Cruciaal voor het quotum:
+// Google staat 60 leesverzoeken per minuut per gebruiker toe, en de 8s-poll haalde
+// 8 tabbladen apart op = 8 × 7,5 = precies 60 per minuut. Daardoor ging élke extra
+// actie van de gebruiker (een vinkje zetten kost een rij-controle + een resync) over
+// het quotum heen, met 'Quota exceeded' tot gevolg. Nu kost een poll 1 verzoek.
+async function fetchSheets(names){
+  if(!state.oauthToken) throw new Error('Niet ingelogd');
+  const qs=names.map(n=>`ranges=${encodeURIComponent(n)}`).join('&');
+  const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values:batchGet?${qs}`,{
+    cache:'no-store',
+    headers:{Authorization:`Bearer ${state.oauthToken}`}
+  });
+  if(!r.ok){const e=await r.json().catch(()=>({}));if(r.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'API fout');err.status=r.status;throw err}
+  const vr=(await r.json()).valueRanges||[];
+  // batchGet levert valueRanges in dezelfde volgorde als de meegegeven ranges.
+  // Een leeg tabblad komt terug zónder 'values'; dat wordt een lege lijst.
+  return names.map((_,i)=>(vr[i]&&vr[i].values)||[]);
+}
+
 // Formule-injectie-rem op ALLE frontend-writes (spiegel van cd_safeCell in Apps
 // Script): een cel die met =, +, -, @, tab of CR begint zou via USER_ENTERED een
 // levende formule worden — geplakte mailtekst met =IMPORTDATA(...) is dan een
@@ -118,4 +137,4 @@ async function assertRowsMatch(checks, sheetName='Nog Te Doen'){
 }
 const assertRowMatch=(row, code, sheetName)=>assertRowsMatch([{ row, code }], sheetName);
 
-export { fetchSheet, writeRange, appendRange, veiligeCel, _veiligeRij, _shiftNtdRows, _herstelShift, _isTransient, _withRetry, askChat, _rowMismatch, _a1ColA, assertRowsMatch, assertRowMatch };
+export { fetchSheet, fetchSheets, writeRange, appendRange, veiligeCel, _veiligeRij, _shiftNtdRows, _herstelShift, _isTransient, _withRetry, askChat, _rowMismatch, _a1ColA, assertRowsMatch, assertRowMatch };

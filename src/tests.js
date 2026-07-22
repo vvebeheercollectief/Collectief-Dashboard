@@ -12,7 +12,7 @@ import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel 
 import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk.js";
-import { _isTransient, _rowMismatch, _a1ColA, _herstelShift, veiligeCel, _veiligeRij } from "./api.js";
+import { _isTransient, _rowMismatch, _a1ColA, _herstelShift, veiligeCel, _veiligeRij, fetchSheets } from "./api.js";
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
@@ -804,6 +804,32 @@ import { shouldPromptReload } from "./sw-update.js";
   // ── Rij-guard A1-range: apostrof in tabblad-naam escapen ──
   eq('a1: gewone tabblad-naam', _a1ColA('Nog Te Doen',5,5), "'Nog Te Doen'!A5:A5");
   eq('a1: apostrof wordt geëscaped (ALV)', _a1ColA("ALV's overzicht",3,7), "'ALV''s overzicht'!A3:A7");
+  // ── Quotum: de 8s-poll haalde 8 tabbladen in 8 aparte leesverzoeken op = 60 per minuut,
+  //    precies de Google-limiet van 60 leesverzoeken per minuut per gebruiker. Elke actie
+  //    van de gebruiker ging daardoor over het quotum. Eén batchGet = één verzoek. ──
+  await (async()=>{
+    const _fetch=window.fetch, tokenOud=state.oauthToken, expiryOud=state.oauthExpiry;
+    try{
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
+      const urls=[];
+      window.fetch=async(url)=>{
+        urls.push(decodeURIComponent(String(url)));
+        return new Response(JSON.stringify({valueRanges:[
+          {values:[['a1','a2']]}, {values:[['b1']]}, {}   // derde tabblad is leeg → geen 'values'
+        ]}),{status:200});
+      };
+      const namen=["Nog Te Doen","ALV's overzicht","Leeg Tabblad"];
+      const uit=await fetchSheets(namen);
+      eq('batchGet: drie tabbladen kosten één leesverzoek', urls.length, 1);
+      eq('batchGet: gebruikt het batchGet-eindpunt', urls[0].includes('values:batchGet'), true);
+      eq('batchGet: alle drie de tabbladen zitten in dat ene verzoek',
+         namen.every(n=>urls[0].includes('ranges='+n)), true);
+      eq('batchGet: waarden komen terug in dezelfde volgorde', uit, [[['a1','a2']],[['b1']],[]]);
+      eq('batchGet: leeg tabblad wordt een lege lijst, geen undefined', Array.isArray(uit[2]), true);
+    } finally {
+      window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
+    }
+  })();
   // ── AI-chat kostenrem: _chatMessages begrenst + start met user ──
   eq('chat: korte historie ongewijzigd (2)', _chatMessages([{rol:'user',tekst:'a'},{rol:'assistant',tekst:'b'}]).length, 2);
   eq('chat: lange historie begrensd tot max', _chatMessages(Array.from({length:30},(_,i)=>({rol:i%2?'assistant':'user',tekst:String(i)})),10).length <= 10, true);
@@ -1010,6 +1036,11 @@ import { shouldPromptReload } from "./sw-update.js";
         // Kolom A voor de identiteitscontrole: standaard afgeleid uit hetzelfde blad,
         // zodat een ingevoegde lege rij ook hier klopt en de blokkenlogica getest wordt.
         if(d.includes('!A')) return new Response(JSON.stringify({values:(kolomA?kolomA.map(c=>[c]):blad.slice(2).map(r=>[r[0]]))}),{status:200});
+        // loadAll leest sinds de quotum-fix alle tabbladen in één batchGet; die moet vóór
+        // de losse-read-tak staan, want de batchGet-URL bevat óók "ALV's overzicht".
+        // Volgorde = POLL_TABS, dus het ALV-overzicht staat op index 2.
+        if(u.includes('values:batchGet'))
+          return new Response(JSON.stringify({valueRanges:[{},{},{values:blad},{},{},{},{},{}]}),{status:200});
         if(d.includes("ALV's overzicht")) return new Response(JSON.stringify({values:blad}),{status:200});
         if(u.includes(':batchUpdate')){
           const b=JSON.parse(opt.body);
@@ -1066,6 +1097,8 @@ import { shouldPromptReload } from "./sw-update.js";
             {properties:{sheetId:22,title:"ALV's overzicht",index:0,gridProperties:{columnCount:7}}},
             {properties:{sheetId:44,title:"ALV's afgerond",index:1,gridProperties:{columnCount:3}}}]}),{status:200});
         if(d.includes('!A')) return new Response(JSON.stringify({values:[['V0'],['V1'],['V2']]}),{status:200});
+        if(u.includes('values:batchGet'))
+          return new Response(JSON.stringify({valueRanges:[{},{},{values:rijen(['V0','V1','V2'])},{},{},{},{},{}]}),{status:200});
         if(d.includes("ALV's overzicht")) return new Response(JSON.stringify({values:rijen(['V0','V1','V2'])}),{status:200});
         if(u.includes(':batchUpdate')) return new Response(JSON.stringify({replies:[{}]}),{status:200});
         return new Response(JSON.stringify({values:[]}),{status:200});

@@ -754,7 +754,7 @@ import { shouldPromptReload } from "./sw-update.js";
     },
     af: { OPPAKKEN: [{ code:'CH1', actiepunt:'Lift-onderhoudscontract verlengd', datum:'18 mei 2026' }],
       VERGADERVERZOEKEN: [], 'OFFERTE-TRAJECTEN': [], LOD: [] },
-    alvo: [{ code:'CH1', naam:'VvE Chattest', uitnodiging:true, notulen:false, begroting:false, status:'Gepland' }],
+    alvo: [{ code:'CH1', naam:'VvE Chattest', klaargezet:true, uitnodiging:true, notulen:false, begroting:false, status:'Gepland' }],
     alfa: [],
     logboek: [{ code:'CH1', timestamp:'2026-05-30T10:00:00.000Z', actie:'Contact', veld:'Telefoon',
       oudeWaarde:'Bestuur', nieuweWaarde:'voorzitter gebeld over schilderwerk', gebruiker:'info@vvebeheercollectief.nl' }],
@@ -766,6 +766,7 @@ import { shouldPromptReload } from "./sw-update.js";
   truthy('chat: context bevat afgerond punt', _ctx.includes('Lift-onderhoudscontract verlengd'));
   truthy('chat: context bevat ALV-status', /ALV/i.test(_ctx));
   truthy('chat: context bevat laatste contact', _ctx.includes('voorzitter gebeld over schilderwerk'));
+  truthy('chat: context noemt de klaargezet-stand', /klaargezet/i.test(_ctx));
 
   const _ctxLeeg = dossierContextTekst('ZZZ', _Dchat, _Tchat);
   truthy('chat: onbekende code geeft geldige (niet-lege) tekst', typeof _ctxLeeg === 'string' && _ctxLeeg.includes('ZZZ'));

@@ -32,7 +32,8 @@ function dossierContextTekst(code, data, vandaag){
     o.afgerond.slice(0,8).forEach(r=>L.push(`- ${t(r)}${r.datum?` (${r.datum})`:''}`));
   }
   if(o.alvo){
-    L.push(`Komende ALV: status ${o.alvo.status}; uitnodiging ${o.alvo.uitnodiging?'verstuurd':'nog niet'}, `
+    L.push(`Komende ALV: status ${o.alvo.status}; agenda ${o.alvo.klaargezet?'klaargezet':'nog niet klaargezet'}, `
+      + `uitnodiging ${o.alvo.uitnodiging?'verstuurd':'nog niet'}, `
       + `notulen ${o.alvo.notulen?'ja':'nee'}, begroting ${o.alvo.begroting?'ja':'nee'}.`);
   }
   if(o.alfa && o.alfa.length) L.push(`Laatst gehouden ALV: ${o.alfa[0].datum}.`);

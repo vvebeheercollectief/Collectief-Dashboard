@@ -236,7 +236,7 @@ function renderVve(){
     let html='';
     if(o.alvo){
       html+=`<div class="vve-alv-rij"><b>Komende ALV</b><span class="badge status-${esc((o.alvo.status||'').toLowerCase().replace(/[^a-z0-9]+/g,'-'))}">${esc(o.alvo.status)}</span></div>
-        <div class="vve-alv-flags">${['uitnodiging','notulen','begroting'].map(f=>
+        <div class="vve-alv-flags">${['klaargezet','uitnodiging','notulen','begroting'].map(f=>
           `<span class="badge" style="background:${o.alvo[f]?'var(--gn-l)':'var(--sur2)'};color:${o.alvo[f]?'var(--gn)':'var(--mut)'}">${o.alvo[f]?'✓':'–'} ${f.charAt(0).toUpperCase()+f.slice(1)}</span>`).join('')}</div>`;
     }
     if(o.alfa.length){

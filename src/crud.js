@@ -71,8 +71,8 @@ function fillModalFields(sec,r){
       tog('tog-ib-v',r.inBehandeling==='TRUE');break;
     case'OFFERTE-TRAJECTEN':
       setv('m-daang',toISODate(r.datumAangevraagd));setv('m-beh-o',r.behandelaar);
-      {const[ор,от]=(r.offertes||'').split('/').map(s=>parseInt(s)||0);
-      setv('m-off-recv',ор||0);setv('m-off-total',от||0);}
+      {const[ontv,totaal]=(r.offertes||'').split('/').map(s=>parseInt(s)||0);
+      setv('m-off-recv',ontv||0);setv('m-off-total',totaal||0);}
       setv('m-dl-o',toISODate(r.deadline));setv('m-opm-o',r.opmerkingen);setv('m-sub-off',r.subcategorie);break;
     case'LOD':
       setv('m-actie-l',r.actiepunt);setv('m-stat-l',r.status);setv('m-beh-l',r.behandelaar);

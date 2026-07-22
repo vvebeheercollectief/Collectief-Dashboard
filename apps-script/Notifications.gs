@@ -622,6 +622,18 @@ function cd_safeCell(s) {
   return /^[=+\-@\t\r]/.test(s) ? "'" + s : s;
 }
 
+// SHA-256 → lowercase hex. Gebruikt om het oude gelekte webhook-secret te herkennen
+// zonder de gelekte waarde zelf in dit openbaar gevolgde bestand te bewaren.
+function cd_sha256Hex(s) {
+  var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, s, Utilities.Charset.UTF_8);
+  var hex = '';
+  for (var i = 0; i < bytes.length; i++) {
+    var b = (bytes[i] + 256) % 256;
+    hex += ('0' + b.toString(16)).slice(-2);
+  }
+  return hex;
+}
+
 function cd_createTaskRow(categorie, code, naam, actiepunt, behandelaar, deadline, herhaalId) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(NTD_SHEET); // 'Nog Te Doen'
@@ -692,7 +704,10 @@ function setupWebhookSecret() {
   // Roteren = in de LIVE editor de echte waarde invullen en deze functie 1x draaien.
   // (Geroteerd 2026-06-08: het oude secret was gelekt via git-history + publieke index.html.)
   var nieuwSecret = 'ZET-DE-ECHTE-WAARDE-ALLEEN-IN-DE-LIVE-EDITOR';
-  var oudGelekt   = '0038352e880dab9ee033277cbb19ef68f3ca5378077ee09d';
+  // Het oude, gelekte secret staat NIET meer letterlijk in dit openbaar gevolgde bestand;
+  // we bewaren alleen z'n SHA-256-hash als vangnet, zodat we hem kunnen herkennen zonder
+  // de gelekte waarde opnieuw te publiceren.
+  var oudGelektHash = '4500923fdf5ce957b40e574d99d9dc1720605e88fcd7b5ab7e5d450b85b1dd43';
 
   // Vangnet: voorkomt dat deze plaatshouder per ongeluk als echt secret wordt ingesteld.
   if (nieuwSecret.indexOf('ZET-DE-ECHTE') === 0) {
@@ -702,7 +717,7 @@ function setupWebhookSecret() {
   PropertiesService.getScriptProperties().setProperty('CD_WEBHOOK_SECRET', nieuwSecret);
 
   var opgeslagen = PropertiesService.getScriptProperties().getProperty('CD_WEBHOOK_SECRET');
-  if (opgeslagen === nieuwSecret && nieuwSecret !== oudGelekt) {
+  if (opgeslagen === nieuwSecret && cd_sha256Hex(nieuwSecret) !== oudGelektHash) {
     Logger.log('✅ Gelukt — het secret is geroteerd (' + opgeslagen.length + ' tekens).');
     Logger.log('   Het oude, gelekte wachtwoord werkt vanaf nu NIET meer.');
   } else {

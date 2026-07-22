@@ -1,0 +1,16 @@
+# GitHub Pages (Jekyll legacy build). We voegen alleen een exclude-lijst toe: interne
+# mockups, presentatie-decks, het bronpakket met logo's, het wekelijkse HTML-deck, de
+# specs/plannen en de Apps Script-broncode horen NIET op de publieke site. De app zelf
+# (index.html, src/, styles.css, sw.js, manifest.json, iconen, allowed-emails.js en de
+# losse logo-*.png in de root) heeft geen underscore-prefix en staat niet in de lijst,
+# dus die wordt gewoon gepubliceerd.
+exclude:
+  - mockups
+  - logo-pakket
+  - vrijdagsoverzicht.html
+  - docs
+  - .superpowers
+  - apps-script
+  - README.md
+  - BRAND-GUIDELINES.md
+  - beheer-playbook.md

@@ -289,6 +289,7 @@
     .sw-update-btn:hover{filter:brightness(1.05)}
     .sw-update-x{background:none;border:none;color:var(--mut);font-size:18px;line-height:1;cursor:pointer;padding:0 2px}
     .sw-update-x:hover{color:var(--txt)}
+    .staging-balk{position:fixed;top:0;left:0;right:0;z-index:100000;background:var(--am);color:#fff;text-align:center;font:600 13px/2.4 system-ui,sans-serif;letter-spacing:.3px}
     @keyframes toast-in{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:translateX(0)}}
     @keyframes toast-out{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(24px)}}
     @keyframes toast-bar{from{width:100%}to{width:0%}}
@@ -785,6 +786,29 @@
     [data-theme=dark] .act-af{background:#12302a;border-color:#1f4a3c;color:#34d39a}
     [data-theme=dark] .act-af:hover{background:#34d39a;border-color:#34d39a;color:#0f1b1a}
     [data-theme=dark] tbody tr[data-prio=laag]{--prio-bar:#3a414d}
+    /* Accent-gevulde elementen: in donker thema is de vulling licht (--ac #8b9dc4, sec-pastellen),
+       dus wit erop haalt maar ~1.9–2.8:1. Donkere inkt op de lichte vulling — zelfde omkering als
+       .act-af:hover hierboven; gemeten ≥6.2:1 op elke vulling (norm: 4.5 tekst, 3 iconen).
+       .tog.on doet níet mee: die krijgt via --modal-sec een vaste donkere kleur, daar hoort de
+       witte knop juist. De stagingbalk (--am-vulling) volgt hetzelfde patroon. */
+    [data-theme=dark] .btn-pri,
+    [data-theme=dark] .sw-update-btn,
+    [data-theme=dark] .pb.on,
+    [data-theme=dark] .period-btn.on,
+    [data-theme=dark] .ai-step .dot,
+    [data-theme=dark] .ai-mini.plus,
+    [data-theme=dark] .cb.aan::after,
+    [data-theme=dark] .bb-datum button,
+    [data-theme=dark] .of-aann-toevoeg,
+    [data-theme=dark] .vd-toggle span.on,
+    [data-theme=dark] .chat-bub.user,
+    [data-theme=dark] #chat-send,
+    [data-theme=dark] .kc-plus,
+    [data-theme=dark] .staging-balk{color:#15181d}
+    /* Avatars kleuren per persoon via inline background (pastel in donker) → donkere initiaal;
+       alleen de vaste navy (--nv) houdt witte tekst, donkere inkt is dáár juist onleesbaar. */
+    [data-theme=dark] .lchip .av,[data-theme=dark] .log-av{color:#15181d}
+    [data-theme=dark] .lchip .av[style*="--nv"],[data-theme=dark] .log-av[style*="--nv"]{color:#fff}
 
     /* ── Dagstart-cockpit (Vandaag) ── */
     #dash-vandaag{margin-bottom:22px}

@@ -1,12 +1,12 @@
-website-mockup*.html
-mockup-*.html
-presentatie-*.html
-brand-preview.html
-brand-update-preview.html
-BRAND-GUIDELINES.md
-COMPANY-CONTEXT.md
+# Interne bestanden en bronassets die niet mee hoeven in de publieke Vercel-deploy.
+# (De app zelf — index.html, src/, styles.css, sw.js, manifest, iconen en de losse
+#  logo-*.png in de root — blijft gewoon meegedeployed.)
 README.md
+BRAND-GUIDELINES.md
+beheer-playbook.md
 docs/
 .superpowers/
 apps-script/
 mockups/
+logo-pakket/
+vrijdagsoverzicht.html

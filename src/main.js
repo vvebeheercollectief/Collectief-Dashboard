@@ -77,8 +77,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   if (IS_STAGING) {
     document.title = '[TEST] ' + document.title;
     document.body.insertAdjacentHTML('afterbegin',
-      '<div style="position:fixed;top:0;left:0;right:0;z-index:100000;background:var(--am);color:#fff;'
-      + 'text-align:center;font:600 13px/2.4 system-ui,sans-serif;letter-spacing:.3px">'
+      '<div class="staging-balk">'
       + ico('waarschuwing',14).replace('<svg ','<svg style="vertical-align:-2.5px;margin-right:4px" ')
       + 'TESTOMGEVING — dit is niet het echte dashboard</div>'
       + '<div style="height:34px"></div>');

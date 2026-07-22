@@ -191,6 +191,7 @@
             </div>
             <select class="filter-select" id="f-status-alvo"><option value="">Alle statussen</option><option>Open</option><option>Klaargezet</option><option>Gepland</option><option>Afgerond</option></select>
             <label class="filter-check"><input type="checkbox" id="f-budget-alvo"/> Budgetpakket</label>
+            <button class="btn btn-sec btn-sm" data-action="alvo-reset-open" title="Alle vinkjes wissen voor een nieuwe vergaderronde">Nieuwe ronde starten</button>
           </div>
         </div>
         <div class="tbl-wrap">
@@ -660,6 +661,23 @@
       <button class="btn btn-sec" id="hh-cancel">Annuleren</button>
       <button class="btn btn-del" id="hh-del" style="display:none" data-action="herhaal-verwijderen"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 7.5l.7 11.6a2 2 0 0 0 2 1.9h5.6a2 2 0 0 0 2-1.9l.7-11.6z" fill="currentColor" fill-opacity="0.18"/><path d="M4 7.5h16"/><path d="M9.5 7.5V6a1.8 1.8 0 0 1 1.8-1.8h1.4A1.8 1.8 0 0 1 14.5 6v1.5"/><path d="M10 11.5v5M14 11.5v5"/></svg> Verwijder</button>
       <button class="btn btn-pri" id="hh-submit"><span id="hh-submit-lbl">Toevoegen</span></button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ NIEUWE VERGADERRONDE (ALV-RESET) MODAL ═══════ -->
+<div class="modal-bg" id="alvoreset-bg">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-hdr">
+      <h2 id="alvoreset-title">Weet je zeker dat je het overzicht wilt resetten?</h2>
+      <button class="modal-close" id="alvoreset-close">×</button>
+    </div>
+    <div class="modal-body">
+      <p id="alvoreset-tekst" style="line-height:1.6;margin:0"></p>
+    </div>
+    <div class="modal-foot" style="justify-content:space-between">
+      <button class="btn btn-sec" data-action="alvo-reset-annuleer">Annuleer</button>
+      <button class="btn btn-del" data-action="alvo-reset-doe" id="alvoreset-doe">Reset</button>
     </div>
   </div>
 </div>

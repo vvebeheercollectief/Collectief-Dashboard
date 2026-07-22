@@ -4,6 +4,7 @@
 //  (C=Uitnodiging, D=Notulen, E=Begroting, G=Klaargezet).
 //  Het papieren ritueel — elk jaar een nieuwe lijst uitprinten — als knop.
 // ══════════════════════════════════════
+import { D } from "./state.js";
 
 // Welke rijen mag de reset raken? Onderaan het tabblad staan samenvattingsregels
 // ('Totaal …', 'Uitnodigingen …') die parseAlvo overslaat; die mogen niet gewist worden.
@@ -24,4 +25,17 @@ function _archiefNaam(jaar,bestaandeNamen){
   return `${basis} (${n})`;
 }
 
-export { _resetBereik, _archiefNaam };
+function openResetModal(){
+  const b=_resetBereik(D.alvo||[]);
+  if(!b.aantal){ alert('Er staan geen VvE-rijen in het overzicht om te resetten.'); return; }
+  document.getElementById('alvoreset-tekst').textContent =
+    `Alle vier de vinkjes gaan uit bij ${b.aantal} ${b.aantal===1?'VvE':"VvE's"}. `+
+    `Elke VvE staat daarna weer op Open. De huidige ronde wordt eerst weggeschreven naar een `+
+    `archieftabblad, dus er gaat niets verloren.`;
+  document.getElementById('alvoreset-bg').classList.add('open');
+}
+function closeResetModal(){
+  document.getElementById('alvoreset-bg').classList.remove('open');
+}
+
+export { _resetBereik, _archiefNaam, openResetModal, closeResetModal };

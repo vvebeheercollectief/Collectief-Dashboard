@@ -22,6 +22,7 @@ import { loadAll } from './data.js';
 import { initActions } from './actions.js';
 import { initVveZoekveld } from './vve-zoekveld.js';
 import { closeSnoozeModal, snoozeOpslaan, snoozeWis } from './snooze.js';
+import { closeResetModal } from './alv-reset.js';
 import { renderHerhaal, openHerhaalModal, closeHerhaalModal, syncHerhaalVelden, submitHerhaal } from './render-herhaal.js';
 import { renderVve } from './render-vve.js';
 import { openChat, closeChat, setChatVve } from './dossier-chat.js';
@@ -39,6 +40,7 @@ const MODAL_SLUITERS = {
   'ontw-modal-bg': closeOntwModal,
   'hh-bg': closeHerhaalModal,
   'snooze-bg': closeSnoozeModal,
+  'alvoreset-bg': closeResetModal,
   'notif-bg': closeNotifModal,
   'ai-bg': closeAiHelp,
 };
@@ -194,6 +196,12 @@ document.addEventListener('DOMContentLoaded',()=>{
       document.getElementById('hh-naam').value = naam;
     },
   });
+
+  // Nieuwe-vergaderronde-modal (ALV-reset)
+  document.getElementById('alvoreset-close').onclick=closeResetModal;
+  let _resetMouseDown=null;
+  document.getElementById('alvoreset-bg').addEventListener('mousedown',e=>{_resetMouseDown=e.target});
+  document.getElementById('alvoreset-bg').addEventListener('click',e=>{if(e.target.id==='alvoreset-bg'&&_resetMouseDown?.id==='alvoreset-bg')closeResetModal()});
 
   // Wegleggen-modal (Fase 4)
   document.getElementById('snooze-close').onclick=closeSnoozeModal;

@@ -204,12 +204,14 @@ function parseAlvo(rows){
     const uitn=(r[2]||'').trim()==='TRUE';
     const notu=(r[3]||'').trim()==='TRUE';
     const begr=(r[4]||'').trim()==='TRUE';
+    // Kolom G: de stap vóór 'Uitnodiging verstuurd' — agenda uitgeschreven, klaar om te versturen.
+    const klaar=(r[6]||'').trim()==='TRUE';
     const opm=(r[5]||'').trim();
     // Budgetpakket-markering: kolom F bevat exact "Budget" (of voluit "Budgetpakket"),
     // hoofdletterongevoelig. Vrije-tekst-opmerkingen ("Naar budget per…","Vergaderen zelf") tellen bewust niet mee.
     const budget=/^budget(pakket)?$/i.test(opm);
-    const status=notu?'Afgerond':uitn?'Gepland':'Open';
-    return{code,naam:(r[1]||'').trim(),uitnodiging:uitn,notulen:notu,begroting:begr,opmerkingen:opm,budget,status,_row:i+3};
+    const status=notu?'Afgerond':uitn?'Gepland':klaar?'Klaargezet':'Open';
+    return{code,naam:(r[1]||'').trim(),uitnodiging:uitn,notulen:notu,begroting:begr,klaargezet:klaar,opmerkingen:opm,budget,status,_row:i+3};
   }).filter(Boolean);
 }
 

@@ -901,6 +901,27 @@ import { shouldPromptReload } from "./sw-update.js";
     eq('parseAlvo: "Vergaderen zelf" → budget=false', av[4].budget, false);
     eq('parseAlvo: lege opmerking → budget=false', av[5].budget, false);
   })();
+  // parseAlvo: Klaargezet uit kolom G — de stap vóór 'Uitnodiging verstuurd'. Vier-traps status.
+  (()=>{
+    const rows=[
+      ['','','','','','',''],
+      ['Code','Naam','Uitnodiging','Notulen','Begroting','Opmerkingen','Klaargezet'],
+      ['A1','Alfahof',    'FALSE','FALSE','FALSE','',      'TRUE' ],
+      ['A2','Betaplein',  'TRUE', 'FALSE','FALSE','',      'TRUE' ],
+      ['A3','Gammalaan',  'FALSE','FALSE','FALSE','',      'FALSE'],
+      ['A4','Deltastraat','TRUE', 'TRUE', 'FALSE','',      'TRUE' ],
+      ['A5','Epsilonweg', 'TRUE', 'FALSE','FALSE','Budget','FALSE'],
+    ];
+    const av=parseAlvo(rows);
+    eq('alvo: klaargezet uit kolom G',          av[0].klaargezet, true);
+    eq('alvo: klaargezet FALSE leest false',    av[2].klaargezet, false);
+    eq('alvo: status Klaargezet',               av[0].status, 'Klaargezet');
+    eq('alvo: uitnodiging wint van klaargezet', av[1].status, 'Gepland');
+    eq('alvo: geen enkele vlag → Open',         av[2].status, 'Open');
+    eq('alvo: notulen wint van alles',          av[3].status, 'Afgerond');
+    eq('alvo: budget nog steeds herkend',       av[4].budget, true);
+    eq('alvo: rijnummer klopt nog',             av[0]._row, 3);
+  })();
   // parseAlfa: slice(1); rij zonder code valt weg.
   (()=>{
     const rows=[['Code','Naam','Datum'],['CH1','VvE 1','2026-05-01'],['','geen code','x'],['CH2','VvE 2','']];

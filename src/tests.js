@@ -1053,6 +1053,27 @@ import { shouldPromptReload } from "./sw-update.js";
       const mislukt=await draai({archiefStatus:500});
       eq('reset: archiveren mislukt → wél geprobeerd', mislukt.archief.length, 1);
       eq('reset: archiveren mislukt → NIETS gewist',   mislukt.wis.length, 0);
+
+      // Dubbelklik-race: twee gelijktijdige aanroepen mogen samen één ronde opleveren.
+      // Staat de controle op _alvoResetBezig vóór 'await ensureToken()', dan lezen beide
+      // klikken 'false' en krijg je een tweede archieftabblad. Deze assert pint dat vast.
+      const raceVerzoeken=[];
+      window.fetch=async(url,opt)=>{
+        const u=String(url), d=decodeURIComponent(u);
+        raceVerzoeken.push({url:d, body:opt&&opt.body?JSON.parse(opt.body):null});
+        if(u.includes('?fields=sheets.properties'))
+          return new Response(JSON.stringify({sheets:[
+            {properties:{sheetId:22,title:"ALV's overzicht",index:0,gridProperties:{columnCount:7}}},
+            {properties:{sheetId:44,title:"ALV's afgerond",index:1,gridProperties:{columnCount:3}}}]}),{status:200});
+        if(d.includes('!A')) return new Response(JSON.stringify({values:[['V0'],['V1'],['V2']]}),{status:200});
+        if(d.includes("ALV's overzicht")) return new Response(JSON.stringify({values:rijen(['V0','V1','V2'])}),{status:200});
+        if(u.includes(':batchUpdate')) return new Response(JSON.stringify({replies:[{}]}),{status:200});
+        return new Response(JSON.stringify({values:[]}),{status:200});
+      };
+      await Promise.all([doeReset(), doeReset()]);
+      document.querySelectorAll('.toast').forEach(t=>t.remove());
+      eq('reset: dubbelklik levert één archief, geen twee',
+         raceVerzoeken.filter(v=>v.url.includes(':batchUpdate') && v.body.requests[0].duplicateSheet).length, 1);
     } finally {
       window.fetch=_fetch;
       state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;

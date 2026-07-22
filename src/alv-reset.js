@@ -78,8 +78,13 @@ async function _tabbladen(){
 }
 
 async function doeReset(){
-  if(state._alvoResetBezig) return;
   if(!await ensureToken()){ showToast('Niet ingelogd','Kan niet resetten','var(--rd)'); return; }
+  // Dubbelklik-rem NÁ ensureToken, en controle+zetten pal naast elkaar zónder await
+  // ertussen — anders lezen twee snelle klikken allebei 'false' en draaien ze allebei,
+  // wat een tweede archieftabblad oplevert. Zelfde idioom als _completeBusy in crud.js:
+  // bewust niet vóór ensureToken, want een hangende OAuth-popup zou de vlag dan eeuwig
+  // op true laten staan en is een tweede klik juist een legitieme herkansing.
+  if(state._alvoResetBezig) return;
   state._alvoResetBezig=true;
   const knop=document.getElementById('alvoreset-doe');
   if(knop){ knop.disabled=true; knop.textContent='Bezig…'; }

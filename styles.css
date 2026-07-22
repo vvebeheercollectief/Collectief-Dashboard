@@ -246,6 +246,7 @@
     tr.snooze-row td{opacity:.55}
     .grp-kop{background:var(--group-bg);padding:9px 26px;font-size:11.5px;font-weight:600;color:#7c8694;text-transform:uppercase;letter-spacing:.04em;border:none}
     .status-open{background:var(--rd-l);color:var(--rd)}
+    .status-klaargezet{background:var(--ac-l);color:var(--ac)}
     .status-gepland{background:var(--am-l);color:var(--am)}
     .status-afgerond{background:var(--gn-l);color:var(--gn)}
     .badge.budget-tag{background:var(--bl-l);color:var(--bl);margin-left:8px;vertical-align:middle}

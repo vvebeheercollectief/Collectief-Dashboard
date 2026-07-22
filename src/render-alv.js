@@ -55,13 +55,14 @@ function renderAlvo(){
       return`<tr>
         <td>${vveCodeSpan(r.code, '--sec:var(--ac);--sec-l:var(--ac-l)')}</td>
         <td class="cell-name">${esc(r.naam)}${r.budget?' <span class="badge budget-tag" title="Budgetpakket — vergadert zelf">Budget</span>':''}</td>
+        <td>${flagPill(idx,'klaargezet',r.klaargezet)}</td>
         <td>${flagPill(idx,'uitnodiging',r.uitnodiging)}</td>
         <td>${flagPill(idx,'notulen',r.notulen)}</td>
         <td>${flagPill(idx,'begroting',r.begroting)}</td>
         <td><span class="badge status-${esc((r.status||'').toLowerCase().replace(/[^a-z0-9]+/g,'-'))}">${statusIco(r.status)} ${esc(r.status)}</span></td>
       </tr>`;
     }).join('')
-    :emptyRow(6);
+    :emptyRow(7);
   renderPag('alvo-pag',rows.length,pgs.alvo,'alvo');
 }
 

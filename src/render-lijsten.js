@@ -68,13 +68,20 @@ function renderNtdDonut(){
   const done=(D.alvo||[]).filter(r=>r.uitnodiging).length;
   const total=(D.alvo||[]).length;
   const pct=total?Math.round(done/total*100):0;
+  // Voorbereid = klaargezet óf al verstuurd; de balk toont dat als lichter voorloopstuk.
+  const voorbereid=(D.alvo||[]).filter(r=>r.klaargezet||r.uitnodiging).length;
+  const pctVoor=total?Math.round(voorbereid/total*100):0;
   const txt=`${done} / ${total}`;
   document.getElementById('ntd-progress-val-base').textContent=txt;
   document.getElementById('ntd-progress-val-rev').textContent=txt;
-  document.getElementById('ntd-progress-sub').textContent=`${pct}% van de vergaderingen uitgeschreven`;
+  document.getElementById('ntd-progress-sub').textContent = voorbereid>done
+    ? `${pct}% verstuurd, ${pctVoor}% klaargezet`
+    : `${pct}% van de vergaderingen uitgeschreven`;
   // vollopend effect + reveal: witte cijfers worden onthuld over het gevulde deel,
   // donkere cijfers blijven leesbaar over het lichte deel (beide identiek gecentreerd)
   requestAnimationFrame(()=>{
+    const voor=document.getElementById('ntd-progress-voor');
+    if(voor) voor.style.width=pctVoor+'%';
     document.getElementById('ntd-progress-fill').style.width=pct+'%';
     document.getElementById('ntd-progress-val-rev').style.clipPath=`inset(0 ${100-pct}% 0 0)`;
   });

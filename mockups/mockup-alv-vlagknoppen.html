@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="nl" data-theme="light">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Mockup — ALV-vlagknoppen in de huisstijl</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+/* ─────────────────────────────────────────────────────────────
+   Tokens — 1-op-1 overgenomen uit styles.css (Operator-palet)
+   ───────────────────────────────────────────────────────────── */
+:root{
+  --bg:#f4f5f7;--sur:#ffffff;--sur2:#fbfcfd;--bor:#ebedf0;
+  --txt:#1b1e24;--mut:#5b6675;--fnt:#9aa1ad;
+  --row-divider:#f1f3f5;--row-hover:#f7f9fb;--group-bg:#f5f7f9;
+  --r:10px;--rs:7px;--sh:0 1px 2px rgba(16,22,34,.05);
+  --shm:0 4px 16px rgba(16,22,34,.08);
+  --tr:.17s ease;
+  --am:#B45309;--am-l:#fef3c7;--am-b:#FCD34D;
+  --rd:#B91C1C;--rd-l:#fee2e2;--rd-b:#fecaca;
+  --gn:#047857;--gn-l:#d1fae5;--gn-b:#a7f3d0;
+  --ac:#4a5b7a;--ac-l:#eef1f6;--ac-b:#d6deea;--ac-900:#3a4a66;
+  --r-lg:14px;
+}
+[data-theme=dark]{
+  --bg:#15181d;--sur:#1f242c;--sur2:#191d23;--bor:#2a2e36;
+  --txt:#f2f4f7;--mut:#9aa1ad;--fnt:#6b7280;
+  --row-divider:#23272f;--row-hover:#232830;--group-bg:#1b1f26;
+  --sh:0 1px 2px rgba(0,0,0,.4);--shm:0 4px 16px rgba(0,0,0,.5);
+  --am:#FBBF24;--am-l:#3A2E12;--am-b:#5C4718;
+  --rd:#F87171;--rd-l:#3B1B1B;--rd-b:#5C2A2A;
+  --gn:#34D39A;--gn-l:#103129;--gn-b:#1F4A3C;
+  --ac:#8b9dc4;--ac-l:#262b35;--ac-b:#3a4256;--ac-900:#a8b8d8;
+}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);
+  font-family:'IBM Plex Sans',system-ui,-apple-system,sans-serif;font-size:14px;
+  -webkit-font-smoothing:antialiased;transition:background .2s ease,color .2s ease}
+.wrap{max-width:1080px;margin:0 auto;padding:28px 20px 80px}
+
+/* ── Kop ── */
+.pagekop{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:6px}
+h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin:0 0 6px}
+.lead{color:var(--mut);font-size:13.5px;line-height:1.6;margin:0;max-width:62ch}
+.themaknop{display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:var(--rs);
+  font-size:13px;font-weight:600;background:var(--sur);color:var(--mut);border:1px solid var(--bor);
+  cursor:pointer;font-family:inherit;transition:background var(--tr),color var(--tr);white-space:nowrap}
+.themaknop:hover{background:var(--sur2);color:var(--txt)}
+
+/* ── Kaart ── */
+.kaart{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r-lg);
+  box-shadow:var(--sh);margin-top:22px;overflow:hidden}
+.kaart-kop{padding:15px 20px;border-bottom:1px solid var(--bor);display:flex;
+  align-items:center;gap:12px;flex-wrap:wrap}
+.kaart-kop h2{font-size:15px;font-weight:600;margin:0;letter-spacing:-.01em}
+.kaart-kop p{margin:3px 0 0;font-size:12.5px;color:var(--mut);line-height:1.55;flex-basis:100%}
+.merk{display:inline-flex;align-items:center;padding:2px 9px;border-radius:6px;font-size:11px;
+  font-weight:600;white-space:nowrap;background:var(--ac-l);color:var(--ac)}
+.merk.nu{background:var(--rd-l);color:var(--rd)}
+.merk.tip{background:var(--gn-l);color:var(--gn)}
+
+/* ── Tabel — geometrie uit het dashboard ── */
+table{width:100%;border-collapse:collapse}
+th{background:var(--ac-l);color:var(--ac);border-bottom:1px solid var(--ac-b);
+  text-align:left;padding:9px 10px;font-size:11px;font-weight:600;
+  text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+td{padding:9px 10px;font-size:13px;line-height:1.4;border-bottom:1px solid var(--row-divider);
+  vertical-align:middle}
+tbody tr:hover td{background:var(--row-hover)}
+tbody tr:last-child td{border-bottom:none}
+.vve-code{display:inline-block;padding:2px 7px;border-radius:5px;font-size:11.5px;font-weight:600;
+  font-family:'IBM Plex Mono',ui-monospace,monospace;background:var(--ac-l);color:var(--ac)}
+.cell-name{font-weight:500;white-space:nowrap}
+
+/* ── Badges — ongewijzigd, dienen als ijkpunt ── */
+.badge{display:inline-flex;align-items:center;gap:3px;padding:2px 9px;border-radius:6px;
+  font-size:11px;font-weight:600;white-space:nowrap}
+.status-open{background:var(--rd-l);color:var(--rd)}
+.status-klaargezet{background:var(--ac-l);color:var(--ac)}
+.status-gepland{background:var(--am-l);color:var(--am)}
+.status-afgerond{background:var(--gn-l);color:var(--gn)}
+
+/* ═════════════════════════════════════════════════════════════
+   HUIDIG — letterlijk styles.css regel 267-275
+   ═════════════════════════════════════════════════════════════ */
+.nu .flag-toggle{display:inline-flex;align-items:center;gap:5px;padding:4px 11px;border-radius:20px;
+  font-size:12px;font-weight:700;border:1px solid transparent;cursor:pointer;font-family:inherit;
+  transition:transform var(--tr),box-shadow var(--tr),background var(--tr),color var(--tr);
+  user-select:none;line-height:1}
+.nu .flag-toggle.on{background:var(--gn-l);color:var(--gn);border-color:color-mix(in srgb,var(--gn) 18%,transparent)}
+.nu .flag-toggle.off{background:var(--sur2);color:var(--mut);border-color:var(--bor)}
+.nu .flag-toggle:hover{transform:translateY(-1px);box-shadow:0 2px 6px rgba(0,0,0,.08)}
+.nu .flag-toggle.off:hover{background:color-mix(in srgb,var(--gn) 8%,var(--sur2));color:var(--gn);
+  border-color:color-mix(in srgb,var(--gn) 20%,transparent)}
+.nu .flag-toggle.on:hover{background:color-mix(in srgb,var(--gn) 22%,var(--gn-l));color:var(--gn)}
+.nu .flag-toggle:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+
+/* ═════════════════════════════════════════════════════════════
+   VOORSTEL — badge-vormtaal (6px / 11px / 600), vlakke hover.
+   Kleur per kolom via --flag; variant A/B/C zet alleen die drie tokens.
+   ═════════════════════════════════════════════════════════════ */
+.nw .flag-toggle{position:relative;display:inline-flex;align-items:center;gap:4px;padding:3px 9px;
+  border-radius:6px;font-size:11px;font-weight:600;border:1px solid transparent;cursor:pointer;
+  font-family:inherit;transition:background var(--tr),color var(--tr),border-color var(--tr);
+  user-select:none;line-height:1.3;
+  --flag:var(--gn);--flag-l:var(--gn-l);--flag-b:var(--gn-b)}
+.nw .flag-toggle.on{background:var(--flag-l);color:var(--flag);border-color:var(--flag-b)}
+.nw .flag-toggle.off{background:var(--sur2);color:var(--mut);border-color:var(--bor)}
+.nw .flag-toggle.off:hover{background:color-mix(in srgb,var(--flag) 8%,var(--sur2));
+  color:var(--flag);border-color:var(--flag-b)}
+.nw .flag-toggle.on:hover{background:color-mix(in srgb,var(--flag) 16%,var(--flag-l));
+  border-color:color-mix(in srgb,var(--flag) 35%,var(--flag-b))}
+.nw .flag-toggle:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+
+/* Variant B — alleen Klaargezet in het leiblauwe merk-accent */
+.var-b .flag-toggle[data-field="klaargezet"]{--flag:var(--ac);--flag-l:var(--ac-l);--flag-b:var(--ac-b)}
+/* Variant C — volledige status-echo: ac / amber / groen / groen */
+.var-c .flag-toggle[data-field="klaargezet"]{--flag:var(--ac);--flag-l:var(--ac-l);--flag-b:var(--ac-b)}
+.var-c .flag-toggle[data-field="uitnodiging"]{--flag:var(--am);--flag-l:var(--am-l);--flag-b:var(--am-b)}
+
+/* Grotere klikzone op touch — zelfde patroon als .cb::before in styles.css */
+@media(pointer:coarse){
+  .nw .flag-toggle::after{content:'';position:absolute;inset:-9px -8px}
+}
+
+/* ── Beide thema's naast elkaar (tokens hard gezet, volgt de themaknop niet) ── */
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:0}
+.duo-helft{padding:20px}
+.duo-helft+.duo-helft{border-left:1px solid var(--bor)}
+.duo-helft[data-thema-vast="licht"]{
+  --sur:#ffffff;--sur2:#fbfcfd;--bor:#ebedf0;--mut:#5b6675;--fnt:#9aa1ad;
+  --gn:#047857;--gn-l:#d1fae5;--gn-b:#a7f3d0;
+  --ac:#4a5b7a;--ac-l:#eef1f6;--ac-b:#d6deea;
+  background:#ffffff}
+.duo-helft[data-thema-vast="donker"]{
+  --sur:#1f242c;--sur2:#191d23;--bor:#2a2e36;--mut:#9aa1ad;--fnt:#6b7280;
+  --gn:#34D39A;--gn-l:#103129;--gn-b:#1F4A3C;
+  --ac:#8b9dc4;--ac-l:#262b35;--ac-b:#3a4256;
+  background:#1f242c}
+.duo-lab{display:block;font-size:11px;font-weight:600;text-transform:uppercase;
+  letter-spacing:.05em;color:var(--fnt);margin-bottom:12px}
+.duo-rij{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+@media(max-width:640px){.duo{grid-template-columns:1fr}
+  .duo-helft+.duo-helft{border-left:none;border-top:1px solid var(--bor)}}
+
+/* ── Detail-panelen ── */
+.detail{padding:18px 20px;display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.detail h3{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;
+  color:var(--fnt);margin:0 0 10px}
+.rij{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:8px}
+.rij:last-child{margin-bottom:0}
+.rij small{color:var(--mut);font-size:11.5px}
+.meetlat{padding:18px 20px;border-top:1px solid var(--bor);background:var(--sur2)}
+.meetlat .strook{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:12px 14px;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rs)}
+.klikzone{position:relative}
+.klikzone::before{content:'';position:absolute;inset:-9px -8px;border:1px dashed var(--ac-b);
+  border-radius:9px;pointer-events:none}
+
+/* ── Tabel met meetwaarden ── */
+.meet{margin-top:22px}
+.meet table td,.meet table th{white-space:normal}
+.meet table td:first-child{font-weight:600;white-space:nowrap}
+.meet code{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11.5px;
+  background:var(--sur2);border:1px solid var(--bor);border-radius:4px;padding:1px 5px}
+.weg{color:var(--mut);text-decoration:line-through}
+.naar{color:var(--gn);font-weight:600}
+
+.voet{margin-top:26px;font-size:12.5px;color:var(--mut);line-height:1.65}
+.voet strong{color:var(--txt);font-weight:600}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="pagekop">
+    <div>
+      <h1>ALV-vlagknoppen in de huisstijl</h1>
+      <p class="lead">De knoppen in de kolommen Klaargezet, Uitnodiging, Notulen en Begroting
+      krijgen dezelfde vormtaal als de badges ernaast: 6px-hoek, 11px/600, vlakke hover.
+      Hieronder eerst hoe het nu is, daarna drie kleurvarianten.
+      Wissel van thema om het contrast in het donker te zien.</p>
+    </div>
+    <button class="themaknop" id="thema" type="button">Donker thema</button>
+  </div>
+
+  <!-- ══════════ BEIDE THEMA'S NAAST ELKAAR ══════════ -->
+  <section class="kaart">
+    <div class="kaart-kop">
+      <h2>Variant B in beide thema's</h2>
+      <p>Links licht, rechts donker — los van de themaknop hierboven, zodat het contrast
+      in één blik te vergelijken is. Alle tekstkleuren halen WCAG AA (laagste paar 4,8:1).</p>
+    </div>
+    <div class="duo">
+      <div class="duo-helft nw var-b" data-thema-vast="licht">
+        <span class="duo-lab">Licht</span>
+        <div class="duo-rij">
+          <button type="button" class="flag-toggle on" data-field="klaargezet" aria-pressed="true">✓ Ja</button>
+          <button type="button" class="flag-toggle on" data-field="notulen" aria-pressed="true">✓ Ja</button>
+          <button type="button" class="flag-toggle off" data-field="begroting" aria-pressed="false">–</button>
+          <span class="badge status-klaargezet">Klaargezet</span>
+          <span class="badge status-afgerond">Afgerond</span>
+        </div>
+      </div>
+      <div class="duo-helft nw var-b" data-thema-vast="donker">
+        <span class="duo-lab">Donker</span>
+        <div class="duo-rij">
+          <button type="button" class="flag-toggle on" data-field="klaargezet" aria-pressed="true">✓ Ja</button>
+          <button type="button" class="flag-toggle on" data-field="notulen" aria-pressed="true">✓ Ja</button>
+          <button type="button" class="flag-toggle off" data-field="begroting" aria-pressed="false">–</button>
+          <span class="badge status-klaargezet">Klaargezet</span>
+          <span class="badge status-afgerond">Afgerond</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ HUIDIG ══════════ -->
+  <section class="kaart nu">
+    <div class="kaart-kop">
+      <h2>Nu</h2><span class="merk nu">huidig</span>
+      <p>Volle pil (20px), 12px/700, en een hover die de knop optilt met een schaduw.
+      De Status-badge rechts in dezelfde rij is 6px en 11px/600 — daar botsen de twee vormtalen.</p>
+    </div>
+    <table>
+      <thead><tr>
+        <th>VvE Code</th><th>VvE Naam</th><th>Klaargezet</th><th>Uitnodiging</th>
+        <th>Notulen</th><th>Begroting</th><th>Status</th>
+      </tr></thead>
+      <tbody id="tb-nu"></tbody>
+    </table>
+  </section>
+
+  <!-- ══════════ A ══════════ -->
+  <section class="kaart nw var-a">
+    <div class="kaart-kop">
+      <h2>Variant A — badge-vorm, alles groen</h2><span class="merk">vorm</span>
+      <p>Alleen de vormtaal verandert: 6px-hoek, 11px/600, en een hover die uitsluitend
+      van kleur wisselt. Eén groen voor alle vier de kolommen, zoals nu.</p>
+    </div>
+    <table>
+      <thead><tr>
+        <th>VvE Code</th><th>VvE Naam</th><th>Klaargezet</th><th>Uitnodiging</th>
+        <th>Notulen</th><th>Begroting</th><th>Status</th>
+      </tr></thead>
+      <tbody id="tb-a"></tbody>
+    </table>
+  </section>
+
+  <!-- ══════════ B ══════════ -->
+  <section class="kaart nw var-b">
+    <div class="kaart-kop">
+      <h2>Variant B — Klaargezet in het merk-accent</h2><span class="merk tip">aanrader</span>
+      <p>Zelfde vorm als A, maar Klaargezet krijgt het leiblauwe accent <code>--ac</code>.
+      Dat is geen nieuwe kleur: de Status-badge “Klaargezet” rechts in de rij is al
+      <code>--ac</code>. Kolom en status spreken zo dezelfde taal, en de kolom die je nu
+      wekenlang afloopt is met één blik te vinden.</p>
+    </div>
+    <table>
+      <thead><tr>
+        <th>VvE Code</th><th>VvE Naam</th><th>Klaargezet</th><th>Uitnodiging</th>
+        <th>Notulen</th><th>Begroting</th><th>Status</th>
+      </tr></thead>
+      <tbody id="tb-b"></tbody>
+    </table>
+  </section>
+
+  <!-- ══════════ C ══════════ -->
+  <section class="kaart nw var-c">
+    <div class="kaart-kop">
+      <h2>Variant C — volledige status-echo</h2><span class="merk">ter vergelijking</span>
+      <p>Elke kolom de kleur van de status die hij oplevert: Klaargezet leiblauw,
+      Uitnodiging amber (= Gepland), Notulen groen (= Afgerond), Begroting groen.
+      Consequent doorgeredeneerd, maar amber leest als “let op” terwijl het vinkje
+      juist iets afgerond betekent — en vier kleuren naast elkaar wordt weer druk.</p>
+    </div>
+    <table>
+      <thead><tr>
+        <th>VvE Code</th><th>VvE Naam</th><th>Klaargezet</th><th>Uitnodiging</th>
+        <th>Notulen</th><th>Begroting</th><th>Status</th>
+      </tr></thead>
+      <tbody id="tb-c"></tbody>
+    </table>
+  </section>
+
+  <!-- ══════════ DETAILS ══════════ -->
+  <section class="kaart nw var-b">
+    <div class="kaart-kop">
+      <h2>Toestanden en toegankelijkheid</h2>
+      <p>Alle knopstanden van variant B naast elkaar. Beweeg met de muis over de knoppen
+      voor de hover, en gebruik <strong>Tab</strong> voor de focus-ring.</p>
+    </div>
+    <div class="detail">
+      <div>
+        <h3>Uit → aan</h3>
+        <div class="rij">
+          <button type="button" class="flag-toggle off" data-field="notulen" aria-pressed="false">–</button>
+          <small>uit — neutraal grijs</small>
+        </div>
+        <div class="rij">
+          <button type="button" class="flag-toggle on" data-field="notulen" aria-pressed="true">✓ Ja</button>
+          <small>aan — groen</small>
+        </div>
+        <div class="rij">
+          <button type="button" class="flag-toggle off" data-field="klaargezet" aria-pressed="false">–</button>
+          <small>uit — hover kleurt leiblauw</small>
+        </div>
+        <div class="rij">
+          <button type="button" class="flag-toggle on" data-field="klaargezet" aria-pressed="true">✓ Ja</button>
+          <small>aan — leiblauw</small>
+        </div>
+      </div>
+      <div>
+        <h3>Naast de badge</h3>
+        <div class="rij">
+          <button type="button" class="flag-toggle on" data-field="klaargezet" aria-pressed="true">✓ Ja</button>
+          <span class="badge status-klaargezet">Klaargezet</span>
+        </div>
+        <div class="rij">
+          <button type="button" class="flag-toggle on" data-field="notulen" aria-pressed="true">✓ Ja</button>
+          <span class="badge status-afgerond">Afgerond</span>
+        </div>
+        <div class="rij"><small>Gelijke hoogte, gelijke hoek, gelijk lettergewicht.</small></div>
+      </div>
+      <div>
+        <h3>Bezig met opslaan</h3>
+        <div class="rij">
+          <button type="button" class="flag-toggle on toggling" data-field="klaargezet" aria-pressed="true"
+            style="pointer-events:none;opacity:.6">✓ Ja</button>
+          <small>ongewijzigd — <code>.toggling</code> blijft pulseren</small>
+        </div>
+        <h3 style="margin-top:16px">Toetsenbord</h3>
+        <div class="rij">
+          <button type="button" class="flag-toggle off" data-field="begroting" aria-pressed="false"
+            style="outline:2px solid var(--ac);outline-offset:2px">–</button>
+          <small><code>:focus-visible</code> — ongewijzigd</small>
+        </div>
+      </div>
+    </div>
+    <div class="meetlat">
+      <h3 style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--fnt);margin:0 0 10px">
+        Klikzone op touch</h3>
+      <div class="strook">
+        <span class="klikzone"><button type="button" class="flag-toggle on" data-field="klaargezet" aria-pressed="true">✓ Ja</button></span>
+        <small style="color:var(--mut);font-size:12px;line-height:1.6">
+          De stippellijn is het onzichtbare raakvlak dat de knop op een touchscreen krijgt
+          (<code>::after</code> met <code>inset:-9px -8px</code>) — ongeveer 40 × 46 px.
+          Zelfde truc als het selectievakje in de takenlijst. De knop wordt dus kleiner om
+          te zien, maar niet om te raken.
+        </small>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ MEETWAARDEN ══════════ -->
+  <section class="kaart meet">
+    <div class="kaart-kop"><h2>Wat er precies verandert</h2></div>
+    <table>
+      <thead><tr><th>Eigenschap</th><th>Nu</th><th>Voorstel</th><th>Gelijk aan</th></tr></thead>
+      <tbody>
+        <tr><td>Hoekradius</td><td><span class="weg">20px</span></td><td><span class="naar">6px</span></td><td><code>.badge</code>, <code>.btn-afr</code>, <code>.pill-telaat</code></td></tr>
+        <tr><td>Lettergrootte</td><td><span class="weg">12px</span></td><td><span class="naar">11px</span></td><td><code>.badge</code>, <code>.btn-afr</code></td></tr>
+        <tr><td>Lettergewicht</td><td><span class="weg">700</span></td><td><span class="naar">600</span></td><td><code>.badge</code>, <code>.btn-afr</code></td></tr>
+        <tr><td>Binnenruimte</td><td><span class="weg">4px 11px</span></td><td><span class="naar">3px 9px</span></td><td><code>.badge</code> (2px 9px, plus 1px rand)</td></tr>
+        <tr><td>Hover</td><td><span class="weg">optillen + schaduw</span></td><td><span class="naar">alleen kleur</span></td><td><code>.btn-afr</code>, <code>.btn-del</code></td></tr>
+        <tr><td>Randkleur aan</td><td><span class="weg">color-mix 18%</span></td><td><span class="naar">--gn-b / --ac-b</span></td><td><code>.btn-afr</code>, <code>.btn-done</code></td></tr>
+        <tr><td>Klikzone touch</td><td><span class="weg">geen</span></td><td><span class="naar">::after inset -9px -8px</span></td><td><code>.cb::before</code></td></tr>
+        <tr><td>Focus-ring</td><td>2px <code>--ac</code></td><td>2px <code>--ac</code></td><td>ongewijzigd</td></tr>
+        <tr><td><code>aria-pressed</code></td><td>ja</td><td>ja</td><td>ongewijzigd</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <p class="voet">
+    <strong>Nog te doen na akkoord:</strong> de regel <code>prefers-reduced-motion</code> in
+    styles.css noemt <code>.flag-toggle:hover</code> om de transform uit te zetten. Zonder
+    transform is die vermelding overbodig; die haal ik daar weg zodat de regel blijft kloppen.
+    De rest van die media-query blijft ongemoeid. Er verandert niets aan <code>render-alv.js</code>:
+    de kleur per kolom komt uit het <code>data-field</code>-attribuut dat er al op zit.
+  </p>
+
+</div>
+
+<script>
+const VVES=[
+  {code:'VVE-0142',naam:'Residentie Parkzicht',   k:1,u:1,n:1,b:1,st:'Afgerond'},
+  {code:'VVE-0207',naam:'Hof van Delft 12-40',    k:1,u:1,n:0,b:1,st:'Gepland'},
+  {code:'VVE-0311',naam:'De Waterkant',           k:1,u:0,n:0,b:0,st:'Klaargezet'},
+  {code:'VVE-0388',naam:'Zomerhof Blok C',        k:1,u:1,n:0,b:0,st:'Gepland'},
+  {code:'VVE-0455',naam:'Beatrixlaan 2-88',       k:0,u:0,n:0,b:0,st:'Open'},
+  {code:'VVE-0512',naam:'Molenwerf Noord',        k:1,u:0,n:0,b:1,st:'Klaargezet'}
+];
+const pil=(veld,aan)=>
+  `<button type="button" class="flag-toggle ${aan?'on':'off'}" data-field="${veld}" `+
+  `aria-pressed="${aan?'true':'false'}" title="Klik om ${veld} ${aan?'uit':'aan'} te zetten">`+
+  `${aan?'✓ Ja':'–'}</button>`;
+const statusKlasse=s=>'status-'+s.toLowerCase();
+const rijen=VVES.map(v=>
+  `<tr>
+     <td><span class="vve-code">${v.code}</span></td>
+     <td class="cell-name">${v.naam}</td>
+     <td>${pil('klaargezet',v.k)}</td>
+     <td>${pil('uitnodiging',v.u)}</td>
+     <td>${pil('notulen',v.n)}</td>
+     <td>${pil('begroting',v.b)}</td>
+     <td><span class="badge ${statusKlasse(v.st)}">${v.st}</span></td>
+   </tr>`).join('');
+['tb-nu','tb-a','tb-b','tb-c'].forEach(id=>document.getElementById(id).innerHTML=rijen);
+
+// Klikken schakelt de knop echt om, zodat het gedrag voelbaar is in de mockup.
+document.addEventListener('click',e=>{
+  const b=e.target.closest('.flag-toggle');
+  if(!b||b.classList.contains('toggling'))return;
+  const aan=b.classList.contains('on');
+  b.classList.toggle('on',!aan);
+  b.classList.toggle('off',aan);
+  b.setAttribute('aria-pressed',String(!aan));
+  b.textContent=aan?'–':'✓ Ja';
+});
+
+const knop=document.getElementById('thema');
+// ?thema=donker opent de pagina meteen in het donkere thema
+if(new URLSearchParams(location.search).get('thema')==='donker'){
+  document.documentElement.dataset.theme='dark';
+  knop.textContent='Licht thema';
+}
+knop.addEventListener('click',()=>{
+  const donker=document.documentElement.dataset.theme==='dark';
+  document.documentElement.dataset.theme=donker?'light':'dark';
+  knop.textContent=donker?'Donker thema':'Licht thema';
+});
+</script>
+</body>
+</html>

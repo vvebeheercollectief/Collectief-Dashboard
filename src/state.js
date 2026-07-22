@@ -33,6 +33,8 @@ export const state = {
   oauthExpiry: 0,
   currentUserEmail: null,
   _gsiTokenClient: null,
+  _authBezig: 0,           // teller: >0 = inlog/tokenvernieuwing loopt → sw-update stelt auto-herladen uit
+  _gsiErrorCb: null,       // per-aanvraag gebonden GIS error_callback (popup gesloten/geblokkeerd)
   // taak-bewerkmodus
   editMode: false,
   editRowData: null,

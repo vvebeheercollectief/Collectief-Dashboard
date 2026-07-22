@@ -19,7 +19,8 @@ import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset
 import { setv, serializeNtdUndo, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages } from "./dossier-chat.js";
-import { shouldPromptReload } from "./sw-update.js";
+import { shouldPromptReload, maakHerlaadKern } from "./sw-update.js";
+import { doOAuth } from "./auth.js";
 
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
   // ── mini-assert helper (Fase 1 testnet) ──
@@ -794,6 +795,153 @@ import { shouldPromptReload } from "./sw-update.js";
   eq('sw: geen balk bij eerste installatie (geen controller)', shouldPromptReload(null), false);
   eq('sw: geen balk bij undefined controller', shouldPromptReload(undefined), false);
   truthy('sw: wel balk bij bestaande controller (update)', shouldPromptReload({ scriptURL: 'x' }));
+  // ── SW-update herlaadkern (inlogstoring 22-07-2026): de herlaad-wens mag niet blijven
+  //    hangen, en een automatische herlading mag nooit samenvallen met een lopende inlog.
+  //    Achtergrond: clients.claim() in sw.js laat een "Herladen"-klik in een ÁNDER venster
+  //    ook hier een controllerchange afvuren; met een blijven-hangen-vlag herlaadde dit
+  //    venster dan op een willekeurig later moment — bv. midden in het Google-inlogvenster,
+  //    waardoor het token verloren ging en de gebruiker terugviel op het inlogscherm. ──
+  (()=>{
+    const maak=()=>{
+      const st={t:1000, reloads:0, bezet:false, taken:[]};
+      const kern=maakHerlaadKern({
+        nu:()=>st.t, herlaad:()=>{st.reloads++;},
+        isBezet:()=>st.bezet, plan:(fn)=>st.taken.push(fn),
+      });
+      return {st,kern};
+    };
+    const fakeWaiting=()=>{const posts=[];return {posts,postMessage:m=>posts.push(m)};};
+
+    // Normale pad: klik met wachtende SW → SKIP_WAITING → controllerchange → herladen
+    { const {st,kern}=maak(); const w=fakeWaiting();
+      eq('swk: klik met wachtende SW → gepost', kern.klik({waiting:w}), 'gepost');
+      eq('swk: bericht is SKIP_WAITING', w.posts[0]&&w.posts[0].type, 'SKIP_WAITING');
+      kern.controllerChange();
+      eq('swk: normale klik → herladen', st.reloads, 1); }
+
+    // HET STORINGSSCENARIO: klik zonder wachtende SW (bv. al door een ander venster
+    // geactiveerd) mag NIET armen. De klik zelf herlaadt meteen — dat is precies wat de
+    // gebruiker vroeg en het is een eigen handeling, geen herlading op een willekeurig
+    // later moment. Een latere controllerchange mag daarna niets meer doen.
+    { const {st,kern}=maak();
+      eq('swk: klik zonder wachtende SW herlaadt direct', kern.klik({}), 'herlaad-direct');
+      eq('swk: directe herlading uitgevoerd', st.reloads, 1);
+      eq('swk: vlag niet gearmd na loze klik', kern._gearmd(), false); }
+    { const {st,kern}=maak();
+      kern.klik({});                       // loze klik: vlag mag niet blijven hangen
+      st.reloads=0;                        // de directe herlading telt niet mee
+      st.t+=4*3600e3; kern.controllerChange();
+      eq('swk: controllerchange uren later → géén herlading', st.reloads, 0); }
+
+    // Houdbaarheid: een klik van >30 s geleden telt niet meer
+    { const {st,kern}=maak(); const w=fakeWaiting();
+      kern.klik({waiting:w}); st.t+=31_000; kern.controllerChange();
+      eq('swk: verlopen klik (31 s) → géén herlading', st.reloads, 0);
+      eq('swk: verlopen klik ontwapent de vlag', kern._gearmd(), false); }
+
+    // Inlog-guard: controllerchange tijdens een lopende inlog wacht tot die klaar is
+    { const {st,kern}=maak(); const w=fakeWaiting();
+      kern.klik({waiting:w}); st.bezet=true; kern.controllerChange();
+      eq('swk: bezet (inlog loopt) → nog niet herladen', st.reloads, 0);
+      eq('swk: er staat een wacht-stap gepland', st.taken.length, 1);
+      st.bezet=false; st.taken.shift()();
+      eq('swk: na de inlog alsnog herladen', st.reloads, 1); }
+
+    // Plafond: blijft de pagina eeuwig "bezet" (inlogvenster nooit afgemaakt) → opgeven
+    { const {st,kern}=maak(); const w=fakeWaiting();
+      kern.klik({waiting:w}); st.bezet=true; kern.controllerChange();
+      st.t+=6*60_000; st.taken.shift()();
+      eq('swk: na >5 min wachten opgegeven → géén herlading', st.reloads, 0);
+      st.bezet=false; kern.controllerChange();
+      eq('swk: opgeven ontwapent de vlag', kern._gearmd(), false); }
+
+    // Kruisje op de balk = annuleren
+    { const {st,kern}=maak(); const w=fakeWaiting();
+      kern.klik({waiting:w}); kern.annuleer(); kern.controllerChange();
+      eq('swk: geannuleerd via kruisje → géén herlading', st.reloads, 0); }
+
+    // Klik terwijl de nieuwe SW nog installeert: armen zodra hij klaarstaat
+    { const {st,kern}=maak(); const w=fakeWaiting();
+      let cb=null; const inst={state:'installing', addEventListener:(t,f)=>{cb=f;}, removeEventListener:()=>{}};
+      const reg={installing:inst};
+      eq('swk: klik tijdens installeren wacht netjes', kern.klik(reg), 'wacht-op-install');
+      inst.state='installed'; reg.waiting=w; cb();
+      eq('swk: na install alsnog SKIP_WAITING gepost', w.posts.length, 1);
+      kern.controllerChange();
+      eq('swk: en dan herlading na controllerchange', st.reloads, 1); }
+
+    // Dubbele controllerchange → maar één herlading
+    { const {st,kern}=maak(); const w=fakeWaiting();
+      kern.klik({waiting:w}); kern.controllerChange(); kern.controllerChange();
+      eq('swk: dubbele controllerchange → één herlading', st.reloads, 1); }
+
+    // Wiring-contract: de teller die de standaard-isBezet leest bestaat in state
+    eq('swk: state._authBezig teller bestaat', typeof state._authBezig, 'number');
+  })();
+  // ── Bezig-teller rond de inlog: hij MOET op elk eindpad weer op 0 komen. Blijft hij
+  //    hangen, dan herlaadt de app na een update nooit meer automatisch; telt hij dubbel
+  //    af, dan valt de bescherming tijdens een gelijktijdige tweede inlog juist weg. ──
+  await (async()=>{
+    const googleOud=window.google, clientOud=state._gsiTokenClient, bezigOud=state._authBezig;
+    const tokenOud=state.oauthToken, expiryOud=state.oauthExpiry;
+    try{
+      let cfg=null, tijdensAanvraag=0;
+      window.google={accounts:{oauth2:{initTokenClient:c=>{cfg=c;return{
+        requestAccessToken:()=>{tijdensAanvraag=state._authBezig;},
+        get callback(){return cfg.callback}, set callback(v){cfg.callback=v},
+      }}}}};
+      // NB: de belofte in een object teruggeven — een async functie die 'm kaal
+      // retourneert wacht er zélf op en dat is een deadlock (de callback komt later).
+      const start=async()=>{ state._gsiTokenClient=null; state._authBezig=0;
+        const p=doOAuth(false); await Promise.resolve(); return {p}; };
+
+      let {p}=await start();
+      eq('auth: teller staat op 1 tijdens de aanvraag', tijdensAanvraag, 1);
+      cfg.callback({access_token:'t1',expires_in:3600});
+      await p;
+      eq('auth: teller terug op 0 na geslaagde inlog', state._authBezig, 0);
+
+      ({p}=await start());
+      cfg.callback({error:'access_denied'});
+      await p;
+      eq('auth: teller terug op 0 na geweigerde inlog', state._authBezig, 0);
+
+      // Gesloten/geblokkeerd inlogvenster: GIS roept alleen error_callback aan. Zonder
+      // deze route bleef de teller eeuwig op 1 staan (en de Promise eeuwig hangen).
+      ({p}=await start());
+      cfg.error_callback({type:'popup_closed'});
+      eq('auth: gesloten inlogvenster laat de belofte niet hangen', await p, null);
+      eq('auth: teller terug op 0 na gesloten inlogvenster', state._authBezig, 0);
+
+      // Beide routes vuren voor één aanvraag → mag maar één keer aftellen.
+      ({p}=await start());
+      cfg.error_callback({type:'popup_closed'});
+      cfg.callback({access_token:'t2',expires_in:3600});
+      await p;
+      eq('auth: dubbel afgehandelde aanvraag telt maar één keer af', state._authBezig, 0);
+
+      // Twee gelijktijdige aanvragen: de teller moet 2 zijn en pas op 0 als beide klaar zijn.
+      state._gsiTokenClient=null; state._authBezig=0;
+      const a=doOAuth(false); await Promise.resolve();
+      const eersteCb=cfg.callback;
+      const b=doOAuth(false); await Promise.resolve();
+      eq('auth: twee gelijktijdige aanvragen → teller 2', state._authBezig, 2);
+      eersteCb({error:'x'}); await a;
+      eq('auth: na de eerste is de teller nog 1', state._authBezig, 1);
+      // Vuurt de afhandeling van diezelfde eerste aanvraag NOG een keer (GIS-hik, of een
+      // error_callback ná een gewone callback), dan mag dat de teller niet nóg een keer
+      // verlagen — anders denkt de app dat er geen inlog meer loopt terwijl de tweede
+      // aanvraag nog open staat, en mag sw-update er dwars doorheen herladen.
+      eersteCb({error:'x'});
+      eq('auth: herhaalde afhandeling van dezelfde aanvraag telt niet dubbel', state._authBezig, 1);
+      cfg.callback({access_token:'t3',expires_in:3600}); await b;
+      eq('auth: pas na de tweede terug op 0', state._authBezig, 0);
+    } finally {
+      window.google=googleOud; state._gsiTokenClient=clientOud; state._authBezig=bezigOud;
+      state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
+      try{['oauthToken','oauthExpiry'].forEach(k=>sessionStorage.removeItem(k))}catch(_){}
+    }
+  })();
   // ── Zichtbaar versienummer: vast formaat X.Y ──
   truthy('versie: APP_VERSION heeft formaat X.Y', /^\d+\.\d+$/.test(APP_VERSION));
   // ── Rij-bescherming: _rowMismatch (schrijf-guard kern) ──

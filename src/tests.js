@@ -940,6 +940,34 @@ import { shouldPromptReload } from "./sw-update.js";
         eq(`parse==recompute bij k=${k} u=${u} n=${n}`, parseAlvo([[],[],rij])[0].status, _st(k,u,n));
       });
   })();
+  // Stat-tegels zijn de afstreeplijst: klikken zet het statusfilter, nogmaals klikken wist het.
+  (()=>{
+    const alvoOud=D.alvo, filterOud=document.getElementById('f-status-alvo').value, pgOud=pgs.alvo;
+    try{
+      D.alvo=[
+        {code:'T1',naam:'Een', klaargezet:true, uitnodiging:false,notulen:false,begroting:false,status:'Klaargezet',_row:3},
+        {code:'T2',naam:'Twee',klaargezet:true, uitnodiging:true, notulen:false,begroting:false,status:'Gepland',   _row:4},
+        {code:'T3',naam:'Drie',klaargezet:false,uitnodiging:false,notulen:false,begroting:false,status:'Open',      _row:5},
+      ];
+      document.getElementById('s-alvo').value='';
+      document.getElementById('f-status-alvo').value='';
+      renderAlvo();
+      const tegel=()=>document.querySelector('[data-action="alvo-stat"][data-status="Klaargezet"]');
+      truthy('stat-tegel Klaargezet bestaat', !!tegel());
+      eq('stat-tegel Klaargezet telt 1', tegel().textContent.includes('1'), true);
+      ACTIONS['alvo-stat'](tegel());
+      eq('klik zet filter op Klaargezet', document.getElementById('f-status-alvo').value, 'Klaargezet');
+      eq('tabel toont alleen die rij', document.querySelectorAll('#alvo-tbody tr').length, 1);
+      eq('actieve tegel is aangedrukt', tegel().getAttribute('aria-pressed'), 'true');
+      ACTIONS['alvo-stat'](tegel());
+      eq('tweede klik wist het filter', document.getElementById('f-status-alvo').value, '');
+      eq('tabel toont weer alles', document.querySelectorAll('#alvo-tbody tr').length, 3);
+    } finally {
+      D.alvo=alvoOud;
+      document.getElementById('f-status-alvo').value=filterOud;
+      pgs.alvo=pgOud;
+    }
+  })();
   // parseAlfa: slice(1); rij zonder code valt weg.
   (()=>{
     const rows=[['Code','Naam','Datum'],['CH1','VvE 1','2026-05-01'],['','geen code','x'],['CH2','VvE 2','']];

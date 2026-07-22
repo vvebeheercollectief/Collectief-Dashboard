@@ -137,6 +137,11 @@
     .stat-strip{display:flex;align-items:center;flex-wrap:wrap;background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);padding:4px 22px;box-shadow:var(--sh);margin-bottom:18px}
     .stat-item{display:flex;align-items:baseline;gap:10px;padding:14px 26px 14px 0;margin-right:26px;border-right:1px solid var(--bor)}
     .stat-item:last-child{border-right:none;margin-right:0;padding-right:0}
+    /* Knop-reset met longhands: border-right bewust NIET zetten, anders wint deze regel
+       van de mobiele .stat-item{border-right:none} en komen de scheidingslijnen terug. */
+    .stat-item.stat-klik{background:none;border-top:0;border-left:0;border-bottom:0;font:inherit;text-align:left;cursor:pointer;border-radius:0}
+    .stat-item.stat-klik:hover .stat-cap{color:var(--txt)}
+    .stat-item.stat-klik.aan{box-shadow:inset 0 -2px 0 var(--ac)}
     /* tel-item vlak vóór het weekblok: geen eigen scheidingslijn (dat doet het weekblok al via border-left),
        maar wél de padding houden zodat de scheidingslijn niet tegen de tekst plakt */
     .stat-item:has(+ .stat-week){border-right:none;margin-right:0}

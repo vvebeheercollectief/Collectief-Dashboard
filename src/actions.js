@@ -41,6 +41,9 @@ export const ACTIONS = {
                                      pgs.ntd=1; renderNtd(); },
   'af-sectie':             (el) => setAf(el.dataset.sec),
   'alvo-flag':             (el) => toggleAlvoFlag(+el.dataset.idx, el.dataset.field),
+  'alvo-stat':             (el) => { const f=document.getElementById('f-status-alvo');
+                                     f.value = f.value===el.dataset.status ? '' : el.dataset.status;
+                                     pgs.alvo=1; renderAlvo(); },
   'taak-bewerken':         (el) => openModal(true, state._rowCache[+el.dataset.rid]),
   'taak-afronden':         (el) => completeTask(+el.dataset.rid),
   'pagineer':              (el) => { const d=el.dataset.doel; pgs[d]=+el.dataset.pg; PAG_RENDER[d](); },

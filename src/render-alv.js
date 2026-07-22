@@ -30,13 +30,18 @@ function renderAlvo(){
   const tot=D.alvo.length;
   const afd=D.alvo.filter(r=>r.status==='Afgerond').length;
   const gep=D.alvo.filter(r=>r.status==='Gepland').length;
+  const kla=D.alvo.filter(r=>r.status==='Klaargezet').length;
   const opn=D.alvo.filter(r=>r.status==='Open').length;
+  // De tegels zijn de afstreeplijst: klikken zet het statusfilter (actie 'alvo-stat').
+  const huidig=document.getElementById('f-status-alvo').value;
   const aItem=(val,cls,cap)=>`<div class="stat-item"><span class="stat-val ${cls}">${val}</span><div class="stat-meta"><span class="stat-cap">${cap}</span></div></div>`;
+  const aKnop=(val,cls,cap,status)=>`<button type="button" class="stat-item stat-klik${huidig===status?' aan':''}" data-action="alvo-stat" data-status="${status}" aria-pressed="${huidig===status}" title="Toon alleen ${cap}"><span class="stat-val ${cls}">${val}</span><div class="stat-meta"><span class="stat-cap">${cap}</span></div></button>`;
   document.getElementById('alvo-stats').innerHTML=
     aItem(tot,'',"Totaal VvE's")+
-    aItem(afd,'green','Afgerond')+
-    aItem(gep,'amber','Gepland')+
-    aItem(opn,opn?'red':'muted','Open');
+    aKnop(afd,'green','Afgerond','Afgerond')+
+    aKnop(gep,'amber','Gepland','Gepland')+
+    aKnop(kla,'teal','Klaargezet','Klaargezet')+
+    aKnop(opn,opn?'red':'muted','Open','Open');
 
   const q=document.getElementById('s-alvo').value.toLowerCase();
   const fs=document.getElementById('f-status-alvo').value;

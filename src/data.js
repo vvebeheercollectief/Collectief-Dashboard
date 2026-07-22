@@ -74,13 +74,30 @@ function clearLoadError(){ document.getElementById('load-err-banner')?.remove();
 const POLL_TABS=["Nog Te Doen","Afgerond","ALV's overzicht","ALV's afgerond",
                  "Ontwikkeling","Logboek","Herhaalregels","Kenmerken"];
 
+// Mag de achtergrond-verversing draaien? Alleen met een echte sessie. Zonder deze rem
+// vroeg de 8s-timer óók op het inlogscherm elke ronde zelf een token aan. Elke aanvraag
+// herbindt de Google-callback (zie auth.js), dus tikte de timer terwijl de gebruiker in
+// het Google-venster zijn account koos, dan ving de timer dát antwoord op en bleef de
+// eigen inlogpoging eeuwig hangen — de gebruiker viel terug op het inlogscherm.
+// Pure functie, zodat de regel testbaar is los van timers en DOM.
+function magPollen(s){ return !!(s && s.currentUserEmail); }
+
 async function loadAll(silent){
   if(state._loadInFlight){ state._loadAgain=true; if(!silent) state._loadAgainLoud=true; return; }
   state._loadInFlight=true;
   try{
     // Altijd een geldige token garanderen (ook bij Vernieuwen-knop / schrijf-resync):
     // een verlopen-maar-niet-null token gaf anders een 401 → onnodige 'Fout'.
-    if(!await ensureToken()){setSyncErr();return}
+    // Mislukt dat, dan moet de gebruiker dat uiteindelijk ZIEN: voorheen keerde de
+    // 8s-poll hier stilzwijgend terug en bleef 'Live · HH:MM' staan terwijl er niets
+    // meer binnenkwam. Zelfde tolerantie als bij leesfouten: één stille hapering mag,
+    // vanaf de tweede op rij (of bij een handmatige verversing) tonen we 'Fout'.
+    if(!await ensureToken()){
+      state._syncFails=(state._syncFails||0)+1;
+      if(!silent || state._syncFails>=2) setSyncErr();
+      if(!silent) showLoadError();
+      return;
+    }
     if(!silent) setSyncing();
     // Reads met herkansing bij tijdelijke API-fouten (429 / 5xx / netwerk-blip), zodat
     // één hapering niet meteen de hele ronde laat falen en 'Fout' toont.
@@ -239,5 +256,5 @@ function parseAlfa(rows){
 // ══════════════════════════════════════
 
 export {
-  backgroundWrite, setSyncing, setSynced, setSyncErr, dot, loadAll, parseSections, parseAlvo, parseAlfa, parseHerhaal,
+  backgroundWrite, setSyncing, setSynced, setSyncErr, dot, loadAll, magPollen, parseSections, parseAlvo, parseAlfa, parseHerhaal,
 };

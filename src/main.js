@@ -18,7 +18,7 @@ import {
 import {
   openModal, closeModal, submitTask, doCompleteTask, closeCompleteModal,
 } from './crud.js';
-import { loadAll } from './data.js';
+import { loadAll, magPollen } from './data.js';
 import { initActions } from './actions.js';
 import { initVveZoekveld } from './vve-zoekveld.js';
 import { closeSnoozeModal, snoozeOpslaan, snoozeWis } from './snooze.js';
@@ -123,7 +123,10 @@ document.addEventListener('DOMContentLoaded',()=>{
     b.classList.add('on'); state.logAct=b.dataset.act; pgs.logboek=1; renderLogboek();
   });
 
-  document.getElementById('refresh-btn').onclick=loadAll;
+  // Bewust een wikkel: hing loadAll er rechtstreeks aan, dan gaf de DOM het klik-event
+  // mee als eerste argument — en dat is de 'stil'-vlag. De knop onderdrukte daardoor
+  // zijn eigen 'Laden…'-melding én de foutbanner met 'Opnieuw proberen'.
+  document.getElementById('refresh-btn').onclick=()=>loadAll();
   document.getElementById('theme-btn').onclick=()=>applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
   document.getElementById('density-btn').onclick=cycleDensity;
   document.getElementById('ai-btn').onclick=openAiHelp;
@@ -270,8 +273,10 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(state.bulkMode) return;
     if(state._animBusy) return;
     if(state._undoInFlight) return;
-    if(!await ensureToken()) return;
-    loadAll(true);
+    // Nog geen sessie → niet pollen. Anders vroeg deze timer op het inlogscherm elke
+    // 8 s zélf een token aan en kaapte hij het antwoord van een lopende inlogpoging.
+    if(!magPollen(state)) return;
+    loadAll(true);   // loadAll vernieuwt de token zelf en toont fouten in de statusbalk
   },8000);
 
   // Token-refresh heartbeat — elke 4 min proactief vernieuwen vóór expiry.

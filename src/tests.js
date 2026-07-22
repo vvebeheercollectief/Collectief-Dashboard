@@ -13,8 +13,8 @@ import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk.js";
 import { _isTransient, _rowMismatch, _a1ColA, _herstelShift, veiligeCel, _veiligeRij, fetchSheets } from "./api.js";
-import { parseSections, parseAlvo, parseAlfa, parseHerhaal } from "./data.js";
-import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo } from "./render-alv.js";
+import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen } from "./data.js";
+import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
 import { setv, serializeNtdUndo, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
@@ -942,6 +942,49 @@ import { doOAuth } from "./auth.js";
       try{['oauthToken','oauthExpiry'].forEach(k=>sessionStorage.removeItem(k))}catch(_){}
     }
   })();
+  // ── De 8s-verversing mag NIET draaien zolang er geen sessie is. Deed hij dat wel, dan
+  //    vroeg hij op het inlogscherm elke 8 s zelf een token aan; elke aanvraag herbindt de
+  //    Google-callback, dus tikte de timer terwijl de gebruiker zijn account koos, dan ging
+  //    het antwoord naar de timer en bleef de eigen inlogpoging eeuwig hangen. ──
+  eq('poll: geen sessie → niet pollen', magPollen({currentUserEmail:null}), false);
+  eq('poll: lege sessie-naam → niet pollen', magPollen({currentUserEmail:''}), false);
+  truthy('poll: ingelogd → wel pollen', magPollen({currentUserEmail:'info@vvebeheercollectief.nl'}));
+  // ── Vernieuwen-knop: de DOM geeft het klik-event als eerste argument mee. Was de functie
+  //    rechtstreeks aan onclick gehangen, dan kwam dat event binnen als de 'stil'-vlag en
+  //    onderdrukte het de 'Laden…'-melding én de foutbanner. ──
+  (()=>{
+    const knop=document.getElementById('refresh-btn');
+    truthy('vernieuwen: knop heeft een handler', !!knop && typeof knop.onclick==='function');
+    truthy('vernieuwen: klik-event wordt niet als stille-vlag doorgegeven', knop.onclick!==loadAll);
+    eq('vernieuwen: handler neemt geen argumenten aan', knop.onclick.length, 0);
+  })();
+  // ── Mislukt de tokenvernieuwing, dan moet de gebruiker dat uiteindelijk ZIEN. Voorheen
+  //    stopte de verversing vóór de statusbalk, zodat er 'Live · 09:14' bleef staan terwijl
+  //    er niets meer binnenkwam. Eén stille hapering blijft wel onzichtbaar (die herstelt
+  //    zich meestal vanzelf); pas de tweede op rij toont 'Fout'. ──
+  await (async()=>{
+    const googleOud=window.google, clientOud=state._gsiTokenClient, failsOud=state._syncFails;
+    const tokenOud=state.oauthToken, expiryOud=state.oauthExpiry, mailOud=state.currentUserEmail;
+    try{
+      window.google={accounts:{oauth2:{initTokenClient:()=>{
+        const o={requestAccessToken:()=>o.callback({error:'access_denied'})};return o;
+      }}}};
+      state._gsiTokenClient=null; state.oauthToken=null; state.oauthExpiry=0;
+      state.currentUserEmail='info@vvebeheercollectief.nl'; state._syncFails=0;
+      const isFout=()=>document.getElementById('dot').className.includes('err');
+      await loadAll(true);
+      eq('sync: eerste stille hapering telt mee', state._syncFails, 1);
+      eq('sync: eerste stille hapering toont nog geen Fout', isFout(), false);
+      await loadAll(true);
+      eq('sync: tweede hapering op rij toont wél Fout', isFout(), true);
+    } finally {
+      window.google=googleOud; state._gsiTokenClient=clientOud; state._syncFails=failsOud;
+      state.oauthToken=tokenOud; state.oauthExpiry=expiryOud; state.currentUserEmail=mailOud;
+      document.getElementById('dot').className='dot';
+      document.getElementById('load-err-banner')?.remove();
+      try{['oauthToken','oauthExpiry'].forEach(k=>sessionStorage.removeItem(k))}catch(_){}
+    }
+  })();
   // ── Zichtbaar versienummer: vast formaat X.Y ──
   truthy('versie: APP_VERSION heeft formaat X.Y', /^\d+\.\d+$/.test(APP_VERSION));
   // ── Rij-bescherming: _rowMismatch (schrijf-guard kern) ──
@@ -1260,6 +1303,58 @@ import { doOAuth } from "./auth.js";
       state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
       state._alvoResetBezig=false;
       D.alvo=alvoOud;
+    }
+  })();
+  // ── Dubbelklik op een ALV-vinkje. De oude rem zette een class op de knop en riep één
+  //    regel later renderAlvo() aan, die de hele tabel herschrijft — de gelockte knop was
+  //    meteen weg en de rem leefde nul milliseconden. Twee tegengestelde schrijfacties en
+  //    twee logboekregels ('Aangevinkt' én 'Uitgevinkt') waren het gevolg. ──
+  await (async()=>{
+    const _fetch=window.fetch, tokenOud=state.oauthToken, expiryOud=state.oauthExpiry;
+    const alvoOud=D.alvo, idsOud=state._sheetIds, pendOud=state.pendingWrites;
+    try{
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
+      state._sheetIds={"ALV's overzicht":22};
+      D.alvo=[{code:'V0',naam:'VvE Nul',uitnodiging:false,notulen:false,begroting:false,
+               klaargezet:false,opmerkingen:'',budget:false,status:'Open',_row:3}];
+      document.getElementById('s-alvo').value='';
+      document.getElementById('f-status-alvo').value='';
+      const posts=[];
+      let losMaken; const traag=new Promise(r=>{losMaken=r});
+      let schrijfBegonnen; const bijSchrijfactie=new Promise(r=>{schrijfBegonnen=r});
+      window.fetch=async(url,opt)=>{
+        const u=String(url), d=decodeURIComponent(u);
+        if(d.includes('!A')) return new Response(JSON.stringify({values:[['V0']]}),{status:200});
+        if(u.includes(':batchUpdate')){
+          posts.push(JSON.parse(opt.body));
+          schrijfBegonnen();
+          await traag;                       // schrijfactie blijft hangen = het klikvenster
+          return new Response(JSON.stringify({replies:[{}]}),{status:200});
+        }
+        if(u.includes(':append')) return new Response(JSON.stringify({}),{status:200});
+        return new Response(JSON.stringify({values:[]}),{status:200});
+      };
+      const eerste=toggleAlvoFlag(0,'notulen');
+      await bijSchrijfactie;                  // de eerste klik zit nu écht midden in de schrijfactie
+      const tweede=toggleAlvoFlag(0,'notulen'); // dubbelklik binnen dat venster
+      // Niet kaal awaiten: zónder rem blijft de tweede klik zélf op de schrijfactie hangen
+      // en zou de hele testronde vastlopen i.p.v. netjes falen.
+      await Promise.race([tweede, new Promise(r=>setTimeout(r,60))]);
+      eq('alvo-vink: tweede klik binnen het venster schrijft niet', posts.length, 1);
+      eq('alvo-vink: de lopende schrijfactie remt de 8s-poll', state.pendingWrites>0, true);
+      losMaken(); await eerste; await tweede;
+      eq('alvo-vink: na afloop is de rem los', state.pendingWrites, pendOud);
+      eq('alvo-vink: waarde staat op aangevinkt, niet teruggedraaid', D.alvo[0].notulen, true);
+      eq('alvo-vink: status volgt de waarde', D.alvo[0].status, 'Afgerond');
+      // Een tweede klik NA afloop moet gewoon weer werken (de rem mag niet blijven staan).
+      const derde=toggleAlvoFlag(0,'notulen'); await derde;
+      eq('alvo-vink: klik na afloop werkt weer', posts.length, 2);
+      eq('alvo-vink: uitvinken verwerkt', D.alvo[0].notulen, false);
+    } finally {
+      window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
+      D.alvo=alvoOud; state._sheetIds=idsOud; state.pendingWrites=pendOud;
+      state._alvoFlagBezig=null;
+      document.querySelectorAll('.toast').forEach(t=>t.remove());
     }
   })();
   // parseAlfa: slice(1); rij zonder code valt weg.

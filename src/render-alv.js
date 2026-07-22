@@ -93,6 +93,21 @@ async function toggleAlvoFlag(idx,field){
   if(!r){console.warn('toggleAlvoFlag: rij niet gevonden',idx);return}
   if(!await ensureToken()){showToast('Niet ingelogd','Kan wijziging niet opslaan','var(--rd)');return}
 
+  // Dubbelklik-rem. De oude rem was een class op de knop, maar renderAlvo() hieronder
+  // herschrijft de hele tabel en gooit die knop meteen weg — de rem leefde nul
+  // milliseconden. Gevolg: twee tegengestelde schrijfacties naar dezelfde cel en twee
+  // logboekregels ('Aangevinkt' én 'Uitgevinkt'). Nu een vlag per vinkje (dus een ánder
+  // vinkje blijft gewoon klikbaar), NÁ ensureToken en zonder await ertussen — zelfde
+  // idioom als _alvoResetBezig in alv-reset.js en _completeBusy in crud.js.
+  const sleutel=`${idx}:${field}`;
+  if(!state._alvoFlagBezig) state._alvoFlagBezig=new Set();
+  if(state._alvoFlagBezig.has(sleutel)) return;
+  state._alvoFlagBezig.add(sleutel);
+  // Deze schrijfweg loopt buiten de seriële wachtrij van backgroundWrite om. Zonder
+  // deze teller ziet de 8s-poll geen lopende schrijfactie en kan hij de optimistische
+  // stand overschrijven met de nog-oude waarde uit de Sheet.
+  state.pendingWrites++;
+
   // Lock UI op de specifieke pill
   const btn=document.querySelector(`.flag-toggle[data-idx="${idx}"][data-field="${field}"]`);
   if(btn) btn.classList.add('toggling');
@@ -137,6 +152,8 @@ async function toggleAlvoFlag(idx,field){
     showToast('Opslaan mislukt',e.message||'Onbekende fout','var(--rd)');
     console.error('toggleAlvoFlag fout:',e);
   }finally{
+    state.pendingWrites=Math.max(0,state.pendingWrites-1);
+    state._alvoFlagBezig.delete(sleutel);
     const btn2=document.querySelector(`.flag-toggle[data-idx="${idx}"][data-field="${field}"]`);
     if(btn2) btn2.classList.remove('toggling');
   }

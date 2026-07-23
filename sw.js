@@ -1,7 +1,7 @@
 // Collectief Dashboard — Service Worker
 // Verhoog versie bij elke nieuwe deploy zodat clients de nieuwe cache pakken.
 
-const CACHE_VERSION = 'cd-v78';
+const CACHE_VERSION = 'cd-v79';
 const APP_SHELL = [
   './',
   './index.html',
@@ -49,6 +49,7 @@ const APP_SHELL = [
   './src/render-analytics.js',
   './src/offerte-aannemers.js',
   './src/vve-zoekveld.js',
+  './src/opmaak.js',
 ];
 
 self.addEventListener('install', e => {

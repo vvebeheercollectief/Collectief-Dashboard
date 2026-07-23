@@ -9,6 +9,7 @@ import { openModal } from "./crud.js";
 import { showToast } from "./notifications.js";
 import { fmtLogTs } from "./render-overig.js";
 import { ico } from "./icons.js";
+import { zonderOpmaak } from "./opmaak.js";
 
 //  AI-HULP — plak mailtekst (slim kopieer-plak)
 // ══════════════════════════════════════
@@ -44,7 +45,7 @@ function aiVveContext(code){
   });
   if(!naam){ const a=(D.alvo||[]).find(x=>String(x.code||'').toLowerCase()===c); if(a)naam=a.naam||''; }
   const laatste=(D.logboek||[]).filter(r=>String(r.code||'').toLowerCase()===c).slice(0,3)
-    .map(r=>`${fmtLogTs(r.timestamp)} — ${displayName(r.gebruiker)}: ${r.actie}${r.nieuweWaarde?' ('+r.nieuweWaarde+')':''}`);
+    .map(r=>`${fmtLogTs(r.timestamp)} — ${displayName(r.gebruiker)}: ${r.actie}${r.nieuweWaarde?' ('+zonderOpmaak(r.nieuweWaarde)+')':''}`);
   if(!naam && !behs.size && !open.length && !laatste.length) return null;
   return {code, naam, beh:[...behs].join(', '), open, laatste};
 }

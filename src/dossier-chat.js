@@ -8,6 +8,7 @@ import { vveOverzicht } from "./render-vve.js";
 import { fmtLogTs } from "./render-overig.js";
 import { askChat } from "./api.js";
 import { ensureToken } from "./auth.js";
+import { zonderOpmaak } from "./opmaak.js";
 
 // Pure helper (testbaar): compacte, feitelijke context-tekst over één VvE.
 function dossierContextTekst(code, data, vandaag){
@@ -42,8 +43,8 @@ function dossierContextTekst(code, data, vandaag){
     o.logboek.slice(0,15).forEach(r=>{
       const wie = displayName(r.gebruiker) || r.gebruiker || '?';
       const wat = r.actie === 'Contact'
-        ? `${r.veld || 'Contact'} met ${r.oudeWaarde || '?'}: ${r.nieuweWaarde || ''}`
-        : `${r.actie}${r.nieuweWaarde ? ': ' + r.nieuweWaarde : ''}`;
+        ? `${r.veld || 'Contact'} met ${r.oudeWaarde || '?'}: ${zonderOpmaak(r.nieuweWaarde)}`
+        : `${r.actie}${r.nieuweWaarde ? ': ' + zonderOpmaak(r.nieuweWaarde) : ''}`;
       L.push(`- ${fmtLogTs(r.timestamp)} (${wie}) ${wat}`);
     });
   }

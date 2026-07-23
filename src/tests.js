@@ -792,6 +792,16 @@ import { opmaakHtml, htmlNaarMarkers, zonderOpmaak, pasToe, opmaakBalk } from ".
   const _ctxInj = dossierContextTekst('INJ', _Dinj, _Tchat);
   truthy('chat: context-injectie — geen """ delimiter meer in context', !_ctxInj.includes('"""'));
 
+  // Opmaakmarkeringen horen niet in de AI-context: het model zou ze anders voorlezen.
+  const _Dopm = { ntd:{OPPAKKEN:[],VERGADERVERZOEKEN:[],'OFFERTE-TRAJECTEN':[],LOD:[]},
+    af:{OPPAKKEN:[],VERGADERVERZOEKEN:[],'OFFERTE-TRAJECTEN':[],LOD:[]},
+    alvo:[{code:'OPM',naam:'VvE Opmaak',status:'Gepland',uitnodiging:false,notulen:false,begroting:false}], alfa:[],
+    logboek:[{code:'OPM',timestamp:'2026-05-30T10:00:00.000Z',actie:'Contact',veld:'Telefoon',
+      oudeWaarde:'Bestuur',nieuweWaarde:'dit is **dringend** en _stil_',gebruiker:'info@vvebeheercollectief.nl'}] };
+  const _ctxOpm = dossierContextTekst('OPM', _Dopm, _Tchat);
+  truthy('chat: context bevat geen opmaakmarkeringen', !_ctxOpm.includes('**') && !_ctxOpm.includes('_stil_'));
+  truthy('chat: context houdt de tekst zelf wél', _ctxOpm.includes('dit is dringend en stil'));
+
   // ── SW-update: balk alleen bij echte update, niet bij eerste installatie ──
   eq('sw: geen balk bij eerste installatie (geen controller)', shouldPromptReload(null), false);
   eq('sw: geen balk bij undefined controller', shouldPromptReload(undefined), false);

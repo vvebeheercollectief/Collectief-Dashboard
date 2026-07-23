@@ -108,4 +108,114 @@ function htmlNaarMarkers(html){
     .trim();
 }
 
-export { opmaakHtml, zonderOpmaak, htmlNaarMarkers };
+// ── Invoerkant: knoppen, sneltoetsen, plakken, meegroeien ───
+const MARK={vet:'**', schuin:'_'};
+
+// Puur (testbaar zonder DOM): pas een opmaakknop toe op een selectie.
+// Geeft de nieuwe tekst plus waar de selectie daarna moet staan.
+function pasToe(tekst, start, eind, soort){
+  const t=String(tekst==null?'':tekst);
+  if(soort==='lijst'){
+    // Werk op hele regels: van het begin van de eerste tot het eind van de laatste.
+    const a=t.lastIndexOf('\n',Math.max(0,start-1))+1;
+    const nb=t.indexOf('\n',eind);
+    const b=nb===-1?t.length:nb;
+    const regels=t.slice(a,b).split('\n');
+    // Staan ze er al allemaal? Dan is de knop een schakelaar en halen we ze weg.
+    const alAan=regels.every(r=>RE_PUNT.test(r)||!r.trim());
+    const nieuw=regels.map(r=>{
+      if(!r.trim()) return r;
+      const m=RE_PUNT.exec(r);
+      return alAan ? (m?m[1]:r) : '- '+r;
+    }).join('\n');
+    return {tekst:t.slice(0,a)+nieuw+t.slice(b), start:a, eind:a+nieuw.length};
+  }
+  const mk=MARK[soort]; if(!mk) return {tekst:t, start, eind};
+  const n=mk.length;
+  // Staat de markering er al omheen? Dan weghalen (knop is een schakelaar).
+  if(t.slice(start-n,start)===mk && t.slice(eind,eind+n)===mk){
+    return {tekst:t.slice(0,start-n)+t.slice(start,eind)+t.slice(eind+n), start:start-n, eind:eind-n};
+  }
+  const sel=t.slice(start,eind);
+  return {tekst:t.slice(0,start)+mk+sel+mk+t.slice(eind), start:start+n, eind:start+n+sel.length};
+}
+
+const LIJST_ICO='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="4.5" cy="6.5" r="1.4" fill="currentColor" stroke="none"/><circle cx="4.5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="4.5" cy="17.5" r="1.4" fill="currentColor" stroke="none"/><path d="M9 6.5h11M9 12h11M9 17.5h11"/></svg>';
+
+// HTML voor het knoppenbalkje onder een veld. Staat óók letterlijk in index.html
+// voor #hist-note (statische markup); houd die twee gelijk.
+function opmaakBalk(){
+  return `<div class="opmaak-balk">
+    <button type="button" class="opmaak-knop" data-action="opmaak-vet" title="Vet (Ctrl+B)" aria-label="Vet"><b>B</b></button>
+    <button type="button" class="opmaak-knop" data-action="opmaak-schuin" title="Schuin (Ctrl+I)" aria-label="Schuin"><i>I</i></button>
+    <button type="button" class="opmaak-knop" data-action="opmaak-lijst" title="Opsomming" aria-label="Opsomming">${LIJST_ICO}</button>
+  </div>`;
+}
+
+// Hoogte laten meegroeien met de inhoud (maximum staat als max-height in de CSS).
+function groei(el){
+  if(!el) return;
+  el.style.height='auto';
+  el.style.height=el.scrollHeight+'px';
+}
+
+// Alle opmaakvelden in beeld opnieuw op maat brengen. Wordt na elke render
+// aangeroepen: de 8s-poll tekent het dossier opnieuw en dan is de hoogte weg.
+function groeiVelden(root){
+  (root||document).querySelectorAll('.opmaak-veld textarea').forEach(groei);
+}
+
+// Zoek de textarea die bij een knop hoort. Via closest(), want hetzelfde
+// bewerkformulier staat tegelijk op de Logboek-pagina én in het dossier.
+function veldVan(el){
+  return el?.closest('.opmaak-veld')?.querySelector('textarea')||null;
+}
+
+// Knopactie uitvoeren op een veld en de selectie netjes terugzetten.
+function doeOpmaak(el, soort){
+  const t=veldVan(el); if(!t) return;
+  const r=pasToe(t.value, t.selectionStart, t.selectionEnd, soort);
+  t.value=r.tekst;
+  t.focus();
+  t.setSelectionRange(r.start, r.eind);
+  groei(t);
+}
+
+const isOpmaakVeld=el=>el?.tagName==='TEXTAREA'&&!!el.closest('.opmaak-veld');
+
+// Eenmalige document-brede koppeling. Delegatie, want de velden worden bij elke
+// render opnieuw aangemaakt — losse listeners zouden verdwijnen of verdubbelen.
+function initOpmaak(){
+  // Meegroeien tijdens typen
+  document.addEventListener('input', e=>{ if(isOpmaakVeld(e.target)) groei(e.target); });
+  // Sneltoetsen Ctrl/Cmd+B en Ctrl/Cmd+I
+  document.addEventListener('keydown', e=>{
+    if(!(e.ctrlKey||e.metaKey) || e.altKey || !isOpmaakVeld(e.target)) return;
+    const k=(e.key||'').toLowerCase();
+    if(k!=='b'&&k!=='i') return;
+    e.preventDefault();
+    doeOpmaak(e.target, k==='b'?'vet':'schuin');
+  });
+  // Plakken met behoud van vet/schuin/opsomming
+  document.addEventListener('paste', e=>{
+    const t=e.target;
+    if(!isOpmaakVeld(t)) return;
+    const html=e.clipboardData?.getData('text/html');
+    if(!html) return;                       // geen opmaak op het klembord: laat de browser plakken
+    const tekst=htmlNaarMarkers(html);
+    if(!tekst) return;
+    e.preventDefault();
+    // execCommand houdt de ongedaan-maken-geschiedenis van de browser intact;
+    // valt terug op directe invoeging als de browser 'm niet (meer) ondersteunt.
+    let gelukt=false;
+    try{ gelukt=!!document.execCommand&&document.execCommand('insertText',false,tekst); }catch(err){ gelukt=false; }
+    if(!gelukt){
+      const s=t.selectionStart, eind=t.selectionEnd;
+      t.value=t.value.slice(0,s)+tekst+t.value.slice(eind);
+      t.setSelectionRange(s+tekst.length, s+tekst.length);
+    }
+    groei(t);
+  });
+}
+
+export { opmaakHtml, zonderOpmaak, htmlNaarMarkers, pasToe, opmaakBalk, groei, groeiVelden, doeOpmaak, initOpmaak };

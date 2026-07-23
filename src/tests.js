@@ -21,7 +21,7 @@ import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages } from "./dossier-chat.js";
 import { shouldPromptReload, maakHerlaadKern } from "./sw-update.js";
 import { doOAuth } from "./auth.js";
-import { opmaakHtml, htmlNaarMarkers, zonderOpmaak } from "./opmaak.js";
+import { opmaakHtml, htmlNaarMarkers, zonderOpmaak, pasToe, opmaakBalk } from "./opmaak.js";
 
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
   // ── mini-assert helper (Fase 1 testnet) ──
@@ -1627,6 +1627,29 @@ import { opmaakHtml, htmlNaarMarkers, zonderOpmaak } from "./opmaak.js";
   eq('zonderOpmaak haalt vet weg', zonderOpmaak('dit is **dringend**'), 'dit is dringend');
   eq('zonderOpmaak haalt schuin weg', zonderOpmaak('dit is _stil_'), 'dit is stil');
   eq('zonderOpmaak laat streepjes staan', zonderOpmaak('- een\n- twee'), '- een\n- twee');
+
+  // ── knoppen zetten markeringen om de selectie ──
+  eq('pasToe vet om selectie', pasToe('een dringend geval', 4, 12, 'vet'),
+     {tekst:'een **dringend** geval', start:6, eind:14});
+  eq('pasToe schuin om selectie', pasToe('een stil geval', 4, 8, 'schuin'),
+     {tekst:'een _stil_ geval', start:5, eind:9});
+  eq('pasToe vet zonder selectie zet cursor ertussen', pasToe('', 0, 0, 'vet'),
+     {tekst:'****', start:2, eind:2});
+  eq('pasToe haalt vet weer weg', pasToe('een **dringend** geval', 6, 14, 'vet'),
+     {tekst:'een dringend geval', start:4, eind:12});
+  eq('pasToe lijst zet streepjes voor elke regel', pasToe('een\ntwee', 0, 8, 'lijst').tekst, '- een\n- twee');
+  eq('pasToe lijst haalt streepjes weer weg', pasToe('- een\n- twee', 0, 12, 'lijst').tekst, 'een\ntwee');
+  eq('pasToe lijst op één regel zonder selectie', pasToe('een', 1, 1, 'lijst').tekst, '- een');
+  // de knop moet ook werken op een regel midden in een langere notitie
+  eq('pasToe lijst pakt alleen de geraakte regel', pasToe('kop\nmidden\nslot', 5, 5, 'lijst').tekst, 'kop\n- midden\nslot');
+
+  truthy('opmaakBalk heeft alle drie de knoppen',
+    opmaakBalk().includes('data-action="opmaak-vet"') &&
+    opmaakBalk().includes('data-action="opmaak-schuin"') &&
+    opmaakBalk().includes('data-action="opmaak-lijst"'));
+  truthy('actie opmaak-vet bestaat', typeof ACTIONS['opmaak-vet']==='function');
+  truthy('actie opmaak-schuin bestaat', typeof ACTIONS['opmaak-schuin']==='function');
+  truthy('actie opmaak-lijst bestaat', typeof ACTIONS['opmaak-lijst']==='function');
 
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');

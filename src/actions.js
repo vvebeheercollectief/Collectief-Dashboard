@@ -24,6 +24,7 @@ import { vraagChat, chatSuggestie } from './dossier-chat.js';
 import { saveKenmerken } from './kenmerken.js';
 import { palKies } from './palette.js';
 import { toggleBulkMode, bulkVink, toggleBulkMenu, bulkDoe } from './bulk.js';
+import { doeOpmaak, initOpmaak } from './opmaak.js';
 
 const PAG_RENDER = { ntd:renderNtd, af:renderAf, alvo:renderAlvo, alfa:renderAlfa, ontw:renderOntw, logboek:renderLogboek };
 
@@ -95,6 +96,9 @@ export const ACTIONS = {
   'log-annuleren':         ()   => cancelLogboek(),
   'log-soort':             (el) => setLogSoort(el.dataset.soort),
   'log-verwijderen':       (el) => deleteLogboek(+el.dataset.row),
+  'opmaak-vet':            (el) => doeOpmaak(el,'vet'),
+  'opmaak-schuin':         (el) => doeOpmaak(el,'schuin'),
+  'opmaak-lijst':          (el) => doeOpmaak(el,'lijst'),
 };
 
 export function initActions() {
@@ -130,4 +134,5 @@ export function initActions() {
       if (box) saveLogboek(+box.dataset.row, box);
     }
   });
+  initOpmaak();
 }

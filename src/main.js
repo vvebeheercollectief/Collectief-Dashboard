@@ -31,6 +31,7 @@ import { initPalette } from './palette.js';
 import { initSwUpdate } from './sw-update.js';
 import { initModalA11y } from './modal-a11y.js';
 import { ico } from './icons.js';
+import { groeiVelden } from './opmaak.js';
 
 // Centrale Escape-sluiting: per venster de juiste sluitfunctie (met opruimlogica),
 // i.p.v. alleen de .open-class te verwijderen zodat er geen toestand achterblijft.
@@ -322,6 +323,7 @@ export function renderAll(){
   renderHerhaal();
   renderVve();
   renderVandaag();
+  groeiVelden();   // de poll hertekent de velden; hun meegroei-hoogte moet terug
 }
 
 // ══════════════════════════════════════

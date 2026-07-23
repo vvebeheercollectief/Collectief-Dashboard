@@ -670,6 +670,16 @@
     .tk .dl{font-family:'IBM Plex Mono','SFMono-Regular',ui-monospace,monospace;font-size:11.5px;color:var(--mut);flex-shrink:0}
     .tk .dl.af{color:var(--gn)}
     .tk .tk-af{align-self:center;flex-shrink:0}
+    /* Taakrijen staan op twee regels: tekst over de volle breedte, daaronder sectie/
+       behandelaar links en de deadline rechts. Op één regel (tekst | datum + 'Te laat'-pil
+       | ✓) hield de tekst in het 330px-paneel maar ~58px over, waardoor woorden middenin
+       afbraken. Deze regels staan ná .tk, want ze overschrijven de flex-opzet. */
+    .tk-taak{display:grid;grid-template-columns:1fr auto;column-gap:10px;row-gap:3px}
+    .tk-taak .nm{grid-column:1;grid-row:1}
+    .tk-taak .tk-af{grid-column:2;grid-row:1;align-self:center}
+    .tk-taak .tk-onder{grid-column:1/-1;grid-row:2;min-width:0;display:flex;flex-wrap:wrap;
+      align-items:baseline;justify-content:space-between;gap:2px 10px}
+    .tk-taak .mt{font-size:11px;color:var(--mut);min-width:0}
     .tk.rij-puls-groen{background:var(--puls-gn);color:var(--puls-gn-t);transition:background .15s ease}
     .tk.rij-fade-weg{opacity:0;transition:opacity .4s ease}
     .tk-leeg{padding:10px 0;color:var(--mut);font-size:12.5px}

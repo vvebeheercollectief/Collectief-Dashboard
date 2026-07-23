@@ -223,10 +223,12 @@ function renderVve(){
       : r.deadline
         ? `${esc(r.deadline)}${p.teLaat?` <span class="pill-telaat">Te laat (${Math.abs(p.dagenTot)}d)</span>`:''}`
         : '<span class="warn-geen-deadline">Geen deadline</span>';
-    return `<div class="tk${weg?' snooze-row':''}" data-action="taak-bewerken" data-rid="${rid}" style="cursor:pointer">
-      <span class="nm">${esc(r.actiepunt||r.periode||r.agendapunten||r.status||'')}
-        <span class="mt">${esc(meta.label)}${r.behandelaar?' · '+esc(r.behandelaar):''}</span></span>
-      <span class="dl">${dl}</span>
+    return `<div class="tk tk-taak${weg?' snooze-row':''}" data-action="taak-bewerken" data-rid="${rid}" style="cursor:pointer">
+      <span class="nm">${esc(r.actiepunt||r.periode||r.agendapunten||r.status||'')}</span>
+      <div class="tk-onder">
+        <span class="mt">${esc(meta.label)}${r.behandelaar?' · '+esc(r.behandelaar):''}</span>
+        <span class="dl">${dl}</span>
+      </div>
       <button class="act-af act-ico tk-af" data-action="taak-afronden" data-rid="${rid}" title="Afronden" aria-label="Afronden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 12 4 4 10-10"/></svg></button></div>`;
   };
   const afLimiet=state._vveAfAlles?o.afgerond.length:5;

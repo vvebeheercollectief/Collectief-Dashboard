@@ -8,7 +8,7 @@ import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
 import { filterNtd, setNtd, renderNtd, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey } from "./render-lijsten.js";
 import { state, D, pgs } from "./state.js";
-import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel } from "./render-vve.js";
+import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel, renderVve } from "./render-vve.js";
 import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk.js";
@@ -355,6 +355,26 @@ import { opmaakHtml, htmlNaarMarkers, zonderOpmaak, pasToe, opmaakBalk } from ".
   eq('vve budget=true bij alvo.budget',      vveOverzicht('B1', _Dbud, TF).budget, true);
   eq('vve budget=false zonder alvo.budget',  _o5.budget, false);
   eq('vve budget=false bij onbekende code',  vveOverzicht('ZZZ', _D5, TF).budget, false);
+
+  // ── dossier-taakrij: deadline hoort op een eigen onderregel ──
+  // Stond de deadline + 'Te laat'-pil náást de tekst (één flexregel), dan hield de tekst in
+  // het 330px-paneel maar ~58px over en brak elk woord middenin af (gemeld 23-07-2026).
+  truthy('dossier-taakrij: tekst alleen in .nm, meta+deadline in .tk-onder', (()=>{
+    try{
+      const vC=state.vveCode, vN=D.ntd.OPPAKKEN, vA=D.af.OPPAKKEN;
+      D.ntd.OPPAKKEN=[{code:'WRAP1',naam:'VvE Terugloop',actiepunt:'In afwachting van subsidie. Subsidiebureau gemaild met verzoek om met voorrang in behandeling te nemen.',deadline:'01-06-2026',behandelaar:'Cihad',inBehandeling:'FALSE',opvolgdatum:'',_sec:'OPPAKKEN',_row:9701}];
+      D.af.OPPAKKEN=[];
+      state.vveCode='WRAP1';
+      renderVve();
+      const rij=document.querySelector('#vve-inhoud .tk-taak');
+      const nm=rij&&rij.querySelector('.nm'), onder=rij&&rij.querySelector('.tk-onder');
+      const ok = !!nm && !!onder
+        && !nm.querySelector('.mt') && !nm.querySelector('.dl')          // tekst krijgt de volle breedte
+        && !!onder.querySelector('.mt') && !!onder.querySelector('.dl'); // sectie/behandelaar + deadline eronder
+      D.ntd.OPPAKKEN=vN; D.af.OPPAKKEN=vA; state.vveCode=vC; renderVve();
+      return ok;
+    }catch(e){ console.error('dossier-taakrij-test:',e); return false; }
+  })());
 
   // vveCodeSpan: gedeelde klikbare VvE-code (dossier-navigatie via centrale 'vve-open'-delegatie)
   eq('vveCodeSpan: klikbaar → data-action vve-open', /data-action="vve-open"/.test(vveCodeSpan('21004')), true);

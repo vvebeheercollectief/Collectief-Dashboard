@@ -21,6 +21,7 @@ import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages } from "./dossier-chat.js";
 import { shouldPromptReload, maakHerlaadKern } from "./sw-update.js";
 import { doOAuth } from "./auth.js";
+import { opmaakHtml } from "./opmaak.js";
 
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
   // ── mini-assert helper (Fase 1 testnet) ──
@@ -1569,6 +1570,37 @@ import { doOAuth } from "./auth.js";
       document.getElementById('complete-date').value='';
     }
   })();
+
+  // ══════════════════════════════════════
+  //  OPMAAK — vet/schuin/opsomming in vrije-tekstvelden
+  // ══════════════════════════════════════
+  console.log('%c[TESTS] Opmaak', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+
+  // ── markeringen → veilige HTML ──
+  eq('opmaakHtml vet', opmaakHtml('dit is **dringend** hoor'), 'dit is <strong>dringend</strong> hoor');
+  eq('opmaakHtml schuin', opmaakHtml('dit is _volgens bestuur_ hoor'), 'dit is <em>volgens bestuur</em> hoor');
+  eq('opmaakHtml vet aan het begin', opmaakHtml('**let op** dit'), '<strong>let op</strong> dit');
+  eq('opmaakHtml schuin aan het begin', opmaakHtml('_let op_ dit'), '<em>let op</em> dit');
+  eq('opmaakHtml vet én schuin', opmaakHtml('**a** en _b_'), '<strong>a</strong> en <em>b</em>');
+  eq('opmaakHtml lijst', opmaakHtml('- een\n- twee'), '<ul class="op-lijst"><li>een</li><li>twee</li></ul>');
+  eq('opmaakHtml lijst met bolletje-teken', opmaakHtml('• een\n• twee'), '<ul class="op-lijst"><li>een</li><li>twee</li></ul>');
+  eq('opmaakHtml lijst met opmaak erin', opmaakHtml('- **een**'), '<ul class="op-lijst"><li><strong>een</strong></li></ul>');
+  eq('opmaakHtml tekst vóór en na een lijst', opmaakHtml('kop\n- een\nslot'), 'kop<ul class="op-lijst"><li>een</li></ul>slot');
+  eq('opmaakHtml houdt gewone regelafbreking', opmaakHtml('een\ntwee'), 'een\ntwee');
+  eq('opmaakHtml houdt witregel', opmaakHtml('een\n\ntwee'), 'een\n\ntwee');
+
+  // veiligheid: geen enkele invoer mag HTML de pagina in krijgen
+  truthy('opmaakHtml escapet HTML', !opmaakHtml('<script>alert(1)</script>').includes('<script'));
+  truthy('opmaakHtml escapet HTML binnen vet', !opmaakHtml('**<img src=x onerror=1>**').includes('<img'));
+  eq('opmaakHtml escapet ampersand', opmaakHtml('Jan & Piet'), 'Jan &amp; Piet');
+
+  // bestaande notities mogen niet van betekenis veranderen
+  eq('opmaakHtml laat los sterretje staan', opmaakHtml('3*4 = 12'), '3*4 = 12');
+  eq('opmaakHtml laat snake_case staan', opmaakHtml('bestand_naam_hier'), 'bestand_naam_hier');
+  eq('opmaakHtml negeert vet met spatie erin', opmaakHtml('** niet vet **'), '** niet vet **');
+  eq('opmaakHtml negeert streepjeslijn', opmaakHtml('-----'), '-----');
+  eq('opmaakHtml leeg', opmaakHtml(''), '');
+  eq('opmaakHtml null', opmaakHtml(null), '');
 
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');

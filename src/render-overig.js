@@ -13,6 +13,7 @@ import { loadAll, backgroundWrite } from "./data.js";
 import { getCurrentWho, showToast, showUndoToast } from "./notifications.js";
 import { animateRowOut } from "./anim.js";
 import { renderVve } from "./render-vve.js";
+import { opmaakHtml, opmaakBalk } from "./opmaak.js";
 // (kringverwijzing render-overig ⇄ render-vve: zelfde patroon als render-vve ⇄ ui/kenmerken —
 //  live bindings, en renderVve is een gehoisde functiedeclaratie die pas op runtime wordt aangeroepen)
 
@@ -306,7 +307,7 @@ function logItemHtml(r,subtiel,acties,opts){
     extra=`<div class="log-change"><span class="old">${esc(r.oudeWaarde||'—')}</span><span class="arr">→</span><span class="new">${esc(r.nieuweWaarde||'—')}</span></div>`;
   }
   if((r.actie==='Opmerking'||r.actie==='Contact') && r.nieuweWaarde){
-    extra=`<div class="log-note">${esc(r.nieuweWaarde)}</div>`;
+    extra=`<div class="log-note">${opmaakHtml(r.nieuweWaarde)}</div>`;
   }
   const init=(displayName(r.gebruiker)||'?').charAt(0).toUpperCase();
   const acts=magActies?`<span class="log-acts">
@@ -370,7 +371,10 @@ function logEditForm(r){
       `<option${(r.oudeWaarde||'Overig')===w?' selected':''}>${esc(w)}</option>`).join('')}</select>
   </div>`:'';
   return `<div class="log-item"><div class="log-edit" data-row="${r._row}" data-ts="${esc(r.timestamp||'')}">
-    <textarea class="log-edit-tekst" rows="2">${esc(r.nieuweWaarde||'')}</textarea>
+    <div class="opmaak-veld">
+      <textarea class="log-edit-tekst" rows="2">${esc(r.nieuweWaarde||'')}</textarea>
+      ${opmaakBalk()}
+    </div>
     ${contactRij}
     <div class="log-edit-knoppen">
       <button class="btn btn-sec btn-sm" data-action="log-annuleren">Annuleren</button>
@@ -577,7 +581,7 @@ function renderTaskHistory(code,sec){
         ${actieBadge(r.actie)}
         <span style="margin-left:6px;color:var(--mut)">${esc(displayName(r.gebruiker))}</span>
         ${r.veld?`<div class="hist-change">${esc(r.veld)}: ${esc(r.oudeWaarde)} → ${esc(r.nieuweWaarde)}</div>`:''}
-        ${r.actie==='Opmerking'&&r.nieuweWaarde?`<div class="log-note">${esc(r.nieuweWaarde)}</div>`:''}
+        ${r.actie==='Opmerking'&&r.nieuweWaarde?`<div class="log-note">${opmaakHtml(r.nieuweWaarde)}</div>`:''}
       </div>
     </div>`).join('');
   }

@@ -582,7 +582,15 @@
         <p class="logboek-sub">Leg vast wat je hebt gedaan — ook korte notities helpen collega's de status te volgen.</p>
         <div id="hist-body" class="logboek-body"></div>
         <div class="logboek-add">
-          <textarea id="hist-note" rows="3" placeholder="Typ hier je notitie… (Enter = nieuwe regel)"></textarea>
+          <!-- Knoppenbalk staat hier letterlijk (statische markup); houd 'm gelijk aan opmaakBalk() in src/opmaak.js -->
+          <div class="opmaak-veld">
+            <textarea id="hist-note" rows="3" placeholder="Typ hier je notitie… (Enter = nieuwe regel)"></textarea>
+            <div class="opmaak-balk">
+              <button type="button" class="opmaak-knop" data-action="opmaak-vet" title="Vet (Ctrl+B)" aria-label="Vet"><b>B</b></button>
+              <button type="button" class="opmaak-knop" data-action="opmaak-schuin" title="Schuin (Ctrl+I)" aria-label="Schuin"><i>I</i></button>
+              <button type="button" class="opmaak-knop" data-action="opmaak-lijst" title="Opsomming" aria-label="Opsomming"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="4.5" cy="6.5" r="1.4" fill="currentColor" stroke="none"/><circle cx="4.5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="4.5" cy="17.5" r="1.4" fill="currentColor" stroke="none"/><path d="M9 6.5h11M9 12h11M9 17.5h11"/></svg></button>
+            </div>
+          </div>
           <div class="logboek-foot">
             <span class="logboek-hint"><kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>Enter</kbd> om snel toe te voegen</span>
             <button class="btn btn-pri" data-action="notitie-toevoegen" style="padding:7px 16px">Toevoegen</button>

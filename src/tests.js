@@ -1651,6 +1651,14 @@ import { opmaakHtml, htmlNaarMarkers, zonderOpmaak, pasToe, opmaakBalk } from ".
   truthy('actie opmaak-schuin bestaat', typeof ACTIONS['opmaak-schuin']==='function');
   truthy('actie opmaak-lijst bestaat', typeof ACTIONS['opmaak-lijst']==='function');
 
+  // ── aangesloten op de echte velden ──
+  const _logOpm={_row:5,actie:'Contact',veld:'Telefoon',oudeWaarde:'Bestuur',code:'TEST01',
+    nieuweWaarde:'dit is **dringend**',timestamp:'2026-07-23T10:00:00.000Z',gebruiker:'info@vvebeheercollectief.nl'};
+  truthy('logItemHtml toont een notitie met vet',
+    logItemHtml(_logOpm,false,false,{}).includes('<strong>dringend</strong>'));
+  truthy('logEditForm zit in een opmaak-veld', logEditForm(_logOpm).includes('opmaak-veld'));
+  truthy('logEditForm heeft een opmaakbalk', logEditForm(_logOpm).includes('data-action="opmaak-vet"'));
+
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');
   window._testResult = `${totOk} OK, ${totFail} FAIL`; // uitleesbaar voor test-automatisering

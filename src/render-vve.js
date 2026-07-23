@@ -12,6 +12,7 @@ import { backgroundWrite } from "./data.js";
 import { appendRange } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { getCurrentWho } from "./notifications.js";
+import { opmaakHtml, opmaakBalk } from "./opmaak.js";
 // (kringverwijzing render-vve ⇄ ui/kenmerken is hetzelfde patroon als crud ⇄ main:
 //  live bindings, de aanroep gebeurt pas op runtime)
 
@@ -118,7 +119,10 @@ function kenmerkenKaart(code){
     return `<div class="kmk-rij"><span>Balkons</span>${sel('kmk-balkons',k.balkons)}</div>
       <div class="kmk-rij"><span>Kozijnen</span>${sel('kmk-kozijnen',k.kozijnen)}</div>
       <div class="kmk-bron-lbl">Bron</div>
-      <textarea id="kmk-bron" rows="2" placeholder="bv. splitsingsakte art. 17, mail gemeente 03-2024">${esc(k.bron)}</textarea>
+      <div class="opmaak-veld">
+        <textarea id="kmk-bron" rows="2" placeholder="bv. splitsingsakte art. 17, mail gemeente 03-2024">${esc(k.bron)}</textarea>
+        ${opmaakBalk()}
+      </div>
       <div class="kmk-knoppen">
         <button class="btn btn-sec btn-sm" data-action="kenmerken-annuleren">Annuleren</button>
         <button class="btn btn-pri btn-sm" data-action="kenmerken-opslaan">Opslaan</button>
@@ -128,7 +132,7 @@ function kenmerkenKaart(code){
   return `<div class="kmk-rij"><span>Balkons</span>${kmkPil(k.balkons)}</div>
     <div class="kmk-rij"><span>Kozijnen</span>${kmkPil(k.kozijnen)}</div>
     <div class="kmk-bron-lbl">Bron</div>
-    <div class="kmk-bron">${k.bron?esc(k.bron):'<span style="color:var(--mut)">Nog geen bron vastgelegd</span>'}</div>${wijz}`;
+    <div class="kmk-bron">${k.bron?opmaakHtml(k.bron):'<span style="color:var(--mut)">Nog geen bron vastgelegd</span>'}</div>${wijz}`;
 }
 
 // Pure helper (testbaar zonder DOM): waar brengt het terug-pijltje je heen?
@@ -172,7 +176,10 @@ function composerHtml(code){
     </button>`;
   }
   return `<div class="dos-composer">
-    <textarea id="dos-tekst" data-code="${esc(code)}" rows="2" placeholder="Leg vast wat er gebeurd is — bv. zojuist gebeld met een eigenaar… (Ctrl+Enter = vastleggen)"></textarea>
+    <div class="opmaak-veld">
+      <textarea id="dos-tekst" data-code="${esc(code)}" rows="2" placeholder="Leg vast wat er gebeurd is — bv. zojuist gebeld met een eigenaar… (Ctrl+Enter = vastleggen)"></textarea>
+      ${opmaakBalk()}
+    </div>
     <div class="dos-rij">
       <div class="dos-chips">${CONTACT_SOORTEN.map(([s,sIco])=>
         `<button class="soort-chip${(state._contactSoort||'Telefoon')===s?' aan':''}" data-action="contact-soort" data-soort="${s}">${sIco} ${s}</button>`).join('')}</div>

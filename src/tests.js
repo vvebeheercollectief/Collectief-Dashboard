@@ -21,7 +21,7 @@ import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages } from "./dossier-chat.js";
 import { shouldPromptReload, maakHerlaadKern } from "./sw-update.js";
 import { doOAuth } from "./auth.js";
-import { opmaakHtml } from "./opmaak.js";
+import { opmaakHtml, htmlNaarMarkers, zonderOpmaak } from "./opmaak.js";
 
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
   // ── mini-assert helper (Fase 1 testnet) ──
@@ -1601,6 +1601,32 @@ import { opmaakHtml } from "./opmaak.js";
   eq('opmaakHtml negeert streepjeslijn', opmaakHtml('-----'), '-----');
   eq('opmaakHtml leeg', opmaakHtml(''), '');
   eq('opmaakHtml null', opmaakHtml(null), '');
+
+  // ── klembord-HTML → markeringen ──
+  eq('htmlNaarMarkers vet via <b>', htmlNaarMarkers('<b>dringend</b>'), '**dringend**');
+  eq('htmlNaarMarkers vet via <strong>', htmlNaarMarkers('<strong>dringend</strong>'), '**dringend**');
+  eq('htmlNaarMarkers schuin via <i>', htmlNaarMarkers('<i>bestuur</i>'), '_bestuur_');
+  eq('htmlNaarMarkers schuin via <em>', htmlNaarMarkers('<em>bestuur</em>'), '_bestuur_');
+  eq('htmlNaarMarkers vet via style (Google Docs)', htmlNaarMarkers('<span style="font-weight:700">dringend</span>'), '**dringend**');
+  eq('htmlNaarMarkers schuin via style', htmlNaarMarkers('<span style="font-style:italic">bestuur</span>'), '_bestuur_');
+  eq('htmlNaarMarkers gewone tekst blijft gewoon', htmlNaarMarkers('<p>gewoon</p>'), 'gewoon');
+  eq('htmlNaarMarkers zin met vet erin', htmlNaarMarkers('<p>dit is <b>dringend</b> hoor</p>'), 'dit is **dringend** hoor');
+  eq('htmlNaarMarkers alinea wordt witregel', htmlNaarMarkers('<p>een</p><p>twee</p>'), 'een\n\ntwee');
+  eq('htmlNaarMarkers <br> wordt regelafbreking', htmlNaarMarkers('een<br>twee'), 'een\ntwee');
+  eq('htmlNaarMarkers lijst wordt streepjes', htmlNaarMarkers('<ul><li>een</li><li>twee</li></ul>'), '- een\n- twee');
+  eq('htmlNaarMarkers spatie blijft buiten de markering', htmlNaarMarkers('<b>vet </b>na'), '**vet** na');
+  eq('htmlNaarMarkers negeert lege vetmarkering', htmlNaarMarkers('<b></b>tekst'), 'tekst');
+  eq('htmlNaarMarkers geen dubbele markering bij nesting', htmlNaarMarkers('<b><strong>een</strong></b>'), '**een**');
+  eq('htmlNaarMarkers slaat script over', htmlNaarMarkers('<script>alert(1)</script>tekst'), 'tekst');
+  eq('htmlNaarMarkers leeg', htmlNaarMarkers(''), '');
+
+  // heen-en-terug: geplakte opmaak komt door de weergavefunctie weer als opmaak terug
+  eq('htmlNaarMarkers → opmaakHtml rondje', opmaakHtml(htmlNaarMarkers('<p>dit is <b>dringend</b></p>')), 'dit is <strong>dringend</strong>');
+
+  // ── markeringen strippen voor de AI ──
+  eq('zonderOpmaak haalt vet weg', zonderOpmaak('dit is **dringend**'), 'dit is dringend');
+  eq('zonderOpmaak haalt schuin weg', zonderOpmaak('dit is _stil_'), 'dit is stil');
+  eq('zonderOpmaak laat streepjes staan', zonderOpmaak('- een\n- twee'), '- een\n- twee');
 
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');

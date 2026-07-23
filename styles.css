@@ -545,9 +545,6 @@
     .log-edit-wie{margin-left:auto;font-size:12.5px;padding:6px 8px;border:1px solid var(--bor);border-radius:8px;background:var(--sur);color:var(--txt)}
     .log-edit-knoppen{display:flex;gap:8px;justify-content:flex-end}
     .log-edit-tekst:focus,.log-edit-wie:focus{outline:none;border-color:var(--ac);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 14%,transparent)}
-    /* Opmaakvelden: textarea + knoppenbalkje. De hoogte groeit mee met de inhoud
-       (JS zet height=scrollHeight); max-height bepaalt waar hij gaat scrollen. */
-    .opmaak-veld textarea{display:block;min-height:68px;max-height:260px;overflow-y:auto;resize:none}
     .opmaak-balk{display:flex;gap:2px;margin-top:4px}
     .opmaak-knop{display:inline-flex;align-items:center;justify-content:center;width:26px;height:24px;border-radius:5px;background:none;border:1px solid transparent;color:var(--mut);font-size:12px;font-family:inherit;line-height:1;cursor:pointer;transition:background var(--tr),color var(--tr)}
     .opmaak-knop:hover{background:var(--sur2);color:var(--txt)}
@@ -987,3 +984,10 @@ body.bulk #chat-fab{display:none}
 .badge svg{width:12px;height:12px;vertical-align:-2px}
 .ai-rhead svg,.ai-card-hd svg{width:15px;height:15px;flex:none}
 .load-err svg{width:15px;height:15px;flex:none}
+
+/* Opmaakvelden: de hoogte groeit mee met de inhoud (JS zet height=scrollHeight),
+   max-height bepaalt waar hij gaat scrollen. Staat bewust achteraan: deze regels
+   moeten winnen van de veld-specifieke min-height/resize hierboven
+   (.dos-composer textarea, .log-edit-tekst, #kmk-bron) — gelijke specificiteit,
+   dus volgorde beslist. Een sleepgreep hoort niet bij een veld dat zelf meegroeit. */
+.opmaak-veld textarea{display:block;min-height:78px;max-height:260px;overflow-y:auto;resize:none}

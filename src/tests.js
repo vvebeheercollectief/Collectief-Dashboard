@@ -1647,6 +1647,15 @@ import { opmaakHtml, htmlNaarMarkers, zonderOpmaak, pasToe, opmaakBalk } from ".
      {tekst:'****', start:2, eind:2});
   eq('pasToe haalt vet weer weg', pasToe('een **dringend** geval', 6, 14, 'vet'),
      {tekst:'een dringend geval', start:4, eind:12});
+  // Dubbelklikken selecteert in veel browsers het woord ÉN de spatie erachter. Die spatie
+  // moet buiten de markering blijven, anders levert de knop een dode "**vet **" op.
+  eq('pasToe houdt spatie buiten de markering', pasToe('Voorzitter gebeld', 0, 11, 'vet'),
+     {tekst:'**Voorzitter** gebeld', start:2, eind:12});
+  eq('pasToe houdt spatie ervóór buiten de markering', pasToe('een stil geval', 3, 8, 'schuin'),
+     {tekst:'een _stil_ geval', start:5, eind:9});
+  // Selecteer je het al-vette woord inclusief sterretjes, dan is de knop óók een schakelaar
+  eq('pasToe haalt vet weg als de selectie de sterretjes bevat', pasToe('een **dringend** geval', 4, 16, 'vet'),
+     {tekst:'een dringend geval', start:4, eind:12});
   eq('pasToe lijst zet streepjes voor elke regel', pasToe('een\ntwee', 0, 8, 'lijst').tekst, '- een\n- twee');
   eq('pasToe lijst haalt streepjes weer weg', pasToe('- een\n- twee', 0, 12, 'lijst').tekst, 'een\ntwee');
   eq('pasToe lijst op één regel zonder selectie', pasToe('een', 1, 1, 'lijst').tekst, '- een');

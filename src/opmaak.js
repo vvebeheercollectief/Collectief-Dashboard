@@ -132,12 +132,24 @@ function pasToe(tekst, start, eind, soort){
   }
   const mk=MARK[soort]; if(!mk) return {tekst:t, start, eind};
   const n=mk.length;
-  // Staat de markering er al omheen? Dan weghalen (knop is een schakelaar).
+  // Schakelaar 1: de markering staat al net buiten de selectie.
   if(t.slice(start-n,start)===mk && t.slice(eind,eind+n)===mk){
     return {tekst:t.slice(0,start-n)+t.slice(start,eind)+t.slice(eind+n), start:start-n, eind:eind-n};
   }
   const sel=t.slice(start,eind);
-  return {tekst:t.slice(0,start)+mk+sel+mk+t.slice(eind), start:start+n, eind:start+n+sel.length};
+  // Schakelaar 2: de selectie bevat de markering zélf (je sleepte er overheen).
+  if(sel.length>2*n && sel.startsWith(mk) && sel.endsWith(mk)){
+    const kern=sel.slice(n,-n);
+    return {tekst:t.slice(0,start)+kern+t.slice(eind), start, eind:start+kern.length};
+  }
+  // Spaties horen BUITEN de markering: "**vet **" wordt niet als vet weergegeven, en
+  // dubbelklikken op een woord neemt in veel browsers de spatie erachter mee.
+  const m=/^(\s*)([\s\S]*?)(\s*)$/.exec(sel);
+  const voor=m[1], kern=m[2], na=m[3];
+  // Niets (of alleen witruimte) geselecteerd: leeg paar neerzetten, cursor ertussen.
+  if(!kern) return {tekst:t.slice(0,start)+mk+mk+t.slice(eind), start:start+n, eind:start+n};
+  const a=start+voor.length;
+  return {tekst:t.slice(0,a)+mk+kern+mk+na+t.slice(eind), start:a+n, eind:a+n+kern.length};
 }
 
 const LIJST_ICO='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="4.5" cy="6.5" r="1.4" fill="currentColor" stroke="none"/><circle cx="4.5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="4.5" cy="17.5" r="1.4" fill="currentColor" stroke="none"/><path d="M9 6.5h11M9 12h11M9 17.5h11"/></svg>';

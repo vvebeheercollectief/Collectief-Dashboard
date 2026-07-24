@@ -4,6 +4,7 @@
 import { IS_STAGING, ALLOWED_EMAILS, SKEYS, APP_VERSION } from './config.js';
 import { D, pgs, state } from './state.js';
 import { ensureToken, doOAuth } from './auth.js';
+import { startSplash } from './login-splash.js';
 import { goTo, closeSb, applyTheme, applyDensity, cycleDensity, setupSearch } from './ui.js';
 import { renderNtd, renderAf, renderAlvo, renderAlfa, renderNtdStats } from './render-lijsten.js';
 import {
@@ -65,7 +66,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   initModalA11y();
 
   // Zichtbaar versienummer overal gelijk zetten (één bron: APP_VERSION)
-  document.querySelectorAll('#app-version, #app-version-login').forEach(el => el.textContent = APP_VERSION);
+  document.querySelectorAll('#app-version, #app-version-login, #app-version-splash').forEach(el => el.textContent = APP_VERSION);
 
   // Logo-fallback (CSP-veilig; verving de inline onerror= die de strakke CSP blokkeert):
   // toont 'VBC' als het logo-bestand niet laadt.
@@ -298,6 +299,11 @@ document.addEventListener('DOMContentLoaded',()=>{
     state.oauthToken=_st;state.oauthExpiry=_se;state.currentUserEmail=_sm;
     document.getElementById('login-gate').style.display='none';
     loadAll();
+  } else {
+    // Geen geldige sessie → login nodig. Speel de gebrande launch-splash
+    // (na ~1,9s → login-kaart). Bewust alleen hier: ingelogde terugkeerders
+    // krijgen de gate meteen verborgen en zien dus nooit een splash-flits.
+    startSplash();
   }
 
   goTo('vandaag');

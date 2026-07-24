@@ -4,6 +4,7 @@
 import { clientId, ALLOWED_EMAILS } from "./config.js";
 import { state } from "./state.js";
 import { loadAll } from "./data.js";
+import { toonKaart } from "./login-splash.js";
 
 function doOAuth(forcePrompt){
   return new Promise(resolve=>{
@@ -68,18 +69,20 @@ async function doLogin(){
   const errEl=document.getElementById('login-error');
   const btn=document.getElementById('login-btn');
   errEl.style.display='none';
-  btn.textContent='Even geduld…';btn.disabled=true;
+  // Loading-state: toont de spinner + "Doorsturen naar Google…" (styles.css).
+  // Blijft staan tot succes (gate verdwijnt) of annulering/fout (hieronder terug).
+  btn.classList.add('is-signing');btn.disabled=true;
   // Bezig-teller over de HÉLE inlog (ook e-mail ophalen + allowlist + sessie-opslag):
   // pas als alles in sessionStorage staat mag een uitgestelde herlading doorgaan.
   state._authBezig++;
   try{
     await doOAuth(true);
-    if(!state.oauthToken){errEl.textContent='Inloggen geannuleerd of mislukt.';errEl.style.display='block';btn.textContent='Inloggen met Google';btn.disabled=false;return}
+    if(!state.oauthToken){errEl.textContent='Inloggen geannuleerd of mislukt.';errEl.style.display='block';btn.classList.remove('is-signing');btn.disabled=false;return}
     const email=await fetchUserEmail();
-    if(!email){errEl.textContent='Kon e-mailadres niet ophalen.';errEl.style.display='block';btn.textContent='Inloggen met Google';btn.disabled=false;return}
+    if(!email){errEl.textContent='Kon e-mailadres niet ophalen.';errEl.style.display='block';btn.classList.remove('is-signing');btn.disabled=false;return}
     if(!ALLOWED_EMAILS.includes(email.toLowerCase())){
       state.oauthToken=null;state.oauthExpiry=0;
-      errEl.textContent='Geen toegang. Gebruik je VvE Beheer Collectief account.';errEl.style.display='block';btn.textContent='Inloggen met Google';btn.disabled=false;return;
+      errEl.textContent='Geen toegang. Gebruik je VvE Beheer Collectief account.';errEl.style.display='block';btn.classList.remove('is-signing');btn.disabled=false;return;
     }
     state.currentUserEmail=email;
     sessionStorage.setItem('currentUserEmail',email);
@@ -122,7 +125,8 @@ function logout(reden){
   if(state._notifVisibilityHandler){ document.removeEventListener('visibilitychange', state._notifVisibilityHandler); state._notifVisibilityHandler=null; }
   try{ if(window.OneSignal && OneSignal.logout) OneSignal.logout(); }catch(_){}
   const gate=document.getElementById('login-gate'); if(gate) gate.style.display='';
-  const btn=document.getElementById('login-btn'); if(btn){ btn.textContent='Inloggen met Google'; btn.disabled=false; }
+  toonKaart(); // meteen de login-kaart (geen splash-herhaling bij uitloggen)
+  const btn=document.getElementById('login-btn'); if(btn){ btn.classList.remove('is-signing'); btn.disabled=false; }
   const errEl=document.getElementById('login-error');
   if(errEl && reden){ errEl.textContent=reden; errEl.style.display='block'; }
 }

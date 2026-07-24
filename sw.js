@@ -1,7 +1,7 @@
 // Collectief Dashboard — Service Worker
 // Verhoog versie bij elke nieuwe deploy zodat clients de nieuwe cache pakken.
 
-const CACHE_VERSION = 'cd-v80';
+const CACHE_VERSION = 'cd-v81';
 const APP_SHELL = [
   './',
   './index.html',
@@ -13,6 +13,8 @@ const APP_SHELL = [
   './apple-touch-icon.png',
   './logo-login.png',
   './logo-sidebar.png',
+  './beeldmerk-wit.svg',
+  './logo-gestapeld-leisteen.svg',
   // ES-modulegraaf (zonder tests.js — alleen dev) zodat de app-shell ook offline laadt.
   './src/main.js',
   './src/sw-update.js',
@@ -25,6 +27,7 @@ const APP_SHELL = [
   './src/render-vandaag.js',
   './src/api.js',
   './src/auth.js',
+  './src/login-splash.js',
   './src/data.js',
   './src/actions.js',
   './src/ui.js',

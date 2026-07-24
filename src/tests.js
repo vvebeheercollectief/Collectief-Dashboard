@@ -21,6 +21,7 @@ import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages } from "./dossier-chat.js";
 import { shouldPromptReload, maakHerlaadKern } from "./sw-update.js";
 import { doOAuth } from "./auth.js";
+import { SPLASH_MS, _setFase } from "./login-splash.js";
 import { opmaakHtml, htmlNaarMarkers, zonderOpmaak, pasToe, opmaakBalk } from "./opmaak.js";
 
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
@@ -263,6 +264,22 @@ import { opmaakHtml, htmlNaarMarkers, zonderOpmaak, pasToe, opmaakBalk } from ".
 'kenmerken-bewerken','kenmerken-opslaan','kenmerken-annuleren',
 'contact-soort','contact-vastleggen','vve-log-filter','vve-log-alles','ntd-sorteer'];
   VERWACHTE_ACTIES.forEach(a => truthy(`actie '${a}' bestaat`, typeof ACTIONS[a] === 'function'));
+
+  // ── login-beginscherm ── (redesign jul-2026: splash → kaart)
+  // De fase-logica + de dragende haken die auth.js/login-splash.js verwachten.
+  eq('login-splash: SPLASH_MS = 1900ms', SPLASH_MS, 1900);
+  const _lg = document.createElement('div');
+  _setFase(_lg, 'splash');
+  truthy('login-splash: fase splash → alleen is-splash', _lg.classList.contains('is-splash') && !_lg.classList.contains('is-ready'));
+  _setFase(_lg, 'ready');
+  truthy('login-splash: fase ready → alleen is-ready',  _lg.classList.contains('is-ready')  && !_lg.classList.contains('is-splash'));
+  // Dragende DOM-haken: auth.js zoekt ze op id, main.js stampt de versies, login-splash op .lg-splash.
+  ['login-gate','login-btn','login-error','app-version-login','app-version-splash'].forEach(id =>
+    truthy(`login-gate: #${id} bestaat`, !!document.getElementById(id)));
+  truthy('login-gate: knop draagt data-action="login"', document.getElementById('login-btn')?.dataset.action === 'login');
+  truthy('login-gate: knop heeft default- én signing-state',
+    !!document.querySelector('#login-btn .lg-btn-default') && !!document.querySelector('#login-btn .lg-btn-signing'));
+  truthy('login-gate: splash-laag bestaat (klik = overslaan)', !!document.querySelector('#login-gate .lg-splash'));
 
   // ── terugDoel ── (terug-pijltje in de dossier-kop: waar kom je uit?)
   eq('terugDoel: onthouden pagina',            terugDoel('vandaag'),      'vandaag');

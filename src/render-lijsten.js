@@ -294,6 +294,7 @@ function setAf(s){state.activeAf=s;pgs.af=1;renderAf()}
 
 export {
   SEC_ICONS, SEC_THEMES, renderNtdStats, renderNtdDonut, renderNtd, setNtd, filterNtd, sorteerNtd, ntdSorteerKey, renderAf, setAf,
+  kopOpen,
   offerteAannemerPaneel, offerteAannSamenvatting,
   ALVO_ICONS, renderAlvo, ALVO_COLS, ALVO_LABELS, flagPill, _recomputeAlvoStatus, toggleAlvoFlag, statusIco, renderAlfa,
   renderThead, renderTbody, bepaalStil, deadlineCel, rowNtd, rowAf, renderPag,

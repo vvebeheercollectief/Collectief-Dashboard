@@ -1770,6 +1770,68 @@ import { opmaakHtml, htmlNaarMarkers, zonderOpmaak, pasToe, opmaakBalk } from ".
     } finally { D.ntd = ntdOud; D.af = afOud; state.ntdStatus = statusOud; }
   })();
 
+  // ── Klik op een pil zet het filter, nogmaals klikken wist het ──
+  (()=>{
+    const ntdOud=D.ntd, afOud=D.af, statusOud=state.ntdStatus, secOud=state.activeNtd;
+    try{
+      const _vd=_vandaagAmsterdam();
+      const _mnd=['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
+      const _dag=n=>{ const d=new Date(_vd.getFullYear(),_vd.getMonth(),_vd.getDate()+n);
+                      return `${d.getDate()} ${_mnd[d.getMonth()]} ${d.getFullYear()}`; };
+      D.ntd={OPPAKKEN:[
+        {code:'K1',naam:'Laat', deadline:_dag(-4), opvolgdatum:'', _row:3},
+        {code:'K2',naam:'Later',deadline:_dag(12), opvolgdatum:'', _row:4},
+        {code:'K3',naam:'Weg',  deadline:_dag(12), opvolgdatum:_dag(6), _row:5},
+      ], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[]};
+      D.af={OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[]};
+      state.activeNtd='OPPAKKEN';
+      state.ntdStatus='';
+      document.getElementById('s-ntd').value='';
+      document.getElementById('f-code-ntd').value='';
+      document.getElementById('f-beh-ntd').value='';
+      document.getElementById('f-prio-ntd').value='';
+      renderNtdStats(); renderNtd();
+
+      const pil=s=>document.querySelector(`[data-action="ntd-stat"][data-status="${s}"]`);
+      eq('vooraf: drie rijen zichtbaar', document.querySelectorAll('#ntd-tbody tr[data-row]').length, 3);
+
+      ACTIONS['ntd-stat'](pil('telaat'));
+      eq('klik zet ntdStatus op telaat', state.ntdStatus, 'telaat');
+      eq('lijst toont alleen de late rij', document.querySelectorAll('#ntd-tbody tr[data-row]').length, 1);
+      eq('pil is aangedrukt', pil('telaat').getAttribute('aria-pressed'), 'true');
+
+      ACTIONS['ntd-stat'](pil('weggelegd'));
+      eq('andere pil vervangt het filter', state.ntdStatus, 'weggelegd');
+      eq('lijst toont alleen de weggelegde rij', document.querySelectorAll('#ntd-tbody tr[data-row]').length, 1);
+      eq('vorige pil niet meer aangedrukt', pil('telaat').getAttribute('aria-pressed'), 'false');
+
+      ACTIONS['ntd-stat'](pil('weggelegd'));
+      eq('tweede klik wist het filter', state.ntdStatus, '');
+      eq('lijst toont weer alles', document.querySelectorAll('#ntd-tbody tr[data-row]').length, 3);
+
+      // De tabtellers moeten het filter volgen: hun som is precies het getal in de pil.
+      const tabSom = () => [...document.querySelectorAll('#ntd-tabs .cnt')]
+                             .reduce((a,e)=>a + (+e.textContent||0), 0);
+      eq('tabtellers zonder filter tellen op tot 3', tabSom(), 3);
+      ACTIONS['ntd-stat'](pil('telaat'));
+      eq('tabtellers volgen het filter', tabSom(), 1);
+
+      // Het getal ÍN de pil blijft het ongefilterde totaal — anders is de weg terug weg.
+      truthy('pilgetal blijft het totaal', pil('telaat').textContent.includes('1'));
+      truthy('pil weggelegd toont nog steeds haar eigen totaal',
+             pil('weggelegd').textContent.includes('1'));
+
+      // Het filter hoort een tabwissel te overleven (state, niet DOM).
+      state.activeNtd='VERGADERVERZOEKEN'; renderNtd();
+      eq('filter overleeft een tabwissel', state.ntdStatus, 'telaat');
+      state.activeNtd='OPPAKKEN'; renderNtd();
+      eq('terug op het tabblad nog steeds gefilterd',
+         document.querySelectorAll('#ntd-tbody tr[data-row]').length, 1);
+    } finally {
+      D.ntd=ntdOud; D.af=afOud; state.ntdStatus=statusOud; state.activeNtd=secOud;
+    }
+  })();
+
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');
   window._testResult = `${totOk} OK, ${totFail} FAIL`; // uitleesbaar voor test-automatisering

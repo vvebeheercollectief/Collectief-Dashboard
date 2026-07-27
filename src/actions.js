@@ -4,7 +4,7 @@
 // ══════════════════════════════════════
 import { pgs, state } from './state.js';
 import {
-  setNtd, renderNtd, setAf, renderAf, renderAlvo, toggleAlvoFlag, renderAlfa,
+  setNtd, renderNtd, renderNtdStats, setAf, renderAf, renderAlvo, toggleAlvoFlag, renderAlfa,
 } from './render-lijsten.js';
 import {
   setOntw, renderOntw, editOntwItem, addTaskNote, renderLogboek,
@@ -49,6 +49,9 @@ export const ACTIONS = {
   'alvo-stat':             (el) => { const f=document.getElementById('f-status-alvo');
                                      f.value = f.value===el.dataset.status ? '' : el.dataset.status;
                                      pgs.alvo=1; renderAlvo(); },
+  'ntd-stat':              (el) => { const s=el.dataset.status;
+                                     state.ntdStatus = state.ntdStatus===s ? '' : s;
+                                     pgs.ntd=1; renderNtd(); renderNtdStats(); },
   'taak-bewerken':         (el) => openModal(true, state._rowCache[+el.dataset.rid]),
   'taak-afronden':         (el) => completeTask(+el.dataset.rid),
   'pagineer':              (el) => { const d=el.dataset.doel; pgs[d]=+el.dataset.pg; PAG_RENDER[d](); },

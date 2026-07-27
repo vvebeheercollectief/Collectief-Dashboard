@@ -1872,6 +1872,16 @@ import { goTo } from "./ui.js";
   (()=>{
     const pillen = document.getElementById('ntd-kop-pillen');
     const sub    = document.getElementById('page-sub');
+
+    // Met nog lege pillen (vóór de eerste databeurt) moet de ondertitel blijven staan,
+    // anders toont de kop tijdens het laden alleen de titel.
+    const _pilHtml = pillen.innerHTML;
+    pillen.innerHTML = '';
+    goTo('ntd');
+    truthy('lege pillen → ondertitel blijft staan', !sub.hidden);
+    truthy('lege pillen → ondertitel heeft tekst', sub.textContent.length > 0);
+    pillen.innerHTML = _pilHtml;
+
     goTo('ntd');
     truthy('op NTD zijn de pillen zichtbaar', !pillen.hidden);
     truthy('op NTD is de ondertitel verborgen', sub.hidden);

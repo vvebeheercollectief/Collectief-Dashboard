@@ -5,7 +5,7 @@ import { IS_STAGING, ALLOWED_EMAILS, SKEYS, APP_VERSION } from './config.js';
 import { D, pgs, state } from './state.js';
 import { ensureToken, doOAuth } from './auth.js';
 import { startSplash } from './login-splash.js';
-import { goTo, closeSb, applyTheme, applyDensity, cycleDensity, setupSearch } from './ui.js';
+import { goTo, syncKop, closeSb, applyTheme, applyDensity, cycleDensity, setupSearch } from './ui.js';
 import { renderNtd, renderAf, renderAlvo, renderAlfa, renderNtdStats, zetKopOpen, kopOpen } from './render-lijsten.js';
 import {
   renderOntw, renderLogboek, openOntwModal, closeOntwModal,
@@ -320,6 +320,7 @@ export function renderAll(){
   const ntdTotal=SKEYS.reduce((s,k)=>s+(D.ntd[k]?.length||0),0);
   document.getElementById('b-ntd').textContent=ntdTotal;
   renderNtdStats();
+  syncKop();
   zetKopOpen(kopOpen());
   renderNtd();
   renderAf();

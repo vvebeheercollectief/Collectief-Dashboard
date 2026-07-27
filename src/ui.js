@@ -10,6 +10,22 @@ import { renderHerhaal } from "./render-herhaal.js";
 import { renderVve } from "./render-vve.js";
 import { showToast } from "./notifications.js";
 
+let _pagina = 'vandaag';   // laatst geopende pagina, zodat renderAll de kop kan bijwerken
+
+// De kop-pillen vervangen de ondertitel op Nog Te Doen — maar pas zodra ze gevuld zijn.
+// Tot de eerste databeurt binnen is blijft de ondertitel staan, anders toont de kop
+// tijdens het laden alleen de titel en verder niets.
+function syncKop(){
+  const [,s] = PAGE_META[_pagina] || ['',''];
+  const sub = document.getElementById('page-sub');
+  const pillen = document.getElementById('ntd-kop-pillen');
+  const opNtd = _pagina === 'ntd';
+  const gevuld = !!(pillen && pillen.children.length);
+  sub.textContent = opNtd && gevuld ? '' : s;
+  sub.hidden = opNtd && gevuld;
+  if (pillen) pillen.hidden = !opNtd;
+}
+
 function goTo(page){
   // Een open logregel-bewerking hoort bij het scherm waar die begon; bij een ÉCHTE
   // paginawissel sluiten we 'm, anders kan een verouderd formulier later opslaan.
@@ -22,16 +38,10 @@ function goTo(page){
     el.setAttribute('aria-current',actief?'page':'false');
   });
   document.querySelectorAll('.page').forEach(el=>el.classList.toggle('active',el.id==='page-'+page));
-  const[t,s]=PAGE_META[page]||['',''];
+  const[t]=PAGE_META[page]||['',''];   // ondertitel haalt syncKop zelf op
   document.getElementById('page-title').textContent=t;
-  // Op Nog Te Doen nemen de kop-pillen de plek van de ondertitel in: die ondertitel is
-  // decoratie, de tellers zijn informatie. Elders blijft de kop ongewijzigd.
-  const opNtd = page==='ntd';
-  const sub = document.getElementById('page-sub');
-  sub.textContent = opNtd ? '' : s;
-  sub.hidden = opNtd;
-  const pillen = document.getElementById('ntd-kop-pillen');
-  if(pillen) pillen.hidden = !opNtd;
+  _pagina = page;
+  syncKop();
   document.getElementById('btn-add').style.display=page==='ntd'?'inline-flex':'none';
   if(page==='ontw') renderOntw();
   if(page==='logboek') renderLogboek();
@@ -80,4 +90,4 @@ function setupSearch(id,cb){
   let t;el.addEventListener('input',()=>{clearTimeout(t);t=setTimeout(cb,200)});
 }
 
-export { goTo, closeSb, applyTheme, applyDensity, cycleDensity, setupSearch };
+export { goTo, syncKop, closeSb, applyTheme, applyDensity, cycleDensity, setupSearch };

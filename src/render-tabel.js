@@ -2,7 +2,7 @@
 //  RENDER-TABEL — generieke tabel/paginering (thead, tbody, rij-render, paginatie)
 //  Verplaatst uit render-lijsten.js (Batch D / punt 11) — zuivere refactor, geen gedragswijziging.
 // ══════════════════════════════════════
-import { esc, vveCodeSpan, persBadges, subBadge, offProg, emptyRow, berekenPrioriteit, opvolgStatus, taakTitel, _verschilInKalenderdagen, _vandaagAmsterdam, STIL_DREMPEL_DAGEN } from "./util.js";
+import { esc, vveCodeSpan, persBadges, subBadge, offProg, emptyRow, berekenPrioriteit, opvolgStatus, taakTitel, kortDatum, _verschilInKalenderdagen, _vandaagAmsterdam, STIL_DREMPEL_DAGEN } from "./util.js";
 import { SECS, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { bulkGeselecteerd } from "./bulk.js";
@@ -91,14 +91,18 @@ function rowNtd(r,sec){
   const _stilDagen = bepaalStil(r, sec);
   // De offerte-tab is bewust kaal (v6.2): daar geen berekend stil-label. De andere secties
   // houden 'm wél — daar is het hun signaal dat een taak stil blijft liggen.
+  // De pillen staan in de tekstkolom en aten daar breedte op die het actiepunt beter kan
+  // gebruiken (v8.10). Daarom kort: het icoon draagt de betekenis, de volledige uitleg
+  // staat in de title. "Stil 5d" → "5d", "Opvolgen vandaag" → "Vandaag", en de
+  // wegleg-datum kort ("28 jul") i.p.v. voluit.
   const stilPill = (_stilDagen !== null && sec !== 'OFFERTE-TRAJECTEN')
-    ? `<span class="pill-stil" data-action="taak-bewerken" data-rid="${rid}" title="Geen activiteit in ${_stilDagen} dagen">Stil ${_stilDagen}d</span>`
+    ? `<span class="pill-stil" data-action="taak-bewerken" data-rid="${rid}" title="Stil: geen activiteit in ${_stilDagen} dagen">${ico('belUit',11)}${_stilDagen}d</span>`
     : '';
   const ov = opvolgStatus(r);
   const opvolgPill = ov.vandaag
-    ? `<span class="pill-opvolg" data-action="taak-wegleggen" data-rid="${rid}" title="Opvolgdatum: ${esc(r.opvolgdatum)}">${ico('bel')} Opvolgen vandaag</span>`
+    ? `<span class="pill-opvolg" data-action="taak-wegleggen" data-rid="${rid}" title="Opvolgen vandaag — opvolgdatum ${esc(r.opvolgdatum)}">${ico('bel',11)}Vandaag</span>`
     : ov.weggelegd
-      ? `<span class="pill-snooze" data-action="taak-wegleggen" data-rid="${rid}" title="Weggelegd tot ${esc(r.opvolgdatum)}">${esc(r.opvolgdatum)}</span>`
+      ? `<span class="pill-snooze" data-action="taak-wegleggen" data-rid="${rid}" title="Weggelegd tot ${esc(r.opvolgdatum)}">${ico('pauze',11)}${esc(kortDatum(r.opvolgdatum))}</span>`
       : '';
   const extraPills = stilPill + opvolgPill;
   switch(sec){

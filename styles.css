@@ -284,12 +284,10 @@
     .s-telaat{font-size:12.5px;font-weight:700;color:var(--rd);white-space:nowrap}
     .s-soon{font-size:12.5px;font-weight:600;color:var(--am);white-space:nowrap}
     .s-normal{font-size:12.5px;font-weight:500;color:#48505c;white-space:nowrap}
-    .pill-stil{display:inline-block;background:rgba(107,114,128,0.15);color:#4b5563;font-size:11px;font-weight:600;padding:2px 7px;border-radius:10px;margin-left:6px;cursor:pointer}
-    .pill-stil::before{content:'🔕 '}
+    .pill-stil{display:inline-flex;align-items:center;gap:3px;background:rgba(107,114,128,0.15);color:#4b5563;font-size:11px;font-weight:600;padding:1px 6px;border-radius:10px;margin-left:5px;cursor:pointer;vertical-align:middle}
     /* Fase 4 — opvolging & herhaling */
-    .pill-opvolg{display:inline-block;background:#16a34a;color:#fff;font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;margin-left:6px;cursor:pointer}
-    .pill-snooze{display:inline-block;background:rgba(107,114,128,0.15);color:#4b5563;font-size:11px;font-weight:600;padding:2px 7px;border-radius:10px;margin-left:6px;cursor:pointer;white-space:nowrap}
-    .pill-snooze::before{content:'⏸ '}
+    .pill-opvolg{display:inline-flex;align-items:center;gap:3px;background:#16a34a;color:#fff;font-size:11px;font-weight:700;padding:1px 6px;border-radius:10px;margin-left:5px;cursor:pointer;vertical-align:middle}
+    .pill-snooze{display:inline-flex;align-items:center;gap:3px;background:rgba(107,114,128,0.15);color:#4b5563;font-size:11px;font-weight:600;padding:1px 6px;border-radius:10px;margin-left:5px;cursor:pointer;white-space:nowrap;vertical-align:middle}
     [data-theme=dark] .pill-snooze{color:#9ca3af}
     tr.snooze-row td{opacity:.55}
     .grp-kop{background:var(--group-bg);padding:9px 26px;font-size:11.5px;font-weight:600;color:#7c8694;text-transform:uppercase;letter-spacing:.04em;border:none}
@@ -1023,7 +1021,7 @@ body.bulk #chat-fab{display:none}
 .pal-ico svg{width:15px;height:15px}
 .bb-knop svg{width:13px;height:13px;vertical-align:-2px;margin-right:3px}
 .bb-knop svg.caret{width:10px;height:10px;margin:0 0 0 1px;vertical-align:-1px;opacity:.75}
-.pill-opvolg svg{width:12px;height:12px;vertical-align:-2px;margin-right:2px}
+.pill-stil svg,.pill-opvolg svg,.pill-snooze svg{width:11px;height:11px;flex-shrink:0}
 .badge svg{width:12px;height:12px;vertical-align:-2px}
 .ai-rhead svg,.ai-card-hd svg{width:15px;height:15px;flex:none}
 .load-err svg{width:15px;height:15px;flex:none}

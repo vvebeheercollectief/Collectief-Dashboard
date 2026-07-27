@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf, _vandaagAmsterdam } from "./util.js";
+import { berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf, _vandaagAmsterdam } from "./util.js";
 import { logZin, logPaginaSoort, parseLogboek, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, SECS } from "./config.js";
 import { ACTIONS } from "./actions.js";
@@ -289,6 +289,14 @@ import { goTo } from "./ui.js";
   eq('terugDoel: dossier telt niet als bron',  terugDoel('vve'),          'ntd');
   eq('terugDoel: leeg → Nog Te Doen',          terugDoel(null),           'ntd');
   eq('terugDoel: onbekende pagina → vangnet',  terugDoel('bestaat-niet'), 'ntd');
+
+  // ── kortDatum ── (korte vorm in de pillen; jaartal alleen buiten het lopende jaar)
+  const _kdT = new Date(2026,6,27);
+  eq('kortDatum: lopend jaar zonder jaartal', kortDatum('28-07-2026', _kdT), '28 jul');
+  eq('kortDatum: ander jaar mét jaartal',     kortDatum('05-01-2027', _kdT), "5 jan '27");
+  eq('kortDatum: Nederlandse long-date',      kortDatum('21 augustus 2026', _kdT), '21 aug');
+  eq('kortDatum: onparsebaar blijft staan',   kortDatum('nog niet bekend', _kdT), 'nog niet bekend');
+  eq('kortDatum: leeg blijft leeg',           kortDatum('', _kdT), '');
 
   // ── volgendeDeadline ── (herhaalregels; maandgrens-clamp)
   eq('vd maand',            volgendeDeadline('15-01-2026','maand'),            '15-02-2026');

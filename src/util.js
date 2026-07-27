@@ -251,6 +251,17 @@ function coerceDagenVooraf(v, def=14){
   return Number.isFinite(n)&&n>=0 ? n : def;
 }
 
+// Korte datum voor krappe plekken (de pillen in de takentabel): "28 jul", met
+// jaartal alleen als het níét het lopende jaar is. Onparsebare tekst blijft staan.
+const _MND_KORT = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
+function kortDatum(s, vandaag){
+  const d = _parseAnyDate(s);
+  if(!d) return String(s == null ? '' : s);
+  const jaarNu = (vandaag || _vandaagAmsterdam()).getFullYear();
+  const mnd = _MND_KORT[d.m - 1] || '';
+  return d.y === jaarNu ? `${d.d} ${mnd}` : `${d.d} ${mnd} '${String(d.y).slice(2)}`;
+}
+
 // ══════════════════════════════════════
 //  TAAKTITEL — één leesbare regel per taak, ongeacht sectie
 // ══════════════════════════════════════
@@ -288,7 +299,7 @@ function taakTitel(r, sec){
 }
 
 export {
-  taakTitel,
+  taakTitel, kortDatum,
   displayName, filt, PRIO_REGELS, STIL_DREMPEL_DAGEN, STIL_ESCALATIE_REGELS,
   opvolgStatus, volgendeDeadline, HERHAAL_MAANDEN, _vandaagAmsterdam, isoWeek,
   _verschilInKalenderdagen, berekenPrioriteit, prioBadge, persBadges,

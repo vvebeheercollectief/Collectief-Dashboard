@@ -128,6 +128,18 @@ function vulProgressBalk(){
   });
 }
 
+// Tegenhanger van vulProgressBalk: bij het dichtklappen alles terug op nul. Zonder deze
+// reset blijft de inline breedte staan en loopt de balk alléén de eerste keer vol — daarna
+// staat hij bij het openklappen meteen op zijn eindwaarde.
+function leegProgressBalk(){
+  const fill=document.getElementById('ntd-progress-fill'); if(!fill) return;
+  fill.style.width='0';
+  const voor=document.getElementById('ntd-progress-voor');
+  if(voor) voor.style.width='0';
+  const rev=document.getElementById('ntd-progress-val-rev');
+  if(rev) rev.style.clipPath='inset(0 100% 0 0)';
+}
+
 // Paneel openen/sluiten. Schrijft de keuze weg en houdt de chevron in sync.
 function zetKopOpen(aan){
   localStorage.setItem(KOP_KEY, aan?'1':'0');
@@ -140,7 +152,7 @@ function zetKopOpen(aan){
     chev.setAttribute('aria-label', lbl);
     chev.setAttribute('title', lbl);
   }
-  if(aan) vulProgressBalk();
+  if(aan) vulProgressBalk(); else leegProgressBalk();
 }
 
 // ══════════════════════════════════════

@@ -1872,25 +1872,39 @@ import { goTo } from "./ui.js";
   (()=>{
     const pillen = document.getElementById('ntd-kop-pillen');
     const sub    = document.getElementById('page-sub');
+    // Dit blok wisselt van pagina; zonder herstel eindigt een ?test=1-ronde op Nog Te Doen
+    // i.p.v. de startpagina, met de neptellingen van een eerder testblok in de kop.
+    const _paginaVoor = (document.querySelector('.page.active')?.id||'page-vandaag').replace('page-','');
+    try{
+      // Met nog lege pillen (vóór de eerste databeurt) moet de ondertitel blijven staan,
+      // anders toont de kop tijdens het laden alleen de titel.
+      const _pilHtml = pillen.innerHTML;
+      pillen.innerHTML = '';
+      goTo('ntd');
+      truthy('lege pillen → ondertitel blijft staan', !sub.hidden);
+      truthy('lege pillen → ondertitel heeft tekst', sub.textContent.length > 0);
+      pillen.innerHTML = _pilHtml;
 
-    // Met nog lege pillen (vóór de eerste databeurt) moet de ondertitel blijven staan,
-    // anders toont de kop tijdens het laden alleen de titel.
-    const _pilHtml = pillen.innerHTML;
-    pillen.innerHTML = '';
-    goTo('ntd');
-    truthy('lege pillen → ondertitel blijft staan', !sub.hidden);
-    truthy('lege pillen → ondertitel heeft tekst', sub.textContent.length > 0);
-    pillen.innerHTML = _pilHtml;
-
-    goTo('ntd');
-    truthy('op NTD zijn de pillen zichtbaar', !pillen.hidden);
-    truthy('op NTD is de ondertitel verborgen', sub.hidden);
-    goTo('alvo');
-    truthy('elders zijn de pillen verborgen', pillen.hidden);
-    truthy('elders is de ondertitel zichtbaar', !sub.hidden);
-    truthy('elders staat er tekst in de ondertitel', sub.textContent.length > 0);
-    goTo('ntd');
-    truthy('terug op NTD zijn de pillen weer zichtbaar', !pillen.hidden);
+      goTo('ntd');
+      truthy('op NTD zijn de pillen zichtbaar', !pillen.hidden);
+      truthy('op NTD is de ondertitel verborgen', sub.hidden);
+      goTo('alvo');
+      truthy('elders zijn de pillen verborgen', pillen.hidden);
+      truthy('elders is de ondertitel zichtbaar', !sub.hidden);
+      truthy('elders staat er tekst in de ondertitel', sub.textContent.length > 0);
+      goTo('ntd');
+      truthy('terug op NTD zijn de pillen weer zichtbaar', !pillen.hidden);
+    } finally {
+      // Eerst de echte tellingen terugzetten (D.ntd is hierboven al hersteld), dán pas
+      // terug naar de startpagina: goTo roept syncKop aan en die kijkt naar de inhoud
+      // van de pillen om te bepalen of de ondertitel moet wijken.
+      renderNtdStats();
+      goTo(_paginaVoor);
+    }
+    eq('testblok laat de app op de startpagina achter',
+       (document.querySelector('.page.active')?.id||''), 'page-'+_paginaVoor);
+    truthy('pillen tonen na afloop weer een telling',
+       document.getElementById('ntd-kop-pillen').children.length > 0);
   })();
 
   const totOk = ok + _tOk, totFail = fail + _tFail;

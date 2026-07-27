@@ -87,8 +87,14 @@
     .hdr-info p{font-size:12px;font-weight:500;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     /* Kop-pillen: de vier tellers van Nog Te Doen, in de paginakop i.p.v. een strook eronder.
        [hidden] moet expliciet, anders wint display:flex van de browser-standaard en staan
-       de pillen ook op de andere pagina's in de kop. */
-    .kop-pillen{display:flex;align-items:center;gap:6px;min-width:0;flex-shrink:1;overflow:hidden}
+       de pillen ook op de andere pagina's in de kop.
+       Bewust géén overflow-clamp: de pillen raken de doosrand precies, en een clamp knipt dan
+       de focus-ring (2px outline + 2px offset) van de twee filterknoppen en de chevron af tot
+       een los haakje. Boven 1000px passen de pillen altijd — gemeten op 1005px in het slechtste
+       geval (zijbalk open, viercijferige tellers, ✕ zichtbaar) blijft er nog ruim 20px lucht tot
+       de eerste icoonknop — dus de clamp was een vangnet dat nooit in werking trad. Daaronder
+       neemt het @media-blok het over met een eigen regel én opvulling voor de ring. */
+    .kop-pillen{display:flex;align-items:center;gap:6px;min-width:0;flex-shrink:1}
     .kop-pillen[hidden],.kop-pillen:empty{display:none}
     /* Staan er pillen, dan houdt de titel haar breedte en leveren de pillen in — nooit andersom. */
     .hdr-info:has(.kop-pillen:not([hidden])) h1{flex-shrink:0}
@@ -999,13 +1005,19 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,.search-box inpu
    wordt twee regels hoog. .hdr-info geeft daarvoor haar eigen doos op (display:contents), anders
    wrappen de pillen bínnen die smalle doos i.p.v. over de volle breedte. De titel mag hier wél
    inleveren — anders duwt een lange naam de icoonknoppen weg. Alles hangt aan :has(.kop-pillen),
-   zodat de kop op alle andere pagina's onaangeroerd blijft. Dit blok staat ná het 560-blok: de
+   zodat de kop op alle andere pagina's onaangeroerd blijft. De :not(:empty) hoort erbij: vóór de
+   eerste databeurt staan de pillen er nog leeg bij en hoort de ondertitel gewoon naast de titel
+   te staan, niet ~90px verderop door display:contents. Dit blok staat ná het 560-blok: de
    padding-longhands moeten winnen van de padding-shorthand daar. */
 @media(max-width:1000px){
-  #hdr:has(.kop-pillen:not([hidden])){height:auto;min-height:var(--hh);flex-wrap:wrap;padding-top:8px;padding-bottom:8px}
-  #hdr:has(.kop-pillen:not([hidden])) .hdr-info{display:contents}
-  #hdr:has(.kop-pillen:not([hidden])) h1{flex:1 1 auto}
-  .kop-pillen{flex:1 1 100%;order:2;margin-top:6px;overflow-x:auto;padding-bottom:2px}
+  #hdr:has(.kop-pillen:not([hidden]):not(:empty)){height:auto;min-height:var(--hh);flex-wrap:wrap;padding-top:8px;padding-bottom:8px}
+  #hdr:has(.kop-pillen:not([hidden]):not(:empty)) .hdr-info{display:contents}
+  #hdr:has(.kop-pillen:not([hidden]):not(:empty)) h1{flex:1 1 auto}
+  /* overflow-x:auto maakt per spec ook de y-as niet-visible: hier moet de focus-ring dus
+     bínnen de doos passen. Vandaar 4px opvulling boven/onder/rechts (2px outline + 2px offset);
+     links 0 zodat de pillen op één lijn blijven met de titel erboven. De margin-top zakt van
+     6 naar 2px, zodat de optische ruimte boven de pillen 6px blijft. */
+  .kop-pillen{flex:1 1 100%;order:2;margin-top:2px;overflow-x:auto;padding:4px 4px 4px 0}
 }
 @media(max-width:380px){.stats-grid{grid-template-columns:1fr}}
 

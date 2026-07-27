@@ -30,8 +30,14 @@ const SEC_THEMES={
   'OFFERTE-TRAJECTEN':'--sec:var(--pu);--sec-l:var(--pu-l)',
   LOD:'--sec:var(--rd);--sec-l:var(--rd-l)',
 };
+// Open/dicht-stand van het uitklappaneel. Bewust in localStorage: de gebruiker die
+// hem één keer openzet wil hem morgen ook open.
+const KOP_KEY = 'ntd_kop_open';
+function kopOpen(){ return localStorage.getItem(KOP_KEY) === '1'; }
+
+const CHEV_SVG = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>`;
+
 function renderNtdStats(){
-  // V3-stat-strip: aggregaten i.p.v. per-sectie-tegels (per-sectie staat al in de tabs)
   let open=0, telaat=0, weg=0;
   SKEYS.forEach(s=>{
     (D.ntd[s]||[]).forEach(r=>{
@@ -44,21 +50,43 @@ function renderNtdStats(){
   const todayISO=`${tv.getFullYear()}-${String(tv.getMonth()+1).padStart(2,'0')}-${String(tv.getDate()).padStart(2,'0')}`;
   let afVandaag=0;
   SKEYS.forEach(s=>{(D.af?.[s]||[]).forEach(r=>{ if(toISODate(r.datum||'')===todayISO) afVandaag++; })});
-  const item=(val,cls,cap,hint)=>`<div class="stat-item"><span class="stat-val ${cls}">${val}</span><div class="stat-meta"><span class="stat-cap">${cap}</span>${hint?`<span class="stat-hint">${hint}</span>`:''}</div></div>`;
-  // Huidige ISO-weeknummer, rechts in de balk (ma-start; tooltip = ma–zo datumbereik)
+
+  const host=document.getElementById('ntd-kop-pillen');
+  if(!host) return;
+
+  // Plat = alleen aflezen. 'Open' filtert niet (filteren op alles is geen filter) en
+  // 'af' komt uit D.af, dat de lijst eronder niet kan tonen.
+  const plat=(val,cap,cls='')=>
+    `<span class="kop-pil ${cls}"><b>${val}</b> ${cap}</span>`;
+  const knop=(val,cap,cls,status)=>{
+    const aan=state.ntdStatus===status;
+    return `<button type="button" class="kop-pil kop-pil-klik ${cls}${aan?' aan':''}" data-action="ntd-stat" data-status="${status}" aria-pressed="${aan}" title="${aan?'Filter uitzetten':'Toon alleen '+cap}"><b>${val}</b> ${cap}${aan?' <span aria-hidden="true">✕</span>':''}</button>`;
+  };
+  const paneelOpen=kopOpen();
+  const chev=`<button type="button" class="kop-chev" data-action="ntd-kop-toggle" aria-expanded="${paneelOpen}" aria-controls="ntd-top-row" aria-label="${paneelOpen?'Details verbergen':'Week en vergaderingen tonen'}" title="${paneelOpen?'Details verbergen':'Week en vergaderingen tonen'}">${CHEV_SVG}</button>`;
+
+  host.innerHTML=
+    plat(open,'open')+
+    knop(telaat,'te laat','pil-rd','telaat')+
+    knop(weg,'weggelegd','pil-am','weggelegd')+
+    plat(afVandaag,'af','pil-dof')+
+    chev;
+
+  renderNtdWeek();
+  renderNtdDonut();
+}
+
+// Weekblok, nu in het uitklappaneel in plaats van in de statstrook.
+function renderNtdWeek(){
+  const host=document.getElementById('ntd-week'); if(!host) return;
+  const tv=_vandaagAmsterdam();
   const MND=['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
   const wk=isoWeek(tv);
   const ma=new Date(tv); ma.setDate(tv.getDate()-((tv.getDay()+6)%7));
   const zo=new Date(ma); zo.setDate(ma.getDate()+6);
   const range=`${ma.getDate()} ${MND[ma.getMonth()]} – ${zo.getDate()} ${MND[zo.getMonth()]} ${zo.getFullYear()}`;
-  const weekBlok=`<div class="stat-week" title="ISO-week ${wk} · ${range}"><span class="stat-week-cap">Week</span><span class="stat-week-val">${wk}</span></div>`;
-  document.getElementById('ntd-stats').innerHTML=
-    item(open,'','Open taken','')+
-    item(telaat,telaat?'red':'muted','Te laat','')+
-    item(weg,weg?'amber':'muted','Weggelegd','')+
-    item(afVandaag,'muted','Afgerond vandaag','')+
-    weekBlok;
-  renderNtdDonut();
+  host.innerHTML=`<span class="stat-week-cap">Week</span><span class="stat-week-val">${wk}</span>`;
+  host.title=`ISO-week ${wk} · ${range}`;
 }
 
 // NTD: voortgangsbalk uitgeschreven vergaderingen (alvo: uitnodiging=TRUE → uitnodiging verzonden)

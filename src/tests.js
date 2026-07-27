@@ -6,7 +6,7 @@ import { logZin, logPaginaSoort, parseLogboek, _shiftRows, _shiftLogEditRef, log
 import { _isStagingHost, APP_VERSION, SECS } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
-import { filterNtd, setNtd, renderNtd, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey } from "./render-lijsten.js";
+import { filterNtd, setNtd, renderNtd, renderNtdStats, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey } from "./render-lijsten.js";
 import { state, D, pgs } from "./state.js";
 import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel, renderVve } from "./render-vve.js";
 import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN } from "./kenmerken.js";
@@ -1736,6 +1736,38 @@ import { opmaakHtml, htmlNaarMarkers, zonderOpmaak, pasToe, opmaakBalk } from ".
     eq('statusfilter onbekend → alles',    codes('bestaatniet').length, 4);
     eq('statusfilter combineert met zoek',
        filterNtd(rijen,'te laat','','','','OPPAKKEN','telaat').map(r=>r.code), ['A1']);
+  })();
+
+  // ── Kop-pillen: vier tellers, twee ervan zijn knoppen ──
+  (()=>{
+    const ntdOud = D.ntd, afOud = D.af, statusOud = state.ntdStatus;
+    try{
+      const _vd = _vandaagAmsterdam();
+      const _mnd = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
+      const _dag = n => { const d = new Date(_vd.getFullYear(), _vd.getMonth(), _vd.getDate()+n);
+                          return `${d.getDate()} ${_mnd[d.getMonth()]} ${d.getFullYear()}`; };
+      D.ntd = {OPPAKKEN:[
+        {code:'P1', naam:'Laat', deadline:_dag(-1), opvolgdatum:'', _row:3},
+        {code:'P2', naam:'Weg',  deadline:_dag(9),  opvolgdatum:_dag(4), _row:4},
+      ], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[]};
+      D.af = {OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[]};
+      state.ntdStatus = '';
+      renderNtdStats();
+
+      const host = document.getElementById('ntd-kop-pillen');
+      truthy('kop-pillen container bestaat', !!host);
+      eq('vier pillen in de kop', host.querySelectorAll('.kop-pil').length, 4);
+      eq('twee pillen zijn knoppen', host.querySelectorAll('button.kop-pil').length, 2);
+
+      const pil = s => host.querySelector(`[data-action="ntd-stat"][data-status="${s}"]`);
+      truthy('pil te laat bestaat',    !!pil('telaat'));
+      truthy('pil weggelegd bestaat',  !!pil('weggelegd'));
+      truthy('pil te laat telt 1',     pil('telaat').textContent.includes('1'));
+      truthy('pil weggelegd telt 1',   pil('weggelegd').textContent.includes('1'));
+      eq('pil te laat niet aangedrukt', pil('telaat').getAttribute('aria-pressed'), 'false');
+
+      truthy('chevron bestaat', !!host.querySelector('[data-action="ntd-kop-toggle"]'));
+    } finally { D.ntd = ntdOud; D.af = afOud; state.ntdStatus = statusOud; }
   })();
 
   const totOk = ok + _tOk, totFail = fail + _tFail;

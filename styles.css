@@ -258,8 +258,13 @@
        Cellen met colspan (groepskoppen 'In behandeling'/'Weggelegd', lege-lijst-regel)
        scrollen bewust gewoon mee — die hebben geen actieknoppen. */
     #ntd-tbl-wrap thead th:last-child{position:sticky;right:0;z-index:3;background:var(--sur2)}
-    #ntd-tbl-wrap tbody td:not([colspan]):last-child{position:sticky;right:0;z-index:2;background:var(--sur)}
-    #ntd-tbl-wrap tbody tr:hover td:not([colspan]):last-child{background:var(--row-hover)}
+    #ntd-tbl-wrap tbody td:not([colspan]):last-child{position:sticky;right:0;z-index:2}
+    /* De cel moet ondoorzichtig zijn (anders schemeren de wegscrollende cellen erdoorheen),
+       maar mag de rijkleur niet afdekken — daarom staat de dekkende laag in een ::after
+       áchter de cel i.p.v. op de cel zelf. Zo schilderen rijkleuren die op de td zitten
+       (.row-telaat) er gewoon overheen en loopt de rode tint door tot de rand. */
+    #ntd-tbl-wrap tbody td:not([colspan]):last-child::after{content:'';position:absolute;inset:0;z-index:-1;background:var(--sur)}
+    #ntd-tbl-wrap tbody tr:hover td:not([colspan]):last-child::after{background:var(--row-hover)}
     #ntd-tbl-wrap thead th:last-child,
     #ntd-tbl-wrap tbody td:not([colspan]):last-child{box-shadow:-8px 0 8px -8px rgba(16,22,34,.16)}
     [data-theme=dark] #ntd-tbl-wrap thead th:last-child,

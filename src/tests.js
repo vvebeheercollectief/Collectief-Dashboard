@@ -6,7 +6,7 @@ import { logZin, logPaginaSoort, parseLogboek, _shiftRows, _shiftLogEditRef, log
 import { _isStagingHost, APP_VERSION, SECS } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
-import { filterNtd, setNtd, renderNtd, renderNtdStats, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey } from "./render-lijsten.js";
+import { filterNtd, setNtd, renderNtd, renderNtdStats, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey, kopOpen, zetKopOpen } from "./render-lijsten.js";
 import { state, D, pgs } from "./state.js";
 import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel, renderVve } from "./render-vve.js";
 import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN } from "./kenmerken.js";
@@ -1829,6 +1829,41 @@ import { opmaakHtml, htmlNaarMarkers, zonderOpmaak, pasToe, opmaakBalk } from ".
          document.querySelectorAll('#ntd-tbody tr[data-row]').length, 1);
     } finally {
       D.ntd=ntdOud; D.af=afOud; state.ntdStatus=statusOud; state.activeNtd=secOud;
+    }
+  })();
+
+  // ── Uitklappaneel: chevron togglet en onthoudt ──
+  (()=>{
+    const bewaard = localStorage.getItem('ntd_kop_open');
+    const ntdOud = D.ntd, afOud = D.af;
+    try{
+      D.ntd={OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[]};
+      D.af ={OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[]};
+
+      localStorage.setItem('ntd_kop_open','0');
+      zetKopOpen(false);
+      renderNtdStats();
+      const paneel = document.getElementById('ntd-top-row');
+      const chev   = () => document.querySelector('[data-action="ntd-kop-toggle"]');
+      truthy('paneel is dicht bij start', paneel.hidden);
+      eq('chevron meldt dicht', chev().getAttribute('aria-expanded'), 'false');
+      eq('chevron wijst naar het paneel', chev().getAttribute('aria-controls'), 'ntd-top-row');
+
+      ACTIONS['ntd-kop-toggle']();
+      truthy('klik opent het paneel', !paneel.hidden);
+      eq('onthouden als open', localStorage.getItem('ntd_kop_open'), '1');
+      eq('chevron meldt open', chev().getAttribute('aria-expanded'), 'true');
+
+      ACTIONS['ntd-kop-toggle']();
+      truthy('tweede klik sluit het paneel', paneel.hidden);
+      eq('onthouden als dicht', localStorage.getItem('ntd_kop_open'), '0');
+
+      eq('kopOpen leest de opslag', (localStorage.setItem('ntd_kop_open','1'), kopOpen()), true);
+    } finally {
+      if(bewaard===null) localStorage.removeItem('ntd_kop_open');
+      else localStorage.setItem('ntd_kop_open', bewaard);
+      D.ntd=ntdOud; D.af=afOud;
+      zetKopOpen(kopOpen());
     }
   })();
 

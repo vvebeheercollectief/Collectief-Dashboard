@@ -5,6 +5,7 @@
 import { pgs, state } from './state.js';
 import {
   setNtd, renderNtd, renderNtdStats, setAf, renderAf, renderAlvo, toggleAlvoFlag, renderAlfa,
+  kopOpen, zetKopOpen,
 } from './render-lijsten.js';
 import {
   setOntw, renderOntw, editOntwItem, addTaskNote, renderLogboek,
@@ -52,6 +53,7 @@ export const ACTIONS = {
   'ntd-stat':              (el) => { const s=el.dataset.status;
                                      state.ntdStatus = state.ntdStatus===s ? '' : s;
                                      pgs.ntd=1; renderNtd(); renderNtdStats(); },
+  'ntd-kop-toggle':        ()   => zetKopOpen(!kopOpen()),
   'taak-bewerken':         (el) => openModal(true, state._rowCache[+el.dataset.rid]),
   'taak-afronden':         (el) => completeTask(+el.dataset.rid),
   'pagineer':              (el) => { const d=el.dataset.doel; pgs[d]=+el.dataset.pg; PAG_RENDER[d](); },

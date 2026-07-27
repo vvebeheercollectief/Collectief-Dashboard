@@ -105,14 +105,42 @@ function renderNtdDonut(){
   document.getElementById('ntd-progress-sub').textContent = voorbereid>done
     ? `${pct}% verstuurd, ${pctVoor}% klaargezet`
     : `${pct}% van de vergaderingen uitgeschreven`;
-  // vollopend effect + reveal: witte cijfers worden onthuld over het gevulde deel,
-  // donkere cijfers blijven leesbaar over het lichte deel (beide identiek gecentreerd)
+  // Alleen vullen als het paneel zichtbaar is. Staat het op hidden, dan zou de animatie
+  // ongezien afgelopen zijn en de balk bij het openklappen in één keer vol staan.
+  if(kopOpen()) vulProgressBalk();
+}
+
+// Vollopend effect + reveal: witte cijfers worden onthuld over het gevulde deel,
+// donkere cijfers blijven leesbaar over het lichte deel (beide identiek gecentreerd).
+function vulProgressBalk(){
+  const fill=document.getElementById('ntd-progress-fill'); if(!fill) return;
+  const total=(D.alvo||[]).length;
+  const done=(D.alvo||[]).filter(r=>r.uitnodiging).length;
+  const voorbereid=(D.alvo||[]).filter(r=>r.klaargezet||r.uitnodiging).length;
+  const pct=total?Math.round(done/total*100):0;
+  const pctVoor=total?Math.round(voorbereid/total*100):0;
   requestAnimationFrame(()=>{
     const voor=document.getElementById('ntd-progress-voor');
     if(voor) voor.style.width=pctVoor+'%';
-    document.getElementById('ntd-progress-fill').style.width=pct+'%';
-    document.getElementById('ntd-progress-val-rev').style.clipPath=`inset(0 ${100-pct}% 0 0)`;
+    fill.style.width=pct+'%';
+    const rev=document.getElementById('ntd-progress-val-rev');
+    if(rev) rev.style.clipPath=`inset(0 ${100-pct}% 0 0)`;
   });
+}
+
+// Paneel openen/sluiten. Schrijft de keuze weg en houdt de chevron in sync.
+function zetKopOpen(aan){
+  localStorage.setItem(KOP_KEY, aan?'1':'0');
+  const paneel=document.getElementById('ntd-top-row');
+  if(paneel) paneel.hidden=!aan;
+  const chev=document.querySelector('[data-action="ntd-kop-toggle"]');
+  if(chev){
+    chev.setAttribute('aria-expanded', aan?'true':'false');
+    const lbl = aan?'Details verbergen':'Week en vergaderingen tonen';
+    chev.setAttribute('aria-label', lbl);
+    chev.setAttribute('title', lbl);
+  }
+  if(aan) vulProgressBalk();
 }
 
 // ══════════════════════════════════════
@@ -294,7 +322,7 @@ function setAf(s){state.activeAf=s;pgs.af=1;renderAf()}
 
 export {
   SEC_ICONS, SEC_THEMES, renderNtdStats, renderNtdDonut, renderNtd, setNtd, filterNtd, sorteerNtd, ntdSorteerKey, renderAf, setAf,
-  kopOpen,
+  kopOpen, zetKopOpen,
   offerteAannemerPaneel, offerteAannSamenvatting,
   ALVO_ICONS, renderAlvo, ALVO_COLS, ALVO_LABELS, flagPill, _recomputeAlvoStatus, toggleAlvoFlag, statusIco, renderAlfa,
   renderThead, renderTbody, bepaalStil, deadlineCel, rowNtd, rowAf, renderPag,

@@ -6,7 +6,7 @@ import { D, pgs, state } from './state.js';
 import { ensureToken, doOAuth } from './auth.js';
 import { startSplash } from './login-splash.js';
 import { goTo, closeSb, applyTheme, applyDensity, cycleDensity, setupSearch } from './ui.js';
-import { renderNtd, renderAf, renderAlvo, renderAlfa, renderNtdStats } from './render-lijsten.js';
+import { renderNtd, renderAf, renderAlvo, renderAlfa, renderNtdStats, zetKopOpen, kopOpen } from './render-lijsten.js';
 import {
   renderOntw, renderLogboek, openOntwModal, closeOntwModal,
   submitOntwItem, deleteOntwItem, histNoteKey,
@@ -320,6 +320,7 @@ export function renderAll(){
   const ntdTotal=SKEYS.reduce((s,k)=>s+(D.ntd[k]?.length||0),0);
   document.getElementById('b-ntd').textContent=ntdTotal;
   renderNtdStats();
+  zetKopOpen(kopOpen());
   renderNtd();
   renderAf();
   renderAlvo();

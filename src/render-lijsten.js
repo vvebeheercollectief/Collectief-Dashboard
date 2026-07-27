@@ -105,7 +105,7 @@ function renderNtd(){
 
   // Tabs
   document.getElementById('ntd-tabs').innerHTML=SKEYS.map(s=>{
-    const rows=filterNtd(D.ntd[s]||[],q,fCode,fBeh,fPrio,s);
+    const rows=filterNtd(D.ntd[s]||[],q,fCode,fBeh,fPrio,s,state.ntdStatus);
     return`<button type="button" class="tab ${s===state.activeNtd?'on':''}" role="tab" aria-selected="${s===state.activeNtd}" style="${s===state.activeNtd?SECS[s].css:''}" data-action="ntd-sectie" data-sec="${s}">${SECS[s].label}<span class="cnt">${rows.length}</span></button>`;
   }).join('');
 
@@ -114,10 +114,10 @@ function renderNtd(){
   const card=document.getElementById('ntd-card');
   SECS[state.activeNtd].css.split(';').forEach(p=>{const[k,v]=p.split(':');if(k&&v)card.style.setProperty(k.trim(),v.trim())});
 
-  const rows=sorteerNtd(filterNtd(D.ntd[state.activeNtd]||[],q,fCode,fBeh,fPrio,state.activeNtd),state.ntdSort);
+  const rows=sorteerNtd(filterNtd(D.ntd[state.activeNtd]||[],q,fCode,fBeh,fPrio,state.activeNtd,state.ntdStatus),state.ntdSort);
   renderThead('ntd-thead',[...(state.bulkMode?['']:[]),...SECS[state.activeNtd].cols,''],SECS[state.activeNtd].css,
     {active:state.ntdSort, keyFor:ntdSorteerKey});
-  renderTbody('ntd-tbody',rows,state.activeNtd,pgs.ntd,false,!!(q||fCode||fBeh||fPrio));
+  renderTbody('ntd-tbody',rows,state.activeNtd,pgs.ntd,false,!!(q||fCode||fBeh||fPrio||state.ntdStatus));
   renderPag('ntd-pag',rows.length,pgs.ntd,'ntd');
   renderNtdCrossList(state.activeNtd);
 }
@@ -144,6 +144,8 @@ function renderNtdCrossList(sec){
         if(fCode && !((r.code||'').toLowerCase().includes(fCode))) return;
         if(fBeh && !((r.behandelaar||'').toLowerCase().includes(fBeh))) return;
         if(fPrio && berekenPrioriteit(r.deadline,s).prioriteit!==fPrio) return;
+        if(state.ntdStatus==='telaat'    && !berekenPrioriteit(r.deadline,s).teLaat) return;
+        if(state.ntdStatus==='weggelegd' && !opvolgStatus(r).weggelegd) return;
         treffers.push(r);
       });
     });
@@ -171,7 +173,7 @@ function setNtd(s){
   renderNtd();renderBulkUi();
 }
 
-function filterNtd(rows,q,fCode,beh,prio,sec){
+function filterNtd(rows,q,fCode,beh,prio,sec,status){
   const out=rows.filter(r=>{
     if(q&&!SECS[sec].keys.some(k=>(r[k]||'').toLowerCase().includes(q))) return false;
     if(fCode&&!(r.code||'').toLowerCase().includes(fCode)) return false;
@@ -180,6 +182,10 @@ function filterNtd(rows,q,fCode,beh,prio,sec){
       const berekend = berekenPrioriteit(r.deadline, sec).prioriteit;
       if (berekend !== prio) return false;
     }
+    // Statusfilter uit de kop-pillen. Onbekende waarden filteren niets weg, zodat een
+    // oude/rare state nooit een lege lijst oplevert.
+    if(status==='telaat'    && !berekenPrioriteit(r.deadline, sec).teLaat) return false;
+    if(status==='weggelegd' && !opvolgStatus(r).weggelegd) return false;
     return true;
   });
   // Aannemerslijst (kolom P) op de rij zetten + de X/N-teller bijstellen. Moet vóór de

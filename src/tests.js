@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf } from "./util.js";
+import { berekenPrioriteit, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf, _vandaagAmsterdam } from "./util.js";
 import { logZin, logPaginaSoort, parseLogboek, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, SECS } from "./config.js";
 import { ACTIONS } from "./actions.js";
@@ -1714,6 +1714,29 @@ import { opmaakHtml, htmlNaarMarkers, zonderOpmaak, pasToe, opmaakBalk } from ".
     logItemHtml(_logOpm,false,false,{}).includes('<strong>dringend</strong>'));
   truthy('logEditForm zit in een opmaak-veld', logEditForm(_logOpm).includes('opmaak-veld'));
   truthy('logEditForm heeft een opmaakbalk', logEditForm(_logOpm).includes('data-action="opmaak-vet"'));
+
+  // ── Statusfilter uit de kop-pillen (te laat / weggelegd) ──
+  (()=>{
+    const _vd = _vandaagAmsterdam();
+    const _mnd = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
+    const _dag = n => { const d = new Date(_vd.getFullYear(), _vd.getMonth(), _vd.getDate()+n);
+                        return `${d.getDate()} ${_mnd[d.getMonth()]} ${d.getFullYear()}`; };
+    const rijen = [
+      {code:'A1', naam:'Te laat',   deadline:_dag(-3), opvolgdatum:'',       behandelaar:''},
+      {code:'A2', naam:'Op tijd',   deadline:_dag(10), opvolgdatum:'',       behandelaar:''},
+      {code:'A3', naam:'Weggelegd', deadline:_dag(10), opvolgdatum:_dag(5),  behandelaar:''},
+      {code:'A4', naam:'Laat+weg',  deadline:_dag(-2), opvolgdatum:_dag(4),  behandelaar:''},
+    ];
+    const codes = st => filterNtd(rijen,'','','','','OPPAKKEN',st).map(r=>r.code);
+    eq('statusfilter leeg → alles',        codes('').length, 4);
+    eq('statusfilter telaat',              codes('telaat'), ['A1','A4']);
+    // Volgorde komt uit de bestaande sortering: binnen Weggelegd staat de vroegste
+    // opvolgdatum vooraan, dus A4 (+4 dagen) vóór A3 (+5 dagen).
+    eq('statusfilter weggelegd',           codes('weggelegd'), ['A4','A3']);
+    eq('statusfilter onbekend → alles',    codes('bestaatniet').length, 4);
+    eq('statusfilter combineert met zoek',
+       filterNtd(rijen,'te laat','','','','OPPAKKEN','telaat').map(r=>r.code), ['A1']);
+  })();
 
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');

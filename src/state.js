@@ -69,6 +69,7 @@ export const state = {
   bulkMode: false,         // bulk-selecteerstand op de NTD-lijst (Fase 5)
   expandedRows: new Set(), // _row-id's van NTD-rijen die de gebruiker uitklapte (Operator: 1-regel → volledige tekst)
   ntdSort: {key:null, asc:true}, // kolomkop-sortering NTD: key 'code'|'deadline'|null (null = standaardvolgorde)
+  ntdStatus: '',                 // statusfilter uit de kop-pillen: '' | 'telaat' | 'weggelegd'
   // VvE-dossier (logboek + kenmerken)
   kenmerkenEdit: false,    // kenmerken-paneel in bewerkmodus
   vveLogFilter: 'alles',   // 'alles' | 'contact'

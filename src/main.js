@@ -27,7 +27,6 @@ import { closeResetModal } from './alv-reset.js';
 import { renderHerhaal, openHerhaalModal, closeHerhaalModal, syncHerhaalVelden, submitHerhaal } from './render-herhaal.js';
 import { renderVve } from './render-vve.js';
 import { openChat, closeChat, setChatVve } from './dossier-chat.js';
-import { renderVandaag } from './render-vandaag.js';
 import { initPalette } from './palette.js';
 import { initSwUpdate } from './sw-update.js';
 import { initModalA11y } from './modal-a11y.js';
@@ -306,7 +305,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     startSplash();
   }
 
-  goTo('vandaag');
+  goTo('ntd');
 });
 
 
@@ -330,7 +329,6 @@ export function renderAll(){
   renderLogboek();
   renderHerhaal();
   renderVve();
-  renderVandaag();
   groeiVelden();   // de poll hertekent de velden; hun meegroei-hoogte moet terug
 }
 

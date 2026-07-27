@@ -2,7 +2,7 @@
 //  RENDER-TABEL — generieke tabel/paginering (thead, tbody, rij-render, paginatie)
 //  Verplaatst uit render-lijsten.js (Batch D / punt 11) — zuivere refactor, geen gedragswijziging.
 // ══════════════════════════════════════
-import { esc, vveCodeSpan, prioBadge, persBadges, subBadge, offProg, emptyRow, berekenPrioriteit, opvolgStatus, _verschilInKalenderdagen, _vandaagAmsterdam, STIL_DREMPEL_DAGEN } from "./util.js";
+import { esc, vveCodeSpan, persBadges, subBadge, offProg, emptyRow, berekenPrioriteit, opvolgStatus, taakTitel, _verschilInKalenderdagen, _vandaagAmsterdam, STIL_DREMPEL_DAGEN } from "./util.js";
 import { SECS, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { bulkGeselecteerd } from "./bulk.js";
@@ -108,7 +108,6 @@ function rowNtd(r,sec){
         <td class="cell-txt"><span class="ct" title="${esc(r.actiepunt)}">${esc(r.actiepunt)}</span>${extraPills}</td>
         ${deadlineCel(r, 'OPPAKKEN')}
         <td>${persBadges(r.behandelaar)}</td>
-        <td>${prioBadge(r, 'OPPAKKEN')}</td>
         <td class="cell-note"><span class="ct" title="${esc(r.opmerkingen||'')}">${esc(r.opmerkingen||'')}</span></td>
         <td>${editBtn}</td>`;
       break;
@@ -119,7 +118,6 @@ function rowNtd(r,sec){
         <td class="cell-txt"><span class="ct" title="${esc(r.agendapunten||r.actiepunt||'')}">${esc(r.agendapunten||r.actiepunt||'')}</span>${extraPills}</td>
         <td>${persBadges(r.behandelaar)}</td>
         ${deadlineCel(r, 'VERGADERVERZOEKEN')}
-        <td>${prioBadge(r, 'VERGADERVERZOEKEN')}</td>
         <td class="cell-note"><span class="ct" title="${esc(r.opmerkingen||'')}">${esc(r.opmerkingen||'')}</span></td>
         <td>${editBtn}</td>`;
       break;
@@ -130,7 +128,6 @@ function rowNtd(r,sec){
         <td>${offProg(r.offertes)}<div class="of-aann-tbl-tog">${offerteAannSamenvatting(r)}</div></td>
         <td>${persBadges(r.behandelaar)}</td>
         ${deadlineCel(r, 'OFFERTE-TRAJECTEN')}
-        <td>${prioBadge(r, 'OFFERTE-TRAJECTEN')}</td>
         <td class="cell-note"><span class="ct" title="${esc(r.opmerkingen||'')}">${esc(r.opmerkingen||'')}</span>${extraPills}</td>
         <td>${editBtn}</td>`;
       break;
@@ -141,7 +138,6 @@ function rowNtd(r,sec){
         <td class="cell-txt" style="font-style:italic"><span class="ct" title="${esc(r.status||'')}">${esc(r.status||'')}</span></td>
         <td>${persBadges(r.behandelaar)}</td>
         ${deadlineCel(r, 'LOD')}
-        <td>${prioBadge(r, 'LOD')}</td>
         <td class="cell-note"><span class="ct" title="${esc(r.opmerkingen||'')}">${esc(r.opmerkingen||'')}</span></td>
         <td>${editBtn}</td>`;
       break;
@@ -165,7 +161,7 @@ function rowAf(r,sec){
   return`<tr>
     <td>${vveCodeSpan(r.code, css)}</td>
     <td class="cell-name">${esc(r.naam)}</td>
-    <td class="cell-txt">${esc(r.actiepunt||r.periode||r.agendapunten||'')}</td>
+    <td class="cell-txt">${esc(taakTitel(r,r._sec))}</td>
     <td class="cell-sm">${esc(r.subcategorie||'')}</td>
     <td class="cell-sm">${esc(r.datum||'')}</td>
     <td class="cell-txt">${r.opmerking?`<span style="font-size:12px">${esc(r.opmerking)}</span>`:''}</td>

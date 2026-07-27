@@ -4,13 +4,12 @@
 import { PAGE_META } from "./config.js";
 import { state } from "./state.js";
 import { buildAnalytics, buildDash } from "./render-analytics.js";
-import { renderVandaag } from "./render-vandaag.js";
 import { renderOntw, renderLogboek } from "./render-overig.js";
 import { renderHerhaal } from "./render-herhaal.js";
 import { renderVve } from "./render-vve.js";
 import { showToast } from "./notifications.js";
 
-let _pagina = 'vandaag';   // laatst geopende pagina, zodat renderAll de kop kan bijwerken
+let _pagina = 'ntd';   // laatst geopende pagina, zodat renderAll de kop kan bijwerken
 
 // De kop-pillen vervangen de ondertitel op Nog Te Doen — maar pas zodra ze gevuld zijn.
 // Tot de eerste databeurt binnen is blijft de ondertitel staan, anders toont de kop
@@ -50,7 +49,6 @@ function goTo(page){
   closeSb();
   if(page==='analytics') buildAnalytics();
   if(page==='dash') buildDash();
-  if(page==='vandaag') renderVandaag();
 }
 function closeSb(){document.getElementById('sb').classList.remove('open');document.getElementById('overlay').classList.remove('on');document.getElementById('hamburger')?.setAttribute('aria-expanded','false')}
 

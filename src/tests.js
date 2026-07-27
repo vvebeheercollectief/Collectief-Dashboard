@@ -283,7 +283,8 @@ import { goTo } from "./ui.js";
   truthy('login-gate: splash-laag bestaat (klik = overslaan)', !!document.querySelector('#login-gate .lg-splash'));
 
   // ── terugDoel ── (terug-pijltje in de dossier-kop: waar kom je uit?)
-  eq('terugDoel: onthouden pagina',            terugDoel('vandaag'),      'vandaag');
+  eq('terugDoel: onthouden pagina',            terugDoel('alvo'),         'alvo');
+  eq('terugDoel: Vandaag bestaat niet meer',   terugDoel('vandaag'),      'ntd');
   eq('terugDoel: Nog Te Doen zelf',            terugDoel('ntd'),          'ntd');
   eq('terugDoel: dossier telt niet als bron',  terugDoel('vve'),          'ntd');
   eq('terugDoel: leeg → Nog Te Doen',          terugDoel(null),           'ntd');
@@ -1874,7 +1875,7 @@ import { goTo } from "./ui.js";
     const sub    = document.getElementById('page-sub');
     // Dit blok wisselt van pagina; zonder herstel eindigt een ?test=1-ronde op Nog Te Doen
     // i.p.v. de startpagina, met de neptellingen van een eerder testblok in de kop.
-    const _paginaVoor = (document.querySelector('.page.active')?.id||'page-vandaag').replace('page-','');
+    const _paginaVoor = (document.querySelector('.page.active')?.id||'page-ntd').replace('page-','');
     try{
       // Met nog lege pillen (vóór de eerste databeurt) moet de ondertitel blijven staan,
       // anders toont de kop tijdens het laden alleen de titel.

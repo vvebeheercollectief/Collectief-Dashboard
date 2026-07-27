@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  PER-VVE-PAGINA — alles van één VvE op één scherm (Fase 5)
 // ══════════════════════════════════════
-import { esc, displayName, persBadges, berekenPrioriteit, opvolgStatus, parseDt, _vandaagAmsterdam, _verschilInKalenderdagen } from "./util.js";
+import { esc, displayName, persBadges, berekenPrioriteit, opvolgStatus, parseDt, taakTitel, _vandaagAmsterdam, _verschilInKalenderdagen } from "./util.js";
 import { ico } from "./icons.js";
 import { SECS, SKEYS, PAGE_META } from "./config.js";
 import { state, D } from "./state.js";
@@ -59,9 +59,11 @@ function vveOverzicht(code, data, vandaag){
 // Een rij zonder tekst mag niet als kale datum in beeld komen (leest als een fout).
 // We verzinnen niets: we vallen terug op het sectielabel dat wél in de data zit.
 function afOmschrijving(r){
-  const tekst=(r.actiepunt||r.periode||r.agendapunten||'').trim();
-  if(tekst) return { tekst, leeg:false };
   const label=(SECS[r._sec]||{}).label||'Onbekende sectie';
+  // taakTitel vangt ook de offerte-rijen af (die hebben geen actiepunt-veld); valt hij
+  // terug op de kale sectienaam, dan is er echt geen omschrijving.
+  const tekst=taakTitel(r, r._sec).trim();
+  if(tekst && tekst!==label) return { tekst, leeg:false };
   return { tekst:`${label} — geen omschrijving`, leeg:true };
 }
 
@@ -224,7 +226,7 @@ function renderVve(){
         ? `${esc(r.deadline)}${p.teLaat?` <span class="pill-telaat">Te laat (${Math.abs(p.dagenTot)}d)</span>`:''}`
         : '<span class="warn-geen-deadline">Geen deadline</span>';
     return `<div class="tk tk-taak${weg?' snooze-row':''}" data-action="taak-bewerken" data-rid="${rid}" style="cursor:pointer">
-      <span class="nm">${esc(r.actiepunt||r.periode||r.agendapunten||r.status||'')}</span>
+      <span class="nm">${esc(taakTitel(r,sec))}</span>
       <div class="tk-onder">
         <span class="mt">${esc(meta.label)}${r.behandelaar?' · '+esc(r.behandelaar):''}</span>
         <span class="dl">${dl}</span>

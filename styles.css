@@ -242,12 +242,28 @@
     .cell-note{color:var(--mut);font-size:12px}
     .cell-name,.cell-txt,.cell-note{line-height:var(--row-lh,1.4);cursor:pointer;white-space:nowrap}
     .cell-name>.ct,.cell-txt>.ct,.cell-note>.ct{display:inline-block;vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .cell-name>.ct{max-width:200px}
-    .cell-txt>.ct{max-width:320px}
-    .cell-note>.ct{max-width:240px}
+    /* Breedteverdeling (v8.9). Het actiepunt is de kolom die je écht leest, dus die krijgt
+       de meeste ruimte; VvE-naam en opmerkingen leveren in. De som is zo gekozen dat de
+       tabel op een venster van 1440 past — daaronder vangt de vastgezette actiekolom af.
+       Afgekapte tekst blijft bereikbaar: klik op de rij klapt 'm uit, hover toont de titel. */
+    .cell-name>.ct{max-width:160px}
+    .cell-txt>.ct{max-width:350px}
+    .cell-note>.ct{max-width:155px}
     tr.expanded .cell-name,tr.expanded .cell-txt,tr.expanded .cell-note{white-space:normal}
     tr.expanded .cell-name>.ct,tr.expanded .cell-txt>.ct,tr.expanded .cell-note>.ct{display:inline;max-width:none;white-space:normal;overflow:visible;text-overflow:clip}
     .cell-sm{font-size:12.5px;color:#48505c;white-space:nowrap}
+    /* Actiekolom blijft in beeld (v8.9). De takentabel is breder dan het venster, waardoor
+       de bewerk-/wegleg-/afvinkknoppen erbuiten vielen en je eerst zijwaarts moest scrollen
+       om iets af te ronden. Alleen de NTD-tabel: daar is de laatste kolom de actiekolom.
+       Cellen met colspan (groepskoppen 'In behandeling'/'Weggelegd', lege-lijst-regel)
+       scrollen bewust gewoon mee — die hebben geen actieknoppen. */
+    #ntd-tbl-wrap thead th:last-child{position:sticky;right:0;z-index:3;background:var(--sur2)}
+    #ntd-tbl-wrap tbody td:not([colspan]):last-child{position:sticky;right:0;z-index:2;background:var(--sur)}
+    #ntd-tbl-wrap tbody tr:hover td:not([colspan]):last-child{background:var(--row-hover)}
+    #ntd-tbl-wrap thead th:last-child,
+    #ntd-tbl-wrap tbody td:not([colspan]):last-child{box-shadow:-8px 0 8px -8px rgba(16,22,34,.16)}
+    [data-theme=dark] #ntd-tbl-wrap thead th:last-child,
+    [data-theme=dark] #ntd-tbl-wrap tbody td:not([colspan]):last-child{box-shadow:-8px 0 8px -8px rgba(0,0,0,.5)}
     /* Dichtheid (per collega, onthouden in localStorage) */
     html[data-density="compact"]{--row-py:5px;--row-px:10px;--row-fs:12.5px;--row-lh:1.3}
     html[data-density="standaard"]{--row-py:9px;--row-px:10px;--row-fs:13px;--row-lh:1.4}
@@ -858,7 +874,6 @@
     [data-theme=dark] .cb.aan::after,
     [data-theme=dark] .bb-datum button,
     [data-theme=dark] .of-aann-toevoeg,
-    [data-theme=dark] .vd-toggle span.on,
     [data-theme=dark] .chat-bub.user,
     [data-theme=dark] #chat-send,
     [data-theme=dark] .kc-plus,
@@ -869,41 +884,6 @@
        alleen de vaste navy (--nv) houdt witte tekst, donkere inkt is dáár juist onleesbaar. */
     [data-theme=dark] .lchip .av,[data-theme=dark] .log-av{color:#15181d}
     [data-theme=dark] .lchip .av[style*="--nv"],[data-theme=dark] .log-av[style*="--nv"]{color:#fff}
-
-    /* ── Dagstart-cockpit (Vandaag) ── */
-    #dash-vandaag{margin-bottom:22px}
-    .vd-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:14px}
-    .vd-groet{font-size:20px;font-weight:600;color:var(--txt)}
-    .vd-datum{font-size:13px;color:var(--mut);margin-top:2px}
-    .vd-toggle{display:inline-flex;border:1px solid var(--bor);border-radius:8px;overflow:hidden;font-size:12px;flex-shrink:0}
-    .vd-toggle span{padding:6px 12px;cursor:pointer;color:var(--mut)}
-    .vd-toggle span.on{background:var(--ac);color:#fff}
-    .vd-lo-strip{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
-    .vd-lo{display:inline-flex;align-items:center;font-size:12px;font-weight:600;padding:5px 10px;border-radius:8px}
-    .vd-lo.lo-danger{background:var(--rd-l);color:var(--rd)}
-    .vd-lo.lo-warning{background:var(--am-l);color:var(--am)}
-    .vd-lo.lo-info{background:var(--bl-l);color:var(--bl)}
-    .vd-eerst-lbl,.vd-sub{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);margin:0 0 8px}
-    .vd-sub{margin:14px 0 8px}
-    .vd-lijst{display:flex;flex-direction:column;gap:8px}
-    .vd-rest{margin-top:14px}
-    .vd-row{display:flex;background:var(--sur);border:1px solid var(--bor);border-radius:8px;overflow:hidden;cursor:pointer;transition:border-color var(--tr,.15s)}
-    .vd-row:hover{border-color:var(--ac)}
-    .vd-bar{width:4px;flex-shrink:0;background:var(--bl)}
-    .vd-row.u-vandaag .vd-bar{background:var(--rd)}
-    .vd-row.u-week .vd-bar{background:var(--am)}
-    .vd-body{padding:9px 12px;flex:1;min-width:0}
-    .vd-top{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
-    .vd-actie{font-size:13.5px;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .vd-reden{font-size:11.5px;color:var(--mut);white-space:nowrap;flex-shrink:0}
-    .vd-meta{font-size:11.5px;color:var(--mut);margin-top:3px}
-    .vd-leeg{padding:14px;text-align:center;color:var(--mut);font-size:13px;background:var(--sur);border:1px solid var(--bor);border-radius:8px}
-    .vd-acts{display:flex;align-items:center;gap:4px;padding-right:8px;flex-shrink:0}
-    @media(max-width:560px){
-      .vd-top{flex-direction:column;align-items:flex-start;gap:2px}
-      .vd-actie{white-space:normal}
-      .vd-reden{white-space:normal}
-    }
 
 /* ── VvE-dossier chat-agent ── */
 #chat-fab{position:fixed;right:20px;bottom:20px;width:56px;height:56px;border-radius:50%;

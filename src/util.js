@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  UTIL — gedeelde pure helpers (datums, prioriteit, tekst, badges)
 // ══════════════════════════════════════
-import { EMAIL_NAMES, OFFERTE_FASES } from './config.js';
+import { EMAIL_NAMES, OFFERTE_FASES, SECS } from './config.js';
 import { ICONS } from './icons.js';
 
 function displayName(s){
@@ -251,7 +251,44 @@ function coerceDagenVooraf(v, def=14){
   return Number.isFinite(n)&&n>=0 ? n : def;
 }
 
+// ══════════════════════════════════════
+//  TAAKTITEL — één leesbare regel per taak, ongeacht sectie
+// ══════════════════════════════════════
+// Offerte-trajecten hebben géén 'actiepunt'-veld (zie SECS in config.js): hun
+// onderwerp staat in de opmerkingen (kolom G) en de voortgang in de X/N-teller
+// (kolom D). Zonder deze helper vielen offerte-rijen in het VvE-dossier léég —
+// en op andere plekken terug op het nietszeggende woord "Offerte-traject".
+// De opmerkingen zijn vaak meerregelig met een opsomming van aannemers eronder;
+// alleen de eerste gevulde regel is de titel.
+const TAAKTITEL_MAX = 90;
+function _eersteRegel(s){
+  return String(s == null ? '' : s).split('\n').map(x => x.trim()).find(Boolean) || '';
+}
+// Opslagvorm van opgemaakte velden is platte tekst met **vet**/*schuin* (zie opmaak.js);
+// in een titel horen die sterretjes niet thuis.
+function _zonderSterren(s){
+  return s.replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(.+?)\*/g, '$1');
+}
+function _kort(s){
+  return s.length > TAAKTITEL_MAX ? s.slice(0, TAAKTITEL_MAX - 1).trimEnd() + '…' : s;
+}
+function taakTitel(r, sec){
+  if(!r) return '';
+  sec = sec || r._sec || '';
+  const schoon = v => _zonderSterren(_eersteRegel(v));
+  if(sec === 'OFFERTE-TRAJECTEN'){
+    const onderwerp = schoon(r.opmerkingen) || 'Offerte-traject';
+    const [recv, req] = parseOff(r.offertes);
+    // Alleen een teller tonen als er echt iets aangevraagd is; "0 van 0" zegt niets.
+    const teller = req > 0 ? `${recv} van ${req} binnen` : '';
+    return teller ? `${_kort(onderwerp)} — ${teller}` : _kort(onderwerp);
+  }
+  const eigen = schoon(r.actiepunt) || schoon(r.agendapunten) || schoon(r.periode) || schoon(r.status);
+  return _kort(eigen || (SECS[sec] && SECS[sec].label) || '');
+}
+
 export {
+  taakTitel,
   displayName, filt, PRIO_REGELS, STIL_DREMPEL_DAGEN, STIL_ESCALATIE_REGELS,
   opvolgStatus, volgendeDeadline, HERHAAL_MAANDEN, _vandaagAmsterdam, isoWeek,
   _verschilInKalenderdagen, berekenPrioriteit, prioBadge, persBadges,

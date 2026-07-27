@@ -85,6 +85,30 @@
     .hdr-info{flex:1;display:flex;align-items:baseline;gap:10px;min-width:0}
     .hdr-info h1{font-size:16px;font-weight:600;line-height:1.2;letter-spacing:-.01em;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:1;min-width:0}
     .hdr-info p{font-size:12px;font-weight:500;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    /* Kop-pillen: de vier tellers van Nog Te Doen, in de paginakop i.p.v. een strook eronder.
+       [hidden] moet expliciet, anders wint display:flex van de browser-standaard en staan
+       de pillen ook op de andere pagina's in de kop. */
+    .kop-pillen{display:flex;align-items:center;gap:6px;min-width:0;flex-shrink:1;overflow:hidden}
+    .kop-pillen[hidden],.kop-pillen:empty{display:none}
+    /* Staan er pillen, dan houdt de titel haar breedte en leveren de pillen in — nooit andersom. */
+    .hdr-info:has(.kop-pillen:not([hidden])) h1{flex-shrink:0}
+    .kop-pil{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:500;color:var(--mut);background:var(--sur2);border:1px solid transparent;border-radius:999px;padding:3px 9px;white-space:nowrap;line-height:1.3}
+    .kop-pil b{font-weight:700;color:var(--txt);font-variant-numeric:tabular-nums}
+    /* 'af' leest gedempt, maar --fnt haalt op 11,5px maar 2,5:1 — net als de zoekplaceholder
+       hierboven pakken we --mut (5,7:1). Het vet houdt het getal apart van het bijschrift. */
+    .kop-pil.pil-dof b{color:var(--mut)}
+    .kop-pil-klik{cursor:pointer;background:var(--sur);border-color:var(--bor-input);font-family:inherit;transition:background var(--tr),border-color var(--tr),color var(--tr)}
+    .kop-pil-klik:hover{background:var(--sur2);border-color:var(--ac-b)}
+    .kop-pil.pil-rd b{color:var(--rd)}
+    .kop-pil.pil-am b{color:var(--am)}
+    .kop-pil-klik.pil-rd{border-color:var(--rd-b)}
+    .kop-pil-klik.pil-am{border-color:var(--am-b)}
+    .kop-pil-klik.aan.pil-rd{background:var(--rd);border-color:var(--rd);color:#fff}
+    .kop-pil-klik.aan.pil-am{background:var(--am);border-color:var(--am);color:#fff}
+    .kop-pil-klik.aan b{color:#fff}
+    .kop-chev{width:22px;height:22px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--bor-input);border-radius:6px;background:var(--sur);color:var(--mut);cursor:pointer;transition:background var(--tr),color var(--tr),transform var(--tr)}
+    .kop-chev:hover{background:var(--sur2);color:var(--txt)}
+    .kop-chev[aria-expanded="true"]{background:var(--ac-l);color:var(--ac-900);transform:rotate(180deg)}
     .ico-btn{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid var(--bor-input);color:#7c8694;background:var(--sur);transition:background var(--tr),color var(--tr),border-color var(--tr);flex-shrink:0}
     .ico-btn:hover{background:var(--sur2);color:var(--txt)}
     .ico-btn svg{width:16px;height:16px}
@@ -142,16 +166,13 @@
     .stat-item.stat-klik{background:none;border-top:0;border-left:0;border-bottom:0;font:inherit;text-align:left;cursor:pointer;border-radius:0}
     .stat-item.stat-klik:hover .stat-cap{color:var(--txt)}
     .stat-item.stat-klik.aan{box-shadow:inset 0 -2px 0 var(--ac)}
-    /* tel-item vlak vóór het weekblok: geen eigen scheidingslijn (dat doet het weekblok al via border-left),
-       maar wél de padding houden zodat de scheidingslijn niet tegen de tekst plakt */
-    .stat-item:has(+ .stat-week){border-right:none;margin-right:0}
     .stat-val{font-size:30px;font-weight:900;letter-spacing:-.06em;line-height:1;color:var(--txt);font-variant-numeric:tabular-nums}
     .stat-val.red{color:var(--rd)} .stat-val.amber{color:var(--am)} .stat-val.green{color:var(--gn)} .stat-val.teal{color:var(--ac)} .stat-val.muted{color:var(--fnt)}
     .stat-meta{display:flex;flex-direction:column;gap:1px;padding-bottom:2px}
     .stat-cap{font-size:11px;font-weight:700;color:var(--mut);white-space:nowrap}
     .stat-hint{font-size:11px;font-weight:700;color:var(--ac-500);white-space:nowrap}
-    /* Huidige weeknummer: rekt uit en vult de lege ruimte rechts; "Week 26" naast elkaar, gecentreerd, eigen accent zodat 't niet als telling leest */
-    .stat-week{flex:1 1 auto;display:flex;flex-direction:row;align-items:baseline;justify-content:center;gap:8px;padding:10px 26px;border-left:1px solid var(--bor)}
+    /* Huidige weeknummer — staat sinds de compacte kop in .ntd-week (het uitklappaneel);
+       "Week 26" naast elkaar, eigen accent zodat 't niet als telling leest */
     .stat-week-cap{font-size:26px;font-weight:900;letter-spacing:-.05em;line-height:1;color:var(--txt);white-space:nowrap}
     .stat-week-val{font-size:26px;font-weight:900;letter-spacing:-.05em;line-height:1;color:var(--ac);font-variant-numeric:tabular-nums}
 
@@ -367,23 +388,26 @@
     .kpi-trend i{font-size:13px}
     .kpi-trend-arrow{font-size:10px;line-height:1;display:inline-block;transform:translateY(-1px)}
 
-    /* NTD top-row: stats links, totaal-teller rechts */
-    .ntd-top-row{display:flex;gap:14px;margin-bottom:18px;align-items:stretch}
-    .ntd-top-row > .stats-grid{flex:1.7 1 0;min-width:0;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
-    .ntd-top-row > .stat-strip{flex:1.7 1 0;min-width:0;margin-bottom:0;align-self:stretch}
-    .ntd-progress-card{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);padding:16px 20px;box-shadow:var(--sh),0 4px 12px color-mix(in srgb,var(--ac) 18%,transparent);flex:1 1 0;width:auto;min-width:280px;max-width:560px;display:flex;flex-direction:column;justify-content:center;gap:10px}
-    .ntd-progress-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--txt);opacity:.7;line-height:1.2}
-    .ntd-progress-track{position:relative;height:32px;border-radius:999px;background:var(--sur2);overflow:hidden}
+    /* NTD-uitklappaneel achter de chevron: week links, vergaderbalk rechts, één regel.
+       [hidden] moet expliciet — een gewone display:flex-regel wint anders van de browser-standaard. */
+    .ntd-top-row{display:flex;gap:14px;margin-bottom:18px;align-items:center;background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);box-shadow:var(--sh);padding:10px 18px}
+    .ntd-top-row[hidden]{display:none}
+    .ntd-week{display:flex;align-items:baseline;gap:7px;flex-shrink:0;padding-right:16px;border-right:1px solid var(--bor)}
+    /* De kaart zit ín het paneel: geen eigen rand, schaduw of opvulling meer. */
+    .ntd-progress-card{background:none;border:0;box-shadow:none;padding:0;flex:1 1 0;min-width:220px;max-width:none;display:flex;align-items:center;gap:12px}
+    .ntd-progress-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--txt);opacity:.7;line-height:1.2;flex-shrink:0}
+    .ntd-progress-track{position:relative;height:22px;border-radius:999px;background:var(--sur2);overflow:hidden;flex:1 1 auto;min-width:120px}
     /* Voorloopstuk: wél klaargezet, nog niet verstuurd. Ligt onder de gevulde balk. */
     .ntd-progress-voor{position:absolute;inset:0 auto 0 0;width:0;border-radius:999px;background:var(--ac-b);transition:width .9s cubic-bezier(.22,1,.36,1)}
     .ntd-progress-fill{position:absolute;inset:0 auto 0 0;width:0;border-radius:999px;background:linear-gradient(135deg,#4a5b7a,#6f81a3);transition:width .9s cubic-bezier(.22,1,.36,1)}
     .ntd-progress-val{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;letter-spacing:-.01em;white-space:nowrap;pointer-events:none;font-variant-numeric:tabular-nums}
     .ntd-progress-val-base{color:var(--txt)}
     .ntd-progress-val-rev{color:#fff;clip-path:inset(0 100% 0 0);transition:clip-path .9s cubic-bezier(.22,1,.36,1)}
-    .ntd-progress-sub{font-size:12px;font-weight:500;color:var(--mut)}
+    .ntd-progress-sub{font-size:12px;font-weight:500;color:var(--mut);flex-shrink:0;white-space:nowrap}
     @media(max-width:900px){
-      .ntd-top-row{flex-direction:column}
-      .ntd-progress-card{flex:none;width:100%;max-width:none}
+      .ntd-top-row{flex-direction:column;align-items:stretch}
+      .ntd-week{border-right:none;border-bottom:1px solid var(--bor);padding:0 0 8px}
+      .ntd-progress-card{flex:none;width:100%;max-width:none;flex-wrap:wrap}
     }
     .kpi-spark{position:relative;height:36px;margin-top:8px}
     .kpi-spark canvas{position:absolute;inset:0}
@@ -819,6 +843,7 @@
        .tog.on doet níet mee: die krijgt via --modal-sec een vaste donkere kleur, daar hoort de
        witte knop juist. De stagingbalk (--am-vulling) volgt hetzelfde patroon. */
     [data-theme=dark] .btn-pri,
+    [data-theme=dark] .kop-pil-klik.aan,
     [data-theme=dark] .sw-update-btn,
     [data-theme=dark] .pb.on,
     [data-theme=dark] .period-btn.on,
@@ -832,6 +857,8 @@
     [data-theme=dark] #chat-send,
     [data-theme=dark] .kc-plus,
     [data-theme=dark] .staging-balk{color:#15181d}
+    /* Het getal in een actieve pil zet zelf color:#fff en is specifieker — hier terugdraaien. */
+    [data-theme=dark] .kop-pil-klik.aan b{color:#15181d}
     /* Avatars kleuren per persoon via inline background (pastel in donker) → donkere initiaal;
        alleen de vaste navy (--nv) houdt witte tekst, donkere inkt is dáár juist onleesbaar. */
     [data-theme=dark] .lchip .av,[data-theme=dark] .log-av{color:#15181d}
@@ -961,10 +988,24 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,.search-box inpu
   #toast-container{top:auto;bottom:88px;left:8px;right:8px;max-width:none}
   .stat-strip{padding:8px 14px}
   .stat-item{border-right:none;margin-right:0;padding:8px 0;flex:1 0 45%}
-  .stat-item:has(+ .stat-week){border-right:none}
-  .stat-week{flex-basis:100%;border-left:none;border-top:1px solid var(--bor);justify-content:flex-start;padding:10px 0}
   .modal-bg{padding:8px}
   .modal-body{max-height:calc(100vh - 170px)}
+}
+/* ── Smalle kop: pillen naar een eigen regel ──
+   Titel (91px) + pillen (303px) + de icoonknoppen (200px) + opvulling vragen samen ±656px kopbreedte;
+   met de zijbalk erbij is dat een venster van ±900px. Daaronder zou de kop de pillen middenin een
+   woord afkappen — en de chevron staat achteraan, die zou als eerste verdwijnen. Grens op 1000px
+   voor lucht bij drie- of viercijferige tellers. De pillen zakken dan naar een eigen regel en #hdr
+   wordt twee regels hoog. .hdr-info geeft daarvoor haar eigen doos op (display:contents), anders
+   wrappen de pillen bínnen die smalle doos i.p.v. over de volle breedte. De titel mag hier wél
+   inleveren — anders duwt een lange naam de icoonknoppen weg. Alles hangt aan :has(.kop-pillen),
+   zodat de kop op alle andere pagina's onaangeroerd blijft. Dit blok staat ná het 560-blok: de
+   padding-longhands moeten winnen van de padding-shorthand daar. */
+@media(max-width:1000px){
+  #hdr:has(.kop-pillen:not([hidden])){height:auto;min-height:var(--hh);flex-wrap:wrap;padding-top:8px;padding-bottom:8px}
+  #hdr:has(.kop-pillen:not([hidden])) .hdr-info{display:contents}
+  #hdr:has(.kop-pillen:not([hidden])) h1{flex:1 1 auto}
+  .kop-pillen{flex:1 1 100%;order:2;margin-top:6px;overflow-x:auto;padding-bottom:2px}
 }
 @media(max-width:380px){.stats-grid{grid-template-columns:1fr}}
 

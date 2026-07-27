@@ -24,7 +24,14 @@ function goTo(page){
   document.querySelectorAll('.page').forEach(el=>el.classList.toggle('active',el.id==='page-'+page));
   const[t,s]=PAGE_META[page]||['',''];
   document.getElementById('page-title').textContent=t;
-  document.getElementById('page-sub').textContent=s;
+  // Op Nog Te Doen nemen de kop-pillen de plek van de ondertitel in: die ondertitel is
+  // decoratie, de tellers zijn informatie. Elders blijft de kop ongewijzigd.
+  const opNtd = page==='ntd';
+  const sub = document.getElementById('page-sub');
+  sub.textContent = opNtd ? '' : s;
+  sub.hidden = opNtd;
+  const pillen = document.getElementById('ntd-kop-pillen');
+  if(pillen) pillen.hidden = !opNtd;
   document.getElementById('btn-add').style.display=page==='ntd'?'inline-flex':'none';
   if(page==='ontw') renderOntw();
   if(page==='logboek') renderLogboek();

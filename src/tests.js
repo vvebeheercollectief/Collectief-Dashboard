@@ -23,6 +23,7 @@ import { shouldPromptReload, maakHerlaadKern } from "./sw-update.js";
 import { doOAuth } from "./auth.js";
 import { SPLASH_MS, _setFase } from "./login-splash.js";
 import { opmaakHtml, htmlNaarMarkers, zonderOpmaak, pasToe, opmaakBalk } from "./opmaak.js";
+import { goTo } from "./ui.js";
 
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
   // ── mini-assert helper (Fase 1 testnet) ──
@@ -1865,6 +1866,21 @@ import { opmaakHtml, htmlNaarMarkers, zonderOpmaak, pasToe, opmaakBalk } from ".
       D.ntd=ntdOud; D.af=afOud;
       zetKopOpen(kopOpen());
     }
+  })();
+
+  // ── De pillen horen alleen bij Nog Te Doen; elders staat de ondertitel ──
+  (()=>{
+    const pillen = document.getElementById('ntd-kop-pillen');
+    const sub    = document.getElementById('page-sub');
+    goTo('ntd');
+    truthy('op NTD zijn de pillen zichtbaar', !pillen.hidden);
+    truthy('op NTD is de ondertitel verborgen', sub.hidden);
+    goTo('alvo');
+    truthy('elders zijn de pillen verborgen', pillen.hidden);
+    truthy('elders is de ondertitel zichtbaar', !sub.hidden);
+    truthy('elders staat er tekst in de ondertitel', sub.textContent.length > 0);
+    goTo('ntd');
+    truthy('terug op NTD zijn de pillen weer zichtbaar', !pillen.hidden);
   })();
 
   const totOk = ok + _tOk, totFail = fail + _tFail;

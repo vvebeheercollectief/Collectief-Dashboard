@@ -67,11 +67,21 @@ const toastIco = (naam) => {
   return svg ? `<span class="toast-ico">${svg}</span>` : '';
 };
 
-function showToast(title, msg, color, icoNaam) {
-  const key = title + '|' + msg;
-  if (_shownToasts.has(key)) return;
-  _shownToasts.add(key);
-  setTimeout(() => _shownToasts.delete(key), TOAST_DEDUP_MS);
+// opts: { geenDedup:true }        → sla de 15s-ontdubbeling over. Nodig voor opslagbevestigingen:
+//                                   twee keer dezelfde taak opslaan binnen 15 s zou anders de
+//                                   TWEEDE bevestiging inslikken, wat als 'mislukt' leest.
+//       { geenSysteemmelding:true } → geen OS-notificatie als het venster niet in focus is.
+//                                   Anders krijgt de gebruiker bij élke opslag met het venster
+//                                   op de achtergrond een systeemmelding — precies het scenario
+//                                   waarvoor de eerlijke status bedoeld is.
+function showToast(title, msg, color, icoNaam, opts) {
+  const o = opts || {};
+  if (!o.geenDedup) {
+    const key = title + '|' + msg;
+    if (_shownToasts.has(key)) return;
+    _shownToasts.add(key);
+    setTimeout(() => _shownToasts.delete(key), TOAST_DEDUP_MS);
+  }
 
   const el = document.createElement('div');
   el.className = 'toast';
@@ -91,7 +101,7 @@ function showToast(title, msg, color, icoNaam) {
   container.appendChild(el);
 
   // Systeemmelding wanneer pagina niet in focus (ander venster of tabblad)
-  if ('Notification' in window && Notification.permission === 'granted' && !document.hasFocus()) {
+  if (!o.geenSysteemmelding && 'Notification' in window && Notification.permission === 'granted' && !document.hasFocus()) {
     try {
       new Notification(title, { body: msg, icon: 'icon-192.png', badge: 'icon-192.png', tag: 'cd-' + Date.now() });
     } catch(e) {

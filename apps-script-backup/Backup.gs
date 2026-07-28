@@ -12,7 +12,7 @@
 // trigger cd_onNotifQueueChange elke nacht cd_drainNotifQueue wakker maken.
 
 const BK_BRON_ID = '1fnUsbwb4nDMNttWym9FWBw1CMMMAVTuZ3v88b35isUw'; // PROD-Sheet
-const BK_MAP_ID  = 'VUL_HIER_HET_MAP_ID_IN';                       // uit Taak 1.1
+const BK_MAP_ID  = '1bL53_v3kltsX3qZ88BotU_0ncufNjoGR';            // map 'Dashboard back-ups'
 const BK_PREFIX  = 'BACKUP Collectief Dashboard ';
 const BK_STAART  = ' — NIET BEWERKEN';
 const BK_DAGEN   = 14;  // aantal dagelijkse kopieën dat bewaard blijft

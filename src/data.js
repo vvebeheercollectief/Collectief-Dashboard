@@ -25,7 +25,9 @@ import { renderAll } from "./main.js";
 // wijziging terug en verschijnt een foutmelding.
 function backgroundWrite(writeFn, rollback, foutTitel){
   state.pendingWrites++;
+  setSaving();
   state._writeChain=state._writeChain.then(async()=>{
+    state._writeStart=Date.now();   // pas hier begint deze write écht (de wachtrij is serieel)
     try{
       await _withRetry(writeFn);
     }catch(e){
@@ -42,8 +44,9 @@ function backgroundWrite(writeFn, rollback, foutTitel){
       }
       console.error(foutTitel,e);
     }finally{
+      state._writeStart=null;
       state.pendingWrites--;
-      if(state.pendingWrites===0){ loadAll(true); } // stille resync van rij-indexen
+      if(state.pendingWrites===0){ loadAll(true); } // stille resync van rij-indexen; zet ook de balk weer op Live
     }
   });
   return state._writeChain;
@@ -62,7 +65,16 @@ function schrijfActieLoopt(nu){
 }
 
 function setSyncing(){dot('loading');document.getElementById('sync-lbl').textContent='Laden…'}
-function setSynced(){dot('');document.getElementById('sync-lbl').textContent='Live · '+new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});clearLoadError()}
+function setSaving(){dot('loading');document.getElementById('sync-lbl').textContent='Opslaan…'}
+// Guard: zolang er een schrijfactie loopt mag NIETS 'Live · HH:MM' over de 'Opslaan…'-stand
+// heen zetten. Zonder deze regel liegt de balk opnieuw zodra iemand midden in een schrijfactie
+// op Vernieuwen klikt (data.js keert dan vroegtijdig terug en riep setSynced aan).
+function setSynced(){
+  if(state.pendingWrites>0) return;
+  dot('');
+  document.getElementById('sync-lbl').textContent='Live · '+new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
+  clearLoadError();
+}
 function setSyncErr(){dot('err');document.getElementById('sync-lbl').textContent='Fout'}
 function dot(cls){const d=document.getElementById('dot');d.className='dot'+(cls?' '+cls:'')}
 
@@ -268,5 +280,5 @@ function parseAlfa(rows){
 // ══════════════════════════════════════
 
 export {
-  backgroundWrite, schrijfActieLoopt, setSyncing, setSynced, setSyncErr, dot, loadAll, magPollen, parseSections, parseAlvo, parseAlfa, parseHerhaal,
+  backgroundWrite, schrijfActieLoopt, setSyncing, setSaving, setSynced, setSyncErr, dot, loadAll, magPollen, parseSections, parseAlvo, parseAlfa, parseHerhaal,
 };

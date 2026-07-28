@@ -89,17 +89,17 @@ async function submitHerhaal(){
     Object.assign(r,{omschrijving:oms,sectie,code,naam,behandelaar:beh,type,
       interval:type==='na-afronden'?interval:'',dagenVooraf:vooraf,volgendeDeadline:volgende});
     renderHerhaal();
-    showToast('Herhaalregel opgeslagen',oms,null,'opslaan');
     backgroundWrite(async()=>{
       await assertRowMatch(r._row, r.id, 'Herhaalregels'); // bescherming: rij nog dezelfde regel vóór overschrijven
       await writeRange(`'Herhaalregels'!A${r._row}:L${r._row}`,values);
-      logEvent(code,sectie,'Herhaalregel bewerkt','','',oms);
+      await logEvent(code,sectie,'Herhaalregel bewerkt','','',oms);
+      showToast('Herhaalregel opgeslagen',oms,null,'opslaan',{geenDedup:true,geenSysteemmelding:true});
     },()=>{Object.assign(r,oud);},'Opslaan mislukt');
   }else{
-    showToast('Herhaalregel toegevoegd',oms,null,'plus');
     backgroundWrite(async()=>{
       await appendRange("'Herhaalregels'!A:L",values);
-      logEvent(code,sectie,'Herhaalregel aangemaakt','','',oms);
+      await logEvent(code,sectie,'Herhaalregel aangemaakt','','',oms);
+      showToast('Herhaalregel toegevoegd',oms,null,'plus',{geenDedup:true,geenSysteemmelding:true});
     },()=>{},'Toevoegen mislukt');
   }
 }
@@ -108,11 +108,11 @@ function toggleHerhaalStatus(hid){
   const r=(D.herhaal||[]).find(x=>x._row===hid); if(!r) return;
   const oud=r.status, nieuw=oud==='ACTIEF'?'GEPAUZEERD':'ACTIEF';
   r.status=nieuw; renderHerhaal();
-  showToast(nieuw==='ACTIEF'?'Regel geactiveerd':'Regel gepauzeerd',r.omschrijving,null,nieuw==='ACTIEF'?'afspelen':'pauze');
   backgroundWrite(async()=>{
     await assertRowMatch(r._row, r.id, 'Herhaalregels'); // bescherming: rij nog dezelfde regel vóór status-write
     await writeRange(`'Herhaalregels'!K${r._row}:K${r._row}`,[nieuw]);
-    logEvent(r.code,r.sectie,'Herhaalregel '+(nieuw==='ACTIEF'?'geactiveerd':'gepauzeerd'),'','',r.omschrijving);
+    await logEvent(r.code,r.sectie,'Herhaalregel '+(nieuw==='ACTIEF'?'geactiveerd':'gepauzeerd'),'','',r.omschrijving);
+    showToast(nieuw==='ACTIEF'?'Regel geactiveerd':'Regel gepauzeerd',r.omschrijving,null,nieuw==='ACTIEF'?'afspelen':'pauze',{geenDedup:true,geenSysteemmelding:true});
   },()=>{r.status=oud;},'Status wijzigen mislukt');
 }
 
@@ -124,7 +124,6 @@ async function deleteHerhaal(){
   const pos=(D.herhaal||[]).indexOf(r); if(pos>-1)D.herhaal.splice(pos,1);
   (D.herhaal||[]).forEach(x=>{if(x._row>r._row)x._row--;});
   renderHerhaal();
-  showToast('Herhaalregel verwijderd',r.omschrijving,null,'prullenbak');
   backgroundWrite(async()=>{
     const ids=await getSheetIds();
     const sheetId=ids['Herhaalregels'];
@@ -134,7 +133,8 @@ async function deleteHerhaal(){
       method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
       body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:r._row-1,endIndex:r._row}}}]})});
     if(!resp.ok){const e=await resp.json();const err=new Error(e.error?.message||'Verwijderfout');err.status=resp.status;throw err}
-    logEvent(r.code,r.sectie,'Herhaalregel verwijderd','','',r.omschrijving);
+    await logEvent(r.code,r.sectie,'Herhaalregel verwijderd','','',r.omschrijving);
+    showToast('Herhaalregel verwijderd',r.omschrijving,null,'prullenbak',{geenDedup:true,geenSysteemmelding:true});
   },()=>{ // rollback: rij terugzetten + _row-indexen herstellen
     if((D.herhaal||[]).indexOf(r)===-1){ (D.herhaal||[]).forEach(x=>{if(x._row>=r._row)x._row++;}); D.herhaal.splice(Math.min(pos<0?D.herhaal.length:pos,D.herhaal.length),0,r); }
   },'Verwijderen mislukt');

@@ -407,15 +407,19 @@ async function submitTask(){
       renderAll();
       flashRow('ntd-tbody', doelRow._row);
       closeModal();clearModal();
-      showToast('Opgeslagen',`${code} — ${naam||''}`,null,'opslaan');
       backgroundWrite(
         async ()=>{
           await assertRowMatch(doelRow._row, oudeWaarden.code); // bescherming: rij nog dezelfde VvE vóór overschrijven
           await writeRange(`'Nog Te Doen'!A${doelRow._row}:${endCol}${doelRow._row}`,values);
           if(newBeh && newBeh!==(oudeWaarden.behandelaar||'')){
             fireNotifEvent('assigned',{sec,code,naam,behandelaar:newBeh});
-            logEvent(code,sec,'Behandelaar gewijzigd','behandelaar',oudeWaarden.behandelaar,newBeh);
+            await logEvent(code,sec,'Behandelaar gewijzigd','behandelaar',oudeWaarden.behandelaar,newBeh);
           }
+          // Bevestiging pas hier: vóór de write was 'Opgeslagen' een belofte, geen feit.
+          // Helemaal onderaan de writeFn, zodat een _withRetry-herkansing er geen tweede
+          // kan opleveren. geenDedup: twee keer dezelfde taak opslaan binnen 15 s moet
+          // twee bevestigingen geven, anders leest de tweede als 'mislukt'.
+          showToast('Opgeslagen',`${code} — ${naam||''}`,null,'opslaan',{geenDedup:true,geenSysteemmelding:true});
         },
         ()=>{ keys.forEach(k=>{ doelRow[k]=oudeWaarden[k]; }); doelRow.subcategorie=oudeWaarden.subcategorie; delete doelRow._offertesManual; },
         'Opslaan mislukt'
@@ -431,12 +435,12 @@ async function submitTask(){
       renderAll();
       flashRow('ntd-tbody', nieuw._row, 'rij-flits-groen');
       closeModal();clearModal();
-      showToast('Taak toegevoegd',`${code} — ${naam||''}`,null,'plus');
       backgroundWrite(
         async ()=>{
           await insertAndWriteRow('Nog Te Doen',afterRow,values);
           fireNotifEvent('newtask',{sec,code,naam,behandelaar:newBeh});
-          logEvent(code,sec,'Aangemaakt','','',newBeh||'');
+          await logEvent(code,sec,'Aangemaakt','','',newBeh||'');
+          showToast('Taak toegevoegd',`${code} — ${naam||''}`,null,'plus',{geenDedup:true,geenSysteemmelding:true});
         },
         ()=>{ const a=D.ntd[sec]||[]; const p=a.indexOf(nieuw); if(p>-1){ a.splice(p,1); _shiftNtdRows(afterRow,-1); } },
         'Toevoegen mislukt'

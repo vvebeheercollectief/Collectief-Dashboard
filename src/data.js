@@ -49,6 +49,18 @@ function backgroundWrite(writeFn, rollback, foutTitel){
   return state._writeChain;
 }
 
+// Loopt er een schrijfactie die het sluiten van het tabblad zou moeten tegenhouden?
+// Puur (nu meegegeven i.p.v. Date.now()) zodat de regel los testbaar is.
+// De bovengrens vangt een vastgelopen write af: anders zou het tabblad nooit meer zonder
+// waarschuwing te sluiten zijn. Hij telt vanaf het ECHTE begin van de write — een write die
+// nog in de seriële wachtrij staat heeft _writeStart null en waarschuwt dus altijd.
+const WRITE_VAST_MS = 30000;
+function schrijfActieLoopt(nu){
+  if(state.pendingWrites<=0) return false;
+  if(state._writeStart && (nu - state._writeStart) > WRITE_VAST_MS) return false;
+  return true;
+}
+
 function setSyncing(){dot('loading');document.getElementById('sync-lbl').textContent='Laden…'}
 function setSynced(){dot('');document.getElementById('sync-lbl').textContent='Live · '+new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});clearLoadError()}
 function setSyncErr(){dot('err');document.getElementById('sync-lbl').textContent='Fout'}
@@ -256,5 +268,5 @@ function parseAlfa(rows){
 // ══════════════════════════════════════
 
 export {
-  backgroundWrite, setSyncing, setSynced, setSyncErr, dot, loadAll, magPollen, parseSections, parseAlvo, parseAlfa, parseHerhaal,
+  backgroundWrite, schrijfActieLoopt, setSyncing, setSynced, setSyncErr, dot, loadAll, magPollen, parseSections, parseAlvo, parseAlfa, parseHerhaal,
 };

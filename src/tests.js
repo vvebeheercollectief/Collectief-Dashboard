@@ -13,7 +13,7 @@ import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk.js";
 import { _isTransient, _rowMismatch, _a1ColA, _herstelShift, veiligeCel, _veiligeRij, fetchSheets } from "./api.js";
-import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen } from "./data.js";
+import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
 import { setv, serializeNtdUndo, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal } from "./crud.js";
@@ -792,6 +792,21 @@ import { goTo } from "./ui.js";
     const r=parseSections(rows).data['OPPAKKEN'][0];
     return r.datum==='17-06-2026' && r.behandelaar==='Jer' && r.deadline==='19-06-2026';
   })());
+
+  // ── schrijfActieLoopt: waarschuwen bij sluiten zolang er écht iets loopt. ──
+  (()=>{
+    const pendOud=state.pendingWrites, startOud=state._writeStart;
+    try{
+      state.pendingWrites=0; state._writeStart=null;
+      eq('sluit: niets onderweg → geen waarschuwing', schrijfActieLoopt(1000), false);
+      state.pendingWrites=1; state._writeStart=null;
+      eq('sluit: in de wachtrij, nog niet begonnen → wél waarschuwen', schrijfActieLoopt(1000), true);
+      state.pendingWrites=1; state._writeStart=1000;
+      eq('sluit: net begonnen → waarschuwen', schrijfActieLoopt(1500), true);
+      eq('sluit: 29s bezig → waarschuwen', schrijfActieLoopt(30000), true);
+      eq('sluit: >30s bezig → vastgelopen, niet blokkeren', schrijfActieLoopt(32000), false);
+    } finally { state.pendingWrites=pendOud; state._writeStart=startOud; }
+  })();
 
   // ── VvE-dossier AI-agent (chat) ──
   console.log('%c[TESTS] Dossier-chat', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');

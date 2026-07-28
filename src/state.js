@@ -48,6 +48,9 @@ export const state = {
   // schrijf-pijplijn
   pendingWrites: 0,
   _writeChain: Promise.resolve(),
+  _writeStart: null,       // tijdstip waarop de LOPENDE write echt begon (null = niets onderweg).
+                           // Bewust niet gezet bij het in de wachtrij zetten: de wachtrij is serieel,
+                           // dus een wachtende bulk-write zou anders meteen als 'vastgelopen' gelden.
   _lastDHash: null,
   _loadInFlight: false,
   _loadAgain: false,

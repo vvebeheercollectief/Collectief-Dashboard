@@ -147,7 +147,9 @@ function bulkAfronden(rows){
       method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
       body:JSON.stringify({requests})});
     if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Bulk-afronden fout');err.status=resp.status;throw err}
-    items.forEach(it=>logEvent(it.code,it.sec,'Afgerond','status','Nog Te Doen','Afgerond op '+vandaag+' (bulk)'));
+    // for…of i.p.v. forEach: in een forEach-callback kun je niet awaiten, en zonder await valt
+    // de schrijfteller naar 0 terwijl de logboek-appends nog lopen (resync te vroeg, regel weg).
+    for(const it of items) await logEvent(it.code,it.sec,'Afgerond','status','Nog Te Doen','Afgerond op '+vandaag+' (bulk)');
   },()=>{ // rollback: laag→hoog terugzetten
     [...items].reverse().forEach(it=>{
       const a=(D.ntd[it.sec]=D.ntd[it.sec]||[]);
@@ -227,7 +229,7 @@ function bulkVerwijderen(rows){
       method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
       body:JSON.stringify({requests:items.map(it=>({deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:it.origRow-1,endIndex:it.origRow}}}))})});
     if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Bulk-verwijderfout');err.status=resp.status;throw err}
-    items.forEach(it=>logEvent(it.code,it.sec,'Verwijderd','',it.ntdValues[2]||'','(bulk)'));
+    for(const it of items) await logEvent(it.code,it.sec,'Verwijderd','',it.ntdValues[2]||'','(bulk)');
   },()=>{
     [...items].reverse().forEach(it=>{
       const a=(D.ntd[it.sec]=D.ntd[it.sec]||[]);
@@ -299,7 +301,7 @@ function bulkVeld(rows,soort,waarde){
         method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
         body:JSON.stringify({valueInputOption:'USER_ENTERED', data})});
       if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Bulk-actie fout');err.status=resp.status;throw err}
-      if(!gelogd){ items.forEach(it=>logEvent(it.code,it.sec,conf.log,conf.veld,welkeWaarde==='oud'?waarde:it.oud,welkeWaarde==='oud'?it.oud:waarde)); gelogd=true; }
+      if(!gelogd){ for(const it of items) await logEvent(it.code,it.sec,conf.log,conf.veld,welkeWaarde==='oud'?waarde:it.oud,welkeWaarde==='oud'?it.oud:waarde); gelogd=true; }
     };
   };
   showUndoToast(conf.titel,items.map(i=>i.code).join(', '),async()=>{

@@ -59,13 +59,16 @@ async function saveKenmerken(){
   let rec=(D.kenmerken||[]).find(k=>k.code===code);
   if(!rec){ rec={...oud}; D.kenmerken.push(rec); }
   Object.assign(rec,nieuw,{gewijzigdDoor:who,gewijzigdOp:ts});
+  // Optimistisch tonen mag meteen; de echte logboek-appends gaan hieronder de schrijf-keten in,
+  // zodat ze onder de schrijfteller vallen (statusbalk/sluit-waarschuwing) en de resync niet
+  // start terwijl ze nog lopen.
   gewijzigd.forEach(([lbl,k])=>{
-    logEvent(code,'','Kenmerk',lbl,oud[k]||'',nieuw[k]||'');
     D.logboek.unshift({_row:0,timestamp:ts,code,sectie:'',actie:'Kenmerk',veld:lbl,
       oudeWaarde:oud[k]||'',nieuweWaarde:nieuw[k]||'',gebruiker:who});
   });
   renderVve();
   const waarden=[code,rec.balkons,rec.kozijnen,rec.bron,who,ts];
+  let gelogd=false;   // append is niet idempotent; overleeft _withRetry-herkansingen
   backgroundWrite(
     async ()=>{
       // Beslis append-vs-update BINNEN de schrijf-keten: een eerdere append heeft rec._row
@@ -75,6 +78,10 @@ async function saveKenmerken(){
         const resp=await appendRange("'Kenmerken'!A:F",waarden);
         const m=(resp&&resp.updates&&resp.updates.updatedRange||'').match(/!A(\d+):/i);
         if(m) rec._row=+m[1];   // nieuw rijnummer onthouden → volgende opslag wordt een update
+      }
+      if(!gelogd){
+        for(const [lbl,k] of gewijzigd) await logEvent(code,'','Kenmerk',lbl,oud[k]||'',nieuw[k]||'');
+        gelogd=true;
       }
     },
     ()=>{ Object.assign(rec,sn); },

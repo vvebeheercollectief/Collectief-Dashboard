@@ -196,7 +196,7 @@ async function deleteTaskRow(r){
         if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Verwijderfout');err.status=resp.status;throw err}
         verwijderd=true;
       }
-      logEvent(r.code, sec, 'Verwijderd', '', r.actiepunt||r.periode||'', '');
+      await logEvent(r.code, sec, 'Verwijderd', '', r.actiepunt||r.periode||'', '');
     },
     ()=>{ if(arr.indexOf(r)===-1){ _herstelShift(_shiftNtdRows,oudeRow); arr.splice(Math.min(pos<0?arr.length:pos,arr.length),0,r); } },
     'Verwijderen mislukt'
@@ -343,7 +343,7 @@ async function doCompleteTask(){
           if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Fout bij afhandelen taak');err.status=resp.status;throw err}
           afgerond=true;
         }
-        logEvent(r.code, sec, 'Afgerond', 'status', 'Nog Te Doen', 'Afgerond op ' + today + (comment ? ' — ' + comment : ''));
+        await logEvent(r.code, sec, 'Afgerond', 'status', 'Nog Te Doen', 'Afgerond op ' + today + (comment ? ' — ' + comment : ''));
       },
       ()=>{ const a=(D.ntd[sec]=D.ntd[sec]||[]); if(a.indexOf(r)===-1){ _herstelShift(_shiftNtdRows,r._row); a.splice(Math.min(pos<0?a.length:pos,a.length),0,r); } },
       'Afronden mislukt'

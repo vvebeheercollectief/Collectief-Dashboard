@@ -435,6 +435,14 @@ Schrijven wordt geblokkeerd **vóór** de optimistische mutatie, niet erna terug
 - Datums die naar de Sheet gaan: Nederlandse notatie via het bestaande idioom; nooit een
   rauw `Date`-object (dat komt terug als long-date).
 
+## Hoe dit ontwerp wordt uitgevoerd
+
+Eén implementatieplan met de fases als losse, elk zelfstandig uit te rollen blokken.
+Fases 0 t/m 3 worden meteen tot op stapniveau uitgeschreven. Fases 4 en 5 blijven bewust
+grover: de trigger-inventarisatie uit fase 0 en de proefopstelling uit fase 4 bepalen daar
+nog echte ontwerpkeuzes. Die twee fases worden aangevuld zodra fase 0 en 1 live zijn — niet
+eerder, om te voorkomen dat er stappen op papier staan die op aannames rusten.
+
 ## Openstaande punten
 
 1. **Mechanisme voor het taaknummer** — uitkomst van de proef in fase 4, aan de gebruiker

@@ -64,6 +64,30 @@ function schrijfActieLoopt(nu){
   return true;
 }
 
+// Markeert een schrijfweg die NIET via backgroundWrite loopt als 'lopend'. Zonder dit zijn
+// de gevaarlijkste paden (undo's, ALV-reset, Ontwikkeling) onzichtbaar voor de statusbalk,
+// de sluit-waarschuwing én de poll-rem — en is een 'eerlijke' status alleen een
+// geloofwaardiger onwaarheid.
+// Fouten gaan ONGEMOEID door naar de aanroeper: die paden hebben hun eigen foutafhandeling.
+//
+// BELANGRIJK voor de aanroepers: omhul alléén het echt-schrijvende deel, nooit een `loadAll`
+// of een `await state._writeChain`. loadAll gooit zijn verse data namelijk weg zolang
+// pendingWrites>0 ("de optimistische stand is leidend"), dus een loadAll bínnen dit omhulsel
+// laadt niets — wat bijvoorbeeld bulkUndoAfronden op een stale D.af zou laten werken en de
+// afgeronde rijen in bèide lijsten zou achterlaten.
+async function metWriteMarkering(fn){
+  state.pendingWrites++;
+  setSaving();
+  const eerder=state._writeStart;
+  state._writeStart=Date.now();
+  try{ return await fn(); }
+  finally{
+    state._writeStart=eerder;
+    state.pendingWrites--;
+    if(state.pendingWrites===0) setSynced();
+  }
+}
+
 function setSyncing(){dot('loading');document.getElementById('sync-lbl').textContent='Laden…'}
 function setSaving(){dot('loading');document.getElementById('sync-lbl').textContent='Opslaan…'}
 // Guard: zolang er een schrijfactie loopt mag NIETS 'Live · HH:MM' over de 'Opslaan…'-stand
@@ -280,5 +304,5 @@ function parseAlfa(rows){
 // ══════════════════════════════════════
 
 export {
-  backgroundWrite, schrijfActieLoopt, setSyncing, setSaving, setSynced, setSyncErr, dot, loadAll, magPollen, parseSections, parseAlvo, parseAlfa, parseHerhaal,
+  backgroundWrite, schrijfActieLoopt, metWriteMarkering, setSyncing, setSaving, setSynced, setSyncErr, dot, loadAll, magPollen, parseSections, parseAlvo, parseAlfa, parseHerhaal,
 };

@@ -7,7 +7,7 @@
 import { state, D } from "./state.js";
 import { SID } from "./config.js";
 import { ensureToken } from "./auth.js";
-import { loadAll } from "./data.js";
+import { loadAll, metWriteMarkering } from "./data.js";
 import { assertRowsMatch } from "./api.js";
 import { showToast } from "./notifications.js";
 import { logEvent } from "./render-overig.js";
@@ -95,52 +95,58 @@ async function doeReset(){
     if(!bereik.aantal) throw new Error('Geen VvE-rijen gevonden.');
     const blokken=_resetBlokken(D.alvo);
 
-    // Rij-identiteit vóór een bulkschrijfactie: één GET over het hele bereik, gooit bij
-    // de eerste rij die niet meer bij de verwachte VvE-code hoort. Niets geschreven.
-    await assertRowsMatch(D.alvo.map(r=>({row:r._row,code:r.code})), ALVO_TAB);
+    // Alleen het schrijvende deel onder de schrijfteller (statusbalk/sluit-waarschuwing/poll-rem).
+    // De loadAll hierboven en hieronder blijven er bewust buiten: bínnen de markering gooit
+    // loadAll zijn verse data weg (pendingWrites>0) en verviel juist de verse-stand-controle.
+    const naam=await metWriteMarkering(async()=>{
+      // Rij-identiteit vóór een bulkschrijfactie: één GET over het hele bereik, gooit bij
+      // de eerste rij die niet meer bij de verwachte VvE-code hoort. Niets geschreven.
+      await assertRowsMatch(D.alvo.map(r=>({row:r._row,code:r.code})), ALVO_TAB);
 
-    const props=await _tabbladen();
-    const bron=props.find(p=>_isAlvoTab(p.title));
-    if(!bron) throw new Error(`Tabblad '${ALVO_TAB}' niet gevonden.`);
-    if((bron.gridProperties&&bron.gridProperties.columnCount||0)<7)
-      throw new Error('Kolom G bestaat nog niet in dit tabblad — voeg hem eerst toe.');
+      const props=await _tabbladen();
+      const bron=props.find(p=>_isAlvoTab(p.title));
+      if(!bron) throw new Error(`Tabblad '${ALVO_TAB}' niet gevonden.`);
+      if((bron.gridProperties&&bron.gridProperties.columnCount||0)<7)
+        throw new Error('Kolom G bestaat nog niet in dit tabblad — voeg hem eerst toe.');
 
-    const laatsteVoor=props.slice().sort((a,b)=>a.index-b.index).pop().title;
-    const naam=_archiefNaam(new Date().getFullYear(),props.map(p=>p.title));
+      const laatsteVoor=props.slice().sort((a,b)=>a.index-b.index).pop().title;
+      const archiefNaam=_archiefNaam(new Date().getFullYear(),props.map(p=>p.title));
 
-    // Archiveren. Het archief komt DIRECT NA 'ALV's overzicht' — dat navigeert
-    // prettiger dan achteraan. (Historisch ook noodzaak: verplaatsALV schreef naar het
-    // láátste tabblad; sinds die op naam zoekt is de positie alleen nog voorkeur.)
-    const arch=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
-      method:'POST',
-      headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
-      body:JSON.stringify({requests:[{duplicateSheet:{
-        sourceSheetId:bron.sheetId, insertSheetIndex:bron.index+1, newSheetName:naam
-      }}]})
+      // Archiveren. Het archief komt DIRECT NA 'ALV's overzicht' — dat navigeert
+      // prettiger dan achteraan. (Historisch ook noodzaak: verplaatsALV schreef naar het
+      // láátste tabblad; sinds die op naam zoekt is de positie alleen nog voorkeur.)
+      const arch=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+        method:'POST',
+        headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
+        body:JSON.stringify({requests:[{duplicateSheet:{
+          sourceSheetId:bron.sheetId, insertSheetIndex:bron.index+1, newSheetName:archiefNaam
+        }}]})
+      });
+      if(!arch.ok) throw new Error(`Archiveren mislukt: HTTP ${arch.status} — er is niets gewist.`);
+
+      // Wissen: per blok × per vlagkolom één repeatCell, alles in één batchUpdate. Alleen
+      // echte VvE-rijen, dus samenvattingsregels en lege rijen blijven ongemoeid.
+      const verzoeken=[];
+      for(const blok of blokken) for(const col of RESET_KOLOMMEN) verzoeken.push({repeatCell:{
+        range:{sheetId:bron.sheetId,startRowIndex:blok.start-1,endRowIndex:blok.eind,
+               startColumnIndex:col,endColumnIndex:col+1},
+        cell:{userEnteredValue:{boolValue:false}},
+        fields:'userEnteredValue'
+      }});
+      const wis=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+        method:'POST',
+        headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
+        body:JSON.stringify({requests:verzoeken})
+      });
+      if(!wis.ok) throw new Error(`Wissen mislukt: HTTP ${wis.status} — het archief '${archiefNaam}' is wel aangemaakt.`);
+
+      const laatsteNa=(await _tabbladen()).slice().sort((a,b)=>a.index-b.index).pop().title;
+      if(laatsteNa!==laatsteVoor)
+        showToast('Let op','Het laatste tabblad is verschoven — controleer de spreadsheet','var(--am)');
+
+      await logEvent('','ALVS','Nieuwe ronde gestart',`${bereik.aantal} VvE's gereset, archief '${archiefNaam}'`,'','');
+      return archiefNaam;
     });
-    if(!arch.ok) throw new Error(`Archiveren mislukt: HTTP ${arch.status} — er is niets gewist.`);
-
-    // Wissen: per blok × per vlagkolom één repeatCell, alles in één batchUpdate. Alleen
-    // echte VvE-rijen, dus samenvattingsregels en lege rijen blijven ongemoeid.
-    const verzoeken=[];
-    for(const blok of blokken) for(const col of RESET_KOLOMMEN) verzoeken.push({repeatCell:{
-      range:{sheetId:bron.sheetId,startRowIndex:blok.start-1,endRowIndex:blok.eind,
-             startColumnIndex:col,endColumnIndex:col+1},
-      cell:{userEnteredValue:{boolValue:false}},
-      fields:'userEnteredValue'
-    }});
-    const wis=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
-      method:'POST',
-      headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
-      body:JSON.stringify({requests:verzoeken})
-    });
-    if(!wis.ok) throw new Error(`Wissen mislukt: HTTP ${wis.status} — het archief '${naam}' is wel aangemaakt.`);
-
-    const laatsteNa=(await _tabbladen()).slice().sort((a,b)=>a.index-b.index).pop().title;
-    if(laatsteNa!==laatsteVoor)
-      showToast('Let op','Het laatste tabblad is verschoven — controleer de spreadsheet','var(--am)');
-
-    logEvent('','ALVS','Nieuwe ronde gestart',`${bereik.aantal} VvE's gereset, archief '${naam}'`,'','');
     closeResetModal();
     await loadAll(true);                     // loadAll hertekent zelf zodra de data wijzigt
     showToast('Nieuwe ronde gestart',`${bereik.aantal} VvE's op Open, archief '${naam}'`,'var(--gn)','herhaal');

@@ -8,7 +8,7 @@ import { ensureToken } from "./auth.js";
 import { fetchSheet, appendRange } from "./api.js";
 import { logEvent } from "./render-overig.js";
 import { getSheetIds, insertAndWriteRow, getInsertRow } from "./crud.js";
-import { loadAll, parseSections } from "./data.js";
+import { loadAll, parseSections, metWriteMarkering } from "./data.js";
 import { flashRow } from "./anim.js";
 import { ico } from "./icons.js";
 
@@ -152,24 +152,30 @@ async function undoComplete(undoData) {
   state._undoInFlight = true; // pauzeer de 8s-poll; deze undo doet z'n eigen loadAll
   try {
     await state._writeChain; // de afronding-write moet eerst klaar zijn vóór we de rij zoeken
-    const ids = await getSheetIds();
-    const afId = ids['Afgerond'];
-    // Verse Afgerond-data en de ZOJUIST afgeronde rij zoeken (nieuwste datum eerst, zelfde
-    // sortering als D.af). D.af kan nog verouderd zijn; we matchen op code én pakken de
-    // nieuwste, zodat we niet per ongeluk een óúdere afronding met dezelfde code wissen.
-    const afData = (parseSections(await fetchSheet('Afgerond')).data[sec] || [])
-      .slice().sort((a, b) => parseDt(b.datum) - parseDt(a.datum));
-    const doelAf = afData.find(x => x.code === undoData.code) || null;
-    if (doelAf) {
-      await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${state.oauthToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requests: [{ deleteDimension: { range: { sheetId: afId, dimension: 'ROWS', startIndex: doelAf._row - 1, endIndex: doelAf._row } } }] })
-      });
-    }
-    const insertRow = getInsertRow(sec);
-    await insertAndWriteRow('Nog Te Doen', insertRow, ntdValues);
-    logEvent(undoData.code, sec, 'Teruggezet', 'status', 'Afgerond', 'Nog Te Doen');
+    // Alleen het schrijvende deel onder de teller — de loadAll hieronder moet zijn verse data
+    // WÉL kunnen gebruiken (zie de waarschuwing bij metWriteMarkering).
+    await metWriteMarkering(async () => {
+      const ids = await getSheetIds();
+      const afId = ids['Afgerond'];
+      // Verse Afgerond-data en de ZOJUIST afgeronde rij zoeken (nieuwste datum eerst, zelfde
+      // sortering als D.af). D.af kan nog verouderd zijn; we matchen op code én pakken de
+      // nieuwste, zodat we niet per ongeluk een óúdere afronding met dezelfde code wissen.
+      const afData = (parseSections(await fetchSheet('Afgerond')).data[sec] || [])
+        .slice().sort((a, b) => parseDt(b.datum) - parseDt(a.datum));
+      const doelAf = afData.find(x => x.code === undoData.code) || null;
+      // EERST terugzetten, DAN pas weghalen. Breekt de verbinding ertussen, dan staat de taak
+      // dubbel (zichtbaar, herstelbaar) in plaats van nergens (onzichtbaar, verloren).
+      const insertRow = getInsertRow(sec);
+      await insertAndWriteRow('Nog Te Doen', insertRow, ntdValues);
+      if (doelAf) {
+        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${state.oauthToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requests: [{ deleteDimension: { range: { sheetId: afId, dimension: 'ROWS', startIndex: doelAf._row - 1, endIndex: doelAf._row } } }] })
+        });
+      }
+      await logEvent(undoData.code, sec, 'Teruggezet', 'status', 'Afgerond', 'Nog Te Doen');
+    });
     showToast('Ongedaan gemaakt', `${undoData.code} terug in Nog Te Doen`, 'var(--am)', 'ongedaan');
     await loadAll();
     const terug=(D.ntd[sec]||[]).filter(x=>x.code===undoData.code).pop();
@@ -184,9 +190,11 @@ async function undoDelete(undoData) {
   try {
     await state._writeChain;            // delete-write gegarandeerd vóór de re-insert
     const { sec, ntdValues } = undoData;
-    const insertRow = getInsertRow(sec);
-    await insertAndWriteRow('Nog Te Doen', insertRow, ntdValues);
-    logEvent(undoData.code, sec, 'Teruggezet', 'status', 'Verwijderd', 'Nog Te Doen');
+    await metWriteMarkering(async () => {
+      const insertRow = getInsertRow(sec);
+      await insertAndWriteRow('Nog Te Doen', insertRow, ntdValues);
+      await logEvent(undoData.code, sec, 'Teruggezet', 'status', 'Verwijderd', 'Nog Te Doen');
+    });
     showToast('Ongedaan gemaakt', `${undoData.code} terug in Nog Te Doen`, 'var(--am)', 'ongedaan');
     await loadAll();
     const terug=(D.ntd[sec]||[]).filter(x=>x.code===undoData.code).pop();

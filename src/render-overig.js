@@ -9,7 +9,7 @@ import { ensureToken } from "./auth.js";
 import { writeRange, appendRange, assertRowMatch, _herstelShift } from "./api.js";
 import { renderThead, renderPag } from "./render-lijsten.js";
 import { getSheetIds, setv, gv, insertAndWriteRow } from "./crud.js";
-import { loadAll, backgroundWrite } from "./data.js";
+import { loadAll, backgroundWrite, metWriteMarkering } from "./data.js";
 import { getCurrentWho, showToast, showUndoToast } from "./notifications.js";
 import { animateRowOut } from "./anim.js";
 import { renderVve } from "./render-vve.js";
@@ -111,12 +111,14 @@ async function submitOntwItem(){
   const today=`${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;
   const values=[titel,cat,inhoud,who,today,status];
   try{
-    if(state.ontwEditMode&&state.ontwEditRow?._row){
-      await assertRowMatch(state.ontwEditRow._row, state.ontwEditRow.titel, 'Ontwikkeling'); // bescherming: rij nog hetzelfde item vóór overschrijven
-      await writeRange(`'Ontwikkeling'!A${state.ontwEditRow._row}:F${state.ontwEditRow._row}`,values);
-    } else {
-      await appendRange("'Ontwikkeling'!A:F",values);
-    }
+    await metWriteMarkering(async()=>{
+      if(state.ontwEditMode&&state.ontwEditRow?._row){
+        await assertRowMatch(state.ontwEditRow._row, state.ontwEditRow.titel, 'Ontwikkeling'); // bescherming: rij nog hetzelfde item vóór overschrijven
+        await writeRange(`'Ontwikkeling'!A${state.ontwEditRow._row}:F${state.ontwEditRow._row}`,values);
+      } else {
+        await appendRange("'Ontwikkeling'!A:F",values);
+      }
+    });
     closeOntwModal();
     await loadAll();
   }catch(e){alert('Fout: '+e.message)}
@@ -161,7 +163,7 @@ async function undoOntwDelete(values, titel){
   if(!await ensureToken()){alert('Inloggen mislukt.');return}
   try{
     await state._writeChain;
-    await appendRange("'Ontwikkeling'!A:F", values);
+    await metWriteMarkering(()=>appendRange("'Ontwikkeling'!A:F", values));
     showToast('Ongedaan gemaakt', `"${titel||''}" teruggezet`, 'var(--am)', 'ongedaan');
     await loadAll();
   }catch(e){alert('Undo fout: '+e.message)}
@@ -494,7 +496,7 @@ async function undoDeleteLog(vals, oudeRow, wasVerwijderd){
       showToast('Niets te herstellen','De regel staat er nog — verwijderen was niet gelukt.','var(--am)','ongedaan');
       return;
     }
-    await insertAndWriteRow('Logboek', oudeRow-1, vals);
+    await metWriteMarkering(()=>insertAndWriteRow('Logboek', oudeRow-1, vals));
     // Open bewerkformulier op een regel die bij de delete omhoog schoof: terug omlaag,
     // zodat het ná de verse loadAll (echte _row-nummers) weer bij dezelfde regel hoort.
     state.logEdit=_shiftLogEditRef(state.logEdit,oudeRow,+1);

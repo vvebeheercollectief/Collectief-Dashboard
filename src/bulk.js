@@ -8,7 +8,7 @@ import { SECS, SID } from "./config.js";
 import { ensureToken } from "./auth.js";
 import { _shiftNtdRows, _herstelShift, assertRowsMatch } from "./api.js";
 import { getSheetIds, getAfInsertRow, getInsertRow, insertAndWriteRow, serializeNtdUndo } from "./crud.js";
-import { backgroundWrite, loadAll } from "./data.js";
+import { backgroundWrite, loadAll, metWriteMarkering } from "./data.js";
 import { showToast, showUndoToast } from "./notifications.js";
 import { logEvent } from "./render-overig.js";
 import { renderAll } from "./main.js";
@@ -175,24 +175,31 @@ async function bulkUndoAfronden(items){
   try{
     await state._writeChain;
     await loadAll(true);                       // verse D.af zodat we de zojuist afgeronde rijen vinden
-    const ids=await getSheetIds();
-    // 1) Bepaal welke Afgerond-rijen weg moeten (nieuwste per code), hoog→laag _row.
-    const teVerwijderen=_bulkUndoAfDoelRijen(items, D.af);
-    // 2) Verwijder ze in één batch in aflopende _row-volgorde, zodat de delete-indexen
-    //    elkaar niet verschuiven (i.t.t. de oude code die de oudste rij koos).
-    if(teVerwijderen.length){
-      const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
-        method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
-        body:JSON.stringify({requests:teVerwijderen.map(af=>({deleteDimension:{range:{sheetId:ids['Afgerond'],dimension:'ROWS',startIndex:af._row-1,endIndex:af._row}}}))})});
-      if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Bulk-undo verwijderfout');err.status=resp.status;throw err}
-    }
-    // 3) Zet de taken terug in Nog Te Doen (per-sectie offset, getInsertRow verandert niet tussendoor).
-    const offset={};
-    for(const it of items){
-      await insertAndWriteRow('Nog Te Doen',getInsertRow(it.sec)+(offset[it.sec]||0),it.ntdValues);
-      offset[it.sec]=(offset[it.sec]||0)+1;
-      logEvent(it.code,it.sec,'Teruggezet','status','Afgerond','Nog Te Doen (bulk-undo)');
-    }
+    // Pas hierná de teller ophogen: bínnen metWriteMarkering zou loadAll zijn verse data
+    // weggooien (pendingWrites>0) en werkten we op een stale D.af.
+    await metWriteMarkering(async()=>{
+      const ids=await getSheetIds();
+      // 1) Bepaal welke Afgerond-rijen weg moeten (nieuwste per code), hoog→laag _row.
+      const teVerwijderen=_bulkUndoAfDoelRijen(items, D.af);
+      // 2) EERST terugzetten in Nog Te Doen (per-sectie offset, getInsertRow verandert niet
+      //    tussendoor), DAN pas weghalen uit Afgerond. Breekt de verbinding ertussen, dan staat
+      //    de taak dubbel (zichtbaar, herstelbaar) in plaats van nergens (onzichtbaar, verloren).
+      const offset={};
+      for(const it of items){
+        await insertAndWriteRow('Nog Te Doen',getInsertRow(it.sec)+(offset[it.sec]||0),it.ntdValues);
+        offset[it.sec]=(offset[it.sec]||0)+1;
+        await logEvent(it.code,it.sec,'Teruggezet','status','Afgerond','Nog Te Doen (bulk-undo)');
+      }
+      // 3) Verwijder de Afgerond-rijen in één batch in aflopende _row-volgorde, zodat de
+      //    delete-indexen elkaar niet verschuiven (i.t.t. de oude code die de oudste rij koos).
+      //    De inserts hierboven raakten een ánder tabblad, dus deze _row-nummers kloppen nog.
+      if(teVerwijderen.length){
+        const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+          method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
+          body:JSON.stringify({requests:teVerwijderen.map(af=>({deleteDimension:{range:{sheetId:ids['Afgerond'],dimension:'ROWS',startIndex:af._row-1,endIndex:af._row}}}))})});
+        if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Bulk-undo verwijderfout');err.status=resp.status;throw err}
+      }
+    });
     showToast('Ongedaan gemaakt',`${items.length} taken terug in Nog Te Doen`,'var(--am)','ongedaan');
     await loadAll();
   }catch(e){ alert('Undo fout: '+e.message); }
@@ -233,14 +240,16 @@ async function bulkUndoVerwijderen(items){
   state._undoInFlight=true; // pauzeer de 8s-poll; deze undo doet z'n eigen loadAll
   try{
     await state._writeChain;
-    // Offset per sectie: getInsertRow leest D.ntd (verandert niet tussen inserts), dus zonder
-    // offset belanden alle rijen op dezelfde positie en stapelen ze in omgekeerde volgorde.
-    const offset={};
-    for(const it of items){
-      await insertAndWriteRow('Nog Te Doen',getInsertRow(it.sec)+(offset[it.sec]||0),it.ntdValues);
-      offset[it.sec]=(offset[it.sec]||0)+1;
-    }
-    items.forEach(it=>logEvent(it.code,it.sec,'Teruggezet','status','Verwijderd','Nog Te Doen (bulk-undo)'));
+    await metWriteMarkering(async()=>{
+      // Offset per sectie: getInsertRow leest D.ntd (verandert niet tussen inserts), dus zonder
+      // offset belanden alle rijen op dezelfde positie en stapelen ze in omgekeerde volgorde.
+      const offset={};
+      for(const it of items){
+        await insertAndWriteRow('Nog Te Doen',getInsertRow(it.sec)+(offset[it.sec]||0),it.ntdValues);
+        offset[it.sec]=(offset[it.sec]||0)+1;
+      }
+      for(const it of items) await logEvent(it.code,it.sec,'Teruggezet','status','Verwijderd','Nog Te Doen (bulk-undo)');
+    });
     showToast('Ongedaan gemaakt',`${items.length} taken terug in Nog Te Doen`,'var(--am)','ongedaan');
     await loadAll();
   }catch(e){ alert('Undo fout: '+e.message); }

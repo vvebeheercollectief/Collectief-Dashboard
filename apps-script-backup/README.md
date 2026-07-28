@@ -43,6 +43,17 @@ bewaard (15):   ["2026-07-01","2026-07-07", … ,"2026-07-20"]
 Staat er bij `vreemde naam` of `bijna-naam` iets anders dan `null`, **stop dan** — dan kan het
 opruimen vreemde bestanden in de map raken.
 
+## Tweede herstelweg: wekelijkse export
+
+`bk_wekelijkseExport` zet elke zondagnacht een **XLSX-bestand** in een aparte map
+(`BK_EXPORT_MAP_ID`). Ander formaat, andere map — zodat één ongeluk niet beide herstelwegen
+tegelijk meeneemt, en zodat je de gegevens ook zonder Google-account kunt openen.
+
+Wat het **niet** dekt: het staat in dezelfde Drive onder hetzelfde account. Raakt dát account
+kwijt, dan is de export ook weg. Wil je dat afdekken, dan hoeft alleen `bk_exportAfleveren`
+te wijzigen (bijvoorbeeld naar `MailApp.sendEmail` met de bijlage, of naar een map van een
+tweede account) — de rest van het script blijft hetzelfde.
+
 ## Alarm
 
 `bk_dagelijks` en `bk_controleer` vangen hun fouten bewust NIET af. Een mislukking levert

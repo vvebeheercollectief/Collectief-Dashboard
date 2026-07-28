@@ -20,6 +20,14 @@ const BK_MAANDEN = 12;  // aantal maandelijkse kopieën dat bewaard blijft
 const BK_PROP    = 'bk_laatste_geslaagd';  // ISO-datum van de laatste geslaagde kopie
 const BK_MAX_OUD = 2;   // na hoeveel dagen zonder geslaagde kopie er alarm is
 
+// Map voor de wekelijkse XLSX-export. Bewust een ANDERE map dan de dagelijkse kopieën, zodat
+// een ongeluk met één map niet allebei de herstelwegen tegelijk meeneemt.
+// LET OP: dit is dezelfde Drive en hetzelfde account. Deze export beschermt dus tegen een
+// kapotte Sheet en tegen een verkeerd opgeruimde back-upmap, maar NIET tegen het kwijtraken
+// van het account zelf. Wie dat óók wil afdekken, zet de export bij een tweede partij
+// (mailbox, ander account) — zie bk_exportAfleveren.
+const BK_EXPORT_MAP_ID = '1E7wRlHAQQ2x9zkmVGLo5dqClpTeyClNl';  // 'Dashboard back-ups — wekelijkse export'
+
 // Naam van de kopie van een gegeven dag. Puur → los testbaar.
 function bk_naam(d) {
   return BK_PREFIX + Utilities.formatDate(d, 'Europe/Amsterdam', 'yyyy-MM-dd') + BK_STAART;
@@ -95,17 +103,37 @@ function bk_controleer() {
   Logger.log('Back-up in orde — laatste geslaagde kopie: ' + laatst);
 }
 
-// Installeert beide triggers. Verwijdert eerst alleen de EIGEN triggers, zodat een
+// Wekelijkse XLSX-export als tweede, onafhankelijke herstelweg. Bewust een ANDER formaat dan
+// de dagelijkse kopie: een Excel-bestand opent ook zonder Google-account, en een storing in
+// het Sheets-formaat raakt het niet. Ook hier geen try/catch — een mislukking hoort een
+// storingsmail op te leveren.
+function bk_wekelijkseExport() {
+  const url = 'https://docs.google.com/spreadsheets/d/' + BK_BRON_ID + '/export?format=xlsx';
+  const blob = UrlFetchApp.fetch(url, {
+    headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() }
+  }).getBlob().setName(bk_naam(new Date()).replace(BK_STAART, '') + '.xlsx');
+  bk_exportAfleveren(blob);
+  Logger.log('Export gemaakt: ' + blob.getName());
+}
+
+// Aflevering apart gehouden van het maken: wil je later naar een mailbox of een tweede
+// account, dan wijzig je alleen deze functie.
+function bk_exportAfleveren(blob) {
+  DriveApp.getFolderById(BK_EXPORT_MAP_ID).createFile(blob);
+}
+
+// Installeert alle drie de triggers. Verwijdert eerst alleen de EIGEN triggers, zodat een
 // tweede aanroep geen dubbele oplevert. Logger.log i.p.v. een UI-alert: in een los
 // (niet-gebonden) project bestaat SpreadsheetApp.getUi() niet.
 function bk_installeerTriggers() {
   ScriptApp.getProjectTriggers().forEach(function (t) {
     const f = t.getHandlerFunction();
-    if (f === 'bk_dagelijks' || f === 'bk_controleer') ScriptApp.deleteTrigger(t);
+    if (f === 'bk_dagelijks' || f === 'bk_controleer' || f === 'bk_wekelijkseExport') ScriptApp.deleteTrigger(t);
   });
   ScriptApp.newTrigger('bk_dagelijks').timeBased().atHour(2).nearMinute(15).everyDays(1).create();
   ScriptApp.newTrigger('bk_controleer').timeBased().atHour(8).nearMinute(0).everyDays(1).create();
-  Logger.log('Triggers geïnstalleerd: bk_dagelijks (02:15), bk_controleer (08:00)');
+  ScriptApp.newTrigger('bk_wekelijkseExport').timeBased().onWeekDay(ScriptApp.WeekDay.SUNDAY).atHour(3).create();
+  Logger.log('Triggers geïnstalleerd: bk_dagelijks (02:15), bk_controleer (08:00), bk_wekelijkseExport (zo 03:00)');
 }
 
 // Handmatige zelftest van de pure functies. Draai deze vóór bk_installeerTriggers.

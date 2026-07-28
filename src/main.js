@@ -19,7 +19,7 @@ import {
 import {
   openModal, closeModal, submitTask, doCompleteTask, closeCompleteModal,
 } from './crud.js';
-import { loadAll, magPollen } from './data.js';
+import { loadAll, magPollen, schrijfActieLoopt } from './data.js';
 import { initActions } from './actions.js';
 import { initVveZoekveld } from './vve-zoekveld.js';
 import { closeSnoozeModal, snoozeOpslaan, snoozeWis } from './snooze.js';
@@ -261,6 +261,14 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('notif-unsubscribe-btn').onclick = unsubscribeNotifs;
   document.getElementById('notif-test-btn').onclick = () => sendTestNotif(getCurrentWho(), 'Test melding', 'Notificaties werken correct op dit apparaat!');
   startNotifPoll();
+
+  // Waarschuw bij het sluiten zolang er een schrijfactie loopt. De browser toont zijn eigen,
+  // niet-aanpasbare tekst; werkt op de desktop en op telefoon/PWA vrijwel niet.
+  window.addEventListener('beforeunload', (e) => {
+    if(!schrijfActieLoopt(Date.now())) return;
+    e.preventDefault();
+    e.returnValue = '';   // vereist door oudere browsers
+  });
 
   // Live updates — auto-refresh elke 8 seconden (smart diff voorkomt onnodige re-renders)
   // Id bewaard zodat logout() de poll kan stoppen (anders blijft hij na uitloggen doordraaien).

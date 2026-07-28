@@ -74,5 +74,42 @@ gaat debuggen. En let op: `onEdit` vuurt alleen op echte edits in de Sheets-UI �
   (in-app toasts) én sturen een OneSignal-push. Niet verwijderen.
 - Alle `.gs`-bestanden delen één globale scope in Apps Script — declareer constanten
   daarom maar in één bestand (geen dubbele `const`-namen over bestanden heen).
-</content>
-</invoke>
+
+## Werkelijk geïnstalleerde triggers (gecontroleerd 2026-07-28)
+
+PROD-script `Afgerond script`, id `1BALy8QbzWr7DbJy_RjYi7m-c6HdNDRs_47ndYcKV_cFIHh6GDR-GicKF`
+(bereikbaar via de PROD-Sheet → Uitbreidingen → Apps Script → wekker-icoon). Tien triggers,
+állemaal in eigendom van de Sheet-eigenaar `info@vvebeheercollectief.nl` — er draait niets
+onder een ander account.
+
+| Functie | Type | Draait als |
+|---|---|---|
+| `cd_recalcPrioriteiten` | Tijdgebonden (dagelijks ±06:00) | eigenaar |
+| `cd_opvolgingMotor` | Tijdgebonden (dagelijks ±06:30) | eigenaar |
+| `cd_dailySummary` | Tijdgebonden (dagelijks ±08:30) | eigenaar |
+| `cd_checkDeadlines` | Tijdgebonden (elk uur) | eigenaar |
+| `cd_sweepNotifQueue` | Tijdgebonden (elke 5 min) | eigenaar |
+| `cd_onNotifQueueChange` | Uit spreadsheet — Bij wijzigen (`onChange`) | eigenaar |
+| `cd_onEditChange` | Uit spreadsheet — Bij bewerken (`onEdit`) | eigenaar |
+| `verplaatsAfgerond` | Uit spreadsheet — Bij bewerken (`onEdit`) | eigenaar |
+| `verplaatsALV` | Uit spreadsheet — Bij bewerken (`onEdit`) | eigenaar |
+| `sorteerOfferteTrajecten` | Uit spreadsheet — Bij bewerken (`onEdit`) | eigenaar |
+
+De legacy onEdit-triggers (`verplaatsAfgerond`, `verplaatsALV`, `sorteerOfferteTrajecten`)
+staan in geen enkele setup-functie, maar draaien op PROD wél degelijk. Er verschuiven dus
+rijen buiten het dashboard om (zie fase 4 van
+docs/superpowers/plans/2026-07-28-opslag-hardening.md).
+
+In de praktijk staan de vier `onEdit`-triggers stil — hun kolom "Laatste keer uitgevoerd"
+was leeg terwijl alle tijdgebonden triggers diezelfde dag hadden gedraaid. Verklaring: het
+team werkt via het dashboard, en Sheets-API-writes vuren geen `onEdit`. Ze wórden pas wakker
+zodra iemand met de hand in de Sheet typt.
+
+### Waarschuwing bij handmatig werk in `Nog Te Doen`
+
+`sorteerOfferteTrajecten` sorteert bij elke handmatige bewerking het hele sectieblok waarin
+je typt, maar het sorteerbereik is **`getRange(start, 1, rijen, 9)` — alleen kolom A t/m I**,
+terwijl de rijen tot en met kolom P gevuld zijn (K=subcategorie, L=opvolgdatum, M=herhaalID,
+N=escalatie, O=fase, P=aannemers). Wat in J–P staat blijft dus liggen en hoort daarna bij de
+verkeerde taak. Zet deze trigger uit vóór je met de hand in `Nog Te Doen` gaat werken, en
+daarna weer aan.

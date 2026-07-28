@@ -21,7 +21,10 @@ export function _isStagingHost(hostname){ return !PROD_HOSTS.includes(hostname);
 export const IS_STAGING = _isStagingHost(location.hostname);
 
 export const SID_PROD = '1fnUsbwb4nDMNttWym9FWBw1CMMMAVTuZ3v88b35isUw';
-export const SID_TEST = '1-6Q36CrwB0szX2DS2eLjPwfiY-jAw8lK9JOPDSlljm4';   // test-Sheet "Collectief Dashboard - Kopie" (Taak 3)
+// TIJDELIJK — herstel-oefening 2026-07-28. Wijst naar een BACK-UPKOPIE om te bewijzen dat
+// zo'n kopie een werkend dashboard oplevert. Zet na de oefening terug op:
+// '1-6Q36CrwB0szX2DS2eLjPwfiY-jAw8lK9JOPDSlljm4'   // test-Sheet "Collectief Dashboard - Kopie" (Taak 3)
+export const SID_TEST = '1k0vU6CkdW_tcIdzOjUGACDCA089gT5g4HyGgwus79lQ';   // BACKUP Collectief Dashboard 2026-07-28
 export const SID = IS_STAGING ? SID_TEST : SID_PROD;
 export const PG   = 25;
 // AI-proxy: op staging same-origin (/api/chat); op productie de vaste Vercel-functie-URL.

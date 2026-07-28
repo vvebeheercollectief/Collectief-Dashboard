@@ -12,6 +12,7 @@ import { showToast } from "./notifications.js";
 import { ensureToken } from "./auth.js";
 import { renderPag } from "./render-tabel.js";
 import { renderNtdDonut } from "./render-lijsten.js";
+import { metWriteMarkering } from "./data.js";
 import { ico } from "./icons.js";
 
 // ══════════════════════════════════════
@@ -103,10 +104,6 @@ async function toggleAlvoFlag(idx,field){
   if(!state._alvoFlagBezig) state._alvoFlagBezig=new Set();
   if(state._alvoFlagBezig.has(sleutel)) return;
   state._alvoFlagBezig.add(sleutel);
-  // Deze schrijfweg loopt buiten de seriële wachtrij van backgroundWrite om. Zonder
-  // deze teller ziet de 8s-poll geen lopende schrijfactie en kan hij de optimistische
-  // stand overschrijven met de nog-oude waarde uit de Sheet.
-  state.pendingWrites++;
 
   // Lock UI op de specifieke pill
   const btn=document.querySelector(`.flag-toggle[data-idx="${idx}"][data-field="${field}"]`);
@@ -123,26 +120,37 @@ async function toggleAlvoFlag(idx,field){
   renderNtdDonut(); // voortgangsbalk meteen mee laten lopen
 
   try{
-    const ids=await getSheetIds();
-    const sheetId=ids["ALV's overzicht"]??ids["ALV's Overzicht"]??ids["ALV's overzicht "];
-    if(sheetId==null) throw new Error("Sheet 'ALV's overzicht' niet gevonden");
-    await assertRowMatch(r._row, r.code, "ALV's overzicht"); // bescherming: rij nog van deze VvE vóór flag-write
-    const col=ALVO_COLS[field];
-    const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
-      method:'POST',
-      headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
-      body:JSON.stringify({requests:[{
-        updateCells:{
-          range:{sheetId,startRowIndex:r._row-1,endRowIndex:r._row,startColumnIndex:col,endColumnIndex:col+1},
-          rows:[{values:[{userEnteredValue:{boolValue:newVal}}]}],
-          fields:'userEnteredValue'
-        }
-      }]})
-    });
-    if(!resp.ok){const t=await resp.text();throw new Error(`HTTP ${resp.status}: ${t.slice(0,120)}`)}
+    // Deze schrijfweg loopt buiten de seriële wachtrij van backgroundWrite om. metWriteMarkering
+    // doet de schrijfteller (die remt de 8s-poll, zodat die de optimistische stand niet met de
+    // nog-oude Sheet-waarde overschrijft), de statusbalk 'Opslaan…' én de sluit-waarschuwing in
+    // één keer. Bewust GEEN handmatige pendingWrites++ meer erbij: dat zou dubbel tellen en de
+    // balk na afloop op 'Opslaan…' laten hangen.
+    // De optimistische render hierboven staat er bewust vóór: daar zit geen await tussen, dus
+    // de poll kan er niet tussendoor glippen.
+    await metWriteMarkering(async()=>{
+      const ids=await getSheetIds();
+      const sheetId=ids["ALV's overzicht"]??ids["ALV's Overzicht"]??ids["ALV's overzicht "];
+      if(sheetId==null) throw new Error("Sheet 'ALV's overzicht' niet gevonden");
+      await assertRowMatch(r._row, r.code, "ALV's overzicht"); // bescherming: rij nog van deze VvE vóór flag-write
+      const col=ALVO_COLS[field];
+      const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+        method:'POST',
+        headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
+        body:JSON.stringify({requests:[{
+          updateCells:{
+            range:{sheetId,startRowIndex:r._row-1,endRowIndex:r._row,startColumnIndex:col,endColumnIndex:col+1},
+            rows:[{values:[{userEnteredValue:{boolValue:newVal}}]}],
+            fields:'userEnteredValue'
+          }
+        }]})
+      });
+      if(!resp.ok){const t=await resp.text();throw new Error(`HTTP ${resp.status}: ${t.slice(0,120)}`)}
 
-    await logEvent(r.code,'ALVS',newVal?'Aangevinkt':'Uitgevinkt',ALVO_LABELS[field],oldVal?'TRUE':'FALSE',newVal?'TRUE':'FALSE');
-    showToast(`${ALVO_LABELS[field]} ${newVal?'aan':'uit'}`,`${r.code} – ${r.naam}`,newVal?'var(--gn)':'var(--mut)',newVal?'vink':'cirkelOpen');
+      await logEvent(r.code,'ALVS',newVal?'Aangevinkt':'Uitgevinkt',ALVO_LABELS[field],oldVal?'TRUE':'FALSE',newVal?'TRUE':'FALSE');
+      // geenDedup: hetzelfde vinkje binnen 15 s uit- en weer aanzetten geeft twee keer dezelfde
+      // titel+tekst; zonder deze vlag slikt de ontdubbeling de tweede bevestiging in.
+      showToast(`${ALVO_LABELS[field]} ${newVal?'aan':'uit'}`,`${r.code} – ${r.naam}`,newVal?'var(--gn)':'var(--mut)',newVal?'vink':'cirkelOpen',{geenDedup:true,geenSysteemmelding:true});
+    });
   }catch(e){
     // Revert
     r[field]=oldVal;
@@ -152,7 +160,6 @@ async function toggleAlvoFlag(idx,field){
     showToast('Opslaan mislukt',e.message||'Onbekende fout','var(--rd)');
     console.error('toggleAlvoFlag fout:',e);
   }finally{
-    state.pendingWrites=Math.max(0,state.pendingWrites-1);
     state._alvoFlagBezig.delete(sleutel);
     const btn2=document.querySelector(`.flag-toggle[data-idx="${idx}"][data-field="${field}"]`);
     if(btn2) btn2.classList.remove('toggling');

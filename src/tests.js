@@ -1415,8 +1415,14 @@ import { goTo } from "./ui.js";
       await Promise.race([tweede, new Promise(r=>setTimeout(r,60))]);
       eq('alvo-vink: tweede klik binnen het venster schrijft niet', posts.length, 1);
       eq('alvo-vink: de lopende schrijfactie remt de 8s-poll', state.pendingWrites>0, true);
+      // De balk moet tijdens het opslaan van een vinkje óók eerlijk zijn (fase 2): deze
+      // schrijfweg liep eerst met een eigen teller en liet 'Live · HH:MM' staan.
+      eq('alvo-vink: balk zegt Opslaan… tijdens de schrijfactie',
+         document.getElementById('sync-lbl').textContent, 'Opslaan…');
       losMaken(); await eerste; await tweede;
       eq('alvo-vink: na afloop is de rem los', state.pendingWrites, pendOud);
+      truthy('alvo-vink: balk staat na afloop weer op Live',
+             /^Live · /.test(document.getElementById('sync-lbl').textContent));
       eq('alvo-vink: waarde staat op aangevinkt, niet teruggedraaid', D.alvo[0].notulen, true);
       eq('alvo-vink: status volgt de waarde', D.alvo[0].status, 'Afgerond');
       // Een tweede klik NA afloop moet gewoon weer werken (de rem mag niet blijven staan).

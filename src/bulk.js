@@ -6,7 +6,7 @@ import { renderNtd } from "./render-lijsten.js";
 import { toDutchDate, berekenPrioriteit, _parseAnyDate, _vandaagAmsterdam, _verschilInKalenderdagen, parseDt } from "./util.js";
 import { SECS, SID } from "./config.js";
 import { ensureToken } from "./auth.js";
-import { _shiftNtdRows, _herstelShift, assertRowsMatch } from "./api.js";
+import { _shiftNtdRows, _herstelShift, assertRowsMatch, _veiligeRij } from "./api.js";
 import { getSheetIds, getAfInsertRow, getInsertRow, insertAndWriteRow, serializeNtdUndo } from "./crud.js";
 import { backgroundWrite, loadAll, metWriteMarkering } from "./data.js";
 import { showToast, showUndoToast } from "./notifications.js";
@@ -287,14 +287,17 @@ function bulkVeld(rows,soort,waarde){
       // values:batchUpdate met USER_ENTERED — één atomaire POST (alles-of-niets) én zelfde
       // invoer-parsing als de modal-flow (writeRange): een datum-string wordt zo óók via bulk
       // een echte datum-waarde, niet platte tekst. (updateCells/stringValue zou RAW opslaan.)
+      // Formule-rem: veiligeCel zit alleen in writeRange/appendRange, en deze route gebruikt
+      // óók USER_ENTERED maar liep erlangs. Zonder _veiligeRij zou een behandelaarsnaam of
+      // opvolgnotitie die met =,+,-,@ begint hier alsnog als formule in de Sheet landen.
       const data=[];
       for(const it of items){
         const kol=conf.kolom(it.r);
         const val=welkeWaarde==='oud'?it.oud:waarde;
-        data.push({range:`'Nog Te Doen'!${kol}${it.r._row}`, values:[[val]]});
+        data.push({range:`'Nog Te Doen'!${kol}${it.r._row}`, values:[_veiligeRij([val])]});
         if(oppDl && it.sec==='OPPAKKEN'){
           const prio=welkeWaarde==='oud'?it.oudPrio:berekenPrioriteit(waarde,'OPPAKKEN').prioriteit;
-          data.push({range:`'Nog Te Doen'!F${it.r._row}`, values:[[prio]]}); // F=prioriteit, herberekend bij nieuwe deadline
+          data.push({range:`'Nog Te Doen'!F${it.r._row}`, values:[_veiligeRij([prio])]}); // F=prioriteit, herberekend bij nieuwe deadline
         }
       }
       const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values:batchUpdate`,{

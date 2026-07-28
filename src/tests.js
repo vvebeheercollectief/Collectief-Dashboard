@@ -1612,6 +1612,7 @@ import { goTo } from "./ui.js";
     eq('veiligeCel: getal blijft getal', veiligeCel(5), 5);
     eq('_veiligeRij: alleen de riskante cel geprefixt', _veiligeRij(['=x','21-07-2026',true,5,'']), ["'=x",'21-07-2026',true,5,'']);
     eq('_veiligeRij: null-invoer geeft lege rij', _veiligeRij(null), []);
+    eq('bulk-batchUpdate: formule wordt tekst', _veiligeRij(['=SOM(A1:A9)','gewoon']), ["'=SOM(A1:A9)",'gewoon']);
   })();
   // ── Dubbelklik-rem op Afhandelen: met de vlag al gezet (eerste klik onderweg) mag
   //    een tweede doCompleteTask NOOIT de schrijf-fase bereiken. We stubben fetch +

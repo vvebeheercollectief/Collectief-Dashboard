@@ -28,6 +28,7 @@ const APP_SHELL = [
   './src/auth.js',
   './src/login-splash.js',
   './src/data.js',
+  './src/structuurcheck.js',
   './src/actions.js',
   './src/ui.js',
   './src/anim.js',

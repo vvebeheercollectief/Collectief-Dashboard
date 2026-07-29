@@ -24,6 +24,7 @@ import { doOAuth } from "./auth.js";
 import { SPLASH_MS, _setFase } from "./login-splash.js";
 import { opmaakHtml, htmlNaarMarkers, zonderOpmaak, pasToe, opmaakBalk } from "./opmaak.js";
 import { goTo } from "./ui.js";
+import { checkSecties, checkRaster, RASTER_MIN } from "./structuurcheck.js";
 
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
   // ── mini-assert helper (Fase 1 testnet) ──
@@ -806,6 +807,42 @@ import { goTo } from "./ui.js";
       eq('sluit: 29s bezig → waarschuwen', schrijfActieLoopt(30000), true);
       eq('sluit: >30s bezig → vastgelopen, niet blokkeren', schrijfActieLoopt(32000), false);
     } finally { state.pendingWrites=pendOud; state._writeStart=startOud; }
+  })();
+
+  // ── structuurcheck: waarnemend, mag nooit vals alarm geven op gezonde data. ──
+  (()=>{
+    const gezond=[['OPPAKKEN'],['VvE Code','VvE','Actiepunt','Deadline','Behandelaar','Prioriteit','Opmerkingen'],
+                  ['311198','VvE A','iets','','Jer','','']];
+    eq('structuur: gezonde sectie → geen bevindingen', checkSecties(gezond).length, 0);
+
+    const verdwaald=[['OPPAKKEN'],['311198','VvE A','iets','','Jer','',''],
+                     ['VvE Code','VvE','Actiepunt','Deadline','Behandelaar','Prioriteit','Opmerkingen']];
+    eq('structuur: datarij op de kolomkoprij → 1 bevinding', checkSecties(verdwaald).length, 1);
+    eq('structuur: bevinding noemt het regelnummer', checkSecties(verdwaald)[0].regel, 2);
+
+    eq('structuur: leeg blad is GEEN bevinding', checkSecties([]).length, 0);
+
+    eq('structuur: raster breed genoeg', checkRaster('Afgerond', 26), null);
+    eq('structuur: raster te smal', checkRaster('Afgerond', 8).nodig, 12);
+    eq('structuur: onbekend tabblad → geen oordeel', checkRaster('Iets anders', 1), null);
+
+    // REGRESSIE-GUARD op echte data (gemeten op de PROD-Sheet 2026-07-28): OPPAKKEN heeft
+    // 'VvE-Code' MET STREEPJE, de andere drie secties 'VvE Code' met spatie. parseSections
+    // accepteert beide; herkent checkSecties alleen de spatie-vorm, dan slaat hij bij élke
+    // poll vals alarm op OPPAKKEN — en dat leert de gebruiker de melding te negeren.
+    eq('structuur: VvE-Code MET STREEPJE is óók een kolomkoprij',
+       checkSecties([['OPPAKKEN'],['VvE-Code','VvE'],['311198','VvE A']]).length, 0);
+    // De vier secties precies zoals ze in de PROD-Sheet staan, gemengde spelling incluis.
+    eq('structuur: echte NTD-vorm (gemengde spelling) geeft nul bevindingen',
+       checkSecties([['OPPAKKEN'],['VvE-Code','VvE'],['381105','VvE X'],
+                     ['VERGADERVERZOEKEN'],['VvE Code','VvE'],['361023','VvE Y'],
+                     ['OFFERTE-TRAJECTEN'],['VvE Code','VvE'],['311198','VvE Z'],
+                     [],[],
+                     ['LOD'],['VvE Code','VvE'],['381004','VvE Q'],
+                     ['','Losse notitie onderaan het blad']]).length, 0);
+    // Alle negen bekende tabbladen zijn op PROD breed genoeg (gemeten 2026-07-28).
+    eq('structuur: Nog Te Doen op 16 kolommen is precies genoeg', checkRaster('Nog Te Doen', 16), null);
+    eq('structuur: Nog Te Doen op 15 kolommen is te smal', checkRaster('Nog Te Doen', 15).nodig, 16);
   })();
 
   // ── VvE-dossier AI-agent (chat) ──

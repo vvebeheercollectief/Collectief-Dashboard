@@ -12,6 +12,9 @@
       --rd:#B91C1C;--rd-l:#fee2e2;--rd-b:#fecaca;
       --gn:#047857;--gn-l:#d1fae5;--gn-b:#a7f3d0;
       --pk:#BE185D;--pk-l:#fce7f3;--pk-b:#fbcfe8;
+      /* Teal = sectiekleur Subsidie-trajecten. Bewust niet --gn: groen betekent in
+         dit dashboard overal 'afgerond' (afrondknop, status-afgerond, check-yes). */
+      --tl:#0F766E;--tl-l:#e3f2f0;--tl-b:#b3ddd7;
       /* Accent = Operator-leiblauw (#4a5b7a) i.p.v. teal */
       --ac:#4a5b7a;--ac-l:#eef1f6;--ac-b:#d6deea;--ac-900:#3a4a66;--ac-500:#6f81a3;
       --nv:#2B3544;--nv-d:#1E2530;
@@ -39,6 +42,7 @@
       --rd:#F0746F;--rd-l:#371A1B;--rd-b:#582A2A;
       --gn:#34D39A;--gn-l:#103129;--gn-b:#1F4A3C;
       --pk:#F06BAA;--pk-l:#371628;--pk-b:#582441;
+      --tl:#5EC8BC;--tl-l:#10302E;--tl-b:#1F5049;
       --ac:#8b9dc4;--ac-l:#262b35;--ac-b:#3a4256;--ac-900:#a8b8d8;--ac-500:#9fb0d4;
       --fg:#f2f4f7;--prio:#e08b82;
     }

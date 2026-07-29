@@ -62,6 +62,18 @@ export const SECS = {
   LOD:{label:'LOD',css:'--sec:var(--rd);--sec-l:var(--rd-l);--sec-b:var(--rd-b)',color:'#B91C1C',
     cols:['VvE Code','VvE','Actiepunt','Status','Behandelaar','Deadline LOD','Opmerkingen'],
     keys:['code','naam','actiepunt','status','behandelaar','deadline','opmerkingen','inBehandeling']},
+  // Subsidie-trajecten (2026-07-29). Zelfde kolomstramien als LOD, met 'Status'
+  // vervangen door 'Fase'. Twee dingen liggen hier vast en mogen niet losjes wijzigen:
+  //   - de sleutel heet `subsidieFase`, NIET `fase`: parseSections overschrijft
+  //     entry.fase na de keys-loop met kolom O (de offerte-fase).
+  //   - `color` is een letterlijke hex, geen var(): de donut op Analytics haalt deze
+  //     waarde door _lightenHex() en createLinearGradient(), en die kunnen niet met
+  //     een var()-string overweg.
+  // Opmerkingen (kolom G) bestaat wel als veld maar staat bewust niet in `cols`:
+  // de gebruiker koos zes kolommen om de rij rustig te houden.
+  'SUBSIDIE-TRAJECTEN':{label:'Subsidie-trajecten',css:'--sec:var(--tl);--sec-l:var(--tl-l);--sec-b:var(--tl-b)',color:'#0F766E',
+    cols:['VvE Code','VvE','Subsidie','Fase','Behandelaar','Deadline'],
+    keys:['code','naam','subsidie','subsidieFase','behandelaar','deadline','opmerkingen','inBehandeling']},
 };
 export const SKEYS = Object.keys(SECS);
 

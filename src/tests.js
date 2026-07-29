@@ -2198,6 +2198,32 @@ import { checkSecties, checkRaster, checkNummers, RASTER_MIN } from "./structuur
        document.getElementById('ntd-kop-pillen').children.length > 0);
   })();
 
+  // ══════════════════════════════════════
+  //  SUBSIDIE-TRAJECTEN — vijfde sectie
+  // ══════════════════════════════════════
+  console.log('%c[TESTS] Subsidie-trajecten', 'background:#0F766E;color:white;padding:2px 6px;border-radius:3px');
+
+  // ── Sectiedefinitie ──
+  eq('SECS heeft vijf secties', Object.keys(SECS).length, 5);
+  eq('subsidie is de laatste sectie', Object.keys(SECS)[4], 'SUBSIDIE-TRAJECTEN');
+  eq('subsidie-label', SECS['SUBSIDIE-TRAJECTEN'].label, 'Subsidie-trajecten');
+  eq('subsidie heeft 6 kolomkoppen', SECS['SUBSIDIE-TRAJECTEN'].cols.length, 6);
+  eq('subsidie heeft 8 sleutels', SECS['SUBSIDIE-TRAJECTEN'].keys.length, 8);
+  // parseSections overschrijft entry.fase met kolom O (de offerte-fase); een sleutel
+  // die 'fase' heet zou dus stil worden weggegooid.
+  eq('sleutel heet subsidieFase, niet fase', SECS['SUBSIDIE-TRAJECTEN'].keys[3], 'subsidieFase');
+  eq('deadline staat op kolom F (index 5)', SECS['SUBSIDIE-TRAJECTEN'].keys[5], 'deadline');
+  // ntdSorteerKey leidt de sorteersleutel af uit de kolomkop-tekst en eist deze twee
+  // letterlijk; wijkt de kop af, dan valt sorteren stil weg zonder foutmelding.
+  eq('eerste kop is exact "VvE Code"', SECS['SUBSIDIE-TRAJECTEN'].cols[0], 'VvE Code');
+  truthy('deadline-kop begint met Deadline', SECS['SUBSIDIE-TRAJECTEN'].cols[5].startsWith('Deadline'));
+  // De donut haalt deze waarde door _lightenHex() en createLinearGradient(); een
+  // var()-string levert daar NaN-kleuren op.
+  truthy('color is een letterlijke hex', /^#[0-9A-Fa-f]{6}$/.test(SECS['SUBSIDIE-TRAJECTEN'].color));
+  // afOff = Math.max(keys.length, 8) bepaalt waar kolom I begint — meer dan 8
+  // sleutels schuift de afronddatum op en breekt elke sectie tegelijk.
+  Object.keys(SECS).forEach(s => truthy(`${s} heeft hoogstens 8 sleutels`, SECS[s].keys.length <= 8));
+
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');
   window._testResult = `${totOk} OK, ${totFail} FAIL`; // uitleesbaar voor test-automatisering

@@ -19,8 +19,12 @@ import { SKEYS, SECS } from "./config.js";
 // Gemeten op PROD 2026-07-28: alle negen halen dit. 'Nog Te Doen' staat op exact 16 —
 // geen speling, dus een nieuwe kolom Q vraagt éérst het raster verbreden (schrijfacties
 // buiten het raster mislukken zonder melding).
+// LET OP — dit getal loopt bewust GELIJK op met de werkelijkheid, niet vooruit: zet het pas
+// op 17 op het moment dat de kolom er op PROD én TEST echt bij staat (taak 4.3 stap A1).
+// Eerder ophogen zou de structuurbewaking laten klagen over iets dat nog niet gedaan is,
+// en dat is precies hoe een melding zijn geloofwaardigheid verliest.
 const RASTER_MIN = {
-  'Nog Te Doen':      16,  // kolom P (offerte-aannemers)
+  'Nog Te Doen':      16,  // kolom P (offerte-aannemers) — wordt 17 zodra kolom Q er staat
   'Afgerond':         12,  // A:L — NIET 16
   'Herhaalregels':    12,  // A:L
   'Kenmerken':         6,  // A:F

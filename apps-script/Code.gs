@@ -161,6 +161,13 @@ function sorteerOfferteTrajecten(e) {
   // queue-drain) via dezelfde document-lock. Voorheen liep deze sort als enige zónder lock.
   cd_lockedRun('sorteerOfferteTrajecten', function() { _sorteerOfferteTrajectenImpl(e); });
 }
+// Breedte van het sorteerbereik. Stond op 9 (A t/m I) terwijl de rijen tot en met Q gevuld
+// zijn. Gevolg: bij elke handmatige bewerking schoven A-I wél en J-Q niet, waarna opvolgdatum,
+// herhaal-ID, escalatie, offerte-fase en aannemerslijst bij de VERKEERDE taak hoorden. Gemeten
+// op 2026-07-29: een sortering die het volledige gevulde bereik dekt verplaatst de rijen zelf
+// (inclusief hun vaste taaknummer); een smaller bereik verplaatst alleen celwaarden.
+// Bij een nieuwe kolom rechts: dit getal MEE ophogen, anders zakt die kolom weer weg.
+const NTD_SORT_KOLOMMEN = 17;   // A t/m Q
 function _sorteerOfferteTrajectenImpl(e) {
   var ss = e ? e.source : SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName("Nog Te Doen");
@@ -185,6 +192,11 @@ function _sorteerOfferteTrajectenImpl(e) {
     if (val === "LOD") lodHeader = i + 1;
   }
 
+  // Nooit breder sorteren dan het blad is: getRange gooit een fout zodra numColumns het
+  // raster overschrijdt, en die fout zou de hele trigger (incl. de sortering zelf) stilleggen
+  // op een Sheet die nog niet verbreed is.
+  var sortBreedte = Math.min(NTD_SORT_KOLOMMEN, sheet.getMaxColumns());
+
   var editedRow = e ? e.range.getRow() : 0;
   var sortAll = (editedRow === 0);
 
@@ -204,7 +216,7 @@ function _sorteerOfferteTrajectenImpl(e) {
     }
     var oppakkenRows = oppakkenEnd - oppakkenStart + 1;
     if (oppakkenRows > 1) {
-      sheet.getRange(oppakkenStart, 1, oppakkenRows, 9).sort({column: 8, ascending: true});
+      sheet.getRange(oppakkenStart, 1, oppakkenRows, sortBreedte).sort({column: 8, ascending: true});
     }
   }
 
@@ -219,7 +231,7 @@ function _sorteerOfferteTrajectenImpl(e) {
     }
     var vergaderRows = vergaderEnd - vergaderStart + 1;
     if (vergaderRows > 1) {
-      sheet.getRange(vergaderStart, 1, vergaderRows, 9).sort({column: 8, ascending: true});
+      sheet.getRange(vergaderStart, 1, vergaderRows, sortBreedte).sort({column: 8, ascending: true});
     }
   }
 
@@ -234,7 +246,7 @@ function _sorteerOfferteTrajectenImpl(e) {
     }
     var offerteRows = offerteEnd - offerteStart + 1;
     if (offerteRows > 1) {
-      sheet.getRange(offerteStart, 1, offerteRows, 9).sort({column: 3, ascending: true});
+      sheet.getRange(offerteStart, 1, offerteRows, sortBreedte).sort({column: 3, ascending: true});
     }
   }
 
@@ -249,7 +261,7 @@ function _sorteerOfferteTrajectenImpl(e) {
     }
     var lodRows = lodEnd - lodStart + 1;
     if (lodRows > 1) {
-      sheet.getRange(lodStart, 1, lodRows, 9).sort({column: 6, ascending: true});
+      sheet.getRange(lodStart, 1, lodRows, sortBreedte).sort({column: 6, ascending: true});
     }
   }
 }

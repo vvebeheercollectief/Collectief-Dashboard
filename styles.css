@@ -480,6 +480,11 @@
     /* Modal */
     .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;display:flex;align-items:flex-start;justify-content:center;padding:32px 16px;overflow-y:auto;opacity:0;pointer-events:none;transition:opacity .2s}
     .modal-bg.open{opacity:1;pointer-events:all}
+    /* Verticaal centreren via auto-marges, NIET via align-items:center. Deze laag scrollt
+       (overflow-y:auto), en bij align-items:center raakt de bovenkant van een venster dat hoger
+       is dan het scherm onbereikbaar — je kunt er dan niet naartoe scrollen. Auto-marges vallen
+       in dat geval netjes terug op 0, dus lange formulieren blijven volledig bereikbaar. */
+    .modal-bg > *{margin:auto}
     .modal{background:var(--sur);border-radius:var(--r);width:100%;max-width:600px;box-shadow:var(--shl);transform:translateY(-10px);transition:transform .2s}
     .modal-bg.open .modal{transform:translateY(0)}
     .modal-hdr{padding:16px 20px;border-bottom:1px solid var(--bor);display:flex;align-items:center;justify-content:space-between}
@@ -771,7 +776,8 @@
     @media(max-width:700px){#dos-wie{margin-left:0}}
 
     /* ── Commandocentrum (Fase 5) ── */
-    #pal-bg.open{align-items:flex-start;padding-top:10vh}
+    /* Het zoekvenster stond bewust op 10vh (de gebruikelijke plek voor een commandopalet),
+       maar dat las als 'omhoog kijken'. Nu midden op het scherm, net als de andere vensters. */
     .pal{width:min(620px,94vw);background:var(--sur);border-radius:14px;box-shadow:var(--shl);overflow:hidden;border:1px solid var(--bor)}
     .pal-zoek{display:flex;align-items:center;gap:10px;padding:13px 17px;border-bottom:1px solid var(--bor);color:var(--mut)}
     .pal-zoek input{border:none;outline:none;background:none;font-size:16px;flex:1;color:var(--txt)}

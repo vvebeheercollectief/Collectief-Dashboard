@@ -55,9 +55,9 @@ function _sluitMenus(){ document.querySelectorAll('.bb-menu').forEach(m=>m.class
 
 // ── Bulk-acties ─────────────────────────────────────────────────────────
 // Kolomletters in 'Nog Te Doen': behandelaar is overal E (keys-index 4);
-// deadline is D bij OPPAKKEN (index 3) en F bij de andere drie (index 5).
+// deadline is D bij OPPAKKEN (index 3) en F bij de andere vier (index 5).
 const BULK_BEH_KOLOM='E';
-const BULK_DEADLINE_KOLOM={OPPAKKEN:'D',VERGADERVERZOEKEN:'F','OFFERTE-TRAJECTEN':'F',LOD:'F'};
+const BULK_DEADLINE_KOLOM={OPPAKKEN:'D',VERGADERVERZOEKEN:'F','OFFERTE-TRAJECTEN':'F',LOD:'F','SUBSIDIE-TRAJECTEN':'F'};
 const OPVOLG_KOLOM='L';
 
 // Serialiseer een taakrij naar de NTD-kolomwaarden — gedeelde bron in crud.js
@@ -109,6 +109,7 @@ function bulkAfronden(rows){
       case 'OPPAKKEN':          values=[r.code,r.naam,r.actiepunt||'',r.deadline||'',r.behandelaar||'',r.prioriteit||'',r.opmerkingen||'',r.inBehandeling||'',vandaag,'',r.subcategorie||''];break;
       case 'VERGADERVERZOEKEN': values=[r.code,r.naam,r.periode||'',r.agendapunten||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'',r.inBehandeling||'',vandaag,'',r.subcategorie||''];break;
       case 'OFFERTE-TRAJECTEN': values=[r.code,r.naam,r.datumAangevraagd||'',r.offertes||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'','',vandaag,'',r.subcategorie||''];break;
+      case 'SUBSIDIE-TRAJECTEN': values=[r.code,r.naam,r.subsidie||'',r.subsidieFase||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'',r.inBehandeling||'',vandaag,'',r.subcategorie||''];break;
       default:                  values=[r.code,r.naam,r.actiepunt||'',r.status||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'',r.inBehandeling||'',vandaag,'',r.subcategorie||''];
     }
     values.push(r.herhaalId||''); // L in 'Afgerond': Herhaal-ID (Fase 4-motor)

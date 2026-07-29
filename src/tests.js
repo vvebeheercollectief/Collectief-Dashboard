@@ -12,11 +12,11 @@ import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel,
 import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk.js";
-import { _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, veiligeCel, _veiligeRij, fetchSheets, vingerafdruk, rijVingerafdruk, _normCel, _rijNaarCellen, assertRowMatch } from "./api.js";
+import { _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, veiligeCel, _veiligeRij, fetchSheets, vingerafdruk, rijVingerafdruk, _normCel, _rijNaarCellen, assertRowMatch, NTD_DATUM } from "./api.js";
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
-import { setv, serializeNtdUndo, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal } from "./crud.js";
+import { setv, serializeNtdUndo, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, kiesModalFase, _modalFaseWoord } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages } from "./dossier-chat.js";
 import { shouldPromptReload, maakHerlaadKern } from "./sw-update.js";
@@ -2291,6 +2291,44 @@ import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml } from "./subsidie-fa
      dossierContextTekst('311028', _Dsub, T).includes('SVVE isolatie'));
   truthy('Ctrl+K vindt een traject op zijn omschrijving',
      zoekAlles('SVVE', _Dsub).taken.some(t => t.code === '311028'));
+
+  // ── Bewerkscherm ──
+  truthy('vijfde formuliergroep bestaat', !!document.getElementById('fg-sub'));
+  ['m-subsidie','m-beh-s','m-dl-s','m-opm-s','m-sub-sub','tog-ib-s','m-fase']
+    .forEach(id => truthy(`veld ${id} bestaat`, !!document.getElementById(id)));
+  ['m-sub-opp','m-sub-verg','m-sub-off','m-sub-lod','m-sub-sub'].forEach(id => {
+    const opts = [...document.getElementById(id).options].map(o => o.text);
+    truthy(`${id} biedt Subsidie-trajecten`, opts.includes('Subsidie-trajecten'));
+    eq(`${id} heeft Geen + vijf secties`, opts.length, 6);
+  });
+
+  // ── Schrijfwegen ──
+  eq('bulk-deadline staat op kolom F', BULK_DEADLINE_KOLOM['SUBSIDIE-TRAJECTEN'], 'F');
+  // NTD_DATUM stuurt de datumopmaak van de Sheet aan. Bij deze sectie is D de fase;
+  // stond D hier wél in, dan kreeg het fasewoord een datumopmaak.
+  eq('datumkolom is F, niet D', NTD_DATUM['SUBSIDIE-TRAJECTEN'], [5]);
+  truthy('kolom D staat NIET in de datumkolommen', !NTD_DATUM['SUBSIDIE-TRAJECTEN'].includes(3));
+  // serializeNtdUndo moet A..P vullen, anders raakt een undo het taaknummer kwijt.
+  const _u = serializeNtdUndo({ _sec:'SUBSIDIE-TRAJECTEN', code:'311028', naam:'VvE N',
+    subsidie:'SVVE', subsidieFase:'Verleend', behandelaar:'Cihad', deadline:'1 juli 2026',
+    opmerkingen:'x', inBehandeling:'TRUE' });
+  truthy('undo-rij is minstens 16 kolommen breed', _u.length >= 16);
+  eq('undo houdt de omschrijving op kolom C', _u[2], 'SVVE');
+  eq('undo houdt de fase op kolom D', _u[3], 'Verleend');
+  eq('undo houdt de deadline op kolom F', _u[5], '1 juli 2026');
+
+  // ── Klik-acties ──
+  truthy('klik-actie op een bolletje is geregistreerd', typeof ACTIONS['subsidie-fase'] === 'function');
+  truthy('modal-variant is een aparte actie', typeof ACTIONS['subsidie-fase-modal'] === 'function');
+  // De modal-variant mag niets naar de Sheet schrijven, alleen de lokale stand zetten.
+  kiesModalFase(4);
+  eq('modal-fase onthoudt de keuze', _modalFaseWoord(), 'Uitgevoerd');
+  eq('modal-kiezer tekent vijf knoppen',
+     document.querySelectorAll('#m-fase .fase-bol').length, 5);
+  truthy('modal-knoppen schrijven niet rechtstreeks weg',
+     [...document.querySelectorAll('#m-fase .fase-bol')].every(b => b.dataset.action === 'subsidie-fase-modal'));
+  clearModal();
+  eq('leegmaken zet de fase terug op Voorbereiden', _modalFaseWoord(), 'Voorbereiden');
 
   // ── Rij-opbouw in de tabel ──
   // rowNtd is niet geëxporteerd; we testen via renderNtd op echte data.

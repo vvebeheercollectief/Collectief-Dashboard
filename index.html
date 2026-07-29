@@ -494,7 +494,7 @@
         <div class="fld-row">
           <div class="fld" style="flex:1"><label>Opmerkingen</label><input type="text" id="m-opm"/></div>
         </div>
-        <div class="fld"><label>Subcategorie</label><select id="m-sub-opp"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option></select></div>
+        <div class="fld"><label>Subcategorie</label><select id="m-sub-opp"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option><option>Subsidie-trajecten</option></select></div>
         <div class="toggle-row"><button type="button" class="tog" role="switch" aria-checked="false" id="tog-ib" data-action="toggle"></button><span>In behandeling</span></div>
       </div>
 
@@ -511,7 +511,7 @@
           <div class="fld"><label>Deadline uitschrijven</label><input type="date" id="m-dl-v"/></div>
           <div class="fld"><label>Opmerkingen</label><input type="text" id="m-opm-v"/></div>
         </div>
-        <div class="fld"><label>Subcategorie</label><select id="m-sub-verg"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option></select></div>
+        <div class="fld"><label>Subcategorie</label><select id="m-sub-verg"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option><option>Subsidie-trajecten</option></select></div>
         <div class="toggle-row"><button type="button" class="tog" role="switch" aria-checked="false" id="tog-ib-v" data-action="toggle"></button><span>In behandeling</span></div>
       </div>
 
@@ -545,7 +545,7 @@
           <div class="fld"><label>Deadline</label><input type="date" id="m-dl-o"/></div>
         </div>
         <div class="fld"><label>Opmerkingen</label><textarea id="m-opm-o"></textarea></div>
-        <div class="fld"><label>Subcategorie</label><select id="m-sub-off"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option></select></div>
+        <div class="fld"><label>Subcategorie</label><select id="m-sub-off"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option><option>Subsidie-trajecten</option></select></div>
       </div>
 
       <!-- LOD -->
@@ -561,8 +561,25 @@
           <div class="fld"><label>Deadline LOD</label><input type="date" id="m-dl-l"/></div>
           <div class="fld"><label>Opmerkingen</label><input type="text" id="m-opm-l"/></div>
         </div>
-        <div class="fld"><label>Subcategorie</label><select id="m-sub-lod"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option></select></div>
+        <div class="fld"><label>Subcategorie</label><select id="m-sub-lod"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option><option>Subsidie-trajecten</option></select></div>
         <div class="toggle-row"><button type="button" class="tog" role="switch" aria-checked="false" id="tog-ib-l" data-action="toggle"></button><span>In behandeling</span></div>
+      </div>
+      <!-- SUBSIDIE-TRAJECTEN -->
+      <div id="fg-sub" style="display:none">
+        <div class="fld"><label>Subsidie</label><textarea id="m-subsidie" placeholder="Waar gaat dit traject over? bv. SVVE isolatie"></textarea></div>
+        <div class="fld">
+          <label>Fase</label>
+          <div id="m-fase"></div>
+        </div>
+        <div class="fld-row">
+          <div class="fld"><label>Deadline</label><input type="date" id="m-dl-s"/></div>
+          <div class="fld"><label>Behandelaar</label>
+            <select id="m-beh-s"><option value="">Selecteer…</option><option>Jer</option><option>Cihad</option><option>Gabos</option><option>Cihad, Jer</option><option>Jer, Gabos</option><option>Cihad, Gabos</option></select>
+          </div>
+        </div>
+        <div class="fld"><label>Opmerkingen</label><input type="text" id="m-opm-s"/></div>
+        <div class="fld"><label>Subcategorie</label><select id="m-sub-sub"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option><option>Subsidie-trajecten</option></select></div>
+        <div class="toggle-row"><button type="button" class="tog" role="switch" aria-checked="false" id="tog-ib-s" data-action="toggle"></button><span>In behandeling</span></div>
       </div>
       <!-- Logboek per taak -->
       <div id="fg-history" class="logboek-box" style="display:none">

@@ -137,8 +137,10 @@ const FP_KOLOMMEN = {
   'Afgerond':    { tekst:[0,2], datum:[8]  },  // A=code, C=actiepunt, I=datum afgerond
 };
 // Welke kolom de deadline draagt verschilt per sectie van 'Nog Te Doen' (zie SECS.keys):
-// OPPAKKEN D(3) · VERGADERVERZOEKEN F(5) · OFFERTE-TRAJECTEN C(2)+F(5) · LOD F(5).
-const NTD_DATUM = { OPPAKKEN:[3], VERGADERVERZOEKEN:[5], 'OFFERTE-TRAJECTEN':[2,5], LOD:[5] };
+// OPPAKKEN D(3) · VERGADERVERZOEKEN F(5) · OFFERTE-TRAJECTEN C(2)+F(5) · LOD F(5)
+// · SUBSIDIE-TRAJECTEN F(5). Let op: bij subsidie is D de FASE, geen datum — daar
+// mag dus geen datumopmaak op.
+const NTD_DATUM = { OPPAKKEN:[3], VERGADERVERZOEKEN:[5], 'OFFERTE-TRAJECTEN':[2,5], LOD:[5], 'SUBSIDIE-TRAJECTEN':[5] };
 
 // Eén cel vergelijkbaar maken. isDatum → vergelijk op de GEPARSEERDE datum, nooit op de tekst:
 // het dashboard houdt '17-06-2026' in het geheugen terwijl values.get (FORMATTED_VALUE)
@@ -267,4 +269,4 @@ async function assertRowsMatch(checks, sheetName='Nog Te Doen'){
 const assertRowMatch=(row, bronOfCode, sheetName)=>assertRowsMatch(
   [(bronOfCode && typeof bronOfCode==='object') ? { row, r:bronOfCode } : { row, code:bronOfCode }], sheetName);
 
-export { fetchSheet, fetchSheets, writeRange, appendRange, veiligeCel, _veiligeRij, _shiftNtdRows, _herstelShift, _isTransient, _withRetry, askChat, _rowMismatch, _a1Bereik, vingerafdruk, rijVingerafdruk, _nummerDeel, _normCel, _rijNaarCellen, assertRowsMatch, assertRowMatch };
+export { NTD_DATUM, fetchSheet, fetchSheets, writeRange, appendRange, veiligeCel, _veiligeRij, _shiftNtdRows, _herstelShift, _isTransient, _withRetry, askChat, _rowMismatch, _a1Bereik, vingerafdruk, rijVingerafdruk, _nummerDeel, _normCel, _rijNaarCellen, assertRowsMatch, assertRowMatch };

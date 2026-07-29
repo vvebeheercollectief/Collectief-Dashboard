@@ -10,6 +10,15 @@ import { showToast, showUndoToast, fireNotifEvent, undoComplete, undoDelete } fr
 import { animateRowOut, flashRow } from "./anim.js";
 import { logEvent, renderTaskHistory } from "./render-overig.js";
 import { backgroundWrite, loadAll } from "./data.js";
+import { faseIndex, faseWoord, faseRijHtml } from "./subsidie-fase.js";
+
+// Welke formuliergroep hoort bij welke sectie. Eén bron: openModal verbergt ze
+// allemaal via deze map en toont er precies één, dus een zesde sectie raakt
+// straks maar één plek in plaats van vijf losse regels.
+const FG_PER_SECTIE = {
+  OPPAKKEN:'fg-opp', VERGADERVERZOEKEN:'fg-verg', 'OFFERTE-TRAJECTEN':'fg-off',
+  LOD:'fg-lod', 'SUBSIDIE-TRAJECTEN':'fg-sub',
+};
 import { renderAll } from "./main.js";
 
 //  MODAL — Open / Close
@@ -28,11 +37,8 @@ function openModal(isEdit,rowData,opts){
   document.documentElement.style.setProperty('--modal-sec',SECS[sec].color);
 
   // Show correct field group
-  document.getElementById('fg-opp').style.display='none';
-  document.getElementById('fg-verg').style.display='none';
-  document.getElementById('fg-off').style.display='none';
-  document.getElementById('fg-lod').style.display='none';
-  const fg={OPPAKKEN:'fg-opp',VERGADERVERZOEKEN:'fg-verg','OFFERTE-TRAJECTEN':'fg-off',LOD:'fg-lod'}[sec];
+  Object.values(FG_PER_SECTIE).forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
+  const fg=FG_PER_SECTIE[sec];
   if(fg) document.getElementById(fg).style.display='';
 
   if(isEdit&&state.editRowData){
@@ -78,6 +84,11 @@ function fillModalFields(sec,r){
       setv('m-actie-l',r.actiepunt);setv('m-stat-l',r.status);setv('m-beh-l',r.behandelaar);
       setv('m-dl-l',toISODate(r.deadline));setv('m-opm-l',r.opmerkingen);setv('m-sub-lod',r.subcategorie);
       tog('tog-ib-l',r.inBehandeling==='TRUE');break;
+    case'SUBSIDIE-TRAJECTEN':
+      setv('m-subsidie',r.subsidie);setv('m-beh-s',r.behandelaar);
+      setv('m-dl-s',toISODate(r.deadline));setv('m-opm-s',r.opmerkingen);setv('m-sub-sub',r.subcategorie);
+      tog('tog-ib-s',r.inBehandeling==='TRUE');
+      zetModalFase(r.subsidieFase);break;
   }
 }
 function setv(id,v){const el=document.getElementById(id);if(el)el.value=(v===undefined||v===null)?'':v} // 0 blijft '0' (geen falsy-coercie)
@@ -85,8 +96,25 @@ function setv(id,v){const el=document.getElementById(id);if(el)el.value=(v===und
 function clearModal(){
   document.querySelectorAll('.modal-body input,.modal-body select,.modal-body textarea').forEach(el=>{if(!el.readOnly)el.value=''});
   ['m-off-recv','m-off-total'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='0'});
-  ['tog-ib','tog-ib-v','tog-ib-l'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('on')});
+  ['tog-ib','tog-ib-v','tog-ib-l','tog-ib-s'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('on')});
+  zetModalFase('');   // terug naar Voorbereiden, anders erft een nieuwe taak de vorige fase
 }
+
+// ── Fase-kiezer in het bewerkscherm ──
+// De stand staat in een module-variabele en niet in de DOM: submitTask heeft het
+// wóórd nodig, niet de knoppen, en zo blijft de kiezer werken als de modal
+// tussendoor opnieuw wordt getekend.
+let _modalFase = 1;
+function zetModalFase(woord){
+  _modalFase = faseIndex(woord);
+  const host = document.getElementById('m-fase');
+  if(!host) return;
+  host.innerHTML = faseRijHtml(faseWoord(_modalFase), -1, 'fase-rij-modal');
+  // In de modal mag een klik niet meteen naar de Sheet schrijven — pas bij Opslaan.
+  host.querySelectorAll('.fase-bol').forEach(b=>{ b.dataset.action='subsidie-fase-modal'; });
+}
+function kiesModalFase(n){ zetModalFase(faseWoord(n)); }
+function _modalFaseWoord(){ return faseWoord(_modalFase); }
 
 // ══════════════════════════════════════
 //  SHEET HELPERS (insert / delete rows)
@@ -296,6 +324,8 @@ async function doCompleteTask(){
         values=[r.code,r.naam,r.periode||'',r.agendapunten||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'',r.inBehandeling||'',today,comment,r.subcategorie||''];break;
       case'OFFERTE-TRAJECTEN':
         values=[r.code,r.naam,r.datumAangevraagd||'',r.offertes||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'','',today,comment,r.subcategorie||''];break;
+      case'SUBSIDIE-TRAJECTEN':
+        values=[r.code,r.naam,r.subsidie||'',r.subsidieFase||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'',r.inBehandeling||'',today,comment,r.subcategorie||''];break;
       case'LOD':
         values=[r.code,r.naam,r.actiepunt||'',r.status||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'',r.inBehandeling||'',today,comment,r.subcategorie||''];break;
       default: throw new Error('Onbekende sectie: '+sec);
@@ -371,7 +401,7 @@ async function submitTask(){
   let values;
 
   try{
-    const subId={OPPAKKEN:'m-sub-opp',VERGADERVERZOEKEN:'m-sub-verg','OFFERTE-TRAJECTEN':'m-sub-off',LOD:'m-sub-lod'}[sec];
+    const subId={OPPAKKEN:'m-sub-opp',VERGADERVERZOEKEN:'m-sub-verg','OFFERTE-TRAJECTEN':'m-sub-off',LOD:'m-sub-lod','SUBSIDIE-TRAJECTEN':'m-sub-sub'}[sec];
     const sub=gv(subId);
     // Kolomvolgorde 'Nog Te Doen': … H=InBeh, I=Afgerond, J=(leeg), K=Subcategorie, L=Opvolg, …
     // De subcategorie moet dus op kolom K (index 10) staan — gelijk aan parseSections en de
@@ -392,12 +422,15 @@ async function submitTask(){
       case'LOD':
         values=[code,naam,gv('m-actie-l'),gv('m-stat-l'),gv('m-beh-l'),toDutchDate(gv('m-dl-l')),gv('m-opm-l'),
           document.getElementById('tog-ib-l').classList.contains('on'),'','',sub];break;
+      case'SUBSIDIE-TRAJECTEN':
+        values=[code,naam,gv('m-subsidie'),faseWoord(_modalFase),gv('m-beh-s'),toDutchDate(gv('m-dl-s')),gv('m-opm-s'),
+          document.getElementById('tog-ib-s').classList.contains('on'),'','',sub];break;
     }
 
     const endCol=String.fromCharCode(64+Math.max(values.length,9));
     const keys=SECS[sec].keys;
     const norm=v=>v===true?'TRUE':v===false?'FALSE':v; // boolean → Sheets-stringvorm
-    const newBeh=(sec==='OPPAKKEN'?gv('m-beh'):sec==='VERGADERVERZOEKEN'?gv('m-beh-v'):sec==='OFFERTE-TRAJECTEN'?gv('m-beh-o'):gv('m-beh-l'));
+    const newBeh=(sec==='OPPAKKEN'?gv('m-beh'):sec==='VERGADERVERZOEKEN'?gv('m-beh-v'):sec==='OFFERTE-TRAJECTEN'?gv('m-beh-o'):sec==='SUBSIDIE-TRAJECTEN'?gv('m-beh-s'):gv('m-beh-l'));
     if(state.editMode&&state.editRowData?._row){
       // ── Bewerken: lokale rij meteen bijwerken, dan op de achtergrond opslaan ──
       const doelRow=state.editRowData, oudeWaarden={...state.editRowData};
@@ -467,9 +500,35 @@ function gv(id){const el=document.getElementById(id);return el?el.value.trim():'
 
 // ══════════════════════════════════════
 
+// Fase wegschrijven naar kolom D vanaf een bolletje in de tabelrij.
+// Zelfde vorm als _bewaar in offerte-aannemers.js: eerst lokaal muteren zodat het
+// scherm meteen klopt, dan pas de Sheet — met assertRowMatch ertussen, zodat we
+// nooit een ándere taak overschrijven als er intussen rijen zijn verschoven.
+async function zetSubsidieFase(rid, stap){
+  const r = state._rowCache[rid];
+  if(!r || r._sec !== 'SUBSIDIE-TRAJECTEN') return;
+  const nieuw = faseWoord(stap), oud = r.subsidieFase || '';
+  if(nieuw === oud) return;
+  if(!await ensureToken()){alert('Inloggen mislukt. Probeer het opnieuw.');return}
+  r.subsidieFase = nieuw;
+  renderAll();
+  backgroundWrite(
+    async ()=>{
+      // De snapshot moet de stand VÓÓR de optimistische mutatie zijn — dat is wat
+      // er op dit moment nog in de Sheet hoort te staan.
+      await assertRowMatch(r._row, {...r, subsidieFase: oud});
+      await writeRange(`'Nog Te Doen'!D${r._row}`, [nieuw]);
+      await logEvent(r.code, 'SUBSIDIE-TRAJECTEN', 'Fase gewijzigd', 'fase', oud || 'Voorbereiden', nieuw);
+      showToast('Fase bijgewerkt', `${r.code} — ${nieuw}`, null, 'opslaan', {geenSysteemmelding:true});
+    },
+    ()=>{ r.subsidieFase = oud; },
+    'Fase opslaan mislukt'
+  );
+}
+
 export {
   openModal, editRow, closeModal, fillModalFields, setv, clearModal,
   getSheetIds, getInsertRow, insertAndWriteRow, deleteTask, deleteCurrentEditTask, deleteTaskRow,
   getAfInsertRow, completeTask, completeCurrentEditTask, doCompleteTask, closeCompleteModal, submitTask, gv,
-  _verseRijIdx, _herankerRij,
+  _verseRijIdx, _herankerRij, zetSubsidieFase, kiesModalFase, _modalFaseWoord,
 };

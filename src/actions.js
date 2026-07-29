@@ -11,7 +11,7 @@ import {
   setOntw, renderOntw, editOntwItem, addTaskNote, renderLogboek,
   editLogboek, saveLogboek, cancelLogboek, setLogSoort, deleteLogboek,
 } from './render-overig.js';
-import { openModal, completeTask, completeCurrentEditTask, deleteCurrentEditTask } from './crud.js';
+import { openModal, completeTask, completeCurrentEditTask, deleteCurrentEditTask, zetSubsidieFase, kiesModalFase } from './crud.js';
 import { adjOff } from './util.js';
 import { copyAiPrompt, aiOvernemen, aiActieTaak, aiKopieerConcept } from './ai.js';
 import { dismissToast, saveNotifPrefs } from './notifications.js';
@@ -33,6 +33,11 @@ export const ACTIONS = {
   'toggle':                (el) => { el.setAttribute('aria-checked', el.classList.toggle('on')); },
   'notif-toggle':          (el) => { el.setAttribute('aria-checked', el.classList.toggle('on')); saveNotifPrefs(); },
   'off':                   (el) => adjOff(el.dataset.off, +el.dataset.delta),
+  // Fase-bolletje in een tabelrij: schrijft meteen weg naar kolom D.
+  'subsidie-fase':         (el) => zetSubsidieFase(+el.dataset.rid, +el.dataset.fase),
+  // Hetzelfde bolletje in het bewerkscherm: zet alleen de lokale stand; pas bij
+  // Opslaan gaat het naar de Sheet.
+  'subsidie-fase-modal':   (el) => kiesModalFase(+el.dataset.fase),
   'notitie-toevoegen':     ()   => addTaskNote(),
   'taak-verwijder-modal':  ()   => deleteCurrentEditTask(),
   'taak-afronden-modal':   ()   => completeCurrentEditTask(),

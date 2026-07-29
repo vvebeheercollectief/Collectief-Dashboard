@@ -794,6 +794,23 @@ import { checkSecties, checkRaster, checkNummers, RASTER_MIN } from "./structuur
     return r.datum==='17-06-2026' && r.behandelaar==='Jer' && r.deadline==='19-06-2026';
   })());
 
+  // ── parseSections leest het vaste taaknummer uit kolom Q (fase 4). ──
+  // Dit is de schakel tussen de Sheet en de guard: staat hier iets fout, dan valt élke rij
+  // stilzwijgend terug op de inhoudsvergelijking en heeft het nummer geen enkel effect.
+  (()=>{
+    const kop=['VvE-Code','VvE','Actiepunt','Deadline','Behandelaar','Prio','Opm','InBeh','Afgerond','','','Opvolg','HerhaalID','Esc','Fase','Aannemers','TaakID'];
+    const rij=(q)=>['311062','VvE Lunteren','CRM','19-06-2026','Jer','Hoog','','FALSE','','','','','','','','',q];
+    const lees=q=>parseSections([['OPPAKKEN'],kop,rij(q)]).data['OPPAKKEN'][0];
+    eq('parseSections: taaknummer uit kolom Q', lees('Tabc123').taakId, 'Tabc123');
+    eq('parseSections: geërfde FALSE in Q telt als geen nummer', lees('FALSE').taakId, '');
+    eq('parseSections: lege Q geeft leeg taaknummer', lees('').taakId, '');
+    eq('parseSections: kolom Q verstoort de bestaande kolommen niet',
+       [lees('Tabc123').deadline, lees('Tabc123').behandelaar], ['19-06-2026','Jer']);
+    // Een rij die vóór de kolom bestond komt korter terug (values.get kapt de staart af)
+    eq('parseSections: rij zonder kolom Q valt niet om',
+       parseSections([['OPPAKKEN'],kop,['311062','VvE Lunteren','CRM']]).data['OPPAKKEN'][0].taakId, '');
+  })();
+
   // ── schrijfActieLoopt: waarschuwen bij sluiten zolang er écht iets loopt. ──
   (()=>{
     const pendOud=state.pendingWrites, startOud=state._writeStart;

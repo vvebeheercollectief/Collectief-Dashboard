@@ -2014,37 +2014,625 @@ het nummer gaat leunen. Zelfde trapsgewijze aanpak als fase 3.
 
 ---
 
-# FASE 5 — Leeslast en offline *(bewust grover)*
+# FASE 5 — Leeslast en offline
 
-> **Wordt uitgeschreven na fase 4.** Gelaagd ophalen verlengt het TOCTOU-venster op de trage
-> tabbladen van 8 naar 60 seconden; dat is pas verantwoord zodra de identiteit van een regel
-> vaststaat.
+**Doel:** de leeslast ontkoppelen van de historie, en offline eerlijk maken.
 
-**Taak 5.1 — Gelaagd ophalen.**
-Snelle groep (8 s): `Nog Te Doen`, `ALV's overzicht`, **`Afgerond`**. Afgerond hoort er
-nadrukkelijk bij — het is het enige tabblad met een positionele `deleteDimension` zónder
-rij-guard, en met ~224 gevulde regels kost het niets.
-Trage groep (60 s): `ALV's afgerond`, `Ontwikkeling`, `Logboek`, `Herhaalregels`, `Kenmerken`.
-Uitpakken **op naam, niet op index**; een overgeslagen tabblad **behoudt** zijn vorige data.
-Let op de bestaande test-stub die een hardgecodeerde array van acht `valueRanges` teruggeeft.
+**Voorwaarde — afgevinkt op 2026-07-29:** fase 4 is live (v9.7/cd-v92). Gelaagd ophalen verlengt
+het venster waarin het dashboard met verouderde gegevens werkt van 8 naar 60 seconden op de trage
+tabbladen; dat is alleen verantwoord nu de identiteit van een regel vaststaat.
 
-**Taak 5.2 — Incrementeel staart-lezen van het Logboek.** Volledig bij start, daarna alleen
-nieuwe regels. Ontdubbeling tegen de optimistische regels met `_row: 0` is een ontwerpeis,
-geen testpunt achteraf.
+> **Rol niets uit voordat fase 4 een dag in echt gebruik is geweest.** Bouwen mag meteen; live
+> zetten stapelt anders een tweede verandering op schrijfwegen die nog niemand met de hand heeft
+> beproefd. Gaat er later iets mis, dan is niet meer te zeggen wélke van de twee het deed.
 
-**Taak 5.3 — Zichtbare offline-toestand.** Blokkeren vóór de optimistische mutatie.
-Signaal: `navigator.onLine === false` plus een **eigen** netwerkteller die na elke geslaagde
-read op 0 gaat — uitdrukkelijk **niet** `state._syncFails`, die telt ook mislukte inlogpogingen,
-401/403 en quota-fouten en zou het dashboard in een quotum-incident op slot zetten.
-Inventarisatie via `grep -rn "writeRange\|appendRange\|batchUpdate" src/*.js`, niet via
-`ensureToken` — drie schrijfwegen hebben die guard helemaal niet. Twee plekken muteren vóór
-de guard en moeten omgedraaid (`src/offerte-aannemers.js`, `src/kenmerken.js`).
+### Wat het onderzoek heeft vastgesteld (2026-07-29)
 
-**Taak 5.4 — Leescache (pas na de meting uit Taak 0.1).** Sleutel gekoppeld aan `APP_VERSION`
-én aan het e-mailadres; `logout()` wist hem. `ntdSecInfo`/`afSecInfo` moeten mee (zonder die
-twee valt de invoegpositie terug op regel 2 en belandt een nieuwe taak bovenaan `Nog Te Doen`
-in plaats van in zijn sectie). De logboeklijst niet hersorteren of ontdubbelen: `_row` houdt
-bewust de ruwe Sheet-index.
+Gemeten in de code, met adversariële controle:
+
+- **De koppeling tabblad → variabele is positioneel, op TWEE plekken:** `src/data.js:159`
+  (batchGet) én `src/data.js:164-171` (terugval). Beide moeten mee; alleen de eerste omzetten
+  laat een stille tijdbom achter in de terugvaltak.
+- **De terugvaltak is niet uniform.** `Nog Te Doen`, `Afgerond`, `ALV's overzicht` en
+  `ALV's afgerond` hebben géén `.catch`, de andere vier wél. **`ALV's afgerond` zit in de trage
+  groep maar mist die catch** — wordt de trage groep een eigen ronde, dan laat één ontbrekend
+  tabblad de hele trage ronde vallen. Een kale `namen.map(n=>lees(n).catch(()=>[]))` is dus
+  **geen** gedragsneutrale refactor.
+- **Het poll-slot kent geen groepen.** `_loadAgain` is één boolean die N onderdrukte aanroepen
+  tot één herhaling samenvouwt. Met twee ritmes kan een onderdrukte trage ronde als snelle ronde
+  terugkomen, waarna de trage tabbladen willekeurig lang blijven staan.
+- **De 8s-timer heeft acht remmen** (`src/main.js:275-289`) die tikken laten vallen zónder te
+  tellen. "Elke zevende tik" werkt daarom niet als 60s-ritme; er moet een tijdstempel aan te pas
+  komen.
+- **Er is een tweede poll:** `Meldingen`, elke 10 s, buiten `POLL_TABS`
+  (`src/notifications.js:233,282`). Die haalt het hele tabblad op en kost 6 leesverzoeken per
+  minuut naast de 7,5 van `loadAll`.
+- **`_row` van een logregel is bewust de RUWE Sheet-index** (`parseLogboek`,
+  `src/render-overig.js:181-193`) en drie schrijfwegen leunen erop. Staart-lezen vanaf rij N
+  levert zonder correctie `i+2` in plaats van `N+i`.
+- **De rij-guard op `Logboek` vergelijkt alleen kolom A (de timestamp)**, en het commentaar op
+  `src/render-overig.js:456-458` stelt vast dat bulk-acties meerdere logregels met **exact
+  dezelfde milliseconde** schrijven. Bij een venster van 60 s weegt dat zwaarder dan bij 8 s.
+- **`ensureToken()` geeft offline gewoon `true`** — een geldig token in het geheugen vraagt geen
+  netwerk. Het is dus géén offline-poort, en uitbreiden helpt niet.
+- **`_isTransient` herkent geen netwerkfout.** Dat is meteen het discriminerende kenmerk: een
+  `fetch` die rejectet heeft **geen** `.status`; een API-fout heeft er wél een.
+- **`localStorage` bevat vandaag alleen voorkeuren** (thema, dichtheid, …), nul data. `logout()`
+  raakt localStorage nergens aan.
+- **De twee `valueRanges`-stubs met acht elementen staan in het `doeReset`-testblok**
+  (`src/tests.js:1501-1502` en `1559-1560`), niet in de quotum-test. Ze zetten het ALV-overzicht
+  op **index 2**. Volgt de snelle groep de volgorde uit dit plan (NTD, ALV's overzicht,
+  Afgerond), dan is index 2 ineens `Afgerond` en vallen die tests om.
+
+---
+
+### Taak 5.1: Gelaagd ophalen
+
+**Files:**
+- Modify: `src/data.js`, `src/main.js`, `src/state.js`
+- Test: `src/tests.js`
+
+Snelle groep (elke 8 s): `Nog Te Doen`, `Afgerond`, `ALV's overzicht`.
+Trage groep (elke 60 s): `ALV's afgerond`, `Ontwikkeling`, `Logboek`, `Herhaalregels`, `Kenmerken`.
+
+> **Let op de volgorde.** De snelle groep houdt de POLL_TABS-volgorde (`Nog Te Doen`, `Afgerond`,
+> `ALV's overzicht`) — niet de volgorde waarin de spec ze noemt. Dat scheelt de twee bestaande
+> test-stubs, die het ALV-overzicht op index 2 verwachten. Ze worden hieronder alsnog
+> naam-gestuurd gemaakt, maar er is geen reden om ze onnodig te breken.
+
+`Afgerond` hoort bij de snelle groep: het is het tabblad waar de undo-weg een positionele
+`deleteDimension` doet, en met ~224 regels kost het vrijwel niets.
+
+- [ ] **Stap 1: Schrijf de falende tests**
+
+In `src/tests.js`, met `SNELLE_TABS, TRAGE_TABS, _magTraag` erbij in de import uit `./data.js`:
+
+```js
+  // ── Gelaagd ophalen: welke tabbladen in welke groep, en wanneer de trage groep meemoet ──
+  (()=>{
+    eq('gelaagd: snelle groep is precies drie tabbladen', SNELLE_TABS.length, 3);
+    eq('gelaagd: Afgerond zit in de SNELLE groep (positionele delete zonder rij-guard)',
+       SNELLE_TABS.includes('Afgerond'), true);
+    eq('gelaagd: Logboek zit in de TRAGE groep', TRAGE_TABS.includes('Logboek'), true);
+    eq('gelaagd: geen tabblad zit in beide groepen',
+       SNELLE_TABS.filter(t=>TRAGE_TABS.includes(t)).length, 0);
+    eq('gelaagd: samen dekken ze alle acht tabbladen', SNELLE_TABS.length+TRAGE_TABS.length, 8);
+    // De timer laat tikken vallen (acht remmen), dus 'elke zevende tik' zou het ritme laten
+    // wegdrijven. Daarom een tijdstempel: 60 s is een bovengrens, geen telling.
+    eq('gelaagd: nog nooit traag geladen → trage groep moet mee', _magTraag(0, 1000), true);
+    eq('gelaagd: 59 s geleden → trage groep hoeft niet', _magTraag(1000, 60000), false);
+    eq('gelaagd: precies 60 s geleden → trage groep moet mee', _magTraag(1000, 61000), true);
+  })();
+```
+
+- [ ] **Stap 2: Test draaien, moet falen**
+
+Open `http://localhost:8899/index.html?test=1`. Verwacht een importfout — `SNELLE_TABS` bestaat niet.
+
+- [ ] **Stap 3: De groepen en de ritme-regel**
+
+In `src/data.js`, vervang `POLL_TABS` door:
+
+```js
+// De acht tabbladen, verdeeld naar hoe vaak ze écht veranderen.
+// SNEL (elke 8 s): waar de gebruiker op kijkt en waar geschreven wordt. 'Afgerond' hoort hier
+// nadrukkelijk bij — het is het tabblad waar de undo-weg een positionele deleteDimension doet,
+// en met ~224 regels kost het niets.
+// TRAAG (elke 60 s): tabbladen die zelden wijzigen. Het Logboek is hier de grote winst: dat
+// groeit onbeperkt en werd tot nu toe élke 8 seconden volledig opnieuw ingelezen.
+// De volgorde van de snelle groep is bewust die van de oude POLL_TABS.
+const SNELLE_TABS=["Nog Te Doen","Afgerond","ALV's overzicht"];
+const TRAGE_TABS =["ALV's afgerond","Ontwikkeling","Logboek","Herhaalregels","Kenmerken"];
+const TRAAG_MS   = 60000;
+
+// Tabbladen die in de terugvaltak GEEN .catch krijgen: zonder deze vier kan het dashboard niet
+// zinnig renderen, dus daar is falen beter dan stilzwijgend een lege lijst. De andere vier zijn
+// optioneel (ze bestaan niet op elke kopie van de Sheet) en worden wél afgevangen.
+// LET OP: "ALV's afgerond" is verplicht én zit in de TRAGE groep — die combinatie is de reden
+// dat de terugvaltak per tabblad moet weten of hij mag falen, en niet uniform mag worden.
+const VERPLICHTE_TABS=new Set(["Nog Te Doen","Afgerond","ALV's overzicht","ALV's afgerond"]);
+
+// Moet de trage groep deze ronde mee? Puur (tijden meegegeven) zodat de regel los testbaar is.
+// Bewust een TIJDSTEMPEL en geen tikteller: de 8s-timer heeft acht remmen die een tik laten
+// vallen zonder te tellen, dus 'elke zevende tik' zou onvoorspelbaar wegdrijven.
+function _magTraag(laatsteTraagMs, nu){ return !laatsteTraagMs || (nu-laatsteTraagMs)>=TRAAG_MS; }
+```
+
+In `src/state.js`, bij de andere poll-velden:
+
+```js
+  _laatsteTraagMs: 0,      // wanneer de trage tabbladen voor het laatst zijn gelezen (0 = nooit)
+  _loadAgainTraag: false,  // was de ONDERDRUKTE ronde er één met de trage groep erbij?
+                           // Zonder dit zou een uitgestelde trage ronde als snelle terugkomen
+                           // en bleven de trage tabbladen willekeurig lang staan.
+```
+
+- [ ] **Stap 4: `fetchSheets` op naam laten teruggeven**
+
+In `src/api.js`, vervang de returnregel van `fetchSheets`:
+
+```js
+  // Op NAAM teruggeven, niet op positie. Zolang de aanroeper op index uitpakte, verschoof élke
+  // variabele zodra de gevraagde lijst korter werd — precies wat gelaagd ophalen doet.
+  const uit={};
+  names.forEach((n,i)=>{ uit[n]=(vr[i]&&vr[i].values)||[]; });
+  return uit;
+```
+
+En pas de bestaande `fetchSheets`-test aan: die verwacht nu een array.
+
+- [ ] **Stap 5: `loadAll` gelaagd maken**
+
+In `src/data.js`, vervang regel 154-172 (het ophalen) door:
+
+```js
+    // Welke tabbladen deze ronde? De trage groep ligt er alleen bij als hij aan de beurt is.
+    const traagMee=_magTraag(state._laatsteTraagMs, Date.now());
+    const namen=traagMee ? SNELLE_TABS.concat(TRAGE_TABS) : SNELLE_TABS;
+    let R;
+    try{
+      R=await _withRetry(()=>fetchSheets(namen));
+    }catch(e){
+      // Terugval op losse reads. batchGet faalt in z'n geheel als één tabblad ontbreekt; de oude
+      // weg levert de optionele tabbladen dan alsnog los aan (duurder, maar werkt).
+      // Per tabblad beslissen of hij mag falen — een uniforme .catch zou een ontbrekend
+      // 'Nog Te Doen' in stilte als lege lijst doorlaten en het dashboard leegvegen.
+      console.warn('batchGet mislukt, terugval op losse reads:', e.message);
+      R={};
+      await Promise.all(namen.map(async n=>{
+        R[n]=VERPLICHTE_TABS.has(n) ? await lees(n) : await lees(n).catch(()=>[]);
+      }));
+    }
+    if(traagMee) state._laatsteTraagMs=Date.now();
+```
+
+En vervang het uitpakken (regel 177-191) door een vorm die een overgeslagen tabblad **overslaat**
+in plaats van leegmaakt:
+
+```js
+    // Alleen toekennen wat deze ronde ook echt gelezen is. Een overgeslagen tabblad BEHOUDT zijn
+    // vorige waarde — zou hij hier door parseX(undefined) gaan, dan zou elke snelle ronde het
+    // logboek, de herhaalregels en de kenmerken leegvegen.
+    const zetAls=(naam,fn)=>{ if(R[naam]!==undefined) fn(R[naam]); };
+    zetAls('Nog Te Doen', r=>{ const p=parseSections(r); D.ntd=p.data; D.ntdSecInfo=p.secInfo; });
+    zetAls('Afgerond',    r=>{ const p=parseSections(r); D.af=p.data; D.afSecInfo=p.secInfo;
+                               SKEYS.forEach(s=>{if(D.af[s])D.af[s].sort((a,b)=>parseDt(b.datum)-parseDt(a.datum))}); });
+    try{
+      const bev=[...checkSecties(R['Nog Te Doen']||[]), ...checkSecties(R['Afgerond']||[]),
+                 ...checkNummers(Object.values(D.ntd||{}).flat())];
+      if(bev.length) console.warn('[structuurcheck]', bev);
+    }catch(e){ console.warn('[structuurcheck] overgeslagen:', e.message); }
+    zetAls("ALV's overzicht", r=>{ D.alvo=parseAlvo(r); });
+    zetAls("ALV's afgerond", r=>{ D.alfa=parseAlfa(r); });
+    zetAls('Ontwikkeling',   r=>{ D.ontw=parseOntw(r); });
+    zetAls('Logboek',        r=>{ D.logboek=parseLogboek(r); });
+    zetAls('Herhaalregels',  r=>{ D.herhaal=parseHerhaal(r); });
+    zetAls('Kenmerken',      r=>{ D.kenmerken=parseKenmerken(r); });
+```
+
+- [ ] **Stap 6: Het slot laten onthouden wélke groep werd onderdrukt**
+
+Regel 135 en 213 in `src/data.js`:
+
+```js
+  if(state._loadInFlight){
+    state._loadAgain=true;
+    if(!silent) state._loadAgainLoud=true;
+    // Onthoud óók of de onderdrukte ronde de trage groep nodig had. Zonder dit komt een
+    // uitgestelde trage ronde terug als snelle en blijven de trage tabbladen staan tot de
+    // volgende hele minuut — of langer, want _magTraag kijkt naar de laatste GESLAAGDE ronde.
+    if(_magTraag(state._laatsteTraagMs, Date.now())) state._loadAgainTraag=true;
+    return;
+  }
+```
+
+```js
+    state._loadInFlight=false;
+    if(state._loadAgain){
+      const loud=state._loadAgainLoud, traag=state._loadAgainTraag;
+      state._loadAgain=false; state._loadAgainLoud=false; state._loadAgainTraag=false;
+      if(traag) state._laatsteTraagMs=0;   // dwing de trage groep af in de herhaalronde
+      loadAll(!loud);
+    }
+```
+
+- [ ] **Stap 7: De twee test-stubs naam-gestuurd maken**
+
+`src/tests.js:1501-1502` en `1559-1560` geven een vaste array van acht `valueRanges` terug met
+het ALV-overzicht op index 2. Vervang beide door een stub die de gevraagde namen uit de URL leest:
+
+```js
+        // Naam-gestuurd i.p.v. op index: gelaagd ophalen vraagt niet altijd dezelfde lijst,
+        // en een index-stub is dan groen om de verkeerde reden.
+        if(u.includes('values:batchGet')){
+          const namen=[...u.matchAll(/ranges=([^&]+)/g)].map(m=>decodeURIComponent(m[1]));
+          return new Response(JSON.stringify({ valueRanges: namen.map(n=>
+            n==="ALV's overzicht" ? {values:blad} : {}) }),{status:200});
+        }
+```
+
+(idem in het tweede blok, met `rijen(['V0','V1','V2'])` in plaats van `blad`.)
+
+- [ ] **Stap 8: De trage groep meenemen in de 60s-regel van de timer**
+
+De timer in `src/main.js` hoeft **niet** te wijzigen: `loadAll` beslist zelf of de trage groep
+meemoet. Controleer wel dat de acht remmen ongemoeid blijven — die zijn er allemaal om een reden.
+
+- [ ] **Stap 9: Tests draaien**
+
+FAIL blijft 0, OK stijgt met 8. Controleer daarna handmatig in de console:
+
+```js
+(await import('/src/state.js')).state._laatsteTraagMs
+```
+
+Dat getal hoort hooguit één keer per minuut te veranderen.
+
+- [ ] **Stap 10: Commit**
+
+```bash
+git add src/data.js src/api.js src/main.js src/state.js src/tests.js
+git commit -m "Gelaagd ophalen: snelle groep elke 8s, trage groep elke minuut"
+```
+
+---
+
+### Taak 5.2: Incrementeel staart-lezen van het Logboek
+
+**Files:**
+- Modify: `src/render-overig.js`, `src/data.js`, `src/state.js`
+- Test: `src/tests.js`
+
+Het Logboek is de grootste post in de leeslast en groeit onbeperkt. Na taak 5.1 wordt het nog
+maar één keer per minuut gelezen; hier gaat het van "de hele geschiedenis" naar "alleen wat
+erbij kwam".
+
+> **Twee harde ontwerpeisen.** (1) `_row` blijft de **ruwe** Sheet-index — daar hangen bewerken
+> en verwijderen van logregels aan. (2) De optimistische regels met `_row: 0` moeten ontdubbeld
+> worden tegen de teruggelezen echte regels; vandaag lost een volledige herlezing dat vanzelf op.
+
+- [ ] **Stap 1: Schrijf de falende tests**
+
+```js
+  // ── Logboek incrementeel: offset, volgorde en ontdubbeling ──
+  (()=>{
+    const kop=['Timestamp','Code','Sectie','Actie','Veld','Oud','Nieuw','Wie'];
+    const r=(ts,code,actie)=>[ts,code,'OPPAKKEN',actie,'','','','jer'];
+    // Volledige lezing: rij 1 is de kop, de eerste datarij is Sheet-rij 2.
+    const vol=parseLogboek([kop, r('2026-07-01T10:00:00Z','A','Aangemaakt'),
+                                 r('2026-07-02T10:00:00Z','B','Afgerond')]);
+    eq('logboek: volledige lezing → nieuwste eerst', vol[0].code, 'B');
+    eq('logboek: volledige lezing → _row is de ruwe Sheet-rij', vol[0]._row, 3);
+
+    // Staartlezing vanaf Sheet-rij 3: geen koprij, en _row moet bij 3 beginnen.
+    const staart=parseLogboek([r('2026-07-02T10:00:00Z','B','Afgerond')], 3);
+    eq('logboek: staartlezing → _row telt door vanaf de startrij', staart[0]._row, 3);
+    eq('logboek: staartlezing behandelt de eerste rij NIET als koprij', staart.length, 1);
+
+    // Ontdubbeling: een optimistische regel (_row 0) verdwijnt zodra de echte binnenkomt.
+    const opt={_row:0, timestamp:'2026-07-02T10:00:00.500Z', code:'B', sectie:'', actie:'Opmerking',
+               veld:'', oudeWaarde:'', nieuweWaarde:'gebeld', gebruiker:'jer'};
+    const echt={_row:9, timestamp:'2026-07-02T10:00:02.100Z', code:'B', sectie:'', actie:'Opmerking',
+                veld:'', oudeWaarde:'', nieuweWaarde:'gebeld', gebruiker:'jer'};
+    eq('logboek: optimistische regel wijkt voor de echte', _ontdubbelLog([echt], [opt]).length, 1);
+    eq('logboek: en de ECHTE blijft over (met zijn Sheet-rij)', _ontdubbelLog([echt], [opt])[0]._row, 9);
+    eq('logboek: een ándere regel blijft gewoon staan',
+       _ontdubbelLog([echt], [{...opt, nieuweWaarde:'iets anders'}]).length, 2);
+    eq('logboek: zonder optimistische regels verandert er niets', _ontdubbelLog([echt], []).length, 1);
+  })();
+```
+
+- [ ] **Stap 2: Test draaien, moet falen**
+
+- [ ] **Stap 3: `parseLogboek` een startrij geven**
+
+In `src/render-overig.js`:
+
+```js
+// startRij = het Sheet-rijnummer van rows[0]. Weggelaten → 1, dus de klassieke vorm waarin
+// rows[0] de koprij is en de eerste datarij Sheet-rij 2 is.
+// Bij een staartlezing ('Logboek'!A400:H) is rows[0] géén koprij en telt _row door vanaf 400.
+// _row MOET de ruwe Sheet-index blijven: bewerken en verwijderen van logregels schrijven op dat
+// nummer, en de filter+reverse hieronder mag daar niets aan veranderen.
+function parseLogboek(rows, startRij){
+  if(!rows||!rows.length) return [];
+  const start=startRij||1;
+  const data=start===1 ? rows.slice(1) : rows;
+  const eersteRij=start===1 ? 2 : start;
+  return data.map((r,i)=>{
+    const c=j=>((r&&r[j])||'').trim();
+    return {
+      _row:eersteRij+i,
+      timestamp:c(0), code:c(1), sectie:c(2), actie:c(3),
+      veld:c(4), oudeWaarde:c(5), nieuweWaarde:c(6), gebruiker:c(7)
+    };
+  }).filter(o=>o.timestamp&&!LOG_VERBORGEN.has(o.actie)).reverse();
+}
+```
+
+- [ ] **Stap 4: De ontdubbeling**
+
+Ook in `src/render-overig.js`:
+
+```js
+// Haalt de optimistische regels (_row 0) weg die inmiddels écht in de Sheet staan.
+// NIET op timestamp vergelijken: bij twee van de drie optimistische paden (addTaskNote en
+// saveKenmerken) is de lokale tijd een andere dan die de append in de Sheet zet — minstens de
+// duur van het netwerkverkeer ertussen. De inhoud is wél gelijk, dus daarop matchen we.
+// Puur, dus los testbaar.
+const _logSleutel=o=>[o.code,o.sectie,o.actie,o.veld,o.nieuweWaarde,o.gebruiker].join('\x1f');
+function _ontdubbelLog(echteRegels, optimistisch){
+  const gezien=new Set((echteRegels||[]).map(_logSleutel));
+  return (echteRegels||[]).concat((optimistisch||[]).filter(o=>!gezien.has(_logSleutel(o))));
+}
+```
+
+- [ ] **Stap 5: Staart-lezen in `loadAll`**
+
+In `src/state.js`: `_logHoogwater: 0,   // hoogste gelezen Sheet-rij van het Logboek (0 = nog niets)`
+
+In `src/data.js`, bij het samenstellen van de namenlijst:
+
+```js
+    // Logboek: de eerste keer volledig, daarna alleen de staart. De hoogwaterstand is het
+    // laatst gelezen Sheet-rijnummer; +1 is de eerste die we nog niet hebben.
+    const logNaam = state._logHoogwater
+      ? `'Logboek'!A${state._logHoogwater+1}:H`
+      : 'Logboek';
+```
+
+en bij het toekennen:
+
+```js
+    zetAls(logNaam, r=>{
+      const start = state._logHoogwater ? state._logHoogwater+1 : 1;
+      const nieuwe = parseLogboek(r, start);
+      const bestaand = state._logHoogwater ? D.logboek.filter(x=>x._row>0) : [];
+      // Nieuwe staartregels vooraan (parseLogboek keert al om), daarna wat we al hadden, en pas
+      // dán de nog niet bevestigde optimistische regels — die horen bovenaan te blijven staan
+      // tot hun echte tegenhanger binnen is.
+      D.logboek=_ontdubbelLog(nieuwe.concat(bestaand), D.logboek.filter(x=>x._row===0));
+      // Hoogwaterstand pas NU opschuiven: gebeurt dat bij het lezen, dan gaan regels definitief
+      // verloren zodra de pendingWrites-tak hierboven de ronde alsnog weggooit.
+      const hoogste=Math.max(state._logHoogwater, ...nieuwe.map(x=>x._row), 0);
+      if(hoogste) state._logHoogwater=hoogste;
+    });
+```
+
+> **Bewust niet opgelost:** een logregel die een ánder wist of bewerkt, ziet deze weg niet — de
+> staart kent alleen nieuwe rijen. Dat is aanvaardbaar omdat het Logboek een werkspoor is en geen
+> auditspoor (zo staat het ook in de spec), en omdat de Logboek-pagina een eigen Vernieuwen-knop
+> heeft die `state._logHoogwater=0` kan zetten voor een volledige herlezing. Bouw die reset in
+> dezelfde stap.
+
+- [ ] **Stap 6: Tests draaien en handmatig controleren**
+
+FAIL blijft 0. Handmatig: voeg op de VvE-pagina een contactnotitie toe. Verwacht: de regel
+verschijnt meteen (optimistisch) en **verdubbelt niet** zodra de volgende trage ronde binnenkomt.
+
+- [ ] **Stap 7: Commit**
+
+```bash
+git add src/render-overig.js src/data.js src/state.js src/tests.js
+git commit -m "Logboek: alleen nieuwe regels ophalen in plaats van de hele geschiedenis"
+```
+
+---
+
+### Taak 5.3: Zichtbare offline-toestand
+
+**Files:**
+- Modify: `src/api.js`, `src/state.js`, `src/data.js`, `styles.css`
+- Modify (callsites): `src/offerte-aannemers.js`, `src/kenmerken.js`, `src/render-herhaal.js`, `src/bulk.js`
+- Test: `src/tests.js`
+
+Vandaag doet het dashboard alsof een wijziging is opgeslagen terwijl er niets is vertrokken; pas
+bij de mislukte write wordt het teruggedraaid. Offline moet **vóór** de optimistische mutatie
+blokkeren.
+
+- [ ] **Stap 1: Het signaal — falende tests eerst**
+
+```js
+  // ── Offline-signaal: alleen echte netwerkfouten tellen mee ──
+  (()=>{
+    eq('offline: browser zegt offline → offline', _isOffline(false, 0), true);
+    eq('offline: browser online en geen netwerkfouten → online', _isOffline(true, 0), false);
+    eq('offline: één netwerkfout is nog geen oordeel', _isOffline(true, 1), false);
+    eq('offline: twee netwerkfouten op rij → offline', _isOffline(true, 2), true);
+    // Het onderscheid netwerk vs. API: een fetch die rejectet heeft GEEN .status.
+    eq('offline: fout zonder status telt als netwerkfout', _isNetwerkFout(new Error('Failed to fetch')), true);
+    eq('offline: 401 telt NIET als netwerkfout', _isNetwerkFout(Object.assign(new Error('x'),{status:401})), false);
+    eq('offline: 429 quotum telt NIET als netwerkfout', _isNetwerkFout(Object.assign(new Error('x'),{status:429})), false);
+    eq('offline: 500 telt NIET als netwerkfout', _isNetwerkFout(Object.assign(new Error('x'),{status:500})), false);
+  })();
+```
+
+- [ ] **Stap 2: Implementeren in `src/api.js`**
+
+```js
+// ── Offline-signaal ────────────────────────────────────────────────────────
+// Uitdrukkelijk NIET state._syncFails: die telt óók mislukte inlogpogingen (data.js:145),
+// 401/403 en quota-fouten mee. In een quotum-incident zou het dashboard zichzelf dan op slot
+// zetten op precies het moment dat het zich aan het herstellen is.
+//
+// Het onderscheid is scherp te maken: een fetch die rejectet (geen netwerk, DNS, CORS-blokkade)
+// gooit een TypeError ZONDER .status; elk antwoord van Google — ook 401, 429 en 500 — heeft er
+// wél een. Alleen het eerste is bewijs dat de verbinding weg is.
+const _isNetwerkFout = e => !!e && e.status===undefined;
+
+// Twee op rij, zodat één hapering in de tunnel of de lift het dashboard niet meteen op slot zet.
+function _isOffline(browserOnline, netwerkFouten){
+  if(!browserOnline) return true;
+  return (netwerkFouten||0) >= 2;
+}
+// De live toestand. Geen blijvende state.offline-vlag: die zou door de bestaande tests niet
+// worden teruggezet en zou blijven hangen na een geslaagde ronde.
+const isOffline = () => _isOffline(navigator.onLine, state._netwerkFouten||0);
+```
+
+Wikkel in `fetchSheet`, `fetchSheets`, `writeRange` en `appendRange` de `fetch`-aanroep zelf:
+
+```js
+  let r;
+  try{ r=await fetch(url, opts); }
+  catch(e){ state._netwerkFouten=(state._netwerkFouten||0)+1; throw e; }
+  state._netwerkFouten=0;   // er kwám een antwoord — ook een 4xx bewijst dat er netwerk is
+```
+
+Repareer in dezelfde stap twee kleine dingen die dit onderscheid anders ondermijnen:
+`writeRange` en `appendRange` doen `await r.json()` in het foutpad zónder `.catch`, en
+`appendRange` zet geen `err.status`. Beide toevoegen.
+
+In `src/state.js`: `_netwerkFouten: 0,   // opeenvolgende ECHTE netwerkfouten (fetch-reject zonder status)`
+
+- [ ] **Stap 3: De vier plekken die vóór de guard muteren**
+
+Het plan noemde er twee; het zijn er **vier**. Zet in elk de offline-check bovenaan, vóór de
+mutatie:
+
+```js
+// src/offerte-aannemers.js — in addAannemer, toggleAannemerBinnen én verwijderAannemer
+//   (alle drie muteren r.aannemers en renderen vóór _bewaar):
+if(isOffline()){ showToast('Geen verbinding','Wijzigen kan niet zonder internet.','var(--rd)'); return; }
+
+// src/kenmerken.js — vóór regel 54 (state.kenmerkenEdit=false), anders is de invoer weg
+// src/render-herhaal.js — toggleHerhaalStatus, vóór `r.status=nieuw`
+// src/bulk.js — de undo-callback van bulkVeld, vóór de items.forEach
+```
+
+- [ ] **Stap 4: De overige schrijfwegen**
+
+Zet de check op de plek van de bestaande `ensureToken`-regel. **`ensureToken` is zelf géén
+offline-poort:** met een geldig token in het geheugen doet hij geen netwerkverkeer en geeft hij
+gewoon `true`.
+
+Inventariseer met `grep -rn "writeRange\|appendRange\|batchUpdate" src/*.js` — 33 aanroepen in 13
+bestanden, waarvan 15 rauwe `:batchUpdate`-fetches die `api.js` omzeilen. `api.js` is dus geen
+choke point.
+
+- [ ] **Stap 5: Vangnet in `backgroundWrite`**
+
+```js
+    // Laatste lijn. De aanroeper hoort al geblokkeerd te hebben (het contract van
+    // backgroundWrite is dat de UI al optimistisch gemuteerd is), maar een gemiste callsite mag
+    // niet stil doorlopen. Dit levert gratis de bestaande rollback + foutmelding op.
+    if(isOffline()) throw Object.assign(new Error('Geen verbinding'), {offline:true});
+```
+
+- [ ] **Stap 6: Bewust NIET blokkeren: `logEvent`, `queueNotif` en `sendTestNotif`**
+
+Die drie zijn fire-and-forget en falen vandaag al stil. Een offline-blokkade zou een logregel
+definitief laten verdwijnen zonder dat iemand het ziet — erger dan de huidige situatie. Leg dat
+vast in een comment bij `logEvent`.
+
+- [ ] **Stap 7: De zichtbare toestand**
+
+Hergebruik het bestaande banner-patroon (`showLoadError`, `role="alert"`, idempotente guard) en
+de statusbalk. Twee vallen uit eerder werk:
+
+- **De `[hidden]`-cascade:** krijgt de banner een eigen `display`-regel, dan moet er een eigen
+  `[hidden]{display:none}` bij — anders staat hij permanent in beeld.
+- **De focus-ring:** een strook met een eigen `overflow`-regel knipt de focusring van de knoppen
+  eronder weg; geef 4px opvulling aan de klemmende zijden.
+
+En let op: **een `disabled` knop valt uit de focus-trap van `modal-a11y.js`.** Wordt élke knop in
+een modal offline gedempt, dan houdt die modal geen focusdoel over. Laat Annuleren/Sluiten dus
+altijd actief.
+
+- [ ] **Stap 8: Handmatig controleren**
+
+DevTools → Network → Offline. Verwacht: de knoppen dempen, een taak opslaan geeft een melding en
+**verandert de rij niet**. Terug online: alles werkt weer zonder herladen.
+
+- [ ] **Stap 9: Commit**
+
+```bash
+git add src/
+git commit -m "Offline: schrijven blokkeren vóór de optimistische wijziging, met eigen netwerkteller"
+```
+
+---
+
+### Taak 5.4: Leescache
+
+**Files:**
+- Modify: `src/data.js`, `src/auth.js`, `src/state.js`
+- Test: `src/tests.js`
+
+Comfort bij het openen, geen offline-vermogen: inloggen is bij een koude start altijd
+netwerkafhankelijk.
+
+- [ ] **Stap 1: De sleutel**
+
+```js
+// Sleutel aan APP_VERSION én aan het e-mailadres. localStorage is origin-gebonden, niet
+// gebruiker-gebonden: zonder het adres ziet collega B bij het openen eerst de stand van
+// collega A. De versie erin zodat een gewijzigd dataformaat nooit een oude cache leest.
+const _cacheSleutel = email => `cd_cache_${APP_VERSION}_${email||'onbekend'}`;
+```
+
+- [ ] **Stap 2: Wat erin moet**
+
+**Alle tien velden van `D`**, inclusief `ntdSecInfo` en `afSecInfo`. Zonder die twee valt
+`getInsertRow` terug op regel 2 (`src/crud.js:109`) en belandt een nieuwe taak bovenaan
+`Nog Te Doen` in plaats van in zijn sectie.
+
+De logboeklijst gaat er **ongewijzigd** in: niet hersorteren, niet comprimeren, niet ontdubbelen.
+`_row` houdt bewust de ruwe Sheet-index.
+
+- [ ] **Stap 3: Wanneer schrijven**
+
+Pas ná het toekennen van alle velden — dus ná het `zetAls`-blok, en **niet** in de
+`pendingWrites>0`-tak, want daar wordt de verse data juist als niet-leidend verworpen.
+
+Omvang: de gemeten poll-omvang is 563.675 tekens; localStorage geeft ~5 MB per origin en JS-tekens
+zijn 2 bytes. Dat is ~1,1 MB — het past, maar controleer het en vang `QuotaExceededError` af met
+een stille `removeItem`.
+
+- [ ] **Stap 4: `logout()` moet hem wissen**
+
+`logout()` raakt localStorage vandaag **nergens** aan. Voeg het wissen toe — anders blijft de
+stand van de vorige gebruiker op een gedeelde computer staan.
+
+- [ ] **Stap 5: Tests, handmatige controle en commit**
+
+Test de sleutelopbouw en dat `logout()` wist. Handmatig: laad, log uit, controleer dat de sleutel
+weg is.
+
+```bash
+git add src/
+git commit -m "Leescache: dashboard toont meteen de laatste stand bij openen"
+```
+
+---
+
+### Taak 5.5: Fase 5 uitrollen
+
+- [ ] **Stap 1: Versies** — `APP_VERSION = '9.8'`, `CACHE_VERSION = 'cd-v93'`.
+- [ ] **Stap 2: Volledige testronde** lokaal, FAIL = 0.
+- [ ] **Stap 3: Naar staging**, daarna een **ingelogde** ronde: taak opslaan, afronden, ongedaan
+      maken, notitie toevoegen, en offline zetten in DevTools.
+- [ ] **Stap 4: Meten of het gewerkt heeft.** Na één minuut ingelogd:
+
+```js
+(await import('/src/state.js')).state._lastDHash?.length
+```
+
+Vergelijk met de nulmeting van **563.675** tekens uit Taak 0.1.
+
+- [ ] **Stap 5: Naar productie**, controleer het versienummer op de Pages-URL.
+
+---
+
+### Bewust buiten fase 5
+
+| Wat | Waarom niet |
+|---|---|
+| Een offline-schrijfwachtrij | Wijzigingen die later "vanzelf" wegschrijven zijn onvoorspelbaar; blokkeren is eerlijker |
+| Service worker naar cache-first | Eerder door de gebruiker afgewezen; niet opnieuw voorstellen |
+| De `Meldingen`-poll van 10 s meenemen | Goedkoopste resterende winst (6 van de 13,5 leesverzoeken per minuut), maar hij raakt de meldingenweg en verdient een eigen ronde |
+| `logEvent`/`queueNotif` offline blokkeren | Zou een logregel definitief laten verdwijnen zonder dat iemand het ziet |
+| Logregels die een ánder wist of bewerkt terugzien in de staart | De staart kent alleen nieuwe rijen; de Vernieuwen-knop zet de hoogwaterstand terug |
 
 ---
 
@@ -2052,8 +2640,14 @@ bewust de ruwe Sheet-index.
 
 - **Spec-dekking:** fase 0 → taken 0.1-0.4; fase 1 → 1.1-1.5; fase 2 → 2.1-2.11; fase 3 →
   3.1-3.3; fase 4 → 4.1-4.3 (uitgeschreven op 2026-07-29, nadat 0.2 en fase 1 af waren);
-  fase 5 → bewust grof, met de voorwaarden expliciet. De "bewust niet"-tabel uit de spec leidt
-  tot geen taken, zoals bedoeld.
+  fase 5 → 5.1-5.5 (uitgeschreven op 2026-07-29, nadat fase 4 live was). De "bewust niet"-tabel
+  uit de spec leidt tot geen taken, zoals bedoeld.
+- **Correcties op de spec bij het uitschrijven van fase 5:** de spec noemt **twee** plekken die
+  vóór de guard muteren; het zijn er **vier** (`offerte-aannemers.js` met drie aanroepers,
+  `kenmerken.js`, `toggleHerhaalStatus`, de undo-callback van `bulkVeld`). De spec noemt **één**
+  test-stub met acht `valueRanges`; het zijn er **twee**, en ze staan in het `doeReset`-blok, niet
+  in de quotum-test. En `ensureToken()` is géén offline-poort: met een geldig token in het
+  geheugen geeft hij offline gewoon `true`.
 - **Correctie op de spec, vastgesteld bij het uitschrijven van fase 4:** de spec stelt dat de
   tussenmaatregel de bestaande serialisatie `serializeNtdUndo` kan hergebruiken. Dat dekt maar
   8 van de 18 callsites (de functie kent alleen `Nog Te Doen`) en neemt kolom N mee, die de

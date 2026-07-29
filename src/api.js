@@ -154,14 +154,20 @@ function _normCel(v, isDatum){
 // een rij-object gaat er eerst met _rijNaarCellen doorheen. Beide kanten van de vergelijking
 // door dezelfde functie halen is de hele truc — anders lopen trim en datumvorm uiteen.
 // Onbekend tabblad → val terug op kolom A, zodat een nieuw tabblad nooit stil de guard uitzet.
-function vingerafdruk(sheetName, rij, sec){
+// `negeerNummer` maakt de vergelijking SYMMETRISCH: kent de kant die we verwachten geen
+// taaknummer, dan mag de teruggelezen kant het zijne ook niet gebruiken. Zonder dat zou een
+// rij-object zonder nummer tegenover een Sheet-rij mét nummer ALTIJD als mismatch gelden en dus
+// elke schrijfactie blokkeren — een vals alarm, want 'ik ken het nummer niet' is geen bewijs dat
+// het de verkeerde rij is. Gemeten op staging 2026-07-29; zonder deze regel blokkeerde zelfs een
+// volstrekt ongewijzigde rij.
+function vingerafdruk(sheetName, rij, sec, negeerNummer){
   const spec=FP_KOLOMMEN[sheetName];
   rij=rij||[];
   if(!spec) return _normCel(rij[0]);
   // Heeft de rij een vast taaknummer (kolom Q), dan ÍS dat de identiteit en doet de rest niet
   // meer mee. Dit is het eindstation waar fase 4 op mikte: de vingerafdruk blijft alleen het
   // vangnet voor rijen van vóór de backfill of van een client die nog oude code draait.
-  const nr=leegBijErfenis(rij[16]);
+  const nr=negeerNummer ? '' : leegBijErfenis(rij[16]);
   if(nr && nr!=='TaakID') return 'T:'+nr;
   const datumKol=spec.datum || (sheetName==='Nog Te Doen' ? (NTD_DATUM[sec]||[]) : []);
   const idx=spec.tekst.concat(datumKol).sort((a,b)=>a-b);
@@ -217,7 +223,12 @@ function _a1Bereik(sheetName, minR, maxR){
 async function assertRowsMatch(checks, sheetName='Nog Te Doen'){
   const cs=(checks||[]).filter(c=>c&&c.row).map(c=>{
     // Rij-object én een tabblad met vingerafdruk-spec → de volle vergelijking.
-    if(c.r && FP_KOLOMMEN[sheetName]) return { row:c.row, fp:true, sec:c.r._sec, code:rijVingerafdruk(sheetName, c.r) };
+    if(c.r && FP_KOLOMMEN[sheetName]){
+      // heeftNr: kent de verwachte kant een taaknummer? Zo niet, dan mag de teruggelezen kant
+      // het zijne ook niet gebruiken — anders blokkeert de guard op 'ik weet het niet'.
+      const heeftNr=!!(sheetName==='Nog Te Doen' && c.r.taakId);
+      return { row:c.row, fp:true, sec:c.r._sec, heeftNr, code:rijVingerafdruk(sheetName, c.r) };
+    }
     // Rij-object op een tabblad zónder spec: val terug op de sleutel in kolom A i.p.v. te
     // vergelijken met een lege vingerafdruk — dat laatste zou élke schrijfactie blokkeren.
     if(c.r) return { row:c.row, code:((c.r.code ?? c.r.id ?? c.r.titel ?? c.r.timestamp ?? '')+'').trim() };
@@ -227,7 +238,7 @@ async function assertRowsMatch(checks, sheetName='Nog Te Doen'){
   const rows=cs.map(c=>c.row), minR=Math.min(...rows), maxR=Math.max(...rows);
   const vals=await fetchSheet(_a1Bereik(sheetName, minR, maxR));
   const mm=_rowMismatch(vals, minR, cs, (ruw,c)=>c.fp
-    ? vingerafdruk(sheetName, ruw, c.sec)
+    ? vingerafdruk(sheetName, ruw, c.sec, !c.heeftNr)
     : ((ruw[0]||'').toString().trim()));
   if(mm){ const err=new Error('De lijst was net gewijzigd — opnieuw geladen.'); err.rowMismatch=true; err.detail=mm; throw err; }
 }

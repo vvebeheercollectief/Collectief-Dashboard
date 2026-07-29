@@ -1259,6 +1259,20 @@ import { checkSecties, checkRaster, checkNummers, RASTER_MIN } from "./structuur
       stub(['311198','VvE A','maakt niet uit']);
       let door2=true; try{ await assertRowMatch(12, '311198', 'Logboek'); }catch(e){ door2=false; }
       truthy('guard e2e: oude vorm met kale sleutel werkt onveranderd', door2);
+
+      // 5. Rij ZONDER nummer tegenover een Sheet-rij MÉT nummer. Op staging bleek dit élke
+      //    schrijfactie te blokkeren: de ene kant zei 'T:…' en de andere de inhoud. 'Ik ken het
+      //    nummer niet' is geen bewijs dat het de verkeerde rij is — de vergelijking moet dan
+      //    symmetrisch terugvallen op de inhoud.
+      const zonderNr={_sec:'OPPAKKEN', code:'311198', naam:'VvE A', actiepunt:'dak nakijken',
+                      deadline:'17-06-2026', behandelaar:'Jer', prioriteit:'Hoog', opmerkingen:'iets'};
+      stub(['311198','VvE A','dak nakijken','17 juni 2026','Jer','Hoog','iets','','','','','','','','','','Tabc123']);
+      let door3=true; try{ await assertRowMatch(12, zonderNr); }catch(e){ door3=false; }
+      truthy('guard e2e: rij zonder nummer tegen Sheet MET nummer → geen vals alarm', door3);
+      // …maar een echte inhoudswijziging moet dan nog steeds blokkeren
+      stub(['311198','VvE A','HEEL ANDERS','17 juni 2026','Jer','Hoog','iets','','','','','','','','','','Tabc123']);
+      let fout3=null; try{ await assertRowMatch(12, zonderNr); }catch(e){ fout3=e; }
+      truthy('guard e2e: …maar een echte inhoudswijziging blokkeert nog wél', !!(fout3&&fout3.rowMismatch));
     } finally { window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud; }
   })();
   // ── Quotum: de 8s-poll haalde 8 tabbladen in 8 aparte leesverzoeken op = 60 per minuut,

@@ -2608,7 +2608,7 @@ git commit -m "Leescache: dashboard toont meteen de laatste stand bij openen"
 
 ### Taak 5.5: Fase 5 uitrollen
 
-- [ ] **Stap 1: Versies** — `APP_VERSION = '9.8'`, `CACHE_VERSION = 'cd-v93'`.
+- [ ] **Stap 1: Versies** — `APP_VERSION = '9.9'`, `CACHE_VERSION = 'cd-v94'`.
 - [ ] **Stap 2: Volledige testronde** lokaal, FAIL = 0.
 - [ ] **Stap 3: Naar staging**, daarna een **ingelogde** ronde: taak opslaan, afronden, ongedaan
       maken, notitie toevoegen, en offline zetten in DevTools.

@@ -16,15 +16,13 @@ import { SKEYS, SECS } from "./config.js";
 
 // Minimale rasterbreedte per tabblad, afgeleid uit de breedste schrijfactie op elk blad.
 // Bij elke wijziging: eerst de callsite opzoeken, dan dit getal aanpassen.
-// Gemeten op PROD 2026-07-28: alle negen halen dit. 'Nog Te Doen' staat op exact 16 —
-// geen speling, dus een nieuwe kolom Q vraagt éérst het raster verbreden (schrijfacties
-// buiten het raster mislukken zonder melding).
-// LET OP — dit getal loopt bewust GELIJK op met de werkelijkheid, niet vooruit: zet het pas
-// op 17 op het moment dat de kolom er op PROD én TEST echt bij staat (taak 4.3 stap A1).
-// Eerder ophogen zou de structuurbewaking laten klagen over iets dat nog niet gedaan is,
-// en dat is precies hoe een melding zijn geloofwaardigheid verliest.
+// Gemeten op PROD 2026-07-28: alle negen haalden dit; 'Nog Te Doen' stond toen op exact 16.
+// Op 2026-07-29 verbreed naar 17 voor het vaste taaknummer in kolom Q, op TEST én PROD.
+// Schrijfacties buiten het raster mislukken ZONDER melding, dus dit getal is de bewaking
+// daarop: zakt het raster ooit terug, dan meldt de structuurcheck dat vóórdat er stil data
+// verdwijnt. Dit getal loopt gelijk op met de werkelijkheid, nooit erop vooruit.
 const RASTER_MIN = {
-  'Nog Te Doen':      16,  // kolom P (offerte-aannemers) — wordt 17 zodra kolom Q er staat
+  'Nog Te Doen':      17,  // kolom Q (vast taaknummer) — verbreed op TEST én PROD 2026-07-29
   'Afgerond':         12,  // A:L — NIET 16
   'Herhaalregels':    12,  // A:L
   'Kenmerken':         6,  // A:F
@@ -85,4 +83,22 @@ function checkRaster(tabblad, kolommen){
                 + `Schrijfacties naar de laatste kolommen mislukken zonder melding.` };
 }
 
-export { checkSecties, checkRaster, RASTER_MIN, isSectieKop, isKolomKop };
+// Staat elk vast taaknummer maar op één regel? Twee regels met hetzelfde nummer is de ergste
+// storing die dit mechanisme kan krijgen: de guard herkent de rij dan als 'klopt' en schrijft
+// mét overtuiging naar de verkeerde taak. Puur, dus los testbaar.
+// Rijen zonder nummer tellen niet mee — die bestaan legitiem (aangemaakt door een client die
+// nog oude code draait) en vallen terug op de vingerafdruk-guard.
+function checkNummers(rijen){
+  const gezien={}, uit=[];
+  (rijen||[]).forEach(r=>{
+    const nr=r&&r.taakId;
+    if(!nr) return;
+    if(gezien[nr]) uit.push({ nummer:nr, regels:[gezien[nr], r._row],
+      tekst:`Taaknummer ${nr} staat op twee regels (${gezien[nr]} en ${r._row}). `
+          + `Een schrijfactie kan daardoor de verkeerde taak raken.` });
+    else gezien[nr]=r._row;
+  });
+  return uit;
+}
+
+export { checkSecties, checkRaster, checkNummers, RASTER_MIN, isSectieKop, isKolomKop };

@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  CRUD — taak-modals, sheet-helpers, toevoegen/afronden/verwijderen
 // ══════════════════════════════════════
-import { esc, berekenPrioriteit, toISODate, toDutchDate } from "./util.js";
+import { esc, berekenPrioriteit, toISODate, toDutchDate, nieuwTaakId } from "./util.js";
 import { state, D } from "./state.js";
 import { SECS, SKEYS, SID } from "./config.js";
 import { writeRange, _shiftNtdRows, _herstelShift, assertRowMatch } from "./api.js";
@@ -118,6 +118,8 @@ export function serializeNtdUndo(r){
   const v=SECS[r._sec].keys.map(k=>r[k]||'');
   while(v.length<8) v.push('');                  // OFFERTE heeft 7 velden → vul tot H
   v.push('', '', r.subcategorie||'', r.opvolgdatum||'', r.herhaalId||'', '', r.fase||'', r.aannemers||''); // I, J, K=sub, L, M, N, O=fase, P=aannemers
+  v.push(r.taakId||'');   // Q — het vaste taaknummer moet de undo overleven, anders krijgt de
+                          // teruggezette taak een nieuwe identiteit en is de oude een wees.
   return v;
 }
 
@@ -432,6 +434,11 @@ async function submitTask(){
       const nieuw={_sec:sec,_row:afterRow+1};
       keys.forEach((k,i)=>{ nieuw[k]=norm(values[i]); });
       nieuw.subcategorie=values[values.length-1];
+      // Vast taaknummer (kolom Q) meteen bij het aanmaken. `values` loopt tot K; L t/m P blijven
+      // leeg en Q krijgt het nummer, zodat insertAndWriteRow A..Q in één keer schrijft. Bewust
+      // NIET in de bewerk-tak hierboven: die schrijft A..K en zou L..Q leegvegen.
+      nieuw.taakId=nieuwTaakId();
+      const addValues=values.concat(['','','','','',nieuw.taakId]);
       _shiftNtdRows(afterRow,+1); // bestaande rijen eronder schuiven mee
       (D.ntd[sec]=D.ntd[sec]||[]).push(nieuw);
       renderAll();
@@ -439,7 +446,7 @@ async function submitTask(){
       closeModal();clearModal();
       backgroundWrite(
         async ()=>{
-          await insertAndWriteRow('Nog Te Doen',afterRow,values);
+          await insertAndWriteRow('Nog Te Doen',afterRow,addValues);
           fireNotifEvent('newtask',{sec,code,naam,behandelaar:newBeh});
           await logEvent(code,sec,'Aangemaakt','','',newBeh||'');
           showToast('Taak toegevoegd',`${code} — ${naam||''}`,null,'plus',{geenDedup:true,geenSysteemmelding:true});

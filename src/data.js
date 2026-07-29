@@ -10,7 +10,7 @@ import { buildAnalytics, buildDash } from "./render-analytics.js";
 import { renderNtdDonut } from "./render-lijsten.js";
 import { parseOntw, parseLogboek } from "./render-overig.js";
 import { parseKenmerken } from "./kenmerken.js";
-import { checkSecties } from "./structuurcheck.js";
+import { checkSecties, checkNummers } from "./structuurcheck.js";
 import { ico } from "./icons.js";
 // (kringverwijzing data ⇄ kenmerken: aanroepen gebeuren op runtime — live bindings, veilig)
 import { showToast } from "./notifications.js";
@@ -179,7 +179,7 @@ async function loadAll(silent){
     // Fase 3, trap 1: alleen meekijken. Zodra dit een tijd lang stil blijft op gezonde data
     // gaat de banner aan (trap 2). Nooit blokkerend — dit mag het laden niet beïnvloeden.
     try{
-      const bev=[...checkSecties(ntdR), ...checkSecties(afR)];
+      const bev=[...checkSecties(ntdR), ...checkSecties(afR), ...checkNummers(Object.values(D.ntd||{}).flat())];
       if(bev.length) console.warn('[structuurcheck]', bev);
     }catch(e){ console.warn('[structuurcheck] overgeslagen:', e.message); }
     SKEYS.forEach(s=>{if(D.af[s])D.af[s].sort((a,b)=>parseDt(b.datum)-parseDt(a.datum))});
@@ -247,6 +247,9 @@ function parseSections(rows){
     entry.esc        =_f4v(row[13]);  // N (alleen door Apps Script geschreven)
     entry.fase       =_f4v(row[14]);  // O — offerte-fase (offerte-motor)
     entry.aannemers  =_f4v(row[15]);  // P — aannemerslijst (naam|0/1 per regel)
+    entry.taakId     =_f4v(row[16]);  // Q — vast taaknummer (fase 4). Leeg = nog niet genummerd:
+                                      // rijen van vóór de backfill en rijen die een oude client
+                                      // aanmaakte. De guard valt dan terug op de vingerafdruk.
     // Legacy 'Afgerond'-rijen (oude onEdit-vinkjes, vóór juni): 5-koloms vorm
     // [code,naam,actiepunt,behandelaar,datum] met de afronddatum op kolom E i.p.v. I.
     // Herken ze — geen datum op I, maar kolom E (in entry.behandelaar) is wél een datum —

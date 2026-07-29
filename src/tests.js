@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf, _vandaagAmsterdam } from "./util.js";
+import { nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf, _vandaagAmsterdam } from "./util.js";
 import { logZin, logPaginaSoort, parseLogboek, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, SECS } from "./config.js";
 import { ACTIONS } from "./actions.js";
@@ -24,7 +24,7 @@ import { doOAuth } from "./auth.js";
 import { SPLASH_MS, _setFase } from "./login-splash.js";
 import { opmaakHtml, htmlNaarMarkers, zonderOpmaak, pasToe, opmaakBalk } from "./opmaak.js";
 import { goTo } from "./ui.js";
-import { checkSecties, checkRaster, RASTER_MIN } from "./structuurcheck.js";
+import { checkSecties, checkRaster, checkNummers, RASTER_MIN } from "./structuurcheck.js";
 
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
   // ── mini-assert helper (Fase 1 testnet) ──
@@ -822,7 +822,43 @@ import { checkSecties, checkRaster, RASTER_MIN } from "./structuurcheck.js";
 
     eq('structuur: leeg blad is GEEN bevinding', checkSecties([]).length, 0);
 
+    // ── Vast taaknummer (kolom Q): identiteit vóór vingerafdruk ──
+    const zonderNr = vingerafdruk('Nog Te Doen', ['311198','VvE A','dak nakijken','17 juni 2026'], 'OPPAKKEN');
+    const metNr    = ['311198','VvE A','dak nakijken','17 juni 2026','Jer','Hoog','','','','','','','','','','','Tabc123'];
+    truthy('taaknummer: een rij mét nummer wordt op het nummer herkend, niet op de inhoud',
+       vingerafdruk('Nog Te Doen', metNr, 'OPPAKKEN') === 'T:Tabc123');
+    truthy('taaknummer: rij zonder nummer valt terug op de vingerafdruk', zonderNr !== 'T:Tabc123' && zonderNr.length > 0);
+    eq('taaknummer: gewijzigde tekst doet er niet meer toe zodra het nummer klopt',
+       vingerafdruk('Nog Te Doen', ['311198','VvE A','HEEL ANDERE TEKST','1 jan 2020','','','','','','','','','','','','','Tabc123'], 'OPPAKKEN'),
+       vingerafdruk('Nog Te Doen', metNr, 'OPPAKKEN'));
+    truthy('taaknummer: een ánder nummer op dezelfde plek is een mismatch',
+       vingerafdruk('Nog Te Doen', metNr.slice(0,16).concat(['Tzzz999']), 'OPPAKKEN') !== 'T:Tabc123');
+    eq('taaknummer: geërfde FALSE in kolom Q telt niet als nummer',
+       vingerafdruk('Nog Te Doen', ['311198','VvE A','dak nakijken','17 juni 2026','','','','','','','','','','','','','FALSE'], 'OPPAKKEN'),
+       zonderNr);
+    eq('taaknummer: de kolomkop TaakID telt niet als nummer',
+       vingerafdruk('Nog Te Doen', ['311198','VvE A','dak nakijken','17 juni 2026','','','','','','','','','','','','','TaakID'], 'OPPAKKEN'),
+       zonderNr);
+    eq('taaknummer: rij-object en verse lezing komen op hetzelfde nummer uit',
+       rijVingerafdruk('Nog Te Doen', {_sec:'OPPAKKEN', code:'311198', naam:'VvE A',
+         actiepunt:'dak nakijken', deadline:'17-06-2026', taakId:'Tabc123'}), 'T:Tabc123');
+    truthy('taaknummer: het gelezen bereik loopt t/m Q', /!A5:Q9/.test(_a1Bereik('Nog Te Doen',5,9)));
+    truthy('taaknummer: nieuwTaakId geeft telkens iets anders', nieuwTaakId() !== nieuwTaakId());
+    truthy('taaknummer: nieuwTaakId begint met T en is kort', /^T[a-z0-9]{8,16}$/.test(nieuwTaakId()));
+
+    // checkNummers: twee regels met hetzelfde nummer is de ergste storing die kan optreden
+    eq('nummers: allemaal uniek → geen bevindingen',
+       checkNummers([{taakId:'T1',_row:3},{taakId:'T2',_row:4}]).length, 0);
+    eq('nummers: rijen zónder nummer tellen niet mee',
+       checkNummers([{_row:3},{_row:4},{taakId:'',_row:5}]).length, 0);
+    eq('nummers: hetzelfde nummer twee keer → 1 bevinding',
+       checkNummers([{taakId:'T1',_row:3},{taakId:'T1',_row:9}]).length, 1);
+    eq('nummers: de bevinding noemt beide regelnummers',
+       checkNummers([{taakId:'T1',_row:3},{taakId:'T1',_row:9}])[0].regels, [3,9]);
+
     eq('structuur: raster breed genoeg', checkRaster('Afgerond', 26), null);
+    eq('structuur: NTD vraagt nu 17 kolommen (kolom Q)', checkRaster('Nog Te Doen', 16).nodig, 17);
+    eq('structuur: NTD met 17 kolommen is in orde', checkRaster('Nog Te Doen', 17), null);
     eq('structuur: raster te smal', checkRaster('Afgerond', 8).nodig, 12);
     eq('structuur: onbekend tabblad → geen oordeel', checkRaster('Iets anders', 1), null);
 
@@ -841,8 +877,9 @@ import { checkSecties, checkRaster, RASTER_MIN } from "./structuurcheck.js";
                      ['LOD'],['VvE Code','VvE'],['381004','VvE Q'],
                      ['','Losse notitie onderaan het blad']]).length, 0);
     // Alle negen bekende tabbladen zijn op PROD breed genoeg (gemeten 2026-07-28).
-    eq('structuur: Nog Te Doen op 16 kolommen is precies genoeg', checkRaster('Nog Te Doen', 16), null);
-    eq('structuur: Nog Te Doen op 15 kolommen is te smal', checkRaster('Nog Te Doen', 15).nodig, 16);
+    // Sinds 2026-07-29 heeft NTD kolom Q (vast taaknummer), dus 16 is niet meer genoeg.
+    truthy('structuur: Nog Te Doen op 16 kolommen is nu te smal', !!checkRaster('Nog Te Doen', 16));
+    eq('structuur: Nog Te Doen op 15 kolommen is te smal', checkRaster('Nog Te Doen', 15).nodig, 17);
   })();
 
   // ── VvE-dossier AI-agent (chat) ──
@@ -1103,8 +1140,8 @@ import { checkSecties, checkRaster, RASTER_MIN } from "./structuurcheck.js";
   eq('rij-guard: ontbrekende rij telt als mismatch (got leeg)', (_rowMismatch([], 5, [{row:5,code:'CH1'}])||{}).got, '');
   eq('rij-guard: whitespace-tolerant → null', _rowMismatch([[' CH1 ']], 5, [{row:5,code:'CH1'}]), null);
   // ── Rij-guard A1-range: apostrof in tabblad-naam escapen ──
-  eq('a1: gewone tabblad-naam', _a1Bereik('Nog Te Doen',5,5), "'Nog Te Doen'!A5:I5");
-  eq('a1: apostrof wordt geëscaped (ALV)', _a1Bereik("ALV's overzicht",3,7), "'ALV''s overzicht'!A3:I7");
+  eq('a1: gewone tabblad-naam', _a1Bereik('Nog Te Doen',5,5), "'Nog Te Doen'!A5:Q5");
+  eq('a1: apostrof wordt geëscaped (ALV)', _a1Bereik("ALV's overzicht",3,7), "'ALV''s overzicht'!A3:Q7");
 
   // ── Vingerafdruk-guard: 'zelfde taak', niet alleen 'zelfde VvE'. ──
   // De oude guard las alleen kolom A en bewees daarmee hooguit 'zelfde VvE'. Deze blokjes
@@ -1188,7 +1225,7 @@ import { checkSecties, checkRaster, RASTER_MIN } from "./structuurcheck.js";
       stub(['311198','VvE A','dak nakijken','17 juni 2026','Jer','Hoog','iets','TRUE','','','','','','T1:28-07-2026']);
       let door=true; try{ await assertRowMatch(12, taak); }catch(e){ door=false; }
       truthy('guard e2e: ongewijzigde rij mag door (ondanks andere datumvorm en escalatiestempel)', door);
-      truthy('guard e2e: er wordt A..I gelezen, niet alleen kolom A', /!A12:I12/.test(gevraagd));
+      truthy('guard e2e: er wordt A..Q gelezen, niet alleen kolom A', /!A12:Q12/.test(gevraagd));
 
       // 2. Iemand heeft de tekst in kolom C met de hand aangepast → moet blokkeren.
       stub(['311198','VvE A','GOOT nakijken','17 juni 2026','Jer','Hoog','iets']);
@@ -1255,7 +1292,7 @@ import { checkSecties, checkRaster, RASTER_MIN } from "./structuurcheck.js";
   (()=>{
     const off={_sec:'OFFERTE-TRAJECTEN',code:'CH1',naam:'VvE 1',datumAangevraagd:'1 jun 2026',offertes:'2/3',behandelaar:'Jer',deadline:'10 jun 2026',opmerkingen:'x',subcategorie:'dak',opvolgdatum:'',herhaalId:'',fase:'bij_vve',aannemers:'Bakker|1\nDe Vries|0'};
     const v=serializeNtdUndo(off);
-    eq('undo-serialisatie offerte: 16 kolommen (A..P)', v.length, 16);
+    eq('undo-serialisatie offerte: 17 kolommen (A..Q, incl. taaknummer)', v.length, 17);
     eq('undo-serialisatie offerte: fase op kolom O (idx 14)', v[14], 'bij_vve');
     eq('undo-serialisatie offerte: aannemers op kolom P (idx 15)', v[15], 'Bakker|1\nDe Vries|0');
     eq('undo-serialisatie offerte: subcategorie blijft kolom K (idx 10)', v[10], 'dak');
@@ -1263,9 +1300,11 @@ import { checkSecties, checkRaster, RASTER_MIN } from "./structuurcheck.js";
   (()=>{
     const opp={_sec:'OPPAKKEN',code:'CH2',naam:'VvE2',actiepunt:'iets',deadline:'5 jun 2026',behandelaar:'Cihad',prioriteit:'Hoog',opmerkingen:'',inBehandeling:'FALSE',subcategorie:'',opvolgdatum:'',herhaalId:''};
     const v=serializeNtdUndo(opp);
-    eq('undo-serialisatie OPPAKKEN: 16 kolommen', v.length, 16);
+    eq('undo-serialisatie OPPAKKEN: 17 kolommen (A..Q)', v.length, 17);
     eq('undo-serialisatie OPPAKKEN: O leeg (geen offerte-velden)', v[14], '');
     eq('undo-serialisatie OPPAKKEN: P leeg', v[15], '');
+    eq('undo-serialisatie: taaknummer overleeft op kolom Q (idx 16)',
+       serializeNtdUndo({_sec:'OPPAKKEN', code:'X', taakId:'Tabc123'})[16], 'Tabc123');
   })();
   // #21 coerceDagenVooraf: bewuste 0 blijft 0; leeg/ongeldig/negatief → 14
   eq('coerceDagenVooraf: "0" blijft 0', coerceDagenVooraf('0'), 0);

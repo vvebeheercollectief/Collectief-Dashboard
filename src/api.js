@@ -158,6 +158,11 @@ function vingerafdruk(sheetName, rij, sec){
   const spec=FP_KOLOMMEN[sheetName];
   rij=rij||[];
   if(!spec) return _normCel(rij[0]);
+  // Heeft de rij een vast taaknummer (kolom Q), dan ÍS dat de identiteit en doet de rest niet
+  // meer mee. Dit is het eindstation waar fase 4 op mikte: de vingerafdruk blijft alleen het
+  // vangnet voor rijen van vóór de backfill of van een client die nog oude code draait.
+  const nr=leegBijErfenis(rij[16]);
+  if(nr && nr!=='TaakID') return 'T:'+nr;
   const datumKol=spec.datum || (sheetName==='Nog Te Doen' ? (NTD_DATUM[sec]||[]) : []);
   const idx=spec.tekst.concat(datumKol).sort((a,b)=>a-b);
   // Ontbrekende cel → '' : values.get kapt afsluitende lege cellen én lege rijen af, dus een rij
@@ -177,6 +182,7 @@ function _rijNaarCellen(sheetName, r){
   const uit=keys.map(k=>r[k] ?? '');
   while(uit.length<8) uit.push('');            // OFFERTE heeft 7 velden → vul tot H
   if(sheetName==='Afgerond') uit[8]=r.datum ?? '';   // I = datum afgerond
+  if(sheetName==='Nog Te Doen' && r.taakId) uit[16]=r.taakId;   // Q = vast taaknummer
   return uit;
 }
 // Vingerafdruk rechtstreeks uit een rij-object.
@@ -197,9 +203,10 @@ function _rowMismatch(vals, minRow, checks, maak){
 }
 // Bouwt de A1-range over de vingerafdruk-kolommen; escapet apostrofs in de tabblad-naam
 // (bv. "ALV's overzicht" → 'ALV''s overzicht'!A..). Altijd t/m I: dat dekt élke kolom die in
-// FP_KOLOMMEN voorkomt, en het houdt het op ÉÉN aaneengesloten range = één leesverzoek.
+// FP_KOLOMMEN voorkomt, plus kolom Q met het vaste taaknummer. Het blijft ÉÉN aaneengesloten
+// range en dus één leesverzoek — de guard wordt er niet duurder van.
 function _a1Bereik(sheetName, minR, maxR){
-  return `'${(sheetName||'').replace(/'/g,"''")}'!A${minR}:I${maxR}`;
+  return `'${(sheetName||'').replace(/'/g,"''")}'!A${minR}:Q${maxR}`;
 }
 // Leest de vingerafdruk-kolommen van de doelrij(en) terug en gooit een ROW_MISMATCH-fout als een
 // rij niet meer dezelfde taak bevat. Eén GET dekt het hele rijbereik. backgroundWrite vangt de fout.

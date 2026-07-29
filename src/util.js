@@ -188,6 +188,17 @@ function offProg(v){
 const _MAANDEN={jan:1,feb:2,mrt:3,maa:3,apr:4,mei:5,jun:6,jul:7,aug:8,sep:9,sept:9,okt:10,nov:11,dec:12,
   januari:1,februari:2,maart:3,april:4,juni:6,juli:7,augustus:8,september:9,oktober:10,november:11,december:12};
 
+// Selectievakje-erfenis: rijen in 'Nog Te Doen' erven de TRUE/FALSE-validatie van de kolommen
+// rechts van H. Zo'n geërfde waarde is géén inhoud en telt als leeg. Stond eerder als lokale
+// const `_f4v` binnen parseSections; hierheen gehaald zodat de parse én de schrijf-guard
+// gegarandeerd dezelfde regel hanteren — lopen die twee uiteen, dan slaat de guard vals alarm.
+// Bewust NIET op kolom H toepassen: dáár is 'TRUE' de betekenisvolle waarde 'in behandeling'.
+const leegBijErfenis = v => {
+  const s = ((v ?? '') + '').trim();
+  const u = s.toUpperCase();
+  return (u === 'TRUE' || u === 'FALSE') ? '' : s;
+};
+
 // Round-trip-check: een onmogelijke datum (32-13, 31 feb) rolt in JS stil door naar een
 // verkeerde dag. Door terug te vergelijken met new Date() vangen we die en geven we null.
 function _valDate(y,mn,d){
@@ -303,7 +314,7 @@ export {
   displayName, filt, PRIO_REGELS, STIL_DREMPEL_DAGEN, STIL_ESCALATIE_REGELS,
   opvolgStatus, volgendeDeadline, HERHAAL_MAANDEN, _vandaagAmsterdam, isoWeek,
   _verschilInKalenderdagen, berekenPrioriteit, prioBadge, persBadges,
-  adjOff, offProg, _MAANDEN, _parseAnyDate, parseDt, toISODate, toDutchDate,
+  adjOff, offProg, _MAANDEN, _parseAnyDate, parseDt, toISODate, toDutchDate, leegBijErfenis,
   emptyRow, esc, vveCodeSpan, subBadge, coerceDagenVooraf,
   parseOff, offerteFase,
   parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes,

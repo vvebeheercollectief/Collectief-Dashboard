@@ -127,7 +127,7 @@ function bulkAfronden(rows){
     const ids=await getSheetIds();
     const afSheetId=ids['Afgerond'], ntdSheetId=ids['Nog Te Doen'];
     if(afSheetId==null||ntdSheetId==null) throw new Error('Sheet niet gevonden');
-    await assertRowsMatch(items.map(it=>({row:it.origRow, code:it.code}))); // bescherming: alle rijen nog van hun VvE vóór bulk-afronden
+    await assertRowsMatch(items.map(it=>({row:it.origRow, r:it.r}))); // bescherming: alle rijen nog dezelfde TAAK vóór bulk-afronden
     // Atomair: ALLE items in één batchUpdate (Sheets past die alles-of-niets toe). Voorheen
     // liep dit per item in aparte fetches; faalde item 3, dan stonden 1 en 2 al server-side
     // afgerond terwijl de lokale rollback ze terugzette → spook-dubbels na de resync.
@@ -196,6 +196,10 @@ async function bulkUndoAfronden(items){
       //    delete-indexen elkaar niet verschuiven (i.t.t. de oude code die de oudste rij koos).
       //    De inserts hierboven raakten een ánder tabblad, dus deze _row-nummers kloppen nog.
       if(teVerwijderen.length){
+        // 'Afgerond' had als énige tabblad een positionele deleteDimension zónder guard, en juist
+        // op de undo-weg: de rij wordt weggegooid op grond van een onthouden rijnummer. Klopte dat
+        // nummer niet meer, dan verdween er stil een ándere afronding. Nu eerst controleren.
+        await assertRowsMatch(teVerwijderen.map(af=>({row:af._row, r:af})), 'Afgerond');
         const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
           method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
           body:JSON.stringify({requests:teVerwijderen.map(af=>({deleteDimension:{range:{sheetId:ids['Afgerond'],dimension:'ROWS',startIndex:af._row-1,endIndex:af._row}}}))})});
@@ -224,7 +228,7 @@ function bulkVerwijderen(rows){
     const ids=await getSheetIds();
     const sheetId=ids['Nog Te Doen'];
     if(sheetId==null) throw new Error('Sheet "Nog Te Doen" niet gevonden');
-    await assertRowsMatch(items.map(it=>({row:it.origRow, code:it.code}))); // bescherming: alle rijen nog van hun VvE vóór bulk-verwijderen
+    await assertRowsMatch(items.map(it=>({row:it.origRow, r:it.r}))); // bescherming: alle rijen nog dezelfde TAAK vóór bulk-verwijderen
     const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
       method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
       body:JSON.stringify({requests:items.map(it=>({deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:it.origRow-1,endIndex:it.origRow}}}))})});
@@ -283,7 +287,17 @@ function bulkVeld(rows,soort,waarde){
   const schrijf=(welkeWaarde)=>{
     let gelogd=false;
     return async()=>{
-      await assertRowsMatch(items.map(it=>({row:it.r._row, code:it.code}))); // bescherming: alle rijen nog van hun VvE vóór bulk-celschrijf
+      // Bescherming: alle rijen nog dezelfde TAAK vóór bulk-celschrijf.
+      // Let op de richting. Deze closure schrijft zowel de nieuwe waarde als (bij undo) de oude
+      // terug, en het rij-object is op dát moment al bijgewerkt. De guard moet vergelijken met
+      // wat er NU in de Sheet hoort te staan, en dat is juist de waarde die we NIET schrijven:
+      // bij 'nieuw' staat de oude waarde er nog, bij 'oud' (undo) de zojuist geschreven nieuwe.
+      // Zonder deze omkering zou elke bulk-deadline en elke bulk-undo gegarandeerd vals afgaan,
+      // want de deadline zit in de vingerafdruk.
+      await assertRowsMatch(items.map(it=>({
+        row: it.r._row,
+        r: { ...it.r, [conf.veld]: (welkeWaarde==='oud' ? waarde : it.oud) },
+      })));
       // values:batchUpdate met USER_ENTERED — één atomaire POST (alles-of-niets) én zelfde
       // invoer-parsing als de modal-flow (writeRange): een datum-string wordt zo óók via bulk
       // een echte datum-waarde, niet platte tekst. (updateCells/stringValue zou RAW opslaan.)

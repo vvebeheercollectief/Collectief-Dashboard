@@ -58,7 +58,7 @@ async function schrijfOpvolgdatum(r, nieuw, actie){
   renderAll();
   backgroundWrite(
     async ()=>{
-      await assertRowMatch(r._row, r.code); // bescherming: rij nog van deze VvE vóór L-write
+      await assertRowMatch(r._row, r); // bescherming: rij nog dezelfde TAAK vóór L-write (kolom L zit niet in de vingerafdruk)
       await writeRange(`'Nog Te Doen'!${OPVOLG_KOLOM}${r._row}:${OPVOLG_KOLOM}${r._row}`, [nieuw]);
       await logEvent(r.code, r._sec, actie, 'opvolgdatum', oud, nieuw);
       // Bevestiging pas ná de write; onderaan de writeFn zodat een herkansing er niet twee geeft.

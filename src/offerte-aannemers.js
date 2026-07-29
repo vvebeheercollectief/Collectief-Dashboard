@@ -23,7 +23,7 @@ async function _bewaar(r, vorige){
   if(!await ensureToken()){ r.aannemers=vorige; renderNtd(); return; }
   let gedaan=false;
   backgroundWrite(
-    async()=>{ if(!gedaan){ await assertRowMatch(r._row, r.code); await writeRange(`'Nog Te Doen'!P${r._row}`,[r.aannemers]); gedaan=true; } },
+    async()=>{ if(!gedaan){ await assertRowMatch(r._row, r); await writeRange(`'Nog Te Doen'!P${r._row}`,[r.aannemers]); gedaan=true; } },
     ()=>{ r.aannemers=vorige; },
     'Aannemers opslaan'
   );

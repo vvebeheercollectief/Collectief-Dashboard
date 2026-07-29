@@ -187,7 +187,7 @@ async function deleteTaskRow(r){
       const sheetId=ids['Nog Te Doen'];
       if(sheetId==null) throw new Error('Sheet "Nog Te Doen" niet gevonden');
       if(!verwijderd){
-        await assertRowMatch(oudeRow, r.code); // bescherming: rij nog van deze VvE vóór verwijderen
+        await assertRowMatch(oudeRow, r); // bescherming: rij nog dezelfde TAAK vóór verwijderen
         const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
           method:'POST',
           headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
@@ -336,7 +336,7 @@ async function doCompleteTask(){
     backgroundWrite(
       async ()=>{
         if(!afgerond){
-          await assertRowMatch(r._row, r.code); // bescherming: rij nog van deze VvE vóór afronden
+          await assertRowMatch(r._row, r); // bescherming: rij nog dezelfde TAAK vóór afronden
           const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
             method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
             body:JSON.stringify(batchBody)});
@@ -409,7 +409,9 @@ async function submitTask(){
       closeModal();clearModal();
       backgroundWrite(
         async ()=>{
-          await assertRowMatch(doelRow._row, oudeWaarden.code); // bescherming: rij nog dezelfde VvE vóór overschrijven
+          await assertRowMatch(doelRow._row, oudeWaarden); // bescherming: rij nog dezelfde TAAK vóór overschrijven
+          // oudeWaarden is de snapshot VÓÓR de optimistische mutatie van doelRow — precies wat
+          // er op dit moment nog in de Sheet hoort te staan.
           await writeRange(`'Nog Te Doen'!A${doelRow._row}:${endCol}${doelRow._row}`,values);
           if(newBeh && newBeh!==(oudeWaarden.behandelaar||'')){
             fireNotifEvent('assigned',{sec,code,naam,behandelaar:newBeh});

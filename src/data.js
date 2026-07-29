@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  DATA — laden, parsen, achtergrond-schrijven, sync-indicator
 // ══════════════════════════════════════
-import { parseDt, _parseAnyDate, coerceDagenVooraf } from "./util.js";
+import { parseDt, _parseAnyDate, coerceDagenVooraf, leegBijErfenis } from "./util.js";
 import { state, D } from "./state.js";
 import { SKEYS, SECS } from "./config.js";
 import { fetchSheet, fetchSheets, _withRetry } from "./api.js";
@@ -239,7 +239,8 @@ function parseSections(rows){
     entry.datum=(row[afOff]||'').trim();
     entry.opmerking=(row[afOff+1]||'').trim();
     // Checkbox-erfenis (rijen erven TRUE/FALSE-validatie in K/L/M/N) telt als leeg.
-    const _f4v=v=>{v=((v||'')+'').trim();return (v.toUpperCase()==='FALSE'||v.toUpperCase()==='TRUE')?'':v;};
+    // Gedeeld met de schrijf-guard in api.js — zie leegBijErfenis in util.js.
+    const _f4v=leegBijErfenis;
     entry.subcategorie=_f4v(row[afOff+2]);
     entry.opvolgdatum=_f4v(row[11]);  // L — Fase 4
     entry.herhaalId  =_f4v(row[12]);  // M

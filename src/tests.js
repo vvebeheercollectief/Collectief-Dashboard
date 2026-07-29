@@ -12,7 +12,7 @@ import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel,
 import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk.js";
-import { _isTransient, _rowMismatch, _a1ColA, _herstelShift, veiligeCel, _veiligeRij, fetchSheets } from "./api.js";
+import { _isTransient, _rowMismatch, _a1Bereik, _herstelShift, veiligeCel, _veiligeRij, fetchSheets, vingerafdruk, rijVingerafdruk, _normCel, _rijNaarCellen } from "./api.js";
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
@@ -1103,8 +1103,69 @@ import { checkSecties, checkRaster, RASTER_MIN } from "./structuurcheck.js";
   eq('rij-guard: ontbrekende rij telt als mismatch (got leeg)', (_rowMismatch([], 5, [{row:5,code:'CH1'}])||{}).got, '');
   eq('rij-guard: whitespace-tolerant → null', _rowMismatch([[' CH1 ']], 5, [{row:5,code:'CH1'}]), null);
   // ── Rij-guard A1-range: apostrof in tabblad-naam escapen ──
-  eq('a1: gewone tabblad-naam', _a1ColA('Nog Te Doen',5,5), "'Nog Te Doen'!A5:A5");
-  eq('a1: apostrof wordt geëscaped (ALV)', _a1ColA("ALV's overzicht",3,7), "'ALV''s overzicht'!A3:A7");
+  eq('a1: gewone tabblad-naam', _a1Bereik('Nog Te Doen',5,5), "'Nog Te Doen'!A5:I5");
+  eq('a1: apostrof wordt geëscaped (ALV)', _a1Bereik("ALV's overzicht",3,7), "'ALV''s overzicht'!A3:I7");
+
+  // ── Vingerafdruk-guard: 'zelfde taak', niet alleen 'zelfde VvE'. ──
+  // De oude guard las alleen kolom A en bewees daarmee hooguit 'zelfde VvE'. Deze blokjes
+  // leggen vast dat de vingerafdruk (a) door dagelijkse Apps-Script-stempels heen kijkt,
+  // (b) twee taken van dezelfde VvE uit elkaar houdt, en (c) beide kanten identiek normaliseert.
+  (()=>{
+    eq('normcel: ontbrekende cel → lege tekst', _normCel(undefined), '');
+    eq('normcel: spaties eraf', _normCel('  hoi  '), 'hoi');
+    eq('normcel: geërfde FALSE telt als leeg', _normCel('FALSE'), '');
+    eq('normcel: twee schrijfwijzen van dezelfde datum zijn gelijk',
+       _normCel('17-06-2026', true), _normCel('17 juni 2026', true));
+    truthy('normcel: datum is niet leeg', _normCel('17-06-2026', true).length > 0);
+    eq('normcel: onherkenbare datum valt terug op de tekst', _normCel('sept/okt', true), 'sept/okt');
+
+    const basis = ['311198','VvE A','dak nakijken','17 juni 2026','Jer','Hoog','Opmerking'];
+    const fpBasis = vingerafdruk('Nog Te Doen', basis, 'OPPAKKEN');
+
+    eq('vingerafdruk: geheugen-object en verse lezing komen op hetzelfde uit',
+       rijVingerafdruk('Nog Te Doen', {_sec:'OPPAKKEN', code:'311198', naam:'VvE A',
+         actiepunt:'dak nakijken', deadline:'17-06-2026', behandelaar:'Jer', prioriteit:'Hoog',
+         opmerkingen:'Opmerking'}), fpBasis);
+    truthy('vingerafdruk: ándere taak van DEZELFDE VvE → ongelijk',
+       rijVingerafdruk('Nog Te Doen', {_sec:'OPPAKKEN', code:'311198', naam:'VvE A',
+         actiepunt:'brief sturen', deadline:'17-06-2026'}) !== fpBasis);
+    truthy('vingerafdruk: ándere deadline, zelfde tekst → ongelijk',
+       vingerafdruk('Nog Te Doen', ['311198','VvE A','dak nakijken','18 juni 2026'], 'OPPAKKEN') !== fpBasis);
+    eq('vingerafdruk: afgekapte staartcellen maken niet uit',
+       vingerafdruk('Nog Te Doen', ['311198','VvE A','dak nakijken','17 juni 2026'], 'OPPAKKEN'), fpBasis);
+    eq('vingerafdruk: dagelijkse escalatiestempel in N verandert niets',
+       vingerafdruk('Nog Te Doen', basis.concat(['TRUE','','','','','','T1:28-07-2026']), 'OPPAKKEN'), fpBasis);
+    eq('vingerafdruk: door Apps Script herberekende prioriteit in F verandert niets',
+       vingerafdruk('Nog Te Doen', ['311198','VvE A','dak nakijken','17 juni 2026','Jer','Laag',''], 'OPPAKKEN'), fpBasis);
+    eq('vingerafdruk: VERGADERVERZOEKEN pakt de deadline in kolom F, niet D',
+       vingerafdruk('Nog Te Doen', ['311198','VvE A','sept/okt','agenda','Jer','01-09-2026'], 'VERGADERVERZOEKEN'),
+       vingerafdruk('Nog Te Doen', ['311198','VvE A','sept/okt','ANDERE agenda','Cihad','1 september 2026'], 'VERGADERVERZOEKEN'));
+    eq('vingerafdruk: onbekend tabblad valt terug op kolom A',
+       vingerafdruk('Iets anders', ['ABC','rest','doet','niet','mee']), 'ABC');
+    eq('vingerafdruk: tabblad met een al unieke sleutel valt terug op kolom A',
+       vingerafdruk('Logboek', ['2026-07-29T10:00:00.000Z','311198','OPPAKKEN']), '2026-07-29T10:00:00.000Z');
+    // Een rij-object op een tabblad zónder vingerafdruk-spec mag NIET op een lege vingerafdruk
+    // uitkomen — dat zou elke schrijfactie daar blokkeren. _rijNaarCellen geeft daar bewust [].
+    eq('vingerafdruk: rij-object op een spec-loos tabblad geeft geen bruikbare cel-array',
+       _rijNaarCellen('Logboek', {timestamp:'x'}).length, 0);
+    // Afgerond komt óók uit parseSections: 'actiepunt' is kolom C (index 2), niet index 1.
+    // Deze test is de reden dat _rijNaarCellen SECS.keys gebruikt en geen eigen veldlijstje.
+    eq('vingerafdruk: Afgerond zet actiepunt op kolom C en de afronddatum op kolom I',
+       rijVingerafdruk('Afgerond', {_sec:'OPPAKKEN', code:'311198', naam:'VvE A',
+         actiepunt:'dak nakijken', datum:'17-06-2026'}),
+       vingerafdruk('Afgerond', ['311198','VvE A','dak nakijken','','','','','','17 juni 2026']));
+    truthy('vingerafdruk: Afgerond onderscheidt twee afrondingen van dezelfde VvE',
+       rijVingerafdruk('Afgerond', {_sec:'OPPAKKEN', code:'311198', actiepunt:'dak', datum:'17-06-2026'}) !==
+       rijVingerafdruk('Afgerond', {_sec:'OPPAKKEN', code:'311198', actiepunt:'goot', datum:'17-06-2026'}));
+    truthy('vingerafdruk: geen enkele kolom valt buiten het gelezen bereik A..I',
+       _rijNaarCellen('Afgerond', {_sec:'OPPAKKEN', code:'a', actiepunt:'b', datum:'c'}).length <= 9);
+
+    // _rowMismatch: oude vorm (kolom A) blijft werken naast de nieuwe (vingerafdruk)
+    eq('rij-guard: vingerafdruk klopt → null',
+       _rowMismatch([['V1','n','t']], 5, [{row:5, code:'V1\x1fn\x1ft'}], ruw=>ruw.join('\x1f')), null);
+    truthy('rij-guard: vingerafdruk wijkt af → mismatch',
+       !!_rowMismatch([['V1','n','ANDERS']], 5, [{row:5, code:'V1\x1fn\x1ft'}], ruw=>ruw.join('\x1f')));
+  })();
   // ── Quotum: de 8s-poll haalde 8 tabbladen in 8 aparte leesverzoeken op = 60 per minuut,
   //    precies de Google-limiet van 60 leesverzoeken per minuut per gebruiker. Elke actie
   //    van de gebruiker ging daardoor over het quotum. Eén batchGet = één verzoek. ──

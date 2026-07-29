@@ -5,7 +5,7 @@ import { esc, displayName, parseDt } from "./util.js";
 import { state, D, _shownToasts } from "./state.js";
 import { SID, ONESIGNAL_APP_ID } from "./config.js";
 import { ensureToken } from "./auth.js";
-import { fetchSheet, appendRange } from "./api.js";
+import { fetchSheet, appendRange, assertRowMatch } from "./api.js";
 import { logEvent } from "./render-overig.js";
 import { getSheetIds, insertAndWriteRow, getInsertRow } from "./crud.js";
 import { loadAll, parseSections, metWriteMarkering } from "./data.js";
@@ -178,6 +178,10 @@ async function undoComplete(undoData) {
       const insertRow = getInsertRow(sec);
       await insertAndWriteRow('Nog Te Doen', insertRow, ntdValues);
       if (doelAf) {
+        // Guard op 'Afgerond': deze deleteDimension leunt op een rijnummer uit een verse lezing,
+        // maar tussen die lezing en dit verzoek kan de Sheet alsnog verschoven zijn. Klopt de rij
+        // niet meer, dan zou hier stil een ándere afronding verdwijnen.
+        await assertRowMatch(doelAf._row, doelAf, 'Afgerond');
         await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${state.oauthToken}`, 'Content-Type': 'application/json' },

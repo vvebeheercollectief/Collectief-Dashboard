@@ -1,5 +1,6 @@
 import { state, D } from "./state.js";
-import { SID, SKEYS, PROXY_URL } from "./config.js";
+import { SID, SKEYS, PROXY_URL, SECS } from "./config.js";
+import { _parseAnyDate, leegBijErfenis } from "./util.js";
 
 async function fetchSheet(name){
   if(!state.oauthToken) throw new Error('Niet ingelogd');
@@ -109,32 +110,123 @@ async function askChat(system, messages){
   return (data.antwoord || '').trim();
 }
 
+// ── Vingerafdruk van een rij ───────────────────────────────────────────────
+// De guard vergeleek tot v9.5 alléén kolom A. Dat bewijst 'deze rij hoort nog bij dezelfde
+// VvE', niet 'dit is nog dezelfde taak' — en voor een VvE met meerdere openstaande taken ving
+// hij dus niets. Juist dat is het waarschijnlijke schadegeval, want rijen verschuiven bínnen
+// een sectie.
+//
+// Alleen kolommen die het DASHBOARD bezit en die STABIEL zijn doen mee. Bewust buitengesloten:
+//   N  escalatie   — alleen door Apps Script geschreven; cd_opvolgingMotor stempelt hem élke
+//                    ochtend ±06:30. Meenemen zou stil álle schrijfacties blokkeren op precies
+//                    de taken die het langst stilliggen.
+//   F  prioriteit  — cd_recalcPrioriteiten herschrijft die dagelijks (alleen OPPAKKEN)
+//   L  opvolgdatum — door de opvolgmotor geschreven
+//   I,J            — afvink-selectievakje / ongebruikt; dragen TRUE/FALSE-erfenis
+//   O,P            — buiten de gewone bewerkweg om geschreven; voegen niets toe aan identiteit
+// De VvE-naam doet niet mee: dezelfde code betekent per definitie dezelfde naam.
+// Alleen de twee tabbladen waar kolom A NIET onderscheidend genoeg is. Op Herhaalregels,
+// Ontwikkeling, Logboek, Kenmerken en ALV's overzicht is de sleutel in kolom A al uniek genoeg
+// (een ID, een titel, een timestamp, een VvE-code bij één rij per VvE); die blijven bewust op de
+// kolom-A-controle staan. Een tabblad dat hier niet in staat valt terug op kolom A — precies het
+// gedrag van vóór v9.6. Wie zo'n tabblad later wél wil verbreden, zet hem hier bij én breidt
+// _rijNaarCellen uit; doe dat niet op de gok, maar controleer eerst de echte kolomindeling in de
+// parser van dat tabblad (de veldnamen lopen niet gelijk op met de kolomvolgorde).
+const FP_KOLOMMEN = {
+  'Nog Te Doen': { tekst:[0,2], datum:null },  // A=code, C=actiepunt/periode/datumAangevraagd; deadline per sectie
+  'Afgerond':    { tekst:[0,2], datum:[8]  },  // A=code, C=actiepunt, I=datum afgerond
+};
+// Welke kolom de deadline draagt verschilt per sectie van 'Nog Te Doen' (zie SECS.keys):
+// OPPAKKEN D(3) · VERGADERVERZOEKEN F(5) · OFFERTE-TRAJECTEN C(2)+F(5) · LOD F(5).
+const NTD_DATUM = { OPPAKKEN:[3], VERGADERVERZOEKEN:[5], 'OFFERTE-TRAJECTEN':[2,5], LOD:[5] };
+
+// Eén cel vergelijkbaar maken. isDatum → vergelijk op de GEPARSEERDE datum, nooit op de tekst:
+// het dashboard houdt '17-06-2026' in het geheugen terwijl values.get (FORMATTED_VALUE)
+// '17 juni 2026' teruggeeft. Onherkenbaar als datum → val terug op de tekst ('sept/okt', '2/3').
+function _normCel(v, isDatum){
+  const s=leegBijErfenis(v);
+  if(!isDatum||!s) return s;
+  const d=_parseAnyDate(s);              // geeft {y,m,d} of null
+  return d ? `${d.y}-${d.m}-${d.d}` : s;
+}
+
+// Vingerafdruk van één rij. `rij` is ALTIJD een cel-array (zoals values.get hem teruggeeft);
+// een rij-object gaat er eerst met _rijNaarCellen doorheen. Beide kanten van de vergelijking
+// door dezelfde functie halen is de hele truc — anders lopen trim en datumvorm uiteen.
+// Onbekend tabblad → val terug op kolom A, zodat een nieuw tabblad nooit stil de guard uitzet.
+function vingerafdruk(sheetName, rij, sec){
+  const spec=FP_KOLOMMEN[sheetName];
+  rij=rij||[];
+  if(!spec) return _normCel(rij[0]);
+  const datumKol=spec.datum || (sheetName==='Nog Te Doen' ? (NTD_DATUM[sec]||[]) : []);
+  const idx=spec.tekst.concat(datumKol).sort((a,b)=>a-b);
+  // Ontbrekende cel → '' : values.get kapt afsluitende lege cellen én lege rijen af, dus een rij
+  // met lege staartkolommen komt korter terug dan hij in de Sheet staat.
+  return idx.map(i=>_normCel(rij[i], datumKol.includes(i))).join('\x1f');
+}
+
+// Rij-OBJECT → cel-array, zodat geheugen en verse lezing dezelfde weg volgen.
+// 'Nog Te Doen' én 'Afgerond' komen allebei uit parseSections en dragen dus SECS-velden op de
+// kolomvolgorde van hun sectie. Let op: die volgorde is NIET de volgorde waarin de velden in het
+// object staan — 'actiepunt' is kolom C (index 2), niet index 1. Vandaar SECS.keys en geen
+// eigen lijstje.
+function _rijNaarCellen(sheetName, r){
+  r=r||{};
+  if(!FP_KOLOMMEN[sheetName]) return [];
+  const keys=(SECS[r._sec]||{}).keys||[];
+  const uit=keys.map(k=>r[k] ?? '');
+  while(uit.length<8) uit.push('');            // OFFERTE heeft 7 velden → vul tot H
+  if(sheetName==='Afgerond') uit[8]=r.datum ?? '';   // I = datum afgerond
+  return uit;
+}
+// Vingerafdruk rechtstreeks uit een rij-object.
+const rijVingerafdruk=(sheetName, r)=>vingerafdruk(sheetName, _rijNaarCellen(sheetName, r), r&&r._sec);
+
 // ── Bescherming tegen schrijven naar de verkeerde rij ──────────────────────
-// Pure (testbaar): gegeven de teruggelezen kolom-A-waarden (vanaf minRow) en de
-// verwachte {row,code}-checks → geef de eerste mismatch terug, of null als alles klopt.
-function _rowMismatch(vals, minRow, checks){
+// Pure (testbaar): gegeven de teruggelezen rijen (vanaf minRow) en de verwachte checks → geef de
+// eerste mismatch terug, of null als alles klopt. `maak` zet een ruwe rij om in de te vergelijken
+// waarde; zonder `maak` is dat de kale kolom-A-waarde (het gedrag van vóór v9.6).
+function _rowMismatch(vals, minRow, checks, maak){
   for(const c of checks){
-    const got=(((vals[c.row-minRow]||[])[0])||'').toString().trim();
-    if(got!==(c.code||'').toString().trim()) return { row:c.row, expected:(c.code||'').toString().trim(), got };
+    const ruw=vals[c.row-minRow]||[];
+    const got=maak ? maak(ruw, c) : ((ruw[0]||'').toString().trim());
+    const exp=(c.code||'').toString().trim();
+    if(got!==exp) return { row:c.row, expected:exp, got };
   }
   return null;
 }
-// Bouwt de A1-range voor kolom A; escapet apostrofs in de tabblad-naam
-// (bv. "ALV's overzicht" → 'ALV''s overzicht'!A..). Testbaar gehouden.
-function _a1ColA(sheetName, minR, maxR){
-  return `'${(sheetName||'').replace(/'/g,"''")}'!A${minR}:A${maxR}`;
+// Bouwt de A1-range over de vingerafdruk-kolommen; escapet apostrofs in de tabblad-naam
+// (bv. "ALV's overzicht" → 'ALV''s overzicht'!A..). Altijd t/m I: dat dekt élke kolom die in
+// FP_KOLOMMEN voorkomt, en het houdt het op ÉÉN aaneengesloten range = één leesverzoek.
+function _a1Bereik(sheetName, minR, maxR){
+  return `'${(sheetName||'').replace(/'/g,"''")}'!A${minR}:I${maxR}`;
 }
-// Leest kolom A van de doelrij(en) terug en gooit een ROW_MISMATCH-fout als een
-// rij niet meer de verwachte sleutel (VvE-code/ID/titel) bevat (de Sheet verschoof
-// sinds de render). Eén GET dekt het hele rijbereik. backgroundWrite vangt de fout.
+// Leest de vingerafdruk-kolommen van de doelrij(en) terug en gooit een ROW_MISMATCH-fout als een
+// rij niet meer dezelfde taak bevat. Eén GET dekt het hele rijbereik. backgroundWrite vangt de fout.
+// Een check is óf {row, r} met het rij-OBJECT (volle vingerafdruk) óf {row, code} (alleen kolom A,
+// de oude vorm — nog in gebruik op de tabbladen waar kolom A al onderscheidend genoeg is).
+// Let op: deze guard zit binnen de writeFn en dus binnen _withRetry — bij een 429/5xx draait hij
+// tot drie keer. Dat is bewust: een herkansing ná een storing moet opnieuw controleren.
 async function assertRowsMatch(checks, sheetName='Nog Te Doen'){
-  checks=(checks||[]).filter(c=>c&&c.row);
-  if(!checks.length) return;
-  const rows=checks.map(c=>c.row), minR=Math.min(...rows), maxR=Math.max(...rows);
-  const vals=await fetchSheet(_a1ColA(sheetName, minR, maxR));
-  const mm=_rowMismatch(vals, minR, checks);
+  const cs=(checks||[]).filter(c=>c&&c.row).map(c=>{
+    // Rij-object én een tabblad met vingerafdruk-spec → de volle vergelijking.
+    if(c.r && FP_KOLOMMEN[sheetName]) return { row:c.row, fp:true, sec:c.r._sec, code:rijVingerafdruk(sheetName, c.r) };
+    // Rij-object op een tabblad zónder spec: val terug op de sleutel in kolom A i.p.v. te
+    // vergelijken met een lege vingerafdruk — dat laatste zou élke schrijfactie blokkeren.
+    if(c.r) return { row:c.row, code:((c.r.code ?? c.r.id ?? c.r.titel ?? c.r.timestamp ?? '')+'').trim() };
+    return { row:c.row, code:(c.code||'').toString().trim() };
+  });
+  if(!cs.length) return;
+  const rows=cs.map(c=>c.row), minR=Math.min(...rows), maxR=Math.max(...rows);
+  const vals=await fetchSheet(_a1Bereik(sheetName, minR, maxR));
+  const mm=_rowMismatch(vals, minR, cs, (ruw,c)=>c.fp
+    ? vingerafdruk(sheetName, ruw, c.sec)
+    : ((ruw[0]||'').toString().trim()));
   if(mm){ const err=new Error('De lijst was net gewijzigd — opnieuw geladen.'); err.rowMismatch=true; err.detail=mm; throw err; }
 }
-const assertRowMatch=(row, code, sheetName)=>assertRowsMatch([{ row, code }], sheetName);
+// Achterwaarts compatibel: een STRING blijft de oude kolom-A-controle, een rij-OBJECT geeft de
+// volle vingerafdruk. Zo kon elke callsite los mee, zonder big-bang.
+const assertRowMatch=(row, bronOfCode, sheetName)=>assertRowsMatch(
+  [(bronOfCode && typeof bronOfCode==='object') ? { row, r:bronOfCode } : { row, code:bronOfCode }], sheetName);
 
-export { fetchSheet, fetchSheets, writeRange, appendRange, veiligeCel, _veiligeRij, _shiftNtdRows, _herstelShift, _isTransient, _withRetry, askChat, _rowMismatch, _a1ColA, assertRowsMatch, assertRowMatch };
+export { fetchSheet, fetchSheets, writeRange, appendRange, veiligeCel, _veiligeRij, _shiftNtdRows, _herstelShift, _isTransient, _withRetry, askChat, _rowMismatch, _a1Bereik, vingerafdruk, rijVingerafdruk, _normCel, _rijNaarCellen, assertRowsMatch, assertRowMatch };

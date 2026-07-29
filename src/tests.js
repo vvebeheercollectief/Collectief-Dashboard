@@ -12,7 +12,7 @@ import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel,
 import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk.js";
-import { _isTransient, _rowMismatch, _a1Bereik, _herstelShift, veiligeCel, _veiligeRij, fetchSheets, vingerafdruk, rijVingerafdruk, _normCel, _rijNaarCellen } from "./api.js";
+import { _isTransient, _rowMismatch, _a1Bereik, _herstelShift, veiligeCel, _veiligeRij, fetchSheets, vingerafdruk, rijVingerafdruk, _normCel, _rijNaarCellen, assertRowMatch } from "./api.js";
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
@@ -1165,6 +1165,47 @@ import { checkSecties, checkRaster, RASTER_MIN } from "./structuurcheck.js";
        _rowMismatch([['V1','n','t']], 5, [{row:5, code:'V1\x1fn\x1ft'}], ruw=>ruw.join('\x1f')), null);
     truthy('rij-guard: vingerafdruk wijkt af → mismatch',
        !!_rowMismatch([['V1','n','ANDERS']], 5, [{row:5, code:'V1\x1fn\x1ft'}], ruw=>ruw.join('\x1f')));
+  })();
+
+  // ── assertRowMatch end-to-end, met een nagebootste Sheet-lezing. ──
+  // De pure tests hierboven dekken de vingerafdruk zelf; dit blok dekt de BEDRADING: dat een
+  // rij-object langs _rijNaarCellen gaat, dat het gelezen bereik A..I is, en dat een met de hand
+  // gewijzigde tekst in kolom C de schrijfactie écht tegenhoudt. Precies wat de handmatige
+  // controle op staging zou aantonen, maar dan zonder inlog.
+  await (async()=>{
+    const _fetch=window.fetch, tokenOud=state.oauthToken, expiryOud=state.oauthExpiry;
+    try{
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
+      const taak={_sec:'OPPAKKEN', _row:12, code:'311198', naam:'VvE A', actiepunt:'dak nakijken',
+                  deadline:'17-06-2026', behandelaar:'Jer', prioriteit:'Hoog', opmerkingen:'iets'};
+      let gevraagd='';
+      const stub=rij=>{ window.fetch=async(url)=>{ gevraagd=decodeURIComponent(String(url));
+        return new Response(JSON.stringify({values:[rij]}),{status:200}); }; };
+
+      // 1. De Sheet bevat nog exact deze taak → mag door. De Sheet geeft de datum in de lange
+      //    Nederlandse vorm terug en heeft een verse escalatiestempel in N; allebei mogen niets
+      //    uitmaken.
+      stub(['311198','VvE A','dak nakijken','17 juni 2026','Jer','Hoog','iets','TRUE','','','','','','T1:28-07-2026']);
+      let door=true; try{ await assertRowMatch(12, taak); }catch(e){ door=false; }
+      truthy('guard e2e: ongewijzigde rij mag door (ondanks andere datumvorm en escalatiestempel)', door);
+      truthy('guard e2e: er wordt A..I gelezen, niet alleen kolom A', /!A12:I12/.test(gevraagd));
+
+      // 2. Iemand heeft de tekst in kolom C met de hand aangepast → moet blokkeren.
+      stub(['311198','VvE A','GOOT nakijken','17 juni 2026','Jer','Hoog','iets']);
+      let fout=null; try{ await assertRowMatch(12, taak); }catch(e){ fout=e; }
+      truthy('guard e2e: met de hand gewijzigde tekst blokkeert de schrijfactie', !!(fout&&fout.rowMismatch));
+
+      // 3. De rij is verschoven naar een ándere taak van DEZELFDE VvE — precies wat de oude
+      //    kolom-A-guard doorliet.
+      stub(['311198','VvE A','brief sturen','17 juni 2026','Cihad','Hoog','']);
+      let fout2=null; try{ await assertRowMatch(12, taak); }catch(e){ fout2=e; }
+      truthy('guard e2e: andere taak van dezelfde VvE blokkeert nu wél', !!(fout2&&fout2.rowMismatch));
+
+      // 4. De oude aanroepvorm met een kale code blijft werken (de tien niet-gemigreerde plekken).
+      stub(['311198','VvE A','maakt niet uit']);
+      let door2=true; try{ await assertRowMatch(12, '311198', 'Logboek'); }catch(e){ door2=false; }
+      truthy('guard e2e: oude vorm met kale sleutel werkt onveranderd', door2);
+    } finally { window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud; }
   })();
   // ── Quotum: de 8s-poll haalde 8 tabbladen in 8 aparte leesverzoeken op = 60 per minuut,
   //    precies de Google-limiet van 60 leesverzoeken per minuut per gebruiker. Elke actie

@@ -25,6 +25,7 @@ import { SPLASH_MS, _setFase } from "./login-splash.js";
 import { opmaakHtml, htmlNaarMarkers, zonderOpmaak, pasToe, opmaakBalk } from "./opmaak.js";
 import { goTo } from "./ui.js";
 import { checkSecties, checkRaster, checkNummers, RASTER_MIN } from "./structuurcheck.js";
+import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml } from "./subsidie-fase.js";
 
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
   // ── mini-assert helper (Fase 1 testnet) ──
@@ -2241,6 +2242,34 @@ import { checkSecties, checkRaster, checkNummers, RASTER_MIN } from "./structuur
      berekenPrioriteit(plus(10), 'SUBSIDIE-TRAJECTEN', T).prioriteit !== '');
   eq('subsidie-escalatie trap1', STIL_ESCALATIE_REGELS['SUBSIDIE-TRAJECTEN'].trap1, 21);
   eq('subsidie-escalatie trap2', STIL_ESCALATIE_REGELS['SUBSIDIE-TRAJECTEN'].trap2, 42);
+
+  // ── Fase-helpers ──
+  eq('vijf fases', SUBSIDIE_FASES.length, 5);
+  eq('fasevolgorde', SUBSIDIE_FASES, ['Voorbereiden','Aangevraagd','Verleend','Uitgevoerd','Vastgesteld']);
+  eq('woord → index', faseIndex('Verleend'), 3);
+  eq('index is 1-gebaseerd', faseIndex('Voorbereiden'), 1);
+  // Alles hieronder komt zo uit de Sheet en mag de tabel niet breken.
+  eq('leeg telt als Voorbereiden', faseIndex(''), 1);
+  eq('null telt als Voorbereiden', faseIndex(null), 1);
+  eq('undefined telt als Voorbereiden', faseIndex(undefined), 1);
+  eq('onbekend woord valt terug op stap 1', faseIndex('Kwijtgeraakt'), 1);
+  eq('hoofdletterongevoelig', faseIndex('vErLeEnD'), 3);
+  eq('spaties eromheen', faseIndex('  Aangevraagd  '), 2);
+  eq('index → woord', faseWoord(4), 'Uitgevoerd');
+  eq('index buiten bereik → eerste woord', faseWoord(99), 'Voorbereiden');
+  eq('index 0 → eerste woord', faseWoord(0), 'Voorbereiden');
+  const _fh = faseRijHtml('Verleend', 7);
+  eq('vijf knoppen', (_fh.match(/<button/g) || []).length, 5);
+  eq('één actieve stap', (_fh.match(/aria-pressed="true"/g) || []).length, 1);
+  eq('vier verbindingslijnen', (_fh.match(/fase-lijn/g) || []).length, 4);
+  truthy('rij-id gaat mee', _fh.includes('data-rid="7"'));
+  truthy('fasewoord staat er als tekst onder', _fh.includes('>Verleend<'));
+  truthy('groep heeft een rol', _fh.includes('role="group"'));
+  truthy('elke knop heeft een aria-label', (_fh.match(/aria-label="Zet op /g) || []).length === 5);
+  eq('bij Verleend zijn twee stappen afgerond', (_fh.match(/class="fase-bol af"/g) || []).length, 2);
+  // Kolom D is vrij tekstveld in de Sheet; wat daar staat mag geen HTML worden.
+  truthy('onbekende waarde wordt niet ruw doorgegeven',
+     !faseRijHtml('<img src=x onerror=alert(1)>', 1).includes('<img'));
 
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');

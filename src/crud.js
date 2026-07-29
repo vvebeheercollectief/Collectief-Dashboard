@@ -129,11 +129,26 @@ async function getSheetIds(){
   return state._sheetIds;
 }
 
+// Bestaat het blok van deze sectie fysiek in 'Nog Te Doen'? Een sectie die wel in
+// SECS staat maar (nog) geen kop + kolomkoprij in de Sheet heeft, levert géén
+// colHeaderRow op. Zonder deze controle valt getInsertRow terug op rij 2 en landt
+// een nieuwe taak middenin OPPAKKEN — precies het gat tussen "nieuwe code live" en
+// "blok toegevoegd aan de Sheet" bij het uitrollen van een nieuwe sectie.
+function sectieBestaatInSheet(sec){
+  if((D.ntd[sec]||[]).length>0) return true;          // er staan al rijen, dus het blok bestaat
+  return !!(D.ntdSecInfo && D.ntdSecInfo[sec] && D.ntdSecInfo[sec].colHeaderRow);
+}
+
 function getInsertRow(sec){
   const entries=D.ntd[sec]||[];
   if(entries.length>0) return entries[entries.length-1]._row;
   const info=D.ntdSecInfo[sec];
-  return info?.colHeaderRow||2;
+  if(!info?.colHeaderRow){
+    // Bewust een harde fout en geen stille terugval: een taak die ongemerkt in een
+    // ándere sectie belandt is veel duurder dan een mislukte toevoeging.
+    throw new Error(`De sectie ${SECS[sec]?.label||sec} bestaat nog niet in het tabblad 'Nog Te Doen'. Voeg daar eerst het blok toe (een regel met ${sec} in kolom A, met daaronder een kolomkoprij).`);
+  }
+  return info.colHeaderRow;
 }
 
 // Gedeelde undo-serialisatie van een NTD-taakrij → kolomwaarden A..P.

@@ -17,7 +17,7 @@ import { _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, veil
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
-import { setv, serializeNtdUndo, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, kiesModalFase, _modalFaseWoord } from "./crud.js";
+import { setv, serializeNtdUndo, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, kiesModalFase, _modalFaseWoord, getInsertRow } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages } from "./dossier-chat.js";
 import { shouldPromptReload, maakHerlaadKern } from "./sw-update.js";
@@ -2292,6 +2292,32 @@ import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml } from "./subsidie-fa
      dossierContextTekst('311028', _Dsub, T).includes('SVVE isolatie'));
   truthy('Ctrl+K vindt een traject op zijn omschrijving',
      zoekAlles('SVVE', _Dsub).taken.some(t => t.code === '311028'));
+
+  // ── Guard: sectie bestaat nog niet in de Sheet ──
+  // Tussen "nieuwe code live" en "blok toegevoegd aan de Sheet" zit een gat. Zonder
+  // guard valt getInsertRow terug op rij 2 en landt een nieuwe subsidietaak middenin
+  // OPPAKKEN — onzichtbaar fout. Beter een duidelijke weigering.
+  (() => {
+    const _bewNtd = D.ntd['SUBSIDIE-TRAJECTEN'], _bewInfo = D.ntdSecInfo;
+    try {
+      D.ntd['SUBSIDIE-TRAJECTEN'] = [];
+      D.ntdSecInfo = { 'SUBSIDIE-TRAJECTEN': { colHeaderRow: null } };
+      let _fout = null;
+      try { getInsertRow('SUBSIDIE-TRAJECTEN'); } catch (e) { _fout = e; }
+      truthy('ontbrekend blok geeft een fout in plaats van rij 2', !!_fout);
+      truthy('de fout legt uit wat er moet gebeuren',
+         !!_fout && /bestaat nog niet/i.test(_fout.message) && _fout.message.includes('Nog Te Doen'));
+      // En mét kolomkoprij levert hij gewoon die rij op.
+      D.ntdSecInfo = { 'SUBSIDIE-TRAJECTEN': { colHeaderRow: 83 } };
+      eq('mét blok geeft hij de kolomkoprij', getInsertRow('SUBSIDIE-TRAJECTEN'), 83);
+      // Bestaande rijen winnen: dan is de laatste rij het invoegpunt.
+      D.ntd['SUBSIDIE-TRAJECTEN'] = [{ _row: 88, code: 'X' }];
+      eq('met rijen geeft hij de laatste rij', getInsertRow('SUBSIDIE-TRAJECTEN'), 88);
+    } finally {
+      if (_bewNtd === undefined) delete D.ntd['SUBSIDIE-TRAJECTEN']; else D.ntd['SUBSIDIE-TRAJECTEN'] = _bewNtd;
+      D.ntdSecInfo = _bewInfo;
+    }
+  })();
 
   // ── Grafiek en dashboardpillen ──
   // De kleurenlijst stond hardgecodeerd op vier items naast twee SKEYS.map()-aanroepen

@@ -318,7 +318,10 @@ function taakTitel(r, sec){
     const teller = req > 0 ? `${recv} van ${req} binnen` : '';
     return teller ? `${_kort(onderwerp)} — ${teller}` : _kort(onderwerp);
   }
-  const eigen = schoon(r.actiepunt) || schoon(r.agendapunten) || schoon(r.periode) || schoon(r.status);
+  // r.subsidie hoort erbij: een subsidietraject heeft geen actiepunt/periode/status,
+  // dus zonder deze terugval toont het dossier letterlijk "Subsidie-trajecten —
+  // geen omschrijving" (zie afOmschrijving in render-vve.js).
+  const eigen = schoon(r.actiepunt) || schoon(r.agendapunten) || schoon(r.periode) || schoon(r.status) || schoon(r.subsidie);
   return _kort(eigen || (SECS[sec] && SECS[sec].label) || '');
 }
 

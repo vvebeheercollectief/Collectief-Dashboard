@@ -39,7 +39,7 @@ function aiVveContext(code){
       if(String(r.code||'').toLowerCase()!==c) return;
       if(r.naam && !naam) naam=r.naam;
       if(r.behandelaar) String(r.behandelaar).split(/[,\/]/).forEach(b=>{const t=b.trim();if(t)behs.add(t);});
-      const titel=r.actiepunt||r.agendapunten||r.status||SECS[s].label;
+      const titel=r.actiepunt||r.agendapunten||r.status||r.subsidie||SECS[s].label;
       open.push(`${SECS[s].label}: ${titel}`.trim());
     });
   });
@@ -52,7 +52,7 @@ function aiVveContext(code){
 
 const AI_WANT_TEKST={
   samenvatting:'Een korte samenvatting in 2-3 zinnen.',
-  categorie:'In welke categorie dit valt (Oppakken / Vergaderverzoeken / Offerte-trajecten / LOD) en om welke VvE het gaat, met een prioriteit-inschatting (Hoog/Midden/Laag).',
+  categorie:'In welke categorie dit valt (Oppakken / Vergaderverzoeken / Offerte-trajecten / LOD / Subsidie-trajecten) en om welke VvE het gaat, met een prioriteit-inschatting (Hoog/Midden/Laag).',
   acties:'De concrete actiepunten als bulletlijst (begin elke regel met "- ").',
   antwoord:'Een vriendelijk, professioneel concept-antwoord namens VvE Beheer Collectief.'
 };
@@ -153,6 +153,7 @@ function parseAiAnswer(){
 function aiGisCategorie(txt){
   const t=(txt||'').toLowerCase();
   if(t.includes('vergader')) return 'VERGADERVERZOEKEN';
+  if(t.includes('subsidie')) return 'SUBSIDIE-TRAJECTEN';
   if(t.includes('offerte')) return 'OFFERTE-TRAJECTEN';
   if(/\blod\b/.test(t)) return 'LOD';
   return 'OPPAKKEN';
@@ -171,6 +172,7 @@ function prefillNieuweTaak(sec, code, naam, actiepunt){
     else if(sec==='VERGADERVERZOEKEN') setIf('m-agenda',actiepunt);
     else if(sec==='OFFERTE-TRAJECTEN') setIf('m-opm-o',actiepunt);
     else if(sec==='LOD') setIf('m-actie-l',actiepunt);
+    else if(sec==='SUBSIDIE-TRAJECTEN') setIf('m-subsidie',actiepunt);
   }
 }
 function aiOvernemen(sec){ prefillNieuweTaak(sec,state._aiLastCode,state._aiLastNaam,''); }

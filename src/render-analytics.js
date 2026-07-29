@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  RENDER-ANALYTICS — grafieken, KPI's, dashboard
 // ══════════════════════════════════════
-import { esc, displayName, persBadges, emptyRow, parseDt, _parseAnyDate, vveCodeSpan } from "./util.js";
+import { esc, displayName, persBadges, emptyRow, parseDt, _parseAnyDate, vveCodeSpan, taakTitel } from "./util.js";
 import { SECS, SKEYS, TEAM } from "./config.js";
 import { state, D } from "./state.js";
 import { ico } from "./icons.js";
@@ -621,7 +621,7 @@ function buildDash(){
     <td>${secPill[r._sec]||''}</td>
     <td>${vveCodeSpan(r.code, SECS[r._sec].css)}</td>
     <td class="cell-name">${esc(r.naam)}</td>
-    <td class="cell-txt">${esc(r.actiepunt||r.periode||'')}</td>
+    <td class="cell-txt">${esc(taakTitel(r, r._sec))}</td>
     <td>${persBadges(r.behandelaar)}</td>
     <td class="cell-sm">${esc(r.datum||'')}</td>
   </tr>`).join('')||`<tr><td colspan="6">${emptyRow(6,true)}</td></tr>`;

@@ -26,7 +26,7 @@ function zoekAlles(q, data, max){
   // er nooit bij. Relevantie: exacte code-match eerst, daarna op urgentie (te laat = meest negatief).
   const alleTaken=[];
   SKEYS.forEach(s=>(data.ntd[s]||[]).forEach(r=>{
-    if(hit(r.code,r.naam,r.actiepunt,r.periode,r.agendapunten,r.status,r.opmerkingen)) alleTaken.push(r);
+    if(hit(r.code,r.naam,r.actiepunt,r.periode,r.agendapunten,r.status,r.subsidie,r.opmerkingen)) alleTaken.push(r);
   }));
   const _dt=r=>{const p=berekenPrioriteit(r.deadline,r._sec).dagenTot; return p==null?Infinity:p;};
   alleTaken.sort((a,b)=>{
@@ -36,7 +36,7 @@ function zoekAlles(q, data, max){
   });
   res.taken=alleTaken.slice(0,max.taken);
   SKEYS.forEach(s=>(data.af[s]||[]).forEach(r=>{
-    if(res.afgerond.length<max.afgerond && hit(r.code,r.naam,r.actiepunt,r.periode,r.agendapunten,r.opmerking)) res.afgerond.push(r);
+    if(res.afgerond.length<max.afgerond && hit(r.code,r.naam,r.actiepunt,r.periode,r.agendapunten,r.subsidie,r.opmerking)) res.afgerond.push(r);
   }));
   res.logboek=(data.logboek||[])
     .filter(e=>hit(e.code,e.actie,e.veld,e.oudeWaarde,e.nieuweWaarde,displayName(e.gebruiker)))
@@ -96,11 +96,11 @@ function renderPal(q){
     html+=_groep('Open taken',res.taken.map(r=>{
       const p=berekenPrioriteit(r.deadline,r._sec);
       const pill=p.teLaat?`<span class="pill-telaat">Te laat (${Math.abs(p.dagenTot)}d)</span>`:esc(r.deadline||'');
-      return _item(`<span class="pal-ico pal-ico-taak">${ico('cirkelOpen')}</span><div class="pal-tekst"><b>${esc(r.actiepunt||r.periode||r.agendapunten||r.status||'')}</b><span>${esc(r.code)} ${esc(r.naam||'')} · ${esc(SECS[r._sec].label)} · ${esc(r.behandelaar||'—')}</span></div><span class="pal-hint">${pill}</span>`,
+      return _item(`<span class="pal-ico pal-ico-taak">${ico('cirkelOpen')}</span><div class="pal-tekst"><b>${esc(r.actiepunt||r.periode||r.agendapunten||r.status||r.subsidie||'')}</b><span>${esc(r.code)} ${esc(r.naam||'')} · ${esc(SECS[r._sec].label)} · ${esc(r.behandelaar||'—')}</span></div><span class="pal-hint">${pill}</span>`,
         ()=>{ closePalette(); openModal(true,r); });
     }).join(''));
     html+=_groep('Afgerond',res.afgerond.map(r=>
-      _item(`<span class="pal-ico pal-ico-af">${ico('vink')}</span><div class="pal-tekst"><b>${esc(r.actiepunt||r.periode||r.agendapunten||'')}</b><span>${esc(r.code)} · afgerond ${esc(r.datum||'')}</span></div>`,
+      _item(`<span class="pal-ico pal-ico-af">${ico('vink')}</span><div class="pal-tekst"><b>${esc(r.actiepunt||r.periode||r.agendapunten||r.subsidie||'')}</b><span>${esc(r.code)} · afgerond ${esc(r.datum||'')}</span></div>`,
         ()=>{ closePalette(); openVvePagina(r.code); })).join(''));
     html+=_groep('Logboek',res.logboek.map(e=>
       _item(`<span class="pal-ico pal-ico-log">${ico('potlood')}</span><div class="pal-tekst"><b class="pal-logzin">${logZin(e)}</b></div>`,

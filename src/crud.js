@@ -165,7 +165,7 @@ async function deleteCurrentEditTask(){
 }
 
 async function deleteTaskRow(r){
-  const omschrijving=r.actiepunt||r.periode||r.code||'deze taak';
+  const omschrijving=r.actiepunt||r.periode||r.subsidie||r.code||'deze taak';
   if(!await ensureToken()){alert('Inloggen mislukt. Probeer het opnieuw.');return}
   const sec=r._sec;
   // undo-data vastleggen vóór de mutatie (zelfde serialisatie als afronden)
@@ -198,7 +198,7 @@ async function deleteTaskRow(r){
         if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Verwijderfout');err.status=resp.status;throw err}
         verwijderd=true;
       }
-      await logEvent(r.code, sec, 'Verwijderd', '', r.actiepunt||r.periode||'', '');
+      await logEvent(r.code, sec, 'Verwijderd', '', r.actiepunt||r.periode||r.subsidie||'', '');
     },
     ()=>{ if(arr.indexOf(r)===-1){ _herstelShift(_shiftNtdRows,oudeRow); arr.splice(Math.min(pos<0?arr.length:pos,arr.length),0,r); } },
     'Verwijderen mislukt'
@@ -259,7 +259,7 @@ async function completeTask(idx){
   const d=new Date();
   document.getElementById('complete-date').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   document.getElementById('complete-comment').value='';
-  document.getElementById('complete-title').textContent=`Taak afhandelen — ${r.actiepunt||r.periode||r.code||''}`;
+  document.getElementById('complete-title').textContent=`Taak afhandelen — ${r.actiepunt||r.periode||r.subsidie||r.code||''}`;
   document.getElementById('complete-bg').classList.add('open');
 }
 
@@ -329,7 +329,7 @@ async function doCompleteTask(){
     if(pos>-1) arr.splice(pos,1);
     _shiftNtdRows(r._row,-1);
     closeCompleteModal();
-    showUndoToast('Taak afgerond',`${r.code} — ${r.actiepunt||r.naam||''}`,()=>undoComplete(undoData),'vinkCirkel');
+    showUndoToast('Taak afgerond',`${r.code} — ${r.actiepunt||r.subsidie||r.naam||''}`,()=>undoComplete(undoData),'vinkCirkel');
     // 2) op de achtergrond wegschrijven; bij fout de taak terugzetten
     // Idempotentie-vlag: de batch (insert+update+delete) is positie-gebaseerd en NIET
     // idempotent — een retry na een transient fout zou dubbel kunnen afronden / de verkeerde

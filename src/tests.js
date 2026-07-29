@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf, _vandaagAmsterdam } from "./util.js";
+import { taakTitel, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf, _vandaagAmsterdam } from "./util.js";
 import { logZin, logPaginaSoort, parseLogboek, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, SECS } from "./config.js";
 import { ACTIONS } from "./actions.js";
@@ -2270,6 +2270,27 @@ import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml } from "./subsidie-fa
   // Kolom D is vrij tekstveld in de Sheet; wat daar staat mag geen HTML worden.
   truthy('onbekende waarde wordt niet ruw doorgegeven',
      !faseRijHtml('<img src=x onerror=alert(1)>', 1).includes('<img'));
+
+  // ── Omschrijving: overal waar een taak een titel krijgt ──
+  // Een subsidietaak heeft geen actiepunt/periode/agendapunten/status. Zonder
+  // terugval op r.subsidie toont het dossier letterlijk "Subsidie-trajecten —
+  // geen omschrijving" en vindt Ctrl+K het traject niet op zijn onderwerp.
+  const _sr = { _sec:'SUBSIDIE-TRAJECTEN', code:'311028', naam:'VvE Naarderstraat',
+                subsidie:'SVVE isolatie', subsidieFase:'Verleend', deadline:'28 augustus 2026' };
+  eq('taakTitel pakt de subsidie-omschrijving', taakTitel(_sr, 'SUBSIDIE-TRAJECTEN'), 'SVVE isolatie');
+  truthy('taakTitel valt niet terug op het sectielabel',
+     taakTitel(_sr, 'SUBSIDIE-TRAJECTEN') !== SECS['SUBSIDIE-TRAJECTEN'].label);
+  // Dezelfde vorm als _Dchat hierboven: vveOverzicht verwacht alle vijf de secties
+  // in ntd én af, plus alvo/alfa/logboek.
+  const _Dsub = {
+    ntd: { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[_sr] },
+    af:  { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] },
+    alvo: [{ code:'311028', naam:'VvE Naarderstraat' }], alfa: [], logboek: [],
+  };
+  truthy('dossier-context noemt de omschrijving',
+     dossierContextTekst('311028', _Dsub, T).includes('SVVE isolatie'));
+  truthy('Ctrl+K vindt een traject op zijn omschrijving',
+     zoekAlles('SVVE', _Dsub).taken.some(t => t.code === '311028'));
 
   // ── Rij-opbouw in de tabel ──
   // rowNtd is niet geëxporteerd; we testen via renderNtd op echte data.

@@ -13,7 +13,7 @@ import { zonderOpmaak } from "./opmaak.js";
 // Pure helper (testbaar): compacte, feitelijke context-tekst over één VvE.
 function dossierContextTekst(code, data, vandaag){
   const o = vveOverzicht(code, data, vandaag);
-  const t = r => (r.actiepunt || r.agendapunten || r.status || r.periode || '').trim();
+  const t = r => (r.actiepunt || r.agendapunten || r.status || r.periode || r.subsidie || '').trim();
   const L = [];
   L.push(`VvE: ${o.code}${o.naam ? ' — ' + o.naam : ''}`);
   if(o.behandelaars.length) L.push(`Behandelaar(s): ${o.behandelaars.join(', ')}`);

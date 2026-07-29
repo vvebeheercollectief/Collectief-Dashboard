@@ -63,7 +63,7 @@ async function schrijfOpvolgdatum(r, nieuw, actie){
       await logEvent(r.code, r._sec, actie, 'opvolgdatum', oud, nieuw);
       // Bevestiging pas ná de write; onderaan de writeFn zodat een herkansing er niet twee geeft.
       showToast(nieuw ? 'Weggelegd tot '+nieuw : 'Opvolgdatum gewist',
-                `${r.code} — ${r.actiepunt||r.periode||r.naam||''}`, null, nieuw ? 'pauze' : 'bel',
+                `${r.code} — ${r.actiepunt||r.periode||r.subsidie||r.naam||''}`, null, nieuw ? 'pauze' : 'bel',
                 {geenDedup:true,geenSysteemmelding:true});
     },
     ()=>{ r.opvolgdatum = oud; },

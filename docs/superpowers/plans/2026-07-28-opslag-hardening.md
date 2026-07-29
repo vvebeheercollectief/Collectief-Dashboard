@@ -1232,34 +1232,785 @@ deze observatie oplevert).
 
 ---
 
-# FASE 4 — Vast taaknummer *(bewust grover)*
+# FASE 4 — Vast taaknummer
 
-> **Deze fase wordt uitgeschreven zodra fase 0 en 1 live zijn.** De trigger-inventarisatie uit
-> Taak 0.2 bepaalt of er rijen buiten het dashboard om verschuiven, en de proef hieronder
-> bepaalt het mechanisme. Stappen op papier zetten vóór die twee uitkomsten bekend zijn, zou
-> precies het soort aanname zijn dat dit traject probeert uit te bannen.
+**Doel:** de rij-POSITIE is niet langer de identiteit van een taak.
 
-**Voorwaarden voordat deze fase begint:**
-- Fase 1 is live én de herstel-oefening (Taak 1.4) is gedaan
-- Taak 0.2 is afgerond en in `apps-script/README.md` vastgelegd
+**Voorwaarden — beide afgevinkt op 2026-07-29:**
+- Fase 1 is live én de herstel-oefening (Taak 1.4) is gedaan ✅
+- Taak 0.2 is afgerond en vastgelegd in `apps-script/README.md` ✅
 
-**Taak 4.1 — Proefopstelling (1 dag, op de TEST-Sheet).** Twee mechanismen naast elkaar:
-een verborgen kolom Q, en DeveloperMetadata op de rij-dimensie. Meten: overleeft het nummer
-een `insertDimension`, een `deleteDimension`, een handmatige sortering, en een handmatig
-geplakte rij? Uitkomst aan de gebruiker voorleggen vóór er iets gebouwd wordt.
+### Wat Taak 0.2 heeft opgeleverd, en waarom dat deze fase stuurt
 
-**Taak 4.2 — Tussenmaatregel: bredere guard.** `assertRowsMatch` vergelijkt nu alleen kolom A.
-Verbreden naar de bestaande serialisatie `serializeNtdUndo`/`_ntdValues` (A..P — dezelfde die
-`_herankerRij` al gebruikt en die al getest is), met normalisatie van: ontbrekende cellen → `''`
-(`values.get` kapt afsluitende lege cellen én lege rijen af), `'TRUE'`/`'FALSE'`-erfenis, en
-datumkolommen via `_parseAnyDate` in plaats van tekstueel (het dashboard schrijft `17-06-2026`,
-`values.get` geeft `17 juni 2026` terug). **18 callsites in 9 bestanden** — elke aanroeper
-bouwt zijn eigen `{row, code}`-object, dus elke callsite moet mee.
+De trigger-inventarisatie was de voorwaarde omdat hij bepaalt of er rijen buiten het dashboard
+om verschuiven. De uitkomst is scherper dan verwacht en verdeelt alle mutaties in twee soorten:
 
-*Eerlijk over de grens:* een vingerafdruk-guard die matcht, schrijft. Bij écht identieke regels
-doet hij dat fout, stil. Dit is een tussenmaatregel, geen eindstation.
+| Soort | Wat er beweegt | Wie doet dat |
+|---|---|---|
+| **Rij-dimensie** | de hele rij schuift; alles wat eraan hangt schuift mee | `insertDimension`/`deleteDimension` (dashboard, `src/crud.js:132` e.v.), `insertRowBefore`/`deleteRow` (`verplaatsAfgerond`, `cd_createTaskRow`), handmatig rij invoegen/verwijderen |
+| **Waarden binnen een bereik** | de celwaarden verspringen, de rij blijft fysiek staan | `sorteerOfferteTrajecten` (`apps-script/Code.gs:207/222/237/252`), handmatig sorteren, handmatig knippen/plakken |
 
-**Taak 4.3 — Het gekozen mechanisme invoeren**, met migratie op de TEST-Sheet vóór PROD.
+Op de eerste soort is elk merkteken bestand. Op de tweede soort in beginsel géén van beide —
+en dát is de hele mechanismekeuze. Er is precies **één** plek in het hele systeem waar waarden
+los van hun rij bewegen: `sorteerOfferteTrajecten`, die per sectieblok sorteert met
+`getRange(start, 1, rijen, 9)` — **negen kolommen, A t/m I**, terwijl de rijen tot en met P
+gevuld zijn. Die trigger staat op PROD geïnstalleerd. Hij ligt in de praktijk stil (Sheets-API-
+writes vuren geen `onEdit`), maar wordt wakker zodra iemand met de hand in `Nog Te Doen` typt.
+
+*Dit is geen nieuw risico dat fase 4 introduceert.* Kolom K t/m P raken vandaag al los van hun
+taak bij elke handmatige bewerking — `apps-script/README.md` waarschuwt daar al voor. Fase 4
+maakt die bestaande scheur alleen zichtbaar, en biedt de kans hem te dichten.
+
+### Wat het onderzoek heeft vastgesteld — en wat bewust ongemeten bleef
+
+Gemeten in de code en in de officiële Sheets-documentatie:
+
+- **PROD `Nog Te Doen` is exact 16 kolommen breed** (gemeten 2026-07-28, vastgelegd in
+  `src/structuurcheck.js:19-21`). Kolom Q past er nu **niet** in. **De TEST-Sheet is 17 kolommen
+  breed en heeft in Q al overal `FALSE` staan** (geërfde selectievakje-validatie). TEST is op dit
+  punt dus géén getrouwe afspiegeling van PROD — reken daarop bij de proef.
+- **De leesweg haalt hele tabbladen op**, zonder kolombegrenzing (`src/api.js:18-31`, `POLL_TABS`
+  bevat kale tabbladnamen). Een kolom Q komt dus gratis mee in elke poll; DeveloperMetadata komt
+  níét mee en kost een tweede verzoek (7,5 → 15 leesverzoeken/minuut, ruim binnen het quotum van 60).
+- **DeveloperMetadata schuift gedocumenteerd mee** bij invoegen en verdwijnt mee bij verwijderen
+  (developerMetadata-reference: *"…it will remain associated at those locations as they move
+  around"*).
+- **Sorteren en knippen/plakken zijn NIET gedocumenteerd.** Het woord *sort* komt nul keer voor in
+  de developerMetadata-reference. Precies de twee scenario's die er hier toe doen, zijn de twee
+  die Google niet beschrijft.
+- **`makeCopy` en metadata: geen enkele bron gevonden.** Dat is een open risico voor de back-up
+  uit fase 1 — kopiëren de nummers niet mee, dan is herstel uit back-up een herstel zónder
+  identiteit.
+- **`values.batchUpdateByDataFilter` laat je schrijven zonder de rij-index te kennen.** Dat is de
+  eigenlijke winst van mechanisme (b): op die paden wordt `assertRowMatch` overbodig in plaats van
+  breder. Let op: waarden landen vanaf kolom A, dus één kolom schrijven kan alleen met de
+  `null`-truc (*"Null values will be skipped"*).
+
+Daarom blijft Taak 4.1 staan en kan hij niet door documentatie-onderzoek worden vervangen.
+Formuleer hem als **meten omdat het ongedocumenteerd is**, niet als "even controleren".
+
+---
+
+### Taak 4.1: Proefopstelling — welk merkteken blijft bij zijn taak?
+
+**Files:**
+- Create: `docs/superpowers/proeven/2026-07-29-fase4-rij-identiteit.md` *(uitkomst)*
+
+De proef draait op een **wegwerp-tabblad** in de TEST-Sheet, niet op `Nog Te Doen`. Elke meting
+begint met een vers tabblad, zodat de metingen elkaar niet kunnen vervuilen. `Nog Te Doen`,
+`Afgerond` en alle andere tabbladen blijven onaangeraakt.
+
+De meetmatrix — twee mechanismen tegen zes bewerkingen plus twee erfenisvragen:
+
+| | Bewerking | Waarom die |
+|---|---|---|
+| O1 | `insertDimension` bóven de rij, `inheritFromBefore:true` | wat het dashboard doet bij een nieuwe taak (`src/crud.js:132`) |
+| O2 | `deleteDimension` bóven de rij | afronden en verwijderen |
+| O3 | `sortRange` over **A:I** | exact wat `sorteerOfferteTrajecten` doet |
+| O4 | `sortRange` over **A:Q** | de mogelijke reparatie: sorteerbereik verbreden |
+| O5 | `cutPaste` van een hele rij | de handmatige val die Taak 0.4 moest opruimen |
+| O6 | bestandskopie via Drive | de back-up uit fase 1 — overleeft identiteit een herstel? |
+| H1 | erft een ingevoegde rij de **Q-waarde** van de rij erboven? | zo ja → twee taken met hetzelfde nummer |
+| H2 | erft een ingevoegde rij de **metadata** van de rij erboven? | idem |
+
+- [ ] **Stap 1: Proefscript draaien op het staging-dashboard**
+
+Open het **staging**-dashboard (dat draait op `SID_TEST`), log in, en plak onderstaand script in
+de console. Het gebruikt het OAuth-token dat de app al heeft — geen nieuwe scope, geen nieuw
+Apps Script-project.
+
+```js
+// ══ PROEF FASE 4 — welk merkteken blijft bij zijn taak? ══
+// Draaien in de console van het STAGING-dashboard (ingelogd) → werkt op SID_TEST.
+// Raakt geen enkel bestaand tabblad aan: alles gebeurt op een wegwerp-tabblad.
+const { state } = await import('./src/state.js');
+const { SID }   = await import('./src/config.js');
+const TAB = 'PROEF-fase4', SLEUTEL = 'proef_tid', RIJEN = 8;
+
+const H = () => ({ Authorization: 'Bearer ' + state.oauthToken, 'Content-Type': 'application/json' });
+const api = async (pad, body) => {
+  const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}${pad}`,
+    body ? { method:'POST', headers:H(), body:JSON.stringify(body) } : { headers:H(), cache:'no-store' });
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(pad + ' → ' + (j.error?.message || r.status));
+  return j;
+};
+const bu = reqs => api(':batchUpdate', { requests: reqs });
+
+let SH = null;
+// Verse grondtoestand: tabblad weggooien en opnieuw opbouwen. Zo start elke meting gegarandeerd
+// schoon — óók qua metadata, want die verdwijnt mee met het tabblad.
+async function grondtoestand(){
+  const meta = await api('?fields=sheets.properties.sheetId,sheets.properties.title');
+  const oud = (meta.sheets||[]).find(s => s.properties.title === TAB);
+  if (oud) await bu([{ deleteSheet: { sheetId: oud.properties.sheetId } }]);
+  const gem = await bu([{ addSheet: { properties: { title: TAB, gridProperties: { rowCount: 40, columnCount: 20 } } } }]);
+  SH = gem.replies[0].addSheet.properties.sheetId;
+
+  const waarden = [];
+  for (let i = 1; i <= RIJEN; i++) {
+    const rij = new Array(17).fill('');
+    rij[0]  = 'V' + i;        // A — staat voor de VvE-code (wat de guard vandaag leest)
+    rij[2]  = 'taak-' + i;    // C — de tekst waarop gesorteerd wordt
+    rij[16] = 'Q' + i;        // Q — kandidaat (a): verborgen kolom
+    waarden.push(rij);
+  }
+  await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values/`
+            + encodeURIComponent(`${TAB}!A1:Q${RIJEN}`) + '?valueInputOption=RAW',
+    { method:'PUT', headers:H(), body:JSON.stringify({ values: waarden }) });
+
+  // kandidaat (b): DeveloperMetadata op de RIJ-dimensie. DOCUMENT-zichtbaarheid, want Apps Script
+  // draait in een ánder Cloud-project dan het dashboard en moet er straks ook bij kunnen.
+  await bu(Array.from({ length: RIJEN }, (_, i) => ({
+    createDeveloperMetadata: { developerMetadata: {
+      metadataKey: SLEUTEL, metadataValue: 'M' + (i + 1), visibility: 'DOCUMENT',
+      location: { dimensionRange: { sheetId: SH, dimension: 'ROWS', startIndex: i, endIndex: i + 1 } },
+    }},
+  })));
+}
+
+// Meting: hoort elk merkteken nog bij zijn éigen taak? Rij 'V3' hoort Q3 en M3 te dragen.
+async function meet(naam){
+  const v  = (await api('/values/' + encodeURIComponent(`${TAB}!A1:Q40`))).values || [];
+  const md = (await api('/developerMetadata:search',
+               { dataFilters: [{ developerMetadataLookup: { metadataKey: SLEUTEL } }] })
+             ).matchedDeveloperMetadata || [];
+  const perRij = {};
+  md.forEach(m => { const s = m.developerMetadata?.location?.dimensionRange?.startIndex;
+                    if (s != null) perRij[s] = m.developerMetadata.metadataValue; });
+
+  let qGoed = 0, mGoed = 0, n = 0; const regels = [];
+  v.forEach((r, i) => {
+    const a = (r[0] || '').trim();
+    if (!/^V\d+$/.test(a)) return;
+    n++;
+    const nr = a.slice(1), q = (r[16] || '').trim(), m = perRij[i] || '';
+    if (q === 'Q' + nr) qGoed++;
+    if (m === 'M' + nr) mGoed++;
+    regels.push(`rij ${String(i+1).padStart(2)}: ${a} ${(r[2]||'').padEnd(8)}`
+              + ` Q=${(q||'—').padEnd(3)}${q === 'Q'+nr ? '✓' : '✗'}`
+              + `  meta=${(m||'—').padEnd(3)}${m === 'M'+nr ? '✓' : '✗'}`);
+  });
+  console.log(`\n══ ${naam} ══  kolom Q: ${qGoed}/${n} correct · metadata: ${mGoed}/${n} correct`);
+  regels.forEach(x => console.log('   ' + x));
+  return { meting: naam, rijen: n, kolomQ: `${qGoed}/${n}`, metadata: `${mGoed}/${n}` };
+}
+
+const uit = [];
+await grondtoestand();                       uit.push(await meet('O0 · grondtoestand'));
+
+await grondtoestand();
+await bu([{ insertDimension: { range: { sheetId: SH, dimension:'ROWS', startIndex: 3, endIndex: 4 }, inheritFromBefore: true } }]);
+uit.push(await meet('O1 · rij invoegen boven rij 4 (+H1/H2: erft de nieuwe rij iets?)'));
+
+await grondtoestand();
+await bu([{ deleteDimension: { range: { sheetId: SH, dimension:'ROWS', startIndex: 2, endIndex: 3 } } }]);
+uit.push(await meet('O2 · rij 3 verwijderen'));
+
+await grondtoestand();
+await bu([{ sortRange: { range: { sheetId: SH, startRowIndex: 0, endRowIndex: RIJEN, startColumnIndex: 0, endColumnIndex: 9 },
+                         sortSpecs: [{ dimensionIndex: 2, sortOrder: 'DESCENDING' }] } }]);
+uit.push(await meet('O3 · sorteren over A:I — precies wat sorteerOfferteTrajecten doet'));
+
+await grondtoestand();
+await bu([{ sortRange: { range: { sheetId: SH, startRowIndex: 0, endRowIndex: RIJEN, startColumnIndex: 0, endColumnIndex: 17 },
+                         sortSpecs: [{ dimensionIndex: 2, sortOrder: 'DESCENDING' }] } }]);
+uit.push(await meet('O4 · sorteren over A:Q — bereik verbreed'));
+
+await grondtoestand();
+await bu([{ cutPaste: { source: { sheetId: SH, startRowIndex: 4, endRowIndex: 5, startColumnIndex: 0, endColumnIndex: 17 },
+                        destination: { sheetId: SH, rowIndex: 20, columnIndex: 0 }, pasteType: 'PASTE_NORMAL' } }]);
+uit.push(await meet('O5 · rij 5 knippen en op rij 21 plakken'));
+
+console.table(uit);
+console.log('Laat het tabblad "' + TAB + '" staan voor meting O6.');
+window._proefFase4 = uit;
+```
+
+Noteer de uitvoer van `console.table` letterlijk.
+
+- [ ] **Stap 2: O6 — overleeft het merkteken een back-upkopie?**
+
+Dit kan niet vanuit het dashboard: het token heeft alleen de `spreadsheets`-scope, geen Drive.
+Handmatig, precies zoals een echt herstel zou gaan:
+
+1. Open de TEST-Sheet in Drive → **Bestand → Een kopie maken**, naam `PROEF-fase4-kopie`.
+2. Neem het id van de kopie over uit de URL (het deel tussen `/d/` en `/edit`).
+3. Draai in dezelfde console:
+
+```js
+const KOPIE = 'PLAK_HIER_HET_ID_VAN_DE_KOPIE';
+const { state: st } = await import('./src/state.js');
+const kv = await (await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${KOPIE}/values/`
+        + encodeURIComponent('PROEF-fase4!A1:Q40'), { headers:{ Authorization:'Bearer '+st.oauthToken } })).json();
+const km = await (await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${KOPIE}/developerMetadata:search`,
+  { method:'POST', headers:{ Authorization:'Bearer '+st.oauthToken, 'Content-Type':'application/json' },
+    body: JSON.stringify({ dataFilters:[{ developerMetadataLookup:{ metadataKey:'proef_tid' } }] }) })).json();
+console.log('kolom Q in de kopie :', (kv.values||[]).filter(r=>/^V\d+$/.test((r[0]||'').trim())).map(r=>r[16]||'—').join(' '));
+console.log('metadata in de kopie:', (km.matchedDeveloperMetadata||[]).length, 'records gevonden');
+```
+
+Verwacht bij kolom Q: `Q1 Q2 … Q8`. Bij metadata is de uitkomst **onbekend** — dat is exact wat
+deze meting moet uitwijzen. Nul records betekent: een herstel uit back-up levert taken zónder
+nummer op, en dat weegt zwaar mee in de keuze.
+
+- [ ] **Stap 3: Opruimen**
+
+```js
+const { state: s2 } = await import('./src/state.js');
+const { SID: S } = await import('./src/config.js');
+const m = await (await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${S}?fields=sheets.properties`,
+  { headers:{ Authorization:'Bearer '+s2.oauthToken } })).json();
+const t = m.sheets.find(x=>x.properties.title==='PROEF-fase4');
+if(t) await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${S}:batchUpdate`, { method:'POST',
+  headers:{ Authorization:'Bearer '+s2.oauthToken, 'Content-Type':'application/json' },
+  body: JSON.stringify({ requests:[{ deleteSheet:{ sheetId: t.properties.sheetId } }] }) });
+console.log('wegwerp-tabblad opgeruimd');
+```
+
+Gooi daarna ook `PROEF-fase4-kopie` in Drive weg.
+
+- [ ] **Stap 4: Uitkomst vastleggen**
+
+Schrijf `docs/superpowers/proeven/2026-07-29-fase4-rij-identiteit.md` met: de meetmatrix met de
+échte uitkomsten, wat er anders liep dan verwacht, en een aanbeveling in twee alinea's. Geen
+conclusie die verder gaat dan de meting.
+
+- [ ] **Stap 5: Keuze voorleggen aan de gebruiker — STOP hier**
+
+Leg de uitkomst voor met deze drie vragen, in gewone taal:
+
+1. **Welk merkteken?** Kolom Q (zichtbaar in de Sheet, met de hand te repareren, komt gratis mee
+   in elke poll) of onzichtbare metadata (schuift automatisch mee, maar niemand kan hem zien of
+   herstellen, en er is geen ervaring mee in dit project)?
+2. **Mag `sorteerOfferteTrajecten` worden aangepast of uitgezet?** Als hij blijft zoals hij is,
+   raakt élk merkteken los bij een handmatige bewerking. Het bereik verbreden van 9 naar 17
+   kolommen repareert en passant de bestaande J–P-bug.
+3. **Mag het raster van PROD `Nog Te Doen` van 16 naar 17 kolommen?** Alleen nodig bij kolom Q.
+
+**Bouw niets voordat deze drie beantwoord zijn.** Taak 4.3 heeft twee uitgeschreven varianten;
+welke er gebouwd wordt, hangt hieraan.
+
+- [ ] **Stap 6: Commit**
+
+```bash
+git add docs/superpowers/proeven/2026-07-29-fase4-rij-identiteit.md
+git commit -m "Fase 4: proefopstelling rij-identiteit gemeten op de TEST-Sheet"
+```
+
+---
+
+### Taak 4.2: Tussenmaatregel — de guard kijkt naar de hele taak, niet alleen naar de VvE
+
+**Files:**
+- Modify: `src/api.js`, `src/data.js`, `src/util.js`
+- Modify (callsites): `src/crud.js`, `src/bulk.js`, `src/snooze.js`, `src/offerte-aannemers.js`, `src/notifications.js`
+- Test: `src/tests.js`
+
+Deze taak staat **los van de keuze uit 4.1** en mag meteen. Hij is het vangnet zolang er nog geen
+vast nummer is.
+
+Vandaag leest `assertRowsMatch` (`src/api.js:130-137`) uitsluitend **kolom A**. Daarmee bewijst de
+guard alleen *"deze rij hoort nog bij dezelfde VvE"* — niet *"dit is nog dezelfde taak"*. Voor een
+VvE met drie openstaande taken vangt hij dus niets. Dat is precies het meest waarschijnlijke
+schadegeval, want rijen verschuiven binnen een sectie.
+
+> **Correctie op de eerdere planregel.** Er stond dat `serializeNtdUndo`/`_ntdValues` hergebruikt
+> kan worden voor alle 18 callsites. Dat klopt niet, om twee redenen die het onderzoek heeft
+> vastgesteld:
+> 1. `serializeNtdUndo` (`src/crud.js:117-122`) werkt via `SECS[r._sec].keys` en dekt daarmee
+>    **alleen `Nog Te Doen`** — 8 van de 18 callsites. De andere **10** zitten op Herhaalregels (3),
+>    Ontwikkeling (2), Logboek (2), Kenmerken (1) en ALV's overzicht (2).
+> 2. `serializeNtdUndo` is géén getrouwe afbeelding van de rij: hij zet **I, J en N hardgecodeerd
+>    leeg**. Kolom **N** bevat echte escalatiedata die het dashboard nooit schrijft maar de
+>    Apps-Script-motor élke ochtend om ±06:30 stempelt. Een guard die N meeneemt, zou stil álle
+>    schrijfacties blokkeren op precies de taken die het langst stilliggen.
+>
+> Daarom bouwt deze taak een **eigen, smalle vingerafdruk** in plaats van de undo-serialisatie te
+> hergebruiken. Ook `_ntdValues` is geen aparte functie maar een alias van `serializeNtdUndo`
+> (`src/bulk.js:65`) — één ding, niet twee.
+
+**De regel: alleen kolommen die het dashboard zelf bezit en die stabiel zijn.**
+
+Uitgesloten, met reden:
+- **N** (escalatie) — alleen door Apps Script geschreven, wijzigt dagelijks
+- **F bij OPPAKKEN** (prioriteit) — `cd_recalcPrioriteiten` herschrijft die elke ochtend
+- **L** (opvolgdatum) — door de opvolgmotor geschreven
+- **I, J** — selectievakje respectievelijk ongebruikt; dragen `TRUE`/`FALSE`-erfenis
+- **O, P** — worden buiten de gewone bewerkweg om geschreven en voegen niets toe aan de identiteit
+
+Wat overblijft is klein en scherp: **de sleutel + de tekst waaraan een mens de taak herkent + de
+deadline**. Twee taken van dezelfde VvE verschillen daar vrijwel altijd in.
+
+- [ ] **Stap 1: `_f4v` uit `parseSections` lichten en delen**
+
+`_f4v` (de `TRUE`/`FALSE`-erfenisfilter) is nu een lokale `const` binnen `parseSections`
+(`src/data.js:242`) en niet herbruikbaar. Parse en guard moeten gegarandeerd dezelfde regel
+hanteren, anders lopen ze uiteen.
+
+In `src/util.js`, bij de andere kleine helpers:
+
+```js
+// Selectievakje-erfenis: rijen in 'Nog Te Doen' erven de TRUE/FALSE-validatie van kolom H t/m Q.
+// Zo'n geërfde waarde is géén inhoud en telt als leeg. Bewust NIET op kolom H toepassen: daar is
+// 'TRUE' de betekenisvolle waarde 'in behandeling'.
+export const leegBijErfenis = v => {
+  const s = ((v ?? '') + '').trim();
+  return (s.toUpperCase() === 'TRUE' || s.toUpperCase() === 'FALSE') ? '' : s;
+};
+```
+
+In `src/data.js`: `leegBijErfenis` erbij in de import uit `./util.js`, en in `parseSections` de
+lokale `const _f4v = …` (regel 242) vervangen door `const _f4v = leegBijErfenis;`.
+
+- [ ] **Stap 2: Schrijf de falende tests voor de vingerafdruk**
+
+In `src/tests.js`, met `vingerafdruk, _normCel` erbij in de import uit `./api.js` en
+`leegBijErfenis` erbij in die uit `./util.js`:
+
+```js
+  // ── Vingerafdruk-guard: 'zelfde taak', niet alleen 'zelfde VvE'. ──
+  (()=>{
+    // _normCel maakt de twee kanten vergelijkbaar: het dashboard houdt '17-06-2026' in het
+    // geheugen terwijl values.get '17 juni 2026' teruggeeft (de datumformaat-les).
+    eq('normcel: ontbrekende cel → lege tekst', _normCel(undefined), '');
+    eq('normcel: spaties eraf', _normCel('  hoi  '), 'hoi');
+    eq('normcel: geërfde FALSE telt als leeg', leegBijErfenis('FALSE'), '');
+    eq('normcel: twee schrijfwijzen van dezelfde datum zijn gelijk',
+       _normCel('17-06-2026', true), _normCel('17 juni 2026', true));
+    eq('normcel: onherkenbare datum valt terug op de tekst', _normCel('sept/okt', true), 'sept/okt');
+
+    const taakA = {_sec:'OPPAKKEN', code:'311198', naam:'VvE A', actiepunt:'dak nakijken', deadline:'17-06-2026'};
+    const taakB = {_sec:'OPPAKKEN', code:'311198', naam:'VvE A', actiepunt:'brief sturen',  deadline:'17-06-2026'};
+
+    eq('vingerafdruk: rij ongewijzigd → gelijk',
+       vingerafdruk('Nog Te Doen', taakA),
+       vingerafdruk('Nog Te Doen', ['311198','VvE A','dak nakijken','17 juni 2026','Jer','Hoog','']));
+    truthy('vingerafdruk: ándere taak van DEZELFDE VvE → ongelijk',
+       vingerafdruk('Nog Te Doen', taakB) !==
+       vingerafdruk('Nog Te Doen', ['311198','VvE A','dak nakijken','17 juni 2026','Jer','Hoog','']));
+    eq('vingerafdruk: afgekapte staartcellen maken niet uit',
+       vingerafdruk('Nog Te Doen', ['311198','VvE A','dak nakijken','17-06-2026']),
+       vingerafdruk('Nog Te Doen', ['311198','VvE A','dak nakijken','17-06-2026','','','']));
+    truthy('vingerafdruk: dagelijks gestempelde escalatie in N verandert niets',
+       vingerafdruk('Nog Te Doen', ['311198','VvE A','dak nakijken','17-06-2026','Jer','Hoog','','TRUE','','','','','','T1:28-07-2026'])
+       === vingerafdruk('Nog Te Doen', ['311198','VvE A','dak nakijken','17-06-2026','Jer','Hoog','']));
+    truthy('vingerafdruk: gewijzigde prioriteit in F verandert niets',
+       vingerafdruk('Nog Te Doen', ['311198','VvE A','dak nakijken','17-06-2026','Jer','Laag',''])
+       === vingerafdruk('Nog Te Doen', ['311198','VvE A','dak nakijken','17-06-2026','Jer','Hoog','']));
+    eq('vingerafdruk: onbekend tabblad valt terug op kolom A',
+       vingerafdruk('Iets anders', ['ABC','rest','doet','niet','mee']), 'ABC');
+
+    // _rowMismatch werkt nu op vingerafdrukken i.p.v. op kale kolom-A-waarden
+    eq('rij-guard: vingerafdruk klopt → null',
+       _rowMismatch([['V1','n','t']], 5, [{row:5, fp:'V1\x1fn\x1ft'}], 'Nog Te Doen', r=>r.join('\x1f')), null);
+  })();
+```
+
+- [ ] **Stap 3: Tests draaien — moeten falen**
+
+Open `http://localhost:8899/index.html?test=1`. Verwacht: een importfout — `vingerafdruk` en
+`_normCel` bestaan niet.
+
+- [ ] **Stap 4: De vingerafdruk implementeren**
+
+In `src/api.js`, direct vóór `_rowMismatch`, met `_parseAnyDate` en `leegBijErfenis` erbij in de
+import uit `./util.js` en `SECS` uit `./config.js`:
+
+```js
+// ── Vingerafdruk van een rij ────────────────────────────────────────────────
+// De guard vergeleek alleen kolom A: dat bewijst 'zelfde VvE', niet 'zelfde taak'. Voor een VvE
+// met drie openstaande taken ving hij dus niets — en juist dát is het waarschijnlijke schadegeval.
+//
+// Alleen kolommen die het DASHBOARD bezit en die STABIEL zijn doen mee. Bewust buitengesloten:
+//   N  escalatie      — alleen door Apps Script geschreven, wordt élke ochtend ±06:30 gestempeld
+//   F  prioriteit     — cd_recalcPrioriteiten herschrijft die dagelijks (alleen OPPAKKEN)
+//   L  opvolgdatum    — door de opvolgmotor geschreven
+//   I,J               — selectievakje / ongebruikt; dragen TRUE/FALSE-erfenis
+//   O,P               — buiten de bewerkweg om geschreven; voegen niets toe aan de identiteit
+// Namen zijn er niet bij: dezelfde VvE-code betekent per definitie dezelfde naam.
+const FP_KOLOMMEN = {
+  'Nog Te Doen':      { tekst: [0, 2], datum: null },  // datumkolom hangt van de sectie af — zie hieronder
+  'Afgerond':         { tekst: [0, 2], datum: [8]  },  // A=code, C=actiepunt, I=datum afgerond
+  'Herhaalregels':    { tekst: [0, 1], datum: null },  // A=ID, B=omschrijving
+  'Ontwikkeling':     { tekst: [0, 1], datum: null },  // A=titel, B=omschrijving
+  'Logboek':          { tekst: [0, 1], datum: null },  // A=timestamp, B=VvE-code
+  'Kenmerken':        { tekst: [0, 1], datum: null },  // A=VvE-code, B=kenmerk
+  "ALV's overzicht":  { tekst: [0, 1], datum: null },  // A=VvE-code, B=naam
+};
+// Welke kolom de deadline is, verschilt per sectie van 'Nog Te Doen':
+// OPPAKKEN D(3) · VERGADERVERZOEKEN F(5) · OFFERTE-TRAJECTEN C(2)+F(5) · LOD F(5).
+const NTD_DATUM = { OPPAKKEN: [3], VERGADERVERZOEKEN: [5], 'OFFERTE-TRAJECTEN': [2, 5], LOD: [5] };
+
+// Eén cel vergelijkbaar maken. isDatum=true → vergelijk op de GEPARSEERDE datum, nooit op de
+// tekst: het dashboard houdt '17-06-2026' in het geheugen terwijl values.get (FORMATTED_VALUE)
+// '17 juni 2026' teruggeeft. Onherkenbaar als datum → val terug op de tekst ('sept/okt').
+function _normCel(v, isDatum){
+  const s = leegBijErfenis(v);
+  if(!isDatum || !s) return s;
+  const d = _parseAnyDate(s);
+  return d ? `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}` : s;
+}
+
+// Vingerafdruk van één rij. `bron` is óf een rij-OBJECT uit het geheugen óf een ruwe cel-array
+// zoals values.get hem teruggeeft. Beide kanten door dezelfde functie halen is de hele truc —
+// anders lopen normalisatie en trim onvermijdelijk uiteen.
+// Onbekend tabblad → val terug op kolom A, zodat een nieuw tabblad nooit stil de guard uitzet.
+function vingerafdruk(sheetName, bron){
+  const spec = FP_KOLOMMEN[sheetName];
+  const rij = Array.isArray(bron) ? bron : _rijNaarCellen(sheetName, bron);
+  if(!spec) return _normCel(rij[0]);
+  const sec = Array.isArray(bron) ? null : bron._sec;
+  const datumKol = spec.datum || (sheetName === 'Nog Te Doen' ? (NTD_DATUM[sec] || []) : []);
+  const idx = spec.tekst.concat(datumKol).sort((a,b)=>a-b);
+  return idx.map(i => _normCel(rij[i], datumKol.includes(i))).join('\x1f');
+}
+
+// Een rij-object → cel-array, zodat een object en een verse lezing door dezelfde weg gaan.
+function _rijNaarCellen(sheetName, r){
+  if(sheetName !== 'Nog Te Doen'){
+    // Buiten NTD staat de sleutel altijd op A en het tweede veld op B; welke velden dat zijn,
+    // verschilt per tabblad — vandaar de expliciete kaart.
+    const K = { 'Herhaalregels':['id','omschrijving'], 'Ontwikkeling':['titel','omschrijving'],
+                'Logboek':['timestamp','code'], 'Kenmerken':['code','kenmerk'],
+                'Afgerond':['code','actiepunt'], "ALV's overzicht":['code','naam'] }[sheetName] || [];
+    const uit = []; K.forEach((k,i)=>{ uit[i] = r[k] ?? ''; });
+    if(sheetName === 'Afgerond') uit[8] = r.datum ?? '';
+    return uit;
+  }
+  const keys = (SECS[r._sec] || {}).keys || [];
+  const uit = keys.map(k => r[k] ?? '');
+  while(uit.length < 8) uit.push('');
+  return uit;
+}
+```
+
+> **Let op de asymmetrie bij `Nog Te Doen`.** Een rij-OBJECT kent zijn sectie (`r._sec`) en neemt
+> de deadlinekolom dus mee; een RUWE rij uit `values.get` kent hem niet — de sectie staat in een
+> kopregel erbóven. Voor een ruwe rij doet de deadline daarom niet mee. Dat maakt de vingerafdruk
+> aan die kant **smaller, nooit breder**: hij kan daardoor iets missen, maar nooit vals alarm
+> geven. Bij `assertRowsMatch` hieronder worden **beide** kanten via de ruwe weg gebouwd, zodat ze
+> gegarandeerd vergelijkbaar zijn.
+
+Vervang `_rowMismatch` en `_a1ColA` door de brede vorm:
+
+```js
+// Pure (testbaar): gegeven de teruggelezen rijen (vanaf minRow) en de verwachte {row, fp}-checks
+// → geef de eerste afwijking terug, of null als alles klopt. `maak` maakt van een ruwe rij een
+// vingerafdruk; die wordt meegegeven zodat deze functie puur blijft.
+function _rowMismatch(vals, minRow, checks, sheetName, maak){
+  for(const c of checks){
+    const ruw = vals[c.row - minRow] || [];
+    const got = maak ? maak(ruw) : ((ruw[0] || '').toString().trim());
+    if(got !== c.fp) return { row: c.row, expected: c.fp, got };
+  }
+  return null;
+}
+// Bouwt de A1-range over de vingerafdruk-kolommen. Escapet apostrofs in de tabbladnaam
+// (bv. "ALV's overzicht" → 'ALV''s overzicht'!A..). Altijd t/m I: dat dekt elke kolom die in
+// FP_KOLOMMEN voorkomt, en het houdt het op ÉÉN aaneengesloten range = één leesverzoek.
+function _a1Bereik(sheetName, minR, maxR){
+  return `'${(sheetName||'').replace(/'/g,"''")}'!A${minR}:I${maxR}`;
+}
+```
+
+En `assertRowsMatch`:
+
+```js
+// Leest de vingerafdruk-kolommen van de doelrij(en) terug en gooit een ROW_MISMATCH-fout als een
+// rij niet meer dezelfde TAAK bevat. Eén GET dekt het hele rijbereik.
+// Let op: deze guard zit binnen de writeFn en dus binnen _withRetry — bij een 429/5xx wordt hij
+// tot drie keer uitgevoerd. Dat is bewust: een herkansing na een storing moet opnieuw controleren.
+async function assertRowsMatch(checks, sheetName='Nog Te Doen'){
+  checks=(checks||[]).filter(c=>c&&c.row);
+  if(!checks.length) return;
+  const rows=checks.map(c=>c.row), minR=Math.min(...rows), maxR=Math.max(...rows);
+  const vals=await fetchSheet(_a1Bereik(sheetName, minR, maxR));
+  const mm=_rowMismatch(vals, minR, checks, sheetName, ruw=>vingerafdruk(sheetName, ruw));
+  if(mm){ const err=new Error('De lijst was net gewijzigd — opnieuw geladen.'); err.rowMismatch=true; err.detail=mm; throw err; }
+}
+// Achterwaarts compatibel: (row, code) blijft werken, maar een rij-OBJECT geeft de volle
+// vingerafdruk. Zo kan elke callsite apart mee, zonder big-bang. Het object wordt via
+// _rijNaarCellen naar de RUWE vorm gebracht, zodat beide kanten identiek genormaliseerd worden.
+const assertRowMatch=(row, bronOfCode, sheetName)=>assertRowsMatch(
+  [{ row, fp: (bronOfCode && typeof bronOfCode === 'object')
+       ? vingerafdruk(sheetName||'Nog Te Doen', _rijNaarCellen(sheetName||'Nog Te Doen', bronOfCode))
+       : ((bronOfCode||'')+'').trim() }], sheetName);
+```
+
+Voeg `vingerafdruk`, `_normCel`, `_rijNaarCellen` en `_a1Bereik` toe aan de `export {...}` onderaan
+`src/api.js`, en haal `_a1ColA` daar weg.
+
+- [ ] **Stap 5: Tests draaien — moeten slagen**
+
+`window._testResult`: FAIL blijft 0, OK is met 12 gestegen ten opzichte van de basislijn van
+**726 OK, 0 FAIL** (gemeten op deze tak, 2026-07-29).
+
+Let op de bestaande `_a1ColA`-tests: die verwijzen naar een functie die niet meer bestaat. Pas ze
+aan naar `_a1Bereik` en verwacht `A..I` in plaats van `A..A`.
+
+- [ ] **Stap 6: De acht `Nog Te Doen`-callsites het rij-object laten meegeven**
+
+Per callsite: geef het rij-object mee in plaats van alleen de code. De acht plekken:
+
+```js
+// src/crud.js:190   (verwijderen)   → await assertRowMatch(oudeRow, r);
+// src/crud.js:339   (afronden)      → await assertRowMatch(r._row, r);
+// src/crud.js:412   (bewerken)      → await assertRowMatch(doelRow._row, oudeWaarden);
+// src/snooze.js:61                  → await assertRowMatch(r._row, r);
+// src/offerte-aannemers.js:26       → await assertRowMatch(r._row, r);
+// src/bulk.js:130                   → await assertRowsMatch(items.map(it=>({row:it.origRow, fp:vingerafdruk('Nog Te Doen', _rijNaarCellen('Nog Te Doen', it.r))})));
+// src/bulk.js:227                   → idem
+// src/bulk.js:286                   → await assertRowsMatch(items.map(it=>({row:it.r._row, fp:vingerafdruk('Nog Te Doen', _rijNaarCellen('Nog Te Doen', it.r))})));
+```
+
+In `src/bulk.js` `vingerafdruk` en `_rijNaarCellen` erbij in de import uit `./api.js`.
+
+> **Bewust nu níét meegenomen:** de tien callsites buiten `Nog Te Doen` (Herhaalregels,
+> Ontwikkeling, Logboek, Kenmerken, ALV's overzicht). Ze blijven op de kolom-A-vorm draaien, die
+> achterwaarts compatibel is gehouden. Reden: op die tabbladen is de sleutel in kolom A al veel
+> beter onderscheidend (een timestamp, een herhaal-ID, een titel), dus de winst is klein en het
+> risico op vals alarm relatief groot. Wie ze later wil meenemen, hoeft alleen het rij-object mee
+> te geven — `FP_KOLOMMEN` kent ze al.
+
+- [ ] **Stap 7: `Afgerond` krijgt eindelijk een guard**
+
+`Afgerond` is het énige tabblad met een positionele `deleteDimension` **zonder enige guard** —
+`src/bulk.js:199` en `src/notifications.js:181`, allebei op de undo-weg. Dat is precies de
+gevaarlijkste weg, want daar wordt een regel weggehaald op grond van een onthouden rijnummer.
+
+Voeg vóór beide `deleteDimension`-aanroepen toe (met `assertRowMatch`/`assertRowsMatch` en
+`vingerafdruk`/`_rijNaarCellen` in de import uit `./api.js`):
+
+```js
+      await assertRowMatch(doelAf._row, doelAf, 'Afgerond'); // rij nog dezelfde afronding vóór verwijderen
+```
+
+en in `src/bulk.js:199` de meervoudsvorm over de te verwijderen rijen.
+
+- [ ] **Stap 8: Handmatig controleren dat hij niet vals afgaat**
+
+Draai het dashboard lokaal en doe achter elkaar: taak bewerken, afronden, ongedaan maken,
+snoozen, bulk-afronden, aannemer aanvinken. Verwacht: geen enkele
+`De lijst was net gewijzigd`-melding.
+
+Doe daarna één ronde ná 07:00 op staging, zodat de escalatiemotor van ±06:30 zijn stempel in
+kolom N heeft gezet. Verwacht: nog steeds geen melding — dat is de test op de N-landmijn.
+
+- [ ] **Stap 9: Bewust afgaan**
+
+Open de TEST-Sheet, verander met de hand de tekst van een openstaande taak, en sla die taak
+binnen 8 seconden op in het dashboard. Verwacht: `De lijst was net gewijzigd — opnieuw geladen.`
+en de wijziging teruggedraaid. Met de oude kolom-A-guard gebeurde dit **niet**.
+
+- [ ] **Stap 10: Commit**
+
+```bash
+git add src/api.js src/util.js src/data.js src/crud.js src/bulk.js src/snooze.js src/offerte-aannemers.js src/notifications.js src/tests.js
+git commit -m "Guard: vingerafdruk over de hele taak i.p.v. alleen de VvE-code, en Afgerond krijgt er ook een"
+```
+
+- [ ] **Stap 11: Uitrollen**
+
+`src/config.js`: `APP_VERSION = '9.6'`. `sw.js`: `CACHE_VERSION = 'cd-v91'`.
+
+```bash
+git add src/config.js sw.js
+git commit -m "Versie 9.6 / cd-v91: guard kijkt naar de hele taak"
+git push -u origin feature/opslag-hardening
+git checkout staging && git merge feature/opslag-hardening && git push
+```
+
+Testen op de Vercel-testlink met `?test=1`, daarna handmatig stap 8 en 9 herhalen. Dan:
+
+```bash
+git checkout main && git merge staging && git push
+```
+
+*Eerlijk over de grens:* een vingerafdruk-guard die matcht, schrijft. Bij écht identieke regels —
+zelfde VvE, zelfde tekst, zelfde deadline — doet hij dat fout, en stil. Alleen een uniek nummer
+sluit dat helemaal. Dit is een tussenmaatregel, geen eindstation.
+
+---
+
+### Taak 4.3: Het gekozen mechanisme invoeren
+
+> **Beslispunt.** Welke variant je uitvoert, hangt volledig aan de drie vragen uit Taak 4.1
+> stap 5. Beide varianten staan hieronder uitgeschreven; voer er **één** uit.
+
+Wat de varianten delen:
+
+- Het nummer is **onveranderlijk** en wordt nooit hergebruikt. Vorm: `T` + een oplopend getal
+  (`T1041`). Kort, want bij variant B telt elk teken tegen het metadata-budget van 30.000 tekens
+  per tabblad (±2.700 rijen — ruim, maar het is een plafond).
+- De teller staat in **`Ontwikkeling`** — geen nieuw tabblad, en dat blad wordt al gelezen.
+  Sleutel `_taakteller`, waarde het laatst uitgegeven getal.
+- **Backfill vóór gebruik.** Elke bestaande rij krijgt eerst een nummer; pas daarna gaat de code
+  er iets mee doen. Volgorde: TEST volledig, één week meekijken, dan PROD.
+- **De guard uit 4.2 blijft staan.** Het nummer vervangt hem niet, het maakt hem exact: eerst
+  nummer zoeken, gevonden → schrijf daar; niet gevonden → weiger. De vingerafdruk blijft het
+  vangnet voor rijen die nog geen nummer hebben.
+
+#### Variant A — verborgen kolom Q
+
+Voer deze uit als de proef laat zien dat de metadata een sortering of een plakactie **niet**
+overleeft, of als de gebruiker een merkteken wil dat je met eigen ogen kunt zien en repareren.
+
+- [ ] **Stap A1: Rasters verbreden — eerst, anders mislukken de writes stil**
+
+`Nog Te Doen` staat op PROD op **exact 16 kolommen**. Een write naar Q buiten het raster mislukt
+**zonder foutmelding** — de val die in het offerte-opvolgsysteem al eens is opgelopen. Verbreed
+op TEST én PROD naar 17 (rechtsklik op de kolomkop → rechts een kolom invoegen).
+
+Verwijder daarna de selectievakje-validatie uit kolom Q (Gegevens → Gegevensvalidatie →
+verwijderen voor `Q:Q`); op de TEST-Sheet staat daar nu overal een geërfde `FALSE`.
+
+In `src/structuurcheck.js`: `'Nog Te Doen': 17,` en het comment bijwerken.
+
+- [ ] **Stap A2: `sorteerOfferteTrajecten` verbreden van 9 naar 17 kolommen**
+
+`apps-script/Code.gs` regels 207, 222, 237 en 252: vervang `, 9)` door `, 17)` in elke
+`getRange(...).sort(...)`. Dit is de voorwaarde voor variant A — zonder deze wijziging raakt Q los
+bij de eerste handmatige bewerking.
+
+En passant repareert dit de bestaande J–P-bug. Haal daarna de waarschuwing onderaan
+`apps-script/README.md` (sectie "Waarschuwing bij handmatig werk in `Nog Te Doen`") weg en
+vervang hem door één regel die vastlegt dat het sorteerbereik nu de volle breedte dekt.
+
+- [ ] **Stap A3: Lezen, schrijven en uitdelen**
+
+In `src/data.js`, in `parseSections`, direct ná `entry.aannemers`:
+
+```js
+    entry.taakId = _f4v(row[16]);   // Q — vast taaknummer (leeg bij nog niet genummerde rijen)
+```
+
+In `src/crud.js`, in `serializeNtdUndo`, het nummer meenemen zodat een undo het niet kwijtraakt:
+
+```js
+  v.push(r.taakId || '');   // Q — het nummer moet de undo overleven
+```
+
+En in `insertAndWriteRow` de `endCol`-berekening (`src/crud.js:135`) laten meegroeien tot Q.
+
+- [ ] **Stap A4: Backfill**
+
+Draai het backfill-script (zie stap C1 hieronder) met `MODUS = 'kolomQ'`.
+
+- [ ] **Stap A5: De guard op het nummer laten werken**
+
+In `src/api.js`: als de rij een `taakId` heeft, is de vingerafdruk het nummer alleen. Voeg
+bovenin `vingerafdruk` toe:
+
+```js
+  // Heeft de rij een vast nummer, dan ís dat de identiteit — de rest doet er niet meer toe.
+  if(Array.isArray(bron) && bron[16]) return 'T:' + leegBijErfenis(bron[16]);
+```
+
+en breid `_a1Bereik` uit van `A..I` naar `A..Q` voor `Nog Te Doen`.
+
+#### Variant B — DeveloperMetadata op de rij-dimensie
+
+Voer deze uit als de proef laat zien dat metadata sorteren én plakken **wél** overleeft, én dat
+hij een bestandskopie overleeft (O6).
+
+- [ ] **Stap B1: Uitdelen bij het aanmaken, in één atomische aanroep**
+
+Vervang `insertAndWriteRow` (`src/crud.js:124-150`) door één `batchUpdate` met drie requests in
+deze volgorde: `insertDimension`, `updateCells`, `createDeveloperMetadata`. Google garandeert dat
+een batchUpdate atomisch is (*"the updates in the request will be applied together atomically"*),
+dus vervalt meteen de ghost-rij-opruiming die er nu onder staat.
+
+Let op: binnen `batchUpdate` bestaat `valueInputOption=USER_ENTERED` niet; gebruik
+`updateCells` met `userEnteredValue` per cel, en houd `veiligeCel` uit `src/api.js` ervoor.
+
+- [ ] **Stap B2: Lezen — één extra verzoek per poll**
+
+In `src/api.js` erbij:
+
+```js
+// Nummer → rij-index, in één verzoek voor het hele bestand. Kost +1 leesverzoek per poll
+// (7,5 → 15 per minuut; het quotum is 60 per gebruiker per minuut).
+async function fetchTaakNummers(){
+  if(!state.oauthToken) throw new Error('Niet ingelogd');
+  const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}/developerMetadata:search`,{
+    method:'POST', cache:'no-store',
+    headers:{ Authorization:`Bearer ${state.oauthToken}`, 'Content-Type':'application/json' },
+    body: JSON.stringify({ dataFilters:[{ developerMetadataLookup:{ metadataKey:'tid' } }] })
+  });
+  if(!r.ok) throw new Error('Taaknummers ophalen mislukt');
+  const uit = {};
+  ((await r.json()).matchedDeveloperMetadata||[]).forEach(m=>{
+    const d=m.developerMetadata, loc=d.location?.dimensionRange;
+    if(loc) (uit[loc.sheetId] = uit[loc.sheetId] || {})[loc.startIndex + 1] = d.metadataValue;
+  });
+  return uit;
+}
+```
+
+- [ ] **Stap B3: Schrijven zonder rijnummer**
+
+Op de paden waar het nummer bekend is, vervalt `assertRowMatch`: schrijf via
+`values:batchUpdateByDataFilter` met een `developerMetadataLookup`-filter. **Cruciaal detail:** de
+waarden landen vanaf **kolom A**, en een `DataFilter` kan niet tegelijk op metadata én op een
+kolombereik filteren. Eén kolom schrijven kan alleen door de voorliggende posities op `null` te
+zetten — *"Null values will be skipped"*:
+
+```js
+// Alleen kolom L schrijven van de rij met dit nummer, zonder de rij-index te kennen.
+body: JSON.stringify({ valueInputOption:'USER_ENTERED', data:[{
+  dataFilter:{ developerMetadataLookup:{ metadataKey:'tid', metadataValue: taakId } },
+  majorDimension:'ROWS',
+  values:[[null,null,null,null,null,null,null,null,null,null,null, waarde]],
+}]})
+```
+
+- [ ] **Stap B4: Backfill**
+
+Draai het backfill-script met `MODUS = 'metadata'`.
+
+#### Gemeenschappelijk
+
+- [ ] **Stap C1: Backfill-script**
+
+Draai op de **TEST-Sheet** eerst, controleer, en pas daarna op PROD. Het script deelt aan élke
+nog niet genummerde datarij in `Nog Te Doen` een nummer uit, in blokken van 100 (er is geen
+gedocumenteerd maximum aantal requests per `batchUpdate`, dus niet gokken dat "het wel past").
+Het script is **idempotent**: rijen die al een nummer hebben, slaat het over.
+
+Schrijf het script bij het uitvoeren uit op basis van de gekozen variant; het bestaat uit: rijen
+lezen → rijen zonder nummer selecteren → teller ophalen uit `Ontwikkeling` → per blok van 100 een
+`batchUpdate` → teller wegschrijven → opnieuw lezen en verifiëren dat elk nummer precies één keer
+voorkomt.
+
+- [ ] **Stap C2: Uniciteitscontrole in de structuurcheck**
+
+In `src/structuurcheck.js` erbij, met een test in `src/tests.js`:
+
+```js
+// Twee taken met hetzelfde nummer is de ergste storing die dit mechanisme kan krijgen: de guard
+// schrijft dan mét overtuiging naar de verkeerde rij. Puur, dus los testbaar.
+function checkNummers(rijen){
+  const gezien={}, uit=[];
+  rijen.forEach(r=>{
+    if(!r.taakId) return;
+    if(gezien[r.taakId]) uit.push({ nummer:r.taakId, regels:[gezien[r.taakId], r._row],
+      tekst:`Taaknummer ${r.taakId} staat op twee regels (${gezien[r.taakId]} en ${r._row}).` });
+    else gezien[r.taakId]=r._row;
+  });
+  return uit;
+}
+```
+
+Hang hem aan dezelfde console-melding als trap 1 van fase 3 (`src/data.js`, ná `D.ntd=ntdP.data`).
+
+- [ ] **Stap C3: Uitrollen**
+
+`APP_VERSION = '9.7'`, `CACHE_VERSION = 'cd-v92'`. Route als altijd:
+`feature/opslag-hardening` → `staging` → testlink → `main`.
+
+Na de uitrol: **één week meekijken** met `checkNummers` in de console vóór er een schrijfweg op
+het nummer gaat leunen. Zelfde trapsgewijze aanpak als fase 3.
 
 ---
 
@@ -1300,8 +2051,14 @@ bewust de ruwe Sheet-index.
 ## Zelfcontrole van dit plan
 
 - **Spec-dekking:** fase 0 → taken 0.1-0.4; fase 1 → 1.1-1.5; fase 2 → 2.1-2.11; fase 3 →
-  3.1-3.3; fase 4 en 5 → bewust grof, met de voorwaarden expliciet. De "bewust niet"-tabel uit
-  de spec leidt tot geen taken, zoals bedoeld.
+  3.1-3.3; fase 4 → 4.1-4.3 (uitgeschreven op 2026-07-29, nadat 0.2 en fase 1 af waren);
+  fase 5 → bewust grof, met de voorwaarden expliciet. De "bewust niet"-tabel uit de spec leidt
+  tot geen taken, zoals bedoeld.
+- **Correctie op de spec, vastgesteld bij het uitschrijven van fase 4:** de spec stelt dat de
+  tussenmaatregel de bestaande serialisatie `serializeNtdUndo` kan hergebruiken. Dat dekt maar
+  8 van de 18 callsites (de functie kent alleen `Nog Te Doen`) en neemt kolom N mee, die de
+  Apps-Script-escalatiemotor elke ochtend stempelt. Taak 4.2 bouwt daarom een eigen, smallere
+  vingerafdruk. Zie het kader in Taak 4.2.
 - **Bewust buiten dit plan:** de dagelijkse Apps Script-structuurcontrole — de spec stelt die
   expliciet uit tot ná fase 3, omdat de melding zonder frontend-wijziging bij niemand aankomt.
   En de zichtbare structuurbanner (trap 2 van fase 3): de drempel daarvoor hangt af van wat de

@@ -133,6 +133,7 @@ function cd_handleNtdEdit(sheet, row, e) {
     'VERGADERVERZOEKEN': 5,
     'OFFERTE-TRAJECTEN': 5,
     'LOD': 5,
+    'SUBSIDIE-TRAJECTEN': 5,
   };
   const beh = (rowData[behandelaarColMap[sec] - 1] || '').toString().trim();
 
@@ -209,10 +210,10 @@ function cd_checkDeadlines() {
     const data = sheet.getDataRange().getValues();
     const now = new Date();
     let curSec = null;
-    const SKEYS = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD'];
+    const SKEYS = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN'];
 
-    const DEADLINE_COL = { 'OPPAKKEN': 3, 'VERGADERVERZOEKEN': 5, 'OFFERTE-TRAJECTEN': 5, 'LOD': 5 };
-    const BEH_COL      = { 'OPPAKKEN': 4, 'VERGADERVERZOEKEN': 4, 'OFFERTE-TRAJECTEN': 4, 'LOD': 4 };
+    const DEADLINE_COL = { 'OPPAKKEN': 3, 'VERGADERVERZOEKEN': 5, 'OFFERTE-TRAJECTEN': 5, 'LOD': 5, 'SUBSIDIE-TRAJECTEN': 5 };
+    const BEH_COL      = { 'OPPAKKEN': 4, 'VERGADERVERZOEKEN': 4, 'OFFERTE-TRAJECTEN': 4, 'LOD': 4, 'SUBSIDIE-TRAJECTEN': 4 };
 
     for (let i = 0; i < data.length; i++) {
       const first = (data[i][0] || '').toString().trim().toUpperCase();
@@ -267,9 +268,9 @@ function cd_dailySummary() {
     if (!sheet) return;
     const data = sheet.getDataRange().getValues();
     let curSec = null;
-    const SKEYS = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD'];
-    const BEH_COL = { 'OPPAKKEN': 4, 'VERGADERVERZOEKEN': 4, 'OFFERTE-TRAJECTEN': 4, 'LOD': 4 };
-    const DEADLINE_COL = { 'OPPAKKEN': 3, 'VERGADERVERZOEKEN': 5, 'OFFERTE-TRAJECTEN': 5, 'LOD': 5 };
+    const SKEYS = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN'];
+    const BEH_COL = { 'OPPAKKEN': 4, 'VERGADERVERZOEKEN': 4, 'OFFERTE-TRAJECTEN': 4, 'LOD': 4, 'SUBSIDIE-TRAJECTEN': 4 };
+    const DEADLINE_COL = { 'OPPAKKEN': 3, 'VERGADERVERZOEKEN': 5, 'OFFERTE-TRAJECTEN': 5, 'LOD': 5, 'SUBSIDIE-TRAJECTEN': 5 };
     const today = new Date(); today.setHours(0,0,0,0);
     const stilMap = cd_laatsteActiviteitMap(); // Opvolging.gs (Fase 4)
 
@@ -317,6 +318,7 @@ function cd_dailySummary() {
         if (p.secs['VERGADERVERZOEKEN']) parts.push(p.secs['VERGADERVERZOEKEN'] + ' vergaderverzoek' + (p.secs['VERGADERVERZOEKEN']>1?'en':''));
         if (p.secs['OFFERTE-TRAJECTEN']) parts.push(p.secs['OFFERTE-TRAJECTEN'] + ' offerte-traject' + (p.secs['OFFERTE-TRAJECTEN']>1?'en':''));
         if (p.secs['LOD']) parts.push(p.secs['LOD'] + ' LOD');
+        if (p.secs['SUBSIDIE-TRAJECTEN']) parts.push(p.secs['SUBSIDIE-TRAJECTEN'] + ' subsidie-traject' + (p.secs['SUBSIDIE-TRAJECTEN']>1?'en':''));
 
         cd_notifyByExternalId(name, 'n_daily', '1', {
           title: '☀️ Goedemorgen — ' + total + ' open ' + (total===1?'taak':'taken'),
@@ -332,7 +334,7 @@ function cd_dailySummary() {
 //  HELPERS
 // ════════════════════════════════════════════════════════════
 function cd_findSection(sheet, row) {
-  const SKEYS = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD'];
+  const SKEYS = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN'];
   const colA = sheet.getRange(1, 1, row, 1).getValues();
   for (let i = row - 1; i >= 0; i--) {
     const v = (colA[i][0] || '').toString().trim().toUpperCase();
@@ -620,7 +622,7 @@ function cd_drainNotifQueue() {
 //  Kolommen "Nog Te Doen" (1-geteld): A=code B=naam C=actiepunt
 //  D=deadline E=behandelaar F=prioriteit. Data start op kop+2.
 // ════════════════════════════════════════════════════════════
-const CD_NTD_SECTIES = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD'];
+const CD_NTD_SECTIES = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN'];
 
 // Formule-injectie-rem: waarden uit een onvertrouwde bron (mail-intake) die met = + - @ (of een
 // stuur-teken) beginnen, zou Sheets als formule uitvoeren. Een apostrof-prefix forceert platte tekst.

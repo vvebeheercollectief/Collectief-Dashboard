@@ -10,9 +10,10 @@ const CD_STIL_ESCALATIE_REGELS = {
   'VERGADERVERZOEKEN': { trap1: 14, trap2: 21 },
   'OFFERTE-TRAJECTEN': { trap1: 21, trap2: 35 },
   'LOD':               { trap1: 30, trap2: 60 },
+  'SUBSIDIE-TRAJECTEN': { trap1: 21, trap2: 42 },
 };
 const HR_SHEET = 'Herhaalregels';
-const CD_OPV_SKEYS = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD'];
+const CD_OPV_SKEYS = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN'];
 
 function cd_opvolgingMotor() {
   cd_lockedRun('cd_opvolgingMotor', function () {

@@ -26,7 +26,7 @@ function verplaatsAfgerond(e) {
   var sectie = "";
   for (var i = row - 1; i >= 1; i--) {
     var cellValue = sheet.getRange(i, 1).getValue().toString().trim().toUpperCase();
-    if (cellValue === "OPPAKKEN" || cellValue === "VERGADERVERZOEKEN" || cellValue === "LOD" || cellValue === "OFFERTE-TRAJECTEN") {
+    if (cellValue === "OPPAKKEN" || cellValue === "VERGADERVERZOEKEN" || cellValue === "LOD" || cellValue === "OFFERTE-TRAJECTEN" || cellValue === "SUBSIDIE-TRAJECTEN") {
       sectie = cellValue;
       break;
     }
@@ -60,7 +60,7 @@ function verplaatsAfgerond(e) {
 
   while (insertRow <= lastRowTarget) {
     var checkVal = targetSheet.getRange(insertRow, 1).getValue().toString().trim().toUpperCase();
-    if (checkVal === "OPPAKKEN" || checkVal === "VERGADERVERZOEKEN" || checkVal === "LOD" || checkVal === "OFFERTE-TRAJECTEN") {
+    if (checkVal === "OPPAKKEN" || checkVal === "VERGADERVERZOEKEN" || checkVal === "LOD" || checkVal === "OFFERTE-TRAJECTEN" || checkVal === "SUBSIDIE-TRAJECTEN") {
       break;
     }
     if (targetSheet.getRange(insertRow, 1).getValue() === "") {
@@ -183,6 +183,7 @@ function _sorteerOfferteTrajectenImpl(e) {
   var vergaderHeader = -1;
   var offerteHeader = -1;
   var lodHeader = -1;
+  var subsidieHeader = -1;
 
   for (var i = 0; i < allValues.length; i++) {
     var val = allValues[i][0].toString().trim().toUpperCase();
@@ -190,6 +191,7 @@ function _sorteerOfferteTrajectenImpl(e) {
     if (val === "VERGADERVERZOEKEN") vergaderHeader = i + 1;
     if (val === "OFFERTE-TRAJECTEN") offerteHeader = i + 1;
     if (val === "LOD") lodHeader = i + 1;
+    if (val === "SUBSIDIE-TRAJECTEN") subsidieHeader = i + 1;
   }
 
   // Nooit breder sorteren dan het blad is: getRange gooit een fout zodra numColumns het
@@ -203,7 +205,11 @@ function _sorteerOfferteTrajectenImpl(e) {
   var inOppakken = sortAll || (editedRow > oppakkenHeader && editedRow < vergaderHeader);
   var inVergader = sortAll || (editedRow > vergaderHeader && editedRow < offerteHeader);
   var inOfferte = sortAll || (editedRow > offerteHeader && editedRow < lodHeader);
-  var inLOD = sortAll || (editedRow > lodHeader);
+  // LOD is sinds de vijfde sectie niet meer het laatste blok, dus niet langer
+  // "alles onder de LOD-kop": anders sorteert een bewerking in het subsidieblok
+  // de LOD-rijen mee (en andersom).
+  var inLOD = sortAll || (editedRow > lodHeader && (subsidieHeader < 0 || editedRow < subsidieHeader));
+  var inSubsidie = sortAll || (subsidieHeader > 0 && editedRow > subsidieHeader);
 
   // Sorteer OPPAKKEN op kolom H (8)
   if (inOppakken && oppakkenHeader > 0) {
@@ -256,12 +262,30 @@ function _sorteerOfferteTrajectenImpl(e) {
     var lodEnd = lodStart - 1;
     for (var k = lodStart; k <= lastRow; k++) {
       var kv = allValues[k - 1][0].toString().trim().toUpperCase();
-      if (kv === "") break;
+      // Ook stoppen op een volgende sectiekop: alleen op een lege regel breken zou het
+      // LOD-blok laten doorlopen tot in SUBSIDIE-TRAJECTEN als daar geen lege rij tussen zit.
+      if (kv === "" || kv === "SUBSIDIE-TRAJECTEN") break;
       lodEnd = k;
     }
     var lodRows = lodEnd - lodStart + 1;
     if (lodRows > 1) {
       sheet.getRange(lodStart, 1, lodRows, sortBreedte).sort({column: 6, ascending: true});
+    }
+  }
+
+  // Sorteer SUBSIDIE-TRAJECTEN op kolom F (6) — de deadline, net als LOD.
+  // NIET kolom D: daar staat bij deze sectie de fase.
+  if (inSubsidie && subsidieHeader > 0) {
+    var subStart = subsidieHeader + 2;
+    var subEnd = subStart - 1;
+    for (var m = subStart; m <= lastRow; m++) {
+      var mv = allValues[m - 1][0].toString().trim().toUpperCase();
+      if (mv === "") break;
+      subEnd = m;
+    }
+    var subRows = subEnd - subStart + 1;
+    if (subRows > 1) {
+      sheet.getRange(subStart, 1, subRows, sortBreedte).sort({column: 6, ascending: true});
     }
   }
 }

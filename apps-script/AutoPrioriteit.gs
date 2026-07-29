@@ -6,8 +6,11 @@ const AP_PRIO_COL     = 5; // kolom F (0-geteld) = Prioriteit bij Oppakken
 // LET OP — SYNC: deze drempels (7/14) MOETEN gelijk blijven aan PRIO_REGELS.OPPAKKEN
 // in index.html. Alleen OPPAKKEN wordt server-side herberekend (enige sectie met een
 // Prioriteit-kolom F). Voeg je hier ooit andere secties toe, neem dan ook hun eigen
-// drempels over (Vergaderverzoeken 14/21, Offerte 21/42, LOD 90/240) — anders krijgen
-// die secties stilletjes de Oppakken-grenzen.
+// drempels over (Vergaderverzoeken 14/21, Offerte 21/42, LOD 90/240, Subsidie 14/45) —
+// anders krijgen die secties stilletjes de Oppakken-grenzen.
+// SUBSIDIE-TRAJECTEN blijft hier BEWUST buiten: AP_PRIO_COL wijst naar kolom F, en dat
+// is bij die sectie de DEADLINE, geen prioriteit. Een herberekening zou de deadline
+// overschrijven. Prioriteit voor subsidie leeft alleen live in het dashboard.
 function ap_berekenPrio(dlVal, today) {
   if (!dlVal) return '';
   const dl = cd_parseDate(dlVal);
@@ -28,7 +31,7 @@ function cd_recalcPrioriteiten() {
     let inOppakken = false, updates = 0;
     for (let i = 0; i < data.length; i++) {
       const first = (data[i][0] || '').toString().trim().toUpperCase();
-      if (['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD'].indexOf(first) !== -1) {
+      if (['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN'].indexOf(first) !== -1) {
         inOppakken = (first === 'OPPAKKEN'); continue;
       }
       if (!inOppakken || !data[i][0]) continue;

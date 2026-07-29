@@ -7,6 +7,7 @@ import {
   PRIO_REGELS, STIL_ESCALATIE_REGELS, berekenPrioriteit, opvolgStatus,
   _vandaagAmsterdam, _verschilInKalenderdagen,
 } from './util.js';
+import { SKEYS } from './config.js';
 
 const STIL_DREMPEL = 4;
 
@@ -99,7 +100,7 @@ export function letOpSignalen(D, opts){
     out.push({ soort:'danger', icon:'alert', tekst:
       `LOD ${e.r.naam || e.r.code} ${e.p.teLaat ? 'is over de termijn' : `verloopt over ${e.p.dagenTot} ${e.p.dagenTot===1?'dag':'dagen'}`}` });
   }
-  const SECS_ALL = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD'];
+  const SECS_ALL = SKEYS;   // afgeleid, zodat een nieuwe sectie hier niet stil buiten valt
   let langStil = 0;
   SECS_ALL.forEach(sec => ((D && D[sec]) || []).forEach(r => {
     const reg = STIL_ESCALATIE_REGELS[sec];

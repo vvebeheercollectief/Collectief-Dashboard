@@ -2271,6 +2271,45 @@ import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml } from "./subsidie-fa
   truthy('onbekende waarde wordt niet ruw doorgegeven',
      !faseRijHtml('<img src=x onerror=alert(1)>', 1).includes('<img'));
 
+  // ── Rij-opbouw in de tabel ──
+  // rowNtd is niet geëxporteerd; we testen via renderNtd op echte data.
+  (() => {
+    const _bewaardNtd = D.ntd['SUBSIDIE-TRAJECTEN'];
+    const _bewaardActief = state.activeNtd, _bewaardPg = pgs.ntd;
+    try {
+      D.ntd['SUBSIDIE-TRAJECTEN'] = [{
+        _row: 99, _sec: 'SUBSIDIE-TRAJECTEN', code: '311028', naam: 'VvE Naarderstraat',
+        subsidie: 'SVVE isolatie', subsidieFase: 'Verleend', behandelaar: 'Cihad',
+        deadline: '28 augustus 2026', opmerkingen: 'DIT-MAG-NIET-IN-DE-TABEL',
+        inBehandeling: 'TRUE',
+      }];
+      state.activeNtd = 'SUBSIDIE-TRAJECTEN'; pgs.ntd = 1;
+      renderNtd();
+      const _tr = document.querySelector('#ntd-tbody tr[data-row="99"]');
+      truthy('subsidierij wordt getekend', !!_tr);
+      // Zonder eigen case in de switch komt er een <tr> zonder enkele <td> uit rowNtd.
+      eq('zes kolommen plus de actiekolom', _tr ? _tr.querySelectorAll('td').length : 0, 7);
+      eq('evenveel kolomkoppen als cellen',
+         document.querySelectorAll('#ntd-thead th').length, 7);
+      truthy('subsidie-omschrijving staat in de rij', !!_tr && _tr.textContent.includes('SVVE isolatie'));
+      truthy('fasewoord staat in de rij', !!_tr && _tr.textContent.includes('Verleend'));
+      truthy('opmerkingen staan NIET in de tabel',
+         !!_tr && !_tr.textContent.includes('DIT-MAG-NIET-IN-DE-TABEL'));
+      eq('vijf fase-knoppen in de rij', _tr ? _tr.querySelectorAll('.fase-bol').length : 0, 5);
+      // Wachten is hier de normale toestand, dus geen stil-klokje.
+      eq('geen stil-pill op dit tabblad', _tr ? _tr.querySelectorAll('.pill-stil').length : 0, 0);
+      // De kolomkoppen moeten de gekozen zes zijn, in volgorde.
+      eq('kolomkoppen in de juiste volgorde',
+         [...document.querySelectorAll('#ntd-thead th')].slice(0, 6).map(t => t.textContent.trim().replace(/[▲▼]$/, '')),
+         ['VvE Code','VvE','Subsidie','Fase','Behandelaar','Deadline']);
+    } finally {
+      if (_bewaardNtd === undefined) delete D.ntd['SUBSIDIE-TRAJECTEN'];
+      else D.ntd['SUBSIDIE-TRAJECTEN'] = _bewaardNtd;
+      state.activeNtd = _bewaardActief; pgs.ntd = _bewaardPg;
+      renderNtd();
+    }
+  })();
+
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');
   window._testResult = `${totOk} OK, ${totFail} FAIL`; // uitleesbaar voor test-automatisering

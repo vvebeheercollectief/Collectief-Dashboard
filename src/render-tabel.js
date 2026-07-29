@@ -8,6 +8,10 @@ import { state, D, pgs } from "./state.js";
 import { bulkGeselecteerd } from "./bulk.js";
 import { offerteAannSamenvatting, offerteAannemerPaneel } from "./render-offerte.js";
 import { ico } from "./icons.js";
+import { faseRijHtml } from "./subsidie-fase.js";
+
+// Zie de toelichting bij het gebruik in rowNtd().
+const GEEN_STIL_PILL = ['OFFERTE-TRAJECTEN', 'SUBSIDIE-TRAJECTEN'];
 
 // ══════════════════════════════════════
 //  TABLE HELPERS
@@ -95,7 +99,10 @@ function rowNtd(r,sec){
   // gebruiken (v8.10). Daarom kort: het icoon draagt de betekenis, de volledige uitleg
   // staat in de title. "Stil 5d" → "5d", "Opvolgen vandaag" → "Vandaag", en de
   // wegleg-datum kort ("28 jul") i.p.v. voluit.
-  const stilPill = (_stilDagen !== null && sec !== 'OFFERTE-TRAJECTEN')
+  // Secties waar stilliggen geen signaal is maar de normale toestand: bij offertes
+  // wacht je op een aannemer, bij subsidie op de gemeente. Een klokje bij elke rij
+  // leert de gebruiker alleen maar om het klokje te negeren.
+  const stilPill = (_stilDagen !== null && !GEEN_STIL_PILL.includes(sec))
     ? `<span class="pill-stil" data-action="taak-bewerken" data-rid="${rid}" title="Stil: geen activiteit in ${_stilDagen} dagen">${ico('belUit',11)}${_stilDagen}d</span>`
     : '';
   const ov = opvolgStatus(r);
@@ -143,6 +150,18 @@ function rowNtd(r,sec){
         <td>${persBadges(r.behandelaar)}</td>
         ${deadlineCel(r, 'LOD')}
         <td class="cell-note"><span class="ct" title="${esc(r.opmerkingen||'')}">${esc(r.opmerkingen||'')}</span></td>
+        <td>${editBtn}</td>`;
+      break;
+    // Zes kolommen, niet zeven: Opmerkingen bestaat wel als veld (kolom G) maar staat
+    // bewust niet in de tabel — de fase-bolletjes hebben die ruimte nodig en de rij
+    // moet rustig blijven. Houd dit gelijk aan SECS['SUBSIDIE-TRAJECTEN'].cols.
+    case'SUBSIDIE-TRAJECTEN':
+      cells=`<td>${vveCodeSpan(r.code, css)}</td>
+        <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}</td>
+        <td class="cell-txt"><span class="ct" title="${esc(r.subsidie||'')}">${esc(r.subsidie||'')}</span>${extraPills}</td>
+        <td>${faseRijHtml(r.subsidieFase, rid)}</td>
+        <td>${persBadges(r.behandelaar)}</td>
+        ${deadlineCel(r, 'SUBSIDIE-TRAJECTEN')}
         <td>${editBtn}</td>`;
       break;
   }

@@ -943,6 +943,25 @@
 .off-inp{width:46px;height:34px;text-align:center;border:none;border-left:1px solid var(--bor);border-right:1px solid var(--bor);background:var(--sur);color:var(--txt);font-size:14px;font-weight:700;-moz-appearance:textfield;appearance:textfield;outline:none}
 .off-inp::-webkit-outer-spin-button,.off-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 
+/* ── Fase-indicator (Subsidie-trajecten): vijf stappen op een lijn ──
+   Alleen var()-kleuren, zodat er geen aparte [data-theme=dark]-regels nodig zijn. */
+.fase-rij{display:flex;flex-direction:column;gap:5px;min-width:158px}
+.fase-rail{display:flex;align-items:center}
+.fase-bol{position:relative;width:11px;height:11px;padding:0;border-radius:50%;box-sizing:border-box;flex:none;background:var(--bor-input);border:2px solid var(--bor-input);cursor:pointer;transition:background var(--tr),border-color var(--tr),transform var(--tr-fast)}
+.fase-bol:hover{transform:scale(1.28)}
+.fase-bol.af{background:var(--tl);border-color:var(--tl)}
+.fase-bol.nu{background:var(--sur);border-color:var(--tl)}
+.fase-bol:focus-visible{outline:2px solid var(--tl);outline-offset:2px}
+.fase-lijn{height:2px;flex:1;min-width:9px;background:var(--bor-input)}
+.fase-lijn.af{background:var(--tl)}
+.fase-lbl{font-size:11.5px;font-weight:600;color:var(--mut);white-space:nowrap}
+.fase-rij-modal{min-width:0;max-width:280px}
+/* Op aanraakschermen is 11px te klein om te raken. Alleen in de tabel: in het
+   bewerkscherm staan de bolletjes al ruim genoeg uit elkaar. */
+@media(pointer:coarse){
+  .fase-rij:not(.fase-rij-modal) .fase-bol::before{content:'';position:absolute;inset:-11px -3px}
+}
+
 /* ── Chat-velden: zelfde afwerking als de overige invoervelden ── */
 .chat-invoer input,.chat-vve-wrap input{border:1px solid var(--bor);border-radius:9px;padding:8px 11px;background:var(--sur2);color:var(--txt);outline:none;height:36px;transition:border var(--tr),box-shadow var(--tr)}
 .chat-invoer input:focus,.chat-vve-wrap input:focus{border-color:var(--ac);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 14%,transparent)}
@@ -956,7 +975,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,.search-box inpu
 #sb :focus-visible{outline-color:var(--sbglow)}
 
 /* ── Druk-feedback op knoppen (vooral op touch) + chat-knop-feedback ── */
-.btn:active,.ico-btn:active,.bb-knop:active,#chat-send:active,.pb:active,.act-af:active,.act-bw:active,.ni:active,.tab:active,.cb:active{transform:scale(.97)}
+.btn:active,.ico-btn:active,.bb-knop:active,#chat-send:active,.pb:active,.act-af:active,.act-bw:active,.ni:active,.tab:active,.cb:active,.fase-bol:active{transform:scale(.97)}
 #chat-fab{transition:transform var(--tr),box-shadow var(--tr)}
 #chat-fab:hover{transform:scale(1.06);box-shadow:var(--shl)}
 #chat-fab:active{transform:scale(.95)}

@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="nl" data-theme="light">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Mockup — Subsidie-trajecten</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="../styles.css"/>
+<style>
+  /* ── Nieuwe sectiekleur: teal. Groen (--gn) kon niet: dat betekent in dit
+     dashboard overal "afgerond". Zelfde vorm als --am/--pu/--rd. ── */
+  :root{ --tl:#0F766E; --tl-l:#e3f2f0; --tl-b:#b3ddd7; }
+  [data-theme=dark]{ --tl:#5EC8BC; --tl-l:#10302E; --tl-b:#1F5049; }
+
+  /* ── Fase-indicator: vijf stappen op een lijn ── */
+  .fase{display:flex;flex-direction:column;gap:5px;min-width:158px}
+  .fase-rail{display:flex;align-items:center}
+  .fase-stap{width:11px;height:11px;padding:0;border-radius:50%;box-sizing:border-box;flex:none;
+    background:var(--bor-input);border:2px solid var(--bor-input);cursor:pointer;
+    transition:background var(--tr),border-color var(--tr),transform var(--tr-fast)}
+  .fase-stap:hover{transform:scale(1.28)}
+  .fase-stap.af{background:var(--sec);border-color:var(--sec)}
+  .fase-stap.nu{background:var(--sur);border-color:var(--sec)}
+  .fase-lijn{height:2px;flex:1;min-width:9px;background:var(--bor-input)}
+  .fase-lijn.af{background:var(--sec)}
+  .fase-lbl{font-size:11.5px;font-weight:600;color:var(--mut);white-space:nowrap}
+
+  /* ── Alleen mockup-chrome, hoort niet in de app ── */
+  body{padding:26px 22px 60px;background:var(--bg)}
+  .mk-wrap{max-width:1180px;margin:0 auto}
+  .mk-bar{display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+  .mk-bar h1{font-size:17px;font-weight:700;color:var(--txt)}
+  .mk-tag{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+    background:var(--am-l);color:var(--am);padding:3px 9px;border-radius:6px}
+  .mk-note{font-size:12.5px;color:var(--mut);margin:0 0 10px;max-width:70ch;line-height:1.6}
+  .mk-kop{font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+    color:var(--fnt);margin:30px 0 10px}
+</style>
+</head>
+<body>
+<div class="mk-wrap">
+
+  <div class="mk-bar">
+    <h1>Subsidie-trajecten</h1>
+    <span class="mk-tag">Mockup</span>
+    <button class="btn btn-sec btn-sm" id="thema">Donkere modus</button>
+    <span class="mk-note" style="margin:0">Echte stylesheet van het dashboard — dit is hoe het er straks uitziet.</span>
+  </div>
+
+  <!-- ══ HET TABBLAD ══ -->
+  <div class="card" id="kaart" style="--sec:var(--tl);--sec-l:var(--tl-l);--sec-b:var(--tl-b)">
+    <div class="card-hdr">
+      <h2>Subsidie-trajecten</h2>
+      <div class="filter-bar">
+        <div class="search-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input type="text" placeholder="Zoek…"/>
+        </div>
+        <div class="search-box" style="min-width:120px;max-width:150px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 5.523-8 13-8 13S4 15.523 4 10a8 8 0 0116 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          <input type="text" placeholder="VvE Code…"/>
+        </div>
+        <select class="filter-select"><option>Alle behandelaars</option></select>
+        <select class="filter-select"><option>Alle prioriteiten</option></select>
+        <button class="btn btn-sec btn-sm">Selecteren</button>
+        <button class="btn btn-pri btn-sm">Toevoegen</button>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button type="button" class="tab">Oppakken<span class="cnt">14</span></button>
+      <button type="button" class="tab">Vergaderverzoeken<span class="cnt">16</span></button>
+      <button type="button" class="tab">Offerte-trajecten<span class="cnt">37</span></button>
+      <button type="button" class="tab">LOD<span class="cnt">9</span></button>
+      <button type="button" class="tab on" style="--sec:var(--tl);--sec-l:var(--tl-l);--sec-b:var(--tl-b)">Subsidie-trajecten<span class="cnt">6</span></button>
+    </div>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead id="kop"></thead>
+        <tbody id="rijen"></tbody>
+      </table>
+    </div>
+
+    <!-- Cross-list: taken die elders staan maar via Subcategorie óók hier horen -->
+    <div id="kruis"></div>
+  </div>
+
+  <!-- ══ DE BEWERK-KAART ══ -->
+  <div class="mk-kop">De bewerk-kaart</div>
+  <p class="mk-note">Zelfde venster als bij de andere tabbladen. De fase kies je hier ook — handig als je 'm in één keer twee stappen verder zet.</p>
+
+  <div class="card" style="--sec:var(--tl);--sec-l:var(--tl-l);--sec-b:var(--tl-b);max-width:560px">
+    <div class="card-hdr"><h2>Traject bewerken</h2></div>
+    <div style="padding:16px">
+      <div class="fld-row">
+        <div class="fld"><label>VvE Code *</label><input type="text" value="311028"/></div>
+        <div class="fld"><label>VvE Naam</label><input type="text" value="VvE Naarderstraat 107 t/m 117" readonly style="opacity:.7"/></div>
+      </div>
+      <div class="fld"><label>Subsidie</label><input type="text" value="SVVE — isolatie en glas"/></div>
+      <div class="fld">
+        <label>Fase</label>
+        <div id="modal-fase" style="max-width:280px;margin-top:5px"></div>
+      </div>
+      <div class="fld-row">
+        <div class="fld"><label>Deadline</label><input type="date" value="2026-07-31"/></div>
+        <div class="fld"><label>Behandelaar</label>
+          <select><option>Cihad</option><option>Jer</option><option>Gabos</option></select>
+        </div>
+      </div>
+      <div class="fld"><label>Opmerkingen</label><textarea rows="2">Subsidiebureau gemaild met verzoek om met voorrang in behandeling te nemen.</textarea></div>
+      <div class="fld"><label>Subcategorie</label>
+        <select><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option><option>Subsidie-trajecten</option></select>
+      </div>
+      <div class="toggle-row"><button type="button" class="tog on" role="switch" aria-checked="true" id="tog-ib-mk"></button><span>In behandeling</span></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const FASES = ['Voorbereiden','Aangevraagd','Verleend','Uitgevoerd','Vastgesteld'];
+const KOLOMMEN = ['VvE Code','VvE','Subsidie','Fase','Behandelaar','Deadline',''];
+
+// Vandaag = 29 juli 2026, zodat 'te laat' en 'binnenkort' realistisch uitpakken.
+const RIJEN = [
+  {code:'381105', naam:'VvE Schlegelstraat 18 - 20 - 22',         onderwerp:'SVVE — isolatie',            fase:2, beh:'Cihad',      dl:'22 juli 2026',      dagen:-7},
+  {code:'311028', naam:'VvE Naarderstraat 107 t/m 117',           onderwerp:'SVVE — isolatie en glas',    fase:2, beh:'Cihad',      dl:'31 juli 2026',      dagen:2},
+  {code:'381017', naam:'VvE Van Musschenbroekstraat 31/33/35',    onderwerp:'SVVE — gevelisolatie',       fase:2, beh:'Cihad, Jer', dl:'28 augustus 2026', dagen:30},
+  {code:'311059', naam:'VvE Nunspeetlaan 355 t/m 365',            onderwerp:'Aanmelding via aanmeldlink', fase:1, beh:'Jer',        dl:'31 juli 2026',      dagen:2},
+  {code:'311122', naam:'VvE Harderwijkstraat 161-163-165',        onderwerp:'SVVE — isolatie',            fase:2, beh:'Cihad',      dl:'28 augustus 2026', dagen:30},
+  {code:'301042', naam:'VvE Steijnlaan 189/191/193',              onderwerp:'SVVE — dak en glas',         fase:2, beh:'Cihad, Jer', dl:'07 augustus 2026',  dagen:9},
+];
+
+const esc = s => String(s??'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function persBadges(v){
+  return v.split(/[,\/]/).map(n=>n.trim()).filter(Boolean)
+    .map(n=>`<span class="pers pers-default">${esc(n)}</span>`).join('');
+}
+
+function deadlineCel(r){
+  if(r.dagen < 0)  return `<td><span class="s-telaat">Te laat (${Math.abs(r.dagen)}d)</span></td>`;
+  if(r.dagen <= 7) return `<td><span class="s-soon">${esc(r.dl)}</span></td>`;
+  return `<td><span class="s-normal">${esc(r.dl)}</span></td>`;
+}
+
+function faseHtml(n, idx){
+  let rail = '';
+  for(let i=1;i<=5;i++){
+    const cls = i<n ? 'af' : i===n ? 'nu' : '';
+    rail += `<button type="button" class="fase-stap ${cls}" data-rij="${idx}" data-stap="${i}"
+              title="Zet op ${FASES[i-1]}" aria-label="Zet op ${FASES[i-1]}"></button>`;
+    if(i<5) rail += `<span class="fase-lijn ${i<n?'af':''}"></span>`;
+  }
+  return `<div class="fase">
+            <div class="fase-rail">${rail}</div>
+            <div class="fase-lbl">${FASES[n-1]}</div>
+          </div>`;
+}
+
+function teken(){
+  document.getElementById('kop').innerHTML =
+    '<tr>' + KOLOMMEN.map(c=>`<th>${c}</th>`).join('') + '</tr>';
+
+  document.getElementById('rijen').innerHTML = RIJEN.map((r,i)=>`
+    <tr class="ib-row${r.dagen<0?' row-telaat':''}">
+      <td><span class="code code-klik">${esc(r.code)}</span></td>
+      <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span></td>
+      <td class="cell-txt"><span class="ct" title="${esc(r.onderwerp)}">${esc(r.onderwerp)}</span></td>
+      <td>${faseHtml(r.fase, i)}</td>
+      <td>${persBadges(r.beh)}</td>
+      ${deadlineCel(r)}
+      <td><div class="acts">
+        <button class="act-bw act-ico" title="Bewerken"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+        <button class="act-bw act-ico" title="Wegleggen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 13.5"/></svg></button>
+        <button class="act-af act-ico" title="Afronden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m5 12 4 4 10-10"/></svg></button>
+      </div></td>
+    </tr>`).join('');
+
+  document.getElementById('kruis').innerHTML = `
+    <div class="xl-blok">
+      <div class="xl-kop">Ook hier <span class="xl-sub">· via subcategorie · 1</span></div>
+      <div class="xl-rij">
+        <span class="xl-code">381025</span>
+        <div class="xl-mid">
+          <div class="xl-naam">VvE Pasteurstraat 85/87/89</div>
+          <div class="xl-ctx"><span class="xl-herk">Offerte-trajecten</span> · 17 juli 2026 · Offerte Klusbouw incl. isolerende maatregelen</div>
+        </div>
+        <button class="xl-edit" title="Bewerken"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+      </div>
+    </div>`;
+
+  document.getElementById('modal-fase').innerHTML = faseHtml(2, -1);
+}
+
+document.addEventListener('click', e => {
+  const stap = e.target.closest('.fase-stap');
+  if(stap && stap.dataset.rij >= 0){
+    RIJEN[+stap.dataset.rij].fase = +stap.dataset.stap;
+    teken();
+    return;
+  }
+  if(e.target.id === 'thema'){
+    const donker = document.documentElement.dataset.theme === 'dark';
+    document.documentElement.dataset.theme = donker ? 'light' : 'dark';
+    e.target.textContent = donker ? 'Donkere modus' : 'Lichte modus';
+  }
+  if(e.target.id === 'tog-ib-mk') e.target.classList.toggle('on');
+});
+
+teken();
+</script>
+</body>
+</html>

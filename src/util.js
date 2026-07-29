@@ -23,6 +23,10 @@ const PRIO_REGELS = {
   'VERGADERVERZOEKEN': { hoog: 14, midden:  21 },
   'OFFERTE-TRAJECTEN': { hoog: 21, midden:  42 },
   'LOD':               { hoog: 90, midden: 240 },
+  // Subsidietrajecten lopen lang (aanvraag → gemeente → verlening → vaststelling).
+  // Met de Oppakken-drempels zou vrijwel elke rij Hoog worden en verliest de kleur
+  // z'n betekenis.
+  'SUBSIDIE-TRAJECTEN': { hoog: 14, midden: 45 },
 };
 const STIL_DREMPEL_DAGEN = 4;
 
@@ -35,6 +39,7 @@ const STIL_ESCALATIE_REGELS = {
   'VERGADERVERZOEKEN': { trap1: 14, trap2: 21 },
   'OFFERTE-TRAJECTEN': { trap1: 21, trap2: 35 },
   'LOD':               { trap1: 30, trap2: 60 },
+  'SUBSIDIE-TRAJECTEN': { trap1: 21, trap2: 42 },
 };
 
 // Status van de opvolgdatum: weggelegd (toekomst) of opvolgen-vandaag (vandaag/verleden).

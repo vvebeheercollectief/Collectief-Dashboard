@@ -2224,6 +2224,24 @@ import { checkSecties, checkRaster, checkNummers, RASTER_MIN } from "./structuur
   // sleutels schuift de afronddatum op en breekt elke sectie tegelijk.
   Object.keys(SECS).forEach(s => truthy(`${s} heeft hoogstens 8 sleutels`, SECS[s].keys.length <= 8));
 
+  // ── Drempels: prioriteit en stil-escalatie ──
+  // Subsidietrajecten lopen lang; met de Oppakken-drempels (7/14) zou alles rood staan.
+  // Let op: berekenPrioriteit(deadline, categorie, vandaag) — T meegeven, anders rekent
+  // hij vanaf de echte datum van vandaag en ligt plus(n) in het verleden.
+  eq('subsidie 10 dagen → Hoog', berekenPrioriteit(plus(10), 'SUBSIDIE-TRAJECTEN', T).prioriteit, 'Hoog');
+  eq('subsidie 14 dagen → Hoog (grens)', berekenPrioriteit(plus(14), 'SUBSIDIE-TRAJECTEN', T).prioriteit, 'Hoog');
+  eq('subsidie 15 dagen → Midden', berekenPrioriteit(plus(15), 'SUBSIDIE-TRAJECTEN', T).prioriteit, 'Midden');
+  eq('subsidie 45 dagen → Midden (grens)', berekenPrioriteit(plus(45), 'SUBSIDIE-TRAJECTEN', T).prioriteit, 'Midden');
+  eq('subsidie 46 dagen → Laag', berekenPrioriteit(plus(46), 'SUBSIDIE-TRAJECTEN', T).prioriteit, 'Laag');
+  eq('subsidie verlopen deadline → te laat', berekenPrioriteit(plus(-3), 'SUBSIDIE-TRAJECTEN', T).teLaat, true);
+  // Zonder eigen regel geeft berekenPrioriteit een LEGE prioriteit terug (util.js:104-105).
+  // Dan matcht het prioriteitsfilter nooit en zakt de rij altijd naar onderen — terwijl
+  // 'te laat' wél blijft werken, dus je ziet het niet meteen.
+  truthy('subsidie heeft een eigen prioriteitsregel',
+     berekenPrioriteit(plus(10), 'SUBSIDIE-TRAJECTEN', T).prioriteit !== '');
+  eq('subsidie-escalatie trap1', STIL_ESCALATIE_REGELS['SUBSIDIE-TRAJECTEN'].trap1, 21);
+  eq('subsidie-escalatie trap2', STIL_ESCALATIE_REGELS['SUBSIDIE-TRAJECTEN'].trap2, 42);
+
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');
   window._testResult = `${totOk} OK, ${totFail} FAIL`; // uitleesbaar voor test-automatisering

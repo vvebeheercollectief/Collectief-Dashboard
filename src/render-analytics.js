@@ -558,7 +558,7 @@ const HERO_VIEWS=[
     build:()=>{
       const data=SKEYS.map(s=>D.ntd[s]?.length||0);
       const tot=data.reduce((a,b)=>a+b,0);
-      return{labels:SKEYS.map(s=>SECS[s].label),data,colors:[acColor(),'#B45309','#6D5BD0','#B91C1C'],centerVal:`${tot}`,centerLbl:'Open Taken'};
+      return{labels:SKEYS.map(s=>SECS[s].label),data,colors:SKEYS.map(s=>s==='OPPAKKEN'?acColor():SECS[s].color),centerVal:`${tot}`,centerLbl:'Open Taken'};
     }
   },
 ];
@@ -614,6 +614,7 @@ function buildDash(){
     VERGADERVERZOEKEN:`<span style="background:var(--am-l);color:var(--am)" class="badge">Vergadering</span>`,
     'OFFERTE-TRAJECTEN':`<span style="background:var(--pu-l);color:var(--pu)" class="badge">Offerte</span>`,
     LOD:`<span style="background:var(--rd-l);color:var(--rd)" class="badge">LOD</span>`,
+    'SUBSIDIE-TRAJECTEN':`<span style="background:var(--tl-l);color:var(--tl)" class="badge">Subsidie</span>`,
   };
   const all=SKEYS.flatMap(s=>(D.af[s]||[]).map(r=>({...r,_sec:s})));
   all.sort((a,b)=>parseDt(b.datum)-parseDt(a.datum));

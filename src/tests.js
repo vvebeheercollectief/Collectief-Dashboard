@@ -7,6 +7,7 @@ import { _isStagingHost, APP_VERSION, SECS } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
 import { filterNtd, setNtd, renderNtd, renderNtdStats, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey, kopOpen, zetKopOpen } from "./render-lijsten.js";
+import { HERO_VIEWS } from "./render-analytics.js";
 import { state, D, pgs } from "./state.js";
 import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel, renderVve } from "./render-vve.js";
 import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN } from "./kenmerken.js";
@@ -2291,6 +2292,17 @@ import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml } from "./subsidie-fa
      dossierContextTekst('311028', _Dsub, T).includes('SVVE isolatie'));
   truthy('Ctrl+K vindt een traject op zijn omschrijving',
      zoekAlles('SVVE', _Dsub).taken.some(t => t.code === '311028'));
+
+  // ── Grafiek en dashboardpillen ──
+  // De kleurenlijst stond hardgecodeerd op vier items naast twee SKEYS.map()-aanroepen
+  // en liep dus stil uit de pas; nu afgeleid uit SECS.
+  const _donut = HERO_VIEWS.find(v => v.key === 'taken').build();
+  eq('donut heeft evenveel kleuren als secties', _donut.colors.length, Object.keys(SECS).length);
+  eq('donut heeft evenveel labels als secties', _donut.labels.length, Object.keys(SECS).length);
+  truthy('elke donutkleur is een echte kleurwaarde',
+     _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
+
+  eq('versie opgehoogd', APP_VERSION, '10.1');
 
   // ── Bewerkscherm ──
   truthy('vijfde formuliergroep bestaat', !!document.getElementById('fg-sub'));

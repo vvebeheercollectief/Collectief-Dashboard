@@ -164,17 +164,25 @@ function vingerafdruk(sheetName, rij, sec, negeerNummer){
   const spec=FP_KOLOMMEN[sheetName];
   rij=rij||[];
   if(!spec) return _normCel(rij[0]);
-  // Heeft de rij een vast taaknummer (kolom Q), dan ÍS dat de identiteit en doet de rest niet
-  // meer mee. Dit is het eindstation waar fase 4 op mikte: de vingerafdruk blijft alleen het
-  // vangnet voor rijen van vóór de backfill of van een client die nog oude code draait.
-  const nr=negeerNummer ? '' : leegBijErfenis(rij[16]);
-  if(nr && nr!=='TaakID') return 'T:'+nr;
   const datumKol=spec.datum || (sheetName==='Nog Te Doen' ? (NTD_DATUM[sec]||[]) : []);
   const idx=spec.tekst.concat(datumKol).sort((a,b)=>a-b);
   // Ontbrekende cel → '' : values.get kapt afsluitende lege cellen én lege rijen af, dus een rij
   // met lege staartkolommen komt korter terug dan hij in de Sheet staat.
-  return idx.map(i=>_normCel(rij[i], datumKol.includes(i))).join('\x1f');
+  const inhoud=idx.map(i=>_normCel(rij[i], datumKol.includes(i))).join('\x1f');
+  // Het taaknummer (kolom Q) en de inhoud doen ALLEBEI mee, gescheiden door \x1e.
+  //   nummer  → "schrijf ik naar de juiste RIJ?"  (dat lost fase 4 op)
+  //   inhoud  → "heeft iemand deze taak intussen gewijzigd?"
+  // Alleen op het nummer vergelijken zou het tweede laten vallen: een collega die met de hand
+  // in de Sheet iets aanpast, zou dan zonder waarschuwing overschreven worden. Met z'n drieën
+  // in dezelfde lijst is een stille overschrijving erger dan een extra melding.
+  const nr=negeerNummer ? '' : leegBijErfenis(rij[16]);
+  return (nr && nr!=='TaakID') ? 'T:'+nr+'\x1e'+inhoud : inhoud;
 }
+
+// Uit een vingerafdruk het nummer-deel halen (leeg als er geen nummer in zit). Hiermee kan de
+// guard onderscheiden WAT er mis is: zelfde nummer + andere inhoud = iemand heeft deze taak
+// gewijzigd; ander nummer = de rij is verschoven. Twee heel verschillende meldingen.
+const _nummerDeel = fp => (fp||'').startsWith('T:') ? (fp.split('\x1e')[0]) : '';
 
 // Rij-OBJECT → cel-array, zodat geheugen en verse lezing dezelfde weg volgen.
 // 'Nog Te Doen' én 'Afgerond' komen allebei uit parseSections en dragen dus SECS-velden op de
@@ -240,11 +248,23 @@ async function assertRowsMatch(checks, sheetName='Nog Te Doen'){
   const mm=_rowMismatch(vals, minR, cs, (ruw,c)=>c.fp
     ? vingerafdruk(sheetName, ruw, c.sec, !c.heeftNr)
     : ((ruw[0]||'').toString().trim()));
-  if(mm){ const err=new Error('De lijst was net gewijzigd — opnieuw geladen.'); err.rowMismatch=true; err.detail=mm; throw err; }
+  if(mm){
+    const err=new Error('De lijst was net gewijzigd — opnieuw geladen.');
+    err.rowMismatch=true; err.detail=mm;
+    // Zelfde taaknummer maar andere inhoud → het is wél de juiste rij, maar iemand heeft de taak
+    // intussen aangepast. Dat is een heel ander verhaal dan 'de rij is verschoven', en verdient
+    // een melding die de gebruiker ook echt kan plaatsen.
+    const nrOud=_nummerDeel(mm.expected);
+    err.zelfdeTaak = !!nrOud && nrOud===_nummerDeel(mm.got);
+    err.melding = err.zelfdeTaak
+      ? 'Iemand heeft deze taak net gewijzigd. Je scherm is bijgewerkt — kijk even en probeer opnieuw.'
+      : 'De lijst was net gewijzigd — opnieuw geladen, probeer nog eens.';
+    throw err;
+  }
 }
 // Achterwaarts compatibel: een STRING blijft de oude kolom-A-controle, een rij-OBJECT geeft de
 // volle vingerafdruk. Zo kon elke callsite los mee, zonder big-bang.
 const assertRowMatch=(row, bronOfCode, sheetName)=>assertRowsMatch(
   [(bronOfCode && typeof bronOfCode==='object') ? { row, r:bronOfCode } : { row, code:bronOfCode }], sheetName);
 
-export { fetchSheet, fetchSheets, writeRange, appendRange, veiligeCel, _veiligeRij, _shiftNtdRows, _herstelShift, _isTransient, _withRetry, askChat, _rowMismatch, _a1Bereik, vingerafdruk, rijVingerafdruk, _normCel, _rijNaarCellen, assertRowsMatch, assertRowMatch };
+export { fetchSheet, fetchSheets, writeRange, appendRange, veiligeCel, _veiligeRij, _shiftNtdRows, _herstelShift, _isTransient, _withRetry, askChat, _rowMismatch, _a1Bereik, vingerafdruk, rijVingerafdruk, _nummerDeel, _normCel, _rijNaarCellen, assertRowsMatch, assertRowMatch };

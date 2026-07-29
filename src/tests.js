@@ -12,7 +12,7 @@ import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel,
 import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk.js";
-import { _isTransient, _rowMismatch, _a1Bereik, _herstelShift, veiligeCel, _veiligeRij, fetchSheets, vingerafdruk, rijVingerafdruk, _normCel, _rijNaarCellen, assertRowMatch } from "./api.js";
+import { _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, veiligeCel, _veiligeRij, fetchSheets, vingerafdruk, rijVingerafdruk, _normCel, _rijNaarCellen, assertRowMatch } from "./api.js";
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
@@ -842,23 +842,53 @@ import { checkSecties, checkRaster, checkNummers, RASTER_MIN } from "./structuur
     // ── Vast taaknummer (kolom Q): identiteit vóór vingerafdruk ──
     const zonderNr = vingerafdruk('Nog Te Doen', ['311198','VvE A','dak nakijken','17 juni 2026'], 'OPPAKKEN');
     const metNr    = ['311198','VvE A','dak nakijken','17 juni 2026','Jer','Hoog','','','','','','','','','','','Tabc123'];
-    truthy('taaknummer: een rij mét nummer wordt op het nummer herkend, niet op de inhoud',
-       vingerafdruk('Nog Te Doen', metNr, 'OPPAKKEN') === 'T:Tabc123');
-    truthy('taaknummer: rij zonder nummer valt terug op de vingerafdruk', zonderNr !== 'T:Tabc123' && zonderNr.length > 0);
-    eq('taaknummer: gewijzigde tekst doet er niet meer toe zodra het nummer klopt',
-       vingerafdruk('Nog Te Doen', ['311198','VvE A','HEEL ANDERE TEKST','1 jan 2020','','','','','','','','','','','','','Tabc123'], 'OPPAKKEN'),
-       vingerafdruk('Nog Te Doen', metNr, 'OPPAKKEN'));
+    truthy('taaknummer: het nummer staat vooraan in de vingerafdruk',
+       vingerafdruk('Nog Te Doen', metNr, 'OPPAKKEN').startsWith('T:Tabc123\x1e'));
+    truthy('taaknummer: rij zonder nummer valt terug op alleen de inhoud', !zonderNr.startsWith('T:'));
+    // BEWUSTE KEUZE (2026-07-29): nummer én inhoud doen mee. Alleen het nummer zou betekenen dat
+    // een collega die deze taak intussen wijzigt, zonder waarschuwing wordt overschreven.
+    truthy('taaknummer: zelfde nummer maar gewijzigde tekst is TOCH een verschil',
+       vingerafdruk('Nog Te Doen', ['311198','VvE A','HEEL ANDERE TEKST','17 juni 2026','','','','','','','','','','','','','Tabc123'], 'OPPAKKEN')
+       !== vingerafdruk('Nog Te Doen', metNr, 'OPPAKKEN'));
     truthy('taaknummer: een ánder nummer op dezelfde plek is een mismatch',
-       vingerafdruk('Nog Te Doen', metNr.slice(0,16).concat(['Tzzz999']), 'OPPAKKEN') !== 'T:Tabc123');
+       vingerafdruk('Nog Te Doen', metNr.slice(0,16).concat(['Tzzz999']), 'OPPAKKEN')
+       !== vingerafdruk('Nog Te Doen', metNr, 'OPPAKKEN'));
+    // Het onderscheid waar de mélding aan hangt: zelfde nummer = 'iemand wijzigde deze taak',
+    // ander nummer = 'de rij is verschoven'.
+    eq('melding: nummer-deel is los te halen uit de vingerafdruk',
+       _nummerDeel(vingerafdruk('Nog Te Doen', metNr, 'OPPAKKEN')), 'T:Tabc123');
+    eq('melding: een vingerafdruk zonder nummer heeft geen nummer-deel', _nummerDeel(zonderNr), '');
+
+    // De bulk-richting. bulkVeld muteert het rij-object vóór de write en gebruikt dezelfde
+    // closure voor de undo, dus zijn check zet het veld terug op de waarde die NIET geschreven
+    // wordt. Nu de deadline óók in de vingerafdruk zit, is dat geen detail meer maar de reden
+    // dat elke bulk-deadline en elke bulk-undo anders gegarandeerd vals afgaat.
+    (()=>{
+      const taak={_sec:'OPPAKKEN', code:'311198', naam:'VvE A', actiepunt:'dak', deadline:'01-09-2026', taakId:'T1'};
+      const nieuw='15-10-2026';
+      const inSheetOud=['311198','VvE A','dak','1 september 2026','','','','','','','','','','','','','T1'];
+      const inSheetNieuw=['311198','VvE A','dak','15 oktober 2026','','','','','','','','','','','','','T1'];
+      // heenweg: object staat al op de NIEUWE deadline; check corrigeert naar de oude
+      const heen={...taak, deadline:nieuw, ...{deadline:taak.deadline}};
+      eq('bulk-richting: heenweg verwacht de OUDE deadline (die staat nog in de Sheet)',
+         rijVingerafdruk('Nog Te Doen', heen), vingerafdruk('Nog Te Doen', inSheetOud, 'OPPAKKEN'));
+      // undo: object staat terug op oud; check corrigeert naar de nieuwe (die nu in de Sheet staat)
+      const terug={...taak, deadline:nieuw};
+      eq('bulk-richting: undo verwacht de NIEUWE deadline (die staat nu in de Sheet)',
+         rijVingerafdruk('Nog Te Doen', terug), vingerafdruk('Nog Te Doen', inSheetNieuw, 'OPPAKKEN'));
+      truthy('bulk-richting: zonder die omkering zou het niet matchen',
+         rijVingerafdruk('Nog Te Doen', {...taak, deadline:nieuw}) !== vingerafdruk('Nog Te Doen', inSheetOud, 'OPPAKKEN'));
+    })();
     eq('taaknummer: geërfde FALSE in kolom Q telt niet als nummer',
        vingerafdruk('Nog Te Doen', ['311198','VvE A','dak nakijken','17 juni 2026','','','','','','','','','','','','','FALSE'], 'OPPAKKEN'),
        zonderNr);
     eq('taaknummer: de kolomkop TaakID telt niet als nummer',
        vingerafdruk('Nog Te Doen', ['311198','VvE A','dak nakijken','17 juni 2026','','','','','','','','','','','','','TaakID'], 'OPPAKKEN'),
        zonderNr);
-    eq('taaknummer: rij-object en verse lezing komen op hetzelfde nummer uit',
+    eq('taaknummer: rij-object en verse lezing komen op hetzelfde uit',
        rijVingerafdruk('Nog Te Doen', {_sec:'OPPAKKEN', code:'311198', naam:'VvE A',
-         actiepunt:'dak nakijken', deadline:'17-06-2026', taakId:'Tabc123'}), 'T:Tabc123');
+         actiepunt:'dak nakijken', deadline:'17-06-2026', taakId:'Tabc123'}),
+       vingerafdruk('Nog Te Doen', ['311198','VvE A','dak nakijken','17 juni 2026','','','','','','','','','','','','','Tabc123'], 'OPPAKKEN'));
     truthy('taaknummer: het gelezen bereik loopt t/m Q', /!A5:Q9/.test(_a1Bereik('Nog Te Doen',5,9)));
     truthy('taaknummer: nieuwTaakId geeft telkens iets anders', nieuwTaakId() !== nieuwTaakId());
     truthy('taaknummer: nieuwTaakId begint met T en is kort', /^T[a-z0-9]{8,16}$/.test(nieuwTaakId()));
@@ -1273,6 +1303,27 @@ import { checkSecties, checkRaster, checkNummers, RASTER_MIN } from "./structuur
       stub(['311198','VvE A','HEEL ANDERS','17 juni 2026','Jer','Hoog','iets','','','','','','','','','','Tabc123']);
       let fout3=null; try{ await assertRowMatch(12, zonderNr); }catch(e){ fout3=e; }
       truthy('guard e2e: …maar een echte inhoudswijziging blokkeert nog wél', !!(fout3&&fout3.rowMismatch));
+
+      // 6. De twee soorten mismatch geven een ANDERE melding. Zelfde nummer + gewijzigde tekst =
+      //    'iemand wijzigde deze taak'; ander nummer = 'de rij is verschoven'. Dat onderscheid
+      //    is het verschil tussen een melding die de gebruiker begrijpt en één die hij negeert.
+      const metNummer={...taak, taakId:'Tabc123'};
+      stub(['311198','VvE A','IEMAND ANDERS WIJZIGDE DIT','17 juni 2026','Jer','Hoog','iets','','','','','','','','','','Tabc123']);
+      let f4=null; try{ await assertRowMatch(12, metNummer); }catch(e){ f4=e; }
+      truthy('guard e2e: collega wijzigde deze taak → geblokkeerd', !!(f4&&f4.rowMismatch));
+      truthy('guard e2e: …en herkend als DEZELFDE taak', !!(f4&&f4.zelfdeTaak));
+      truthy('guard e2e: …met een melding die dat uitlegt', /iemand heeft deze taak/i.test(f4?.melding||''));
+
+      stub(['311198','VvE A','dak nakijken','17 juni 2026','Jer','Hoog','iets','','','','','','','','','','Tzzz999']);
+      let f5=null; try{ await assertRowMatch(12, metNummer); }catch(e){ f5=e; }
+      truthy('guard e2e: ándere taak op deze rij → geblokkeerd', !!(f5&&f5.rowMismatch));
+      eq('guard e2e: …en NIET als dezelfde taak herkend', !!(f5&&f5.zelfdeTaak), false);
+      truthy('guard e2e: …met de verschoven-lijst-melding', /lijst was net gewijzigd/i.test(f5?.melding||''));
+
+      // 7. De gewone gevallen mogen hier niet door geraakt worden: ongewijzigde rij mét nummer.
+      stub(['311198','VvE A','dak nakijken','17 juni 2026','Jer','Hoog','iets','TRUE','','','','','','T1:28-07-2026','','','Tabc123']);
+      let door4=true; try{ await assertRowMatch(12, metNummer); }catch(e){ door4=false; }
+      truthy('guard e2e: ongewijzigde rij mét nummer gaat gewoon door', door4);
     } finally { window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud; }
   })();
   // ── Quotum: de 8s-poll haalde 8 tabbladen in 8 aparte leesverzoeken op = 60 per minuut,

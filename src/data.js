@@ -36,7 +36,7 @@ function backgroundWrite(writeFn, rollback, foutTitel){
       const msg=(e.message||'').toLowerCase();
       if(e&&e.rowMismatch){
         // De doelrij was verschoven (Sheet tussentijds gewijzigd) → niet geschreven, teruggedraaid.
-        showToast(foutTitel,'De lijst was net gewijzigd — opnieuw geladen, probeer nog eens.','var(--rd)');
+        showToast(foutTitel, e.melding || 'De lijst was net gewijzigd — opnieuw geladen, probeer nog eens.','var(--rd)');
       }else if(msg.includes('authentication')||msg.includes('unauthenticated')||msg.includes('unauthorized')){
         state.oauthToken=null;state.oauthExpiry=0;
         showToast(foutTitel,'Sessie verlopen — wijziging teruggezet. Probeer opnieuw.','var(--rd)');

@@ -10,6 +10,7 @@ import { buildAnalytics, buildDash } from "./render-analytics.js";
 import { renderNtdDonut } from "./render-lijsten.js";
 import { parseOntw, parseLogboek } from "./render-overig.js";
 import { parseKenmerken } from "./kenmerken.js";
+import { checkSecties } from "./structuurcheck.js";
 import { ico } from "./icons.js";
 // (kringverwijzing data ⇄ kenmerken: aanroepen gebeuren op runtime — live bindings, veilig)
 import { showToast } from "./notifications.js";
@@ -175,6 +176,12 @@ async function loadAll(silent){
     if(state.pendingWrites>0){ if(!silent) setSynced(); return; }
     const ntdP=parseSections(ntdR); D.ntd=ntdP.data; D.ntdSecInfo=ntdP.secInfo;
     const afP=parseSections(afR); D.af=afP.data; D.afSecInfo=afP.secInfo;
+    // Fase 3, trap 1: alleen meekijken. Zodra dit een tijd lang stil blijft op gezonde data
+    // gaat de banner aan (trap 2). Nooit blokkerend — dit mag het laden niet beïnvloeden.
+    try{
+      const bev=[...checkSecties(ntdR), ...checkSecties(afR)];
+      if(bev.length) console.warn('[structuurcheck]', bev);
+    }catch(e){ console.warn('[structuurcheck] overgeslagen:', e.message); }
     SKEYS.forEach(s=>{if(D.af[s])D.af[s].sort((a,b)=>parseDt(b.datum)-parseDt(a.datum))});
     D.alvo=parseAlvo(alvoR);
     D.alfa=parseAlfa(alfaR);

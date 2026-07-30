@@ -28,18 +28,16 @@ Je ziet een leeg tabblad Subsidie-trajecten. Dat hoort zo — het blok bestaat n
 
 > **Let op:** klik op dit tabblad nog niet op *Toevoegen*. Je krijgt dan een nette foutmelding ("De sectie Subsidie-trajecten bestaat nog niet in het tabblad Nog Te Doen"). Dat is een beveiliging die ik er bewust in heb gezet — zonder die melding zou een nieuwe taak middenin Oppakken belanden.
 
-### Stap 2 · Zet het blok in de test-Sheet
+### Stap 2 · ~~Zet het blok in de test-Sheet~~ — AL GEDAAN
 
-In de Sheet **"Collectief Dashboard - Kopie"**, tabblad **Nog Te Doen**. De data loopt daar tot rij 80. Laat rij 81 leeg en vul:
+Dit heb ik voor je gedaan in de Sheet **"Collectief Dashboard - Kopie"**:
 
-| Rij | A | B | C | D | E | F | G | H |
-|-----|---|---|---|---|---|---|---|---|
-| 82 | `SUBSIDIE-TRAJECTEN` | *(leeg)* | | | | | | |
-| 83 | `VvE Code` | `VvE` | `Subsidie` | `Fase` | `Behandelaar` | `Deadline` | `Overige opmerkingen` | `In behandeling` |
+- **Nog Te Doen:** rooster verlengd van 91 naar 160 rijen, blokkop op rij 93, kolomkoppen op rij 94.
+- **Afgerond:** blokkop op rij 117, kolomkoppen op rij 118.
 
-**Rij 82 mag alleen in kolom A iets bevatten** — staat er ook iets in B, dan herkent het dashboard de kop niet.
+Je kunt op staging dus meteen op *Toevoegen* klikken en de bolletjes uitproberen. Ik heb bewust geen voorbeeldrijen neergezet — zelf een traject aanmaken is een betere test.
 
-Daarna kun je op staging taken toevoegen en de bolletjes uitproberen. Doe hetzelfde blok ook onderaan het tabblad **Afgerond**, anders kun je een subsidietraject niet afronden.
+**Wat ik onderweg tegenkwam:** in "Nog Te Doen" staan op rij 88 t/m 91 losse aantekeningen in kolom B ("Mail bevestiging aanpasssen…", "Vinkestyn afhandelen!", "Berichtmodel opstellen Teams uitnodiging"). Kolom A is daar leeg, dus het dashboard ziet ze niet — ze doen geen kwaad. Maar het subsidieblok staat nu wél ónder die aantekeningen. Wil je ze opruimen of verplaatsen, doe dat dan gerust; het maakt voor het dashboard niets uit.
 
 ### Stap 3 · Zeg het als het goed is
 
@@ -94,6 +92,24 @@ Deze vijf blijven bewust staan waar ze staan, omdat subsidie daar alleen als *mo
 
 ---
 
-## Nog te doen, maar niet dringend
+## Precies wat er op productie moet gebeuren
 
-Het rooster van "Nog Te Doen" is krap: productie heeft 107 rijen (data tot 95), test 91 (data tot 80). Het nieuwe blok past er nog net in, maar daarna is er weinig groeiruimte. Een keer verlengen naar zo'n 160 rijen is verstandig. Ik heb dat niet gedaan omdat het gereedschap dat ik heb het tabblad niet kan aanwijzen, en blind rijen invoegen in de verkeerde tab wilde ik niet riskeren.
+Bij het inrichten van de test-Sheet ontdekte ik dat het op productie **niet** kan zoals ik eerst dacht. De situatie daar:
+
+| Rijen | Wat er staat |
+|---|---|
+| t/m 95 | LOD-taken (laatste: 411008, Katendrechtse Lagedijk) |
+| 96 – 103 | leeg |
+| 104 – 107 | dezelfde losse aantekeningen in kolom B als op test |
+| — | **het rooster stopt bij rij 107** |
+
+Er is dus geen enkele vrije rij over. Het rooster **moet** eerst verlengd worden — dat is geen opruimwerk maar een voorwaarde. De volgorde wordt daarmee:
+
+1. Rooster van "Nog Te Doen" verlengen naar 160 rijen (en de opmaak van de nieuwe rijen wissen — ze erven anders de rode achtergrond van rij 107)
+2. Code naar productie
+3. Iedereen één keer verversen
+4. Blokkop op rij 109, kolomkoppen op rij 110
+5. Hetzelfde blok onderaan het tabblad Afgerond
+6. De zes trajecten verhuizen
+
+Stap 1 kan wél vooraf: een leeg rooster verlengen verandert niets aan wat het dashboard leest.

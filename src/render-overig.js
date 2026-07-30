@@ -211,6 +211,7 @@ function actieBadge(actie){
     'Opmerking':['--sec:var(--am);--sec-l:var(--am-l)',ico('chat')],
     'Contact':['--sec:var(--ac);--sec-l:var(--ac-l)',ico('telefoon')],
     'Kenmerk':['--sec:var(--pu);--sec-l:var(--pu-l)',ico('klembord')],
+    'Fase gewijzigd':['--sec:var(--tl);--sec-l:var(--tl-l)',ico('chevronRechts')],
   };
   const[css,badgeIco]=map[actie]||['',''];
   return css?`<span class="badge" style="background:var(--sec-l);color:var(--sec);${css}">${badgeIco} ${esc(actie)}</span>`:`<span class="badge">${esc(actie)}</span>`;
@@ -263,6 +264,7 @@ function logZin(r, opts){
     case'Kenmerk':             return A('wijzigde')+`kenmerk <b>${esc(r.veld||'')}</b>`+bij+(r.nieuweWaarde?` <span style="color:var(--mut)">→ ${esc(r.nieuweWaarde)}</span>`:'');
     case'Weggelegd':           return A('legde')+(zonderCode?'een taak':chip)+' weg'+(r.nieuweWaarde?` tot <b>${esc(r.nieuweWaarde)}</b>`:'');
     case'Opvolgdatum gewist':  return A('haalde')+(zonderCode?'een taak':chip)+' terug uit weggelegd';
+    case'Fase gewijzigd':      return A('zette')+(zonderCode?'het subsidietraject':chip)+` op <b>${esc(r.nieuweWaarde||'—')}</b>`+(r.oudeWaarde?` <span style="color:var(--mut)">(was ${esc(r.oudeWaarde)})</span>`:'');
     case'Auto-prioriteit':     return A('paste')+'de prioriteit automatisch aan'+(r.nieuweWaarde?` <span style="color:var(--mut)">· ${esc(r.nieuweWaarde)}</span>`:'');
     default:                   return `<b>${naam}</b> — ${esc(r.actie||'')}`+staart;
   }
@@ -281,7 +283,10 @@ function logTijd(iso){
 function logPaginaSoort(actie){
   const a=(actie||'').trim();
   if(a==='Opmerking'||a==='Contact') return 'normaal';
-  if(a==='Afgerond'||a.indexOf('Aangemaakt')===0) return 'subtiel';
+  // Fasewijzigingen horen op de logboekpagina thuis — het verloop van een
+  // subsidietraject is juist wat je later wilt terugzien. Gedempt, want de app
+  // schrijft ze zelf, net als 'Afgerond' en 'Aangemaakt'.
+  if(a==='Afgerond'||a==='Fase gewijzigd'||a.indexOf('Aangemaakt')===0) return 'subtiel';
   return null;
 }
 

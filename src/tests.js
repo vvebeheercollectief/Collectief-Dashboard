@@ -2,7 +2,7 @@
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
 import { taakTitel, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf, _vandaagAmsterdam } from "./util.js";
-import { logZin, logPaginaSoort, parseLogboek, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog } from "./render-overig.js";
+import { logZin, logPaginaSoort, parseLogboek, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, SECS, SKEYS } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
@@ -2287,6 +2287,24 @@ import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from
   eq('spaties tellen niet als wijziging', faseWijziging('Verleend','  Verleend  '), null);
   eq('terugzetten wordt ook gelogd',
      faseWijziging('Afgerond','Verleend'), {van:'Afgerond', naar:'Verleend'});
+
+  // ── Weergave van die logregel ──
+  // De regel werd wél weggeschreven maar viel in logZin's default-tak, waardoor het
+  // dossier alleen "Fase gewijzigd" toonde zonder te zeggen naar wát.
+  const _lr = { actie:'Fase gewijzigd', veld:'fase', oudeWaarde:'Aangevraagd',
+                nieuweWaarde:'In behandeling', code:'311028', gebruiker:'Jer' };
+  const _lz = logZin(_lr, {zonderCode:true});
+  truthy('logzin noemt de nieuwe fase', _lz.includes('In behandeling'));
+  truthy('logzin noemt de oude fase', _lz.includes('Aangevraagd'));
+  truthy('logzin valt niet terug op de kale actienaam', !/—\s*Fase gewijzigd/.test(_lz));
+  // Zonder oude waarde (allereerste wijziging) mag er geen "(was )" blijven staan.
+  const _lz2 = logZin({..._lr, oudeWaarde:''}, {zonderCode:true});
+  truthy('geen lege was-tussenzin', !_lz2.includes('(was )'));
+  truthy('nieuwe fase staat er nog steeds', _lz2.includes('In behandeling'));
+  // De Logboek-pagina filterde de regel volledig weg.
+  eq('fasewijziging is zichtbaar op de logboekpagina',
+     logPaginaSoort('Fase gewijzigd'), 'subtiel');
+  truthy('badge krijgt een eigen kleur', actieBadge('Fase gewijzigd').includes('--sec:'));
 
   // ── Omschrijving: overal waar een taak een titel krijgt ──
   // Een subsidietaak heeft geen actiepunt/periode/agendapunten/status. Zonder

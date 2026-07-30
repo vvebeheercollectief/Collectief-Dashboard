@@ -60,6 +60,9 @@ export const state = {
   _logVolledigMs: 0,       // wanneer het Logboek voor het laatst VOLLEDIG gelezen is. Een staart-
                            // lezing ziet geen bewerkte bestaande regels, dus af en toe volledig —
                            // maar alleen als er logboektekst in beeld staat (zie _logVolledigNodig).
+  _alfaMs: 0,              // wanneer "ALV's afgerond" voor het laatst is gelezen. Dat archief
+                           // verandert alleen bij de jaarlijkse reset en het dashboard schrijft er
+                           // NOOIT naartoe, dus het hoeft niet elke 8 seconden mee (zie _alfaNodig).
   _uitCache: false,        // staat het scherm op de leescache en is de eerste verse ronde nog
                            // onderweg? Dan zijn de rijnummers mogelijk verschoven → schrijven
                            // kort geblokkeerd (zie blokkeerOffline).

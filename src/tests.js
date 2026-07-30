@@ -14,7 +14,7 @@ import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN, saveKenmerken } from "./
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk.js";
 import { _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, veiligeCel, _veiligeRij, fetchSheet, fetchSheets, vingerafdruk, rijVingerafdruk, _normCel, _rijNaarCellen, assertRowMatch, NTD_DATUM, _isOffline, _isNetwerkFout } from "./api.js";
-import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, _logBereik, _verwerkLogboek, _logVolledigNodig, blokkeerOffline, clearOfflineBanner, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
+import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, blokkeerOffline, clearOfflineBanner, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
 import { setv, serializeNtdUndo, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, kiesModalFase, _modalFaseWoord, getInsertRow } from "./crud.js";
@@ -1782,6 +1782,52 @@ import { addAannemer } from "./offerte-aannemers.js";
       clearOfflineBanner(); document.querySelectorAll('.toast').forEach(t=>t.remove());
     }
   })();
+  // ── 'ALV's afgerond' hoeft niet elke acht seconden mee ──
+  // Gemeten: 21 kB per ronde. Dit tabblad is het enige waar het dashboard NOOIT naartoe schrijft,
+  // dus verouderde gegevens kunnen er per definitie niets overschrijven — de reden waarom dit
+  // wél mag en bij Kenmerken/Herhaalregels/Ontwikkeling bewust niet.
+  eq('archief: handmatige verversing leest het altijd', _alfaNodig(true, false, 1000, 2000), true);
+  eq('archief: nog nooit gelezen → altijd meenemen', _alfaNodig(false, false, 0, 999999), true);
+  eq('archief: niemand kijkt ernaar en het is nog geen minuut geleden → overslaan',
+     _alfaNodig(false, false, 1000, 60000), false);
+  eq('archief: precies een minuut geleden → weer meenemen', _alfaNodig(false, false, 1000, 61000), true);
+  eq('archief: iemand kijkt ernaar → elke ronde meenemen', _alfaNodig(false, true, 1000, 1001), true);
+  // En het gedrag dat ertoe doet: een overgeslagen tabblad BEHOUDT zijn gegevens.
+  await (async()=>{
+    const _fetch=window.fetch, tokenOud=state.oauthToken, expiryOud=state.oauthExpiry;
+    const hashOud=state._lastDHash, alfaMsOud=state._alfaMs, hwOud=state._logHoogwater, ankOud=state._logAnkerTs;
+    const dOud={}; Object.keys(D).forEach(k=>dOud[k]=D[k]);
+    const bereiken=[];
+    try{
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3; state._lastDHash=null;
+      state._logHoogwater=0; state._logAnkerTs='';
+      window.fetch=async(url)=>{
+        const d=decodeURIComponent(String(url));
+        const rr=[...d.matchAll(/ranges=([^&]+)/g)].map(m=>m[1]);
+        bereiken.push(rr);
+        return new Response(JSON.stringify({valueRanges:rr.map(n=>
+          n==="ALV's afgerond" ? {values:[['kop'],['Code','Naam','Datum'],['V1','VvE 1','01-01-2026']]} : {})}),{status:200});
+      };
+      state._alfaMs=0;
+      await loadAll(true);
+      truthy('archief: eerste ronde haalt het archief op', bereiken[0].includes("ALV's afgerond"));
+      const gelezen=(D.alfa||[]).length;
+      truthy('archief: en het staat in het geheugen', gelezen>0);
+      bereiken.length=0;
+      await loadAll(true);                      // meteen erna: nog geen minuut voorbij
+      truthy('archief: tweede ronde slaat het over', !bereiken[0].includes("ALV's afgerond"));
+      // Dit is de kern: een overgeslagen tabblad mag niet door parseX(undefined) leeggeveegd
+      // worden, maar houdt zijn vorige waarde. Vandaar zetAls.
+      eq('archief: overgeslagen tabblad behoudt zijn gegevens (wordt NIET leeggeveegd)',
+         (D.alfa||[]).length, gelezen);
+    } finally {
+      window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
+      state._lastDHash=hashOud; state._alfaMs=alfaMsOud; state._logHoogwater=hwOud; state._logAnkerTs=ankOud;
+      Object.keys(dOud).forEach(k=>{ D[k]=dOud[k]; });
+      document.getElementById('dot').className='dot';
+      document.getElementById('load-err-banner')?.remove();
+    }
+  })();
   // ── Terugval op losse reads: per tabblad beslissen of hij mag falen ──
   // Vier tabbladen zijn verplicht (Nog Te Doen, Afgerond, beide ALV-tabbladen): valt er één weg,
   // dan is hard falen beter dan een leeg dashboard tonen alsof er niets te doen is. De vier
@@ -1809,7 +1855,9 @@ import { addAannemer } from "./offerte-aannemers.js";
       state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
 
       // 1. Optioneel tabblad valt weg → stil afgevangen, de ronde slaagt.
-      urls.length=0; state._syncFails=0; state._lastDHash=null;
+      // _alfaMs op 0 zodat het archief deze ronde gegarandeerd meedoet: anders hangt het aantal
+      // losse reads af van hoe lang een eerdere test geleden draaide.
+      urls.length=0; state._syncFails=0; state._lastDHash=null; state._alfaMs=0;
       stub(['Kenmerken']);
       await loadAll(true);
       eq('terugval: mislukte batchGet valt terug op losse reads', urls.filter(u=>u.includes('/values/')).length, 8);
@@ -1818,7 +1866,7 @@ import { addAannemer } from "./offerte-aannemers.js";
       // 2. Verplicht tabblad valt weg → de ronde faalt en de oude data blijft staan.
       //    Zou hier een uniforme .catch(()=>[]) staan, dan werd het dashboard leeggeveegd
       //    terwijl de statusbalk 'Live' bleef zeggen.
-      urls.length=0; state._syncFails=0; state._lastDHash=null;
+      urls.length=0; state._syncFails=0; state._lastDHash=null; state._alfaMs=0;
       D.af={KANARIE:[{code:'blijf-staan'}]};
       stub(['Afgerond']);
       await loadAll(true);
@@ -2891,7 +2939,7 @@ import { addAannemer } from "./offerte-aannemers.js";
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '10.3');
+  eq('versie opgehoogd', APP_VERSION, '10.4');
 
   // ── Bewerkscherm ──
   truthy('vijfde formuliergroep bestaat', !!document.getElementById('fg-sub'));

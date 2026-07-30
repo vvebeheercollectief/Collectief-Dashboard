@@ -315,6 +315,26 @@ function _kijktNaarLog(){
          || document.getElementById('page-vve')?.classList.contains('active'));
 }
 
+// ── 'ALV's afgerond': het archief hoeft niet elke acht seconden mee ─────────
+// Gemeten op 30-07: 21 kB per ronde, na het Logboek de laatste post die de moeite waard was.
+// Dit tabblad is bijzonder omdat het dashboard er NOOIT naartoe schrijft — geen enkele schrijfweg
+// raakt het — en het verandert alleen bij de jaarlijkse ALV-reset. Verouderde gegevens kunnen hier
+// dus per definitie niets overschrijven; het enige risico is dat je een archiefregel even later
+// ziet. Daarom dezelfde regel als bij het Logboek: elke ronde meelezen zolang iemand ernaar kijkt,
+// anders hoogstens één keer per minuut. Puur, dus los testbaar.
+const ALFA_MS=60000;
+function _alfaNodig(luid, kijkt, laatsteMs, nu){
+  if(luid || !laatsteMs) return true;      // handmatige verversing of nog nooit gelezen
+  if(kijkt) return true;
+  return (nu-laatsteMs)>=ALFA_MS;
+}
+// Alle plekken die D.alfa tonen: de archieflijst zelf, Analytics en het Dashboard (KPI
+// 'vergaderingen uitgeschreven') en het VvE-dossier ('laatst gehouden ALV').
+function _kijktNaarAlfa(){
+  return ['page-alfa','page-analytics','page-dash','page-vve']
+    .some(id=>document.getElementById(id)?.classList.contains('active'));
+}
+
 // Hoogwaterstand + anker uit de RUWE lezing: het hoogste rijnummer dat we gezien hebben en de
 // kolom-A-waarde die daar stond. Bewust de ruwe rijen en niet D.logboek: parseLogboek filtert
 // verborgen acties eruit en keert de lijst om, dus de laatste regel van D.logboek is niet per se
@@ -397,7 +417,9 @@ async function loadAll(silent){
     // De stille 8s-poll leest de staart.
     const logVolledig=_logVolledigNodig(!silent, state._logHoogwater, _kijktNaarLog(), state._logVolledigMs, Date.now());
     const logNaam=logVolledig ? 'Logboek' : _logBereik(state._logHoogwater);
-    const namen=POLL_TABS.map(n=>n==='Logboek' ? logNaam : n);
+    const alfaMee=_alfaNodig(!silent, _kijktNaarAlfa(), state._alfaMs, Date.now());
+    const namen=POLL_TABS.map(n=>n==='Logboek' ? logNaam : n)
+                         .filter(n=>alfaMee || n!=="ALV's afgerond");
     let R;
     try{
       // Eén batchGet i.p.v. acht losse reads — zie fetchSheets: acht aparte verzoeken
@@ -434,7 +456,10 @@ async function loadAll(silent){
       if(bev.length) console.warn('[structuurcheck]', bev);
     }catch(e){ console.warn('[structuurcheck] overgeslagen:', e.message); }
     zetAls("ALV's overzicht", r=>{ D.alvo=parseAlvo(r); });
-    zetAls("ALV's afgerond",  r=>{ D.alfa=parseAlfa(r); });
+    // Pas ná het toekennen bijhouden dat het archief gelezen is: een ronde die eerder strandt mag
+    // de klok van de volgende lezing niet vooruitzetten. Werd het tabblad deze ronde overgeslagen,
+    // dan behoudt zetAls vanzelf de vorige D.alfa.
+    zetAls("ALV's afgerond",  r=>{ D.alfa=parseAlfa(r); state._alfaMs=Date.now(); });
     zetAls('Ontwikkeling',    r=>{ D.ontw=parseOntw(r); });
     await _verwerkLogboek(R, logNaam, logVolledig, lees);
     zetAls('Herhaalregels',   r=>{ D.herhaal=parseHerhaal(r); });
@@ -582,7 +607,7 @@ function parseAlfa(rows){
 
 export {
   backgroundWrite, schrijfActieLoopt, metWriteMarkering, setSyncing, setSaving, setSynced, setSyncErr, dot, loadAll, magPollen, parseSections, parseAlvo, parseAlfa, parseHerhaal,
-  POLL_TABS, VERPLICHTE_TABS, _logBereik, _zetLogAnker, _verwerkLogboek, _logVolledigNodig,
+  POLL_TABS, VERPLICHTE_TABS, _logBereik, _zetLogAnker, _verwerkLogboek, _logVolledigNodig, _alfaNodig,
   blokkeerOffline, showOfflineBanner, clearOfflineBanner, setSyncOffline,
   bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade,
 };

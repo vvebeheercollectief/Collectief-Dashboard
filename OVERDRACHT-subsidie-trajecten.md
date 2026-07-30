@@ -22,34 +22,22 @@ De opmaak van het blok is niet nagebouwd maar letterlijk uit jouw kopie-Sheet ge
 
 ## Wat nog van jou is
 
-### 1. De zes trajecten verhuizen
+**De omschrijving per traject.** In kolom "Subsidie" staat nu overal `Subsidieaanvraag`. Vervang dat door waar het echt over gaat ("SVVE isolatie", "gemeente dakisolatie") — zes velden, zo gedaan. Het oorspronkelijke actiepunt is niet weggegooid: dat staat nu bij Opmerkingen.
 
-Ze staan nog in Oppakken. Knippen, niet kopiëren, en let op de kolomvertaling:
-
-| | Oppakken | Subsidie-trajecten |
-|---|---|---|
-| C | Actiepunt | **Subsidie** (waar gaat het over) |
-| D | Deadline | **Fase** |
-| F | Prioriteit | **Deadline** |
-
-Neem het volle bereik **A t/m Q** mee, niet A:H — anders raak je het vaste taaknummer (Q), de opvolgdatum (L) en de escalatievlag (N) kwijt.
-
-### 2. De omschrijving per traject
-
-Vul bij elk verhuisd traject in kolom C in waar het over gaat. Nu is dat nog leeg; iets als "SVVE isolatie" of "gemeente dakisolatie" maakt de lijst in één blik leesbaar.
+**De fase nalopen.** Ik heb 311059 op *Voorbereiden* gezet (die is net aangemeld via de aanmeldlink) en de andere vijf op *In behandeling*, omdat er bij alle vijf "in afwachting van subsidie" stond. Klopt dat niet, dan is het één klik op een bolletje.
 
 ---
 
-## De zes trajecten die verhuizen
+## De zes verhuisde trajecten
 
-| VvE | Beginfase |
-|---|---|
-| 381105 · Schlegelstraat 18-20-22 | Aangevraagd |
-| 311028 · Naarderstraat 107 t/m 117 | Aangevraagd |
-| 381017 · Van Musschenbroekstraat 31/33/35 | Aangevraagd |
-| 311059 · Nunspeetlaan 355 t/m 365 | Voorbereiden |
-| 311122 · Harderwijkstraat 161-163-165 | Aangevraagd |
-| 301042 · Steijnlaan 189/191/193 | Aangevraagd |
+| VvE | Fase | Rij |
+|---|---|---|
+| 381105 · Schlegelstraat 18-20-22 | In behandeling | 99 |
+| 311028 · Naarderstraat 107 t/m 117 | In behandeling | 100 |
+| 381017 · Van Musschenbroekstraat 31/33/35 | In behandeling | 103 |
+| 311059 · Nunspeetlaan 355 t/m 365 | Voorbereiden | 101 |
+| 311122 · Harderwijkstraat 161-163-165 | In behandeling | 104 |
+| 301042 · Steijnlaan 189/191/193 | In behandeling | 102 |
 
 Deze vijf blijven bewust staan waar ze staan, omdat subsidie daar alleen als *mogelijkheid* wordt genoemd: 361023 (Troelstrakade), 301074 (Herman Costerstraat), 311198 (Hoenderloostraat), 381025 (Pasteurstraat 85), 301065 (Kaapstraat). Blijkt er later een echt traject uit te komen, dan zet je bij die taak de subcategorie op *Subsidie-trajecten* en verschijnt hij onderaan het subsidie-tabblad in het lijstje "Ook hier" — zonder uit zijn eigen scherm te verdwijnen.
 

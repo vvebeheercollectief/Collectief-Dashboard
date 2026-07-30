@@ -1777,6 +1777,10 @@ import { addAannemer } from "./offerte-aannemers.js";
       await backgroundWrite(async()=>{ geschreven=true; }, ()=>{ teruggedraaid=true; }, 'Test');
       eq('offline vangnet: backgroundWrite schrijft niet', geschreven, false);
       truthy('offline vangnet: en draait de optimistische wijziging terug', teruggedraaid);
+      // backgroundWrite start in zijn finally een resync die niemand awaitet. Laat je die hangen,
+      // dan staat _loadInFlight nog op true als de volgende test loadAll aanroept en meet die
+      // niets. Op een trage verbinding (productie) viel de suite daardoor om.
+      for(let i=0;i<200 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,10));
     } finally {
       state._netwerkFouten=nfOud; state.pendingWrites=pwOud;
       clearOfflineBanner(); document.querySelectorAll('.toast').forEach(t=>t.remove());
@@ -1808,14 +1812,17 @@ import { addAannemer } from "./offerte-aannemers.js";
         return new Response(JSON.stringify({valueRanges:rr.map(n=>
           n==="ALV's afgerond" ? {values:[['kop'],['Code','Naam','Datum'],['V1','VvE 1','01-01-2026']]} : {})}),{status:200});
       };
+      // Wachten tot een eventuele lopende ronde klaar is: anders keert loadAll meteen terug
+      // zónder te lezen en meet deze test niets (viel om op de trage productie-verbinding).
+      const rustig=async()=>{ for(let i=0;i<200 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,10)); };
       state._alfaMs=0;
-      await loadAll(true);
-      truthy('archief: eerste ronde haalt het archief op', bereiken[0].includes("ALV's afgerond"));
+      await rustig(); await loadAll(true);
+      truthy('archief: eerste ronde haalt het archief op', !!bereiken[0] && bereiken[0].includes("ALV's afgerond"));
       const gelezen=(D.alfa||[]).length;
       truthy('archief: en het staat in het geheugen', gelezen>0);
       bereiken.length=0;
-      await loadAll(true);                      // meteen erna: nog geen minuut voorbij
-      truthy('archief: tweede ronde slaat het over', !bereiken[0].includes("ALV's afgerond"));
+      await rustig(); await loadAll(true);      // meteen erna: nog geen minuut voorbij
+      truthy('archief: tweede ronde slaat het over', !!bereiken[0] && !bereiken[0].includes("ALV's afgerond"));
       // Dit is de kern: een overgeslagen tabblad mag niet door parseX(undefined) leeggeveegd
       // worden, maar houdt zijn vorige waarde. Vandaar zetAls.
       eq('archief: overgeslagen tabblad behoudt zijn gegevens (wordt NIET leeggeveegd)',
@@ -2939,7 +2946,7 @@ import { addAannemer } from "./offerte-aannemers.js";
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '10.4');
+  eq('versie opgehoogd', APP_VERSION, '10.5');
 
   // ── Bewerkscherm ──
   truthy('vijfde formuliergroep bestaat', !!document.getElementById('fg-sub'));

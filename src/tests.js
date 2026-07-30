@@ -2,7 +2,7 @@
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
 import { taakTitel, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf, _vandaagAmsterdam } from "./util.js";
-import { logZin, logPaginaSoort, parseLogboek, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge } from "./render-overig.js";
+import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, SECS, SKEYS } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
@@ -14,7 +14,7 @@ import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk.js";
 import { _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, veiligeCel, _veiligeRij, fetchSheets, vingerafdruk, rijVingerafdruk, _normCel, _rijNaarCellen, assertRowMatch, NTD_DATUM } from "./api.js";
-import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS } from "./data.js";
+import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, _logBereik, _verwerkLogboek } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
 import { setv, serializeNtdUndo, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, kiesModalFase, _modalFaseWoord, getInsertRow } from "./crud.js";
@@ -215,6 +215,102 @@ import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from
   eq('parseLogboek negeert lege rij', _lbGap.length, 2);
   eq('parseLogboek _row na lege rij = 4', _lbGap.find(r => r.nieuweWaarde === 'tweede')._row, 4);
   eq('parseLogboek _row vóór lege rij = 2', _lbGap.find(r => r.nieuweWaarde === 'eerste')._row, 2);
+
+  // ── Logboek incrementeel: staartlezing, anker, ontdubbeling ──
+  // Het Logboek groeit onbeperkt (1.261 regels bij het bouwen van fase 5) en werd élke 8 seconden
+  // volledig opnieuw ingelezen. Nu alleen wat erbij komt. Twee harde eisen: _row blijft de RUWE
+  // Sheet-index (bewerken/verwijderen schrijft op dát nummer) en de optimistische regels moeten
+  // ontdubbeld worden tegen de teruggelezen echte regels.
+  (()=>{
+    const _lbKop=['Timestamp','Code','Sectie','Actie','Veld','Oud','Nieuw','Wie'];
+    const _lbR=(ts,code,actie)=>[ts,code,'OPPAKKEN',actie||'Afgerond','','','','jer'];
+    const _st=parseLogboek([_lbR('2026-07-02T10:00:00Z','B')], 3);
+    eq('logboek staart: _row telt door vanaf de startrij', _st[0]._row, 3);
+    eq('logboek staart: eerste rij is GEEN koprij', _st.length, 1);
+    eq('logboek staart: lege lezing → lege lijst', parseLogboek([], 3), []);
+    eq('logboek staart: startrij 1 blijft de klassieke vorm (rij 1 = kop)',
+       parseLogboek([_lbKop, _lbR('t','A')], 1)[0]._row, 2);
+    // Een weggefilterde 'Bewerkt' mag de rijnummers van de rest ook in de staart niet verschuiven.
+    eq('logboek staart: verborgen actie eruit, rijnummers ongemoeid',
+       parseLogboek([_lbR('t1','B','Bewerkt'), _lbR('t2','C')], 10).map(o=>[o.code,o._row]), [['C',11]]);
+  })();
+  (()=>{
+    // Ontdubbeling op INHOUD, niet op tijd: bij addTaskNote en saveKenmerken is de lokale tijd een
+    // andere dan die de append in de Sheet zet, dus een timestamp-vergelijking zou nooit matchen.
+    const mk=(over)=>Object.assign({_row:0, timestamp:'lokaal', code:'B', sectie:'', actie:'Opmerking',
+      veld:'', oudeWaarde:'', nieuweWaarde:'gebeld', gebruiker:'jer'}, over||{});
+    const opt=mk();
+    eq('logboek ontdubbel: echte regel laat de optimistische wijken', _nogNietBevestigd([opt],[mk({_row:9})]).length, 0);
+    eq('logboek ontdubbel: afwijkende tijd mag niet uitmaken',
+       _nogNietBevestigd([opt],[mk({_row:9, timestamp:'2026-07-02T10:00:02.100Z'})]).length, 0);
+    eq('logboek ontdubbel: andere inhoud blijft staan',
+       _nogNietBevestigd([opt],[mk({_row:9, nieuweWaarde:'iets anders'})]).length, 1);
+    eq('logboek ontdubbel: andere gebruiker blijft staan',
+       _nogNietBevestigd([opt],[mk({_row:9, gebruiker:'cihad'})]).length, 1);
+    eq('logboek ontdubbel: zonder nieuwe regels blijft de eigen regel staan', _nogNietBevestigd([opt],[]).length, 1);
+  })();
+  await (async()=>{
+    const logOud=D.logboek, hwOud=state._logHoogwater, ankOud=state._logAnkerTs;
+    const kop=['Timestamp','Code','Sectie','Actie','Veld','Oud','Nieuw','Wie'];
+    const rg=(ts,code)=>[ts,code,'OPPAKKEN','Afgerond','','','','jer'];
+    const nooit=async()=>{ throw new Error('er had geen tweede lezing nodig moeten zijn'); };
+    try{
+      // 1. Eerste ronde: volledig lezen. Hoogwaterstand en anker komen uit de RUWE rijen, niet
+      //    uit D.logboek — dat filtert verborgen acties en keert de lijst om.
+      D.logboek=[];
+      await _verwerkLogboek({'Logboek':[kop, rg('t1','A'), rg('t2','B')]}, 'Logboek', true, nooit);
+      eq('logboek anker: volledige ronde zet de hoogwaterstand op de laatste Sheet-rij', state._logHoogwater, 3);
+      eq('logboek anker: en het anker op kolom A van díe rij', state._logAnkerTs, 't2');
+      eq('logboek anker: beide regels in het geheugen, nieuwste eerst', D.logboek.map(o=>o.code), ['B','A']);
+
+      // 2. Staartronde. Het bereik begint óp het anker, dus de eerste teruggekomen rij is er één
+      //    die we al hebben; die mag geen duplicaat opleveren.
+      await _verwerkLogboek({[_logBereik(3)]:[rg('t2','B'), rg('t3','C')]}, _logBereik(3), false, nooit);
+      eq('logboek anker: staartronde voegt alleen de nieuwe regel toe', D.logboek.map(o=>o.code), ['C','B','A']);
+      eq('logboek anker: het anker levert geen dubbele regel', D.logboek.filter(o=>o.code==='B').length, 1);
+      eq('logboek anker: nieuwe regel krijgt het juiste Sheet-rijnummer', D.logboek[0]._row, 4);
+      eq('logboek anker: hoogwaterstand schuift mee', state._logHoogwater, 4);
+
+      // 3. Niets nieuws: alleen het anker komt terug → de lijst blijft exact staan (en de hash
+      //    verandert dus niet, zodat er ook niet onnodig hertekend wordt).
+      const zelfde=D.logboek;
+      await _verwerkLogboek({[_logBereik(4)]:[rg('t3','C')]}, _logBereik(4), false, nooit);
+      truthy('logboek anker: ronde zonder nieuwe regels laat de lijst ongemoeid', D.logboek===zelfde);
+
+      // 4. Iemand verwijderde een logregel → het anker komt niet meer terug. Zonder deze controle
+      //    bevriest het logboek stil: de hoogwaterstand staat boven het einde van het tabblad, het
+      //    staartbereik geeft voor altijd niets terug, en bewerken/verwijderen van logregels zou
+      //    op verschoven rijnummers werken.
+      let herlezingen=0;
+      const herlees=async()=>{ herlezingen++; return [kop, rg('t1','A'), rg('t3','C')]; };
+      await _verwerkLogboek({[_logBereik(4)]:[]}, _logBereik(4), false, herlees);
+      eq('logboek anker: verdwenen anker dwingt precies één volledige herlezing af', herlezingen, 1);
+      eq('logboek anker: de lijst komt uit die herlezing', D.logboek.map(o=>o.code), ['C','A']);
+      eq('logboek anker: hoogwaterstand opnieuw gezet', state._logHoogwater, 3);
+
+      // 5. Anker bestaat nog wél maar bevat iets anders (rijen opgeschoven) → ook herlezen.
+      let tweede=0;
+      await _verwerkLogboek({[_logBereik(3)]:[rg('HEEL-ANDERS','X')]}, _logBereik(3), false,
+        async()=>{ tweede++; return [kop, rg('t9','Z')]; });
+      eq('logboek anker: verschoven anker dwingt óók een herlezing af', tweede, 1);
+      eq('logboek anker: lijst komt uit de herlezing', D.logboek.map(o=>o.code), ['Z']);
+      eq('logboek anker: hoogwaterstand volgt de kortere lijst', state._logHoogwater, 2);
+
+      // 6. Een eigen notitie staat optimistisch bovenaan (_row 0) en moet daar blijven staan tot
+      //    de echte regel uit de Sheet binnenkomt — en dan zonder dubbele regel verdwijnen.
+      D.logboek=[{_row:0,timestamp:'lokaal',code:'B',sectie:'',actie:'Opmerking',veld:'',
+                  oudeWaarde:'',nieuweWaarde:'gebeld',gebruiker:'jer'}].concat(D.logboek);
+      await _verwerkLogboek({[_logBereik(2)]:[rg('t9','Z'), rg('t10','Q')]}, _logBereik(2), false, nooit);
+      eq('logboek anker: eigen nog-niet-bevestigde regel blijft bovenaan', D.logboek[0]._row, 0);
+      eq('logboek anker: de nieuwe echte regel komt eronder', D.logboek[1].code, 'Q');
+      await _verwerkLogboek({[_logBereik(3)]:[rg('t10','Q'),
+        ['echt-uit-sheet','B','','Opmerking','','','gebeld','jer']]}, _logBereik(3), false, nooit);
+      eq('logboek anker: echte regel vervangt de optimistische, geen dubbele',
+         D.logboek.filter(o=>o.code==='B').length, 1);
+      eq('logboek anker: en dat is de regel mét een echt Sheet-rijnummer',
+         D.logboek.find(o=>o.code==='B')._row, 4);
+    } finally { D.logboek=logOud; state._logHoogwater=hwOud; state._logAnkerTs=ankOud; }
+  })();
   // De stil-berekening leunt hierna op écht werk (de notitie) i.p.v. op een taak-opslag.
   // Dit is wat vooraf gemeten is: 'Opmerking' en 'Bewerkt' staan vrijwel altijd op dezelfde
   // dag, dus het wegvallen van 'Bewerkt' verschuift de stil-dagen niet.
@@ -1416,6 +1512,54 @@ import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from
     } finally {
       window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
       state._syncFails=failsOud; state._lastDHash=hashOud;
+      Object.keys(dOud).forEach(k=>{ D[k]=dOud[k]; });
+      document.getElementById('dot').className='dot';
+      document.getElementById('load-err-banner')?.remove();
+    }
+  })();
+  // ── Het bewijs van de leeslast-winst: welke bereiken loadAll écht opvraagt ──
+  // Eerste ronde het hele Logboek, elke volgende ronde alleen de staart vanaf de hoogwaterstand.
+  // En een handmatige verversing (niet-stil) leest altijd weer volledig — dát is het moment
+  // waarop iemand wil zien wat een ánder heeft gewijzigd of weggehaald, en de staart kent
+  // alleen nieuwe rijen.
+  await (async()=>{
+    const _fetch=window.fetch, tokenOud=state.oauthToken, expiryOud=state.oauthExpiry;
+    const hwOud=state._logHoogwater, ankOud=state._logAnkerTs, hashOud=state._lastDHash;
+    const failsOud=state._syncFails;
+    const dOud={}; Object.keys(D).forEach(k=>dOud[k]=D[k]);
+    const kop=['Timestamp','Code','Sectie','Actie','Veld','Oud','Nieuw','Wie'];
+    const rg=(ts,code)=>[ts,code,'OPPAKKEN','Afgerond','','','','jer'];
+    const bereiken=[];
+    try{
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
+      state._logHoogwater=0; state._logAnkerTs=''; state._lastDHash=null; state._syncFails=0;
+      D.logboek=[];
+      window.fetch=async(url)=>{
+        const d=decodeURIComponent(String(url));
+        const rr=[...d.matchAll(/ranges=([^&]+)/g)].map(m=>m[1]);
+        bereiken.push(...rr);
+        return new Response(JSON.stringify({valueRanges:rr.map(n=>
+          n==='Logboek'             ? {values:[kop, rg('t1','A')]} :   // volledige lezing
+          n.startsWith("'Logboek'") ? {values:[rg('t1','A')]}     :   // staart: alleen het anker
+          {})}),{status:200});
+      };
+      await loadAll(true);
+      eq('leeslast: eerste ronde vraagt het hele Logboek op',
+         bereiken.filter(b=>b.includes('Logboek')), ['Logboek']);
+      eq('leeslast: hoogwaterstand staat na die ronde op de laatste regel', state._logHoogwater, 2);
+      bereiken.length=0;
+      await loadAll(true);
+      eq('leeslast: tweede ronde vraagt alléén de staart op',
+         bereiken.filter(b=>b.includes('Logboek')), ["'Logboek'!A2:H"]);
+      eq('leeslast: en er is geen tweede leesverzoek nodig geweest', state._syncFails, 0);
+      bereiken.length=0;
+      await loadAll();          // niet-stil = handmatige verversing
+      eq('leeslast: handmatige verversing leest weer volledig',
+         bereiken.filter(b=>b.includes('Logboek')), ['Logboek']);
+    } finally {
+      window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
+      state._logHoogwater=hwOud; state._logAnkerTs=ankOud; state._lastDHash=hashOud;
+      state._syncFails=failsOud;
       Object.keys(dOud).forEach(k=>{ D[k]=dOud[k]; });
       document.getElementById('dot').className='dot';
       document.getElementById('load-err-banner')?.remove();

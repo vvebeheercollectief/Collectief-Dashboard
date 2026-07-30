@@ -52,6 +52,11 @@ export const state = {
                            // Bewust niet gezet bij het in de wachtrij zetten: de wachtrij is serieel,
                            // dus een wachtende bulk-write zou anders meteen als 'vastgelopen' gelden.
   _lastDHash: null,
+  _logHoogwater: 0,        // hoogste Sheet-rijnummer van het Logboek dat we gelezen hebben
+                           // (0 = nog niets → volgende ronde volledig lezen)
+  _logAnkerTs: '',         // kolom A van díe rij. Komt die niet terug bij de staartlezing, dan
+                           // heeft iemand een logregel verwijderd en zijn de rijnummers
+                           // opgeschoven → volledig herlezen i.p.v. stil bevriezen.
   _loadInFlight: false,
   _loadAgain: false,
   _loadAgainLoud: false,   // werd de onderdrukte aanroep door een NIET-stille (handmatige) verversing getriggerd? → herstart luid, zodat de fout-banner/spinner zichtbaar blijft

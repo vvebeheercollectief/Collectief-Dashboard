@@ -8,7 +8,7 @@ import { fetchSheet, fetchSheets, _withRetry } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { buildAnalytics, buildDash } from "./render-analytics.js";
 import { renderNtdDonut } from "./render-lijsten.js";
-import { parseOntw, parseLogboek } from "./render-overig.js";
+import { parseOntw, parseLogboek, _nogNietBevestigd } from "./render-overig.js";
 import { parseKenmerken } from "./kenmerken.js";
 import { checkSecties, checkNummers } from "./structuurcheck.js";
 import { ico } from "./icons.js";
@@ -140,6 +140,64 @@ const POLL_TABS=["Nog Te Doen","Afgerond","ALV's overzicht","ALV's afgerond",
 // het verschil tussen wél en géén .catch alleen uit de vorm van de regel te lezen was.
 const VERPLICHTE_TABS=new Set(["Nog Te Doen","Afgerond","ALV's overzicht","ALV's afgerond"]);
 
+// ── Logboek: alleen de staart lezen ────────────────────────────────────────
+// Het Logboek is het enige tabblad dat onbeperkt groeit — 1.261 regels op het moment van bouwen,
+// ~60% van alles wat elke 8 seconden binnenkwam, en dat werd elke ronde volledig opnieuw
+// ingelezen. Na de eerste volledige lezing wordt alleen nog opgehaald wat erbij kwam, en dat
+// blijft even goedkoop bij 6.000 regels.
+//
+// Het bereik begint bij de hoogwaterstand ZELF en niet bij +1: die ene regel is het ANKER.
+// Komt hij niet terug, of staat er iets anders, dan heeft iemand een logregel verwijderd en zijn
+// alle rijnummers eronder opgeschoven → meteen volledig herlezen. Zonder die controle zou het
+// logboek stil bevriezen: de hoogwaterstand staat dan boven het einde van het tabblad, het
+// staartbereik geeft voor altijd niets terug, en nieuwe regels landen op rijnummers die we nooit
+// meer opvragen. Bewerken en verwijderen van logregels zou dan op verkeerde rijnummers werken.
+const _logBereik=(hoogwater)=>`'Logboek'!A${hoogwater}:H`;
+
+// Hoogwaterstand + anker uit de RUWE lezing: het hoogste rijnummer dat we gezien hebben en de
+// kolom-A-waarde die daar stond. Bewust de ruwe rijen en niet D.logboek: parseLogboek filtert
+// verborgen acties eruit en keert de lijst om, dus de laatste regel van D.logboek is niet per se
+// de laatste Sheet-rij. Geen bruikbaar anker (lege kolom A) → terug naar volledig lezen; liever
+// een duurdere ronde dan een anker dat op elke rij 'klopt'.
+function _zetLogAnker(rows, eersteRij){
+  const ts=(((rows||[])[(rows||[]).length-1]||[])[0]||'').toString().trim();
+  if(!rows||!rows.length||!ts){ state._logHoogwater=0; state._logAnkerTs=''; return; }
+  state._logHoogwater=eersteRij+rows.length-1;
+  state._logAnkerTs=ts;
+}
+
+// Verwerkt de Logboek-lezing. Staat als enige tabblad in een eigen functie omdat hij een tweede
+// leesverzoek kan doen: als het anker verschoven is, moet er in dezelfde ronde volledig herlezen
+// worden — één extra verzoek in een zeldzaam geval, in plaats van een logboek dat achterblijft.
+async function _verwerkLogboek(R, naam, volledig, lees){
+  let rows=R[naam];
+  if(rows===undefined) return;                     // niet gevraagd deze ronde → laat staan
+  if(!volledig){
+    const anker=((rows[0]||[])[0]||'').toString().trim();
+    if(!rows.length || !state._logAnkerTs || anker!==state._logAnkerTs){
+      console.warn('[logboek] anker verschoven — volledige herlezing');
+      rows=await lees('Logboek').catch(()=>undefined);
+      if(rows===undefined){ state._logHoogwater=0; state._logAnkerTs=''; return; }
+      volledig=true;
+    }
+  }
+  const optimistisch=(D.logboek||[]).filter(x=>x._row===0);
+  if(volledig){
+    const nieuw=parseLogboek(rows);
+    D.logboek=_nogNietBevestigd(optimistisch, nieuw).concat(nieuw);
+    _zetLogAnker(rows, 1);
+    return;
+  }
+  const staart=rows.slice(1);                      // rows[0] is het anker; die hadden we al
+  if(!staart.length) return;                       // niets nieuws → D.logboek onaangeroerd
+  const nieuw=parseLogboek(staart, state._logHoogwater+1);
+  const bestaand=(D.logboek||[]).filter(x=>x._row>0);
+  // Volgorde: eigen nog-niet-bevestigde regels bovenaan (daar zet unshift ze ook), dan de nieuwe
+  // staart (parseLogboek keert die al om: nieuwste eerst), dan wat we al hadden.
+  D.logboek=_nogNietBevestigd(optimistisch, nieuw).concat(nieuw, bestaand);
+  _zetLogAnker(staart, state._logHoogwater+1);
+}
+
 // Mag de achtergrond-verversing draaien? Alleen met een echte sessie. Zonder deze rem
 // vroeg de 8s-timer óók op het inlogscherm elke ronde zelf een token aan. Elke aanvraag
 // herbindt de Google-callback (zie auth.js), dus tikte de timer terwijl de gebruiker in
@@ -168,7 +226,13 @@ async function loadAll(silent){
     // Reads met herkansing bij tijdelijke API-fouten (429 / 5xx / netwerk-blip), zodat
     // één hapering niet meteen de hele ronde laat falen en 'Fout' toont.
     const lees=(naam)=>_withRetry(()=>fetchSheet(naam));
-    const namen=POLL_TABS.slice();
+    // Een handmatige verversing (de knop in de titelbalk, of het herstel ná een verwijderde
+    // logregel) leest het Logboek altijd volledig: dat is precies het moment waarop iemand wil
+    // zien wat een ánder heeft gewijzigd of weggehaald, en de staart kent alleen nieuwe rijen.
+    // De stille 8s-poll leest de staart.
+    const logVolledig=!silent || !state._logHoogwater;
+    const logNaam=logVolledig ? 'Logboek' : _logBereik(state._logHoogwater);
+    const namen=POLL_TABS.map(n=>n==='Logboek' ? logNaam : n);
     let R;
     try{
       // Eén batchGet i.p.v. acht losse reads — zie fetchSheets: acht aparte verzoeken
@@ -207,7 +271,7 @@ async function loadAll(silent){
     zetAls("ALV's overzicht", r=>{ D.alvo=parseAlvo(r); });
     zetAls("ALV's afgerond",  r=>{ D.alfa=parseAlfa(r); });
     zetAls('Ontwikkeling',    r=>{ D.ontw=parseOntw(r); });
-    zetAls('Logboek',         r=>{ D.logboek=parseLogboek(r); });
+    await _verwerkLogboek(R, logNaam, logVolledig, lees);
     zetAls('Herhaalregels',   r=>{ D.herhaal=parseHerhaal(r); });
     zetAls('Kenmerken',       r=>{ D.kenmerken=parseKenmerken(r); });
     setSynced();
@@ -337,5 +401,5 @@ function parseAlfa(rows){
 
 export {
   backgroundWrite, schrijfActieLoopt, metWriteMarkering, setSyncing, setSaving, setSynced, setSyncErr, dot, loadAll, magPollen, parseSections, parseAlvo, parseAlfa, parseHerhaal,
-  POLL_TABS, VERPLICHTE_TABS,
+  POLL_TABS, VERPLICHTE_TABS, _logBereik, _zetLogAnker, _verwerkLogboek,
 };

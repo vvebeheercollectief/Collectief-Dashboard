@@ -178,18 +178,37 @@ async function undoOntwDelete(values, titel){
 // bepaalStil/dagenStil.
 const LOG_VERBORGEN = new Set(['Bewerkt']);
 
-function parseLogboek(rows){
-  if(!rows||rows.length<2) return [];
-  // _row komt uit de RUWE index: het filter hieronder mag het Sheet-rijnummer niet laten
-  // opschuiven, want daar hangt bewerken/verwijderen op de Logboek-pagina aan.
-  return rows.slice(1).map((r,i)=>{
+// startRij = het Sheet-rijnummer van rows[0]. Weggelaten (of 1) → de klassieke vorm waarin
+// rows[0] de koprij is en de eerste datarij Sheet-rij 2 is. Bij een staartlezing
+// ('Logboek'!A1262:H) is rows[0] géén koprij en telt _row door vanaf 1262.
+// _row MOET de ruwe Sheet-index blijven: bewerken en verwijderen van logregels schrijven op dat
+// nummer, en het filter + de omkering hieronder mogen daar niets aan veranderen.
+function parseLogboek(rows, startRij){
+  if(!rows||!rows.length) return [];
+  const start=startRij||1;
+  const data=start===1 ? rows.slice(1) : rows;
+  const eersteRij=start===1 ? 2 : start;
+  return data.map((r,i)=>{
     const c=j=>((r&&r[j])||'').trim();
     return {
-      _row:i+2,
+      _row:eersteRij+i,
       timestamp:c(0), code:c(1), sectie:c(2), actie:c(3),
       veld:c(4), oudeWaarde:c(5), nieuweWaarde:c(6), gebruiker:c(7)
     };
   }).filter(o=>o.timestamp&&!LOG_VERBORGEN.has(o.actie)).reverse();
+}
+
+// Welke optimistische regels (_row 0) staan nog niet écht in de Sheet?
+// Bewust alleen vergelijken met de regels die deze ronde NIEUW binnenkwamen en niet met de hele
+// historie: de sleutel bevat geen tijd, dus een tweede identieke notitie ('gebeld' bij dezelfde
+// VvE door dezelfde persoon) zou anders meteen weer van het scherm verdwijnen omdat de eerste er
+// al staat. NIET op timestamp vergelijken: bij twee van de drie optimistische paden (addTaskNote
+// en saveKenmerken) is de lokale tijd een andere dan die de append in de Sheet zet — minstens de
+// duur van het netwerkverkeer ertussen. De inhoud is wél gelijk. Puur, dus los testbaar.
+const _logSleutel=o=>[o.code,o.sectie,o.actie,o.veld,o.nieuweWaarde,o.gebruiker].join('\x1f');
+function _nogNietBevestigd(optimistisch, nieuweRegels){
+  const gezien=new Set((nieuweRegels||[]).map(_logSleutel));
+  return (optimistisch||[]).filter(o=>!gezien.has(_logSleutel(o)));
 }
 
 function fmtLogTs(iso){
@@ -626,7 +645,7 @@ async function logEvent(code, sec, actie, veld, oudeWaarde, nieuweWaarde) {
 
 export {
   ONTW_CATS, ONTW_CAT_COLORS, parseOntw, renderOntw, setOntw, openOntwModal, closeOntwModal,
-  submitOntwItem, deleteOntwItem, editOntwItem, parseLogboek, fmtLogTs, actieBadge, _LOG_AVKLEUR, avatarKleur,
+  submitOntwItem, deleteOntwItem, editOntwItem, parseLogboek, _logSleutel, _nogNietBevestigd, fmtLogTs, actieBadge, _LOG_AVKLEUR, avatarKleur,
   logDayLabel, logZin, logTijd, logItemHtml, logPaginaSoort, renderLogboek, histNoteKey, renderTaskHistory, addTaskNote, logEvent,
   _shiftRows, _shiftLogboekRows, _shiftLogEditRef, logEditWrite, logDeleteLabel,
   logEditForm, editLogboek, saveLogboek, cancelLogboek, setLogSoort, deleteLogboek, undoDeleteLog,

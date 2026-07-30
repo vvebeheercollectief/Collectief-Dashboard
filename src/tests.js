@@ -26,7 +26,7 @@ import { SPLASH_MS, _setFase } from "./login-splash.js";
 import { opmaakHtml, htmlNaarMarkers, zonderOpmaak, pasToe, opmaakBalk } from "./opmaak.js";
 import { goTo } from "./ui.js";
 import { checkSecties, checkRaster, checkNummers, RASTER_MIN } from "./structuurcheck.js";
-import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml } from "./subsidie-fase.js";
+import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from "./subsidie-fase.js";
 
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
   // ── mini-assert helper (Fase 1 testnet) ──
@@ -2246,20 +2246,20 @@ import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml } from "./subsidie-fa
 
   // ── Fase-helpers ──
   eq('vijf fases', SUBSIDIE_FASES.length, 5);
-  eq('fasevolgorde', SUBSIDIE_FASES, ['Voorbereiden','Aangevraagd','Verleend','Uitgevoerd','Vastgesteld']);
-  eq('woord → index', faseIndex('Verleend'), 3);
+  eq('fasevolgorde', SUBSIDIE_FASES, ['Voorbereiden','Aangevraagd','In behandeling','Verleend','Afgerond']);
+  eq('woord → index', faseIndex('In behandeling'), 3);
   eq('index is 1-gebaseerd', faseIndex('Voorbereiden'), 1);
   // Alles hieronder komt zo uit de Sheet en mag de tabel niet breken.
   eq('leeg telt als Voorbereiden', faseIndex(''), 1);
   eq('null telt als Voorbereiden', faseIndex(null), 1);
   eq('undefined telt als Voorbereiden', faseIndex(undefined), 1);
   eq('onbekend woord valt terug op stap 1', faseIndex('Kwijtgeraakt'), 1);
-  eq('hoofdletterongevoelig', faseIndex('vErLeEnD'), 3);
+  eq('hoofdletterongevoelig', faseIndex('iN bEhAnDeLiNg'), 3);
   eq('spaties eromheen', faseIndex('  Aangevraagd  '), 2);
-  eq('index → woord', faseWoord(4), 'Uitgevoerd');
+  eq('index → woord', faseWoord(4), 'Verleend');
   eq('index buiten bereik → eerste woord', faseWoord(99), 'Voorbereiden');
   eq('index 0 → eerste woord', faseWoord(0), 'Voorbereiden');
-  const _fh = faseRijHtml('Verleend', 7);
+  const _fh = faseRijHtml('Verleend', 7);   // stap 4 van 5
   eq('vijf knoppen', (_fh.match(/<button/g) || []).length, 5);
   eq('één actieve stap', (_fh.match(/aria-pressed="true"/g) || []).length, 1);
   eq('vier verbindingslijnen', (_fh.match(/fase-lijn/g) || []).length, 4);
@@ -2267,10 +2267,26 @@ import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml } from "./subsidie-fa
   truthy('fasewoord staat er als tekst onder', _fh.includes('>Verleend<'));
   truthy('groep heeft een rol', _fh.includes('role="group"'));
   truthy('elke knop heeft een aria-label', (_fh.match(/aria-label="Zet op /g) || []).length === 5);
-  eq('bij Verleend zijn twee stappen afgerond', (_fh.match(/class="fase-bol af"/g) || []).length, 2);
+  eq('bij Verleend zijn drie stappen afgerond', (_fh.match(/class="fase-bol af"/g) || []).length, 3);
   // Kolom D is vrij tekstveld in de Sheet; wat daar staat mag geen HTML worden.
   truthy('onbekende waarde wordt niet ruw doorgegeven',
      !faseRijHtml('<img src=x onerror=alert(1)>', 1).includes('<img'));
+
+  // ── Logregel bij een fasewijziging ──
+  // Eén bron voor beide wegen: klik op een bolletje in de rij, en Opslaan in het
+  // bewerkscherm. Zonder deze helper liep dat uit elkaar en werd de wijziging via
+  // Opslaan niet gelogd.
+  eq('wijziging levert van/naar', faseWijziging('Aangevraagd','Verleend'), {van:'Aangevraagd', naar:'Verleend'});
+  eq('lege oude waarde telt als Voorbereiden',
+     faseWijziging('','In behandeling'), {van:'Voorbereiden', naar:'In behandeling'});
+  eq('null oude waarde telt als Voorbereiden',
+     faseWijziging(null,'Aangevraagd'), {van:'Voorbereiden', naar:'Aangevraagd'});
+  eq('geen wijziging → niets loggen', faseWijziging('Verleend','Verleend'), null);
+  eq('lege nieuwe waarde → niets loggen', faseWijziging('Verleend',''), null);
+  eq('beide leeg → niets loggen', faseWijziging('',''), null);
+  eq('spaties tellen niet als wijziging', faseWijziging('Verleend','  Verleend  '), null);
+  eq('terugzetten wordt ook gelogd',
+     faseWijziging('Afgerond','Verleend'), {van:'Afgerond', naar:'Verleend'});
 
   // ── Omschrijving: overal waar een taak een titel krijgt ──
   // Een subsidietaak heeft geen actiepunt/periode/agendapunten/status. Zonder
@@ -2360,7 +2376,7 @@ import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml } from "./subsidie-fa
   truthy('modal-variant is een aparte actie', typeof ACTIONS['subsidie-fase-modal'] === 'function');
   // De modal-variant mag niets naar de Sheet schrijven, alleen de lokale stand zetten.
   kiesModalFase(4);
-  eq('modal-fase onthoudt de keuze', _modalFaseWoord(), 'Uitgevoerd');
+  eq('modal-fase onthoudt de keuze', _modalFaseWoord(), 'Verleend');
   eq('modal-kiezer tekent vijf knoppen',
      document.querySelectorAll('#m-fase .fase-bol').length, 5);
   truthy('modal-knoppen schrijven niet rechtstreeks weg',

@@ -24,7 +24,7 @@ Genomen in het gesprek van 2026-07-29:
 |---|-------|---------|
 | 1 | Welke kolommen? | **Zes** — VvE Code, VvE, Subsidie, Fase, Behandelaar, Deadline. Opmerkingen bestaat wel maar staat niet in de tabel |
 | 2 | Hoe wordt de fase getoond? | **Vijf klikbare bolletjes** met het fasewoord eronder. Nadrukkelijk visueel: "we willen ook echt een visueel element wat betreft de fase" |
-| 3 | Welke fases? | **Vijf**: Voorbereiden → Aangevraagd → Verleend → Uitgevoerd → Vastgesteld |
+| 3 | Welke fases? | **Vijf**: Voorbereiden → Aangevraagd → In behandeling → Verleend → Afgerond (bijgesteld 2026-07-30: tussen indienen en toekennen zit een aparte wachtperiode, en daar zit het merendeel van de trajecten in) |
 | 4 | Wat gebeurt er met bestaande subsidietaken? | Gebruiker wijst ze zelf aan. Uitkomst: **de zes uit Oppakken verhuizen**, de vijf twijfelgevallen blijven staan |
 | 5 | En hun logboekgeschiedenis? | **Meeverhuizen** — maar preciezer dan eerst gedacht, zie "Migratie" |
 | 6 | Welke kleur? | **Teal** (nieuwe `--tl`-familie). Niet het bestaande `--gn`: groen betekent in dit dashboard overal "afgerond" |
@@ -107,7 +107,7 @@ nergens heen.
 
 ### De vijf fases
 
-`Voorbereiden` → `Aangevraagd` → `Verleend` → `Uitgevoerd` → `Vastgesteld`, opgeslagen als
+`Voorbereiden` → `Aangevraagd` → `In behandeling` → `Verleend` → `Afgerond`, opgeslagen als
 gewoon woord in kolom D. Dus ook leesbaar als je de Sheet zelf openslaat.
 
 - Een **lege** cel telt als *Voorbereiden*.

@@ -10,7 +10,7 @@ import { showToast, showUndoToast, fireNotifEvent, undoComplete, undoDelete } fr
 import { animateRowOut, flashRow } from "./anim.js";
 import { logEvent, renderTaskHistory } from "./render-overig.js";
 import { backgroundWrite, loadAll } from "./data.js";
-import { faseIndex, faseWoord, faseRijHtml } from "./subsidie-fase.js";
+import { faseIndex, faseWoord, faseRijHtml, faseWijziging } from "./subsidie-fase.js";
 
 // Welke formuliergroep hoort bij welke sectie. Eén bron: openModal verbergt ze
 // allemaal via deze map en toont er precies één, dus een zesde sectie raakt
@@ -467,6 +467,14 @@ async function submitTask(){
             fireNotifEvent('assigned',{sec,code,naam,behandelaar:newBeh});
             await logEvent(code,sec,'Behandelaar gewijzigd','behandelaar',oudeWaarden.behandelaar,newBeh);
           }
+          // Fase-wijziging vanuit het bewerkscherm ook vastleggen. Klikken op een
+          // bolletje in de tabelrij logt al via zetSubsidieFase; zonder dit blok bleef
+          // dezelfde wijziging via Opslaan onzichtbaar in het logboek, en juist het
+          // verloop van een subsidietraject wil je later kunnen terugzien.
+          if(sec==='SUBSIDIE-TRAJECTEN'){
+            const w=faseWijziging(oudeWaarden.subsidieFase, doelRow.subsidieFase);
+            if(w) await logEvent(code,sec,'Fase gewijzigd','fase',w.van,w.naar);
+          }
           // Bevestiging pas hier: vóór de write was 'Opgeslagen' een belofte, geen feit.
           // Helemaal onderaan de writeFn, zodat een _withRetry-herkansing er geen tweede
           // kan opleveren. geenDedup: twee keer dezelfde taak opslaan binnen 15 s moet
@@ -533,7 +541,8 @@ async function zetSubsidieFase(rid, stap){
       // er op dit moment nog in de Sheet hoort te staan.
       await assertRowMatch(r._row, {...r, subsidieFase: oud});
       await writeRange(`'Nog Te Doen'!D${r._row}`, [nieuw]);
-      await logEvent(r.code, 'SUBSIDIE-TRAJECTEN', 'Fase gewijzigd', 'fase', oud || 'Voorbereiden', nieuw);
+      const w=faseWijziging(oud, nieuw);
+      if(w) await logEvent(r.code, 'SUBSIDIE-TRAJECTEN', 'Fase gewijzigd', 'fase', w.van, w.naar);
       showToast('Fase bijgewerkt', `${r.code} — ${nieuw}`, null, 'opslaan', {geenSysteemmelding:true});
     },
     ()=>{ r.subsidieFase = oud; },

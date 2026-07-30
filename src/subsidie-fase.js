@@ -13,7 +13,12 @@
 // De schrijfweg (zetSubsidieFase) staat daarom in crud.js.
 import { esc } from './util.js';
 
-export const SUBSIDIE_FASES = ['Voorbereiden', 'Aangevraagd', 'Verleend', 'Uitgevoerd', 'Vastgesteld'];
+// Volgorde vastgesteld met de gebruiker (2026-07-30): tussen indienen en toekennen
+// zit een aparte periode waarin de aanvraag bij de verstrekker in behandeling is —
+// en dáár zit het merendeel van de lopende trajecten in.
+// LET OP: 'In behandeling' is hier een FASE in kolom D en staat volledig los van de
+// kolom 'In behandeling' (H), die aangeeft of een collega de taak heeft opgepakt.
+export const SUBSIDIE_FASES = ['Voorbereiden', 'Aangevraagd', 'In behandeling', 'Verleend', 'Afgerond'];
 
 // Woord → 1-gebaseerd stapnummer. Onbekend, leeg of null = 1 (Voorbereiden).
 export function faseIndex(woord) {
@@ -25,6 +30,18 @@ export function faseIndex(woord) {
 // Stapnummer → woord. Buiten bereik = het eerste woord.
 export function faseWoord(n) {
   return SUBSIDIE_FASES[(n | 0) - 1] || SUBSIDIE_FASES[0];
+}
+
+// Moet deze fase-overgang in het logboek? Geeft null als er niets te melden is,
+// anders {van, naar} met de woorden zoals ze in de logregel horen te staan.
+// Eén bron voor beide wegen waarlangs een fase kan wijzigen: een klik op een
+// bolletje in de tabelrij, en Opslaan in het bewerkscherm.
+// Een lege oude waarde telt als 'Voorbereiden' — dat is wat de rij toonde.
+export function faseWijziging(oud, nieuw){
+  const o = ((oud == null ? '' : oud) + '').trim();
+  const n = ((nieuw == null ? '' : nieuw) + '').trim();
+  if (!n || n === o) return null;
+  return { van: o || SUBSIDIE_FASES[0], naar: n };
 }
 
 // Vijf knoppen op een lijn met het fasewoord eronder.

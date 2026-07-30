@@ -30,14 +30,14 @@ Je ziet een leeg tabblad Subsidie-trajecten. Dat hoort zo — het blok bestaat n
 
 ### Stap 2 · ~~Zet het blok in de test-Sheet~~ — AL GEDAAN
 
-Dit heb ik voor je gedaan in de Sheet **"Collectief Dashboard - Kopie"**:
+Klaar in de Sheet **"Collectief Dashboard - Kopie"**. Jer heeft de losse aantekeningen opgeruimd en het blok zelf strak achter LOD gezet:
 
-- **Nog Te Doen:** rooster verlengd van 91 naar 160 rijen, blokkop op rij 93, kolomkoppen op rij 94.
+- **Nog Te Doen:** blokkop op rij 87, kolomkoppen op rij 88. Rooster 154 rijen.
 - **Afgerond:** blokkop op rij 117, kolomkoppen op rij 118.
 
-Je kunt op staging dus meteen op *Toevoegen* klikken en de bolletjes uitproberen. Ik heb bewust geen voorbeeldrijen neergezet — zelf een traject aanmaken is een betere test.
+Geverifieerd door de echte vorm door `parseSections` te halen: kolomkoprij komt uit op 88, `subsidieFase` wordt uit kolom D gelezen terwijl de offerte-`fase` uit kolom O leeg blijft, en de lege regels met "FALSE" in kolom H worden genegeerd. LOD blijft ongemoeid.
 
-**Wat ik onderweg tegenkwam:** in "Nog Te Doen" staan op rij 88 t/m 91 losse aantekeningen in kolom B ("Mail bevestiging aanpasssen…", "Vinkestyn afhandelen!", "Berichtmodel opstellen Teams uitnodiging"). Kolom A is daar leeg, dus het dashboard ziet ze niet — ze doen geen kwaad. Maar het subsidieblok staat nu wél ónder die aantekeningen. Wil je ze opruimen of verplaatsen, doe dat dan gerust; het maakt voor het dashboard niets uit.
+Je kunt op staging dus meteen op *Toevoegen* klikken en de bolletjes uitproberen. Ik heb bewust geen voorbeeldrijen neergezet — zelf een traject aanmaken is een betere test.
 
 ### Stap 3 · Zeg het als het goed is
 
@@ -96,20 +96,26 @@ Deze vijf blijven bewust staan waar ze staan, omdat subsidie daar alleen als *mo
 
 Bij het inrichten van de test-Sheet ontdekte ik dat het op productie **niet** kan zoals ik eerst dacht. De situatie daar:
 
+Productie is nog onaangeroerd (gecontroleerd). De situatie daar:
+
 | Rijen | Wat er staat |
 |---|---|
 | t/m 95 | LOD-taken (laatste: 411008, Katendrechtse Lagedijk) |
 | 96 – 103 | leeg |
-| 104 – 107 | dezelfde losse aantekeningen in kolom B als op test |
+| 104 – 107 | dezelfde losse aantekeningen in kolom B die je op test hebt opgeruimd |
 | — | **het rooster stopt bij rij 107** |
 
-Er is dus geen enkele vrije rij over. Het rooster **moet** eerst verlengd worden — dat is geen opruimwerk maar een voorwaarde. De volgorde wordt daarmee:
+Zolang die aantekeningen er staan is er geen vrije rij over. Twee wegen:
 
-1. Rooster van "Nog Te Doen" verlengen naar 160 rijen (en de opmaak van de nieuwe rijen wissen — ze erven anders de rode achtergrond van rij 107)
+**Makkelijkst** — doe daar hetzelfde als op test: aantekeningen weghalen, blok strak achter LOD (kop op 97, kolomkoppen op 98). Dan hoeft het rooster niet eens verlengd te worden.
+
+**Anders** — rooster eerst verlengen naar 160 rijen, dan het blok onder de aantekeningen. Let op: nieuwe rijen erven de rode opmaak van rij 107, dus daarna opmaak wissen.
+
+Hoe dan ook blijft de volgorde dwingend:
+
+1. Ruimte maken in de Sheet (aantekeningen weg óf rooster verlengen) — dit mag vooraf, het verandert niets aan wat het dashboard leest
 2. Code naar productie
 3. Iedereen één keer verversen
-4. Blokkop op rij 109, kolomkoppen op rij 110
+4. **Pas dan** het blok plaatsen
 5. Hetzelfde blok onderaan het tabblad Afgerond
 6. De zes trajecten verhuizen
-
-Stap 1 kan wél vooraf: een leeg rooster verlengen verandert niets aan wat het dashboard leest.

@@ -275,7 +275,14 @@ document.addEventListener('DOMContentLoaded',()=>{
   // daarom niet zelf de teller op 0 zetten maar gewoon een ronde doen. Slaagt die, dan zet
   // setSynced de balk en de banner zelf weg.
   window.addEventListener('offline', ()=>{ setSyncOffline(); showOfflineBanner(); });
-  window.addEventListener('online',  ()=>{ if(magPollen(state)) loadAll(true); });
+  window.addEventListener('online',  ()=>{
+    // Dezelfde remmen als de 8s-poll: een verversing mag geen open venster, bulk-selectie of
+    // lopende undo onder de gebruiker weghalen. Blijft dit staan, dan haalt de poll het zo op.
+    if(!magPollen(state)) return;
+    if(document.querySelector('.modal-bg.open')) return;
+    if(state.pendingWrites>0 || state.bulkMode || state._animBusy || state._undoInFlight) return;
+    loadAll(true);
+  });
 
   // Live updates — auto-refresh elke 8 seconden (smart diff voorkomt onnodige re-renders)
   // Id bewaard zodat logout() de poll kan stoppen (anders blijft hij na uitloggen doordraaien).

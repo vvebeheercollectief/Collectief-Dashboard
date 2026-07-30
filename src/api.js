@@ -178,6 +178,19 @@ async function askChat(system, messages){
 const FP_KOLOMMEN = {
   'Nog Te Doen': { tekst:[0,2], datum:null },  // A=code, C=actiepunt/periode/datumAangevraagd; deadline per sectie
   'Afgerond':    { tekst:[0,2], datum:[8]  },  // A=code, C=actiepunt, I=datum afgerond
+  // Logboek: de HELE regel (A t/m H). Kolom A alleen was hier niet genoeg. Bulk-acties schrijven
+  // meerdere logregels met exact dezelfde milliseconde, en — belangrijker — het bewerken van een
+  // logregel verandert alléén kolom E/F/G. Vergeleken we alleen de timestamp, dan zag de guard
+  // een bewerking van een collega niet en overschreef hij die stil met de oude tekst. Er komt
+  // niets van Apps Script in dit tabblad, dus er is geen kolom die vanzelf verandert en vals
+  // alarm zou geven.
+  'Logboek':     { tekst:[0,1,2,3,4,5,6,7], datum:null },
+};
+// Veldnamen per kolom voor tabbladen die NIET uit parseSections komen. De vingerafdruk moet
+// beide kanten via dezelfde weg bouwen (rij-object → cellen), en buiten Nog Te Doen/Afgerond
+// bestaat SECS[r._sec] niet.
+const OBJ_KOLOMMEN = {
+  'Logboek': ['timestamp','code','sectie','actie','veld','oudeWaarde','nieuweWaarde','gebruiker'],
 };
 // Welke kolom de deadline draagt verschilt per sectie van 'Nog Te Doen' (zie SECS.keys):
 // OPPAKKEN D(3) · VERGADERVERZOEKEN F(5) · OFFERTE-TRAJECTEN C(2)+F(5) · LOD F(5)
@@ -237,6 +250,8 @@ const _nummerDeel = fp => (fp||'').startsWith('T:') ? (fp.split('\x1e')[0]) : ''
 function _rijNaarCellen(sheetName, r){
   r=r||{};
   if(!FP_KOLOMMEN[sheetName]) return [];
+  const eigen=OBJ_KOLOMMEN[sheetName];
+  if(eigen) return eigen.map(k=>r[k] ?? '');   // vaste kolomvolgorde, niet via SECS
   const keys=(SECS[r._sec]||{}).keys||[];
   const uit=keys.map(k=>r[k] ?? '');
   while(uit.length<8) uit.push('');            // OFFERTE heeft 7 velden → vul tot H

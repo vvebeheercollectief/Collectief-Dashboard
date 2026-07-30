@@ -65,10 +65,14 @@ async function saveKenmerken(){
   // Optimistisch tonen mag meteen; de echte logboek-appends gaan hieronder de schrijf-keten in,
   // zodat ze onder de schrijfteller vallen (statusbalk/sluit-waarschuwing) en de resync niet
   // start terwijl ze nog lopen.
-  gewijzigd.forEach(([lbl,k])=>{
-    D.logboek.unshift({_row:0,timestamp:ts,code,sectie:'',actie:'Kenmerk',veld:lbl,
-      oudeWaarde:oud[k]||'',nieuweWaarde:nieuw[k]||'',gebruiker:who});
-  });
+  // De regels worden vastgehouden zodat de rollback ze weer kan weghalen (zelfde patroon als
+  // addContactLog in render-vve.js). Zonder dat bleven ze na een mislukte opslag staan: sinds het
+  // logboek incrementeel wordt gelezen, wordt D.logboek niet meer elke ronde volledig vervangen,
+  // dus een niet-opgeruimde optimistische regel is dan blijvend — en beweert in de tijdlijn dat
+  // een wijziging is opgeslagen die juist is teruggedraaid.
+  const optLog=gewijzigd.map(([lbl,k])=>({_row:0,timestamp:ts,code,sectie:'',actie:'Kenmerk',veld:lbl,
+    oudeWaarde:oud[k]||'',nieuweWaarde:nieuw[k]||'',gebruiker:who}));
+  optLog.forEach(r=>D.logboek.unshift(r));
   renderVve();
   const waarden=[code,rec.balkons,rec.kozijnen,rec.bron,who,ts];
   let gelogd=false;   // append is niet idempotent; overleeft _withRetry-herkansingen
@@ -87,7 +91,12 @@ async function saveKenmerken(){
         gelogd=true;
       }
     },
-    ()=>{ Object.assign(rec,sn); },
+    ()=>{
+      Object.assign(rec,sn);
+      // Ook de optimistische logregels terugnemen — alleen die van deze poging (op identiteit,
+      // niet op inhoud), zodat een gelijkluidende regel van een andere opslag blijft staan.
+      optLog.forEach(r=>{ const i=D.logboek.indexOf(r); if(i>-1) D.logboek.splice(i,1); });
+    },
     'Kenmerken opslaan'
   );
 }

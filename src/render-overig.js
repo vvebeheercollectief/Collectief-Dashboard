@@ -457,7 +457,14 @@ async function saveLogboek(row, box){
   _rerenderLog();
   const w=logEditWrite(entry.actie, row, soort, wie, tekst);
   backgroundWrite(
-    async ()=>{ await assertRowMatch(row, entry.timestamp, 'Logboek'); await writeRange(w.range, w.values); },
+    // Het rij-OBJECT meegeven, niet alleen de timestamp: dan vergelijkt de guard de hele regel.
+    // Alleen op kolom A vergelijken liet een bewerking van een collega stil overschrijven — het
+    // bewerken van een logregel raakt namelijk alleen kolom E/F/G, dus de timestamp bleef gelijk.
+    // LET OP DE RICHTING (zelfde val als bij bulkVeld): `entry` is hierboven al optimistisch
+    // bijgewerkt, dus vergelijken met `entry` zelf zou de NIEUWE tekst afzetten tegen de oude in
+    // de Sheet en élke bewerking laten mislukken. Vergelijk met de stand die er nú nog hoort te
+    // staan: entry met de oude veld/wie/tekst terug.
+    async ()=>{ await assertRowMatch(row, {...entry, ...oud}, 'Logboek'); await writeRange(w.range, w.values); },
     ()=>{ entry.veld=oud.veld; entry.oudeWaarde=oud.oudeWaarde; entry.nieuweWaarde=oud.nieuweWaarde; },
     'Bewerken mislukt'
   );
@@ -492,7 +499,7 @@ async function deleteLogboek(row){
       const sheetId=ids['Logboek'];
       if(sheetId==null) throw new Error('Sheet "Logboek" niet gevonden');
       if(!verwijderd){
-        await assertRowMatch(oudeRow, entry.timestamp, 'Logboek'); // rij nog de juiste vóór verwijderen
+        await assertRowMatch(oudeRow, entry, 'Logboek'); // rij nog dezelfde REGEL (hele inhoud) vóór verwijderen
         const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
           method:'POST',
           headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},

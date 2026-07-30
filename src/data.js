@@ -153,7 +153,10 @@ function laadUitCache(){
     const [ntd,af,alvo,alfa,ontw,logboek,herhaal,kenmerken]=o.d||[];
     if(!ntd||!af) return false;
     D.ntd=ntd; D.af=af; D.alvo=alvo||[]; D.alfa=alfa||[]; D.ontw=ontw||[];
-    D.logboek=logboek||[]; D.herhaal=herhaal||[]; D.kenmerken=kenmerken||[];
+    // Optimistische regels (_row 0) horen NIET uit een cache terug te komen: dat zijn eigen
+    // wijzigingen waarvan nooit bevestigd is dat ze in de Sheet staan. Uit een vorige sessie
+    // zouden ze een blijvende onwaarheid in de tijdlijn zijn.
+    D.logboek=(logboek||[]).filter(r=>r&&r._row>0); D.herhaal=herhaal||[]; D.kenmerken=kenmerken||[];
     D.ntdSecInfo=(o.s||[])[0]||{}; D.afSecInfo=(o.s||[])[1]||{};
     // Deze stand kan uren oud zijn en de rijnummers erin dus verschoven. Schrijven blijft
     // geblokkeerd tot de eerste verse ronde binnen is — dat is een seconde of twee, en het
@@ -183,17 +186,25 @@ function wisCache(){
 // fire-and-forget en falen vandaag al stil. Blokkeren zou een logregel definitief laten
 // verdwijnen zonder dat iemand het ziet — erger dan de huidige situatie.
 function blokkeerOffline(){
-  // Nog geen verse ronde binnen: het scherm komt uit de leescache en de rijnummers erin kunnen
-  // verschoven zijn. Duurt maar een seconde of twee (loadAll heft de vlag op zodra de eerste
-  // ronde klaar is, geslaagd of niet).
-  if(state._uitCache){
-    showToast('Even wachten','De gegevens worden nog vernieuwd — probeer het over een seconde opnieuw.','var(--am)','zandloper',{geenSysteemmelding:true});
+  // Geen verbinding is de meest specifieke reden en krijgt dus voorrang op de cache-rem hieronder.
+  if(isOffline()){
+    showOfflineBanner();
+    showToast('Geen verbinding','Wijzigen lukt niet zonder internet. Er is niets gewijzigd — probeer het opnieuw zodra je weer online bent.','var(--rd)','waarschuwing',{geenSysteemmelding:true});
     return true;
   }
-  if(!isOffline()) return false;
-  showOfflineBanner();
-  showToast('Geen verbinding','Wijzigen lukt niet zonder internet. Er is niets gewijzigd — probeer het opnieuw zodra je weer online bent.','var(--rd)','waarschuwing',{geenSysteemmelding:true});
-  return true;
+  // Nog geen verse ronde binnen: het scherm komt uit de leescache en de rijnummers erin kunnen
+  // uren oud en dus verschoven zijn. Normaal duurt dit een seconde of twee; slaagt de eerste ronde
+  // niet, dan blijft de rem staan — dan is het beter niet te schrijven dan een taak in het
+  // verkeerde sectieblok te zetten.
+  if(state._uitCache){
+    const gefaald=(state._syncFails||0)>0;
+    showToast(gefaald ? 'Gegevens niet vernieuwd' : 'Even wachten',
+      gefaald ? 'De gegevens konden niet worden opgehaald. Klik op Vernieuwen voordat je iets wijzigt.'
+              : 'De gegevens worden nog vernieuwd — probeer het over een seconde opnieuw.',
+      'var(--am)','zandloper',{geenSysteemmelding:true});
+    return true;
+  }
+  return false;
 }
 
 // Zelfde patroon als showLoadError: één banner, idempotent, met role="alert" zodat een
@@ -233,6 +244,7 @@ function dot(cls){const d=document.getElementById('dot');d.className='dot'+(cls?
 // Een verlopen sessie wordt elders al via het inlogscherm afgevangen; dit vangt
 // netwerk-/API-fouten zodat de gebruiker geen blanco scherm ziet maar uitleg + actie.
 function showLoadError(){
+  clearOfflineBanner();   // ze staan op dezelfde plek; twee banners over elkaar is onleesbaar
   if(document.getElementById('load-err-banner')) return;
   const b=document.createElement('div');
   b.id='load-err-banner'; b.className='load-err'; b.setAttribute('role','alert');
@@ -280,6 +292,26 @@ const VERPLICHTE_TABS=new Set(["Nog Te Doen","Afgerond","ALV's overzicht","ALV's
 // meer opvragen. Bewerken en verwijderen van logregels zou dan op verkeerde rijnummers werken.
 const _logBereik=(hoogwater)=>`'Logboek'!A${hoogwater}:H`;
 
+// Een staartlezing ziet alleen NIEUWE rijen. Bewerkt een collega de tékst van een bestaande
+// logregel, dan verandert kolom A niet en schuift er niets op: die wijziging komt dus nooit binnen,
+// waar élke ronde dat vóór fase 5 binnen 8 seconden bijwerkte. Daarom af en toe volledig lezen —
+// maar alleen als er iemand naar logboektekst kíjkt (de Logboek-pagina of een VvE-dossier), en dan
+// hoogstens één keer per minuut. Staat er geen logboek in beeld, dan doet verouderde tekst geen
+// kwaad en dekt de rij-guard op 'Logboek' (die de hele regel vergelijkt) de schrijfkant.
+// Puur, dus los testbaar.
+const LOG_VOL_MS=60000;
+function _logVolledigNodig(luid, hoogwater, kijktNaarLog, laatsteVolledigMs, nu){
+  if(luid || !hoogwater) return true;                       // handmatige verversing of eerste ronde
+  if(!kijktNaarLog) return false;
+  return !laatsteVolledigMs || (nu-laatsteVolledigMs)>=LOG_VOL_MS;
+}
+// Staat er logboektekst in beeld? De Logboek-pagina en het VvE-dossier (dat de tijdlijn toont en
+// waar logregels óók bewerkt en verwijderd kunnen worden).
+function _kijktNaarLog(){
+  return !!(document.getElementById('page-logboek')?.classList.contains('active')
+         || document.getElementById('page-vve')?.classList.contains('active'));
+}
+
 // Hoogwaterstand + anker uit de RUWE lezing: het hoogste rijnummer dat we gezien hebben en de
 // kolom-A-waarde die daar stond. Bewust de ruwe rijen en niet D.logboek: parseLogboek filtert
 // verborgen acties eruit en keert de lijst om, dus de laatste regel van D.logboek is niet per se
@@ -312,6 +344,9 @@ async function _verwerkLogboek(R, naam, volledig, lees){
     const nieuw=parseLogboek(rows);
     D.logboek=_nogNietBevestigd(optimistisch, nieuw).concat(nieuw);
     _zetLogAnker(rows, 1);
+    // Pas hier bijhouden dat er volledig gelezen is, niet bij het opvragen: een ronde die
+    // hierboven strandt mag de klok van de volgende volledige lezing niet vooruitzetten.
+    state._logVolledigMs=Date.now();
     return;
   }
   const staart=rows.slice(1);                      // rows[0] is het anker; die hadden we al
@@ -357,7 +392,7 @@ async function loadAll(silent){
     // logregel) leest het Logboek altijd volledig: dat is precies het moment waarop iemand wil
     // zien wat een ánder heeft gewijzigd of weggehaald, en de staart kent alleen nieuwe rijen.
     // De stille 8s-poll leest de staart.
-    const logVolledig=!silent || !state._logHoogwater;
+    const logVolledig=_logVolledigNodig(!silent, state._logHoogwater, _kijktNaarLog(), state._logVolledigMs, Date.now());
     const logNaam=logVolledig ? 'Logboek' : _logBereik(state._logHoogwater);
     const namen=POLL_TABS.map(n=>n==='Logboek' ? logNaam : n);
     let R;
@@ -401,6 +436,12 @@ async function loadAll(silent){
     await _verwerkLogboek(R, logNaam, logVolledig, lees);
     zetAls('Herhaalregels',   r=>{ D.herhaal=parseHerhaal(r); });
     zetAls('Kenmerken',       r=>{ D.kenmerken=parseKenmerken(r); });
+    // Verse data staat in D: de leescache-stand is niet langer de basis, dus de schrijf-rem eraf.
+    // Bewust hier en niet in het finally: bij een MISLUKTE eerste ronde staat het scherm nog op de
+    // cache van gisteren, en dan mag er niet geschreven worden — getInsertRow zou de verouderde
+    // ntdSecInfo gebruiken en een nieuwe taak in het verkeerde sectieblok zetten. De 8s-poll heft
+    // de rem op zodra er één ronde slaagt.
+    state._uitCache=false;
     setSynced();
     const hash=JSON.stringify([D.ntd,D.af,D.alvo,D.alfa,D.ontw,D.logboek,D.herhaal,D.kenmerken]);
     if(hash!==state._lastDHash){
@@ -431,10 +472,6 @@ async function loadAll(silent){
     console.error(e);
   }
   finally{
-    // Eerste ronde is klaar (geslaagd of niet): de leescache-stand is niet langer de basis, dus
-    // de schrijf-rem eraf. Ook bij een mislukte ronde, want dan is de rij-guard de bescherming en
-    // valt het gedrag terug op dat van vóór de cache — een permanente rem zou erger zijn.
-    state._uitCache=false;
     state._loadInFlight=false;
     if(state._loadAgain){ const loud=state._loadAgainLoud; state._loadAgain=false; state._loadAgainLoud=false; loadAll(!loud); } // onderdrukte aanroep alsnog uitvoeren; luid als er een handmatige verversing tussen zat
   }
@@ -542,7 +579,7 @@ function parseAlfa(rows){
 
 export {
   backgroundWrite, schrijfActieLoopt, metWriteMarkering, setSyncing, setSaving, setSynced, setSyncErr, dot, loadAll, magPollen, parseSections, parseAlvo, parseAlfa, parseHerhaal,
-  POLL_TABS, VERPLICHTE_TABS, _logBereik, _zetLogAnker, _verwerkLogboek,
+  POLL_TABS, VERPLICHTE_TABS, _logBereik, _zetLogAnker, _verwerkLogboek, _logVolledigNodig,
   blokkeerOffline, showOfflineBanner, clearOfflineBanner, setSyncOffline,
   bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade,
 };

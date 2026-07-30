@@ -2,7 +2,7 @@
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
 import { taakTitel, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf, _vandaagAmsterdam } from "./util.js";
-import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge } from "./render-overig.js";
+import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, SECS, SKEYS } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
@@ -10,11 +10,11 @@ import { filterNtd, setNtd, renderNtd, renderNtdStats, offerteAannemerPaneel, of
 import { HERO_VIEWS } from "./render-analytics.js";
 import { state, D, pgs } from "./state.js";
 import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel, renderVve } from "./render-vve.js";
-import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN } from "./kenmerken.js";
+import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN, saveKenmerken } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk.js";
 import { _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, veiligeCel, _veiligeRij, fetchSheet, fetchSheets, vingerafdruk, rijVingerafdruk, _normCel, _rijNaarCellen, assertRowMatch, NTD_DATUM, _isOffline, _isNetwerkFout } from "./api.js";
-import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, _logBereik, _verwerkLogboek, blokkeerOffline, clearOfflineBanner, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
+import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, _logBereik, _verwerkLogboek, _logVolledigNodig, blokkeerOffline, clearOfflineBanner, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
 import { setv, serializeNtdUndo, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, kiesModalFase, _modalFaseWoord, getInsertRow } from "./crud.js";
@@ -1332,12 +1332,19 @@ import { addAannemer } from "./offerte-aannemers.js";
        vingerafdruk('Nog Te Doen', ['311198','VvE A','sept/okt','ANDERE agenda','Cihad','1 september 2026'], 'VERGADERVERZOEKEN'));
     eq('vingerafdruk: onbekend tabblad valt terug op kolom A',
        vingerafdruk('Iets anders', ['ABC','rest','doet','niet','mee']), 'ABC');
+    // Herhaalregels, Kenmerken, Ontwikkeling en ALV's overzicht hebben een al unieke sleutel in
+    // kolom A (een id, een VvE-code, een titel) en blijven daarom bewust op de kolom-A-controle.
+    // (Het Logboek stond hier eerder ook bij, maar heeft sinds het incrementeel lezen een volle
+    // vingerafdruk nodig: het bewerken van een logregel raakt alleen kolom E/F/G, dus kolom A
+    // alleen zag zo'n wijziging niet en liet hem stil overschrijven.)
     eq('vingerafdruk: tabblad met een al unieke sleutel valt terug op kolom A',
-       vingerafdruk('Logboek', ['2026-07-29T10:00:00.000Z','311198','OPPAKKEN']), '2026-07-29T10:00:00.000Z');
+       vingerafdruk('Herhaalregels', ['H-17','311198','OPPAKKEN','wat dan ook']), 'H-17');
     // Een rij-object op een tabblad zónder vingerafdruk-spec mag NIET op een lege vingerafdruk
     // uitkomen — dat zou elke schrijfactie daar blokkeren. _rijNaarCellen geeft daar bewust [].
     eq('vingerafdruk: rij-object op een spec-loos tabblad geeft geen bruikbare cel-array',
-       _rijNaarCellen('Logboek', {timestamp:'x'}).length, 0);
+       _rijNaarCellen('Herhaalregels', {id:'H-17'}).length, 0);
+    // En het Logboek is nu juist wél spec-hebbend: acht kolommen, in de vaste veldvolgorde.
+    eq('vingerafdruk: Logboek gebruikt de hele regel', _rijNaarCellen('Logboek', {timestamp:'x'}).length, 8);
     // Afgerond komt óók uit parseSections: 'actiepunt' is kolom C (index 2), niet index 1.
     // Deze test is de reden dat _rijNaarCellen SECS.keys gebruikt en geen eigen veldlijstje.
     eq('vingerafdruk: Afgerond zet actiepunt op kolom C en de afronddatum op kolom I',
@@ -1468,6 +1475,127 @@ import { addAannemer } from "./offerte-aannemers.js";
       window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
     }
   })();
+  // ── Regressie-guard: een BEWERKTE bestaande logregel moet alsnog binnenkomen ──
+  // Een staartlezing ziet alleen nieuwe rijen. Bewerkt een collega de tekst van een bestaande
+  // regel, dan blijft kolom A gelijk en schuift er niets op: het anker klopt, en de wijziging komt
+  // nooit binnen. Vóór fase 5 loste elke ronde dat binnen 8 seconden op. Daarom: volledig lezen
+  // zodra er logboektekst in beeld staat, en dan hoogstens één keer per minuut.
+  eq('logboek vol: handmatige verversing leest altijd volledig', _logVolledigNodig(true, 500, false, 999, 1000), true);
+  eq('logboek vol: eerste ronde (nog geen hoogwaterstand) leest volledig', _logVolledigNodig(false, 0, false, 0, 1000), true);
+  eq('logboek vol: niemand kijkt naar logboektekst → staart volstaat',
+     _logVolledigNodig(false, 500, false, 1000, 10_000_000), false);
+  eq('logboek vol: logboek in beeld en nog nooit volledig → volledig',
+     _logVolledigNodig(false, 500, true, 0, 1000), true);
+  eq('logboek vol: logboek in beeld, 59s geleden volledig gelezen → staart',
+     _logVolledigNodig(false, 500, true, 1000, 60000), false);
+  eq('logboek vol: logboek in beeld, 60s geleden → weer volledig',
+     _logVolledigNodig(false, 500, true, 1000, 61000), true);
+  // En de schrijfkant: de rij-guard op Logboek vergelijkt nu de HELE regel, niet alleen de
+  // timestamp. Anders overschrijft een verouderd scherm de bewerking van een collega stil — het
+  // bewerken van een logregel raakt namelijk alleen kolom E/F/G.
+  (()=>{
+    const regel={_row:12,timestamp:'2026-07-01T10:00:00.000Z',code:'311198',sectie:'OPPAKKEN',
+                 actie:'Opmerking',veld:'',oudeWaarde:'',nieuweWaarde:'gebeld met de aannemer',gebruiker:'jer'};
+    const cellen=['2026-07-01T10:00:00.000Z','311198','OPPAKKEN','Opmerking','','','gebeld met de aannemer','jer'];
+    eq('logboek guard: rij-object en Sheet-rij geven dezelfde vingerafdruk',
+       rijVingerafdruk('Logboek', regel), vingerafdruk('Logboek', cellen));
+    truthy('logboek guard: gewijzigde tekst geeft een ANDERE vingerafdruk',
+       rijVingerafdruk('Logboek', regel) !== vingerafdruk('Logboek',
+         cellen.map((c,i)=>i===6?'gebeld met de VvE':c)));
+    truthy('logboek guard: gelijke timestamp met andere inhoud wordt nu wél gezien (was het gat)',
+       rijVingerafdruk('Logboek', regel) !== vingerafdruk('Logboek',
+         cellen.map((c,i)=>i===4?'Telefoon':c)));
+    eq('logboek guard: alleen kolom A gelijk houden is niet genoeg om als match te gelden',
+       vingerafdruk('Logboek', ['2026-07-01T10:00:00.000Z']) === rijVingerafdruk('Logboek', regel), false);
+    // Whitespace mag geen vals alarm geven: beide kanten door dezelfde normalisatie.
+    eq('logboek guard: whitespace-tolerant', rijVingerafdruk('Logboek', regel),
+       vingerafdruk('Logboek', cellen.map((c,i)=>i===6?'  gebeld met de aannemer  ':c)));
+  })();
+  // Einde-tot-einde: het bewerken van een logregel moet nog gewoon LUKKEN met de volle guard, en
+  // moet worden GEBLOKKEERD als een collega die regel intussen wijzigde. De richting is hier de
+  // valkuil (zelfde als bij bulkVeld): het rij-object is al optimistisch bijgewerkt vóór de guard,
+  // dus vergelijken met dat object zelf zou élke bewerking laten mislukken.
+  await (async()=>{
+    const _fetch=window.fetch, tokenOud=state.oauthToken, expiryOud=state.oauthExpiry;
+    const logOud=D.logboek, pwOud=state.pendingWrites, editOud=state.logEdit;
+    const rij=(tekst)=>['2026-07-01T10:00:00.000Z','311198','OPPAKKEN','Opmerking','','',tekst,'jer'];
+    const doeOpslag=async(watStaatErInDeSheet)=>{
+      const verzoeken=[];
+      D.logboek=[{_row:12,timestamp:'2026-07-01T10:00:00.000Z',code:'311198',sectie:'OPPAKKEN',
+                  actie:'Opmerking',veld:'',oudeWaarde:'',nieuweWaarde:'oude tekst',gebruiker:'jer'}];
+      state.logEdit=12;
+      const box=document.createElement('div');
+      box.className='log-edit';
+      box.innerHTML='<textarea class="log-edit-tekst">nieuwe tekst</textarea>';
+      document.body.appendChild(box);
+      window.fetch=async(url,opt)=>{
+        const d=decodeURIComponent(String(url));
+        verzoeken.push({url:d, method:(opt&&opt.method)||'GET'});
+        // De guard-lezing gaat óók met opties (cache/headers), dus onderscheid op METHODE:
+        // de write is een PUT, de guard-lezing een GET.
+        if(opt&&opt.method==='PUT') return new Response(JSON.stringify({}),{status:200});
+        if(d.includes('/values/')) return new Response(JSON.stringify({values:[watStaatErInDeSheet]}),{status:200});
+        return new Response(JSON.stringify({values:[]}),{status:200});
+      };
+      await saveLogboek(12, box);
+      await state._writeChain;
+      for(let i=0;i<100 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,5));
+      box.remove();
+      document.querySelectorAll('.toast').forEach(t=>t.remove());
+      return verzoeken.filter(v=>v.method==='PUT');
+    };
+    try{
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
+      // 1. De Sheet bevat nog de OUDE tekst → de bewerking mag gewoon door.
+      eq('logregel bewerken: ongewijzigde regel wordt opgeslagen', (await doeOpslag(rij('oude tekst'))).length, 1);
+      // 2. Een collega heeft de tekst van diezelfde regel intussen gewijzigd (kolom A onveranderd!)
+      //    → nu wél blokkeren. Vóór deze fix liet de guard dit stil overschrijven.
+      eq('logregel bewerken: door een ander gewijzigde regel wordt NIET overschreven',
+         (await doeOpslag(rij('door Cihad aangepast'))).length, 0);
+    } finally {
+      window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
+      D.logboek=logOud; state.pendingWrites=pwOud; state.logEdit=editOud;
+      document.querySelectorAll('.log-edit').forEach(b=>b.remove());
+      document.querySelectorAll('.toast').forEach(t=>t.remove());
+    }
+  })();
+  // Een mislukte kenmerken-opslag mag geen spookregel achterlaten. De rollback haalde de
+  // optimistische logregels niet weg; vóór fase 5 verdwenen ze bij de volgende volledige lezing,
+  // nu zouden ze blijven staan en zelfs in de leescache belanden.
+  await (async()=>{
+    const _fetch=window.fetch, tokenOud=state.oauthToken, expiryOud=state.oauthExpiry;
+    const logOud=D.logboek, kmkOud=D.kenmerken, editOud=state.kenmerkenEdit, pwOud=state.pendingWrites;
+    const codeOud=state.vveCode, nfOud=state._netwerkFouten;
+    try{
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3; state._netwerkFouten=0;
+      state.vveCode='311198'; D.logboek=[]; D.kenmerken=[{code:'311198',balkons:'',kozijnen:'',bron:'',gewijzigdDoor:'',gewijzigdOp:''}];
+      // Bewerkscherm nabouwen met één gewijzigd veld.
+      const veld=document.createElement('div');
+      veld.innerHTML='<select id="kmk-balkons"><option selected>Gemeenschappelijk</option></select>'
+                    +'<select id="kmk-kozijnen"><option selected></option></select>'
+                    +'<textarea id="kmk-bron"></textarea>';
+      document.body.appendChild(veld);
+      state.kenmerkenEdit=true;
+      window.fetch=async()=>new Response(JSON.stringify({error:{message:'Geen rechten'}}),{status:403});
+      await saveKenmerken();
+      await state._writeChain;
+      // backgroundWrite start in zijn finally een stille resync die NIET wordt afgewacht. Laat je
+      // die hangen, dan staat _loadInFlight nog op true als de volgende test loadAll aanroept, en
+      // keert die meteen terug zónder te lezen — waardoor een reeks latere tests faalt op iets wat
+      // niets met hun eigen onderwerp te maken heeft. Hier netjes leeglopen, mét de stub nog
+      // actief zodat die ronde snel en zonder inlogpoging faalt.
+      for(let i=0;i<100 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,5));
+      eq('kenmerken: mislukte opslag laat GEEN spookregel in het logboek achter', D.logboek.length, 0);
+      eq('kenmerken: en de waarde is teruggedraaid', D.kenmerken[0].balkons, '');
+      veld.remove();
+    } finally {
+      window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
+      D.logboek=logOud; D.kenmerken=kmkOud; state.kenmerkenEdit=editOud;
+      state.pendingWrites=pwOud; state.vveCode=codeOud; state._netwerkFouten=nfOud;
+      document.querySelectorAll('.toast').forEach(t=>t.remove());
+    }
+  })();
+
   // ── Leescache: sleutel, inhoud, opruimen en wissen bij uitloggen ──
   // Comfort bij het openen, geen offline-vermogen. De sleutel moet aan de VERSIE én aan het
   // e-mailadres hangen: localStorage is origin-gebonden en niet gebruiker-gebonden, dus zonder

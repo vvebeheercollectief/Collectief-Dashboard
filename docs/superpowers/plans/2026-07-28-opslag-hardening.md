@@ -2624,6 +2624,90 @@ Vergelijk met de nulmeting van **563.675** tekens uit Taak 0.1.
 
 ---
 
+---
+
+## Wat er werkelijk gebouwd is (2026-07-30, v10.2 / cd-v97)
+
+Fase 5 is uitgevoerd op tak `feature/opslag-hardening-fase5` (vers vanaf `main`, want
+`feature/opslag-hardening` liep achter op het subsidie-werk). Testsuite **901 → 982 OK, 0 FAIL**.
+Vier afwijkingen van het plan hierboven, elk met de reden.
+
+### 1. GEEN trage groep van 60 seconden — alle acht tabbladen blijven op 8 seconden
+
+Gemeten op de PROD-Sheet (niet-lege regels in kolom A): **Logboek 1.261**, ALV's afgerond 202,
+Kenmerken 14, Ontwikkeling 5, Herhaalregels 0. Het Logboek was dus vrijwel de hele leeslast, en
+dat is precies wat taak 5.2 wegneemt. De vier overige kandidaten voor de trage groep zijn samen
+222 regels: daar viel na 5.2 niets meer te winnen.
+
+Daar stond een reëel risico tegenover dat de spec te gunstig inschatte. Élke schrijfactie naar een
+traag tabblad doet vlak vóór het schrijven zélf een verse lezing (`assertRowMatch`), dus voor
+"schrijf ik naar de juiste rij" is het venster niet 60 seconden maar bijna nul. **Maar** op
+Herhaalregels, Ontwikkeling, Kenmerken en Logboek vergelijkt die guard alleen de sléutel (id,
+titel, VvE-code, timestamp) en niet de inhoud — precies het onderscheid dat taak 4.2 voor
+`Nog Te Doen` wél maakte. Een collega die een kenmerk wijzigt terwijl jij een verouderd scherm
+hebt, wordt dus stil overschreven; `saveKenmerken` schrijft de hele rij A:F terug. Dát venster zou
+van 8 naar 60 seconden gaan, 7,5× zo waarschijnlijk, op de tabbladen met de zwakste guard.
+
+Wat er wél uit taak 5.1 is overgenomen, omdat het los van het ritme waarde heeft: `fetchSheets`
+geeft de tabbladen terug **op naam** in plaats van op positie (de positionele koppeling was een
+tijdbom: één bereik erbij of eraf zette stil het logboek in `D.ontw`), het uitpakken gaat via
+`zetAls` zodat een ontbrekend tabblad zijn vorige waarde behóudt, en `VERPLICHTE_TABS` legt
+expliciet vast welke vier tabbladen in de terugvaltak níet stil mogen wegvallen.
+
+*Openstaand, als de trage groep er ooit tóch moet komen:* breid eerst de inhoud-vingerafdruk
+(`FP_KOLOMMEN` + `_rijNaarCellen` in `src/api.js`) uit naar Kenmerken, Herhaalregels, Ontwikkeling
+en Logboek. Dan pas is 60 seconden verantwoord.
+
+### 2. Het staartbereik begint op de hoogwaterstand zélf — een anker
+
+Het plan las vanaf `hoogwater+1`. Daarmee **bevriest het logboek stil** zodra iemand een logregel
+verwijdert: de hoogwaterstand staat dan boven het einde van het tabblad, het staartbereik geeft
+voor altijd niets meer terug, en nieuwe regels landen op rijnummers die nooit meer worden
+opgevraagd. Bewerken en verwijderen van logregels werken daarna op verschoven nummers.
+Nu wordt de hoogwaterrij zelf meegelezen als anker (kolom A in `state._logAnkerTs`); klopt die niet
+of komt hij niet terug, dan volgt meteen een volledige herlezing. Kosten: één regel per ronde.
+Daarnaast leest élke handmatige (niet-stille) verversing het Logboek altijd volledig — het plan
+verwees naar een eigen Vernieuwen-knop op de Logboek-pagina, maar die bestaat niet; er is één
+algemene knop in de titelbalk.
+
+### 3. Ontdubbeling alleen tegen de nieuwe staart, en optimistische regels blijven bovenaan
+
+Het plan vergeleek de optimistische regels met álle regels die je al hebt. De sleutel bevat geen
+tijd, dus een tweede identieke notitie ("gebeld" bij dezelfde VvE door dezelfde persoon) zou meteen
+weer van het scherm verdwijnen omdat de eerste er al staat. Nu wordt er uitsluitend vergeleken met
+wat deze ronde nieuw binnenkwam — de echte regel landt altijd onderaan en zit dus altijd in de
+staart. Ook: het plan zette de optimistische regels met `concat` áchteraan, terwijl ze met
+`unshift` bovenaan gezet worden; een net toegevoegde notitie sprong daardoor naar de bodem.
+
+### 4. Leescache: opruimen, alleen bij wijziging schrijven, en kort schrijven blokkeren
+
+Drie dingen die het plan niet noemde. Oude sleutels worden nu opgeruimd (anders blijft er per
+uitgebrachte versie ~1 MB achter in ~5 MB en faalt na een paar releases élke `setItem`, óók die van
+thema en dichtheid). Er wordt alleen geschreven als de data echt gewijzigd is, met hergebruik van
+de hash-string die `loadAll` toch al bouwt (elke 8 seconden ~1 MB synchroon serialiseren is op een
+telefoon merkbaar). En schrijven is geblokkeerd tot de eerste verse ronde binnen is — de rijnummers
+in de cache kunnen uren oud zijn. Die rem gaat er ook af als die ronde mislukt: dan is de rij-guard
+de bescherming, precies zoals vóór de cache.
+
+### Correctie op de succesmaat van taak 5.5
+
+`state._lastDHash.length` meet wat er in het gehéugen staat, niet wat over de lijn komt — en het
+Logboek blijft volledig in het geheugen (één keer volledig gelezen, daarna aangevuld). Die 563.675
+tekens blijven dus staan en fase 5 zou mislukt *lijken*. Meet in plaats daarvan de omvang van de
+batchGet-antwoorden, ingelogd, ná een minuut:
+
+```js
+performance.getEntriesByType('resource')
+  .filter(e=>e.name.includes('values:batchGet'))
+  .slice(-4).map(e=>({kB: Math.round((e.transferSize||e.decodedBodySize)/1024)}))
+```
+
+Verwacht: de eerste ronde groot (het hele Logboek), elke volgende ronde een fractie daarvan.
+En voor het quotum verandert er niets: sinds de batchGet-fix is een poll één leesverzoek, hoeveel
+tabbladen er ook in zitten. De winst zit in bytes, parse-tijd, accu en mobiele data.
+
+---
+
 ### Bewust buiten fase 5
 
 | Wat | Waarom niet |

@@ -2,9 +2,40 @@ import { state, D } from "./state.js";
 import { SID, SKEYS, PROXY_URL, SECS } from "./config.js";
 import { _parseAnyDate, leegBijErfenis } from "./util.js";
 
+// ── Offline-signaal ────────────────────────────────────────────────────────
+// Uitdrukkelijk NIET state._syncFails gebruiken: die telt óók mislukte inlogpogingen, 401/403 en
+// quota-fouten mee. In een quotum-incident zou het dashboard zichzelf dan op slot zetten op
+// precies het moment dat het zich aan het herstellen is.
+//
+// Het onderscheid is scherp te maken: een fetch die REJECTET (geen netwerk, DNS weg,
+// CORS-blokkade) gooit een TypeError zónder .status; élk antwoord van Google — ook 401, 429 en
+// 500 — heeft er wél een. Alleen het eerste is bewijs dat de verbinding weg is.
+const _isNetwerkFout = e => !!e && e.status===undefined;
+
+// Twee netwerkfouten op rij, zodat één hapering in een tunnel of een lift het dashboard niet
+// meteen op slot zet. navigator.onLine=false is wél meteen genoeg: dan zegt het besturingssysteem
+// zelf dat er geen verbinding is. Puur, dus los testbaar.
+function _isOffline(browserOnline, netwerkFouten){
+  if(!browserOnline) return true;
+  return (netwerkFouten||0) >= 2;
+}
+// De live toestand. Bewust géén blijvende state.offline-vlag: die zou na een geslaagde ronde
+// blijven hangen en door bestaande tests nooit teruggezet worden.
+const isOffline = () => _isOffline(navigator.onLine, state._netwerkFouten||0);
+
+// Elke Sheets-fetch loopt hierlangs, zodat de teller op één plek klopt: een reject is een echte
+// netwerkfout, en élk antwoord (ook 4xx en 5xx) bewijst dat er verbinding ís.
+async function _fetchGeteld(url, opts){
+  let r;
+  try{ r=await fetch(url, opts); }
+  catch(e){ state._netwerkFouten=(state._netwerkFouten||0)+1; throw e; }
+  state._netwerkFouten=0;
+  return r;
+}
+
 async function fetchSheet(name){
   if(!state.oauthToken) throw new Error('Niet ingelogd');
-  const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values/${encodeURIComponent(name)}`,{
+  const r=await _fetchGeteld(`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values/${encodeURIComponent(name)}`,{
     cache:'no-store',
     headers:{Authorization:`Bearer ${state.oauthToken}`}
   });
@@ -19,7 +50,7 @@ async function fetchSheet(name){
 async function fetchSheets(names){
   if(!state.oauthToken) throw new Error('Niet ingelogd');
   const qs=names.map(n=>`ranges=${encodeURIComponent(n)}`).join('&');
-  const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values:batchGet?${qs}`,{
+  const r=await _fetchGeteld(`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values:batchGet?${qs}`,{
     cache:'no-store',
     headers:{Authorization:`Bearer ${state.oauthToken}`}
   });
@@ -52,15 +83,20 @@ async function writeRange(range,values,method='PUT'){
   if(!state.oauthToken) throw new Error('Niet ingelogd');
   const url=`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`;
   const opts={method,headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},body:JSON.stringify({values:[_veiligeRij(values)]})};
-  const r=await fetch(url,opts);
-  if(!r.ok){const e=await r.json();if(r.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Schrijffout');err.status=r.status;throw err}
+  const r=await _fetchGeteld(url,opts);
+  // .catch op het uitlezen van het foutlichaam: een 502 van een tussenliggende proxy stuurt HTML,
+  // en dan gooide r.json() een SyntaxError zónder .status — die zou als 'netwerkfout' gelden en
+  // het dashboard onterecht op offline zetten.
+  if(!r.ok){const e=await r.json().catch(()=>({}));if(r.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Schrijffout');err.status=r.status;throw err}
   return r.json();
 }
 async function appendRange(range,values){
   if(!state.oauthToken) throw new Error('Niet ingelogd');
   const url=`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
-  const r=await fetch(url,{method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},body:JSON.stringify({values:[_veiligeRij(values)]})});
-  if(!r.ok){const e=await r.json();if(r.status===401){state.oauthToken=null;state.oauthExpiry=0}throw new Error(e.error?.message||'Schrijffout')}
+  const r=await _fetchGeteld(url,{method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},body:JSON.stringify({values:[_veiligeRij(values)]})});
+  // err.status hoorde hier ook te staan: zonder status geldt een 429 of 500 van deze route als
+  // netwerkfout (zie _isNetwerkFout) én komt hij niet door de transient-herkansing.
+  if(!r.ok){const e=await r.json().catch(()=>({}));if(r.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Schrijffout');err.status=r.status;throw err}
   return r.json();
 }
 
@@ -276,4 +312,4 @@ async function assertRowsMatch(checks, sheetName='Nog Te Doen'){
 const assertRowMatch=(row, bronOfCode, sheetName)=>assertRowsMatch(
   [(bronOfCode && typeof bronOfCode==='object') ? { row, r:bronOfCode } : { row, code:bronOfCode }], sheetName);
 
-export { NTD_DATUM, fetchSheet, fetchSheets, writeRange, appendRange, veiligeCel, _veiligeRij, _shiftNtdRows, _herstelShift, _isTransient, _withRetry, askChat, _rowMismatch, _a1Bereik, vingerafdruk, rijVingerafdruk, _nummerDeel, _normCel, _rijNaarCellen, assertRowsMatch, assertRowMatch };
+export { NTD_DATUM, isOffline, _isOffline, _isNetwerkFout, fetchSheet, fetchSheets, writeRange, appendRange, veiligeCel, _veiligeRij, _shiftNtdRows, _herstelShift, _isTransient, _withRetry, askChat, _rowMismatch, _a1Bereik, vingerafdruk, rijVingerafdruk, _nummerDeel, _normCel, _rijNaarCellen, assertRowsMatch, assertRowMatch };

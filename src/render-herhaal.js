@@ -10,7 +10,7 @@ import { ensureToken } from "./auth.js";
 import { getSheetIds } from "./crud.js";
 import { showToast } from "./notifications.js";
 import { logEvent } from "./render-overig.js";
-import { backgroundWrite } from "./data.js";
+import { backgroundWrite, blokkeerOffline } from "./data.js";
 
 const TYPE_LABELS = { week:'Elke week', maand:'Elke maand', kwartaal:'Elk kwartaal',
                       halfjaar:'Elk half jaar', jaar:'Elk jaar' };
@@ -70,6 +70,7 @@ function syncHerhaalVelden(){
 function gvh(id){const el=document.getElementById(id);return el?el.value.trim():''}
 
 async function submitHerhaal(){
+  if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){alert('Inloggen mislukt. Probeer het opnieuw.');return}
   const oms=gvh('hh-omschrijving'), code=gvh('hh-code'), naam=gvh('hh-naam');
   const sectie=gvh('hh-sectie'), beh=gvh('hh-beh'), type=gvh('hh-type');
@@ -106,6 +107,7 @@ async function submitHerhaal(){
 
 function toggleHerhaalStatus(hid){
   const r=(D.herhaal||[]).find(x=>x._row===hid); if(!r) return;
+  if(blokkeerOffline()) return;   // vóór de mutatie: deze weg heeft geen ensureToken-poort
   const oud=r.status, nieuw=oud==='ACTIEF'?'GEPAUZEERD':'ACTIEF';
   r.status=nieuw; renderHerhaal();
   backgroundWrite(async()=>{
@@ -120,6 +122,7 @@ async function deleteHerhaal(){
   const r=state.herhaalEditRow; if(!r) return;
   if(!confirm(`Herhaalregel "${r.omschrijving}" definitief verwijderen?\nTip: pauzeren kan ook.`)) return;
   closeHerhaalModal();
+  if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){alert('Inloggen mislukt.');return}
   const pos=(D.herhaal||[]).indexOf(r); if(pos>-1)D.herhaal.splice(pos,1);
   (D.herhaal||[]).forEach(x=>{if(x._row>r._row)x._row--;});

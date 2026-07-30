@@ -7,7 +7,7 @@
 import { state, D } from "./state.js";
 import { SID } from "./config.js";
 import { ensureToken } from "./auth.js";
-import { loadAll, metWriteMarkering } from "./data.js";
+import { loadAll, metWriteMarkering, blokkeerOffline } from "./data.js";
 import { assertRowsMatch } from "./api.js";
 import { showToast } from "./notifications.js";
 import { logEvent } from "./render-overig.js";
@@ -78,6 +78,7 @@ async function _tabbladen(){
 }
 
 async function doeReset(){
+  if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){ showToast('Niet ingelogd','Kan niet resetten','var(--rd)'); return; }
   // Dubbelklik-rem NÁ ensureToken, en controle+zetten pal naast elkaar zónder await
   // ertussen — anders lezen twee snelle klikken allebei 'false' en draaien ze allebei,

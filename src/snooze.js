@@ -6,7 +6,7 @@ import { state } from "./state.js";
 import { toDutchDate, toISODate, _parseAnyDate, _vandaagAmsterdam, _verschilInKalenderdagen, parseDt } from "./util.js";
 import { writeRange, assertRowMatch } from "./api.js";
 import { ensureToken } from "./auth.js";
-import { backgroundWrite } from "./data.js";
+import { backgroundWrite, blokkeerOffline } from "./data.js";
 import { renderAll } from "./main.js";
 import { showToast } from "./notifications.js";
 import { logEvent } from "./render-overig.js";
@@ -52,6 +52,7 @@ function snoozeWis(){
   closeSnoozeModal();
 }
 async function schrijfOpvolgdatum(r, nieuw, actie){
+  if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){ alert('Inloggen mislukt. Probeer het opnieuw.'); return; }
   const oud = r.opvolgdatum || '';
   r.opvolgdatum = nieuw;

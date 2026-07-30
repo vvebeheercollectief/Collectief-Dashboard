@@ -8,7 +8,7 @@ import { state, D } from "./state.js";
 import { goTo } from "./ui.js";
 import { fmtLogTs, logItemHtml, logDayLabel, logPaginaSoort } from "./render-overig.js";
 import { vveKenmerken, KENMERK_WAARDEN } from "./kenmerken.js";
-import { backgroundWrite } from "./data.js";
+import { backgroundWrite, blokkeerOffline } from "./data.js";
 import { appendRange } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { getCurrentWho } from "./notifications.js";
@@ -96,6 +96,7 @@ async function addContactLog(){
   if(!tekst){ alert('Typ eerst wat er gebeurd is.'); return; }
   const code=state.vveCode;
   if(!code) return;
+  if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){ alert('Inloggen mislukt.'); return; }
   const soort=state._contactSoort||'Telefoon';
   const wie=document.getElementById('dos-wie')?.value||'Overig';

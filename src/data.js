@@ -4,7 +4,7 @@
 import { parseDt, _parseAnyDate, coerceDagenVooraf, leegBijErfenis } from "./util.js";
 import { state, D } from "./state.js";
 import { SKEYS, SECS } from "./config.js";
-import { fetchSheet, fetchSheets, _withRetry } from "./api.js";
+import { fetchSheet, fetchSheets, _withRetry, isOffline } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { buildAnalytics, buildDash } from "./render-analytics.js";
 import { renderNtdDonut } from "./render-lijsten.js";
@@ -30,11 +30,18 @@ function backgroundWrite(writeFn, rollback, foutTitel){
   state._writeChain=state._writeChain.then(async()=>{
     state._writeStart=Date.now();   // pas hier begint deze write écht (de wachtrij is serieel)
     try{
+      // Laatste lijn. De aanroeper hoort al geblokkeerd te hebben (zie blokkeerOffline): het
+      // contract van backgroundWrite is dat de UI al optimistisch gemuteerd is, dus hier komen
+      // we te laat om dat te voorkomen. Maar een gemiste schrijfweg mag niet stil doorlopen —
+      // dit levert gratis de bestaande rollback en foutmelding op.
+      if(isOffline()) throw Object.assign(new Error('Geen verbinding'), {offline:true});
       await _withRetry(writeFn);
     }catch(e){
       try{ rollback(); renderAll(); }catch(_){}
       const msg=(e.message||'').toLowerCase();
-      if(e&&e.rowMismatch){
+      if(e&&e.offline){
+        showToast(foutTitel,'Geen verbinding — de wijziging is teruggezet. Probeer het opnieuw zodra je weer online bent.','var(--rd)');
+      }else if(e&&e.rowMismatch){
         // De doelrij was verschoven (Sheet tussentijds gewijzigd) → niet geschreven, teruggedraaid.
         showToast(foutTitel, e.melding || 'De lijst was net gewijzigd — opnieuw geladen, probeer nog eens.','var(--rd)');
       }else if(msg.includes('authentication')||msg.includes('unauthenticated')||msg.includes('unauthorized')){
@@ -89,6 +96,37 @@ async function metWriteMarkering(fn){
   }
 }
 
+// ── Offline: blokkeren vóór de optimistische wijziging ─────────────────────
+// Poort vóór élke schrijfactie. Tot nu toe veranderde de rij eerst op het scherm en draaide
+// backgroundWrite hem daarna terug: het dashboard deed dus alsof er iets was opgeslagen terwijl
+// er niets was vertrokken. Nu gebeurt er niets, met één duidelijke melding.
+// ensureToken is hiervoor géén poort: met een geldig token in het geheugen doet die geen
+// netwerkverkeer en geeft hij offline gewoon 'true'.
+// Bewust NIET gebruiken bij logEvent, queueNotif en sendTestNotif: die drie zijn
+// fire-and-forget en falen vandaag al stil. Blokkeren zou een logregel definitief laten
+// verdwijnen zonder dat iemand het ziet — erger dan de huidige situatie.
+function blokkeerOffline(){
+  if(!isOffline()) return false;
+  showOfflineBanner();
+  showToast('Geen verbinding','Wijzigen lukt niet zonder internet. Er is niets gewijzigd — probeer het opnieuw zodra je weer online bent.','var(--rd)','waarschuwing',{geenSysteemmelding:true});
+  return true;
+}
+
+// Zelfde patroon als showLoadError: één banner, idempotent, met role="alert" zodat een
+// schermlezer hem voorleest. Bewust géén knoppen body-breed dempen: een half uitgeschakelde
+// interface leest verwarrender dan één duidelijke melding op het moment dat je iets probeert te
+// wijzigen, en `disabled` knoppen halen de focus-trap van modal-a11y.js onderuit (dan houdt een
+// venster geen enkel focusdoel meer over).
+function showOfflineBanner(){
+  clearLoadError();                                  // niet twee banners over elkaar
+  if(document.getElementById('offline-banner')) return;
+  const b=document.createElement('div');
+  b.id='offline-banner'; b.className='load-err'; b.setAttribute('role','alert');
+  b.innerHTML='<span>'+ico('waarschuwing',15)+' Geen verbinding — kijken kan, wijzigen lukt nu niet.</span>';
+  document.body.appendChild(b);
+}
+function clearOfflineBanner(){ document.getElementById('offline-banner')?.remove(); }
+
 function setSyncing(){dot('loading');document.getElementById('sync-lbl').textContent='Laden…'}
 function setSaving(){dot('loading');document.getElementById('sync-lbl').textContent='Opslaan…'}
 // Guard: zolang er een schrijfactie loopt mag NIETS 'Live · HH:MM' over de 'Opslaan…'-stand
@@ -99,8 +137,12 @@ function setSynced(){
   dot('');
   document.getElementById('sync-lbl').textContent='Live · '+new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
   clearLoadError();
+  clearOfflineBanner();
 }
 function setSyncErr(){dot('err');document.getElementById('sync-lbl').textContent='Fout'}
+// 'Fout' suggereert een storing aan de andere kant; 'Offline' benoemt wat er werkelijk aan de
+// hand is en waarom wijzigen nu niet lukt.
+function setSyncOffline(){dot('err');document.getElementById('sync-lbl').textContent='Offline'}
 function dot(cls){const d=document.getElementById('dot');d.className='dot'+(cls?' '+cls:'')}
 
 // Nette foutmelding in beeld bij een harde laadfout (niet de zwijgende achtergrond-polls).
@@ -218,6 +260,7 @@ async function loadAll(silent){
     // vanaf de tweede op rij (of bij een handmatige verversing) tonen we 'Fout'.
     if(!await ensureToken()){
       state._syncFails=(state._syncFails||0)+1;
+      if(isOffline()){ setSyncOffline(); showOfflineBanner(); return; }
       if(!silent || state._syncFails>=2) setSyncErr();
       if(!silent) showLoadError();
       return;
@@ -289,8 +332,14 @@ async function loadAll(silent){
     // herstelt zich vaak vanzelf bij de volgende ronde. Pas na 2 mislukkingen op rij
     // (of bij een handmatige, niet-stille verversing) tonen we 'Fout'.
     state._syncFails=(state._syncFails||0)+1;
-    if(!silent || state._syncFails>=2) setSyncErr();
-    if(!silent) showLoadError(); // alleen bij eerste/handmatige lading, niet bij zwijgende polls
+    if(isOffline()){
+      // Meteen eerlijk zijn, ook bij een stille poll: de verbinding is weg, dat herstelt zich
+      // niet vanzelf bij de volgende ronde en het bepaalt of wijzigen nu kan.
+      setSyncOffline(); showOfflineBanner();
+    }else{
+      if(!silent || state._syncFails>=2) setSyncErr();
+      if(!silent) showLoadError(); // alleen bij eerste/handmatige lading, niet bij zwijgende polls
+    }
     console.error(e);
   }
   finally{
@@ -402,4 +451,5 @@ function parseAlfa(rows){
 export {
   backgroundWrite, schrijfActieLoopt, metWriteMarkering, setSyncing, setSaving, setSynced, setSyncErr, dot, loadAll, magPollen, parseSections, parseAlvo, parseAlfa, parseHerhaal,
   POLL_TABS, VERPLICHTE_TABS, _logBereik, _zetLogAnker, _verwerkLogboek,
+  blokkeerOffline, showOfflineBanner, clearOfflineBanner, setSyncOffline,
 };

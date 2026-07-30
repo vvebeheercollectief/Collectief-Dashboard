@@ -9,7 +9,7 @@ import { ensureToken } from "./auth.js";
 import { showToast, showUndoToast, fireNotifEvent, undoComplete, undoDelete } from "./notifications.js";
 import { animateRowOut, flashRow } from "./anim.js";
 import { logEvent, renderTaskHistory } from "./render-overig.js";
-import { backgroundWrite, loadAll } from "./data.js";
+import { backgroundWrite, loadAll, blokkeerOffline } from "./data.js";
 import { faseIndex, faseWoord, faseRijHtml, faseWijziging } from "./subsidie-fase.js";
 
 // Welke formuliergroep hoort bij welke sectie. Eén bron: openModal verbergt ze
@@ -209,6 +209,7 @@ async function deleteCurrentEditTask(){
 
 async function deleteTaskRow(r){
   const omschrijving=r.actiepunt||r.periode||r.subsidie||r.code||'deze taak';
+  if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){alert('Inloggen mislukt. Probeer het opnieuw.');return}
   const sec=r._sec;
   // undo-data vastleggen vóór de mutatie (zelfde serialisatie als afronden)
@@ -321,6 +322,7 @@ async function doCompleteTask(){
   if(!dateVal){alert('Datum is verplicht.');return}
   const dp=dateVal.split('-');
   const today=`${dp[2]}-${dp[1]}-${dp[0]}`;
+  if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){alert('Inloggen mislukt. Probeer het opnieuw.');return}
   // Dubbelklik-rem NÁ ensureToken: het gevaarlijke gat is tussen de token en de
   // batch-write (getSheetIds is nog een await), waar een tweede klik de taak dubbel
@@ -407,6 +409,7 @@ function closeCompleteModal(){document.getElementById('complete-bg').classList.r
 //  SUBMIT TASK (Add + Edit)
 // ══════════════════════════════════════
 async function submitTask(){
+  if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){alert('Inloggen mislukt. Probeer het opnieuw.');return}
   const code=document.getElementById('m-code').value.trim();
   const naam=document.getElementById('m-naam').value.trim();
@@ -532,6 +535,7 @@ async function zetSubsidieFase(rid, stap){
   if(!r || r._sec !== 'SUBSIDIE-TRAJECTEN') return;
   const nieuw = faseWoord(stap), oud = r.subsidieFase || '';
   if(nieuw === oud) return;
+  if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){alert('Inloggen mislukt. Probeer het opnieuw.');return}
   r.subsidieFase = nieuw;
   renderAll();

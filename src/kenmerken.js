@@ -5,7 +5,7 @@
 import { state, D } from "./state.js";
 import { writeRange, appendRange, assertRowMatch } from "./api.js";
 import { ensureToken } from "./auth.js";
-import { backgroundWrite } from "./data.js";
+import { backgroundWrite, blokkeerOffline } from "./data.js";
 import { logEvent } from "./render-overig.js";
 import { getCurrentWho } from "./notifications.js";
 import { renderVve } from "./render-vve.js";
@@ -51,6 +51,9 @@ async function saveKenmerken(){
   const oud=vveKenmerken(code,D);
   const gewijzigd=[['Balkons','balkons'],['Kozijnen','kozijnen'],['Bron','bron']]
     .filter(([,k])=>nieuw[k]!==(oud[k]||''));
+  // Offline-poort staat hier, vóór het sluiten van het bewerkscherm: doe je dit later, dan is de
+  // invoer van de gebruiker weg terwijl er niets is opgeslagen.
+  if(gewijzigd.length && blokkeerOffline()) return;
   state.kenmerkenEdit=false;
   if(!gewijzigd.length){ renderVve(); return; }
   if(!await ensureToken()){ renderVve(); alert('Inloggen mislukt.'); return; }

@@ -8,7 +8,7 @@ import { SECS, SID } from "./config.js";
 import { ensureToken } from "./auth.js";
 import { _shiftNtdRows, _herstelShift, assertRowsMatch, _veiligeRij } from "./api.js";
 import { getSheetIds, getAfInsertRow, getInsertRow, insertAndWriteRow, serializeNtdUndo } from "./crud.js";
-import { backgroundWrite, loadAll, metWriteMarkering } from "./data.js";
+import { backgroundWrite, loadAll, metWriteMarkering, blokkeerOffline } from "./data.js";
 import { showToast, showUndoToast } from "./notifications.js";
 import { logEvent } from "./render-overig.js";
 import { renderAll } from "./main.js";
@@ -74,6 +74,7 @@ async function bulkDoe(el){
   const wat=el.dataset.wat;
   const rows=bulkSelectie();             // hoog→laag _row
   if(!rows.length) return;
+  if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){ alert('Inloggen mislukt. Probeer het opnieuw.'); return; }
   _sluitMenus();
   if(wat==='afronden')    bulkAfronden(rows);
@@ -173,6 +174,7 @@ function _bulkUndoAfDoelRijen(items, afPerSec){
 }
 
 async function bulkUndoAfronden(items){
+  if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){ alert('Inloggen mislukt.'); return; }
   state._undoInFlight=true; // pauzeer de 8s-poll; deze undo doet z'n eigen loadAll
   try{
@@ -243,6 +245,7 @@ function bulkVerwijderen(rows){
   },'Bulk-verwijderen mislukt');
 }
 async function bulkUndoVerwijderen(items){
+  if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){ alert('Inloggen mislukt.'); return; }
   state._undoInFlight=true; // pauzeer de 8s-poll; deze undo doet z'n eigen loadAll
   try{
@@ -324,6 +327,7 @@ function bulkVeld(rows,soort,waarde){
   };
   showUndoToast(conf.titel,items.map(i=>i.code).join(', '),async()=>{
     await state._writeChain;
+    if(blokkeerOffline()) return;   // vóór het terugzetten: anders staat het scherm op 'oud' terwijl de Sheet 'nieuw' houdt
     items.forEach(it=>{ it.r[conf.veld]=it.oud; if(oppDl && it.sec==='OPPAKKEN') it.r.prioriteit=it.oudPrio; });
     renderAll();
     backgroundWrite(schrijf('oud'),()=>{},'Undo mislukt');

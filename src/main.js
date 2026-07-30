@@ -19,7 +19,7 @@ import {
 import {
   openModal, closeModal, submitTask, doCompleteTask, closeCompleteModal,
 } from './crud.js';
-import { loadAll, magPollen, schrijfActieLoopt } from './data.js';
+import { loadAll, magPollen, schrijfActieLoopt, setSyncOffline, showOfflineBanner } from './data.js';
 import { initActions } from './actions.js';
 import { initVveZoekveld } from './vve-zoekveld.js';
 import { closeSnoozeModal, snoozeOpslaan, snoozeWis } from './snooze.js';
@@ -269,6 +269,13 @@ document.addEventListener('DOMContentLoaded',()=>{
     e.preventDefault();
     e.returnValue = '';   // vereist door oudere browsers
   });
+
+  // Verbinding weg of terug: meteen laten zien, niet pas bij de volgende 8s-ronde.
+  // 'online' bewijst alleen dat er weer een netwerkinterface is, niet dat Google bereikbaar is —
+  // daarom niet zelf de teller op 0 zetten maar gewoon een ronde doen. Slaagt die, dan zet
+  // setSynced de balk en de banner zelf weg.
+  window.addEventListener('offline', ()=>{ setSyncOffline(); showOfflineBanner(); });
+  window.addEventListener('online',  ()=>{ if(magPollen(state)) loadAll(true); });
 
   // Live updates — auto-refresh elke 8 seconden (smart diff voorkomt onnodige re-renders)
   // Id bewaard zodat logout() de poll kan stoppen (anders blijft hij na uitloggen doordraaien).

@@ -9,7 +9,7 @@ import { ensureToken } from "./auth.js";
 import { writeRange, appendRange, assertRowMatch, _herstelShift } from "./api.js";
 import { renderThead, renderPag } from "./render-lijsten.js";
 import { getSheetIds, setv, gv, insertAndWriteRow } from "./crud.js";
-import { loadAll, backgroundWrite, metWriteMarkering } from "./data.js";
+import { loadAll, backgroundWrite, metWriteMarkering, blokkeerOffline } from "./data.js";
 import { getCurrentWho, showToast, showUndoToast } from "./notifications.js";
 import { animateRowOut } from "./anim.js";
 import { renderVve } from "./render-vve.js";
@@ -99,6 +99,7 @@ function editOntwItem(idx){
 }
 
 async function submitOntwItem(){
+  if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){alert('Inloggen mislukt.');return}
   const titel=gv('ontw-m-titel');
   const cat=gv('ontw-m-cat');
@@ -126,6 +127,7 @@ async function submitOntwItem(){
 
 async function deleteOntwItem(){
   if(!state.ontwEditRow) return;
+  if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){alert('Inloggen mislukt.');return}
   const r=state.ontwEditRow;
   const values=[r.titel||'',r.categorie||'',r.inhoud||'',r.door||'',r.datum||'',r.status||''];
@@ -160,6 +162,7 @@ async function deleteOntwItem(){
 }
 
 async function undoOntwDelete(values, titel){
+  if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){alert('Inloggen mislukt.');return}
   try{
     await state._writeChain;
@@ -441,6 +444,7 @@ async function saveLogboek(row, box){
   box=box||document.querySelector('.page.active .log-edit');
   const tekst=(box?.querySelector('.log-edit-tekst')?.value||'').trim();
   if(!tekst){ alert('De tekst mag niet leeg zijn.'); return; }
+  if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){ alert('Inloggen mislukt.'); return; }
   const isContact=entry.actie==='Contact';
   const soort=isContact ? (state.logEditSoort||entry.veld||'Telefoon') : entry.veld;
@@ -464,6 +468,7 @@ async function deleteLogboek(row){
   const idx=entries.findIndex(e=>e._row===row);
   if(idx<0) return;
   const entry=entries[idx];
+  if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){ alert('Inloggen mislukt.'); return; }
   const vals=[entry.timestamp, entry.code, entry.sectie, entry.actie, entry.veld, entry.oudeWaarde, entry.nieuweWaarde, entry.gebruiker];
   const oudeRow=entry._row;
@@ -509,6 +514,7 @@ async function deleteLogboek(row){
 // Undo: rij terugzetten op de oude positie en lokaal vers herladen (zoals taak-undo).
 // wasVerwijderd = kijkgaatje op de idempotentie-vlag van de delete-closure.
 async function undoDeleteLog(vals, oudeRow, wasVerwijderd){
+  if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){ alert('Inloggen mislukt.'); return; }
   state._undoInFlight=true; // pauzeer de 8s-poll; deze undo doet z'n eigen loadAll
   try{
@@ -616,6 +622,7 @@ function renderTaskHistory(code,sec){
 async function addTaskNote(){
   const note=(document.getElementById('hist-note').value||'').trim();
   if(!note){alert('Typ eerst een opmerking.');return}
+  if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){alert('Inloggen mislukt.');return}
   const container=document.getElementById('fg-history');
   const code=container.dataset.code;

@@ -8,7 +8,7 @@ import { ensureToken } from "./auth.js";
 import { fetchSheet, appendRange, assertRowMatch } from "./api.js";
 import { logEvent } from "./render-overig.js";
 import { getSheetIds, insertAndWriteRow, getInsertRow } from "./crud.js";
-import { loadAll, parseSections, metWriteMarkering } from "./data.js";
+import { loadAll, parseSections, metWriteMarkering, blokkeerOffline } from "./data.js";
 import { flashRow } from "./anim.js";
 import { ico } from "./icons.js";
 
@@ -157,6 +157,7 @@ function showUndoToast(title, msg, undoFn, icoNaam) {
 }
 
 async function undoComplete(undoData) {
+  if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if (!await ensureToken()) { alert('Inloggen mislukt.'); return; }
   const { sec, ntdValues, ntdRow } = undoData;
   state._undoInFlight = true; // pauzeer de 8s-poll; deze undo doet z'n eigen loadAll
@@ -199,6 +200,7 @@ async function undoComplete(undoData) {
 }
 
 async function undoDelete(undoData) {
+  if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if (!await ensureToken()) { alert('Inloggen mislukt.'); return; }
   state._undoInFlight = true; // pauzeer de 8s-poll; deze undo doet z'n eigen loadAll
   try {

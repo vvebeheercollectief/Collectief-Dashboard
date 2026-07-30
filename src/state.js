@@ -61,6 +61,10 @@ export const state = {
   _loadAgain: false,
   _loadAgainLoud: false,   // werd de onderdrukte aanroep door een NIET-stille (handmatige) verversing getriggerd? → herstart luid, zodat de fout-banner/spinner zichtbaar blijft
   _syncFails: 0,           // opeenvolgende mislukte sync-rondes; 'Fout' pas na 2 (transient-tolerantie)
+  _netwerkFouten: 0,       // opeenvolgende ECHTE netwerkfouten (een fetch die rejectet, dus zónder
+                           // .status). Bewust los van _syncFails: die telt ook 401/403, quota en
+                           // mislukte inlogpogingen mee, en dan zou een quotum-incident het
+                           // dashboard op slot zetten precies wanneer het zich herstelt.
   _animBusy: 0,            // teller van lopende rij-animaties (>0 = poll pauzeren)
   _undoInFlight: false,    // een undo-actie (afronden/verwijderen/bulk) loopt → poll pauzeren (undo doet eigen loadAll)
   // diversen

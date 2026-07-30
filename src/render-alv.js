@@ -12,7 +12,7 @@ import { showToast } from "./notifications.js";
 import { ensureToken } from "./auth.js";
 import { renderPag } from "./render-tabel.js";
 import { renderNtdDonut } from "./render-lijsten.js";
-import { metWriteMarkering } from "./data.js";
+import { metWriteMarkering, blokkeerOffline } from "./data.js";
 import { ico } from "./icons.js";
 
 // ══════════════════════════════════════
@@ -92,6 +92,7 @@ function _recomputeAlvoStatus(r){
 async function toggleAlvoFlag(idx,field){
   const r=D.alvo[idx];
   if(!r){console.warn('toggleAlvoFlag: rij niet gevonden',idx);return}
+  if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){showToast('Niet ingelogd','Kan wijziging niet opslaan','var(--rd)');return}
 
   // Dubbelklik-rem. De oude rem was een class op de knop, maar renderAlvo() hieronder

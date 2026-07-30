@@ -8,7 +8,7 @@ import { state, D } from "./state.js";
 import { parseAannemers, serializeAannemers } from "./util.js";
 import { writeRange, assertRowMatch } from "./api.js";
 import { ensureToken } from "./auth.js";
-import { backgroundWrite } from "./data.js";
+import { backgroundWrite, blokkeerOffline } from "./data.js";
 import { renderNtd } from "./render-lijsten.js";
 
 function _vindRij(code){
@@ -29,10 +29,13 @@ async function _bewaar(r, vorige){
   );
 }
 
+// De offline-poort staat in deze drie aanroepers en niet in _bewaar: daar is r.aannemers al
+// gemuteerd en de lijst al opnieuw getekend, dus dan was de wijziging op het scherm al gebeurd.
 function addAannemer(code, naam){
   const r=_vindRij(code); if(!r) return;
   naam=((naam||'')+'').replace(/[|\n]/g,' ').trim();
   if(!naam) return;
+  if(blokkeerOffline()) return;
   const lijst=parseAannemers(r.aannemers);
   if(lijst.some(a=>a.naam.toLowerCase()===naam.toLowerCase())) return; // dubbel: niets doen
   const vorige=r.aannemers;
@@ -46,6 +49,7 @@ function toggleAannemerBinnen(code, idx){
   const r=_vindRij(code); if(!r) return;
   const lijst=parseAannemers(r.aannemers);
   if(!lijst[idx]) return;
+  if(blokkeerOffline()) return;
   const vorige=r.aannemers;
   lijst[idx].binnen=!lijst[idx].binnen;
   r.aannemers=serializeAannemers(lijst);
@@ -56,6 +60,7 @@ function verwijderAannemer(code, idx){
   const r=_vindRij(code); if(!r) return;
   const lijst=parseAannemers(r.aannemers);
   if(!lijst[idx]) return;
+  if(blokkeerOffline()) return;
   const vorige=r.aannemers;
   lijst.splice(idx,1);
   r.aannemers=serializeAannemers(lijst);

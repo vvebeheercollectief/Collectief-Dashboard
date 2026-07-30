@@ -13,8 +13,8 @@ import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel,
 import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk.js";
-import { _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, veiligeCel, _veiligeRij, fetchSheets, vingerafdruk, rijVingerafdruk, _normCel, _rijNaarCellen, assertRowMatch, NTD_DATUM } from "./api.js";
-import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, _logBereik, _verwerkLogboek } from "./data.js";
+import { _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, veiligeCel, _veiligeRij, fetchSheet, fetchSheets, vingerafdruk, rijVingerafdruk, _normCel, _rijNaarCellen, assertRowMatch, NTD_DATUM, _isOffline, _isNetwerkFout } from "./api.js";
+import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, _logBereik, _verwerkLogboek, blokkeerOffline, clearOfflineBanner, backgroundWrite } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
 import { setv, serializeNtdUndo, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, kiesModalFase, _modalFaseWoord, getInsertRow } from "./crud.js";
@@ -27,6 +27,8 @@ import { opmaakHtml, htmlNaarMarkers, zonderOpmaak, pasToe, opmaakBalk } from ".
 import { goTo } from "./ui.js";
 import { checkSecties, checkRaster, checkNummers, RASTER_MIN } from "./structuurcheck.js";
 import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from "./subsidie-fase.js";
+import { toggleHerhaalStatus } from "./render-herhaal.js";
+import { addAannemer } from "./offerte-aannemers.js";
 
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
   // ── mini-assert helper (Fase 1 testnet) ──
@@ -1464,6 +1466,87 @@ import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from
          Object.keys(await fetchSheets(["'Logboek'!A400:H"]))[0], "'Logboek'!A400:H");
     } finally {
       window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
+    }
+  })();
+  // ── Offline: alleen ECHTE netwerkfouten tellen mee ──
+  // Uitdrukkelijk niet state._syncFails hergebruiken: die telt ook 401/403, quota-fouten en
+  // mislukte inlogpogingen mee. In een quotum-incident zou het dashboard zichzelf dan op slot
+  // zetten op precies het moment dat het zich herstelt.
+  eq('offline: browser zegt offline → offline', _isOffline(false, 0), true);
+  eq('offline: browser online en geen netwerkfouten → online', _isOffline(true, 0), false);
+  eq('offline: één netwerkfout is nog geen oordeel (tunnel, lift)', _isOffline(true, 1), false);
+  eq('offline: twee netwerkfouten op rij → offline', _isOffline(true, 2), true);
+  // Het onderscheid netwerk vs. API: een fetch die rejectet heeft GEEN .status.
+  truthy('offline: fout zonder status telt als netwerkfout', _isNetwerkFout(new Error('Failed to fetch')));
+  eq('offline: 401 telt NIET als netwerkfout', _isNetwerkFout(Object.assign(new Error('x'),{status:401})), false);
+  eq('offline: 429 quotum telt NIET als netwerkfout', _isNetwerkFout(Object.assign(new Error('x'),{status:429})), false);
+  eq('offline: 500 telt NIET als netwerkfout', _isNetwerkFout(Object.assign(new Error('x'),{status:500})), false);
+  eq('offline: geen fout is geen netwerkfout', _isNetwerkFout(null), false);
+  // De teller wordt door de leesweg zelf bijgehouden: een reject hoogt op, élk antwoord (ook een
+  // 4xx) zet hem terug op 0 — want dan ís er verbinding.
+  await (async()=>{
+    const _fetch=window.fetch, tokenOud=state.oauthToken, expiryOud=state.oauthExpiry, nfOud=state._netwerkFouten;
+    try{
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3; state._netwerkFouten=0;
+      window.fetch=async()=>{ throw new TypeError('Failed to fetch'); };
+      for(const _ of [1,2]) await fetchSheet('Kenmerken').catch(()=>{});
+      eq('offline: twee mislukte leesrondes hogen de netwerkteller op', state._netwerkFouten, 2);
+      window.fetch=async()=>new Response('{}',{status:403});
+      await fetchSheet('Kenmerken').catch(()=>{});
+      eq('offline: een 403 bewijst dat er verbinding is → teller terug op 0', state._netwerkFouten, 0);
+    } finally { window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud; state._netwerkFouten=nfOud; }
+  })();
+  // De poort zelf: offline → geblokkeerd mét melding en banner; online → vrije doorgang.
+  (()=>{
+    const nfOud=state._netwerkFouten;
+    try{
+      state._netwerkFouten=0;
+      eq('offline poort: online laat de schrijfactie door', blokkeerOffline(), false);
+      truthy('offline poort: en zet geen banner in beeld', !document.getElementById('offline-banner'));
+      state._netwerkFouten=5;
+      eq('offline poort: offline blokkeert', blokkeerOffline(), true);
+      truthy('offline poort: met een zichtbare melding', !!document.getElementById('offline-banner'));
+      truthy('offline poort: die als alert wordt aangekondigd',
+             document.getElementById('offline-banner').getAttribute('role')==='alert');
+      blokkeerOffline();
+      eq('offline poort: tweede keer geen tweede banner', document.querySelectorAll('#offline-banner').length, 1);
+    } finally {
+      state._netwerkFouten=nfOud; clearOfflineBanner();
+      document.querySelectorAll('.toast').forEach(t=>t.remove());
+    }
+  })();
+  // Het gedrag waar het uiteindelijk om gaat: offline verandert er NIETS op het scherm. Vóór
+  // fase 5 muteerden deze twee wegen eerst en draaide de mislukte write het daarna terug — het
+  // dashboard deed dus alsof er iets was opgeslagen terwijl er niets was vertrokken.
+  (()=>{
+    const nfOud=state._netwerkFouten, herhaalOud=D.herhaal, ntdOud=D.ntd;
+    try{
+      state._netwerkFouten=5;   // = offline
+      D.herhaal=[{_row:7,id:'H1',status:'ACTIEF',omschrijving:'test',code:'X1',sectie:'OPPAKKEN'}];
+      toggleHerhaalStatus(7);
+      eq('offline: herhaalregel blijft op ACTIEF staan (geen optimistische flip)', D.herhaal[0].status, 'ACTIEF');
+      D.ntd={...D.ntd, 'OFFERTE-TRAJECTEN':[{_row:9,code:'X1',aannemers:'Jansen|0'}]};
+      addAannemer('X1','Pietersen');
+      eq('offline: aannemerslijst blijft ongewijzigd',
+         D.ntd['OFFERTE-TRAJECTEN'][0].aannemers, 'Jansen|0');
+    } finally {
+      state._netwerkFouten=nfOud; D.herhaal=herhaalOud; D.ntd=ntdOud;
+      clearOfflineBanner(); document.querySelectorAll('.toast').forEach(t=>t.remove());
+    }
+  })();
+  // Vangnet: een gemiste schrijfweg mag offline niet stil doorlopen. backgroundWrite draait de
+  // optimistische wijziging dan terug en meldt het, in plaats van te doen alsof het gelukt is.
+  await (async()=>{
+    const nfOud=state._netwerkFouten, pwOud=state.pendingWrites;
+    let geschreven=false, teruggedraaid=false;
+    try{
+      state._netwerkFouten=5;
+      await backgroundWrite(async()=>{ geschreven=true; }, ()=>{ teruggedraaid=true; }, 'Test');
+      eq('offline vangnet: backgroundWrite schrijft niet', geschreven, false);
+      truthy('offline vangnet: en draait de optimistische wijziging terug', teruggedraaid);
+    } finally {
+      state._netwerkFouten=nfOud; state.pendingWrites=pwOud;
+      clearOfflineBanner(); document.querySelectorAll('.toast').forEach(t=>t.remove());
     }
   })();
   // ── Terugval op losse reads: per tabblad beslissen of hij mag falen ──

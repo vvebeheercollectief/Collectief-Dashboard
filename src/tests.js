@@ -14,7 +14,7 @@ import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk.js";
 import { _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, veiligeCel, _veiligeRij, fetchSheets, vingerafdruk, rijVingerafdruk, _normCel, _rijNaarCellen, assertRowMatch, NTD_DATUM } from "./api.js";
-import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt } from "./data.js";
+import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
 import { setv, serializeNtdUndo, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, kiesModalFase, _modalFaseWoord, getInsertRow } from "./crud.js";
@@ -37,6 +37,12 @@ import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from
     else { _tFail++; console.error(`FAIL: ${label} → verwacht ${e}, kreeg ${g}`); }
   };
   const truthy = (label, got) => { if (got) { _tOk++; } else { _tFail++; console.error(`FAIL: ${label} → verwacht waar, kreeg ${JSON.stringify(got)}`); } };
+  // Antwoord op een values:batchGet-URL bouwen dat de gevraagde reeksen respecteert: vul alleen
+  // het tabblad waar de test om gaat, de rest leeg. Naam-gestuurd, zodat een stub niet omvalt
+  // (of groen blijft om de verkeerde reden) zodra loadAll een andere reeks vraagt.
+  const _batchGetStub = (url, vulNaam, waarden) =>
+    [...String(url).matchAll(/ranges=([^&]+)/g)]
+      .map(m => decodeURIComponent(m[1]) === vulNaam ? { values: waarden } : {});
   const T = new Date(2026, 5, 2); // 2 juni 2026
   const fmt = d => `${d.getDate()} ${['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'][d.getMonth()]} ${d.getFullYear()}`;
   const plus = n => fmt(new Date(T.getFullYear(), T.getMonth(), T.getDate() + n));
@@ -1348,10 +1354,71 @@ import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from
       eq('batchGet: gebruikt het batchGet-eindpunt', urls[0].includes('values:batchGet'), true);
       eq('batchGet: alle drie de tabbladen zitten in dat ene verzoek',
          namen.every(n=>urls[0].includes('ranges='+n)), true);
-      eq('batchGet: waarden komen terug in dezelfde volgorde', uit, [[['a1','a2']],[['b1']],[]]);
-      eq('batchGet: leeg tabblad wordt een lege lijst, geen undefined', Array.isArray(uit[2]), true);
+      // Op NAAM, niet op positie. Pakte de aanroeper op index uit, dan schoof élke variabele
+      // zodra de gevraagde reeks veranderde (bv. het Logboek als staartbereik) — stil, zonder
+      // foutmelding, met het logboek in D.ontw en de kenmerken in D.herhaal.
+      eq('batchGet: teruggave is op naam gesleuteld', uit["ALV's overzicht"], [['b1']]);
+      eq('batchGet: het eerste tabblad staat onder zijn eigen naam', uit['Nog Te Doen'], [['a1','a2']]);
+      eq('batchGet: leeg tabblad wordt een lege lijst, geen undefined', uit['Leeg Tabblad'], []);
+      eq('batchGet: niet gevraagd tabblad is undefined (en wordt dus overgeslagen, niet gewist)',
+         uit['Kenmerken'], undefined);
+      // Een bereik i.p.v. een kale tabbladnaam komt onder díe reeks terug — de sleutel waarop
+      // loadAll het staart-gelezen Logboek terugvindt.
+      eq('batchGet: een A1-bereik is zelf de sleutel',
+         Object.keys(await fetchSheets(["'Logboek'!A400:H"]))[0], "'Logboek'!A400:H");
     } finally {
       window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
+    }
+  })();
+  // ── Terugval op losse reads: per tabblad beslissen of hij mag falen ──
+  // Vier tabbladen zijn verplicht (Nog Te Doen, Afgerond, beide ALV-tabbladen): valt er één weg,
+  // dan is hard falen beter dan een leeg dashboard tonen alsof er niets te doen is. De vier
+  // andere zijn optioneel — die bestaan niet op elke kopie van de Sheet en mogen stil leeg zijn.
+  // Vóór fase 5 stond dat verschil alleen in de vorm van acht met de hand uitgeschreven regels.
+  eq('terugval: vier tabbladen zijn verplicht', VERPLICHTE_TABS.size, 4);
+  eq('terugval: alle acht poll-tabbladen', POLL_TABS.length, 8);
+  truthy('terugval: elk verplicht tabblad wordt ook echt gepolld',
+         [...VERPLICHTE_TABS].every(n=>POLL_TABS.includes(n)));
+  truthy('terugval: het Logboek is optioneel (mag stil leeg zijn)', !VERPLICHTE_TABS.has('Logboek'));
+  await (async()=>{
+    const _fetch=window.fetch, tokenOud=state.oauthToken, expiryOud=state.oauthExpiry;
+    const failsOud=state._syncFails, hashOud=state._lastDHash;
+    const dOud={}; Object.keys(D).forEach(k=>dOud[k]=D[k]);
+    const urls=[];
+    const stub=(kapot)=>{ window.fetch=async(url)=>{
+      const d=decodeURIComponent(String(url)); urls.push(d);
+      // batchGet weigeren met 400 (niet-tijdelijk, dus _withRetry probeert het niet opnieuw):
+      // dat dwingt loadAll naar de terugvaltak met losse reads.
+      if(d.includes('values:batchGet')) return new Response('{}',{status:400});
+      if(kapot.some(n=>d.includes('/values/'+n))) return new Response('{}',{status:400});
+      return new Response(JSON.stringify({values:[]}),{status:200});
+    }; };
+    try{
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
+
+      // 1. Optioneel tabblad valt weg → stil afgevangen, de ronde slaagt.
+      urls.length=0; state._syncFails=0; state._lastDHash=null;
+      stub(['Kenmerken']);
+      await loadAll(true);
+      eq('terugval: mislukte batchGet valt terug op losse reads', urls.filter(u=>u.includes('/values/')).length, 8);
+      eq('terugval: wegvallend Kenmerken laat de ronde slagen', state._syncFails, 0);
+
+      // 2. Verplicht tabblad valt weg → de ronde faalt en de oude data blijft staan.
+      //    Zou hier een uniforme .catch(()=>[]) staan, dan werd het dashboard leeggeveegd
+      //    terwijl de statusbalk 'Live' bleef zeggen.
+      urls.length=0; state._syncFails=0; state._lastDHash=null;
+      D.af={KANARIE:[{code:'blijf-staan'}]};
+      stub(['Afgerond']);
+      await loadAll(true);
+      eq('terugval: wegvallend Afgerond laat de ronde WEL falen', state._syncFails, 1);
+      eq('terugval: en de bestaande lijst blijft staan i.p.v. leeggeveegd',
+         (D.af.KANARIE||[])[0]?.code, 'blijf-staan');
+    } finally {
+      window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
+      state._syncFails=failsOud; state._lastDHash=hashOud;
+      Object.keys(dOud).forEach(k=>{ D[k]=dOud[k]; });
+      document.getElementById('dot').className='dot';
+      document.getElementById('load-err-banner')?.remove();
     }
   })();
   // ── AI-chat kostenrem: _chatMessages begrenst + start met user ──
@@ -1564,9 +1631,11 @@ import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from
         if(d.includes('!A')) return new Response(JSON.stringify({values:(kolomA?kolomA.map(c=>[c]):blad.slice(2).map(r=>[r[0]]))}),{status:200});
         // loadAll leest sinds de quotum-fix alle tabbladen in één batchGet; die moet vóór
         // de losse-read-tak staan, want de batchGet-URL bevat óók "ALV's overzicht".
-        // Volgorde = POLL_TABS, dus het ALV-overzicht staat op index 2.
+        // Naam-gestuurd i.p.v. op index: loadAll vraagt niet altijd exact dezelfde reeks (het
+        // Logboek komt als staartbereik binnen), en een index-stub is dan groen om de verkeerde
+        // reden — of valt om zodra de reeks één element verschuift.
         if(u.includes('values:batchGet'))
-          return new Response(JSON.stringify({valueRanges:[{},{},{values:blad},{},{},{},{},{}]}),{status:200});
+          return new Response(JSON.stringify({valueRanges:_batchGetStub(u, "ALV's overzicht", blad)}),{status:200});
         if(d.includes("ALV's overzicht")) return new Response(JSON.stringify({values:blad}),{status:200});
         if(u.includes(':batchUpdate')){
           const b=JSON.parse(opt.body);
@@ -1624,7 +1693,7 @@ import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from
             {properties:{sheetId:44,title:"ALV's afgerond",index:1,gridProperties:{columnCount:3}}}]}),{status:200});
         if(d.includes('!A')) return new Response(JSON.stringify({values:[['V0'],['V1'],['V2']]}),{status:200});
         if(u.includes('values:batchGet'))
-          return new Response(JSON.stringify({valueRanges:[{},{},{values:rijen(['V0','V1','V2'])},{},{},{},{},{}]}),{status:200});
+          return new Response(JSON.stringify({valueRanges:_batchGetStub(u, "ALV's overzicht", rijen(['V0','V1','V2']))}),{status:200});
         if(d.includes("ALV's overzicht")) return new Response(JSON.stringify({values:rijen(['V0','V1','V2'])}),{status:200});
         if(u.includes(':batchUpdate')) return new Response(JSON.stringify({replies:[{}]}),{status:200});
         return new Response(JSON.stringify({values:[]}),{status:200});

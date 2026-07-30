@@ -119,9 +119,26 @@ function clearLoadError(){ document.getElementById('load-err-banner')?.remove();
 
 // Herhaal-slot: voorkomt dat twee loadAll-aanroepen tegelijk lopen en elkaars data
 // overschrijven (8s-poll, schrijf-resync, refresh-knop, handmatige awaits).
-// De acht tabbladen die elke poll gelezen worden, in de volgorde waarin loadAll ze uitpakt.
+// De acht tabbladen die elke poll gelezen worden. Sinds fase 5 wordt er niet meer op positie
+// uitgepakt maar op naam (zie fetchSheets), dus deze reeks bepaalt alleen nog WAT er gevraagd
+// wordt — niet meer welke variabele wat krijgt.
+//
+// BEWUST alle acht elke ronde. Het ontwerp stelde een trage groep voor (vijf tabbladen elke
+// 60 s), maar de meting op productie wees uit dat het Logboek 1.261 van de ~1.700 regels was en
+// de vier andere kandidaten samen 222 (ALV's afgerond 202, Kenmerken 14, Ontwikkeling 5,
+// Herhaalregels 0). Met het Logboek incrementeel (zie _logBereik) valt er op die vier niets
+// meer te winnen, terwijl minder vaak lezen het venster verlengt waarin twee collega's elkaars
+// wijziging kunnen overschrijven — op precies de tabbladen waar de rij-guard alleen de sleutel
+// vergelijkt en niet de inhoud. Prijs en risico stonden niet in verhouding.
 const POLL_TABS=["Nog Te Doen","Afgerond","ALV's overzicht","ALV's afgerond",
                  "Ontwikkeling","Logboek","Herhaalregels","Kenmerken"];
+
+// Tabbladen die in de terugvaltak GEEN .catch krijgen: zonder deze vier kan het dashboard niet
+// zinnig renderen, dus daar is hard falen beter dan stilzwijgend een lege lijst tonen. De andere
+// vier zijn optioneel (ze bestaan niet op elke kopie van de Sheet) en worden wél afgevangen.
+// Dit legt expliciet vast wat eerder in de hand uitgeschreven Promise.all-regels stond — waar
+// het verschil tussen wél en géén .catch alleen uit de vorm van de regel te lezen was.
+const VERPLICHTE_TABS=new Set(["Nog Te Doen","Afgerond","ALV's overzicht","ALV's afgerond"]);
 
 // Mag de achtergrond-verversing draaien? Alleen met een echte sessie. Zonder deze rem
 // vroeg de 8s-timer óók op het inlogscherm elke ronde zelf een token aan. Elke aanvraag
@@ -151,44 +168,48 @@ async function loadAll(silent){
     // Reads met herkansing bij tijdelijke API-fouten (429 / 5xx / netwerk-blip), zodat
     // één hapering niet meteen de hele ronde laat falen en 'Fout' toont.
     const lees=(naam)=>_withRetry(()=>fetchSheet(naam));
-    let ntdR,afR,alvoR,alfaR,ontwR,logR,hhR,kmkR;
+    const namen=POLL_TABS.slice();
+    let R;
     try{
       // Eén batchGet i.p.v. acht losse reads — zie fetchSheets: acht aparte verzoeken
       // per poll was precies de Google-leeslimiet van 60 per minuut, waardoor elke
       // gebruikersactie erbovenop 'Quota exceeded' opleverde.
-      [ntdR,afR,alvoR,alfaR,ontwR,logR,hhR,kmkR]=await _withRetry(()=>fetchSheets(POLL_TABS));
+      R=await _withRetry(()=>fetchSheets(namen));
     }catch(e){
       // Terugval op losse reads. batchGet faalt in z'n geheel als één tabblad ontbreekt;
       // de oude weg levert de optionele tabbladen dan alsnog los aan (duurder, maar werkt).
+      // Per tabblad beslissen of hij mag falen: een uniforme .catch zou een ontbrekend
+      // 'Nog Te Doen' in stilte als lege lijst doorlaten en het dashboard leegvegen.
       console.warn('batchGet mislukt, terugval op losse reads:', e.message);
-      [ntdR,afR,alvoR,alfaR,ontwR,logR,hhR,kmkR]=await Promise.all([
-        lees("Nog Te Doen"),lees("Afgerond"),
-        lees("ALV's overzicht"),lees("ALV's afgerond"),
-        lees("Ontwikkeling").catch(()=>[]),
-        lees("Logboek").catch(()=>[]),
-        lees("Herhaalregels").catch(()=>[]),
-        lees("Kenmerken").catch(()=>[]),
-      ]);
+      R={};
+      await Promise.all(namen.map(async n=>{
+        R[n]=VERPLICHTE_TABS.has(n) ? await lees(n) : await lees(n).catch(()=>[]);
+      }));
     }
     state._syncFails=0; // alle reads geslaagd
     // Kwam er tijdens het lezen een schrijfactie tussen? Dan is de lokale (optimistische)
     // staat leidend; de eigen resync van die schrijfactie haalt zo de verse data op.
     if(state.pendingWrites>0){ if(!silent) setSynced(); return; }
-    const ntdP=parseSections(ntdR); D.ntd=ntdP.data; D.ntdSecInfo=ntdP.secInfo;
-    const afP=parseSections(afR); D.af=afP.data; D.afSecInfo=afP.secInfo;
+    // Toekennen op NAAM. Een tabblad dat niet in deze ronde zat, behoudt zijn vorige waarde in
+    // plaats van door parseX(undefined) leeggeveegd te worden. Vandaag zit alles er elke ronde
+    // in; de vorm is er zodat een gemiste of afwijkend gevraagde reeks nooit stil data wist.
+    const zetAls=(naam,fn)=>{ if(R[naam]!==undefined) fn(R[naam]); };
+    zetAls('Nog Te Doen', r=>{ const p=parseSections(r); D.ntd=p.data; D.ntdSecInfo=p.secInfo; });
+    zetAls('Afgerond',    r=>{ const p=parseSections(r); D.af=p.data; D.afSecInfo=p.secInfo;
+                               SKEYS.forEach(s=>{if(D.af[s])D.af[s].sort((a,b)=>parseDt(b.datum)-parseDt(a.datum))}); });
     // Fase 3, trap 1: alleen meekijken. Zodra dit een tijd lang stil blijft op gezonde data
     // gaat de banner aan (trap 2). Nooit blokkerend — dit mag het laden niet beïnvloeden.
     try{
-      const bev=[...checkSecties(ntdR), ...checkSecties(afR), ...checkNummers(Object.values(D.ntd||{}).flat())];
+      const bev=[...checkSecties(R['Nog Te Doen']||[]), ...checkSecties(R['Afgerond']||[]),
+                 ...checkNummers(Object.values(D.ntd||{}).flat())];
       if(bev.length) console.warn('[structuurcheck]', bev);
     }catch(e){ console.warn('[structuurcheck] overgeslagen:', e.message); }
-    SKEYS.forEach(s=>{if(D.af[s])D.af[s].sort((a,b)=>parseDt(b.datum)-parseDt(a.datum))});
-    D.alvo=parseAlvo(alvoR);
-    D.alfa=parseAlfa(alfaR);
-    D.ontw=parseOntw(ontwR);
-    D.logboek=parseLogboek(logR);
-    D.herhaal=parseHerhaal(hhR);
-    D.kenmerken=parseKenmerken(kmkR);
+    zetAls("ALV's overzicht", r=>{ D.alvo=parseAlvo(r); });
+    zetAls("ALV's afgerond",  r=>{ D.alfa=parseAlfa(r); });
+    zetAls('Ontwikkeling',    r=>{ D.ontw=parseOntw(r); });
+    zetAls('Logboek',         r=>{ D.logboek=parseLogboek(r); });
+    zetAls('Herhaalregels',   r=>{ D.herhaal=parseHerhaal(r); });
+    zetAls('Kenmerken',       r=>{ D.kenmerken=parseKenmerken(r); });
     setSynced();
     const hash=JSON.stringify([D.ntd,D.af,D.alvo,D.alfa,D.ontw,D.logboek,D.herhaal,D.kenmerken]);
     if(hash!==state._lastDHash){
@@ -316,4 +337,5 @@ function parseAlfa(rows){
 
 export {
   backgroundWrite, schrijfActieLoopt, metWriteMarkering, setSyncing, setSaving, setSynced, setSyncErr, dot, loadAll, magPollen, parseSections, parseAlvo, parseAlfa, parseHerhaal,
+  POLL_TABS, VERPLICHTE_TABS,
 };

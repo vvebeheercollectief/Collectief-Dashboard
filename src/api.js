@@ -25,9 +25,16 @@ async function fetchSheets(names){
   });
   if(!r.ok){const e=await r.json().catch(()=>({}));if(r.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'API fout');err.status=r.status;throw err}
   const vr=(await r.json()).valueRanges||[];
-  // batchGet levert valueRanges in dezelfde volgorde als de meegegeven ranges.
+  // batchGet levert valueRanges in dezelfde volgorde als de meegegeven ranges, maar we geven ze
+  // op NAAM terug en niet op positie. Zolang de aanroeper op index uitpakte, verschoof élke
+  // variabele zodra de gevraagde lijst veranderde: één bereik erbij of eraf (zoals de
+  // staartlezing van het Logboek) zette dan stil het logboek in D.ontw, de kenmerken in
+  // D.herhaal, enzovoort — zonder één foutmelding. De sleutel is exact de gevraagde reeks,
+  // dus ook een bereik als "'Logboek'!A400:H" komt onder díe naam terug.
   // Een leeg tabblad komt terug zónder 'values'; dat wordt een lege lijst.
-  return names.map((_,i)=>(vr[i]&&vr[i].values)||[]);
+  const uit={};
+  names.forEach((n,i)=>{ uit[n]=(vr[i]&&vr[i].values)||[]; });
+  return uit;
 }
 
 // Formule-injectie-rem op ALLE frontend-writes (spiegel van cd_safeCell in Apps

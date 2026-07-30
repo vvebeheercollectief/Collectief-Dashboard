@@ -19,7 +19,7 @@ import {
 import {
   openModal, closeModal, submitTask, doCompleteTask, closeCompleteModal,
 } from './crud.js';
-import { loadAll, magPollen, schrijfActieLoopt, setSyncOffline, showOfflineBanner } from './data.js';
+import { loadAll, magPollen, schrijfActieLoopt, setSyncOffline, showOfflineBanner, laadUitCache } from './data.js';
 import { initActions } from './actions.js';
 import { initVveZoekveld } from './vve-zoekveld.js';
 import { closeSnoozeModal, snoozeOpslaan, snoozeWis } from './snooze.js';
@@ -312,6 +312,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   if(_st&&Date.now()<_se&&_sm&&ALLOWED_EMAILS.includes(_sm.toLowerCase())){
     state.oauthToken=_st;state.oauthExpiry=_se;state.currentUserEmail=_sm;
     document.getElementById('login-gate').style.display='none';
+    laadUitCache();   // meteen de laatst bekende stand in beeld; loadAll vervangt hem
     loadAll();
   } else {
     // Geen geldige sessie → login nodig. Speel de gebrande launch-splash

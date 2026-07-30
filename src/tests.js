@@ -14,7 +14,7 @@ import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk.js";
 import { _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, veiligeCel, _veiligeRij, fetchSheet, fetchSheets, vingerafdruk, rijVingerafdruk, _normCel, _rijNaarCellen, assertRowMatch, NTD_DATUM, _isOffline, _isNetwerkFout } from "./api.js";
-import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, _logBereik, _verwerkLogboek, blokkeerOffline, clearOfflineBanner, backgroundWrite } from "./data.js";
+import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, _logBereik, _verwerkLogboek, blokkeerOffline, clearOfflineBanner, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
 import { setv, serializeNtdUndo, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, kiesModalFase, _modalFaseWoord, getInsertRow } from "./crud.js";
@@ -1468,6 +1468,69 @@ import { addAannemer } from "./offerte-aannemers.js";
       window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
     }
   })();
+  // ── Leescache: sleutel, inhoud, opruimen en wissen bij uitloggen ──
+  // Comfort bij het openen, geen offline-vermogen. De sleutel moet aan de VERSIE én aan het
+  // e-mailadres hangen: localStorage is origin-gebonden en niet gebruiker-gebonden, dus zonder
+  // dat adres ziet collega B bij het openen eerst de stand van collega A.
+  eq('cache: sleutel bevat de versie én het e-mailadres',
+     _cacheSleutel('Info@VvEBeheerCollectief.nl'), `cd_cache_${APP_VERSION}_info@vvebeheercollectief.nl`);
+  truthy('cache: twee gebruikers krijgen verschillende sleutels',
+         _cacheSleutel('a@b.nl') !== _cacheSleutel('c@d.nl'));
+  eq('cache: zonder adres een eigen sleutel i.p.v. undefined', _cacheSleutel('').includes('onbekend'), true);
+  (()=>{
+    const mailOud=state.currentUserEmail, cacheOud=state._uitCache;
+    const dOud={}; Object.keys(D).forEach(k=>dOud[k]=D[k]);
+    const bewaard={}; try{ for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i); if(k.startsWith(CACHE_PREFIX)) bewaard[k]=localStorage.getItem(k);} }catch(_){}
+    try{
+      state.currentUserEmail='test@vvebeheercollectief.nl';
+      D.ntd={OPPAKKEN:[{code:'X1',_row:5,_sec:'OPPAKKEN'}]}; D.af={OPPAKKEN:[]};
+      D.alvo=[{code:'A1'}]; D.alfa=[]; D.ontw=[]; D.logboek=[{_row:9,code:'X1',timestamp:'t'}];
+      D.herhaal=[]; D.kenmerken=[];
+      D.ntdSecInfo={OPPAKKEN:{colHeaderRow:2}}; D.afSecInfo={OPPAKKEN:{colHeaderRow:2}};
+      const hash=JSON.stringify([D.ntd,D.af,D.alvo,D.alfa,D.ontw,D.logboek,D.herhaal,D.kenmerken]);
+      // Onder ?test=1 bewaart hij bewust niets: de suite draait loadAll met verzonnen data en die
+      // zou anders bij de volgende echte start één ronde lang in beeld staan.
+      wisCache(); bewaarCache(hash);
+      eq('cache: in de testomgeving wordt er niets bewaard',
+         localStorage.getItem(_cacheSleutel(state.currentUserEmail)), null);
+      _zetCacheBlokkade(false);   // vanaf hier de échte schrijfweg beproeven
+      // Een oude sleutel van een vorige versie moet bij het schrijven verdwijnen: zonder dat
+      // opruimen blijft er per release ~1 MB achter in een ruimte van ~5 MB en faalt uiteindelijk
+      // élke setItem — óók die van het thema en de dichtheid.
+      localStorage.setItem(CACHE_PREFIX+'0.1_test@vvebeheercollectief.nl','{"d":[]}');
+      bewaarCache(hash);
+      truthy('cache: er staat iets onder de huidige sleutel',
+             !!localStorage.getItem(_cacheSleutel(state.currentUserEmail)));
+      eq('cache: de sleutel van een oudere versie is opgeruimd',
+         localStorage.getItem(CACHE_PREFIX+'0.1_test@vvebeheercollectief.nl'), null);
+      // Leegmaken en terugladen: alle tien velden moeten terugkomen.
+      Object.keys(D).forEach(k=>{ D[k]=Array.isArray(dOud[k])?[]:{}; });
+      eq('cache: terugladen lukt', laadUitCache(), true);
+      eq('cache: taken terug', D.ntd?.OPPAKKEN?.[0]?.code, 'X1');
+      eq('cache: ALV-overzicht terug', D.alvo?.[0]?.code, 'A1');
+      eq('cache: logboek terug met het RUWE Sheet-rijnummer', D.logboek?.[0]?._row, 9);
+      // Zonder deze twee valt getInsertRow terug en belandt een nieuwe taak bovenaan de lijst
+      // in plaats van in zijn eigen sectie.
+      eq('cache: ntdSecInfo terug (invoegpositie van een nieuwe taak)', D.ntdSecInfo?.OPPAKKEN?.colHeaderRow, 2);
+      eq('cache: afSecInfo terug', D.afSecInfo?.OPPAKKEN?.colHeaderRow, 2);
+      truthy('cache: markeert de stand als nog-niet-vers', state._uitCache);
+      // Die vlag houdt schrijven kort tegen: de rijnummers uit de cache kunnen verschoven zijn.
+      eq('cache: schrijven is geblokkeerd zolang de eerste verse ronde onderweg is', blokkeerOffline(), true);
+      state._uitCache=false;
+      // Uitloggen moet de cache wissen, anders blijft de stand van de vorige gebruiker op een
+      // gedeelde computer staan. logout() raakte localStorage voorheen nergens aan.
+      wisCache();
+      eq('cache: uitloggen wist de cache', localStorage.getItem(_cacheSleutel(state.currentUserEmail)), null);
+      eq('cache: en terugladen levert dan niets meer op', laadUitCache(), false);
+    } finally {
+      _zetCacheBlokkade(true);   // testomgeving weer op 'niets bewaren'
+      state.currentUserEmail=mailOud; state._uitCache=cacheOud;
+      Object.keys(dOud).forEach(k=>{ D[k]=dOud[k]; });
+      try{ wisCache(); Object.entries(bewaard).forEach(([k,v])=>localStorage.setItem(k,v)); }catch(_){}
+      document.querySelectorAll('.toast').forEach(t=>t.remove());
+    }
+  })();
+
   // ── Offline: alleen ECHTE netwerkfouten tellen mee ──
   // Uitdrukkelijk niet state._syncFails hergebruiken: die telt ook 401/403, quota-fouten en
   // mislukte inlogpogingen mee. In een quotum-incident zou het dashboard zichzelf dan op slot
@@ -2658,7 +2721,7 @@ import { addAannemer } from "./offerte-aannemers.js";
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '10.1');
+  eq('versie opgehoogd', APP_VERSION, '10.2');
 
   // ── Bewerkscherm ──
   truthy('vijfde formuliergroep bestaat', !!document.getElementById('fg-sub'));

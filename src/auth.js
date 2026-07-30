@@ -3,7 +3,7 @@
 // ══════════════════════════════════════
 import { clientId, ALLOWED_EMAILS } from "./config.js";
 import { state } from "./state.js";
-import { loadAll } from "./data.js";
+import { loadAll, laadUitCache, wisCache } from "./data.js";
 import { toonKaart } from "./login-splash.js";
 
 function doOAuth(forcePrompt){
@@ -87,6 +87,7 @@ async function doLogin(){
     state.currentUserEmail=email;
     sessionStorage.setItem('currentUserEmail',email);
     document.getElementById('login-gate').style.display='none';
+    laadUitCache();   // meteen de laatst bekende stand in beeld; loadAll vervangt hem
     loadAll();
   }finally{state._authBezig=Math.max(0,state._authBezig-1)}
 }
@@ -119,6 +120,7 @@ async function ensureToken(){
 function logout(reden){
   state.oauthToken=null; state.oauthExpiry=0; state.currentUserEmail=null;
   try{ ['oauthToken','oauthExpiry','currentUserEmail'].forEach(k=>sessionStorage.removeItem(k)); }catch(_){}
+  wisCache();   // anders blijft de stand van de vorige gebruiker op een gedeelde computer staan
   if(state._notifPollTimer){ clearInterval(state._notifPollTimer); state._notifPollTimer=null; }
   if(state._resyncTimer){ clearInterval(state._resyncTimer); state._resyncTimer=null; }
   if(state._heartbeatTimer){ clearInterval(state._heartbeatTimer); state._heartbeatTimer=null; }

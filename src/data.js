@@ -3,7 +3,7 @@
 // ══════════════════════════════════════
 import { parseDt, _parseAnyDate, coerceDagenVooraf, leegBijErfenis } from "./util.js";
 import { state, D } from "./state.js";
-import { SKEYS, SECS } from "./config.js";
+import { SKEYS, SECS, APP_VERSION } from "./config.js";
 import { fetchSheet, fetchSheets, _withRetry, isOffline } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { buildAnalytics, buildDash } from "./render-analytics.js";
@@ -96,6 +96,83 @@ async function metWriteMarkering(fn){
   }
 }
 
+// ── Leescache ──────────────────────────────────────────────────────────────
+// Comfort bij het openen: meteen de laatst bekende stand in beeld in plaats van een leeg scherm.
+// Uitdrukkelijk GEEN offline-vermogen — bij een koude start is inloggen netwerkafhankelijk.
+//
+// De sleutel hangt aan APP_VERSION én aan het e-mailadres. localStorage is origin-gebonden en
+// niet gebruiker-gebonden, dus zonder dat adres ziet collega B bij het openen eerst de stand van
+// collega A. De versie erin zodat een gewijzigd dataformaat nooit een oude cache leest.
+const CACHE_PREFIX='cd_cache_';
+const _cacheSleutel = email => `${CACHE_PREFIX}${APP_VERSION}_${(email||'onbekend').toLowerCase()}`;
+
+// Alles wat níet de sleutel van nu is, weg. Zonder dit blijft er per uitgebrachte versie ~1 MB
+// achter in een ruimte van ~5 MB — na een paar releases loopt localStorage vol en faalt élke
+// setItem, óók die van de voorkeuren (thema, dichtheid).
+function _ruimOudeCache(huidig){
+  try{
+    for(let i=localStorage.length-1;i>=0;i--){
+      const k=localStorage.key(i);
+      if(k && k.startsWith(CACHE_PREFIX) && k!==huidig) localStorage.removeItem(k);
+    }
+  }catch(_){}
+}
+
+// hashJson is de string die loadAll al voor de wijzigings-vergelijking heeft gebouwd; die
+// hergebruiken we in plaats van een tweede keer een halve megabyte te serialiseren.
+// ntdSecInfo en afSecInfo zitten NIET in die hash maar moeten wél mee: zonder die twee valt
+// getInsertRow terug en belandt een nieuwe taak bovenaan 'Nog Te Doen' in plaats van in zijn
+// sectie. De logboeklijst gaat er ongewijzigd in — niet hersorteren, niet ontdubbelen: _row is
+// bewust de ruwe Sheet-index en daar hangt bewerken/verwijderen van logregels aan.
+// In de testomgeving niets bewaren: de suite draait loadAll met verzonnen data, en die zou dan
+// bij de volgende echte start één ronde lang in beeld staan. De vlag is omzetbaar zodat de
+// cache-test zélf de echte schrijfweg kan beproeven.
+let _cacheGeblokkeerd = location.search.includes('test=1');
+const _zetCacheBlokkade = aan => { _cacheGeblokkeerd = !!aan; };
+
+function bewaarCache(hashJson){
+  if(_cacheGeblokkeerd) return;
+  const sleutel=_cacheSleutel(state.currentUserEmail);
+  try{
+    _ruimOudeCache(sleutel);
+    localStorage.setItem(sleutel, '{"d":'+hashJson+',"s":'+JSON.stringify([D.ntdSecInfo,D.afSecInfo])+'}');
+  }catch(e){
+    // Vol of geweigerd (privémodus): stil opgeven en de eigen sleutel weghalen. Een cache is
+    // comfort; hij mag nooit een laadronde of een voorkeur-setItem in de weg zitten.
+    try{ localStorage.removeItem(sleutel); }catch(_){}
+  }
+}
+
+// Zet de laatst bewaarde stand in D en meld of dat gelukt is. Bewust ná de inlog aangeroepen:
+// vóór het e-mailadres bekend is, is er geen sleutel om te lezen.
+function laadUitCache(){
+  try{
+    const ruw=localStorage.getItem(_cacheSleutel(state.currentUserEmail));
+    if(!ruw) return false;
+    const o=JSON.parse(ruw);
+    const [ntd,af,alvo,alfa,ontw,logboek,herhaal,kenmerken]=o.d||[];
+    if(!ntd||!af) return false;
+    D.ntd=ntd; D.af=af; D.alvo=alvo||[]; D.alfa=alfa||[]; D.ontw=ontw||[];
+    D.logboek=logboek||[]; D.herhaal=herhaal||[]; D.kenmerken=kenmerken||[];
+    D.ntdSecInfo=(o.s||[])[0]||{}; D.afSecInfo=(o.s||[])[1]||{};
+    // Deze stand kan uren oud zijn en de rijnummers erin dus verschoven. Schrijven blijft
+    // geblokkeerd tot de eerste verse ronde binnen is — dat is een seconde of twee, en het
+    // voorkomt dat een klik meteen op een verouderd rijnummer landt. De hoogwaterstand van het
+    // Logboek gaat NIET mee in de cache, dus die eerste ronde leest het logboek volledig.
+    state._uitCache=true;
+    renderAll();
+    return true;
+  }catch(_){ return false; }
+}
+function wisCache(){
+  try{
+    for(let i=localStorage.length-1;i>=0;i--){
+      const k=localStorage.key(i);
+      if(k && k.startsWith(CACHE_PREFIX)) localStorage.removeItem(k);
+    }
+  }catch(_){}
+}
+
 // ── Offline: blokkeren vóór de optimistische wijziging ─────────────────────
 // Poort vóór élke schrijfactie. Tot nu toe veranderde de rij eerst op het scherm en draaide
 // backgroundWrite hem daarna terug: het dashboard deed dus alsof er iets was opgeslagen terwijl
@@ -106,6 +183,13 @@ async function metWriteMarkering(fn){
 // fire-and-forget en falen vandaag al stil. Blokkeren zou een logregel definitief laten
 // verdwijnen zonder dat iemand het ziet — erger dan de huidige situatie.
 function blokkeerOffline(){
+  // Nog geen verse ronde binnen: het scherm komt uit de leescache en de rijnummers erin kunnen
+  // verschoven zijn. Duurt maar een seconde of twee (loadAll heft de vlag op zodra de eerste
+  // ronde klaar is, geslaagd of niet).
+  if(state._uitCache){
+    showToast('Even wachten','De gegevens worden nog vernieuwd — probeer het over een seconde opnieuw.','var(--am)','zandloper',{geenSysteemmelding:true});
+    return true;
+  }
   if(!isOffline()) return false;
   showOfflineBanner();
   showToast('Geen verbinding','Wijzigen lukt niet zonder internet. Er is niets gewijzigd — probeer het opnieuw zodra je weer online bent.','var(--rd)','waarschuwing',{geenSysteemmelding:true});
@@ -321,6 +405,10 @@ async function loadAll(silent){
     const hash=JSON.stringify([D.ntd,D.af,D.alvo,D.alfa,D.ontw,D.logboek,D.herhaal,D.kenmerken]);
     if(hash!==state._lastDHash){
       state._lastDHash=hash;
+      // Alleen bij een echte wijziging naar de leescache, niet elke 8 seconden: localStorage
+      // schrijft synchroon naar schijf en dit is ~1 MB. Zo blijft het een handjevol keer per
+      // sessie in plaats van 450 keer per uur.
+      bewaarCache(hash);
       renderAll();
       // Re-render actieve detailpagina's met nieuwe data
       if(document.getElementById('page-analytics')?.classList.contains('active')) buildAnalytics();
@@ -343,6 +431,10 @@ async function loadAll(silent){
     console.error(e);
   }
   finally{
+    // Eerste ronde is klaar (geslaagd of niet): de leescache-stand is niet langer de basis, dus
+    // de schrijf-rem eraf. Ook bij een mislukte ronde, want dan is de rij-guard de bescherming en
+    // valt het gedrag terug op dat van vóór de cache — een permanente rem zou erger zijn.
+    state._uitCache=false;
     state._loadInFlight=false;
     if(state._loadAgain){ const loud=state._loadAgainLoud; state._loadAgain=false; state._loadAgainLoud=false; loadAll(!loud); } // onderdrukte aanroep alsnog uitvoeren; luid als er een handmatige verversing tussen zat
   }
@@ -452,4 +544,5 @@ export {
   backgroundWrite, schrijfActieLoopt, metWriteMarkering, setSyncing, setSaving, setSynced, setSyncErr, dot, loadAll, magPollen, parseSections, parseAlvo, parseAlfa, parseHerhaal,
   POLL_TABS, VERPLICHTE_TABS, _logBereik, _zetLogAnker, _verwerkLogboek,
   blokkeerOffline, showOfflineBanner, clearOfflineBanner, setSyncOffline,
+  bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade,
 };

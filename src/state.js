@@ -57,6 +57,9 @@ export const state = {
   _logAnkerTs: '',         // kolom A van díe rij. Komt die niet terug bij de staartlezing, dan
                            // heeft iemand een logregel verwijderd en zijn de rijnummers
                            // opgeschoven → volledig herlezen i.p.v. stil bevriezen.
+  _uitCache: false,        // staat het scherm op de leescache en is de eerste verse ronde nog
+                           // onderweg? Dan zijn de rijnummers mogelijk verschoven → schrijven
+                           // kort geblokkeerd (zie blokkeerOffline).
   _loadInFlight: false,
   _loadAgain: false,
   _loadAgainLoud: false,   // werd de onderdrukte aanroep door een NIET-stille (handmatige) verversing getriggerd? → herstart luid, zodat de fout-banner/spinner zichtbaar blijft

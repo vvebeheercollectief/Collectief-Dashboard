@@ -1272,6 +1272,10 @@ import { addAannemer } from "./offerte-aannemers.js";
       state._gsiTokenClient=null; state.oauthToken=null; state.oauthExpiry=0;
       state.currentUserEmail='info@vvebeheercollectief.nl'; state._syncFails=0;
       const isFout=()=>document.getElementById('dot').className.includes('err');
+      // Eerst wachten tot een eventuele lopende ronde klaar is: staat _loadInFlight nog op true,
+      // dan keert loadAll meteen terug zónder de tokenvernieuwing te proberen en telt _syncFails
+      // niet op. Op een trage verbinding (productie) gebeurde dat.
+      for(let i=0;i<200 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,10));
       await loadAll(true);
       eq('sync: eerste stille hapering telt mee', state._syncFails, 1);
       eq('sync: eerste stille hapering toont nog geen Fout', isFout(), false);
@@ -1865,6 +1869,9 @@ import { addAannemer } from "./offerte-aannemers.js";
       // _alfaMs op 0 zodat het archief deze ronde gegarandeerd meedoet: anders hangt het aantal
       // losse reads af van hoe lang een eerdere test geleden draaide.
       urls.length=0; state._syncFails=0; state._lastDHash=null; state._alfaMs=0;
+      state._logHoogwater=0; state._logAnkerTs='';   // logboek als heel tabblad: anders komt er een
+      // negende leesverzoek bij (het anker klopt niet in een gestubde ronde) en telt deze test scheef
+      for(let i=0;i<200 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,10));
       stub(['Kenmerken']);
       await loadAll(true);
       eq('terugval: mislukte batchGet valt terug op losse reads', urls.filter(u=>u.includes('/values/')).length, 8);
@@ -1905,6 +1912,7 @@ import { addAannemer } from "./offerte-aannemers.js";
       state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
       state._logHoogwater=0; state._logAnkerTs=''; state._lastDHash=null; state._syncFails=0;
       D.logboek=[];
+      for(let i=0;i<200 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,10));
       window.fetch=async(url)=>{
         const d=decodeURIComponent(String(url));
         const rr=[...d.matchAll(/ranges=([^&]+)/g)].map(m=>m[1]);
@@ -2946,7 +2954,7 @@ import { addAannemer } from "./offerte-aannemers.js";
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '10.5');
+  eq('versie opgehoogd', APP_VERSION, '10.6');
 
   // ── Bewerkscherm ──
   truthy('vijfde formuliergroep bestaat', !!document.getElementById('fg-sub'));

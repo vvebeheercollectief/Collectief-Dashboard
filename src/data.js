@@ -189,7 +189,10 @@ function blokkeerOffline(){
   // Geen verbinding is de meest specifieke reden en krijgt dus voorrang op de cache-rem hieronder.
   if(isOffline()){
     showOfflineBanner();
-    showToast('Geen verbinding','Wijzigen lukt niet zonder internet. Er is niets gewijzigd — probeer het opnieuw zodra je weer online bent.','var(--rd)','waarschuwing',{geenSysteemmelding:true});
+    setSyncOffline();   // de balk moet hetzelfde zeggen als de banner, ook als de poll nog niet faalde
+    // geenDedup: élke poging verdient een antwoord. Met de 15s-ontdubbeling bleef de tweede klik
+    // stil, en stilte leest als 'het is gelukt' — precies wat deze poort moet voorkomen.
+    showToast('Geen verbinding','Wijzigen lukt niet zonder internet. Er is niets gewijzigd — probeer het opnieuw zodra je weer online bent.','var(--rd)','waarschuwing',{geenDedup:true,geenSysteemmelding:true});
     return true;
   }
   // Nog geen verse ronde binnen: het scherm komt uit de leescache en de rijnummers erin kunnen
@@ -201,7 +204,7 @@ function blokkeerOffline(){
     showToast(gefaald ? 'Gegevens niet vernieuwd' : 'Even wachten',
       gefaald ? 'De gegevens konden niet worden opgehaald. Klik op Vernieuwen voordat je iets wijzigt.'
               : 'De gegevens worden nog vernieuwd — probeer het over een seconde opnieuw.',
-      'var(--am)','zandloper',{geenSysteemmelding:true});
+      'var(--am)','zandloper',{geenDedup:true,geenSysteemmelding:true});
     return true;
   }
   return false;

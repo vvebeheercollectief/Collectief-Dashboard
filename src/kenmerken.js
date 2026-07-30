@@ -48,7 +48,11 @@ async function saveKenmerken(){
     kozijnen:norm(document.getElementById('kmk-kozijnen')?.value),
     bron:(document.getElementById('kmk-bron')?.value||'').trim(),
   };
-  const oud=vveKenmerken(code,D);
+  // KOPIE, geen verwijzing: vveKenmerken geeft het LEVENDE record uit D.kenmerken terug zodra dat
+  // bestaat, en `Object.assign(rec,nieuw)` hieronder muteert dan ook `oud`. Het logboek kreeg
+  // daardoor de nieuwe waarde als oude waarde te zien — in het dossier stond letterlijk
+  // "Balkons: Individueel → Individueel". Op staging gemeten (30-07) en hier gerepareerd.
+  const oud={...vveKenmerken(code,D)};
   const gewijzigd=[['Balkons','balkons'],['Kozijnen','kozijnen'],['Bron','bron']]
     .filter(([,k])=>nieuw[k]!==(oud[k]||''));
   // Offline-poort staat hier, vóór het sluiten van het bewerkscherm: doe je dit later, dan is de

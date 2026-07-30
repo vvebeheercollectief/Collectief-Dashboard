@@ -1588,6 +1588,26 @@ import { addAannemer } from "./offerte-aannemers.js";
       eq('kenmerken: mislukte opslag laat GEEN spookregel in het logboek achter', D.logboek.length, 0);
       eq('kenmerken: en de waarde is teruggedraaid', D.kenmerken[0].balkons, '');
       veld.remove();
+      // Ingelogd op staging gemeten: het logboek kreeg de NIEUWE waarde als oude waarde te zien,
+      // want vveKenmerken geeft het levende record terug en Object.assign muteerde dat mee.
+      // In het dossier stond letterlijk "Balkons: Individueel → Individueel".
+      D.logboek=[]; D.kenmerken=[{code:'311198',balkons:'Gemeenschappelijk',kozijnen:'',bron:'',gewijzigdDoor:'',gewijzigdOp:''}];
+      state.kenmerkenEdit=true;
+      const veld2=document.createElement('div');
+      veld2.innerHTML='<select id="kmk-balkons"><option selected>Individueel</option></select>'
+                     +'<select id="kmk-kozijnen"><option selected></option></select>'
+                     +'<textarea id="kmk-bron"></textarea>';
+      document.body.appendChild(veld2);
+      window.fetch=async(u,o)=>(o&&o.method==='POST'&&String(u).includes(':append'))
+        ? new Response(JSON.stringify({updates:{updatedRange:"'Kenmerken'!A9:F9"}}),{status:200})
+        : new Response(JSON.stringify({values:[]}),{status:200});
+      await saveKenmerken();
+      await state._writeChain;
+      for(let i=0;i<100 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,5));
+      const kmkLog=D.logboek.find(r=>r.actie==='Kenmerk'&&r.veld==='Balkons');
+      eq('kenmerken: het logboek noteert de ECHTE oude waarde', kmkLog&&kmkLog.oudeWaarde, 'Gemeenschappelijk');
+      eq('kenmerken: en de nieuwe waarde ernaast', kmkLog&&kmkLog.nieuweWaarde, 'Individueel');
+      veld2.remove();
     } finally {
       window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
       D.logboek=logOud; D.kenmerken=kmkOud; state.kenmerkenEdit=editOud;
@@ -1703,6 +1723,28 @@ import { addAannemer } from "./offerte-aannemers.js";
       eq('offline poort: tweede keer geen tweede banner', document.querySelectorAll('#offline-banner').length, 1);
     } finally {
       state._netwerkFouten=nfOud; clearOfflineBanner();
+      document.querySelectorAll('.toast').forEach(t=>t.remove());
+    }
+  })();
+  // Twee dingen die pas bij het ingelogd doortesten op staging (30-07) opvielen: een tweede
+  // poging kreeg geen melding meer (de 15s-ontdubbeling slikte hem op, en stilte leest als
+  // 'gelukt'), en de statusbalk bleef 'Live' staan terwijl de banner al zei dat er geen
+  // verbinding was.
+  (()=>{
+    const nfOud=state._netwerkFouten, lblOud=document.getElementById('sync-lbl').textContent;
+    try{
+      state._netwerkFouten=5;
+      document.querySelectorAll('.toast').forEach(t=>t.remove());
+      blokkeerOffline();
+      const na1=document.querySelectorAll('.toast').length;
+      blokkeerOffline();
+      eq('offline: ook de TWEEDE poging krijgt een melding', document.querySelectorAll('.toast').length, na1+1);
+      eq('offline: de statusbalk zegt hetzelfde als de banner',
+         document.getElementById('sync-lbl').textContent, 'Offline');
+    } finally {
+      state._netwerkFouten=nfOud; clearOfflineBanner();
+      document.getElementById('sync-lbl').textContent=lblOud;
+      document.getElementById('dot').className='dot';
       document.querySelectorAll('.toast').forEach(t=>t.remove());
     }
   })();
@@ -2849,7 +2891,7 @@ import { addAannemer } from "./offerte-aannemers.js";
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '10.2');
+  eq('versie opgehoogd', APP_VERSION, '10.3');
 
   // ── Bewerkscherm ──
   truthy('vijfde formuliergroep bestaat', !!document.getElementById('fg-sub'));

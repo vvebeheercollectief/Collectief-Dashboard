@@ -1,7 +1,8 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { taakTitel, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf, _vandaagAmsterdam } from "./util.js";
+import { taakTitel, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel } from "./util.js";
+import { verwerkMeldingRijen, toonMeldingen, MAX_TOAST_BURST } from "./notifications.js";
 import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, SECS, SKEYS } from "./config.js";
 import { ACTIONS } from "./actions.js";
@@ -14,7 +15,7 @@ import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN, saveKenmerken } from "./
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk.js";
 import { _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, veiligeCel, _veiligeRij, fetchSheet, fetchSheets, vingerafdruk, rijVingerafdruk, _normCel, _rijNaarCellen, assertRowMatch, NTD_DATUM, _isOffline, _isNetwerkFout } from "./api.js";
-import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, blokkeerOffline, clearOfflineBanner, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
+import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
 import { setv, serializeNtdUndo, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, kiesModalFase, _modalFaseWoord, getInsertRow } from "./crud.js";
@@ -1494,6 +1495,124 @@ import { addAannemer } from "./offerte-aannemers.js";
      _logVolledigNodig(false, 500, true, 1000, 60000), false);
   eq('logboek vol: logboek in beeld, 60s geleden → weer volledig',
      _logVolledigNodig(false, 500, true, 1000, 61000), true);
+
+  // ── Meldingen: het venster en de beslislogica ──────────────────────────────
+  // Dit hele pad had tot nu toe NUL dekking, terwijl het bepaalt of iemand een melding van een
+  // collega te zien krijgt. De poll haalde elke 10s het hele tabblad op met een eigen verzoek;
+  // de rijen liften nu mee in de batchGet. Wat hier vastgepind wordt is vooral: er mag geen
+  // melding tussen twee rondes doorglippen.
+  eq('meldingen: ongekalibreerd venster begint bij de eerste datarij', _meldBereik(0), "'Meldingen'!A2:E");
+  eq('meldingen: venster kan nooit de koprij opslokken', _meldBereik(1), "'Meldingen'!A2:E");
+  eq('meldingen: gekalibreerd venster', _meldBereik(162), "'Meldingen'!A162:E");
+  // 40 rijen terug vanaf de laatst gelezen rij: begon het venster op 162 en kwamen er 40 rijen
+  // terug, dan is de laatste rij 201 en begint het volgende venster op 162.
+  eq('meldingen: volgend venster telt terug vanaf de laatste rij', _meldVolgendeStart(162, 40, 40), 162);
+  eq('meldingen: volgend venster na een gegroeid tabblad schuift mee', _meldVolgendeStart(162, 45, 40), 167);
+  eq('meldingen: volgend venster blijft onder de koprij vandaan', _meldVolgendeStart(2, 10, 40), 2);
+
+  (()=>{
+    const KOP = ['Timestamp','Type','Titel','Inhoud','Voor'];
+    const r = (ts, type, titel, inhoud, voor) => [ts, type, titel, inhoud, voor];
+    const prefsAan = { newtask:true, assigned:true, deadline:true, alv:true, daily:true };
+
+    // Koude start: nooit toasts voor wat er al stond, wel meteen een basislijn op de ECHTE
+    // sheet-tijdstempel (niet de browserklok — die kan scheef lopen).
+    const koud = verwerkMeldingRijen(KOP, [
+      r('2026-07-31T08:00:00.000Z','n_newtask','A','a','allen'),
+      r('2026-07-31T09:00:00.000Z','n_newtask','B','b','allen'),
+    ], null, 'Jer', prefsAan);
+    eq('meldingen: koude start toont niets', koud.toon.length, 0);
+    eq('meldingen: koude start zet de basislijn op de hoogste tijdstempel', koud.watermerk, '2026-07-31T09:00:00.000Z');
+
+    // Alleen wat nieuwer is dan de basislijn, nieuwste bovenaan.
+    const nieuw = verwerkMeldingRijen(KOP, [
+      r('2026-07-31T08:00:00.000Z','n_newtask','oud','a','allen'),
+      r('2026-07-31T09:00:00.000Z','n_newtask','nieuw1','b','allen'),
+      r('2026-07-31T09:00:01.000Z','n_newtask','nieuw2','c','allen'),
+    ], '2026-07-31T08:30:00.000Z', 'Jer', prefsAan);
+    eq('meldingen: alleen nieuwer dan de basislijn', nieuw.toon.length, 2);
+    eq('meldingen: nieuwste bovenaan', nieuw.toon[0].title, 'nieuw2');
+    eq('meldingen: basislijn schuift op naar de hoogste', nieuw.watermerk, '2026-07-31T09:00:01.000Z');
+
+    // De basislijn volgt de HOOGSTE tijdstempel, niet de laatste rij. Meerdere Apps-Script-paden
+    // hangen meldingen aan; belandt er één buiten volgorde onderaan, dan zou 'laatste rij' de
+    // basislijn te ver vooruit zetten en alles ertussen voorgoed overslaan.
+    const scheef = verwerkMeldingRijen(KOP, [
+      r('2026-07-31T09:00:05.000Z','n_newtask','laat','a','allen'),
+      r('2026-07-31T09:00:02.000Z','n_newtask','buiten volgorde','b','allen'),
+    ], '2026-07-31T09:00:00.000Z', 'Jer', prefsAan);
+    eq('meldingen: basislijn = hoogste tijdstempel, niet de laatste rij', scheef.watermerk, '2026-07-31T09:00:05.000Z');
+    eq('meldingen: buiten volgorde binnengekomen regel wordt wél getoond', scheef.toon.length, 2);
+
+    // Persoonsgericht: 'allen' is voor iedereen, een naam alleen voor die persoon, en een apparaat
+    // zonder ingestelde naam krijgt persoonsgerichte meldingen NIET te zien.
+    const gericht = [
+      r('2026-07-31T09:00:01.000Z','n_assigned','voor Jer','a','Jer'),
+      r('2026-07-31T09:00:02.000Z','n_assigned','voor Cihad','b','Cihad'),
+      r('2026-07-31T09:00:03.000Z','n_newtask','voor allen','c','allen'),
+    ];
+    const bijJer = verwerkMeldingRijen(KOP, gericht, '2026-07-31T09:00:00.000Z', 'Jer', prefsAan);
+    eq('meldingen: persoonsgericht filtert op de juiste persoon', bijJer.toon.length, 2);
+    truthy('meldingen: de melding van een ander komt niet door', !bijJer.toon.some(n=>n.title==='voor Cihad'));
+    const naamloos = verwerkMeldingRijen(KOP, gericht, '2026-07-31T09:00:00.000Z', '', prefsAan);
+    eq('meldingen: apparaat zonder naam ziet alleen wat voor allen is', naamloos.toon.length, 1);
+    eq('meldingen: en dat is de allen-melding', naamloos.toon[0].title, 'voor allen');
+    // De basislijn schuift óók op over meldingen die voor een ánder waren — die zijn wél
+    // beoordeeld. Anders zou elke ronde opnieuw dezelfde rijen langslopen.
+    eq('meldingen: basislijn schuift over andermans meldingen heen', bijJer.watermerk, '2026-07-31T09:00:03.000Z');
+
+    // Voorkeuren uit het notificatievenster.
+    const prefsUit = { ...prefsAan, daily:false };
+    const gefilterd = verwerkMeldingRijen(KOP, [
+      r('2026-07-31T09:00:01.000Z','n_daily','ochtendbericht','a','allen'),
+      r('2026-07-31T09:00:02.000Z','n_newtask','taak','b','allen'),
+    ], '2026-07-31T09:00:00.000Z', 'Jer', prefsUit);
+    eq('meldingen: uitgezette soort wordt niet getoond', gefilterd.toon.length, 1);
+    eq('meldingen: de andere soort komt gewoon door', gefilterd.toon[0].title, 'taak');
+
+    // HET KERNPUNT: valt een melding tussen twee rondes, dan moet dat gezien worden.
+    // Het venster begint hier op een regel die al nieuwer is dan de basislijn — er kan dus iets
+    // tussen zitten dat wij nooit gelezen hebben.
+    const gat = verwerkMeldingRijen(KOP, [
+      r('2026-07-31T09:00:10.000Z','n_newtask','X','a','allen'),
+    ], '2026-07-31T09:00:00.000Z', 'Jer', prefsAan);
+    truthy('meldingen: venster dat niet terugreikt tot de basislijn meldt een mogelijk gat', gat.gatMogelijk);
+    const geenGat = verwerkMeldingRijen(KOP, [
+      r('2026-07-31T08:59:00.000Z','n_newtask','oud','a','allen'),
+      r('2026-07-31T09:00:10.000Z','n_newtask','X','b','allen'),
+    ], '2026-07-31T09:00:00.000Z', 'Jer', prefsAan);
+    truthy('meldingen: venster dat de basislijn omvat meldt géén gat', !geenGat.gatMogelijk);
+
+    // Een stukke koprij mag NIET stilzwijgend alles wegfilteren: zonder deze vlag zou er nooit
+    // meer een melding komen en zou niets dat verraden.
+    const stuk = verwerkMeldingRijen(['Tijd','Soort','Kop'], [
+      r('2026-07-31T09:00:01.000Z','n_newtask','A','a','allen'),
+    ], '2026-07-31T09:00:00.000Z', 'Jer', prefsAan);
+    truthy('meldingen: stukke koprij wordt gemeld in plaats van stil alles weg te gooien', stuk.kopStuk);
+    eq('meldingen: stukke koprij laat de basislijn staan', stuk.watermerk, '2026-07-31T09:00:00.000Z');
+
+    // Rijen zonder tijdstempel of titel tellen niet mee.
+    const rommel = verwerkMeldingRijen(KOP, [
+      r('','n_newtask','geen tijd','a','allen'),
+      r('2026-07-31T09:00:01.000Z','n_newtask','','b','allen'),
+      r('2026-07-31T09:00:02.000Z','n_newtask','goed','c','allen'),
+    ], '2026-07-31T09:00:00.000Z', 'Jer', prefsAan);
+    eq('meldingen: regels zonder tijd of titel tellen niet mee', rommel.toon.length, 1);
+  })();
+
+  // De ontdubbelsleutel negeert een leidend symbool. Apps Script schrijft '📋 Nieuwe taak — …',
+  // de frontend toont 'Nieuwe taak — …' voor dezelfde gebeurtenis; op de ruwe tekst botsten die
+  // nooit, dus zag wie een taak aanmaakte hem twee keer.
+  eq('toast-sleutel: emoji-titel botst met de kale titel',
+     meldSleutel('📋 Nieuwe taak — oppakken', '201129 · VvE X'),
+     meldSleutel('Nieuwe taak — oppakken', '201129 · VvE X'));
+  eq('toast-sleutel: ➕-variant botst ook',
+     meldSleutel('➕ Toegewezen aan jou', '381105 · VvE Y'),
+     meldSleutel('Toegewezen aan jou', '381105 · VvE Y'));
+  truthy('toast-sleutel: écht verschillende meldingen blijven verschillend',
+     meldSleutel('Nieuwe taak — oppakken', 'A') !== meldSleutel('Nieuwe taak — oppakken', 'B'));
+  truthy('toast-sleutel: een symbool middenin blijft onderscheidend',
+     meldSleutel('Taak', 'A → Jer') !== meldSleutel('Taak', 'A → Cihad'));
   // En de schrijfkant: de rij-guard op Logboek vergelijkt nu de HELE regel, niet alleen de
   // timestamp. Anders overschrijft een verouderd scherm de bewerking van een collega stil — het
   // bewerken van een logregel raakt namelijk alleen kolom E/F/G.
@@ -1895,6 +2014,139 @@ import { addAannemer } from "./offerte-aannemers.js";
       document.getElementById('load-err-banner')?.remove();
     }
   })();
+
+  // ── Meldingen liften mee op de batchGet, en kosten dus 0 extra leesverzoeken ──
+  // Was: een eigen values:get elke 10 seconden = 6 van de ~13,5 leesverzoeken per minuut.
+  await (async()=>{
+    const _fetch=window.fetch, tokenOud=state.oauthToken, expiryOud=state.oauthExpiry;
+    const failsOud=state._syncFails, hashOud=state._lastDHash;
+    const mOud={s:state._meldStart, u:state._meldUit, t:state._lastNotifTs,
+                a:state._alfaMs, h:state._logHoogwater, k:state._logAnkerTs};
+    const dOud={}; Object.keys(D).forEach(k=>dOud[k]=D[k]);
+    const urls=[];
+    // Een ronde stubben: alle tabbladen leeg, behalve wat 'meld' meegeeft voor de
+    // meldingenbereiken. Zet altijd eerst de staat zoals de vorige les voorschrijft (_alfaMs en
+    // de logboek-hoogwaterstand op 0), anders varieert het aantal bereiken met wat een eerdere
+    // test achterliet.
+    const rondeStub=(meld)=>{ window.fetch=async(url)=>{
+      const d=decodeURIComponent(String(url)); urls.push(d);
+      if(d.includes('values:batchGet')){
+        if(meld==='kapot' && d.includes('Meldingen')) return new Response('{}',{status:400});
+        const ranges=[...d.matchAll(/ranges=([^&]*)/g)].map(m=>m[1]);
+        return new Response(JSON.stringify({valueRanges: ranges.map(r=>({values: (meld&&meld[r])||[]}))}),{status:200});
+      }
+      if(d.includes('values:batchGet')===false && d.includes('/values/')) return new Response(JSON.stringify({values:[]}),{status:200});
+      return new Response(JSON.stringify({values:[]}),{status:200});
+    }; };
+    const verseRonde=async(meld)=>{
+      state._syncFails=0; state._lastDHash=null; state._alfaMs=0;
+      state._logHoogwater=0; state._logAnkerTs='';
+      // backgroundWrite start in zijn finally een resync die niemand awaitet: laten leeglopen,
+      // anders keert de volgende loadAll meteen terug zónder te lezen.
+      for(let i=0;i<200 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,10));
+      urls.length=0; rondeStub(meld); await loadAll(true);
+    };
+    try{
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
+
+      // 1. Eén verzoek voor de hele ronde, mét de twee meldingenbereiken erin.
+      state._meldUit=false; state._meldStart=0; state._lastNotifTs=null;
+      await verseRonde(null);
+      eq('meldingen: de hele ronde kost één leesverzoek', urls.length, 1);
+      truthy('meldingen: de koprij zit in dezelfde batchGet', urls[0].includes(MELD_KOP));
+      truthy('meldingen: het datavenster zit in dezelfde batchGet', urls[0].includes("'Meldingen'!A2:E"));
+
+      // 2. Een verse melding komt via de gewone ronde als toast binnen, een al bekende niet.
+      document.querySelectorAll('.toast').forEach(t=>t.remove());
+      state._meldUit=false; state._meldStart=0; state._lastNotifTs='2026-07-31T09:00:00.000Z';
+      await verseRonde({
+        [MELD_KOP]: [['Timestamp','Type','Titel','Inhoud','Voor']],
+        "'Meldingen'!A2:E": [
+          ['2026-07-31T09:00:00.000Z','n_newtask','al gezien','x','allen'],
+          ['2026-07-31T09:00:05.000Z','n_newtask','verse melding','301074 · VvE Z','allen'],
+        ],
+      });
+      const titels=[...document.querySelectorAll('.toast-title')].map(e=>e.textContent);
+      truthy('meldingen: een verse melding komt via de gewone ronde binnen', titels.includes('verse melding'));
+      truthy('meldingen: een al gezien melding komt niet opnieuw', !titels.includes('al gezien'));
+      eq('meldingen: de basislijn staat daarna op de nieuwste', state._lastNotifTs, '2026-07-31T09:00:05.000Z');
+      document.querySelectorAll('.toast').forEach(t=>t.remove());
+
+      // 3. Een leeg venster (tabblad korter dan waar wij begonnen) herkalibreert naar volledig
+      //    lezen in plaats van voor altijd niets meer te zien.
+      state._meldStart=500; state._lastNotifTs='2026-07-31T09:00:00.000Z';
+      await verseRonde({ [MELD_KOP]: [['Timestamp','Type','Titel','Inhoud','Voor']] });
+      eq('meldingen: leeg venster zet het terug op volledig lezen', state._meldStart, 0);
+      eq('meldingen: en laat de basislijn ongemoeid', state._lastNotifTs, '2026-07-31T09:00:00.000Z');
+
+      // 4. HET KERNGEVAL: reikt het venster niet terug tot de basislijn, dan wordt er niets
+      //    getoond en leest de volgende ronde volledig. Een melding die ertussen viel is dan
+      //    hoogstens 8 seconden later alsnog te zien — nooit voorgoed weg.
+      document.querySelectorAll('.toast').forEach(t=>t.remove());
+      state._meldStart=190; state._lastNotifTs='2026-07-31T09:00:00.000Z';
+      await verseRonde({
+        [MELD_KOP]: [['Timestamp','Type','Titel','Inhoud','Voor']],
+        "'Meldingen'!A190:E": [['2026-07-31T09:00:30.000Z','n_newtask','te ver vooruit','x','allen']],
+      });
+      eq('meldingen: een mogelijk gat dwingt de volgende ronde tot volledig lezen', state._meldStart, 0);
+      eq('meldingen: en de basislijn blijft staan zodat er niets verloren gaat',
+         state._lastNotifTs, '2026-07-31T09:00:00.000Z');
+      eq('meldingen: er wordt in die ronde niets getoond', document.querySelectorAll('.toast').length, 0);
+
+      // 5. Ontbreekt het tabblad (verse Sheet-kopie), dan faalt de HELE batchGet. Zonder vangnet
+      //    zou élke ronde in de losse-reads-terugval belanden: 9 verzoeken per ronde, meer dan
+      //    vóór deze wijziging, en dus 'Quota exceeded' bij de eerste gebruikersactie.
+      state._meldUit=false; state._meldStart=0;
+      await verseRonde('kapot');
+      truthy('meldingen: ontbrekend tabblad zet ze deze sessie uit', state._meldUit);
+      eq('meldingen: die ronde slaagt gewoon', state._syncFails, 0);
+      eq('meldingen: zónder in de dure losse-reads-terugval te belanden',
+         urls.filter(u=>u.includes('/values/')).length, 0);
+
+      // 6. En de terugvaltak zelf haalt de meldingen bewust niet los op: dat zou de ronde van
+      //    acht naar tien verzoeken tillen voor iets wat alleen een toast oplevert.
+      state._meldUit=false; state._meldStart=0;
+      state._syncFails=0; state._lastDHash=null; state._alfaMs=0;
+      state._logHoogwater=0; state._logAnkerTs='';
+      for(let i=0;i<200 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,10));
+      urls.length=0;
+      window.fetch=async(url)=>{
+        const d=decodeURIComponent(String(url)); urls.push(d);
+        if(d.includes('values:batchGet')) return new Response('{}',{status:400});
+        return new Response(JSON.stringify({values:[]}),{status:200});
+      };
+      await loadAll(true);
+      eq('meldingen: de terugval blijft op acht losse leesverzoeken',
+         urls.filter(u=>u.includes('/values/')).length, 8);
+      eq('meldingen: en vraagt het meldingen-tabblad daar niet los op',
+         urls.filter(u=>u.includes('/values/') && u.includes('Meldingen')).length, 0);
+
+      // 7. Burst-plafond: liever vier leesbare toasts met een eerlijke telling dan een stapel
+      //    die onder de schermrand verdwijnt en nergens meer terug te vinden is.
+      document.querySelectorAll('.toast').forEach(t=>t.remove());
+      toonMeldingen([1,2,3,4,5,6].map(i=>({ts:'t'+i, type:'n_newtask', title:'melding '+i, body:'b'+i, voor:'allen'})));
+      eq('meldingen: burst-plafond op het aantal toasts per ronde',
+         document.querySelectorAll('.toast').length, MAX_TOAST_BURST+1);
+      truthy('meldingen: met een eerlijke telling van wat er niet getoond is',
+         [...document.querySelectorAll('.toast-title')].some(e=>e.textContent.includes('2 meldingen niet getoond')));
+    } finally {
+      // Eerst leeg laten lopen, mét de stub nog actief: loadAll start in zijn finally een
+      // onderdrukte ronde die niemand awaitet. Laat je die staan, dan schrijft hij ná dit blok
+      // alsnog lege lijsten in D — en faalt een véél latere test op iets wat niets met meldingen
+      // te maken heeft.
+      state._loadAgain=false; state._loadAgainLoud=false;
+      for(let i=0;i<200 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,10));
+      window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
+      state._syncFails=failsOud; state._lastDHash=hashOud;
+      state._meldStart=mOud.s; state._meldUit=mOud.u; state._lastNotifTs=mOud.t;
+      state._alfaMs=mOud.a; state._logHoogwater=mOud.h; state._logAnkerTs=mOud.k;
+      Object.keys(dOud).forEach(k=>{ D[k]=dOud[k]; });
+      document.querySelectorAll('.toast').forEach(t=>t.remove());
+      document.getElementById('dot').className='dot';
+      document.getElementById('load-err-banner')?.remove();
+    }
+  })();
+
   // ── Het bewijs van de leeslast-winst: welke bereiken loadAll écht opvraagt ──
   // Eerste ronde het hele Logboek, elke volgende ronde alleen de staart vanaf de hoogwaterstand.
   // En een handmatige verversing (niet-stil) leest altijd weer volledig — dát is het moment
@@ -2151,7 +2403,10 @@ import { addAannemer } from "./offerte-aannemers.js";
             {properties:{sheetId:44,title:"ALV's afgerond",index:1,gridProperties:{columnCount:3}}}]}),{status:200});
         // Kolom A voor de identiteitscontrole: standaard afgeleid uit hetzelfde blad,
         // zodat een ingevoegde lege rij ook hier klopt en de blokkenlogica getest wordt.
-        if(d.includes('!A')) return new Response(JSON.stringify({values:(kolomA?kolomA.map(c=>[c]):blad.slice(2).map(r=>[r[0]]))}),{status:200});
+        // De batchGet-uitzondering is nodig omdat die URL sinds de meldingen-bereiken ZELF een
+        // '!A' bevat ('Meldingen'!A1:E1). Zonder de uitzondering kreeg een batchGet hier een
+        // kolom-antwoord zonder valueRanges terug, waarna loadAll álle lijsten leegveegde.
+        if(d.includes('!A') && !u.includes('values:batchGet')) return new Response(JSON.stringify({values:(kolomA?kolomA.map(c=>[c]):blad.slice(2).map(r=>[r[0]]))}),{status:200});
         // loadAll leest sinds de quotum-fix alle tabbladen in één batchGet; die moet vóór
         // de losse-read-tak staan, want de batchGet-URL bevat óók "ALV's overzicht".
         // Naam-gestuurd i.p.v. op index: loadAll vraagt niet altijd exact dezelfde reeks (het
@@ -2214,7 +2469,7 @@ import { addAannemer } from "./offerte-aannemers.js";
           return new Response(JSON.stringify({sheets:[
             {properties:{sheetId:22,title:"ALV's overzicht",index:0,gridProperties:{columnCount:7}}},
             {properties:{sheetId:44,title:"ALV's afgerond",index:1,gridProperties:{columnCount:3}}}]}),{status:200});
-        if(d.includes('!A')) return new Response(JSON.stringify({values:[['V0'],['V1'],['V2']]}),{status:200});
+        if(d.includes('!A') && !u.includes('values:batchGet')) return new Response(JSON.stringify({values:[['V0'],['V1'],['V2']]}),{status:200});
         if(u.includes('values:batchGet'))
           return new Response(JSON.stringify({valueRanges:_batchGetStub(u, "ALV's overzicht", rijen(['V0','V1','V2']))}),{status:200});
         if(d.includes("ALV's overzicht")) return new Response(JSON.stringify({values:rijen(['V0','V1','V2'])}),{status:200});
@@ -2251,7 +2506,7 @@ import { addAannemer } from "./offerte-aannemers.js";
       let schrijfBegonnen; const bijSchrijfactie=new Promise(r=>{schrijfBegonnen=r});
       window.fetch=async(url,opt)=>{
         const u=String(url), d=decodeURIComponent(u);
-        if(d.includes('!A')) return new Response(JSON.stringify({values:[['V0']]}),{status:200});
+        if(d.includes('!A') && !u.includes('values:batchGet')) return new Response(JSON.stringify({values:[['V0']]}),{status:200});
         if(u.includes(':batchUpdate')){
           posts.push(JSON.parse(opt.body));
           schrijfBegonnen();
@@ -2954,7 +3209,7 @@ import { addAannemer } from "./offerte-aannemers.js";
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '10.6');
+  eq('versie opgehoogd', APP_VERSION, '10.7');
 
   // ── Bewerkscherm ──
   truthy('vijfde formuliergroep bestaat', !!document.getElementById('fg-sub'));

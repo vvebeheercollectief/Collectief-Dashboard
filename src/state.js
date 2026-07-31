@@ -19,8 +19,9 @@ export const state = {
   // notificaties
   oneSignalReady: false,
   isSubscribed: false,
-  _lastNotifTs: null,      // basislijn wordt op de eerste poll op de echte sheet-timestamp gezet (niet op de browserklok)
-  _notifPollTimer: null,
+  _lastNotifTs: null,      // basislijn wordt op de eerste ronde op de echte sheet-timestamp gezet (niet op de browserklok)
+  _meldStart: 0,           // eerste rij van het meldingen-venster; 0 = nog niet gekalibreerd → volledig lezen
+  _meldUit: false,         // tabblad 'Meldingen' onleesbaar (verse Sheet-kopie) → deze sessie niet meer opvragen
   _notifVisibilityHandler: null, // visibilitychange-listener; logout() koppelt 'm los
   _resyncTimer: null,      // 8s live-resync-interval (stopbaar bij logout)
   _heartbeatTimer: null,   // token-refresh heartbeat-interval (stopbaar bij logout)

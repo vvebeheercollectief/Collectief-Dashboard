@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  NOTIFICATIONS — meldingen (wachtrij/push) + in-app toasts
 // ══════════════════════════════════════
-import { esc, displayName, parseDt } from "./util.js";
+import { esc, displayName, parseDt, meldSleutel } from "./util.js";
 import { state, D, _shownToasts } from "./state.js";
 import { SID, ONESIGNAL_APP_ID } from "./config.js";
 import { ensureToken } from "./auth.js";
@@ -54,11 +54,29 @@ const TOAST_ICONS  = {
 };
 const TOAST_COLORS = { n_newtask:'var(--ac)', n_assigned:'var(--gn)', n_deadline:'var(--am)', n_alv:'var(--pu)', n_daily:'var(--am)', test:'var(--ac)' };
 const TOAST_DURATION = 5000;
-// Dedup-venster: vangt de dubbele toast (zelfde event via directe fire én via de 10s-poll), die
-// binnen ~10s arriveert. Bewust korter dan voorheen (30s) zodat twee échte, snel-opeenvolgende
-// acties met toevallig identieke titel+tekst niet onnodig lang worden onderdrukt; ruim boven de
-// poll-cadans van 10s zodat de cross-pad-dedup intact blijft.
+// Dedup-venster: vangt de dubbele toast (zelfde event via directe fire én via de meelezende
+// meldingen-ronde), die binnen ~8s arriveert. Bewust korter dan voorheen (30s) zodat twee échte,
+// snel-opeenvolgende acties met toevallig identieke titel+tekst niet onnodig lang worden
+// onderdrukt; ruim boven de rondecadans van 8s zodat de kruispad-dedup intact blijft.
+// De sleutel loopt via meldSleutel() en niet over de ruwe tekst — zie de uitleg daar.
 const TOAST_DEDUP_MS = 15000;
+
+// Hoeveel toasts er hoogstens tegelijk uit één ronde komen. Zonder plafond stort een inhaalronde
+// (tabblad een weekend verborgen, of de deadline-motor die 's nachts 23 meldingen in 40 seconden
+// wegschrijft) de hele achterstand in één keer uit: er passen er een stuk of elf op het scherm,
+// de rest wordt onder de onderrand getekend en is na vijf seconden weg. En weg is écht weg — het
+// tabblad Meldingen wordt nergens in de app getoond. Liever vier leesbare meldingen plus een
+// eerlijke telling van wat je gemist hebt.
+const MAX_TOAST_BURST = 4;
+
+// Elke systeemmelding een eigen tag. Stond op 'cd-' + Date.now(), maar de lus die de nieuwe
+// meldingen afwerkt is synchroon: meerdere meldingen uit dezelfde ronde landen in dezelfde
+// milliseconde, krijgen dezelfde tag en de Notification-API vervángt er dan één. Van N
+// systeemmeldingen bleef er precies één over — en door de nieuwste-eerst-volgorde was dat de
+// oudste. Precies in het scenario waar de systeemmelding voor bedoeld is: venster open, niet in
+// focus. Op productie komen meldingen aantoonbaar in paren binnen één ronde binnen.
+let _notifSeq = 0;
+const _notifTag = () => 'cd-' + Date.now() + '-' + (++_notifSeq);
 
 // Icoon-vak links in de toast: kent zowel de notificatie-iconen (TOAST_ICONS)
 // als de algemene set (ICONS). Zonder (geldige) naam → geen vak, layout als vanouds.
@@ -77,7 +95,7 @@ const toastIco = (naam) => {
 function showToast(title, msg, color, icoNaam, opts) {
   const o = opts || {};
   if (!o.geenDedup) {
-    const key = title + '|' + msg;
+    const key = meldSleutel(title, msg);
     if (_shownToasts.has(key)) return;
     _shownToasts.add(key);
     setTimeout(() => _shownToasts.delete(key), TOAST_DEDUP_MS);
@@ -102,11 +120,12 @@ function showToast(title, msg, color, icoNaam, opts) {
 
   // Systeemmelding wanneer pagina niet in focus (ander venster of tabblad)
   if (!o.geenSysteemmelding && 'Notification' in window && Notification.permission === 'granted' && !document.hasFocus()) {
+    const tag = _notifTag();
     try {
-      new Notification(title, { body: msg, icon: 'icon-192.png', badge: 'icon-192.png', tag: 'cd-' + Date.now() });
+      new Notification(title, { body: msg, icon: 'icon-192.png', badge: 'icon-192.png', tag });
     } catch(e) {
       navigator.serviceWorker?.ready.then(reg => reg.showNotification(title, {
-        body: msg, icon: 'icon-192.png', badge: 'icon-192.png', tag: 'cd-' + Date.now()
+        body: msg, icon: 'icon-192.png', badge: 'icon-192.png', tag
       })).catch(() => {});
     }
   }
@@ -232,56 +251,83 @@ function getNotifPrefs() {
   };
 }
 
-async function pollNotifsForToast() {
-  try {
-    const r = await fetchSheet('Meldingen');
-    if (!r || r.length < 2) return;
-    const h = r[0].map(c => (c||'').toString().toLowerCase().trim());
-    const iTs=h.indexOf('timestamp'), iTi=h.indexOf('titel'), iIn=h.indexOf('inhoud'), iVo=h.indexOf('voor'), iTy=h.indexOf('type');
-    const rows = r.slice(1).reverse()
-      .map(row => ({ ts:(row[iTs]||'').toString(), type:(row[iTy]||'').toString(), title:(row[iTi]||'').toString(), body:(row[iIn]||'').toString(), voor:(row[iVo]||'').toString() }))
-      .filter(n => n.ts && n.title);
-    if (!rows.length) return;
+const TYPE_NAAR_PREFS = { n_newtask:'newtask', n_assigned:'assigned', n_deadline:'deadline', n_alv:'alv', n_daily:'daily' };
 
-    const who   = getCurrentWho();
-    const prefs = getNotifPrefs();
-    const typeToPrefs = { n_newtask:'newtask', n_assigned:'assigned', n_deadline:'deadline', n_alv:'alv', n_daily:'daily' };
+// Beslist wat er getoond moet worden. PUUR: geen netwerk, geen DOM, geen state — daarom voor het
+// eerst los te testen. Hij las voorheen zélf elke 10 seconden het hele tabblad op; de rijen komen
+// nu mee in de batchGet van loadAll (zie _meldBereik in data.js).
+//
+// Retourneert:
+//   toon        — de meldingen die dit moment op het scherm horen, nieuwste eerst
+//   watermerk   — de nieuwe basislijn (de HOOGSTE tijdstempel, niet de laatste rij: meldingen
+//                 worden door meerdere Apps-Script-paden aangehangen, dus een regel kan
+//                 buiten volgorde onderaan belanden en zou de basislijn te ver vooruit zetten)
+//   gatMogelijk — het gelezen venster reikt niet terug tot de basislijn, dus er kan een melding
+//                 tussen gevallen zijn die wij nooit gezien hebben → volledig herlezen
+//   kopStuk     — de koprij mist de kolom Timestamp of Titel; zónder deze vlag zou de filtering
+//                 hieronder stilzwijgend ÁLLE rijen weggooien en zou er nooit meer een melding
+//                 komen, zonder één spoor op het scherm of in de console
+function verwerkMeldingRijen(koppen, rijen, watermerk, who, prefs) {
+  const leeg = { toon: [], watermerk, gatMogelijk: false, kopStuk: false };
+  const h = (koppen || []).map(c => (c||'').toString().toLowerCase().trim());
+  const iTs=h.indexOf('timestamp'), iTi=h.indexOf('titel'), iIn=h.indexOf('inhoud'), iVo=h.indexOf('voor'), iTy=h.indexOf('type');
+  if (iTs < 0 || iTi < 0) return { ...leeg, kopStuk: true };
 
-    // Bij cold-start (_lastNotifTs === null) tonen we GEEN toasts voor al bestaande meldingen;
-    // we zetten alleen de basislijn op de echte (server-)timestamp van de nieuwste rij. Voorheen
-    // werd die basislijn op de BROWSERklok gezet (state.js), wat bij klokscheef oude meldingen
-    // als nieuw toonde of juist nieuwe miste.
-    const newRows = state._lastNotifTs == null ? [] : rows.filter(n => n.ts > state._lastNotifTs);
-    for (const n of newRows) {
-      // Persoonsgerichte melding alleen tonen aan de juiste persoon. Op een apparaat zonder
-      // ingestelde naam (who==='') NIET tonen (geen 'who &&'-kortsluiting → anders lekt het).
-      if (n.voor && n.voor !== 'allen' && n.voor !== who) continue;
-      const prefKey = typeToPrefs[n.type];
-      if (prefKey && prefs[prefKey] === false) continue;
-      showToast(n.title, n.body, TOAST_COLORS[n.type] || 'var(--ac)', n.type);
-    }
-    if (state._lastNotifTs == null || newRows.length) state._lastNotifTs = rows[0].ts;
-  } catch(e) { /* stil falen */ }
+  const rows = (rijen || [])
+    .map(row => ({ ts:(row[iTs]||'').toString(), type:(row[iTy]||'').toString(), title:(row[iTi]||'').toString(), body:(row[iIn]||'').toString(), voor:(row[iVo]||'').toString() }))
+    .filter(n => n.ts && n.title);
+  if (!rows.length) return leeg;
+
+  const hoogste = rows.reduce((m, n) => n.ts > m ? n.ts : m, '');
+  const oudste  = rows.reduce((m, n) => (m === '' || n.ts < m) ? n.ts : m, '');
+  const gatMogelijk = watermerk != null && oudste > watermerk;
+
+  // Koude start: GEEN toasts voor al bestaande meldingen; alleen de basislijn zetten op de echte
+  // (server-)tijdstempel. Voorheen werd die op de BROWSERklok gezet, wat bij een scheve klok oude
+  // meldingen als nieuw toonde of juist nieuwe miste.
+  if (watermerk == null) return { toon: [], watermerk: hoogste, gatMogelijk: false, kopStuk: false };
+
+  const toon = rows
+    .filter(n => n.ts > watermerk)
+    // Persoonsgerichte melding alleen aan de juiste persoon. Op een apparaat zonder ingestelde
+    // naam (who==='') NIET tonen (geen 'who &&'-kortsluiting → anders lekt het).
+    .filter(n => !(n.voor && n.voor !== 'allen' && n.voor !== who))
+    .filter(n => { const k = TYPE_NAAR_PREFS[n.type]; return !(k && prefs[k] === false); })
+    .sort((a, b) => a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0);   // nieuwste bovenaan
+
+  return { toon, watermerk: hoogste > watermerk ? hoogste : watermerk, gatMogelijk, kopStuk: false };
+}
+
+// Zet de uitkomst op het scherm, met een plafond op het aantal toasts per ronde.
+function toonMeldingen(lijst) {
+  const eerste = (lijst || []).slice(0, MAX_TOAST_BURST);
+  for (const n of eerste) showToast(n.title, n.body, TOAST_COLORS[n.type] || 'var(--ac)', n.type);
+  const rest = (lijst || []).length - eerste.length;
+  // geenDedup: deze telling MOET verschijnen, ook als er net een gelijkluidende stond — stilte
+  // zou hier lezen als 'er was niets meer'.
+  if (rest > 0) showToast(`+ ${rest} meldingen niet getoond`, 'Er kwamen er meer binnen dan er op het scherm passen.', 'var(--ac)', '', { geenDedup: true });
 }
 
 // Benoemde handler (i.p.v. anoniem) zodat logout() 'm netjes kan loskoppelen, met een
-// token-guard zodat een uitgelogde tab niet alsnog gaat pollen/laden.
+// token-guard zodat een uitgelogde tab niet alsnog gaat laden.
+// De meldingen liften mee op loadAll, dus één ronde haalt hier álles op: verse lijsten én de
+// meldingen die tijdens het verborgen zijn binnenkwamen.
 function onNotifVisibility() {
   if (document.hidden || !state.oauthToken) return;
-  pollNotifsForToast();
   // Zelfde guards als de 8s-poll: een loadAll mag geen open modal / bulk-selectie / lopende
   // animatie / undo onder de gebruiker vandaan trekken (resync gooit _rowCache + D om).
   if (document.querySelector('.modal-bg.open')) return;
   if (state.bulkMode || state._animBusy || state._undoInFlight || state.pendingWrites > 0) return;
-  if (state._loadInFlight) return; // een lopende/ingeplande poll levert toch verse data → geen extra loadAll erbovenop stapelen bij elke tabwissel
+  if (state._loadInFlight) return; // een lopende/ingeplande ronde levert toch verse data → geen extra loadAll erbovenop stapelen bij elke tabwissel
   loadAll(true);
 }
 
-function startNotifPoll() {
-  pollNotifsForToast();
-  if (state._notifPollTimer) clearInterval(state._notifPollTimer); // idempotent: geen dubbele poll
-  // hidden-guard: een verborgen tab hoeft de 'Meldingen'-sheet niet elke 10s te lezen (quota/batterij)
-  state._notifPollTimer = setInterval(() => { if (document.hidden) return; pollNotifsForToast(); }, 10000);
+// Was: een eigen setInterval die elke 10 seconden het hele tabblad 'Meldingen' ophaalde — 6 van de
+// 13,5 leesverzoeken per minuut, bijna de helft van het Google-quotum, voor één tabblad dat nergens
+// in het scherm terechtkomt. De rijen komen nu mee in de batchGet die er tóch al is (zie
+// _meldBereik in data.js), wat 0 extra verzoeken kost. Hier blijft alleen het aanhaken op
+// tabwissel over.
+function initMeldingen() {
   document.removeEventListener('visibilitychange', onNotifVisibility);
   document.addEventListener('visibilitychange', onNotifVisibility);
   state._notifVisibilityHandler = onNotifVisibility; // logout() koppelt 'm via state los
@@ -465,8 +511,8 @@ OneSignalDeferred.push(async function(OneSignal) {
 // ══════════════════════════════════════
 
 export {
-  fireNotifEvent, TOAST_ICONS, TOAST_COLORS, TOAST_DURATION, showToast, dismissToast, showUndoToast,
-  undoComplete, undoDelete, getNotifPrefs, pollNotifsForToast, startNotifPoll, openNotifModal, closeNotifModal,
+  fireNotifEvent, TOAST_ICONS, TOAST_COLORS, TOAST_DURATION, MAX_TOAST_BURST, showToast, dismissToast, showUndoToast,
+  undoComplete, undoDelete, getNotifPrefs, verwerkMeldingRijen, toonMeldingen, initMeldingen, openNotifModal, closeNotifModal,
   refreshNotifUI, onWhoChange, getCurrentWho, saveNotifPrefs, waitForOneSignal, subscribeNotifs,
   unsubscribeNotifs, sendTestNotif,
 };

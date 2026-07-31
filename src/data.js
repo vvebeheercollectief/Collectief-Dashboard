@@ -13,7 +13,7 @@ import { parseKenmerken } from "./kenmerken.js";
 import { checkSecties, checkNummers } from "./structuurcheck.js";
 import { ico } from "./icons.js";
 // (kringverwijzing data ⇄ kenmerken: aanroepen gebeuren op runtime — live bindings, veilig)
-import { showToast } from "./notifications.js";
+import { showToast, verwerkMeldingRijen, toonMeldingen, getCurrentWho, getNotifPrefs } from "./notifications.js";
 // (kringverwijzing data ⇄ main: renderAll wordt pas op runtime aangeroepen — live binding, veilig.
 //  Bewust niet ontvlochten: een aparte render-orchestrator zou puur cosmetisch zijn, geen bug.)
 import { renderAll } from "./main.js";
@@ -335,6 +335,61 @@ function _kijktNaarAlfa(){
     .some(id=>document.getElementById(id)?.classList.contains('active'));
 }
 
+// ── 'Meldingen': meeliften op de batchGet in plaats van een eigen verzoek ──
+// Dit tabblad werd elke 10 seconden in zijn geheel opgehaald met een eigen values:get, buiten
+// POLL_TABS om: 6 van de ~13,5 leesverzoeken per minuut, bijna de helft van het Google-quotum van
+// 60 per minuut. Meesturen in de batchGet die er tóch al is kost 0 extra verzoeken (zie
+// fetchSheets), en brengt het totaal op 7,5 per minuut.
+//
+// Waarom een VENSTER en niet het hele tabblad: de cadans gaat van 6 naar 7,5 rondes per minuut,
+// dus alles meesturen zou het leesvolume juist opdrijven (7,5 × 34 kB tegen 6 × 34 kB nu).
+//
+// Waarom GEEN anker op rijnummer zoals bij het Logboek: cd_schrijfMelding houdt het tabblad op
+// MELDING_MAX=200 rijen door bovenaan te knippen, en het zit dáár nu op (gemeten op productie:
+// laatste gevulde rij 201). Elke nieuwe melding verschuift dus álle rijnummers. Een rij-anker zou
+// bij élke melding mismatchen en een volledige herlezing uitlokken: 2 verzoeken per ronde in plaats
+// van 1, het tegenovergestelde van de bedoeling. De identiteit hier is de tijdstempel, niet de rij.
+//
+// De koprij komt als apart minibereik mee (~50 bytes, zelfde verzoek): de verwerking zoekt de
+// kolommen op naam op, en een staartbereik bevat de koprij niet.
+const MELD_MARGE=40;
+const MELD_KOP="'Meldingen'!A1:E1";
+const _meldBereik=(start)=>`'Meldingen'!A${Math.max(2,start||2)}:E`;
+// Volgend venster: eindig bij de laatst gelezen rij en tel MELD_MARGE terug. De marge is gemeten,
+// niet gegokt: de zwaarste burst op productie was 23 meldingen in 40 seconden (de deadline-motor,
+// 31-07 04:27:47→04:28:27), dus ~0,6 rij per seconde. 40 rijen dekt ruim een minuut achterstand,
+// tegen een cadans van 8 seconden. En als het tóch niet genoeg is, ziet _verwerkMeldingen dat —
+// zie gatMogelijk. Puur, dus los testbaar.
+function _meldVolgendeStart(start, aantal, marge){
+  const laatsteRij=(start||2)+(aantal||0)-1;
+  return Math.max(2, laatsteRij-(marge||MELD_MARGE)+1);
+}
+
+// Verwerkt de meldingen-lezing. Doet zelf GEEN netwerkverkeer: staat er een gat, dan leest de
+// vólgende ronde volledig — dat kost niets extra omdat het bereik in dezelfde batchGet zit
+// (anders dan bij het Logboek, waar een verschoven anker wél een tweede verzoek kost).
+function _verwerkMeldingen(R, bereik, start){
+  const kop=R[MELD_KOP], rijen=R[bereik];
+  if(kop===undefined || rijen===undefined) return;   // niet gevraagd deze ronde → niets doen
+  // Leeg venster: het tabblad is korter dan waar wij begonnen (opgeschoond, of MELDING_MAX omlaag).
+  // Niets verwerken, basislijn laten staan, volgende ronde vanaf rij 2.
+  if(!rijen.length){ if(start>2) state._meldStart=0; return; }
+  const uit=verwerkMeldingRijen(kop[0]||[], rijen, state._lastNotifTs, getCurrentWho(), getNotifPrefs());
+  if(uit.kopStuk){ console.warn('[meldingen] koprij mist Timestamp/Titel — niets verwerkt'); return; }
+  // Reikt het venster niet terug tot de basislijn, dan kan er een melding tussen gevallen zijn.
+  // Volgende ronde volledig lezen en deze ronde niets tonen; de basislijn blijft staan, dus er
+  // gaat niets verloren — het komt hoogstens 8 seconden later.
+  // Bij een volledige lezing (start===2) accepteren we altijd: verder terug dan rij 2 bestaat niet
+  // meer op dit tabblad, en anders zou dit eeuwig blijven herlezen zonder ooit iets te tonen.
+  if(start>2 && uit.gatMogelijk){
+    console.warn('[meldingen] venster reikt niet tot de basislijn — volgende ronde volledig');
+    state._meldStart=0; return;
+  }
+  toonMeldingen(uit.toon);
+  state._lastNotifTs=uit.watermerk;
+  state._meldStart=_meldVolgendeStart(start, rijen.length, MELD_MARGE);
+}
+
 // Hoogwaterstand + anker uit de RUWE lezing: het hoogste rijnummer dat we gezien hebben en de
 // kolom-A-waarde die daar stond. Bewust de ruwe rijen en niet D.logboek: parseLogboek filtert
 // verborgen acties eruit en keert de lijst om, dus de laatste regel van D.logboek is niet per se
@@ -420,24 +475,50 @@ async function loadAll(silent){
     const alfaMee=_alfaNodig(!silent, _kijktNaarAlfa(), state._alfaMs, Date.now());
     const namen=POLL_TABS.map(n=>n==='Logboek' ? logNaam : n)
                          .filter(n=>alfaMee || n!=="ALV's afgerond");
+    // De meldingenbereiken zitten bewust NIET in POLL_TABS: ze landen nergens in D en mogen nooit
+    // meetellen als een tabblad waarvan het dashboard afhangt.
+    const meldStart=Math.max(2, state._meldStart||2);
+    const meldBereik=_meldBereik(meldStart);
+    const meldBereiken=state._meldUit ? [] : [MELD_KOP, meldBereik];
     let R;
     try{
       // Eén batchGet i.p.v. acht losse reads — zie fetchSheets: acht aparte verzoeken
       // per poll was precies de Google-leeslimiet van 60 per minuut, waardoor elke
       // gebruikersactie erbovenop 'Quota exceeded' opleverde.
-      R=await _withRetry(()=>fetchSheets(namen));
+      R=await _withRetry(()=>fetchSheets(namen.concat(meldBereiken)));
     }catch(e){
-      // Terugval op losse reads. batchGet faalt in z'n geheel als één tabblad ontbreekt;
-      // de oude weg levert de optionele tabbladen dan alsnog los aan (duurder, maar werkt).
-      // Per tabblad beslissen of hij mag falen: een uniforme .catch zou een ontbrekend
-      // 'Nog Te Doen' in stilte als lege lijst doorlaten en het dashboard leegvegen.
-      console.warn('batchGet mislukt, terugval op losse reads:', e.message);
-      R={};
-      await Promise.all(namen.map(async n=>{
-        R[n]=VERPLICHTE_TABS.has(n) ? await lees(n) : await lees(n).catch(()=>[]);
-      }));
+      // batchGet faalt in z'n geheel als één bereik niet bestaat, en 'Meldingen' wordt door Apps
+      // Script pas lui aangemaakt bij de eerste melding. Op een verse Sheet-kopie zou élke ronde
+      // dus stranden en in de dure terugval belanden — méér verzoeken dan vóór deze wijziging,
+      // waarmee een storing in het meldingenpad het hele dashboard zou meetrekken. Eén keer
+      // proberen zonder de meldingenbereiken; lukt dat, dan blijven ze deze sessie achterwege.
+      // Alleen bij 400 (onparseerbaar bereik): 429/5xx zijn tijdelijk en heeft _withRetry al gehad.
+      if(e.status===400 && meldBereiken.length && !state._meldUit){
+        try{
+          R=await fetchSheets(namen);
+          state._meldUit=true;
+          console.warn('[meldingen] tabblad niet leesbaar — meldingen blijven deze sessie uit');
+        }catch(_){ R=null; }
+      }
+      if(!R){
+        // Terugval op losse reads. De oude weg levert de optionele tabbladen dan alsnog los aan
+        // (duurder, maar werkt). Per tabblad beslissen of hij mag falen: een uniforme .catch zou
+        // een ontbrekend 'Nog Te Doen' in stilte als lege lijst doorlaten en het dashboard
+        // leegvegen. De meldingen gaan hier bewust NIET los opgehaald worden: dat zou de ronde
+        // van 8 naar 10 verzoeken tillen voor iets wat alleen een toast oplevert.
+        console.warn('batchGet mislukt, terugval op losse reads:', e.message);
+        R={};
+        await Promise.all(namen.map(async n=>{
+          R[n]=VERPLICHTE_TABS.has(n) ? await lees(n) : await lees(n).catch(()=>[]);
+        }));
+      }
     }
     state._syncFails=0; // alle reads geslaagd
+    // Meldingen VÓÓR de pendingWrites-terugkeer hieronder: een toast is alleen-lezen en heeft geen
+    // belang bij de regel 'de optimistische stand is leidend'. Die regel bestaat om D niet te
+    // overschrijven, niet om meldingen tegen te houden. Stond dit bij de zetAls-regels, dan zou
+    // een vinkje dat net tijdens de lezing gezet wordt de al opgehaalde meldingen weggooien.
+    _verwerkMeldingen(R, meldBereik, meldStart);
     // Kwam er tijdens het lezen een schrijfactie tussen? Dan is de lokale (optimistische)
     // staat leidend; de eigen resync van die schrijfactie haalt zo de verse data op.
     if(state.pendingWrites>0){ if(!silent) setSynced(); return; }
@@ -608,6 +689,7 @@ function parseAlfa(rows){
 export {
   backgroundWrite, schrijfActieLoopt, metWriteMarkering, setSyncing, setSaving, setSynced, setSyncErr, dot, loadAll, magPollen, parseSections, parseAlvo, parseAlfa, parseHerhaal,
   POLL_TABS, VERPLICHTE_TABS, _logBereik, _zetLogAnker, _verwerkLogboek, _logVolledigNodig, _alfaNodig,
+  MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen,
   blokkeerOffline, showOfflineBanner, clearOfflineBanner, setSyncOffline,
   bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade,
 };

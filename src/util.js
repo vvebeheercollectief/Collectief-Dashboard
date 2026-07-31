@@ -15,6 +15,16 @@ function filt(rows,q){
   return rows.filter(r=>Object.values(r).some(v=>String(v??'').toLowerCase().includes(q)));
 }
 
+// Sleutel voor het ontdubbelen van toasts, ongevoelig voor een leidend symbool.
+// Dezelfde gebeurtenis komt langs twee wegen binnen met een ANDERE titel: de frontend toont
+// 'Nieuwe taak — oppakken' (notifications.js) en Apps Script schrijft '📋 Nieuwe taak — oppakken'
+// naar het tabblad Meldingen (Notifications.gs). Op de ruwe tekst botsten die nooit, waardoor de
+// kruispad-ontdubbeling die notifications.js belooft in de praktijk nóóit werkte: wie een taak
+// aanmaakte, zag hem twee keer. Alleen het begin wordt geschoond — een emoji middenin de tekst
+// blijft betekenisvol en mag het onderscheid tussen twee meldingen niet wegpoetsen.
+const _zonderLeidendSymbool=(s)=>(s||'').toString().replace(/^[^\p{L}\p{N}]+/u,'').trim();
+const meldSleutel=(titel,msg)=>_zonderLeidendSymbool(titel)+'|'+_zonderLeidendSymbool(msg);
+
 // ══════════════════════════════════════
 //  AUTO-PRIORITEIT (zie docs/superpowers/specs/2026-06-02-auto-prioriteit-design.md)
 // ══════════════════════════════════════
@@ -334,4 +344,5 @@ export {
   emptyRow, esc, vveCodeSpan, subBadge, coerceDagenVooraf,
   parseOff, offerteFase,
   parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes,
+  meldSleutel, _zonderLeidendSymbool,
 };

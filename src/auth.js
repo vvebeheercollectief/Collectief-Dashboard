@@ -2,7 +2,7 @@
 //  OAUTH / login
 // ══════════════════════════════════════
 import { clientId, ALLOWED_EMAILS } from "./config.js";
-import { state } from "./state.js";
+import { state, _shownToasts } from "./state.js";
 import { loadAll, laadUitCache, wisCache } from "./data.js";
 import { toonKaart } from "./login-splash.js";
 
@@ -121,7 +121,11 @@ function logout(reden){
   state.oauthToken=null; state.oauthExpiry=0; state.currentUserEmail=null;
   try{ ['oauthToken','oauthExpiry','currentUserEmail'].forEach(k=>sessionStorage.removeItem(k)); }catch(_){}
   wisCache();   // anders blijft de stand van de vorige gebruiker op een gedeelde computer staan
-  if(state._notifPollTimer){ clearInterval(state._notifPollTimer); state._notifPollTimer=null; }
+  // Meldingen-stand terug naar koude start. Zonder dit zou een volgende gebruiker op dezelfde
+  // computer verder werken met de basislijn én de al-getoond-lijst van de vórige: meldingen van
+  // vóór zijn sessie zouden alsnog als toast langskomen, of juist stil overgeslagen worden.
+  state._lastNotifTs=null; state._meldStart=0; state._meldUit=false;
+  try{ _shownToasts.clear(); }catch(_){}
   if(state._resyncTimer){ clearInterval(state._resyncTimer); state._resyncTimer=null; }
   if(state._heartbeatTimer){ clearInterval(state._heartbeatTimer); state._heartbeatTimer=null; }
   if(state._notifVisibilityHandler){ document.removeEventListener('visibilitychange', state._notifVisibilityHandler); state._notifVisibilityHandler=null; }

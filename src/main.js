@@ -14,7 +14,7 @@ import {
 import { openAiHelp, closeAiHelp, buildAiPrompt, parseAiAnswer } from './ai.js';
 import {
   openNotifModal, closeNotifModal, onWhoChange, saveNotifPrefs,
-  subscribeNotifs, unsubscribeNotifs, sendTestNotif, getCurrentWho, startNotifPoll,
+  subscribeNotifs, unsubscribeNotifs, sendTestNotif, getCurrentWho, initMeldingen,
 } from './notifications.js';
 import {
   openModal, closeModal, submitTask, doCompleteTask, closeCompleteModal,
@@ -260,7 +260,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('notif-subscribe-btn').onclick = subscribeNotifs;
   document.getElementById('notif-unsubscribe-btn').onclick = unsubscribeNotifs;
   document.getElementById('notif-test-btn').onclick = () => sendTestNotif(getCurrentWho(), 'Test melding', 'Notificaties werken correct op dit apparaat!');
-  startNotifPoll();
+  initMeldingen();
 
   // Waarschuw bij het sluiten zolang er een schrijfactie loopt. De browser toont zijn eigen,
   // niet-aanpasbare tekst; werkt op de desktop en op telefoon/PWA vrijwel niet.

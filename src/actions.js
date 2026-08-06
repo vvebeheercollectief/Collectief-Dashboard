@@ -70,10 +70,12 @@ export const ACTIONS = {
   'toast-sluiten':         (el) => dismissToast(el.closest('.toast')),
   'taak-wegleggen':        (el) => openSnoozeModal(+el.dataset.rid),
   'snooze-kies':           (el) => snoozeKies(+el.dataset.dagen),
-  'offerte-aann-open':     (el) => { const c=el.dataset.code; if(state.offerteAannOpen.has(c)) state.offerteAannOpen.delete(c); else state.offerteAannOpen.add(c); renderNtd(); },
-  'offerte-aann-binnen':   (el) => toggleAannemerBinnen(el.dataset.code, +el.dataset.idx),
-  'offerte-aann-verwijder':(el) => verwijderAannemer(el.dataset.code, +el.dataset.idx),
-  'offerte-aann-add':      (el) => { const inp=el.closest('.of-aann-add')?.querySelector('.of-aann-input'); if(!inp) return; const v=inp.value; inp.value=''; addAannemer(el.dataset.code, v); },
+  // data-aann = de traject-sleutel (vast taaknummer), niet de VvE-code: twee offerte-trajecten
+  // van dezelfde VvE moeten los van elkaar open/dicht kunnen en los beschreven worden.
+  'offerte-aann-open':     (el) => { const s=el.dataset.aann; if(state.offerteAannOpen.has(s)) state.offerteAannOpen.delete(s); else state.offerteAannOpen.add(s); renderNtd(); },
+  'offerte-aann-binnen':   (el) => toggleAannemerBinnen(el.dataset.aann, +el.dataset.idx),
+  'offerte-aann-verwijder':(el) => verwijderAannemer(el.dataset.aann, +el.dataset.idx),
+  'offerte-aann-add':      (el) => { const inp=el.closest('.of-aann-add')?.querySelector('.of-aann-input'); if(!inp) return; const v=inp.value; inp.value=''; addAannemer(el.dataset.aann, v); },
   'herhaal-bewerken':      (el) => openHerhaalModal(+el.dataset.hid),
   'herhaal-status':        (el) => toggleHerhaalStatus(+el.dataset.hid),
   'herhaal-verwijderen':   ()   => deleteHerhaal(),
@@ -127,9 +129,9 @@ export function initActions() {
     // Offerte-aannemer toevoegen: Enter in het inline invoerveld (delegatie: veld leeft kort)
     if (e.target && e.target.classList && e.target.classList.contains('of-aann-input') && e.key === 'Enter') {
       e.preventDefault();
-      const code = e.target.dataset.code, val = e.target.value;
+      const sleutel = e.target.dataset.aann, val = e.target.value;
       e.target.value = '';
-      addAannemer(code, val);
+      addAannemer(sleutel, val);
     }
     // Chat-agent: Enter in het vraagveld = versturen
     if (e.target && e.target.id === 'chat-input' && e.key === 'Enter') {

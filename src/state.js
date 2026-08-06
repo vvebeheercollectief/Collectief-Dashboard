@@ -84,7 +84,7 @@ export const state = {
   _completeBusy: false,    // afhandelen loopt (dubbelklik-rem over het async-gat)
   _alvoFlagBezig: null,    // Set van 'idx:veld' met lopende ALV-vinkjes (dubbelklik-rem)
   _snoozeRow: null,        // taak waarvoor de wegleggen-modal open staat (Fase 4)
-  offerteAannOpen: new Set(),   // codes van trajecten met uitgeklapt aannemers-paneel
+  offerteAannOpen: new Set(),   // sleutels (aannSleutel) van trajecten met uitgeklapt aannemers-paneel
   vveCode: null,           // VvE op de per-VvE-pagina (Fase 5)
   vveTerug: null,          // pagina waar de gebruiker vandaan kwam vóór het dossier (terug-pijltje)
   _vveAfAlles: false,      // per-VvE: alle afgeronde taken uitgeklapt

@@ -1,7 +1,21 @@
 // Collectief Dashboard — Service Worker
 // Verhoog versie bij elke nieuwe deploy zodat clients de nieuwe cache pakken.
 
-const CACHE_VERSION = 'cd-v102';
+// OneSignal draait BEWUST in deze service worker (in het OneSignal-dashboard staat sw.js als
+// worker ingesteld, en notifications.js geeft hetzelfde pad door). Zonder deze regel komt er
+// wel een push binnen, maar is er niemand die hem tekent: dit bestand had geen enkele
+// 'push'- of 'notificationclick'-afhandeling, waardoor pushmeldingen nooit zijn aangekomen.
+// LET OP de bestandsnaam: in v16 heet de worker OneSignalSDK.sw.js — het oudere
+// OneSignalSDKWorker.js geeft een 404 en zou het probleem stil laten bestaan.
+// In try/catch: is de CDN even onbereikbaar, dan mag dat de hele service worker (en daarmee
+// de offline-schil van het dashboard) niet onderuithalen — dan vervalt alleen de push.
+try {
+  importScripts('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js');
+} catch (e) {
+  console.warn('[sw] OneSignal-worker niet geladen, pushmeldingen uit:', e);
+}
+
+const CACHE_VERSION = 'cd-v103';
 const APP_SHELL = [
   './',
   './index.html',

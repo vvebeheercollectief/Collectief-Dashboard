@@ -2,7 +2,7 @@
 //  RENDER-TABEL — generieke tabel/paginering (thead, tbody, rij-render, paginatie)
 //  Verplaatst uit render-lijsten.js (Batch D / punt 11) — zuivere refactor, geen gedragswijziging.
 // ══════════════════════════════════════
-import { esc, vveCodeSpan, persBadges, subBadge, offProg, emptyRow, berekenPrioriteit, opvolgStatus, taakTitel, kortDatum, _verschilInKalenderdagen, _vandaagAmsterdam, STIL_DREMPEL_DAGEN } from "./util.js";
+import { esc, vveCodeSpan, persBadges, subBadge, offProg, emptyRow, berekenPrioriteit, opvolgStatus, taakTitel, kortDatum, _verschilInKalenderdagen, _vandaagAmsterdam, STIL_DREMPEL_DAGEN, aannSleutel } from "./util.js";
 import { SECS, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { bulkGeselecteerd } from "./bulk.js";
@@ -173,7 +173,7 @@ function rowNtd(r,sec){
     ov.weggelegd ? 'snooze-row' : '',
     state.expandedRows.has(''+r._row) ? 'expanded' : ''
   ].filter(Boolean).join(' ');
-  const aannRow = (sec==='OFFERTE-TRAJECTEN' && state.offerteAannOpen.has(r.code))
+  const aannRow = (sec==='OFFERTE-TRAJECTEN' && state.offerteAannOpen.has(aannSleutel(r)))
     ? `<tr class="of-aann-tr"><td colspan="${(state.bulkMode?1:0)+SECS[sec].cols.length+1}">${offerteAannemerPaneel(r)}</td></tr>`
     : '';
   return `<tr class="${rowCls}" data-row="${r._row}"${prioAttr}>${bulkCel}${cells}</tr>${aannRow}`;

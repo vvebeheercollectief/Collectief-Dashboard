@@ -46,10 +46,20 @@ function verplaatsAfgerond(e) {
     setupAfgerondSheet(targetSheet);
   }
 
+  // 'Afgerond' is een ARCHIEF: hier staat de hele historie van afgeronde taken in. Ziet cel A1
+  // er anders uit dan verwacht, dan stond hier eerst targetSheet.clear() gevolgd door een vers
+  // skelet — één ingevoegde regel bovenaan het tabblad was dus genoeg om bij de eerstvolgende
+  // handmatige afvink-actie het COMPLETE archief te wissen, zonder waarschuwing en zonder spoor.
+  // Zelfde keuze als bij verplaatsALV hierboven: bij een onverwachte situatie niets schrijven,
+  // het vinkje laten staan en het zichtbaar melden. Nooit wissen om te 'herstellen'.
   var firstCell = targetSheet.getRange(1, 1).getValue().toString().trim().toUpperCase();
   if (firstCell !== "OPPAKKEN") {
-    targetSheet.clear();
-    setupAfgerondSheet(targetSheet);
+    Logger.log("verplaatsAfgerond: A1 van 'Afgerond' is '" + firstCell + "' i.p.v. 'OPPAKKEN' — "
+      + "niets gewist, taak " + vveCode + " niet gearchiveerd");
+    cd_schrijfLogboek(vveCode, sectie, 'Fout', 'Afgerond', '',
+      "Tabblad 'Afgerond' ziet er anders uit dan verwacht (A1 = '" + firstCell + "') — "
+      + "taak niet gearchiveerd en er is NIETS gewist. Controleer de kop van het tabblad.", 'systeem');
+    return;
   }
 
   var sectieRow = findSectieRow(targetSheet, sectie);

@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { taakTitel, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel } from "./util.js";
+import { taakTitel, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel } from "./util.js";
 import { verwerkMeldingRijen, toonMeldingen, MAX_TOAST_BURST } from "./notifications.js";
 import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, SECS, SKEYS } from "./config.js";
@@ -29,7 +29,7 @@ import { goTo } from "./ui.js";
 import { checkSecties, checkRaster, checkNummers, RASTER_MIN } from "./structuurcheck.js";
 import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from "./subsidie-fase.js";
 import { toggleHerhaalStatus } from "./render-herhaal.js";
-import { addAannemer } from "./offerte-aannemers.js";
+import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
 
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
   // ── mini-assert helper (Fase 1 testnet) ──
@@ -697,6 +697,42 @@ import { addAannemer } from "./offerte-aannemers.js";
     offerteAannemerPaneel({code:'Q',_aannemers:[{naam:'X',binnen:false}]}).includes('offerte-aann-verwijder'));
   truthy('aannemer-samenvatting heeft open-actie',
     offerteAannSamenvatting({code:'Q',_aannemers:[]}).includes('offerte-aann-open'));
+
+  // ── offerte-aannemers: twee trajecten van DEZELFDE VvE zijn losse trajecten ──
+  // Regressie (audit 2026-08-06). Het paneel werd op VvE-code gestuurd: bij twee offerte-
+  // trajecten van dezelfde VvE landde élke toevoeging op het EERSTE traject, klapten beide
+  // panelen tegelijk open, en wiste het kruisje een aannemer bij het traject dat de gebruiker
+  // niet had aangewezen. Op productie stonden vijf van zulke dubbele codes.
+  eq('sleutel: taaknummer wint van VvE-code', aannSleutel({code:'201009',taakId:'Tabc'}), 'nr:Tabc');
+  eq('sleutel: zonder taaknummer terugval op de code', aannSleutel({code:'201009'}), 'code:201009');
+  truthy('sleutel: twee trajecten van dezelfde VvE krijgen verschillende sleutels',
+    aannSleutel({code:'201009',taakId:'Ta'}) !== aannSleutel({code:'201009',taakId:'Tb'}));
+  truthy('sleutel: een taaknummer botst nooit met een gelijknamige VvE-code',
+    aannSleutel({code:'X1',taakId:'X1'}) !== aannSleutel({code:'X1'}));
+  // Geen _row → _bewaar keert terug vóór elk netwerkverkeer; puur de doel-keuze wordt getest.
+  (()=>{
+    const vR=D.ntd['OFFERTE-TRAJECTEN'], vO=new Set(state.offerteAannOpen);
+    try{
+      state.offerteAannOpen.clear();
+      const r1={code:'DUP-1',taakId:'Tdak',naam:'VvE Dubbel',aannemers:'Jansen|0',_sec:'OFFERTE-TRAJECTEN'};
+      const r2={code:'DUP-1',taakId:'Tverf',naam:'VvE Dubbel',aannemers:'',_sec:'OFFERTE-TRAJECTEN'};
+      D.ntd={...D.ntd,'OFFERTE-TRAJECTEN':[r1,r2]};
+      addAannemer(aannSleutel(r2),'Pietersen');
+      eq('twee trajecten zelfde VvE: toevoegen landt op het AANGEWEZEN traject', r2.aannemers, 'Pietersen|0');
+      eq('twee trajecten zelfde VvE: het andere traject blijft ongemoeid bij toevoegen', r1.aannemers, 'Jansen|0');
+      verwijderAannemer(aannSleutel(r1),0);
+      eq('twee trajecten zelfde VvE: verwijderen wist bij het AANGEWEZEN traject', r1.aannemers, '');
+      eq('twee trajecten zelfde VvE: verwijderen laat het andere traject staan', r2.aannemers, 'Pietersen|0');
+      truthy('twee trajecten zelfde VvE: alleen het aangeklikte paneel staat open',
+        state.offerteAannOpen.has(aannSleutel(r2)) && !state.offerteAannOpen.has(aannSleutel(r1)));
+    } finally { D.ntd['OFFERTE-TRAJECTEN']=vR; state.offerteAannOpen=vO; }
+  })();
+  // De knoppen moeten de sleutel dragen, niet de kale VvE-code — anders valt de dispatcher
+  // alsnog terug op de code en is bovenstaande winst op het scherm weer weg.
+  truthy('aannemer-paneel draagt de trajectsleutel in de knoppen',
+    offerteAannemerPaneel({code:'201009',taakId:'Tdak',_aannemers:[{naam:'X',binnen:false}]}).includes('Tdak'));
+  truthy('aannemer-samenvatting draagt de trajectsleutel',
+    offerteAannSamenvatting({code:'201009',taakId:'Tdak',_aannemers:[]}).includes('Tdak'));
 
   // ── offerte-aannemers: actie-handlers bedraad ──
   truthy('actie offerte-aann-open bestaat', typeof ACTIONS['offerte-aann-open']==='function');
@@ -3209,7 +3245,29 @@ import { addAannemer } from "./offerte-aannemers.js";
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '10.7');
+  eq('versie opgehoogd', APP_VERSION, '10.8');
+
+  // ── Pushmeldingen: de twee schakels die stil kapot waren (audit 2026-08-06) ──
+  // Beide defecten waren onzichtbaar: de app meldde "Notificaties zijn aan!" terwijl er nooit
+  // iets aankwam. Daarom hier een wachtpost op het uitgeleverde bestand zélf, niet op een
+  // functie — juist het BESTAND is twee keer stil uit de pas gelopen.
+  await (async()=>{
+    try{
+      const sw = await (await fetch(new URL('sw.js', document.baseURI), {cache:'no-store'})).text();
+      truthy('sw.js laadt de OneSignal-worker (anders komt een push nergens aan)',
+        /importScripts\(\s*['"]https:\/\/cdn\.onesignal\.com\/sdks\/web\/v16\/OneSignalSDK\.sw\.js['"]\s*\)/.test(sw));
+      // Alleen de échte importScripts-aanroep telt; de naam mag in een toelichting voorkomen.
+      truthy('sw.js importeert niet het oude, 404-gevende OneSignalSDKWorker.js',
+        !/importScripts\([^)]*OneSignalSDKWorker\.js/.test(sw));
+      const csp = document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.getAttribute('content')||'';
+      const scriptSrc = (csp.split(';').find(d=>d.trim().startsWith('script-src'))||'');
+      truthy('CSP staat api.onesignal.com toe (anders blijft OneSignal.init eeuwig hangen)',
+        /\*\.onesignal\.com|api\.onesignal\.com/.test(scriptSrc));
+    }catch(e){
+      // Geen fetch mogelijk (bv. file://) → niet stil groen worden.
+      truthy('push-wachtpost kon sw.js lezen', false);
+    }
+  })();
 
   // ── Bewerkscherm ──
   truthy('vijfde formuliergroep bestaat', !!document.getElementById('fg-sub'));

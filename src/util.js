@@ -162,6 +162,18 @@ function offerteFase(r){
   return recv > 0 ? 'ontvangen' : 'aangevraagd';
 }
 
+// Identiteit van één offerte-traject, voor het aannemers-paneel. Bewust NIET de VvE-code:
+// een VvE kan meerdere offerte-trajecten tegelijk hebben (dak én schilderwerk), en op de
+// code sturen liet elke toevoeging/verwijdering op het EERSTE traject landen — het kruisje
+// wiste dan een aannemer bij een traject dat de gebruiker niet had aangewezen. Op productie
+// stonden vijf van zulke dubbele codes (201009, 201104, 381179, 311011 en 121034-G drie keer),
+// dus dit was geen theoretisch geval.
+// Het vaste taaknummer (kolom Q) is de identiteit; ontbreekt dat — legitiem, bij een rij die
+// door een client met oude code is aangemaakt — dan valt de sleutel terug op de code en is het
+// gedrag exact als voorheen. De prefix houdt de twee soorten uit elkaar, zodat een taaknummer
+// nooit per ongeluk tegen een VvE-code kan matchen.
+const aannSleutel = r => (r && r.taakId) ? 'nr:' + r.taakId : 'code:' + (((r && r.code) || '') + '').trim();
+
 // ── Aannemers per offerte-traject (kolom P 'Nog Te Doen') ──────────────────
 // Eén aannemer per regel; naam en 'binnen'-vlag gescheiden door '|':  "Naam|1".
 // '|1' = offerte binnen, anders nog niet. Lege/whitespace-regels worden genegeerd.
@@ -343,6 +355,6 @@ export {
   adjOff, offProg, _MAANDEN, _parseAnyDate, parseDt, toISODate, toDutchDate, leegBijErfenis, nieuwTaakId,
   emptyRow, esc, vveCodeSpan, subBadge, coerceDagenVooraf,
   parseOff, offerteFase,
-  parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes,
+  parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, aannSleutel,
   meldSleutel, _zonderLeidendSymbool,
 };

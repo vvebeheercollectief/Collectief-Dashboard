@@ -4,32 +4,35 @@
 //  (v6.2): de offerte-tab is weer een platte tabel zoals Oppakken/LOD. Wat rest is de
 //  aannemerslijst achter de X/N-teller — de enige offerte-specifieke UI die overblijft.
 // ══════════════════════════════════════
-import { esc, parseAannemers, reconcileOffertes } from "./util.js";
+import { esc, parseAannemers, reconcileOffertes, aannSleutel } from "./util.js";
 import { state } from "./state.js";
 import { ico } from "./icons.js";
 
 // Klikbare samenvatting die het aannemers-paneel open/dicht klapt (staat in de teller-cel).
 function offerteAannSamenvatting(r){
   const lijst=r._aannemers||[];
-  const open=state.offerteAannOpen.has(r.code);
+  // data-aann draagt de TRAJECT-sleutel, niet de VvE-code (zie aannSleutel in util.js). Een
+  // eigen attribuutnaam, want data-code betekent elders in de app 'open het VvE-dossier'.
+  const sl=aannSleutel(r);
+  const open=state.offerteAannOpen.has(sl);
   const lbl=lijst.length
     ? `Aannemers · ${lijst.filter(a=>a.binnen).length} van ${lijst.length} binnen`
     : 'Aannemers toevoegen';
-  return `<span class="of-aann-tog" data-action="offerte-aann-open" data-code="${esc(r.code)}">${open?ico('chevronOnder',12):ico('chevronRechts',12)} ${lbl}</span>`;
+  return `<span class="of-aann-tog" data-action="offerte-aann-open" data-aann="${esc(sl)}">${open?ico('chevronOnder',12):ico('chevronRechts',12)} ${lbl}</span>`;
 }
 
 // Uitklapbaar aannemers-lijstje voor één traject (gemount als extra <tr> onder de rij).
 function offerteAannemerPaneel(r){
-  const code=esc(r.code);
+  const sl=esc(aannSleutel(r));
   const rijen=(r._aannemers||[]).map((a,i)=>`<div class="of-aann-rij">
       <span class="of-aann-naam">${esc(a.naam)}</span>
-      <button class="of-aann-st ${a.binnen?'in':''}" data-action="offerte-aann-binnen" data-code="${code}" data-idx="${i}">${a.binnen?'✓ binnen':'nog niet'}</button>
-      <button class="of-aann-x" data-action="offerte-aann-verwijder" data-code="${code}" data-idx="${i}" title="Verwijderen" aria-label="Verwijderen">×</button>
+      <button class="of-aann-st ${a.binnen?'in':''}" data-action="offerte-aann-binnen" data-aann="${sl}" data-idx="${i}">${a.binnen?'✓ binnen':'nog niet'}</button>
+      <button class="of-aann-x" data-action="offerte-aann-verwijder" data-aann="${sl}" data-idx="${i}" title="Verwijderen" aria-label="Verwijderen">×</button>
     </div>`).join('');
   return `<div class="of-aann-paneel">${rijen}
     <div class="of-aann-add">
-      <input class="of-aann-input" data-code="${code}" placeholder="Aannemer toevoegen…" autocomplete="off" aria-label="Aannemer toevoegen">
-      <button class="of-aann-toevoeg" data-action="offerte-aann-add" data-code="${code}">+ Toevoegen</button>
+      <input class="of-aann-input" data-aann="${sl}" placeholder="Aannemer toevoegen…" autocomplete="off" aria-label="Aannemer toevoegen">
+      <button class="of-aann-toevoeg" data-action="offerte-aann-add" data-aann="${sl}">+ Toevoegen</button>
     </div>
   </div>`;
 }

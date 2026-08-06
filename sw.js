@@ -9,7 +9,7 @@
 // herlading terugkwam. OneSignal heeft daarom een eigen bestand op een eigen bereik:
 // ./onesignal-sw.js met scope './onesignal/'.
 
-const CACHE_VERSION = 'cd-v104';
+const CACHE_VERSION = 'cd-v105';
 const APP_SHELL = [
   './',
   './index.html',

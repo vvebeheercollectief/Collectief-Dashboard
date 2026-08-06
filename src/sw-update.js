@@ -93,7 +93,15 @@ function toonUpdateBalk(onReload, onDismiss) {
     + '<button type="button" class="sw-update-btn" id="sw-update-reload">Herladen</button>'
     + '<button type="button" class="sw-update-x" id="sw-update-dismiss" aria-label="Sluiten">×</button>';
   document.body.appendChild(bar);
-  document.getElementById('sw-update-reload').addEventListener('click', onReload);
+  const knop = document.getElementById('sw-update-reload');
+  knop.addEventListener('click', () => {
+    // Zichtbare bevestiging. Het herladen kan even uitgesteld worden (lopende inlog of
+    // schrijfactie, zie maakHerlaadKern), en dan leek de knop kapot: je klikte en er
+    // gebeurde niets. Nu zie je dat de klik is aangekomen.
+    knop.disabled = true;
+    knop.textContent = 'Bezig…';
+    onReload();
+  });
   document.getElementById('sw-update-dismiss').addEventListener('click', () => { bar.remove(); onDismiss(); });
 }
 

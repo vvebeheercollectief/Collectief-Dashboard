@@ -6,6 +6,11 @@ import { state, _shownToasts } from "./state.js";
 import { loadAll, laadUitCache, wisCache } from "./data.js";
 import { toonKaart } from "./login-splash.js";
 
+// Hoe lang een tokenaanvraag zonder antwoord de bezig-teller mag bezetten. Ruim boven een
+// normale inlog (waarbij de gebruiker een venster moet doorlopen), maar eindig — zie het
+// vangnet in doOAuth. Tests kunnen dit verlagen via state._authTimeoutMs.
+const AUTH_ANTWOORD_TIMEOUT = 90_000;
+
 function doOAuth(forcePrompt){
   return new Promise(resolve=>{
     if(!clientId){resolve(null);return}
@@ -17,12 +22,25 @@ function doOAuth(forcePrompt){
     // inlog bezig' terwijl een gelijktijdige tweede aanvraag nog open staat.
     state._authBezig++;
     let afgehandeld=false;
+    // VANGNET (storing 2026-08-06). GIS kent per client maar ÉÉN callback: de laatst
+    // gebonden. Overlappen twee aanvragen — de 4-minuten-hartslag bovenop een
+    // ensureToken van de poll — dan landen béíde antwoorden op de handler van de
+    // TWEEDE, telt de eerste nooit af en blijft _authBezig eeuwig >0. sw-update ziet
+    // dan permanent 'bezig' en herlaadt nooit meer: de balk "Er is een nieuwe versie"
+    // bleef staan met een Herladen-knop die niets deed. Een antwoord dat helemaal
+    // uitblijft mag de app dus nooit blijvend vastzetten.
+    let tid=0;
     const klaar=v=>{
       if(afgehandeld) return;
       afgehandeld=true;
+      clearTimeout(tid);
       state._authBezig=Math.max(0,state._authBezig-1);
       resolve(v);
     };
+    tid=setTimeout(()=>{
+      console.warn('OAuth: geen antwoord binnen de tijd — aanvraag losgelaten');
+      klaar(null);
+    }, state._authTimeoutMs || AUTH_ANTWOORD_TIMEOUT);
     try{
       if(!state._gsiTokenClient){
         state._gsiTokenClient=google.accounts.oauth2.initTokenClient({

@@ -3245,7 +3245,7 @@ import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '10.8');
+  eq('versie opgehoogd', APP_VERSION, '10.9');
 
   // ── Pushmeldingen: de twee schakels die stil kapot waren (audit 2026-08-06) ──
   // Beide defecten waren onzichtbaar: de app meldde "Notificaties zijn aan!" terwijl er nooit
@@ -3253,20 +3253,37 @@ import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
   // functie — juist het BESTAND is twee keer stil uit de pas gelopen.
   await (async()=>{
     try{
-      const sw = await (await fetch(new URL('sw.js', document.baseURI), {cache:'no-store'})).text();
-      truthy('sw.js laadt de OneSignal-worker (anders komt een push nergens aan)',
-        /importScripts\(\s*['"]https:\/\/cdn\.onesignal\.com\/sdks\/web\/v16\/OneSignalSDK\.sw\.js['"]\s*\)/.test(sw));
+      const lees = async n => (await fetch(new URL(n, document.baseURI), {cache:'no-store'})).text();
+      const sw = await lees('sw.js'), osw = await lees('onesignal-sw.js');
+      const IMPORT = /importScripts\(\s*['"]https:\/\/cdn\.onesignal\.com\/sdks\/web\/v16\/OneSignalSDK\.sw\.js['"]\s*\)/;
+      truthy('onesignal-sw.js laadt de OneSignal-worker (anders komt een push nergens aan)',
+        IMPORT.test(osw));
       // Alleen de échte importScripts-aanroep telt; de naam mag in een toelichting voorkomen.
-      truthy('sw.js importeert niet het oude, 404-gevende OneSignalSDKWorker.js',
-        !/importScripts\([^)]*OneSignalSDKWorker\.js/.test(sw));
+      truthy('onesignal-sw.js importeert niet het oude, 404-gevende OneSignalSDKWorker.js',
+        !/importScripts\([^)]*OneSignalSDKWorker\.js/.test(osw));
+      // DE regressie van 2026-08-06: stond de OneSignal-worker in sw.js, dan registreerde de SDK
+      // 'sw.js?appId=…' naast onze eigen 'sw.js' op hetzelfde bereik. Die twee verdrongen elkaar
+      // om beurten en lieten de "nieuwe versie"-balk na élke herlading terugkomen.
+      truthy('sw.js bevat NIET de OneSignal-worker (anders botst hij met onze eigen registratie)',
+        !/importScripts\([^)]*onesignal/i.test(sw));
       const csp = document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.getAttribute('content')||'';
       const scriptSrc = (csp.split(';').find(d=>d.trim().startsWith('script-src'))||'');
       truthy('CSP staat api.onesignal.com toe (anders blijft OneSignal.init eeuwig hangen)',
         /\*\.onesignal\.com|api\.onesignal\.com/.test(scriptSrc));
     }catch(e){
       // Geen fetch mogelijk (bv. file://) → niet stil groen worden.
-      truthy('push-wachtpost kon sw.js lezen', false);
+      truthy('push-wachtpost kon de service workers lezen', false);
     }
+  })();
+  // De twee registraties moeten op VERSCHILLENDE bereiken staan, anders verdringen ze elkaar.
+  await (async()=>{
+    try{
+      const bron = await (await fetch(new URL('src/notifications.js', document.baseURI), {cache:'no-store'})).text();
+      truthy('OneSignal-init wijst naar een eigen workerbestand, niet naar sw.js',
+        /serviceWorkerPath:\s*swBase\s*\+\s*'\/onesignal-sw\.js'/.test(bron));
+      truthy('OneSignal-init gebruikt een eigen bereik, niet dat van de app-worker',
+        /serviceWorkerParam:\s*\{\s*scope:\s*swBase\s*\+\s*'\/onesignal\/'\s*\}/.test(bron));
+    }catch(e){ truthy('bereik-wachtpost kon notifications.js lezen', false); }
   })();
 
   // ── Bewerkscherm ──

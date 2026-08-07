@@ -23,7 +23,7 @@ import { openHerhaalModal, toggleHerhaalStatus, deleteHerhaal } from './render-h
 import { openVvePagina, renderVve, addContactLog, terugVanDossier } from './render-vve.js';
 import { vraagChat, chatSuggestie } from './dossier-chat.js';
 import { saveKenmerken } from './kenmerken.js';
-import { palKies } from './palette.js';
+import { palKies, closePalette } from './palette.js';
 import { toggleBulkMode, bulkVink, toggleBulkMenu, bulkDoe } from './bulk.js';
 import { doeOpmaak, initOpmaak } from './opmaak.js';
 
@@ -79,7 +79,9 @@ export const ACTIONS = {
   'herhaal-bewerken':      (el) => openHerhaalModal(+el.dataset.hid),
   'herhaal-status':        (el) => toggleHerhaalStatus(+el.dataset.hid),
   'herhaal-verwijderen':   ()   => deleteHerhaal(),
-  'vve-open':              (el) => openVvePagina(el.dataset.code),
+  // closePalette eerst: klik je in Ctrl+K op een VvE-code (bv. in een logboekresultaat), dan
+  // bleef het zoekvenster anders over het geopende dossier heen staan. No-op als het dicht is.
+  'vve-open':              (el) => { closePalette(); openVvePagina(el.dataset.code); },
   'vve-terug':             ()   => terugVanDossier(),
   'vve-taak-nieuw':        (el) => openModal(false, null, {sec:'OPPAKKEN', code:el.dataset.code, naam:el.dataset.naam||''}),
   'vve-af-alles':          ()   => { state._vveAfAlles=true; renderVve(); },

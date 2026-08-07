@@ -3,7 +3,7 @@
 //  + re-export van render-offerte / render-alv / render-tabel (publieke interface stabiel).
 //  Batch D / punt 11: offerte/ALV/tabel-render zijn naar eigen modules verplaatst.
 // ══════════════════════════════════════
-import { esc, filt, berekenPrioriteit, parseDt, opvolgStatus, _vandaagAmsterdam, toISODate, isoWeek } from "./util.js";
+import { esc, filt, berekenPrioriteit, parseDt, opvolgStatus, _vandaagAmsterdam, toISODate, isoWeek, vveCodeSpan } from "./util.js";
 import { SECS, SKEYS } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { bulkWis, renderBulkUi } from "./bulk.js";
@@ -208,8 +208,10 @@ function renderNtdCrossList(sec){
     const herkomst=esc((SECS[r._sec]?.label)||r._sec||'');
     const dl=r.deadline?` · ${esc(r.deadline)}`:'';
     const opm=esc(((r.opmerkingen||'').split('\n')[0]||'').slice(0,60));
+    // De code via de gedeelde bouwsteen, zodat élke VvE-code in de app hetzelfde doet:
+    // deze was als enige niet klikbaar. De sectie-css zet --sec, zodat de kleur blijft kloppen.
     return `<div class="xl-rij">
-      <span class="xl-code">${esc(r.code)}</span>
+      ${vveCodeSpan(r.code, SECS[r._sec]?.css||'')}
       <div class="xl-mid"><div class="xl-naam">${esc(r.naam||'')}</div>
         <div class="xl-ctx"><span class="xl-herk">${herkomst}</span>${dl}${opm?` · ${opm}`:''}</div></div>
       <button class="xl-edit" data-action="taak-bewerken" data-rid="${rid}" title="Bewerken" aria-label="Bewerken"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
@@ -308,7 +310,7 @@ function renderAf(){
     const rows=filt(D.af[s]||[],q);
     return`<button type="button" class="tab ${s===state.activeAf?'on':''}" role="tab" aria-selected="${s===state.activeAf}" style="${s===state.activeAf?SECS[s].css:''}" data-action="af-sectie" data-sec="${s}">${SECS[s].label}<span class="cnt">${rows.length}</span></button>`;
   }).join('');
-  const cols=['VvE Code','VvE','Categorie','Subcategorie','Afgerond op','Opmerking'];
+  const cols=['VvE Code','VvE','Taak','Subcategorie','Afgerond op','Opmerking'];  // 'Categorie' stond boven de taakomschrijving
   renderThead('af-thead',cols,SECS[state.activeAf].css);
   const rows=filt(D.af[state.activeAf]||[],q);
   renderTbody('af-tbody',rows,state.activeAf,pgs.af,true,!!q);

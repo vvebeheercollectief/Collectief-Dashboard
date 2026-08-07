@@ -3,11 +3,11 @@
 // ══════════════════════════════════════
 import { taakTitel, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel } from "./util.js";
 import { verwerkMeldingRijen, toonMeldingen, MAX_TOAST_BURST, _whoSleutel, getCurrentWho } from "./notifications.js";
-import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek, logEvents } from "./render-overig.js";
-import { _isStagingHost, APP_VERSION, SECS, SKEYS } from "./config.js";
+import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek, logEvents, renderOntw } from "./render-overig.js";
+import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
-import { filterNtd, setNtd, renderNtd, renderNtdStats, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey, kopOpen, zetKopOpen } from "./render-lijsten.js";
+import { filterNtd, setNtd, renderNtd, renderNtdStats, renderAf, setAf, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey, kopOpen, zetKopOpen } from "./render-lijsten.js";
 import { HERO_VIEWS } from "./render-analytics.js";
 import { state, D, pgs } from "./state.js";
 import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel, renderVve } from "./render-vve.js";
@@ -816,6 +816,74 @@ import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
       return !html.includes('XL-2');
     }catch(e){ console.error('crosslist-neg-test:',e); return false; }
   })());
+  // De code in 'Ook hier' was als enige in de app niet klikbaar. Nu via dezelfde bouwsteen.
+  truthy('cross-list: de VvE-code opent het dossier, net als overal elders', (()=>{
+    try{
+      const vA=state.activeNtd, vOpp=D.ntd['OPPAKKEN'], vOff=D.ntd['OFFERTE-TRAJECTEN'];
+      D.ntd['OFFERTE-TRAJECTEN']=[];
+      D.ntd['OPPAKKEN']=[{code:'XL-3',naam:'VvE Cross3',actiepunt:'x',subcategorie:'Offerte-trajecten',_sec:'OPPAKKEN',_row:9402}];
+      setNtd('OFFERTE-TRAJECTEN');
+      const el=document.querySelector('#ntd-crosslist .xl-rij [data-action="vve-open"]');
+      const ok = !!el && el.dataset.code==='XL-3';
+      D.ntd['OPPAKKEN']=vOpp; D.ntd['OFFERTE-TRAJECTEN']=vOff; setNtd(vA);
+      return ok;
+    }catch(e){ console.error('crosslist-klik-test:',e); return false; }
+  })());
+
+  // ── Ctrl+K: een klik op een VvE-code sluit het zoekvenster ──
+  // Anders bleef het palet over het zojuist geopende dossier heen staan.
+  truthy('Ctrl+K: klik op een VvE-code sluit het zoekvenster', (()=>{
+    try{
+      const vCode=state.vveCode, vPag=state.page;
+      const actiefVoor=[...document.querySelectorAll('.page.active')].map(p=>p.id);
+      document.getElementById('pal-bg').classList.add('open');
+      ACTIONS['vve-open']({dataset:{code:'91023'}});
+      const dicht=!document.getElementById('pal-bg').classList.contains('open');
+      // Pagina exact terugzetten. Laat je 'page-vve' actief staan, dan denkt de laadronde dat
+      // de gebruiker naar het ALV-archief kijkt en haalt hij dat élke ronde op — waardoor een
+      // latere test over de archief-skip omvalt.
+      document.querySelectorAll('.page.active').forEach(p=>p.classList.remove('active'));
+      actiefVoor.forEach(id=>document.getElementById(id)?.classList.add('active'));
+      state.vveCode=vCode; state.page=vPag;
+      return dicht;
+    }catch(e){ console.error('palet-sluit-test:',e); return false; }
+  })());
+
+  // ── Afgerond: de derde kolomkop hoort boven de taakomschrijving te staan ──
+  truthy('Afgerond: derde kolomkop heet niet meer Categorie', (()=>{
+    try{
+      const vA=state.activeAf;
+      renderAf();
+      const koppen=[...document.querySelectorAll('#af-thead th')].map(t=>t.textContent.trim());
+      setAf(vA);
+      return koppen[2]==='Taak' && !koppen.includes('Categorie');
+    }catch(e){ console.error('af-kop-test:',e); return false; }
+  })());
+
+  // ── Ontwikkeling: een te hoge pagina valt terug i.p.v. eeuwig 'Geen resultaten' ──
+  truthy('Ontwikkeling: te hoge pagina valt terug en toont de gegevens weer', (()=>{
+    try{
+      const vO=D.ontw, vA=state.activeOntw, vP=pgs.ontw, vS=document.getElementById('s-ontw').value;
+      document.getElementById('s-ontw').value='';
+      state.activeOntw='Alles';
+      D.ontw=[{titel:'ONTW-CLAMP',categorie:'Ideeën',inhoud:'',door:'Jer',datum:'',status:'Open',_row:2}];
+      pgs.ontw=7;                       // pagina die na een verwijdering niet meer bestaat
+      renderOntw();
+      const html=document.getElementById('ontw-tbody').innerHTML;
+      const pag=pgs.ontw;
+      D.ontw=vO; state.activeOntw=vA; pgs.ontw=vP; document.getElementById('s-ontw').value=vS;
+      return html.includes('ONTW-CLAMP') && pag===1;
+    }catch(e){ console.error('ontw-clamp-test:',e); return false; }
+  })());
+
+  // ── 'Wie ben jij' kent het hele team ──
+  // Cihan ontbrak, terwijl de code hem wél als bekende naam accepteert.
+  eq('notif-who biedt het hele team',
+     [...document.querySelectorAll('#notif-who option')].map(o=>o.value).filter(v=>v&&v!=='__other__'),
+     ['Jer','Cihad','Gabos','Cihan']);
+  eq('notif-who loopt gelijk op met de teamlijst in config',
+     [...document.querySelectorAll('#notif-who option')].map(o=>o.value).filter(v=>v&&v!=='__other__').length,
+     TEAM.length);
 
   truthy('lege offerte-lijst → generieke leeg-rij, geen crash', (()=>{
     try{
@@ -2091,6 +2159,9 @@ import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
       eq('loadAll: en die vervolgronde heeft echt gedraaid', rondes, 2);
     } finally {
       if(losmaken) losmaken();
+      // Eerst de vervolgronde laten uitrazen ZOLANG de stub nog staat: anders loopt hij door in
+      // het volgende testblok en meet dát blok een ronde die er niet bij hoort.
+      for(let i=0;i<300 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,10));
       window.fetch=_fetch; state.oauthToken=tOud; state.oauthExpiry=eOud;
       state._lastDHash=hashOud; state._syncFails=failsOud; state._loadWachtMs=wachtOud;
       state._loadAgain=false; state._loadAgainLoud=false;

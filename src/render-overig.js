@@ -55,9 +55,15 @@ function renderOntw(){
   if(q) rows=rows.filter(r=>`${r.titel} ${r.inhoud} ${r.categorie} ${r.door}`.toLowerCase().includes(q));
 
   renderThead('ontw-thead',['Titel','Categorie','Inhoud','Door','Datum','Status',''],'--sec:var(--pk);--sec-l:var(--pk-l);--sec-b:var(--pk-b)');
+  // Clamp, zoals de ALV-lijsten al doen: verwijder je op pagina 2 het laatste item, dan wees
+  // pgs.ontw naar een pagina die niet meer bestaat en bleef de lijst permanent op 'Geen
+  // resultaten' staan — óók na verversen, want niets zette het paginanummer terug.
+  pgs.ontw=Math.min(Math.max(1,pgs.ontw),Math.max(1,Math.ceil(rows.length/PG)));
   const sl=rows.slice((pgs.ontw-1)*PG,pgs.ontw*PG);
   const el=document.getElementById('ontw-tbody');
-  if(!sl.length){el.innerHTML=`<tr><td colspan="7">${emptyRow(7,true)}</td></tr>`;return}
+  // Ook bij een lege uitkomst de paginabalk bijwerken; anders bleef daar de oude, onjuiste
+  // tekst staan en was er geen knop om terug te klikken.
+  if(!sl.length){el.innerHTML=`<tr><td colspan="7">${emptyRow(7,true)}</td></tr>`;renderPag('ontw-pag',rows.length,pgs.ontw,'ontw');return}
   el.innerHTML=sl.map(r=>{
     const rid=state._rowCache.length;state._rowCache.push(Object.assign({},r,{_sec:'ONTW'}));
     const clr=ONTW_CAT_COLORS[r.categorie]||'var(--mut)';

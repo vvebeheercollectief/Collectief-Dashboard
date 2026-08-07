@@ -281,6 +281,14 @@ const POLL_TABS=["Nog Te Doen","Afgerond","ALV's overzicht","ALV's afgerond",
 // het verschil tussen wél en géén .catch alleen uit de vorm van de regel te lezen was.
 const VERPLICHTE_TABS=new Set(["Nog Te Doen","Afgerond","ALV's overzicht","ALV's afgerond"]);
 
+// Is de terugval op losse reads hier zinvol? Alleen bij een 400: dan wees Google één bereik af
+// (een tabblad dat op deze kopie van de Sheet niet bestaat) en levert per-tabblad lezen de rest
+// alsnog op. Bij 429/5xx is het omgekeerde waar — _withRetry heeft het al drie keer geprobeerd,
+// en 7-8 losse reads mét eigen herkansingen zetten juist op het drukste moment nóg meer druk op
+// hetzelfde quotum: één verzoek werd er zo tot 24. Bij 401 en bij een netwerkfout (geen .status)
+// levert de terugval alleen dezelfde fout, acht keer. Puur, dus los testbaar.
+const magTerugvalLosseReads = e => !!e && e.status===400;
+
 // ── Logboek: alleen de staart lezen ────────────────────────────────────────
 // Het Logboek is het enige tabblad dat onbeperkt groeit — 1.261 regels op het moment van bouwen,
 // ~60% van alles wat elke 8 seconden binnenkwam, en dat werd elke ronde volledig opnieuw
@@ -501,6 +509,11 @@ async function loadAll(silent){
         }catch(_){ R=null; }
       }
       if(!R){
+        // Alleen een afgewezen bereik (400) is met losse reads te repareren. Bij 429/5xx/401 of
+        // een netwerkfout gooien we door naar de buitenste catch: die telt _syncFails, laat de
+        // bestaande gegevens staan en toont vanaf de tweede mislukking 'Fout'. Acht seconden
+        // later probeert de poll het gewoon opnieuw — met één verzoek in plaats van acht.
+        if(!magTerugvalLosseReads(e)) throw e;
         // Terugval op losse reads. De oude weg levert de optionele tabbladen dan alsnog los aan
         // (duurder, maar werkt). Per tabblad beslissen of hij mag falen: een uniforme .catch zou
         // een ontbrekend 'Nog Te Doen' in stilte als lege lijst doorlaten en het dashboard
@@ -688,7 +701,7 @@ function parseAlfa(rows){
 
 export {
   backgroundWrite, schrijfActieLoopt, metWriteMarkering, setSyncing, setSaving, setSynced, setSyncErr, dot, loadAll, magPollen, parseSections, parseAlvo, parseAlfa, parseHerhaal,
-  POLL_TABS, VERPLICHTE_TABS, _logBereik, _zetLogAnker, _verwerkLogboek, _logVolledigNodig, _alfaNodig,
+  POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _zetLogAnker, _verwerkLogboek, _logVolledigNodig, _alfaNodig,
   MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen,
   blokkeerOffline, showOfflineBanner, clearOfflineBanner, setSyncOffline,
   bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade,

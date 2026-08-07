@@ -202,11 +202,26 @@ async function undoComplete(undoData) {
         // maar tussen die lezing en dit verzoek kan de Sheet alsnog verschoven zijn. Klopt de rij
         // niet meer, dan zou hier stil een ándere afronding verdwijnen.
         await assertRowMatch(doelAf._row, doelAf, 'Afgerond');
-        await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`, {
+        const resp = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${state.oauthToken}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ requests: [{ deleteDimension: { range: { sheetId: afId, dimension: 'ROWS', startIndex: doelAf._row - 1, endIndex: doelAf._row } } }] })
         });
+        // Dit antwoord bleef als ENIGE in de app ongecontroleerd. Gevolg: 'Ongedaan gemaakt' op
+        // het scherm terwijl de afronding nog in 'Afgerond' staat — de taak staat dan dubbel
+        // zonder dat iemand het weet, en er werd bovendien een logregel 'Teruggezet' bij
+        // geschreven die beweert dat het rond is. bulk.js doet bij precies dezelfde delete al
+        // wél deze controle. Het foutlichaam met .catch uitlezen om de reden uit api.js: een
+        // HTML-antwoord van een tussenliggende proxy geeft anders een SyntaxError zónder
+        // .status, die dan als NETWERKfout telt en het dashboard onterecht offline zet.
+        if(!resp.ok){
+          const e = await resp.json().catch(()=>({}));
+          if(resp.status===401){ state.oauthToken=null; state.oauthExpiry=0; }
+          const err = new Error(e.error?.message
+            || 'De taak staat terug in Nog Te Doen, maar de regel in Afgerond kon niet worden weggehaald — hij staat nu dubbel.');
+          err.status = resp.status;
+          throw err;
+        }
       }
       await logEvent(undoData.code, sec, 'Teruggezet', 'status', 'Afgerond', 'Nog Te Doen');
     });

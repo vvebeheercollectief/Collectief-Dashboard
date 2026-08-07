@@ -15,7 +15,7 @@ import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN, saveKenmerken } from "./
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk.js";
 import { _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, veiligeCel, _veiligeRij, fetchSheet, fetchSheets, vingerafdruk, rijVingerafdruk, _normCel, _rijNaarCellen, assertRowMatch, NTD_DATUM, _isOffline, _isNetwerkFout } from "./api.js";
-import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
+import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
 import { setv, serializeNtdUndo, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, kiesModalFase, _modalFaseWoord, getInsertRow } from "./crud.js";
@@ -2029,6 +2029,14 @@ import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
   truthy('terugval: elk verplicht tabblad wordt ook echt gepolld',
          [...VERPLICHTE_TABS].every(n=>POLL_TABS.includes(n)));
   truthy('terugval: het Logboek is optioneel (mag stil leeg zijn)', !VERPLICHTE_TABS.has('Logboek'));
+  // Wanneer is de dure terugval zinvol? Alleen bij een afgewezen bereik. Bij 'te druk' of een
+  // storing maakte één mislukt verzoek er tot 24 — precies op het moment dat het al misging.
+  eq('terugval: wél bij een afgewezen bereik (400)', magTerugvalLosseReads({status:400}), true);
+  eq('terugval: NIET bij rate-limit 429', magTerugvalLosseReads({status:429}), false);
+  eq('terugval: niet bij een serverfout', magTerugvalLosseReads({status:503}), false);
+  eq('terugval: niet bij een verlopen inlog', magTerugvalLosseReads({status:401}), false);
+  eq('terugval: niet bij een netwerkfout zonder status', magTerugvalLosseReads(new TypeError('Failed to fetch')), false);
+  eq('terugval: niets in de hand is geen reden tot terugval', magTerugvalLosseReads(null), false);
   await (async()=>{
     const _fetch=window.fetch, tokenOud=state.oauthToken, expiryOud=state.oauthExpiry;
     const failsOud=state._syncFails, hashOud=state._lastDHash;
@@ -2067,6 +2075,20 @@ import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
       eq('terugval: wegvallend Afgerond laat de ronde WEL falen', state._syncFails, 1);
       eq('terugval: en de bestaande lijst blijft staan i.p.v. leeggeveegd',
          (D.af.KANARIE||[])[0]?.code, 'blijf-staan');
+
+      // 3. Een storing/te-druk-antwoord mag NIET tot losse reads leiden. Voorheen werd één
+      //    geweigerd verzoek er zo acht — juist wanneer Google het al te zwaar had. 401 gekozen
+      //    omdat die niet-tijdelijk is: met 429 zou _withRetry deze test ~1,8 s laten wachten.
+      urls.length=0; state._syncFails=0; state._lastDHash=null; state._alfaMs=0;
+      window.fetch=async(url)=>{
+        const d=decodeURIComponent(String(url)); urls.push(d);
+        if(d.includes('values:batchGet')) return new Response('{}',{status:401});
+        return new Response(JSON.stringify({values:[]}),{status:200});
+      };
+      await loadAll(true);
+      eq('terugval: een storing doet GEEN acht losse reads erbovenop',
+         urls.filter(u=>u.includes('/values/')).length, 0);
+      eq('terugval: de mislukking wordt wel geteld, zodat de balk op Fout kan', state._syncFails, 1);
     } finally {
       window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
       state._syncFails=failsOud; state._lastDHash=hashOud;
@@ -3295,6 +3317,25 @@ import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
       // Geen fetch mogelijk (bv. file://) → niet stil groen worden.
       truthy('push-wachtpost kon de service workers lezen', false);
     }
+  })();
+
+  // ── De rauwe batchUpdate in undoComplete moet zijn antwoord controleren ──
+  // Dit was de énige plek in de app die dat niet deed: bij een mislukte delete op 'Afgerond'
+  // meldde hij tóch 'Ongedaan gemaakt' en schreef hij een logregel 'Teruggezet', terwijl de
+  // taak in werkelijkheid in beide lijsten stond. Bewust een controle op de BRON: het echte
+  // gedrag zit verweven met zes andere netwerkstappen, en juist het WEGLATEN van de check is
+  // de regressie die we willen vangen.
+  await (async()=>{
+    try{
+      const bron = await (await fetch(new URL('src/notifications.js', document.baseURI), {cache:'no-store'})).text();
+      // `resp` bestaat in dit bestand alleen bij deze ene delete, dus deze drie zijn specifiek.
+      truthy('undo-afronden: het antwoord van de Afgerond-delete wordt gecontroleerd',
+        /const\s+resp\s*=\s*await\s+fetch/.test(bron) && /if\s*\(\s*!\s*resp\.ok\s*\)/.test(bron));
+      truthy('undo-afronden: een verlopen inlog wist het token, net als elders in de app',
+        /resp\.status\s*===\s*401/.test(bron));
+      truthy('undo-afronden: de melding vertelt dat de taak nu dubbel staat',
+        /staat nu dubbel/.test(bron));
+    }catch(e){ truthy('undo-wachtpost kon notifications.js lezen', false); }
   })();
   // ── Eén registratie per bereik: onze eigen registratie mag die van OneSignal niet verdringen ──
   // OneSignal registreert HETZELFDE bestand met '?appId=…&sdkVersion=…' erachter. Zag sw-update

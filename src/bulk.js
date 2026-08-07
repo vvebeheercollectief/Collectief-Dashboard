@@ -10,7 +10,7 @@ import { _shiftNtdRows, _herstelShift, assertRowsMatch, _veiligeRij } from "./ap
 import { getSheetIds, getAfInsertRow, getInsertRow, insertAndWriteRow, serializeNtdUndo } from "./crud.js";
 import { backgroundWrite, loadAll, metWriteMarkering, blokkeerOffline } from "./data.js";
 import { showToast, showUndoToast } from "./notifications.js";
-import { logEvent } from "./render-overig.js";
+import { logEvents } from "./render-overig.js";
 import { renderAll } from "./main.js";
 
 const _sel = new Set();   // geselecteerde taak-objecten (rij-referenties in D)
@@ -151,7 +151,8 @@ function bulkAfronden(rows){
     if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Bulk-afronden fout');err.status=resp.status;throw err}
     // for…of i.p.v. forEach: in een forEach-callback kun je niet awaiten, en zonder await valt
     // de schrijfteller naar 0 terwijl de logboek-appends nog lopen (resync te vroeg, regel weg).
-    for(const it of items) await logEvent(it.code,it.sec,'Afgerond','status','Nog Te Doen','Afgerond op '+vandaag+' (bulk)');
+    // Eén append voor de hele bulk i.p.v. één per taak: 20 taken kostten zo 20 schrijfverzoeken.
+    await logEvents(items.map(it=>({code:it.code,sec:it.sec,actie:'Afgerond',veld:'status',oudeWaarde:'Nog Te Doen',nieuweWaarde:'Afgerond op '+vandaag+' (bulk)'})));
   },()=>{ // rollback: laag→hoog terugzetten
     [...items].reverse().forEach(it=>{
       const a=(D.ntd[it.sec]=D.ntd[it.sec]||[]);
@@ -193,8 +194,10 @@ async function bulkUndoAfronden(items){
       for(const it of items){
         await insertAndWriteRow('Nog Te Doen',getInsertRow(it.sec)+(offset[it.sec]||0),it.ntdValues);
         offset[it.sec]=(offset[it.sec]||0)+1;
-        await logEvent(it.code,it.sec,'Teruggezet','status','Afgerond','Nog Te Doen (bulk-undo)');
       }
+      // Pas ná de lus loggen, in één append: de logregels zijn een journaal van deze ene
+      // handeling en hoeven niet tussen de inserts door. Scheelt bij 20 taken 19 verzoeken.
+      await logEvents(items.map(it=>({code:it.code,sec:it.sec,actie:'Teruggezet',veld:'status',oudeWaarde:'Afgerond',nieuweWaarde:'Nog Te Doen (bulk-undo)'})));
       // 3) Verwijder de Afgerond-rijen in één batch in aflopende _row-volgorde, zodat de
       //    delete-indexen elkaar niet verschuiven (i.t.t. de oude code die de oudste rij koos).
       //    De inserts hierboven raakten een ánder tabblad, dus deze _row-nummers kloppen nog.
@@ -236,7 +239,7 @@ function bulkVerwijderen(rows){
       method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
       body:JSON.stringify({requests:items.map(it=>({deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:it.origRow-1,endIndex:it.origRow}}}))})});
     if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Bulk-verwijderfout');err.status=resp.status;throw err}
-    for(const it of items) await logEvent(it.code,it.sec,'Verwijderd','',it.ntdValues[2]||'','(bulk)');
+    await logEvents(items.map(it=>({code:it.code,sec:it.sec,actie:'Verwijderd',veld:'',oudeWaarde:it.ntdValues[2]||'',nieuweWaarde:'(bulk)'})));
   },()=>{
     [...items].reverse().forEach(it=>{
       const a=(D.ntd[it.sec]=D.ntd[it.sec]||[]);
@@ -258,7 +261,7 @@ async function bulkUndoVerwijderen(items){
         await insertAndWriteRow('Nog Te Doen',getInsertRow(it.sec)+(offset[it.sec]||0),it.ntdValues);
         offset[it.sec]=(offset[it.sec]||0)+1;
       }
-      for(const it of items) await logEvent(it.code,it.sec,'Teruggezet','status','Verwijderd','Nog Te Doen (bulk-undo)');
+      await logEvents(items.map(it=>({code:it.code,sec:it.sec,actie:'Teruggezet',veld:'status',oudeWaarde:'Verwijderd',nieuweWaarde:'Nog Te Doen (bulk-undo)'})));
     });
     showToast('Ongedaan gemaakt',`${items.length} taken terug in Nog Te Doen`,'var(--am)','ongedaan');
     await loadAll();
@@ -322,7 +325,7 @@ function bulkVeld(rows,soort,waarde){
         method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
         body:JSON.stringify({valueInputOption:'USER_ENTERED', data})});
       if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Bulk-actie fout');err.status=resp.status;throw err}
-      if(!gelogd){ for(const it of items) await logEvent(it.code,it.sec,conf.log,conf.veld,welkeWaarde==='oud'?waarde:it.oud,welkeWaarde==='oud'?it.oud:waarde); gelogd=true; }
+      if(!gelogd){ await logEvents(items.map(it=>({code:it.code,sec:it.sec,actie:conf.log,veld:conf.veld,oudeWaarde:welkeWaarde==='oud'?waarde:it.oud,nieuweWaarde:welkeWaarde==='oud'?it.oud:waarde}))); gelogd=true; }
     };
   };
   showUndoToast(conf.titel,items.map(i=>i.code).join(', '),async()=>{

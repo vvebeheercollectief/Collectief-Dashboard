@@ -6,7 +6,7 @@ import { ico } from "./icons.js";
 import { PG, SID } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { ensureToken } from "./auth.js";
-import { writeRange, appendRange, assertRowMatch, _herstelShift } from "./api.js";
+import { writeRange, appendRange, appendRows, assertRowMatch, _herstelShift } from "./api.js";
 import { renderThead, renderPag } from "./render-lijsten.js";
 import { getSheetIds, setv, gv, insertAndWriteRow } from "./crud.js";
 import { loadAll, backgroundWrite, metWriteMarkering, blokkeerOffline } from "./data.js";
@@ -656,11 +656,32 @@ async function logEvent(code, sec, actie, veld, oudeWaarde, nieuweWaarde) {
   } catch(e) { console.warn('Logboek schrijffout:', e); return false; }
 }
 
+// Meerdere logregels in ÉÉN append. Zelfde contract als logEvent: gooit nooit, geeft een
+// boolean terug — het logboek is een journaal, geen bronwaarheid, en een mislukte logregel mag
+// een geslaagde bulk-actie niet alsnog laten omvallen.
+// Alle regels van één bulk-actie delen bewust dezelfde timestamp: het ís één handeling, en het
+// Logboek toont ze daardoor als één blok in plaats van als twintig losse gebeurtenissen.
+// Vervangt de lus `for(const it of items) await logEvent(...)`, die bij 20 taken 20 aparte
+// schrijfverzoeken deed (~4,7 s 'Opslaan…', en in die tijd ziet het dashboard geen wijzigingen
+// van collega's omdat de poll op pendingWrites wacht).
+async function logEvents(regels) {
+  try {
+    if (!state.oauthToken) return false;
+    const lijst = (regels || []).filter(Boolean);
+    if (!lijst.length) return true;
+    const who = getCurrentWho() || '?';
+    const ts = new Date().toISOString();
+    await appendRows("'Logboek'!A:H", lijst.map(e =>
+      [ts, e.code||'', e.sec||'', e.actie||'', e.veld||'', e.oudeWaarde||'', e.nieuweWaarde||'', who]));
+    return true;
+  } catch(e) { console.warn('Logboek schrijffout:', e); return false; }
+}
+
 
 export {
   ONTW_CATS, ONTW_CAT_COLORS, parseOntw, renderOntw, setOntw, openOntwModal, closeOntwModal,
   submitOntwItem, deleteOntwItem, editOntwItem, parseLogboek, _logSleutel, _nogNietBevestigd, fmtLogTs, actieBadge, _LOG_AVKLEUR, avatarKleur,
-  logDayLabel, logZin, logTijd, logItemHtml, logPaginaSoort, renderLogboek, histNoteKey, renderTaskHistory, addTaskNote, logEvent,
+  logDayLabel, logZin, logTijd, logItemHtml, logPaginaSoort, renderLogboek, histNoteKey, renderTaskHistory, addTaskNote, logEvent, logEvents,
   _shiftRows, _shiftLogboekRows, _shiftLogEditRef, logEditWrite, logDeleteLabel,
   logEditForm, editLogboek, saveLogboek, cancelLogboek, setLogSoort, deleteLogboek, undoDeleteLog,
 };

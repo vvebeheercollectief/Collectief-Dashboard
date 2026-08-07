@@ -3,7 +3,7 @@
 // ══════════════════════════════════════
 import { taakTitel, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel } from "./util.js";
 import { verwerkMeldingRijen, toonMeldingen, MAX_TOAST_BURST } from "./notifications.js";
-import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek } from "./render-overig.js";
+import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek, logEvents } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, SECS, SKEYS } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
@@ -14,7 +14,7 @@ import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel,
 import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN, saveKenmerken } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk.js";
-import { _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, veiligeCel, _veiligeRij, fetchSheet, fetchSheets, vingerafdruk, rijVingerafdruk, _normCel, _rijNaarCellen, assertRowMatch, NTD_DATUM, _isOffline, _isNetwerkFout } from "./api.js";
+import { _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, veiligeCel, _veiligeRij, fetchSheet, fetchSheets, vingerafdruk, rijVingerafdruk, _normCel, _rijNaarCellen, assertRowMatch, NTD_DATUM, _isOffline, _isNetwerkFout, appendRange, appendRows } from "./api.js";
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
@@ -2811,6 +2811,49 @@ import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
     eq('_veiligeRij: alleen de riskante cel geprefixt', _veiligeRij(['=x','21-07-2026',true,5,'']), ["'=x",'21-07-2026',true,5,'']);
     eq('_veiligeRij: null-invoer geeft lege rij', _veiligeRij(null), []);
     eq('bulk-batchUpdate: formule wordt tekst', _veiligeRij(['=SOM(A1:A9)','gewoon']), ["'=SOM(A1:A9)",'gewoon']);
+  })();
+  // ── Logregels van één bulk-actie gaan in ÉÉN append ──
+  // Was: één schrijfverzoek per taak. Bij 20 taken dus 20 verzoeken (~4,7 s 'Opslaan…'), en
+  // zolang die lopen staat de 8s-poll stil, dus zie je ondertussen geen wijzigingen van
+  // collega's. Het zijn logregels van één handeling; ze horen in één rondreis.
+  await (async()=>{
+    const _fetch=window.fetch, tOud=state.oauthToken, eOud=state.oauthExpiry;
+    const calls=[];
+    try{
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
+      window.fetch=async(url,opt)=>{ calls.push({url:decodeURIComponent(String(url)), body:JSON.parse(opt.body)}); return new Response('{}',{status:200}); };
+
+      await logEvents([{code:'A',sec:'OPPAKKEN',actie:'Afgerond'},{code:'B',sec:'LOD',actie:'Afgerond'},{code:'C',sec:'LOD',actie:'Afgerond'}]);
+      eq('logEvents: drie regels kosten ÉÉN verzoek', calls.length, 1);
+      eq('logEvents: rijen in de meegegeven volgorde', calls[0].body.values.map(r=>r[1]), ['A','B','C']);
+      eq('logEvents: één handeling, dus één tijdstempel',
+         new Set(calls[0].body.values.map(r=>r[0])).size, 1);
+      truthy('logEvents: via de append-route met INSERT_ROWS',
+         calls[0].url.includes(':append') && calls[0].url.includes('INSERT_ROWS'));
+      eq('logEvents: acht kolommen per regel (A t/m H)', calls[0].body.values[0].length, 8);
+
+      calls.length=0;
+      eq('logEvents: lege lijst is een succes', await logEvents([]), true);
+      eq('logEvents: en kost geen enkel verzoek', calls.length, 0);
+
+      // Contract van logEvent: het logboek is een journaal, geen bronwaarheid. Een mislukte
+      // logregel mag een geslaagde bulk-actie niet alsnog laten omvallen.
+      calls.length=0;
+      window.fetch=async()=>new Response('{}',{status:500});
+      eq('logEvents: een mislukte logregel gooit niet, maar meldt false',
+         await logEvents([{code:'X',sec:'LOD',actie:'Afgerond'}]), false);
+
+      // De één-rij-weg blijft werken: appendRange is nu een doorgeefluik naar appendRows.
+      calls.length=0;
+      window.fetch=async(url,opt)=>{ calls.push({body:JSON.parse(opt.body)}); return new Response('{}',{status:200}); };
+      await appendRange("'Logboek'!A:H", ['a','b']);
+      eq('appendRange: schrijft nog steeds precies één rij', calls[0].body.values.length, 1);
+      eq('appendRows: formule-rem geldt voor élke rij',
+         (await (async()=>{ calls.length=0; await appendRows("'Logboek'!A:H", [['=kwaad'],['ok']]); return calls[0].body.values; })()),
+         [["'=kwaad"],['ok']]);
+    } finally {
+      window.fetch=_fetch; state.oauthToken=tOud; state.oauthExpiry=eOud;
+    }
   })();
   // ── Dubbelklik-rem op Afhandelen: met de vlag al gezet (eerste klik onderweg) mag
   //    een tweede doCompleteTask NOOIT de schrijf-fase bereiken. We stubben fetch +

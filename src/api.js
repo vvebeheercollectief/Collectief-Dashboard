@@ -90,15 +90,23 @@ async function writeRange(range,values,method='PUT'){
   if(!r.ok){const e=await r.json().catch(()=>({}));if(r.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Schrijffout');err.status=r.status;throw err}
   return r.json();
 }
-async function appendRange(range,values){
+// Meerdere rijen in ÉÉN append. Een bulk-actie op 20 taken schreef 20 losse logregels, dus 20
+// schrijfverzoeken (~4,7 s 'Opslaan…') en een derde van het schrijfquotum van 60/min — voor
+// regels die samen één handeling zijn. values.append neemt gewoon meerdere rijen aan en zet ze
+// in de meegegeven volgorde aaneengesloten onderaan het tabblad: één rondreis, één uitkomst.
+async function appendRows(range,rows){
   if(!state.oauthToken) throw new Error('Niet ingelogd');
+  const lijst=(rows||[]).filter(Boolean);
+  if(!lijst.length) return null;                  // niets te schrijven → ook geen verzoek
   const url=`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
-  const r=await _fetchGeteld(url,{method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},body:JSON.stringify({values:[_veiligeRij(values)]})});
+  const r=await _fetchGeteld(url,{method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},body:JSON.stringify({values:lijst.map(_veiligeRij)})});
   // err.status hoorde hier ook te staan: zonder status geldt een 429 of 500 van deze route als
   // netwerkfout (zie _isNetwerkFout) én komt hij niet door de transient-herkansing.
   if(!r.ok){const e=await r.json().catch(()=>({}));if(r.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Schrijffout');err.status=r.status;throw err}
   return r.json();
 }
+// Eén rij: doorgeefluik, zodat er maar één fetch-implementatie te onderhouden is.
+const appendRange=(range,values)=>appendRows(range,[values]);
 
 // Aantal lopende/wachtende achtergrond-schrijfacties. Zolang >0 slaat de 8s-poll
 // over, zodat een optimistische wijziging niet kort teruggedraaid wordt.
@@ -327,4 +335,4 @@ async function assertRowsMatch(checks, sheetName='Nog Te Doen'){
 const assertRowMatch=(row, bronOfCode, sheetName)=>assertRowsMatch(
   [(bronOfCode && typeof bronOfCode==='object') ? { row, r:bronOfCode } : { row, code:bronOfCode }], sheetName);
 
-export { NTD_DATUM, isOffline, _isOffline, _isNetwerkFout, fetchSheet, fetchSheets, writeRange, appendRange, veiligeCel, _veiligeRij, _shiftNtdRows, _herstelShift, _isTransient, _withRetry, askChat, _rowMismatch, _a1Bereik, vingerafdruk, rijVingerafdruk, _nummerDeel, _normCel, _rijNaarCellen, assertRowsMatch, assertRowMatch };
+export { NTD_DATUM, isOffline, _isOffline, _isNetwerkFout, fetchSheet, fetchSheets, writeRange, appendRange, appendRows, veiligeCel, _veiligeRij, _shiftNtdRows, _herstelShift, _isTransient, _withRetry, askChat, _rowMismatch, _a1Bereik, vingerafdruk, rijVingerafdruk, _nummerDeel, _normCel, _rijNaarCellen, assertRowsMatch, assertRowMatch };

@@ -2,7 +2,7 @@
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
 import { taakTitel, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel } from "./util.js";
-import { verwerkMeldingRijen, toonMeldingen, MAX_TOAST_BURST } from "./notifications.js";
+import { verwerkMeldingRijen, toonMeldingen, MAX_TOAST_BURST, _whoSleutel, getCurrentWho } from "./notifications.js";
 import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek, logEvents } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, SECS, SKEYS } from "./config.js";
 import { ACTIONS } from "./actions.js";
@@ -1809,6 +1809,34 @@ import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
   truthy('cache: twee gebruikers krijgen verschillende sleutels',
          _cacheSleutel('a@b.nl') !== _cacheSleutel('c@d.nl'));
   eq('cache: zonder adres een eigen sleutel i.p.v. undefined', _cacheSleutel('').includes('onbekend'), true);
+
+  // ── 'Wie ben jij' hangt aan het ACCOUNT, niet aan het apparaat ──
+  // Op een gedeelde computer bleef de naam van de vorige gebruiker staan, waardoor logregels
+  // (kolom H van 'Logboek') onder díe naam werden weggeschreven en 'toegewezen aan jou'-
+  // meldingen bij de verkeerde persoon landden. Er is geen uitlogknop, dus niets ruimde het op.
+  eq('who: sleutel bevat het genormaliseerde e-mailadres',
+     _whoSleutel('Info@VvEBeheerCollectief.nl'), 'notif_who_info@vvebeheercollectief.nl');
+  truthy('who: twee gebruikers krijgen verschillende sleutels',
+         _whoSleutel('a@b.nl') !== _whoSleutel('c@d.nl'));
+  eq('who: zonder adres een eigen sleutel i.p.v. undefined', _whoSleutel('').includes('onbekend'), true);
+  truthy('who: de sleutel is niet meer de kale apparaat-sleutel', _whoSleutel('a@b.nl') !== 'notif_who');
+  // Gedragstest: de naam van gebruiker A mag niet bij gebruiker B opduiken.
+  (()=>{
+    const mailOud=state.currentUserEmail;
+    const sel=document.getElementById('notif-who'); const selOud=sel?sel.value:null;
+    try{
+      state.currentUserEmail='info@vvebeheercollectief.nl';
+      localStorage.setItem(_whoSleutel(state.currentUserEmail),'Jer');
+      if(sel) sel.value='';                       // select leeg: dan wint de opgeslagen naam
+      eq('who: eigen naam komt terug bij dezelfde gebruiker', getCurrentWho(), 'Jer');
+      state.currentUserEmail='djiowchico@gmail.com';
+      truthy('who: de naam van de vorige gebruiker lekt NIET door', getCurrentWho() !== 'Jer');
+      eq('who: en valt terug op de naam van wie er nu is ingelogd', getCurrentWho(), 'Cihad');
+    } finally {
+      try{ localStorage.removeItem('notif_who_info@vvebeheercollectief.nl'); }catch(_){}
+      state.currentUserEmail=mailOud; if(sel && selOud!==null) sel.value=selOud;
+    }
+  })();
   (()=>{
     const mailOud=state.currentUserEmail, cacheOud=state._uitCache;
     const dOud={}; Object.keys(D).forEach(k=>dOud[k]=D[k]);
@@ -2029,6 +2057,49 @@ import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
   truthy('terugval: elk verplicht tabblad wordt ook echt gepolld',
          [...VERPLICHTE_TABS].every(n=>POLL_TABS.includes(n)));
   truthy('terugval: het Logboek is optioneel (mag stil leeg zijn)', !VERPLICHTE_TABS.has('Logboek'));
+
+  // ── loadAll tijdens een lopende ronde: wachten op de VOLGENDE ronde, niet stil teruggeven ──
+  // Bulk-undo en de ALV-reset doen `await loadAll(true)` om met verse gegevens de juiste
+  // archiefregel aan te wijzen. Liep er al een ronde, dan keerde loadAll stil terug en werkten
+  // ze dóór op de oude D. Meeliften op de LOPENDE ronde zou schijnveiligheid geven: die kan zijn
+  // batchGet al vóór hun schrijfactie hebben gedaan.
+  await (async()=>{
+    const _fetch=window.fetch, tOud=state.oauthToken, eOud=state.oauthExpiry;
+    const hashOud=state._lastDHash, failsOud=state._syncFails, wachtOud=state._loadWachtMs;
+    const dOud={}; Object.keys(D).forEach(k=>dOud[k]=D[k]);
+    let rondes=0, losmaken=null;
+    try{
+      for(let i=0;i<200 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,10));
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
+      state._lastDHash=null; state._syncFails=0; state._loadWachtMs=3000;
+      window.fetch=async(url)=>{
+        if(!String(url).includes('values:batchGet')) return new Response(JSON.stringify({values:[]}),{status:200});
+        rondes++;
+        if(rondes===1) await new Promise(r=>{ losmaken=r; });   // ronde 1 blijft hangen tot wij hem vrijgeven
+        return new Response(JSON.stringify({valueRanges:[]}),{status:200});
+      };
+      const r1=loadAll(true);                                    // ronde 1 start en blijft hangen
+      for(let i=0;i<100 && !losmaken;i++) await new Promise(r=>setTimeout(r,10));
+      let tweedeKlaar=false;
+      const r2=loadAll(true).then(()=>{ tweedeKlaar=true; });    // wachter tijdens de lopende ronde
+      await new Promise(r=>setTimeout(r,50));
+      eq('loadAll: een wachter krijgt een belofte, geen stille undefined', typeof r2.then, 'function');
+      truthy('loadAll: de wachter is nog NIET klaar zolang ronde 1 loopt', !tweedeKlaar);
+      losmaken();                                                // ronde 1 af → vervolgronde start
+      await r1; await r2;
+      truthy('loadAll: de wachter komt pas vrij ná de vervolgronde', tweedeKlaar);
+      eq('loadAll: en die vervolgronde heeft echt gedraaid', rondes, 2);
+    } finally {
+      if(losmaken) losmaken();
+      window.fetch=_fetch; state.oauthToken=tOud; state.oauthExpiry=eOud;
+      state._lastDHash=hashOud; state._syncFails=failsOud; state._loadWachtMs=wachtOud;
+      state._loadAgain=false; state._loadAgainLoud=false;
+      state._loadAgainPromise=null; state._loadAgainKlaar=null;
+      Object.keys(dOud).forEach(k=>{ D[k]=dOud[k]; });
+      document.getElementById('dot').className='dot';
+      document.getElementById('load-err-banner')?.remove();
+    }
+  })();
   // Wanneer is de dure terugval zinvol? Alleen bij een afgewezen bereik. Bij 'te druk' of een
   // storing maakte één mislukt verzoek er tot 24 — precies op het moment dat het al misging.
   eq('terugval: wél bij een afgewezen bereik (400)', magTerugvalLosseReads({status:400}), true);

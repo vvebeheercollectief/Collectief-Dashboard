@@ -453,8 +453,35 @@ async function _verwerkLogboek(R, naam, volledig, lees){
 // Pure functie, zodat de regel testbaar is los van timers en DOM.
 function magPollen(s){ return !!(s && s.currentUserEmail); }
 
-async function loadAll(silent){
-  if(state._loadInFlight){ state._loadAgain=true; if(!silent) state._loadAgainLoud=true; return; }
+// Vangnet-tijd voor een aanroeper die op de volgende ronde wacht. De Sheets-fetches kennen geen
+// eigen timeout, dus een hangende ronde zou `await loadAll()` voorgoed laten staan en een undo
+// of de ALV-reset eeuwig op 'Bezig…' zetten. Zelfde idioom als AUTH_ANTWOORD_TIMEOUT in auth.js;
+// tests verlagen hem via state._loadWachtMs.
+const LOAD_WACHT_TIMEOUT = 30_000;
+
+// Loopt er al een ronde, dan werd hier stil `return` gedaan. Aanroepers die schreven en dáárna
+// `await loadAll()` deden om met VERSE gegevens verder te werken (bulk-undo, ALV-reset) kregen zo
+// niets: ze liepen door op de oude D en konden de verkeerde archiefregel aanwijzen.
+// Bewust NIET meeliften op de lopende ronde: die kan zijn batchGet al vóór de schrijfactie van
+// de aanroeper hebben afgevuurd en levert dan precies de verouderde data waar het wachten voor
+// bedoeld was. Wat de aanroeper nodig heeft is een ronde die ná zijn aanroep begint — en die
+// wordt hieronder al ingepland. We maken die inplanning nu awaitbaar.
+function loadAll(silent){
+  if(state._loadInFlight){
+    state._loadAgain=true; if(!silent) state._loadAgainLoud=true;
+    if(!state._loadAgainPromise){
+      state._loadAgainPromise=new Promise(res=>{
+        state._loadAgainKlaar=res;
+        setTimeout(()=>{ if(state._loadAgainKlaar===res){ state._loadAgainKlaar=null; state._loadAgainPromise=null; res(); } },
+                   state._loadWachtMs || LOAD_WACHT_TIMEOUT);
+      });
+    }
+    return state._loadAgainPromise;
+  }
+  return _loadRonde(silent);
+}
+
+async function _loadRonde(silent){
   state._loadInFlight=true;
   try{
     // Altijd een geldige token garanderen (ook bij Vernieuwen-knop / schrijf-resync):
@@ -595,7 +622,16 @@ async function loadAll(silent){
   }
   finally{
     state._loadInFlight=false;
-    if(state._loadAgain){ const loud=state._loadAgainLoud; state._loadAgain=false; state._loadAgainLoud=false; loadAll(!loud); } // onderdrukte aanroep alsnog uitvoeren; luid als er een handmatige verversing tussen zat
+    if(state._loadAgain){
+      // Onderdrukte aanroep alsnog uitvoeren; luid als er een handmatige verversing tussen zat.
+      const loud=state._loadAgainLoud; state._loadAgain=false; state._loadAgainLoud=false;
+      // De wachtenden losmaken zodra DEZE vervolgronde klaar is — niet eerder. De vlaggen worden
+      // hierboven al gewist, zodat een aanroep tijdens de vervolgronde een NIEUWE belofte krijgt
+      // en niet meelift op een ronde die voor hem te vroeg begon.
+      const klaar=state._loadAgainKlaar;
+      state._loadAgainKlaar=null; state._loadAgainPromise=null;
+      _loadRonde(!loud).finally(()=>{ if(klaar) klaar(); });
+    }
   }
 }
 

@@ -70,6 +70,8 @@ export const state = {
   _loadInFlight: false,
   _loadAgain: false,
   _loadAgainLoud: false,   // werd de onderdrukte aanroep door een NIET-stille (handmatige) verversing getriggerd? → herstart luid, zodat de fout-banner/spinner zichtbaar blijft
+  _loadAgainPromise: null, // awaitbare belofte voor wie op de VOLGENDE ronde wacht (zie loadAll)
+  _loadAgainKlaar: null,   // resolver daarvan
   _syncFails: 0,           // opeenvolgende mislukte sync-rondes; 'Fout' pas na 2 (transient-tolerantie)
   _netwerkFouten: 0,       // opeenvolgende ECHTE netwerkfouten (een fetch die rejectet, dus zónder
                            // .status). Bewust los van _syncFails: die telt ook 401/403, quota en

@@ -352,7 +352,7 @@ function initMeldingen() {
 //  NOTIFICATIE MODAL
 // ══════════════════════════════════════
 function openNotifModal() {
-  const who = localStorage.getItem('notif_who') || '';
+  const who = localStorage.getItem(_whoSleutel(state.currentUserEmail)) || '';
   const known = ['Jer','Cihad','Gabos','Cihan',''];
   if (known.includes(who)) {
     document.getElementById('notif-who').value = who;
@@ -388,6 +388,17 @@ function onWhoChange() {
   document.getElementById('notif-who-other').style.display = sel.value === '__other__' ? '' : 'none';
 }
 
+// De naam hangt aan het ACCOUNT, niet aan het apparaat — zelfde reden als _cacheSleutel in
+// data.js: localStorage is gebonden aan de origin, niet aan de gebruiker. Op een gedeelde
+// computer bleef de naam van de vorige gebruiker staan, en schreef logEvent zijn logregels
+// (kolom H van 'Logboek') onder díe naam; ook 'toegewezen aan jou'-meldingen gingen dan naar de
+// verkeerde persoon. Er is bovendien geen uitlogknop — mensen sluiten het tabblad — dus niets
+// ruimde die waarde ooit op.
+// Bewust GEEN migratie van de oude platte sleutel: valt de nieuwe leeg uit, dan geeft
+// getCurrentWho hieronder gewoon displayName(state.currentUserEmail) terug, wat voor het vaste
+// team exact dezelfde naam oplevert.
+const _whoSleutel = email => 'notif_who_' + (email || 'onbekend').toLowerCase();
+
 function getCurrentWho() {
   const sel = document.getElementById('notif-who');
   if (sel) {
@@ -396,7 +407,7 @@ function getCurrentWho() {
       if (v) return v;
     } else if (sel.value) return sel.value;
   }
-  const stored = localStorage.getItem('notif_who');
+  const stored = localStorage.getItem(_whoSleutel(state.currentUserEmail));
   if (stored) return stored;
   if (state.currentUserEmail) return displayName(state.currentUserEmail);
   return '';
@@ -405,7 +416,7 @@ function getCurrentWho() {
 async function saveNotifPrefs(forceInit) {
   const who = getCurrentWho();
   if (!who && !forceInit) return;
-  if (who) localStorage.setItem('notif_who', who);
+  if (who) localStorage.setItem(_whoSleutel(state.currentUserEmail), who);
   const prefs = {
     newtask:  document.getElementById('tog-notif-newtask').classList.contains('on'),
     assigned: document.getElementById('tog-notif-assigned').classList.contains('on'),
@@ -465,7 +476,7 @@ async function subscribeNotifs() {
       if (localStorage.getItem('notif_' + k) === null) localStorage.setItem('notif_' + k, 'true');
     });
     if (!localStorage.getItem('notif_deadline_hours')) localStorage.setItem('notif_deadline_hours', '1');
-    localStorage.setItem('notif_who', who);
+    localStorage.setItem(_whoSleutel(state.currentUserEmail), who);
     await saveNotifPrefs(true);
     state.isSubscribed = true;
     refreshNotifUI();
@@ -535,6 +546,6 @@ OneSignalDeferred.push(async function(OneSignal) {
 export {
   fireNotifEvent, TOAST_ICONS, TOAST_COLORS, TOAST_DURATION, MAX_TOAST_BURST, showToast, dismissToast, showUndoToast,
   undoComplete, undoDelete, getNotifPrefs, verwerkMeldingRijen, toonMeldingen, initMeldingen, openNotifModal, closeNotifModal,
-  refreshNotifUI, onWhoChange, getCurrentWho, saveNotifPrefs, waitForOneSignal, subscribeNotifs,
+  refreshNotifUI, onWhoChange, getCurrentWho, _whoSleutel, saveNotifPrefs, waitForOneSignal, subscribeNotifs,
   unsubscribeNotifs, sendTestNotif,
 };

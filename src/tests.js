@@ -21,7 +21,7 @@ import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset
 import { setv, serializeNtdUndo, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, kiesModalFase, _modalFaseWoord, getInsertRow } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages } from "./dossier-chat.js";
-import { shouldPromptReload, maakHerlaadKern } from "./sw-update.js";
+import { shouldPromptReload, maakHerlaadKern, zelfdeWorker } from "./sw-update.js";
 import { doOAuth } from "./auth.js";
 import { SPLASH_MS, _setFase } from "./login-splash.js";
 import { opmaakHtml, htmlNaarMarkers, zonderOpmaak, pasToe, opmaakBalk } from "./opmaak.js";
@@ -3270,7 +3270,7 @@ import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '10.10');
+  eq('versie opgehoogd', APP_VERSION, '10.11');
 
   // ── Pushmeldingen: de twee schakels die stil kapot waren (audit 2026-08-06) ──
   // Beide defecten waren onzichtbaar: de app meldde "Notificaties zijn aan!" terwijl er nooit
@@ -3279,18 +3279,14 @@ import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
   await (async()=>{
     try{
       const lees = async n => (await fetch(new URL(n, document.baseURI), {cache:'no-store'})).text();
-      const sw = await lees('sw.js'), osw = await lees('onesignal-sw.js');
+      const sw = await lees('sw.js');
       const IMPORT = /importScripts\(\s*['"]https:\/\/cdn\.onesignal\.com\/sdks\/web\/v16\/OneSignalSDK\.sw\.js['"]\s*\)/;
-      truthy('onesignal-sw.js laadt de OneSignal-worker (anders komt een push nergens aan)',
-        IMPORT.test(osw));
+      // OneSignal registreert sw.js (workerName uit hún dashboard, niet te overrulen vanuit de
+      // code). De push komt dus hier binnen en zonder deze import tekent niemand hem.
+      truthy('sw.js laadt de OneSignal-worker (anders komt een push nergens aan)', IMPORT.test(sw));
       // Alleen de échte importScripts-aanroep telt; de naam mag in een toelichting voorkomen.
-      truthy('onesignal-sw.js importeert niet het oude, 404-gevende OneSignalSDKWorker.js',
-        !/importScripts\([^)]*OneSignalSDKWorker\.js/.test(osw));
-      // DE regressie van 2026-08-06: stond de OneSignal-worker in sw.js, dan registreerde de SDK
-      // 'sw.js?appId=…' naast onze eigen 'sw.js' op hetzelfde bereik. Die twee verdrongen elkaar
-      // om beurten en lieten de "nieuwe versie"-balk na élke herlading terugkomen.
-      truthy('sw.js bevat NIET de OneSignal-worker (anders botst hij met onze eigen registratie)',
-        !/importScripts\([^)]*onesignal/i.test(sw));
+      truthy('sw.js importeert niet het oude, 404-gevende OneSignalSDKWorker.js',
+        !/importScripts\([^)]*OneSignalSDKWorker\.js/.test(sw));
       const csp = document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.getAttribute('content')||'';
       const scriptSrc = (csp.split(';').find(d=>d.trim().startsWith('script-src'))||'');
       truthy('CSP staat api.onesignal.com toe (anders blijft OneSignal.init eeuwig hangen)',
@@ -3300,16 +3296,22 @@ import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
       truthy('push-wachtpost kon de service workers lezen', false);
     }
   })();
-  // De twee registraties moeten op VERSCHILLENDE bereiken staan, anders verdringen ze elkaar.
-  await (async()=>{
-    try{
-      const bron = await (await fetch(new URL('src/notifications.js', document.baseURI), {cache:'no-store'})).text();
-      truthy('OneSignal-init wijst naar een eigen workerbestand, niet naar sw.js',
-        /serviceWorkerPath:\s*swBase\s*\+\s*'\/onesignal-sw\.js'/.test(bron));
-      truthy('OneSignal-init gebruikt een eigen bereik, niet dat van de app-worker',
-        /serviceWorkerParam:\s*\{\s*scope:\s*swBase\s*\+\s*'\/onesignal\/'\s*\}/.test(bron));
-    }catch(e){ truthy('bereik-wachtpost kon notifications.js lezen', false); }
-  })();
+  // ── Eén registratie per bereik: onze eigen registratie mag die van OneSignal niet verdringen ──
+  // OneSignal registreert HETZELFDE bestand met '?appId=…&sdkVersion=…' erachter. Zag sw-update
+  // dat als een andere worker, dan verdrongen ze elkaar om beurten en bleef er telkens een
+  // wachtende versie staan — de "nieuwe versie"-balk kwam dan na élke herlading terug.
+  truthy('zelfdeWorker: query en hash tellen niet mee',
+    zelfdeWorker('https://x/Collectief-Dashboard/sw.js?appId=abc&sdkVersion=160609',
+                 '/Collectief-Dashboard/sw.js'));
+  truthy('zelfdeWorker: herkent de kale URL als dezelfde worker',
+    zelfdeWorker('https://x/Collectief-Dashboard/sw.js', '/Collectief-Dashboard/sw.js'));
+  truthy('zelfdeWorker: een ANDER bestand is niet dezelfde worker',
+    !zelfdeWorker('https://x/Collectief-Dashboard/onesignal-sw.js?appId=abc',
+                  '/Collectief-Dashboard/sw.js'));
+  truthy('zelfdeWorker: een ander pad met dezelfde bestandsnaam telt niet mee',
+    !zelfdeWorker('https://x/anders/sw.js', '/Collectief-Dashboard/sw.js'));
+  truthy('zelfdeWorker: lege invoer levert nooit een valse treffer op',
+    !zelfdeWorker('', '/sw.js') && !zelfdeWorker('https://x/sw.js', '') && !zelfdeWorker(null, null));
 
   // ── Bewerkscherm ──
   truthy('vijfde formuliergroep bestaat', !!document.getElementById('fg-sub'));

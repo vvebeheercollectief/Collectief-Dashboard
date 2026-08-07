@@ -9,6 +9,39 @@ export function shouldPromptReload(hasController) {
   return !!hasController;
 }
 
+// Wijzen twee service-worker-URL's naar HETZELFDE bestand? Query en hash tellen niet mee.
+// Nodig omdat OneSignal ons eigen sw.js registreert met een query erachter:
+//     sw.js?appId=…&sdkVersion=…
+// Puur, dus los testbaar.
+export function zelfdeWorker(a, b) {
+  if (!a || !b) return false;
+  try { return new URL(a, 'https://x/').pathname === new URL(b, 'https://x/').pathname; }
+  catch (_) { return false; }
+}
+
+// Pak de registratie die er al staat als die naar hetzelfde bestand wijst; registreer anders zelf.
+//
+// WAAROM (storing 2026-08-06, twee keer misbegrepen voor het klopte): per bereik bestaat er maar
+// ÉÉN service-worker-registratie. OneSignal registreert `sw.js?appId=…&sdkVersion=…` op ons
+// bereik — die bestandsnaam komt uit hun eigen dashboard-instelling en is met de init-opties
+// serviceWorkerPath/serviceWorkerParam NIET te overrulen (op productie geverifieerd: ook met een
+// eigen pad en eigen scope bleef hun registratie `sw.js` op ons bereik). Registreerden wij daar
+// de kale URL naast, dan verdrongen die twee elkaar om beurten en bleef er telkens een WACHTENDE
+// versie staan — precies wat updatefound/reg.waiting hieronder als "nieuwe versie" ziet. Gevolg:
+// de balk kwam na élke herlading terug. Nemen we de bestaande registratie over, dan is er niets
+// om over te vechten en blijft de update-controle gewoon werken (reg.update() haalt hetzelfde
+// bestand op).
+function pakRegistratie(swPad, scope) {
+  if (!navigator.serviceWorker.getRegistration) {
+    return navigator.serviceWorker.register(swPad, { scope, updateViaCache: 'none' });
+  }
+  return navigator.serviceWorker.getRegistration(scope).then(bestaand => {
+    const huidig = bestaand && (bestaand.active || bestaand.waiting || bestaand.installing);
+    if (huidig && zelfdeWorker(huidig.scriptURL, swPad)) return bestaand;
+    return navigator.serviceWorker.register(swPad, { scope, updateViaCache: 'none' });
+  });
+}
+
 // Kern van het herlaadgedrag, injecteerbaar voor tests. Twee harde regels
 // (inlogstoring 22-07-2026):
 //  1. De herlaad-wens is KORT houdbaar: alleen een klik die echt een wachtende
@@ -117,10 +150,7 @@ export function initSwUpdate() {
 
   window.addEventListener('load', () => {
     const base = location.pathname.replace(/\/[^/]*$/, '') || '';
-    navigator.serviceWorker.register(base + '/sw.js', {
-      scope: base + '/',
-      updateViaCache: 'none', // omzeil HTTP-cache (GitHub Pages) bij update-checks
-    }).then(reg => {
+    pakRegistratie(base + '/sw.js', base + '/').then(reg => {
       const vraagHerladen = () => kern.klik(reg);
       const balk = () => toonUpdateBalk(vraagHerladen, () => kern.annuleer());
 

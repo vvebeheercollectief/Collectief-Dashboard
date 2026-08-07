@@ -491,12 +491,15 @@ OneSignalDeferred.push(async function(OneSignal) {
     const swBase = location.pathname.replace(/\/[^/]*$/, '') || '';
     await OneSignal.init({
       appId: ONESIGNAL_APP_ID,
-      // Eigen worker op een EIGEN bereik — niet de app-sw.js op '/'. De SDK hangt er
-      // '?appId=…&sdkVersion=…' achter, dus zou hij op hetzelfde bereik eeuwig met onze
-      // eigen registratie wisselen en steeds de "nieuwe versie"-balk oproepen.
-      // Zie de toelichting in onesignal-sw.js en sw.js.
-      serviceWorkerPath: swBase + '/onesignal-sw.js',
-      serviceWorkerParam: { scope: swBase + '/onesignal/' },
+      // Deze twee opties worden door de SDK GENEGEERD zolang de worker-instelling in het
+      // OneSignal-dashboard staat ingevuld (workerName 'sw.js', scope '/Collectief-Dashboard/').
+      // Op productie geverifieerd: een eigen bestand op een eigen bereik werd niet overgenomen,
+      // de SDK registreerde onverstoorbaar 'sw.js?appId=…&sdkVersion=…' op ons eigen bereik.
+      // Ze staan hier daarom gelijk aan wat het dashboard doet, zodat code en werkelijkheid
+      // elkaar niet tegenspreken. Wil je dit ooit scheiden, dan moet dat in het OneSignal-
+      // dashboard gebeuren, niet hier.
+      serviceWorkerPath: swBase + '/sw.js',
+      serviceWorkerParam: { scope: swBase + '/' },
       notifyButton: { enable: false },
       allowLocalhostAsSecureOrigin: true,
     });

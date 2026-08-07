@@ -1,15 +1,24 @@
 // Collectief Dashboard — Service Worker
 // Verhoog versie bij elke nieuwe deploy zodat clients de nieuwe cache pakken.
 
-// LET OP — zet hier NOOIT de OneSignal-worker in (importScripts van OneSignalSDK.sw.js).
-// Dat lijkt te werken, maar de SDK registreert zijn worker als 'sw.js?appId=…&sdkVersion=…'
-// terwijl src/sw-update.js dit bestand zonder query registreert. Twee URL's op één bereik
-// verdringen elkaar om beurten, en de verdrongen versie blijft als 'waiting' staan — precies
-// de trigger van de balk "Er is een nieuwe versie van het dashboard", die daardoor na élke
-// herlading terugkwam. OneSignal heeft daarom een eigen bestand op een eigen bereik:
-// ./onesignal-sw.js met scope './onesignal/'.
+// OneSignal draait BEWUST in deze service worker. Dat is geen keuze maar een gegeven: de SDK
+// registreert 'sw.js?appId=…&sdkVersion=…' op basis van de workerName-instelling in hun eigen
+// dashboard, en die is met de init-opties serviceWorkerPath/serviceWorkerParam niet te
+// overrulen (op productie geverifieerd — een eigen bestand op een eigen bereik werd genegeerd).
+// Een push komt dus hier binnen, en zonder deze regel is er niemand die hem tekent.
+// LET OP de bestandsnaam: in v16 heet de worker OneSignalSDK.sw.js — het veelgeciteerde
+// OneSignalSDKWorker.js geeft een 404 en zou de push stil kapot laten.
+// In try/catch: is de CDN even onbereikbaar, dan mag dat de hele service worker (en daarmee
+// de offline-schil van het dashboard) niet onderuithalen — dan vervalt alleen de push.
+// De bijbehorende helft van de oplossing staat in src/sw-update.js: die neemt de bestaande
+// registratie over in plaats van er een tweede naast te zetten.
+try {
+  importScripts('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js');
+} catch (e) {
+  console.warn('[sw] OneSignal-worker niet geladen, pushmeldingen uit:', e);
+}
 
-const CACHE_VERSION = 'cd-v105';
+const CACHE_VERSION = 'cd-v106';
 const APP_SHELL = [
   './',
   './index.html',

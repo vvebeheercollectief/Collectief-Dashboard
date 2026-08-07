@@ -11,7 +11,23 @@ import { toonKaart } from "./login-splash.js";
 // vangnet in doOAuth. Tests kunnen dit verlagen via state._authTimeoutMs.
 const AUTH_ANTWOORD_TIMEOUT = 90_000;
 
+// Hoogstens ÉÉN lopende aanvraag per prompt-stand. GIS kent per client maar één callback: bindt
+// een tweede aanvraag hem opnieuw, dan landen béíde antwoorden bij de tweede en lost de eerste
+// pas op via het vangnet hieronder — 90 seconden waarin de bezig-teller >0 blijft en sw-update
+// niet herlaadt. Meeliften haalt die overschrijving bij de wortel weg; het vangnet blijft als
+// tweede lijn staan. Op prompt-stand gescheiden: een stille verversing en een aanvraag mét
+// inlogvenster zijn niet uitwisselbaar.
+let _lopendeAanvraag=null, _lopendePrompt=null;
+
 function doOAuth(forcePrompt){
+  if(_lopendeAanvraag && _lopendePrompt===!!forcePrompt) return _lopendeAanvraag;
+  const p=_doOAuth(forcePrompt);
+  _lopendeAanvraag=p; _lopendePrompt=!!forcePrompt;
+  p.finally(()=>{ if(_lopendeAanvraag===p){ _lopendeAanvraag=null; _lopendePrompt=null; } });
+  return p;
+}
+
+function _doOAuth(forcePrompt){
   return new Promise(resolve=>{
     if(!clientId){resolve(null);return}
     // Bezig-teller: zolang deze aanvraag loopt mag sw-update niet automatisch herladen
@@ -144,9 +160,15 @@ function logout(reden){
   // vóór zijn sessie zouden alsnog als toast langskomen, of juist stil overgeslagen worden.
   state._lastNotifTs=null; state._meldStart=0; state._meldUit=false;
   try{ _shownToasts.clear(); }catch(_){}
-  if(state._resyncTimer){ clearInterval(state._resyncTimer); state._resyncTimer=null; }
-  if(state._heartbeatTimer){ clearInterval(state._heartbeatTimer); state._heartbeatTimer=null; }
-  if(state._notifVisibilityHandler){ document.removeEventListener('visibilitychange', state._notifVisibilityHandler); state._notifVisibilityHandler=null; }
+  // De 8s-poll, de token-heartbeat en de meldingen-visibilityhandler worden UITSLUITEND bij
+  // DOMContentLoaded gestart (main.js). Stopten we ze hier, dan kwamen ze na een tweede inlog
+  // in hetzelfde tabblad nooit meer terug: het dashboard laadde dan één keer en bevroor daarna
+  // stil — geen verversing meer, geen tokenvernieuwing, geen meldingen.
+  // Stoppen is ook niet nodig: alle drie hebben ze hun eigen sessiepoort en liggen na deze
+  // logout vanzelf stil.
+  //   · de 8s-poll      → magPollen() eist state.currentUserEmail, hierboven leeggemaakt
+  //   · de heartbeat    → keert terug op !state.oauthToken
+  //   · onNotifVisibility → keert terug op !state.oauthToken
   try{ if(window.OneSignal && OneSignal.logout) OneSignal.logout(); }catch(_){}
   const gate=document.getElementById('login-gate'); if(gate) gate.style.display='';
   toonKaart(); // meteen de login-kaart (geen splash-herhaling bij uitloggen)

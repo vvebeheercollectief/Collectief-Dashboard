@@ -7,7 +7,7 @@ import { esc, filt, berekenPrioriteit, parseDt, opvolgStatus, _vandaagAmsterdam,
 import { SECS, SKEYS } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { bulkWis, renderBulkUi } from "./bulk.js";
-import { renderThead, renderTbody, renderPag, bepaalStil, deadlineCel, rowNtd, rowAf } from "./render-tabel.js";
+import { renderThead, renderTbody, renderPag, bepaalStil, bouwStilIndex, _zetStilIndex, deadlineCel, rowNtd, rowAf } from "./render-tabel.js";
 import { _verrijkOfferteRij, offerteAannemerPaneel, offerteAannSamenvatting } from "./render-offerte.js";
 import { renderAlvo, renderAlfa, toggleAlvoFlag, ALVO_ICONS, ALVO_COLS, ALVO_LABELS, flagPill, _recomputeAlvoStatus, statusIco } from "./render-alv.js";
 
@@ -323,5 +323,5 @@ export {
   kopOpen, zetKopOpen,
   offerteAannemerPaneel, offerteAannSamenvatting,
   ALVO_ICONS, renderAlvo, ALVO_COLS, ALVO_LABELS, flagPill, _recomputeAlvoStatus, toggleAlvoFlag, statusIco, renderAlfa,
-  renderThead, renderTbody, bepaalStil, deadlineCel, rowNtd, rowAf, renderPag,
+  renderThead, renderTbody, bepaalStil, bouwStilIndex, _zetStilIndex, deadlineCel, rowNtd, rowAf, renderPag,
 };

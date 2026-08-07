@@ -3,7 +3,11 @@ function verplaatsAfgerond(e) {
   var sheet = e.source.getActiveSheet();
   var range = e.range;
 
-  if (sheet.getName() === "Afgerond") return;
+  // Allowlist, net als verplaatsALV verderop: alléén het echte tabblad 'Nog Te Doen'. Een kopie
+  // of back-up daarvan heeft exact dezelfde sectiekoppen én dezelfde checkbox in kolom I; met een
+  // denylist op alleen "Afgerond" knipte één vinkje in zo'n back-up een rij uit de BACK-UP en zette
+  // hem in het echte archief. Hoofdletterongevoelig + trim, zoals _isAlvoTab in src/alv-reset.js.
+  if (sheet.getName().trim().toLowerCase() !== NTD_SHEET.toLowerCase()) return;
 
   if (range.getColumn() !== 9) return;
 
@@ -62,18 +66,36 @@ function verplaatsAfgerond(e) {
     return;
   }
 
-  var sectieRow = findSectieRow(targetSheet, sectie);
-  if (sectieRow === -1) return;
+  // Kolom A in ÉÉN keer ophalen, net als _sorteerOfferteTrajectenImpl verderop. Cel voor cel
+  // lezen kostte hier tot honderden losse getValue-aanroepen per afgevinkte taak — en elke cel
+  // in de lus zelfs twee keer — allemaal binnen de document-lock.
+  var lastRowTarget = targetSheet.getLastRow();
+  var kolomA = targetSheet.getRange(1, 1, Math.max(lastRowTarget, 1), 1).getValues();
+  var celA = function (r) { return kolomA[r - 1][0]; };
+  var kopA = function (r) { return celA(r).toString().trim().toUpperCase(); };
+
+  var sectieRow = -1;
+  for (var s = 1; s <= lastRowTarget; s++) {
+    if (kopA(s) === sectie) { sectieRow = s; break; }
+  }
+  if (sectieRow === -1) {
+    // Stond hier een kale return: de taak bleef dan afgevinkt in 'Nog Te Doen' staan zonder
+    // dat iemand kon zien waarom hij niet in het archief kwam. Nu een spoor, net als hierboven.
+    Logger.log("verplaatsAfgerond: sectie '" + sectie + "' niet gevonden in 'Afgerond' — taak "
+      + vveCode + " niet gearchiveerd");
+    cd_schrijfLogboek(vveCode, sectie, 'Fout', 'Afgerond', '',
+      "Sectie '" + sectie + "' ontbreekt in het tabblad 'Afgerond' — taak niet gearchiveerd. "
+      + "Voeg de sectiekop toe.", 'systeem');
+    return;
+  }
 
   var insertRow = sectieRow + 2;
-  var lastRowTarget = targetSheet.getLastRow();
-
   while (insertRow <= lastRowTarget) {
-    var checkVal = targetSheet.getRange(insertRow, 1).getValue().toString().trim().toUpperCase();
+    var checkVal = kopA(insertRow);
     if (checkVal === "OPPAKKEN" || checkVal === "VERGADERVERZOEKEN" || checkVal === "LOD" || checkVal === "OFFERTE-TRAJECTEN" || checkVal === "SUBSIDIE-TRAJECTEN") {
       break;
     }
-    if (targetSheet.getRange(insertRow, 1).getValue() === "") {
+    if (celA(insertRow) === "") {
       break;
     }
     insertRow++;
@@ -103,6 +125,14 @@ function setupAfgerondSheet(sheet) {
 
   sheet.getRange(10, 1).setValue("OFFERTE-TRAJECTEN");
   sheet.getRange(11, 1, 1, 5).setValues([headers]);
+  sheet.getRange(12, 1).setValue("");
+
+  // Vijfde sectie (2026-07-29). Ontbrak hier, waardoor findSectieRow op een vers skelet -1 gaf
+  // en een afgevinkte subsidietaak stil niet gearchiveerd werd. De volgorde LOD vóór
+  // OFFERTE-TRAJECTEN is BEWUST anders dan SKEYS — zo staat het echt op productie, zie de
+  // toelichting bovenin src/structuurcheck.js. Niet 'rechttrekken'.
+  sheet.getRange(13, 1).setValue("SUBSIDIE-TRAJECTEN");
+  sheet.getRange(14, 1, 1, 5).setValues([headers]);
 }
 
 function findSectieRow(sheet, sectie) {

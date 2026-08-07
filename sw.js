@@ -18,7 +18,11 @@ try {
   console.warn('[sw] OneSignal-worker niet geladen, pushmeldingen uit:', e);
 }
 
-const CACHE_VERSION = 'cd-v106';
+// logo-login.png en src/urgentie.js stonden hier zonder gebruiker: het logo is bij het nieuwe
+// loginscherm vervangen, en urgentie.js wordt alleen nog door de testsuite geïmporteerd. Beide
+// werden bij iedereen meegedownload en gecached. De BESTANDEN blijven wél staan: src/tests.js
+// hangt aan urgentie.js.
+const CACHE_VERSION = 'cd-v107';
 const APP_SHELL = [
   './',
   './index.html',
@@ -28,7 +32,6 @@ const APP_SHELL = [
   './icon-512.png',
   './icon-maskable.png',
   './apple-touch-icon.png',
-  './logo-login.png',
   './logo-sidebar.png',
   './beeldmerk-wit.svg',
   './logo-gestapeld-leisteen.svg',
@@ -40,7 +43,6 @@ const APP_SHELL = [
   './src/state.js',
   './src/util.js',
   './src/icons.js',
-  './src/urgentie.js',
   './src/api.js',
   './src/auth.js',
   './src/login-splash.js',

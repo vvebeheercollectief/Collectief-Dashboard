@@ -7,7 +7,7 @@ import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _s
 import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
-import { filterNtd, setNtd, renderNtd, renderNtdStats, renderAf, setAf, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey, kopOpen, zetKopOpen } from "./render-lijsten.js";
+import { filterNtd, setNtd, renderNtd, renderNtdStats, renderAf, setAf, bepaalStil, bouwStilIndex, _zetStilIndex, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey, kopOpen, zetKopOpen } from "./render-lijsten.js";
 import { HERO_VIEWS } from "./render-analytics.js";
 import { state, D, pgs } from "./state.js";
 import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel, renderVve } from "./render-vve.js";
@@ -1326,45 +1326,40 @@ import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
       eq('auth: dubbel afgehandelde aanvraag telt maar één keer af', state._authBezig, 0);
 
       // Twee gelijktijdige aanvragen: de teller moet 2 zijn en pas op 0 als beide klaar zijn.
+      // ── Twee gelijktijdige aanvragen liften mee op één GIS-aanvraag ──
+      // GIS kent per client maar ÉÉN callback. Bond een tweede aanvraag hem opnieuw, dan landden
+      // béíde antwoorden bij de tweede, loste de eerste nooit op en bleef _authBezig >0 — waarna
+      // sw-update nooit meer herlaadde en de Herladen-knop niets deed. Nu deelt een tweede
+      // gelijke aanvraag simpelweg de lopende.
+      state._authTimeoutMs=60;   // vangnet kort houden; hij blijft als tweede lijn bestaan
       state._gsiTokenClient=null; state._authBezig=0;
       const a=doOAuth(false); await Promise.resolve();
-      const eersteCb=cfg.callback;
       const b=doOAuth(false); await Promise.resolve();
-      eq('auth: twee gelijktijdige aanvragen → teller 2', state._authBezig, 2);
-      eersteCb({error:'x'}); await a;
-      eq('auth: na de eerste is de teller nog 1', state._authBezig, 1);
-      // Vuurt de afhandeling van diezelfde eerste aanvraag NOG een keer (GIS-hik, of een
-      // error_callback ná een gewone callback), dan mag dat de teller niet nóg een keer
-      // verlagen — anders denkt de app dat er geen inlog meer loopt terwijl de tweede
-      // aanvraag nog open staat, en mag sw-update er dwars doorheen herladen.
-      eersteCb({error:'x'});
-      eq('auth: herhaalde afhandeling van dezelfde aanvraag telt niet dubbel', state._authBezig, 1);
-      cfg.callback({access_token:'t3',expires_in:3600}); await b;
-      eq('auth: pas na de tweede terug op 0', state._authBezig, 0);
+      truthy('auth: een tweede gelijke aanvraag lift mee op de lopende', a===b);
+      eq('auth: en telt dus maar één keer als bezig', state._authBezig, 1);
+      cfg.callback({access_token:'t3',expires_in:3600});
+      await Promise.all([a,b]);
+      eq('auth: teller terug op 0 als die ene aanvraag klaar is', state._authBezig, 0);
 
-      // ── ECHTE GIS-semantiek: er is maar ÉÉN callback ────────────────────────────
-      // De test hierboven bewaart `eersteCb` en roept die apart aan — die luxe bestaat in
-      // het echt niet. GIS leest bij elk antwoord `client.callback`, en die is door de
-      // tweede doOAuth overschreven. Beide antwoorden landen dus op de handler van de
-      // TWEEDE aanvraag; de eerste telt nooit af en `_authBezig` blijft eeuwig >0.
-      // Gevolg voor de gebruiker: sw-update herlaadt daarna nooit meer, dus de balk
-      // "Er is een nieuwe versie" blijft staan en de Herladen-knop doet niets.
-      state._authTimeoutMs=60;   // vangnet kort houden, anders duurt deze test 90 s
+      // Een aanvraag MÉT inlogvenster is niet uitwisselbaar met een stille verversing.
       state._gsiTokenClient=null; state._authBezig=0;
-      const c1=doOAuth(false); await Promise.resolve();
-      const c2=doOAuth(false); await Promise.resolve();
-      eq('auth: twee overlappende aanvragen → teller 2', state._authBezig, 2);
-      // Eén antwoord van Google, via de HUIDIGE binding (zoals GIS het doet): dat handelt
-      // alleen de tweede aanvraag af. De eerste krijgt nooit iets — precies het geval dat
-      // de teller eeuwig op 1 liet staan en de Herladen-knop dood maakte.
-      cfg.callback({access_token:'r2',expires_in:3600});
-      // Met een deadline: zonder vangnet lost c1 nóóit op en zou een kale await de hele
-      // testsuite laten hangen in plaats van rood te worden.
-      const meteenOfNiet = p => Promise.race([p.then(()=>'klaar'), new Promise(r=>setTimeout(()=>r('hangt'),400))]);
-      eq('auth: onbeantwoorde aanvraag laat de belofte niet eeuwig hangen', await meteenOfNiet(c1), 'klaar');
-      eq('auth: beantwoorde aanvraag lost gewoon op', await meteenOfNiet(c2), 'klaar');
-      eq('auth: bezig-teller loopt hoe dan ook leeg (anders herlaadt de app nooit meer)',
-         state._authBezig, 0);
+      const stil=doOAuth(false); await Promise.resolve();
+      const luid=doOAuth(true);  await Promise.resolve();
+      truthy('auth: stille en luide aanvraag worden NIET gedeeld', stil!==luid);
+      eq('auth: die twee tellen wel allebei als bezig', state._authBezig, 2);
+      cfg.callback({access_token:'t4',expires_in:3600});
+      await Promise.race([Promise.all([stil,luid]), new Promise(r=>setTimeout(r,400))]);
+      // Het vangnet ruimt op wat GIS niet beantwoordt; de teller mag nooit blijven hangen.
+      await new Promise(r=>setTimeout(r,200));
+      eq('auth: het vangnet laat de teller hoe dan ook leeglopen', state._authBezig, 0);
+
+      // Herhaalde afhandeling van dezelfde aanvraag mag niet dubbel aftellen.
+      state._gsiTokenClient=null; state._authBezig=0;
+      const enk=doOAuth(false); await Promise.resolve();
+      cfg.callback({access_token:'t5',expires_in:3600});
+      cfg.callback({access_token:'t5',expires_in:3600});
+      await enk;
+      eq('auth: herhaalde afhandeling telt niet dubbel af', state._authBezig, 0);
       delete state._authTimeoutMs;
     } finally {
       window.google=googleOud; state._gsiTokenClient=clientOud; state._authBezig=bezigOud;
@@ -1877,6 +1872,33 @@ import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
   truthy('cache: twee gebruikers krijgen verschillende sleutels',
          _cacheSleutel('a@b.nl') !== _cacheSleutel('c@d.nl'));
   eq('cache: zonder adres een eigen sleutel i.p.v. undefined', _cacheSleutel('').includes('onbekend'), true);
+
+  // ── Stil-markering: één opzoeklijst per render i.p.v. een logboekscan per taakrij ──
+  (()=>{
+    const log=[
+      {code:'A1',sectie:'OPPAKKEN',timestamp:'2026-06-01T10:00:00Z'},
+      {code:'A1',sectie:'OPPAKKEN',timestamp:'2026-06-05T10:00:00Z'},
+      {code:'A1',sectie:'LOD',     timestamp:'2026-06-09T10:00:00Z'},
+      {code:'B2',sectie:'OPPAKKEN',timestamp:'2026-06-02T10:00:00Z'},
+    ];
+    const ix=bouwStilIndex(log,'OPPAKKEN');
+    eq('stil-index: alleen de regels van de gevraagde sectie', ix.get('A1').length, 2);
+    eq('stil-index: per code gegroepeerd', ix.get('B2').length, 1);
+    eq('stil-index: onbekende code geeft niets', ix.get('ZZZ'), undefined);
+    eq('stil-index: zonder sectie tellen alle regels mee', bouwStilIndex(log,null).get('A1').length, 3);
+    eq('stil-index: leeg logboek geeft een lege index', bouwStilIndex(null,'OPPAKKEN').size, 0);
+    // De index mag exact hetzelfde antwoord geven als de scan die hij vervangt.
+    const rij={code:'A1',inBehandeling:'TRUE',opvolgdatum:''};
+    const logOud=D.logboek;
+    try{
+      D.logboek=log;
+      const zonder=bepaalStil(rij,'OPPAKKEN');
+      _zetStilIndex(ix);
+      const met=bepaalStil(rij,'OPPAKKEN');
+      _zetStilIndex(null);
+      eq('stil-index: zelfde uitkomst als de scan die hij vervangt', met, zonder);
+    } finally { D.logboek=logOud; _zetStilIndex(null); }
+  })();
 
   // ── 'Wie ben jij' hangt aan het ACCOUNT, niet aan het apparaat ──
   // Op een gedeelde computer bleef de naam van de vorige gebruiker staan, waardoor logregels
@@ -3477,7 +3499,7 @@ import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '10.11');
+  eq('versie opgehoogd', APP_VERSION, '10.12');
 
   // ── Pushmeldingen: de twee schakels die stil kapot waren (audit 2026-08-06) ──
   // Beide defecten waren onzichtbaar: de app meldde "Notificaties zijn aan!" terwijl er nooit

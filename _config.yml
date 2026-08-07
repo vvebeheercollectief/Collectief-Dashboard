@@ -11,7 +11,12 @@ exclude:
   - docs
   - .superpowers
   - apps-script
+  - apps-script-backup
   - README.md
   - BRAND-GUIDELINES.md
   - beheer-playbook.md
   - OVERDRACHT-subsidie-trajecten.md
+# Let op: Jekyll matcht deze regels ook op PREFIX — 'apps-script' weert daardoor ook
+# apps-script-backup. Zet hier daarom NOOIT een korte regel als 'src' of 'index': dan
+# verdwijnt de app zelf van de site. 'apps-script-backup' staat er expliciet bij zodat het
+# niet van die prefix-toevalligheid afhangt.

@@ -7,6 +7,10 @@ beheer-playbook.md
 docs/
 .superpowers/
 apps-script/
+apps-script-backup/
 mockups/
 logo-pakket/
 vrijdagsoverzicht.html
+OVERDRACHT-subsidie-trajecten.md
+# Let op: dit is gitignore-syntax en matcht NIET op prefix — 'apps-script/' weert
+# apps-script-backup/ dus niet. Elke map hier apart noemen.

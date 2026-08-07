@@ -40,6 +40,9 @@ function renderTbody(tbodyId,rows,sec,page,isAf,filtered){
   const leegCols=isAf?6:(SECS[sec].cols.length+1+(state.bulkMode?1:0));
   if(!sl.length){el.innerHTML=`<tr><td colspan="${leegCols}">${emptyRow(leegCols,true,filtered)}</td></tr>`;return}
   if(isAf){el.innerHTML=sl.map(r=>rowAf(r,sec)).join('');return}
+  // Eén opzoeklijst voor de hele render i.p.v. een logboekscan per rij (zie bouwStilIndex).
+  _zetStilIndex(bouwStilIndex(D.logboek, sec));
+  try{
   // Drie groepen (Fase 4): actief / in behandeling / weggelegd
   const grpOf = r => opvolgStatus(r).weggelegd ? 2 : (r.inBehandeling==='TRUE' ? 1 : 0);
   const main=sl.filter(r=>grpOf(r)===0);
@@ -58,12 +61,38 @@ function renderTbody(tbodyId,rows,sec,page,isAf,filtered){
     html+=wg.map(r=>rowNtd(r,sec)).join('');
   }
   el.innerHTML=html;
+  } finally { _zetStilIndex(null); }   // index nooit laten overleven: hij mag niet verouderen
 }
+
+// Eén pass over het logboek: VvE-code → de logregels van DEZE sectie. Voorheen scande
+// bepaalStil het hele logboek (±1.300 regels) opnieuw voor élke getoonde taakrij; op een pagina
+// van 25 rijen dus 25 keer. De index wordt per render één keer gebouwd en daarna weggegooid,
+// zodat hij nooit kan verouderen ten opzichte van D.logboek.
+// Bewust ZONDER de timestamps vooraf te parsen: alle ~1.300 Date-objecten vooraf maken is bij de
+// werkelijke verhouding (een handvol in-behandeling-rijen per pagina) juist trager dan de scan
+// die het vervangt. Het aantal Date-objecten blijft zo exact gelijk; alleen het herhaalde
+// doorlopen verdwijnt. Puur, dus los testbaar.
+function bouwStilIndex(logboek, sec){
+  const m = new Map();
+  (logboek || []).forEach(e => {
+    if (sec && e.sectie !== sec) return;
+    const v = m.get(e.code);
+    if (v) v.push(e); else m.set(e.code, [e]);
+  });
+  return m;
+}
+
+// Index van de lopende render. null = geen index → bepaalStil valt terug op de oude scan, zodat
+// losse aanroepers (en de tests) ongemoeid blijven werken.
+let _stilIndex = null;
+const _zetStilIndex = ix => { _stilIndex = ix || null; };
 
 function bepaalStil(r, sec){
   if (opvolgStatus(r).weggelegd) return null; // weggelegd = bewust geparkeerd, niet stil (Fase 4)
   if (r.inBehandeling !== 'TRUE') return null;
-  const entries = (D.logboek || []).filter(e => e.code === r.code && (!sec || e.sectie === sec));
+  const entries = _stilIndex
+    ? (_stilIndex.get(r.code) || [])
+    : (D.logboek || []).filter(e => e.code === r.code && (!sec || e.sectie === sec));
   if (!entries.length) return null; // geen activiteit-data → niet markeren
   let laatst = null;
   entries.forEach(e => {
@@ -215,4 +244,4 @@ function renderPag(id,total,cur,doel){
     </div>`;
 }
 
-export { renderThead, renderTbody, bepaalStil, deadlineCel, rowNtd, rowAf, renderPag };
+export { renderThead, renderTbody, bepaalStil, bouwStilIndex, _zetStilIndex, deadlineCel, rowNtd, rowAf, renderPag };

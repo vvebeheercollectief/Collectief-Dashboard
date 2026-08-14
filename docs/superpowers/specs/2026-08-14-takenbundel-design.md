@@ -118,10 +118,16 @@ volgnummer én is de gesleepte volgorde ook echt de getoonde volgorde — óók 
 vóór een afgerond lid moet komen. Dat laatste is geen randgeval: een bundel met een open hoofdtaak
 op 0 en één afgevinkte subtaak op 10 is de gewone stand zodra er één vinkje is gezet.
 
+Er is één situatie waarin de gesleepte volgorde sowieso niet gehaald kan worden: een **afgerond
+lid op volgnummer 0**. Daar ligt geen ruimte onder, dus een open lid kan er nooit vóór komen. Dat
+is geen bedacht randgeval — elke bundel begint met de hoofdtaak op 0, dus zodra iemand de
+hoofdtaak afvinkt vóórdat er ooit gesleept is, staat dat vaste 0 er. De sleepafhandeling moet dit
+daarom bénoemen in plaats van stil niets te doen (§6.3).
+
 Passen er geen ronde tientallen in zo'n gat, dan wordt het gat gelijk verdeeld (11, 12, 13 …).
 Past er zelfs dán niets meer tussen — twee vaste nummers pal naast elkaar — dan telt de reeks
 door voorbij het afgeronde lid en landen die leden er in beeld áchter in plaats van ervoor. Dat is
-de enige situatie waarin de getoonde volgorde afwijkt van de gesleepte; de nummers botsen ook dan
+de tweede situatie waarin de getoonde volgorde afwijkt van de gesleepte; de nummers botsen ook dan
 niet, en het gevolg blijft een verkeerde volgorde en nooit verloren werk (§5). Een afgerond lid
 met een leeggemaakt volgnummer is geen vast punt: het sorteert achteraan en zakt naar de staart
 van de bundel, in plaats van dat één lege cel de hele reeks gijzelt.

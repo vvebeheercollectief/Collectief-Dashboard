@@ -136,7 +136,9 @@ function verdeelRuimte(laag, boven, k, bezet){
   if (tien + (k - 1) * 10 < boven) return reeks(tien, 10);
   // 2. Twee vaste nummers dicht op elkaar: verdeel het gat gelijk. Dat levert oneven nummers op
   //    (15, 16, 17 …), maar de volgorde die de gebruiker net met de muis maakte weegt zwaarder
-  //    dan een rond getal — en bij de volgende sleepactie zijn ze vanzelf weer rond.
+  //    dan een rond getal. Ze worden pas weer rond zodra de klemmende afgeronde buur uit de
+  //    bundel verdwijnt of het lid het gat uit gesleept wordt: hernummerLeden is idempotent, dus
+  //    een tweede sleepactie met dezelfde buren levert exact dezelfde nummers op.
   const stap = Math.floor((boven - laag) / (k + 1));
   if (stap >= 1) return reeks(laag + stap, stap);
   // 3. Er past geen enkel getal meer tussen. Dan telt de reeks door vóórbij het vaste nummer: de

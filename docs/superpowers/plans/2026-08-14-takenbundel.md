@@ -855,7 +855,11 @@ function subRegel(m, i){
   const kleur = (SECS[r._sec]||{}).color || 'var(--tx3)';
   const label = SECS[r._sec] ? SECS[r._sec].label : r._sec;
   if (m.af){
-    return `<div class="bdl-sub af"><span class="bdl-h" aria-hidden="true">⠿</span>`
+    // `data-taak` óók hier: een afgerond lid is bij het hernummeren een VAST ANKER
+    // (zie hernummerLeden), dus de sleepcode moet hem in de volgorde kunnen terugvinden.
+    // Maar géén ⠿-handvat — een afgerond lid slepen zou niets doen, en een dood handvat
+    // belooft iets wat de functie niet waarmaakt. Een lege plaatshouder houdt de kolommen recht.
+    return `<div class="bdl-sub af" data-taak="${esc(r.taakId||'')}"><span class="bdl-h leeg" aria-hidden="true"></span>`
          + `<span class="bdl-num">${i+1}</span>`
          + `<span class="bdl-dot" style="background:${kleur}"></span>`
          + `<span class="bdl-txt">${esc(taakTitel(r))}</span>`
@@ -1866,10 +1870,33 @@ export function initBundelSlepen(container){
 }
 ```
 
-⚠️ Afgeronde leden hebben geen `data-taak` (zie `subRegel` in `render-bundel.js`) en vallen door
-`.filter(Boolean)` uit de nieuwe volgorde. Dat is fout: ze horen hun plek te houden. Voeg
-`data-taak` óók toe aan de afgeronde regel in `src/render-bundel.js`, zodat elk lid meedoet.
-Werk de test uit Taak 8 bij zodat hij dat vastlegt.
+⚠️ **Elk lid moet in de nieuwe volgorde meedoen, ook de afgeronde.** `hernummerLeden` verwacht de
+vólledige lijst in de getoonde volgorde en gebruikt de afgeronde leden als vaste ankers. Vallen
+ze uit de lijst, dan verschuiven de open leden ten opzichte van ankers die de functie niet ziet.
+Taak 8 geeft afgeronde regels daarom wél een `data-taak` (maar geen sleep-handvat).
+
+⚠️ **Een sleepactie die niets kan veranderen moet dat zeggen.** Afgeronde leden houden hun
+volgnummer — hun rij staat in "Afgerond" en wordt bij het herordenen niet aangeraakt. Sleep je
+een open lid boven een afgerond lid dat op volgnummer 0 staat, dan is er geen ruimte eronder en
+levert `hernummerLeden` nul wijzigingen op. Zonder melding lijkt het dashboard dan kapot: je
+sleept, je laat los, en er gebeurt zichtbaar niets.
+
+Vang dat af in `herordenBundel`: is de DOM-volgorde veranderd maar geeft `hernummerLeden` geen
+enkele wijziging, toon dan een korte melding in plaats van stilte:
+
+```js
+  const wijzigingen = hernummerLeden(nieuweVolgorde);
+  if (!wijzigingen.length){
+    // Volgorde ongewijzigd is normaal (je liet los waar je begon) — dan zwijgen we. Maar is de
+    // gesleepte volgorde wél anders, dan botst hij op een afgerond lid dat zijn nummer houdt.
+    if (volgordeGewijzigd) showToast('Deze volgorde kan niet',
+      'Er staat een afgeronde subtaak boven die zijn plek houdt.', null, 'info');
+    return;
+  }
+```
+
+Bepaal `volgordeGewijzigd` door de taaknummers vóór en ná het slepen te vergelijken. Leg dit
+vast met een test.
 
 - [ ] **Stap 5: Roep initBundelSlepen aan**
 

@@ -7,7 +7,7 @@ import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _s
 import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
-import { filterNtd, setNtd, renderNtd, renderNtdStats, renderAf, setAf, bepaalStil, bouwStilIndex, _zetStilIndex, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey, kopOpen, zetKopOpen } from "./render-lijsten.js";
+import { filterNtd, setNtd, renderNtd, renderNtdStats, renderAf, setAf, bepaalStil, bouwStilIndex, _zetStilIndex, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey, kopOpen, zetKopOpen, absorbeer, isPlatteWeergave } from "./render-lijsten.js";
 import { HERO_VIEWS } from "./render-analytics.js";
 import { state, D, pgs } from "./state.js";
 import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel, renderVve } from "./render-vve.js";
@@ -4214,6 +4214,34 @@ import { bouwBundelIndex, zichtbareKop, isBundel, bundelVan, hernummerLeden, vol
     // optimistisch als getal op het rij-object, en een `.trim()` daarop nekt de hele sleepactie.
     eq('koppel: numerieke bundelvelden vallen niet om',
        magKoppelen({ taakId:1, bundelId:'', bundelVolg:'' }, { taakId:2, bundelId:2, bundelVolg:0 }, ix).bundelId, '2');
+  })();
+
+  (() => {
+    const t = (taakId, bundelId, volg, sec) => ({ taakId, bundelId, bundelVolg:volg, _sec:sec,
+                                                  code:'311212', naam:'Testflat', actiepunt:'X', deadline:'' });
+    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const kop = t('Tkop','Tkop','0','OPPAKKEN');
+    const subZelfde = t('Tb','Tkop','10','OPPAKKEN');       // zelfde tabblad → wordt geabsorbeerd
+    const subAnder  = t('Ta','Tkop','20','OFFERTE-TRAJECTEN'); // ander tabblad → blijft staan
+    const ix = bouwBundelIndex({ ...leeg, OPPAKKEN:[kop, subZelfde], 'OFFERTE-TRAJECTEN':[subAnder] }, leeg);
+
+    eq('absorptie: subtaak in hetzelfde tabblad verdwijnt uit de vlakke lijst',
+       absorbeer([kop, subZelfde], 'OPPAKKEN', ix).map(r => r.taakId), ['Tkop']);
+    eq('absorptie: subtaak in een ander tabblad blijft staan',
+       absorbeer([subAnder], 'OFFERTE-TRAJECTEN', ix).map(r => r.taakId), ['Ta']);
+    eq('absorptie: zonder bundels verandert er niets',
+       absorbeer([kop], 'OPPAKKEN', new Map()).map(r => r.taakId), ['Tkop']);
+
+    eq('plat: standaardlijst is niet plat',
+       isPlatteWeergave({ q:'', fCode:'', beh:'', prio:'', status:'', sortKey:null, bulk:false }), false);
+    eq('plat: zoeken maakt plat',
+       isPlatteWeergave({ q:'dak', fCode:'', beh:'', prio:'', status:'', sortKey:null, bulk:false }), true);
+    eq('plat: kolomsortering maakt plat',
+       isPlatteWeergave({ q:'', fCode:'', beh:'', prio:'', status:'', sortKey:'deadline', bulk:false }), true);
+    eq('plat: bulk-modus maakt plat',
+       isPlatteWeergave({ q:'', fCode:'', beh:'', prio:'', status:'', sortKey:null, bulk:true }), true);
+    eq('plat: statusfilter maakt plat',
+       isPlatteWeergave({ q:'', fCode:'', beh:'', prio:'', status:'telaat', sortKey:null, bulk:false }), true);
   })();
 
   const totOk = ok + _tOk, totFail = fail + _tFail;

@@ -10,6 +10,7 @@ import { bulkWis, renderBulkUi } from "./bulk.js";
 import { renderThead, renderTbody, renderPag, bepaalStil, bouwStilIndex, _zetStilIndex, deadlineCel, rowNtd, rowAf } from "./render-tabel.js";
 import { _verrijkOfferteRij, offerteAannemerPaneel, offerteAannSamenvatting } from "./render-offerte.js";
 import { renderAlvo, renderAlfa, toggleAlvoFlag, ALVO_ICONS, ALVO_COLS, ALVO_LABELS, flagPill, _recomputeAlvoStatus, statusIco } from "./render-alv.js";
+import { bouwBundelIndex, zichtbareKop, bundelVan } from "./bundel.js";
 
 // ══════════════════════════════════════
 //  NTD STATS
@@ -142,11 +143,46 @@ function zetKopOpen(aan){
 // ══════════════════════════════════════
 //  NOG TE DOEN
 // ══════════════════════════════════════
+// De gestapelde weergave verschijnt alleen in de ONGEFILTERDE standaardlijst. Zodra er wordt
+// gezocht, gefilterd, op een kolomkop gesorteerd of bulk-geselecteerd, tonen we plat.
+// Reden: een treffer mag niet verstopt zitten in een dichtgeklapte bundel, een vaste groepering
+// is in strijd met een gekozen sortering, en in bulk-modus moet élke taak aanvinkbaar zijn.
+// Puur, dus los testbaar.
+function isPlatteWeergave({ q, fCode, beh, prio, status, sortKey, bulk }){
+  return !!(q || fCode || beh || prio || status || sortKey || bulk);
+}
+
+// Haal subtaken uit de vlakke lijst weg wanneer hun zichtbare kop in HETZELFDE tabblad staat —
+// die worden dan in het bundelpaneel onder die kop getekend. Staat de kop in een ander tabblad,
+// dan blijft de rij gewoon staan — daar komt straks het ⛓-merkje op (§3.2b). Zo wordt elke taak
+// per tabblad precies één keer getoond en blijven de tellers kloppen.
+function absorbeer(rows, sec, index){
+  if (!index || !index.size) return rows;
+  return rows.filter(r => {
+    const leden = bundelVan(index, r);
+    if (!leden) return true;
+    const kop = zichtbareKop(leden);
+    if (!kop || kop.r === r) return true;          // zelf de kop → blijft staan
+    return kop.r._sec !== sec;                     // kop elders → blijft staan; kop hier → absorberen
+  });
+}
+
 function renderNtd(){
   const q=document.getElementById('s-ntd').value.toLowerCase();
   const fCode=document.getElementById('f-code-ntd').value.toLowerCase();
   const fBeh=document.getElementById('f-beh-ntd').value;
   const fPrio=document.getElementById('f-prio-ntd').value;
+
+  // Eén bundelindex per render. Plat = een lege Map i.p.v. een vlag: dan valt de stapelweergave
+  // vanzelf weg, want zowel de absorptie hieronder als de rij-opmaak vindt er geen enkele bundel
+  // in. Zo staat de plat-of-niet-beslissing op precies één plek.
+  const plat=isPlatteWeergave({ q, fCode, beh:fBeh, prio:fPrio, status:state.ntdStatus,
+                                sortKey:state.ntdSort.key, bulk:state.bulkMode });
+  const bundelIx=plat?new Map():bouwBundelIndex(D.ntd,D.af);
+  // Op `state` en niet als parameter: de rij-opmaak zit in render-tabel.js en heeft geen ingang
+  // voor deze index. Die leest hem daar straks uit — bewust dezelfde momentopname als de
+  // absorptie hieronder, anders verdwijnt een rij hier terwijl hij daar geen stapel krijgt.
+  state._bundelIx=bundelIx;
 
   // Snoei de uitklap-Set tot rij-id's die nog bestaan: na verwijderen/afronden schuiven de
   // _row-nummers mee, dus verdwenen id's mogen niet blijven hangen (anders staat een verkeerde
@@ -166,11 +202,14 @@ function renderNtd(){
   const card=document.getElementById('ntd-card');
   SECS[state.activeNtd].css.split(';').forEach(p=>{const[k,v]=p.split(':');if(k&&v)card.style.setProperty(k.trim(),v.trim())});
 
-  const rows=sorteerNtd(filterNtd(D.ntd[state.activeNtd]||[],q,fCode,fBeh,fPrio,state.activeNtd,state.ntdStatus),state.ntdSort);
+  // Absorptie als laatste stap, ná filteren en sorteren: alleen de lijst die getekend wordt
+  // krimpt. De tab-tellers hierboven blijven bewust op de ONgeabsorbeerde lijst staan — een
+  // geabsorbeerde subtaak is niet verdwenen, alleen anders getekend, en moet dus meetellen.
+  const zichtbaar=absorbeer(sorteerNtd(filterNtd(D.ntd[state.activeNtd]||[],q,fCode,fBeh,fPrio,state.activeNtd,state.ntdStatus),state.ntdSort),state.activeNtd,bundelIx);
   renderThead('ntd-thead',[...(state.bulkMode?['']:[]),...SECS[state.activeNtd].cols,''],SECS[state.activeNtd].css,
     {active:state.ntdSort, keyFor:ntdSorteerKey});
-  renderTbody('ntd-tbody',rows,state.activeNtd,pgs.ntd,false,!!(q||fCode||fBeh||fPrio||state.ntdStatus));
-  renderPag('ntd-pag',rows.length,pgs.ntd,'ntd');
+  renderTbody('ntd-tbody',zichtbaar,state.activeNtd,pgs.ntd,false,!!(q||fCode||fBeh||fPrio||state.ntdStatus));
+  renderPag('ntd-pag',zichtbaar.length,pgs.ntd,'ntd');
   renderNtdCrossList(state.activeNtd);
 }
 // Cross-list (bug #2): taken die fysiek in een ándere sectie staan maar via hun
@@ -320,7 +359,7 @@ function setAf(s){state.activeAf=s;pgs.af=1;renderAf()}
 
 export {
   renderNtdStats, renderNtdDonut, renderNtd, setNtd, filterNtd, sorteerNtd, ntdSorteerKey, renderAf, setAf,
-  kopOpen, zetKopOpen,
+  kopOpen, zetKopOpen, absorbeer, isPlatteWeergave,
   offerteAannemerPaneel, offerteAannSamenvatting,
   ALVO_ICONS, renderAlvo, ALVO_COLS, ALVO_LABELS, flagPill, _recomputeAlvoStatus, toggleAlvoFlag, statusIco, renderAlfa,
   renderThead, renderTbody, bepaalStil, bouwStilIndex, _zetStilIndex, deadlineCel, rowNtd, rowAf, renderPag,

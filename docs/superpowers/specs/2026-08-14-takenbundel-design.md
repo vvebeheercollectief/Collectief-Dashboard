@@ -69,6 +69,21 @@ Een eerder overwogen variant — alleen de subtaak wijst naar de hoofdtaak, de h
 blijft leeg — is verworpen: zodra de hoofdtaak wordt afgerond verhuist die naar "Afgerond" en
 wijzen de subtaken naar iets dat niet meer in de takenlijst staat. De bundel viel dan uit elkaar.
 
+### 3.2b Een afgeronde rij hoort pas bij een bundel als hij een taaknummer heeft
+
+Rijen in "Afgerond" tellen alleen mee als bundellid wanneer hun `taakId` (kolom Q) gevuld is.
+
+Dat is een bewuste vangrail. Kolom Q van "Afgerond" wordt uitsluitend geschreven door de nieuwe
+afrondcode; élke rij van vóór deze functie heeft daar niets staan. Wat er in de kolommen M t/m S
+van dat blad staat is nergens gedocumenteerd — het dashboard schreef er nooit verder dan L — en
+het was niet te controleren: de Sheets-koppeling die hier beschikbaar is kan geen specifiek
+tabblad aanwijzen. Zonder deze regel zou historische rommel in kolom R afgeronde rijen stil aan
+een bundel knopen die niet bestaat.
+
+De regel volgt bovendien uit de logica van de functie zelf: bundellidmaatschap is een verwijzing
+tussen taken met een identiteit. Een rij zonder taaknummer heeft geen identiteit en kan dus per
+definitie nergens bij horen.
+
 ### 3.3 De zichtbare-kop-regel
 
 > **De zichtbare kop van een bundel is het nog openstaande lid met het laagste volgnummer.**

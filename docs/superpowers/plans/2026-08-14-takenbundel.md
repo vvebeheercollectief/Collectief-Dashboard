@@ -450,6 +450,17 @@ git add src/crud.js src/bulk.js src/tests.js && git commit -m "Takenbundel: afro
     const raar = { ...leeg, OPPAKKEN:[ { bundelId:'Tkop', bundelVolg:'', _sec:'OPPAKKEN', code:'1' } ] };
     eq('index: lid zonder volgnummer valt achteraan',
        bouwBundelIndex(raar, leeg).get('Tkop').length, 1);
+
+    // Vangrail (spec §3.2b): een AFGERONDE rij zonder taaknummer telt niet mee. Zo kan
+    // historische rommel in kolom R van 'Afgerond' geen spookbundel maken.
+    const rommel = { ...leeg, OPPAKKEN:[ { bundelId:'Xoud', bundelVolg:'', _sec:'OPPAKKEN', code:'1' },
+                                         { bundelId:'Xoud', bundelVolg:'', _sec:'OPPAKKEN', code:'2' } ] };
+    eq('index: afgeronde rijen zonder taaknummer maken geen bundel',
+       bouwBundelIndex(leeg, rommel).has('Xoud'), false);
+    // Een OPENSTAANDE rij zonder taaknummer telt wél mee: die kan alleen door onze eigen
+    // koppelcode een bundelnummer hebben gekregen, en die kent altijd eerst een nummer toe.
+    eq('index: openstaande rij zonder taaknummer telt wel mee',
+       bouwBundelIndex(rommel, leeg).get('Xoud').length, 2);
   })();
 ```
 
@@ -490,6 +501,14 @@ export function bouwBundelIndex(ntd, af){
   const voegToe = (r, isAf) => {
     const id = ((r && r.bundelId) || '').trim();
     if (!id) return;
+    // Vangrail voor 'Afgerond': een rij daar telt alleen mee als hij een taaknummer heeft.
+    // Kolom Q van dat blad wordt alleen door de nieuwe afrondcode geschreven, dus élke rij van
+    // vóór deze functie is daar leeg. Wat er in M..S van 'Afgerond' staat is nergens vastgelegd
+    // (het dashboard schreef er nooit verder dan L) en was hier niet te controleren. Zonder deze
+    // regel zou historische rommel in kolom R afgeronde rijen stil aan een niet-bestaande bundel
+    // knopen. Volgt bovendien uit de logica: lidmaatschap is een verwijzing tussen taken met een
+    // identiteit, en een rij zonder taaknummer heeft die niet.
+    if (isAf && !((r.taakId || '').trim())) return;
     if (!m.has(id)) m.set(id, []);
     m.get(id).push({ r, af: isAf });
   };
@@ -542,7 +561,7 @@ export function volgendeVolg(leden){
 
 - [ ] **Stap 4: Draai de tests en zie ze slagen**
 
-Verwacht: `1155 OK, 0 FAIL`.
+Verwacht: `1157 OK, 0 FAIL` (13 asserts: 11 uit het plan plus de twee vangrail-asserts)..
 
 - [ ] **Stap 5: Commit**
 
@@ -620,7 +639,7 @@ export function magKoppelen(bron, doel, index){
 
 - [ ] **Stap 4: Draai de tests en zie ze slagen**
 
-Verwacht: `1162 OK, 0 FAIL`.
+Verwacht: `1164 OK, 0 FAIL`.
 
 - [ ] **Stap 5: Commit**
 
@@ -713,7 +732,7 @@ En voeg `absorbeer, isPlatteWeergave` toe aan de export-lijst onderaan het besta
 
 - [ ] **Stap 4: Draai de tests en zie ze slagen**
 
-Verwacht: `1170 OK, 0 FAIL`.
+Verwacht: `1172 OK, 0 FAIL`.
 
 - [ ] **Stap 5: Sluit beide functies aan op renderNtd**
 
@@ -934,7 +953,7 @@ namen, verzin er geen. Let op de donkere modus.
 
 - [ ] **Stap 5: Draai de tests en zie ze slagen**
 
-Verwacht: `1177 OK, 0 FAIL`.
+Verwacht: `1179 OK, 0 FAIL`.
 
 - [ ] **Stap 6: Commit**
 
@@ -1068,7 +1087,7 @@ moeten zoeken, en dat is niet uniek.
 
 - [ ] **Stap 5: Draai de tests en zie ze slagen**
 
-Verwacht: `1184 OK, 0 FAIL`.
+Verwacht: `1186 OK, 0 FAIL`.
 
 - [ ] **Stap 6: Bekijk het resultaat in de browser**
 
@@ -1160,7 +1179,7 @@ groen eindigt.
 
 - [ ] **Stap 5: Draai de tests en zie ze slagen**
 
-Verwacht: `1188 OK, 0 FAIL`.
+Verwacht: `1190 OK, 0 FAIL`.
 
 - [ ] **Stap 6: Verifieer in de browser**
 
@@ -1257,7 +1276,7 @@ Voeg in beide functies toe: `state._nieuwBundel = null;`
 
 - [ ] **Stap 5: Draai de tests en zie ze slagen**
 
-Verwacht: `1191 OK, 0 FAIL`.
+Verwacht: `1193 OK, 0 FAIL`.
 
 - [ ] **Stap 6: Verifieer ingelogd op staging**
 
@@ -1475,7 +1494,7 @@ een bestaande naam.
 
 - [ ] **Stap 4: Draai de tests en zie ze slagen**
 
-Verwacht: `1202 OK, 0 FAIL`.
+Verwacht: `1204 OK, 0 FAIL`.
 
 - [ ] **Stap 5: Commit**
 
@@ -1731,7 +1750,7 @@ gekozen taak. Zonder dat koppelt een leeggemaakt veld alsnog.
 
 - [ ] **Stap 7: Draai de tests en zie ze slagen**
 
-Verwacht: `1209 OK, 0 FAIL` (3 asserts uit stap 1b, 3 uit stap 2, 1 uit stap 5b).
+Verwacht: `1211 OK, 0 FAIL` (3 asserts uit stap 1b, 3 uit stap 2, 1 uit stap 5b).
 
 - [ ] **Stap 8: Verifieer ingelogd op staging**
 
@@ -1862,7 +1881,7 @@ In `src/main.js`, bij de bestaande listeners op `#ntd-tbody`:
 
 - [ ] **Stap 6: Draai de tests en zie ze slagen**
 
-Verwacht: `1215 OK, 0 FAIL`.
+Verwacht: `1217 OK, 0 FAIL`.
 
 - [ ] **Stap 7: Verifieer ingelogd op staging, óók op de telefoon**
 
@@ -2087,7 +2106,7 @@ Er is bewust **geen cascade**: verwijderen raakt nooit meer dan één taak.
 
 - [ ] **Stap 6: Draai de tests en zie ze slagen**
 
-Verwacht: `1221 OK, 0 FAIL`.
+Verwacht: `1223 OK, 0 FAIL`.
 
 - [ ] **Stap 7: Verifieer ingelogd op staging**
 
@@ -2118,7 +2137,7 @@ git add src/crud.js src/bundel.js src/tests.js && git commit -m "Takenbundel: wa
 
 - [ ] **Stap 2: Draai de volledige testronde**
 
-Open `index.html?test=1`. Verwacht: `1221 OK, 0 FAIL`. Bij ook maar één FAIL: eerst oplossen.
+Open `index.html?test=1`. Verwacht: `1223 OK, 0 FAIL`. Bij ook maar één FAIL: eerst oplossen.
 
 - [ ] **Stap 3: Push naar staging**
 
@@ -2150,7 +2169,7 @@ Loop deze lijst af en vink elk punt af:
 
 - [ ] **Stap 5: Draai de tests op de live staging-URL**
 
-Open de staging-URL met `?test=1` en lees `window._testResult`. Verwacht: `1221 OK, 0 FAIL`.
+Open de staging-URL met `?test=1` en lees `window._testResult`. Verwacht: `1223 OK, 0 FAIL`.
 Dit is een andere controle dan lokaal: hier draait de gepubliceerde code.
 
 - [ ] **Stap 6: Commit en push**
@@ -2186,7 +2205,7 @@ echte data.
 
 - [ ] **Stap 4: Draai de tests op productie**
 
-Open de productie-URL met `?test=1`. Verwacht: `1221 OK, 0 FAIL`.
+Open de productie-URL met `?test=1`. Verwacht: `1223 OK, 0 FAIL`.
 
 - [ ] **Stap 5: Werk het projectgeheugen bij**
 

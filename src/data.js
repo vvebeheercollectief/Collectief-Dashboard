@@ -671,6 +671,9 @@ function parseSections(rows){
     entry.taakId     =_f4v(row[16]);  // Q — vast taaknummer (fase 4). Leeg = nog niet genummerd:
                                       // rijen van vóór de backfill en rijen die een oude client
                                       // aanmaakte. De guard valt dan terug op de vingerafdruk.
+    entry.bundelId   =_f4v(row[17]);  // R — Takenbundel: élk lid draagt hetzelfde nummer, ook de
+                                      // hoofdtaak (die draagt zijn eigen taakId). Leeg = geen bundel.
+    entry.bundelVolg =_f4v(row[18]);  // S — volgorde binnen de bundel: '0' = hoofdtaak, dan 10/20/30.
     // Legacy 'Afgerond'-rijen (oude onEdit-vinkjes, vóór juni): 5-koloms vorm
     // [code,naam,actiepunt,behandelaar,datum] met de afronddatum op kolom E i.p.v. I.
     // Herken ze — geen datum op I, maar kolom E (in entry.behandelaar) is wél een datum —

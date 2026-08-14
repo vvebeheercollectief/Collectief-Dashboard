@@ -3638,6 +3638,36 @@ import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
     }
   })();
 
+  console.log('%c[TESTS] Takenbundel', 'background:#B45309;color:white;padding:2px 6px;border-radius:3px');
+  (() => {
+    // 19 kolommen: A..H sectievelden, I datum, J opmerking, K sub, L opvolg, M herhaal,
+    // N esc, O fase, P aannemers, Q taakId, R bundelId, S bundelVolg.
+    const rij = (code, taakId, bundelId, volg) => {
+      const r = new Array(19).fill('');
+      r[0] = code; r[1] = 'Testflat 1'; r[2] = 'Iets doen';
+      r[16] = taakId; r[17] = bundelId; r[18] = volg;
+      return r;
+    };
+    const rows = [
+      ['OPPAKKEN','','','','','','',''],
+      ['VvE Code','VvE','Actiepunt','Deadline','Behandelaar','Prioriteit','Opmerkingen','In behandeling'],
+      rij('311212','Tkop','Tkop','0'),
+      rij('311212','Tsub','Tkop','10'),
+      rij('311204','Tlos','',''),
+    ];
+    const { data } = parseSections(rows);
+    const opp = data.OPPAKKEN;
+    eq('bundel: drie rijen geparset', opp.length, 3);
+    eq('bundel: kop draagt eigen nummer', [opp[0].bundelId, opp[0].bundelVolg], ['Tkop','0']);
+    eq('bundel: subtaak wijst naar de kop', [opp[1].bundelId, opp[1].bundelVolg], ['Tkop','10']);
+    eq('bundel: losse taak heeft niets', [opp[2].bundelId, opp[2].bundelVolg], ['','']);
+    // Geërfde TRUE/FALSE in R/S telt als leeg (leegBijErfenis), net als bij de andere kolommen.
+    const geerfd = rij('311300','Tx','TRUE','FALSE');
+    const { data: d2 } = parseSections([rows[0], rows[1], geerfd]);
+    eq('bundel: geërfde TRUE/FALSE telt als leeg',
+       [d2.OPPAKKEN[0].bundelId, d2.OPPAKKEN[0].bundelVolg], ['','']);
+  })();
+
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');
   window._testResult = `${totOk} OK, ${totFail} FAIL`; // uitleesbaar voor test-automatisering

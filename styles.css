@@ -1215,3 +1215,47 @@ body.bulk #chat-fab{display:none}
   #login-gate .lg-splash{ animation-duration:.001s; }
   #login-gate .lg-spinner{ animation-duration:.8s; } /* spinner mag blijven draaien */
 }
+
+/* ── Takenbundel ─────────────────────────────────────────────────────────────
+   --sec/--sec-l zijn de kleuren van het actieve tabblad: renderNtd zet ze met
+   style.setProperty op #ntd-card, dus binnen de takentabel erven pill en merkje ze.
+   Buiten die kaart (VvE-dossier) bestaan ze niet en valt alles terug op het accent. */
+.bdl-chev{background:none;border:0;padding:2px 5px;margin:-2px 3px -2px -5px;cursor:pointer;
+  color:var(--mut);border-radius:4px;line-height:1;transition:transform var(--tr)}
+.bdl-chev:hover{background:var(--sur2);color:var(--txt)}
+.bdl-chev.open{transform:rotate(90deg)}
+.bdl-pill{background:var(--sec-l,var(--ac-l));color:var(--sec,var(--ac));font-size:11px;
+  padding:1px 8px;border-radius:20px;white-space:nowrap;margin-left:8px}
+/* De twee 'papierrandjes' die de stapel suggereren. Alleen zichtbaar als de bundel dicht is.
+   De border-bottom moet op de <tr>: die komt van `tbody tr` en zou anders als deelstreepje
+   tussen de twee randjes blijven staan. */
+.bdl-peek{border-bottom:0}
+.bdl-peek td{padding:0!important;border:0!important;height:5px}
+.bdl-peek .l{display:block;height:5px;margin:0 5px;background:var(--sur2);
+  border:1px solid var(--bor);border-top:0;border-radius:0 0 5px 5px}
+.bdl-peek.d2 .l{height:4px;margin:0 11px}
+/* Het paneel vult zijn cel helemaal; de gewone rij-padding zou er een rand omheen trekken. */
+.bdl-tr>td{padding:0!important}
+.bdl-paneel{border-left:3px solid var(--sec,var(--ac));background:var(--group-bg)}
+.bdl-sub{display:flex;align-items:center;gap:9px;padding:7px 10px 7px 22px;
+  border-top:1px solid var(--bor);font-size:12.5px;touch-action:none}
+.bdl-sub.af{color:var(--mut)}
+.bdl-sub.af .bdl-txt{text-decoration:line-through}
+.bdl-sub.sleep{opacity:.55;background:var(--sur);box-shadow:0 6px 18px rgba(0,0,0,.13)}
+.bdl-h{cursor:grab;color:var(--fnt);font-size:14px;padding:2px 3px;user-select:none;touch-action:none}
+.bdl-h:active{cursor:grabbing}
+.bdl-sub.af .bdl-h{cursor:default;opacity:.4}
+.bdl-num{color:var(--mut);width:13px;text-align:right;flex:none;font-size:12px}
+.bdl-dot{width:7px;height:7px;border-radius:50%;flex:none}
+.bdl-txt{flex:1;min-width:0;text-align:left;background:none;border:0;padding:0;
+  color:inherit;font:inherit;cursor:pointer}
+.bdl-txt:hover{text-decoration:underline}
+.bdl-meta{color:var(--mut);font-size:11.5px;white-space:nowrap}
+.bdl-klaar{color:var(--gn);font-size:12px;white-space:nowrap;display:flex;align-items:center;gap:3px}
+.bdl-acts{display:flex;gap:3px;flex:none}
+.bdl-add{padding:9px 12px 10px 45px;border-top:1px solid var(--bor)}
+.bdl-addb{font-size:12px;color:var(--mut);border:1px solid var(--bor);border-radius:6px;
+  padding:4px 10px;background:none;cursor:pointer}
+.bdl-addb:hover{background:var(--sur)}
+.bdl-merk{background:var(--sec-l,var(--ac-l));color:var(--sec,var(--ac));font-size:11px;
+  padding:1px 7px;border-radius:20px;cursor:pointer;border:0;margin-left:6px}

@@ -31,6 +31,7 @@ import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from
 import { toggleHerhaalStatus } from "./render-herhaal.js";
 import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
 import { bouwBundelIndex, zichtbareKop, isBundel, bundelVan, hernummerLeden, volgendeVolg, magKoppelen } from "./bundel.js";
+import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./render-bundel.js";
 
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
   // ── mini-assert helper (Fase 1 testnet) ──
@@ -4242,6 +4243,32 @@ import { bouwBundelIndex, zichtbareKop, isBundel, bundelVan, hernummerLeden, vol
        isPlatteWeergave({ q:'', fCode:'', beh:'', prio:'', status:'', sortKey:null, bulk:true }), true);
     eq('plat: statusfilter maakt plat',
        isPlatteWeergave({ q:'', fCode:'', beh:'', prio:'', status:'telaat', sortKey:null, bulk:false }), true);
+  })();
+
+  (() => {
+    // De HTML-kant: telpill, paneel en ⛓-merkje. De fixture is met opzet de lastige stand uit
+    // §3.3/§4.1 — de kop staat bij Vergaderverzoeken, één subtaak bij Oppakken en één afgeronde
+    // subtaak bij Offerte-trajecten — want daar hangt alles aan: wat de pill telt, wat er in het
+    // paneel komt en wanneer een subtaak een merkje krijgt.
+    const t = (taakId, bundelId, volg, sec, tekst) => ({ taakId, bundelId, bundelVolg:volg, _sec:sec,
+      code:'311212', naam:'Testflat', actiepunt:tekst, deadline:'1-9-2026' });
+    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const kop = t('Tkop','Tkop','0','VERGADERVERZOEKEN','ALV');
+    const s1  = t('Tb','Tkop','10','OPPAKKEN','Aannemer bellen');
+    const ix  = bouwBundelIndex({ ...leeg, VERGADERVERZOEKEN:[kop], OPPAKKEN:[s1] },
+                                { ...leeg, 'OFFERTE-TRAJECTEN':[ t('Ta','Tkop','20','OFFERTE-TRAJECTEN','Offertes') ] });
+    const leden = ix.get('Tkop');
+
+    eq('pill: telt alles behalve de kop', bundelStand(leden, zichtbareKop(leden)), { klaar:1, totaal:2 });
+    const html = bundelPaneelHtml(leden, zichtbareKop(leden), false);
+    eq('paneel: twee subtaakregels', (html.match(/class="bdl-sub/g)||[]).length, 2);
+    eq('paneel: afgerond lid is doorgestreept', html.includes('bdl-sub af'), true);
+    eq('paneel: knop om een subtaak toe te voegen', html.includes('bundel-nieuw'), true);
+    eq('paneel: afgerond lid heeft geen actieknoppen',
+       (html.split('bdl-sub af')[1]||'').includes('data-action="taak-afronden"'), false);
+    eq('merkje: subtaak met kop elders krijgt een merkje',
+       bundelMerkje(s1, ix, 'OPPAKKEN').includes('bundel-spring'), true);
+    eq('merkje: de kop zelf krijgt geen merkje', bundelMerkje(kop, ix, 'VERGADERVERZOEKEN'), '');
   })();
 
   const totOk = ok + _tOk, totFail = fail + _tFail;

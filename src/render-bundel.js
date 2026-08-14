@@ -56,8 +56,10 @@ function subRegel(m, i){
     // `data-taak` óók hier: een afgerond lid is bij het hernummeren een VAST ANKER
     // (zie hernummerLeden), dus de sleepcode moet hem in de volgorde kunnen terugvinden.
     // Maar géén ⠿-handvat — een afgerond lid slepen zou niets doen, en een dood handvat
-    // belooft iets wat de functie niet waarmaakt. Een lege plaatshouder houdt de kolommen recht.
-    return `<div class="bdl-sub af" data-taak="${esc(tekst(r.taakId))}"><span class="bdl-h leeg" aria-hidden="true"></span>`
+    // belooft iets wat de functie niet waarmaakt. De lege plaatshouder houdt de kolommen recht
+    // omdat `.bdl-h` in styles.css een VASTE breedte heeft; haalt iemand die weg, dan krimpt deze
+    // span tot zijn padding en verspringt elke afgeronde regel naar links.
+    return `<div class="bdl-sub af" data-taak="${esc(tekst(r.taakId))}"><span class="bdl-h" aria-hidden="true"></span>`
          + `<span class="bdl-num">${i+1}</span>`
          + `<span class="bdl-dot" style="background:${kleur}"></span>`
          + `<span class="bdl-txt">${esc(taakTitel(r))}</span>`

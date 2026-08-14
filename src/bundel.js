@@ -64,6 +64,17 @@ export function bouwBundelIndex(ntd, af){
   return m;
 }
 
+// De index voor één render. Platte weergave (zoeken, filteren, sorteren, bulk) is hier een LEGE
+// index en géén tweede vlag: dan vindt zowel de absorptie als de rij-opmaak nergens een bundel en
+// valt de stapelweergave in één keer weg. Zo blijft de plat-of-niet-beslissing op precies één plek.
+//
+// Als eigen functie en niet als ternary in `renderNtd`, omdat juist die koppeling stil kan
+// wegvallen: `renderNtd` leest de DOM en draait niet mee in de testronde, dus een `plat` die niets
+// meer doet zou pas opvallen als een gezochte subtaak uit de trefferlijst verdwijnt.
+export function bundelIndexVoor(plat, ntd, af){
+  return plat ? new Map() : bouwBundelIndex(ntd, af);
+}
+
 // De zichtbare kop: het nog openstaande lid met het laagste volgnummer. null = alles afgerond.
 // Deze ene regel dekt ook 'hoofdtaak afgerond' en 'hoofdtaak verwijderd' af.
 // Bewust zoekend en niet "het eerste open lid": uit `bouwBundelIndex` komt de lijst gesorteerd,

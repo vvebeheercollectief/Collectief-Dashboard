@@ -1242,9 +1242,16 @@ body.bulk #chat-fab{display:none}
 .bdl-sub.af{color:var(--mut)}
 .bdl-sub.af .bdl-txt{text-decoration:line-through}
 .bdl-sub.sleep{opacity:.55;background:var(--sur);box-shadow:0 6px 18px rgba(0,0,0,.13)}
-.bdl-h{cursor:grab;color:var(--fnt);font-size:14px;padding:2px 3px;user-select:none;touch-action:none}
+/* Vaste breedte, want een afgerond lid krijgt hier een LEGE plaatshouder in plaats van het
+   ⠿-handvat (zie subRegel in render-bundel.js). Liet je de breedte aan de inhoud over, dan is die
+   plaatshouder alleen zijn padding en schuiven nummer, bolletje en tekst van élk afgerond lid ruim
+   9px naar links t.o.v. de open leden. */
+.bdl-h{cursor:grab;color:var(--fnt);font-size:14px;flex:none;box-sizing:border-box;width:16px;
+  padding:2px 0;text-align:center;user-select:none;touch-action:none}
 .bdl-h:active{cursor:grabbing}
-.bdl-sub.af .bdl-h{cursor:default;opacity:.4}
+/* De plaatshouder houdt alleen de kolom bezet; de grijp-cursor zou een sleepgebaar beloven dat er
+   voor een afgerond lid niet is. Dimmen heeft geen zin — er staat geen glyph in. */
+.bdl-sub.af .bdl-h{cursor:default}
 .bdl-num{color:var(--mut);width:13px;text-align:right;flex:none;font-size:12px}
 .bdl-dot{width:7px;height:7px;border-radius:50%;flex:none}
 .bdl-txt{flex:1;min-width:0;text-align:left;background:none;border:0;padding:0;

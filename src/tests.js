@@ -30,7 +30,7 @@ import { checkSecties, checkRaster, checkRasters, checkNummers, checkAlles, RAST
 import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from "./subsidie-fase.js";
 import { toggleHerhaalStatus } from "./render-herhaal.js";
 import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
-import { bouwBundelIndex, zichtbareKop, isBundel, bundelVan, hernummerLeden, volgendeVolg, magKoppelen, wordtGeabsorbeerd } from "./bundel.js";
+import { bouwBundelIndex, bundelIndexVoor, zichtbareKop, isBundel, bundelVan, hernummerLeden, volgendeVolg, magKoppelen, wordtGeabsorbeerd } from "./bundel.js";
 import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./render-bundel.js";
 
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
@@ -4260,6 +4260,16 @@ import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./r
        isPlatteWeergave({ q:'', fCode:'', beh:'', prio:'', status:'', sortKey:null, bulk:true }), true);
     eq('plat: statusfilter maakt plat',
        isPlatteWeergave({ q:'', fCode:'', beh:'', prio:'', status:'telaat', sortKey:null, bulk:false }), true);
+
+    // De schakel tussen die vlag en de weergave: plat MOET een lege index opleveren. Gaat dat om,
+    // dan blijft de absorptie hierboven bij een zoekopdracht gewoon draaien en verdwijnt een
+    // gevonden subtaak uit de trefferlijst — geen fout, alleen een treffer die er niet meer is.
+    const bronNtd = { ...leeg, OPPAKKEN:[kop, subZelfde], 'OFFERTE-TRAJECTEN':[subAnder] };
+    eq('plat: een platte render levert een lege bundelindex, een gewone render niet',
+       [bundelIndexVoor(true, bronNtd, leeg).size, bundelIndexVoor(false, bronNtd, leeg).size], [0, 1]);
+    eq('plat: met die lege index blijft de gezochte subtaak in de vlakke lijst staan',
+       absorbeer([kop, subZelfde], 'OPPAKKEN', bundelIndexVoor(true, bronNtd, leeg)).map(r => r.taakId),
+       ['Tkop', 'Tb']);
   })();
 
   (() => {

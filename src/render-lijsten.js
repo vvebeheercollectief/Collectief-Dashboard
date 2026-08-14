@@ -10,7 +10,7 @@ import { bulkWis, renderBulkUi } from "./bulk.js";
 import { renderThead, renderTbody, renderPag, bepaalStil, bouwStilIndex, _zetStilIndex, deadlineCel, rowNtd, rowAf } from "./render-tabel.js";
 import { _verrijkOfferteRij, offerteAannemerPaneel, offerteAannSamenvatting } from "./render-offerte.js";
 import { renderAlvo, renderAlfa, toggleAlvoFlag, ALVO_ICONS, ALVO_COLS, ALVO_LABELS, flagPill, _recomputeAlvoStatus, statusIco } from "./render-alv.js";
-import { bouwBundelIndex, wordtGeabsorbeerd } from "./bundel.js";
+import { bundelIndexVoor, wordtGeabsorbeerd } from "./bundel.js";
 
 // ══════════════════════════════════════
 //  NTD STATS
@@ -169,12 +169,11 @@ function renderNtd(){
   const fBeh=document.getElementById('f-beh-ntd').value;
   const fPrio=document.getElementById('f-prio-ntd').value;
 
-  // Eén bundelindex per render. Plat = een lege Map i.p.v. een vlag: dan valt de stapelweergave
-  // vanzelf weg, want zowel de absorptie hieronder als de rij-opmaak vindt er geen enkele bundel
-  // in. Zo staat de plat-of-niet-beslissing op precies één plek.
+  // Eén bundelindex per render. Plat wordt hier een lege index i.p.v. een vlag; dat omzetten zit
+  // in `bundelIndexVoor` zodat het getest kan worden (deze functie zelf niet — die leest de DOM).
   const plat=isPlatteWeergave({ q, fCode, beh:fBeh, prio:fPrio, status:state.ntdStatus,
                                 sortKey:state.ntdSort.key, bulk:state.bulkMode });
-  const bundelIx=plat?new Map():bouwBundelIndex(D.ntd,D.af);
+  const bundelIx=bundelIndexVoor(plat,D.ntd,D.af);
   // Op `state` en niet als parameter: de rij-opmaak zit in render-tabel.js en heeft geen ingang
   // voor deze index. Die leest hem daar straks uit — bewust dezelfde momentopname als de
   // absorptie hieronder, anders verdwijnt een rij hier terwijl hij daar geen stapel krijgt.

@@ -7,7 +7,7 @@ import { toDutchDate, berekenPrioriteit, _parseAnyDate, _vandaagAmsterdam, _vers
 import { SECS, SID } from "./config.js";
 import { ensureToken } from "./auth.js";
 import { _shiftNtdRows, _herstelShift, assertRowsMatch, _veiligeRij } from "./api.js";
-import { getSheetIds, getAfInsertRow, getInsertRow, insertAndWriteRow, serializeNtdUndo } from "./crud.js";
+import { getSheetIds, getAfInsertRow, getInsertRow, insertAndWriteRow, serializeNtdUndo, afrondWaarden } from "./crud.js";
 import { backgroundWrite, loadAll, metWriteMarkering, blokkeerOffline } from "./data.js";
 import { showToast, showUndoToast } from "./notifications.js";
 import { logEvents } from "./render-overig.js";
@@ -105,15 +105,11 @@ function bulkAfronden(rows){
   const d=new Date();
   const vandaag=`${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;
   const items=rows.map(r=>{
-    let values;
-    switch(r._sec){
-      case 'OPPAKKEN':          values=[r.code,r.naam,r.actiepunt||'',r.deadline||'',r.behandelaar||'',r.prioriteit||'',r.opmerkingen||'',r.inBehandeling||'',vandaag,'',r.subcategorie||''];break;
-      case 'VERGADERVERZOEKEN': values=[r.code,r.naam,r.periode||'',r.agendapunten||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'',r.inBehandeling||'',vandaag,'',r.subcategorie||''];break;
-      case 'OFFERTE-TRAJECTEN': values=[r.code,r.naam,r.datumAangevraagd||'',r.offertes||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'','',vandaag,'',r.subcategorie||''];break;
-      case 'SUBSIDIE-TRAJECTEN': values=[r.code,r.naam,r.subsidie||'',r.subsidieFase||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'',r.inBehandeling||'',vandaag,'',r.subcategorie||''];break;
-      default:                  values=[r.code,r.naam,r.actiepunt||'',r.status||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'',r.inBehandeling||'',vandaag,'',r.subcategorie||''];
-    }
-    values.push(r.herhaalId||''); // L in 'Afgerond': Herhaal-ID (Fase 4-motor)
+    // Zelfde bron als de losse afrond-modal (crud.js), zodat bulk en modal niet uiteen kunnen
+    // lopen — vroeger stond dezelfde kolomvolgorde hier een tweede keer uitgeschreven. Bulk
+    // kent geen toelichtingveld, vandaar de lege J. De oude `default`-tak was letterlijk de
+    // LOD-opbouw; die staat nu als eigen case in afrondWaarden.
+    const values=afrondWaarden(r, r._sec, vandaag, '');
     return { r, sec:r._sec, origRow:r._row, afValues:values, ntdValues:_ntdValues(r), code:r.code };
   });
   // optimistisch: hoog→laag lokaal verwijderen + indexen meeschuiven

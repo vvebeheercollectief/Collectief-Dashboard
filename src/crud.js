@@ -309,6 +309,35 @@ async function completeTask(idx){
   document.getElementById('complete-bg').classList.add('open');
 }
 
+// Rijwaarden voor een afgeronde taak. Puur, dus los testbaar — en één bron voor zowel de
+// modal-flow (doCompleteTask) als bulk-afronden, zodat die twee niet uiteen kunnen lopen.
+// Vaste kolomposities: A..H sectievelden, I afronddatum, J toelichting, K subcategorie,
+// L herhaalId (Opvolging.gs:119 leest afData[i][11] — NIET verplaatsen), M..P leeg,
+// Q taakId, R bundelId, S bundelVolg. Q/R/S liggen op dezelfde index als in 'Nog Te Doen',
+// omdat parseSections beide tabbladen met dezelfde vaste posities leest.
+export function afrondWaarden(r, sec, datum, toelichting){
+  let kop;
+  switch(sec){
+    case'OPPAKKEN':
+      kop=[r.code,r.naam,r.actiepunt||'',r.deadline||'',r.behandelaar||'',r.prioriteit||'',r.opmerkingen||'',r.inBehandeling||''];break;
+    case'VERGADERVERZOEKEN':
+      kop=[r.code,r.naam,r.periode||'',r.agendapunten||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'',r.inBehandeling||''];break;
+    case'OFFERTE-TRAJECTEN':
+      kop=[r.code,r.naam,r.datumAangevraagd||'',r.offertes||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'',''];break;
+    case'SUBSIDIE-TRAJECTEN':
+      kop=[r.code,r.naam,r.subsidie||'',r.subsidieFase||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'',r.inBehandeling||''];break;
+    case'LOD':
+      kop=[r.code,r.naam,r.actiepunt||'',r.status||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'',r.inBehandeling||''];break;
+    default: throw new Error('Onbekende sectie: '+sec);
+  }
+  return kop.concat([
+    datum, toelichting, r.subcategorie||'',   // I, J, K
+    r.herhaalId||'',                          // L
+    '', '', '', '',                           // M, N, O, P
+    r.taakId||'', r.bundelId||'', r.bundelVolg||'',  // Q, R, S
+  ]);
+}
+
 async function doCompleteTask(){
   let r=state._completeRow;
   if(r && _verseRijIdx(r, state._rowCache)<0){
@@ -335,21 +364,7 @@ async function doCompleteTask(){
   state._completeBusy=true;
   try{
     const sec=r._sec;
-    let values;
-    switch(sec){
-      case'OPPAKKEN':
-        values=[r.code,r.naam,r.actiepunt||'',r.deadline||'',r.behandelaar||'',r.prioriteit||'',r.opmerkingen||'',r.inBehandeling||'',today,comment,r.subcategorie||''];break;
-      case'VERGADERVERZOEKEN':
-        values=[r.code,r.naam,r.periode||'',r.agendapunten||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'',r.inBehandeling||'',today,comment,r.subcategorie||''];break;
-      case'OFFERTE-TRAJECTEN':
-        values=[r.code,r.naam,r.datumAangevraagd||'',r.offertes||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'','',today,comment,r.subcategorie||''];break;
-      case'SUBSIDIE-TRAJECTEN':
-        values=[r.code,r.naam,r.subsidie||'',r.subsidieFase||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'',r.inBehandeling||'',today,comment,r.subcategorie||''];break;
-      case'LOD':
-        values=[r.code,r.naam,r.actiepunt||'',r.status||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'',r.inBehandeling||'',today,comment,r.subcategorie||''];break;
-      default: throw new Error('Onbekende sectie: '+sec);
-    }
-    values.push(r.herhaalId||''); // L in 'Afgerond': Herhaal-ID — de motor herkent afgeronde terugkerende taken (Fase 4)
+    const values = afrondWaarden(r, sec, today, comment);
     const ids=await getSheetIds();
     const afSheetId=ids['Afgerond'];
     const ntdSheetId=ids['Nog Te Doen'];

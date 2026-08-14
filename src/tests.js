@@ -18,7 +18,7 @@ import { _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, veil
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
-import { setv, serializeNtdUndo, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, kiesModalFase, _modalFaseWoord, getInsertRow } from "./crud.js";
+import { setv, serializeNtdUndo, afrondWaarden, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, kiesModalFase, _modalFaseWoord, getInsertRow } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages } from "./dossier-chat.js";
 import { shouldPromptReload, maakHerlaadKern, zelfdeWorker } from "./sw-update.js";
@@ -3679,6 +3679,29 @@ import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
     eq('undo: bundelId op index 17', v[17], 'Tkop');
     eq('undo: bundelVolg op index 18', v[18], '0');
     eq('undo: herhaalId blijft op index 12', v[12], '');
+  })();
+
+  (() => {
+    const taak = { code:'311212', naam:'Testflat 1', actiepunt:'Iets doen', deadline:'3-10-2026',
+                   behandelaar:'Jer', prioriteit:'Hoog', opmerkingen:'', inBehandeling:'',
+                   subcategorie:'Dak', herhaalId:'H7',
+                   taakId:'Tsub', bundelId:'Tkop', bundelVolg:'10' };
+    const v = afrondWaarden(taak, 'OPPAKKEN', '2026-08-14', 'Klaar');
+    eq('afrond: 19 velden lang', v.length, 19);
+    eq('afrond: afronddatum op index 8', v[8], '2026-08-14');
+    eq('afrond: toelichting op index 9', v[9], 'Klaar');
+    eq('afrond: subcategorie op index 10', v[10], 'Dak');
+    eq('afrond: herhaalId blijft op index 11', v[11], 'H7');   // L — Opvolging.gs leest deze
+    eq('afrond: M t/m P blijven leeg', [v[12],v[13],v[14],v[15]], ['','','','']);
+    eq('afrond: taakId op index 16', v[16], 'Tsub');
+    eq('afrond: bundelId op index 17', v[17], 'Tkop');
+    eq('afrond: bundelVolg op index 18', v[18], '10');
+    // Vergaderverzoeken heeft andere velden op A..H; de staart moet identiek liggen.
+    const vv = afrondWaarden({ code:'311212', naam:'X', periode:'Q4 2026', agendapunten:'',
+                               behandelaar:'Jer', deadline:'', opmerkingen:'', inBehandeling:'',
+                               subcategorie:'', herhaalId:'', taakId:'Tk', bundelId:'Tk', bundelVolg:'0' },
+                             'VERGADERVERZOEKEN', '2026-08-14', '');
+    eq('afrond: staart ligt gelijk voor elke sectie', [vv.length, vv[16], vv[17], vv[18]], [19,'Tk','Tk','0']);
   })();
 
   const totOk = ok + _tOk, totFail = fail + _tFail;

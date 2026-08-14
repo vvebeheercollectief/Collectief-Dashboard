@@ -18,7 +18,7 @@ import { _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, veil
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
-import { setv, serializeNtdUndo, afrondWaarden, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, kiesModalFase, _modalFaseWoord, getInsertRow } from "./crud.js";
+import { setv, serializeNtdUndo, afrondWaarden, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, kiesModalFase, _modalFaseWoord, getInsertRow, _sheetBreedtes } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages } from "./dossier-chat.js";
 import { shouldPromptReload, maakHerlaadKern, zelfdeWorker } from "./sw-update.js";
@@ -26,7 +26,7 @@ import { doOAuth } from "./auth.js";
 import { SPLASH_MS, _setFase } from "./login-splash.js";
 import { opmaakHtml, htmlNaarMarkers, zonderOpmaak, pasToe, opmaakBalk } from "./opmaak.js";
 import { goTo } from "./ui.js";
-import { checkSecties, checkRaster, checkNummers, RASTER_MIN } from "./structuurcheck.js";
+import { checkSecties, checkRaster, checkRasters, checkNummers, checkAlles, RASTER_MIN } from "./structuurcheck.js";
 import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from "./subsidie-fase.js";
 import { toggleHerhaalStatus } from "./render-herhaal.js";
 import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
@@ -1197,6 +1197,48 @@ import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
        [RASTER_MIN['Nog Te Doen'], RASTER_MIN['Afgerond'],
         serializeNtdUndo({_sec:'OPPAKKEN',code:'1',naam:'X'}).length,
         afrondWaarden({code:'1',naam:'X'},'OPPAKKEN','2026-08-14','').length], [19,19,19,19]);
+
+    // ── De rasterbewaking moet ook echt AANGESLOTEN zijn ──
+    // Tot 2026-08-14 riep niets in de app checkRaster aan: de hele RASTER_MIN-tabel was
+    // documentatie in plaats van bewaking, terwijl 'schrijven buiten het raster mislukt zonder
+    // melding' juist de val is waar dit project eerder in liep.
+    // De breedte komt uit getSheetIds (spreadsheets.get), en die draait pas bij de eerste
+    // schrijfactie. Tot dat moment is élke breedte onbekend, en onbekend mag NOOIT melden:
+    // een melding die op niets gebaseerd is, leert de gebruiker om meldingen te negeren.
+    eq('raster: onbekende breedte → geen oordeel', checkRaster('Nog Te Doen', undefined), null);
+    eq('raster: nog geen enkele breedte bekend → geen bevindingen', checkRasters(null).length, 0);
+    eq('raster: alleen bladen met een bekende breedte krijgen een oordeel',
+       checkRasters({'Nog Te Doen':undefined, 'Afgerond':26}).length, 0);
+    eq('raster: te smal blad geeft één bevinding', checkRasters({'Nog Te Doen':17}).length, 1);
+    eq('raster: reset-archief of backup-tab krijgt geen oordeel', checkRasters({'Backup 2026':3}).length, 0);
+    // De breedte valt gratis uit hetzelfde antwoord te halen als de sheetIds — nul extra
+    // leesverzoeken, en dat is hier de eis: de leeslast is net met 64% teruggebracht.
+    eq('raster: breedtes komen uit dezelfde spreadsheets.get als de sheetIds',
+       _sheetBreedtes({sheets:[
+         {properties:{title:'Nog Te Doen', sheetId:0, gridProperties:{rowCount:900, columnCount:17}}},
+         {properties:{title:'Afgerond',    sheetId:7, gridProperties:{rowCount:5000, columnCount:26}}}]}),
+       {'Nog Te Doen':17, 'Afgerond':26});
+    eq('raster: blad zonder gridProperties levert geen spookbreedte',
+       _sheetBreedtes({sheets:[{properties:{title:'Raar', sheetId:9}}]}), {});
+    // DE aansluiting zelf: checkAlles is de weg die data.js elke leesronde loopt. Zit checkRaster
+    // daar niet in, dan valt deze test om — en dat is precies wat er miste.
+    const _gez=[['OPPAKKEN'],['VvE Code','VvE','Actiepunt'],['311198','VvE A','iets']];
+    eq('raster: leesronde zonder bekende breedtes blijft stil',
+       checkAlles(_gez, _gez, [], null).length, 0);
+    eq('raster: leesronde met een verbreed raster blijft stil',
+       checkAlles(_gez, _gez, [], {'Nog Te Doen':19, 'Afgerond':26}).length, 0);
+    // Verwacht en CORRECT zolang Taak 1 (raster verbreden) open staat: wie ingelogd iets opslaat,
+    // laat getSheetIds draaien en ziet vanaf dan deze waarschuwing.
+    eq('raster: leesronde met NTD op 17 kolommen meldt het raster',
+       checkAlles(_gez, _gez, [], {'Nog Te Doen':17}).length, 1);
+    truthy('raster: die melding noemt het tabblad en de gevonden breedte',
+       /Nog Te Doen.*17 kolommen/.test(checkAlles(_gez, _gez, [], {'Nog Te Doen':17})[0].tekst));
+    // checkAlles vervangt geen van de bestaande controles: sectiefouten en dubbele taaknummers
+    // moeten er nog steeds uitkomen, anders is de aansluiting een verruiling in plaats van een
+    // uitbreiding.
+    const _scheef=[['OPPAKKEN'],['311198','VvE A','iets'],['VvE Code','VvE','Actiepunt']];
+    eq('raster: checkAlles houdt de sectie- en nummercontrole overeind',
+       checkAlles(_scheef, [], [{taakId:'T1',_row:3},{taakId:'T1',_row:9}], {'Nog Te Doen':19}).length, 2);
   })();
 
   // ── VvE-dossier AI-agent (chat) ──
@@ -2318,6 +2360,57 @@ import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
       Object.keys(dOud).forEach(k=>{ D[k]=dOud[k]; });
       document.getElementById('dot').className='dot';
       document.getElementById('load-err-banner')?.remove();
+    }
+  })();
+
+  // ── De rasterbewaking loopt écht mee in de leesronde ──
+  // Een pure test op checkAlles bewijst alleen dat die functie klopt; checkRaster klopte al jaren
+  // en werd door niets aangeroepen. Deze ronde toetst de schakel zelf: loadAll moet de controle
+  // uitvoeren mét de breedtes die getSheetIds onderweg opving.
+  await (async()=>{
+    const _fetch=window.fetch, _warn=console.warn;
+    const tokenOud=state.oauthToken, expiryOud=state.oauthExpiry, kolOud=state._sheetKolommen;
+    const failsOud=state._syncFails, hashOud=state._lastDHash;
+    const dOud={}; Object.keys(D).forEach(k=>dOud[k]=D[k]);
+    const warns=[];
+    const ronde=async(kolommen)=>{
+      state._sheetKolommen=kolommen;
+      state._syncFails=0; state._lastDHash=null; state._alfaMs=0;
+      state._logHoogwater=0; state._logAnkerTs='';
+      // Een resync uit een eerdere test kan nog lopen; anders keert loadAll meteen terug
+      // zónder te lezen en meet deze test niets. (Zelfde les als bij de terugval-tests.)
+      for(let i=0;i<200 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,10));
+      warns.length=0;
+      await loadAll(true);
+      return warns.filter(w=>String(w[0]).includes('[structuurcheck]'));
+    };
+    try{
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
+      window.fetch=async(url)=>{
+        const d=decodeURIComponent(String(url));
+        if(d.includes('values:batchGet')){
+          const leeg=[...d.matchAll(/ranges=([^&]*)/g)].map(()=>({values:[]}));
+          return new Response(JSON.stringify({valueRanges:leeg}),{status:200});
+        }
+        return new Response(JSON.stringify({values:[]}),{status:200});
+      };
+      console.warn=(...a)=>{ warns.push(a); };
+      eq('aansluiting: breedte nog onbekend (nog niet geschreven) → de ronde zwijgt',
+         (await ronde(null)).length, 0);
+      eq('aansluiting: raster op orde → de ronde zwijgt',
+         (await ronde({'Nog Te Doen':19, 'Afgerond':26})).length, 0);
+      // Zolang Taak 1 openstaat is dit het échte geval: schrijven naar R/S loopt stil in het niets.
+      const smal=await ronde({'Nog Te Doen':17});
+      eq('aansluiting: Nog Te Doen nog 17 breed → de leesronde waarschuwt', smal.length, 1);
+      // Bewust op de hele regel en niet op smal[0][1]: blijft de waarschuwing uit, dan moet deze
+      // assert FALEN en niet met een TypeError de rest van de suite meesleuren.
+      truthy('aansluiting: de waarschuwing wijst het tabblad aan',
+         /Nog Te Doen/.test(JSON.stringify(smal[0]||'')));
+    } finally {
+      window.fetch=_fetch; console.warn=_warn;
+      state.oauthToken=tokenOud; state.oauthExpiry=expiryOud; state._sheetKolommen=kolOud;
+      state._syncFails=failsOud; state._lastDHash=hashOud;
+      Object.keys(dOud).forEach(k=>{ D[k]=dOud[k]; });
     }
   })();
 

@@ -80,16 +80,32 @@ function checkSecties(rows){
   return uit;
 }
 
-// Is dit tabblad breed genoeg om naar te schrijven? null = in orde of onbekend tabblad.
-// Een onbekend tabblad krijgt bewust GEEN oordeel: reset-archieven en back-uptabbladen
-// horen hier niet in.
+// Is dit tabblad breed genoeg om naar te schrijven? null = in orde, onbekend tabblad, of
+// onbekende breedte. Een onbekend tabblad krijgt bewust GEEN oordeel: reset-archieven en
+// back-uptabbladen horen hier niet in.
+// Een ONBEKENDE breedte evenmin: de breedtes komen uit getSheetIds, en die draait pas bij de
+// eerste schrijfactie van de sessie. Bij het laden is dus nog van geen enkel blad bekend hoe
+// breed het is, en `undefined >= 19` is false — zonder deze regel zou élke sessie openen met
+// negen meldingen die nergens op gebaseerd zijn.
 function checkRaster(tabblad, kolommen){
   const nodig=RASTER_MIN[tabblad];
   if(!nodig) return null;
+  if(typeof kolommen!=='number') return null;
   if(kolommen>=nodig) return null;
   return { tabblad, nodig, gevonden: kolommen,
            tekst: `Tabblad '${tabblad}' is ${kolommen} kolommen breed, er zijn er ${nodig} nodig. `
                 + `Schrijfacties naar de laatste kolommen mislukken zonder melding.` };
+}
+
+// Alle bekende tabbladbreedtes in één keer langs checkRaster. Verwacht {tabbladnaam: aantal},
+// zoals getSheetIds die uit de spreadsheets.get-respons meeneemt.
+function checkRasters(kolommenPerTab){
+  const uit=[];
+  Object.keys(kolommenPerTab||{}).forEach(t=>{
+    const bev=checkRaster(t, kolommenPerTab[t]);
+    if(bev) uit.push(bev);
+  });
+  return uit;
 }
 
 // Staat elk vast taaknummer maar op één regel? Twee regels met hetzelfde nummer is de ergste
@@ -110,4 +126,14 @@ function checkNummers(rijen){
   return uit;
 }
 
-export { checkSecties, checkRaster, checkNummers, RASTER_MIN, isSectieKop, isKolomKop };
+// Alle controles van één leesronde bij elkaar — de enige ingang die data.js gebruikt.
+// Bewust één functie in plaats van losse aanroepen op de callsite: checkRaster stond hier vanaf
+// dag één klaar maar werd door niets aangeroepen, waardoor de RASTER_MIN-tabel documentatie was
+// in plaats van bewaking. Met één ingang toetst een test de wég die de app loopt, en niet alleen
+// de losse onderdelen die er misschien niet in zitten.
+function checkAlles(ntdRows, afRows, ntdRijen, kolommenPerTab){
+  return [...checkSecties(ntdRows||[]), ...checkSecties(afRows||[]),
+          ...checkNummers(ntdRijen||[]), ...checkRasters(kolommenPerTab)];
+}
+
+export { checkSecties, checkRaster, checkRasters, checkNummers, checkAlles, RASTER_MIN, isSectieKop, isKolomKop };

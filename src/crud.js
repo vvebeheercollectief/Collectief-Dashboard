@@ -119,6 +119,19 @@ function _modalFaseWoord(){ return faseWoord(_modalFase); }
 // ══════════════════════════════════════
 //  SHEET HELPERS (insert / delete rows)
 // ══════════════════════════════════════
+// De breedte van elk tabblad zit al in het antwoord van spreadsheets.get, naast de sheetId.
+// Apart en puur, zodat de vorm van dat antwoord te testen is zonder netwerk — en zodat een blad
+// zónder gridProperties niet als breedte `undefined` de structuurcheck in glipt: die zou dan
+// melden dat het blad te smal is terwijl er niets gemeten is.
+function _sheetBreedtes(d){
+  const uit={};
+  ((d&&d.sheets)||[]).forEach(s=>{
+    const n=s?.properties?.gridProperties?.columnCount;
+    if(typeof n==='number') uit[s.properties.title]=n;
+  });
+  return uit;
+}
+
 async function getSheetIds(){
   if(state._sheetIds) return state._sheetIds;
   const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}`,{headers:{Authorization:`Bearer ${state.oauthToken}`}});
@@ -126,6 +139,10 @@ async function getSheetIds(){
   const d=await r.json();
   state._sheetIds={};
   (d.sheets||[]).forEach(s=>{state._sheetIds[s.properties.title]=s.properties.sheetId});
+  // Meeliften op deze ene lezing: de structuurcheck heeft de rasterbreedte nodig en de langste
+  // rij uit fetchSheets is daar géén maat voor (lege staartcellen komen niet mee). Een eigen
+  // verzoek zou de leeslast weer opdrijven die net met 64% is teruggebracht.
+  state._sheetKolommen=_sheetBreedtes(d);
   return state._sheetIds;
 }
 
@@ -576,7 +593,7 @@ async function zetSubsidieFase(rid, stap){
 
 export {
   openModal, editRow, closeModal, fillModalFields, setv, clearModal,
-  getSheetIds, getInsertRow, insertAndWriteRow, deleteTask, deleteCurrentEditTask, deleteTaskRow,
+  getSheetIds, _sheetBreedtes, getInsertRow, insertAndWriteRow, deleteTask, deleteCurrentEditTask, deleteTaskRow,
   getAfInsertRow, completeTask, completeCurrentEditTask, doCompleteTask, closeCompleteModal, submitTask, gv,
   _verseRijIdx, _herankerRij, zetSubsidieFase, kiesModalFase, _modalFaseWoord,
 };

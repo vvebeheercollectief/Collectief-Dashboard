@@ -81,6 +81,9 @@ export const state = {
   _undoInFlight: false,    // een undo-actie (afronden/verwijderen/bulk) loopt → poll pauzeren (undo doet eigen loadAll)
   // diversen
   _sheetIds: null,
+  _sheetKolommen: null,    // {tabbladnaam: aantal kolommen}, uit dezelfde spreadsheets.get als
+                           // _sheetIds. null zolang er nog niet geschreven is — de structuurcheck
+                           // zwijgt dan over het raster in plaats van te gokken.
   _completeRow: null,      // rij-OBJECT waarvoor de afhandel-modal open staat (identiteit, geen index)
   _completeRid: null,      // geklikte data-rid, alléén voor de groene puls op de juiste DOM-rij
   _completeBusy: false,    // afhandelen loopt (dubbelklik-rem over het async-gat)

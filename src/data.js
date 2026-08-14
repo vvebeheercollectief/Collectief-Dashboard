@@ -10,7 +10,7 @@ import { buildAnalytics, buildDash } from "./render-analytics.js";
 import { renderNtdDonut } from "./render-lijsten.js";
 import { parseOntw, parseLogboek, _nogNietBevestigd } from "./render-overig.js";
 import { parseKenmerken } from "./kenmerken.js";
-import { checkSecties, checkNummers } from "./structuurcheck.js";
+import { checkAlles } from "./structuurcheck.js";
 import { ico } from "./icons.js";
 // (kringverwijzing data ⇄ kenmerken: aanroepen gebeuren op runtime — live bindings, veilig)
 import { showToast, verwerkMeldingRijen, toonMeldingen, getCurrentWho, getNotifPrefs } from "./notifications.js";
@@ -572,8 +572,10 @@ async function _loadRonde(silent){
     // Fase 3, trap 1: alleen meekijken. Zodra dit een tijd lang stil blijft op gezonde data
     // gaat de banner aan (trap 2). Nooit blokkerend — dit mag het laden niet beïnvloeden.
     try{
-      const bev=[...checkSecties(R['Nog Te Doen']||[]), ...checkSecties(R['Afgerond']||[]),
-                 ...checkNummers(Object.values(D.ntd||{}).flat())];
+      // De rasterbreedtes komen uit getSheetIds en zijn er dus pas ná de eerste schrijfactie;
+      // tot dan is _sheetKolommen null en zwijgt checkRaster daarover (zie structuurcheck.js).
+      const bev=checkAlles(R['Nog Te Doen'], R['Afgerond'],
+                           Object.values(D.ntd||{}).flat(), state._sheetKolommen);
       if(bev.length) console.warn('[structuurcheck]', bev);
     }catch(e){ console.warn('[structuurcheck] overgeslagen:', e.message); }
     zetAls("ALV's overzicht", r=>{ D.alvo=parseAlvo(r); });

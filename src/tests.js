@@ -4342,6 +4342,40 @@ import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./r
     eq('merkje: de kop zelf krijgt geen merkje', bundelMerkje(kop, ix, 'VERGADERVERZOEKEN'), '');
   })();
 
+  // ── De gestapelde rij in de tabel ──
+  // rowNtd is niet geëxporteerd; net als bij de subsidierij hierboven testen we via renderNtd op
+  // echte data. Dat is hier extra van belang: rowNtd leest de bundel-index van `state` en niet uit
+  // een parameter, dus alleen een échte render bewijst dat renderNtd en rowNtd dezelfde
+  // momentopname gebruiken.
+  (() => {
+    const bewaardNtd = D.ntd, bewaardAf = D.af, bewaardSec = state.activeNtd, bewaardPg = pgs.ntd;
+    try {
+      const t = (taakId, bundelId, volg, sec) => ({ _row: 10 + (+volg||0)/10, taakId, bundelId,
+        bundelVolg:volg, _sec:sec, code:'311212', naam:'Testflat', actiepunt:'Werk', deadline:'' });
+      const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      D.ntd = { ...leeg, OPPAKKEN:[ t('Tkop','Tkop','0','OPPAKKEN'), t('Tb','Tkop','10','OPPAKKEN') ] };
+      D.af = { ...leeg };
+      state.activeNtd = 'OPPAKKEN'; pgs.ntd = 1; state.bundelOpen = new Set();
+      renderNtd();
+      const tb = document.getElementById('ntd-tbody');
+      eq('rij: één zichtbare taakrij (subtaak geabsorbeerd)',
+         tb.querySelectorAll('tr[data-row]').length, 1);
+      eq('rij: stapelrandjes bij een dichte bundel', tb.querySelectorAll('.bdl-peek').length, 2);
+      eq('rij: telpill aanwezig', tb.querySelectorAll('.bdl-pill').length, 1);
+      eq('rij: geen paneel als de bundel dicht is', tb.querySelectorAll('.bdl-paneel').length, 0);
+
+      state.bundelOpen = new Set(['Tkop']);
+      renderNtd();
+      const tb2 = document.getElementById('ntd-tbody');
+      eq('rij: paneel verschijnt bij open bundel', tb2.querySelectorAll('.bdl-paneel').length, 1);
+      eq('rij: één subtaakregel in het paneel', tb2.querySelectorAll('.bdl-sub').length, 1);
+      eq('rij: stapelrandjes weg bij open bundel', tb2.querySelectorAll('.bdl-peek').length, 0);
+    } finally {
+      D.ntd = bewaardNtd; D.af = bewaardAf; state.activeNtd = bewaardSec;
+      pgs.ntd = bewaardPg; state.bundelOpen = new Set(); renderNtd();
+    }
+  })();
+
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');
   window._testResult = `${totOk} OK, ${totFail} FAIL`; // uitleesbaar voor test-automatisering

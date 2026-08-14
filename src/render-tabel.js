@@ -9,6 +9,8 @@ import { bulkGeselecteerd } from "./bulk.js";
 import { offerteAannSamenvatting, offerteAannemerPaneel } from "./render-offerte.js";
 import { ico } from "./icons.js";
 import { faseRijHtml } from "./subsidie-fase.js";
+import { zichtbareKop, bundelVan } from "./bundel.js";
+import { bundelKopExtra, bundelPaneelHtml, bundelMerkje } from "./render-bundel.js";
 
 // Zie de toelichting bij het gebruik in rowNtd().
 const GEEN_STIL_PILL = ['OFFERTE-TRAJECTEN', 'SUBSIDIE-TRAJECTEN'];
@@ -141,10 +143,22 @@ function rowNtd(r,sec){
       ? `<span class="pill-snooze" data-action="taak-wegleggen" data-rid="${rid}" title="Weggelegd tot ${esc(r.opvolgdatum)}">${ico('pauze',11)}${esc(kortDatum(r.opvolgdatum))}</span>`
       : '';
   const extraPills = stilPill + opvolgPill;
+  // ── Takenbundel ──
+  // state._bundelIx wordt door renderNtd voor déze render klaargezet en is een lege Map in
+  // platte weergave, zodat filters/sortering/bulk gegarandeerd de oude, vlakke tabel opleveren.
+  // Via state en niet via een parameter: renderTbody geeft alleen rij + sectie door.
+  const _ix    = state._bundelIx || null;
+  const _leden = _ix ? bundelVan(_ix, r) : null;
+  const _kop   = _leden ? zichtbareKop(_leden) : null;
+  const _isKop = !!(_kop && _kop.r === r);
+  const _extra = _isKop ? bundelKopExtra(_leden, _kop) : { chevron:'', pill:'' };
+  const bdlChev = _extra.chevron;
+  // Pill op de kop; anders het ⛓-merkje voor een subtaak waarvan de kop in een ander tabblad staat.
+  const bdlNaam = _isKop ? _extra.pill : (_ix ? bundelMerkje(r, _ix, sec) : '');
   switch(sec){
     case'OPPAKKEN':
-      cells=`<td>${vveCodeSpan(r.code, css)}</td>
-        <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}</td>
+      cells=`<td>${bdlChev}${vveCodeSpan(r.code, css)}</td>
+        <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}${bdlNaam}</td>
         <td class="cell-txt"><span class="ct" title="${esc(r.actiepunt)}">${esc(r.actiepunt)}</span>${extraPills}</td>
         ${deadlineCel(r, 'OPPAKKEN')}
         <td>${persBadges(r.behandelaar)}</td>
@@ -152,8 +166,8 @@ function rowNtd(r,sec){
         <td>${editBtn}</td>`;
       break;
     case'VERGADERVERZOEKEN':
-      cells=`<td>${vveCodeSpan(r.code, css)}</td>
-        <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}</td>
+      cells=`<td>${bdlChev}${vveCodeSpan(r.code, css)}</td>
+        <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}${bdlNaam}</td>
         <td><span class="badge" style="background:var(--am-l);color:var(--am)">${esc(r.periode||r.agendapunten||'')}</span></td>
         <td class="cell-txt"><span class="ct" title="${esc(r.agendapunten||r.actiepunt||'')}">${esc(r.agendapunten||r.actiepunt||'')}</span>${extraPills}</td>
         <td>${persBadges(r.behandelaar)}</td>
@@ -162,8 +176,8 @@ function rowNtd(r,sec){
         <td>${editBtn}</td>`;
       break;
     case'OFFERTE-TRAJECTEN':
-      cells=`<td>${vveCodeSpan(r.code, css)}</td>
-        <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}</td>
+      cells=`<td>${bdlChev}${vveCodeSpan(r.code, css)}</td>
+        <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}${bdlNaam}</td>
         <td class="cell-sm">${esc(r.datumAangevraagd||'')}</td>
         <td>${offProg(r.offertes)}<div class="of-aann-tbl-tog">${offerteAannSamenvatting(r)}</div></td>
         <td>${persBadges(r.behandelaar)}</td>
@@ -172,8 +186,8 @@ function rowNtd(r,sec){
         <td>${editBtn}</td>`;
       break;
     case'LOD':
-      cells=`<td>${vveCodeSpan(r.code, css)}</td>
-        <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}</td>
+      cells=`<td>${bdlChev}${vveCodeSpan(r.code, css)}</td>
+        <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}${bdlNaam}</td>
         <td class="cell-txt"><span class="ct" title="${esc(r.actiepunt||'')}">${esc(r.actiepunt||'')}</span>${extraPills}</td>
         <td class="cell-txt" style="font-style:italic"><span class="ct" title="${esc(r.status||'')}">${esc(r.status||'')}</span></td>
         <td>${persBadges(r.behandelaar)}</td>
@@ -185,8 +199,8 @@ function rowNtd(r,sec){
     // bewust niet in de tabel — de fase-bolletjes hebben die ruimte nodig en de rij
     // moet rustig blijven. Houd dit gelijk aan SECS['SUBSIDIE-TRAJECTEN'].cols.
     case'SUBSIDIE-TRAJECTEN':
-      cells=`<td>${vveCodeSpan(r.code, css)}</td>
-        <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}</td>
+      cells=`<td>${bdlChev}${vveCodeSpan(r.code, css)}</td>
+        <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}${bdlNaam}</td>
         <td class="cell-txt"><span class="ct" title="${esc(r.subsidie||'')}">${esc(r.subsidie||'')}</span>${extraPills}</td>
         <td>${faseRijHtml(r.subsidieFase, rid)}</td>
         <td>${persBadges(r.behandelaar)}</td>
@@ -205,7 +219,23 @@ function rowNtd(r,sec){
   const aannRow = (sec==='OFFERTE-TRAJECTEN' && state.offerteAannOpen.has(aannSleutel(r)))
     ? `<tr class="of-aann-tr"><td colspan="${(state.bulkMode?1:0)+SECS[sec].cols.length+1}">${offerteAannemerPaneel(r)}</td></tr>`
     : '';
-  return `<tr class="${rowCls}" data-row="${r._row}"${prioAttr}>${bulkCel}${cells}</tr>${aannRow}`;
+  // Dicht: twee 'papierrandjes' onder de rij. Open: het bundelpaneel.
+  let bdlNa = '';
+  if (_isKop){
+    // Zelfde normalisatie als `tekst()` in bundel.js/render-bundel.js: de chevron zet
+    // `tekst(bundelId)` in zijn data-bundel, en dát is wat er straks in de Set komt. Wijkt de
+    // sleutel hier af, dan geeft `has` false en blijft de rij dicht terwijl de knop 'open' zegt.
+    const open = state.bundelOpen.has(String(r.bundelId ?? '').trim());
+    const kolommen = SECS[sec].cols.length + 1 + (state.bulkMode?1:0);
+    bdlNa = open
+      ? `<tr class="bdl-tr"><td colspan="${kolommen}">${bundelPaneelHtml(_leden, _kop)}</td></tr>`
+      : `<tr class="bdl-peek"><td colspan="${kolommen}"><span class="l"></span></td></tr>`
+      + `<tr class="bdl-peek d2"><td colspan="${kolommen}"><span class="l"></span></td></tr>`;
+  }
+  // `data-rid` op de <tr>: het slepen (Taak 15) moet van de gesleepte rij naar het taak-object
+  // komen. Dat gaat hier overal via state._rowCache (zie ACTIONS); `_row` zou een zoektocht door
+  // D.ntd worden, en dat rijnummer is alleen bínnen één tabblad uniek.
+  return `<tr class="${rowCls}${_isKop?' bdl-kop':''}" data-row="${r._row}" data-rid="${rid}"${prioAttr}>${bulkCel}${cells}</tr>${aannRow}${bdlNa}`;
 }
 
 function rowAf(r,sec){

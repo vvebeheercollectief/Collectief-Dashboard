@@ -30,7 +30,7 @@ import { checkSecties, checkRaster, checkRasters, checkNummers, checkAlles, RAST
 import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from "./subsidie-fase.js";
 import { toggleHerhaalStatus } from "./render-herhaal.js";
 import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
-import { bouwBundelIndex, zichtbareKop, isBundel, bundelVan, hernummerLeden, volgendeVolg } from "./bundel.js";
+import { bouwBundelIndex, zichtbareKop, isBundel, bundelVan, hernummerLeden, volgendeVolg, magKoppelen } from "./bundel.js";
 
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
   // ── mini-assert helper (Fase 1 testnet) ──
@@ -3995,6 +3995,31 @@ import { bouwBundelIndex, zichtbareKop, isBundel, bundelVan, hernummerLeden, vol
        (bouwBundelIndex(getallen, legeAf).get('1') || []).map(m => m.r.taakId), [1, 2]);
     eq('index: numeriek taaknummer in Afgerond valt niet om',
        (bouwBundelIndex(legeAf, getallen).get('1') || []).length, 2);
+  })();
+
+  (() => {
+    // magKoppelen: de vangrail die de structuur één laag diep houdt. Deze tests pinnen de twee
+    // keuzes vast die anders stil kunnen omdraaien — vallen op een subtaak voegt je toe aan DIE
+    // bundel, en een taak met eigen subtaken kan nergens onder.
+    const t = (taakId, bundelId, volg) => ({ taakId, bundelId, bundelVolg:volg, _sec:'OPPAKKEN', code:'311212' });
+    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const kop = t('Tkop','Tkop','0'), sub = t('Tb','Tkop','10'), los = t('Tlos','',''), los2 = t('Tl2','','');
+    const ix = bouwBundelIndex({ ...leeg, OPPAKKEN:[kop, sub, los, los2] }, leeg);
+
+    eq('koppel: losse taak onder losse taak mag', magKoppelen(los, los2, ix).mag, true);
+    eq('koppel: losse taak onder een subtaak mag (voegt toe aan die bundel)',
+       magKoppelen(los, sub, ix).mag, true);
+    eq('koppel: doelbundel is die van de subtaak', magKoppelen(los, sub, ix).bundelId, 'Tkop');
+    eq('koppel: een kop met subtaken mag niet onder iets anders',
+       magKoppelen(kop, los, ix).mag, false);
+    eq('koppel: die weigering benoemt de subtaken',
+       magKoppelen(kop, los, ix).reden, 'Deze taak heeft zelf subtaken; ontkoppel die eerst.');
+    eq('koppel: op zichzelf mag niet', magKoppelen(los, los, ix).mag, false);
+    eq('koppel: al in dezelfde bundel is zinloos', magKoppelen(sub, kop, ix).mag, false);
+    // Numerieke velden mogen ook hier niet omvallen: het herordenen zet bundelId/bundelVolg
+    // optimistisch als getal op het rij-object, en een `.trim()` daarop nekt de hele sleepactie.
+    eq('koppel: numerieke bundelvelden vallen niet om',
+       magKoppelen({ taakId:1, bundelId:'', bundelVolg:'' }, { taakId:2, bundelId:2, bundelVolg:0 }, ix).bundelId, '2');
   })();
 
   const totOk = ok + _tOk, totFail = fail + _tFail;

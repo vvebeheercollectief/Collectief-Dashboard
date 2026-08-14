@@ -79,6 +79,35 @@ export function bundelVan(index, r){
   return isBundel(leden) ? leden : null;
 }
 
+// Mag `bron` als subtaak onder `doel` komen te hangen?
+// Geeft {mag, reden, bundelId} — bundelId is de bundel waar bron in terechtkomt.
+//
+// Twee dingen liggen hier vast:
+//  - Vallen op een lid dat al in een bundel zit voegt je toe aan DIE bundel. Zo kan er geen
+//    fout ontstaan door 'op de verkeerde helft' te mikken.
+//  - Een taak die zélf al subtaken heeft kan nergens onder. Dat houdt de structuur
+//    gegarandeerd één laag diep, en wel bij het koppelen — niet pas bij het tekenen.
+export function magKoppelen(bron, doel, index){
+  if (!bron || !doel) return { mag:false, reden:'Onbekende taak.', bundelId:null };
+  if (bron === doel || (tekst(bron.taakId) && tekst(bron.taakId) === tekst(doel.taakId)))
+    return { mag:false, reden:'Een taak kan niet onder zichzelf hangen.', bundelId:null };
+
+  const bronLeden = bundelVan(index, bron);
+  // Is bron zelf een kop met leden onder zich? Dan zou koppelen een tweede laag maken.
+  if (bronLeden && bronLeden.some(m => m.r !== bron && volgVan(m.r) > volgVan(bron)))
+    return { mag:false, reden:'Deze taak heeft zelf subtaken; ontkoppel die eerst.', bundelId:null };
+
+  const doelBundel = tekst(doel.bundelId);
+  const bronBundel = tekst(bron.bundelId);
+  if (doelBundel && bronBundel && doelBundel === bronBundel)
+    return { mag:false, reden:'Deze taak zit al in deze bundel.', bundelId:null };
+
+  // Nieuwe bundel: het doel wordt de hoofdtaak en draagt zijn eigen taaknummer als bundelnummer.
+  // Heeft het doel nog geen taaknummer (rij van vóór de backfill), dan kent de schrijfweg er
+  // eerst één toe — dat kan hier niet, want deze module is puur.
+  return { mag:true, reden:'', bundelId: doelBundel || tekst(doel.taakId) || null };
+}
+
 // Volgnummers opnieuw uitdelen als 10, 20, 30 … in de gegeven volgorde.
 // Geeft [{r, volg}] terug voor precies de leden die daadwerkelijk veranderen, zodat de
 // schrijfactie zo klein mogelijk blijft.

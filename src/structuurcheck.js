@@ -83,10 +83,14 @@ function checkSecties(rows){
 // Is dit tabblad breed genoeg om naar te schrijven? null = in orde, onbekend tabblad, of
 // onbekende breedte. Een onbekend tabblad krijgt bewust GEEN oordeel: reset-archieven en
 // back-uptabbladen horen hier niet in.
-// Een ONBEKENDE breedte evenmin: de breedtes komen uit getSheetIds, en die draait pas bij de
-// eerste schrijfactie van de sessie. Bij het laden is dus nog van geen enkel blad bekend hoe
-// breed het is, en `undefined >= 19` is false — zonder deze regel zou élke sessie openen met
-// negen meldingen die nergens op gebaseerd zijn.
+// Een ONBEKENDE breedte evenmin, en die guard is bewust een TWEEDE slot: langs de weg die de app
+// vandaag loopt komt een breedteloos blad hier niet eens binnen. Vóór de eerste schrijfactie is
+// _sheetKolommen null en loopt checkRasters over nul sleutels; daarna staan er alleen bladen in
+// waarvan _sheetBreedtes een échte columnCount overhield. Deze regel dekt dus wat dáárlangs zou
+// komen: een blad dat wél in de map staat maar zonder bruikbare breedte, en elke latere aanroeper
+// die deze functie anders voedt (een handgemaakte map, of een refactor die over RASTER_MIN loopt
+// in plaats van over de meting). Zonder de guard is `undefined >= 19` false en zou zo'n blad als
+// te smal gemeld worden terwijl er niets gemeten is — alarm op niets leert de gebruiker negeren.
 function checkRaster(tabblad, kolommen){
   const nodig=RASTER_MIN[tabblad];
   if(!nodig) return null;

@@ -18,7 +18,7 @@ import { _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, veil
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
-import { setv, serializeNtdUndo, afrondWaarden, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, kiesModalFase, _modalFaseWoord, getInsertRow, _sheetBreedtes } from "./crud.js";
+import { setv, serializeNtdUndo, afrondWaarden, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, kiesModalFase, _modalFaseWoord, getInsertRow, _sheetBreedtes, getSheetIds } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages } from "./dossier-chat.js";
 import { shouldPromptReload, maakHerlaadKern, zelfdeWorker } from "./sw-update.js";
@@ -1240,6 +1240,41 @@ import { bouwBundelIndex, zichtbareKop, isBundel, bundelVan, hernummerLeden, vol
     const _scheef=[['OPPAKKEN'],['311198','VvE A','iets'],['VvE Code','VvE','Actiepunt']];
     eq('raster: checkAlles houdt de sectie- en nummercontrole overeind',
        checkAlles(_scheef, [], [{taakId:'T1',_row:3},{taakId:'T1',_row:9}], {'Nog Te Doen':19}).length, 2);
+  })();
+
+  // ── De schakel zelf: getSheetIds moet de gemeten breedtes in state achterlaten ──
+  // De pure test hierboven voedt _sheetBreedtes met een handgemaakt object, en de leesronde-test
+  // verderop zet state._sheetKolommen zélf. Daartussen zit één regel in getSheetIds die de twee
+  // verbindt, en die was door niets gedekt: haalt iemand hem weg — of verandert de vorm van het
+  // spreadsheets.get-antwoord — dan blijft _sheetKolommen eeuwig null, zwijgt de rasterbewaking
+  // over álles, en zegt de suite daar niets van. Vandaar deze test op de echte functie.
+  await (async()=>{
+    const _fetch=window.fetch;
+    const idsOud=state._sheetIds, kolOud=state._sheetKolommen;
+    const tokenOud=state.oauthToken, expiryOud=state.oauthExpiry;
+    try{
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
+      state._sheetIds=null;                     // anders keert getSheetIds meteen terug uit de cache
+      state._sheetKolommen=null;
+      // Vorm van een echt spreadsheets.get-antwoord: sheetId én gridProperties per blad. Het derde
+      // blad heeft er bewust geen — zo blijkt uit de uitkomst dat de breedtes uit de MÉTING komen
+      // en niet uit een lijst tabbladnamen.
+      window.fetch=async()=>new Response(JSON.stringify({sheets:[
+        {properties:{title:'Nog Te Doen', sheetId:0, gridProperties:{rowCount:900,  columnCount:17}}},
+        {properties:{title:'Afgerond',    sheetId:7, gridProperties:{rowCount:5000, columnCount:26}}},
+        {properties:{title:'Backup 2026', sheetId:9}}]}),{status:200});
+      await getSheetIds();
+      eq('aansluiting: getSheetIds legt de gemeten breedtes vast in state',
+         state._sheetKolommen, {'Nog Te Doen':17, 'Afgerond':26});
+      // En dit is waar het om gaat: dát veld is precies wat data.js aan checkAlles doorgeeft.
+      // Hiermee is de ketting meting → state → bewaking rond.
+      eq('aansluiting: en daarmee wordt de rasterbewaking wakker',
+         checkAlles([], [], [], state._sheetKolommen).length, 1);
+    } finally {
+      window.fetch=_fetch;
+      state._sheetIds=idsOud; state._sheetKolommen=kolOud;
+      state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
+    }
   })();
 
   // ── VvE-dossier AI-agent (chat) ──

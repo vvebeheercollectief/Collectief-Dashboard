@@ -105,6 +105,16 @@ Er ontstaan dus nooit wezen — ook niet als er handmatig in de Sheet wordt gero
 Volgnummers lopen 10, 20, 30 … zodat een subtaak ertussen schuiven één cel schrijven is in
 plaats van alles hernummeren. Bij slepen wordt de hele bundel hernummerd naar 10, 20, 30 …
 
+De `0` van de hoofdtaak (§3.1) is daarbij een **startwaarde, geen kenmerk**: bij het hernummeren
+krijgen álle open leden een nieuw nummer vanaf 10, ook de hoofdtaak — die mag net zo goed
+versleept worden. Welk lid de kop is volgt altijd uit §3.3 (het laagste openstaande volgnummer),
+nooit uit de waarde 0; en of een taak subtaken heeft volgt uit wie naar haar taaknummer wijst,
+nooit uit een volgnummer.
+
+Afgeronde leden houden hun nummer — hun rij staat in "Afgerond" en die wordt bij het herordenen
+niet aangeraakt. De nieuwe reeks telt daarom om hun nummers heen, zodat twee leden nooit hetzelfde
+volgnummer krijgen en de gesleepte volgorde ook echt de getoonde volgorde is.
+
 ## 4. Weergaveregels
 
 ### 4.1 Eén plek per tabblad

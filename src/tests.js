@@ -3924,6 +3924,33 @@ import { bouwBundelIndex, zichtbareKop, isBundel, bundelVan, hernummerLeden, vol
     // koppelcode een bundelnummer hebben gekregen, en die kent altijd eerst een nummer toe.
     eq('index: openstaande rij zonder taaknummer telt wel mee',
        bouwBundelIndex(rommel, leeg).get('Xoud').length, 2);
+
+    // Handmatig gerommel dat een CYCLUS maakt: Ta wijst naar Tb en Tb wijst naar Ta. Er is dan
+    // geen enkele rij die zijn eigen nummer draagt, dus het valt vanzelf uiteen in twee bundels
+    // van één = twee gewone taken. Dat gaat vandaag goed omdat de index nergens een verwijzing
+    // volgt, maar het is nergens vastgepind — en juist dit is het geval waar een latere
+    // "zoek de hoofdtaak op"-lus stil in kan blijven rondlopen.
+    const cyclus = { ...leeg, OPPAKKEN:[ t('Ta','Tb','0','OPPAKKEN'), t('Tb','Ta','0','OPPAKKEN') ] };
+    const ixC = bouwBundelIndex(cyclus, leeg);
+    eq('index: een cyclus valt uiteen in twee bundels van één',
+       [(ixC.get('Ta')||[]).length, (ixC.get('Tb')||[]).length], [1, 1]);
+    eq('index: een cyclus levert dus geen bundel op', isBundel(ixC.get('Tb')), false);
+    eq('bundelVan: een cyclus geeft geen bundel', bundelVan(ixC, cyclus.OPPAKKEN[0]), null);
+
+    // Een rij die naar zichzelf wijst is een bundel van één en dus een doodgewone taak.
+    const zelf = { ...leeg, OPPAKKEN:[ t('Tz','Tz','0','OPPAKKEN') ] };
+    eq('index: zelfverwijzing is geen bundel', isBundel(bouwBundelIndex(zelf, leeg).get('Tz')), false);
+
+    // Twee leden met hetzelfde volgnummer (handmatig ingetikt, of een botsing van vroeger): de
+    // volgorde moet dan nog steeds vastliggen, en `zichtbareKop` moet hetzelfde lid aanwijzen als
+    // de sortering vooraan zet — anders lopen "de eerste" en "de kop" uit elkaar.
+    const dubbel = { ...leeg, OPPAKKEN:[ t('Tz','Tk','10','OPPAKKEN'), t('Ta','Tk','10','OPPAKKEN'),
+                                         t('Tk','Tk','0','OPPAKKEN') ] };
+    const ixD = bouwBundelIndex(dubbel, leeg);
+    eq('index: gelijke volgnummers krijgen een vaste volgorde op taaknummer',
+       ixD.get('Tk').map(m => m.r.taakId), ['Tk','Ta','Tz']);
+    eq('kop: bij gelijke volgnummers wijst de kop hetzelfde lid aan als de sortering',
+       zichtbareKop(ixD.get('Tk')).r.taakId, 'Tk');
   })();
 
   (() => {
@@ -3947,9 +3974,34 @@ import { bouwBundelIndex, zichtbareKop, isBundel, bundelVan, hernummerLeden, vol
        [['Tnieuw','20'],['Tb','30']]);
     // De kern: een lid uit 'Afgerond' mag nooit in de schrijflijst belanden. De opdracht draagt
     // alleen `r` en `volg`, dus de aanroeper kan het tabblad achteraf niet meer terugzien.
+    // Het afgeronde lid slaat zijn beurt niet alleen over, het slaat ook geen nummer op: de open
+    // leden krijgen 10 en 20 (het afgeronde lid houdt zijn 0 en staat er dus vóór).
     eq('hernummer: afgerond lid krijgt geen schrijfopdracht',
        hernummerLeden([lid('Tkop','0',true), lid('Ta','99'), lid('Tb','98')]).map(o => [o.r.taakId, o.volg]),
-       [['Ta','20'],['Tb','30']]);
+       [['Ta','10'],['Tb','20']]);
+
+    // Botsing met een afgerond lid. Dat lid houdt zijn nummer, dus de nieuwe reeks moet eromheen
+    // tellen. Deelt een gesleept lid zijn nummer met een afgerond lid, dan beslist de tiebreak op
+    // taaknummer waar het landt — en dan verspringt precies wat de gebruiker net versleepte.
+    const naSleep = [lid('Thoofd','0',true), lid('Za','40'), lid('Tb','20',true), lid('Ac','50')];
+    eq('hernummer: nieuwe nummers botsen niet met een afgerond lid',
+       hernummerLeden(naSleep).map(o => [o.r.taakId, o.volg]), [['Za','10'],['Ac','30']]);
+    // …en de bundel staat daarna ook echt in de gesleepte volgorde. (De optimistische update zet
+    // de nieuwe nummers zo op het rij-object; hier doen we dat na om de uitkomst te kunnen zien.)
+    hernummerLeden(naSleep).forEach(o => { o.r.bundelVolg = o.volg; });
+    eq('hernummer: de bundel staat na afloop in de gesleepte volgorde',
+       naSleep.slice().sort((a, b) => parseInt(a.r.bundelVolg, 10) - parseInt(b.r.bundelVolg, 10))
+              .map(m => m.r.taakId), ['Thoofd','Za','Tb','Ac']);
+    eq('hernummer: geen twee leden delen na afloop een volgnummer',
+       new Set(naSleep.map(m => String(m.r.bundelVolg))).size, 4);
+    // Een afgerond lid met een hoog nummer trekt de reeks mee omhoog, anders zou alles wat er in
+    // de sleepvolgorde achter staat er in beeld vóór komen te staan.
+    eq('hernummer: een afgerond lid trekt de volgende nummers omhoog',
+       hernummerLeden([lid('Za','5'), lid('Tb','100',true), lid('Ac','7')]).map(o => [o.r.taakId, o.volg]),
+       [['Za','10'],['Ac','110']]);
+    // Twee open leden met hetzelfde nummer (handmatig ingetikt) worden uit elkaar getrokken.
+    eq('hernummer: dubbele volgnummers worden uit elkaar getrokken',
+       hernummerLeden([lid('Ta','10'), lid('Tb','10')]).map(o => [o.r.taakId, o.volg]), [['Tb','20']]);
     eq('hernummer: lege lijst is geen fout', hernummerLeden([]).length, 0);
     eq('hernummer: geen lijst is geen fout', hernummerLeden(undefined).length, 0);
     // Een optimistisch gezet GETAL mag niet als "veranderd" gelezen worden (anders schrijft elke
@@ -4016,6 +4068,44 @@ import { bouwBundelIndex, zichtbareKop, isBundel, bundelVan, hernummerLeden, vol
        magKoppelen(kop, los, ix).reden, 'Deze taak heeft zelf subtaken; ontkoppel die eerst.');
     eq('koppel: op zichzelf mag niet', magKoppelen(los, los, ix).mag, false);
     eq('koppel: al in dezelfde bundel is zinloos', magKoppelen(sub, kop, ix).mag, false);
+
+    // De NEGATIEVE richting van diezelfde vangrail. "Heb ik subtaken?" is een vraag over
+    // identiteit — wijst een andere rij naar mijn taaknummer? — en niet over positie. Een guard
+    // die volgnummers vergelijkt laat het anker van een bundel los zodra geen enkel ander lid een
+    // hóger nummer heeft, en dat is geen bedacht geval (zie de sleepketen hieronder).
+    const kopL = t('Tkl','Tkl','20'), subL = t('Tsl','Tkl','10');
+    const ixL = bouwBundelIndex({ ...leeg, OPPAKKEN:[kopL, subL, los] }, leeg);
+    eq('koppel: anker met een LAGER genummerd lid mag nog steeds nergens onder',
+       magKoppelen(kopL, los, ixL).mag, false);
+    const kopG = t('Tkg','Tkg','10'), subG = t('Tsg','Tkg','10');
+    const ixG = bouwBundelIndex({ ...leeg, OPPAKKEN:[kopG, subG, los] }, leeg);
+    eq('koppel: anker met een even hoog genummerd lid ook niet',
+       magKoppelen(kopG, los, ixG).mag, false);
+
+    // De keten uit de praktijk, in twee stappen: een bundel met een AFGEROND lid wordt gesleept,
+    // het anker schuift daarbij omhoog (afgeronde leden houden hun nummer) en een positiegebonden
+    // guard gaf daarna ineens groen licht — waarna het anker naar een andere bundel verhuist en
+    // het afgeronde lid als wees achterblijft. Het antwoord hoort vóór en ná het hernummeren
+    // hetzelfde te zijn.
+    const kopN = t('Tkn','Tkn','0'), subNaf = t('Tsn','Tkn','10');
+    const bouwIxN = () => bouwBundelIndex({ ...leeg, OPPAKKEN:[kopN, los] }, { ...leeg, OPPAKKEN:[subNaf] });
+    eq('koppel: anker met een afgerond lid mag nergens onder (vóór het slepen)',
+       magKoppelen(kopN, los, bouwIxN()).mag, false);
+    hernummerLeden(bouwIxN().get('Tkn')).forEach(o => { o.r.bundelVolg = o.volg; });
+    eq('koppel: het anker is na het hernummeren zijn 0 kwijt', kopN.bundelVolg, '20');
+    eq('koppel: … en mag nog steeds nergens onder', magKoppelen(kopN, los, bouwIxN()).mag, false);
+
+    // Andersom mag de vangrail niet doorslaan: een gewone subtaak met een broer áchter zich heeft
+    // zelf niets onder zich hangen en mag dus gewoon verhangen worden. Een positiegebonden guard
+    // weigerde die met een melding over subtaken die er niet zijn.
+    const kopB = t('Tkb','Tkb','0'), subB1 = t('Tb1','Tkb','10'), subB2 = t('Tb2','Tkb','20');
+    const ixB = bouwBundelIndex({ ...leeg, OPPAKKEN:[kopB, subB1, subB2, los] }, leeg);
+    eq('koppel: subtaak met een broer erachter mag wél verhangen worden',
+       magKoppelen(subB1, los, ixB).mag, true);
+    eq('koppel: en belandt dan in de bundel van het doel',
+       magKoppelen(subB1, los, ixB).bundelId, 'Tlos');
+    eq('koppel: het laatste lid van een bundel mag net zo goed',
+       magKoppelen(subB2, los, ixB).mag, true);
     // Numerieke velden mogen ook hier niet omvallen: het herordenen zet bundelId/bundelVolg
     // optimistisch als getal op het rij-object, en een `.trim()` daarop nekt de hele sleepactie.
     eq('koppel: numerieke bundelvelden vallen niet om',

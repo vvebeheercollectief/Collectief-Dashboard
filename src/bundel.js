@@ -2,8 +2,15 @@
 //  BUNDEL — pure logica voor de Takenbundel
 // ══════════════════════════════════════
 // Kernregel: élk lid van een bundel draagt hetzelfde `bundelId` (kolom R), óók de hoofdtaak —
-// die draagt zijn eigen taaknummer, met volgnummer 0. Een bundel is dus "alle taken met hetzelfde
-// nummer", en dat blijft waar of een lid nu open staat, afgerond is of verwijderd wordt.
+// die draagt zijn eigen taaknummer, bij het aanmaken met volgnummer 0. Een bundel is dus "alle
+// taken met hetzelfde nummer", en dat blijft waar of een lid nu open staat, afgerond is of
+// verwijderd wordt.
+//
+// Die 0 is een startwaarde, geen kenmerk. Bij het slepen hernummert `hernummerLeden` álle open
+// leden vanaf 10 — ook het anker (het lid waarvan het taaknummer het bundelnummer ís), want dat
+// mag net zo goed verplaatst worden. Wie de kop is volgt daarom altijd uit `zichtbareKop` (het
+// laagste OPEN volgnummer), nooit uit de waarde 0; en of een taak subtaken heeft volgt uit wie
+// naar zijn taaknummer wijst (`magKoppelen`), nooit uit een volgnummer.
 //
 // Deze module schrijft niets, raakt de DOM niet en doet geen netwerkverkeer en is volledig los
 // testbaar. Let op: dat maakt hem onschadelijk, maar niet vanzelf zijn uitvoer — `hernummerLeden`
@@ -92,9 +99,14 @@ export function magKoppelen(bron, doel, index){
   if (bron === doel || (tekst(bron.taakId) && tekst(bron.taakId) === tekst(doel.taakId)))
     return { mag:false, reden:'Een taak kan niet onder zichzelf hangen.', bundelId:null };
 
-  const bronLeden = bundelVan(index, bron);
-  // Is bron zelf een kop met leden onder zich? Dan zou koppelen een tweede laag maken.
-  if (bronLeden && bronLeden.some(m => m.r !== bron && volgVan(m.r) > volgVan(bron)))
+  // Heeft bron zélf subtaken? Dat is een vraag over IDENTITEIT — "draagt een andere rij mijn
+  // taaknummer als bundelnummer?" — en nadrukkelijk niet over positie. Een guard die volgnummers
+  // vergelijkt loopt namelijk twee kanten op mis: hij weigert een gewone subtaak die toevallig een
+  // broer áchter zich heeft, én hij laat het anker van een bundel wél los zodra geen enkel ander
+  // lid een hóger nummer heeft. Dat laatste ontstaat vanzelf: `hernummerLeden` schuift het anker
+  // omhoog terwijl afgeronde leden hun nummer houden. Op identiteit toetsen dicht beide gaten.
+  const eigenNr = tekst(bron.taakId);
+  if (eigenNr && ((index && index.get(eigenNr)) || []).some(m => m.r !== bron))
     return { mag:false, reden:'Deze taak heeft zelf subtaken; ontkoppel die eerst.', bundelId:null };
 
   const doelBundel = tekst(doel.bundelId);
@@ -118,16 +130,41 @@ export function magKoppelen(bron, doel, index){
 // `'Nog Te Doen'!S<_row>` van maken en dus in een wildvreemde taak schrijven. Hier weglaten is de
 // enige plek waar dat met zekerheid dicht zit; het scheelt bovendien schrijfwerk aan rijen die
 // toch niet meer verplaatst worden (§3.3: de afgeronde hoofdtaak blijft bovenin het paneel).
-// Gevolg: een afgerond lid houdt zijn oude nummer en kan dus met een nieuw nummer botsen — dan
-// beslist de tiebreak op taaknummer, dus de volgorde blijft voorspelbaar (en §5: de ergste
-// uitkomst van herordenen is een verkeerde vólgorde, nooit verloren werk).
+// Omdat die leden hun oude nummer houden, telt de nieuwe reeks er OMHEEN in plaats van er
+// dwars doorheen: elk nummer dat een afgerond lid vasthoudt is bezet, en een afgerond lid trekt
+// de teller mee omhoog. Zou de reeks gewoon 10, 20, 30 … per positie uitdelen, dan botst een
+// gesleept lid met een afgerond lid zodra er één tussen staat — geen randgeval maar de regel —
+// en besliste de tiebreak op taaknummer waar het item landt. Precies de keuze die de gebruiker
+// net zelf met de muis maakte, dus daar mag niets anders over beslissen.
 // Voorwaarde aan de aanroeper: `af` moet waarheidsgetrouw meekomen, zoals `bouwBundelIndex` hem
 // zet. Bouw je de sleepvolgorde uit de DOM, neem die vlag dan mee — hij is het enige onderscheid.
 export function hernummerLeden(leden){
+  const lijst = leden || [];
+  const bezet = new Set();
+  lijst.forEach(m => {
+    if (!m.af) return;
+    const v = volgVan(m.r);
+    if (v !== Number.MAX_SAFE_INTEGER) bezet.add(v);
+  });
+
   const uit = [];
-  (leden || []).forEach((m, i) => {
-    if (m.af) return;
-    const nieuw = String((i + 1) * 10);
+  let n = 0; // hoogste nummer dat tot hier is uitgedeeld óf door een afgerond lid wordt vastgehouden
+  lijst.forEach(m => {
+    if (m.af) {
+      // Een afgerond lid blijft op zijn nummer staan, dus alles wat er in de sleepvolgorde áchter
+      // staat moet er ook numeriek boven uitkomen — anders springt het in beeld alsnog vóór hem.
+      const v = volgVan(m.r);
+      if (v !== Number.MAX_SAFE_INTEGER && v > n) n = v;
+      return;
+    }
+    // Eerstvolgende vrije tiental. Het aantal pogingen is begrensd op het aantal bezette nummers:
+    // een astronomisch getal uit een handmatig bewerkte cel schuift in drijvende komma niet meer
+    // op, en dan is een verkeerde volgorde (§5) oneindig veel beter dan een vastloper.
+    for (let poging = bezet.size + 1; poging > 0; poging--) {
+      n = (Math.floor(n / 10) + 1) * 10;
+      if (!bezet.has(n)) break;
+    }
+    const nieuw = String(n);
     if (tekst(m.r.bundelVolg) !== nieuw) uit.push({ r: m.r, volg: nieuw });
   });
   return uit;

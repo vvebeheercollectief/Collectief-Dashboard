@@ -169,9 +169,9 @@ function getInsertRow(sec){
 }
 
 // Celwaarde voor een veld waar het GETAL 0 een echte waarde is. `x||''` maakt van 0 een lege
-// cel, en juist de hoofdtaak van een bundel draagt volgnummer 0. Vandaag levert parseSections
+// cel, en de hoofdtaak van een verse bundel draagt volgnummer 0. Vandaag levert parseSections
 // altijd strings ('0' is truthy), maar het herordenen zet bundelVolg optimistisch op het
-// rij-object; zet dat ooit een getal neer, dan zou de hoofdtaak bij afronden of undo stil zijn
+// rij-object; zet dat ooit een getal neer, dan zou die taak bij afronden of undo stil zijn
 // plek in de bundel verliezen — precies de soort schade die dit traject wil voorkomen.
 const nulVeilig = v => (v === 0 || v) ? String(v) : '';
 
@@ -188,7 +188,8 @@ export function serializeNtdUndo(r){
   v.push(r.taakId||'');   // Q — het vaste taaknummer moet de undo overleven, anders krijgt de
                           // teruggezette taak een nieuwe identiteit en is de oude een wees.
   v.push(r.bundelId||''); // R — om dezelfde reden: zonder dit valt de taak na een undo uit zijn bundel.
-  v.push(nulVeilig(r.bundelVolg)); // S — via nulVeilig, want volgnummer 0 is de hoofdtaak
+  v.push(nulVeilig(r.bundelVolg)); // S — via nulVeilig, want 0 is een echt volgnummer (zo begint
+                                   // een verse bundel), geen lege cel
   return v;
 }
 

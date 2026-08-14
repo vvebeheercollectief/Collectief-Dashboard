@@ -675,7 +675,10 @@ function parseSections(rows){
                                       // aanmaakte. De guard valt dan terug op de vingerafdruk.
     entry.bundelId   =_f4v(row[17]);  // R — Takenbundel: élk lid draagt hetzelfde nummer, ook de
                                       // hoofdtaak (die draagt zijn eigen taakId). Leeg = geen bundel.
-    entry.bundelVolg =_f4v(row[18]);  // S — volgorde binnen de bundel: '0' = hoofdtaak, dan 10/20/30.
+    entry.bundelVolg =_f4v(row[18]);  // S — volgorde binnen de bundel. Een verse bundel begint op
+                                      // '0' (hoofdtaak) en 10/20/30, maar slepen hernummert álle
+                                      // open leden vanaf 10 — ook de hoofdtaak. Welk lid de kop is
+                                      // volgt dus uit het laagste OPEN nummer, niet uit de 0.
     // Legacy 'Afgerond'-rijen (oude onEdit-vinkjes, vóór juni): 5-koloms vorm
     // [code,naam,actiepunt,behandelaar,datum] met de afronddatum op kolom E i.p.v. I.
     // Herken ze — geen datum op I, maar kolom E (in entry.behandelaar) is wél een datum —

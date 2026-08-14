@@ -3999,6 +3999,51 @@ import { bouwBundelIndex, zichtbareKop, isBundel, bundelVan, hernummerLeden, vol
     eq('hernummer: een afgerond lid trekt de volgende nummers omhoog',
        hernummerLeden([lid('Za','5'), lid('Tb','100',true), lid('Ac','7')]).map(o => [o.r.taakId, o.volg]),
        [['Za','10'],['Ac','110']]);
+
+    // ── Een open lid moet ook vóór een afgerond lid kunnen komen. ──
+    // Dit was de blinde vlek van de vorige versie: die telde alleen omhoog, dus een open lid
+    // belandde altijd boven élk afgerond nummer dat het al gepasseerd was. De fixture hierboven
+    // dekt dat niet af — daar komen de afgeronde leden toevallig goed uit.
+    //
+    // Het gewone geval, en dus het ergste: hoofdtaak nog open op 0, één subtaak afgevinkt op 10.
+    // Dat is de stand direct nadat iemand één subtaak afvinkt. Eén sleepactie ergens anders in
+    // het paneel hernummert de héle bundel, en mag dit paar dus niet omdraaien.
+    eq('hernummer: een open hoofdtaak op 0 past vóór een afgevinkte subtaak op 10',
+       hernummerLeden([lid('Tkop','0'), lid('Tsub','10',true)]).map(o => [o.r.taakId, o.volg]),
+       [['Tkop','5']]);
+    const na1Vinkje = [lid('Tkop','0'), lid('Tsub','10',true), lid('Tb','20')];
+    hernummerLeden(na1Vinkje).forEach(o => { o.r.bundelVolg = o.volg; });
+    eq('hernummer: en de bundel staat daarna nog in dezelfde volgorde',
+       na1Vinkje.slice().sort((a, b) => parseInt(a.r.bundelVolg, 10) - parseInt(b.r.bundelVolg, 10))
+                .map(m => m.r.taakId), ['Tkop','Tsub','Tb']);
+    // De directe handeling: de gebruiker sleept een open lid boven een afgerond lid. Deed eerst
+    // zichtbaar niets — het lid kwam op 20 en bleef er dus onder staan, zonder melding.
+    const naarBoven = [lid('Topen','20'), lid('Taf','10',true)];
+    hernummerLeden(naarBoven).forEach(o => { o.r.bundelVolg = o.volg; });
+    eq('hernummer: een open lid boven een afgerond lid slepen komt er ook echt boven',
+       naarBoven.slice().sort((a, b) => parseInt(a.r.bundelVolg, 10) - parseInt(b.r.bundelVolg, 10))
+                .map(m => m.r.taakId), ['Topen','Taf']);
+    // Tussen twee afgeronde leden in: het gat (10..20) is te smal voor een rond tiental, dus
+    // wordt het gelijk verdeeld. Lelijk nummer, juiste plek — en bij de volgende sleepactie
+    // zonder afgeronde buren zijn de nummers vanzelf weer rond.
+    eq('hernummer: een lid tussen twee afgeronde leden landt in het gat',
+       hernummerLeden([lid('Ta','10',true), lid('Tx','99'), lid('Tb','20',true)])
+         .map(o => [o.r.taakId, o.volg]), [['Tx','15']]);
+    eq('hernummer: twee leden in hetzelfde gat blijven onderling op volgorde',
+       hernummerLeden([lid('Ta','10',true), lid('Tx','1'), lid('Ty','2'), lid('Tb','20',true)])
+         .map(o => [o.r.taakId, o.volg]), [['Tx','13'],['Ty','16']]);
+    // Past er zelfs geen enkel getal meer tussen (twee vaste nummers pal naast elkaar), dan telt
+    // de reeks door vóórbij het afgeronde lid: de volgorde klopt dan niet meer (§5), maar de
+    // nummers botsen niet — het bezette 10 wordt overgeslagen.
+    const teKrap = [lid('Tx','99'), lid('Ta','1',true), lid('Tb','10',true)];
+    eq('hernummer: bij een te krap gat telt de reeks door voorbij het afgeronde lid',
+       hernummerLeden(teKrap).map(o => [o.r.taakId, o.volg]), [['Tx','20']]);
+    // Een afgerond lid met een leeggemaakte cel is geen vast punt — er is niets om omheen te
+    // tellen. Het sorteert achteraan (`volgVan`) en zakt dus naar de staart van de bundel; het
+    // alternatief zou zijn dat één lege cel de hele reeks gijzelt.
+    eq('hernummer: afgerond lid zonder leesbaar volgnummer houdt de reeks niet tegen',
+       hernummerLeden([lid('Tleeg','',true), lid('Ta','5')]).map(o => [o.r.taakId, o.volg]),
+       [['Ta','10']]);
     // Twee open leden met hetzelfde nummer (handmatig ingetikt) worden uit elkaar getrokken.
     eq('hernummer: dubbele volgnummers worden uit elkaar getrokken',
        hernummerLeden([lid('Ta','10'), lid('Tb','10')]).map(o => [o.r.taakId, o.volg]), [['Tb','20']]);
@@ -4092,7 +4137,9 @@ import { bouwBundelIndex, zichtbareKop, isBundel, bundelVan, hernummerLeden, vol
     eq('koppel: anker met een afgerond lid mag nergens onder (vóór het slepen)',
        magKoppelen(kopN, los, bouwIxN()).mag, false);
     hernummerLeden(bouwIxN().get('Tkn')).forEach(o => { o.r.bundelVolg = o.volg; });
-    eq('koppel: het anker is na het hernummeren zijn 0 kwijt', kopN.bundelVolg, '20');
+    // Het anker houdt zijn plek vóór het afgeronde lid (het gat 0..10 wordt gedeeld), maar zijn 0
+    // is het kwijt — precies genoeg om een positiegebonden guard te laten doorslaan.
+    eq('koppel: het anker is na het hernummeren zijn 0 kwijt', kopN.bundelVolg, '5');
     eq('koppel: … en mag nog steeds nergens onder', magKoppelen(kopN, los, bouwIxN()).mag, false);
 
     // Andersom mag de vangrail niet doorslaan: een gewone subtaak met een broer áchter zich heeft

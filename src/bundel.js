@@ -7,8 +7,8 @@
 // verwijderd wordt.
 //
 // Die 0 is een startwaarde, geen kenmerk. Bij het slepen hernummert `hernummerLeden` álle open
-// leden vanaf 10 — ook het anker (het lid waarvan het taaknummer het bundelnummer ís), want dat
-// mag net zo goed verplaatst worden. Wie de kop is volgt daarom altijd uit `zichtbareKop` (het
+// leden — ook het anker (het lid waarvan het taaknummer het bundelnummer ís), want dat mag net zo
+// goed verplaatst worden. Wie de kop is volgt daarom altijd uit `zichtbareKop` (het
 // laagste OPEN volgnummer), nooit uit de waarde 0; en of een taak subtaken heeft volgt uit wie
 // naar zijn taaknummer wijst (`magKoppelen`), nooit uit een volgnummer.
 //
@@ -105,6 +105,13 @@ export function magKoppelen(bron, doel, index){
   // broer áchter zich heeft, én hij laat het anker van een bundel wél los zodra geen enkel ander
   // lid een hóger nummer heeft. Dat laatste ontstaat vanzelf: `hernummerLeden` schuift het anker
   // omhoog terwijl afgeronde leden hun nummer houden. Op identiteit toetsen dicht beide gaten.
+  //
+  // Voorwaarde aan de aanroeper: `index` en `bron` komen uit dezelfde momentopname. De regel
+  // hieronder filtert de taak zélf uit de lijst op object-identiteit (`m.r !== bron`), want twee
+  // rijen kunnen hetzelfde taaknummer dragen (een dubbele rij in de Sheet) en dán is dat wél een
+  // echte subtaak-achtige verwijzing. Geef je een `bron` mee die uit een ándere leesronde komt
+  // dan waaruit `bouwBundelIndex` is gebouwd, dan telt de taak zichzelf als 'andere rij' en
+  // weigert deze guard élke koppeling — zichtbaar als een melding over subtaken die er niet zijn.
   const eigenNr = tekst(bron.taakId);
   if (eigenNr && ((index && index.get(eigenNr)) || []).some(m => m.r !== bron))
     return { mag:false, reden:'Deze taak heeft zelf subtaken; ontkoppel die eerst.', bundelId:null };
@@ -120,7 +127,38 @@ export function magKoppelen(bron, doel, index){
   return { mag:true, reden:'', bundelId: doelBundel || tekst(doel.taakId) || null };
 }
 
-// Volgnummers opnieuw uitdelen als 10, 20, 30 … in de gegeven volgorde.
+// `k` strikt stijgende nummers in de open ruimte tussen `laag` en `boven` (beide zelf uitgesloten).
+// Hoort bij `hernummerLeden`; daar staat waarom er een bovengrens is.
+function verdeelRuimte(laag, boven, k, bezet){
+  const reeks = (eerste, stap) => Array.from({ length:k }, (_, t) => eerste + t * stap);
+  // 1. Het gewone geval: ronde tientallen, met gaten om later tussen te schuiven (§3.4).
+  const tien = (Math.floor(laag / 10) + 1) * 10;
+  if (tien + (k - 1) * 10 < boven) return reeks(tien, 10);
+  // 2. Twee vaste nummers dicht op elkaar: verdeel het gat gelijk. Dat levert oneven nummers op
+  //    (15, 16, 17 …), maar de volgorde die de gebruiker net met de muis maakte weegt zwaarder
+  //    dan een rond getal — en bij de volgende sleepactie zijn ze vanzelf weer rond.
+  const stap = Math.floor((boven - laag) / (k + 1));
+  if (stap >= 1) return reeks(laag + stap, stap);
+  // 3. Er past geen enkel getal meer tussen. Dan telt de reeks door vóórbij het vaste nummer: de
+  //    leden landen er in beeld áchter in plaats van ervoor. Dat is de enige plek waar de
+  //    getoonde volgorde van de gesleepte kan afwijken, en het blijft bij een verkeerde volgorde
+  //    (§5) — botsen doen de nummers niet, want de reeks slaat bezette nummers over. Het aantal
+  //    pogingen is begrensd op het aantal bezette nummers: een astronomisch getal uit een
+  //    handmatig bewerkte cel schuift in drijvende komma niet meer op, en dan is een verkeerde
+  //    volgorde oneindig veel beter dan een vastloper.
+  const uit = [];
+  let n = laag;
+  for (let t = 0; t < k; t++) {
+    for (let poging = bezet.size + 1; poging > 0; poging--) {
+      n = (Math.floor(n / 10) + 1) * 10;
+      if (!bezet.has(n)) break;
+    }
+    uit.push(n);
+  }
+  return uit;
+}
+
+// Volgnummers opnieuw uitdelen in de gegeven (gesleepte) volgorde: 10, 20, 30 …
 // Geeft [{r, volg}] terug voor precies de leden die daadwerkelijk veranderen, zodat de
 // schrijfactie zo klein mogelijk blijft.
 //
@@ -130,16 +168,24 @@ export function magKoppelen(bron, doel, index){
 // `'Nog Te Doen'!S<_row>` van maken en dus in een wildvreemde taak schrijven. Hier weglaten is de
 // enige plek waar dat met zekerheid dicht zit; het scheelt bovendien schrijfwerk aan rijen die
 // toch niet meer verplaatst worden (§3.3: de afgeronde hoofdtaak blijft bovenin het paneel).
-// Omdat die leden hun oude nummer houden, telt de nieuwe reeks er OMHEEN in plaats van er
-// dwars doorheen: elk nummer dat een afgerond lid vasthoudt is bezet, en een afgerond lid trekt
-// de teller mee omhoog. Zou de reeks gewoon 10, 20, 30 … per positie uitdelen, dan botst een
-// gesleept lid met een afgerond lid zodra er één tussen staat — geen randgeval maar de regel —
-// en besliste de tiebreak op taaknummer waar het item landt. Precies de keuze die de gebruiker
-// net zelf met de muis maakte, dus daar mag niets anders over beslissen.
+//
+// Daardoor liggen hún nummers VAST, en moet de nieuwe reeks in de gaten ertussen passen. Puur
+// omhoog tellen kan dat niet: een open lid komt dan nooit vóór een afgerond lid. Dat is geen
+// randgeval maar de gewone stand na één vinkje — hoofdtaak open op 0, subtaak afgevinkt op 10 —
+// en elke sleepactie elders in het paneel zou die twee dan omdraaien, zonder dat de gebruiker
+// over dat paar iets sleepte. Daarom deelt `verdeelRuimte` de nummers uit binnen het gat tot het
+// eerstvolgende vaste nummer. Alleen als daar écht geen getal meer in past telt de reeks door
+// voorbij dat lid (zie geval 3 daar).
+//
 // Voorwaarde aan de aanroeper: `af` moet waarheidsgetrouw meekomen, zoals `bouwBundelIndex` hem
 // zet. Bouw je de sleepvolgorde uit de DOM, neem die vlag dan mee — hij is het enige onderscheid.
+// Een afgerond lid met een onleesbaar volgnummer (handmatig gewiste cel) is géén vast punt: er is
+// dan niets om omheen te tellen. Zo'n lid sorteert via `volgVan` achteraan en zakt dus naar de
+// staart van de bundel — rommel hoort achteraan (§5), en het alternatief zou zijn dat één lege
+// cel de hele reeks gijzelt.
 export function hernummerLeden(leden){
   const lijst = leden || [];
+  // De vaste nummers: alles wat een afgerond lid vasthoudt.
   const bezet = new Set();
   lijst.forEach(m => {
     if (!m.af) return;
@@ -148,25 +194,34 @@ export function hernummerLeden(leden){
   });
 
   const uit = [];
-  let n = 0; // hoogste nummer dat tot hier is uitgedeeld óf door een afgerond lid wordt vastgehouden
-  lijst.forEach(m => {
-    if (m.af) {
-      // Een afgerond lid blijft op zijn nummer staan, dus alles wat er in de sleepvolgorde áchter
-      // staat moet er ook numeriek boven uitkomen — anders springt het in beeld alsnog vóór hem.
-      const v = volgVan(m.r);
-      if (v !== Number.MAX_SAFE_INTEGER && v > n) n = v;
-      return;
+  let laag = 0; // ondergrens: alles wat nog uitgedeeld wordt ligt hierboven
+  let i = 0;
+  while (i < lijst.length) {
+    if (lijst[i].af) {
+      // Een afgerond lid houdt zijn nummer, dus alles wat er in de sleepvolgorde áchter staat
+      // moet er ook numeriek boven uitkomen — anders springt het in beeld alsnog vóór hem.
+      const v = volgVan(lijst[i].r);
+      if (v !== Number.MAX_SAFE_INTEGER && v > laag) laag = v;
+      i++;
+      continue;
     }
-    // Eerstvolgende vrije tiental. Het aantal pogingen is begrensd op het aantal bezette nummers:
-    // een astronomisch getal uit een handmatig bewerkte cel schuift in drijvende komma niet meer
-    // op, en dan is een verkeerde volgorde (§5) oneindig veel beter dan een vastloper.
-    for (let poging = bezet.size + 1; poging > 0; poging--) {
-      n = (Math.floor(n / 10) + 1) * 10;
-      if (!bezet.has(n)) break;
+    // Een aaneengesloten reeks open leden krijgt in één keer een plek in het gat erboven. De
+    // bovengrens is het LAAGSTE vaste nummer boven `laag`, gezocht over de hele lijst en niet
+    // alleen bij het eerstvolgende afgeronde lid: zo ligt er per definitie geen vast nummer
+    // binnen het gat, ook niet als de leden in een andere dan de getoonde volgorde binnenkomen.
+    let j = i;
+    while (j < lijst.length && !lijst[j].af) j++;
+    let boven = Number.MAX_SAFE_INTEGER;
+    bezet.forEach(v => { if (v > laag && v < boven) boven = v; });
+
+    const nrs = verdeelRuimte(laag, boven, j - i, bezet);
+    for (let t = i; t < j; t++) {
+      const nieuw = String(nrs[t - i]);
+      if (tekst(lijst[t].r.bundelVolg) !== nieuw) uit.push({ r: lijst[t].r, volg: nieuw });
     }
-    const nieuw = String(n);
-    if (tekst(m.r.bundelVolg) !== nieuw) uit.push({ r: m.r, volg: nieuw });
-  });
+    laag = nrs[nrs.length - 1];
+    i = j;
+  }
   return uit;
 }
 

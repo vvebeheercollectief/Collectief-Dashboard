@@ -106,14 +106,25 @@ Volgnummers lopen 10, 20, 30 … zodat een subtaak ertussen schuiven één cel s
 plaats van alles hernummeren. Bij slepen wordt de hele bundel hernummerd naar 10, 20, 30 …
 
 De `0` van de hoofdtaak (§3.1) is daarbij een **startwaarde, geen kenmerk**: bij het hernummeren
-krijgen álle open leden een nieuw nummer vanaf 10, ook de hoofdtaak — die mag net zo goed
-versleept worden. Welk lid de kop is volgt altijd uit §3.3 (het laagste openstaande volgnummer),
-nooit uit de waarde 0; en of een taak subtaken heeft volgt uit wie naar haar taaknummer wijst,
-nooit uit een volgnummer.
+krijgen álle open leden een nieuw nummer, ook de hoofdtaak — die mag net zo goed versleept worden.
+Welk lid de kop is volgt altijd uit §3.3 (het laagste openstaande volgnummer), nooit uit de waarde
+0; en of een taak subtaken heeft volgt uit wie naar haar taaknummer wijst, nooit uit een
+volgnummer.
 
 Afgeronde leden houden hun nummer — hun rij staat in "Afgerond" en die wordt bij het herordenen
-niet aangeraakt. De nieuwe reeks telt daarom om hun nummers heen, zodat twee leden nooit hetzelfde
-volgnummer krijgen en de gesleepte volgorde ook echt de getoonde volgorde is.
+niet aangeraakt. Hun nummers liggen dus **vast**, en de open leden krijgen hun nieuwe nummer
+binnen het gat tot het eerstvolgende vaste nummer. Alleen zo krijgen twee leden nooit hetzelfde
+volgnummer én is de gesleepte volgorde ook echt de getoonde volgorde — óók wanneer een open lid
+vóór een afgerond lid moet komen. Dat laatste is geen randgeval: een bundel met een open hoofdtaak
+op 0 en één afgevinkte subtaak op 10 is de gewone stand zodra er één vinkje is gezet.
+
+Passen er geen ronde tientallen in zo'n gat, dan wordt het gat gelijk verdeeld (11, 12, 13 …).
+Past er zelfs dán niets meer tussen — twee vaste nummers pal naast elkaar — dan telt de reeks
+door voorbij het afgeronde lid en landen die leden er in beeld áchter in plaats van ervoor. Dat is
+de enige situatie waarin de getoonde volgorde afwijkt van de gesleepte; de nummers botsen ook dan
+niet, en het gevolg blijft een verkeerde volgorde en nooit verloren werk (§5). Een afgerond lid
+met een leeggemaakt volgnummer is geen vast punt: het sorteert achteraan en zakt naar de staart
+van de bundel, in plaats van dat één lege cel de hele reeks gijzelt.
 
 ## 4. Weergaveregels
 

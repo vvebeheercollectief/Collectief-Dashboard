@@ -84,6 +84,10 @@ export const state = {
   _sheetKolommen: null,    // {tabbladnaam: aantal kolommen}, uit dezelfde spreadsheets.get als
                            // _sheetIds. null zolang er nog niet geschreven is — de structuurcheck
                            // zwijgt dan over het raster in plaats van te gokken.
+  _structLaatst: null,     // JSON van de bevindingen van de vórige leesronde; de structuurcheck
+                           // waarschuwt alleen als die verzameling wijzigt. De poll draait elke
+                           // 8 seconden, dus zonder deze vergelijking herhaalt één staande
+                           // bevinding zich honderden keren per dag (zie data.js).
   _completeRow: null,      // rij-OBJECT waarvoor de afhandel-modal open staat (identiteit, geen index)
   _completeRid: null,      // geklikte data-rid, alléén voor de groene puls op de juiste DOM-rij
   _completeBusy: false,    // afhandelen loopt (dubbelklik-rem over het async-gat)

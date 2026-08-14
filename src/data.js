@@ -576,7 +576,14 @@ async function _loadRonde(silent){
       // tot dan is _sheetKolommen null en zwijgt checkRaster daarover (zie structuurcheck.js).
       const bev=checkAlles(R['Nog Te Doen'], R['Afgerond'],
                            Object.values(D.ntd||{}).flat(), state._sheetKolommen);
-      if(bev.length) console.warn('[structuurcheck]', bev);
+      // Eén melding per VERANDERING, niet per ronde. Deze code draait elke 8 seconden, dus een
+      // bevinding die blijft staan (nu: het nog niet verbrede raster) zou honderden regels per dag
+      // opleveren en de eerstvolgende échte melding tussen de herhalingen laten verdwijnen —
+      // dezelfde reden waarom de controles zelf vals alarm mijden. De vingerafdruk wordt óók bij
+      // een LEGE uitkomst bijgewerkt, zodat een bevinding die verdwijnt en terugkomt opnieuw meldt.
+      const vinger=JSON.stringify(bev);
+      if(bev.length && vinger!==state._structLaatst) console.warn('[structuurcheck]', bev);
+      state._structLaatst=vinger;
     }catch(e){ console.warn('[structuurcheck] overgeslagen:', e.message); }
     zetAls("ALV's overzicht", r=>{ D.alvo=parseAlvo(r); });
     // Pas ná het toekennen bijhouden dat het archief gelezen is: een ronde die eerder strandt mag

@@ -2406,7 +2406,8 @@ import { bouwBundelIndex, zichtbareKop, isBundel, bundelVan, hernummerLeden, vol
   await (async()=>{
     const _fetch=window.fetch, _warn=console.warn;
     const tokenOud=state.oauthToken, expiryOud=state.oauthExpiry, kolOud=state._sheetKolommen;
-    const failsOud=state._syncFails, hashOud=state._lastDHash;
+    const failsOud=state._syncFails, hashOud=state._lastDHash, structOud=state._structLaatst;
+    const alfaMsOud=state._alfaMs, hwOud=state._logHoogwater, ankOud=state._logAnkerTs;
     const dOud={}; Object.keys(D).forEach(k=>dOud[k]=D[k]);
     const warns=[];
     const ronde=async(kolommen)=>{
@@ -2442,10 +2443,31 @@ import { bouwBundelIndex, zichtbareKop, isBundel, bundelVan, hernummerLeden, vol
       // assert FALEN en niet met een TypeError de rest van de suite meesleuren.
       truthy('aansluiting: de waarschuwing wijst het tabblad aan',
          /Nog Te Doen/.test(JSON.stringify(smal[0]||'')));
+      // Ontdubbeling: dezelfde bevinding hoort ÉÉN keer in de console, niet elke acht seconden.
+      // Zolang het raster niet verbreed is staat deze bevinding wekenlang; per ronde melden zou
+      // de eerstvolgende échte structuurmelding tussen honderden herhalingen verstoppen.
+      eq('ontdubbeling: dezelfde bevinding een ronde later zwijgt',
+         (await ronde({'Nog Te Doen':17})).length, 0);
+      // Maar een ANDERE stand is nieuws en moet er wél doorheen — anders zou het raster stil
+      // verder kunnen versmallen terwijl de console blijft zwijgen.
+      eq('ontdubbeling: een gewijzigde bevinding meldt opnieuw',
+         (await ronde({'Nog Te Doen':16})).length, 1);
+      eq('ontdubbeling: en die nieuwe stand herhaalt zich daarna evenmin',
+         (await ronde({'Nog Te Doen':16})).length, 0);
+      // Verdwijnt de bevinding en komt hij terug, dan is dat opnieuw nieuws: de vingerafdruk wordt
+      // ook bij een lege uitkomst bijgewerkt, dus de tussenliggende gezonde ronde 'ontgrendelt'.
+      eq('ontdubbeling: tussendoor gezond → daarna meldt hetzelfde geval weer',
+         (await ronde({'Nog Te Doen':19, 'Afgerond':26})).length, 0);
+      eq('ontdubbeling: en de terugkeer van de bevinding wordt gemeld',
+         (await ronde({'Nog Te Doen':16})).length, 1);
     } finally {
       window.fetch=_fetch; console.warn=_warn;
       state.oauthToken=tokenOud; state.oauthExpiry=expiryOud; state._sheetKolommen=kolOud;
-      state._syncFails=failsOud; state._lastDHash=hashOud;
+      state._syncFails=failsOud; state._lastDHash=hashOud; state._structLaatst=structOud;
+      // De ronde-helper zet deze drie om het archief en het logboek gegarandeerd mee te laten
+      // doen; niet herstellen laat een volgende test stil op ónze stand meeliften. De twee
+      // buurblokken hierboven doen dit al net zo.
+      state._alfaMs=alfaMsOud; state._logHoogwater=hwOud; state._logAnkerTs=ankOud;
       Object.keys(dOud).forEach(k=>{ D[k]=dOud[k]; });
     }
   })();

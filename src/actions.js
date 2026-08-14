@@ -2,11 +2,12 @@
 //  ACTIONS — centraal klik-systeem (Fase 2B)
 //  Eén delegatie-listener; elementen dragen data-action="…" + data-attributen.
 // ══════════════════════════════════════
-import { pgs, state } from './state.js';
+import { pgs, state, D } from './state.js';
 import {
   setNtd, renderNtd, renderNtdStats, setAf, renderAf, renderAlvo, toggleAlvoFlag, renderAlfa,
-  kopOpen, zetKopOpen,
+  kopOpen, zetKopOpen, zetBundelOpen,
 } from './render-lijsten.js';
+import { bouwBundelIndex, zichtbareKop } from './bundel.js';
 import {
   setOntw, renderOntw, editOntwItem, addTaskNote, renderLogboek,
   editLogboek, saveLogboek, cancelLogboek, setLogSoort, deleteLogboek,
@@ -59,6 +60,27 @@ export const ACTIONS = {
                                      state.ntdStatus = state.ntdStatus===s ? '' : s;
                                      pgs.ntd=1; renderNtd(); renderNtdStats(); },
   'ntd-kop-toggle':        ()   => zetKopOpen(!kopOpen()),
+  // Chevron op de kop-rij van een bundel. De sleutel één keer normaliseren en dan voor de vraag
+  // én het antwoord gebruiken: kregen `has()` en `zetBundelOpen` verschillende sleutels, dan gaat
+  // de getrimde de Set in terwijl `has()` naar de ongetrimde blijft zoeken — de bundel opent dan
+  // wel, maar sluit nooit meer.
+  'bundel-toggle':         (el) => { const id=(el.dataset.bundel||'').trim();
+                                     zetBundelOpen(id, !state.bundelOpen.has(id)); },
+  // Het ⛓-merkje op een subtaak waarvan de kop in een ánder tabblad staat: spring naar dat
+  // tabblad en klap de bundel open, zodat de rij daar meteen in beeld staat.
+  // De index vers uit D en niet uit `state._bundelIx`: dat is de momentopname van de laatste
+  // NTD-render, en die is leeg zodra er plat getekend wordt (zoeken, filteren, sorteren, bulk).
+  // Zo hangt het springen niet af van de filterstand van dat moment.
+  // Filters en zoekveld blijven bewust staan: die heeft de gebruiker zelf gezet.
+  'bundel-spring':         (el) => { const id=(el.dataset.bundel||'').trim();
+                                     const leden=bouwBundelIndex(D.ntd,D.af).get(id);
+                                     const kop=leden&&zichtbareKop(leden);
+                                     if(!kop) return;
+                                     // Rechtstreeks in de Set en niet via zetBundelOpen: setNtd
+                                     // hertekent zelf al, en twee renders na elkaar laten de
+                                     // lijst zichtbaar springen.
+                                     state.bundelOpen.add(id);
+                                     setNtd(kop.r._sec); },
   'taak-bewerken':         (el) => openModal(true, state._rowCache[+el.dataset.rid]),
   'taak-afronden':         (el) => completeTask(+el.dataset.rid),
   'pagineer':              (el) => { const d=el.dataset.doel; pgs[d]=+el.dataset.pg; PAG_RENDER[d](); },

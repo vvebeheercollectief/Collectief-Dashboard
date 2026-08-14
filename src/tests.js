@@ -7,7 +7,7 @@ import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _s
 import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
-import { filterNtd, setNtd, renderNtd, renderNtdStats, renderAf, setAf, bepaalStil, bouwStilIndex, _zetStilIndex, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey, kopOpen, zetKopOpen, absorbeer, isPlatteWeergave } from "./render-lijsten.js";
+import { filterNtd, setNtd, renderNtd, renderNtdStats, renderAf, setAf, bepaalStil, bouwStilIndex, _zetStilIndex, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey, kopOpen, zetKopOpen, zetBundelOpen, absorbeer, isPlatteWeergave } from "./render-lijsten.js";
 import { HERO_VIEWS } from "./render-analytics.js";
 import { state, D, pgs } from "./state.js";
 import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel, renderVve } from "./render-vve.js";
@@ -4417,6 +4417,64 @@ import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./r
         eq(`rij (${sec}): paneelrij overspant de hele rij`,
            (tb2.querySelector('.bdl-tr td') || {}).colSpan, kopTr2 ? kopTr2.cells.length : -1);
       });
+    } finally {
+      D.ntd = bewaardNtd; D.af = bewaardAf; state.activeNtd = bewaardSec;
+      pgs.ntd = bewaardPg; state.bundelOpen = new Set(); renderNtd();
+    }
+  })();
+
+  // ── Open- en dichtklappen ──
+  // De twee acties apart getoetst: ze zitten alleen als data-action in de HTML (chevron en
+  // ⛓-merkje), dus een hernoemde of vergeten sleutel geeft geen fout — de knop doet dan niets.
+  (() => {
+    eq('toggle: bundel-toggle bestaat als actie', typeof ACTIONS['bundel-toggle'], 'function');
+    eq('toggle: bundel-spring bestaat als actie', typeof ACTIONS['bundel-spring'], 'function');
+    state.bundelOpen = new Set();
+    zetBundelOpen('Tkop', true);
+    eq('toggle: openzetten onthouden', state.bundelOpen.has('Tkop'), true);
+    zetBundelOpen('Tkop', false);
+    eq('toggle: dichtzetten onthouden', state.bundelOpen.has('Tkop'), false);
+
+    // En dan de weg die de gebruiker zelf aflegt: een ECHTE klik op de getekende chevron. De
+    // asserts hierboven roepen zetBundelOpen rechtstreeks aan en blijven groen als `data-bundel`
+    // op de knop ontbreekt of anders heet — de bundel opent dan in de app niet, en omdat de
+    // rij-klikhandler [data-action] laat passeren gebeurt er precies niets.
+    const bewaardNtd = D.ntd, bewaardAf = D.af, bewaardSec = state.activeNtd, bewaardPg = pgs.ntd;
+    try {
+      const t = (taakId, volg) => ({ _row: 10 + (+volg||0)/10, taakId, bundelId:'Tkop',
+        bundelVolg:volg, _sec:'OPPAKKEN', code:'311212', naam:'Testflat', actiepunt:'Werk', deadline:'' });
+      const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      D.af = { ...leeg };
+      D.ntd = { ...leeg, OPPAKKEN: [ t('Tkop','0'), t('Tb','10') ] };
+      state.activeNtd = 'OPPAKKEN'; pgs.ntd = 1; state.bundelOpen = new Set();
+      renderNtd();
+      // Elke keer opnieuw opzoeken: zetBundelOpen hertekent, dus na een klik is de knop van
+      // daarvoor losgekoppeld van het document en zou een tweede klik nergens aankomen.
+      const klik = () => {
+        const chev = document.querySelector('#ntd-tbody [data-action="bundel-toggle"]');
+        if (chev) chev.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        return !!chev;
+      };
+      const panelen = () => document.querySelectorAll('#ntd-tbody .bdl-paneel').length;
+      truthy('toggle: er staat een chevron in de tabel om op te klikken', klik());
+      eq('toggle: een klik op de chevron opent het paneel', panelen(), 1);
+      truthy('toggle: de chevron staat er na het openen nog steeds', klik());
+      eq('toggle: nog een klik sluit het paneel weer', panelen(), 0);
+
+      // Het ⛓-merkje: kop in een ánder tabblad dan de subtaak. Twee dingen moeten gebeuren, en
+      // alleen samen zijn ze nuttig: van tabblad wisselen én de bundel openzetten. Springt hij
+      // wel maar staat de bundel dicht, dan kijkt de gebruiker naar een dichtgeklapte rij en
+      // moet hij alsnog zoeken waar zijn subtaak gebleven is.
+      D.ntd = { ...leeg, OPPAKKEN: [ t('Tb','10') ],
+                VERGADERVERZOEKEN: [ { ...t('Tkop','0'), _sec:'VERGADERVERZOEKEN' } ] };
+      state.activeNtd = 'OPPAKKEN'; pgs.ntd = 1; state.bundelOpen = new Set();
+      renderNtd();
+      const merk = document.querySelector('#ntd-tbody [data-action="bundel-spring"]');
+      truthy('spring: subtaak met de kop elders krijgt een klikbaar merkje', !!merk);
+      if (merk) merk.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      eq('spring: de klik brengt je naar het tabblad van de kop', state.activeNtd, 'VERGADERVERZOEKEN');
+      eq('spring: en zet de bundel daar open', state.bundelOpen.has('Tkop'), true);
+      eq('spring: het paneel staat er dan ook echt', panelen(), 1);
     } finally {
       D.ntd = bewaardNtd; D.af = bewaardAf; state.activeNtd = bewaardSec;
       pgs.ntd = bewaardPg; state.bundelOpen = new Set(); renderNtd();

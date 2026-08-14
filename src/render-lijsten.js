@@ -163,6 +163,23 @@ function absorbeer(rows, sec, index){
   return rows.filter(r => !wordtGeabsorbeerd(r, index, sec));
 }
 
+// Een bundel open- of dichtzetten. De stand gaat op bundelId de Set in en niet op rijnummer:
+// rijnummers schuiven bij elke insert/delete, dus een op rijnummer bewaarde stand zet na een
+// poll de verkeerde rij open (vandaar ook de snoei van `state.expandedRows` in renderNtd).
+// Op bundelId is die snoei niet nodig — een verdwenen id vindt straks gewoon geen bundel meer.
+//
+// Hertekenen en niet alleen een klasse omzetten: bij het openen komt er een hele paneelrij bij
+// en verdwijnen de stapelrandjes eronder, en dat zijn andere <tr>'s dan de kop-rij zelf.
+function zetBundelOpen(bundelId, aan){
+  // Zelfde normalisatie als in bundel.js/render-bundel.js: bundelId komt als string uit de Sheet,
+  // maar het herordenen zet hem optimistisch als getal op het rij-object — en `.trim()` op een
+  // getal is een TypeError die hier de hele takenlijst zou meenemen.
+  const id = String(bundelId ?? '').trim();
+  if (!id) return;
+  if (aan) state.bundelOpen.add(id); else state.bundelOpen.delete(id);
+  renderNtd();
+}
+
 function renderNtd(){
   const q=document.getElementById('s-ntd').value.toLowerCase();
   const fCode=document.getElementById('f-code-ntd').value.toLowerCase();
@@ -354,7 +371,7 @@ function setAf(s){state.activeAf=s;pgs.af=1;renderAf()}
 
 export {
   renderNtdStats, renderNtdDonut, renderNtd, setNtd, filterNtd, sorteerNtd, ntdSorteerKey, renderAf, setAf,
-  kopOpen, zetKopOpen, absorbeer, isPlatteWeergave,
+  kopOpen, zetKopOpen, zetBundelOpen, absorbeer, isPlatteWeergave,
   offerteAannemerPaneel, offerteAannSamenvatting,
   ALVO_ICONS, renderAlvo, ALVO_COLS, ALVO_LABELS, flagPill, _recomputeAlvoStatus, toggleAlvoFlag, statusIco, renderAlfa,
   renderThead, renderTbody, bepaalStil, bouwStilIndex, _zetStilIndex, deadlineCel, rowNtd, rowAf, renderPag,

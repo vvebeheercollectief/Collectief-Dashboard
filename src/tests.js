@@ -30,6 +30,7 @@ import { checkSecties, checkRaster, checkRasters, checkNummers, checkAlles, RAST
 import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from "./subsidie-fase.js";
 import { toggleHerhaalStatus } from "./render-herhaal.js";
 import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
+import { bouwBundelIndex, zichtbareKop, isBundel, bundelVan, hernummerLeden, volgendeVolg } from "./bundel.js";
 
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
   // ── mini-assert helper (Fase 1 testnet) ──
@@ -3871,6 +3872,58 @@ import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
     eq('undo: een numeriek volgnummer wordt een string', serializeNtdUndo({ ...nul, bundelVolg:20 })[18], '20');
     eq('afrond: ontbrekend volgnummer blijft leeg',
        afrondWaarden({ ...nul, bundelVolg:undefined }, 'OPPAKKEN', '2026-08-14', '')[18], '');
+  })();
+
+  (() => {
+    const t = (taakId, bundelId, volg, sec) => ({ taakId, bundelId, bundelVolg:volg, _sec:sec, code:'311212' });
+    const ntd = {
+      VERGADERVERZOEKEN: [ t('Tkop','Tkop','0','VERGADERVERZOEKEN') ],
+      'OFFERTE-TRAJECTEN': [ t('Ta','Tkop','20','OFFERTE-TRAJECTEN') ],
+      OPPAKKEN: [ t('Tb','Tkop','10','OPPAKKEN'), t('Tlos','','','OPPAKKEN') ],
+      LOD: [], 'SUBSIDIE-TRAJECTEN': [],
+    };
+    const af = { OPPAKKEN: [], VERGADERVERZOEKEN: [], 'OFFERTE-TRAJECTEN': [], LOD: [], 'SUBSIDIE-TRAJECTEN': [] };
+    const ix = bouwBundelIndex(ntd, af);
+    eq('index: één bundel gevonden', ix.size, 1);
+    eq('index: leden op volgnummer gesorteerd',
+       (ix.get('Tkop')||[]).map(m => m.r.taakId), ['Tkop','Tb','Ta']);
+    eq('index: losse taak zit in geen bundel', ix.has(''), false);
+    eq('kop: hoofdtaak is de zichtbare kop', zichtbareKop(ix.get('Tkop')).r.taakId, 'Tkop');
+    eq('bundel: telt als bundel bij 2+ leden', isBundel(ix.get('Tkop')), true);
+
+    // Hoofdtaak afgerond → kop schuift door naar het eerstvolgende openstaande lid.
+    const ntd2 = { ...ntd, VERGADERVERZOEKEN: [] };
+    const af2 = { ...af, VERGADERVERZOEKEN: [ t('Tkop','Tkop','0','VERGADERVERZOEKEN') ] };
+    const ix2 = bouwBundelIndex(ntd2, af2);
+    eq('kop: schuift door na afronden hoofdtaak', zichtbareKop(ix2.get('Tkop')).r.taakId, 'Tb');
+    eq('kop: afgerond lid blijft in de bundel', (ix2.get('Tkop')||[]).length, 3);
+    eq('kop: afgerond lid is als afgerond gemarkeerd', ix2.get('Tkop')[0].af, true);
+
+    // Alles afgerond → geen zichtbare kop meer.
+    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const alAf = { ...leeg, OPPAKKEN:[ t('Tb','Tkop','10','OPPAKKEN') ] };
+    const ix3 = bouwBundelIndex(leeg, alAf);
+    eq('kop: geen kop als alles afgerond is', zichtbareKop(ix3.get('Tkop')), null);
+
+    // Eén lid over is geen bundel meer.
+    const solo = { ...leeg, OPPAKKEN:[ t('Tb','Tkop','10','OPPAKKEN') ] };
+    eq('bundel: één lid is geen bundel', isBundel(bouwBundelIndex(solo, leeg).get('Tkop')), false);
+
+    // Rijen zonder taakId mogen de index niet laten omvallen.
+    const raar = { ...leeg, OPPAKKEN:[ { bundelId:'Tkop', bundelVolg:'', _sec:'OPPAKKEN', code:'1' } ] };
+    eq('index: lid zonder volgnummer valt achteraan',
+       bouwBundelIndex(raar, leeg).get('Tkop').length, 1);
+
+    // Vangrail (spec §3.2b): een AFGERONDE rij zonder taaknummer telt niet mee. Zo kan
+    // historische rommel in kolom R van 'Afgerond' geen spookbundel maken.
+    const rommel = { ...leeg, OPPAKKEN:[ { bundelId:'Xoud', bundelVolg:'', _sec:'OPPAKKEN', code:'1' },
+                                         { bundelId:'Xoud', bundelVolg:'', _sec:'OPPAKKEN', code:'2' } ] };
+    eq('index: afgeronde rijen zonder taaknummer maken geen bundel',
+       bouwBundelIndex(leeg, rommel).has('Xoud'), false);
+    // Een OPENSTAANDE rij zonder taaknummer telt wél mee: die kan alleen door onze eigen
+    // koppelcode een bundelnummer hebben gekregen, en die kent altijd eerst een nummer toe.
+    eq('index: openstaande rij zonder taaknummer telt wel mee',
+       bouwBundelIndex(rommel, leeg).get('Xoud').length, 2);
   })();
 
   const totOk = ok + _tOk, totFail = fail + _tFail;

@@ -4878,31 +4878,44 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   // stil in de VERKEERDE cel landt. Vandaar hier eerst de kale bereiken, en daaronder de hele
   // keten met een gestubde fetch.
   (() => {
-    const kop = { _row:12, taakId:'Tkop', bundelId:'',     bundelVolg:'' };
-    const sub = { _row:20, taakId:'Tb',   bundelId:'',     bundelVolg:'' };
-    const d1 = koppelBereiken(sub, kop, 'Tkop', '10');
+    const d1 = koppelBereiken({ subRij:20, subNr:'Tb', kopRij:12, kopNr:'Tkop',
+                                bundelId:'Tkop', volg:'10', schrijfKop:true });
     eq('koppel: twee bereiken (kop en subtaak)', d1.length, 2);
     eq('koppel: kop krijgt Q:S op zijn eigen rij', d1[0].range, "'Nog Te Doen'!Q12:S12");
     eq('koppel: kop draagt zijn eigen nummer als bundelnummer', d1[0].values[0], ['Tkop','Tkop','0']);
     eq('koppel: subtaak krijgt Q:S', d1[1].range, "'Nog Te Doen'!Q20:S20");
     eq('koppel: subtaak krijgt volgnummer 10', d1[1].values[0], ['Tb','Tkop','10']);
 
-    // Kop zit al in een bundel → alleen de subtaak wordt geschreven.
-    const kop2 = { _row:12, taakId:'Tkop', bundelId:'Tkop', bundelVolg:'0' };
-    const d2 = koppelBereiken(sub, kop2, 'Tkop', '20');
+    // Kop zit al in een bundel → alleen de subtaak wordt geschreven. `schrijfKop` is een VLAG en
+    // geen afleiding uit kop.bundelId: op schrijfmoment staat het bundelnummer er optimistisch al
+    // op, dus zelf afleiden zou de kop-rij overslaan in het enige geval dat hij geschreven moet.
+    const d2 = koppelBereiken({ subRij:20, subNr:'Tb', kopRij:12, kopNr:'Tkop',
+                                bundelId:'Tkop', volg:'20', schrijfKop:false });
     eq('koppel: bestaande bundel schrijft alleen de subtaak', d2.length, 1);
     eq('koppel: en dan op de rij van de subtaak', d2[0].range, "'Nog Te Doen'!Q20:S20");
 
-    // Ontkoppelen wist R en S maar laat het taaknummer staan.
-    const d3 = ontkoppelBereiken({ _row:20, taakId:'Tb', bundelId:'Tkop', bundelVolg:'10' });
+    // Ontkoppelen wist R en S en laat kolom Q ONGEMOEID — niet als belofte maar als bereik.
+    const d3 = ontkoppelBereiken(20);
     eq('ontkoppel: één bereik', d3.length, 1);
-    eq('ontkoppel: taaknummer blijft, bundel weg', d3[0].values[0], ['Tb','','']);
+    eq('ontkoppel: het taaknummer valt buiten het bereik', d3[0].range, "'Nog Te Doen'!R20:S20");
+    eq('ontkoppel: twee lege cellen', d3[0].values[0], ['','']);
 
     // Herordenen schrijft alleen S, en alleen voor leden die echt veranderen.
-    const d4 = herordenBereiken([{ r:{_row:20}, volg:'10' }, { r:{_row:31}, volg:'20' }]);
+    const d4 = herordenBereiken([{ rij:20, volg:'10' }, { rij:31, volg:'20' }]);
     eq('herorden: twee bereiken', d4.length, 2);
     eq('herorden: alleen kolom S', d4[0].range, "'Nog Te Doen'!S20");
     eq('herorden: nieuwe volgnummers', [d4[0].values[0][0], d4[1].values[0][0]], ['10','20']);
+
+    // Formule-rem (_veiligeRij). Deze bereiken gaan met USER_ENTERED de Sheet in, dus een waarde
+    // die met = begint zou een LEVENDE formule worden. Kolom Q wordt teruggeschreven zoals hij
+    // gelezen is, en een handmatig bewerkte cel kan letterlijk '=IETS' bevatten; de apostrof maakt
+    // er gegarandeerd tekst van. Zonder deze twee toetsen kon de rem uit alle vier de
+    // bereik-opbouwen verdwijnen zonder dat er iets afging.
+    const d5 = koppelBereiken({ subRij:20, subNr:'=kwaad', kopRij:12, kopNr:'Tkop',
+                                bundelId:'Tkop', volg:'10', schrijfKop:true });
+    eq('koppel: een taaknummer dat met = begint gaat als tekst de cel in', d5[1].values[0][0], "'=kwaad");
+    const d6 = herordenBereiken([{ rij:20, volg:'=1' }]);
+    eq('herorden: ook een volgnummer met = wordt als tekst weggeschreven', d6[0].values[0][0], "'=1");
   })();
 
   // ── En dezelfde drie acties van klik tot geschreven cel, met een gestubde fetch ──
@@ -4921,6 +4934,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     let geschreven=[];        // de data-blokken van elke values:batchUpdate
     let meldingen=[];         // wat er via alert() naar de gebruiker ging
     let faalSchrijven=false;
+    let schuifTijdensLezen=null;   // haakje om _row te laten opschuiven MIDDEN in de rij-controle
     try {
       state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;  // ensureToken keert meteen true
       state._uitCache=false;                                        // blokkeerOffline laat schrijven toe
@@ -4942,6 +4956,9 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
           const m=/!A(\d+):Q(\d+)/.exec(u)||[];
           const rijen=[];
           for(let r=+m[1]; r<=+m[2]; r++) rijen.push(blad[r]||[]);
+          // Haakje voor geval 15: een ándere actie die MIDDEN in de rij-controle rijnummers
+          // opschuift (zo werkt _shiftNtdRows). Eén keer, daarna vanzelf weer uit.
+          if(schuifTijdensLezen){ const f=schuifTijdensLezen; schuifTijdensLezen=null; f(); }
           return new Response(JSON.stringify({values:rijen}),{status:200});
         }
         volgorde.push('schrijf');
@@ -4986,8 +5003,8 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       eq('ontkoppel-e2e: de taak is meteen los', [sub.bundelId, sub.bundelVolg], ['','']);
       await state._writeChain;
       eq('ontkoppel-e2e: eerst lezen, dan schrijven', volgorde, ['lees','schrijf']);
-      eq('ontkoppel-e2e: alleen de rij van de subtaak', geschreven.map(g=>g.range), ["'Nog Te Doen'!Q20:S20"]);
-      eq('ontkoppel-e2e: taaknummer blijft, R en S leeg', geschreven[0].values[0], ['Tb','','']);
+      eq('ontkoppel-e2e: alleen R en S van de subtaak', geschreven.map(g=>g.range), ["'Nog Te Doen'!R20:S20"]);
+      eq('ontkoppel-e2e: twee lege cellen, kolom Q blijft buiten het bereik', geschreven[0].values[0], ['','']);
 
       // 3. Herordenen: de subtaak naar voren. Alleen de kop verandert van nummer (0 → 20), dus er
       //    mag maar ÉÉN cel geschreven worden — een herordening die alle leden aanraakt kost
@@ -5043,6 +5060,137 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       await state._writeChain;
       eq('koppel-e2e: een mislukte koppeling laat ook geen taaknummer achter',
          [kop.taakId, sub.taakId, kop.bundelId, sub.bundelId], ['','','','']);
+      faalSchrijven=false;
+
+      // 8. Een bundel die tot ÉÉN lid gekrompen is (de kop ontkoppeld of verwijderd) houdt zijn
+      //    bundelnummer gewoon. Een nieuwe subtaak moet dan ÁCHTER dat achtergebleven lid landen:
+      //    bij twee gelijke volgnummers beslist de tiebreak op taaknummer wie de kop is, en dan
+      //    kan de zojuist gesleepte taak zomaar bovenaan komen te staan.
+      ({ kop, sub } = opnieuw());
+      kop.bundelId='Tweg'; kop.bundelVolg='10';        // enig overgebleven lid van bundel 'Tweg'
+      await koppelTaak(sub, kop);
+      eq('koppel-e2e: nieuwe subtaak landt áchter het laatste lid van een gekrompen bundel',
+         [sub.bundelId, sub.bundelVolg], ['Tweg','20']);
+      await state._writeChain;
+      eq('koppel-e2e: en de kop-rij blijft buiten de batch', geschreven.map(g=>g.range),
+         ["'Nog Te Doen'!Q20:S20"]);
+
+      // 9. Kop mét bundelnummer maar zónder taaknummer (handmatig gevulde R, of een oudere
+      //    client). Zijn rij blijft buiten de batch, dus mag het scherm hem ook geen vers
+      //    taaknummer toekennen: dat zou een nummer claimen dat nergens is weggeschreven, en
+      //    vanaf dat moment ketst élke schrijfactie op die rij af op de rij-guard.
+      ({ kop, sub } = opnieuw(false));                 // beide zonder taaknummer
+      kop.bundelId='Tweg'; kop.bundelVolg='0';
+      await koppelTaak(sub, kop);
+      await state._writeChain;
+      eq('koppel-e2e: een kop die niet geschreven wordt krijgt geen taaknummer', kop.taakId, '');
+      eq('koppel-e2e: en alleen de subtaak gaat de Sheet in', geschreven.map(g=>g.range),
+         ["'Nog Te Doen'!Q20:S20"]);
+
+      // 10. Een rij zonder rijnummer wordt geweigerd vóór er ook maar iets over het net gaat.
+      //     Zonder die rem zou het bereik `'Nog Te Doen'!Q undefined` worden — een schrijfactie die
+      //     de guard niet eens kán controleren, want assertRowsMatch filtert een check zonder
+      //     rijnummer stil weg en keert dan zonder één lezing terug.
+      ({ kop, sub } = opnieuw());
+      delete sub._row;
+      await koppelTaak(sub, kop);
+      await state._writeChain;
+      eq('koppel-e2e: een rij zonder rijnummer levert geen enkel verzoek op', volgorde, []);
+      eq('koppel-e2e: en de gebruiker hoort waarom', meldingen.length, 1);
+
+      // 11. De undo van het herordenen is een tweede, volwaardige schrijfweg — eigen rij-controle,
+      //     eigen rollback — en draaide in geen enkele testronde. De knop uit de toast rechtstreeks
+      //     aanroepen is de goedkoopste manier om hem écht langs te laten komen.
+      ({ kop, sub } = opnieuw());
+      sub.bundelId='Tkop'; sub.bundelVolg='10'; kop.bundelId='Tkop'; kop.bundelVolg='0';
+      document.querySelectorAll('#toast-container .toast').forEach(el => el.remove());
+      await herordenBundel([{ r:sub, af:false }, { r:kop, af:false }]);
+      await state._writeChain;
+      volgorde.length=0; geschreven=[];
+      const undoHerorden=document.querySelector('#toast-container .toast-undo');
+      truthy('herorden-e2e: er wordt een undo aangeboden', !!undoHerorden);
+      if(undoHerorden) await undoHerorden.onclick();
+      await state._writeChain;
+      eq('herorden-undo: het oude volgnummer staat terug op het scherm',
+         [sub.bundelVolg, kop.bundelVolg], ['10','0']);
+      eq('herorden-undo: ook de undo leest eerst de rij terug', volgorde, ['lees','schrijf']);
+      eq('herorden-undo: en schrijft alleen de rij die terug moet', geschreven.map(g=>g.range),
+         ["'Nog Te Doen'!S12"]);
+      eq('herorden-undo: met het oude nummer erin', geschreven[0].values[0], ['0']);
+
+      // 12. Twee sleepacties kort na elkaar moeten ALLEBEI een undo aanbieden. showUndoToast
+      //     ontdubbelt 30 seconden op titel+melding terwijl de toast na 8 seconden weg is; zonder
+      //     de geenDedup-vlag kreeg de tweede sleepactie dus geen toast en dus geen weg terug.
+      document.querySelectorAll('#toast-container .toast').forEach(el => el.remove());
+      await herordenBundel([{ r:kop, af:false }, { r:sub, af:false }]);
+      await state._writeChain;
+      await herordenBundel([{ r:sub, af:false }, { r:kop, af:false }]);
+      await state._writeChain;
+      eq('herorden-e2e: elke sleepactie krijgt zijn eigen undo-toast',
+         document.querySelectorAll('#toast-container .toast-undo').length, 2);
+
+      // 13. En de undo van het stapelen: die loopt via ontkoppelTaak, dus hij moet zijn eigen
+      //     rij-controle doen en de rij ook echt weer los in de Sheet zetten.
+      ({ kop, sub } = opnieuw());
+      document.querySelectorAll('#toast-container .toast').forEach(el => el.remove());
+      await koppelTaak(sub, kop);
+      await state._writeChain;
+      volgorde.length=0; geschreven=[];
+      const undoKoppel=document.querySelector('#toast-container .toast-undo');
+      truthy('koppel-e2e: er wordt een undo aangeboden', !!undoKoppel);
+      if(undoKoppel) await undoKoppel.onclick();
+      await state._writeChain;
+      eq('koppel-undo: de subtaak is weer los', [sub.bundelId, sub.bundelVolg], ['','']);
+      eq('koppel-undo: en dat gaat langs dezelfde weg', volgorde, ['lees','schrijf']);
+      eq('koppel-undo: alleen R en S van de subtaak, kolom Q blijft ongemoeid',
+         geschreven.map(g=>g.range), ["'Nog Te Doen'!R20:S20"]);
+
+      // 14. Een afgerond lid staat wél in het bundelpaneel, maar zijn `_row` is een regelnummer in
+      //     'Afgerond'. Zou een knop daar toch een schrijfweg starten, dan ging er een bereik
+      //     'Nog Te Doen'!R<rij> naar een wildvreemde taak. Alle drie de acties weigeren dat, en
+      //     vertrouwen dus niet op de rij-guard: die vangt het meestal, maar bij toeval.
+      ({ kop, sub } = opnieuw());
+      const afLid=t(12, 'Taf', 'Afgerond werk'); afLid.bundelId='Tkop'; afLid.bundelVolg='20';
+      D.af={ ...leeg, OPPAKKEN:[afLid] };
+      await koppelTaak(sub, afLid);
+      await ontkoppelTaak(afLid);
+      await herordenBundel([{ r:afLid, af:false }, { r:sub, af:false }]);
+      await state._writeChain;
+      eq('bundel-e2e: een rij uit Afgerond levert geen enkel verzoek op', volgorde, []);
+      eq('bundel-e2e: en alle drie de acties melden waarom', meldingen.length, 3);
+      eq('bundel-e2e: de afgeronde rij blijft ongemoeid',
+         [afLid.bundelId, afLid.bundelVolg], ['Tkop','20']);
+
+      // 15. De rij die de guard CONTROLEERT en de rij die de POST BESCHRIJFT moeten dezelfde zijn,
+      //     ook als `_row` er tussenin verspringt. `_shiftNtdRows` (api.js) muteert `_row`
+      //     in-place op de levende rij-objecten en draait optimistisch bij de klik van een ándere
+      //     actie (afronden, verwijderen, bulk) — dus precies tijdens de netwerklezing van
+      //     assertRowsMatch kan het nummer veranderen. De stub schuift hieronder op dat moment.
+      //     Zou een bereik zijn eigen `_row` lezen, dan meldde de guard groen over rij 12/20
+      //     terwijl de POST naar 17/25 ging: een schrijfactie in een wildvreemde taak, zonder één
+      //     waarschuwing. Alle drie de schrijfwegen nemen daarom vóór de lezing één momentopname.
+      ({ kop, sub } = opnieuw());
+      schuifTijdensLezen = () => { sub._row += 5; kop._row += 5; };
+      await koppelTaak(sub, kop);
+      await state._writeChain;
+      eq('koppel-e2e: schrijft naar de rijen die de guard net gecontroleerd heeft',
+         geschreven.map(g=>g.range), ["'Nog Te Doen'!Q12:S12", "'Nog Te Doen'!Q20:S20"]);
+
+      ({ kop, sub } = opnieuw());
+      sub.bundelId='Tkop'; sub.bundelVolg='10'; kop.bundelId='Tkop'; kop.bundelVolg='0';
+      schuifTijdensLezen = () => { sub._row += 5; };
+      await ontkoppelTaak(sub);
+      await state._writeChain;
+      eq('ontkoppel-e2e: idem — het rijnummer van vóór de lezing telt',
+         geschreven.map(g=>g.range), ["'Nog Te Doen'!R20:S20"]);
+
+      ({ kop, sub } = opnieuw());
+      sub.bundelId='Tkop'; sub.bundelVolg='10'; kop.bundelId='Tkop'; kop.bundelVolg='0';
+      schuifTijdensLezen = () => { sub._row += 5; kop._row += 5; };
+      await herordenBundel([{ r:sub, af:false }, { r:kop, af:false }]);
+      await state._writeChain;
+      eq('herorden-e2e: idem — de gecontroleerde rij is de beschreven rij',
+         geschreven.map(g=>g.range), ["'Nog Te Doen'!S12"]);
 
       // De stille resync van backgroundWrite laten leeglopen mét de stub nog actief (zie de
       // _loadInFlight-les hierboven).

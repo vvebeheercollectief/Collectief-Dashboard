@@ -139,12 +139,20 @@ function dismissToast(el) {
   setTimeout(() => el.remove(), 260);
 }
 
-function showUndoToast(title, msg, undoFn, icoNaam) {
+// `opts.geenDedup` werkt hier hetzelfde als bij showToast hierboven, en is om dezelfde reden nodig
+// als bij blokkeerOffline (data.js): stilte leest als 'er valt niets te doen'. Bij een undo-toast
+// weegt dat zwaarder dan bij een gewone melding — de knop erin is de ENIGE weg terug, en de sleutel
+// blijft 30 seconden staan terwijl de toast na 8 seconden verdwijnt. In dat gat van 22 seconden
+// voorkomt de ontdubbeling dus niets dubbels; ze laat een herhaalde handeling gewoon onherstelbaar.
+// De standaard blijft ontdubbelen: een dubbelklik op dezelfde knop hoort geen twee toasts te geven.
+function showUndoToast(title, msg, undoFn, icoNaam, opts) {
   const UNDO_DURATION = 8000;
-  const key = 'undo|' + title + '|' + msg;
-  if (_shownToasts.has(key)) return;
-  _shownToasts.add(key);
-  setTimeout(() => _shownToasts.delete(key), 30000);
+  if (!(opts||{}).geenDedup) {
+    const key = 'undo|' + title + '|' + msg;
+    if (_shownToasts.has(key)) return;
+    _shownToasts.add(key);
+    setTimeout(() => _shownToasts.delete(key), 30000);
+  }
 
   const el = document.createElement('div');
   el.className = 'toast';

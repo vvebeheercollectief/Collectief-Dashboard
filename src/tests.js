@@ -32,6 +32,7 @@ import { toggleHerhaalStatus } from "./render-herhaal.js";
 import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
 import { bouwBundelIndex, bundelWeergave, zichtbareKop, isBundel, bundelVan, bundelMetId, hernummerLeden, volgendeVolg, magKoppelen, wordtGeabsorbeerd } from "./bundel.js";
 import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./render-bundel.js";
+import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkoppelTaak, herordenBundel } from "./bundel-acties.js";
 
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
   // ── mini-assert helper (Fase 1 testnet) ──
@@ -4868,6 +4869,192 @@ import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./r
       document.querySelectorAll('.toast').forEach(el => el.remove());
       filterVelden.forEach((id, i) => document.getElementById(id).value = fWaarden[i]);
       state.ntdStatus=fStatus; state.ntdSort=fSort; state.bulkMode=fBulk;
+      renderNtd(); renderNtdStats(); goTo(paginaVoor);
+    }
+  })();
+
+  // ── Koppelen, ontkoppelen en herordenen: de opbouw van de schrijfopdracht ──
+  // De schrijfweg zelf gaat over het net; de bereik-opbouw is puur en is de plek waar een fout
+  // stil in de VERKEERDE cel landt. Vandaar hier eerst de kale bereiken, en daaronder de hele
+  // keten met een gestubde fetch.
+  (() => {
+    const kop = { _row:12, taakId:'Tkop', bundelId:'',     bundelVolg:'' };
+    const sub = { _row:20, taakId:'Tb',   bundelId:'',     bundelVolg:'' };
+    const d1 = koppelBereiken(sub, kop, 'Tkop', '10');
+    eq('koppel: twee bereiken (kop en subtaak)', d1.length, 2);
+    eq('koppel: kop krijgt Q:S op zijn eigen rij', d1[0].range, "'Nog Te Doen'!Q12:S12");
+    eq('koppel: kop draagt zijn eigen nummer als bundelnummer', d1[0].values[0], ['Tkop','Tkop','0']);
+    eq('koppel: subtaak krijgt Q:S', d1[1].range, "'Nog Te Doen'!Q20:S20");
+    eq('koppel: subtaak krijgt volgnummer 10', d1[1].values[0], ['Tb','Tkop','10']);
+
+    // Kop zit al in een bundel → alleen de subtaak wordt geschreven.
+    const kop2 = { _row:12, taakId:'Tkop', bundelId:'Tkop', bundelVolg:'0' };
+    const d2 = koppelBereiken(sub, kop2, 'Tkop', '20');
+    eq('koppel: bestaande bundel schrijft alleen de subtaak', d2.length, 1);
+    eq('koppel: en dan op de rij van de subtaak', d2[0].range, "'Nog Te Doen'!Q20:S20");
+
+    // Ontkoppelen wist R en S maar laat het taaknummer staan.
+    const d3 = ontkoppelBereiken({ _row:20, taakId:'Tb', bundelId:'Tkop', bundelVolg:'10' });
+    eq('ontkoppel: één bereik', d3.length, 1);
+    eq('ontkoppel: taaknummer blijft, bundel weg', d3[0].values[0], ['Tb','','']);
+
+    // Herordenen schrijft alleen S, en alleen voor leden die echt veranderen.
+    const d4 = herordenBereiken([{ r:{_row:20}, volg:'10' }, { r:{_row:31}, volg:'20' }]);
+    eq('herorden: twee bereiken', d4.length, 2);
+    eq('herorden: alleen kolom S', d4[0].range, "'Nog Te Doen'!S20");
+    eq('herorden: nieuwe volgnummers', [d4[0].values[0][0], d4[1].values[0][0]], ['10','20']);
+  })();
+
+  // ── En dezelfde drie acties van klik tot geschreven cel, met een gestubde fetch ──
+  // De bereik-opbouw hierboven zegt niets over de VOLGORDE waarin de weg hem gebruikt, en juist
+  // daar zit het gevaar van deze fase: schrijft de actie vóórdat assertRowsMatch de rij heeft
+  // teruggelezen, dan is de hele rij-bescherming een dode letter zonder dat er iets aan te zien
+  // is. Deze toets legt daarom vast dát er eerst gelezen wordt, wát er dan geschreven wordt, en
+  // dat een geweigerde of mislukte schrijfactie het scherm ongemoeid achterlaat.
+  await (async () => {
+    const _fetch=window.fetch, _alert=window.alert;
+    const tokenOud=state.oauthToken, expiryOud=state.oauthExpiry, cacheOud=state._uitCache;
+    const failsOud=state._syncFails;   // de stille resync hieronder faalt met opzet en telt door
+    const bewaardNtd=D.ntd, bewaardAf=D.af, bewaardSec=state.activeNtd, bewaardPg=pgs.ntd;
+    const paginaVoor=(document.querySelector('.page.active')?.id || 'page-ntd').replace('page-','');
+    const volgorde=[];        // 'lees' / 'schrijf', in de volgorde waarin ze langskwamen
+    let geschreven=[];        // de data-blokken van elke values:batchUpdate
+    let meldingen=[];         // wat er via alert() naar de gebruiker ging
+    let faalSchrijven=false;
+    try {
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;  // ensureToken keert meteen true
+      state._uitCache=false;                                        // blokkeerOffline laat schrijven toe
+      window.alert=(m)=>meldingen.push(m);
+      // Het blad zoals de guard het terugleest: kolom A/C/D (de vingerafdruk van OPPAKKEN) plus
+      // kolom Q. R en S staan er bewust NIET in — die doen in de vingerafdruk niet mee, en dat is
+      // precies wat deze test moet bewijzen: de guard slaat niet alarm op de kolommen die we zelf
+      // aan het wijzigen zijn.
+      const bladRij=(actie, taakId) => { const c=['311212','Testflat',actie,'','','','','']; c[16]=taakId; return c; };
+      let blad={};
+      window.fetch=async (url, opt) => {
+        const u=decodeURIComponent(String(url)), methode=(opt&&opt.method)||'GET';
+        // De stille resync van backgroundWrite (values:batchGet) mag niet slagen: die zou D vullen
+        // met lege antwoorden en de tests hierna slopen. 403 is niet transient → geen herkansing.
+        if(u.includes('values:batchGet'))
+          return new Response(JSON.stringify({error:{message:'geen leesverkeer in deze test'}}),{status:403});
+        if(methode==='GET'){                    // de rij-controle van assertRowsMatch
+          volgorde.push('lees');
+          const m=/!A(\d+):Q(\d+)/.exec(u)||[];
+          const rijen=[];
+          for(let r=+m[1]; r<=+m[2]; r++) rijen.push(blad[r]||[]);
+          return new Response(JSON.stringify({values:rijen}),{status:200});
+        }
+        volgorde.push('schrijf');
+        geschreven.push(...(JSON.parse(opt.body).data||[]));
+        return faalSchrijven
+          ? new Response(JSON.stringify({error:{message:'geen schrijfrecht in deze test'}}),{status:400})
+          : new Response('{}',{status:200});
+      };
+
+      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const t=(row, taakId, actie) => ({ _row:row, _sec:'OPPAKKEN', taakId, bundelId:'', bundelVolg:'',
+        code:'311212', naam:'Testflat', actiepunt:actie, deadline:'', behandelaar:'', prioriteit:'',
+        opmerkingen:'', inBehandeling:'' });
+      // Zet scherm én blad terug op dezelfde beginstand. `metNummer=false` bootst een rij van vóór
+      // de backfill na: kolom Q is dan in de Sheet én in het geheugen leeg.
+      const opnieuw=(metNummer=true) => {
+        const kop=t(12, metNummer?'Tkop':'', 'Kop-werk'), sub=t(20, metNummer?'Tb':'', 'Sub-werk');
+        blad={ 12: bladRij('Kop-werk', kop.taakId), 20: bladRij('Sub-werk', sub.taakId) };
+        D.af={ ...leeg }; D.ntd={ ...leeg, OPPAKKEN:[kop, sub] };
+        state.activeNtd='OPPAKKEN'; pgs.ntd=1; state.bundelOpen=new Set();
+        volgorde.length=0; geschreven=[]; meldingen=[];
+        return { kop, sub };
+      };
+
+      // 1. Koppelen: nieuwe bundel, dus beide rijen krijgen Q:S.
+      let { kop, sub } = opnieuw();
+      await koppelTaak(sub, kop);
+      eq('koppel-e2e: het scherm toont de bundel meteen',
+         [sub.bundelId, sub.bundelVolg, kop.bundelId, kop.bundelVolg], ['Tkop','10','Tkop','0']);
+      truthy('koppel-e2e: en de nieuwe bundel staat open', state.bundelOpen.has('Tkop'));
+      await state._writeChain;
+      eq('koppel-e2e: eerst de rij-controle, dan pas schrijven', volgorde, ['lees','schrijf']);
+      eq('koppel-e2e: twee bereiken weggeschreven', geschreven.map(g=>g.range),
+         ["'Nog Te Doen'!Q12:S12", "'Nog Te Doen'!Q20:S20"]);
+      eq('koppel-e2e: de cellen die erin gaan', geschreven.map(g=>g.values[0]),
+         [['Tkop','Tkop','0'], ['Tb','Tkop','10']]);
+
+      // 2. Ontkoppelen: alleen de rij van de subtaak, taaknummer blijft staan.
+      ({ kop, sub } = opnieuw());
+      sub.bundelId='Tkop'; sub.bundelVolg='10'; kop.bundelId='Tkop'; kop.bundelVolg='0';
+      await ontkoppelTaak(sub);
+      eq('ontkoppel-e2e: de taak is meteen los', [sub.bundelId, sub.bundelVolg], ['','']);
+      await state._writeChain;
+      eq('ontkoppel-e2e: eerst lezen, dan schrijven', volgorde, ['lees','schrijf']);
+      eq('ontkoppel-e2e: alleen de rij van de subtaak', geschreven.map(g=>g.range), ["'Nog Te Doen'!Q20:S20"]);
+      eq('ontkoppel-e2e: taaknummer blijft, R en S leeg', geschreven[0].values[0], ['Tb','','']);
+
+      // 3. Herordenen: de subtaak naar voren. Alleen de kop verandert van nummer (0 → 20), dus er
+      //    mag maar ÉÉN cel geschreven worden — een herordening die alle leden aanraakt kost
+      //    schrijfquotum en zet rijen aan die niemand versleepte.
+      ({ kop, sub } = opnieuw());
+      sub.bundelId='Tkop'; sub.bundelVolg='10'; kop.bundelId='Tkop'; kop.bundelVolg='0';
+      await herordenBundel([{ r:sub, af:false }, { r:kop, af:false }]);
+      eq('herorden-e2e: het nieuwe nummer staat meteen op het scherm', [sub.bundelVolg, kop.bundelVolg], ['10','20']);
+      await state._writeChain;
+      eq('herorden-e2e: alleen de rij die echt verandert', geschreven.map(g=>g.range), ["'Nog Te Doen'!S12"]);
+      eq('herorden-e2e: en alleen kolom S', geschreven[0].values[0], ['20']);
+
+      // 4. Een geweigerde koppeling schrijft NIETS. Een taak onder zichzelf hangen is de
+      //    goedkoopste manier om te zien of magKoppelen vóór de schrijfweg staat en niet erna.
+      ({ kop, sub } = opnieuw());
+      await koppelTaak(kop, kop);
+      await state._writeChain;
+      eq('koppel-e2e: onder zichzelf hangen levert geen enkel verzoek op', volgorde, []);
+      eq('koppel-e2e: en de gebruiker krijgt te horen waarom', meldingen.length, 1);
+      eq('koppel-e2e: de kop blijft ongemoeid', [kop.bundelId, kop.bundelVolg], ['','']);
+
+      // 5. Mislukt de schrijfactie, dan moet het scherm terug naar vóór de klik. Zonder rollback
+      //    ziet de gebruiker een bundel die in de Sheet niet bestaat en die na de volgende ronde
+      //    weer uit elkaar valt.
+      ({ kop, sub } = opnieuw());
+      faalSchrijven=true;
+      await koppelTaak(sub, kop);
+      await state._writeChain;
+      eq('koppel-e2e: na een mislukte schrijfactie is alles teruggedraaid',
+         [sub.bundelId, sub.bundelVolg, kop.bundelId, kop.bundelVolg], ['','','','']);
+      faalSchrijven=false;
+
+      // 6. Een rij van vóór de backfill: kolom Q is leeg en krijgt bij het stapelen een vers
+      //    taaknummer. Dát nummer zit wél in de vingerafdruk, dus het moet als OUDE (lege) waarde
+      //    langs assertRowsMatch — anders vergelijkt de guard 'T:<vers>' met een Sheet-rij zonder
+      //    nummer, ketst élke koppeling op zo'n rij af, en ziet de gebruiker alleen 'de lijst was
+      //    net gewijzigd'. Zonder dit geval draait de omkering in koppelTaak nergens op.
+      ({ kop, sub } = opnieuw(false));
+      await koppelTaak(sub, kop);
+      await state._writeChain;
+      eq('koppel-e2e: een rij zónder taaknummer komt langs de guard en wordt geschreven',
+         volgorde, ['lees','schrijf']);
+      truthy('koppel-e2e: kop én subtaak krijgen een vers taaknummer', !!kop.taakId && !!sub.taakId);
+      eq('koppel-e2e: dat nummer gaat in kolom Q mee, en de kop wordt het bundelnummer',
+         geschreven.map(g=>g.values[0]), [[kop.taakId, kop.taakId, '0'], [sub.taakId, kop.taakId, '10']]);
+
+      // 7. En mislukt die schrijfactie, dan moet ook het verse taaknummer weer weg. Blijft het
+      //    staan, dan claimt het scherm een nummer dat in de Sheet niet bestaat en blokkeert de
+      //    guard vanaf dat moment élke volgende schrijfactie op die rij.
+      ({ kop, sub } = opnieuw(false));
+      faalSchrijven=true;
+      await koppelTaak(sub, kop);
+      await state._writeChain;
+      eq('koppel-e2e: een mislukte koppeling laat ook geen taaknummer achter',
+         [kop.taakId, sub.taakId, kop.bundelId, sub.bundelId], ['','','','']);
+
+      // De stille resync van backgroundWrite laten leeglopen mét de stub nog actief (zie de
+      // _loadInFlight-les hierboven).
+      for(let i=0;i<100 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,5));
+    } finally {
+      faalSchrijven=false;
+      window.fetch=_fetch; window.alert=_alert;
+      state.oauthToken=tokenOud; state.oauthExpiry=expiryOud; state._uitCache=cacheOud;
+      state._syncFails=failsOud;
+      D.ntd=bewaardNtd; D.af=bewaardAf; state.activeNtd=bewaardSec; pgs.ntd=bewaardPg;
+      state.bundelOpen=new Set();
+      document.querySelectorAll('.toast').forEach(el => el.remove());
       renderNtd(); renderNtdStats(); goTo(paginaVoor);
     }
   })();

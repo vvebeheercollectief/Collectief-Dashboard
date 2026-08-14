@@ -151,7 +151,7 @@ function rowNtd(r,sec){
   const _leden = _ix ? bundelVan(_ix, r) : null;
   const _kop   = _leden ? zichtbareKop(_leden) : null;
   const _isKop = !!(_kop && _kop.r === r);
-  const _extra = _isKop ? bundelKopExtra(_leden, _kop) : { chevron:'', pill:'' };
+  const _extra = _isKop ? bundelKopExtra(_leden, _kop) : { chevron:'', pill:'', open:false };
   const bdlChev = _extra.chevron;
   // Pill op de kop; anders het ⛓-merkje voor een subtaak waarvan de kop in een ander tabblad staat.
   const bdlNaam = _isKop ? _extra.pill : (_ix ? bundelMerkje(r, _ix, sec) : '');
@@ -220,22 +220,21 @@ function rowNtd(r,sec){
     ? `<tr class="of-aann-tr"><td colspan="${(state.bulkMode?1:0)+SECS[sec].cols.length+1}">${offerteAannemerPaneel(r)}</td></tr>`
     : '';
   // Dicht: twee 'papierrandjes' onder de rij. Open: het bundelpaneel.
+  // `_extra.open` komt van bundelKopExtra, dat er de chevron mee zet — één antwoord voor de knop
+  // en voor wat eronder komt, zodat die twee niet uit elkaar kunnen lopen.
   let bdlNa = '';
   if (_isKop){
-    // Zelfde normalisatie als `tekst()` in bundel.js/render-bundel.js: de chevron zet
-    // `tekst(bundelId)` in zijn data-bundel, en dát is wat er straks in de Set komt. Wijkt de
-    // sleutel hier af, dan geeft `has` false en blijft de rij dicht terwijl de knop 'open' zegt.
-    const open = state.bundelOpen.has(String(r.bundelId ?? '').trim());
     const kolommen = SECS[sec].cols.length + 1 + (state.bulkMode?1:0);
-    bdlNa = open
+    bdlNa = _extra.open
       ? `<tr class="bdl-tr"><td colspan="${kolommen}">${bundelPaneelHtml(_leden, _kop)}</td></tr>`
       : `<tr class="bdl-peek"><td colspan="${kolommen}"><span class="l"></span></td></tr>`
       + `<tr class="bdl-peek d2"><td colspan="${kolommen}"><span class="l"></span></td></tr>`;
   }
   // `data-rid` op de <tr>: het slepen (Taak 15) moet van de gesleepte rij naar het taak-object
-  // komen. Dat gaat hier overal via state._rowCache (zie ACTIONS); `_row` zou een zoektocht door
-  // D.ntd worden, en dat rijnummer is alleen bínnen één tabblad uniek.
-  return `<tr class="${rowCls}${_isKop?' bdl-kop':''}" data-row="${r._row}" data-rid="${rid}"${prioAttr}>${bulkCel}${cells}</tr>${aannRow}${bdlNa}`;
+  // komen. `rid` is een directe index in state._rowCache — precies het mechanisme waarmee elke
+  // andere rij-actie (bewerken, wegleggen, afronden, bulk) hier al werkt. Op `_row` zoeken zou
+  // een scan door alle vijf de secties van D.ntd worden voor iets wat hier al bij de hand is.
+  return `<tr class="${rowCls}" data-row="${r._row}" data-rid="${rid}"${prioAttr}>${bulkCel}${cells}</tr>${aannRow}${bdlNa}`;
 }
 
 function rowAf(r,sec){

@@ -1082,12 +1082,15 @@ door:
       : `<tr class="bdl-peek"><td colspan="${kolommen}"><span class="l"></span></td></tr>`
       + `<tr class="bdl-peek d2"><td colspan="${kolommen}"><span class="l"></span></td></tr>`;
   }
-  return `<tr class="${rowCls}${_isKop?' bdl-kop':''}" data-row="${r._row}" data-rid="${rid}"${prioAttr}>${bulkCel}${cells}</tr>${aannRow}${bdlNa}`;
+  return `<tr class="${rowCls}" data-row="${r._row}" data-rid="${rid}"${prioAttr}>${bulkCel}${cells}</tr>${aannRow}${bdlNa}`;
 ```
 
 Let op de toegevoegde `data-rid="${rid}"` op de `<tr>`: die heeft Taak 15 nodig om betrouwbaar
-van een gesleepte rij naar het taak-object te komen. Zonder dit zou het stapelen via `_row`
-moeten zoeken, en dat is niet uniek.
+van een gesleepte rij naar het taak-object te komen. `rid` is een directe index in
+`state._rowCache` — hetzelfde mechanisme dat elke andere rij-actie hier al gebruikt. Op `_row`
+zoeken zou een scan door alle vijf de secties van `D.ntd` worden voor iets wat al bij de hand is.
+(`_row` zélf is wél uniek binnen `D.ntd`: `parseSections` zet er de rij-index van het ene blad
+'Nog Te Doen' in, en alle vijf de secties komen uit dat blad.)
 
 - [ ] **Stap 5: Draai de tests en zie ze slagen**
 

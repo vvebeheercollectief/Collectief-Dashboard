@@ -4331,10 +4331,20 @@ import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./r
       const dicht = bundelKopExtra(leden, zichtbareKop(leden));
       eq('kop: chevron staat dicht', dicht.chevron.includes('aria-expanded="false"'), true);
       eq('kop: de telpill toont klaar-van-totaal', dicht.pill.includes('1 van 2 klaar'), true);
+      // De chevron moet een EIGEN actie dragen (§4.3): de klik op de rij zelf is al bezet door het
+      // uitklappen van de volledige tekst, en die handler laat alleen [data-action] passeren.
+      // Zonder deze attribuutnaam opent de bundel niet en klapt in plaats daarvan de tekst uit —
+      // een verschil dat geen enkele aria- of klasse-assert opmerkt.
+      eq('kop: chevron draagt zijn eigen actie',
+         dicht.chevron.includes('data-action="bundel-toggle"'), true);
       state.bundelOpen = new Set(['Tkop']);
       const open = bundelKopExtra(leden, zichtbareKop(leden));
       eq('kop: chevron staat open', open.chevron.includes('aria-expanded="true"'), true);
       eq('kop: open chevron krijgt de gedraaide klasse', open.chevron.includes('bdl-chev open'), true);
+      // De aanroeper tekent hiermee het paneel of de stapelrandjes onder de rij. Eén antwoord voor
+      // de knop én voor wat eronder komt; leidde de aanroeper het zelf af, dan kan de chevron
+      // 'open' zeggen boven een dichte rij.
+      eq('kop: de open-stand komt mee naar buiten', [dicht.open, open.open], [false, true]);
     } finally { state.bundelOpen = bewaardOpen; }
 
     eq('merkje: subtaak met kop elders krijgt een merkje',
@@ -4347,29 +4357,55 @@ import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./r
   // echte data. Dat is hier extra van belang: rowNtd leest de bundel-index van `state` en niet uit
   // een parameter, dus alleen een échte render bewijst dat renderNtd en rowNtd dezelfde
   // momentopname gebruiken.
+  // Alle vijf de secties, en niet alleen Oppakken: de `switch(sec)` in rowNtd bouwt vijf LOSSE
+  // stukken HTML, dus een sectie die bij een wijziging wordt overgeslagen levert geen fout op —
+  // die tab mist dan gewoon zijn chevron of telpill. De secties verschillen bovendien in
+  // kolomaantal (Subsidie-trajecten heeft er zes, de rest zeven) en juist dat getal draagt de
+  // colspan van de stapel- en paneelrijen.
   (() => {
     const bewaardNtd = D.ntd, bewaardAf = D.af, bewaardSec = state.activeNtd, bewaardPg = pgs.ntd;
     try {
       const t = (taakId, bundelId, volg, sec) => ({ _row: 10 + (+volg||0)/10, taakId, bundelId,
         bundelVolg:volg, _sec:sec, code:'311212', naam:'Testflat', actiepunt:'Werk', deadline:'' });
       const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
-      D.ntd = { ...leeg, OPPAKKEN:[ t('Tkop','Tkop','0','OPPAKKEN'), t('Tb','Tkop','10','OPPAKKEN') ] };
       D.af = { ...leeg };
-      state.activeNtd = 'OPPAKKEN'; pgs.ntd = 1; state.bundelOpen = new Set();
-      renderNtd();
-      const tb = document.getElementById('ntd-tbody');
-      eq('rij: één zichtbare taakrij (subtaak geabsorbeerd)',
-         tb.querySelectorAll('tr[data-row]').length, 1);
-      eq('rij: stapelrandjes bij een dichte bundel', tb.querySelectorAll('.bdl-peek').length, 2);
-      eq('rij: telpill aanwezig', tb.querySelectorAll('.bdl-pill').length, 1);
-      eq('rij: geen paneel als de bundel dicht is', tb.querySelectorAll('.bdl-paneel').length, 0);
+      SKEYS.forEach(sec => {
+        D.ntd = { ...leeg, [sec]: [ t('Tkop','Tkop','0',sec), t('Tb','Tkop','10',sec) ] };
+        state.activeNtd = sec; pgs.ntd = 1; state.bundelOpen = new Set();
+        renderNtd();
+        const tb = document.getElementById('ntd-tbody');
+        const kopTr = tb.querySelector('tr[data-row]');
+        eq(`rij (${sec}): één zichtbare taakrij (subtaak geabsorbeerd)`,
+           tb.querySelectorAll('tr[data-row]').length, 1);
+        eq(`rij (${sec}): stapelrandjes bij een dichte bundel`, tb.querySelectorAll('.bdl-peek').length, 2);
+        eq(`rij (${sec}): telpill aanwezig`, tb.querySelectorAll('.bdl-pill').length, 1);
+        eq(`rij (${sec}): geen paneel als de bundel dicht is`, tb.querySelectorAll('.bdl-paneel').length, 0);
+        // De chevron zit vóór de VvE-code in de eerste cel van élke sectie-tak. Op de kop-rij
+        // zoeken en niet in de hele tbody, anders zou een chevron die in het paneel belandt hier
+        // ook meetellen.
+        eq(`rij (${sec}): chevron staat op de kop-rij`,
+           kopTr.querySelectorAll('[data-action="bundel-toggle"]').length, 1);
+        // `data-rid` is de weg van een gesleepte rij naar het taak-object (Taak 15). Niet alleen
+        // "het attribuut bestaat": het moet ook de KOP aanwijzen en niet de subtaak, want de
+        // paneelregels vullen dezelfde cache in dezelfde renderronde.
+        eq(`rij (${sec}): data-rid van de kop-rij wijst naar de kop-taak`,
+           (state._rowCache[+kopTr.dataset.rid] || {}).taakId, 'Tkop');
+        // De colspan tegen het ECHTE aantal cellen van de kop-rij, niet tegen een eigen som: dat
+        // pint alle vijf de secties vast met één regel, en blijft kloppen als er ooit een kolom
+        // bij komt. Een eigen som zou dezelfde fout kunnen maken als de code die hij toetst.
+        const kolommen = kopTr.cells.length;
+        eq(`rij (${sec}): stapelrandjes overspannen de hele rij`,
+           [...tb.querySelectorAll('.bdl-peek td')].map(td => td.colSpan), [kolommen, kolommen]);
 
-      state.bundelOpen = new Set(['Tkop']);
-      renderNtd();
-      const tb2 = document.getElementById('ntd-tbody');
-      eq('rij: paneel verschijnt bij open bundel', tb2.querySelectorAll('.bdl-paneel').length, 1);
-      eq('rij: één subtaakregel in het paneel', tb2.querySelectorAll('.bdl-sub').length, 1);
-      eq('rij: stapelrandjes weg bij open bundel', tb2.querySelectorAll('.bdl-peek').length, 0);
+        state.bundelOpen = new Set(['Tkop']);
+        renderNtd();
+        const tb2 = document.getElementById('ntd-tbody');
+        eq(`rij (${sec}): paneel verschijnt bij open bundel`, tb2.querySelectorAll('.bdl-paneel').length, 1);
+        eq(`rij (${sec}): één subtaakregel in het paneel`, tb2.querySelectorAll('.bdl-sub').length, 1);
+        eq(`rij (${sec}): stapelrandjes weg bij open bundel`, tb2.querySelectorAll('.bdl-peek').length, 0);
+        eq(`rij (${sec}): paneelrij overspant de hele rij`,
+           tb2.querySelector('.bdl-tr td').colSpan, tb2.querySelector('tr[data-row]').cells.length);
+      });
     } finally {
       D.ntd = bewaardNtd; D.af = bewaardAf; state.activeNtd = bewaardSec;
       pgs.ntd = bewaardPg; state.bundelOpen = new Set(); renderNtd();

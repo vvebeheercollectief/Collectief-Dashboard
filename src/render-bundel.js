@@ -31,6 +31,11 @@ export function bundelStand(leden, kop){
 // Extra's op de kop-rij: chevron vóór de VvE-code en de telpill achter de naam.
 // De chevron is een EIGEN knop met data-action; de klik op de rij zelf is al bezet
 // (main.js klapt daarmee de volledige tekst uit) en die handler negeert [data-action].
+//
+// `open` gaat mee naar buiten omdat de aanroeper hetzelfde antwoord nodig heeft: die tekent
+// ónder deze rij het paneel of de stapelrandjes. Zou hij dat zelf uit `state.bundelOpen` halen,
+// dan staat de normalisatie van bundelId op twee plaatsen en kan de chevron 'open' zeggen terwijl
+// de rij eronder dicht blijft.
 export function bundelKopExtra(leden, kop){
   const id = esc(tekst(kop.r.bundelId));
   const open = state.bundelOpen.has(tekst(kop.r.bundelId));
@@ -39,6 +44,7 @@ export function bundelKopExtra(leden, kop){
   return {
     chevron: `<button type="button" class="bdl-chev${open?' open':''}" data-action="bundel-toggle" data-bundel="${id}" aria-expanded="${open}" title="${lbl}" aria-label="${lbl}">${ico('chevronRechts',12)}</button>`,
     pill: `<span class="bdl-pill" title="${klaar} van ${totaal} subtaken klaar">${klaar} van ${totaal} klaar</span>`,
+    open,
   };
 }
 

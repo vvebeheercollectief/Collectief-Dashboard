@@ -585,6 +585,18 @@
         <div class="fld"><label>Subcategorie</label><select id="m-sub-sub"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option><option>Subsidie-trajecten</option></select></div>
         <div class="toggle-row"><button type="button" class="tog" role="switch" aria-checked="false" id="tog-ib-s" data-action="toggle"></button><span>In behandeling</span></div>
       </div>
+      <!-- Hoort bij (Takenbundel) — staat buiten de secties, want elk tabblad kan een subtaak zijn.
+           Alleen zichtbaar bij BEWERKEN: koppelen schrijft naar de RIJ van een bestaande taak, en
+           een nieuwe taak heeft er nog geen. Een nieuwe subtaak loopt via '+ Voeg een subtaak toe'
+           in het bundelpaneel. openModal zet de zichtbaarheid (zie zetHoortBij in crud.js). -->
+      <div class="fld" id="fld-hoortbij" style="display:none">
+        <label for="m-hoortbij">Hoort bij</label>
+        <div class="vve-wrap">
+          <input type="text" id="m-hoortbij" autocomplete="off" placeholder="Zoek een taak om onder te hangen…"/>
+          <button type="button" id="m-hoortbij-x" data-action="bundel-ontkoppel" title="Ontkoppelen" aria-label="Ontkoppelen" style="display:none">×</button>
+          <div class="vve-suggestions" id="m-hoortbij-sug"></div>
+        </div>
+      </div>
       <!-- Logboek per taak -->
       <div id="fg-history" class="logboek-box" style="display:none">
         <div class="logboek-hdr">

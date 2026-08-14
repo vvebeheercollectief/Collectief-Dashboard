@@ -12,7 +12,8 @@ import {
   setOntw, renderOntw, editOntwItem, addTaskNote, renderLogboek,
   editLogboek, saveLogboek, cancelLogboek, setLogSoort, deleteLogboek,
 } from './render-overig.js';
-import { openModal, completeTask, completeCurrentEditTask, deleteCurrentEditTask, zetSubsidieFase, kiesModalFase } from './crud.js';
+import { openModal, completeTask, completeCurrentEditTask, deleteCurrentEditTask, zetSubsidieFase, kiesModalFase, zetHoortBij } from './crud.js';
+import { ontkoppelTaak } from './bundel-acties.js';
 import { adjOff } from './util.js';
 import { copyAiPrompt, aiOvernemen, aiActieTaak, aiKopieerConcept, prefillNieuweTaak } from './ai.js';
 import { dismissToast, saveNotifPrefs } from './notifications.js';
@@ -84,6 +85,21 @@ export const ACTIONS = {
     // alleen zichtbaar aan een lege kolom R.
     prefillNieuweTaak('', kop.r.code, kop.r.naam, '');
     state._nieuwBundel = { bundelId: id, volg: volgendeVolg(leden) };
+  },
+  // Het kruisje achter 'Hoort bij' in het bewerkscherm. Twee standen, en het verschil is
+  // wezenlijk: staat er een nog niet opgeslagen KEUZE, dan valt er nog niets te ontkoppelen —
+  // dan wordt alleen die keuze losgelaten en toont het veld weer de werkelijke stand. Anders is
+  // dit een echte schrijfactie die R en S van deze rij leegmaakt (kolom Q blijft staan).
+  'bundel-ontkoppel':      ()   => {
+    const r = state.editRowData;
+    if (state._hbDoel){ zetHoortBij(r); return; }
+    if (!r) return;
+    ontkoppelTaak(r);   // eigen offline-, token- en rij-controle; schrijft alleen R en S
+    // Meteen leeg op het scherm, net als de rest van het dashboard optimistisch werkt.
+    const veld = document.getElementById('m-hoortbij');
+    if (veld) veld.value = '';
+    const x = document.getElementById('m-hoortbij-x');
+    if (x) x.style.display = 'none';
   },
   'taak-bewerken':         (el) => openModal(true, state._rowCache[+el.dataset.rid]),
   'taak-afronden':         (el) => completeTask(+el.dataset.rid),

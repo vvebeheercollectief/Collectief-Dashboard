@@ -30,7 +30,7 @@ import { checkSecties, checkRaster, checkRasters, checkNummers, checkAlles, RAST
 import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from "./subsidie-fase.js";
 import { toggleHerhaalStatus } from "./render-herhaal.js";
 import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
-import { bouwBundelIndex, bundelWeergave, zichtbareKop, isBundel, bundelVan, bundelMetId, hernummerLeden, volgendeVolg, magKoppelen, wordtGeabsorbeerd } from "./bundel.js";
+import { bouwBundelIndex, bundelWeergave, zichtbareKop, isBundel, bundelVan, bundelMetId, hernummerLeden, volgendeVolg, magKoppelen, wordtGeabsorbeerd, koppelKandidaten, taakFilter } from "./bundel.js";
 import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./render-bundel.js";
 import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkoppelTaak, herordenBundel } from "./bundel-acties.js";
 
@@ -4236,6 +4236,53 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   })();
 
   (() => {
+    // De lijst die 'Hoort bij' aanbiedt. `koppelKandidaten` heeft bewust geen eigen regels: hij
+    // vraagt het per taak aan `magKoppelen`. Een tweede, zelfgeschreven regel zou hier stil van de
+    // guard af gaan lopen, en dan biedt de kiezer keuzes aan die bij het klikken alsnog afketsen —
+    // of erger, hij verbergt keuzes die wél mogen.
+    const t = (taakId, bundelId, volg, sec, tekst) => ({ taakId, bundelId, bundelVolg:volg, _sec:sec,
+      code:'311212', naam:'Testflat', actiepunt:tekst, deadline:'' });
+    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const ntd = { ...leeg,
+      OPPAKKEN:[ t('Ta','','','OPPAKKEN','Losse taak'), t('Tb','Tb','0','OPPAKKEN','Kop met sub') ],
+      VERGADERVERZOEKEN:[ t('Tc','Tb','10','VERGADERVERZOEKEN','Subtaak') ] };
+    const ix = bouwBundelIndex(ntd, leeg);
+    const kandidaten = koppelKandidaten(ntd, ix, ntd.OPPAKKEN[0]);
+    eq('hoortbij: de taak zelf staat er niet bij',
+       kandidaten.some(k => k.taakId === 'Ta'), false);
+    eq('hoortbij: een bestaande kop mag als doel',
+       kandidaten.some(k => k.taakId === 'Tb'), true);
+    eq('hoortbij: een subtaak mag ook als doel (voegt toe aan die bundel)',
+       kandidaten.some(k => k.taakId === 'Tc'), true);
+    eq('hoortbij: de lijst kijkt over alle vijf de tabbladen', kandidaten.length, 2);
+    // De twee weigeringen van de guard, hier als lege of gekrompen lijst zichtbaar. Zonder deze
+    // twee zou een kiezer die gewoon álles teruggeeft net zo groen blijven.
+    eq('hoortbij: een kop met subtaken kan nergens onder en houdt dus een lege lijst',
+       koppelKandidaten(ntd, ix, ntd.OPPAKKEN[1]).length, 0);
+    eq('hoortbij: de eigen bundelgenoten vallen af',
+       koppelKandidaten(ntd, ix, ntd.VERGADERVERZOEKEN[0]).map(k => k.taakId), ['Ta']);
+
+    // Het zoekfilter van datzelfde veld.
+    const taken = [{ code:'311212', naam:'Testflat', actiepunt:'Dak vervangen', taakId:'Ta' },
+                   { code:'311204', naam:'Nassauplein', actiepunt:'Offerte', taakId:'Tb' }];
+    eq('taakkiezer: zoekt op omschrijving', taakFilter('dak', taken).map(x => x.taakId), ['Ta']);
+    eq('taakkiezer: zoekt ook op VvE-code', taakFilter('311204', taken).map(x => x.taakId), ['Tb']);
+    eq('taakkiezer: en op VvE-naam', taakFilter('nassau', taken).map(x => x.taakId), ['Tb']);
+    eq('taakkiezer: lege zoekterm geeft alles', taakFilter('', taken).length, 2);
+    // Welk veld de getoonde regel wórdt verschilt per tabblad (taakTitel): een vergaderverzoek
+    // heeft een periode, een LOD-taak een status, een offerte-traject leunt op zijn opmerkingen.
+    // Zoekt het filter maar in één van die kolommen, dan is de halve lijst onvindbaar.
+    const anders = [{ code:'1', naam:'A', periode:'Mei',           taakId:'Tp' },
+                    { code:'2', naam:'B', opmerkingen:'Dakrenovatie', taakId:'To' },
+                    { code:'3', naam:'C', agendapunten:'Kascommissie', taakId:'Tg' },
+                    { code:'4', naam:'D', status:'Wacht op aannemer',  taakId:'Ts' },
+                    { code:'5', naam:'E', subsidie:'SVVE isolatie',    taakId:'Tu' }];
+    eq('taakkiezer: vindt elk tabblad op zijn eigen omschrijvingskolom',
+       ['mei','dakren','kascom','aannemer','svve'].map(q => taakFilter(q, anders).map(x => x.taakId)),
+       [['Tp'], ['To'], ['Tg'], ['Ts'], ['Tu']]);
+  })();
+
+  (() => {
     const t = (taakId, bundelId, volg, sec) => ({ taakId, bundelId, bundelVolg:volg, _sec:sec,
                                                   code:'311212', naam:'Testflat', actiepunt:'X', deadline:'' });
     const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
@@ -5207,6 +5254,198 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     }
   })();
 
+  // ── 'Hoort bij' in het bewerkscherm: van het veld tot de geschreven cel ──
+  // Drie schakels die los van elkaar stil kunnen breken en alleen samen iets doen: het veld moet
+  // de bestaande bundel TONEN, de kiezer moet de aangewezen taak als OBJECT onthouden (een code of
+  // een titel is geen identiteit — twee taken van dezelfde VvE zijn dan niet uit elkaar te houden)
+  // en submitTask moet die keuze ná het opslaan alsnog wegschrijven. Vergeet die laatste, dan
+  // slaat het scherm gewoon op en verdwijnt de koppeling zonder één melding.
+  await (async () => {
+    const _fetch=window.fetch, _alert=window.alert;
+    const tokenOud=state.oauthToken, expiryOud=state.oauthExpiry, cacheOud=state._uitCache;
+    const failsOud=state._syncFails;   // de stille resync hieronder faalt met opzet en telt door
+    const bewaardNtd=D.ntd, bewaardAf=D.af, bewaardSec=state.activeNtd, bewaardPg=pgs.ntd;
+    const paginaVoor=(document.querySelector('.page.active')?.id || 'page-ntd').replace('page-','');
+    const volgorde=[];       // 'lees' / 'put' / 'post', in de volgorde waarin ze langskwamen
+    let puts=[], posts=[], meldingen=[];
+    const veld=document.getElementById('m-hoortbij');
+    const wisKnop=document.getElementById('m-hoortbij-x');
+    // Eén macrotask, óók in een verborgen tabblad. Een testronde draait vaak zonder dat het
+    // tabblad in beeld staat, en dan knijpt de browser setTimeout af tot één keer per seconde of
+    // zelfs per minuut — een lus van tien tikken duurt dan minuten in plaats van milliseconden.
+    // Een MessageChannel-bericht is een gewone macrotask en ontsnapt aan die rem.
+    const tik=() => new Promise(r => { const k=new MessageChannel(); k.port1.onmessage=()=>r(); k.port2.postMessage(0); });
+    const wacht=async (klaar) => { for(let i=0;i<200 && !klaar();i++) await tik(); };
+    try {
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;  // ensureToken keert meteen true
+      state._uitCache=false;                                        // blokkeerOffline laat schrijven toe
+      window.alert=(m)=>meldingen.push(m);
+      const bladRij=(actie, taakId) => { const c=['311212','Testflat',actie,'','','','','']; c[16]=taakId; return c; };
+      let blad={};
+      window.fetch=async (url, opt) => {
+        const u=decodeURIComponent(String(url)), methode=(opt&&opt.method)||'GET';
+        if(u.includes('values:batchGet'))    // zie de schrijfweg-tests hierboven: geen leesverkeer
+          return new Response(JSON.stringify({error:{message:'geen leesverkeer in deze test'}}),{status:403});
+        if(methode==='GET'){                 // de rij-controle van assertRowMatch/assertRowsMatch
+          volgorde.push('lees');
+          const m=/!A(\d+):Q(\d+)/.exec(u)||[];
+          const rijen=[];
+          for(let r=+m[1]; r<=+m[2]; r++) rijen.push(blad[r]||[]);
+          return new Response(JSON.stringify({values:rijen}),{status:200});
+        }
+        if(methode==='PUT'){                 // writeRange: de A..K van het bewerkscherm
+          volgorde.push('put');
+          const bereik=u.split('/values/')[1].split('?')[0];
+          const cellen=JSON.parse(opt.body).values[0];
+          puts.push({ bereik, rij:cellen });
+          // De PUT ook echt in het nagebootste blad zetten. De koppeling die erna komt doet haar
+          // eigen rij-controle en hoort daar de zojuist opgeslagen tekst terug te lezen; zonder
+          // deze regel zou de test groen blijven bij een volgorde die in het echt op de guard
+          // stukloopt ('De lijst was net gewijzigd' bij élke koppeling vanuit het bewerkscherm).
+          const nr=+(/!A(\d+):/.exec(bereik)||[])[1];
+          if(nr){ const rij=blad[nr]||[]; cellen.forEach((v,i)=>{ rij[i]=String(v); }); blad[nr]=rij; }
+          return new Response('{}',{status:200});
+        }
+        volgorde.push('post');               // values:batchUpdate van de bundelacties
+        posts.push(...(JSON.parse(opt.body).data||[]));
+        return new Response('{}',{status:200});
+      };
+
+      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const t=(row, taakId, actie) => ({ _row:row, _sec:'OPPAKKEN', taakId, bundelId:'', bundelVolg:'',
+        code:'311212', naam:'Testflat', actiepunt:actie, deadline:'', behandelaar:'', prioriteit:'',
+        opmerkingen:'', inBehandeling:'', subcategorie:'' });
+      const opnieuw=() => {
+        const kop=t(12,'Tkop','Kop-werk'), sub=t(20,'Tb','Sub-werk');
+        blad={ 12:bladRij('Kop-werk','Tkop'), 20:bladRij('Sub-werk','Tb') };
+        D.af={ ...leeg }; D.ntd={ ...leeg, OPPAKKEN:[kop, sub] };
+        state.activeNtd='OPPAKKEN'; pgs.ntd=1; state.bundelOpen=new Set();
+        volgorde.length=0; puts=[]; posts=[]; meldingen=[];
+        closeModal(); clearModal();
+        return { kop, sub };
+      };
+
+      truthy('hoortbij: het bewerkscherm heeft een Hoort bij-veld met een kruisje',
+             !!veld && !!wisKnop && !!document.getElementById('m-hoortbij-sug'));
+
+      // 1. Wat het veld TOONT. Een subtaak wijst naar zijn kop; de kop zelf hangt nergens onder en
+      //    kan dat ook niet (magKoppelen weigert een taak met subtaken), dus daar staat het veld op
+      //    slot in plaats van een keuze aan te bieden die bij het klikken alsnog afketst.
+      let { kop, sub } = opnieuw();
+      sub.bundelId='Tkop'; sub.bundelVolg='10'; kop.bundelId='Tkop'; kop.bundelVolg='0';
+      openModal(true, sub);
+      eq('hoortbij: een subtaak toont de hoofdtaak van zijn bundel', veld.value, taakTitel(kop));
+      truthy('hoortbij: en biedt een kruisje om te ontkoppelen', wisKnop.style.display!=='none');
+      openModal(true, kop);
+      eq('hoortbij: de hoofdtaak zelf staat leeg en op slot', [veld.value, veld.disabled], ['', true]);
+      eq('hoortbij: en heeft niets te ontkoppelen', wisKnop.style.display, 'none');
+      // Een losse taak: veld leeg, maar wél te gebruiken.
+      ({ kop, sub } = opnieuw());
+      openModal(true, sub);
+      eq('hoortbij: een losse taak staat leeg en open', [veld.value, veld.disabled], ['', false]);
+      // Bij een NIEUWE taak is er nog geen rij om naar te schrijven; dan hoort het veld er niet
+      // te staan (een subtaak maak je aan via '+ Voeg een subtaak toe' in het bundelpaneel).
+      openModal(false);
+      eq('hoortbij: een nieuwe taak krijgt het veld niet te zien',
+         document.getElementById('fld-hoortbij').style.display, 'none');
+
+      // 2. De kiezer zelf, via een ECHTE toetsaanslag en een ECHTE klik op de suggestie. Alleen zo
+      //    komt de bedrading uit main.js langs; `taakFilter` rechtstreeks aanroepen blijft groen
+      //    terwijl het veld in de app een VvE-lijst toont of helemaal niets doet.
+      ({ kop, sub } = opnieuw());
+      openModal(true, sub);
+      veld.value='Kop';
+      veld.dispatchEvent(new Event('input', { bubbles:true }));
+      const items=document.querySelectorAll('#m-hoortbij-sug .vve-sug-item');
+      eq('hoortbij: de kiezer stelt taken voor, en de taak zelf staat er niet bij', items.length, 1);
+      if(items[0]) items[0].dispatchEvent(new MouseEvent('click', { bubbles:true }));
+      truthy('hoortbij: de klik onthoudt de taak zélf, niet alleen zijn code', state._hbDoel===kop);
+      eq('hoortbij: en zet de titel in het veld', veld.value, taakTitel(kop));
+      // Leegmaken moet de keuze meenemen. Zonder dat koppelt een leeggemaakt veld bij het opslaan
+      // alsnog aan de taak die er even stond.
+      veld.value='';
+      veld.dispatchEvent(new Event('input', { bubbles:true }));
+      eq('hoortbij: het veld leegmaken laat de keuze los', state._hbDoel, null);
+      eq('hoortbij: en het kruisje verdwijnt, want er ligt geen koppeling onder',
+         wisKnop.style.display, 'none');
+
+      // 3. En dan de hele keten: opslaan met een gekozen doeltaak. De bewerking zelf schrijft A..K
+      //    (Q, R en S liggen daarbuiten — anders veegt elke gewone bewerking het taaknummer en de
+      //    bundel leeg) en de koppeling is een tweede, eigen schrijfweg met een eigen rij-controle.
+      //    De VOLGORDE is dwingend: die tweede guard leest de zojuist opgeslagen tekst terug.
+      ({ kop, sub } = opnieuw());
+      openModal(true, sub);
+      state._hbDoel=kop;                                   // alsof de kiezer hem net aanwees
+      document.getElementById('m-actie').value='Sub-werk gewijzigd';
+      await submitTask();
+      await wacht(() => posts.length>0);
+      await state._writeChain;
+      eq('hoortbij: eerst de gewone bewerking, dan pas de koppeling', volgorde, ['lees','put','lees','post']);
+      eq('hoortbij: de bewerking schrijft tot en met kolom K', puts.map(p=>p.bereik), ["'Nog Te Doen'!A20:K20"]);
+      eq('hoortbij: de koppeling schrijft de bundelkolommen van beide rijen',
+         posts.map(p=>p.range), ["'Nog Te Doen'!Q12:S12", "'Nog Te Doen'!Q20:S20"]);
+      eq('hoortbij: de subtaak hangt nu onder de aangewezen kop',
+         [sub.bundelId, sub.bundelVolg, kop.bundelId, kop.bundelVolg], ['Tkop','10','Tkop','0']);
+      eq('hoortbij: en de bewerkte tekst is óók bewaard', sub.actiepunt, 'Sub-werk gewijzigd');
+      eq('hoortbij: de keuze is opgebruikt', state._hbDoel, null);
+
+      // 4. Opslaan zónder keuze mag géén tweede schrijfactie opleveren — anders kost elke gewone
+      //    bewerking van een taak voortaan een extra verzoek naar de bundelkolommen.
+      ({ kop, sub } = opnieuw());
+      openModal(true, sub);
+      document.getElementById('m-actie').value='Sub-werk anders';
+      await submitTask();
+      await state._writeChain;
+      eq('hoortbij: zonder keuze blijft het bij de gewone bewerking', volgorde, ['lees','put']);
+
+      // 5. Het kruisje. Zit de taak écht in een bundel, dan is dit een schrijfactie die alleen R
+      //    en S wist — kolom Q (de identiteit van de taak) blijft er buiten.
+      ({ kop, sub } = opnieuw());
+      sub.bundelId='Tkop'; sub.bundelVolg='10'; kop.bundelId='Tkop'; kop.bundelVolg='0';
+      openModal(true, sub);
+      wisKnop.dispatchEvent(new MouseEvent('click', { bubbles:true }));
+      eq('hoortbij: het veld is meteen leeg', [veld.value, wisKnop.style.display], ['', 'none']);
+      await wacht(() => posts.length>0);
+      await state._writeChain;
+      eq('hoortbij: het kruisje ontkoppelt echt', posts.map(p=>p.range), ["'Nog Te Doen'!R20:S20"]);
+      eq('hoortbij: en de taak is los', [sub.bundelId, sub.bundelVolg], ['','']);
+
+      // 6. Hetzelfde kruisje op een keuze die nog niet is opgeslagen: dan valt er niets te
+      //    ontkoppelen en mag er dus ook niets geschreven worden. Het veld hoort terug te vallen op
+      //    de werkelijke stand — hier de bundel waar de taak nog steeds in zit.
+      ({ kop, sub } = opnieuw());
+      sub.bundelId='Tkop'; sub.bundelVolg='10'; kop.bundelId='Tkop'; kop.bundelVolg='0';
+      const los=t(31,'Tlos','Ander werk'); D.ntd.OPPAKKEN.push(los);
+      openModal(true, sub);
+      state._hbDoel=los; veld.value=taakTitel(los);
+      wisKnop.dispatchEvent(new MouseEvent('click', { bubbles:true }));
+      // Ruim genoeg voor de awaits die ontkoppelTaak vóór zijn eerste verzoek aflegt: hier hoort
+      // er nooit één te komen, dus er valt niets op te wachten — alleen tijd te geven.
+      for(let i=0;i<20;i++) await tik();
+      eq('hoortbij: een nog niet opgeslagen keuze wegklikken schrijft niets', volgorde, []);
+      eq('hoortbij: de keuze is losgelaten', state._hbDoel, null);
+      eq('hoortbij: en het veld toont weer de echte bundel', veld.value, taakTitel(kop));
+      eq('hoortbij: de taak zit dus nog gewoon in zijn bundel', sub.bundelId, 'Tkop');
+
+      // De stille resync van backgroundWrite laten leeglopen mét de stub nog actief (zie de
+      // _loadInFlight-les bij de schrijfweg-tests hierboven).
+      for(let i=0;i<200 && state._loadInFlight;i++) await tik();
+    } finally {
+      window.fetch=_fetch; window.alert=_alert;
+      state.oauthToken=tokenOud; state.oauthExpiry=expiryOud; state._uitCache=cacheOud;
+      state._syncFails=failsOud;
+      D.ntd=bewaardNtd; D.af=bewaardAf; state.activeNtd=bewaardSec; pgs.ntd=bewaardPg;
+      state.bundelOpen=new Set(); state._hbDoel=null;
+      closeModal(); clearModal();
+      document.querySelectorAll('.toast').forEach(el => el.remove());
+      renderNtd(); renderNtdStats(); goTo(paginaVoor);
+    }
+  })();
+
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');
   window._testResult = `${totOk} OK, ${totFail} FAIL`; // uitleesbaar voor test-automatisering
+  // Dezelfde uitslag ook in de DOM. Een runner die van buitenaf meekijkt (de browser-koppeling
+  // draait in een 'isolated world') komt niet bij `window` van de pagina, maar wél bij de DOM —
+  // en de console is geen betrouwbare bron: die bewaart de regels van eerdere runs erbij.
+  document.documentElement.dataset.testResult = window._testResult;

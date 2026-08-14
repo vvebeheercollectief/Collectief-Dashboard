@@ -659,9 +659,12 @@
     /* ── AI-hulp VvE-zoekveld ── */
     .ai-vve-wrap{position:relative}
     .ai-vve-wrap input{width:100%;padding-right:30px}
-    #ai-vve-wis{position:absolute;right:4px;top:50%;transform:translateY(-50%);border:none;background:none;font-size:17px;line-height:1;color:var(--mut);cursor:pointer;padding:4px 8px}
-    #ai-vve-wis:hover{color:var(--rd)}
+    /* Het kruisje van 'Hoort bij' (Takenbundel) deelt deze opmaak: zelfde plek, zelfde betekenis
+       (koppeling weghalen). De ruimte ervoor komt van de padding-right op het veld zelf. */
+    #ai-vve-wis,#m-hoortbij-x{position:absolute;right:4px;top:50%;transform:translateY(-50%);border:none;background:none;font-size:17px;line-height:1;color:var(--mut);cursor:pointer;padding:4px 8px}
+    #ai-vve-wis:hover,#m-hoortbij-x:hover{color:var(--rd)}
     .ai-vve-wrap .vve-suggestions{max-height:240px}
+    #m-hoortbij{padding-right:30px}
 
     /* ── Rij-overgangen: kleurpuls + fade bij acties (effect B, sterkte 2) ── */
     :root{--puls-gn:#C0DD97;--puls-gn-t:#173404;--puls-rd:#F7C1C1;--puls-rd-t:#501313;--flits-gn:#C0DD97;--flits-am:#FAC775}

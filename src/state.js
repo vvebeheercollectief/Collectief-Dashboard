@@ -96,6 +96,9 @@ export const state = {
   _nieuwBundel: null,      // {bundelId, volg} voor een taak die via '+ Voeg een subtaak toe' wordt
                            // aangemaakt. Bewust vluchtig: clearModal én closeModal wissen hem, zodat
                            // een weggeklikt scherm de eerstvolgende LOSSE taak niet in die bundel trekt.
+  _hbDoel: null,           // in 'Hoort bij' aangewezen hoofdtaak (het rij-OBJECT, niet zijn code:
+                           // een koppeling wijst één bepaalde rij aan). submitTask koppelt hem ná
+                           // het opslaan; clearModal wist hem, dus lees hem vóór het sluiten.
   offerteAannOpen: new Set(),   // sleutels (aannSleutel) van trajecten met uitgeklapt aannemers-paneel
   vveCode: null,           // VvE op de per-VvE-pagina (Fase 5)
   vveTerug: null,          // pagina waar de gebruiker vandaan kwam vóór het dossier (terug-pijltje)

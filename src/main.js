@@ -22,6 +22,8 @@ import {
 import { loadAll, magPollen, schrijfActieLoopt, setSyncOffline, showOfflineBanner, laadUitCache } from './data.js';
 import { initActions } from './actions.js';
 import { initVveZoekveld } from './vve-zoekveld.js';
+import { bouwBundelIndex, koppelKandidaten, taakFilter } from './bundel.js';
+import { esc, taakTitel } from './util.js';
 import { closeSnoozeModal, snoozeOpslaan, snoozeWis } from './snooze.js';
 import { closeResetModal } from './alv-reset.js';
 import { renderHerhaal, openHerhaalModal, closeHerhaalModal, syncHerhaalVelden, submitHerhaal } from './render-herhaal.js';
@@ -243,6 +245,42 @@ document.addEventListener('DOMContentLoaded',()=>{
       document.getElementById('m-code').value = code;
       document.getElementById('m-naam').value = naam;
     },
+  });
+
+  // 'Hoort bij' (Takenbundel): dezelfde component, maar met TAKEN als bron. Bewust via
+  // initVveZoekveld en niet met eigen suggestiecode — een tweede kiezer naast deze loopt op eigen
+  // toetsafhandeling, eigen blur-gedrag en eigen opmaak uit de pas.
+  const hbVeld = document.getElementById('m-hoortbij');
+  initVveZoekveld({
+    input: hbVeld,
+    lijstEl: document.getElementById('m-hoortbij-sug'),
+    minTekens: 2, maxItems: 12,
+    // Alleen taken die daadwerkelijk als doel mogen dienen. Welke dat zijn bepaalt de guard
+    // (koppelKandidaten vraagt het aan magKoppelen), niet dit scherm. Vers uit D bij élke
+    // toetsaanslag en niet één keer bij het openen: de 8s-poll staat stil zolang dit venster open
+    // is, maar de lijst kan al van vóór het openen zijn.
+    bron: () => koppelKandidaten(D.ntd, bouwBundelIndex(D.ntd, D.af), state.editRowData || {}),
+    filter: taakFilter,
+    // Zelfde twee regels als de VvE-lijst, maar omgedraaid: de omschrijving is waar je op zoekt,
+    // de VvE eronder zegt wélke het is (twee VvE's hebben zo vaak dezelfde soort taak).
+    itemHtml: m => m.map(r => `<div class="vve-sug-item">`
+      + `<div class="vve-sug-code">${esc(taakTitel(r))}</div>`
+      + `<div class="vve-sug-naam">${esc(r.code)}${r.naam ? ' — ' + esc(r.naam) : ''}</div></div>`).join(''),
+    onSelect: (taak) => {
+      state._hbDoel = taak;              // het rij-OBJECT: een koppeling wijst één rij aan
+      hbVeld.value = taakTitel(taak);
+      document.getElementById('m-hoortbij-x').style.display = '';
+    },
+  });
+  // Overtypen of leegmaken = de keuze weer los. Zonder dit koppelt een leeggemaakt veld bij het
+  // opslaan alsnog aan de taak die er even stond (zelfde valkuil als bij de VvE-koppeling van de
+  // AI-hulp hierboven).
+  hbVeld.addEventListener('input', () => {
+    if (!state._hbDoel || hbVeld.value === taakTitel(state._hbDoel)) return;
+    state._hbDoel = null;
+    // Het kruisje mag alleen blijven staan als er nog een échte koppeling onder ligt om te wissen.
+    if (!String((state.editRowData || {}).bundelId || '').trim())
+      document.getElementById('m-hoortbij-x').style.display = 'none';
   });
 
   // Logboek-notitieveld (was inline onkeydown/onchange — Fase 2B)

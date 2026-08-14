@@ -210,6 +210,45 @@ export function magKoppelen(bron, doel, index){
   return { mag:true, reden:'', bundelId: doelBundel || tekst(doel.taakId) || null };
 }
 
+// ── De taakkiezer van 'Hoort bij' ────────────────────────────────────────────
+// Welke taken mogen als doel dienen? Precies wat `magKoppelen` toestaat, en niets anders — deze
+// lijst heeft bewust GEEN eigen regels. Een tweede regel naast de guard gaat er bij de
+// eerstvolgende wijziging stil vanaf lopen, en dan biedt de kiezer keuzes aan die bij het klikken
+// alsnog met een melding afketsen (of erger: hij verbergt keuzes die wél mogen).
+// Vallen op een subtaak is dus toegestaan — dat voegt je toe aan diezelfde bundel (zie
+// `magKoppelen`) — en een taak die zelf subtaken heeft houdt een lege lijst over.
+//
+// Alleen de open taken (`ntd`), niet 'Afgerond': die rijen staan in een ander tabblad en worden
+// door de schrijfweg sowieso geweigerd (`blokkeerAfgerond` in bundel-acties.js), dus ze aanbieden
+// zou een keuze zijn die per definitie op een foutmelding uitloopt.
+export function koppelKandidaten(ntd, index, bron){
+  const uit = [];
+  SKEYS.forEach(s => ((ntd && ntd[s]) || []).forEach(r => {
+    if (magKoppelen(bron, r, index).mag) uit.push(r);
+  }));
+  return uit;
+}
+
+// De velden waarin het zoekveld naar de omschrijving zoekt. Welk veld de getóónde regel wordt
+// verschilt per tabblad (zie `taakTitel` in util.js): een vergaderverzoek heeft een periode, een
+// LOD-taak een status, een offerte-traject leunt op zijn opmerkingen. Ze staan hier daarom
+// allemaal — zoekt het filter maar in één kolom, dan is de halve lijst met geen mogelijkheid te
+// vinden en lijkt de kiezer stuk.
+const TAAK_ZOEKVELDEN = ['actiepunt', 'agendapunten', 'periode', 'status', 'subsidie', 'opmerkingen'];
+
+// Zoekfilter voor de taakkiezer: VvE-code, VvE-naam en de omschrijving. Lege zoekterm → alles,
+// zelfde vorm als `filterVves` (vve-zoekveld.js), want de component wisselt ze om.
+export function taakFilter(q, lijst){
+  const zoek = v => String(v ?? '').toLowerCase();
+  const z = zoek(q).trim();
+  const alles = (lijst || []).filter(Boolean);
+  if (!z) return alles;
+  return alles.filter(r =>
+    zoek(r.code).includes(z) ||
+    zoek(r.naam).includes(z) ||
+    TAAK_ZOEKVELDEN.some(k => zoek(r[k]).includes(z)));
+}
+
 // `k` strikt stijgende nummers in de open ruimte tussen `laag` en `boven` (beide zelf uitgesloten).
 // Hoort bij `hernummerLeden`; daar staat waarom er een bovengrens is.
 function verdeelRuimte(laag, boven, k, bezet){

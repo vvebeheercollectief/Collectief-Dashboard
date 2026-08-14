@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  CRUD — taak-modals, sheet-helpers, toevoegen/afronden/verwijderen
 // ══════════════════════════════════════
-import { esc, berekenPrioriteit, toISODate, toDutchDate, nieuwTaakId } from "./util.js";
+import { esc, berekenPrioriteit, toISODate, toDutchDate, nieuwTaakId, taakTitel } from "./util.js";
 import { state, D } from "./state.js";
 import { SECS, SKEYS, SID } from "./config.js";
 import { writeRange, _shiftNtdRows, _herstelShift, assertRowMatch } from "./api.js";
@@ -11,6 +11,8 @@ import { animateRowOut, flashRow } from "./anim.js";
 import { logEvent, renderTaskHistory } from "./render-overig.js";
 import { backgroundWrite, loadAll, blokkeerOffline } from "./data.js";
 import { faseIndex, faseWoord, faseRijHtml, faseWijziging } from "./subsidie-fase.js";
+import { bouwBundelIndex, bundelVan, zichtbareKop, zelfdeTaak } from "./bundel.js";
+import { koppelTaak } from "./bundel-acties.js";
 
 // Welke formuliergroep hoort bij welke sectie. Eén bron: openModal verbergt ze
 // allemaal via deze map en toont er precies één, dus een zesde sectie raakt
@@ -46,8 +48,10 @@ function openModal(isEdit,rowData,opts){
     document.getElementById('m-naam').value=state.editRowData.naam||'';
     fillModalFields(sec,state.editRowData);
     renderTaskHistory(state.editRowData.code,sec);
+    zetHoortBij(state.editRowData);
   } else {
     clearModal();
+    zetHoortBij(null);
     document.getElementById('fg-history').style.display='none';
     // Vooraf ingevulde VvE (bv. +-knop op de dossierpagina): code + naam zetten,
     // net alsof de gebruiker 'm via het zoekveld had gekozen.
@@ -68,6 +72,36 @@ function closeModal(){
   // Escape zijn in main.js alle vier aan closeModal geknoopt. Dit is dus de plek waar een
   // niet-verstuurde subtaak zijn bundel weer loslaat.
   state._nieuwBundel=null;
+}
+
+// ── 'Hoort bij' (Takenbundel) ──
+// Vult het veld met de zichtbare kop van de bundel waar deze taak in zit, of verbergt het hele
+// veld (r=null: een nieuwe taak heeft nog geen rij om een koppeling naar weg te schrijven).
+// Geëxporteerd omdat het kruisje er ook op terugvalt als de gebruiker zijn keuze weer weggooit.
+export function zetHoortBij(r){
+  const veld=document.getElementById('m-hoortbij');
+  const wis=document.getElementById('m-hoortbij-x');
+  const vak=document.getElementById('fld-hoortbij');
+  state._hbDoel=null;                 // aangewezen doeltaak; wordt gezet door de kiezer (main.js)
+  if(!veld||!vak) return;
+  vak.style.display=r?'':'none';
+  if(wis) wis.style.display='none';
+  if(!r){ veld.value=''; return; }
+  const leden=bundelVan(bouwBundelIndex(D.ntd,D.af), r);
+  const kop=leden&&zichtbareKop(leden);
+  // 'Ben ik zelf de kop?' via zelfdeTaak en niet op objectidentiteit. De index wordt hier vers uit
+  // D gebouwd, maar `r` komt uit state._rowCache van de laatste render; zijn dat ooit twee
+  // objecten met hetzelfde taaknummer, dan zou een identiteitsvergelijking de kop niet herkennen
+  // en het veld de hoofdtaak uitnodigen om onder zichzelf te gaan hangen (zie de toelichting bij
+  // zelfdeTaak in bundel.js).
+  const isKop=!!(kop&&zelfdeTaak(kop.r,r));
+  veld.value=(kop&&!isKop)?taakTitel(kop.r):'';
+  // Een taak met subtaken kan nergens onder — dat weigert `magKoppelen` toch al. Het veld op slot
+  // zetten voorkomt dat de gebruiker eerst een doel uitzoekt en pas bij het opslaan hoort dat het
+  // niet mag.
+  veld.disabled=isKop;
+  veld.placeholder=isKop?'Deze taak is de hoofdtaak van een bundel':'Zoek een taak om onder te hangen…';
+  if(wis&&kop&&!isKop) wis.style.display='';
 }
 
 function fillModalFields(sec,r){
@@ -109,6 +143,9 @@ function clearModal(){
   // schoon begint. Die volgorde is dwingend voor de actie 'bundel-nieuw' (actions.js): die zet zijn
   // vlag daarom pas ná het openen van het scherm.
   state._nieuwBundel=null;
+  // En de andere kant van dezelfde belofte: een in 'Hoort bij' aangewezen doeltaak hoort bij het
+  // scherm waarin hij is aangewezen. submitTask leest hem daarom vóór het sluiten uit (zie daar).
+  state._hbDoel=null;
 }
 
 // ── Fase-kiezer in het bewerkscherm ──
@@ -516,6 +553,9 @@ async function submitTask(){
     if(state.editMode&&state.editRowData?._row){
       // ── Bewerken: lokale rij meteen bijwerken, dan op de achtergrond opslaan ──
       const doelRow=state.editRowData, oudeWaarden={...state.editRowData};
+      // De in 'Hoort bij' aangewezen doeltaak NU vastpakken: het closeModal/clearModal hieronder
+      // wist die keuze (een leeg formulier hoort bij geen bundel), en dan is hij weg.
+      const hbDoel=state._hbDoel;
       keys.forEach((k,i)=>{ doelRow[k]=norm(values[i]); });
       doelRow.subcategorie=values[values.length-1];
       // Offerte: gooi de gecachete handmatige X/N weg zodat de net-bewerkte kolom-D-waarde
@@ -551,6 +591,16 @@ async function submitTask(){
         ()=>{ keys.forEach(k=>{ doelRow[k]=oudeWaarden[k]; }); doelRow.subcategorie=oudeWaarden.subcategorie; delete doelRow._offertesManual; },
         'Opslaan mislukt'
       );
+      // De bundelkoppeling is een APARTE schrijfweg (kolom Q, R en S) en loopt bewust niet mee in
+      // de write hierboven: die schrijft A..K en raakt de bundelkolommen dus sowieso niet — maar
+      // belangrijker is dat de twee los van elkaar mogen mislukken zonder elkaar mee te trekken.
+      // Beide gaan door dezelfde seriële wachtrij (state._writeChain), en de koppeling komt daarin
+      // als tweede: backgroundWrite hierboven zet zijn opdracht meteen in de rij, terwijl koppelTaak
+      // eerst nog awaits aflegt (offline-check, ensureToken). Die volgorde is nodig — koppelTaak
+      // doet zijn eigen rij-controle en die moet de zojuist opgeslagen tekst teruglezen, niet de
+      // tekst van ervóór. Verplaats deze regel dus niet naar vóór de backgroundWrite: het werkt daar
+      // vandaag toevallig ook, maar dan hangt de volgorde aan die awaits in plaats van aan de rij.
+      if(hbDoel) koppelTaak(doelRow, hbDoel);
     } else {
       // ── Toevoegen: rij meteen lokaal tonen, dan op de achtergrond opslaan ──
       const afterRow=getInsertRow(sec);

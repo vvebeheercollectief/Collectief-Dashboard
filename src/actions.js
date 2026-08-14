@@ -2,7 +2,8 @@
 //  ACTIONS — centraal klik-systeem (Fase 2B)
 //  Eén delegatie-listener; elementen dragen data-action="…" + data-attributen.
 // ══════════════════════════════════════
-import { pgs, state } from './state.js';
+import { pgs, state, D } from './state.js';
+import { bouwBundelIndex, zichtbareKop, volgendeVolg, bundelSleutel } from './bundel.js';
 import {
   setNtd, renderNtd, renderNtdStats, setAf, renderAf, renderAlvo, toggleAlvoFlag, renderAlfa,
   kopOpen, zetKopOpen, toggleBundel, springNaarBundel,
@@ -13,7 +14,7 @@ import {
 } from './render-overig.js';
 import { openModal, completeTask, completeCurrentEditTask, deleteCurrentEditTask, zetSubsidieFase, kiesModalFase } from './crud.js';
 import { adjOff } from './util.js';
-import { copyAiPrompt, aiOvernemen, aiActieTaak, aiKopieerConcept } from './ai.js';
+import { copyAiPrompt, aiOvernemen, aiActieTaak, aiKopieerConcept, prefillNieuweTaak } from './ai.js';
 import { dismissToast, saveNotifPrefs } from './notifications.js';
 import { doLogin } from './auth.js';
 import { openSnoozeModal, snoozeKies } from './snooze.js';
@@ -64,6 +65,26 @@ export const ACTIONS = {
   // lezen en schrijven van `state.bundelOpen` gegarandeerd dezelfde sleutel gebruiken.
   'bundel-toggle':         (el) => toggleBundel(el.dataset.bundel),
   'bundel-spring':         (el) => springNaarBundel(el.dataset.bundel),
+  // '+ Voeg een subtaak toe' onderaan het bundelpaneel: het gewone toevoegscherm, met de VvE van
+  // de kop al ingevuld (§6.1). De index vers uit D en niet uit de laatste render: die momentopname
+  // kan van vóór de laatste poll zijn (zelfde afweging als springNaarBundel).
+  // Bewust `.get()` en niet `bundelMetId`: die eist twee leden, en een bundel die tot één lid
+  // gekrompen is mag hier júist nog een subtaak krijgen — dan is het weer een bundel.
+  'bundel-nieuw':          (el) => {
+    const id = bundelSleutel(el.dataset.bundel);
+    const leden = id ? bouwBundelIndex(D.ntd, D.af).get(id) : null;
+    const kop = leden && zichtbareKop(leden);
+    // Geen open lid meer (alles afgerond, of de bundel is weg): dan is er geen VvE om het scherm
+    // mee te vullen en valt er niets toe te voegen. De eerstvolgende render haalt dit paneel toch
+    // weg — de knop kan alleen in een verouderd scherm nog aangeklikt worden.
+    if (!kop) return;
+    // Eerst het scherm openen, dán onthouden waar de nieuwe taak bij hoort: prefillNieuweTaak gaat
+    // via openModal(false) langs clearModal, en die wist deze vlag juist (crud.js). Andersom zou
+    // hij meteen weer weg zijn en belandde de subtaak als losse taak in de Sheet — zonder fout,
+    // alleen zichtbaar aan een lege kolom R.
+    prefillNieuweTaak('', kop.r.code, kop.r.naam, '');
+    state._nieuwBundel = { bundelId: id, volg: volgendeVolg(leden) };
+  },
   'taak-bewerken':         (el) => openModal(true, state._rowCache[+el.dataset.rid]),
   'taak-afronden':         (el) => completeTask(+el.dataset.rid),
   'pagineer':              (el) => { const d=el.dataset.doel; pgs[d]=+el.dataset.pg; PAG_RENDER[d](); },

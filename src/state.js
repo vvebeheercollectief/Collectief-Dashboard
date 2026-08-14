@@ -93,6 +93,9 @@ export const state = {
   _completeBusy: false,    // afhandelen loopt (dubbelklik-rem over het async-gat)
   _alvoFlagBezig: null,    // Set van 'idx:veld' met lopende ALV-vinkjes (dubbelklik-rem)
   _snoozeRow: null,        // taak waarvoor de wegleggen-modal open staat (Fase 4)
+  _nieuwBundel: null,      // {bundelId, volg} voor een taak die via '+ Voeg een subtaak toe' wordt
+                           // aangemaakt. Bewust vluchtig: clearModal én closeModal wissen hem, zodat
+                           // een weggeklikt scherm de eerstvolgende LOSSE taak niet in die bundel trekt.
   offerteAannOpen: new Set(),   // sleutels (aannSleutel) van trajecten met uitgeklapt aannemers-paneel
   vveCode: null,           // VvE op de per-VvE-pagina (Fase 5)
   vveTerug: null,          // pagina waar de gebruiker vandaan kwam vóór het dossier (terug-pijltje)

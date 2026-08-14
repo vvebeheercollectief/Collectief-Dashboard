@@ -62,7 +62,13 @@ function openModal(isEdit,rowData,opts){
 
 function editRow(r){ openModal(true,r); }
 
-function closeModal(){document.getElementById('modal-bg').classList.remove('open')}
+function closeModal(){
+  document.getElementById('modal-bg').classList.remove('open');
+  // Élke sluitweg van dit venster loopt hierlangs — kruisje, Annuleren, klik naast het venster en
+  // Escape zijn in main.js alle vier aan closeModal geknoopt. Dit is dus de plek waar een
+  // niet-verstuurde subtaak zijn bundel weer loslaat.
+  state._nieuwBundel=null;
+}
 
 function fillModalFields(sec,r){
   const tog=(id,on)=>{const e=document.getElementById(id);if(e){e.classList.toggle('on',!!on);e.setAttribute('aria-checked',!!on);}};
@@ -98,6 +104,11 @@ function clearModal(){
   ['m-off-recv','m-off-total'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='0'});
   ['tog-ib','tog-ib-v','tog-ib-l','tog-ib-s'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('on')});
   zetModalFase('');   // terug naar Voorbereiden, anders erft een nieuwe taak de vorige fase
+  // Hetzelfde voor de bundel: een leeg formulier hoort bij géén bundel. openModal roept clearModal
+  // aan vóór het tonen van een NIEUWE taak, dus dit is de garantie dat een gewoon toevoegscherm
+  // schoon begint. Die volgorde is dwingend voor de actie 'bundel-nieuw' (actions.js): die zet zijn
+  // vlag daarom pas ná het openen van het scherm.
+  state._nieuwBundel=null;
 }
 
 // ── Fase-kiezer in het bewerkscherm ──
@@ -191,6 +202,21 @@ export function serializeNtdUndo(r){
   v.push(nulVeilig(r.bundelVolg)); // S — via nulVeilig, want 0 is een echt volgnummer (zo begint
                                    // een verse bundel), geen lege cel
   return v;
+}
+
+// Kolommen L..S achter de sectievelden van een NIEUWE taakrij. `values` loopt tot en met K, L t/m P
+// blijven leeg, en Q/R/S krijgen taaknummer, bundelnummer en volgnummer — dezelfde vaste posities
+// als serializeNtdUndo en afrondWaarden hierboven.
+// Apart en puur om dezelfde reden als die twee: zo is te toetsen dat de bundel op R en S landt
+// zonder in te loggen. Eén lege string te weinig schuift het bundelnummer een kolom op en de rij
+// wordt gewoon geschreven — geen fout, alleen een taak die stil uit zijn bundel valt.
+// Het rij-object en niet drie losse strings, want `bundelId` en `bundelVolg` zijn allebei korte
+// tekst: verwisseld zou geen enkele toets erop aanslaan.
+export function toevoegWaarden(values, r){
+  return values.concat([
+    '', '', '', '', '',                                      // L..P
+    r.taakId||'', r.bundelId||'', nulVeilig(r.bundelVolg),   // Q, R, S
+  ]);
 }
 
 async function insertAndWriteRow(sheetName,afterRow,values){
@@ -531,11 +557,21 @@ async function submitTask(){
       const nieuw={_sec:sec,_row:afterRow+1};
       keys.forEach((k,i)=>{ nieuw[k]=norm(values[i]); });
       nieuw.subcategorie=values[values.length-1];
-      // Vast taaknummer (kolom Q) meteen bij het aanmaken. `values` loopt tot K; L t/m P blijven
-      // leeg en Q krijgt het nummer, zodat insertAndWriteRow A..Q in één keer schrijft. Bewust
-      // NIET in de bewerk-tak hierboven: die schrijft A..K en zou L..Q leegvegen.
+      // Vast taaknummer (kolom Q) meteen bij het aanmaken, en meteen ook de bundelkolommen R en S,
+      // zodat insertAndWriteRow A..S in één keer schrijft. Bewust NIET in de bewerk-tak hierboven:
+      // die schrijft A..K en zou L..S leegvegen.
       nieuw.taakId=nieuwTaakId();
-      const addValues=values.concat(['','','','','',nieuw.taakId]);
+      // Komt de taak uit een bundel ('+ Voeg een subtaak toe'), dan draagt hij het bundelnummer al
+      // bij het aanmaken. Zo is er geen tweede schrijfactie nodig en kan er geen half-gekoppelde
+      // taak ontstaan als die tweede zou mislukken.
+      const bdl=state._nieuwBundel;
+      nieuw.bundelId  = bdl ? bdl.bundelId : '';
+      nieuw.bundelVolg= bdl ? bdl.volg     : '';
+      // Opgebruikt: deze vlag hoort bij de rij die hier wordt aangemaakt en nergens anders meer
+      // bij. Het closeModal een paar regels verderop wist hem ook, maar dat is de weg voor een
+      // scherm dat wordt weggeklikt — bij het opslaan is de vlag hier al verbruikt.
+      state._nieuwBundel=null;
+      const addValues=toevoegWaarden(values,nieuw);
       _shiftNtdRows(afterRow,+1); // bestaande rijen eronder schuiven mee
       (D.ntd[sec]=D.ntd[sec]||[]).push(nieuw);
       renderAll();

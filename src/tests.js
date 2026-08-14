@@ -18,7 +18,7 @@ import { _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, veil
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
-import { setv, serializeNtdUndo, afrondWaarden, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, kiesModalFase, _modalFaseWoord, getInsertRow, _sheetBreedtes, getSheetIds } from "./crud.js";
+import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, kiesModalFase, _modalFaseWoord, getInsertRow, _sheetBreedtes, getSheetIds } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages } from "./dossier-chat.js";
 import { shouldPromptReload, maakHerlaadKern, zelfdeWorker } from "./sw-update.js";
@@ -4683,6 +4683,104 @@ import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./r
       pgs.ntd = bewaardPg; state.bundelOpen = new Set();
       document.getElementById('f-code-ntd').value = '';
       renderNtd();
+    }
+  })();
+
+  // ── Subtaak toevoegen vanuit de bundel ──
+  // Twee helften die alleen samen iets opleveren: de KOLOMKANT (waar het bundelnummer in een
+  // nieuwe rij landt) en de VLAG (`state._nieuwBundel`, de enige verbinding tussen de knop in het
+  // paneel en submitTask). Die vlag is bewust vluchtig — hij mag geen enkele losse taak besmetten
+  // — en juist daardoor kan hij op twee manieren stil breken: te vroeg gewist (de subtaak belandt
+  // als losse taak in de Sheet) of te laat (de vólgende taak wordt ongevraagd een subtaak).
+  (() => {
+    eq('nieuw: bundel-nieuw bestaat als actie', typeof ACTIONS['bundel-nieuw'], 'function');
+
+    // De kolomkant. `values` loopt tot en met K, dus Q/R/S zitten op index 16/17/18 — dezelfde
+    // posities die serializeNtdUndo en afrondWaarden hierboven al vastpinnen. Eén lege string te
+    // weinig tussen K en Q schuift de bundel naar een wildvreemde kolom zonder dat er ook maar
+    // iets faalt: het bereik wordt dan gewoon een kolom korter en de rij wordt geschreven.
+    const velden = () => Array(11).fill('x');
+    const uit = toevoegWaarden(velden(), { taakId:'T7', bundelId:'Tkop', bundelVolg:'20' });
+    eq('nieuw: taaknummer op Q, bundelnummer op R, volgnummer op S', uit.slice(16), ['T7','Tkop','20']);
+    eq('nieuw: L t/m P blijven leeg', uit.slice(11, 16), ['','','','','']);
+    eq('nieuw: de rij loopt tot en met S (19 kolommen)', uit.length, 19);
+    eq('nieuw: een taak zonder bundel houdt R en S leeg',
+       toevoegWaarden(velden(), { taakId:'T7' }).slice(16), ['T7','','']);
+    // Zelfde reden als bij serializeNtdUndo: 0 is een echt volgnummer, geen lege cel.
+    eq('nieuw: volgnummer 0 wordt geen lege cel',
+       toevoegWaarden(velden(), { taakId:'T7', bundelId:'Tkop', bundelVolg:0 })[18], '0');
+
+    // En de vlag, via een ECHTE klik op de knop in het paneel. Rechtstreeks ACTIONS aanroepen zou
+    // groen blijven als `data-bundel` op de knop ontbreekt of anders heet — de knop doet dan in de
+    // app niets. Bovendien loopt alleen langs deze weg de volgorde mee die hier dwingend is:
+    // prefillNieuweTaak opent het scherm en dát wist de vlag (clearModal), dus de actie moet hem
+    // erná zetten. Zet hij hem ervóór, dan is hij bij het opslaan weg en wordt de subtaak een
+    // gewone losse taak — zonder foutmelding, en pas zichtbaar in de Sheet.
+    const bewaardNtd = D.ntd, bewaardAf = D.af, bewaardSec = state.activeNtd, bewaardPg = pgs.ntd;
+    const filterVelden = ['s-ntd','f-code-ntd','f-beh-ntd','f-prio-ntd'];
+    const fWaarden = filterVelden.map(id => document.getElementById(id).value);
+    const fStatus = state.ntdStatus, fSort = state.ntdSort, fBulk = state.bulkMode;
+    const paginaVoor = (document.querySelector('.page.active')?.id || 'page-ntd').replace('page-','');
+    try {
+      const t = (taakId, volg) => ({ _row: 60 + (+volg||0)/10, taakId, bundelId:'Tkop',
+        bundelVolg:volg, _sec:'OPPAKKEN', code:'311212', naam:'Testflat', actiepunt:'Werk', deadline:'' });
+      const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      // Het paneel wordt alleen getekend als de lijst NIET plat is; een filter uit een eerder
+      // testblok zou de knop laten verdwijnen en deze asserts om de verkeerde reden rood maken.
+      filterVelden.forEach(id => document.getElementById(id).value = '');
+      state.ntdStatus = ''; state.ntdSort = { key:null, asc:true }; state.bulkMode = false;
+      D.af = { ...leeg };
+      D.ntd = { ...leeg, OPPAKKEN: [ t('Tkop','0'), t('Tb','10') ] };
+      state.activeNtd = 'OPPAKKEN'; pgs.ntd = 1; state.bundelOpen = new Set(['Tkop']);
+      state._nieuwBundel = null;
+      renderNtd();
+      const knop = document.querySelector('#ntd-tbody [data-action="bundel-nieuw"]');
+      truthy('nieuw: er staat een knop in het open paneel om op te klikken', !!knop);
+      if (knop) knop.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      eq('nieuw: de klik onthoudt de bundel én het volgende volgnummer',
+         state._nieuwBundel, { bundelId:'Tkop', volg:'20' });
+      eq('nieuw: en het toevoegscherm staat open met de VvE van de kop al ingevuld',
+         [document.getElementById('modal-bg').classList.contains('open'),
+          document.getElementById('m-code').value], [true, '311212']);
+      // De rij die submitTask straks wegschrijft: de vlag levert R en S.
+      eq('nieuw: die vlag vult precies kolom R en S van de nieuwe rij',
+         toevoegWaarden(velden(), { taakId:'T7', bundelId:state._nieuwBundel.bundelId,
+                                    bundelVolg:state._nieuwBundel.volg }).slice(16), ['T7','Tkop','20']);
+
+      // Wegklikken laat niets hangen. Alle sluitwegen (kruisje, Annuleren, klik naast het venster,
+      // Escape) lopen langs closeModal — anders erft de eerstvolgende losse taak deze bundel.
+      closeModal();
+      eq('nieuw: wegklikken laat geen bundel achter', state._nieuwBundel, null);
+      // En het leegmaken van het formulier evenmin: dát is de weg die openModal voor een nieuwe
+      // taak áltijd aflegt, dus hier zit de garantie dat een gewoon toevoegscherm schoon begint.
+      state._nieuwBundel = { bundelId:'Tkop', volg:'20' };
+      clearModal();
+      eq('nieuw: een leeggemaakt formulier draagt ook geen bundel meer', state._nieuwBundel, null);
+
+      // Een bundel waarvan tussen tekenen en klikken het laatste OPEN lid is afgerond: er is geen
+      // kop meer, dus geen VvE om het scherm mee te vullen. Dan gebeurt er niets — een scherm
+      // openen dat een taak aan een afgeronde bundel knoopt is erger dan een dode knop, en de
+      // eerstvolgende render haalt het paneel toch weg.
+      D.ntd = { ...leeg };
+      D.af = { ...leeg, OPPAKKEN: [ t('Tkop','0'), t('Tb','10') ] };
+      ACTIONS['bundel-nieuw']({ dataset:{ bundel:'Tkop' } });
+      eq('nieuw: een volledig afgeronde bundel krijgt er niets bij',
+         [state._nieuwBundel, document.getElementById('modal-bg').classList.contains('open')],
+         [null, false]);
+      // Een bundel die tot één lid gekrompen is mag er júist wél een subtaak bij: dan is het weer
+      // een bundel. Vandaar `.get()` op de index en niet `bundelMetId` (die eist er twee).
+      D.ntd = { ...leeg, OPPAKKEN: [ t('Tkop','0') ] };
+      D.af  = { ...leeg };
+      ACTIONS['bundel-nieuw']({ dataset:{ bundel:'Tkop' } });
+      eq('nieuw: een bundel van één lid krijgt er wél een subtaak bij',
+         state._nieuwBundel, { bundelId:'Tkop', volg:'10' });
+    } finally {
+      D.ntd = bewaardNtd; D.af = bewaardAf; state.activeNtd = bewaardSec; pgs.ntd = bewaardPg;
+      state.bundelOpen = new Set(); state._nieuwBundel = null;
+      closeModal(); clearModal();
+      filterVelden.forEach((id, i) => document.getElementById(id).value = fWaarden[i]);
+      state.ntdStatus = fStatus; state.ntdSort = fSort; state.bulkMode = fBulk;
+      renderNtd(); renderNtdStats(); goTo(paginaVoor);
     }
   })();
 

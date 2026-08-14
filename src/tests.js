@@ -1005,13 +1005,23 @@ import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
     return r.datum==='17-06-2026' && r.behandelaar==='Jer' && r.deadline==='19-06-2026';
   })());
 
-  // ── parseSections leest het vaste taaknummer uit kolom Q (fase 4). ──
+  // ── parseSections leest de staartkolommen: Q (vast taaknummer) en R/S (Takenbundel). ──
   // Dit is de schakel tussen de Sheet en de guard: staat hier iets fout, dan valt élke rij
   // stilzwijgend terug op de inhoudsvergelijking en heeft het nummer geen enkel effect.
   (()=>{
-    const kop=['VvE-Code','VvE','Actiepunt','Deadline','Behandelaar','Prio','Opm','InBeh','Afgerond','','','Opvolg','HerhaalID','Esc','Fase','Aannemers','TaakID'];
-    const rij=(q)=>['311062','VvE Lunteren','CRM','19-06-2026','Jer','Hoog','','FALSE','','','','','','','','',q];
-    const lees=q=>parseSections([['OPPAKKEN'],kop,rij(q)]).data['OPPAKKEN'][0];
+    const kop=['VvE-Code','VvE','Actiepunt','Deadline','Behandelaar','Prio','Opm','InBeh','Afgerond','','','Opvolg','HerhaalID','Esc','Fase','Aannemers','TaakID','BundelID','BundelVolg'];
+    // Kolom P (aannemers) staat bewust gevuld: hij grenst aan Q/R/S, en een verschuiving van één
+    // kolom is alleen te zien als de buurcel iets ánders bevat dan een lege string.
+    // r en s zijn weglaatbaar, want de Sheets-API kapt lege staartcellen af: rijen komen in de
+    // praktijk KORTER terug dan het blad breed is. Weglaten bootst precies dat na.
+    const rij=(q,r,s)=>{
+      const a=['311062','VvE Lunteren','CRM','19-06-2026','Jer','Hoog','','FALSE','','','','','','','','Dakdekker bv|1'];
+      a[16]=q;
+      if(r!==undefined) a[17]=r;
+      if(s!==undefined) a[18]=s;
+      return a;
+    };
+    const lees=(...a)=>parseSections([['OPPAKKEN'],kop,rij(...a)]).data['OPPAKKEN'][0];
     eq('parseSections: taaknummer uit kolom Q', lees('Tabc123').taakId, 'Tabc123');
     eq('parseSections: geërfde FALSE in Q telt als geen nummer', lees('FALSE').taakId, '');
     eq('parseSections: lege Q geeft leeg taaknummer', lees('').taakId, '');
@@ -1020,6 +1030,47 @@ import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
     // Een rij die vóór de kolom bestond komt korter terug (values.get kapt de staart af)
     eq('parseSections: rij zonder kolom Q valt niet om',
        parseSections([['OPPAKKEN'],kop,['311062','VvE Lunteren','CRM']]).data['OPPAKKEN'][0].taakId, '');
+
+    // ── Takenbundel: R = bundelId, S = bundelVolg (§3.1 van het ontwerp) ──
+    const hoofd=lees('Tkop','Tkop','0'), sub=lees('Tsub','Tkop','10');
+    eq('bundel: hoofdtaak draagt zijn eigen nummer, op volgnummer 0',
+       [hoofd.bundelId, hoofd.bundelVolg], ['Tkop','0']);
+    eq('bundel: subtaak wijst naar de hoofdtaak', [sub.bundelId, sub.bundelVolg], ['Tkop','10']);
+    eq('bundel: taak zonder bundel houdt beide velden leeg',
+       [lees('Tlos','','').bundelId, lees('Tlos','','').bundelVolg], ['','']);
+    // Geërfde TRUE/FALSE-validatie telt als leeg (leegBijErfenis), net als in K/L/M/N en Q.
+    eq('bundel: geërfde TRUE/FALSE in R/S telt als leeg',
+       [lees('Tx','TRUE','FALSE').bundelId, lees('Tx','TRUE','FALSE').bundelVolg], ['','']);
+    // Zolang het raster 17 breed is (Taak 1 staat nog open) bestaan R en S niet, en is DIT de
+    // vorm waarin élke echte rij binnenkomt. Een test die alleen 19 kolommen voedt, toetst een
+    // situatie die vandaag nergens voorkomt.
+    eq('bundel: rij zonder R/S valt niet om',
+       [lees('Tabc123').bundelId, lees('Tabc123').bundelVolg], ['','']);
+    eq('bundel: 3-koloms rij valt niet om', (()=>{
+       const e=parseSections([['OPPAKKEN'],kop,['311062','VvE Lunteren','CRM']]).data['OPPAKKEN'][0];
+       return [e.taakId, e.bundelId, e.bundelVolg]; })(), ['','','']);
+    // De buurkolommen: leest bundelId ooit één cel te vroeg, dan wist dat stil het taaknummer —
+    // en dan schrijft de guard mét overtuiging naar de verkeerde rij.
+    eq('bundel: R/S verstoren de buurkolommen P en Q niet',
+       [sub.aannemers, sub.taakId], ['Dakdekker bv|1','Tsub']);
+
+    // ── Dezelfde functie leest 'Afgerond'; §11 vraagt de parse-test voor béide bladen. Q/R/S
+    // liggen daar op exact dezelfde indexen, en dat is een harde eis: parseSections kent het
+    // verschil tussen de twee bladen niet, dus afwijkende posities geven stille verwisselingen.
+    const afKop=['VvE Code','VvE','Actiepunt','Deadline','Behandelaar','Prio','Opm','InBeh','Afgerond op'];
+    const afLees=r=>parseSections([['OPPAKKEN'],afKop,r]).data['OPPAKKEN'][0];
+    const af=afLees(['311062','VvE Lunteren','CRM','19-06-2026','Jer','Hoog','','FALSE','17-06-2026',
+                     'Ging goed','Dak','H7','','','','Dakdekker bv|1','Tsub','Tkop','10']);
+    eq('bundel (Afgerond): Q/R/S staan op dezelfde indexen als in Nog Te Doen',
+       [af.taakId, af.bundelId, af.bundelVolg], ['Tsub','Tkop','10']);
+    eq('bundel (Afgerond): afronddatum, toelichting, subcategorie en P blijven intact',
+       [af.datum, af.opmerking, af.subcategorie, af.aannemers],
+       ['17-06-2026','Ging goed','Dak','Dakdekker bv|1']);
+    // Zo ziet élke rij van vóór deze functie eruit: kort, en zonder taaknummer. Die hoort per
+    // definitie bij geen enkele bundel (§3.2b); hier telt alleen dat hij niet omvalt.
+    const afOud=afLees(['311062','VvE Lunteren','CRM','19-06-2026','Jer','Hoog','','FALSE','17-06-2026']);
+    eq('bundel (Afgerond): oude korte rij valt niet om en heeft geen bundel',
+       [afOud.datum, afOud.taakId, afOud.bundelId, afOud.bundelVolg], ['17-06-2026','','','']);
   })();
 
   // ── schrijfActieLoopt: waarschuwen bij sluiten zolang er écht iets loopt. ──
@@ -3647,46 +3698,22 @@ import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
   })();
 
   console.log('%c[TESTS] Takenbundel', 'background:#B45309;color:white;padding:2px 6px;border-radius:3px');
+  // De parse-kant van de bundel staat bij de andere parseSections-kolomtests, hierboven.
   (() => {
-    // 19 kolommen: A..H sectievelden, I datum, J opmerking, K sub, L opvolg, M herhaal,
-    // N esc, O fase, P aannemers, Q taakId, R bundelId, S bundelVolg.
-    const rij = (code, taakId, bundelId, volg) => {
-      const r = new Array(19).fill('');
-      r[0] = code; r[1] = 'Testflat 1'; r[2] = 'Iets doen';
-      r[16] = taakId; r[17] = bundelId; r[18] = volg;
-      return r;
-    };
-    const rows = [
-      ['OPPAKKEN','','','','','','',''],
-      ['VvE Code','VvE','Actiepunt','Deadline','Behandelaar','Prioriteit','Opmerkingen','In behandeling'],
-      rij('311212','Tkop','Tkop','0'),
-      rij('311212','Tsub','Tkop','10'),
-      rij('311204','Tlos','',''),
-    ];
-    const { data } = parseSections(rows);
-    const opp = data.OPPAKKEN;
-    eq('bundel: drie rijen geparset', opp.length, 3);
-    eq('bundel: kop draagt eigen nummer', [opp[0].bundelId, opp[0].bundelVolg], ['Tkop','0']);
-    eq('bundel: subtaak wijst naar de kop', [opp[1].bundelId, opp[1].bundelVolg], ['Tkop','10']);
-    eq('bundel: losse taak heeft niets', [opp[2].bundelId, opp[2].bundelVolg], ['','']);
-    // Geërfde TRUE/FALSE in R/S telt als leeg (leegBijErfenis), net als bij de andere kolommen.
-    const geerfd = rij('311300','Tx','TRUE','FALSE');
-    const { data: d2 } = parseSections([rows[0], rows[1], geerfd]);
-    eq('bundel: geërfde TRUE/FALSE telt als leeg',
-       [d2.OPPAKKEN[0].bundelId, d2.OPPAKKEN[0].bundelVolg], ['','']);
-  })();
-
-  (() => {
+    // opvolgdatum en herhaalId krijgen bewust een NIET-lege waarde: met twee lege strings zou
+    // elke denkbare kolomverschuiving nog steeds '' opleveren en de test dus niets zien.
+    // Deze twee zijn de enige plek in de suite waar L en M met inhoud worden vastgepind.
     const taak = { _sec:'OPPAKKEN', code:'311212', naam:'Testflat 1', actiepunt:'Iets doen',
                    deadline:'', behandelaar:'Jer', prioriteit:'', opmerkingen:'', inBehandeling:'',
-                   subcategorie:'', opvolgdatum:'', herhaalId:'', fase:'', aannemers:'',
+                   subcategorie:'', opvolgdatum:'1 jul 2026', herhaalId:'H7', fase:'', aannemers:'',
                    taakId:'Tkop', bundelId:'Tkop', bundelVolg:'0' };
     const v = serializeNtdUndo(taak);
     eq('undo: 19 velden lang', v.length, 19);
     eq('undo: taakId op index 16', v[16], 'Tkop');
     eq('undo: bundelId op index 17', v[17], 'Tkop');
     eq('undo: bundelVolg op index 18', v[18], '0');
-    eq('undo: herhaalId blijft op index 12', v[12], '');
+    eq('undo: opvolgdatum blijft op index 11 (L)', v[11], '1 jul 2026');
+    eq('undo: herhaalId blijft op index 12 (M)', v[12], 'H7');
   })();
 
   (() => {

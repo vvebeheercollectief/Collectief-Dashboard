@@ -18,7 +18,7 @@ import { _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, veil
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
-import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, kiesModalFase, _modalFaseWoord, getInsertRow, _sheetBreedtes, getSheetIds } from "./crud.js";
+import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, _sheetBreedtes, getSheetIds } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages } from "./dossier-chat.js";
 import { shouldPromptReload, maakHerlaadKern, zelfdeWorker } from "./sw-update.js";
@@ -4742,11 +4742,6 @@ import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./r
       eq('nieuw: en het toevoegscherm staat open met de VvE van de kop al ingevuld',
          [document.getElementById('modal-bg').classList.contains('open'),
           document.getElementById('m-code').value], [true, '311212']);
-      // De rij die submitTask straks wegschrijft: de vlag levert R en S.
-      eq('nieuw: die vlag vult precies kolom R en S van de nieuwe rij',
-         toevoegWaarden(velden(), { taakId:'T7', bundelId:state._nieuwBundel.bundelId,
-                                    bundelVolg:state._nieuwBundel.volg }).slice(16), ['T7','Tkop','20']);
-
       // Wegklikken laat niets hangen. Alle sluitwegen (kruisje, Annuleren, klik naast het venster,
       // Escape) lopen langs closeModal — anders erft de eerstvolgende losse taak deze bundel.
       closeModal();
@@ -4780,6 +4775,99 @@ import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./r
       closeModal(); clearModal();
       filterVelden.forEach((id, i) => document.getElementById(id).value = fWaarden[i]);
       state.ntdStatus = fStatus; state.ntdSort = fSort; state.bulkMode = fBulk;
+      renderNtd(); renderNtdStats(); goTo(paginaVoor);
+    }
+  })();
+
+  // ── En de schakel ertussen: van de knop naar de rij die écht wordt weggeschreven ──
+  // De twee helften hierboven raken submitTask niet, en juist dáár zit de stilste breuk van deze
+  // taak: leest de toevoeg-tak `state._nieuwBundel` niet, dan wordt de subtaak een gewone losse
+  // taak — geen foutmelding, geen afwijkend scherm, alleen een lege kolom R in de Sheet. Deze
+  // toets legt de hele keten in één keer af (klik → vlag → geschreven cellen) met een gestubde
+  // fetch, zoals de andere schrijfweg-tests hierboven; er gaat niets naar Google.
+  await (async () => {
+    const _fetch=window.fetch, tokenOud=state.oauthToken, expiryOud=state.oauthExpiry;
+    const idsOud=state._sheetIds, cacheOud=state._uitCache, failsOud=state._syncFails;
+    const bewaardNtd=D.ntd, bewaardAf=D.af, bewaardSec=state.activeNtd, bewaardPg=pgs.ntd;
+    const filterVelden=['s-ntd','f-code-ntd','f-beh-ntd','f-prio-ntd'];
+    const fWaarden=filterVelden.map(id => document.getElementById(id).value);
+    const fStatus=state.ntdStatus, fSort=state.ntdSort, fBulk=state.bulkMode;
+    const paginaVoor=(document.querySelector('.page.active')?.id || 'page-ntd').replace('page-','');
+    const geschreven=[];   // elke PUT: het bereik en de rij cellen die erin gaan
+    try {
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3; // ensureToken keert meteen true
+      state._sheetIds={'Nog Te Doen':0};   // scheelt de lezing die getSheetIds anders zou doen
+      state._uitCache=false;               // blokkeerOffline weigert te schrijven op een cache-stand
+      window.fetch=async (url, opt) => {
+        const methode=(opt&&opt.method)||'GET';
+        if(methode==='PUT'){   // writeRange: precies de cellen waar het hier om gaat
+          geschreven.push({ bereik: decodeURIComponent(String(url)).split('/values/')[1].split('?')[0],
+                            rij: JSON.parse(opt.body).values[0] });
+          return new Response('{}',{status:200});
+        }
+        // Het invoegen van de rij (batchUpdate) en de logboek-/meldingregel (append) mogen slagen.
+        if(methode==='POST') return new Response(JSON.stringify({replies:[{}]}),{status:200});
+        // Élke LEZING faalt met 403. backgroundWrite start in zijn finally een stille resync, en
+        // die zou D vullen met de lege antwoorden van deze stub — dus de sectiedata wegvegen voor
+        // de tests die hierna komen. 403 is niet transient (geen herkansing) en geeft geen
+        // terugval op losse reads, dus de ronde stopt meteen en laat D met rust.
+        return new Response(JSON.stringify({error:{message:'geen leesverkeer in deze test'}}),{status:403});
+      };
+
+      const t=(taakId, volg) => ({ _row: 60 + (+volg||0)/10, taakId, bundelId:'Tkop',
+        bundelVolg:volg, _sec:'OPPAKKEN', code:'311212', naam:'Testflat', actiepunt:'Werk', deadline:'' });
+      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      filterVelden.forEach(id => document.getElementById(id).value = '');
+      state.ntdStatus=''; state.ntdSort={ key:null, asc:true }; state.bulkMode=false;
+      D.af={ ...leeg };
+      D.ntd={ ...leeg, OPPAKKEN: [ t('Tkop','0'), t('Tb','10') ] };
+      state.activeNtd='OPPAKKEN'; pgs.ntd=1; state.bundelOpen=new Set(['Tkop']);
+      state._nieuwBundel=null;
+      renderNtd();
+      const knop=document.querySelector('#ntd-tbody [data-action="bundel-nieuw"]');
+      truthy('nieuw-e2e: de knop staat in het open paneel', !!knop);
+      if(knop){
+        knop.dispatchEvent(new MouseEvent('click',{ bubbles:true }));
+        document.getElementById('m-actie').value='Derde stap';
+        await submitTask();
+        // De rij zoals het scherm hem meteen toont — dit is wat de subtaak ONDER zijn kop laat
+        // verschijnen zonder op een verse ronde te wachten.
+        const lokaal=D.ntd.OPPAKKEN[D.ntd.OPPAKKEN.length-1];
+        eq('nieuw-e2e: de toegevoegde rij staat meteen in de bundel',
+           [lokaal.bundelId, lokaal.bundelVolg, lokaal.actiepunt], ['Tkop','20','Derde stap']);
+        await state._writeChain;   // backgroundWrite wordt niet geawait door submitTask
+        eq('nieuw-e2e: er is één rij weggeschreven', geschreven.length, 1);
+        const rij=geschreven[0]||{ bereik:'', rij:[] };
+        // De rij wordt ná de laatste rij van de sectie ingevoegd (61) en loopt tot en met S.
+        eq('nieuw-e2e: het bereik loopt van A tot en met S', rij.bereik, "'Nog Te Doen'!A62:S62");
+        eq('nieuw-e2e: kolom R en S dragen de bundel van de aangeklikte kop', rij.rij.slice(17), ['Tkop','20']);
+        truthy('nieuw-e2e: en kolom Q heeft een taaknummer', !!rij.rij[16]);
+        eq('nieuw-e2e: de vlag is opgebruikt', state._nieuwBundel, null);
+
+        // Meteen daarna een GEWONE taak toevoegen: die mag de bundel niet erven. Dit is de andere
+        // kant van dezelfde vluchtigheid — een vlag die blijft hangen trekt de eerstvolgende losse
+        // taak stil in een bundel waar hij niet hoort.
+        openModal(false);
+        document.getElementById('m-code').value='311212';
+        document.getElementById('m-actie').value='Losse taak';
+        await submitTask();
+        await state._writeChain;
+        eq('nieuw-e2e: de taak erna wordt geschreven', geschreven.length, 2);
+        eq('nieuw-e2e: en die draagt géén bundel', (geschreven[1]||{rij:[]}).rij.slice(17), ['','']);
+      }
+      // De stille resync van backgroundWrite laten leeglopen mét de stub nog actief: blijft
+      // _loadInFlight staan, dan keert de eerstvolgende loadAll meteen terug zónder te lezen en
+      // faalt een latere test op iets wat niets met zijn eigen onderwerp te maken heeft.
+      for(let i=0;i<100 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,5));
+    } finally {
+      window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
+      state._sheetIds=idsOud; state._uitCache=cacheOud; state._syncFails=failsOud;
+      D.ntd=bewaardNtd; D.af=bewaardAf; state.activeNtd=bewaardSec; pgs.ntd=bewaardPg;
+      state.bundelOpen=new Set(); state._nieuwBundel=null;
+      closeModal(); clearModal();
+      document.querySelectorAll('.toast').forEach(el => el.remove());
+      filterVelden.forEach((id, i) => document.getElementById(id).value = fWaarden[i]);
+      state.ntdStatus=fStatus; state.ntdSort=fSort; state.bulkMode=fBulk;
       renderNtd(); renderNtdStats(); goTo(paginaVoor);
     }
   })();

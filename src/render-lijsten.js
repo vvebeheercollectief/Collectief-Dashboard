@@ -10,7 +10,7 @@ import { bulkWis, renderBulkUi } from "./bulk.js";
 import { renderThead, renderTbody, renderPag, bepaalStil, bouwStilIndex, _zetStilIndex, deadlineCel, rowNtd, rowAf } from "./render-tabel.js";
 import { _verrijkOfferteRij, offerteAannemerPaneel, offerteAannSamenvatting } from "./render-offerte.js";
 import { renderAlvo, renderAlfa, toggleAlvoFlag, ALVO_ICONS, ALVO_COLS, ALVO_LABELS, flagPill, _recomputeAlvoStatus, statusIco } from "./render-alv.js";
-import { bouwBundelIndex, zichtbareKop, bundelVan } from "./bundel.js";
+import { bouwBundelIndex, wordtGeabsorbeerd } from "./bundel.js";
 
 // ══════════════════════════════════════
 //  NTD STATS
@@ -156,15 +156,11 @@ function isPlatteWeergave({ q, fCode, beh, prio, status, sortKey, bulk }){
 // die worden dan in het bundelpaneel onder die kop getekend. Staat de kop in een ander tabblad,
 // dan blijft de rij gewoon staan — daar komt straks het ⛓-merkje op (§3.2b). Zo wordt elke taak
 // per tabblad precies één keer getoond en blijven de tellers kloppen.
+// Het predikaat zelf staat in bundel.js, gedeeld met het ⛓-merkje: precies de rijen die hier
+// blijven staan krijgen daar een merkje, en omgekeerd (zie `wordtGeabsorbeerd`).
 function absorbeer(rows, sec, index){
   if (!index || !index.size) return rows;
-  return rows.filter(r => {
-    const leden = bundelVan(index, r);
-    if (!leden) return true;
-    const kop = zichtbareKop(leden);
-    if (!kop || kop.r === r) return true;          // zelf de kop → blijft staan
-    return kop.r._sec !== sec;                     // kop elders → blijft staan; kop hier → absorberen
-  });
+  return rows.filter(r => !wordtGeabsorbeerd(r, index, sec));
 }
 
 function renderNtd(){

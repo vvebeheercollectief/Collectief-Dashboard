@@ -4,9 +4,14 @@
 // Alleen opmaak: deze module leest de bundel-index (uit bundel.js) en levert strings.
 // Hij beslist niets over lidmaatschap, volgorde of nummers — dat hoort in bundel.js, zodat
 // er maar één plek is waar "wie is de kop" en "wat is de volgorde" beantwoord wordt.
-import { esc, taakTitel, kortDatum } from "./util.js";
+//
+// Eén voorwaarde aan de aanroeper: `bundelPaneelHtml` VULT de rij-cache (state._rowCache), net als
+// rowNtd, want de actieknoppen verwijzen via `data-rid` naar die cache. Roep hem dus aan binnen
+// dezelfde renderronde waarin renderAll die cache leeggemaakt heeft — één paneel los hertekenen
+// zou rid's toevoegen aan een cache die daarna niet meer bij de getekende tabel hoort.
+import { esc, taakTitel, kortDatum, taakActieKnoppen } from "./util.js";
 import { SECS } from "./config.js";
-import { zichtbareKop, bundelVan } from "./bundel.js";
+import { zichtbareKop, bundelVan, wordtGeabsorbeerd } from "./bundel.js";
 import { ico } from "./icons.js";
 import { state } from "./state.js";
 
@@ -60,22 +65,25 @@ function subRegel(m, i){
          + `<span class="bdl-klaar" title="Afgerond${r.datum?' '+esc(kortDatum(r.datum)):''}">${ico('vinkCirkel',13)}${r.datum?' '+esc(kortDatum(r.datum)):''}</span></div>`;
   }
   const rid = state._rowCache.length; state._rowCache.push(r);
+  // Het handvat is voor een schermlezer verborgen: het draagt geen eigen actie, alleen een
+  // muisgebaar. Herordenen met het toetsenbord kan dus (nog) niet — die weg hoort bij het slepen
+  // zelf en moet daar bewust gekozen worden, niet stil overgeslagen.
   return `<div class="bdl-sub" data-taak="${esc(tekst(r.taakId))}">`
        + `<span class="bdl-h" data-bdl-grip="1" title="Sleep om de volgorde te wijzigen" aria-hidden="true">⠿</span>`
        + `<span class="bdl-num">${i+1}</span>`
        + `<span class="bdl-dot" style="background:${kleur}"></span>`
        + `<button type="button" class="bdl-txt" data-action="taak-bewerken" data-rid="${rid}" title="Bewerken">${esc(taakTitel(r))}</button>`
        + `<span class="bdl-meta">${esc(label)}${r.deadline?' · '+esc(kortDatum(r.deadline)):''}</span>`
-       + `<span class="bdl-acts">`
-       +   `<button class="act-bw act-ico" data-action="taak-bewerken" data-rid="${rid}" title="Bewerken" aria-label="Bewerken">${ico('potlood',14)}</button>`
-       +   `<button class="act-bw act-ico" data-action="taak-wegleggen" data-rid="${rid}" title="Wegleggen / opvolgdatum" aria-label="Wegleggen">${ico('klok',14)}</button>`
-       +   `<button class="act-af act-ico" data-action="taak-afronden" data-rid="${rid}" title="Afronden" aria-label="Afronden">${ico('vink',14)}</button>`
-       + `</span></div>`;
+       // Exact dezelfde drie knoppen als op een tabelrij, uit één helper: ze staan op hetzelfde
+       // scherm pal onder elkaar, dus een eigen variant hier zou meteen als verschil opvallen.
+       + `<span class="bdl-acts">${taakActieKnoppen(rid)}</span></div>`;
 }
 
 // Het hele paneel: alle leden behálve de zichtbare kop, op volgnummer.
-export function bundelPaneelHtml(leden, kop, plat){
-  if (plat) return '';
+// Geen plat-vlag: platte weergave is een LEGE bundel-index (zie renderNtd), dan vindt `bundelVan`
+// niets, is er geen kop en komt deze functie niet aan de beurt. Zo staat de plat-of-niet-beslissing
+// op precies één plek — een tweede vlag hier zou stil kunnen afwijken van de absorptie.
+export function bundelPaneelHtml(leden, kop){
   const rest = (leden||[]).filter(m => m !== kop);
   const id = esc(tekst(kop.r.bundelId));
   return `<div class="bdl-paneel" data-bundel="${id}">`
@@ -91,7 +99,9 @@ export function bundelMerkje(r, index, sec){
   if (!leden) return '';
   const kop = zichtbareKop(leden);
   if (!kop || kop.r === r) return '';
-  if (kop.r._sec === sec) return '';   // wordt geabsorbeerd, merkje niet nodig
+  // Precies de tegenpool van de absorptie in render-lijsten.js, en daarom uit hetzelfde
+  // predikaat: staat de kop in dit tabblad, dan tekent zíjn paneel deze rij al.
+  if (wordtGeabsorbeerd(r, index, sec)) return '';
   const titel = `Hoort bij: ${taakTitel(kop.r)} — klik om de bundel te openen`;
   return `<button type="button" class="bdl-merk" data-action="bundel-spring" data-bundel="${esc(tekst(r.bundelId))}" title="${esc(titel)}" aria-label="${esc(titel)}">⛓</button>`;
 }

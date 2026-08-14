@@ -289,6 +289,19 @@ function vveCodeSpan(code, style){
   return `<span class="code code-klik"${st} data-action="vve-open" data-code="${esc(c)}" title="Open VvE-dossier">${esc(c)}</span>`;
 }
 function subBadge(v){return v?`<span class="badge" style="background:var(--sur2);color:var(--mut);font-size:10px;margin-left:4px">${esc(v)}</span>`:''}
+// De drie rij-acties (bewerken / wegleggen / afronden) als knoppentrio, op `rid` uit state._rowCache.
+// Eén definitie, want ze staan op twee plekken die op hetzelfde scherm pal onder elkaar komen: de
+// tabelrij (rowNtd) en de subtaakregel in een bundelpaneel (subRegel). Twee kopieën betekent dat
+// dezelfde drie acties er verschillend uit gaan zien zodra er één wordt bijgeschaafd.
+// De SVG's staan hier inline en gaan bewust niet via ico(): dit is de vorm die de takenlijst
+// vandaag toont (dunne lijn), terwijl de duotone-set voor 'wegleggen' een wekker heeft en voor
+// 'bewerken' een gevuld potlood. De maten komen uit .act-bw svg / .act-af svg in styles.css.
+// De aanroeper zet er zelf de wikkel omheen (.acts in de tabel, .bdl-acts in het paneel).
+function taakActieKnoppen(rid){
+  return `<button class="act-bw act-ico" data-action="taak-bewerken" data-rid="${rid}" title="Bewerken" aria-label="Bewerken"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>`
+       + `<button class="act-bw act-ico" data-action="taak-wegleggen" data-rid="${rid}" title="Wegleggen / opvolgdatum" aria-label="Wegleggen of opvolgdatum"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 13.5"/></svg></button>`
+       + `<button class="act-af act-ico" data-action="taak-afronden" data-rid="${rid}" title="Afronden" aria-label="Afronden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 12 4 4 10-10"/></svg></button>`;
+}
 // 'Dagen vooraf zichtbaar' (herhaalregels): bewust 0 toestaan (taak pas op de deadline-dag
 // zichtbaar). Alleen terugvallen op `def` bij een echt lege/ongeldige waarde, niet bij 0 —
 // anders wordt een bewuste 0 stil overschreven. Op alle drie de lagen gebruikt (invoer/parse/zichtbaar).
@@ -353,7 +366,7 @@ export {
   opvolgStatus, volgendeDeadline, HERHAAL_MAANDEN, _vandaagAmsterdam, isoWeek,
   _verschilInKalenderdagen, berekenPrioriteit, prioBadge, persBadges,
   adjOff, offProg, _MAANDEN, _parseAnyDate, parseDt, toISODate, toDutchDate, leegBijErfenis, nieuwTaakId,
-  emptyRow, esc, vveCodeSpan, subBadge, coerceDagenVooraf,
+  emptyRow, esc, vveCodeSpan, subBadge, taakActieKnoppen, coerceDagenVooraf,
   parseOff, offerteFase,
   parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, aannSleutel,
   meldSleutel, _zonderLeidendSymbool,

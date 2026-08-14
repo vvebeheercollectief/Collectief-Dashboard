@@ -30,7 +30,7 @@ import { checkSecties, checkRaster, checkRasters, checkNummers, checkAlles, RAST
 import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from "./subsidie-fase.js";
 import { toggleHerhaalStatus } from "./render-herhaal.js";
 import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
-import { bouwBundelIndex, zichtbareKop, isBundel, bundelVan, hernummerLeden, volgendeVolg, magKoppelen } from "./bundel.js";
+import { bouwBundelIndex, zichtbareKop, isBundel, bundelVan, hernummerLeden, volgendeVolg, magKoppelen, wordtGeabsorbeerd } from "./bundel.js";
 import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./render-bundel.js";
 
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
@@ -4233,6 +4233,23 @@ import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./r
     eq('absorptie: zonder bundels verandert er niets',
        absorbeer([kop], 'OPPAKKEN', new Map()).map(r => r.taakId), ['Tkop']);
 
+    // De absorptie en het ⛓-merkje moeten elkaars exacte tegenpool blijven: precies de rijen die
+    // in de vlakke lijst blijven staan krijgen een merkje. Sinds beide `wordtGeabsorbeerd`
+    // gebruiken kan dat niet meer uiteenlopen; deze asserts pinnen dat vast, want als het toch
+    // gebeurt is het gevolg stil (een merkje op een rij die nergens meer staat, of een rij zonder
+    // enige aanwijzing van het verband).
+    eq('absorptie: het gedeelde predikaat wijst alleen de opgeslokte rij aan',
+       [wordtGeabsorbeerd(subZelfde, ix, 'OPPAKKEN'), wordtGeabsorbeerd(subAnder, ix, 'OFFERTE-TRAJECTEN'),
+        wordtGeabsorbeerd(kop, ix, 'OPPAKKEN')], [true, false, false]);
+    const blijftStaan = r => absorbeer([r], r._sec, ix).length === 1;
+    eq('merkje: een geabsorbeerde subtaak krijgt er géén',
+       [blijftStaan(subZelfde), bundelMerkje(subZelfde, ix, 'OPPAKKEN')], [false, '']);
+    eq('merkje: een subtaak die blijft staan krijgt er wél een',
+       [blijftStaan(subAnder), bundelMerkje(subAnder, ix, 'OFFERTE-TRAJECTEN').includes('bundel-spring')],
+       [true, true]);
+    eq('merkje: de kop blijft staan en krijgt er geen',
+       [blijftStaan(kop), bundelMerkje(kop, ix, 'OPPAKKEN')], [true, '']);
+
     eq('plat: standaardlijst is niet plat',
        isPlatteWeergave({ q:'', fCode:'', beh:'', prio:'', status:'', sortKey:null, bulk:false }), false);
     eq('plat: zoeken maakt plat',
@@ -4260,12 +4277,56 @@ import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./r
     const leden = ix.get('Tkop');
 
     eq('pill: telt alles behalve de kop', bundelStand(leden, zichtbareKop(leden)), { klaar:1, totaal:2 });
-    const html = bundelPaneelHtml(leden, zichtbareKop(leden), false);
+    const html = bundelPaneelHtml(leden, zichtbareKop(leden));
     eq('paneel: twee subtaakregels', (html.match(/class="bdl-sub/g)||[]).length, 2);
     eq('paneel: afgerond lid is doorgestreept', html.includes('bdl-sub af'), true);
     eq('paneel: knop om een subtaak toe te voegen', html.includes('bundel-nieuw'), true);
     eq('paneel: afgerond lid heeft geen actieknoppen',
        (html.split('bdl-sub af')[1]||'').includes('data-action="taak-afronden"'), false);
+
+    // ── De vier regels waar dit paneel op staat of valt. Zonder deze asserts gaat elk van de
+    // vier ongemerkt om, want ze zitten alleen in de gerenderde string. ──
+    // 1. De teller telt POSITIES (1, 2, 3). De volgnummers uit de Sheet lopen met gaten van tien
+    //    en houden bij afgeronde leden hun oude waarde (§3.4) — hier 10 en 20 — dus rauw getoond
+    //    ziet de gebruiker gaten in een lijst die er geen heeft.
+    eq('paneel: de teller telt posities, geen volgnummers uit de Sheet',
+       [...html.matchAll(/class="bdl-num">([^<]*)</g)].map(m => m[1]), ['1','2']);
+    const afRegel   = (html.split('class="bdl-sub af"')[1]||'').split('<div class="bdl-add"')[0];
+    const openRegel = (html.split('class="bdl-sub"')[1]||'').split('class="bdl-sub af"')[0];
+    // 2. Een afgerond lid is bij het hernummeren een VAST ANKER (zie hernummerLeden), dus zijn
+    //    taaknummer moet in de DOM terug te vinden zijn — anders verdwijnt het anker geruisloos
+    //    zodra de sleepcode de volgorde uit het paneel leest.
+    eq('paneel: afgerond lid draagt zijn taaknummer als anker', afRegel.includes('data-taak="Ta"'), true);
+    // 3. …maar géén sleep-handvat: een afgerond lid slepen zou niets doen, en een dood handvat
+    //    belooft iets wat de functie niet waarmaakt.
+    eq('paneel: afgerond lid heeft geen sleep-handvat', afRegel.includes('data-bdl-grip'), false);
+    eq('paneel: een open lid heeft dat handvat wél', openRegel.includes('data-bdl-grip'), true);
+    // 4. Plat = een LEGE index (zie renderNtd), niet een tweede vlag op deze functie: dan vindt
+    //    bundelVan niets en komt er sowieso geen paneel. Zo blijft de plat-beslissing op één plek.
+    eq('paneel: een lege index levert geen bundel en dus geen paneel', bundelVan(new Map(), s1), null);
+    // Een subtaak is een volwaardige taak: exact dezelfde drie acties als een tabelrij.
+    eq('paneel: open subtaak heeft de drie rij-acties',
+       ['taak-bewerken','taak-wegleggen','taak-afronden'].map(a => openRegel.includes(`data-action="${a}"`)),
+       [true, true, true]);
+
+    // De kop-extra's: chevron + telpill. Deze draaien op state.bundelOpen, dus dit is meteen de
+    // controle dat dat veld bestaat — zonder hem gooit bundelKopExtra bij de eerste bundelkop een
+    // TypeError en neemt daarmee de hele takenlijst mee.
+    const bewaardOpen = state.bundelOpen;
+    try {
+      // Eerst apart, want een ontbrekend veld gooit hieronder een TypeError en dan breekt de hele
+      // testronde af zonder dat er iets staat wat de oorzaak noemt.
+      eq('kop: state.bundelOpen bestaat', bewaardOpen instanceof Set, true);
+      state.bundelOpen = new Set();
+      const dicht = bundelKopExtra(leden, zichtbareKop(leden));
+      eq('kop: chevron staat dicht', dicht.chevron.includes('aria-expanded="false"'), true);
+      eq('kop: de telpill toont klaar-van-totaal', dicht.pill.includes('1 van 2 klaar'), true);
+      state.bundelOpen = new Set(['Tkop']);
+      const open = bundelKopExtra(leden, zichtbareKop(leden));
+      eq('kop: chevron staat open', open.chevron.includes('aria-expanded="true"'), true);
+      eq('kop: open chevron krijgt de gedraaide klasse', open.chevron.includes('bdl-chev open'), true);
+    } finally { state.bundelOpen = bewaardOpen; }
+
     eq('merkje: subtaak met kop elders krijgt een merkje',
        bundelMerkje(s1, ix, 'OPPAKKEN').includes('bundel-spring'), true);
     eq('merkje: de kop zelf krijgt geen merkje', bundelMerkje(kop, ix, 'VERGADERVERZOEKEN'), '');

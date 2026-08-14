@@ -86,6 +86,23 @@ export function bundelVan(index, r){
   return isBundel(leden) ? leden : null;
 }
 
+// Wordt deze rij in dít tabblad opgeslokt door het paneel van zijn kop? Waar = de rij hoort hier
+// niet in de vlakke lijst, want hij wordt onder de kop getekend.
+//
+// Eén predikaat voor twee beslissingen die elkaars exacte tegenpool MOETEN blijven: `absorbeer`
+// (render-lijsten.js) haalt de rij uit de lijst, `bundelMerkje` (render-bundel.js) laat het
+// ⛓-merkje juist weg. Leidde elk dat zelf af, dan lopen ze bij de eerstvolgende wijziging stil
+// uit elkaar: een merkje op een rij die nergens meer staat, of een rij die blijft staan zonder
+// enige aanwijzing dat hij bij een bundel hoort. Beide gevallen geven geen fout — ze zien er
+// alleen verkeerd uit.
+export function wordtGeabsorbeerd(r, index, sec){
+  const leden = bundelVan(index, r);
+  if (!leden) return false;
+  const kop = zichtbareKop(leden);
+  if (!kop || kop.r === r) return false;   // geen open lid meer, of zelf de kop → blijft staan
+  return kop.r._sec === sec;               // kop in hetzelfde tabblad → het paneel tekent hem
+}
+
 // Mag `bron` als subtaak onder `doel` komen te hangen?
 // Geeft {mag, reden, bundelId} — bundelId is de bundel waar bron in terechtkomt.
 //

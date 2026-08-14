@@ -99,6 +99,11 @@ export const state = {
   _vveAfAlles: false,      // per-VvE: alle afgeronde taken uitgeklapt
   bulkMode: false,         // bulk-selecteerstand op de NTD-lijst (Fase 5)
   expandedRows: new Set(), // _row-id's van NTD-rijen die de gebruiker uitklapte (Operator: 1-regel → volledige tekst)
+  bundelOpen: new Set(),   // bundelId's van opengeklapte bundels. BEWUST op bundelId en niet op
+                           // _row: rijnummers schuiven bij elke insert/delete, waardoor een op
+                           // rijnummer bewaarde stand na een poll de verkeerde rij openzet.
+                           // Moet bestaan zodra render-bundel.js geladen is: `bundelKopExtra`
+                           // leest hem bij élke bundelkop, en een crash daar neemt de takenlijst mee.
   ntdSort: {key:null, asc:true}, // kolomkop-sortering NTD: key 'code'|'deadline'|null (null = standaardvolgorde)
   ntdStatus: '',                 // statusfilter uit de kop-pillen: '' | 'telaat' | 'weggelegd'
   // VvE-dossier (logboek + kenmerken)

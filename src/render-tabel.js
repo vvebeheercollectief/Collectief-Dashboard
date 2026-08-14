@@ -2,7 +2,7 @@
 //  RENDER-TABEL — generieke tabel/paginering (thead, tbody, rij-render, paginatie)
 //  Verplaatst uit render-lijsten.js (Batch D / punt 11) — zuivere refactor, geen gedragswijziging.
 // ══════════════════════════════════════
-import { esc, vveCodeSpan, persBadges, subBadge, offProg, emptyRow, berekenPrioriteit, opvolgStatus, taakTitel, kortDatum, _verschilInKalenderdagen, _vandaagAmsterdam, STIL_DREMPEL_DAGEN, aannSleutel } from "./util.js";
+import { esc, vveCodeSpan, persBadges, subBadge, taakActieKnoppen, offProg, emptyRow, berekenPrioriteit, opvolgStatus, taakTitel, kortDatum, _verschilInKalenderdagen, _vandaagAmsterdam, STIL_DREMPEL_DAGEN, aannSleutel } from "./util.js";
 import { SECS, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { bulkGeselecteerd } from "./bulk.js";
@@ -119,7 +119,7 @@ function rowNtd(r,sec){
   const bulkCel=state.bulkMode
     ?`<td class="bulk-cel"><button type="button" class="cb${bulkGeselecteerd(r)?' aan':''}" data-action="bulk-vink" data-rid="${rid}" role="checkbox" aria-checked="${bulkGeselecteerd(r)}" aria-label="Selecteer rij"></button></td>`
     :'';
-  const editBtn=`<div class="acts"><button class="act-bw act-ico" data-action="taak-bewerken" data-rid="${rid}" title="Bewerken" aria-label="Bewerken"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><button class="act-bw act-ico" data-action="taak-wegleggen" data-rid="${rid}" title="Wegleggen / opvolgdatum" aria-label="Wegleggen of opvolgdatum"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 13.5"/></svg></button><button class="act-af act-ico" data-action="taak-afronden" data-rid="${rid}" title="Afronden" aria-label="Afronden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 12 4 4 10-10"/></svg></button></div>`;
+  const editBtn=`<div class="acts">${taakActieKnoppen(rid)}</div>`;
   let cells='';
   const _stilDagen = bepaalStil(r, sec);
   // De offerte-tab is bewust kaal (v6.2): daar geen berekend stil-label. De andere secties

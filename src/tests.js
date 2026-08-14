@@ -3926,6 +3926,77 @@ import { bouwBundelIndex, zichtbareKop, isBundel, bundelVan, hernummerLeden, vol
        bouwBundelIndex(rommel, leeg).get('Xoud').length, 2);
   })();
 
+  (() => {
+    // Hernummeren, volgendeVolg en bundelVan: de schrijfkant van de bundel. Hier wordt de keuze
+    // vastgepind dat afgeronde leden GEEN schrijfopdracht krijgen — zonder deze tests kan die
+    // stil omgedraaid worden, en dan schrijft het herordenen straks naar een rij van 'Afgerond'
+    // alsof het er een van 'Nog Te Doen' was.
+    const lid = (taakId, volg, af) => ({ r: { taakId, bundelId:'Tkop', bundelVolg:volg, _row:10 }, af:!!af });
+
+    // Slepen: de gegeven volgorde wordt 10, 20, 30 …
+    const gesleept = [lid('Tb','20'), lid('Tkop','0'), lid('Ta','10')];
+    eq('hernummer: de gegeven volgorde wordt 10/20/30',
+       hernummerLeden(gesleept).map(o => [o.r.taakId, o.volg]), [['Tb','10'],['Tkop','20'],['Ta','30']]);
+    // Alleen wat écht verandert wordt geschreven — de batch blijft zo klein mogelijk.
+    eq('hernummer: onveranderde leden leveren geen schrijfopdracht',
+       hernummerLeden([lid('Ta','10'), lid('Tb','25'), lid('Tc','30')]).map(o => o.r.taakId), ['Tb']);
+    // Ertussen schuiven (§11): een nieuw lid met een tussennummer krijgt na het hernummeren
+    // gewoon zijn eigen tiental, en de rest schuift op.
+    eq('hernummer: invoegen tussen twee leden',
+       hernummerLeden([lid('Ta','10'), lid('Tnieuw','15'), lid('Tb','20')]).map(o => [o.r.taakId, o.volg]),
+       [['Tnieuw','20'],['Tb','30']]);
+    // De kern: een lid uit 'Afgerond' mag nooit in de schrijflijst belanden. De opdracht draagt
+    // alleen `r` en `volg`, dus de aanroeper kan het tabblad achteraf niet meer terugzien.
+    eq('hernummer: afgerond lid krijgt geen schrijfopdracht',
+       hernummerLeden([lid('Tkop','0',true), lid('Ta','99'), lid('Tb','98')]).map(o => [o.r.taakId, o.volg]),
+       [['Ta','20'],['Tb','30']]);
+    eq('hernummer: lege lijst is geen fout', hernummerLeden([]).length, 0);
+    eq('hernummer: geen lijst is geen fout', hernummerLeden(undefined).length, 0);
+    // Een optimistisch gezet GETAL mag niet als "veranderd" gelezen worden (anders schrijft elke
+    // sleepactie de hele bundel opnieuw weg).
+    eq('hernummer: numeriek volgnummer telt als gelijk',
+       hernummerLeden([lid('Ta',10), lid('Tb',20)]).length, 0);
+
+    // volgendeVolg: achteraan erbij, met gaten van tien. Afgeronde leden tellen mee, anders zou
+    // een nieuwe subtaak op het nummer van een afgerond lid landen.
+    eq('volgendeVolg: eerste subtaak op een kale hoofdtaak', volgendeVolg([lid('Tkop','0')]), '10');
+    eq('volgendeVolg: hoogste + 10', volgendeVolg([lid('Tkop','0'), lid('Ta','10'), lid('Tb','20')]), '30');
+    eq('volgendeVolg: afgerond lid telt mee voor het hoogste nummer',
+       volgendeVolg([lid('Tkop','0'), lid('Ta','30',true)]), '40');
+    eq('volgendeVolg: onleesbaar nummer wordt genegeerd, niet meegeteld',
+       volgendeVolg([lid('Ta','20'), lid('Tb','')]), '30');
+    eq('volgendeVolg: lege bundel begint op 10', volgendeVolg([]), '10');
+
+    // zichtbareKop moet ook op een ONGESORTEERDE lijst het laagste nummer pakken: bij het slepen
+    // komt de volgorde straks uit de DOM en niet uit bouwBundelIndex.
+    eq('kop: laagste volgnummer wint, ook ongesorteerd',
+       zichtbareKop([lid('Tb','30'), lid('Ta','10')]).r.taakId, 'Ta');
+    eq('kop: afgerond lid met het laagste nummer wordt overgeslagen',
+       zichtbareKop([lid('Tkop','0',true), lid('Ta','10')]).r.taakId, 'Ta');
+
+    // bundelVan: elke ingang afgevangen. Een ontbrekende index hoort bij een vroege render.
+    const ntdB = { OPPAKKEN:[ { taakId:'Tkop', bundelId:'Tkop', bundelVolg:'0', _sec:'OPPAKKEN' },
+                              { taakId:'Ta', bundelId:'Tkop', bundelVolg:'10', _sec:'OPPAKKEN' } ],
+                   VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const legeAf = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const ixB = bouwBundelIndex(ntdB, legeAf);
+    eq('bundelVan: vindt de bundel van een lid',
+       (bundelVan(ixB, ntdB.OPPAKKEN[1]) || []).map(m => m.r.taakId), ['Tkop','Ta']);
+    eq('bundelVan: taak zonder bundelId', bundelVan(ixB, { taakId:'Tlos', bundelId:'' }), null);
+    eq('bundelVan: dood bundelnummer', bundelVan(ixB, { taakId:'Tx', bundelId:'Tweg' }), null);
+    eq('bundelVan: bundel van één telt niet',
+       bundelVan(bouwBundelIndex({ ...legeAf, OPPAKKEN:[ntdB.OPPAKKEN[0]] }, legeAf), ntdB.OPPAKKEN[0]), null);
+    eq('bundelVan: zonder index (vroege render) geen crash', bundelVan(null, ntdB.OPPAKKEN[1]), null);
+    eq('bundelVan: zonder rij geen crash', bundelVan(ixB, undefined), null);
+    // Een NIET-string in R/S mag de index (en dus de hele takenlijst) niet laten omvallen.
+    const getallen = { ...legeAf, OPPAKKEN:[ { taakId:1, bundelId:1, bundelVolg:0, _sec:'OPPAKKEN' },
+                                             { taakId:2, bundelId:1, bundelVolg:10, _sec:'OPPAKKEN' } ] };
+    eq('index: numerieke bundelvelden vallen niet om',
+       (bouwBundelIndex(getallen, legeAf).get('1') || []).map(m => m.r.taakId), [1, 2]);
+    eq('index: numeriek taaknummer in Afgerond valt niet om',
+       (bouwBundelIndex(legeAf, getallen).get('1') || []).length, 2);
+  })();
+
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');
   window._testResult = `${totOk} OK, ${totFail} FAIL`; // uitleesbaar voor test-automatisering

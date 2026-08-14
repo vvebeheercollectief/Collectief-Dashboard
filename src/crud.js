@@ -151,7 +151,7 @@ function getInsertRow(sec){
   return info.colHeaderRow;
 }
 
-// Gedeelde undo-serialisatie van een NTD-taakrij → kolomwaarden A..P.
+// Gedeelde undo-serialisatie van een NTD-taakrij → kolomwaarden A..S.
 // N (placeholder), O (offerte-fase) en P (aannemerslijst) horen erbij: zo verliest een
 // undo van een afgerond/verwijderd OFFERTE-traject niet stil de opgebouwde aannemerslijst
 // + de expliciete fase. Voor niet-offerte secties zijn r.fase/r.aannemers leeg (harmloos).
@@ -163,6 +163,8 @@ export function serializeNtdUndo(r){
   v.push('', '', r.subcategorie||'', r.opvolgdatum||'', r.herhaalId||'', '', r.fase||'', r.aannemers||''); // I, J, K=sub, L, M, N, O=fase, P=aannemers
   v.push(r.taakId||'');   // Q — het vaste taaknummer moet de undo overleven, anders krijgt de
                           // teruggezette taak een nieuwe identiteit en is de oude een wees.
+  v.push(r.bundelId||''); // R — om dezelfde reden: zonder dit valt de taak na een undo uit zijn bundel.
+  v.push(r.bundelVolg||''); // S
   return v;
 }
 

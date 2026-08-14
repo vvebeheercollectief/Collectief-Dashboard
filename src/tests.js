@@ -2465,7 +2465,7 @@ import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
   (()=>{
     const off={_sec:'OFFERTE-TRAJECTEN',code:'CH1',naam:'VvE 1',datumAangevraagd:'1 jun 2026',offertes:'2/3',behandelaar:'Jer',deadline:'10 jun 2026',opmerkingen:'x',subcategorie:'dak',opvolgdatum:'',herhaalId:'',fase:'bij_vve',aannemers:'Bakker|1\nDe Vries|0'};
     const v=serializeNtdUndo(off);
-    eq('undo-serialisatie offerte: 17 kolommen (A..Q, incl. taaknummer)', v.length, 17);
+    eq('undo-serialisatie offerte: 19 kolommen (A..S, incl. taaknummer + bundel)', v.length, 19);
     eq('undo-serialisatie offerte: fase op kolom O (idx 14)', v[14], 'bij_vve');
     eq('undo-serialisatie offerte: aannemers op kolom P (idx 15)', v[15], 'Bakker|1\nDe Vries|0');
     eq('undo-serialisatie offerte: subcategorie blijft kolom K (idx 10)', v[10], 'dak');
@@ -2473,7 +2473,7 @@ import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
   (()=>{
     const opp={_sec:'OPPAKKEN',code:'CH2',naam:'VvE2',actiepunt:'iets',deadline:'5 jun 2026',behandelaar:'Cihad',prioriteit:'Hoog',opmerkingen:'',inBehandeling:'FALSE',subcategorie:'',opvolgdatum:'',herhaalId:''};
     const v=serializeNtdUndo(opp);
-    eq('undo-serialisatie OPPAKKEN: 17 kolommen (A..Q)', v.length, 17);
+    eq('undo-serialisatie OPPAKKEN: 19 kolommen (A..S)', v.length, 19);
     eq('undo-serialisatie OPPAKKEN: O leeg (geen offerte-velden)', v[14], '');
     eq('undo-serialisatie OPPAKKEN: P leeg', v[15], '');
     eq('undo-serialisatie: taaknummer overleeft op kolom Q (idx 16)',
@@ -3666,6 +3666,19 @@ import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
     const { data: d2 } = parseSections([rows[0], rows[1], geerfd]);
     eq('bundel: geërfde TRUE/FALSE telt als leeg',
        [d2.OPPAKKEN[0].bundelId, d2.OPPAKKEN[0].bundelVolg], ['','']);
+  })();
+
+  (() => {
+    const taak = { _sec:'OPPAKKEN', code:'311212', naam:'Testflat 1', actiepunt:'Iets doen',
+                   deadline:'', behandelaar:'Jer', prioriteit:'', opmerkingen:'', inBehandeling:'',
+                   subcategorie:'', opvolgdatum:'', herhaalId:'', fase:'', aannemers:'',
+                   taakId:'Tkop', bundelId:'Tkop', bundelVolg:'0' };
+    const v = serializeNtdUndo(taak);
+    eq('undo: 19 velden lang', v.length, 19);
+    eq('undo: taakId op index 16', v[16], 'Tkop');
+    eq('undo: bundelId op index 17', v[17], 'Tkop');
+    eq('undo: bundelVolg op index 18', v[18], '0');
+    eq('undo: herhaalId blijft op index 12', v[12], '');
   })();
 
   const totOk = ok + _tOk, totFail = fail + _tFail;

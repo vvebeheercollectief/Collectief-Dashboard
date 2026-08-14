@@ -152,12 +152,25 @@ function zetKopOpen(aan){
 // terug (§4.2). Wat plat precies uitzet staat bij `bundelWeergave` in bundel.js.
 // Puur, dus los testbaar.
 function isPlatteWeergave({ q, fCode, beh, prio, status, sortKey, bulk }){
-  return !!(q || fCode || beh || prio || status || sortKey || bulk);
+  return erIsGefilterd({ q, fCode, beh, prio, status }) || !!sortKey || !!bulk;
+}
+
+// "Er is gefilterd": de zoekterm, de drie filtervelden en de statuspil. Als eigen helper omdat
+// renderNtd dit antwoord op TWEE plekken nodig heeft — hierboven voor de platte weergave, en als
+// `filtered`-vlag aan renderTbody, die bij een lege lijst kiest tussen "Niets gevonden — pas je
+// filter of zoekopdracht aan" en "Geen resultaten" (zie `emptyRow` in util.js). Stonden die twee
+// als losse expressies naast elkaar, dan werkt een zesde filter er later maar op één plek bij: de
+// lijst blijft dan gestapeld terwijl er wél gefilterd is — precies wat §4.2 moet voorkomen — en er
+// faalt niets.
+// Sortering en bulk horen hier bewust NIET bij: die maken de lijst wél plat, maar ze halen er geen
+// rij uit. "Pas je filter aan" zou de gebruiker dan naar een filter sturen dat er niet is.
+function erIsGefilterd({ q, fCode, beh, prio, status }){
+  return !!(q || fCode || beh || prio || status);
 }
 
 // Haal subtaken uit de vlakke lijst weg wanneer hun zichtbare kop in HETZELFDE tabblad staat —
 // die worden dan in het bundelpaneel onder die kop getekend. Staat de kop in een ander tabblad,
-// dan blijft de rij gewoon staan, met het ⛓-merkje erop (§3.2b). Zo wordt elke taak per tabblad
+// dan blijft de rij gewoon staan, met het ⛓-merkje erop (§4.1). Zo wordt elke taak per tabblad
 // precies één keer getoond en blijven de tellers kloppen.
 // Het predikaat zelf staat in bundel.js, gedeeld met het ⛓-merkje: precies de rijen die hier
 // blijven staan krijgen daar een merkje, en omgekeerd (zie `wordtGeabsorbeerd`).
@@ -229,7 +242,14 @@ function springNaarBundel(bundelId){
   const id = bundelSleutel(bundelId);
   const leden = bundelMetId(bouwBundelIndex(D.ntd, D.af), id);
   const kop = leden && zichtbareKop(leden);
-  if (!kop) return;
+  // Niets te tonen: de bundel is tussen tekenen en klikken tot één lid gekrompen of helemaal
+  // afgerond. Wél melden — zonder melding klikt de gebruiker op een knop die zichtbaar in de rij
+  // staat en gebeurt er precies niets, en dan leest dat als een kapot dashboard.
+  if (!kop){
+    showToast('Deze bundel bestaat niet meer','Er is nog één taak over of alles is afgerond.',
+              null,'label',{ geenSysteemmelding:true, geenDedup:true });
+    return;
+  }
   openBundel(id);
   const gewist = wisNtdFilters();
   const zichtbaar = setNtd(kop.r._sec);   // wist de bulk-selectie en hertekent de hele lijst
@@ -247,9 +267,12 @@ function springNaarBundel(bundelId){
     if (tr && tr.scrollIntoView) tr.scrollIntoView({ block:'center' });
   }
   // Geen systeemmelding: dit is uitleg bij een handeling die de gebruiker net zélf deed, geen
-  // gebeurtenis waarvoor hij uit een ander venster gehaald hoort te worden.
+  // gebeurtenis waarvoor hij uit een ander venster gehaald hoort te worden. Om dezelfde reden
+  // geen ontdubbeling: die bestaat om een herhaalde GEBEURTENIS in te slikken, maar wie binnen
+  // vijftien seconden twee keer springt, ziet zijn filters dan de tweede keer zonder uitleg
+  // verdwijnen.
   if (gewist) showToast('Bundel geopend','Zoekterm en filters zijn gewist — anders valt de bundel buiten beeld.',
-                        null,'label',{ geenSysteemmelding:true });
+                        null,'label',{ geenSysteemmelding:true, geenDedup:true });
 }
 
 function renderNtd(){
@@ -261,8 +284,10 @@ function renderNtd(){
   // Eén bundelweergave per render: de index plus de vlaggen `stapel` en `merk`. Wat die betekenen
   // en waarom ze samen bepaald worden staat bij `bundelWeergave` — bewust dáár, zodat het getest
   // kan worden (deze functie zelf niet — die leest de DOM).
-  const plat=isPlatteWeergave({ q, fCode, beh:fBeh, prio:fPrio, status:state.ntdStatus,
-                                sortKey:state.ntdSort.key, bulk:state.bulkMode });
+  // Eén set filterwaarden voor beide vragen ('is de lijst plat?' en 'is er gefilterd?'), zodat de
+  // gedeelde termen niet op twee plekken los uitgeschreven staan — zie `erIsGefilterd`.
+  const filters={ q, fCode, beh:fBeh, prio:fPrio, status:state.ntdStatus };
+  const plat=isPlatteWeergave({ ...filters, sortKey:state.ntdSort.key, bulk:state.bulkMode });
   const bw=bundelWeergave({ plat, bulk:state.bulkMode },D.ntd,D.af);
   // Op `state` en niet als parameter: de rij-opmaak zit in render-tabel.js en heeft geen ingang
   // hiervoor. Die leest hem daar straks uit — bewust dezelfde momentopname als de absorptie
@@ -293,7 +318,7 @@ function renderNtd(){
   const zichtbaar=absorbeer(sorteerNtd(filterNtd(D.ntd[state.activeNtd]||[],q,fCode,fBeh,fPrio,state.activeNtd,state.ntdStatus),state.ntdSort),state.activeNtd,bw);
   renderThead('ntd-thead',[...(state.bulkMode?['']:[]),...SECS[state.activeNtd].cols,''],SECS[state.activeNtd].css,
     {active:state.ntdSort, keyFor:ntdSorteerKey});
-  renderTbody('ntd-tbody',zichtbaar,state.activeNtd,pgs.ntd,false,!!(q||fCode||fBeh||fPrio||state.ntdStatus));
+  renderTbody('ntd-tbody',zichtbaar,state.activeNtd,pgs.ntd,false,erIsGefilterd(filters));
   renderPag('ntd-pag',zichtbaar.length,pgs.ntd,'ntd');
   renderNtdCrossList(state.activeNtd);
   // De getekende lijst gaat terug naar de aanroeper: na filteren, sorteren én absorberen, dus in
@@ -451,7 +476,7 @@ function setAf(s){state.activeAf=s;pgs.af=1;renderAf()}
 
 export {
   renderNtdStats, renderNtdDonut, renderNtd, setNtd, filterNtd, sorteerNtd, ntdSorteerKey, renderAf, setAf,
-  kopOpen, zetKopOpen, toggleBundel, springNaarBundel, wisNtdFilters, absorbeer, isPlatteWeergave,
+  kopOpen, zetKopOpen, toggleBundel, springNaarBundel, wisNtdFilters, absorbeer, isPlatteWeergave, erIsGefilterd,
   offerteAannemerPaneel, offerteAannSamenvatting,
   ALVO_ICONS, renderAlvo, ALVO_COLS, ALVO_LABELS, flagPill, _recomputeAlvoStatus, toggleAlvoFlag, statusIco, renderAlfa,
   renderThead, renderTbody, bepaalStil, bouwStilIndex, _zetStilIndex, deadlineCel, rowNtd, rowAf, renderPag,

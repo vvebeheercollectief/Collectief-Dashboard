@@ -15,7 +15,7 @@
 // groeien tot de eerstvolgende renderAll uit de poll — dat kost geheugen, geen correctheid.
 import { esc, taakTitel, kortDatum, taakActieKnoppen } from "./util.js";
 import { SECS } from "./config.js";
-import { zichtbareKop, bundelVan, wordtGeabsorbeerd, bundelSleutel } from "./bundel.js";
+import { zichtbareKop, bundelVan, wordtGeabsorbeerd, bundelSleutel, zelfdeTaak } from "./bundel.js";
 import { ico } from "./icons.js";
 import { state } from "./state.js";
 
@@ -67,7 +67,8 @@ function subRegel(m, i){
     // Maar géén ⠿-handvat — een afgerond lid slepen zou niets doen, en een dood handvat
     // belooft iets wat de functie niet waarmaakt. De lege plaatshouder houdt de kolommen recht
     // omdat `.bdl-h` in styles.css een VASTE breedte heeft; haalt iemand die weg, dan krimpt deze
-    // span tot zijn padding en verspringt elke afgeronde regel naar links.
+    // span tot niets (de padding daar is horizontaal 0) en verspringt elke afgeronde regel
+    // naar links.
     return `<div class="bdl-sub af" data-taak="${esc(tekst(r.taakId))}"><span class="bdl-h" aria-hidden="true"></span>`
          + `<span class="bdl-num">${i+1}</span>`
          + `<span class="bdl-dot" style="background:${kleur}"></span>`
@@ -121,11 +122,14 @@ export function bundelMerkje(r, bw, sec){
   if (!leden) return '';
   const kop = zichtbareKop(leden);
   if (!kop) return '';
+  // 'Ben ik zelf de kop' via dezelfde `zelfdeTaak` als de absorptie, en niet via objectidentiteit:
+  // deze twee moeten elkaars tegenpool blijven, dus ze horen een rij op precies dezelfde manier
+  // te herkennen (zie de voorwaarde bij `wordtGeabsorbeerd`).
   if (bw.stapel){
-    if (kop.r === r) return '';
+    if (zelfdeTaak(kop.r, r)) return '';
     if (wordtGeabsorbeerd(r, bw.ix, sec)) return '';
   }
-  const titel = (kop.r === r ? `Bundel van ${leden.length} taken` : `Hoort bij: ${taakTitel(kop.r)}`)
+  const titel = (zelfdeTaak(kop.r, r) ? `Bundel van ${leden.length} taken` : `Hoort bij: ${taakTitel(kop.r)}`)
               + ' — klik om de bundel te openen';
   return `<button type="button" class="bdl-merk" data-action="bundel-spring" data-bundel="${esc(tekst(r.bundelId))}" title="${esc(titel)}" aria-label="${esc(titel)}">⛓</button>`;
 }

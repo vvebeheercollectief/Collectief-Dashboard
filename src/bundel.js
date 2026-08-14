@@ -125,6 +125,25 @@ export function bundelMetId(index, id){
 // Dezelfde vraag vanuit een taakrij: in welke bundel zit deze taak?
 export function bundelVan(index, r){ return bundelMetId(index, r && r.bundelId); }
 
+// Zijn dit twee verwijzingen naar dezelfde taak? Op het vaste taaknummer, met het rijnummer als
+// terugval voor rijen die er nog geen hebben (van vóór de backfill, of aangemaakt door een oude
+// client). Die terugval is alleen betrouwbaar binnen één tabblad — `_row` is het regelnummer ín het
+// blad, dus rij 12 van 'Nog Te Doen' en rij 12 van 'Afgerond' zijn verschillende taken. Dat is bij
+// beide gebruikers gedekt: `wordtGeabsorbeerd` en `bundelMerkje` vergelijken een OPEN kop (die komt
+// per definitie uit 'Nog Te Doen') met een rij uit de takenlijst van datzelfde blad.
+//
+// Bewust NIET op objectidentiteit — zie de voorwaarde bij `wordtGeabsorbeerd`. Twee verschillende
+// rijen die hetzelfde taaknummer dragen (een dubbele rij in de Sheet, precies wat `checkNummers`
+// meldt) tellen zo als dezelfde taak. Dat is de veilige kant op: het gevolg is dat er niets wordt
+// opgeslokt en beide rijen blijven staan.
+export const zelfdeTaak = (a, b) => {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const na = tekst(a.taakId), nb = tekst(b.taakId);
+  if (na || nb) return na === nb;          // één mét en één zónder nummer = verschillende taken
+  return a._row != null && a._row === b._row;
+};
+
 // Wordt deze rij in dít tabblad opgeslokt door het paneel van zijn kop? Waar = de rij hoort hier
 // niet in de vlakke lijst, want hij wordt onder de kop getekend.
 //
@@ -134,12 +153,20 @@ export function bundelVan(index, r){ return bundelMetId(index, r && r.bundelId);
 // uit elkaar: een merkje op een rij die nergens meer staat, of een rij die blijft staan zonder
 // enige aanwijzing dat hij bij een bundel hoort. Beide gevallen geven geen fout — ze zien er
 // alleen verkeerd uit.
+//
+// Voorwaarde aan de aanroeper: GEEN. `index` en `r` hoeven nadrukkelijk niet uit dezelfde
+// momentopname te komen, en dáárom gaat 'ben ik zelf de kop' via `zelfdeTaak` en niet via
+// objectidentiteit. Vandaag komen ze wél uit dezelfde synchrone renderNtd, maar deze functie is
+// geëxporteerd en het gevolg van een schending is hier het ergst denkbare: een kop uit een oudere
+// leesronde is een ánder object met hetzelfde taaknummer, zou `kop.r === r` missen, doorvallen
+// naar de _sec-regel en zichzelf wegabsorberen — de taak verdwijnt dan uit de lijst. Vergelijken
+// op identiteit is dus niet 'strenger', het is stiller kapot.
 export function wordtGeabsorbeerd(r, index, sec){
   const leden = bundelVan(index, r);
   if (!leden) return false;
   const kop = zichtbareKop(leden);
-  if (!kop || kop.r === r) return false;   // geen open lid meer, of zelf de kop → blijft staan
-  return kop.r._sec === sec;               // kop in hetzelfde tabblad → het paneel tekent hem
+  if (!kop || zelfdeTaak(kop.r, r)) return false;  // geen open lid meer, of zelf de kop → blijft staan
+  return kop.r._sec === sec;                       // kop in hetzelfde tabblad → het paneel tekent hem
 }
 
 // Mag `bron` als subtaak onder `doel` komen te hangen?

@@ -1244,8 +1244,8 @@ body.bulk #chat-fab{display:none}
 .bdl-sub.sleep{opacity:.55;background:var(--sur);box-shadow:0 6px 18px rgba(0,0,0,.13)}
 /* Vaste breedte, want een afgerond lid krijgt hier een LEGE plaatshouder in plaats van het
    ⠿-handvat (zie subRegel in render-bundel.js). Liet je de breedte aan de inhoud over, dan is die
-   plaatshouder alleen zijn padding en schuiven nummer, bolletje en tekst van élk afgerond lid ruim
-   9px naar links t.o.v. de open leden. */
+   plaatshouder nul breed (de padding hieronder is horizontaal 0) en schuiven nummer, bolletje en
+   tekst van élk afgerond lid ruim 9px naar links t.o.v. de open leden. */
 .bdl-h{cursor:grab;color:var(--fnt);font-size:14px;flex:none;box-sizing:border-box;width:16px;
   padding:2px 0;text-align:center;user-select:none;touch-action:none}
 .bdl-h:active{cursor:grabbing}

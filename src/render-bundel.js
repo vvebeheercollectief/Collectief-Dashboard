@@ -6,20 +6,23 @@
 // er maar één plek is waar "wie is de kop" en "wat is de volgorde" beantwoord wordt.
 //
 // Eén voorwaarde aan de aanroeper: `bundelPaneelHtml` VULT de rij-cache (state._rowCache), net als
-// rowNtd, want de actieknoppen verwijzen via `data-rid` naar die cache. Roep hem dus aan binnen
-// dezelfde renderronde waarin renderAll die cache leeggemaakt heeft — één paneel los hertekenen
-// zou rid's toevoegen aan een cache die daarna niet meer bij de getekende tabel hoort.
+// rowNtd, want de actieknoppen verwijzen via `data-rid` naar die cache. De rid's die hij uitdeelt
+// moeten dus uit dezelfde renderronde komen als de tabel waar het paneel in belandt — in de
+// praktijk: alleen aanroepen vanuit rowNtd.
+// Nadrukkelijk NIET vereist is dat de cache vooraf leeg is. renderNtd bouwt de hele tbody opnieuw
+// op, dus elke getekende `data-rid` krijgt in die ronde een verse index en wijst naar de juiste
+// taak. Een renderNtd zonder voorafgaande renderAll (die de cache leegt) laat de cache alleen
+// groeien tot de eerstvolgende renderAll uit de poll — dat kost geheugen, geen correctheid.
 import { esc, taakTitel, kortDatum, taakActieKnoppen } from "./util.js";
 import { SECS } from "./config.js";
-import { zichtbareKop, bundelVan, wordtGeabsorbeerd } from "./bundel.js";
+import { zichtbareKop, bundelVan, wordtGeabsorbeerd, bundelSleutel } from "./bundel.js";
 import { ico } from "./icons.js";
 import { state } from "./state.js";
 
-// Bundelvelden komen uit de Sheet als string, maar het herordenen zet bundelId/bundelVolg
-// optimistisch op het rij-object en dat mag een getal zijn (zie `nulVeilig` in crud.js).
-// `.trim()` op een getal geeft een TypeError, en omdat deze module bij élke render draait zou
-// dat de hele takenlijst wegnemen. Zelfde reden als de gelijknamige helper in bundel.js.
-const tekst = v => String(v ?? '').trim();
+// Dezelfde normalisatie als overal (zie `bundelSleutel` in bundel.js). Lokaal een kortere naam,
+// want hij staat hier in elke sjabloon; het is bewust dezelfde functie en geen eigen kopie, omdat
+// de open-stand op precies deze sleutel wordt bewaard.
+const tekst = bundelSleutel;
 
 // Stand van de bundel: alles behalve de zichtbare kop zelf — dus precies wat in het paneel staat.
 // Zo blijft het getal stabiel terwijl een bundel vordert en de kop doorschuift.
@@ -88,9 +91,9 @@ function subRegel(m, i){
 }
 
 // Het hele paneel: alle leden behálve de zichtbare kop, op volgnummer.
-// Geen plat-vlag: platte weergave is een LEGE bundel-index (zie renderNtd), dan vindt `bundelVan`
-// niets, is er geen kop en komt deze functie niet aan de beurt. Zo staat de plat-of-niet-beslissing
-// op precies één plek — een tweede vlag hier zou stil kunnen afwijken van de absorptie.
+// Geen plat-vlag: of er gestapeld wordt staat in `stapel` van `bundelWeergave`, en rowNtd tekent
+// deze functie alleen als die aanstaat — dezelfde vlag waarop de absorptie besluit. Een eigen
+// tweede afweging hier zou daar stil van kunnen afwijken.
 export function bundelPaneelHtml(leden, kop){
   const rest = (leden||[]).filter(m => m !== kop);
   const id = esc(tekst(kop.r.bundelId));
@@ -100,16 +103,29 @@ export function bundelPaneelHtml(leden, kop){
        + `</div>`;
 }
 
-// Merkje voor een subtaak die in zijn EIGEN tabblad staat terwijl de kop elders zit.
-// Leeg wanneer er geen bundel is, of wanneer deze rij zelf de kop is.
-export function bundelMerkje(r, index, sec){
-  const leden = bundelVan(index, r);
+// Het ⛓-merkje op een taakrij. Krijgt `bw` (uit `bundelWeergave`) en niet los de index, want de
+// vraag "krijgt deze rij een merkje" hangt van álle drie de onderdelen daarvan af — en het antwoord
+// hoort op één plek te staan, niet half hier en half bij de aanroeper.
+//
+// Twee standen:
+//  - Gestapeld (`stapel`): alleen een subtaak waarvan de kop in een ánder tabblad zit. De kop draagt
+//    hier zelf de telpill, en een subtaak in hetzelfde tabblad staat al in het paneel. Die laatste
+//    toets loopt via `wordtGeabsorbeerd`, precies de tegenpool van de absorptie in render-lijsten.js.
+//  - Plat: élk lid van de bundel krijgt het merkje, kop incluis. Er is dan geen paneel en geen
+//    telpill, dus dit is de enige aanwijzing dát er een bundel is (§4.2) — en de enige weg terug
+//    naar de gestapelde weergave. Ook de kop, want een hoofdtaak met drie subtaken zou anders in een
+//    gefilterde lijst als een gewone losse taak staan.
+export function bundelMerkje(r, bw, sec){
+  if (!bw || !bw.merk) return '';
+  const leden = bundelVan(bw.ix, r);
   if (!leden) return '';
   const kop = zichtbareKop(leden);
-  if (!kop || kop.r === r) return '';
-  // Precies de tegenpool van de absorptie in render-lijsten.js, en daarom uit hetzelfde
-  // predikaat: staat de kop in dit tabblad, dan tekent zíjn paneel deze rij al.
-  if (wordtGeabsorbeerd(r, index, sec)) return '';
-  const titel = `Hoort bij: ${taakTitel(kop.r)} — klik om de bundel te openen`;
+  if (!kop) return '';
+  if (bw.stapel){
+    if (kop.r === r) return '';
+    if (wordtGeabsorbeerd(r, bw.ix, sec)) return '';
+  }
+  const titel = (kop.r === r ? `Bundel van ${leden.length} taken` : `Hoort bij: ${taakTitel(kop.r)}`)
+              + ' — klik om de bundel te openen';
   return `<button type="button" class="bdl-merk" data-action="bundel-spring" data-bundel="${esc(tekst(r.bundelId))}" title="${esc(titel)}" aria-label="${esc(titel)}">⛓</button>`;
 }

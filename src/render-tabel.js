@@ -144,17 +144,20 @@ function rowNtd(r,sec){
       : '';
   const extraPills = stilPill + opvolgPill;
   // ── Takenbundel ──
-  // state._bundelIx wordt door renderNtd voor déze render klaargezet en is een lege Map in
-  // platte weergave, zodat filters/sortering/bulk gegarandeerd de oude, vlakke tabel opleveren.
-  // Via state en niet via een parameter: renderTbody geeft alleen rij + sectie door.
-  const _ix    = state._bundelIx || null;
+  // state._bundelWeergave wordt door renderNtd voor déze render klaargezet (zie `bundelWeergave`):
+  // de index plus `stapel`/`merk`. Via state en niet via een parameter: renderTbody geeft alleen
+  // rij + sectie door.
+  const _bw    = state._bundelWeergave || null;
+  const _ix    = _bw ? _bw.ix : null;
   const _leden = _ix ? bundelVan(_ix, r) : null;
   const _kop   = _leden ? zichtbareKop(_leden) : null;
-  const _isKop = !!(_kop && _kop.r === r);
+  // Een kop-rij bestáát alleen in gestapelde weergave; plat tekent élk lid als gewone rij. Deze ene
+  // vlag houdt chevron, telpill, stapelrandjes en paneel bij elkaar: ze hangen alle vier aan _isKop.
+  const _isKop = !!(_bw && _bw.stapel && _kop && _kop.r === r);
   const _extra = _isKop ? bundelKopExtra(_leden, _kop) : { chevron:'', pill:'', open:false };
   const bdlChev = _extra.chevron;
-  // Pill op de kop; anders het ⛓-merkje voor een subtaak waarvan de kop in een ander tabblad staat.
-  const bdlNaam = _isKop ? _extra.pill : (_ix ? bundelMerkje(r, _ix, sec) : '');
+  // Op de kop de telpill; verder het ⛓-merkje — wie dat krijgt beslist bundelMerkje zelf.
+  const bdlNaam = _isKop ? _extra.pill : bundelMerkje(r, _bw, sec);
   switch(sec){
     case'OPPAKKEN':
       cells=`<td>${bdlChev}${vveCodeSpan(r.code, css)}</td>

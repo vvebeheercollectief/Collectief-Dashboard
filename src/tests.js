@@ -7,7 +7,7 @@ import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _s
 import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
-import { filterNtd, setNtd, renderNtd, renderNtdStats, renderAf, setAf, bepaalStil, bouwStilIndex, _zetStilIndex, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey, kopOpen, zetKopOpen, zetBundelOpen, absorbeer, isPlatteWeergave } from "./render-lijsten.js";
+import { filterNtd, setNtd, renderNtd, renderNtdStats, renderAf, setAf, bepaalStil, bouwStilIndex, _zetStilIndex, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey, kopOpen, zetKopOpen, toggleBundel, wisNtdFilters, absorbeer, isPlatteWeergave } from "./render-lijsten.js";
 import { HERO_VIEWS } from "./render-analytics.js";
 import { state, D, pgs } from "./state.js";
 import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel, renderVve } from "./render-vve.js";
@@ -30,7 +30,7 @@ import { checkSecties, checkRaster, checkRasters, checkNummers, checkAlles, RAST
 import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from "./subsidie-fase.js";
 import { toggleHerhaalStatus } from "./render-herhaal.js";
 import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
-import { bouwBundelIndex, bundelIndexVoor, zichtbareKop, isBundel, bundelVan, hernummerLeden, volgendeVolg, magKoppelen, wordtGeabsorbeerd } from "./bundel.js";
+import { bouwBundelIndex, bundelWeergave, zichtbareKop, isBundel, bundelVan, bundelMetId, hernummerLeden, volgendeVolg, magKoppelen, wordtGeabsorbeerd } from "./bundel.js";
 import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./render-bundel.js";
 
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
@@ -4224,14 +4224,21 @@ import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./r
     const kop = t('Tkop','Tkop','0','OPPAKKEN');
     const subZelfde = t('Tb','Tkop','10','OPPAKKEN');       // zelfde tabblad → wordt geabsorbeerd
     const subAnder  = t('Ta','Tkop','20','OFFERTE-TRAJECTEN'); // ander tabblad → blijft staan
-    const ix = bouwBundelIndex({ ...leeg, OPPAKKEN:[kop, subZelfde], 'OFFERTE-TRAJECTEN':[subAnder] }, leeg);
+    const bron = { ...leeg, OPPAKKEN:[kop, subZelfde], 'OFFERTE-TRAJECTEN':[subAnder] };
+    const ix = bouwBundelIndex(bron, leeg);
+    // De drie weergavestanden, altijd via `bundelWeergave` gebouwd en nooit met de hand: een zelf
+    // samengesteld {ix, stapel, merk} kan hier groen blijven terwijl de echte render iets anders doet.
+    const gestapeld = bundelWeergave({ plat:false, bulk:false }, bron, leeg);
+    const vlak      = bundelWeergave({ plat:true,  bulk:false }, bron, leeg);
+    const inBulk    = bundelWeergave({ plat:true,  bulk:true  }, bron, leeg);
 
     eq('absorptie: subtaak in hetzelfde tabblad verdwijnt uit de vlakke lijst',
-       absorbeer([kop, subZelfde], 'OPPAKKEN', ix).map(r => r.taakId), ['Tkop']);
+       absorbeer([kop, subZelfde], 'OPPAKKEN', gestapeld).map(r => r.taakId), ['Tkop']);
     eq('absorptie: subtaak in een ander tabblad blijft staan',
-       absorbeer([subAnder], 'OFFERTE-TRAJECTEN', ix).map(r => r.taakId), ['Ta']);
+       absorbeer([subAnder], 'OFFERTE-TRAJECTEN', gestapeld).map(r => r.taakId), ['Ta']);
     eq('absorptie: zonder bundels verandert er niets',
-       absorbeer([kop], 'OPPAKKEN', new Map()).map(r => r.taakId), ['Tkop']);
+       absorbeer([kop], 'OPPAKKEN', bundelWeergave({ plat:false, bulk:false }, leeg, leeg)).map(r => r.taakId),
+       ['Tkop']);
 
     // De absorptie en het ⛓-merkje moeten elkaars exacte tegenpool blijven: precies de rijen die
     // in de vlakke lijst blijven staan krijgen een merkje. Sinds beide `wordtGeabsorbeerd`
@@ -4241,14 +4248,20 @@ import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./r
     eq('absorptie: het gedeelde predikaat wijst alleen de opgeslokte rij aan',
        [wordtGeabsorbeerd(subZelfde, ix, 'OPPAKKEN'), wordtGeabsorbeerd(subAnder, ix, 'OFFERTE-TRAJECTEN'),
         wordtGeabsorbeerd(kop, ix, 'OPPAKKEN')], [true, false, false]);
-    const blijftStaan = r => absorbeer([r], r._sec, ix).length === 1;
+    const blijftStaan = r => absorbeer([r], r._sec, gestapeld).length === 1;
     eq('merkje: een geabsorbeerde subtaak krijgt er géén',
-       [blijftStaan(subZelfde), bundelMerkje(subZelfde, ix, 'OPPAKKEN')], [false, '']);
+       [blijftStaan(subZelfde), bundelMerkje(subZelfde, gestapeld, 'OPPAKKEN')], [false, '']);
     eq('merkje: een subtaak die blijft staan krijgt er wél een',
-       [blijftStaan(subAnder), bundelMerkje(subAnder, ix, 'OFFERTE-TRAJECTEN').includes('bundel-spring')],
+       [blijftStaan(subAnder), bundelMerkje(subAnder, gestapeld, 'OFFERTE-TRAJECTEN').includes('bundel-spring')],
        [true, true]);
     eq('merkje: de kop blijft staan en krijgt er geen',
-       [blijftStaan(kop), bundelMerkje(kop, ix, 'OPPAKKEN')], [true, '']);
+       [blijftStaan(kop), bundelMerkje(kop, gestapeld, 'OPPAKKEN')], [true, '']);
+
+    // Een bundel die tussen tekenen en klikken tot één lid krimpt, is geen bundel meer: dan valt er
+    // niets open te klappen en niets te tonen. Vandaar dat het opzoeken via `bundelMetId` gaat en
+    // niet via een kale `index.get()`.
+    eq('bundel: één overgebleven lid is geen bundel meer',
+       bundelMetId(bouwBundelIndex({ ...leeg, OPPAKKEN:[kop] }, leeg), 'Tkop'), null);
 
     eq('plat: standaardlijst is niet plat',
        isPlatteWeergave({ q:'', fCode:'', beh:'', prio:'', status:'', sortKey:null, bulk:false }), false);
@@ -4261,15 +4274,30 @@ import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./r
     eq('plat: statusfilter maakt plat',
        isPlatteWeergave({ q:'', fCode:'', beh:'', prio:'', status:'telaat', sortKey:null, bulk:false }), true);
 
-    // De schakel tussen die vlag en de weergave: plat MOET een lege index opleveren. Gaat dat om,
-    // dan blijft de absorptie hierboven bij een zoekopdracht gewoon draaien en verdwijnt een
-    // gevonden subtaak uit de trefferlijst — geen fout, alleen een treffer die er niet meer is.
-    const bronNtd = { ...leeg, OPPAKKEN:[kop, subZelfde], 'OFFERTE-TRAJECTEN':[subAnder] };
-    eq('plat: een platte render levert een lege bundelindex, een gewone render niet',
-       [bundelIndexVoor(true, bronNtd, leeg).size, bundelIndexVoor(false, bronNtd, leeg).size], [0, 1]);
-    eq('plat: met die lege index blijft de gezochte subtaak in de vlakke lijst staan',
-       absorbeer([kop, subZelfde], 'OPPAKKEN', bundelIndexVoor(true, bronNtd, leeg)).map(r => r.taakId),
-       ['Tkop', 'Tb']);
+    // De schakel tussen die vlag en de weergave. Plat zet de STAPEL uit maar het merkje juist niet:
+    // dat is in platte weergave de enige aanwijzing dat een taak bij een bundel hoort (§4.2) én de
+    // enige weg terug naar de gestapelde lijst. Een eerdere versie loste 'plat' op door de index
+    // leeg te maken; dat nam het merkje mee en maakte een bundel vanuit een gefilterde lijst
+    // onbereikbaar — zonder ook maar één fout in de console.
+    eq('plat: stapelen gaat uit, het merkje blijft; in bulk gaan ze allebei uit',
+       [[gestapeld.stapel, gestapeld.merk], [vlak.stapel, vlak.merk], [inBulk.stapel, inBulk.merk]],
+       [[true, true], [false, true], [false, false]]);
+    eq('plat: zonder stapel blijft de gezochte subtaak in de vlakke lijst staan',
+       absorbeer([kop, subZelfde], 'OPPAKKEN', vlak).map(r => r.taakId), ['Tkop', 'Tb']);
+    // Élk lid krijgt daar een merkje: de subtaak in hetzelfde tabblad (er is geen paneel dat hem
+    // opneemt), de subtaak elders, én de kop zelf — anders staat een hoofdtaak met drie subtaken in
+    // een gefilterde lijst als een gewone losse taak.
+    eq('plat: élk lid krijgt een merkje, de kop incluis',
+       [subZelfde, subAnder, kop].map(r => bundelMerkje(r, vlak, r._sec).includes('bundel-spring')),
+       [true, true, true]);
+    eq('plat: het merkje op de kop noemt de bundel en niet zichzelf',
+       bundelMerkje(kop, vlak, 'OPPAKKEN').includes('Bundel van 3 taken'), true);
+    // In bulk-modus geen merkje: klikken springt naar een ander tabblad en `setNtd` wist daarbij de
+    // bulk-selectie. Een half gemaakte selectie mag niet met één misklik verdwijnen.
+    eq('bulk: in bulk-modus staat er geen merkje in de rij',
+       [subZelfde, subAnder, kop].map(r => bundelMerkje(r, inBulk, r._sec)), ['', '', '']);
+    eq('bulk: en er wordt niets geabsorbeerd — élke taak moet aanvinkbaar zijn',
+       absorbeer([kop, subZelfde], 'OPPAKKEN', inBulk).map(r => r.taakId), ['Tkop', 'Tb']);
   })();
 
   (() => {
@@ -4282,8 +4310,10 @@ import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./r
     const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
     const kop = t('Tkop','Tkop','0','VERGADERVERZOEKEN','ALV');
     const s1  = t('Tb','Tkop','10','OPPAKKEN','Aannemer bellen');
-    const ix  = bouwBundelIndex({ ...leeg, VERGADERVERZOEKEN:[kop], OPPAKKEN:[s1] },
-                                { ...leeg, 'OFFERTE-TRAJECTEN':[ t('Ta','Tkop','20','OFFERTE-TRAJECTEN','Offertes') ] });
+    const bronNtd = { ...leeg, VERGADERVERZOEKEN:[kop], OPPAKKEN:[s1] };
+    const bronAf  = { ...leeg, 'OFFERTE-TRAJECTEN':[ t('Ta','Tkop','20','OFFERTE-TRAJECTEN','Offertes') ] };
+    const ix  = bouwBundelIndex(bronNtd, bronAf);
+    const gestapeld = bundelWeergave({ plat:false, bulk:false }, bronNtd, bronAf);
     const leden = ix.get('Tkop');
 
     eq('pill: telt alles behalve de kop', bundelStand(leden, zichtbareKop(leden)), { klaar:1, totaal:2 });
@@ -4311,9 +4341,11 @@ import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./r
     //    belooft iets wat de functie niet waarmaakt.
     eq('paneel: afgerond lid heeft geen sleep-handvat', afRegel.includes('data-bdl-grip'), false);
     eq('paneel: een open lid heeft dat handvat wél', openRegel.includes('data-bdl-grip'), true);
-    // 4. Plat = een LEGE index (zie renderNtd), niet een tweede vlag op deze functie: dan vindt
-    //    bundelVan niets en komt er sowieso geen paneel. Zo blijft de plat-beslissing op één plek.
-    eq('paneel: een lege index levert geen bundel en dus geen paneel', bundelVan(new Map(), s1), null);
+    // 4. Of er gestapeld wordt beslist rowNtd op één vlag (`stapel` uit bundelWeergave); deze
+    //    functie heeft daar geen eigen mening over en krijgt bij een platte render simpelweg geen
+    //    beurt. Wat hij wél moet overleven is een lege index — bij een vroege render zijn de
+    //    gegevens er nog niet.
+    eq('paneel: zonder bundel in de index is er geen kop en dus geen paneel', bundelVan(new Map(), s1), null);
     // Een subtaak is een volwaardige taak: exact dezelfde drie acties als een tabelrij.
     eq('paneel: open subtaak heeft de drie rij-acties',
        ['taak-bewerken','taak-wegleggen','taak-afronden'].map(a => openRegel.includes(`data-action="${a}"`)),
@@ -4348,8 +4380,8 @@ import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./r
     } finally { state.bundelOpen = bewaardOpen; }
 
     eq('merkje: subtaak met kop elders krijgt een merkje',
-       bundelMerkje(s1, ix, 'OPPAKKEN').includes('bundel-spring'), true);
-    eq('merkje: de kop zelf krijgt geen merkje', bundelMerkje(kop, ix, 'VERGADERVERZOEKEN'), '');
+       bundelMerkje(s1, gestapeld, 'OPPAKKEN').includes('bundel-spring'), true);
+    eq('merkje: de kop zelf krijgt geen merkje', bundelMerkje(kop, gestapeld, 'VERGADERVERZOEKEN'), '');
   })();
 
   // ── De gestapelde rij in de tabel ──
@@ -4430,13 +4462,45 @@ import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./r
     eq('toggle: bundel-toggle bestaat als actie', typeof ACTIONS['bundel-toggle'], 'function');
     eq('toggle: bundel-spring bestaat als actie', typeof ACTIONS['bundel-spring'], 'function');
     state.bundelOpen = new Set();
-    zetBundelOpen('Tkop', true);
+    toggleBundel('Tkop');
     eq('toggle: openzetten onthouden', state.bundelOpen.has('Tkop'), true);
-    zetBundelOpen('Tkop', false);
+    toggleBundel('Tkop');
     eq('toggle: dichtzetten onthouden', state.bundelOpen.has('Tkop'), false);
+    // Rommel om de sleutel heen mag het omschakelen niet in tweeën breken. Deed de aanroeper de
+    // vergelijking zelf, dan kon de getrimde sleutel de Set in gaan terwijl `has()` naar de
+    // ongetrimde zoekt: een bundel die wel opent maar nooit meer sluit.
+    toggleBundel(' Tkop ');
+    eq('toggle: een sleutel met spaties opent dezelfde bundel', state.bundelOpen.has('Tkop'), true);
+    toggleBundel('Tkop');
+    eq('toggle: … en sluit hem daarna gewoon weer', state.bundelOpen.has('Tkop'), false);
+
+    // Het opruimen dat bij het springen hoort: alles wat de lijst plat maakt gaat terug op
+    // standaard, en de functie meldt of er iets stond — daar hangt de uitleg aan de gebruiker aan.
+    // Bulk-modus zit er bewust niet bij (een halve selectie mag niet sneuvelen); het merkje wordt
+    // in bulk-modus dan ook niet getekend.
+    (() => {
+      const velden = ['s-ntd','f-code-ntd','f-beh-ntd','f-prio-ntd'];
+      const vWaarden = velden.map(id => document.getElementById(id).value);
+      const vStatus = state.ntdStatus, vSort = state.ntdSort;
+      try {
+        velden.forEach(id => document.getElementById(id).value = '');
+        state.ntdStatus = ''; state.ntdSort = { key:null, asc:true };
+        eq('wissen: met een schone lijst valt er niets te wissen', wisNtdFilters(), false);
+        document.getElementById('s-ntd').value = 'dak';
+        document.getElementById('f-code-ntd').value = '311212';
+        state.ntdStatus = 'telaat'; state.ntdSort = { key:'deadline', asc:false };
+        eq('wissen: staat er wél iets, dan meldt hij dat', wisNtdFilters(), true);
+        eq('wissen: zoekveld, codefilter, statuspil en kolomsortering staan weer op standaard',
+           [document.getElementById('s-ntd').value, document.getElementById('f-code-ntd').value,
+            state.ntdStatus, state.ntdSort.key], ['', '', '', null]);
+      } finally {
+        velden.forEach((id, i) => document.getElementById(id).value = vWaarden[i]);
+        state.ntdStatus = vStatus; state.ntdSort = vSort;
+      }
+    })();
 
     // En dan de weg die de gebruiker zelf aflegt: een ECHTE klik op de getekende chevron. De
-    // asserts hierboven roepen zetBundelOpen rechtstreeks aan en blijven groen als `data-bundel`
+    // asserts hierboven roepen toggleBundel rechtstreeks aan en blijven groen als `data-bundel`
     // op de knop ontbreekt of anders heet — de bundel opent dan in de app niet, en omdat de
     // rij-klikhandler [data-action] laat passeren gebeurt er precies niets.
     const bewaardNtd = D.ntd, bewaardAf = D.af, bewaardSec = state.activeNtd, bewaardPg = pgs.ntd;
@@ -4448,36 +4512,52 @@ import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./r
       D.ntd = { ...leeg, OPPAKKEN: [ t('Tkop','0'), t('Tb','10') ] };
       state.activeNtd = 'OPPAKKEN'; pgs.ntd = 1; state.bundelOpen = new Set();
       renderNtd();
-      // Elke keer opnieuw opzoeken: zetBundelOpen hertekent, dus na een klik is de knop van
+      // Elke keer opnieuw opzoeken: toggleBundel hertekent, dus na een klik is de knop van
       // daarvoor losgekoppeld van het document en zou een tweede klik nergens aankomen.
-      const klik = () => {
-        const chev = document.querySelector('#ntd-tbody [data-action="bundel-toggle"]');
-        if (chev) chev.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        return !!chev;
+      const klik = (sel) => {
+        const knop = document.querySelector('#ntd-tbody ' + sel);
+        if (knop) knop.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        return !!knop;
       };
       const panelen = () => document.querySelectorAll('#ntd-tbody .bdl-paneel').length;
-      truthy('toggle: er staat een chevron in de tabel om op te klikken', klik());
+      truthy('toggle: er staat een chevron in de tabel om op te klikken',
+             klik('[data-action="bundel-toggle"]'));
+      // De stand én het paneel apart toetsen. Blijft alleen `panelen()` op nul steken, dan wordt de
+      // rij niet goed getekend; blijft óók `bundelOpen` leeg, dan is de klik zelf nooit bij de
+      // handler aangekomen (delegatie nog niet gekoppeld, of een oude service worker die verouderde
+      // code serveert). Dat zijn twee heel verschillende zoektochten.
+      eq('toggle: de klik komt bij de handler aan', state.bundelOpen.has('Tkop'), true);
       eq('toggle: een klik op de chevron opent het paneel', panelen(), 1);
-      truthy('toggle: de chevron staat er na het openen nog steeds', klik());
+      truthy('toggle: de chevron staat er na het openen nog steeds',
+             klik('[data-action="bundel-toggle"]'));
+      eq('toggle: de tweede klik komt óók aan', state.bundelOpen.has('Tkop'), false);
       eq('toggle: nog een klik sluit het paneel weer', panelen(), 0);
 
-      // Het ⛓-merkje: kop in een ánder tabblad dan de subtaak. Twee dingen moeten gebeuren, en
-      // alleen samen zijn ze nuttig: van tabblad wisselen én de bundel openzetten. Springt hij
-      // wel maar staat de bundel dicht, dan kijkt de gebruiker naar een dichtgeklapte rij en
-      // moet hij alsnog zoeken waar zijn subtaak gebleven is.
+      // Het ⛓-merkje: kop in een ánder tabblad dan de subtaak, en met een filter aan. Juist die
+      // stand is waar het merkje voor bestaat: een filter maakt de lijst plat, dus er is geen
+      // paneel, geen chevron en geen stapel — het merkje is dan de enige aanwijzing (§4.2).
+      // Drie dingen moeten gebeuren en alleen samen leveren ze iets op: van tabblad wisselen, de
+      // bundel openzetten en het filter wissen. Blijft dat filter staan, dan is ook het doeltabblad
+      // nog plat en verschijnt daar evenmin een paneel — dan wisselt het knopje alleen van tabblad.
       D.ntd = { ...leeg, OPPAKKEN: [ t('Tb','10') ],
                 VERGADERVERZOEKEN: [ { ...t('Tkop','0'), _sec:'VERGADERVERZOEKEN' } ] };
       state.activeNtd = 'OPPAKKEN'; pgs.ntd = 1; state.bundelOpen = new Set();
+      document.getElementById('f-code-ntd').value = '311212';
       renderNtd();
-      const merk = document.querySelector('#ntd-tbody [data-action="bundel-spring"]');
-      truthy('spring: subtaak met de kop elders krijgt een klikbaar merkje', !!merk);
-      if (merk) merk.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      eq('spring: met een filter aan staat de subtaak er als gewone rij',
+         document.querySelectorAll('#ntd-tbody tr[data-row]').length, 1);
+      truthy('spring: en krijgt hij een klikbaar merkje, óók met dat filter aan',
+             klik('[data-action="bundel-spring"]'));
       eq('spring: de klik brengt je naar het tabblad van de kop', state.activeNtd, 'VERGADERVERZOEKEN');
       eq('spring: en zet de bundel daar open', state.bundelOpen.has('Tkop'), true);
+      eq('spring: het filter is gewist, anders bleef de doellijst plat',
+         document.getElementById('f-code-ntd').value, '');
       eq('spring: het paneel staat er dan ook echt', panelen(), 1);
     } finally {
       D.ntd = bewaardNtd; D.af = bewaardAf; state.activeNtd = bewaardSec;
-      pgs.ntd = bewaardPg; state.bundelOpen = new Set(); renderNtd();
+      pgs.ntd = bewaardPg; state.bundelOpen = new Set();
+      document.getElementById('f-code-ntd').value = '';
+      renderNtd();
     }
   })();
 

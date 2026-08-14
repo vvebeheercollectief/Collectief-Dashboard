@@ -18,11 +18,22 @@
 // dus zelf al veilig zijn (zie daar).
 import { SKEYS } from "./config.js";
 
-// Velden uit de Sheet komen vandaag altijd als string binnen, maar het herordenen zet bundelId en
-// bundelVolg optimistisch op het rij-object (zie `nulVeilig` in crud.js). Eén getal zou hier een
-// `.trim is not a function` geven, en omdat `bouwBundelIndex` bij élke render draait, zou dat de
-// hele takenlijst wegnemen. Daarom overal langs deze ene helper.
-const tekst = v => String(v ?? '').trim();
+// De sleutel waaronder een bundel bekend staat: `bundelId`, en het taaknummer waar dat naar
+// verwijst. Die twee leven in dezelfde ruimte — het bundelnummer ís het taaknummer van de
+// hoofdtaak — dus ze worden ook op dezelfde manier genormaliseerd.
+//
+// Waarom er genormaliseerd wordt: velden uit de Sheet komen vandaag altijd als string binnen, maar
+// het herordenen zet bundelId en bundelVolg optimistisch op het rij-object (zie `nulVeilig` in
+// crud.js). Eén getal zou hier een `.trim is not a function` geven, en omdat `bouwBundelIndex` bij
+// élke render draait, zou dat de hele takenlijst wegnemen.
+//
+// Waarom geëxporteerd: de open-stand van een bundel (state.bundelOpen) wordt op deze sleutel
+// bewaard, en die Set wordt op meerdere plekken gelezen én geschreven. Normaliseerde de schrijfkant
+// anders dan de leeskant, dan gaat de getrimde sleutel de Set in terwijl `has()` naar de ongetrimde
+// zoekt: de bundel opent dan wel, maar sluit nooit meer. Met één functie voor álle aanraakpunten
+// kan dat verschil niet meer ontstaan.
+export const bundelSleutel = v => String(v ?? '').trim();
+const tekst = bundelSleutel;
 
 // Volgnummer als getal. Ontbrekend of onleesbaar → achteraan, nooit een crash: een handmatig
 // leeggemaakte cel in de Sheet mag de bundel niet laten omvallen.
@@ -64,15 +75,26 @@ export function bouwBundelIndex(ntd, af){
   return m;
 }
 
-// De index voor één render. Platte weergave (zoeken, filteren, sorteren, bulk) is hier een LEGE
-// index en géén tweede vlag: dan vindt zowel de absorptie als de rij-opmaak nergens een bundel en
-// valt de stapelweergave in één keer weg. Zo blijft de plat-of-niet-beslissing op precies één plek.
+// Wat de bundelweergave in déze render mag doen: de index plus twee vlaggen. Eén producent, zodat
+// er geen render kan bestaan die de ene helft van de weergave aan- en de andere uitzet.
+//
+//  - `stapel` dekt álles wat de bundel als één blok toont: chevron, telpill, stapelrandjes, het
+//    paneel én de absorptie van subtaken uit de vlakke lijst. Dat gaat uit zodra de lijst plat is
+//    (zoeken, filteren, kolomsortering, bulk): een treffer mag niet verstopt zitten in een
+//    dichtgeklapte bundel en een vaste groepering is in strijd met een gekozen sortering (§4.2).
+//  - `merk` (het ⛓-merkje) blijft in platte weergave juist wél staan — daar is het volgens §4.2 de
+//    ENIGE aanwijzing dat een taak bij een bundel hoort. Een eerdere versie loste 'plat' op door de
+//    index leeg te maken; dat zette met de stapel ook het merkje uit, en dan was een bundel vanuit
+//    een gefilterde lijst helemaal niet meer te bereiken.
+//  - Alleen in bulk-modus valt óók het merkje weg. Klikken op het merkje springt naar een ander
+//    tabblad en `setNtd` wist daarbij de selectie; een half gemaakte bulk-selectie mag niet met één
+//    misklik verdwijnen. In bulk-modus is elke rij een aanvinkbaar item en verder niets.
 //
 // Als eigen functie en niet als ternary in `renderNtd`, omdat juist die koppeling stil kan
-// wegvallen: `renderNtd` leest de DOM en draait niet mee in de testronde, dus een `plat` die niets
+// wegvallen: `renderNtd` leest de DOM en draait niet mee in de testronde, dus een vlag die niets
 // meer doet zou pas opvallen als een gezochte subtaak uit de trefferlijst verdwijnt.
-export function bundelIndexVoor(plat, ntd, af){
-  return plat ? new Map() : bouwBundelIndex(ntd, af);
+export function bundelWeergave({ plat, bulk }, ntd, af){
+  return { ix: bouwBundelIndex(ntd, af), stapel: !plat, merk: !bulk };
 }
 
 // De zichtbare kop: het nog openstaande lid met het laagste volgnummer. null = alles afgerond.
@@ -88,14 +110,20 @@ export function zichtbareKop(leden){
 // Eén lid is geen bundel — dan tekenen we gewoon een normale taakrij.
 export function isBundel(leden){ return !!leden && leden.length >= 2; }
 
-// De bundel waar deze taak in zit, of null. Een ontbrekende index is geen fout maar een vroege
-// render (de gegevens zijn er nog niet) — dan hoort er simpelweg geen bundel te zijn.
-export function bundelVan(index, r){
-  const id = tekst(r && r.bundelId);
-  if (!id || !index) return null;
-  const leden = index.get(id);
+// De bundel met dít nummer, of null. Een ontbrekende index is geen fout maar een vroege render
+// (de gegevens zijn er nog niet) — dan hoort er simpelweg geen bundel te zijn.
+// Gaat langs `isBundel`, dus ook een bundel die tot één lid gekrompen is levert null: tussen
+// tekenen en klikken kan er een lid afgevinkt of verwijderd zijn, en dan is er niets meer om
+// naartoe te springen of open te klappen.
+export function bundelMetId(index, id){
+  const k = tekst(id);
+  if (!k || !index) return null;
+  const leden = index.get(k);
   return isBundel(leden) ? leden : null;
 }
+
+// Dezelfde vraag vanuit een taakrij: in welke bundel zit deze taak?
+export function bundelVan(index, r){ return bundelMetId(index, r && r.bundelId); }
 
 // Wordt deze rij in dít tabblad opgeslokt door het paneel van zijn kop? Waar = de rij hoort hier
 // niet in de vlakke lijst, want hij wordt onder de kop getekend.

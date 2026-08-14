@@ -4,13 +4,14 @@
 //  Batch D / punt 11: offerte/ALV/tabel-render zijn naar eigen modules verplaatst.
 // ══════════════════════════════════════
 import { esc, filt, berekenPrioriteit, parseDt, opvolgStatus, _vandaagAmsterdam, toISODate, isoWeek, vveCodeSpan } from "./util.js";
-import { SECS, SKEYS } from "./config.js";
+import { SECS, SKEYS, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { bulkWis, renderBulkUi } from "./bulk.js";
+import { showToast } from "./notifications.js";
 import { renderThead, renderTbody, renderPag, bepaalStil, bouwStilIndex, _zetStilIndex, deadlineCel, rowNtd, rowAf } from "./render-tabel.js";
 import { _verrijkOfferteRij, offerteAannemerPaneel, offerteAannSamenvatting } from "./render-offerte.js";
 import { renderAlvo, renderAlfa, toggleAlvoFlag, ALVO_ICONS, ALVO_COLS, ALVO_LABELS, flagPill, _recomputeAlvoStatus, statusIco } from "./render-alv.js";
-import { bundelIndexVoor, wordtGeabsorbeerd } from "./bundel.js";
+import { bundelWeergave, wordtGeabsorbeerd, bundelSleutel, bundelMetId, bouwBundelIndex, zichtbareKop } from "./bundel.js";
 
 // ══════════════════════════════════════
 //  NTD STATS
@@ -147,6 +148,8 @@ function zetKopOpen(aan){
 // gezocht, gefilterd, op een kolomkop gesorteerd of bulk-geselecteerd, tonen we plat.
 // Reden: een treffer mag niet verstopt zitten in een dichtgeklapte bundel, een vaste groepering
 // is in strijd met een gekozen sortering, en in bulk-modus moet élke taak aanvinkbaar zijn.
+// Plat betekent níet 'geen bundels meer': het ⛓-merkje blijft staan als aanwijzing en als weg
+// terug (§4.2). Wat plat precies uitzet staat bij `bundelWeergave` in bundel.js.
 // Puur, dus los testbaar.
 function isPlatteWeergave({ q, fCode, beh, prio, status, sortKey, bulk }){
   return !!(q || fCode || beh || prio || status || sortKey || bulk);
@@ -154,30 +157,99 @@ function isPlatteWeergave({ q, fCode, beh, prio, status, sortKey, bulk }){
 
 // Haal subtaken uit de vlakke lijst weg wanneer hun zichtbare kop in HETZELFDE tabblad staat —
 // die worden dan in het bundelpaneel onder die kop getekend. Staat de kop in een ander tabblad,
-// dan blijft de rij gewoon staan — daar komt straks het ⛓-merkje op (§3.2b). Zo wordt elke taak
-// per tabblad precies één keer getoond en blijven de tellers kloppen.
+// dan blijft de rij gewoon staan, met het ⛓-merkje erop (§3.2b). Zo wordt elke taak per tabblad
+// precies één keer getoond en blijven de tellers kloppen.
 // Het predikaat zelf staat in bundel.js, gedeeld met het ⛓-merkje: precies de rijen die hier
 // blijven staan krijgen daar een merkje, en omgekeerd (zie `wordtGeabsorbeerd`).
-function absorbeer(rows, sec, index){
-  if (!index || !index.size) return rows;
-  return rows.filter(r => !wordtGeabsorbeerd(r, index, sec));
+// Krijgt de hele weergave en niet alleen de index, want zonder stapel is er geen paneel om
+// subtaken in op te nemen en hoeft er dus ook niets uit de lijst te verdwijnen. Die toets hoort
+// hier en niet in een ternary bij de aanroeper: renderNtd leest de DOM en draait niet mee in de
+// testronde, dus daar zou hij ongemerkt om kunnen gaan.
+function absorbeer(rows, sec, bw){
+  if (!bw || !bw.stapel || !bw.ix.size) return rows;
+  return rows.filter(r => !wordtGeabsorbeerd(r, bw.ix, sec));
 }
 
-// Een bundel open- of dichtzetten. De stand gaat op bundelId de Set in en niet op rijnummer:
+// Een bundel om-klappen. De stand gaat op bundelId de Set in en niet op rijnummer:
 // rijnummers schuiven bij elke insert/delete, dus een op rijnummer bewaarde stand zet na een
 // poll de verkeerde rij open (vandaar ook de snoei van `state.expandedRows` in renderNtd).
 // Op bundelId is die snoei niet nodig — een verdwenen id vindt straks gewoon geen bundel meer.
 //
+// Het omschakelen zit hier en niet bij de aanroeper, zodat de vraag (`has`) en het antwoord
+// (`add`/`delete`) gegarandeerd dezelfde sleutel gebruiken. Vergeleek de aanroeper zelf, dan kon
+// een getrimde sleutel de Set in gaan terwijl `has()` naar de ongetrimde zoekt — de bundel opent
+// dan wel, maar sluit nooit meer. Zie `bundelSleutel` in bundel.js.
+//
 // Hertekenen en niet alleen een klasse omzetten: bij het openen komt er een hele paneelrij bij
 // en verdwijnen de stapelrandjes eronder, en dat zijn andere <tr>'s dan de kop-rij zelf.
-function zetBundelOpen(bundelId, aan){
-  // Zelfde normalisatie als in bundel.js/render-bundel.js: bundelId komt als string uit de Sheet,
-  // maar het herordenen zet hem optimistisch als getal op het rij-object — en `.trim()` op een
-  // getal is een TypeError die hier de hele takenlijst zou meenemen.
-  const id = String(bundelId ?? '').trim();
+function toggleBundel(bundelId){
+  const id = bundelSleutel(bundelId);
   if (!id) return;
-  if (aan) state.bundelOpen.add(id); else state.bundelOpen.delete(id);
+  if (state.bundelOpen.has(id)) state.bundelOpen.delete(id); else state.bundelOpen.add(id);
   renderNtd();
+}
+
+// Een bundel openzetten zónder te hertekenen, voor aanroepers die daarna zelf al een render doen.
+// Dat scheelt geen zichtbaar geflikker maar verspild werk: `toggleBundel` zou de hele tabel eerst
+// nog een keer opbouwen mét het OUDE actieve tabblad, en `state._rowCache` daarbij een tweede keer
+// volpompen.
+function openBundel(bundelId){
+  const id = bundelSleutel(bundelId);
+  if (id) state.bundelOpen.add(id);
+}
+
+// Alles wat de NTD-lijst plat maakt terug op de standaardstand. Geeft terug of er daadwerkelijk
+// iets stond, zodat de aanroeper kan uitleggen waarom het filter van de gebruiker weg is.
+// Bulk-modus staat er bewust niet bij: die zet je aan om een selectie te maken, en zo'n halve
+// selectie mag niet als bijvangst van een andere handeling sneuvelen. Daarom tekent het ⛓-merkje
+// in bulk-modus niet eens (zie `bundelWeergave`) — dan kan deze weg daar ook niet vandaan komen.
+function wisNtdFilters(){
+  let gewist = false;
+  ['s-ntd','f-code-ntd','f-beh-ntd','f-prio-ntd'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.value){ el.value = ''; gewist = true; }
+  });
+  if (state.ntdStatus){ state.ntdStatus = ''; gewist = true; }
+  if (state.ntdSort.key){ state.ntdSort = { key:null, asc:true }; gewist = true; }
+  return gewist;
+}
+
+// Het ⛓-merkje: laat de bundel zien waar deze taak bij hoort.
+//
+// Drie dingen moeten gebeuren, en alleen samen leveren ze iets op: naar het tabblad van de
+// zichtbare kop, de bundel daar openzetten, en de lijst uit de platte weergave halen. Dat laatste
+// is geen extraatje — het merkje verschijnt juist vooral in platte weergave (§4.2), en zolang er
+// een zoekterm of filter staat tekent renderNtd géén paneel en kan de kop zelfs weggefilterd zijn.
+// Wie alleen van tabblad wisselt, belooft met dit knopje iets wat niet gebeurt.
+//
+// De index vers uit D en niet uit `state._bundelWeergave`: dat is de momentopname van de laatste
+// render, die van vóór de laatste poll kan zijn. Via `bundelMetId`, dus mét `isBundel`-toets:
+// tussen tekenen en klikken kan de bundel tot één lid gekrompen zijn en valt er niets te tonen.
+function springNaarBundel(bundelId){
+  const id = bundelSleutel(bundelId);
+  const leden = bundelMetId(bouwBundelIndex(D.ntd, D.af), id);
+  const kop = leden && zichtbareKop(leden);
+  if (!kop) return;
+  openBundel(id);
+  const gewist = wisNtdFilters();
+  const zichtbaar = setNtd(kop.r._sec);   // wist de bulk-selectie en hertekent de hele lijst
+  if (gewist) renderNtdStats();           // de statuspillen dragen hun eigen aan/uit-stand
+  // Pas ná die render is bekend op welke pagina de kop staat — de lijst hangt immers af van de
+  // zojuist gewiste filters. Daarom de getekende lijst uit setNtd, en niet de pijplijn hier
+  // nabouwen: een tweede kopie van filteren/sorteren/absorberen loopt bij de eerste wijziging
+  // stil uit de pas. Staat de kop er niet in, dan laten we de pagina met rust; springen naar een
+  // rij die er niet is heeft geen zin.
+  const i = (zichtbaar || []).indexOf(kop.r);
+  if (i >= 0){
+    const pg = Math.floor(i / PG) + 1;
+    if (pg !== pgs.ntd){ pgs.ntd = pg; renderNtd(); }
+    const tr = document.querySelector(`#ntd-tbody tr[data-row="${kop.r._row}"]`);
+    if (tr && tr.scrollIntoView) tr.scrollIntoView({ block:'center' });
+  }
+  // Geen systeemmelding: dit is uitleg bij een handeling die de gebruiker net zélf deed, geen
+  // gebeurtenis waarvoor hij uit een ander venster gehaald hoort te worden.
+  if (gewist) showToast('Bundel geopend','Zoekterm en filters zijn gewist — anders valt de bundel buiten beeld.',
+                        null,'label',{ geenSysteemmelding:true });
 }
 
 function renderNtd(){
@@ -186,15 +258,16 @@ function renderNtd(){
   const fBeh=document.getElementById('f-beh-ntd').value;
   const fPrio=document.getElementById('f-prio-ntd').value;
 
-  // Eén bundelindex per render. Plat wordt hier een lege index i.p.v. een vlag; dat omzetten zit
-  // in `bundelIndexVoor` zodat het getest kan worden (deze functie zelf niet — die leest de DOM).
+  // Eén bundelweergave per render: de index plus de vlaggen `stapel` en `merk`. Wat die betekenen
+  // en waarom ze samen bepaald worden staat bij `bundelWeergave` — bewust dáár, zodat het getest
+  // kan worden (deze functie zelf niet — die leest de DOM).
   const plat=isPlatteWeergave({ q, fCode, beh:fBeh, prio:fPrio, status:state.ntdStatus,
                                 sortKey:state.ntdSort.key, bulk:state.bulkMode });
-  const bundelIx=bundelIndexVoor(plat,D.ntd,D.af);
+  const bw=bundelWeergave({ plat, bulk:state.bulkMode },D.ntd,D.af);
   // Op `state` en niet als parameter: de rij-opmaak zit in render-tabel.js en heeft geen ingang
-  // voor deze index. Die leest hem daar straks uit — bewust dezelfde momentopname als de
-  // absorptie hieronder, anders verdwijnt een rij hier terwijl hij daar geen stapel krijgt.
-  state._bundelIx=bundelIx;
+  // hiervoor. Die leest hem daar straks uit — bewust dezelfde momentopname als de absorptie
+  // hieronder, anders verdwijnt een rij hier terwijl hij daar geen stapel krijgt.
+  state._bundelWeergave=bw;
 
   // Snoei de uitklap-Set tot rij-id's die nog bestaan: na verwijderen/afronden schuiven de
   // _row-nummers mee, dus verdwenen id's mogen niet blijven hangen (anders staat een verkeerde
@@ -217,12 +290,16 @@ function renderNtd(){
   // Absorptie als laatste stap, ná filteren en sorteren: alleen de lijst die getekend wordt
   // krimpt. De tab-tellers hierboven blijven bewust op de ONgeabsorbeerde lijst staan — een
   // geabsorbeerde subtaak is niet verdwenen, alleen anders getekend, en moet dus meetellen.
-  const zichtbaar=absorbeer(sorteerNtd(filterNtd(D.ntd[state.activeNtd]||[],q,fCode,fBeh,fPrio,state.activeNtd,state.ntdStatus),state.ntdSort),state.activeNtd,bundelIx);
+  const zichtbaar=absorbeer(sorteerNtd(filterNtd(D.ntd[state.activeNtd]||[],q,fCode,fBeh,fPrio,state.activeNtd,state.ntdStatus),state.ntdSort),state.activeNtd,bw);
   renderThead('ntd-thead',[...(state.bulkMode?['']:[]),...SECS[state.activeNtd].cols,''],SECS[state.activeNtd].css,
     {active:state.ntdSort, keyFor:ntdSorteerKey});
   renderTbody('ntd-tbody',zichtbaar,state.activeNtd,pgs.ntd,false,!!(q||fCode||fBeh||fPrio||state.ntdStatus));
   renderPag('ntd-pag',zichtbaar.length,pgs.ntd,'ntd');
   renderNtdCrossList(state.activeNtd);
+  // De getekende lijst gaat terug naar de aanroeper: na filteren, sorteren én absorberen, dus in
+  // exact de volgorde waarin de rijen op de pagina's verdeeld worden. `springNaarBundel` zoekt er
+  // de pagina van de kop mee op zonder die hele pijplijn na te bouwen.
+  return zichtbaar;
 }
 // Cross-list (bug #2): taken die fysiek in een ándere sectie staan maar via hun
 // Subcategorie-veld óók bij dit scherm horen. We tonen ze als apart lijstje onderaan
@@ -273,9 +350,12 @@ function renderNtdCrossList(sec){
     ${treffers.map(rij).join('')}
   </div>`;
 }
+// Geeft de getekende lijst van renderNtd door (zie daar): een aanroeper die net van tabblad
+// wisselde weet daarmee meteen wat er nu staat, zonder een tweede render of een eigen filterronde.
 function setNtd(s){
   state.activeNtd=s;pgs.ntd=1;bulkWis();
-  renderNtd();renderBulkUi();
+  const zichtbaar=renderNtd();renderBulkUi();
+  return zichtbaar;
 }
 
 function filterNtd(rows,q,fCode,beh,prio,sec,status){
@@ -371,7 +451,7 @@ function setAf(s){state.activeAf=s;pgs.af=1;renderAf()}
 
 export {
   renderNtdStats, renderNtdDonut, renderNtd, setNtd, filterNtd, sorteerNtd, ntdSorteerKey, renderAf, setAf,
-  kopOpen, zetKopOpen, zetBundelOpen, absorbeer, isPlatteWeergave,
+  kopOpen, zetKopOpen, toggleBundel, springNaarBundel, wisNtdFilters, absorbeer, isPlatteWeergave,
   offerteAannemerPaneel, offerteAannSamenvatting,
   ALVO_ICONS, renderAlvo, ALVO_COLS, ALVO_LABELS, flagPill, _recomputeAlvoStatus, toggleAlvoFlag, statusIco, renderAlfa,
   renderThead, renderTbody, bepaalStil, bouwStilIndex, _zetStilIndex, deadlineCel, rowNtd, rowAf, renderPag,

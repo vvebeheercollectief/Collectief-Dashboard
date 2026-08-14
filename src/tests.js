@@ -4375,6 +4375,12 @@ import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./r
         renderNtd();
         const tb = document.getElementById('ntd-tbody');
         const kopTr = tb.querySelector('tr[data-row]');
+        // Eerst een eigen assert dat de rij er is, en daarna élke dereference afgedekt — net als bij
+        // de subsidierij hierboven. Zonder dat zou juist de regressie die dit blok moet vangen een
+        // TypeError geven: deze IIFE is de laatste vóór de samenvatting, dus hij breekt af zonder
+        // `[TESTS] N OK, M FAIL`-regel, de vier andere secties worden niet meer getoetst, en wie dan
+        // de console leest ziet de groene regel van de vórige run.
+        truthy(`rij (${sec}): kop-rij wordt getekend`, !!kopTr);
         eq(`rij (${sec}): één zichtbare taakrij (subtaak geabsorbeerd)`,
            tb.querySelectorAll('tr[data-row]').length, 1);
         eq(`rij (${sec}): stapelrandjes bij een dichte bundel`, tb.querySelectorAll('.bdl-peek').length, 2);
@@ -4384,27 +4390,32 @@ import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./r
         // zoeken en niet in de hele tbody, anders zou een chevron die in het paneel belandt hier
         // ook meetellen.
         eq(`rij (${sec}): chevron staat op de kop-rij`,
-           kopTr.querySelectorAll('[data-action="bundel-toggle"]').length, 1);
+           kopTr ? kopTr.querySelectorAll('[data-action="bundel-toggle"]').length : -1, 1);
         // `data-rid` is de weg van een gesleepte rij naar het taak-object (Taak 15). Niet alleen
         // "het attribuut bestaat": het moet ook de KOP aanwijzen en niet de subtaak, want de
         // paneelregels vullen dezelfde cache in dezelfde renderronde.
         eq(`rij (${sec}): data-rid van de kop-rij wijst naar de kop-taak`,
-           (state._rowCache[+kopTr.dataset.rid] || {}).taakId, 'Tkop');
+           kopTr ? (state._rowCache[+kopTr.dataset.rid] || {}).taakId : '', 'Tkop');
         // De colspan tegen het ECHTE aantal cellen van de kop-rij, niet tegen een eigen som: dat
         // pint alle vijf de secties vast met één regel, en blijft kloppen als er ooit een kolom
         // bij komt. Een eigen som zou dezelfde fout kunnen maken als de code die hij toetst.
-        const kolommen = kopTr.cells.length;
+        // Wat hier NIET onder valt is de bulk-term in diezelfde som (render-tabel.js): bulk-modus
+        // rendert altijd plat (isPlatteWeergave), dus er is dan geen kop-rij om een colspan op te
+        // zetten. Die tak is defensief en blijft per definitie ongedekt.
+        const kolommen = kopTr ? kopTr.cells.length : -1;
         eq(`rij (${sec}): stapelrandjes overspannen de hele rij`,
            [...tb.querySelectorAll('.bdl-peek td')].map(td => td.colSpan), [kolommen, kolommen]);
 
         state.bundelOpen = new Set(['Tkop']);
         renderNtd();
         const tb2 = document.getElementById('ntd-tbody');
+        const kopTr2 = tb2.querySelector('tr[data-row]');
         eq(`rij (${sec}): paneel verschijnt bij open bundel`, tb2.querySelectorAll('.bdl-paneel').length, 1);
         eq(`rij (${sec}): één subtaakregel in het paneel`, tb2.querySelectorAll('.bdl-sub').length, 1);
         eq(`rij (${sec}): stapelrandjes weg bij open bundel`, tb2.querySelectorAll('.bdl-peek').length, 0);
+        truthy(`rij (${sec}): paneelrij bestaat`, !!tb2.querySelector('.bdl-tr td'));
         eq(`rij (${sec}): paneelrij overspant de hele rij`,
-           tb2.querySelector('.bdl-tr td').colSpan, tb2.querySelector('tr[data-row]').cells.length);
+           (tb2.querySelector('.bdl-tr td') || {}).colSpan, kopTr2 ? kopTr2.cells.length : -1);
       });
     } finally {
       D.ntd = bewaardNtd; D.af = bewaardAf; state.activeNtd = bewaardSec;

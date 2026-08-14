@@ -837,6 +837,11 @@ export function bundelStand(leden, kop){
 // Extra's op de kop-rij: chevron vóór de VvE-code en de telpill achter de naam.
 // De chevron is een EIGEN knop met data-action; de klik op de rij zelf is al bezet
 // (main.js klapt daarmee de volledige tekst uit) en die handler negeert [data-action].
+//
+// `open` gaat mee naar buiten omdat de aanroeper (rowNtd, Taak 9) hetzelfde antwoord nodig heeft:
+// die tekent ónder deze rij het paneel of de stapelrandjes. Zou hij dat zelf uit `state.bundelOpen`
+// halen, dan staat de normalisatie van bundelId op twee plaatsen en kan de chevron 'open' zeggen
+// terwijl de rij eronder dicht blijft. Eén bron dus — niet twee afleidingen naast elkaar.
 export function bundelKopExtra(leden, kop){
   const id = esc((kop.r.bundelId||'').trim());
   const open = state.bundelOpen.has((kop.r.bundelId||'').trim());
@@ -845,6 +850,7 @@ export function bundelKopExtra(leden, kop){
   return {
     chevron: `<button type="button" class="bdl-chev${open?' open':''}" data-action="bundel-toggle" data-bundel="${id}" aria-expanded="${open}" title="${lbl}" aria-label="${lbl}">${ico('chevronRechts',12)}</button>`,
     pill: `<span class="bdl-pill" title="${klaar} van ${totaal} subtaken klaar">${klaar} van ${totaal} klaar</span>`,
+    open,
   };
 }
 
@@ -1050,7 +1056,7 @@ Voeg toe direct ná `const extraPills = stilPill + opvolgPill;`:
   const _leden = _ix ? bundelVan(_ix, r) : null;
   const _kop   = _leden ? zichtbareKop(_leden) : null;
   const _isKop = !!(_kop && _kop.r === r);
-  const _extra = _isKop ? bundelKopExtra(_leden, _kop) : { chevron:'', pill:'' };
+  const _extra = _isKop ? bundelKopExtra(_leden, _kop) : { chevron:'', pill:'', open:false };
   const bdlChev = _extra.chevron;
   // Pill op de kop; anders het ⛓-merkje voor een subtaak waarvan de kop in een ander tabblad staat.
   const bdlNaam = _isKop ? _extra.pill : (_ix ? bundelMerkje(r, _ix, sec) : '');
@@ -1073,11 +1079,12 @@ door:
 
 ```js
   // Dicht: twee 'papierrandjes' onder de rij. Open: het bundelpaneel.
+  // `_extra.open` komt van bundelKopExtra, dat er de chevron mee zet — één antwoord voor de knop
+  // en voor wat eronder komt, zodat die twee niet uit elkaar kunnen lopen.
   let bdlNa = '';
   if (_isKop){
-    const open = state.bundelOpen.has((r.bundelId||'').trim());
     const kolommen = SECS[sec].cols.length + 1 + (state.bulkMode?1:0);
-    bdlNa = open
+    bdlNa = _extra.open
       ? `<tr class="bdl-tr"><td colspan="${kolommen}">${bundelPaneelHtml(_leden, _kop, false)}</td></tr>`
       : `<tr class="bdl-peek"><td colspan="${kolommen}"><span class="l"></span></td></tr>`
       + `<tr class="bdl-peek d2"><td colspan="${kolommen}"><span class="l"></span></td></tr>`;

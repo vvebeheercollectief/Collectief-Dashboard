@@ -7,7 +7,7 @@ import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _s
 import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
-import { filterNtd, setNtd, renderNtd, renderNtdStats, renderAf, setAf, bepaalStil, bouwStilIndex, _zetStilIndex, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey, kopOpen, zetKopOpen, toggleBundel, wisNtdFilters, absorbeer, isPlatteWeergave } from "./render-lijsten.js";
+import { filterNtd, setNtd, renderNtd, renderNtdStats, renderAf, setAf, bepaalStil, bouwStilIndex, _zetStilIndex, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey, kopOpen, zetKopOpen, toggleBundel, wisNtdFilters, absorbeer, isPlatteWeergave, erIsGefilterd } from "./render-lijsten.js";
 import { HERO_VIEWS } from "./render-analytics.js";
 import { state, D, pgs } from "./state.js";
 import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel, renderVve } from "./render-vve.js";
@@ -2342,6 +2342,11 @@ import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./r
   await (async()=>{
     const _fetch=window.fetch, tokenOud=state.oauthToken, expiryOud=state.oauthExpiry;
     const failsOud=state._syncFails, hashOud=state._lastDHash;
+    // Deze drie worden hieronder gezet om archief én logboek gegarandeerd mee te laten doen (anders
+    // varieert het aantal losse reads met wat een eerdere test achterliet). Ze horen dus ook hier
+    // bewaard en straks hersteld te worden: laat je ze staan, dan lift een volgend blok stil op
+    // ónze stand mee en meet dát blok een leesronde die er niet bij hoort.
+    const alfaMsOud=state._alfaMs, hwOud=state._logHoogwater, ankOud=state._logAnkerTs;
     const dOud={}; Object.keys(D).forEach(k=>dOud[k]=D[k]);
     const urls=[];
     const stub=(kapot)=>{ window.fetch=async(url)=>{
@@ -2394,6 +2399,7 @@ import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./r
     } finally {
       window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
       state._syncFails=failsOud; state._lastDHash=hashOud;
+      state._alfaMs=alfaMsOud; state._logHoogwater=hwOud; state._logAnkerTs=ankOud;
       Object.keys(dOud).forEach(k=>{ D[k]=dOud[k]; });
       document.getElementById('dot').className='dot';
       document.getElementById('load-err-banner')?.remove();
@@ -2461,13 +2467,24 @@ import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./r
          (await ronde({'Nog Te Doen':19, 'Afgerond':26})).length, 0);
       eq('ontdubbeling: en de terugkeer van de bevinding wordt gemeld',
          (await ronde({'Nog Te Doen':16})).length, 1);
+      // Dezelfde ontdubbeling in de ANDERE tak: valt de controle zelf om, dan is dat één melding
+      // waard en niet één per acht seconden. Een onleesbare meting is daar het simpelste geval van
+      // — checkRasters loopt over de sleutels en struikelt over de getter.
+      const stuk={ get 'Nog Te Doen'(){ throw new Error('meting onleesbaar'); } };
+      eq('ontdubbeling: een omgevallen controle meldt één keer', (await ronde(stuk)).length, 1);
+      eq('ontdubbeling: … en herhaalt zich daarna evenmin', (await ronde(stuk)).length, 0);
+      // De foutstempel mag geen geslaagde ronde nabootsen: daarna moet een échte bevinding er
+      // gewoon weer doorheen komen.
+      eq('ontdubbeling: na een omgevallen controle meldt een echte bevinding weer',
+         (await ronde({'Nog Te Doen':16})).length, 1);
     } finally {
       window.fetch=_fetch; console.warn=_warn;
       state.oauthToken=tokenOud; state.oauthExpiry=expiryOud; state._sheetKolommen=kolOud;
       state._syncFails=failsOud; state._lastDHash=hashOud; state._structLaatst=structOud;
       // De ronde-helper zet deze drie om het archief en het logboek gegarandeerd mee te laten
-      // doen; niet herstellen laat een volgende test stil op ónze stand meeliften. De twee
-      // buurblokken hierboven doen dit al net zo.
+      // doen; niet herstellen laat een volgende test stil op ónze stand meeliften. Het
+      // archiefblok en de terugval-tests hierboven zetten ze om dezelfde reden en herstellen ze
+      // in hun eigen finally — de terugval-tests deden dat aanvankelijk niet, en lekten dus.
       state._alfaMs=alfaMsOud; state._logHoogwater=hwOud; state._logAnkerTs=ankOud;
       Object.keys(dOud).forEach(k=>{ D[k]=dOud[k]; });
     }
@@ -4239,6 +4256,32 @@ import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./r
     eq('absorptie: zonder bundels verandert er niets',
        absorbeer([kop], 'OPPAKKEN', bundelWeergave({ plat:false, bulk:false }, leeg, leeg)).map(r => r.taakId),
        ['Tkop']);
+    // …en dezelfde garantie mét een gevulde index, want dát is de enige stand waarin de toets per
+    // rij écht draait: bij een lege index keert `absorbeer` al bij zijn guard terug. Zonder deze
+    // assert draagt de `!leden`-tak van `wordtGeabsorbeerd` in z'n eentje de garantie "een taak
+    // zonder bundel verdwijnt nooit uit de lijst" en mag die omgedraaid worden zonder dat er ook
+    // maar één assert rood wordt (adversarieel vastgesteld).
+    const losseTaak = t('Tlos','','','OPPAKKEN');
+    eq('absorptie: een taak zonder bundel blijft staan, óók naast een echte bundel',
+       absorbeer([kop, subZelfde, losseTaak], 'OPPAKKEN', gestapeld).map(r => r.taakId), ['Tkop','Tlos']);
+
+    // De momentopname-voorwaarde. Tussen twee polls levert dezelfde taak een NIEUW object op; op
+    // objectidentiteit zou zo'n kop de toets 'ben ik zelf de kop' missen, doorvallen naar de
+    // _sec-regel en zichzelf wegabsorberen — de taak verdwijnt dan uit de lijst, het ergste wat een
+    // weergaveregel kan doen. Vandaar de vergelijking op taaknummer (`zelfdeTaak` in bundel.js).
+    const kopUitOudereRonde = { ...kop };
+    eq('absorptie: een kop uit een andere momentopname absorbeert zichzelf niet weg',
+       absorbeer([kopUitOudereRonde, subZelfde], 'OPPAKKEN', gestapeld).map(r => r.taakId), ['Tkop']);
+    eq('absorptie: … en dat oordeel komt uit het gedeelde predikaat',
+       wordtGeabsorbeerd(kopUitOudereRonde, ix, 'OPPAKKEN'), false);
+    // Rijen van vóór de backfill hebben nog geen taaknummer; dan valt de vergelijking terug op het
+    // rijnummer. Zonder die terugval zou élke kop zonder nummer zichzelf opslokken.
+    const kopZonderNr = { ...t('','Tx','0','OPPAKKEN'), _row:41 };
+    const subZonderNr = { ...t('Tsub','Tx','10','OPPAKKEN'), _row:42 };
+    const ixZonderNr = bouwBundelIndex({ ...leeg, OPPAKKEN:[kopZonderNr, subZonderNr] }, leeg);
+    eq('absorptie: zonder taaknummer valt de vergelijking terug op het rijnummer',
+       [wordtGeabsorbeerd({ ...kopZonderNr }, ixZonderNr, 'OPPAKKEN'),
+        wordtGeabsorbeerd(subZonderNr, ixZonderNr, 'OPPAKKEN')], [false, true]);
 
     // De absorptie en het ⛓-merkje moeten elkaars exacte tegenpool blijven: precies de rijen die
     // in de vlakke lijst blijven staan krijgen een merkje. Sinds beide `wordtGeabsorbeerd`
@@ -4273,6 +4316,24 @@ import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./r
        isPlatteWeergave({ q:'', fCode:'', beh:'', prio:'', status:'', sortKey:null, bulk:true }), true);
     eq('plat: statusfilter maakt plat',
        isPlatteWeergave({ q:'', fCode:'', beh:'', prio:'', status:'telaat', sortKey:null, bulk:false }), true);
+
+    // De vijf filtertermen zitten in één helper omdat renderNtd ze twee keer nodig heeft: voor de
+    // platte weergave én als `filtered`-vlag aan renderTbody (de lege-lijst-melding). Deze assert
+    // pint vast dat die twee gelijk lopen — komt er later een zesde filter dat maar op één plek
+    // meedoet, dan blijft een gefilterde lijst gestapeld (§4.2) zonder dat er iets faalt.
+    const leegF = { q:'', fCode:'', beh:'', prio:'', status:'' };
+    eq('plat: zonder filters is er ook niets gefilterd', erIsGefilterd(leegF), false);
+    eq('plat: élk van de vijf filtertermen telt als gefilterd én maakt de lijst plat',
+       ['q','fCode','beh','prio','status'].map(k =>
+         [erIsGefilterd({ ...leegF, [k]:'x' }),
+          isPlatteWeergave({ ...leegF, [k]:'x', sortKey:null, bulk:false })]),
+       [[true,true],[true,true],[true,true],[true,true],[true,true]]);
+    // Sortering en bulk maken de lijst wél plat maar heten geen filter: ze halen er geen rij uit,
+    // dus een lege lijst hoort daar niet "pas je filter aan" te zeggen.
+    eq('plat: sorteren en bulk maken plat zonder als filter te tellen',
+       [isPlatteWeergave({ ...leegF, sortKey:'code', bulk:false }),
+        isPlatteWeergave({ ...leegF, sortKey:null, bulk:true }),
+        erIsGefilterd({ ...leegF, sortKey:'code', bulk:true })], [true, true, false]);
 
     // De schakel tussen die vlag en de weergave. Plat zet de STAPEL uit maar het merkje juist niet:
     // dat is in platte weergave de enige aanwijzing dat een taak bij een bundel hoort (§4.2) én de
@@ -4455,6 +4516,49 @@ import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./r
     }
   })();
 
+  // ── De bedrading renderNtd → isPlatteWeergave / absorbeer ──
+  // Beide functies zijn hierboven puur getoetst; dit blok toetst de AANROEP ernaartoe, in de twee
+  // standen die hij moet onderscheiden. Twee fouten die geen enkele fout in de console geven en dus
+  // alleen door een assert te vangen zijn:
+  //  - de laatste twee argumenten van `absorbeer` verwisseld: `bw` is dan een sectienaam, `.stapel`
+  //    is undefined, de guard slaat toe en de lijst komt ongewijzigd terug — absorptie volledig uit;
+  //  - `sortKey: state.ntdSort` in plaats van `state.ntdSort.key`: een object is altijd waar, dus
+  //    de lijst is altijd plat en stapelt nooit meer.
+  // Allebei adversarieel geprobeerd. De ONgefilterde helft hieronder valt bij die mutaties om, maar
+  // het rij-blok hierboven ook — dat deel is dus dubbel gedekt. Nieuw is de GEFILTERDE helft: dat
+  // een gezet filter de lijst echt plat maakt. Kop en subtaak staan daarom in HETZELFDE tabblad,
+  // want alleen dan valt er iets te absorberen en is 'plat' aan de rij-telling te zien.
+  (() => {
+    const bewaardNtd = D.ntd, bewaardAf = D.af, bewaardSec = state.activeNtd, bewaardPg = pgs.ntd;
+    const zoek = document.getElementById('s-ntd'), zoekOud = zoek.value;
+    try {
+      const t = (taakId, volg) => ({ _row: 30 + (+volg||0)/10, taakId, bundelId:'Tkop',
+        bundelVolg:volg, _sec:'OPPAKKEN', code:'311212', naam:'Testflat', actiepunt:'Dakwerk', deadline:'' });
+      const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      D.af = { ...leeg };
+      D.ntd = { ...leeg, OPPAKKEN: [ t('Tkop','0'), t('Tb','10') ] };
+      state.activeNtd = 'OPPAKKEN'; pgs.ntd = 1; state.bundelOpen = new Set();
+      zoek.value = '';
+      renderNtd();
+      const tel = (sel) => document.querySelectorAll('#ntd-tbody ' + sel).length;
+      eq('bedrading: ongefilterd absorbeert de render de subtaak', tel('tr[data-row]'), 1);
+      eq('bedrading: … en tekent hij de bundel gestapeld', tel('.bdl-pill'), 1);
+      // Dezelfde gegevens, nu met een zoekterm die op BEIDE rijen past. Is de bedrading naar
+      // isPlatteWeergave stuk, dan blijft de lijst gestapeld en zit de tweede treffer verstopt in
+      // een dichtgeklapte bundel — precies wat §4.2 moet voorkomen.
+      zoek.value = 'dakwerk';
+      renderNtd();
+      eq('bedrading: een zoekterm maakt de lijst plat — beide treffers staan er los',
+         tel('tr[data-row]'), 2);
+      eq('bedrading: … zonder telpill of stapelrandjes', [tel('.bdl-pill'), tel('.bdl-peek')], [0, 0]);
+      eq('bedrading: … maar mét het ⛓-merkje als enige aanwijzing',
+         tel('[data-action="bundel-spring"]'), 2);
+    } finally {
+      D.ntd = bewaardNtd; D.af = bewaardAf; state.activeNtd = bewaardSec;
+      pgs.ntd = bewaardPg; state.bundelOpen = new Set(); zoek.value = zoekOud; renderNtd();
+    }
+  })();
+
   // ── Open- en dichtklappen ──
   // De twee acties apart getoetst: ze zitten alleen als data-action in de HTML (chevron en
   // ⛓-merkje), dus een hernoemde of vergeten sleutel geeft geen fout — de knop doet dan niets.
@@ -4553,6 +4657,27 @@ import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./r
       eq('spring: het filter is gewist, anders bleef de doellijst plat',
          document.getElementById('f-code-ntd').value, '');
       eq('spring: het paneel staat er dan ook echt', panelen(), 1);
+
+      // En de andere afloop: de bundel is tussen tekenen en klikken tot één lid gekrompen (de
+      // andere taak net afgerond of verwijderd). Er valt dan niets te openen — maar het merkje
+      // staat nog in de rij, dus zonder melding klikt de gebruiker op een knop waar niets van
+      // gebeurt. Eerst tekenen mét bundel, dan pas D uitdunnen: precies de volgorde die in de app
+      // ontstaat als er een poll tussen het tekenen en de klik valt.
+      document.querySelectorAll('.toast').forEach(el => el.remove());
+      D.ntd = { ...leeg, OPPAKKEN: [ t('Tb','10') ],
+                VERGADERVERZOEKEN: [ { ...t('Tkop','0'), _sec:'VERGADERVERZOEKEN' } ] };
+      state.activeNtd = 'OPPAKKEN'; pgs.ntd = 1; state.bundelOpen = new Set();
+      document.getElementById('f-code-ntd').value = '311212';
+      renderNtd();
+      D.ntd = { ...leeg, OPPAKKEN: [ t('Tb','10') ] };
+      truthy('spring: het merkje van een net gekrompen bundel staat er nog',
+             klik('[data-action="bundel-spring"]'));
+      // Op 'bevat' en niet op de hele lijst: een achtergrondronde uit een eerdere test kan er een
+      // tweede melding naast zetten, en dan zou deze assert om de verkeerde reden rood worden.
+      eq('spring: en klikken meldt dat de bundel niet meer bestaat',
+         [...document.querySelectorAll('.toast-title')].map(el => el.textContent)
+           .includes('Deze bundel bestaat niet meer'), true);
+      document.querySelectorAll('.toast').forEach(el => el.remove());
     } finally {
       D.ntd = bewaardNtd; D.af = bewaardAf; state.activeNtd = bewaardSec;
       pgs.ntd = bewaardPg; state.bundelOpen = new Set();

@@ -584,7 +584,16 @@ async function _loadRonde(silent){
       const vinger=JSON.stringify(bev);
       if(bev.length && vinger!==state._structLaatst) console.warn('[structuurcheck]', bev);
       state._structLaatst=vinger;
-    }catch(e){ console.warn('[structuurcheck] overgeslagen:', e.message); }
+    }catch(e){
+      // Dezelfde ontdubbeling als hierboven, en om precies dezelfde reden: gooit checkAlles ooit
+      // deterministisch, dan warnt déze tak elke ronde en levert dat evengoed honderden regels per
+      // dag op — de ontdubbeling zou dan in de ene tak zijn wat hij in de andere niet is.
+      // Een 'FOUT:'-stempel kan niet botsen met de vingerafdruk van een geslaagde ronde: die is
+      // JSON van een array en begint dus altijd met een '['.
+      const vinger='FOUT:'+e.message;
+      if(vinger!==state._structLaatst) console.warn('[structuurcheck] overgeslagen:', e.message);
+      state._structLaatst=vinger;
+    }
     zetAls("ALV's overzicht", r=>{ D.alvo=parseAlvo(r); });
     // Pas ná het toekennen bijhouden dat het archief gelezen is: een ronde die eerder strandt mag
     // de klok van de volgende lezing niet vooruitzetten. Werd het tabblad deze ronde overgeslagen,

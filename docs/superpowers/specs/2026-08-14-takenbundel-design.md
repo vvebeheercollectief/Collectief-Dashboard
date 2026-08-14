@@ -159,6 +159,14 @@ kolomsortering is een vaste groepering per definitie in strijd met de gekozen so
 bulk-modus moet élke taak aanvinkbaar zijn. Deze regel snijdt een groot deel van de mogelijke
 foutsituaties in één keer weg.
 
+### 4.2b Uitzondering: geen ⛓-merkje in bulk-modus
+
+In bulk-modus wordt het ⛓-merkje wél weggelaten, anders dan de overige platte standen.
+
+Reden: klikken op het merkje springt naar het tabblad van de kop, en dat wist via `setNtd` een
+half gemaakte bulk-selectie. Een knop die je selectie stilletjes weggooit is erger dan een
+ontbrekende aanwijzing. In bulk-modus ben je bovendien aan het aanvinken, niet aan het navigeren.
+
 ### 4.3 De gestapelde rij
 
 Een bundel-kop is een normale taakrij, met:

@@ -1899,8 +1899,12 @@ enkele wijziging, toon dan een korte melding in plaats van stilte:
   if (!wijzigingen.length){
     // Volgorde ongewijzigd is normaal (je liet los waar je begon) — dan zwijgen we. Maar is de
     // gesleepte volgorde wél anders, dan botst hij op een afgerond lid dat zijn nummer houdt.
+    // geenDedup is hier essentieel: showToast ontdubbelt standaard 15 seconden op titel+tekst,
+    // en juist dit scenario nodigt uit tot meteen nog een poging. Zonder deze vlag krijgt die
+    // tweede poging weer stilte — precies het probleem dat de melding moest oplossen.
+    // 'taak' en niet 'subtaak': het lid dat op volgnummer 0 klemt is per definitie de hoofdtaak.
     if (volgordeGewijzigd) showToast('Deze volgorde kan niet',
-      'Er staat een afgeronde subtaak boven die zijn plek houdt.', null, 'info');
+      'Er staat een afgeronde taak boven die zijn plek houdt.', null, 'pauze', {geenDedup:true});
     return;
   }
 ```

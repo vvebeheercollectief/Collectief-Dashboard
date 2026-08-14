@@ -61,6 +61,16 @@ en draai daarna de volledige testronde.
 17 kolommen breed. Schrijven naar kolom R of S mislukt **zonder foutmelding** zolang het raster
 niet breder is.
 
+> **Stand 2026-08-14 — deze volgorde is in de praktijk omgedraaid.** Taak 2 t/m 4 zijn gebouwd
+> vóór deze taak, dus de schrijfcode (19 kolommen) staat er al terwijl "Nog Te Doen" nog 17 breed
+> is. Bij de naloop op Taak 4 is daarom **stap 6 naar voren gehaald en uitgevoerd**: `RASTER_MIN`
+> staat op 19/19 en de bijbehorende tests zijn bijgewerkt. Anders zou de enige bewaking op
+> "schrijven buiten het raster mislukt stil" precies daar zwijgen waar hij nodig is.
+> **Wat hier nog open staat: stap 1 t/m 5** — de handmatige verbreding van "Nog Te Doen" op TEST
+> en PROD. Zolang die niet gedraaid is, verliezen bundelvelden hun waarde bij het wegschrijven.
+> Stap 7 is inmiddels `1156 OK, 0 FAIL` in plaats van `1124` (Taak 2 t/m 4 plus 12 asserts uit de
+> naloop); tel dat verschil op bij de verwachte totalen verderop in dit plan.
+
 - [ ] **Stap 1: Meet de huidige breedte van beide Sheets**
 
 Draai dit met de Google Sheets MCP (alleen lezen) voor beide spreadsheets:
@@ -97,7 +107,9 @@ Meet opnieuw met de MCP. Verwacht: `Nog Te Doen` = 19.
 
 Zelfde handeling op de productie-Sheet. Verifieer opnieuw met de MCP. Verwacht: 19.
 
-- [ ] **Stap 6: Verhoog RASTER_MIN**
+- [x] **Stap 6: Verhoog RASTER_MIN** — GEDAAN bij de naloop op Taak 4 (zie kader hierboven). De
+toelichting in de code wijkt bewust af van het onderstaande blok: die benoemt dat het getal de
+schrijfcode volgt en dat "Nog Te Doen" tot stap 2 t/m 5 terecht als te smal gemeld wordt.
 
 In `src/structuurcheck.js`, vervang de twee regels in `RASTER_MIN`:
 

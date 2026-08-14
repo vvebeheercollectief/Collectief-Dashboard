@@ -20,10 +20,19 @@ import { SKEYS, SECS } from "./config.js";
 // Op 2026-07-29 verbreed naar 17 voor het vaste taaknummer in kolom Q, op TEST én PROD.
 // Schrijfacties buiten het raster mislukken ZONDER melding, dus dit getal is de bewaking
 // daarop: zakt het raster ooit terug, dan meldt de structuurcheck dat vóórdat er stil data
-// verdwijnt. Dit getal loopt gelijk op met de werkelijkheid, nooit erop vooruit.
+// verdwijnt. Dit getal volgt de BREEDSTE SCHRIJFACTIE in de code, niet een raster dat we nog
+// van plan zijn — zet het dus nooit vast vooruit op een verbreding die nog moet komen.
+//
+// Op 2026-08-14 naar 19 voor de Takenbundel (R=bundelId, S=bundelVolg). De schrijfcode is hier
+// al: serializeNtdUndo levert 19 waarden (insertAndWriteRow schrijft dan A..S) en afrondWaarden
+// evengoed (updateCells met endColumnIndex 19). 'Afgerond' ging mee naar 19 omdat het afronden
+// nu Q/R/S meeschrijft; dat blad is al 26 kolommen breed, daar hoeft niets te gebeuren.
+// LET OP: 'Nog Te Doen' is op TEST en PROD nog 17 breed — de handmatige verbreding staat als
+// Taak 1 van de Takenbundel open. Tot die gedraaid is meldt deze controle dat blad terecht als
+// te smal: schrijven naar R/S loopt daar nú stil in het niets.
 const RASTER_MIN = {
-  'Nog Te Doen':      17,  // kolom Q (vast taaknummer) — verbreed op TEST én PROD 2026-07-29
-  'Afgerond':         12,  // A:L — NIET 16
+  'Nog Te Doen':      19,  // kolom S (bundelVolg) — schrijfcode is er, raster nog te verbreden
+  'Afgerond':         19,  // A:S — taakId/bundelId/bundelVolg op Q/R/S (raster is al 26 breed)
   'Herhaalregels':    12,  // A:L
   'Kenmerken':         6,  // A:F
   'Ontwikkeling':      6,  // A:F

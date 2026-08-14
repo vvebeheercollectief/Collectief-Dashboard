@@ -151,6 +151,13 @@ function getInsertRow(sec){
   return info.colHeaderRow;
 }
 
+// Celwaarde voor een veld waar het GETAL 0 een echte waarde is. `x||''` maakt van 0 een lege
+// cel, en juist de hoofdtaak van een bundel draagt volgnummer 0. Vandaag levert parseSections
+// altijd strings ('0' is truthy), maar het herordenen zet bundelVolg optimistisch op het
+// rij-object; zet dat ooit een getal neer, dan zou de hoofdtaak bij afronden of undo stil zijn
+// plek in de bundel verliezen — precies de soort schade die dit traject wil voorkomen.
+const nulVeilig = v => (v === 0 || v) ? String(v) : '';
+
 // Gedeelde undo-serialisatie van een NTD-taakrij → kolomwaarden A..S.
 // N (placeholder), O (offerte-fase) en P (aannemerslijst) horen erbij: zo verliest een
 // undo van een afgerond/verwijderd OFFERTE-traject niet stil de opgebouwde aannemerslijst
@@ -164,7 +171,7 @@ export function serializeNtdUndo(r){
   v.push(r.taakId||'');   // Q — het vaste taaknummer moet de undo overleven, anders krijgt de
                           // teruggezette taak een nieuwe identiteit en is de oude een wees.
   v.push(r.bundelId||''); // R — om dezelfde reden: zonder dit valt de taak na een undo uit zijn bundel.
-  v.push(r.bundelVolg||''); // S
+  v.push(nulVeilig(r.bundelVolg)); // S — via nulVeilig, want volgnummer 0 is de hoofdtaak
   return v;
 }
 
@@ -315,26 +322,22 @@ async function completeTask(idx){
 // L herhaalId (Opvolging.gs:119 leest afData[i][11] — NIET verplaatsen), M..P leeg,
 // Q taakId, R bundelId, S bundelVolg. Q/R/S liggen op dezelfde index als in 'Nog Te Doen',
 // omdat parseSections beide tabbladen met dezelfde vaste posities leest.
+//
+// A..H komt uit SECS.keys en niet uit een eigen lijstje per sectie: die kolomvolgorde is NIET
+// de volgorde waarin de velden in het rij-object staan ('actiepunt' is kolom C, niet index 1),
+// en parseSections leest hem met precies dezelfde bron terug. Een handgeschreven kopie zou
+// stilletjes uiteen kunnen lopen — dezelfde afweging als in serializeNtdUndo en _rijNaarCellen.
 export function afrondWaarden(r, sec, datum, toelichting){
-  let kop;
-  switch(sec){
-    case'OPPAKKEN':
-      kop=[r.code,r.naam,r.actiepunt||'',r.deadline||'',r.behandelaar||'',r.prioriteit||'',r.opmerkingen||'',r.inBehandeling||''];break;
-    case'VERGADERVERZOEKEN':
-      kop=[r.code,r.naam,r.periode||'',r.agendapunten||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'',r.inBehandeling||''];break;
-    case'OFFERTE-TRAJECTEN':
-      kop=[r.code,r.naam,r.datumAangevraagd||'',r.offertes||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'',''];break;
-    case'SUBSIDIE-TRAJECTEN':
-      kop=[r.code,r.naam,r.subsidie||'',r.subsidieFase||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'',r.inBehandeling||''];break;
-    case'LOD':
-      kop=[r.code,r.naam,r.actiepunt||'',r.status||'',r.behandelaar||'',r.deadline||'',r.opmerkingen||'',r.inBehandeling||''];break;
-    default: throw new Error('Onbekende sectie: '+sec);
-  }
-  return kop.concat([
+  // Harde fout i.p.v. terugvallen op een 'default'-sectie: een taak die in het verkeerde
+  // kolomstramien in 'Afgerond' belandt is duurder dan een mislukte afronding.
+  if(!SECS[sec]) throw new Error('Onbekende sectie: '+sec);
+  const v=SECS[sec].keys.map(k=>r[k]||'');
+  while(v.length<8) v.push('');               // OFFERTE heeft 7 velden → vul tot H
+  return v.concat([
     datum, toelichting, r.subcategorie||'',   // I, J, K
     r.herhaalId||'',                          // L
     '', '', '', '',                           // M, N, O, P
-    r.taakId||'', r.bundelId||'', r.bundelVolg||'',  // Q, R, S
+    r.taakId||'', r.bundelId||'', nulVeilig(r.bundelVolg),  // Q, R, S
   ]);
 }
 

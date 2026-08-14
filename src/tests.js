@@ -1115,9 +1115,11 @@ import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
        checkNummers([{taakId:'T1',_row:3},{taakId:'T1',_row:9}])[0].regels, [3,9]);
 
     eq('structuur: raster breed genoeg', checkRaster('Afgerond', 26), null);
-    eq('structuur: NTD vraagt nu 17 kolommen (kolom Q)', checkRaster('Nog Te Doen', 16).nodig, 17);
-    eq('structuur: NTD met 17 kolommen is in orde', checkRaster('Nog Te Doen', 17), null);
-    eq('structuur: raster te smal', checkRaster('Afgerond', 8).nodig, 12);
+    eq('structuur: NTD vraagt nu 19 kolommen (bundel R/S)', checkRaster('Nog Te Doen', 16).nodig, 19);
+    // 17 was genoeg tot kolom Q, maar sinds de Takenbundel schrijft de code t/m S.
+    eq('structuur: NTD met 17 kolommen is nu te smal', checkRaster('Nog Te Doen', 17).nodig, 19);
+    eq('structuur: NTD met 19 kolommen is in orde', checkRaster('Nog Te Doen', 19), null);
+    eq('structuur: raster te smal', checkRaster('Afgerond', 8).nodig, 19);
     eq('structuur: onbekend tabblad → geen oordeel', checkRaster('Iets anders', 1), null);
 
     // REGRESSIE-GUARD op echte data (gemeten op de PROD-Sheet 2026-07-28): OPPAKKEN heeft
@@ -1134,10 +1136,16 @@ import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
                      [],[],
                      ['LOD'],['VvE Code','VvE'],['381004','VvE Q'],
                      ['','Losse notitie onderaan het blad']]).length, 0);
-    // Alle negen bekende tabbladen zijn op PROD breed genoeg (gemeten 2026-07-28).
-    // Sinds 2026-07-29 heeft NTD kolom Q (vast taaknummer), dus 16 is niet meer genoeg.
+    // Sinds 2026-07-29 heeft NTD kolom Q (vast taaknummer), dus 16 is niet meer genoeg; sinds de
+    // Takenbundel (2026-08-14) schrijft de code t/m S en is zelfs 17 en 18 te smal.
     truthy('structuur: Nog Te Doen op 16 kolommen is nu te smal', !!checkRaster('Nog Te Doen', 16));
-    eq('structuur: Nog Te Doen op 15 kolommen is te smal', checkRaster('Nog Te Doen', 15).nodig, 17);
+    eq('structuur: Nog Te Doen op 15 kolommen is te smal', checkRaster('Nog Te Doen', 15).nodig, 19);
+    // De bewaking moet de breedste schrijfactie volgen, niet het huidige raster: serializeNtdUndo
+    // en afrondWaarden leveren 19 waarden, dus dit getal moet 19 zijn op béide tabbladen.
+    eq('structuur: RASTER_MIN volgt de 19-koloms schrijfcode',
+       [RASTER_MIN['Nog Te Doen'], RASTER_MIN['Afgerond'],
+        serializeNtdUndo({_sec:'OPPAKKEN',code:'1',naam:'X'}).length,
+        afrondWaarden({code:'1',naam:'X'},'OPPAKKEN','2026-08-14','').length], [19,19,19,19]);
   })();
 
   // ── VvE-dossier AI-agent (chat) ──
@@ -3702,6 +3710,47 @@ import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
                                subcategorie:'', herhaalId:'', taakId:'Tk', bundelId:'Tk', bundelVolg:'0' },
                              'VERGADERVERZOEKEN', '2026-08-14', '');
     eq('afrond: staart ligt gelijk voor elke sectie', [vv.length, vv[16], vv[17], vv[18]], [19,'Tk','Tk','0']);
+  })();
+
+  (() => {
+    // A..H per sectie. Bewust met de hand uitgeschreven en NIET afgeleid uit SECS.keys: de code
+    // leest die lijst zelf, dus een test die hem óók leest beweegt netjes mee met een fout erin.
+    // Elk veld krijgt een eigen waarde, zodat een verwisseling (bv. deadline ↔ behandelaar)
+    // zichtbaar wordt in plaats van weg te vallen tegen twee lege strings.
+    const bron = { code:'311212', naam:'Testflat', actiepunt:'ACT', deadline:'DL', behandelaar:'BEH',
+                   prioriteit:'PRIO', opmerkingen:'OPM', inBehandeling:'INB', periode:'PER',
+                   agendapunten:'AGP', datumAangevraagd:'AANGEVR', offertes:'OFF', status:'STA',
+                   subsidie:'SUB', subsidieFase:'FASE' };
+    const kop = sec => afrondWaarden(bron, sec, '2026-08-14', 'x').slice(0, 8);
+    eq('afrond A..H: OPPAKKEN',          kop('OPPAKKEN'),
+       ['311212','Testflat','ACT','DL','BEH','PRIO','OPM','INB']);
+    eq('afrond A..H: VERGADERVERZOEKEN', kop('VERGADERVERZOEKEN'),
+       ['311212','Testflat','PER','AGP','BEH','DL','OPM','INB']);
+    // OFFERTE heeft zeven velden; H blijft leeg (géén inBehandeling), zoals vóór de dedup.
+    eq('afrond A..H: OFFERTE-TRAJECTEN met lege H', kop('OFFERTE-TRAJECTEN'),
+       ['311212','Testflat','AANGEVR','OFF','BEH','DL','OPM','']);
+    eq('afrond A..H: LOD',               kop('LOD'),
+       ['311212','Testflat','ACT','STA','BEH','DL','OPM','INB']);
+    eq('afrond A..H: SUBSIDIE-TRAJECTEN', kop('SUBSIDIE-TRAJECTEN'),
+       ['311212','Testflat','SUB','FASE','BEH','DL','OPM','INB']);
+    // Een onbekende sectie mag niet stil in het LOD-stramien belanden (de oude `default`-tak).
+    let gooide = false;
+    try { afrondWaarden(bron, 'ONBEKEND', '2026-08-14', ''); } catch(_) { gooide = true; }
+    eq('afrond: onbekende sectie wordt geweigerd', gooide, true);
+  })();
+
+  (() => {
+    // Het GETAL 0 als volgnummer: `x||''` zou daar een lege cel van maken, en 0 is juist de
+    // hoofdtaak van een bundel. Het herordenen zet bundelVolg optimistisch op het rij-object,
+    // dus deze waarde kan straks als getal binnenkomen in plaats van als string.
+    const nul = { _sec:'OPPAKKEN', code:'311212', naam:'Testflat', taakId:'Tkop',
+                  bundelId:'Tkop', bundelVolg:0 };
+    eq('undo: volgnummer 0 blijft 0 en wordt geen lege cel', serializeNtdUndo(nul)[18], '0');
+    eq('afrond: volgnummer 0 blijft 0 en wordt geen lege cel',
+       afrondWaarden(nul, 'OPPAKKEN', '2026-08-14', '')[18], '0');
+    eq('undo: een numeriek volgnummer wordt een string', serializeNtdUndo({ ...nul, bundelVolg:20 })[18], '20');
+    eq('afrond: ontbrekend volgnummer blijft leeg',
+       afrondWaarden({ ...nul, bundelVolg:undefined }, 'OPPAKKEN', '2026-08-14', '')[18], '');
   })();
 
   const totOk = ok + _tOk, totFail = fail + _tFail;

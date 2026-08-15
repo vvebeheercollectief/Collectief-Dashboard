@@ -5405,9 +5405,15 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       // Loslaten is een event-handler: die kan niet awaiten, dus `herordenBundel` loopt daarna
       // zelfstandig verder en zet zijn opdracht pas ná `ensureToken` in de wachtrij. Meteen op
       // state._writeChain wachten meet dan de ronde ervóór — precies de nulmeting-val. Even de
-      // gelegenheid geven, en bij een verwachte stilte de volle 100 ms uitzitten.
+      // gelegenheid geven, en bij een verwachte stilte alle tikken uitzitten.
+      // Een MessageChannel-bericht en geen setTimeout: een testronde draait vaak in een verborgen
+      // tabblad, en dan knijpt de browser setTimeout af tot één keer per seconde — de vijf
+      // verwachte stiltes hieronder zitten hun tikken allemaal vól uit en zouden de suite dan
+      // minutenlang laten wachten. Een MessageChannel-bericht is een gewone macrotask en
+      // ontsnapt aan die rem (zelfde truc als `tik` in het blok hieronder).
+      const sleepTik=() => new Promise(r => { const k=new MessageChannel(); k.port1.onmessage=()=>r(); k.port2.postMessage(0); });
       const naSleep=async () => {
-        for(let i=0;i<20 && !volgorde.length;i++) await new Promise(r=>setTimeout(r,5));
+        for(let i=0;i<40 && !volgorde.length;i++) await sleepTik();
         await state._writeChain;
       };
       try {
@@ -5453,6 +5459,89 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         eq('sleep-e2e: alleen de rijen die echt een ander nummer krijgen',
            geschreven.map(g=>g.range), ["'Nog Te Doen'!S12", "'Nog Te Doen'!S20", "'Nog Te Doen'!S36"]);
         eq('sleep-e2e: met de nieuwe volgnummers erin', geschreven.map(g=>g.values[0]), [['10'],['30'],['40']]);
+
+        // 17b. Een rechtermuisklik op het handvat mag géén sleepstand zetten. Daarna opent het
+        //      contextmenu en komt er op de meeste platforms geen pointerup meer, dus die stand
+        //      zou blíjven staan — en de eerstvolgende muisbeweging verplaatst dan een regel die
+        //      niemand vasthoudt, precies het gat dat de window-listeners moesten dichten.
+        volgorde.length=0; geschreven=[];
+        const naEerste=nu();                       // ['Tc','Tb','Td'] uit de sleepactie hierboven
+        regels[0].querySelector('[data-bdl-grip]').dispatchEvent(
+          new PointerEvent('pointerdown',{ bubbles:true, pointerId:1, pointerType:'mouse', button:2 }));
+        truthy('sleep-e2e: een rechtermuisklik pakt de regel niet op', !regels[0].classList.contains('sleep'));
+        window.dispatchEvent(new PointerEvent('pointermove',{ clientY: regels[2].getBoundingClientRect().bottom - 2 }));
+        eq('sleep-e2e: en een muisbeweging erna verplaatst niets', nu(), naEerste);
+        window.dispatchEvent(new PointerEvent('pointerup',{}));
+        await naSleep();
+        eq('sleep-e2e: er is dus ook niets geschreven', volgorde, []);
+
+        // 17c. Wordt de tabel MIDDEN in het slepen opnieuw getekend (de 8s-poll doet dat zodra de
+        //      datahash wijzigt, en renderTbody zet de hele innerHTML van #ntd-tbody opnieuw), dan
+        //      hangt het paneel dat de sleepcode vasthoudt niet meer in het document.
+        //      Twee helften, want ze breken los van elkaar en de één maskeert de ander: hier het
+        //      LOSLATEN na zo'n render. De regel is dan al verplaatst en het paneel geeft dus een
+        //      keurig geldige uitslag met 'gewijzigd' — alleen slaat die op een spookpaneel dat
+        //      niemand meer ziet. Zonder rem schrijft het loslaten die volgorde gewoon weg, mét
+        //      undo-toast, terwijl de gebruiker naar het verse paneel kijkt.
+        volgorde.length=0; geschreven=[];
+        const voorRender=nu();                     // ['Tc','Tb','Td']
+        regels[0].querySelector('[data-bdl-grip]')
+          .dispatchEvent(new PointerEvent('pointerdown',{ bubbles:true, pointerId:1 }));
+        window.dispatchEvent(new PointerEvent('pointermove',
+          { clientY: paneel.querySelector('.bdl-sub').getBoundingClientRect().top + 2 }));
+        eq('sleep-e2e: de regel is opgepakt en verplaatst', nu(), ['Tb','Tc','Td']);
+        host.remove();                             // ← dit is de render die het paneel losmaakt
+        window.dispatchEvent(new PointerEvent('pointerup',{}));
+        await naSleep();
+        eq('sleep-e2e: loslaten na een render schrijft geen spookvolgorde weg', volgorde, []);
+        document.body.appendChild(host);
+
+        //      En de andere helft: BEWEGEN na zo'n render. Op losgekoppelde regels geeft
+        //      getBoundingClientRect louter nullen, dus valt sleepDoel bij elke y>0 in zijn
+        //      buiten-de-lijst-tak en schiet de regel naar de staart van het paneel — bij elke
+        //      pointermove opnieuw, zonder dat de gebruiker daar iets van ziet.
+        //      Bewust een regel die NIET onderaan staat: de staart is precies waar de spookuitslag
+        //      hem heen zou schuiven, dus met de laatste regel zou deze toets ook slagen als de
+        //      rem er niet was.
+        volgorde.length=0; geschreven=[];
+        const naVerplaatsing=nu();                 // ['Tb','Tc','Td']
+        regels[0].querySelector('[data-bdl-grip]')
+          .dispatchEvent(new PointerEvent('pointerdown',{ bubbles:true, pointerId:1 }));
+        host.remove();
+        window.dispatchEvent(new PointerEvent('pointermove',{ clientY: 400 }));
+        eq('sleep-e2e: bewegen na een render verzet niets meer', nu(), naVerplaatsing);
+        window.dispatchEvent(new PointerEvent('pointerup',{}));
+        await naSleep();
+        eq('sleep-e2e: en schrijft dus ook niets', volgorde, []);
+        // Terug in het document. Bewijst dat de sleepstand echt LOSGELATEN is en niet alleen even
+        // overgeslagen: bleef `_sleep` staan, dan pakt de code de regel hier gewoon weer op.
+        document.body.appendChild(host);
+        window.dispatchEvent(new PointerEvent('pointermove',{ clientY: 400 }));
+        eq('sleep-e2e: de sleepstand is losgelaten, niet overgeslagen', nu(), naVerplaatsing);
+        regels[0].classList.remove('sleep');       // die klasse ging met het paneel mee, niet weg
+
+        // 17d. Paneel en gegevens lopen uiteen (een collega voegde een subtaak toe): dan is de
+        //      ledenlijst onvolledig en mag er niet hernummerd worden. Er wordt dus niets
+        //      geschreven — maar de gesleepte regel staat wél op een plek waar hij niet komt te
+        //      staan, en die leugen zou blijven tot een poll toevallig iets te melden heeft. Er
+        //      hoort dus een renderAll te volgen, net als bij de 'deze volgorde kan niet'-tak.
+        //      Meetbaar via #ntd-tbody: renderAll gaat langs renderNtd en zet die tbody opnieuw.
+        //      (Het paneel hierboven staat los in de body en wordt daar niet door geraakt — dat is
+        //      een artefact van deze opstelling, in het echt hangt het ín die tbody.)
+        volgorde.length=0; geschreven=[];
+        const regels2=[...paneel.querySelectorAll('.bdl-sub')];
+        regels2[2].querySelector('[data-bdl-grip]')
+          .dispatchEvent(new PointerEvent('pointerdown',{ bubbles:true, pointerId:1 }));
+        window.dispatchEvent(new PointerEvent('pointermove',{ clientY: regels2[0].getBoundingClientRect().top + 2 }));
+        eq('sleep-e2e: de regel staat op zijn nieuwe plek', nu()[0], regels2[2].dataset.taak);
+        const vijfde=t(44, 'Te', 'Vijfde-werk'); vijfde.bundelId='Tkop'; vijfde.bundelVolg='50';
+        D.ntd={ ...leeg, OPPAKKEN:[kop, sub, derde, vierde, vijfde] };   // lid dat níet in het paneel staat
+        document.getElementById('ntd-tbody').innerHTML='<tr id="sleep-merk"></tr>';
+        window.dispatchEvent(new PointerEvent('pointerup',{}));
+        truthy('sleep-e2e: een paneel dat uit de pas loopt wordt teruggetekend',
+               !document.getElementById('sleep-merk'));
+        await naSleep();
+        eq('sleep-e2e: en schrijft niets', volgorde, []);
       } finally { host.remove(); }
 
       // 18. Een sleepactie die niets kán veranderen moet dat zeggen. Een afgerond lid houdt zijn

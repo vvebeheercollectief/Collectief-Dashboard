@@ -1240,8 +1240,14 @@ body.bulk #chat-fab{display:none}
 /* Het paneel vult zijn cel helemaal; de gewone rij-padding zou er een rand omheen trekken. */
 .bdl-tr>td{padding:0!important}
 .bdl-paneel{border-left:3px solid var(--sec,var(--ac));background:var(--group-bg)}
+/* Bewust GEEN touch-action:none op de hele regel: het sleepgebaar begint altijd op het handvat
+   hieronder, en de browser leidt het scrollgedrag af uit het element waar de aanraking landt
+   samen met zijn voorouders — die kunnen het verder beperken, nooit terugzetten. Hier zou de
+   regel dus niets toevoegen en wél elke aanraking op een subtaakregel doodmaken voor pannen:
+   geen verticale paginascroll én geen horizontale pan van .tbl-wrap, waar de takentabel op een
+   smal scherm juist van afhankelijk is. */
 .bdl-sub{display:flex;align-items:center;gap:9px;padding:7px 10px 7px 22px;
-  border-top:1px solid var(--bor);font-size:12.5px;touch-action:none}
+  border-top:1px solid var(--bor);font-size:12.5px}
 .bdl-sub.af{color:var(--mut)}
 .bdl-sub.af .bdl-txt{text-decoration:line-through}
 .bdl-sub.sleep{opacity:.55;background:var(--sur);box-shadow:0 6px 18px rgba(0,0,0,.13)}
@@ -1250,8 +1256,17 @@ body.bulk #chat-fab{display:none}
    plaatshouder nul breed (de padding hieronder is horizontaal 0) en schuiven nummer, bolletje en
    tekst van élk afgerond lid ruim 9px naar links t.o.v. de open leden. */
 .bdl-h{cursor:grab;color:var(--fnt);font-size:14px;flex:none;box-sizing:border-box;width:16px;
-  padding:2px 0;text-align:center;user-select:none;touch-action:none}
+  padding:2px 0;text-align:center;user-select:none;touch-action:none;position:relative}
 .bdl-h:active{cursor:grabbing}
+/* Het handvat meet 16 × 25 px (gemeten) en is als aanraakdoel dus te smal — richtlijn is 24px+.
+   Het gebied groeit met een pseudo-element in plaats van met echte maten: de vaste breedte
+   hierboven houdt de kolom recht voor de lege plaatshouder van een afgerond lid, en een
+   pseudo-element is zelf geen event-doel — de pointerdown komt gewoon op .bdl-h binnen, waar
+   `[data-bdl-grip]` op staat. 6px eromheen maakt er 28 × 37 van en blijft aan alle kanten binnen
+   de regel: horizontaal past het in de 9px gap naar het nummer, verticaal in de 7px padding van
+   de 40px hoge regel. Het overlapt dus geen tekst en geen buurregel. Alleen op een écht handvat:
+   de plaatshouder van een afgerond lid start geen sleepgebaar. */
+.bdl-h[data-bdl-grip]::after{content:'';position:absolute;inset:-6px}
 /* De plaatshouder houdt alleen de kolom bezet; de grijp-cursor zou een sleepgebaar beloven dat er
    voor een afgerond lid niet is. Dimmen heeft geen zin — er staat geen glyph in. */
 .bdl-sub.af .bdl-h{cursor:default}

@@ -333,9 +333,14 @@ export async function herordenBundel(nieuweVolgorde, volgordeGewijzigd){
 
 // ── Slepen om de volgorde te wijzigen ─────────────────────────────────────────
 // Op pointer-events en niet op de HTML5-sleepfunctie (draggable/dragstart): die kent geen
-// touch-invoer, en dit dashboard wordt ook op de telefoon gebruikt. `touch-action:none` op
-// .bdl-sub en .bdl-h (styles.css) houdt de pagina stil terwijl er met een vinger gesleept wordt —
-// zonder die regel neemt de browser de beweging als scroll-gebaar en komt er geen pointermove meer.
+// touch-invoer, en dit dashboard wordt ook op de telefoon gebruikt. `touch-action:none` op .bdl-h
+// (styles.css) houdt de pagina stil terwijl er met een vinger gesleept wordt — zonder die regel
+// neemt de browser de beweging als scroll-gebaar en komt er geen pointermove meer. Alléén op het
+// handvat en niet op de hele regel: het gebaar begint hier altijd op `[data-bdl-grip]`, en de
+// browser leidt het scrollgedrag af uit het element waar de aanraking landt sámen met zijn
+// voorouders — die kunnen het verder beperken, nooit terugzetten. Op .bdl-sub zou de regel dus
+// niets extra's opleveren en wél elke aanraking op een subtaakregel doodmaken voor pannen,
+// inclusief de horizontale pan van .tbl-wrap waar de takentabel op een smal scherm van leeft.
 
 // Waar komt het gesleepte element terecht? Puur, dus los testbaar zonder DOM.
 // `rects` = [[top,bottom], …] van de zichtbare regels, `y` = de muis-/vingerpositie.
@@ -402,6 +407,12 @@ export function initBundelSlepen(container){
   if (!container || container._bdlSleep) return;
   container._bdlSleep = true;
   container.addEventListener('pointerdown', e => {
+    // Alleen de linkerknop. Een rechtermuisklik op het handvat zou de sleepstand zetten waarna het
+    // contextmenu opengaat, en daarna komt er op de meeste platforms géén pointerup meer: de stand
+    // bleef staan en de eerstvolgende muisbeweging verplaatste een regel die niemand vasthield.
+    // De toets op pointerType erbij omdat `button` bij een gewone aanraking of pen-contact 0 is —
+    // die blijven dus gewoon werken.
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
     const grip = e.target.closest('[data-bdl-grip]');
     if (!grip) return;
     const rij = grip.closest('.bdl-sub');
@@ -416,6 +427,27 @@ export function initBundelSlepen(container){
   if (_sleepGlobaal) return;
   _sleepGlobaal = true;
 
+  // Hangt het paneel dat we vasthouden nog in het document? Zo niet, dan is er tussentijds opnieuw
+  // getekend, en `renderTbody` zet de hele innerHTML van #ntd-tbody opnieuw. Dat gebeurt zodra een
+  // leesronde een andere datahash oplevert (data.js): de 8s-poll, maar ook de stille resync die
+  // `backgroundWrite` ná élke eigen schrijfactie doet — die hash omvat D.logboek, dus hij slaat al
+  // om van een logregel over een wildvreemde taak.
+  // Vanaf dat moment is élke meting aan dit paneel onbruikbaar:
+  //   - `getBoundingClientRect()` geeft op losgekoppelde regels louter nullen, dus `sleepDoel` valt
+  //     bij elke y>0 in zijn buiten-de-lijst-tak en schuift de regel naar de staart;
+  //   - `sleepUitslag` kan op datzelfde spookpaneel gewoon een geldige uitslag geven (de poll ging
+  //     over een ándere taak), en dan zou `herordenBundel` een volgorde wegschrijven die de
+  //     gebruiker nooit gemaakt heeft — hij kijkt intussen naar het verse paneel en heeft zijn
+  //     regel niet eens zien bewegen.
+  // Niets doen is hier precies goed: de render die het paneel losmaakte heeft het beeld al
+  // bijgewerkt. De 'sleep'-klasse hoeft ook niet weg — die zit op een regel bínnen dit paneel
+  // (pointermove verplaatst hem er nooit uit), dus die is met het paneel mee verdwenen.
+  const losgeraakt = () => {
+    if (_sleep.paneel.isConnected) return false;
+    _sleep = null;
+    return true;
+  };
+
   // Bewegen en loslaten op `window` en niet op de tabel. Het loslaten MOET aankomen: tekent de
   // 8s-poll de tabel intussen opnieuw (data.js doet dat zodra er iets gewijzigd is), dan hangt de
   // gesleepte regel niet meer in de tabel en zou een listener dáár het loslaten mislopen — de
@@ -423,7 +455,7 @@ export function initBundelSlepen(container){
   // vasthield. Bewegen hoort om dezelfde reden op window: zonder pointer-capture gaat een
   // pointermove naar wat er ónder de muis ligt, en dat is buiten de tabel niets van ons.
   window.addEventListener('pointermove', e => {
-    if (!_sleep) return;
+    if (!_sleep || losgeraakt()) return;
     const regels = [..._sleep.paneel.querySelectorAll('.bdl-sub')];
     const doel = sleepDoel(regels.map(el => {
       const r = el.getBoundingClientRect(); return [r.top, r.bottom];
@@ -440,18 +472,28 @@ export function initBundelSlepen(container){
   });
 
   const stop = () => {
-    if (!_sleep) return;
+    if (!_sleep || losgeraakt()) return;
     const { rij, paneel, begin } = _sleep;
     _sleep = null;
     rij.classList.remove('sleep');
     const leden = bouwBundelIndex(D.ntd, D.af).get(bundelSleutel(paneel.dataset.bundel)) || [];
     const uitslag = sleepUitslag(paneel, leden, begin);
-    // Niets veranderd, of paneel en gegevens lopen uiteen: in beide gevallen niets schrijven.
-    // Die eerste rem is geen optimalisatie maar een noodzaak — `hernummerLeden` deelt ook zónder
-    // sleepbeweging nieuwe nummers uit zodra de bundel nog op zijn startwaarden staat (0 en 10
-    // worden 10 en 20), dus een kale klik op het handvat zou anders een schrijfronde én een
-    // undo-toast opleveren voor een verplaatsing die niemand deed.
-    if (!uitslag || !uitslag.gewijzigd) return;
+    if (!uitslag){
+      // Paneel en gegevens beschrijven niet meer dezelfde bundel (een collega voegde een subtaak
+      // toe, iemand vinkte er een af). Er wordt niets geschreven — maar de gesleepte regel staat
+      // wél nog op zijn nieuwe plek, en die leugen zou blijven staan tot een poll toevallig iets
+      // te melden heeft. Terugtekenen dus, om precies dezelfde reden als de
+      // 'deze volgorde kan niet'-tak in `herordenBundel`.
+      renderAll();
+      return;
+    }
+    // Niets verschoven → niets schrijven. Die rem is geen optimalisatie maar een noodzaak:
+    // `hernummerLeden` deelt ook zónder sleepbeweging nieuwe nummers uit zodra de bundel nog op
+    // zijn startwaarden staat (0 en 10 worden 10 en 20), dus een kale klik op het handvat zou
+    // anders een schrijfronde én een undo-toast opleveren voor een verplaatsing die niemand deed.
+    // Terugtekenen hoeft hier niet: `gewijzigd:false` zegt letterlijk dat de regels nog in de
+    // volgorde van de laatste render staan.
+    if (!uitslag.gewijzigd) return;
     herordenBundel(uitslag.volgorde, true);
   };
   window.addEventListener('pointerup', stop);

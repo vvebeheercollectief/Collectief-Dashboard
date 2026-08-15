@@ -169,6 +169,27 @@ export function wordtGeabsorbeerd(r, index, sec){
   return kop.r._sec === sec;                       // kop in hetzelfde tabblad → het paneel tekent hem
 }
 
+// De subtaken van een taak: de leden die naar zíjn taaknummer wijzen — open én afgerond, want welke
+// van de twee telt verschilt per aanroeper. `magKoppelen` gebruikt de lijst als vangrail (mag deze
+// taak zelf nog ergens onder?), `openSubtaken` telt er alleen de openstaande van.
+//
+// Eén functie voor die twee, omdat het exact dezelfde vraag is: wie draagt mijn taaknummer als
+// bundelnummer? Dat is de regel uit de kop van deze module, en twee plekken die hem elk zelf
+// afleiden gaan er bij de eerstvolgende wijziging stil van uit elkaar lopen.
+//
+// Voorwaarde aan de aanroeper: `index` en `r` komen uit dezelfde momentopname. De taak zélf valt uit
+// de lijst op object-identiteit (`m.r !== r`), want twee rijen kunnen hetzelfde taaknummer dragen
+// (een dubbele rij in de Sheet, precies wat `checkNummers` meldt) en dán is dat wél een echte
+// subtaak-achtige verwijzing. Geef je een `r` mee uit een ándere leesronde dan waaruit
+// `bouwBundelIndex` is gebouwd, dan telt de taak zichzelf als 'andere rij': `magKoppelen` weigert
+// dan élke koppeling (zichtbaar als een melding over subtaken die er niet zijn) en de waarschuwing
+// bij afronden noemt er één te veel.
+function subtakenVan(index, r){
+  const nr = tekst(r && r.taakId);
+  if (!nr) return [];   // geen taaknummer = niets om naar te wijzen, dus per definitie geen subtaken
+  return ((index && index.get(nr)) || []).filter(m => m.r !== r);
+}
+
 // Mag `bron` als subtaak onder `doel` komen te hangen?
 // Geeft {mag, reden, bundelId} — bundelId is de bundel waar bron in terechtkomt.
 //
@@ -188,15 +209,9 @@ export function magKoppelen(bron, doel, index){
   // broer áchter zich heeft, én hij laat het anker van een bundel wél los zodra geen enkel ander
   // lid een hóger nummer heeft. Dat laatste ontstaat vanzelf: `hernummerLeden` schuift het anker
   // omhoog terwijl afgeronde leden hun nummer houden. Op identiteit toetsen dicht beide gaten.
-  //
-  // Voorwaarde aan de aanroeper: `index` en `bron` komen uit dezelfde momentopname. De regel
-  // hieronder filtert de taak zélf uit de lijst op object-identiteit (`m.r !== bron`), want twee
-  // rijen kunnen hetzelfde taaknummer dragen (een dubbele rij in de Sheet) en dán is dat wél een
-  // echte subtaak-achtige verwijzing. Geef je een `bron` mee die uit een ándere leesronde komt
-  // dan waaruit `bouwBundelIndex` is gebouwd, dan telt de taak zichzelf als 'andere rij' en
-  // weigert deze guard élke koppeling — zichtbaar als een melding over subtaken die er niet zijn.
-  const eigenNr = tekst(bron.taakId);
-  if (eigenNr && ((index && index.get(eigenNr)) || []).some(m => m.r !== bron))
+  // Afgeronde subtaken tellen hier gewoon mee; zie `subtakenVan` voor de voorwaarde die deze
+  // vraag aan de aanroeper stelt.
+  if (subtakenVan(index, bron).length)
     return { mag:false, reden:'Deze taak heeft zelf subtaken; ontkoppel die eerst.', bundelId:null };
 
   const doelBundel = tekst(doel.bundelId);
@@ -208,6 +223,30 @@ export function magKoppelen(bron, doel, index){
   // Heeft het doel nog geen taaknummer (rij van vóór de backfill), dan kent de schrijfweg er
   // eerst één toe — dat kan hier niet, want deze module is puur.
   return { mag:true, reden:'', bundelId: doelBundel || tekst(doel.taakId) || null };
+}
+
+// Hoeveel subtaken van déze taak staan er nog open? Alleen de openstaande leden, want een afgeronde
+// subtaak laat niets liggen om voor te waarschuwen — dáárin verschilt deze telling van de vangrail
+// in `magKoppelen`, die dezelfde lijst juist ongefilterd gebruikt.
+//
+// Nadrukkelijk niet "de rest van mijn bundel" (`bundelVan`): die twee vallen alleen samen voor de
+// hoofdtaak. Voor een subtaak zou dat de kop en de broers meetellen, en dan zou élk vinkje in een
+// bundel een bevestigingsvraag opleveren over taken die niet van hem zijn — terwijl §5 van het
+// ontwerp juist vastlegt dat subtaak 3 afgerond mag worden terwijl 1 en 2 nog openstaan.
+export function openSubtaken(index, r){
+  return subtakenVan(index, r).filter(m => !m.af).length;
+}
+
+// Waarschuwingstekst bij het afronden van een taak met openstaande subtaken. Lege string = niets te
+// melden. Het is een waarschuwing en geen blokkade: de bundel valt hier niet uit elkaar, want hij is
+// 'alle rijen met hetzelfde bundelnummer' en `bouwBundelIndex` telt de rijen uit 'Afgerond' gewoon
+// mee. De kop schuift dus enkel door naar het eerstvolgende openstaande lid (zie `zichtbareKop`).
+export function bundelWaarschuwing(index, r){
+  const n = openSubtaken(index, r);
+  if (!n) return '';
+  return n === 1
+    ? 'Er staat nog 1 subtaak open — toch afronden?'
+    : `Er staan nog ${n} subtaken open — toch afronden?`;
 }
 
 // ── De taakkiezer van 'Hoort bij' ────────────────────────────────────────────

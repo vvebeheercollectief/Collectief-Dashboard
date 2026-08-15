@@ -18,7 +18,7 @@ import { _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, veil
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
-import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, _sheetBreedtes, getSheetIds, kiesSectie } from "./crud.js";
+import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, _sheetBreedtes, getSheetIds, kiesSectie, deleteTaskRow } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages, renderChat } from "./dossier-chat.js";
 import { shouldPromptReload, maakHerlaadKern, zelfdeWorker } from "./sw-update.js";
@@ -30,7 +30,7 @@ import { checkSecties, checkRaster, checkRasters, checkNummers, checkAlles, RAST
 import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from "./subsidie-fase.js";
 import { toggleHerhaalStatus } from "./render-herhaal.js";
 import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
-import { bouwBundelIndex, bundelWeergave, zichtbareKop, isBundel, bundelVan, bundelMetId, hernummerLeden, volgendeVolg, magKoppelen, wordtGeabsorbeerd, koppelKandidaten, taakFilter } from "./bundel.js";
+import { bouwBundelIndex, bundelWeergave, zichtbareKop, isBundel, bundelVan, bundelMetId, hernummerLeden, volgendeVolg, magKoppelen, wordtGeabsorbeerd, koppelKandidaten, taakFilter, openSubtaken, bundelWaarschuwing } from "./bundel.js";
 import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./render-bundel.js";
 import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkoppelTaak, herordenBundel, sleepDoel, paneelTaaknummers, sleepUitslag, initBundelSlepen } from "./bundel-acties.js";
 
@@ -4292,6 +4292,46 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   })();
 
   (() => {
+    // De waarschuwing bij afronden/verwijderen. "Heeft deze taak subtaken?" is dezelfde vraag als
+    // in `magKoppelen` en wordt dus op dezelfde manier beantwoord: wie draagt míjn taaknummer als
+    // bundelnummer? Nadrukkelijk NIET "wie zit er verder nog in mijn bundel" — dan zou élke subtaak
+    // die je afvinkt een bevestigingsvraag opleveren over taken die niet van hem zijn, terwijl het
+    // ontwerp (§5) juist vastlegt dat je subtaak 3 mag afronden terwijl 1 en 2 nog openstaan.
+    const t = (taakId, bundelId, volg, sec) => ({ taakId, bundelId, bundelVolg:volg, _sec:sec, code:'311212' });
+    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const kop = t('Tkop','Tkop','0','VERGADERVERZOEKEN');
+    const subB = t('Tb','Tkop','10','OPPAKKEN'), subC = t('Tc','Tkop','20','OPPAKKEN');
+    const ix = bouwBundelIndex({ ...leeg, VERGADERVERZOEKEN:[kop], OPPAKKEN:[subB, subC] }, leeg);
+    eq('waarschuwing: twee open subtaken', openSubtaken(ix, kop), 2);
+    eq('waarschuwing: tekst benoemt het aantal', bundelWaarschuwing(ix, kop),
+       'Er staan nog 2 subtaken open — toch afronden?');
+    eq('waarschuwing: enkelvoud bij één', bundelWaarschuwing(
+       bouwBundelIndex({ ...leeg, VERGADERVERZOEKEN:[kop], OPPAKKEN:[subB] }, leeg), kop),
+       'Er staat nog 1 subtaak open — toch afronden?');
+    eq('waarschuwing: geen melding zonder open subtaken',
+       bundelWaarschuwing(bouwBundelIndex({ ...leeg, VERGADERVERZOEKEN:[kop] }, leeg), kop), '');
+
+    // De subtaak-kant, en dus het verschil met "de rest van mijn bundel": Tb zit in een bundel van
+    // drie, maar er hangt niets ónder Tb.
+    eq('waarschuwing: een subtaak heeft zelf geen subtaken', openSubtaken(ix, subB), 0);
+    eq('waarschuwing: … en krijgt dus geen vraag bij het afronden', bundelWaarschuwing(ix, subB), '');
+
+    // Een afgeronde subtaak laat niets liggen en telt dus niet mee. Zonder deze toets mag de
+    // `!m.af`-filter eruit zonder dat er één assert rood wordt.
+    eq('waarschuwing: een afgeronde subtaak telt niet mee',
+       openSubtaken(bouwBundelIndex({ ...leeg, VERGADERVERZOEKEN:[kop], OPPAKKEN:[subB] },
+                                    { ...leeg, OPPAKKEN:[subC] }), kop), 1);
+
+    // Randgevallen die geen fout mogen geven: een rij van vóór de backfill (geen taaknummer) kan
+    // per definitie geen subtaken hebben — er is niets om naar te wijzen — en een ontbrekende index
+    // is een vroege render, geen fout.
+    eq('waarschuwing: een rij zonder taaknummer heeft geen subtaken',
+       openSubtaken(ix, t('','Tkop','30','OPPAKKEN')), 0);
+    eq('waarschuwing: geen index is geen fout', openSubtaken(null, kop), 0);
+    eq('waarschuwing: geen taak is geen fout', openSubtaken(ix, null), 0);
+  })();
+
+  (() => {
     const t = (taakId, bundelId, volg, sec) => ({ taakId, bundelId, bundelVolg:volg, _sec:sec,
                                                   code:'311212', naam:'Testflat', actiepunt:'X', deadline:'' });
     const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
@@ -6656,6 +6696,99 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     } finally {
       state._bundelWeergave=bwOud; state._rowCache=cacheOud; state.bulkMode=bulkOud;
       state.bundelOpen=openOud;
+    }
+  })();
+
+  // ── De waarschuwing zit ook écht aan de twee knoppen vast ──
+  // `openSubtaken` en `bundelWaarschuwing` zijn pure functies: die blijven groen terwijl niemand ze
+  // aanroept. Hier gaan `completeTask` en `deleteTaskRow` daarom langs de echte weg, met een
+  // gestubde `confirm`. Beide teksten staan hier voluit — dat is de enige plek waar ze vastliggen,
+  // en het aantal is precies waar de gebruiker zijn besluit op neemt.
+  //
+  // De `deleteTaskRow`-aanroepen worden geAWAIT, en dat is geen netheid maar de kern van de toets:
+  // die functie remt pas ná `await ensureToken()` af, dus een 'nee' die het `return` níet haalt
+  // verwijdert de taak alsnog — één tik later. Zonder await meet de assert eronder de stand van
+  // vóór die tik en blijft groen, wat adversarieel is vastgesteld.
+  await (async () => {
+    const _confirm=window.confirm, _alert=window.alert;
+    let vragen=[], antwoord=false;
+    const cacheOud=state._rowCache, ntdOud=D.ntd, afOud=D.af;
+    const uitCacheOud=state._uitCache, tokenOud=state.oauthToken, expiryOud=state.oauthExpiry;
+    const completeOud=state._completeRow, ridOud=state._completeRid;
+    try {
+      window.confirm=m=>{ vragen.push(m); return antwoord; };
+      window.alert=()=>{};
+      // De twee remmen die vóór de vraag staan open: `blokkeerOffline` mag hier niet als eerste
+      // terugkeren, anders meet dit blok stilte in plaats van een vraag.
+      state._uitCache=false;
+      state.oauthToken='stub'; state.oauthExpiry=Date.now()+3600e3;
+      state._completeRow=null; state._completeRid=null;
+      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const kop={ _sec:'OPPAKKEN', _row:5, code:'BW-1', naam:'VvE BW', actiepunt:'hoofdtaak',
+                  deadline:'', taakId:'Tw1', bundelId:'Tw1', bundelVolg:'0' };
+      const sub={ _sec:'OPPAKKEN', _row:6, code:'BW-1', naam:'VvE BW', actiepunt:'subtaak',
+                  deadline:'', taakId:'Tw2', bundelId:'Tw1', bundelVolg:'10' };
+      D.ntd={ ...leeg, OPPAKKEN:[kop, sub] };
+      D.af ={ ...leeg };
+      state._rowCache=[kop, sub];
+
+      // 1. De hoofdtaak afronden: vraag mét het aantal, en 'nee' laat het afrond-scherm dicht.
+      completeTask(0);
+      eq('afrondvraag: de hoofdtaak stelt de vraag', vragen,
+         ['Er staat nog 1 subtaak open — toch afronden?']);
+      eq('afrondvraag: bij nee blijft het afrond-scherm dicht',
+         document.getElementById('complete-bg').classList.contains('open'), false);
+      eq('afrondvraag: bij nee wordt er ook geen taak onthouden', state._completeRow, null);
+
+      // 2. 'Ja' laat de gewone flow ongemoeid doorlopen.
+      antwoord=true; vragen=[];
+      completeTask(0);
+      eq('afrondvraag: bij ja gaat het scherm alsnog open',
+         document.getElementById('complete-bg').classList.contains('open'), true);
+      truthy('afrondvraag: … op de aangeklikte taak', state._completeRow===kop);
+      closeCompleteModal();
+
+      // 3. Een subtaak afvinken hoort niets te vragen — dat is de dagelijkse handeling.
+      vragen=[];
+      completeTask(1);
+      eq('afrondvraag: een subtaak afvinken vraagt niets', vragen, []);
+      eq('afrondvraag: en opent meteen het scherm',
+         document.getElementById('complete-bg').classList.contains('open'), true);
+      closeCompleteModal();
+
+      // 4. Verwijderen heeft een eigen tekst: geen cascade, de subtaak blijft staan. Bewust géén
+      //    'blijft als bundel bestaan' — met één overgebleven lid is er geen bundel meer
+      //    (`isBundel` telt er twee), en dan zou de melding iets beloven wat niet gebeurt.
+      antwoord=false; vragen=[];
+      await deleteTaskRow(kop);
+      eq('verwijdervraag: de hoofdtaak stelt de vraag', vragen,
+         ['Deze taak heeft nog 1 subtaak. Die wordt niet mee verwijderd. Toch verwijderen?']);
+      truthy('verwijdervraag: bij nee staat de taak er nog', D.ntd.OPPAKKEN.indexOf(kop)===0);
+
+      // 5. Meervoud, en de tegenproef: een subtaak verwijderen vraagt niets.
+      const derde={ ...sub, _row:7, taakId:'Tw3', bundelVolg:'20', actiepunt:'derde' };
+      D.ntd={ ...leeg, OPPAKKEN:[kop, sub, derde] };
+      vragen=[];
+      await deleteTaskRow(kop);
+      eq('verwijdervraag: meervoud bij twee subtaken', vragen,
+         ['Deze taak heeft nog 2 subtaken. Die worden niet mee verwijderd. Toch verwijderen?']);
+      // Zónder vraag loopt de verwijdering gewoon dóór, en die mag hier niet echt gaan schrijven.
+      // De cache-rem van `blokkeerOffline` staat daarom voor deze ene aanroep dicht — die zit ná de
+      // vraag, dus hij kan het antwoord niet maskeren: bleef de guard hangen op 'de rest van mijn
+      // bundel', dan stond de vraag hieronder al in de lijst.
+      state._uitCache=true;
+      vragen=[];
+      await deleteTaskRow(sub);
+      eq('verwijdervraag: een subtaak verwijderen vraagt niets', vragen, []);
+      truthy('verwijdervraag: … en de rem heeft de rij inderdaad niet aangeraakt',
+             D.ntd.OPPAKKEN.indexOf(sub)===1);
+    } finally {
+      window.confirm=_confirm; window.alert=_alert;
+      state._rowCache=cacheOud; D.ntd=ntdOud; D.af=afOud;
+      state._uitCache=uitCacheOud; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
+      state._completeRow=completeOud; state._completeRid=ridOud;
+      document.getElementById('complete-bg').classList.remove('open');
+      document.querySelectorAll('.toast').forEach(el => el.remove());
     }
   })();
 

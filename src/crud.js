@@ -11,7 +11,7 @@ import { animateRowOut, flashRow } from "./anim.js";
 import { logEvent, renderTaskHistory } from "./render-overig.js";
 import { backgroundWrite, loadAll, blokkeerOffline } from "./data.js";
 import { faseIndex, faseWoord, faseRijHtml, faseWijziging } from "./subsidie-fase.js";
-import { bouwBundelIndex, bundelVan, zichtbareKop, zelfdeTaak } from "./bundel.js";
+import { bouwBundelIndex, bundelVan, zichtbareKop, zelfdeTaak, openSubtaken, bundelWaarschuwing } from "./bundel.js";
 import { koppelTaak } from "./bundel-acties.js";
 import { setNtd, renderNtd } from "./render-lijsten.js";
 
@@ -371,6 +371,16 @@ async function deleteCurrentEditTask(){
 
 async function deleteTaskRow(r){
   const omschrijving=r.actiepunt||r.periode||r.subsidie||r.code||'deze taak';
+  // Er is bewust GEEN cascade: verwijderen raakt nooit meer dan één taak (§6.6). De subtaken blijven
+  // dus staan, en dat is precies wat je hier moet weten — je verwijdert de taak waar ze onder
+  // hangen. Bewust niet 'de bundel blijft bestaan': houdt er één subtaak over, dan is het na afloop
+  // géén bundel meer (`isBundel` vraagt om twee leden) en zou die belofte niet uitkomen.
+  // De vraag staat vóór `blokkeerOffline`: een 'nee' kost dan niets, en andersom zou je eerst een
+  // vraag over subtaken beantwoorden om dán pas te horen dat er geen verbinding is. Zelfde volgorde
+  // als bij het wegleggen: `snoozeOpslaan` vraagt, en pas `schrijfOpvolgdatum` remt op offline.
+  const nSub=openSubtaken(bouwBundelIndex(D.ntd, D.af), r);
+  if(nSub && !confirm(`Deze taak heeft nog ${nSub} ${nSub===1?'subtaak':'subtaken'}. `+
+                      `${nSub===1?'Die wordt':'Die worden'} niet mee verwijderd. Toch verwijderen?`)) return;
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){alert('Inloggen mislukt. Probeer het opnieuw.');return}
   const sec=r._sec;
@@ -456,6 +466,12 @@ function _herankerRij(r, ntd){
 async function completeTask(idx){
   const r=state._rowCache[idx];
   if(!r){alert('Taak niet gevonden. Vernieuw de pagina en probeer opnieuw.');return}
+  // Sluit je een taak af waar nog subtaken onder hangen? Dan is dat een waarschuwing en géén
+  // blokkade (§5: de volgorde is een leidraad). De vraag staat hier en niet in doCompleteTask,
+  // zodat je hem krijgt vóórdat je een datum en toelichting invult. Alleen de hoofdtaak stelt hem —
+  // een subtaak afvinken is de dagelijkse handeling en moet stil blijven (zie `openSubtaken`).
+  const waarschuwing=bundelWaarschuwing(bouwBundelIndex(D.ntd, D.af), r);
+  if(waarschuwing && !confirm(waarschuwing)) return;
   // Rij-OBJECT bewaren, geen index: terwijl de modal open staat kan een vertraagde
   // renderAll (animateRowOut, ~1,2s) of de stille resync _rowCache herbouwen — een
   // bewaarde index wijst dan naar een ándere taak. Zelfde patroon als completeCurrentEditTask.

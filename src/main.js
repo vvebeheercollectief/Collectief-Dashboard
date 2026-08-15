@@ -17,7 +17,7 @@ import {
   subscribeNotifs, unsubscribeNotifs, sendTestNotif, getCurrentWho, initMeldingen,
 } from './notifications.js';
 import {
-  openModal, closeModal, submitTask, doCompleteTask, closeCompleteModal,
+  openModal, closeModal, submitTask, doCompleteTask, closeCompleteModal, kiesSectie,
 } from './crud.js';
 import { loadAll, magPollen, schrijfActieLoopt, setSyncOffline, showOfflineBanner, laadUitCache } from './data.js';
 import { initActions } from './actions.js';
@@ -172,6 +172,9 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('modal-bg').addEventListener('mousedown',e=>{_modalMouseDownTarget=e.target});
   document.getElementById('modal-bg').addEventListener('click',e=>{if(e.target.id==='modal-bg'&&_modalMouseDownTarget?.id==='modal-bg')closeModal()});
   document.getElementById('m-submit').onclick=submitTask;
+  // Categorie-kiezer: een <select> geeft `change`, geen `click`, en komt dus niet langs de
+  // delegatie in actions.js (zelfde reden als bij hh-type hieronder).
+  document.getElementById('m-sec').onchange=e=>kiesSectie(e.target.value);
 
   // Ontwikkeling modal + search
   document.getElementById('btn-add-ontw').onclick=()=>openOntwModal(false);

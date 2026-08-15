@@ -9,7 +9,7 @@ import { bulkGeselecteerd } from "./bulk.js";
 import { offerteAannSamenvatting, offerteAannemerPaneel } from "./render-offerte.js";
 import { ico } from "./icons.js";
 import { faseRijHtml } from "./subsidie-fase.js";
-import { zichtbareKop, bundelVan } from "./bundel.js";
+import { zichtbareKop, bundelVan, zelfdeTaak } from "./bundel.js";
 import { bundelKopExtra, bundelPaneelHtml, bundelMerkje } from "./render-bundel.js";
 
 // Zie de toelichting bij het gebruik in rowNtd().
@@ -153,7 +153,18 @@ function rowNtd(r,sec){
   const _kop   = _leden ? zichtbareKop(_leden) : null;
   // Een kop-rij bestáát alleen in gestapelde weergave; plat tekent élk lid als gewone rij. Deze ene
   // vlag houdt chevron, telpill, stapelrandjes en paneel bij elkaar: ze hangen alle vier aan _isKop.
-  const _isKop = !!(_bw && _bw.stapel && _kop && _kop.r === r);
+  //
+  // 'Ben ik zelf de kop' via `zelfdeTaak`, net als `wordtGeabsorbeerd` en `bundelMerkje`. Drie
+  // plekken beantwoorden dezelfde vraag en moeten hem dus op dezelfde manier beantwoorden; op
+  // objectidentiteit zou déze plek als enige afwijken, en het gevolg daarvan is stil. Komt de kop
+  // uit een ándere momentopname dan de rij (een ander object met hetzelfde taaknummer), dan bleef
+  // de kop-rij wel staan maar zónder chevron, telpill en paneel, terwijl `absorbeer` — die wél op
+  // taaknummer vergelijkt — zijn leden uit de lijst haalt: de subtaken verdwijnen dan uit beeld.
+  // De prijs is een randgeval de andere kant op: dragen twee verschillende rijen hetzelfde
+  // taaknummer (een dubbele rij in de Sheet, precies wat `checkNummers` aan de gebruiker meldt),
+  // dan tekenen ze allebei een paneel. Dubbel getoond is zichtbare ruis; weggeabsorbeerd zonder
+  // paneel is verdwenen werk.
+  const _isKop = !!(_bw && _bw.stapel && _kop && zelfdeTaak(_kop.r, r));
   const _extra = _isKop ? bundelKopExtra(_leden, _kop) : { chevron:'', pill:'', open:false };
   const bdlChev = _extra.chevron;
   // Op de kop de telpill; verder het ⛓-merkje — wie dat krijgt beslist bundelMerkje zelf.

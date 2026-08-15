@@ -109,12 +109,25 @@ function heeftRij(...rijen){
 // Komt een van deze rijen uit het tabblad 'Afgerond'? Dan mag geen van deze schrijfwegen hem
 // aanraken: ze bouwen allemaal een bereik `'Nog Te Doen'!…{_row}`, en `_row` is het regelnummer ín
 // het blad waar de rij vandaan komt — rij 12 van 'Afgerond' is dus een wildvreemde taak in
-// 'Nog Te Doen'. Dit is bereikbaar en geen theorie: het bundelpaneel toont afgeronde leden gewoon
-// mee, dus elke knop dáár komt hier langs. `hernummerLeden` (bundel.js) dicht hetzelfde gat door
-// afgeronde leden geen schrijfopdracht te geven; bij koppelen en ontkoppelen kan dat niet — de
-// gebruiker klikt op één bepaalde rij — dus wordt het geweigerd. Niet op de rij-guard vertrouwen:
-// die vangt het meestal (de vingerafdruk van een andere taak matcht niet), maar dat is toeval en
-// geen ontwerp.
+// 'Nog Te Doen'.
+//
+// De route die hier vandaag écht langs kán komen is het herordenen: `herordenBundel` krijgt de
+// gesleepte volgorde van de aanroeper mét een `af`-vlag per lid, en die vlag komt uit de DOM.
+// Afgeronde leden staan wel degelijk in die lijst — ze zijn bij het hernummeren VASTE ANKERS en
+// dragen daarom `data-taak` in het paneel (zie `hernummerLeden` en `subRegel`) — alleen hóórt er
+// `af:true` bij. Klopt dat niet, dan laat `hernummerLeden` zo'n lid niet weg en wordt zijn
+// regelnummer als 'Nog Te Doen'-rij beschreven. Dat staat twintig regels lager bij `herordenBundel`
+// verder uitgewerkt.
+//
+// Bij koppelen en ontkoppelen is dit een vangnet en geen bestaande route (nagelopen 2026-08-15):
+// de `m.af`-tak van `subRegel` (render-bundel.js) geeft een afgerond lid géén actieknoppen, géén
+// `data-action` en géén sleep-handvat, en beide wegen beginnen bij een rij uit `state._rowCache`
+// of `state.editRowData` — daar komen alleen openstaande rijen in (rowNtd, de open tak van
+// `subRegel`, de cross-list, de dossierpagina en Ctrl+K; `rowAf`, `afRij` en de Afgerond-groep van
+// het commandopalet leiden geen van drieën naar het bewerkscherm). De guard staat er dus voor de
+// aanroeper die er straks bij komt: die krijgt een melding in plaats van een stille schrijfactie in
+// een wildvreemde rij. Niet op de rij-guard vertrouwen: die vangt het meestal (de vingerafdruk van
+// een andere taak matcht niet), maar dat is toeval en geen ontwerp.
 // Vergelijkt op OBJECT-identiteit: D.af bevat exact de rij-objecten die uit 'Afgerond' geparst
 // zijn, dus een openstaande taak kan hier niet vals op aanslaan.
 function blokkeerAfgerond(...rijen){

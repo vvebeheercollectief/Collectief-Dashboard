@@ -96,6 +96,9 @@ export const state = {
   _nieuwBundel: null,      // {bundelId, volg} voor een taak die via '+ Voeg een subtaak toe' wordt
                            // aangemaakt. Bewust vluchtig: clearModal én closeModal wissen hem, zodat
                            // een weggeklikt scherm de eerstvolgende LOSSE taak niet in die bundel trekt.
+  _ntdVoorModal: null,     // welk NTD-tabblad er openstond vóórdat prefillNieuweTaak het verzette.
+                           // Dat verzetten gebeurt bij het ÓPENEN van het toevoegscherm, dus vóór
+                           // enige bevestiging; closeModal zet het terug als er niets is aangemaakt.
   _hbDoel: null,           // in 'Hoort bij' aangewezen hoofdtaak (het rij-OBJECT, niet zijn code:
                            // een koppeling wijst één bepaalde rij aan). submitTask koppelt hem ná
                            // het opslaan; clearModal wist hem, dus lees hem vóór het sluiten.

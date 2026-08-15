@@ -25,23 +25,55 @@ import { renderAll } from "./main.js";
 
 //  MODAL — Open / Close
 // ══════════════════════════════════════
-function openModal(isEdit,rowData,opts){
-  state.editMode=!!isEdit;
-  const sec=isEdit?rowData._sec:((opts&&opts.sec)||state.activeNtd);
-  state.editSec=sec; state.editRowData=rowData||null;
-
+// Alles wat aan de gekozen categorie hangt: de stand in `state.editSec` (waar submitTask op
+// afgaat), de titel, het kleuraccent en het zichtbare veldblok. Eén functie, want de
+// categorie-kiezer hieronder moet exact dezelfde vier dingen omzetten als openModal — een tweede
+// kopie zou bij de eerstvolgende wijziging stil uit de pas lopen (zelfde afweging als
+// FG_PER_SECTIE zelf).
+function toonSectie(sec,isEdit){
+  state.editSec=sec;
   document.getElementById('m-title').textContent=(isEdit?'Taak bewerken — ':'Taak toevoegen — ')+SECS[sec].label;
-  document.getElementById('m-submit-lbl').textContent=isEdit?'Opslaan':'Toevoegen';
-  document.getElementById('m-del').style.display=isEdit?'inline-flex':'none';
-  document.getElementById('m-af').style.display=isEdit?'inline-flex':'none';
-
   // Section colour for focus rings
   document.documentElement.style.setProperty('--modal-sec',SECS[sec].color);
-
   // Show correct field group
   Object.values(FG_PER_SECTIE).forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
   const fg=FG_PER_SECTIE[sec];
   if(fg) document.getElementById(fg).style.display='';
+}
+
+// De categorie-kiezer. Alleen zichtbaar bij TOEVOEGEN: een bestaande taak van categorie wisselen
+// betekent hem naar een ander blok van het tabblad verplaatsen, met een andere kolomindeling en
+// een andere rij — dat bestaat niet als functie, en een kiezer die het aanbiedt belooft iets wat
+// submitTask niet doet.
+// De opties komen uit SECS en niet uit vaste HTML, zodat een zesde sectie hier vanzelf meekomt —
+// net als bij FG_PER_SECTIE. Eén keer vullen is genoeg; daarna alleen de stand zetten.
+function zetSectieKiezer(sec,isEdit){
+  const vak=document.getElementById('fld-sectie'), kies=document.getElementById('m-sec');
+  if(!vak||!kies) return;
+  vak.style.display=isEdit?'none':'';
+  if(!kies.options.length)
+    kies.innerHTML=SKEYS.map(s=>`<option value="${esc(s)}">${esc(SECS[s].label)}</option>`).join('');
+  kies.value=sec;
+}
+
+// Een andere categorie kiezen in het toevoegscherm. Zet alleen de LOKALE stand; er gaat pas iets
+// naar de Sheet bij Toevoegen (zelfde afweging als de fase-bolletjes in de modal).
+// De ingevulde velden van de vorige categorie blijven staan maar zijn verborgen: submitTask leest
+// uitsluitend de velden van `state.editSec`, dus ze kunnen niet meeliften.
+function kiesSectie(sec){
+  if(!SECS[sec]||state.editMode) return;
+  toonSectie(sec,false);
+}
+
+function openModal(isEdit,rowData,opts){
+  state.editMode=!!isEdit;
+  const sec=isEdit?rowData._sec:((opts&&opts.sec)||state.activeNtd);
+  state.editRowData=rowData||null;
+  toonSectie(sec,isEdit);
+
+  document.getElementById('m-submit-lbl').textContent=isEdit?'Opslaan':'Toevoegen';
+  document.getElementById('m-del').style.display=isEdit?'inline-flex':'none';
+  document.getElementById('m-af').style.display=isEdit?'inline-flex':'none';
 
   if(isEdit&&state.editRowData){
     document.getElementById('m-code').value=state.editRowData.code||'';
@@ -61,6 +93,10 @@ function openModal(isEdit,rowData,opts){
     }
   }
 
+  // Ná de tak hierboven: `clearModal` zet élk veld in de modal-body op '' en dat geldt ook voor
+  // een <select>, die daarmee op 'geen selectie' zou blijven staan.
+  zetSectieKiezer(sec,isEdit);
+
   document.getElementById('modal-bg').classList.add('open');
 }
 
@@ -77,6 +113,11 @@ function closeModal(){
   // hangt de belofte 'een keuze hoort bij het scherm waarin hij is gemaakt' aan de aanname dat
   // submitTask nooit buiten een geopend venster om draait. Die aanname is hier niet nodig.
   state._hbDoel=null;
+  // En het NTD-tabblad terug naar waar de gebruiker vandaan kwam. `prefillNieuweTaak` (ai.js)
+  // verzet `state.activeNtd` al bij het openen — vóór enige bevestiging — en dit venster kan op
+  // vier manieren weg zonder dat er iets is aangemaakt. `submitTask` wist de vlag zodra de taak
+  // wél bestaat, dus daar blijft het nieuwe tabblad staan.
+  if(state._ntdVoorModal){ state.activeNtd=state._ntdVoorModal; state._ntdVoorModal=null; }
 }
 
 // ── 'Hoort bij' (Takenbundel) ──
@@ -630,13 +671,22 @@ async function submitTask(){
       const bdl=state._nieuwBundel;
       nieuw.bundelId  = bdl ? bdl.bundelId : '';
       nieuw.bundelVolg= bdl ? bdl.volg     : '';
-      // Opgebruikt: deze vlag hoort bij de rij die hier wordt aangemaakt en nergens anders meer
-      // bij. Het closeModal een paar regels verderop wist hem ook, maar dat is de weg voor een
-      // scherm dat wordt weggeklikt — bij het opslaan is de vlag hier al verbruikt.
-      state._nieuwBundel=null;
+      // De vlag wordt hier bewust NIET gewist. Het `closeModal` een paar regels verderop doet dat
+      // al — net als élke andere sluitweg — en tussen dit punt en dat closeModal staat `renderAll()`.
+      // Gooit die, dan blijft dit venster open via de catch onderaan submitTask, en met een al
+      // gewiste vlag zou een tweede klik op Opslaan stil een LOSSE taak opleveren: precies de
+      // dataschade die deze vlag moet voorkomen. Wissen mag dus pas als de taak er echt is, en dat
+      // is precies wat closeModal doet.
       const addValues=toevoegWaarden(values,nieuw);
       _shiftNtdRows(afterRow,+1); // bestaande rijen eronder schuiven mee
       (D.ntd[sec]=D.ntd[sec]||[]).push(nieuw);
+      // Vanaf hier bestaat de taak lokaal, dus het tabblad van DEZE sectie moet blijven staan —
+      // ook als het scherm via prefillNieuweTaak op een ander tabblad begon of de gebruiker in de
+      // categorie-kiezer iets anders koos. Zonder deze twee regels tekent de renderAll hieronder
+      // een lijst waarin de zojuist gemaakte taak niet voorkomt, en dat leest als 'er is niets
+      // gebeurd'.
+      state._ntdVoorModal=null;
+      state.activeNtd=sec;
       renderAll();
       flashRow('ntd-tbody', nieuw._row, 'rij-flits-groen');
       closeModal();clearModal();
@@ -692,7 +742,7 @@ async function zetSubsidieFase(rid, stap){
 }
 
 export {
-  openModal, editRow, closeModal, fillModalFields, setv, clearModal,
+  openModal, editRow, closeModal, fillModalFields, setv, clearModal, kiesSectie, zetSectieKiezer,
   getSheetIds, _sheetBreedtes, getInsertRow, insertAndWriteRow, deleteTask, deleteCurrentEditTask, deleteTaskRow,
   getAfInsertRow, completeTask, completeCurrentEditTask, doCompleteTask, closeCompleteModal, submitTask, gv,
   _verseRijIdx, _herankerRij, zetSubsidieFase, kiesModalFase, _modalFaseWoord,

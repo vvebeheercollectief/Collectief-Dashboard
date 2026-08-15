@@ -7,7 +7,7 @@ import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _s
 import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
-import { filterNtd, setNtd, renderNtd, renderNtdStats, renderAf, setAf, bepaalStil, bouwStilIndex, _zetStilIndex, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey, kopOpen, zetKopOpen, toggleBundel, wisNtdFilters, absorbeer, isPlatteWeergave, erIsGefilterd } from "./render-lijsten.js";
+import { filterNtd, setNtd, renderNtd, renderNtdStats, renderAf, setAf, bepaalStil, bouwStilIndex, _zetStilIndex, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey, kopOpen, zetKopOpen, toggleBundel, springNaarBundel, wisNtdFilters, absorbeer, isPlatteWeergave, erIsGefilterd, rowNtd } from "./render-lijsten.js";
 import { HERO_VIEWS } from "./render-analytics.js";
 import { state, D, pgs } from "./state.js";
 import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel, renderVve } from "./render-vve.js";
@@ -4347,6 +4347,12 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
        [true, true]);
     eq('merkje: de kop blijft staan en krijgt er geen',
        [blijftStaan(kop), bundelMerkje(kop, gestapeld, 'OPPAKKEN')], [true, '']);
+    // …en dat oordeel moet, net als bij de absorptie, op TAAKNUMMER vallen en niet op
+    // objectidentiteit. Op identiteit blijft de assert hierboven groen (daar is `kop` letterlijk
+    // hetzelfde object) terwijl een kop uit een andere leesronde ineens zijn eigen merkje krijgt —
+    // naast de telpill die hij als kop al draagt. Zelfde fixture-truc als de absorptie-toets.
+    eq('merkje: een kop uit een andere momentopname krijgt nog steeds geen merkje',
+       bundelMerkje(kopUitOudereRonde, gestapeld, 'OPPAKKEN'), '');
 
     // Een bundel die tussen tekenen en klikken tot één lid krimpt, is geen bundel meer: dan valt er
     // niets open te klappen en niets te tonen. Vandaar dat het opzoeken via `bundelMetId` gaat en
@@ -4806,10 +4812,19 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       // eerstvolgende render haalt het paneel toch weg.
       D.ntd = { ...leeg };
       D.af = { ...leeg, OPPAKKEN: [ t('Tkop','0'), t('Tb','10') ] };
+      document.querySelectorAll('.toast').forEach(el => el.remove());
       ACTIONS['bundel-nieuw']({ dataset:{ bundel:'Tkop' } });
       eq('nieuw: een volledig afgeronde bundel krijgt er niets bij',
          [state._nieuwBundel, document.getElementById('modal-bg').classList.contains('open')],
          [null, false]);
+      // …maar niet zwijgend. Het ⛓-merkje op ditzelfde paneel meldt zo'n verdwenen bundel wél
+      // (springNaarBundel), en twee knoppen naast elkaar horen zich hetzelfde te gedragen: tot de
+      // eerstvolgende render staat de knop gewoon in beeld, en een knop die niets doet én niets
+      // zegt leest als een kapot dashboard.
+      eq('nieuw: en zegt waarom, net als het ⛓-merkje op hetzelfde paneel',
+         [...document.querySelectorAll('.toast-title')].map(el => el.textContent)
+           .includes('Deze bundel bestaat niet meer'), true);
+      document.querySelectorAll('.toast').forEach(el => el.remove());
       // Een bundel die tot één lid gekrompen is mag er júist wél een subtaak bij: dan is het weer
       // een bundel. Vandaar `.get()` op de index en niet `bundelMetId` (die eist er twee).
       D.ntd = { ...leeg, OPPAKKEN: [ t('Tkop','0') ] };
@@ -4818,9 +4833,13 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       eq('nieuw: een bundel van één lid krijgt er wél een subtaak bij',
          state._nieuwBundel, { bundelId:'Tkop', volg:'10' });
     } finally {
-      D.ntd = bewaardNtd; D.af = bewaardAf; state.activeNtd = bewaardSec; pgs.ntd = bewaardPg;
+      D.ntd = bewaardNtd; D.af = bewaardAf; pgs.ntd = bewaardPg;
       state.bundelOpen = new Set(); state._nieuwBundel = null;
+      // closeModal vóór het terugzetten van activeNtd: hij zet het tabblad zélf terug naar
+      // state._ntdVoorModal (de stand van vóór prefillNieuweTaak), en dat zou het herstel hier
+      // anders weer overschrijven.
       closeModal(); clearModal();
+      state.activeNtd = bewaardSec; state._ntdVoorModal = null;
       filterVelden.forEach((id, i) => document.getElementById(id).value = fWaarden[i]);
       state.ntdStatus = fStatus; state.ntdSort = fSort; state.bulkMode = fBulk;
       renderNtd(); renderNtdStats(); goTo(paginaVoor);
@@ -4910,9 +4929,10 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     } finally {
       window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
       state._sheetIds=idsOud; state._uitCache=cacheOud; state._syncFails=failsOud;
-      D.ntd=bewaardNtd; D.af=bewaardAf; state.activeNtd=bewaardSec; pgs.ntd=bewaardPg;
+      D.ntd=bewaardNtd; D.af=bewaardAf; pgs.ntd=bewaardPg;
       state.bundelOpen=new Set(); state._nieuwBundel=null;
-      closeModal(); clearModal();
+      closeModal(); clearModal();   // zet zelf ook state.activeNtd terug — dus vóór de regel hieronder
+      state.activeNtd=bewaardSec; state._ntdVoorModal=null;
       document.querySelectorAll('.toast').forEach(el => el.remove());
       filterVelden.forEach((id, i) => document.getElementById(id).value = fWaarden[i]);
       state.ntdStatus=fStatus; state.ntdSort=fSort; state.bulkMode=fBulk;
@@ -5239,6 +5259,57 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       eq('herorden-e2e: idem — de gecontroleerde rij is de beschreven rij',
          geschreven.map(g=>g.range), ["'Nog Te Doen'!S12"]);
 
+      // 16. Dezelfde garantie, maar met de verschuiving in het venster tussen de KLIK en de
+      //     UITVOERING. Geval 15 hierboven schuift midden in de rij-controle en onderscheidt
+      //     daarmee maar één helft: een momentopname die op klikmoment wordt genomen is dán óók
+      //     nog van vóór de verschuiving, dus die variant blijft groen. Hier houden we de seriële
+      //     wachtrij (state._writeChain) eerst bezet, verschuiven de rijnummers terwijl de opdracht
+      //     in die rij staat, en laten hem pas daarna lopen. Het blad verhuist mee, zoals bij een
+      //     ingevoegde rij: de guard KÁN dus groen zijn op de nieuwe rij, en het verschil is aan de
+      //     geschreven bereiken te zien in plaats van aan een controle die in beide varianten
+      //     afketst. Alle drie de schrijfwegen, want alle drie nemen hun momentopname zelf.
+      //
+      //     De belofte binnen de `new Promise` toekennen en niet in de `.then`: die callback draait
+      //     pas als de vorige write klaar is, en dan zou `vrijgeven` hieronder nog niet bestaan.
+      const remZetten = () => {
+        let los;
+        const rem = new Promise(r => { los = r; });
+        state._writeChain = state._writeChain.then(() => rem);
+        return los;
+      };
+
+      ({ kop, sub } = opnieuw());
+      let vrijgeven = remZetten();
+      await koppelTaak(sub, kop);
+      kop._row += 5; sub._row += 5;                   // zo verplaatst _shiftNtdRows een rij
+      blad = { 17: bladRij('Kop-werk', kop.taakId), 25: bladRij('Sub-werk', sub.taakId) };
+      vrijgeven();
+      await state._writeChain;
+      eq('koppel-e2e: een verschuiving vóór de uitvoering telt ook — bereik én guard schuiven mee',
+         geschreven.map(g=>g.range), ["'Nog Te Doen'!Q17:S17", "'Nog Te Doen'!Q25:S25"]);
+
+      ({ kop, sub } = opnieuw());
+      sub.bundelId='Tkop'; sub.bundelVolg='10'; kop.bundelId='Tkop'; kop.bundelVolg='0';
+      vrijgeven = remZetten();
+      await ontkoppelTaak(sub);
+      sub._row += 5;
+      blad = { 12: bladRij('Kop-werk', kop.taakId), 25: bladRij('Sub-werk', sub.taakId) };
+      vrijgeven();
+      await state._writeChain;
+      eq('ontkoppel-e2e: idem — de rij van het schrijfmoment, niet die van de klik',
+         geschreven.map(g=>g.range), ["'Nog Te Doen'!R25:S25"]);
+
+      ({ kop, sub } = opnieuw());
+      sub.bundelId='Tkop'; sub.bundelVolg='10'; kop.bundelId='Tkop'; kop.bundelVolg='0';
+      vrijgeven = remZetten();
+      await herordenBundel([{ r:sub, af:false }, { r:kop, af:false }]);
+      kop._row += 5; sub._row += 5;
+      blad = { 17: bladRij('Kop-werk', kop.taakId), 25: bladRij('Sub-werk', sub.taakId) };
+      vrijgeven();
+      await state._writeChain;
+      eq('herorden-e2e: idem — alleen de kop verandert, en dan op zijn nieuwe rij',
+         geschreven.map(g=>g.range), ["'Nog Te Doen'!S17"]);
+
       // De stille resync van backgroundWrite laten leeglopen mét de stub nog actief (zie de
       // _loadInFlight-les hierboven).
       for(let i=0;i<100 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,5));
@@ -5268,6 +5339,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const paginaVoor=(document.querySelector('.page.active')?.id || 'page-ntd').replace('page-','');
     const volgorde=[];       // 'lees' / 'put' / 'post', in de volgorde waarin ze langskwamen
     let puts=[], posts=[], meldingen=[], faalPost=false, veldTijdensPost=null;
+    let tijdensPost=null;    // haakje om de gebruiker MIDDEN in de schrijfactie iets te laten doen
     const veld=document.getElementById('m-hoortbij');
     const wisKnop=document.getElementById('m-hoortbij-x');
     // Eén macrotask, óók in een verborgen tabblad. Een testronde draait vaak zonder dat het
@@ -5311,6 +5383,10 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         // schrijfactie te zien; erna is hij ofwel bevestigd ofwel teruggedraaid, en dan zou een
         // meting achteraf de vraag 'is het scherm meteen meegegaan?' niet meer kunnen beantwoorden.
         veldTijdensPost=veld.value;
+        // Haakje voor geval 9: precies hier — de schrijfactie loopt, het venster staat nog open —
+        // kan de gebruiker in 'Hoort bij' alweer een nieuwe hoofdtaak aanwijzen. Eén keer, daarna
+        // vanzelf weer uit.
+        if(tijdensPost){ const f=tijdensPost; tijdensPost=null; f(); }
         // 403 en niet 5xx: _isTransient laat een 5xx tot drie keer herkansen (met backoff), en
         // dan zou deze test seconden gaan duren voor precies dezelfde uitkomst.
         if(faalPost) return new Response(JSON.stringify({error:{message:'nep-fout voor de rollback'}}),{status:403});
@@ -5327,7 +5403,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         blad={ 12:bladRij('Kop-werk','Tkop'), 20:bladRij('Sub-werk','Tb') };
         D.af={ ...leeg }; D.ntd={ ...leeg, OPPAKKEN:[kop, sub] };
         state.activeNtd='OPPAKKEN'; pgs.ntd=1; state.bundelOpen=new Set();
-        volgorde.length=0; puts=[]; posts=[]; meldingen=[]; veldTijdensPost=null;
+        volgorde.length=0; puts=[]; posts=[]; meldingen=[]; veldTijdensPost=null; tijdensPost=null;
         closeModal(); clearModal();
         return { kop, sub };
       };
@@ -5478,6 +5554,29 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       eq('hoortbij: en de taak zit weer in zijn bundel', [sub.bundelId, sub.bundelVolg], ['Tkop','10']);
       await state._writeChain;
 
+      // 9. De race die dáármee ontstaat. Diezelfde verversing ná de schrijfactie loopt langs
+      //    `zetHoortBij`, en dat wist als éérste `state._hbDoel`. Wijst de gebruiker binnen dat
+      //    venster — het kruisje is geklikt, de schrijfactie loopt, het venster staat nog open —
+      //    alvast een NIEUWE hoofdtaak aan, dan gooit de verversing die keuze weg: het veld toont
+      //    de taak, `submitTask` leest bij Opslaan null en er wordt niets gekoppeld. De keuze is
+      //    jonger dan de verversing en hoort dus te winnen.
+      ({ kop, sub } = opnieuw());
+      sub.bundelId='Tkop'; sub.bundelVolg='10'; kop.bundelId='Tkop'; kop.bundelVolg='0';
+      const nieuwDoel=t(31,'Tn','Nieuw doel');
+      D.ntd.OPPAKKEN.push(nieuwDoel); blad[31]=bladRij('Nieuw doel','Tn');
+      openModal(true, sub);
+      // Precies wat de kiezer doet als de gebruiker een suggestie aanklikt (zie onSelect in main.js).
+      tijdensPost=() => { state._hbDoel=nieuwDoel; veld.value=taakTitel(nieuwDoel); };
+      wisKnop.dispatchEvent(new MouseEvent('click', { bubbles:true }));
+      await wacht(() => posts.length>0);
+      await state._writeChain;
+      for(let i=0;i<20;i++) await tik();   // de verversing ná de schrijfactie zijn beurt geven
+      eq('hoortbij: een keuze die tijdens het ontkoppelen is gemaakt blijft staan',
+         [state._hbDoel===nieuwDoel, veld.value], [true, taakTitel(nieuwDoel)]);
+      eq('hoortbij: en het ontkoppelen zelf is gewoon doorgegaan',
+         [sub.bundelId, posts.map(p=>p.range)], ['', ["'Nog Te Doen'!R20:S20"]]);
+      state._hbDoel=null;
+
       // De stille resync van backgroundWrite laten leeglopen mét de stub nog actief (zie de
       // _loadInFlight-les bij de schrijfweg-tests hierboven).
       for(let i=0;i<200 && state._loadInFlight;i++) await tik();
@@ -5490,6 +5589,353 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       closeModal(); clearModal();
       document.querySelectorAll('.toast').forEach(el => el.remove());
       renderNtd(); renderNtdStats(); goTo(paginaVoor);
+    }
+  })();
+
+  console.log('%c[TESTS] Takenbundel — restpunten', 'background:#B45309;color:white;padding:2px 6px;border-radius:3px');
+
+  // ── '+ Voeg een subtaak toe': de categorie is een KEUZE, geen vaste waarde ──
+  // De knop gaf een lege sectie mee en `prefillNieuweTaak` maakt daar OPPAKKEN van (de terugval in
+  // ai.js). Een bundel met een kop bij Vergaderverzoeken leverde dus altijd een Oppakken-taak op,
+  // en juist het hoofdvoorbeeld uit het ontwerp — een offerte-traject onder een vergaderverzoek
+  // (§1) — was via deze knop niet te maken. Drie dingen liggen hier vast: de beginwaarde volgt de
+  // zichtbare kop, de kiezer staat er (alleen bij toevoegen), en wegklikken laat het tabblad achter
+  // zoals het was.
+  (() => {
+    const bewaardNtd=D.ntd, bewaardAf=D.af, bewaardSec=state.activeNtd, bewaardPg=pgs.ntd;
+    const filterVelden=['s-ntd','f-code-ntd','f-beh-ntd','f-prio-ntd'];
+    const fWaarden=filterVelden.map(id => document.getElementById(id).value);
+    const fStatus=state.ntdStatus, fSort=state.ntdSort, fBulk=state.bulkMode;
+    const paginaVoor=(document.querySelector('.page.active')?.id || 'page-ntd').replace('page-','');
+    try {
+      const t=(taakId, volg) => ({ _row: 70 + (+volg||0)/10, taakId, bundelId:'Tkop', bundelVolg:volg,
+        _sec:'VERGADERVERZOEKEN', code:'311212', naam:'Testflat', periode:'mei', agendapunten:'ALV',
+        deadline:'' });
+      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      filterVelden.forEach(id => document.getElementById(id).value = '');
+      state.ntdStatus=''; state.ntdSort={ key:null, asc:true }; state.bulkMode=false;
+      D.af={ ...leeg };
+      D.ntd={ ...leeg, VERGADERVERZOEKEN:[ t('Tkop','0'), t('Tb','10') ] };
+      state.activeNtd='VERGADERVERZOEKEN'; pgs.ntd=1; state.bundelOpen=new Set(['Tkop']);
+      state._nieuwBundel=null; state._ntdVoorModal=null;
+      renderNtd();
+      const knop=document.querySelector('#ntd-tbody [data-action="bundel-nieuw"]');
+      truthy('categorie: er staat een knop in het open paneel', !!knop);
+      if(knop) knop.dispatchEvent(new MouseEvent('click', { bubbles:true }));
+      eq('categorie: het scherm opent in de categorie van de kop, niet in Oppakken',
+         state.editSec, 'VERGADERVERZOEKEN');
+      eq('categorie: en toont het bijbehorende veldblok',
+         [document.getElementById('fg-verg').style.display,
+          document.getElementById('fg-opp').style.display], ['', 'none']);
+      // De kiezer moet er staan, anders ligt de categorie alsnog vast op wat de knop koos.
+      eq('categorie: het toevoegscherm heeft een categorie-kiezer',
+         document.getElementById('fld-sectie').style.display, '');
+      eq('categorie: met alle secties erin, op de stand van de kop',
+         [[...document.getElementById('m-sec').options].map(o => o.value),
+          document.getElementById('m-sec').value], [SKEYS, 'VERGADERVERZOEKEN']);
+      // …en hij moet ook echt iets doen. Via een ECHT change-event: een <select> geeft geen click
+      // en komt dus niet langs de delegatie in actions.js — die bedrading zit los in main.js en zou
+      // anders ongedekt blijven.
+      const kiezer=document.getElementById('m-sec');
+      kiezer.value='OFFERTE-TRAJECTEN';
+      kiezer.dispatchEvent(new Event('change', { bubbles:true }));
+      eq('categorie: een andere categorie kiezen zet het formulier om',
+         [state.editSec, document.getElementById('fg-off').style.display,
+          document.getElementById('fg-verg').style.display], ['OFFERTE-TRAJECTEN', '', 'none']);
+      closeModal(); clearModal();
+
+      // Bij BEWERKEN hoort de kiezer er niet te staan: een bestaande taak van categorie wisselen is
+      // een andere rij in een ander blok van de Sheet en bestaat niet als functie.
+      openModal(true, D.ntd.VERGADERVERZOEKEN[1]);
+      eq('categorie: bij bewerken staat de kiezer er niet',
+         document.getElementById('fld-sectie').style.display, 'none');
+      closeModal(); clearModal();
+
+      // En het tabblad. `prefillNieuweTaak` verzet het al bij het ÓPENEN — dat moet, want openModal
+      // leidt de categorie eruit af — maar wie wegklikt hoort te blijven staan waar hij stond.
+      // Zonder de terugzet-regel verspringt het zichtbare tabblad pas bij de eerstvolgende render of
+      // poll: seconden later en zonder aanleiding.
+      state.activeNtd='OPPAKKEN';
+      ACTIONS['bundel-nieuw']({ dataset:{ bundel:'Tkop' } });
+      eq('categorie: het scherm springt naar het tabblad van de kop',
+         [state.activeNtd, state.editSec], ['VERGADERVERZOEKEN', 'VERGADERVERZOEKEN']);
+      closeModal();
+      eq('categorie: wegklikken zet het tabblad terug', state.activeNtd, 'OPPAKKEN');
+      eq('categorie: en laat niets hangen', [state._nieuwBundel, state._ntdVoorModal], [null, null]);
+    } finally {
+      D.ntd=bewaardNtd; D.af=bewaardAf; pgs.ntd=bewaardPg;
+      state.bundelOpen=new Set(); state._nieuwBundel=null;
+      closeModal(); clearModal();
+      state.activeNtd=bewaardSec; state._ntdVoorModal=null;
+      filterVelden.forEach((id, i) => document.getElementById(id).value = fWaarden[i]);
+      state.ntdStatus=fStatus; state.ntdSort=fSort; state.bulkMode=fBulk;
+      renderNtd(); renderNtdStats(); goTo(paginaVoor);
+    }
+  })();
+
+  // ── En dezelfde keuze helemaal tot in de Sheet: een OFFERTE-taak onder een VERGADERVERZOEK ──
+  // Het scenario uit §1 van het ontwerp, met een gestubde fetch. Dit is de toets die rood wordt
+  // zodra de knop de categorie weer vastzet: de rij belandt dan in het verkeerde blok van het
+  // tabblad, met de verkeerde kolomindeling — geen foutmelding, alleen een taak op de verkeerde plek.
+  await (async () => {
+    const _fetch=window.fetch, tokenOud=state.oauthToken, expiryOud=state.oauthExpiry;
+    const idsOud=state._sheetIds, cacheOud=state._uitCache, failsOud=state._syncFails;
+    const bewaardNtd=D.ntd, bewaardAf=D.af, bewaardSec=state.activeNtd, bewaardPg=pgs.ntd;
+    const filterVelden=['s-ntd','f-code-ntd','f-beh-ntd','f-prio-ntd'];
+    const fWaarden=filterVelden.map(id => document.getElementById(id).value);
+    const fStatus=state.ntdStatus, fSort=state.ntdSort, fBulk=state.bulkMode;
+    const paginaVoor=(document.querySelector('.page.active')?.id || 'page-ntd').replace('page-','');
+    const geschreven=[];
+    const tik=() => new Promise(r => { const k=new MessageChannel(); k.port1.onmessage=()=>r(); k.port2.postMessage(0); });
+    try {
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
+      state._sheetIds={'Nog Te Doen':0};
+      state._uitCache=false;
+      window.fetch=async (url, opt) => {
+        const methode=(opt&&opt.method)||'GET';
+        if(methode==='PUT'){
+          geschreven.push({ bereik: decodeURIComponent(String(url)).split('/values/')[1].split('?')[0],
+                            rij: JSON.parse(opt.body).values[0] });
+          return new Response('{}',{status:200});
+        }
+        if(methode==='POST') return new Response(JSON.stringify({replies:[{}]}),{status:200});
+        return new Response(JSON.stringify({error:{message:'geen leesverkeer in deze test'}}),{status:403});
+      };
+
+      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const verg=(taakId, volg) => ({ _row: 70 + (+volg||0)/10, taakId, bundelId:'Tkop', bundelVolg:volg,
+        _sec:'VERGADERVERZOEKEN', code:'311212', naam:'Testflat', periode:'mei', agendapunten:'ALV', deadline:'' });
+      filterVelden.forEach(id => document.getElementById(id).value = '');
+      state.ntdStatus=''; state.ntdSort={ key:null, asc:true }; state.bulkMode=false;
+      D.af={ ...leeg };
+      // Het offerte-blok moet al bestaan, anders weet getInsertRow niet waar de rij heen moet.
+      D.ntd={ ...leeg, VERGADERVERZOEKEN:[ verg('Tkop','0'), verg('Tb','10') ],
+              'OFFERTE-TRAJECTEN':[ { _row:90, _sec:'OFFERTE-TRAJECTEN', taakId:'Toff', bundelId:'',
+                bundelVolg:'', code:'311999', naam:'Ander', deadline:'' } ] };
+      state.activeNtd='VERGADERVERZOEKEN'; pgs.ntd=1; state.bundelOpen=new Set(['Tkop']);
+      state._nieuwBundel=null; state._ntdVoorModal=null;
+      renderNtd();
+      const knop=document.querySelector('#ntd-tbody [data-action="bundel-nieuw"]');
+      truthy('categorie-e2e: de knop staat in het open paneel', !!knop);
+      if(knop){
+        knop.dispatchEvent(new MouseEvent('click', { bubbles:true }));
+        const kiezer=document.getElementById('m-sec');
+        kiezer.value='OFFERTE-TRAJECTEN';
+        kiezer.dispatchEvent(new Event('change', { bubbles:true }));
+        document.getElementById('m-opm-o').value='Drie offertes opvragen';
+        await submitTask();
+        await state._writeChain;
+        const rij=geschreven[0]||{ bereik:'', rij:[] };
+        eq('categorie-e2e: er is één rij weggeschreven', geschreven.length, 1);
+        // Ná de laatste rij van het OFFERTE-blok (90), niet ergens in Vergaderverzoeken.
+        eq('categorie-e2e: de rij landt in het blok van de gekozen categorie',
+           rij.bereik, "'Nog Te Doen'!A91:S91");
+        eq('categorie-e2e: en draagt de bundel van de vergaderverzoek-kop', rij.rij.slice(17), ['Tkop','20']);
+        const laatste=(D.ntd['OFFERTE-TRAJECTEN']||[]).slice(-1)[0]||{};
+        eq('categorie-e2e: de taak staat lokaal in Offerte-trajecten',
+           [(D.ntd['OFFERTE-TRAJECTEN']||[]).length, laatste.opmerkingen, laatste.bundelId],
+           [2, 'Drie offertes opvragen', 'Tkop']);
+        // Het tabblad volgt de gemaakte taak: anders tekent de render een lijst waarin hij niet staat.
+        eq('categorie-e2e: en het tabblad staat op de lijst waar hij in belandde',
+           state.activeNtd, 'OFFERTE-TRAJECTEN');
+      }
+      // De stille resync laten leeglopen mét de stub nog actief (de _loadInFlight-les hierboven).
+      // Via een MessageChannel-bericht en niet via setTimeout: een testronde draait vaak in een
+      // verborgen tabblad, en daar knijpt de browser setTimeout af tot één tik per seconde.
+      for(let i=0;i<200 && state._loadInFlight;i++) await tik();
+    } finally {
+      window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
+      state._sheetIds=idsOud; state._uitCache=cacheOud; state._syncFails=failsOud;
+      D.ntd=bewaardNtd; D.af=bewaardAf; pgs.ntd=bewaardPg;
+      state.bundelOpen=new Set(); state._nieuwBundel=null;
+      closeModal(); clearModal();
+      state.activeNtd=bewaardSec; state._ntdVoorModal=null;
+      document.querySelectorAll('.toast').forEach(el => el.remove());
+      filterVelden.forEach((id, i) => document.getElementById(id).value = fWaarden[i]);
+      state.ntdStatus=fStatus; state.ntdSort=fSort; state.bulkMode=fBulk;
+      renderNtd(); renderNtdStats(); goTo(paginaVoor);
+    }
+  })();
+
+  // ── De bundelvlag overleeft een gooiende renderAll ──
+  // `state._nieuwBundel` is de enige verbinding tussen de knop in het paneel en submitTask. Werd hij
+  // gewist vóór `renderAll()`, dan was dat normaal overbodig (closeModal doet het toch al) maar in
+  // het énige geval waarin het verschil maakt schadelijk: gooit die render, dan blijft het venster
+  // open via de catch onderaan submitTask — met een al gewiste vlag levert een tweede klik op
+  // Opslaan stil een LOSSE taak op. Precies de dataschade die de vlag moet voorkomen.
+  // De render laten omvallen door het teller-badge van 'Nog Te Doen' even uit het document te halen:
+  // renderAll begint met `document.getElementById('b-ntd').textContent=…` en gooit daar dan een
+  // TypeError. Bewust dát element en niet een ontbrekende sectie: submitTask zet `state.activeNtd`
+  // zelf op de sectie van de nieuwe taak (vlak vóór de render), dus via die weg is er niets meer
+  // om op om te vallen. De rij is op dit punt al opgebouwd en lokaal toegevoegd — dezelfde volgorde
+  // als in het echte geval.
+  await (async () => {
+    const _fetch=window.fetch, _alert=window.alert;
+    const tokenOud=state.oauthToken, expiryOud=state.oauthExpiry, idsOud=state._sheetIds;
+    const cacheOud=state._uitCache, failsOud=state._syncFails;
+    const bewaardNtd=D.ntd, bewaardAf=D.af, bewaardSec=state.activeNtd, bewaardPg=pgs.ntd;
+    const meldingen=[], geschreven=[];
+    const tik=() => new Promise(r => { const k=new MessageChannel(); k.port1.onmessage=()=>r(); k.port2.postMessage(0); });
+    try {
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
+      state._sheetIds={'Nog Te Doen':0}; state._uitCache=false;
+      window.alert=(m)=>meldingen.push(m);
+      window.fetch=async (url, opt) => {
+        const methode=(opt&&opt.method)||'GET';
+        if(methode==='PUT'){
+          geschreven.push({ bereik: decodeURIComponent(String(url)).split('/values/')[1].split('?')[0],
+                            rij: JSON.parse(opt.body).values[0] });
+          return new Response('{}',{status:200});
+        }
+        if(methode==='POST') return new Response(JSON.stringify({replies:[{}]}),{status:200});
+        return new Response(JSON.stringify({error:{message:'geen leesverkeer in deze test'}}),{status:403});
+      };
+      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      D.af={ ...leeg };
+      D.ntd={ ...leeg, OPPAKKEN:[ { _row:40, _sec:'OPPAKKEN', taakId:'Tkop', bundelId:'Tkop',
+        bundelVolg:'0', code:'311212', naam:'Testflat', actiepunt:'Hoofdtaak', deadline:'' } ] };
+      state.activeNtd='OPPAKKEN'; pgs.ntd=1;
+      openModal(false);
+      document.getElementById('m-code').value='311212';
+      document.getElementById('m-actie').value='Subtaak';
+      state._nieuwBundel={ bundelId:'Tkop', volg:'10' };
+      const badge=document.getElementById('b-ntd');
+      const badgeOuder=badge.parentNode, badgeNa=badge.nextSibling;
+      badgeOuder.removeChild(badge);
+      try { await submitTask(); } finally { badgeOuder.insertBefore(badge, badgeNa); }
+      eq('vlag: de render viel om en het venster bleef open',
+         [meldingen.length, document.getElementById('modal-bg').classList.contains('open')], [1, true]);
+      eq('vlag: de bundel is dan NIET gewist', state._nieuwBundel, { bundelId:'Tkop', volg:'10' });
+      // En dat ook echt bewijzen: de tweede klik op Opslaan, nu met een werkende render.
+      await submitTask();
+      await state._writeChain;
+      truthy('vlag: de tweede poging schrijft een rij', geschreven.length > 0);
+      eq('vlag: …en die draagt nog steeds de bundel in R en S',
+         (geschreven[geschreven.length-1]||{rij:[]}).rij.slice(17), ['Tkop','10']);
+      eq('vlag: pas nu is hij opgebruikt', state._nieuwBundel, null);
+      for(let i=0;i<200 && state._loadInFlight;i++) await tik();
+    } finally {
+      window.fetch=_fetch; window.alert=_alert;
+      state.oauthToken=tokenOud; state.oauthExpiry=expiryOud; state._sheetIds=idsOud;
+      state._uitCache=cacheOud; state._syncFails=failsOud;
+      D.ntd=bewaardNtd; D.af=bewaardAf; pgs.ntd=bewaardPg;
+      state._nieuwBundel=null;
+      closeModal(); clearModal();
+      state.activeNtd=bewaardSec; state._ntdVoorModal=null;
+      document.querySelectorAll('.toast').forEach(el => el.remove());
+      renderNtd(); renderNtdStats();
+    }
+  })();
+
+  // ── De lege-lijst-melding: 'niets gevonden' of 'niets aanwezig' ──
+  // renderNtd geeft `erIsGefilterd(filters)` als `filtered`-vlag door aan renderTbody, en die kiest
+  // daarmee tussen twee heel verschillende boodschappen (zie emptyRow in util.js). De helper zelf is
+  // hierboven puur getoetst; de DOORGIFTE was ongedekt — het argument mocht door `false` vervangen
+  // worden zonder dat er iets afging. Eén assert per richting pint beide kanten vast.
+  (() => {
+    const bewaardNtd=D.ntd, bewaardAf=D.af, bewaardSec=state.activeNtd, bewaardPg=pgs.ntd;
+    const zoek=document.getElementById('s-ntd'), zoekOud=zoek.value;
+    try {
+      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      D.af={ ...leeg };
+      D.ntd={ ...leeg, OPPAKKEN:[ { _row:50, _sec:'OPPAKKEN', taakId:'Tx', bundelId:'', bundelVolg:'',
+        code:'311212', naam:'Testflat', actiepunt:'Dakwerk', deadline:'' } ] };
+      state.activeNtd='OPPAKKEN'; pgs.ntd=1;
+      zoek.value='zzz-bestaat-niet';
+      renderNtd();
+      const tekst=() => document.getElementById('ntd-tbody').textContent || '';
+      eq('leeg: een zoekterm zonder treffers wijst naar het filter',
+         [tekst().includes('Niets gevonden'), tekst().includes('Geen resultaten')], [true, false]);
+      zoek.value='';
+      D.ntd={ ...leeg };
+      renderNtd();
+      eq('leeg: een lege lijst zónder filter zegt gewoon dat er niets is',
+         [tekst().includes('Geen resultaten'), tekst().includes('Niets gevonden')], [true, false]);
+    } finally {
+      D.ntd=bewaardNtd; D.af=bewaardAf; state.activeNtd=bewaardSec; pgs.ntd=bewaardPg;
+      zoek.value=zoekOud; renderNtd();
+    }
+  })();
+
+  // ── De twee spring-meldingen mogen niet ontdubbeld worden ──
+  // showToast slikt 15 seconden lang een gelijkluidende melding in. Voor deze twee is dat verkeerd:
+  // het zijn geen gebeurtenissen maar uitleg bij een handeling die de gebruiker net zélf deed. Wie
+  // twee keer op een ⛓-merkje klikt, ziet de tweede keer anders zijn filters zonder één woord
+  // verdwijnen — of klikt twee keer op een dode bundel en krijgt de tweede keer niets.
+  (() => {
+    const bewaardNtd=D.ntd, bewaardAf=D.af, bewaardSec=state.activeNtd, bewaardPg=pgs.ntd;
+    const codeVeld=document.getElementById('f-code-ntd'), codeOud=codeVeld.value;
+    const paginaVoor=(document.querySelector('.page.active')?.id || 'page-ntd').replace('page-','');
+    try {
+      const t=(taakId, volg, sec) => ({ _row: 60 + (+volg||0)/10, taakId, bundelId:'Tkop',
+        bundelVolg:volg, _sec:sec, code:'311212', naam:'Testflat', actiepunt:'Werk',
+        periode:'mei', agendapunten:'ALV', deadline:'' });
+      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const tel=(titel) => [...document.querySelectorAll('#toast-container .toast-title')]
+                             .filter(el => el.textContent === titel).length;
+      D.af={ ...leeg };
+
+      // 1. Twee keer springen mét een filter aan: allebei de keren hoort de uitleg te komen.
+      document.querySelectorAll('#toast-container .toast').forEach(el => el.remove());
+      for(let i=0;i<2;i++){
+        D.ntd={ ...leeg, OPPAKKEN:[ t('Tb','10','OPPAKKEN') ],
+                VERGADERVERZOEKEN:[ t('Tkop','0','VERGADERVERZOEKEN') ] };
+        state.activeNtd='OPPAKKEN'; pgs.ntd=1; state.bundelOpen=new Set();
+        codeVeld.value='311212';
+        renderNtd();
+        springNaarBundel('Tkop');
+      }
+      eq('dedup: twee keer springen geeft twee keer uitleg over de gewiste filters',
+         tel('Bundel geopend'), 2);
+
+      // 2. En twee keer klikken op een bundel die niet meer bestaat.
+      document.querySelectorAll('#toast-container .toast').forEach(el => el.remove());
+      D.ntd={ ...leeg, OPPAKKEN:[ t('Tb','10','OPPAKKEN') ] };
+      springNaarBundel('Tkop'); springNaarBundel('Tkop');
+      eq('dedup: en twee keer op een verdwenen bundel meldt het ook twee keer',
+         tel('Deze bundel bestaat niet meer'), 2);
+      document.querySelectorAll('#toast-container .toast').forEach(el => el.remove());
+    } finally {
+      D.ntd=bewaardNtd; D.af=bewaardAf; state.activeNtd=bewaardSec; pgs.ntd=bewaardPg;
+      state.bundelOpen=new Set(); codeVeld.value=codeOud;
+      document.querySelectorAll('.toast').forEach(el => el.remove());
+      renderNtd(); renderNtdStats(); goTo(paginaVoor);
+    }
+  })();
+
+  // ── De kop-rij herkent zichzelf op TAAKNUMMER, niet op objectidentiteit ──
+  // `_isKop` in rowNtd draagt chevron, telpill, stapelrandjes én paneel. Vergeleek hij op
+  // objectidentiteit, dan week hij als enige af van `wordtGeabsorbeerd` en `bundelMerkje` — en het
+  // gevolg daarvan is stil: komt de index uit een andere leesronde dan de getekende rij, dan blijft
+  // de kop wel staan maar zonder paneel, terwijl de absorptie (die wél op taaknummer vergelijkt)
+  // zijn leden uit de lijst haalt. De subtaken verdwijnen dan uit beeld.
+  // rowNtd rechtstreeks, want alleen zo zijn de twee momentopnamen uit elkaar te trekken: renderNtd
+  // bouwt de index per definitie uit dezelfde D als de rijen die hij tekent.
+  (() => {
+    const bwOud=state._bundelWeergave, cacheOud=state._rowCache, bulkOud=state.bulkMode;
+    const openOud=state.bundelOpen;
+    try {
+      const t=(taakId, volg) => ({ _row: 80 + (+volg||0)/10, taakId, bundelId:'Tkop', bundelVolg:volg,
+        _sec:'OPPAKKEN', code:'311212', naam:'Testflat', actiepunt:'Werk', deadline:'' });
+      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const kop=t('Tkop','0'), sub=t('Tb','10');
+      // De index uit een ándere leesronde: dezelfde taken, andere objecten. Zo ziet elke poll eruit.
+      const uitOudereRonde={ ...leeg, OPPAKKEN:[ { ...kop }, { ...sub } ] };
+      state._bundelWeergave=bundelWeergave({ plat:false, bulk:false }, uitOudereRonde, leeg);
+      state._rowCache=[]; state.bulkMode=false; state.bundelOpen=new Set(['Tkop']);
+      const html=rowNtd(kop, 'OPPAKKEN');
+      eq('kop: een kop uit een andere momentopname houdt chevron, telpill én paneel',
+         [html.includes('data-action="bundel-toggle"'), html.includes('bdl-pill'),
+          html.includes('bdl-paneel')], [true, true, true]);
+      // De tegenproef: een subtaak wordt daar niet ineens een kop van.
+      state._rowCache=[];
+      const subHtml=rowNtd(sub, 'OPPAKKEN');
+      eq('kop: een subtaak blijft een gewone rij',
+         [subHtml.includes('data-action="bundel-toggle"'), subHtml.includes('bdl-paneel')],
+         [false, false]);
+    } finally {
+      state._bundelWeergave=bwOud; state._rowCache=cacheOud; state.bulkMode=bulkOud;
+      state.bundelOpen=openOud;
     }
   })();
 

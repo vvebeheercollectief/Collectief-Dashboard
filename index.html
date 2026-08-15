@@ -486,6 +486,15 @@
         </div>
       </div>
 
+      <!-- Categorie — alleen bij TOEVOEGEN (openModal verbergt hem bij bewerken).
+           Een subtaak is een volwaardige taak in zijn eigen categorie (§2 van het ontwerp), dus
+           '+ Voeg een subtaak toe' in het bundelpaneel zet deze keuze alleen vóór; hier wijzigt de
+           gebruiker hem. De opties worden uit SECS gevuld — zie zetSectieKiezer in src/crud.js. -->
+      <div class="fld" id="fld-sectie" style="display:none">
+        <label for="m-sec">Categorie</label>
+        <select id="m-sec"></select>
+      </div>
+
       <!-- OPPAKKEN -->
       <div id="fg-opp">
         <div class="fld"><label>Actiepunt *</label><textarea id="m-actie"></textarea></div>

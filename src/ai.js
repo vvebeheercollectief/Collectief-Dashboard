@@ -162,6 +162,14 @@ function aiGisCategorie(txt){
 function prefillNieuweTaak(sec, code, naam, actiepunt){
   if(!SECS[sec]) sec='OPPAKKEN';
   closeAiHelp();
+  // Het tabblad verspringt hieronder al, dus vóórdat de gebruiker iets heeft bevestigd. Dat is
+  // nodig — `openModal(false)` leidt de categorie uit `state.activeNtd` af, en de taak die straks
+  // wordt aangemaakt moet in beeld komen — maar het mag niet blijven staan als er níets wordt
+  // aangemaakt: `goTo` hertekent de NTD-lijst niet, dus het zichtbare tabblad verspringt pas bij
+  // de eerstvolgende render of poll, seconden later en zonder aanleiding. Onthouden waar de
+  // gebruiker vandaan kwam; `closeModal` (crud.js) zet het terug, `submitTask` wist de vlag zodra
+  // de taak er wél is.
+  state._ntdVoorModal=state.activeNtd;
   state.activeNtd=sec;
   goTo('ntd');
   openModal(false);

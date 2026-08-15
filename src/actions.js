@@ -16,7 +16,7 @@ import { openModal, completeTask, completeCurrentEditTask, deleteCurrentEditTask
 import { ontkoppelTaak } from './bundel-acties.js';
 import { adjOff } from './util.js';
 import { copyAiPrompt, aiOvernemen, aiActieTaak, aiKopieerConcept, prefillNieuweTaak } from './ai.js';
-import { dismissToast, saveNotifPrefs } from './notifications.js';
+import { dismissToast, saveNotifPrefs, showToast } from './notifications.js';
 import { doLogin } from './auth.js';
 import { openSnoozeModal, snoozeKies } from './snooze.js';
 import { openResetModal, closeResetModal, doeReset } from './alv-reset.js';
@@ -76,14 +76,32 @@ export const ACTIONS = {
     const leden = id ? bouwBundelIndex(D.ntd, D.af).get(id) : null;
     const kop = leden && zichtbareKop(leden);
     // Geen open lid meer (alles afgerond, of de bundel is weg): dan is er geen VvE om het scherm
-    // mee te vullen en valt er niets toe te voegen. De eerstvolgende render haalt dit paneel toch
-    // weg — de knop kan alleen in een verouderd scherm nog aangeklikt worden.
-    if (!kop) return;
+    // mee te vullen en valt er niets toe te voegen. Wél melden, precies zoals `springNaarBundel`
+    // op ditzelfde paneel doet: de eerstvolgende render haalt dit paneel weg, maar tot die render
+    // staat de knop gewoon in beeld, en een knop die zonder één woord niets doet leest als een
+    // kapot dashboard. Twee knoppen op hetzelfde paneel horen zich daarin hetzelfde te gedragen.
+    if (!kop){
+      showToast('Deze bundel bestaat niet meer',
+                'Alles erin is afgerond of weg — er is niets om een subtaak onder te hangen.',
+                null, 'label', { geenSysteemmelding:true, geenDedup:true });
+      return;
+    }
+    // De categorie is een KEUZE van de gebruiker; deze knop zet hem alleen voor. Stond hier een
+    // lege sectie, dan maakte `prefillNieuweTaak` er OPPAKKEN van (zie de terugval in ai.js) en was
+    // juist het hoofdvoorbeeld uit het ontwerp — een offerte-traject onder een vergaderverzoek
+    // (§1) — via deze knop niet te maken. Wijzigen kan in het scherm zelf, met de categorie-kiezer
+    // die alleen bij toevoegen verschijnt (zetSectieKiezer in crud.js).
+    // Beginwaarde is de sectie van de ZICHTBARE KOP. Dat is het tabblad waarin dit paneel getekend
+    // staat, dus de knop begint met hetzelfde formulier als '+ Nieuwe taak' op die lijst. Uit
+    // `kop.r` en niet uit `state.activeNtd`, omdat dit dezelfde verse index is die ook code en naam
+    // levert: is de kop tussen tekenen en klikken doorgeschoven naar een ander tabblad (§3.3), dan
+    // hoort het scherm bij díe taak en niet bij het tabblad dat nog op het scherm staat.
+    //
     // Eerst het scherm openen, dán onthouden waar de nieuwe taak bij hoort: prefillNieuweTaak gaat
     // via openModal(false) langs clearModal, en die wist deze vlag juist (crud.js). Andersom zou
     // hij meteen weer weg zijn en belandde de subtaak als losse taak in de Sheet — zonder fout,
     // alleen zichtbaar aan een lege kolom R.
-    prefillNieuweTaak('', kop.r.code, kop.r.naam, '');
+    prefillNieuweTaak(kop.r._sec, kop.r.code, kop.r.naam, '');
     state._nieuwBundel = { bundelId: id, volg: volgendeVolg(leden) };
   },
   // Het kruisje achter 'Hoort bij' in het bewerkscherm. Twee standen, en het verschil is
@@ -108,7 +126,15 @@ export const ACTIONS = {
     // hetzelfde scherm nog open staat: is er intussen een andere taak geopend, dan hoort dat
     // scherm zijn eigen stand te houden.
     await state._writeChain;
-    if (state.editRowData === r) zetHoortBij(r);
+    if (state.editRowData !== r) return;
+    // …en niet als de gebruiker intussen al een NIEUWE hoofdtaak heeft aangewezen. Die keuze is
+    // jonger dan deze verversing en hoort te blijven staan: `zetHoortBij` begint met
+    // `state._hbDoel` wissen (crud.js), dus zonder deze rem leest `submitTask` bij Opslaan null —
+    // de gebruiker ziet zijn keuze in het veld staan en er wordt niets gekoppeld. Het venster
+    // tussen de klik op het kruisje en het einde van de schrijfactie is precies lang genoeg om er
+    // een taak in aan te wijzen.
+    if (state._hbDoel) return;
+    zetHoortBij(r);
   },
   'taak-bewerken':         (el) => openModal(true, state._rowCache[+el.dataset.rid]),
   'taak-afronden':         (el) => completeTask(+el.dataset.rid),

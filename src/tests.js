@@ -20,7 +20,7 @@ import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFla
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
 import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, _sheetBreedtes, getSheetIds } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
-import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages } from "./dossier-chat.js";
+import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages, renderChat } from "./dossier-chat.js";
 import { shouldPromptReload, maakHerlaadKern, zelfdeWorker } from "./sw-update.js";
 import { doOAuth } from "./auth.js";
 import { SPLASH_MS, _setFase } from "./login-splash.js";
@@ -5267,7 +5267,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const bewaardNtd=D.ntd, bewaardAf=D.af, bewaardSec=state.activeNtd, bewaardPg=pgs.ntd;
     const paginaVoor=(document.querySelector('.page.active')?.id || 'page-ntd').replace('page-','');
     const volgorde=[];       // 'lees' / 'put' / 'post', in de volgorde waarin ze langskwamen
-    let puts=[], posts=[], meldingen=[];
+    let puts=[], posts=[], meldingen=[], faalPost=false, veldTijdensPost=null;
     const veld=document.getElementById('m-hoortbij');
     const wisKnop=document.getElementById('m-hoortbij-x');
     // Eén macrotask, óók in een verborgen tabblad. Een testronde draait vaak zonder dat het
@@ -5307,6 +5307,13 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
           return new Response('{}',{status:200});
         }
         volgorde.push('post');               // values:batchUpdate van de bundelacties
+        // Wat stond er op dít moment in het veld? De optimistische stand is alleen tíjdens de
+        // schrijfactie te zien; erna is hij ofwel bevestigd ofwel teruggedraaid, en dan zou een
+        // meting achteraf de vraag 'is het scherm meteen meegegaan?' niet meer kunnen beantwoorden.
+        veldTijdensPost=veld.value;
+        // 403 en niet 5xx: _isTransient laat een 5xx tot drie keer herkansen (met backoff), en
+        // dan zou deze test seconden gaan duren voor precies dezelfde uitkomst.
+        if(faalPost) return new Response(JSON.stringify({error:{message:'nep-fout voor de rollback'}}),{status:403});
         posts.push(...(JSON.parse(opt.body).data||[]));
         return new Response('{}',{status:200});
       };
@@ -5320,7 +5327,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         blad={ 12:bladRij('Kop-werk','Tkop'), 20:bladRij('Sub-werk','Tb') };
         D.af={ ...leeg }; D.ntd={ ...leeg, OPPAKKEN:[kop, sub] };
         state.activeNtd='OPPAKKEN'; pgs.ntd=1; state.bundelOpen=new Set();
-        volgorde.length=0; puts=[]; posts=[]; meldingen=[];
+        volgorde.length=0; puts=[]; posts=[]; meldingen=[]; veldTijdensPost=null;
         closeModal(); clearModal();
         return { kop, sub };
       };
@@ -5404,7 +5411,10 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       sub.bundelId='Tkop'; sub.bundelVolg='10'; kop.bundelId='Tkop'; kop.bundelVolg='0';
       openModal(true, sub);
       wisKnop.dispatchEvent(new MouseEvent('click', { bubbles:true }));
-      eq('hoortbij: het veld is meteen leeg', [veld.value, wisKnop.style.display], ['', 'none']);
+      // Het veld gaat leeg zodra de taak écht los is, en dat is een paar microtaken later dan de
+      // klik: ontkoppelTaak muteert pas ná zijn eigen poorten (offline-rem, ensureToken).
+      await wacht(() => veld.value==='');
+      eq('hoortbij: het veld is leeg zodra de taak los is', [veld.value, wisKnop.style.display], ['', 'none']);
       await wacht(() => posts.length>0);
       await state._writeChain;
       eq('hoortbij: het kruisje ontkoppelt echt', posts.map(p=>p.range), ["'Nog Te Doen'!R20:S20"]);
@@ -5427,6 +5437,47 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       eq('hoortbij: en het veld toont weer de echte bundel', veld.value, taakTitel(kop));
       eq('hoortbij: de taak zit dus nog gewoon in zijn bundel', sub.bundelId, 'Tkop');
 
+      // 7. Een GEWEIGERDE ontkoppeling. ontkoppelTaak heeft vier poorten die hem laten terugkeren
+      //    zonder iets te muteren: de offline-/cache-rem, een mislukte login, een rij zonder
+      //    rijnummer en een afgeronde taak. Hier de cache-rem — die komt in het dagelijks gebruik
+      //    het vaakst langs (de eerste seconden na het laden). Het scherm mag dan niet alvast leeg
+      //    gaan; dat zou tegelijk met 'er is niets gewijzigd' beweren dat de taak los is.
+      ({ kop, sub } = opnieuw());
+      sub.bundelId='Tkop'; sub.bundelVolg='10'; kop.bundelId='Tkop'; kop.bundelVolg='0';
+      openModal(true, sub);
+      state._uitCache=true;                  // de cache-rem in blokkeerOffline
+      let veldNaKlik;
+      try {
+        wisKnop.dispatchEvent(new MouseEvent('click', { bubbles:true }));
+        // Synchroon meten, nog vóór de eerste await: dit is het enige moment waarop een veld dat
+        // vooruitloopt op de actie te zien is. Een meting achteraf zou groen blijven bij precies
+        // de fout die deze stap moet vangen — leegmaken en het daarna stilletjes terugzetten.
+        veldNaKlik=veld.value;
+        for(let i=0;i<20;i++) await tik();   // ruim genoeg; er hoort niets te gebeuren
+      } finally { state._uitCache=false; }
+      eq('hoortbij: het veld loopt niet vooruit op de actie', veldNaKlik, taakTitel(kop));
+      eq('hoortbij: een geweigerde ontkoppeling schrijft niets', volgorde, []);
+      eq('hoortbij: en laat het veld op de werkelijke bundel staan',
+         [veld.value, wisKnop.style.display], [taakTitel(kop), '']);
+      eq('hoortbij: de taak zit er dan ook nog gewoon in', [sub.bundelId, sub.bundelVolg], ['Tkop','10']);
+
+      // 8. De schrijfactie mislukt alsnog. De rollback zet de taak terug en tekent het dashboard
+      //    opnieuw, maar een openstaand venster valt buiten die render — zonder een eigen tweede
+      //    peiling blijft het veld dus leeg terwijl de taak in de Sheet nog in zijn bundel zit.
+      ({ kop, sub } = opnieuw());
+      sub.bundelId='Tkop'; sub.bundelVolg='10'; kop.bundelId='Tkop'; kop.bundelVolg='0';
+      openModal(true, sub);
+      faalPost=true; veldTijdensPost=null;
+      try {
+        wisKnop.dispatchEvent(new MouseEvent('click', { bubbles:true }));
+        await wacht(() => veldTijdensPost!==null && veld.value!=='');
+      } finally { faalPost=false; }
+      eq('hoortbij: het veld gaat wél meteen leeg, al tijdens de schrijfactie', veldTijdensPost, '');
+      eq('hoortbij: een mislukte ontkoppeling zet het veld terug',
+         [veld.value, wisKnop.style.display], [taakTitel(kop), '']);
+      eq('hoortbij: en de taak zit weer in zijn bundel', [sub.bundelId, sub.bundelVolg], ['Tkop','10']);
+      await state._writeChain;
+
       // De stille resync van backgroundWrite laten leeglopen mét de stub nog actief (zie de
       // _loadInFlight-les bij de schrijfweg-tests hierboven).
       for(let i=0;i<200 && state._loadInFlight;i++) await tik();
@@ -5439,6 +5490,77 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       closeModal(); clearModal();
       document.querySelectorAll('.toast').forEach(el => el.remove());
       renderNtd(); renderNtdStats(); goTo(paginaVoor);
+    }
+  })();
+
+  // ── De vier VvE-kiezers, na de contractwijziging van initVveZoekveld ──
+  // `onSelect` geeft sinds 'Hoort bij' het RAUWE bronobject door in plaats van twee strings die uit
+  // data-attributen werden teruggelezen (en dus gegarandeerd tekst wáren). Voor de VvE-kant hangt
+  // daarmee alles aan de belofte dat `code` en `naam` in D.alvo echte tekst zijn: een ontbrekende
+  // naam belandt nu regelrecht als 'undefined' in 'm-naam' en 'hh-naam'. Die belofte ligt sindsdien
+  // in parseAlvo en niet meer in de component, dus wordt hier zowel de belofte vastgepind als elke
+  // kiezer langs een echte toetsaanslag en een echte klik gehaald — puur `filterVves` testen laat
+  // de hele bedrading (bron, klik, invulling) ongedekt.
+  (() => {
+    const alvoOud=D.alvo;
+    const chatVveOud=state._chatVve, chatHistOud=state._chatHistorie, aiCodeOud=state._aiVveCode;
+    const velden=['m-code','m-naam','hh-code','hh-naam','ai-vve-input','chat-vve-zoek'];
+    const oudeWaarden=velden.map(id=>document.getElementById(id).value);
+    try {
+      // Twee VvE's, waarvan één met een LEGE naam — dat is wat parseAlvo van een rij zonder
+      // naamcel maakt, en precies het geval waarin een niet-tekst zichtbaar zou worden.
+      D.alvo=[{code:'ZK-01',naam:'Zoekhof',_row:3},{code:'ZK-02',naam:'',_row:4}];
+      eq('vve-kiezer: parseAlvo levert ook zonder naamcel tekst — de belofte waar de kiezers op leunen',
+         parseAlvo([[],[],['ZK-03']]).map(v=>[typeof v.code, typeof v.naam, v.naam]), [['string','string','']]);
+      // Kiezen zoals de gebruiker het doet: typen (input-event) en klikken. Teruggegeven wordt het
+      // aantal aangeboden suggesties — dat is de andere helft van de vraag, want een kiezer die
+      // niets aanbiedt kan ook niets verkeerd invullen en zou anders stil groen blijven.
+      const kies=(inputId, lijstId, query, idx) => {
+        const inp=document.getElementById(inputId), lijst=document.getElementById(lijstId);
+        inp.value=query;
+        inp.dispatchEvent(new Event('input',{bubbles:true}));
+        const items=lijst.querySelectorAll('.vve-sug-item');
+        if(items[idx]) items[idx].dispatchEvent(new MouseEvent('click',{bubbles:true}));
+        return items.length;
+      };
+      const waarde=id=>document.getElementById(id).value;
+
+      // 1. Het taakscherm: code én naam in twee velden.
+      eq('vve-kiezer m-code: de VvE-lijst komt door', kies('m-code','vve-sug','ZK',0), 2);
+      eq('vve-kiezer m-code: code en naam ingevuld', [waarde('m-code'), waarde('m-naam')], ['ZK-01','Zoekhof']);
+      kies('m-code','vve-sug','ZK',1);
+      eq('vve-kiezer m-code: een VvE zonder naam laat het naamveld leeg',
+         [waarde('m-code'), waarde('m-naam')], ['ZK-02','']);
+
+      // 2. De herhaalregel-modal: hetzelfde paar velden, eigen bedrading.
+      eq('vve-kiezer hh-code: de VvE-lijst komt door', kies('hh-code','hh-vve-sug','ZK',0), 2);
+      eq('vve-kiezer hh-code: code en naam ingevuld', [waarde('hh-code'), waarde('hh-naam')], ['ZK-01','Zoekhof']);
+      kies('hh-code','hh-vve-sug','ZK',1);
+      eq('vve-kiezer hh-code: een VvE zonder naam laat het naamveld leeg',
+         [waarde('hh-code'), waarde('hh-naam')], ['ZK-02','']);
+
+      // 3. De AI-hulp: code en naam samen in één regel, plus de onthouden code.
+      eq('vve-kiezer ai-vve-input: de VvE-lijst komt door', kies('ai-vve-input','ai-vve-sug','ZK',0), 2);
+      eq('vve-kiezer ai-vve-input: code + naam in één regel',
+         [waarde('ai-vve-input'), state._aiVveCode], ['ZK-01 — Zoekhof','ZK-01']);
+      kies('ai-vve-input','ai-vve-sug','ZK',1);
+      eq('vve-kiezer ai-vve-input: zonder naam blijft er niets achter de streep staan',
+         [waarde('ai-vve-input'), state._aiVveCode], ['ZK-02 — ','ZK-02']);
+
+      // 4. De dossier-chat: gebruikt alleen de code; de naam in de kop komt uit D.alvo.
+      eq('vve-kiezer chat-vve-zoek: de VvE-lijst komt door', kies('chat-vve-zoek','chat-vve-sug','ZK',0), 2);
+      eq('vve-kiezer chat-vve-zoek: de chat staat op de gekozen VvE',
+         [state._chatVve, document.getElementById('chat-vve-label').textContent], ['ZK-01','ZK-01 — Zoekhof']);
+      kies('chat-vve-zoek','chat-vve-sug','ZK',1);
+      eq('vve-kiezer chat-vve-zoek: zonder naam alleen de code in de kop',
+         [state._chatVve, document.getElementById('chat-vve-label').textContent], ['ZK-02','ZK-02']);
+    } finally {
+      D.alvo=alvoOud;
+      document.getElementById('ai-vve-wis').click();   // langs de echte weg: veld én live-context leeg
+      state._aiVveCode=aiCodeOud;
+      state._chatVve=chatVveOud; state._chatHistorie=chatHistOud; renderChat();
+      velden.forEach((id,i)=>{ document.getElementById(id).value=oudeWaarden[i]; });
+      document.querySelectorAll('.vve-suggestions').forEach(el=>{ el.innerHTML=''; el.style.display='none'; });
     }
   })();
 

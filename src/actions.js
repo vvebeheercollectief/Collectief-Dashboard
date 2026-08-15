@@ -90,16 +90,25 @@ export const ACTIONS = {
   // wezenlijk: staat er een nog niet opgeslagen KEUZE, dan valt er nog niets te ontkoppelen —
   // dan wordt alleen die keuze losgelaten en toont het veld weer de werkelijke stand. Anders is
   // dit een echte schrijfactie die R en S van deze rij leegmaakt (kolom Q blijft staan).
-  'bundel-ontkoppel':      ()   => {
+  'bundel-ontkoppel':      async ()   => {
     const r = state.editRowData;
     if (state._hbDoel){ zetHoortBij(r); return; }
     if (!r) return;
-    ontkoppelTaak(r);   // eigen offline-, token- en rij-controle; schrijft alleen R en S
-    // Meteen leeg op het scherm, net als de rest van het dashboard optimistisch werkt.
-    const veld = document.getElementById('m-hoortbij');
-    if (veld) veld.value = '';
-    const x = document.getElementById('m-hoortbij-x');
-    if (x) x.style.display = 'none';
+    // Het veld NIET vooruit leegmaken. `ontkoppelTaak` heeft vier redenen om niets te doen — de
+    // offline-/cache-rem, een mislukte login, een rij zonder rijnummer, een afgeronde taak — en
+    // keert dan terug zonder de taak te muteren. Een vooraf leeggemaakt veld zou tegelijk met
+    // 'er is niets gewijzigd' beweren dat de taak los is. `zetHoortBij` leidt de stand af uit D
+    // en klopt daarom in beide richtingen; hij keert terug zodra de optimistische mutatie staat,
+    // dus bij een geslaagde actie is het veld nog steeds meteen leeg.
+    await ontkoppelTaak(r);
+    zetHoortBij(r);
+    // En dan nog een keer ná de schrijfactie zelf. Mislukt die, dan zet de rollback bundelId
+    // terug en tekent `backgroundWrite` het dashboard opnieuw — maar een openstaand venster valt
+    // buiten die render, dus zonder deze tweede peiling blijft het veld liegen. Alleen als
+    // hetzelfde scherm nog open staat: is er intussen een andere taak geopend, dan hoort dat
+    // scherm zijn eigen stand te houden.
+    await state._writeChain;
+    if (state.editRowData === r) zetHoortBij(r);
   },
   'taak-bewerken':         (el) => openModal(true, state._rowCache[+el.dataset.rid]),
   'taak-afronden':         (el) => completeTask(+el.dataset.rid),

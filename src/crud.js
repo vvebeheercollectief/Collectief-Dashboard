@@ -72,12 +72,18 @@ function closeModal(){
   // Escape zijn in main.js alle vier aan closeModal geknoopt. Dit is dus de plek waar een
   // niet-verstuurde subtaak zijn bundel weer loslaat.
   state._nieuwBundel=null;
+  // Om dezelfde reden ook de in 'Hoort bij' aangewezen doeltaak. Een volgend `openModal` ruimt hem
+  // via zetHoortBij/clearModal toch al op, dus dit is vandaag geen zichtbaar verschil — maar dan
+  // hangt de belofte 'een keuze hoort bij het scherm waarin hij is gemaakt' aan de aanname dat
+  // submitTask nooit buiten een geopend venster om draait. Die aanname is hier niet nodig.
+  state._hbDoel=null;
 }
 
 // ── 'Hoort bij' (Takenbundel) ──
 // Vult het veld met de zichtbare kop van de bundel waar deze taak in zit, of verbergt het hele
 // veld (r=null: een nieuwe taak heeft nog geen rij om een koppeling naar weg te schrijven).
 // Geëxporteerd omdat het kruisje er ook op terugvalt als de gebruiker zijn keuze weer weggooit.
+const HB_PLACEHOLDER='Zoek een taak om onder te hangen…';
 export function zetHoortBij(r){
   const veld=document.getElementById('m-hoortbij');
   const wis=document.getElementById('m-hoortbij-x');
@@ -86,6 +92,12 @@ export function zetHoortBij(r){
   if(!veld||!vak) return;
   vak.style.display=r?'':'none';
   if(wis) wis.style.display='none';
+  // Het slot en de bijbehorende uitleg horen bij één bepaalde taak, dus ze gaan hier open vóórdat
+  // de terugkeer hieronder ze zou overslaan. Bewerk je eerst een hoofdtaak (die zet disabled) en
+  // open je daarna het toevoegscherm, dan bleef het veld anders op slot staan — vandaag onzichtbaar
+  // omdat het vak bij een nieuwe taak verborgen is, maar het is een val zodra dat verandert.
+  veld.disabled=false;
+  veld.placeholder=HB_PLACEHOLDER;
   if(!r){ veld.value=''; return; }
   const leden=bundelVan(bouwBundelIndex(D.ntd,D.af), r);
   const kop=leden&&zichtbareKop(leden);
@@ -100,7 +112,7 @@ export function zetHoortBij(r){
   // zetten voorkomt dat de gebruiker eerst een doel uitzoekt en pas bij het opslaan hoort dat het
   // niet mag.
   veld.disabled=isKop;
-  veld.placeholder=isKop?'Deze taak is de hoofdtaak van een bundel':'Zoek een taak om onder te hangen…';
+  veld.placeholder=isKop?'Deze taak is de hoofdtaak van een bundel':HB_PLACEHOLDER;
   if(wis&&kop&&!isKop) wis.style.display='';
 }
 
@@ -595,11 +607,12 @@ async function submitTask(){
       // de write hierboven: die schrijft A..K en raakt de bundelkolommen dus sowieso niet — maar
       // belangrijker is dat de twee los van elkaar mogen mislukken zonder elkaar mee te trekken.
       // Beide gaan door dezelfde seriële wachtrij (state._writeChain), en de koppeling komt daarin
-      // als tweede: backgroundWrite hierboven zet zijn opdracht meteen in de rij, terwijl koppelTaak
-      // eerst nog awaits aflegt (offline-check, ensureToken). Die volgorde is nodig — koppelTaak
-      // doet zijn eigen rij-controle en die moet de zojuist opgeslagen tekst teruglezen, niet de
-      // tekst van ervóór. Verplaats deze regel dus niet naar vóór de backgroundWrite: het werkt daar
-      // vandaag toevallig ook, maar dan hangt de volgorde aan die awaits in plaats van aan de rij.
+      // als tweede: backgroundWrite verlengt die wachtrij nog synchroon op de aanroepregel
+      // hierboven, terwijl koppelTaak zijn eigen backgroundWrite pas ná `await ensureToken()`
+      // bereikt. Die volgorde is nodig — koppelTaak doet zijn eigen rij-controle en die moet de
+      // zojuist opgeslagen tekst teruglezen, niet de tekst van ervóór. Verplaats deze regel dus
+      // niet naar vóór de backgroundWrite hierboven: het gaat daar vandaag ook goed, maar dan
+      // hangt de volgorde aan die ene await in koppelTaak in plaats van aan de plek in de wachtrij.
       if(hbDoel) koppelTaak(doelRow, hbDoel);
     } else {
       // ── Toevoegen: rij meteen lokaal tonen, dan op de achtergrond opslaan ──

@@ -522,6 +522,9 @@ export function initBundelSlepen(container){
 // is de hele rij het handvat. Gevolg: met een vinger stapel je niet (de browser leest de beweging
 // als scrollen en stuurt een pointercancel). Dat is de bewuste ruil — de twee andere wegen naar een
 // bundel, 'Hoort bij' en '+ Voeg een subtaak toe', werken op de telefoon gewoon.
+// Wie het gebaar later tóch op de telefoon wil, is met `touch-action:none` alléén niet klaar: de
+// touch-route zit DUBBEL dicht, want ook `doelOnder` werkt daar niet — zie de tweede helft van de
+// toelichting bij die functie.
 
 // Wat BINNEN een rij geen sleepgebaar mag starten. De rij zélf mag deze kenmerken wel dragen, en
 // dat is geen theorie: op de dossierpagina staat `data-action="taak-bewerken"` op de taakrij zelf
@@ -544,9 +547,13 @@ export function initStapelSlepen(container, rijSelector, taakVanEl, magSlepen){
     if (!el) return;
     for (let n = e.target; n && n !== el; n = n.parentElement)
       if (n.matches && n.matches(GEEN_SLEEP)) return;
-    // De taak meteen erbij zoeken. Levert dat niets op (een rij zónder `data-rid`, zoals de
-    // afgerond-regels op de dossierpagina), dan valt er ook niets te stapelen en hoort de rij niet
-    // te gaan dimmen alsof er wél iets gaat gebeuren.
+    // De taak meteen erbij zoeken. Levert dat niets op, dan valt er niets te stapelen en hoort de
+    // rij niet te gaan dimmen alsof er wél iets gaat gebeuren.
+    // Vangnet en geen bestaande route (nagelopen 2026-08-15): beide aanroepers geven élke rij die
+    // hun selector raakt onvoorwaardelijk een `data-rid` — `rowNtd` in render-tabel.js en `taakRij`
+    // in render-vve.js. De afgerond-regels van de dossierpagina komen hier niet eens langs: die
+    // dragen alleen `.tk` en de selector is `.tk-taak`. De guard staat er dus voor de lijst die er
+    // straks bijkomt met een bredere selector, niet voor iets wat vandaag gebeurt.
     const r = taakVanEl(el);
     if (!r) return;
     _stapel = { container, el, rijSelector, taakVanEl, r, x:e.clientX, y:e.clientY, actief:false };
@@ -560,6 +567,10 @@ export function initStapelSlepen(container, rijSelector, taakVanEl, magSlepen){
     _stapel = null;
     s.el.classList.remove('sleep');
     s.container.querySelectorAll('.stapel-doel').forEach(x => x.classList.remove('stapel-doel'));
+    // Onvoorwaardelijk, ook als de selectie-rem nooit aanging: elke weg terug loopt hier langs
+    // (pointerup, pointercancel én `losgeraakt`), en een achtergebleven klasse zou het selecteren
+    // op de hele pagina permanent stilleggen.
+    document.body.classList.remove('stapel-slepen');
     return s;
   };
 
@@ -583,10 +594,27 @@ export function initStapelSlepen(container, rijSelector, taakVanEl, magSlepen){
   // rij hoort: een toast staat met z-index 700 over de tabel en vangt zelf pointer-events
   // (styles.css). Dan levert `closest` hier niets op en gebeurt er niets — beter dan een koppeling
   // met een rij die de gebruiker op dat moment niet eens kon zien.
+  //
+  // LET OP: dat gaat alleen op voor de MUIS. Voor aanraking en pen — de 'direct manipulation'-invoer
+  // uit de Pointer Events-spec — zet de browser bij pointerdown zélf een IMPLICIETE pointer-capture
+  // op het aangeraakte element, en gaan alle volgende pointermove/pointerup dus naar de BRON-rij.
+  // `e.target.closest(...)` geeft daar altijd de eigen rij terug en deze functie levert per
+  // definitie null. Vandaag valt dat niet op omdat een vingergebaar hier sowieso niet aankomt (geen
+  // touch-action:none, zie de kop hierboven), maar die twee horen bij elkaar: wie straks alleen
+  // `touch-action:none` toevoegt, krijgt op de telefoon een gebaar dat nog steeds niets doet en dat
+  // ook niets meldt. Daar hoort dan `document.elementFromPoint(e.clientX, e.clientY)` bij — precies
+  // de weg die hierboven voor de muis bewust is afgewezen.
   const doelOnder = e => {
     const doelEl = e.target && e.target.closest ? e.target.closest(_stapel.rijSelector) : null;
-    // Op jezelf laten vallen betekent niets. En de rij moet uit dezelfde lijst komen: selector én
-    // rij-cache-vertaling horen bij de container waar dit gebaar begon.
+    // Op jezelf laten vallen betekent niets — anders levert een klik met een trillende muis
+    // `koppelTaak(r, r)` op en dus een melding 'Een taak kan niet onder zichzelf hangen'.
+    // En de rij moet uit dezelfde lijst komen: selector én rij-cache-vertaling horen bij de
+    // container waar dit gebaar begon. Die tweede toets is vandaag een vangnet en geen bestaande
+    // route (nagelopen 2026-08-15): er ís een tweede tabel met `tr[data-row]` in dit document
+    // (#ontw-tbody, render-overig.js), maar die staat op een andere pagina en zijn rijen dragen
+    // geen `data-rid`, dus de vertaling zou daar toch al niets opleveren. Hij staat er voor de
+    // lijst die er straks bijkomt: `taakVanEl` hoort bij de container waar het gebaar begon, dus op
+    // een vreemde rij losgelaten vertaalt hij een vreemd rij-nummer naar een wildvreemde taak.
     return (doelEl && doelEl !== _stapel.el && _stapel.container.contains(doelEl)) ? doelEl : null;
   };
 
@@ -597,6 +625,32 @@ export function initStapelSlepen(container, rijSelector, taakVanEl, magSlepen){
     if (!_stapel.actief && Math.abs(e.clientY - _stapel.y) + Math.abs(e.clientX - _stapel.x) < 6) return;
     _stapel.actief = true;
     _stapel.el.classList.add('sleep');
+    // Verlaat de muis de rij waar het gebaar begon, dan is dit geen 'tekst in deze regel
+    // selecteren' meer maar een sleep over rijgrenzen heen — en die twee kunnen hier niet naast
+    // elkaar bestaan, want de hele rij is het handvat. Vanaf dat moment de lopende selectie
+    // opruimen en het selecteren stilleggen (`body.stapel-slepen`, styles.css). Zonder deze rem
+    // trekt de muis een blauwe selectie over elke rij die hij passeert, dwars door de dim-opmaak en
+    // de doel-markering heen, en blijft die staan in alle takken waar `koppelTaak` géén renderAll
+    // doet: een geweigerde koppeling, offline, of loslaten naast een rij.
+    //
+    // Bewust NIET met `preventDefault()` op pointerdown zoals `initBundelSlepen` dat doet, en ook
+    // niet al bij de 6px-drempel: allebei maken ze het selecteren BINNEN één rij onmogelijk, en een
+    // VvE-naam of actiepunt uit de tabel selecteren en kopiëren is een doodgewone leeshandeling.
+    // Bij het paneel-handvat speelt dat niet — daar is het handvat een leeg 16px-glyph.
+    //
+    // De ruil die hiermee vastligt: een selectie die een rijgrens overschrijdt kán niet meer, want
+    // dat gebaar betekent hier stapelen. Wat het wél oplevert is dat de gebruiker dat vóór het
+    // loslaten ziet (dim + opgelichte doelrij, zonder tegenstrijdige blauwe selectie) en dat de
+    // undo-toast erna klaarstaat.
+    //
+    // Eenmalig, met een vlag: terug naar de eigen rij mag het selecteren niet hervatten. Het
+    // ankerpunt van die selectie is dan al weg, en de gebruiker is aantoonbaar aan het slepen.
+    if (!_stapel.selRem && !_stapel.el.contains(e.target)){
+      _stapel.selRem = true;
+      document.body.classList.add('stapel-slepen');
+      const sel = window.getSelection && window.getSelection();
+      if (sel) sel.removeAllRanges();
+    }
     const doelEl = doelOnder(e);
     _stapel.container.querySelectorAll('.stapel-doel').forEach(x => x.classList.remove('stapel-doel'));
     if (doelEl) doelEl.classList.add('stapel-doel');

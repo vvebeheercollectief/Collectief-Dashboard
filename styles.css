@@ -1302,3 +1302,12 @@ tr.stapel-doel>td{background:var(--sec-l,var(--ac-l))!important;
 [data-theme=dark] tr.stapel-doel>td{background:var(--sec-l,var(--ac-l))!important}
 .tk.sleep{opacity:.55}
 .tk.stapel-doel{background:var(--sec-l,var(--ac-l));box-shadow:inset 0 0 0 2px var(--sec,var(--ac))}
+/* Staat aan zolang een stapelgebaar de rij waarop het begon verlaten heeft (zie initStapelSlepen).
+   Zonder deze rem smeert de muis onderweg een blauwe tekstselectie over elke rij die hij passeert,
+   bovenop de dim-opmaak en de doel-markering — en in de takken waar `koppelTaak` géén renderAll
+   doet (weigering, offline, geen doel) blijft die selectie daarna gewoon staan.
+   Op de body en niet op de rijen: de selectie kan ook buiten de lijst doorlopen zodra de muis naast
+   de tabel komt, en `user-select` erft door naar alles eronder.
+   De -webkit-vorm erbij omdat oudere Safari-versies alleen die kennen; het gebaar is muis-only
+   (zie de kop bij initStapelSlepen) en draait dus op de desktopbrowser. */
+body.stapel-slepen{-webkit-user-select:none;user-select:none}

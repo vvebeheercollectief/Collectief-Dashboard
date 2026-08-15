@@ -5626,14 +5626,49 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         await naSleep();
         eq('stapel-e2e: en er wordt niets geschreven', volgorde, []);
 
-        // 19b. En nu de echte sleepactie.
+        // 19a-bis. Slepen BINNEN één rij is geen stapelgebaar maar een tekstselectie: een VvE-naam,
+        //      code of actiepunt uit de tabel selecteren en kopiëren is een doodgewone
+        //      leeshandeling. Twee dingen moeten daarvoor kloppen. De selectie mag niet opgeruimd
+        //      worden — dat sluit meteen de twee grovere reparaties uit die dit gat óók zouden
+        //      dichten (`preventDefault()` op pointerdown zoals initBundelSlepen doet, of de rem al
+        //      bij de 6px-drempel): allebei maken ze selecteren binnen een rij onmogelijk. En het
+        //      loslaten op je eigen rij mag niet bij `koppelTaak(r, r)` uitkomen, want dat levert
+        //      een melding 'Een taak kan niet onder zichzelf hangen' op bij niet meer dan een klik
+        //      met een trillende muis.
+        const sel=window.getSelection();
+        const kies=el=>{ const rg=document.createRange(); rg.selectNodeContents(el);
+                         sel.removeAllRanges(); sel.addRange(rg); };
+        meldingen=[];
+        kies(grijp(bronEl));
+        pak(grijp(bronEl)); beweeg(grijp(bronEl));
+        eq('stapel-e2e: binnen één rij blijft de tekstselectie staan', sel.rangeCount, 1);
+        truthy('stapel-e2e: en de selectie-rem blijft uit',
+               !document.body.classList.contains('stapel-slepen'));
+        laatLos(grijp(bronEl));
+        await naSleep();
+        eq('stapel-e2e: op je eigen rij loslaten schrijft niets', volgorde, []);
+        eq('stapel-e2e: en levert geen melding op', meldingen, []);
+        eq('stapel-e2e: de taken blijven dus los', [sub.bundelId, kop.bundelId], ['','']);
+
+        // 19b. En nu de echte sleepactie. Zodra de muis de eigen rij verlaat is dit gebaar
+        //      aantoonbaar geen tekstselectie meer: de lopende selectie hoort weg en het selecteren
+        //      hoort stil te liggen tot het loslaten. Zonder die rem trekt de muis een blauwe
+        //      selectie over elke rij die hij passeert — in Chrome nagespeeld met een echte
+        //      muissleep over drie rijen — dwars door de dim-opmaak en de doel-markering heen, en
+        //      die blijft daarna staan in alle takken waar `koppelTaak` géén renderAll doet.
+        kies(grijp(bronEl));
         pak(grijp(bronEl));
         beweeg(grijp(doelEl));
+        eq('stapel-e2e: over de rijgrens heen wordt de selectie opgeruimd', sel.rangeCount, 0);
+        truthy('stapel-e2e: en ligt het selecteren stil',
+               document.body.classList.contains('stapel-slepen'));
         truthy('stapel-e2e: de opgepakte rij is gemarkeerd', bronEl.classList.contains('sleep'));
         truthy('stapel-e2e: en de rij eronder licht op als doel', doelEl.classList.contains('stapel-doel'));
         laatLos(grijp(doelEl));
         truthy('stapel-e2e: na het loslaten is de markering weg',
                !bronEl.classList.contains('sleep') && !doelEl.classList.contains('stapel-doel'));
+        truthy('stapel-e2e: en mag er weer geselecteerd worden',
+               !document.body.classList.contains('stapel-slepen'));
         await naSleep();
         eq('stapel-e2e: het scherm toont de bundel',
            [sub.bundelId, sub.bundelVolg, kop.bundelId, kop.bundelVolg], ['Tkop','10','Tkop','0']);
@@ -5685,7 +5720,73 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         await naSleep();
         eq('stapel-e2e: en dat schrijft dus niets', volgorde, []);
 
-        // 19f. Platte weergave: zodra er gezocht, gefilterd, gesorteerd of bulk-geselecteerd wordt
+        // 19f. Een afgebroken gebaar laat géén pointerup achter: de browser stuurt pointercancel
+        //      zodra hij de beweging zelf overneemt (op een touchscreen als scroll-gebaar). Zonder
+        //      opruiming blijft de rij gedimd staan, blijft het selecteren stilliggen én blijft de
+        //      sleepstand gevuld — en dan koppelt het eerstvolgende loslaten, waar dan ook, alsnog
+        //      een rij die niemand meer vasthield.
+        ({ kop, sub } = opnieuw());
+        renderNtd();
+        bronEl=tabelRij(sub); doelEl=tabelRij(kop);
+        pak(grijp(bronEl)); beweeg(grijp(doelEl));
+        truthy('stapel-e2e: de rij is opgepakt', bronEl.classList.contains('sleep'));
+        window.dispatchEvent(new PointerEvent('pointercancel',{ pointerId:1 }));
+        truthy('stapel-e2e: pointercancel haalt de markering weg',
+               !bronEl.classList.contains('sleep') && !doelEl.classList.contains('stapel-doel'));
+        truthy('stapel-e2e: en laat het selecteren weer toe',
+               !document.body.classList.contains('stapel-slepen'));
+        // Bewijst dat de sleepstand echt LOSGELATEN is en niet alleen even opgeruimd: bleef
+        // `_stapel` gevuld, dan koppelt dit loslaten de twee taken alsnog.
+        laatLos(grijp(doelEl));
+        await naSleep();
+        eq('stapel-e2e: na het afbreken koppelt een loslaten niets meer', volgorde, []);
+        eq('stapel-e2e: en de taken blijven los', [sub.bundelId, kop.bundelId], ['','']);
+
+        // 19g. Een rechtermuisklik mag géén sleepstand zetten, om precies dezelfde reden als bij het
+        //      paneel-handvat: daarna opent het contextmenu en komt er op de meeste platforms geen
+        //      pointerup meer, dus die stand zou blíjven staan. De toets op pointerType hoort erbij
+        //      omdat `button` bij een gewone aanraking of pen-contact óók 0 is.
+        ({ kop, sub } = opnieuw());
+        renderNtd();
+        bronEl=tabelRij(sub); doelEl=tabelRij(kop);
+        grijp(bronEl).dispatchEvent(new PointerEvent('pointerdown',
+          { bubbles:true, pointerId:1, pointerType:'mouse', button:2, clientX:0, clientY:0 }));
+        beweeg(grijp(doelEl));
+        truthy('stapel-e2e: een rechtermuisklik pakt de rij niet op', !bronEl.classList.contains('sleep'));
+        laatLos(grijp(doelEl));
+        await naSleep();
+        eq('stapel-e2e: en koppelt dus niets', volgorde, []);
+        eq('stapel-e2e: de taken blijven los na een rechtermuisklik',
+           [sub.bundelId, kop.bundelId], ['','']);
+
+        // 19h. Loslaten op een rij uit een ÁNDERE lijst koppelt niets. `taakVanEl` hoort bij de
+        //      container waar het gebaar begon, dus op een vreemde rij losgelaten zou hij een vreemd
+        //      rij-nummer naar een wildvreemde taak vertalen. #ontw-tbody is écht een tweede tabel
+        //      met `tr[data-row]` in dit document (render-overig.js) — maar hij staat op een andere
+        //      pagina en zijn rijen dragen geen `data-rid`, dus vandaag zou de vertaling daar toch
+        //      al niets opleveren. Deze toets zet dat attribuut er met opzet wél op, en wel op de
+        //      rid van de KOP: alleen dán meet hij de containergrens zelf, en niet het toeval dat
+        //      de vertaling leeg uitkomt.
+        ({ kop, sub } = opnieuw());
+        renderNtd();
+        bronEl=tabelRij(sub);
+        const vreemdeTbody=document.getElementById('ontw-tbody'), ontwOud=vreemdeTbody.innerHTML;
+        vreemdeTbody.innerHTML=`<tr data-row="${kop._row}" data-rid="${tabelRij(kop).dataset.rid}">`
+          +`<td class="cell-name">Ontwikkel-item</td></tr>`;
+        const vreemdeRij=vreemdeTbody.querySelector('tr[data-row]');
+        pak(grijp(bronEl)); beweeg(grijp(vreemdeRij));
+        truthy('stapel-e2e: een rij uit een andere lijst licht niet op als doel',
+               !vreemdeRij.classList.contains('stapel-doel'));
+        laatLos(grijp(vreemdeRij));
+        // Meteen terug, vóór het wachten: een koppeling die tóch doorging zou via renderAll ook
+        // renderOntw laten draaien, en dan zette het herstel hieronder een verse tabel weer terug
+        // op deze nepregel.
+        vreemdeTbody.innerHTML=ontwOud;
+        await naSleep();
+        eq('stapel-e2e: loslaten buiten de eigen lijst koppelt niets', volgorde, []);
+        eq('stapel-e2e: en ook daar blijven de taken los', [sub.bundelId, kop.bundelId], ['','']);
+
+        // 19i. Platte weergave: zodra er gezocht, gefilterd, gesorteerd of bulk-geselecteerd wordt
         //      staat de stapelweergave uit, en dan mag er ook niet gestapeld worden (§4.2). De
         //      rijen staan er dan gewoon nog, dus zonder rem zou het gebaar gewoon werken.
         ({ kop, sub } = opnieuw());

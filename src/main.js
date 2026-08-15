@@ -23,7 +23,7 @@ import { loadAll, magPollen, schrijfActieLoopt, setSyncOffline, showOfflineBanne
 import { initActions } from './actions.js';
 import { initVveZoekveld } from './vve-zoekveld.js';
 import { bouwBundelIndex, koppelKandidaten, taakFilter } from './bundel.js';
-import { initBundelSlepen } from './bundel-acties.js';
+import { initBundelSlepen, initStapelSlepen } from './bundel-acties.js';
 import { esc, taakTitel } from './util.js';
 import { closeSnoozeModal, snoozeOpslaan, snoozeWis } from './snooze.js';
 import { closeResetModal } from './alv-reset.js';
@@ -117,6 +117,16 @@ document.addEventListener('DOMContentLoaded',()=>{
   // hele tbody bij élke render opnieuw, dus een listener op een paneel zou bij de eerstvolgende
   // render aan een weggegooid element hangen.
   initBundelSlepen(document.getElementById('ntd-tbody'));
+  // Rij op rij slepen om te stapelen. Op dezelfde tbody en om dezelfde reden: die overleeft elke
+  // hertekening, de rijen erin niet. De vertaling van rij naar taak loopt via `data-rid` — de
+  // directe index in state._rowCache waar elke andere rij-actie hier ook op werkt (zie rowNtd in
+  // render-tabel.js, dat dit attribuut voor deze sleepactie op de <tr> zet).
+  // De sleeptoets leest de weergave die renderNtd voor deze ronde heeft klaargezet, zodat 'mag ik
+  // slepen' en 'staat de stapel aan' niet uit elkaar kunnen lopen: bij een zoekterm, filter,
+  // kolomsortering of bulk-selectie staat de stapelweergave uit en betekent slepen niets (§4.2).
+  initStapelSlepen(document.getElementById('ntd-tbody'), 'tr[data-row]',
+    el => state._rowCache[+el.dataset.rid] || null,
+    () => !!(state._bundelWeergave && state._bundelWeergave.stapel));
   document.getElementById('f-status-alvo').onchange=()=>{pgs.alvo=1;renderAlvo()};
   document.getElementById('f-budget-alvo').onchange=()=>{pgs.alvo=1;renderAlvo()};
   setupSearch('s-logboek',()=>{pgs.logboek=1;renderLogboek()});

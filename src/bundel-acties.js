@@ -499,3 +499,128 @@ export function initBundelSlepen(container){
   window.addEventListener('pointerup', stop);
   window.addEventListener('pointercancel', stop);
 }
+
+// ── Slepen om te stapelen ─────────────────────────────────────────────────────
+// Rij op rij slepen maakt van de gesleepte taak een subtaak van de rij waar hij landt. Er is hier
+// geen tweede betekenis van slepen: noch de takentabel noch de dossierpagina kent een handmatige
+// volgorde, dus élke drop op een ándere rij betekent 'stapelen'. Dit gebaar en het paneel-slepen
+// hierboven kunnen elkaar niet in de weg zitten: een `.bdl-sub` staat in een `<tr class="bdl-tr">`
+// zónder `data-row` (render-tabel.js), dus hij valt buiten de rijselector van de takentabel.
+//
+// Vier dingen komen van de aanroeper, omdat ze per lijst verschillen: de container (die een
+// hertekening overleeft), de selector van één rij, de weg van rij-element naar taak-object, en of er
+// in deze lijst überhaupt gesleept mag worden. Dat laatste bewust als functie van de aanroeper en
+// niet als één vlag op `state`: de takentabel mag alleen slepen zolang de gestapelde weergave
+// aanstaat (§4.2 — zoeken, filteren, sorteren of bulk zet die uit), terwijl de dossierpagina die
+// weergave helemaal niet kent en dus altijd mag. Eén gedeelde vlag zou het stapelen op het dossier
+// stilleggen zodra er in de takentabel een filter aanstond.
+//
+// Op pointer-events om dezelfde reden als het paneel-slepen. Maar bewust GEEN `touch-action:none`
+// op de rijen: die regel zou élke aanraking op een taakrij doodmaken voor de verticale
+// paginascroll én voor de horizontale pan van .tbl-wrap (zie de toelichting bij .bdl-sub in
+// styles.css) — bij het paneel kon dat nog omdat het gebaar daar op een 16px-handvat begint, hier
+// is de hele rij het handvat. Gevolg: met een vinger stapel je niet (de browser leest de beweging
+// als scrollen en stuurt een pointercancel). Dat is de bewuste ruil — de twee andere wegen naar een
+// bundel, 'Hoort bij' en '+ Voeg een subtaak toe', werken op de telefoon gewoon.
+
+// Wat BINNEN een rij geen sleepgebaar mag starten. De rij zélf mag deze kenmerken wel dragen, en
+// dat is geen theorie: op de dossierpagina staat `data-action="taak-bewerken"` op de taakrij zelf
+// (render-vve.js). Een toets die simpelweg de dichtstbijzijnde [data-action] opzoekt zou daar dus
+// élk sleepgebaar afwijzen — vandaar de wandeling hieronder, die bij de rij stopt.
+const GEEN_SLEEP = 'button,a,input,select,textarea,[data-action]';
+
+// Eén sleepstand voor de hele pagina, net als bij het paneel-slepen: er is maar één muis.
+let _stapel = null;
+let _stapelGlobaal = false;
+
+export function initStapelSlepen(container, rijSelector, taakVanEl, magSlepen){
+  if (!container || container._bdlStapel) return;
+  container._bdlStapel = true;
+  container.addEventListener('pointerdown', e => {
+    // Alleen de linkerknop, om precies dezelfde reden als bij initBundelSlepen.
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (magSlepen && !magSlepen()) return;
+    const el = e.target.closest(rijSelector);
+    if (!el) return;
+    for (let n = e.target; n && n !== el; n = n.parentElement)
+      if (n.matches && n.matches(GEEN_SLEEP)) return;
+    // De taak meteen erbij zoeken. Levert dat niets op (een rij zónder `data-rid`, zoals de
+    // afgerond-regels op de dossierpagina), dan valt er ook niets te stapelen en hoort de rij niet
+    // te gaan dimmen alsof er wél iets gaat gebeuren.
+    const r = taakVanEl(el);
+    if (!r) return;
+    _stapel = { container, el, rijSelector, taakVanEl, r, x:e.clientX, y:e.clientY, actief:false };
+  });
+  if (_stapelGlobaal) return;
+  _stapelGlobaal = true;
+
+  const opruimen = () => {
+    const s = _stapel;
+    if (!s) return null;
+    _stapel = null;
+    s.el.classList.remove('sleep');
+    s.container.querySelectorAll('.stapel-doel').forEach(x => x.classList.remove('stapel-doel'));
+    return s;
+  };
+
+  // Hangt de opgepakte rij nog in het document? Zo niet, dan is er tussentijds opnieuw getekend:
+  // renderTbody en renderVve zetten allebei de hele innerHTML van hun container opnieuw, en dat
+  // gebeurt zodra een leesronde iets nieuws oplevert — de 8s-poll, maar ook de stille resync die
+  // `backgroundWrite` ná élke eigen schrijfactie doet. Doorgaan mag dan niet: `renderAll` leegt
+  // state._rowCache en vult hem opnieuw, dus het `data-rid` van de losgeraakte rij wijst daarna naar
+  // de zoveelste taak van de níeuwe ronde. De gebruiker kijkt intussen naar een verse lijst waarin
+  // hij niets heeft zien bewegen, en zou zomaar twee wildvreemde taken aan elkaar geknoopt zien.
+  const losgeraakt = () => {
+    if (_stapel.el.isConnected) return false;
+    opruimen();
+    return true;
+  };
+
+  // De rij onder de muis, of null. Die hoeft niet uitgerekend te worden: zonder pointer-capture
+  // komt een pointer-event binnen op het element waar de muis op staat en borrelt van daar naar
+  // `window`, dus `e.target` ís het antwoord al. Zelf hit-testen op de rechthoeken van de rijen zou
+  // dat antwoord naboetseren én slechter zijn zodra er iets vóór de tabel ligt dat bij geen enkele
+  // rij hoort: een toast staat met z-index 700 over de tabel en vangt zelf pointer-events
+  // (styles.css). Dan levert `closest` hier niets op en gebeurt er niets — beter dan een koppeling
+  // met een rij die de gebruiker op dat moment niet eens kon zien.
+  const doelOnder = e => {
+    const doelEl = e.target && e.target.closest ? e.target.closest(_stapel.rijSelector) : null;
+    // Op jezelf laten vallen betekent niets. En de rij moet uit dezelfde lijst komen: selector én
+    // rij-cache-vertaling horen bij de container waar dit gebaar begon.
+    return (doelEl && doelEl !== _stapel.el && _stapel.container.contains(doelEl)) ? doelEl : null;
+  };
+
+  window.addEventListener('pointermove', e => {
+    if (!_stapel || losgeraakt()) return;
+    // Pas na 6px echt slepen. Hier is de hele rij het handvat, dus zonder drempel zou een muis die
+    // tijdens het klikken een pixel verschuift al een bundel maken.
+    if (!_stapel.actief && Math.abs(e.clientY - _stapel.y) + Math.abs(e.clientX - _stapel.x) < 6) return;
+    _stapel.actief = true;
+    _stapel.el.classList.add('sleep');
+    const doelEl = doelOnder(e);
+    _stapel.container.querySelectorAll('.stapel-doel').forEach(x => x.classList.remove('stapel-doel'));
+    if (doelEl) doelEl.classList.add('stapel-doel');
+  });
+
+  // Bewegen en loslaten op `window` en niet op de container, om dezelfde reden als bij het
+  // paneel-slepen: laat de gebruiker naast de lijst los, dan zou een listener op de container dat
+  // loslaten mislopen en bleef de sleepstand staan.
+  const stop = e => {
+    if (!_stapel || losgeraakt()) return;
+    const doelEl = _stapel.actief ? doelOnder(e) : null;   // niet actief = gewone klik, geen sleep
+    const s = opruimen();
+    if (!doelEl) return;
+    const doel = s.taakVanEl(doelEl);
+    // Beide rijen hangen aantoonbaar nog in de laatst getekende lijst (`losgeraakt` hierboven, en
+    // het doel komt zojuist uit het document), dus bron en doel komen uit dezelfde ronde als de
+    // index die `koppelTaak` straks bouwt — precies de voorwaarde die `magKoppelen` stelt. Alle
+    // verdere bewaking (offline, token, rij-guard, afgerond, één laag diep) staat daar.
+    if (doel) koppelTaak(s.r, doel);
+  };
+  window.addEventListener('pointerup', stop);
+  // Een afgebroken gebaar laat géén pointerup achter — de browser stuurt pointercancel zodra hij de
+  // beweging zelf overneemt (op een touchscreen als scroll-gebaar, zie de kop hierboven). Zonder
+  // deze opruiming bleef de rij gedimd staan en hield de volgende beweging een rij vast die niemand
+  // meer oppakte.
+  window.addEventListener('pointercancel', () => opruimen());
+}

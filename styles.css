@@ -1284,3 +1284,21 @@ body.bulk #chat-fab{display:none}
 .bdl-addb:hover{background:var(--sur)}
 .bdl-merk{background:var(--sec-l,var(--ac-l));color:var(--sec,var(--ac));font-size:11px;
   padding:1px 7px;border-radius:20px;cursor:pointer;border:0;margin-left:6px}
+/* Rij op rij slepen om te stapelen: de opgepakte rij dimt, de rij eronder licht op als doel.
+   De terugval --sec → --ac is dezelfde als bij de rest van de bundel-opmaak: --sec/--sec-l worden
+   per sectie op de NTD-kaart gezet, maar op de VvE-dossierpagina bestaan ze niet.
+   Op de <td> en niet op de <tr>: de rij-opmaak van deze tabel woont daar ook (zie .row-telaat en
+   tr.snooze-row hierboven), en tr.ib-row zet zijn achtergrond met !important — die is alleen met
+   een even sterke, latere regel te overstemmen. De rand als inset-schaduw boven én onder loopt
+   daardoor als één doorlopende lijn over de hele rij. */
+tr.sleep>td{opacity:.55}
+tr.stapel-doel>td{background:var(--sec-l,var(--ac-l))!important;
+  box-shadow:inset 0 2px 0 var(--sec,var(--ac)),inset 0 -2px 0 var(--sec,var(--ac))}
+/* Dezelfde regel nog eens, alleen om de donkere ib-rij-variant te evenaren: die staat als
+   `[data-theme=dark] tr.ib-row td` en is met zijn extra attribuut-selector sterker dan de regel
+   hierboven. Zonder deze kopie houdt een 'in behandeling'-rij in de donkere stand zijn eigen
+   achtergrond en blijft alleen het randje over. De waarde is identiek — --ac-l wisselt zelf al
+   met het thema. */
+[data-theme=dark] tr.stapel-doel>td{background:var(--sec-l,var(--ac-l))!important}
+.tk.sleep{opacity:.55}
+.tk.stapel-doel{background:var(--sec-l,var(--ac-l));box-shadow:inset 0 0 0 2px var(--sec,var(--ac))}

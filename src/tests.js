@@ -4233,6 +4233,15 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     // optimistisch als getal op het rij-object, en een `.trim()` daarop nekt de hele sleepactie.
     eq('koppel: numerieke bundelvelden vallen niet om',
        magKoppelen({ taakId:1, bundelId:'', bundelVolg:'' }, { taakId:2, bundelId:2, bundelVolg:0 }, ix).bundelId, '2');
+
+    // Het stapelen door te slepen is een nieuwe aanroeper van precies deze guard — het vraagt
+    // niets extra's. Dat de gesleepte taak de SUBtaak wordt en de rij eronder de hoofdtaak staat
+    // hier los van de sleepcode vast: verwisselt die twee argumenten, dan blijft alles werken en
+    // hangt alleen de verkeerde taak onder de andere.
+    const sleepA = t('Ta','',''), sleepB = t('Tb','','');
+    const ixSleep = bouwBundelIndex({ ...leeg, OPPAKKEN:[sleepA, sleepB] }, leeg);
+    eq('stapel: los op los is toegestaan', magKoppelen(sleepA, sleepB, ixSleep).mag, true);
+    eq('stapel: het doel wordt de hoofdtaak', magKoppelen(sleepA, sleepB, ixSleep).bundelId, 'Tb');
   })();
 
   (() => {
@@ -5574,6 +5583,166 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       eq('herorden-e2e: zonder verplaatsing blijft het stil',
          document.querySelectorAll('#toast-container .toast').length, 0);
       D.af={ ...leeg };
+
+      // 19. Rij op rij slepen om te stapelen, langs de ÉCHTE weg: de rijen zoals renderNtd ze
+      //     tekent, de selector en de rij-cache-vertaling uit main.js, en pointer-events zoals de
+      //     browser ze stuurt. De stukken hierboven bewijzen elk hun eigen helft; dát een
+      //     sleepgebaar bij `koppelTaak` uitkomt hangt aan `data-rid` op de <tr> (render-tabel.js)
+      //     en aan de bedrading in main.js, en dat blijkt alleen hieruit.
+      const veldIds=['s-ntd','f-code-ntd','f-beh-ntd','f-prio-ntd'];
+      const veldOud=veldIds.map(id=>document.getElementById(id).value);
+      const sortOud=state.ntdSort, statusOud=state.ntdStatus, bulkOud=state.bulkMode, vveOud=state.vveCode;
+      try {
+        // De lijst op de standaardstand: alleen dán staat de gestapelde weergave aan, en alleen
+        // dán mag er in de tabel gesleept worden (§4.2). Een achtergebleven zoekterm uit een
+        // eerdere test zou dit blok anders stil overslaan.
+        veldIds.forEach(id=>{ document.getElementById(id).value=''; });
+        state.ntdSort={ key:null, asc:true }; state.ntdStatus=''; state.bulkMode=false;
+        ({ kop, sub } = opnieuw());
+        goTo('ntd'); renderNtd();
+        const tabelRij=r=>document.querySelector(`#ntd-tbody tr[data-row="${r._row}"]`);
+        // Elk pointer-event gaat naar een KIND van de rij en borrelt vanaf daar omhoog — precies
+        // zoals de browser ze stuurt: zonder pointer-capture landt een event op het element waar de
+        // muis op staat. Op de <tr> of op window mikken zou de twee dingen overslaan die deze
+        // toetsen juist moeten meten: de rem op knoppen kijkt naar het aangeraakte element, en het
+        // doel van de sleepactie is het element waar het loslaten op binnenkomt. De naamcel (tabel)
+        // en de omschrijving (dossier) zijn de plekken in een rij zonder eigen actie.
+        const grijp=el=>el.querySelector('td.cell-name, .nm')||el;
+        const ev=(el,soort,d)=>el.dispatchEvent(new PointerEvent(soort,{ bubbles:true, pointerId:1, clientX:d, clientY:d }));
+        // Coördinaten tellen alleen nog voor de 6px-drempel: 0 bij het oppakken, `d` daarna.
+        const pak=el=>ev(el,'pointerdown',0);
+        const beweeg=(el,d=40)=>ev(el,'pointermove',d);
+        const laatLos=(el,d=40)=>ev(el,'pointerup',d);
+
+        let bronEl=tabelRij(sub), doelEl=tabelRij(kop);
+        truthy('stapel-e2e: beide taken staan als rij in de tabel', !!bronEl && !!doelEl);
+
+        // 19a. Een klik met een trillende muis is geen sleepactie. De hele rij is hier het
+        //      handvat, dus zonder drempel zou élke klik in de tabel een bundel kunnen maken.
+        pak(grijp(bronEl));
+        beweeg(grijp(doelEl), 2);
+        truthy('stapel-e2e: onder de drempel wordt de rij niet opgepakt', !bronEl.classList.contains('sleep'));
+        laatLos(grijp(doelEl), 2);
+        await naSleep();
+        eq('stapel-e2e: en er wordt niets geschreven', volgorde, []);
+
+        // 19b. En nu de echte sleepactie.
+        pak(grijp(bronEl));
+        beweeg(grijp(doelEl));
+        truthy('stapel-e2e: de opgepakte rij is gemarkeerd', bronEl.classList.contains('sleep'));
+        truthy('stapel-e2e: en de rij eronder licht op als doel', doelEl.classList.contains('stapel-doel'));
+        laatLos(grijp(doelEl));
+        truthy('stapel-e2e: na het loslaten is de markering weg',
+               !bronEl.classList.contains('sleep') && !doelEl.classList.contains('stapel-doel'));
+        await naSleep();
+        eq('stapel-e2e: het scherm toont de bundel',
+           [sub.bundelId, sub.bundelVolg, kop.bundelId, kop.bundelVolg], ['Tkop','10','Tkop','0']);
+        eq('stapel-e2e: eerst de rij-controle, dan pas schrijven', volgorde, ['lees','schrijf']);
+        eq('stapel-e2e: de gesleepte rij wordt de subtaak van de rij eronder',
+           geschreven.map(g=>g.values[0]), [['Tkop','Tkop','0'], ['Tb','Tkop','10']]);
+
+        // 19c. Wordt de lijst MIDDEN in het gebaar opnieuw getekend, dan hangt de opgepakte rij
+        //      niet meer in het document en moet dit gebaar stoppen. Dat is geen bedacht geval: de
+        //      8s-poll hertekent zodra de datahash wijzigt, en `backgroundWrite` doet na élke eigen
+        //      schrijfactie nog een stille resync. Doorgaan zou een wildvreemde taak koppelen —
+        //      `renderAll` leegt state._rowCache en vult hem opnieuw, dus het `data-rid` van de
+        //      losgeraakte rij wijst daarna naar de zoveelste taak van de níeuwe ronde.
+        ({ kop, sub } = opnieuw());
+        renderNtd();
+        pak(grijp(tabelRij(sub)));
+        beweeg(grijp(tabelRij(kop)));
+        renderNtd();                                  // ← de hertekening die de rij losmaakt
+        // Loslaten op een VERSE rij: een losgeraakt element bereikt `window` niet meer, dus daarop
+        // mikken zou deze rem ook groen laten zien als hij er niet was.
+        laatLos(grijp(tabelRij(kop)));
+        await naSleep();
+        eq('stapel-e2e: loslaten na een hertekening koppelt niets', volgorde, []);
+        eq('stapel-e2e: en de taken blijven los', [sub.bundelId, kop.bundelId], ['','']);
+
+        // 19d. Een taak die zélf subtaken heeft kan nergens onder (§6.2). De guard zit in
+        //      `koppelTaak`, maar of het slepen daar überhaupt langskomt blijkt alleen hier.
+        ({ kop, sub } = opnieuw());
+        sub.bundelId='Tkop'; sub.bundelVolg='10'; kop.bundelId='Tkop'; kop.bundelVolg='0';
+        const los=t(28, 'Tlos', 'Los-werk'); blad[28]=bladRij('Los-werk','Tlos');
+        D.ntd={ ...leeg, OPPAKKEN:[kop, sub, los] };
+        renderNtd();
+        bronEl=tabelRij(kop); doelEl=tabelRij(los);
+        pak(grijp(bronEl)); beweeg(grijp(doelEl)); laatLos(grijp(doelEl));
+        await naSleep();
+        eq('stapel-e2e: een taak met eigen subtaken slepen levert geen enkel verzoek op', volgorde, []);
+        eq('stapel-e2e: en de gebruiker hoort waarom', meldingen,
+           ['Deze taak heeft zelf subtaken; ontkoppel die eerst.']);
+
+        // 19e. Wat BINNEN de rij zit start geen sleepgebaar. De VvE-code is de gemene: hij ziet
+        //      eruit als tekst maar draagt `data-action="vve-open"` en opent het dossier, dus een
+        //      sleepactie die daar begint zou de klik eronder in de weg zitten.
+        ({ kop, sub } = opnieuw());
+        renderNtd();
+        bronEl=tabelRij(sub); doelEl=tabelRij(kop);
+        pak(bronEl.querySelector('.code-klik')); beweeg(grijp(doelEl));
+        truthy('stapel-e2e: op de VvE-code begint geen sleepactie', !bronEl.classList.contains('sleep'));
+        laatLos(grijp(doelEl));
+        await naSleep();
+        eq('stapel-e2e: en dat schrijft dus niets', volgorde, []);
+
+        // 19f. Platte weergave: zodra er gezocht, gefilterd, gesorteerd of bulk-geselecteerd wordt
+        //      staat de stapelweergave uit, en dan mag er ook niet gestapeld worden (§4.2). De
+        //      rijen staan er dan gewoon nog, dus zonder rem zou het gebaar gewoon werken.
+        ({ kop, sub } = opnieuw());
+        document.getElementById('s-ntd').value='testflat';
+        renderNtd();
+        truthy('stapel-e2e: de lijst staat plat door de zoekterm', !state._bundelWeergave.stapel);
+        bronEl=tabelRij(sub); doelEl=tabelRij(kop);
+        truthy('stapel-e2e: en de rijen staan er nog steeds', !!bronEl && !!doelEl);
+        pak(grijp(bronEl)); beweeg(grijp(doelEl));
+        truthy('stapel-e2e: in platte weergave wordt de rij niet opgepakt', !bronEl.classList.contains('sleep'));
+        laatLos(grijp(doelEl));
+        await naSleep();
+        eq('stapel-e2e: en er is niets geschreven', volgorde, []);
+        eq('stapel-e2e: de taak is dus ook niet gekoppeld', [sub.bundelId, kop.bundelId], ['','']);
+
+        // 20. Hetzelfde gebaar op de VvE-dossierpagina — dwars door de categorieën heen, want dáár
+        //     staan alle taken van één VvE onder elkaar (het hoofdvoorbeeld uit §6.1: een offerte
+        //     onder een vergaderverzoek). Twee dingen die in de tabel niet te meten zijn:
+        //       - de taakrij draagt daar ZELF `data-action="taak-bewerken"`, dus een rem die alleen
+        //         naar de dichtstbijzijnde [data-action] kijkt zou hier élk gebaar afwijzen;
+        //       - de zoekterm van 19f staat nog aan. Het dossier kent de gestapelde weergave
+        //         helemaal niet, dus een filter in de takentabel mag het slepen hier niet stilleggen.
+        const offerte=t(28, 'Toff', '');
+        offerte._sec='OFFERTE-TRAJECTEN'; offerte.datumAangevraagd=''; offerte.opmerkingen='Offerte-werk';
+        // Voor de vingerafdruk van een offerte-rij tellen A, C en F — bij deze rij alle drie leeg
+        // op de code na (zie NTD_DATUM in api.js), dus een blad-rij zonder actietekst.
+        blad[28]=['311212','Testflat','','','','','','']; blad[28][16]='Toff';
+        D.ntd={ ...leeg, OPPAKKEN:[kop], 'OFFERTE-TRAJECTEN':[offerte] };
+        volgorde.length=0; geschreven=[]; meldingen=[];
+        state.vveCode='311212';
+        goTo('vve'); renderVve();
+        const dosRij=r=>[...document.querySelectorAll('#vve-inhoud .tk-taak')]
+          .find(el=>state._rowCache[+el.dataset.rid]===r);
+        bronEl=dosRij(offerte); doelEl=dosRij(kop);
+        truthy('stapel-e2e: beide taken staan op de dossierpagina', !!bronEl && !!doelEl);
+        // Ook hier eerst de tegenproef: het ✓-knopje in de rij mag geen sleepactie beginnen. De rem
+        // kijkt alleen naar wat er tússen het aangeraakte element en de rij zit, dus dat de rij
+        // zélf een data-action heeft mag hem niet blind maken voor de knop erin.
+        pak(bronEl.querySelector('.tk-af')); beweeg(grijp(doelEl));
+        truthy('stapel-e2e: op het afrond-knopje begint geen sleepactie', !bronEl.classList.contains('sleep'));
+        laatLos(grijp(doelEl));
+        await naSleep();
+        eq('stapel-e2e: en ook dat schrijft niets', volgorde, []);
+        pak(grijp(bronEl)); beweeg(grijp(doelEl));
+        truthy('stapel-e2e: de dossierrij wordt opgepakt ondanks zijn eigen data-action',
+               bronEl.classList.contains('sleep'));
+        laatLos(grijp(doelEl));
+        await naSleep();
+        eq('stapel-e2e: een offerte-traject hangt nu onder de Oppakken-taak',
+           [offerte.bundelId, offerte.bundelVolg, kop.bundelId, kop.bundelVolg], ['Tkop','10','Tkop','0']);
+        eq('stapel-e2e: en dat gaat als twee bereiken de Sheet in', geschreven.map(g=>g.range),
+           ["'Nog Te Doen'!Q12:S12", "'Nog Te Doen'!Q28:S28"]);
+      } finally {
+        veldIds.forEach((id,i)=>{ document.getElementById(id).value=veldOud[i]; });
+        state.ntdSort=sortOud; state.ntdStatus=statusOud; state.bulkMode=bulkOud; state.vveCode=vveOud;
+        D.af={ ...leeg };
+      }
 
       // De stille resync van backgroundWrite laten leeglopen mét de stub nog actief (zie de
       // _loadInFlight-les hierboven).

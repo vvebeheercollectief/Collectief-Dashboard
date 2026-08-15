@@ -9,6 +9,7 @@ import { goTo } from "./ui.js";
 import { fmtLogTs, logItemHtml, logDayLabel, logPaginaSoort } from "./render-overig.js";
 import { vveKenmerken, KENMERK_WAARDEN } from "./kenmerken.js";
 import { backgroundWrite, blokkeerOffline } from "./data.js";
+import { initStapelSlepen } from "./bundel-acties.js";
 import { appendRange } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { getCurrentWho } from "./notifications.js";
@@ -320,6 +321,17 @@ function renderVve(){
     const t=document.querySelector('#vve-inhoud .log-edit-tekst'); if(t) t.value=_leBewaar.tekst;
     const w=document.querySelector('#vve-inhoud .log-edit-wie'); if(w&&_leBewaar.wie) w.value=_leBewaar.wie;
   }
+  // Rij op rij slepen om te stapelen. Dit is de plek waar het hoofdvoorbeeld uit de spec werkt:
+  // hier staan alle categorieën van één VvE onder elkaar, dus een offerte-traject kan onder een
+  // vergaderverzoek. De listener hangt aan #vve-inhoud zelf — die blijft bestaan, alleen zijn
+  // inhoud wordt hierboven vervangen — en initStapelSlepen bedraadt hem maar één keer.
+  // Geen weergave-toets zoals de takentabel die heeft: het dossier kent de gestapelde weergave
+  // niet (geen chevron, geen paneel), dus er is ook geen platte stand die dit hoort uit te zetten.
+  // `.tk-taak` en niet `.tk`: de afgerond-regels dragen alleen `.tk` en géén `data-rid` (zie
+  // `afRij` hierboven). Met de bredere selector zouden ze wél als doel oplichten en bij het
+  // loslaten niets doen — er is geen taak om aan te koppelen.
+  initStapelSlepen(document.getElementById('vve-inhoud'), '.tk-taak',
+    el => state._rowCache[+el.dataset.rid] || null);
 }
 
 export { vveOverzicht, openVvePagina, renderVve, filterDossierLog, dossierFeed, addContactLog, afOmschrijving, terugDoel, terugVanDossier };

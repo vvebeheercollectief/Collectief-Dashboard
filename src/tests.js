@@ -32,7 +32,7 @@ import { toggleHerhaalStatus } from "./render-herhaal.js";
 import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
 import { bouwBundelIndex, bundelWeergave, zichtbareKop, isBundel, bundelVan, bundelMetId, hernummerLeden, volgendeVolg, magKoppelen, wordtGeabsorbeerd, koppelKandidaten, taakFilter } from "./bundel.js";
 import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./render-bundel.js";
-import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkoppelTaak, herordenBundel } from "./bundel-acties.js";
+import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkoppelTaak, herordenBundel, sleepDoel, paneelTaaknummers, sleepUitslag, initBundelSlepen } from "./bundel-acties.js";
 
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
   // ── mini-assert helper (Fase 1 testnet) ──
@@ -4985,6 +4985,80 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     eq('herorden: ook een volgnummer met = wordt als tekst weggeschreven', d6[0].values[0][0], "'=1");
   })();
 
+  // ── Slepen: waar hoort het gesleepte element terecht te komen? ──
+  // De sleepbeweging zelf is niet zinvol te unit-testen; de plaatsbepaling wél. Die beslist
+  // tussen 'vóór deze regel' en 'erná', en een omgedraaide helft-vergelijking geeft een rij die
+  // steeds één plek te ver schuift — met de muis in de hand voelt dat als een haperende animatie
+  // in plaats van als een rekenfout.
+  (() => {
+    // rects zijn [top, bottom] per zichtbare regel.
+    const rects = [[100,130],[130,160],[160,190]];
+    eq('sleep: boven de eerste helft → ervóór', sleepDoel(rects, 110), { index:0, ervoor:true });
+    eq('sleep: onder de eerste helft → erná',   sleepDoel(rects, 125), { index:0, ervoor:false });
+    eq('sleep: middelste regel bovenhelft',      sleepDoel(rects, 140), { index:1, ervoor:true });
+    eq('sleep: boven alles → helemaal vooraan',  sleepDoel(rects, 50),  { index:0, ervoor:true });
+    eq('sleep: onder alles → helemaal achteraan',sleepDoel(rects, 300), { index:2, ervoor:false });
+    // De regels sluiten op elkaar aan (de rand van .bdl-sub telt in getBoundingClientRect mee),
+    // dus de grens tussen twee regels hoort bij de onderste helft van de bovenste én bij de
+    // bovenste helft van de onderste. Precies op die naad mag er dus geen 'buiten alles' uitkomen.
+    eq('sleep: precies op de naad tussen twee regels', sleepDoel(rects, 130), { index:0, ervoor:false });
+    eq('sleep: één pixel eronder hoort bij de volgende regel', sleepDoel(rects, 131), { index:1, ervoor:true });
+    // Een leeg paneel bestaat tijdens het slepen niet — de gesleepte regel telt zelf mee, dus er
+    // is altijd minstens één rechthoek. De rem staat er omdat de laatste regel op `rects[0]`
+    // indexeert: een aanroeper die straks tóch filtert hoort geen TypeError te krijgen.
+    eq('sleep: lege lijst geeft null',           sleepDoel([], 120), null);
+    eq('sleep: geen lijst geeft ook null',       sleepDoel(undefined, 120), null);
+  })();
+
+  // ── Slepen: van de regels in het paneel terug naar de leden van de bundel ──
+  // `hernummerLeden` krijgt straks precies wat hier uit komt. Twee dingen mogen daar niet mis
+  // gaan: élk lid moet erin staan (de afgeronde zijn er de vaste ankers) en de kop hoort vooraan,
+  // ook al staat die niet in het paneel maar in de tabelrij erboven.
+  (() => {
+    const mk = (taakId, volg, af) => ({ af:!!af, r:{ taakId, bundelId:'B1', bundelVolg:volg,
+      _sec:'OPPAKKEN', _row:10, code:'311212', naam:'Testflat', actiepunt:'werk '+taakId } });
+    const paneelVan = (leden, kop) => {
+      const host = document.createElement('div');
+      host.innerHTML = bundelPaneelHtml(leden, kop || zichtbareKop(leden));
+      return host.querySelector('.bdl-paneel');
+    };
+
+    const leden = [mk('T1','0'), mk('T2','10'), mk('T3','20', true)];
+    const paneel = paneelVan(leden);
+    eq('sleep: de regels dragen het taaknummer van hun lid, kop niet meegerekend',
+       paneelTaaknummers(paneel), ['T2','T3']);
+
+    // Zo verplaatst de sleepcode een regel: het afgeronde lid naar voren.
+    const regels = [...paneel.querySelectorAll('.bdl-sub')];
+    paneel.insertBefore(regels[1], regels[0]);
+    const na = sleepUitslag(paneel, leden, ['T2','T3']);
+    eq('sleep: de kop vooraan, daarna de regels in schermvolgorde',
+       na.volgorde.map(m => m.r.taakId), ['T1','T3','T2']);
+    eq('sleep: het afgeronde lid gaat mee, mét zijn af-vlag',
+       na.volgorde.map(m => m.af), [false, true, false]);
+    truthy('sleep: en dit telt als een gewijzigde volgorde', na.gewijzigd);
+    eq('sleep: losgelaten waar je begon telt als onveranderd',
+       sleepUitslag(paneel, leden, ['T3','T2']).gewijzigd, false);
+
+    // Paneel en gegevens uit de pas: dan is de lijst onvolledig en mag er niet hernummerd worden.
+    eq('sleep: een lid dat niet in het paneel staat maakt de uitslag ongeldig',
+       sleepUitslag(paneel, [...leden, mk('T4','30')], ['T3','T2']), null);
+    eq('sleep: een regel die bij geen enkel lid hoort ook',
+       sleepUitslag(paneel, [leden[0], leden[1]], ['T3','T2']), null);
+
+    // Twee rijen in de Sheet met hetzelfde taaknummer (wat `checkNummers` meldt): elke regel hoort
+    // zijn eigen lid te pakken. Bij opzoeken stond één lid twee keer in de lijst — twee
+    // volgnummers voor dezelfde cel — en het andere er niet in.
+    const dub = [mk('T1','0'), mk('T9','10'), mk('T9','20')];
+    const u = sleepUitslag(paneelVan(dub), dub, []);
+    eq('sleep: twee regels met hetzelfde taaknummer leveren drie leden op', u.volgorde.length, 3);
+    truthy('sleep: en het zijn twee verschillende leden', u.volgorde[1] !== u.volgorde[2]);
+
+    // En de bedrading: zonder deze aanroep in main.js doet het handvat in de takenlijst niets.
+    truthy('sleep: de takenlijst luistert naar het handvat',
+           !!document.getElementById('ntd-tbody')._bdlSleep);
+  })();
+
   // ── En dezelfde drie acties van klik tot geschreven cel, met een gestubde fetch ──
   // De bereik-opbouw hierboven zegt niets over de VOLGORDE waarin de weg hem gebruikt, en juist
   // daar zit het gevaar van deze fase: schrijft de actie vóórdat assertRowsMatch de rij heeft
@@ -5309,6 +5383,108 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       await state._writeChain;
       eq('herorden-e2e: idem — alleen de kop verandert, en dan op zijn nieuwe rij',
          geschreven.map(g=>g.range), ["'Nog Te Doen'!S17"]);
+
+      // 17. De hele keten van het slepen: handvat → pointer-events → nieuwe DOM-volgorde →
+      //     geschreven cel. De stukken hierboven bewijzen elk hun eigen helft; dát het handvat de
+      //     sleepcode bereikt hangt aan drie selectors die in een ánder bestand staan
+      //     (`[data-bdl-grip]`, `.bdl-sub` en `.bdl-paneel` komen uit render-bundel.js) en dat
+      //     blijkt alleen hieruit. Het paneel staat los in de body en niet in de tabel: het
+      //     herordenen roept renderAll aan, en die zou een handgemaakt paneel in #ntd-tbody
+      //     midden in de meting weggooien.
+      ({ kop, sub } = opnieuw());
+      const derde=t(28, 'Tc', 'Derde-werk'), vierde=t(36, 'Td', 'Vierde-werk');
+      D.ntd={ ...leeg, OPPAKKEN:[kop, sub, derde, vierde] };
+      blad[28]=bladRij('Derde-werk', 'Tc'); blad[36]=bladRij('Vierde-werk', 'Td');
+      kop.bundelId='Tkop';    kop.bundelVolg='0';
+      sub.bundelId='Tkop';    sub.bundelVolg='10';
+      derde.bundelId='Tkop';  derde.bundelVolg='20';
+      vierde.bundelId='Tkop'; vierde.bundelVolg='30';
+      const host=document.createElement('div');
+      host.style.cssText='position:fixed;top:0;left:0;width:320px';
+      document.body.appendChild(host);
+      // Loslaten is een event-handler: die kan niet awaiten, dus `herordenBundel` loopt daarna
+      // zelfstandig verder en zet zijn opdracht pas ná `ensureToken` in de wachtrij. Meteen op
+      // state._writeChain wachten meet dan de ronde ervóór — precies de nulmeting-val. Even de
+      // gelegenheid geven, en bij een verwachte stilte de volle 100 ms uitzitten.
+      const naSleep=async () => {
+        for(let i=0;i<20 && !volgorde.length;i++) await new Promise(r=>setTimeout(r,5));
+        await state._writeChain;
+      };
+      try {
+        const ldn=bouwBundelIndex(D.ntd, D.af).get('Tkop');
+        host.innerHTML=bundelPaneelHtml(ldn, zichtbareKop(ldn));
+        initBundelSlepen(host);
+        const paneel=host.querySelector('.bdl-paneel');
+        const regels=[...paneel.querySelectorAll('.bdl-sub')];
+        const nu=() => [...paneel.querySelectorAll('.bdl-sub')].map(el=>el.dataset.taak);
+        eq('sleep-e2e: het paneel toont de drie subtaken op volgnummer', nu(), ['Tb','Tc','Td']);
+
+        // Eerst het handvat alleen even aanraken. Dat is géén verplaatsing en hoort dus niets te
+        // schrijven — en dat gaat niet vanzelf: deze bundel staat nog op zijn startnummers
+        // (0, 10, 20, 30) en `hernummerLeden` maakt daar 10, 20, 30, 40 van, dus zonder de rem op
+        // 'is er iets veranderd' zou één aanraking vier cellen schrijven én een undo-toast geven
+        // voor een verplaatsing die niemand deed.
+        regels[0].querySelector('[data-bdl-grip]')
+          .dispatchEvent(new PointerEvent('pointerdown',{ bubbles:true, pointerId:1 }));
+        window.dispatchEvent(new PointerEvent('pointerup',{}));
+        await naSleep();
+        eq('sleep-e2e: alleen aanraken en loslaten schrijft niets', volgorde, []);
+        eq('sleep-e2e: en laat de volgorde met rust', nu(), ['Tb','Tc','Td']);
+
+        // De MIDDELSTE oppakken: alleen dan is te zien of de gesleepte regel zelf meetelt in de
+        // reeks rechthoeken. Zweven boven je eigen regel hoort niets te doen; laat je hem uit de
+        // reeks weg, dan valt die positie buiten álle rechthoeken en schuift sleepDoel hem via de
+        // buiten-de-lijst-regel naar de staart van het paneel.
+        regels[1].querySelector('[data-bdl-grip]')
+          .dispatchEvent(new PointerEvent('pointerdown',{ bubbles:true, pointerId:1 }));
+        truthy('sleep-e2e: de opgepakte regel is als zodanig gemarkeerd', regels[1].classList.contains('sleep'));
+        const eigen=regels[1].getBoundingClientRect();
+        window.dispatchEvent(new PointerEvent('pointermove',{ clientY: eigen.top + eigen.height/2 }));
+        eq('sleep-e2e: boven je eigen regel zweven verandert niets', nu(), ['Tb','Tc','Td']);
+        // En nu naar de bovenste helft van de bovenste regel.
+        window.dispatchEvent(new PointerEvent('pointermove',{ clientY: regels[0].getBoundingClientRect().top + 2 }));
+        eq('sleep-e2e: hij staat meteen op zijn nieuwe plek', nu(), ['Tc','Tb','Td']);
+        window.dispatchEvent(new PointerEvent('pointerup',{}));
+        await naSleep();
+        truthy('sleep-e2e: en de markering is er na het loslaten af', !regels[1].classList.contains('sleep'));
+        // Nieuwe volgorde: kop, Tc, Tb, Td → 10, 20, 30, 40. Tc stond al op 20 en hoort dus buiten
+        // de batch te blijven; een herordening die álle leden aanraakt kost schrijfquotum voor
+        // rijen die niet verschuiven.
+        eq('sleep-e2e: alleen de rijen die echt een ander nummer krijgen',
+           geschreven.map(g=>g.range), ["'Nog Te Doen'!S12", "'Nog Te Doen'!S20", "'Nog Te Doen'!S36"]);
+        eq('sleep-e2e: met de nieuwe volgnummers erin', geschreven.map(g=>g.values[0]), [['10'],['30'],['40']]);
+      } finally { host.remove(); }
+
+      // 18. Een sleepactie die niets kán veranderen moet dat zeggen. Een afgerond lid houdt zijn
+      //     volgnummer; staat dat op 0, dan is er geen ruimte meer onder en levert hernummerLeden
+      //     nul wijzigingen op. Zonder melding lijkt het dashboard kapot: je sleept een subtaak
+      //     naar boven, je laat los, en er gebeurt zichtbaar niets.
+      ({ kop, sub } = opnieuw());
+      const afNul=t(9, 'T0', 'Afgerond-werk'); afNul.bundelId='Tkop'; afNul.bundelVolg='0';
+      D.af={ ...leeg, OPPAKKEN:[afNul] };
+      kop.bundelId='Tkop'; kop.bundelVolg='10'; sub.bundelId='Tkop'; sub.bundelVolg='20';
+      const gesleept=[{ r:kop, af:false }, { r:sub, af:false }, { r:afNul, af:true }];
+      document.querySelectorAll('#toast-container .toast').forEach(el => el.remove());
+      await herordenBundel(gesleept, true);
+      await state._writeChain;
+      eq('herorden-e2e: een onmogelijke volgorde levert geen enkel verzoek op', volgorde, []);
+      eq('herorden-e2e: en de gebruiker hoort waarom',
+         [...document.querySelectorAll('#toast-container .toast-title')].map(el=>el.textContent),
+         ['Deze volgorde kan niet']);
+      // Meteen nog een poging is precies wat iemand doet die net niets zag gebeuren. Ontdubbelde
+      // showToast op titel+tekst, dan bleef juist díe tweede poging stil.
+      await herordenBundel(gesleept, true);
+      await state._writeChain;
+      eq('herorden-e2e: ook de tweede poging krijgt zijn melding',
+         document.querySelectorAll('#toast-container .toast-title').length, 2);
+      // Dezelfde lijst zonder de vlag: dan liet de gebruiker los waar hij begon en hoort het stil
+      // te blijven — een melding bij elke aanraking van het handvat leest als een storing.
+      document.querySelectorAll('#toast-container .toast').forEach(el => el.remove());
+      await herordenBundel(gesleept);
+      await state._writeChain;
+      eq('herorden-e2e: zonder verplaatsing blijft het stil',
+         document.querySelectorAll('#toast-container .toast').length, 0);
+      D.af={ ...leeg };
 
       // De stille resync van backgroundWrite laten leeglopen mét de stub nog actief (zie de
       // _loadInFlight-les hierboven).

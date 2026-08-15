@@ -22,9 +22,9 @@ import { state, D } from "./state.js";
 import { _veiligeRij, assertRowsMatch } from "./api.js";
 import { backgroundWrite, blokkeerOffline } from "./data.js";
 import { ensureToken } from "./auth.js";
-import { showUndoToast } from "./notifications.js";
+import { showUndoToast, showToast } from "./notifications.js";
 import { nieuwTaakId, taakTitel } from "./util.js";
-import { bouwBundelIndex, volgendeVolg, hernummerLeden, magKoppelen, bundelSleutel } from "./bundel.js";
+import { bouwBundelIndex, volgendeVolg, hernummerLeden, magKoppelen, bundelSleutel, zichtbareKop } from "./bundel.js";
 import { renderAll } from "./main.js";
 
 // ── Opbouw van de schrijfopdrachten (puur, los testbaar) ──────────────────────
@@ -261,12 +261,39 @@ const schrijfVolg = wijzigingen => async () => {
 };
 
 // Nieuwe volgorde vastleggen na slepen. `nieuweVolgorde` is de lijst leden in de gewenste
-// volgorde ({r, af}-objecten uit de index).
-export async function herordenBundel(nieuweVolgorde){
+// volgorde ({r, af}-objecten uit de index). `volgordeGewijzigd` zegt of de GEBRUIKER er iets aan
+// veranderd heeft; dat is een andere vraag dan of er nummers wijzigen, en alleen de aanroeper kan
+// hem beantwoorden (zie de melding hieronder).
+export async function herordenBundel(nieuweVolgorde, volgordeGewijzigd){
   if (blokkeerOffline()) return;
   if (!await ensureToken()){ alert('Inloggen mislukt. Probeer het opnieuw.'); return; }
   const wijzigingen = hernummerLeden(nieuweVolgorde);
-  if (!wijzigingen.length) return;                      // niets veranderd → geen verzoek
+  if (!wijzigingen.length){                             // niets te schrijven → geen verzoek
+    // Nul wijzigingen is normaal zolang de gebruiker niets verschoven heeft. Maar sleepte hij wél
+    // iets, dan botst die volgorde op een afgerond lid: dat houdt zijn volgnummer (zie
+    // `hernummerLeden`) en er is geen ruimte om een open lid ervóór te krijgen. In de praktijk is
+    // dat het lid op volgnummer 0 — het enige nummer dat nooit uitgedeeld wordt (`verdeelRuimte`
+    // telt vanaf de ondergrens 0 omhoog en `volgendeVolg` begint bij 10), dus alleen de hoofdtaak
+    // van een verse bundel draagt het en onder de 0 past niets meer.
+    // Zonder melding lijkt het dashboard kapot: je sleept, je laat los, en er gebeurt zichtbaar
+    // niets.
+    if (volgordeGewijzigd){
+      // Eerst terugtekenen. De regel staat nu in het paneel op een plek waar hij niet komt te
+      // staan, en die leugen zou blijven tot een poll toevallig iets te melden heeft: de melding
+      // hieronder zegt dat het niet kan, dus het scherm moet dat ook laten zien.
+      renderAll();
+      // geenDedup is hier essentieel: showToast ontdubbelt standaard 15 seconden op titel+tekst,
+      // en juist dit scenario nodigt uit tot meteen nog een poging. Zonder deze vlag krijgt die
+      // tweede poging weer stilte — precies het probleem dat de melding moest oplossen.
+      // geenSysteemmelding om dezelfde reden als bij `springNaarBundel`: dit is uitleg bij een
+      // handeling die de gebruiker net zelf deed, geen gebeurtenis om hem voor uit een ander
+      // venster te halen.
+      // 'taak' en niet 'subtaak': het lid dat op volgnummer 0 klemt is per definitie de hoofdtaak.
+      showToast('Deze volgorde kan niet', 'Er staat een afgeronde taak in de weg die zijn plek houdt.',
+                null, 'pauze', { geenDedup:true, geenSysteemmelding:true });
+    }
+    return;
+  }
   if (!heeftRij(...wijzigingen.map(w => w.r))) return;
   // Vangnet op de af-vlag: `hernummerLeden` laat afgeronde leden weg op grond van de `af` die de
   // AANROEPER meegeeft, en die komt bij het slepen uit de DOM. Klopt hij niet, dan zou hier een rij
@@ -302,4 +329,131 @@ export async function herordenBundel(nieuweVolgorde){
     () => { oud.forEach(o => { o.r.bundelVolg = o.volg; }); },
     'Volgorde opslaan mislukt'
   );
+}
+
+// ── Slepen om de volgorde te wijzigen ─────────────────────────────────────────
+// Op pointer-events en niet op de HTML5-sleepfunctie (draggable/dragstart): die kent geen
+// touch-invoer, en dit dashboard wordt ook op de telefoon gebruikt. `touch-action:none` op
+// .bdl-sub en .bdl-h (styles.css) houdt de pagina stil terwijl er met een vinger gesleept wordt —
+// zonder die regel neemt de browser de beweging als scroll-gebaar en komt er geen pointermove meer.
+
+// Waar komt het gesleepte element terecht? Puur, dus los testbaar zonder DOM.
+// `rects` = [[top,bottom], …] van de zichtbare regels, `y` = de muis-/vingerpositie.
+export function sleepDoel(rects, y){
+  if (!rects || !rects.length) return null;
+  for (let i = 0; i < rects.length; i++){
+    const [top, bot] = rects[i];
+    if (y >= top && y <= bot) return { index:i, ervoor: y < top + (bot - top)/2 };
+  }
+  // Buiten alle regels: boven het eerste blok vooraan, anders achteraan.
+  return y < rects[0][0] ? { index:0, ervoor:true } : { index:rects.length-1, ervoor:false };
+}
+
+// De taaknummers van de regels in het paneel, in schermvolgorde. `data-taak` is hier de identiteit
+// van een regel: de POSITIE kan het niet zijn (die verschuift juist tijdens het slepen), en
+// `data-rid` staat alleen op open leden terwijl de afgeronde regels hieronder wél mee moeten.
+export function paneelTaaknummers(paneel){
+  return [...(paneel ? paneel.querySelectorAll('.bdl-sub') : [])].map(el => bundelSleutel(el.dataset.taak));
+}
+
+// De gesleepte volgorde als ledenlijst voor `hernummerLeden`, plus of de gebruiker er iets aan
+// veranderd heeft. null = paneel en gegevens beschrijven niet meer dezelfde bundel.
+//
+// Élk lid doet mee, ook de afgeronde: `hernummerLeden` gebruikt die als VASTE ANKERS en deelt de
+// nieuwe nummers uit in de gaten ertussen. Valt er één weg, dan telt de reeks over dat anker heen
+// en verspringen open leden ten opzichte van een lid dat de functie niet ziet. Vandaar ook
+// `data-taak` op een afgeronde regel (zie `subRegel`), die verder geen enkele actie draagt.
+//
+// Elke regel pakt zijn lid ÚIT de voorraad in plaats van het op te zoeken. Dragen twee rijen in de
+// Sheet hetzelfde taaknummer — precies wat `checkNummers` aan de gebruiker meldt — dan houdt elke
+// regel zo nog steeds zijn eigen lid; bij opzoeken stond één lid twee keer in de lijst, met twee
+// verschillende volgnummers voor dezelfde cel, en het andere er helemaal niet in.
+//
+// Blijft er een lid over, of hoort een regel bij geen enkel lid, dan is het paneel van vóór een
+// wijziging die de gegevens al wél hebben (een collega voegde een subtaak toe, iemand vinkte er
+// een af). Hernummeren op een onvolledige lijst zou nummers uitdelen rond ankers die er niet meer
+// zijn, dus dan liever niets: de eerstvolgende render zet het paneel weer goed.
+export function sleepUitslag(paneel, leden, beginNummers){
+  const nu = paneelTaaknummers(paneel);
+  const kop = zichtbareKop(leden);
+  const voorraad = (leden || []).filter(m => m !== kop);
+  const uit = [];
+  for (const nr of nu){
+    const i = voorraad.findIndex(m => bundelSleutel(m.r.taakId) === nr);
+    if (i < 0) return null;
+    uit.push(voorraad.splice(i, 1)[0]);
+  }
+  if (voorraad.length) return null;
+  // De kop staat niet in het paneel maar in de tabel erboven, en hoort in de volgorde die
+  // `hernummerLeden` krijgt wél vooraan: hij is het lid met het laagste open volgnummer.
+  const begin = beginNummers || [];
+  return {
+    volgorde: kop ? [kop, ...uit] : uit,
+    gewijzigd: nu.length !== begin.length || nu.some((v, i) => v !== begin[i]),
+  };
+}
+
+// Eén sleepstand voor de hele pagina: er is maar één muis en er wordt maar één regel tegelijk
+// verplaatst.
+let _sleep = null;
+let _sleepGlobaal = false;
+
+export function initBundelSlepen(container){
+  if (!container || container._bdlSleep) return;
+  container._bdlSleep = true;
+  container.addEventListener('pointerdown', e => {
+    const grip = e.target.closest('[data-bdl-grip]');
+    if (!grip) return;
+    const rij = grip.closest('.bdl-sub');
+    const paneel = rij && rij.closest('.bdl-paneel');
+    if (!rij || !paneel) return;
+    // De beginvolgorde NU vastleggen. Alleen zo is bij het loslaten te zien of deze sleepactie
+    // iets veranderd heeft, en dat is een andere vraag dan of er nummers wijzigen — zie `stop`.
+    _sleep = { rij, paneel, begin: paneelTaaknummers(paneel) };
+    rij.classList.add('sleep');
+    e.preventDefault();     // anders selecteert de muis onderweg de tekst van de regels
+  });
+  if (_sleepGlobaal) return;
+  _sleepGlobaal = true;
+
+  // Bewegen en loslaten op `window` en niet op de tabel. Het loslaten MOET aankomen: tekent de
+  // 8s-poll de tabel intussen opnieuw (data.js doet dat zodra er iets gewijzigd is), dan hangt de
+  // gesleepte regel niet meer in de tabel en zou een listener dáár het loslaten mislopen — de
+  // sleepstand bleef staan en de eerstvolgende muisbeweging verplaatste een regel die niemand
+  // vasthield. Bewegen hoort om dezelfde reden op window: zonder pointer-capture gaat een
+  // pointermove naar wat er ónder de muis ligt, en dat is buiten de tabel niets van ons.
+  window.addEventListener('pointermove', e => {
+    if (!_sleep) return;
+    const regels = [..._sleep.paneel.querySelectorAll('.bdl-sub')];
+    const doel = sleepDoel(regels.map(el => {
+      const r = el.getBoundingClientRect(); return [r.top, r.bottom];
+    }), e.clientY);
+    if (!doel) return;
+    const ref = regels[doel.index];
+    // De gesleepte regel telt zélf mee in de reeks rechthoeken. Zou hij eruit gefilterd worden,
+    // dan zit er een gat precies waar hij staat, valt elke beweging bínnen zijn eigen regel buiten
+    // álle rechthoeken en schuift `sleepDoel` hem via zijn buiten-de-lijst-regel naar de staart van
+    // het paneel: één pixel bewegen zou de regel dan naar onderen laten schieten. Nu betekent
+    // 'ik zweef boven mezelf' gewoon dat er niets verandert.
+    if (ref === _sleep.rij) return;
+    _sleep.paneel.insertBefore(_sleep.rij, doel.ervoor ? ref : ref.nextSibling);
+  });
+
+  const stop = () => {
+    if (!_sleep) return;
+    const { rij, paneel, begin } = _sleep;
+    _sleep = null;
+    rij.classList.remove('sleep');
+    const leden = bouwBundelIndex(D.ntd, D.af).get(bundelSleutel(paneel.dataset.bundel)) || [];
+    const uitslag = sleepUitslag(paneel, leden, begin);
+    // Niets veranderd, of paneel en gegevens lopen uiteen: in beide gevallen niets schrijven.
+    // Die eerste rem is geen optimalisatie maar een noodzaak — `hernummerLeden` deelt ook zónder
+    // sleepbeweging nieuwe nummers uit zodra de bundel nog op zijn startwaarden staat (0 en 10
+    // worden 10 en 20), dus een kale klik op het handvat zou anders een schrijfronde én een
+    // undo-toast opleveren voor een verplaatsing die niemand deed.
+    if (!uitslag || !uitslag.gewijzigd) return;
+    herordenBundel(uitslag.volgorde, true);
+  };
+  window.addEventListener('pointerup', stop);
+  window.addEventListener('pointercancel', stop);
 }

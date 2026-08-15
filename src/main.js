@@ -23,6 +23,7 @@ import { loadAll, magPollen, schrijfActieLoopt, setSyncOffline, showOfflineBanne
 import { initActions } from './actions.js';
 import { initVveZoekveld } from './vve-zoekveld.js';
 import { bouwBundelIndex, koppelKandidaten, taakFilter } from './bundel.js';
+import { initBundelSlepen } from './bundel-acties.js';
 import { esc, taakTitel } from './util.js';
 import { closeSnoozeModal, snoozeOpslaan, snoozeWis } from './snooze.js';
 import { closeResetModal } from './alv-reset.js';
@@ -112,6 +113,10 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(state.expandedRows.has(id)){state.expandedRows.delete(id);tr.classList.remove('expanded');}
     else{state.expandedRows.add(id);tr.classList.add('expanded');}
   });
+  // Slepen binnen een bundelpaneel. Op de tbody en niet op het paneel zelf: renderTbody vult de
+  // hele tbody bij élke render opnieuw, dus een listener op een paneel zou bij de eerstvolgende
+  // render aan een weggegooid element hangen.
+  initBundelSlepen(document.getElementById('ntd-tbody'));
   document.getElementById('f-status-alvo').onchange=()=>{pgs.alvo=1;renderAlvo()};
   document.getElementById('f-budget-alvo').onchange=()=>{pgs.alvo=1;renderAlvo()};
   setupSearch('s-logboek',()=>{pgs.logboek=1;renderLogboek()});

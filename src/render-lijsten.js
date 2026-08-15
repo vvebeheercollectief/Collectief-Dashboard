@@ -383,6 +383,19 @@ function setNtd(s){
   return zichtbaar;
 }
 
+// Op welke pagina van de takenlijst staat deze rij? 0 = hij staat er niet in (weggefilterd, of
+// opgeslokt door het paneel van zijn bundel), en dan valt er ook niets te bladeren.
+//
+// `zichtbaar` is de lijst die `renderNtd`/`setNtd` teruggeeft: ná filteren, sorteren én absorberen,
+// dus in exact de volgorde waarin `renderTbody` de rijen over de pagina's verdeelt. Bewust als
+// parameter en niet zelf opnieuw opgebouwd — een tweede kopie van die pijplijn loopt bij de eerste
+// wijziging stil uit de pas (zelfde afweging als in `springNaarBundel`, dat om die reden op de
+// teruggave van `setNtd` leunt). Zo blijft dit bovendien een pure functie.
+function ntdPagina(zichtbaar, r){
+  const i=(zichtbaar||[]).indexOf(r);
+  return i<0 ? 0 : Math.floor(i/PG)+1;
+}
+
 function filterNtd(rows,q,fCode,beh,prio,sec,status){
   const out=rows.filter(r=>{
     if(q&&!SECS[sec].keys.some(k=>(r[k]||'').toLowerCase().includes(q))) return false;
@@ -475,7 +488,7 @@ function renderAf(){
 function setAf(s){state.activeAf=s;pgs.af=1;renderAf()}
 
 export {
-  renderNtdStats, renderNtdDonut, renderNtd, setNtd, filterNtd, sorteerNtd, ntdSorteerKey, renderAf, setAf,
+  renderNtdStats, renderNtdDonut, renderNtd, setNtd, ntdPagina, filterNtd, sorteerNtd, ntdSorteerKey, renderAf, setAf,
   kopOpen, zetKopOpen, toggleBundel, springNaarBundel, wisNtdFilters, absorbeer, isPlatteWeergave, erIsGefilterd,
   offerteAannemerPaneel, offerteAannSamenvatting,
   ALVO_ICONS, renderAlvo, ALVO_COLS, ALVO_LABELS, flagPill, _recomputeAlvoStatus, toggleAlvoFlag, statusIco, renderAlfa,

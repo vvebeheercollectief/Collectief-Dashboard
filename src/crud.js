@@ -2,7 +2,7 @@
 //  CRUD — taak-modals, sheet-helpers, toevoegen/afronden/verwijderen
 // ══════════════════════════════════════
 import { esc, berekenPrioriteit, toISODate, toDutchDate, nieuwTaakId, taakTitel } from "./util.js";
-import { state, D } from "./state.js";
+import { state, D, pgs } from "./state.js";
 import { SECS, SKEYS, SID } from "./config.js";
 import { writeRange, _shiftNtdRows, _herstelShift, assertRowMatch } from "./api.js";
 import { ensureToken } from "./auth.js";
@@ -13,7 +13,7 @@ import { backgroundWrite, loadAll, blokkeerOffline } from "./data.js";
 import { faseIndex, faseWoord, faseRijHtml, faseWijziging } from "./subsidie-fase.js";
 import { bouwBundelIndex, bundelVan, zichtbareKop, zelfdeTaak, openSubtaken, bundelWaarschuwing } from "./bundel.js";
 import { koppelTaak } from "./bundel-acties.js";
-import { setNtd, renderNtd } from "./render-lijsten.js";
+import { setNtd, renderNtd, ntdPagina } from "./render-lijsten.js";
 
 // Welke formuliergroep hoort bij welke sectie. Eén bron: openModal verbergt ze
 // allemaal via deze map en toont er precies één, dus een zesde sectie raakt
@@ -364,12 +364,38 @@ async function deleteTask(idx){
 
 async function deleteCurrentEditTask(){
   if(!state.editRowData) return;
-  const r=state.editRowData;
-  closeModal();
-  await deleteTaskRow(r);
+  let r=state.editRowData;
+  // Her-ankeren op het KLIKMOMENT, en niet leunen op wat `openModal` ooit bewaarde.
+  // `deleteTask`/`completeTask` lezen `state._rowCache` op het moment van de klik en voldoen
+  // daarmee vanzelf aan de voorwaarde van `subtakenVan` (index en rij uit dezelfde momentopname);
+  // `state.editRowData` blijft juist over het open scherm heen staan. En dat scherm is niet
+  // beschermd tegen een tussentijdse verse parse: de 8s-poll slaat een open modal wel over, maar
+  // `backgroundWrite` doet in zijn finally een `loadAll(true)` zónder die controle (zie de
+  // toelichting in closeModal). Loopt er dus nog een schrijfactie van een eerdere handeling, dan
+  // zijn álle rij-objecten in D intussen vervangen door verse. `deleteTaskRow` bouwt zijn
+  // bundelindex vers uit D en `subtakenVan` filtert de taak zélf op object-identiteit: een oud
+  // object telt daar als 'andere rij' en de vraag noemt één subtaak te veel.
+  //
+  // Getoetst op D.ntd en niet op state._rowCache: dát is de bron waaruit de index gebouwd wordt,
+  // en het Ctrl+K-palet opent dit scherm met een rij die wél in D staat maar niet per se in de
+  // cache van de laatste render. Vinden we hem daar niet meer, dan her-ankeren op inhoud —
+  // dezelfde weg als in doCompleteTask, met dezelfde melding als daar wanneer dat niet lukt.
+  if(!(D.ntd[r._sec]||[]).includes(r)){
+    r=_herankerRij(r, D.ntd);
+    if(!r){alert('Taak niet gevonden. De lijst is intussen ververst — probeer opnieuw.');return}
+  }
+  // Het scherm sluit pas als de verwijdering écht doorgaat. Zie `bijDoorgaan` in deleteTaskRow.
+  await deleteTaskRow(r, closeModal);
 }
 
-async function deleteTaskRow(r){
+// `bijDoorgaan` (optioneel) draait zodra vaststaat dát er verwijderd wordt — dus ná de vraag over
+// openstaande subtaken. Het bewerkscherm hangt daaraan: dat sloot vóór deze fase onvoorwaardelijk
+// vóór de aanroep, en met een afbreekbare vraag erbij betekende dat een 'nee' op een al gesloten
+// scherm — inclusief de getypte wijzigingen die de gebruiker nog niet had opgeslagen.
+// Bewust niet ná `blokkeerOffline`/`ensureToken`: die twee konden het scherm ook vóór dit traject
+// al onder de gebruiker vandaan sluiten (de aanroeper deed dat toen zélf, nog vóór deze functie
+// begon), dus dáár verandert dit traject niets aan. De vraag is de enige nieuwe afbreekweg.
+async function deleteTaskRow(r, bijDoorgaan){
   const omschrijving=r.actiepunt||r.periode||r.subsidie||r.code||'deze taak';
   // Er is bewust GEEN cascade: verwijderen raakt nooit meer dan één taak (§6.6). De subtaken blijven
   // dus staan, en dat is precies wat je hier moet weten — je verwijdert de taak waar ze onder
@@ -381,6 +407,7 @@ async function deleteTaskRow(r){
   const nSub=openSubtaken(bouwBundelIndex(D.ntd, D.af), r);
   if(nSub && !confirm(`Deze taak heeft nog ${nSub} ${nSub===1?'subtaak':'subtaken'}. `+
                       `${nSub===1?'Die wordt':'Die worden'} niet mee verwijderd. Toch verwijderen?`)) return;
+  if(bijDoorgaan) bijDoorgaan();
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){alert('Inloggen mislukt. Probeer het opnieuw.');return}
   const sec=r._sec;
@@ -439,12 +466,15 @@ function getAfInsertRow(sec){
 
 // Afronden vanuit de bewerk-modal: zelfde flow als de ✓-knop op een rij.
 // De modal kreeg de rij uit _rowCache, dus indexOf vindt dezelfde taak terug.
+// Het sluiten gaat als `bijDoorgaan` mee naar completeTask: die stelt eerst de vraag over
+// openstaande subtaken, en bij een 'nee' hoort het bewerkscherm er nog te staan (zie daar).
+// Dat sluiten hoort bovendien ná het opzoeken hierboven: `closeModal` kan de NTD-lijst
+// hertekenen, en dan wijst `idx` in een verse `state._rowCache` naar een andere taak.
 async function completeCurrentEditTask(){
   if(!state.editRowData) return;
   const idx=state._rowCache.indexOf(state.editRowData);
   if(idx<0){alert('Taak niet gevonden. Vernieuw de pagina en probeer opnieuw.');return}
-  closeModal();
-  completeTask(idx);
+  completeTask(idx, closeModal);
 }
 
 // Pure (testbaar): zoek het bewaarde rij-object vers op in de huidige _rowCache.
@@ -463,7 +493,10 @@ function _herankerRij(r, ntd){
   return kandidaten.length===1?kandidaten[0]:null;
 }
 
-async function completeTask(idx){
+// `bijDoorgaan` (optioneel) draait zodra vaststaat dat het afrond-scherm opengaat — dus ná de vraag
+// over openstaande subtaken. Zie de toelichting bij deleteTaskRow: het bewerkscherm sluit hierop,
+// en zou zonder deze plek al dicht zijn vóórdat de gebruiker 'nee' kon antwoorden.
+async function completeTask(idx, bijDoorgaan){
   const r=state._rowCache[idx];
   if(!r){alert('Taak niet gevonden. Vernieuw de pagina en probeer opnieuw.');return}
   // Sluit je een taak af waar nog subtaken onder hangen? Dan is dat een waarschuwing en géén
@@ -472,6 +505,7 @@ async function completeTask(idx){
   // een subtaak afvinken is de dagelijkse handeling en moet stil blijven (zie `openSubtaken`).
   const waarschuwing=bundelWaarschuwing(bouwBundelIndex(D.ntd, D.af), r);
   if(waarschuwing && !confirm(waarschuwing)) return;
+  if(bijDoorgaan) bijDoorgaan();
   // Rij-OBJECT bewaren, geen index: terwijl de modal open staat kan een vertraagde
   // renderAll (animateRowOut, ~1,2s) of de stille resync _rowCache herbouwen — een
   // bewaarde index wijst dan naar een ándere taak. Zelfde patroon als completeCurrentEditTask.
@@ -732,7 +766,21 @@ async function submitTask(){
       // toevoegen aan de lijst waar je al staat niet ineens terugbladert naar pagina 1.
       if(document.querySelector('.page.active')?.id==='page-ntd'){
         state._ntdVoorModal=null;
-        if(sec!==state.activeNtd) setNtd(sec);
+        // De getekende lijst: bij een sectiewissel komt die uit `setNtd` (die hertekent toch al),
+        // anders uit een eigen `renderNtd`. Bewust géén setNtd zonder wissel — dat zou de
+        // paginateller op 1 zetten en de bulk-selectie wissen zonder aanleiding.
+        const zichtbaar = sec!==state.activeNtd ? setNtd(sec) : renderNtd();
+        // …en dan naar de pagina waarop de nieuwe rij écht staat. `getInsertRow` zet hem ACHTERAAN
+        // het sectieblok en de lijst paginateert op PG (25), dus bij een sectie met meer dan 25
+        // rijen staat de zojuist gemaakte taak niet op de pagina die in beeld is — na een
+        // sectiewissel zelfs gegarandeerd niet, want `setNtd` zet de teller op 1. Zonder deze stap
+        // komt de belofte hierboven maar half uit: je landt op een lijst zónder je nieuwe taak, en
+        // ook de groene flits blijft weg omdat `flashRow` stil terugkeert als de <tr> niet in de
+        // DOM zit. `pg===0` laat de teller met rust: de rij staat dan niet als eigen regel in de
+        // getekende lijst (weggefilterd, of als verse subtaak opgeslokt door het paneel van zijn
+        // bundel), en bladeren naar een pagina die hem toch niet toont heeft geen zin.
+        const pg = ntdPagina(zichtbaar, nieuw);
+        if(pg) pgs.ntd = pg;
       }
       renderAll();
       flashRow('ntd-tbody', nieuw._row, 'rij-flits-groen');

@@ -186,7 +186,14 @@ export function wordtGeabsorbeerd(r, index, sec){
 // bij afronden noemt er één te veel.
 function subtakenVan(index, r){
   const nr = tekst(r && r.taakId);
-  if (!nr) return [];   // geen taaknummer = niets om naar te wijzen, dus per definitie geen subtaken
+  // Geen taaknummer = niets om naar te wijzen, dus per definitie geen subtaken. Deze regel kan het
+  // antwoord echter niet veranderen: `bouwBundelIndex` slaat een lege sleutel nooit op, dus
+  // `get('')` geeft daar altijd undefined en de `|| []` hieronder levert al een lege lijst. Hij
+  // staat er als vangnet voor een index van andere makelij, niet als dragende stap — de bijbehorende
+  // test blijft dan ook groen zonder hem.
+  if (!nr) return [];
+  // Het `index &&` ernaast is wél dragend: een ontbrekende index is geen fout maar een vroege
+  // render (zelfde afweging als in `bundelMetId`).
   return ((index && index.get(nr)) || []).filter(m => m.r !== r);
 }
 
@@ -238,9 +245,19 @@ export function openSubtaken(index, r){
 }
 
 // Waarschuwingstekst bij het afronden van een taak met openstaande subtaken. Lege string = niets te
-// melden. Het is een waarschuwing en geen blokkade: de bundel valt hier niet uit elkaar, want hij is
-// 'alle rijen met hetzelfde bundelnummer' en `bouwBundelIndex` telt de rijen uit 'Afgerond' gewoon
-// mee. De kop schuift dus enkel door naar het eerstvolgende openstaande lid (zie `zichtbareKop`).
+// melden. Het is een waarschuwing en geen blokkade.
+//
+// In de OPSLAG valt de bundel hier niet uit elkaar: hij is 'alle rijen met hetzelfde bundelnummer',
+// `afrondWaarden` schrijft taaknummer én bundelnummer mee naar 'Afgerond' (Q, R, S) en
+// `bouwBundelIndex` telt die rijen gewoon mee. De kop schuift dus enkel door naar het
+// eerstvolgende openstaande lid (zie `zichtbareKop`).
+//
+// Op het SCHERM is er wél een gat, en de melding belooft daar niets over: `doCompleteTask` haalt de
+// rij optimistisch uit D.ntd en zet hem niet in D.af. Bij een bundel van twee zakt de index daardoor
+// naar één lid, waarmee `isBundel` false wordt — de overgebleven subtaak toont zich dan een paar
+// seconden als gewone rij, zonder paneel en zonder ⛓, tot de `loadAll(true)` ná de schrijfactie hem
+// uit 'Afgerond' terugleest. Dat komt uit fase C en staat hier alleen genoteerd zodat een latere
+// lezer het niet als storing aanziet.
 export function bundelWaarschuwing(index, r){
   const n = openSubtaken(index, r);
   if (!n) return '';

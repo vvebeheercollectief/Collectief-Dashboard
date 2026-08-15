@@ -407,12 +407,15 @@ export function initBundelSlepen(container){
   if (!container || container._bdlSleep) return;
   container._bdlSleep = true;
   container.addEventListener('pointerdown', e => {
-    // Alleen de linkerknop. Een rechtermuisklik op het handvat zou de sleepstand zetten waarna het
+    // Alleen knop 0. Een rechtermuisklik op het handvat zou de sleepstand zetten waarna het
     // contextmenu opengaat, en daarna komt er op de meeste platforms géén pointerup meer: de stand
     // bleef staan en de eerstvolgende muisbeweging verplaatste een regel die niemand vasthield.
-    // De toets op pointerType erbij omdat `button` bij een gewone aanraking of pen-contact 0 is —
-    // die blijven dus gewoon werken.
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    // Zonder toets op pointerType, want `button` is invoer-onafhankelijk: de Pointer Events-spec
+    // legt 0 vast voor de linker muisknop, voor aanraak-contact én voor pen-contact, en geeft de
+    // pen-zijknop 2 en de pen-gum 5. Een `pointerType === 'mouse'`-voorwaarde ervoor liet die
+    // pen-zijknop dus wél door — inclusief hetzelfde contextmenu dat voor de muis juist is
+    // afgevangen. Kaal is dus zowel korter als breder: aanraking en pen-tip blijven gewoon werken.
+    if (e.button !== 0) return;
     const grip = e.target.closest('[data-bdl-grip]');
     if (!grip) return;
     const rij = grip.closest('.bdl-sub');
@@ -442,8 +445,14 @@ export function initBundelSlepen(container){
   // Niets doen is hier precies goed: de render die het paneel losmaakte heeft het beeld al
   // bijgewerkt. De 'sleep'-klasse hoeft ook niet weg — die zit op een regel bínnen dit paneel
   // (pointermove verplaatst hem er nooit uit), dus die is met het paneel mee verdwenen.
+  //
+  // Paneel én regel worden getoetst. Vandaag zou het paneel alleen al genoeg zijn, want beide
+  // verdwijnen samen met de `innerHTML`-reset van `renderTbody` — maar dat is een aanname over een
+  // ándere module en hij staat nergens vastgelegd. Zet iemand later één paneel op zijn plek
+  // opnieuw, dan blijft dit paneel-object verbonden terwijl de opgepakte regel al vervangen is, en
+  // dekt de guard de regel stil niet meer. Eén term erbij maakt hem daar onafhankelijk van.
   const losgeraakt = () => {
-    if (_sleep.paneel.isConnected) return false;
+    if (_sleep.paneel.isConnected && _sleep.rij.isConnected) return false;
     _sleep = null;
     return true;
   };
@@ -643,8 +652,11 @@ export function initStapelSlepen(container, rijSelector, taakVanEl, magSlepen){
     // loslaten ziet (dim + opgelichte doelrij, zonder tegenstrijdige blauwe selectie) en dat de
     // undo-toast erna klaarstaat.
     //
-    // Eenmalig, met een vlag: terug naar de eigen rij mag het selecteren niet hervatten. Het
-    // ankerpunt van die selectie is dan al weg, en de gebruiker is aantoonbaar aan het slepen.
+    // Eenmalig, met een vlag. Die vlag doet precies één ding: hij houdt `removeAllRanges()` tegen
+    // bij élke vólgende pointermove buiten de bronrij — één keer opruimen is genoeg. Hij is
+    // nadrukkelijk NIET wat voorkomt dat het selecteren hervat zodra de muis terugkeert naar de
+    // eigen rij: dat volgt uit `body.stapel-slepen` zelf, want die klasse gaat nergens af behalve
+    // in `opruimen`.
     if (!_stapel.selRem && !_stapel.el.contains(e.target)){
       _stapel.selRem = true;
       document.body.classList.add('stapel-slepen');

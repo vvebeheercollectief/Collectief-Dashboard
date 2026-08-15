@@ -240,15 +240,36 @@ sleepactie is een verkeerde vólgorde — nooit verloren werk.
 - **Andere VvE** wordt niet geblokkeerd. Het gebeurt zelden, en de ongedaan-maken-melding is hier
   een beter vangnet dan een extra bevestigingsvraag.
 
-### 6.3 Sleep-techniek
+### 6.3 Sleep-techniek (volgorde wijzigen in het bundelpaneel)
 
-Slepen wordt gebouwd op **pointer-events** (`pointerdown` / `pointermove` / `pointerup` +
-`setPointerCapture`), niet op de HTML5-sleepfunctie van de browser — die werkt niet op een
-touchscreen, en het dashboard wordt ook op de telefoon gebruikt. `touch-action: none` op de
-sleepbare rijen voorkomt dat de pagina meescrollt.
+> Bijgewerkt na de bouw (`src/bundel-acties.js`, `initBundelSlepen`). Deze paragraaf beschrijft
+> alleen het slepen om te **sorteren**; het slepen om te **stapelen** staat in §6.1/§6.2.
+
+Slepen wordt gebouwd op **pointer-events** (`pointerdown` / `pointermove` / `pointerup` /
+`pointercancel`), niet op de HTML5-sleepfunctie van de browser — die werkt niet op een touchscreen,
+en het dashboard wordt ook op de telefoon gebruikt.
+
+Twee dingen wijken bewust af van wat hier eerst stond. Zet ze niet terug:
+
+- **Geen `setPointerCapture`; `pointermove`/`pointerup` hangen aan `window`.** Het loslaten móet
+  aankomen, en de gesleepte regel kan tussentijds uit het document verdwijnen: `renderTbody` zet de
+  hele `innerHTML` van `#ntd-tbody` opnieuw zodra een leesronde iets nieuws oplevert — de 8s-poll,
+  maar ook de stille resync ná élke eigen schrijfactie. Een listener op de regel of de tabel zou dat
+  loslaten dan mislopen en de sleepstand bleef staan. Dat een `pointermove` zonder capture naar het
+  element ónder de muis gaat is precies de reden dat `window` de juiste plek is. `losgeraakt()`
+  breekt het gebaar af zodra het paneel of de opgepakte regel niet meer verbonden is.
+- **`touch-action: none` staat alléén op het handvat (`.bdl-h`), niet op de sleepbare rijen.** De
+  browser leidt het scrollgedrag af uit het element waar de aanraking landt sámen met zijn
+  voorouders: die kunnen het verder beperken, nooit terugzetten. Het gebaar begint hier altijd op
+  `[data-bdl-grip]`, dus op de rij levert de regel niets extra's op — en wél schade: hij maakt élke
+  aanraking op een subtaakregel dood voor de horizontale pan van `.tbl-wrap`, waar de takentabel op
+  een smal scherm van leeft.
 
 Bij het loslaten wordt de hele bundel hernummerd (10, 20, 30 …) en in **één** batch-opdracht
-weggeschreven.
+weggeschreven. Is er niets verschoven, dan wordt er ook niets geschreven: `hernummerLeden` deelt
+namelijk óók zonder sleepbeweging nieuwe nummers uit zodra een bundel nog op zijn startwaarden
+staat (0 en 10 worden 10 en 20), dus een kale klik op het handvat zou anders een schrijfronde en een
+ongedaan-maken-melding opleveren voor een verplaatsing die niemand deed.
 
 ### 6.4 Elke stapel-actie krijgt een ongedaan-maken-melding
 

@@ -7,7 +7,7 @@ import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _s
 import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
-import { filterNtd, setNtd, renderNtd, renderNtdStats, renderAf, setAf, bepaalStil, bouwStilIndex, _zetStilIndex, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey, kopOpen, zetKopOpen, toggleBundel, springNaarBundel, wisNtdFilters, absorbeer, isPlatteWeergave, erIsGefilterd, rowNtd } from "./render-lijsten.js";
+import { filterNtd, setNtd, renderNtd, ntdPagina, renderNtdStats, renderAf, setAf, bepaalStil, bouwStilIndex, _zetStilIndex, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey, kopOpen, zetKopOpen, toggleBundel, springNaarBundel, wisNtdFilters, absorbeer, isPlatteWeergave, erIsGefilterd, rowNtd } from "./render-lijsten.js";
 import { HERO_VIEWS } from "./render-analytics.js";
 import { state, D, pgs } from "./state.js";
 import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel, renderVve } from "./render-vve.js";
@@ -18,7 +18,7 @@ import { _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, veil
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
-import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, _sheetBreedtes, getSheetIds, kiesSectie, deleteTaskRow } from "./crud.js";
+import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, _sheetBreedtes, getSheetIds, kiesSectie, deleteTaskRow, deleteCurrentEditTask, completeCurrentEditTask } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages, renderChat } from "./dossier-chat.js";
 import { shouldPromptReload, maakHerlaadKern, zelfdeWorker } from "./sw-update.js";
@@ -5524,6 +5524,33 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         await naSleep();
         eq('sleep-e2e: er is dus ook niets geschreven', volgorde, []);
 
+        // 17b-2. Diezelfde zijknop, maar dan op een PEN. `button` is invoer-onafhankelijk: de
+        //      Pointer Events-spec legt 0 vast voor de linker muisknop, voor aanraak-contact én voor
+        //      pen-contact, en geeft de pen-zijknop 2 en de pen-gum 5. Een toets die eerst óók op
+        //      `pointerType === 'mouse'` filterde liet die twee dus wél door — inclusief hetzelfde
+        //      contextmenu-gat dat voor de muis juist was afgevangen.
+        volgorde.length=0; geschreven=[];
+        const naPen=nu();
+        regels[0].querySelector('[data-bdl-grip]').dispatchEvent(
+          new PointerEvent('pointerdown',{ bubbles:true, pointerId:1, pointerType:'pen', button:5 }));
+        truthy('sleep-e2e: een pen-zijknop pakt de regel evenmin op', !regels[0].classList.contains('sleep'));
+        window.dispatchEvent(new PointerEvent('pointermove',{ clientY: regels[2].getBoundingClientRect().bottom - 2 }));
+        eq('sleep-e2e: en een beweging erna verplaatst niets', nu(), naPen);
+        window.dispatchEvent(new PointerEvent('pointerup',{}));
+        await naSleep();
+        eq('sleep-e2e: de pen-zijknop schrijft dus ook niets', volgorde, []);
+
+        // 17b-3. De tegenproef die de kale toets pas veilig maakt: een gewone AANRAKING rapporteert
+        //      button 0 en moet het handvat gewoon oppakken. Zonder deze assert zou een toets die
+        //      per ongeluk op de muis filtert het slepen op de telefoon stil doodmaken.
+        volgorde.length=0; geschreven=[];           // eigen nulmeting: anders erft deze de pen-uitslag
+        regels[0].querySelector('[data-bdl-grip]').dispatchEvent(
+          new PointerEvent('pointerdown',{ bubbles:true, pointerId:1, pointerType:'touch', button:0 }));
+        truthy('sleep-e2e: een aanraking pakt de regel wél op', regels[0].classList.contains('sleep'));
+        window.dispatchEvent(new PointerEvent('pointerup',{}));
+        await naSleep();
+        eq('sleep-e2e: losgelaten zonder te verschuiven schrijft niets', volgorde, []);
+
         // 17c. Wordt de tabel MIDDEN in het slepen opnieuw getekend (de 8s-poll doet dat zodra de
         //      datahash wijzigt, en renderTbody zet de hele innerHTML van #ntd-tbody opnieuw), dan
         //      hangt het paneel dat de sleepcode vasthoudt niet meer in het document.
@@ -5591,6 +5618,27 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
                !document.getElementById('sleep-merk'));
         await naSleep();
         eq('sleep-e2e: en schrijft niets', volgorde, []);
+
+        // 17e. Alleen de opgepakte REGEL raakt los, terwijl het paneel blijft hangen. Vandaag
+        //      gebeurt dat niet — `renderTbody` zet de hele innerHTML opnieuw en gooit paneel en
+        //      regels dus samen weg — maar die koppeling staat nergens vast, en de guard hing er
+        //      wél volledig op. Zonder `_sleep.rij.isConnected` erbij loopt pointermove hier
+        //      gewoon door: de losgeraakte regel zit niet meer in `querySelectorAll('.bdl-sub')`,
+        //      is daardoor nooit het doel, en `insertBefore` hangt hem er prompt weer ín — een
+        //      regel die niemand meer ziet komt zo terug in de volgorde die straks weggeschreven
+        //      wordt.
+        volgorde.length=0; geschreven=[];
+        const regels3=[...paneel.querySelectorAll('.bdl-sub')];
+        regels3[2].querySelector('[data-bdl-grip]')
+          .dispatchEvent(new PointerEvent('pointerdown',{ bubbles:true, pointerId:1 }));
+        regels3[2].remove();                       // ← alléén de regel; het paneel blijft verbonden
+        window.dispatchEvent(new PointerEvent('pointermove',
+          { clientY: regels3[0].getBoundingClientRect().top + 2 }));
+        eq('sleep-e2e: een losgeraakte regel wordt niet stilletjes teruggehangen',
+           paneel.querySelectorAll('.bdl-sub').length, regels3.length-1);
+        window.dispatchEvent(new PointerEvent('pointerup',{}));
+        await naSleep();
+        eq('sleep-e2e: en het loslaten schrijft niets', volgorde, []);
       } finally { host.remove(); }
 
       // 18. Een sleepactie die niets kán veranderen moet dat zeggen. Een afgerond lid houdt zijn
@@ -6410,6 +6458,19 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     }
   })();
 
+  // ── ntdPagina: op welke pagina staat een rij in de getekende lijst? ──
+  // Puur, dus hier zonder DOM. De grenzen zijn wat telt: rij 25 is de laatste van pagina 1 en rij
+  // 26 de eerste van pagina 2 (PG=25). En 'staat er niet in' geeft 0 en niet 1 — een rij die
+  // weggefilterd is of door zijn bundelpaneel opgeslokt wordt, mag de teller niet verzetten.
+  (() => {
+    const lijst=[...Array(30).keys()].map(i => ({ _row:i }));
+    eq('ntdPagina: eerste rij staat op pagina 1', ntdPagina(lijst, lijst[0]), 1);
+    eq('ntdPagina: rij 25 is nog pagina 1', ntdPagina(lijst, lijst[24]), 1);
+    eq('ntdPagina: rij 26 is pagina 2', ntdPagina(lijst, lijst[25]), 2);
+    eq('ntdPagina: een rij die niet in de lijst staat geeft 0', ntdPagina(lijst, { _row:99 }), 0);
+    eq('ntdPagina: geen lijst is geen fout', ntdPagina(null, lijst[0]), 0);
+  })();
+
   // ── Van tabblad wisselen bij het toevoegen gaat via setNtd, en alleen op de NTD-pagina ──
   // `state.activeNtd=` zetten is niet hetzelfde als van sectie wisselen: `setNtd` zet óók de
   // paginateller terug en wist de bulk-selectie. Die selectie is een set rij-OBJECTEN zonder
@@ -6468,30 +6529,48 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       document.getElementById('m-code').value='311212';
       await submitTask();
       eq('wissel: het tabblad volgt de gemaakte taak', state.activeNtd, 'LOD');
-      eq('wissel: de paginateller gaat mee terug naar 1', pgs.ntd, 1);
       eq('wissel: en de bulk-selectie is gewist', bulkSelectie().length, 0);
       eq('wissel: dus de bulk-balk staat niet meer op onzichtbare rijen',
          document.getElementById('bulk-balk').style.display, 'none');
+      // De paginateller gaat níet blind naar 1. `setNtd` zet hem daar wél op, maar `getInsertRow`
+      // zet de nieuwe rij ACHTERAAN het sectieblok: 30 bestaande LOD-rijen + de nieuwe = 31, en met
+      // PG=25 is dat pagina 2. Zonder die correctie land je op een lijst zónder je zojuist gemaakte
+      // taak — en blijft ook de groene flits weg, want `flashRow` keert stil terug als de <tr> niet
+      // in de DOM zit. Dat laatste is meteen de scherpste toets: staat de rij er écht?
+      const nieuwLod=D.ntd.LOD[D.ntd.LOD.length-1];
+      eq('wissel: de paginateller wijst de pagina van de nieuwe taak aan', pgs.ntd, 2);
+      truthy('wissel: … dus die rij staat ook echt in de getekende tabel',
+             !!document.querySelector(`#ntd-tbody tr[data-row="${nieuwLod._row}"]`));
       await state._writeChain;
       for(let i=0;i<200 && state._loadInFlight;i++) await tik();
 
-      // 2. Toevoegen aan de lijst waar je al staat is géén wissel: dan hoort de paginateller te
-      //    blijven waar hij stond, anders bladert een gewone '+ Nieuwe taak' je terug naar pagina 1.
+      // 2. Toevoegen aan de lijst waar je al staat is géén wissel: `setNtd` blijft weg, dus de
+      //    bulk-selectie blijft staan (dat is het waarneembare verschil — de paginateller zegt
+      //    hier niets meer, want die volgt nu sowieso de nieuwe rij). En ook hier hoort er
+      //    gebladerd te worden: de gebruiker staat op pagina 1 en zijn taak belandt op pagina 2.
       maakLijst();
-      state.bulkMode=false;
+      state.bulkMode=true;
       goTo('ntd'); renderNtd();
-      pgs.ntd=2;
+      [...document.querySelectorAll('#ntd-tbody [data-action="bulk-vink"]')].slice(0,3)
+        .forEach(el => ACTIONS['bulk-vink'](el));
+      pgs.ntd=1;
       openModal(false);
       document.getElementById('m-actie').value='Nog een Oppakken-taak';
       document.getElementById('m-code').value='311212';
       await submitTask();
-      eq('wissel: zonder sectiewissel blijft de pagina staan', [state.activeNtd, pgs.ntd], ['OPPAKKEN', 2]);
+      const nieuwOpp=D.ntd.OPPAKKEN[D.ntd.OPPAKKEN.length-1];
+      eq('wissel: zonder sectiewissel blijft de bulk-selectie staan',
+         [state.activeNtd, bulkSelectie().length], ['OPPAKKEN', 3]);
+      eq('wissel: … en de teller bladert naar de pagina van de nieuwe taak', pgs.ntd, 2);
+      truthy('wissel: … die daardoor ook binnen dezelfde sectie echt in de tabel staat',
+             !!document.querySelector(`#ntd-tbody tr[data-row="${nieuwOpp._row}"]`));
       await state._writeChain;
       for(let i=0;i<200 && state._loadInFlight;i++) await tik();
 
       // 3. Dezelfde toevoeging vanaf de VvE-dossierpagina. Daar is de NTD-lijst niet in beeld, dus
       //    er valt niets te tonen — en het tabblad dat de gebruiker daar achterliet hoort te blijven.
       maakLijst();
+      state.bulkMode=false;
       state.activeNtd='LOD';
       state.vveCode=null;                // renderVve toont dan alleen zijn lege staat
       goTo('vve');
@@ -6714,7 +6793,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     let vragen=[], antwoord=false;
     const cacheOud=state._rowCache, ntdOud=D.ntd, afOud=D.af;
     const uitCacheOud=state._uitCache, tokenOud=state.oauthToken, expiryOud=state.oauthExpiry;
-    const completeOud=state._completeRow, ridOud=state._completeRid;
+    const completeOud=state._completeRow, ridOud=state._completeRid, voorModalOud=state._ntdVoorModal;
     try {
       window.confirm=m=>{ vragen.push(m); return antwoord; };
       window.alert=()=>{};
@@ -6723,6 +6802,9 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       state._uitCache=false;
       state.oauthToken='stub'; state.oauthExpiry=Date.now()+3600e3;
       state._completeRow=null; state._completeRid=null;
+      // Anders zou `closeModal` (dat hieronder aan de twee knoppen hangt) de NTD-lijst met de
+      // neptaken hertekenen en `state._rowCache` onder de test vandaan herbouwen.
+      state._ntdVoorModal=null;
       const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
       const kop={ _sec:'OPPAKKEN', _row:5, code:'BW-1', naam:'VvE BW', actiepunt:'hoofdtaak',
                   deadline:'', taakId:'Tw1', bundelId:'Tw1', bundelVolg:'0' };
@@ -6782,12 +6864,79 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       eq('verwijdervraag: een subtaak verwijderen vraagt niets', vragen, []);
       truthy('verwijdervraag: … en de rem heeft de rij inderdaad niet aangeraakt',
              D.ntd.OPPAKKEN.indexOf(sub)===1);
+
+      // 6. De vraag staat vóór `blokkeerOffline` (en vóór `ensureToken`), en dat moet zo blijven.
+      //    Anders beantwoordt de gebruiker eerst een vraag over subtaken om dán pas te horen dat er
+      //    geen verbinding is — een 'nee' hoort niets te kosten. Zelfde volgorde als bij het
+      //    wegleggen: `snoozeOpslaan` vraagt, `schrijfOpvolgdatum` remt op offline.
+      //    Die volgorde stond alleen als comment in de code: adversarieel bleek het confirm-blok
+      //    naar ná `blokkeerOffline`/`ensureToken` te verplaatsen zonder dat de suite rood werd.
+      //    Deze assert houdt hem vast — de offline-rem staat dicht en de vraag hoort er tóch te zijn.
+      state._uitCache=true;                       // staat hierboven al aan; expliciet voor de leesbaarheid
+      D.ntd={ ...leeg, OPPAKKEN:[kop, sub] };
+      antwoord=false; vragen=[];
+      await deleteTaskRow(kop);
+      eq('verwijdervraag: de vraag komt vóór de offline-rem', vragen,
+         ['Deze taak heeft nog 1 subtaak. Die wordt niet mee verwijderd. Toch verwijderen?']);
+      truthy('verwijdervraag: … en offline blijft de taak hoe dan ook staan',
+             D.ntd.OPPAKKEN.indexOf(kop)===0);
+
+      // 7. De twee knoppen ín het bewerkscherm. Die sloten dat scherm vóór deze fase
+      //    onvoorwaardelijk vóór de actie — en met een afbreekbare vraag erbij betekende dat: 'nee'
+      //    antwoorden op een scherm dat al weg is, inclusief de nog niet opgeslagen wijzigingen die
+      //    de gebruiker erin had staan. Beide knoppen, beide antwoorden.
+      //    De cache-rem staat nog dicht, dus een 'ja' komt niet verder dan het sluiten zelf.
+      const bg=document.getElementById('modal-bg'), cbg=document.getElementById('complete-bg');
+      D.ntd={ ...leeg, OPPAKKEN:[kop, sub] }; state._rowCache=[kop, sub];
+      antwoord=false; vragen=[];
+      openModal(true, kop);
+      await deleteCurrentEditTask();
+      eq('bewerkscherm: nee op de verwijdervraag laat het scherm openstaan',
+         [vragen.length, bg.classList.contains('open')], [1, true]);
+      antwoord=true; vragen=[];
+      await deleteCurrentEditTask();
+      eq('bewerkscherm: ja sluit het scherm alsnog',
+         [vragen.length, bg.classList.contains('open')], [1, false]);
+
+      antwoord=false; vragen=[];
+      openModal(true, kop);
+      await completeCurrentEditTask();
+      eq('bewerkscherm: nee op de afrondvraag laat het scherm openstaan, zonder afrond-scherm',
+         [vragen.length, bg.classList.contains('open'), cbg.classList.contains('open')],
+         [1, true, false]);
+      antwoord=true; vragen=[];
+      await completeCurrentEditTask();
+      eq('bewerkscherm: ja sluit het bewerkscherm en opent het afrond-scherm',
+         [vragen.length, bg.classList.contains('open'), cbg.classList.contains('open')],
+         [1, false, true]);
+      closeCompleteModal();
+
+      // 8. Het aantal in de verwijdervraag vanuit het bewerkscherm moet op het KLIKMOMENT kloppen.
+      //    `state.editRowData` blijft over het open scherm heen staan, en `backgroundWrite` doet in
+      //    zijn finally een `loadAll(true)` zónder te kijken of er een modal openstaat — dan zijn
+      //    álle rij-objecten in D vervangen door verse met dezelfde inhoud. `subtakenVan` filtert de
+      //    taak zélf op object-identiteit, dus een oud object telt zichzelf mee: de vraag noemt er
+      //    dan één te veel. Hieronder precies die situatie, en hij hoort '1 subtaak' te blijven.
+      const versKop={ ...kop }, versSub={ ...sub };
+      openModal(true, kop);                       // het scherm bewaart het OUDE object
+      D.ntd={ ...leeg, OPPAKKEN:[versKop, versSub] };   // …en dan komt de verse parse langs
+      state._rowCache=[versKop, versSub];
+      antwoord=false; vragen=[];
+      await deleteCurrentEditTask();
+      eq('bewerkscherm: na een verse parse telt de vraag de taak zelf niet mee', vragen,
+         ['Deze taak heeft nog 1 subtaak. Die wordt niet mee verwijderd. Toch verwijderen?']);
+      closeModal();
     } finally {
       window.confirm=_confirm; window.alert=_alert;
       state._rowCache=cacheOud; D.ntd=ntdOud; D.af=afOud;
       state._uitCache=uitCacheOud; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
       state._completeRow=completeOud; state._completeRid=ridOud;
       document.getElementById('complete-bg').classList.remove('open');
+      // Rechtstreeks de klasse eraf en niet via `closeModal`: die kan hertekenen, en dat zou de
+      // zojuist teruggezette _rowCache weer omgooien.
+      document.getElementById('modal-bg').classList.remove('open');
+      clearModal();
+      state._ntdVoorModal=voorModalOud;
       document.querySelectorAll('.toast').forEach(el => el.remove());
     }
   })();

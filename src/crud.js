@@ -13,6 +13,7 @@ import { backgroundWrite, loadAll, blokkeerOffline } from "./data.js";
 import { faseIndex, faseWoord, faseRijHtml, faseWijziging } from "./subsidie-fase.js";
 import { bouwBundelIndex, bundelVan, zichtbareKop, zelfdeTaak } from "./bundel.js";
 import { koppelTaak } from "./bundel-acties.js";
+import { setNtd, renderNtd } from "./render-lijsten.js";
 
 // Welke formuliergroep hoort bij welke sectie. Eén bron: openModal verbergt ze
 // allemaal via deze map en toont er precies één, dus een zesde sectie raakt
@@ -45,14 +46,19 @@ function toonSectie(sec,isEdit){
 // betekent hem naar een ander blok van het tabblad verplaatsen, met een andere kolomindeling en
 // een andere rij — dat bestaat niet als functie, en een kiezer die het aanbiedt belooft iets wat
 // submitTask niet doet.
-// De opties komen uit SECS en niet uit vaste HTML, zodat een zesde sectie hier vanzelf meekomt —
-// net als bij FG_PER_SECTIE. Eén keer vullen is genoeg; daarna alleen de stand zetten.
+// De opties komen uit SKEYS en niet uit vaste HTML, maar wél gefilterd op FG_PER_SECTIE. Die map
+// is handmatig (zie boven), net als het veldblok in index.html en de `switch(sec)` in submitTask:
+// een sectie die alleen in SECS staat heeft hier dus geen formulier en geen kolomindeling. Zonder
+// die filter bood de kiezer hem toch aan, toonde `toonSectie` géén enkel veldblok en viel
+// Toevoegen om op een lege `values` ('Fout: …'). Eén keer vullen is genoeg; daarna alleen de stand
+// zetten.
 function zetSectieKiezer(sec,isEdit){
   const vak=document.getElementById('fld-sectie'), kies=document.getElementById('m-sec');
   if(!vak||!kies) return;
   vak.style.display=isEdit?'none':'';
   if(!kies.options.length)
-    kies.innerHTML=SKEYS.map(s=>`<option value="${esc(s)}">${esc(SECS[s].label)}</option>`).join('');
+    kies.innerHTML=SKEYS.filter(s=>FG_PER_SECTIE[s])
+      .map(s=>`<option value="${esc(s)}">${esc(SECS[s].label)}</option>`).join('');
   kies.value=sec;
 }
 
@@ -117,7 +123,20 @@ function closeModal(){
   // verzet `state.activeNtd` al bij het openen — vóór enige bevestiging — en dit venster kan op
   // vier manieren weg zonder dat er iets is aangemaakt. `submitTask` wist de vlag zodra de taak
   // wél bestaat, dus daar blijft het nieuwe tabblad staan.
-  if(state._ntdVoorModal){ state.activeNtd=state._ntdVoorModal; state._ntdVoorModal=null; }
+  //
+  // Mét hertekenen, en dat is geen overbodige render. Normaal staat de oude lijst er nog gewoon
+  // (goTo hertekent de NTD-lijst niet, zie prefillNieuweTaak), maar er kán achter dit venster langs
+  // getekend zijn: `backgroundWrite` doet in zijn finally `loadAll(true)` zodra de laatste
+  // schrijfactie klaar is, en loadAll roept bij elke gewijzigde stand renderAll aan — zonder te
+  // kijken of er een modal open staat (alleen de pollrondes in main.js slaan een open modal over).
+  // Dan staat het NIEUWE tabblad al getekend, en zou het zonder deze render pas bij de
+  // eerstvolgende poll terugspringen: seconden later en zonder aanleiding, precies wat de
+  // terugzetting moest voorkomen. Alleen renderNtd: de statpillen tellen over alle secties heen
+  // (renderNtdStats) en veranderen hier dus niet.
+  if(state._ntdVoorModal){
+    const terug=state._ntdVoorModal; state._ntdVoorModal=null;
+    if(terug!==state.activeNtd){ state.activeNtd=terug; renderNtd(); }
+  }
 }
 
 // ── 'Hoort bij' (Takenbundel) ──
@@ -682,11 +701,23 @@ async function submitTask(){
       (D.ntd[sec]=D.ntd[sec]||[]).push(nieuw);
       // Vanaf hier bestaat de taak lokaal, dus het tabblad van DEZE sectie moet blijven staan —
       // ook als het scherm via prefillNieuweTaak op een ander tabblad begon of de gebruiker in de
-      // categorie-kiezer iets anders koos. Zonder deze twee regels tekent de renderAll hieronder
-      // een lijst waarin de zojuist gemaakte taak niet voorkomt, en dat leest als 'er is niets
-      // gebeurd'.
-      state._ntdVoorModal=null;
-      state.activeNtd=sec;
+      // categorie-kiezer iets anders koos. Zonder deze stap tekent de renderAll hieronder de lijst
+      // van een ánder tabblad, en dat leest als 'er is niets gebeurd'.
+      //
+      // Alleen als de NTD-lijst ook echt in beeld is. '+ Nieuwe taak' op de VvE-dossierpagina maakt
+      // ook een OPPAKKEN-taak (actions.js), en die weg raakt geen bundel en gaat niet naar Nog Te
+      // Doen: daar zou dit het tabblad achter het dossier stilletjes verzetten, merkbaar pas als de
+      // gebruiker terugloopt. Dezelfde toets als in goTo (ui.js), want `_pagina` daar is privé.
+      //
+      // En via `setNtd`, niet via `state.activeNtd=` alleen: een sectiewissel hoort óók de
+      // paginateller op 1 te zetten en de bulk-selectie te wissen. Die selectie is een set
+      // rij-OBJECTEN zonder sectiefilter (bulk.js), dus na een wissel blijft de bulk-balk staan met
+      // een selectie die niet meer op het scherm staat. Alleen bij een échte wissel, zodat
+      // toevoegen aan de lijst waar je al staat niet ineens terugbladert naar pagina 1.
+      if(document.querySelector('.page.active')?.id==='page-ntd'){
+        state._ntdVoorModal=null;
+        if(sec!==state.activeNtd) setNtd(sec);
+      }
       renderAll();
       flashRow('ntd-tbody', nieuw._row, 'rij-flits-groen');
       closeModal();clearModal();
@@ -742,7 +773,7 @@ async function zetSubsidieFase(rid, stap){
 }
 
 export {
-  openModal, editRow, closeModal, fillModalFields, setv, clearModal, kiesSectie, zetSectieKiezer,
+  openModal, editRow, closeModal, fillModalFields, setv, clearModal, kiesSectie,
   getSheetIds, _sheetBreedtes, getInsertRow, insertAndWriteRow, deleteTask, deleteCurrentEditTask, deleteTaskRow,
   getAfInsertRow, completeTask, completeCurrentEditTask, doCompleteTask, closeCompleteModal, submitTask, gv,
   _verseRijIdx, _herankerRij, zetSubsidieFase, kiesModalFase, _modalFaseWoord,

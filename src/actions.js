@@ -118,23 +118,29 @@ export const ACTIONS = {
     // 'er is niets gewijzigd' beweren dat de taak los is. `zetHoortBij` leidt de stand af uit D
     // en klopt daarom in beide richtingen; hij keert terug zodra de optimistische mutatie staat,
     // dus bij een geslaagde actie is het veld nog steeds meteen leeg.
+    //
+    // De peiling gebeurt twee keer: zodra de optimistische mutatie staat, en nog eens ná de
+    // schrijfactie zelf. Die tweede is nodig omdat een mislukte write de rollback bundelId laat
+    // terugzetten en `backgroundWrite` het dashboard opnieuw tekent — maar een openstaand venster
+    // valt buiten die render, dus zonder tweede peiling blijft het veld liegen.
+    //
+    // Beide keren met dezelfde twee remmen, in één helper zodat ze niet uit de pas kunnen lopen.
+    // Het venster waarin ze nodig zijn begint al bij de klik, niet pas bij de write: ontkoppelTaak
+    // wacht vóór zijn eerste mutatie op `ensureToken`, en die valt bij een verlopen of aflopend
+    // token door naar `doOAuth` (auth.js) — een netwerkronde, geen microtask. Wat er in dat venster
+    // kan gebeuren:
+    //  · een ánder scherm. Ctrl+K werkt over een open modal heen (palette.js opent zonder
+    //    modal-guard), dus een treffer 'Open taken' zet hier een andere taak in beeld. Zonder rem
+    //    schrijft de peiling de stand van DEZE taak in dát scherm.
+    //  · een verse keuze in 'Hoort bij'. Die is jonger dan de peiling en hoort te winnen:
+    //    `zetHoortBij` wist als eerste `state._hbDoel` en zet het veld daarna op de werkelijke
+    //    stand — de gebruiker ziet zijn zojuist aangewezen taak dus onder zijn vingers uit het
+    //    veld verdwijnen, en Opslaan koppelt niets.
+    const ververs = () => { if (state.editRowData === r && !state._hbDoel) zetHoortBij(r); };
     await ontkoppelTaak(r);
-    zetHoortBij(r);
-    // En dan nog een keer ná de schrijfactie zelf. Mislukt die, dan zet de rollback bundelId
-    // terug en tekent `backgroundWrite` het dashboard opnieuw — maar een openstaand venster valt
-    // buiten die render, dus zonder deze tweede peiling blijft het veld liegen. Alleen als
-    // hetzelfde scherm nog open staat: is er intussen een andere taak geopend, dan hoort dat
-    // scherm zijn eigen stand te houden.
+    ververs();
     await state._writeChain;
-    if (state.editRowData !== r) return;
-    // …en niet als de gebruiker intussen al een NIEUWE hoofdtaak heeft aangewezen. Die keuze is
-    // jonger dan deze verversing en hoort te blijven staan: `zetHoortBij` begint met
-    // `state._hbDoel` wissen (crud.js), dus zonder deze rem leest `submitTask` bij Opslaan null —
-    // de gebruiker ziet zijn keuze in het veld staan en er wordt niets gekoppeld. Het venster
-    // tussen de klik op het kruisje en het einde van de schrijfactie is precies lang genoeg om er
-    // een taak in aan te wijzen.
-    if (state._hbDoel) return;
-    zetHoortBij(r);
+    ververs();
   },
   'taak-bewerken':         (el) => openModal(true, state._rowCache[+el.dataset.rid]),
   'taak-afronden':         (el) => completeTask(+el.dataset.rid),

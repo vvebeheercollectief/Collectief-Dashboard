@@ -13,12 +13,12 @@ import { state, D, pgs } from "./state.js";
 import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel, renderVve } from "./render-vve.js";
 import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN, saveKenmerken } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
-import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen } from "./bulk.js";
+import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen, bulkSelectie, bulkWis, renderBulkUi } from "./bulk.js";
 import { _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, veiligeCel, _veiligeRij, fetchSheet, fetchSheets, vingerafdruk, rijVingerafdruk, _normCel, _rijNaarCellen, assertRowMatch, NTD_DATUM, _isOffline, _isNetwerkFout, appendRange, appendRows } from "./api.js";
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
-import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, _sheetBreedtes, getSheetIds } from "./crud.js";
+import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, _sheetBreedtes, getSheetIds, kiesSectie } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages, renderChat } from "./dossier-chat.js";
 import { shouldPromptReload, maakHerlaadKern, zelfdeWorker } from "./sw-update.js";
@@ -5577,6 +5577,56 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
          [sub.bundelId, posts.map(p=>p.range)], ['', ["'Nog Te Doen'!R20:S20"]]);
       state._hbDoel=null;
 
+      // 10. Dezelfde race, maar aan de VOORKANT van het venster. Er zijn twee verversingen: de
+      //     tweede staat ná de schrijfactie (geval 9), de eerste meteen ná `ontkoppelTaak` — en die
+      //     wist `state._hbDoel` net zo hard. Het wachten begint namelijk al bij de klik:
+      //     ontkoppelTaak legt vóór zijn eerste mutatie `ensureToken` af, en die valt bij een
+      //     verlopen of aflopend token door naar `doOAuth` (auth.js), een netwerkronde. Het haakje
+      //     van geval 9 vuurt in de POST-stub en komt dus per definitie ná die eerste verversing
+      //     langs; hier wijzen we de nieuwe hoofdtaak aan zodra de klik is uitgereikt — dan hangt de
+      //     handler nog in dat eerste await.
+      ({ kop, sub } = opnieuw());
+      sub.bundelId='Tkop'; sub.bundelVolg='10'; kop.bundelId='Tkop'; kop.bundelVolg='0';
+      const vroegDoel=t(31,'Tv','Vroeg doel');
+      D.ntd.OPPAKKEN.push(vroegDoel); blad[31]=bladRij('Vroeg doel','Tv');
+      openModal(true, sub);
+      wisKnop.dispatchEvent(new MouseEvent('click', { bubbles:true }));
+      // Synchroon: `dispatchEvent` keert terug zodra de async handler op zijn eerste await staat, en
+      // dat await is precies het inloggen in ontkoppelTaak.
+      state._hbDoel=vroegDoel; veld.value=taakTitel(vroegDoel);
+      await wacht(() => posts.length>0);
+      await state._writeChain;
+      for(let i=0;i<20;i++) await tik();
+      eq('hoortbij: een keuze uit het wachten op de login blijft óók staan',
+         [state._hbDoel===vroegDoel, veld.value], [true, taakTitel(vroegDoel)]);
+      eq('hoortbij: en er is gewoon ontkoppeld',
+         [sub.bundelId, posts.map(p=>p.range)], ['', ["'Nog Te Doen'!R20:S20"]]);
+      state._hbDoel=null;
+
+      // 11. En hetzelfde venster met een ÁNDER scherm erin. Ctrl+K werkt over een open modal heen
+      //     (palette.js opent zonder modal-guard), dus een treffer onder 'Open taken' zet hier een
+      //     andere taak in beeld. De verversing kent alleen de stand van de taak waarvan het
+      //     kruisje is geklikt, en die hoort niet in het venster van een ander te belanden.
+      ({ kop, sub } = opnieuw());
+      sub.bundelId='Tkop'; sub.bundelVolg='10'; kop.bundelId='Tkop'; kop.bundelVolg='0';
+      const kop2=t(41,'Tk2','Andere kop'), sub2=t(42,'Ts2','Ander deelwerk');
+      kop2.bundelId='Tk2'; kop2.bundelVolg='0'; sub2.bundelId='Tk2'; sub2.bundelVolg='10';
+      D.ntd.OPPAKKEN.push(kop2, sub2);
+      blad[41]=bladRij('Andere kop','Tk2'); blad[42]=bladRij('Ander deelwerk','Ts2');
+      openModal(true, sub);
+      wisKnop.dispatchEvent(new MouseEvent('click', { bubbles:true }));
+      openModal(true, sub2);               // Ctrl+K → 'Open taken' → een andere taak
+      await wacht(() => posts.length>0);
+      await state._writeChain;
+      for(let i=0;i<20;i++) await tik();
+      // Zou de verversing van `sub` hier toch langskomen, dan stond er '' — sub is dan immers net
+      // ontkoppeld — en dat is precies de leugen: dit venster gaat over sub2, die nog in zijn
+      // eigen bundel zit.
+      eq('hoortbij: een verversing van de vórige taak raakt het nieuwe scherm niet',
+         veld.value, taakTitel(kop2));
+      eq('hoortbij: en die vorige taak is wél ontkoppeld',
+         [sub.bundelId, posts.map(p=>p.range)], ['', ["'Nog Te Doen'!R20:S20"]]);
+
       // De stille resync van backgroundWrite laten leeglopen mét de stub nog actief (zie de
       // _loadInFlight-les bij de schrijfweg-tests hierboven).
       for(let i=0;i<200 && state._loadInFlight;i++) await tik();
@@ -5633,6 +5683,22 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       eq('categorie: met alle secties erin, op de stand van de kop',
          [[...document.getElementById('m-sec').options].map(o => o.value),
           document.getElementById('m-sec').value], [SKEYS, 'VERGADERVERZOEKEN']);
+      // …en met niets méér dan dat. De kiezer belooft dat elke aangeboden categorie ook echt in te
+      // vullen is; een sectie die alleen in SECS staat heeft geen veldblok in index.html en geen tak
+      // in submitTask, en zou hier een keuze bieden waarna er géén veldblok verschijnt en Toevoegen
+      // omvalt. De veldblokken uit de DOM halen en niet uit FG_PER_SECTIE: dat is dezelfde bron als
+      // de kiezer zelf gebruikt, en dan toetst dit niets.
+      {
+        const blokken=[...document.querySelectorAll('.modal-body [id^="fg-"]')].filter(el => el.id!=='fg-history');
+        const zichtbaar=() => blokken.filter(el => el.style.display!=='none').map(el => el.id);
+        const zonderBlok=[...document.getElementById('m-sec').options].filter(o => {
+          kiesSectie(o.value);
+          return zichtbaar().length!==1;
+        }).map(o => o.value);
+        eq('categorie: elke aangeboden categorie heeft ook echt een veldblok', zonderBlok, []);
+        truthy('categorie: en er zijn er meer dan één om uit te kiezen', blokken.length>1);
+        kiesSectie('VERGADERVERZOEKEN');   // terug naar de stand waar de rest op verder toetst
+      }
       // …en hij moet ook echt iets doen. Via een ECHT change-event: een <select> geeft geen click
       // en komt dus niet langs de delegatie in actions.js — die bedrading zit los in main.js en zou
       // anders ongedekt blijven.
@@ -5659,8 +5725,20 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       ACTIONS['bundel-nieuw']({ dataset:{ bundel:'Tkop' } });
       eq('categorie: het scherm springt naar het tabblad van de kop',
          [state.activeNtd, state.editSec], ['VERGADERVERZOEKEN', 'VERGADERVERZOEKEN']);
+      // Er kán achter dit venster langs getekend worden: `backgroundWrite` doet in zijn finally
+      // `loadAll(true)`, en loadAll hertekent bij elke gewijzigde stand — zonder te kijken of er
+      // een modal open staat (alleen de pollrondes slaan een open modal over). Dán staat het nieuwe
+      // tabblad ook echt in de DOM, en moet het terugzetten wél hertekenen. Deze renderNtd is die
+      // render.
+      renderNtd();
+      eq('categorie: en de lijst tekent dat nieuwe tabblad ook echt',
+         document.querySelector('#ntd-tabs .tab.on')?.dataset.sec, 'VERGADERVERZOEKEN');
       closeModal();
       eq('categorie: wegklikken zet het tabblad terug', state.activeNtd, 'OPPAKKEN');
+      eq('categorie: en het scherm gaat mee terug, niet pas bij de volgende poll',
+         [document.querySelector('#ntd-tabs .tab.on')?.dataset.sec,
+          document.getElementById('ntd-title').textContent],
+         ['OPPAKKEN', SECS.OPPAKKEN.label]);
       eq('categorie: en laat niets hangen', [state._nieuwBundel, state._ntdVoorModal], [null, null]);
     } finally {
       D.ntd=bewaardNtd; D.af=bewaardAf; pgs.ntd=bewaardPg;
@@ -5754,6 +5832,113 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       filterVelden.forEach((id, i) => document.getElementById(id).value = fWaarden[i]);
       state.ntdStatus=fStatus; state.ntdSort=fSort; state.bulkMode=fBulk;
       renderNtd(); renderNtdStats(); goTo(paginaVoor);
+    }
+  })();
+
+  // ── Van tabblad wisselen bij het toevoegen gaat via setNtd, en alleen op de NTD-pagina ──
+  // `state.activeNtd=` zetten is niet hetzelfde als van sectie wisselen: `setNtd` zet óók de
+  // paginateller terug en wist de bulk-selectie. Die selectie is een set rij-OBJECTEN zonder
+  // sectiefilter (bulk.js), dus zonder dat wissen blijft de bulk-balk staan met rijen die niet meer
+  // op het scherm staan — en bulk-afronden op onzichtbare rijen is precies wat `bulkWis` in setNtd
+  // hoort te voorkomen. Tweede helft: '+ Nieuwe taak' op de VvE-dossierpagina maakt óók een
+  // OPPAKKEN-taak, en die weg raakt geen bundel en gaat niet naar Nog Te Doen — daar mag het
+  // tabblad achter het dossier dus niet stilletjes verzet worden.
+  await (async () => {
+    const _fetch=window.fetch, tokenOud=state.oauthToken, expiryOud=state.oauthExpiry;
+    const idsOud=state._sheetIds, cacheOud=state._uitCache, failsOud=state._syncFails;
+    const bewaardNtd=D.ntd, bewaardAf=D.af, bewaardSec=state.activeNtd, bewaardPg=pgs.ntd;
+    const filterVelden=['s-ntd','f-code-ntd','f-beh-ntd','f-prio-ntd'];
+    const fWaarden=filterVelden.map(id => document.getElementById(id).value);
+    const fStatus=state.ntdStatus, fSort=state.ntdSort, fBulk=state.bulkMode, codeOud=state.vveCode;
+    const paginaVoor=(document.querySelector('.page.active')?.id || 'page-ntd').replace('page-','');
+    const tik=() => new Promise(r => { const k=new MessageChannel(); k.port1.onmessage=()=>r(); k.port2.postMessage(0); });
+    try {
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
+      state._sheetIds={'Nog Te Doen':0}; state._uitCache=false;
+      window.fetch=async (url, opt) => {
+        const methode=(opt&&opt.method)||'GET';
+        if(methode==='PUT') return new Response('{}',{status:200});
+        if(methode==='POST') return new Response(JSON.stringify({replies:[{}]}),{status:200});
+        return new Response(JSON.stringify({error:{message:'geen leesverkeer in deze test'}}),{status:403});
+      };
+      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const rij=(sec, row, actie) => ({ _row:row, _sec:sec, taakId:'T'+row, bundelId:'', bundelVolg:'',
+        code:'311212', naam:'Testflat', actiepunt:actie, status:'', deadline:'' });
+      // Beide lijsten ruim over één pagina (PG=25) heen: anders klemt `renderPag` de teller sowieso
+      // op 1 (tp<=1) en zou deze toets groen blijven zonder dat er iets teruggezet is.
+      const blok=(sec, start) => [...Array(30).keys()].map(i => rij(sec, start+i, 'Werk '+i));
+      const maakLijst=() => {
+        filterVelden.forEach(id => document.getElementById(id).value = '');
+        state.ntdStatus=''; state.ntdSort={ key:null, asc:true };
+        D.af={ ...leeg };
+        // Het LOD-blok moet al bestaan, anders weet getInsertRow niet waar de rij heen moet.
+        D.ntd={ ...leeg, OPPAKKEN:blok('OPPAKKEN',60), LOD:blok('LOD',100) };
+        state.activeNtd='OPPAKKEN'; pgs.ntd=1; state.bundelOpen=new Set();
+        state._nieuwBundel=null; state._ntdVoorModal=null;
+      };
+
+      // 1. Bulk aan, drie Oppakken-rijen in de selectie, en dan een taak in een ándere categorie.
+      maakLijst();
+      state.bulkMode=true;
+      goTo('ntd'); renderNtd();
+      [...document.querySelectorAll('#ntd-tbody [data-action="bulk-vink"]')].slice(0,3)
+        .forEach(el => ACTIONS['bulk-vink'](el));
+      pgs.ntd=2;                        // alsof de gebruiker doorgebladerd had
+      eq('wissel: er staat een selectie klaar', bulkSelectie().length, 3);
+      openModal(false);
+      const kiezer=document.getElementById('m-sec');
+      kiezer.value='LOD';
+      kiezer.dispatchEvent(new Event('change', { bubbles:true }));
+      document.getElementById('m-actie-l').value='Nieuw LOD-werk';
+      document.getElementById('m-code').value='311212';
+      await submitTask();
+      eq('wissel: het tabblad volgt de gemaakte taak', state.activeNtd, 'LOD');
+      eq('wissel: de paginateller gaat mee terug naar 1', pgs.ntd, 1);
+      eq('wissel: en de bulk-selectie is gewist', bulkSelectie().length, 0);
+      eq('wissel: dus de bulk-balk staat niet meer op onzichtbare rijen',
+         document.getElementById('bulk-balk').style.display, 'none');
+      await state._writeChain;
+      for(let i=0;i<200 && state._loadInFlight;i++) await tik();
+
+      // 2. Toevoegen aan de lijst waar je al staat is géén wissel: dan hoort de paginateller te
+      //    blijven waar hij stond, anders bladert een gewone '+ Nieuwe taak' je terug naar pagina 1.
+      maakLijst();
+      state.bulkMode=false;
+      goTo('ntd'); renderNtd();
+      pgs.ntd=2;
+      openModal(false);
+      document.getElementById('m-actie').value='Nog een Oppakken-taak';
+      document.getElementById('m-code').value='311212';
+      await submitTask();
+      eq('wissel: zonder sectiewissel blijft de pagina staan', [state.activeNtd, pgs.ntd], ['OPPAKKEN', 2]);
+      await state._writeChain;
+      for(let i=0;i<200 && state._loadInFlight;i++) await tik();
+
+      // 3. Dezelfde toevoeging vanaf de VvE-dossierpagina. Daar is de NTD-lijst niet in beeld, dus
+      //    er valt niets te tonen — en het tabblad dat de gebruiker daar achterliet hoort te blijven.
+      maakLijst();
+      state.activeNtd='LOD';
+      state.vveCode=null;                // renderVve toont dan alleen zijn lege staat
+      goTo('vve');
+      ACTIONS['vve-taak-nieuw']({ dataset:{ code:'311212', naam:'Testflat' } });
+      document.getElementById('m-actie').value='Vanuit het dossier';
+      await submitTask();
+      eq('wissel: een taak vanaf het dossier verzet het tabblad niet',
+         [state.activeNtd, D.ntd.OPPAKKEN.length], ['LOD', 31]);
+      await state._writeChain;
+      for(let i=0;i<200 && state._loadInFlight;i++) await tik();
+    } finally {
+      window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
+      state._sheetIds=idsOud; state._uitCache=cacheOud; state._syncFails=failsOud;
+      D.ntd=bewaardNtd; D.af=bewaardAf; pgs.ntd=bewaardPg;
+      state.bundelOpen=new Set(); state._nieuwBundel=null;
+      closeModal(); clearModal();
+      state.activeNtd=bewaardSec; state._ntdVoorModal=null; state.vveCode=codeOud;
+      document.querySelectorAll('.toast').forEach(el => el.remove());
+      filterVelden.forEach((id, i) => document.getElementById(id).value = fWaarden[i]);
+      state.ntdStatus=fStatus; state.ntdSort=fSort; state.bulkMode=fBulk;
+      bulkWis();
+      renderNtd(); renderBulkUi(); renderNtdStats(); goTo(paginaVoor);
     }
   })();
 

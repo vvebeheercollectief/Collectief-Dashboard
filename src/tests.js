@@ -31,7 +31,7 @@ import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from
 import { toggleHerhaalStatus } from "./render-herhaal.js";
 import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
 import { bouwBundelIndex, bundelWeergave, zichtbareKop, isBundel, bundelVan, bundelMetId, hernummerLeden, volgendeVolg, magKoppelen, wordtGeabsorbeerd, koppelKandidaten, taakFilter, openSubtaken, bundelWaarschuwing } from "./bundel.js";
-import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./render-bundel.js";
+import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra, STAPEL_GREEP } from "./render-bundel.js";
 import { vraagBevestiging, beantwoordBevestiging, _vraagStaatOpen } from "./bevestig.js";
 import { bovensteModal } from "./modal-a11y.js";
 import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkoppelTaak, herordenBundel, sleepDoel, paneelTaaknummers, sleepUitslag, initBundelSlepen } from "./bundel-acties.js";
@@ -3730,7 +3730,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '10.14');
+  eq('versie opgehoogd', APP_VERSION, '10.15');
 
   // ── Pushmeldingen: de twee schakels die stil kapot waren (audit 2026-08-06) ──
   // Beide defecten waren onzichtbaar: de app meldde "Notificaties zijn aan!" terwijl er nooit
@@ -4384,7 +4384,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
        [wordtGeabsorbeerd({ ...kopZonderNr }, ixZonderNr, 'OPPAKKEN'),
         wordtGeabsorbeerd(subZonderNr, ixZonderNr, 'OPPAKKEN')], [false, true]);
 
-    // De absorptie en het ⛓-merkje moeten elkaars exacte tegenpool blijven: precies de rijen die
+    // De absorptie en het bundel-merkje moeten elkaars exacte tegenpool blijven: precies de rijen die
     // in de vlakke lijst blijven staan krijgen een merkje. Sinds beide `wordtGeabsorbeerd`
     // gebruiken kan dat niet meer uiteenlopen; deze asserts pinnen dat vast, want als het toch
     // gebeurt is het gevolg stil (een merkje op een rij die nergens meer staat, of een rij zonder
@@ -4469,7 +4469,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   })();
 
   (() => {
-    // De HTML-kant: telpill, paneel en ⛓-merkje. De fixture is met opzet de lastige stand uit
+    // De HTML-kant: telpill, paneel en bundel-merkje. De fixture is met opzet de lastige stand uit
     // §3.3/§4.1 — de kop staat bij Vergaderverzoeken, één subtaak bij Oppakken en één afgeronde
     // subtaak bij Offerte-trajecten — want daar hangt alles aan: wat de pill telt, wat er in het
     // paneel komt en wanneer een subtaak een merkje krijgt.
@@ -4550,6 +4550,25 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     eq('merkje: subtaak met kop elders krijgt een merkje',
        bundelMerkje(s1, gestapeld, 'OPPAKKEN').includes('bundel-spring'), true);
     eq('merkje: de kop zelf krijgt geen merkje', bundelMerkje(kop, gestapeld, 'VERGADERVERZOEKEN'), '');
+
+    // ── Huisstijl: iconen uit de set, geen kale tekens ──
+    // De Takenbundel gebruikte op drie plekken een kale glyph — ⛓ voor het merkje, ⠿ voor de twee
+    // sleep-handvatten — terwijl dit project een eigen iconenset heeft (src/icons.js). Twee soorten
+    // asserts, want de één dekt de ander niet af: 'er zit een SVG in' merkt een teruggekropen glyph
+    // ernaast niet op, en 'er zit geen glyph in' is ook waar als er hélemaal niets meer staat (een
+    // vertypte icoonnaam laat `ico()` een lege string teruggeven, zonder fout).
+    const merkHtml = bundelMerkje(s1, gestapeld, 'OPPAKKEN');
+    eq('iconen: geen kale ⛓ of ⠿ meer in paneel, merkje en rij-handvat',
+       [html, merkHtml, STAPEL_GREEP].map(s => /[⛓⠿]/.test(s)), [false, false, false]);
+    eq('iconen: paneel-handvat, rij-handvat en merkje zijn alle drie een SVG',
+       [openRegel, STAPEL_GREEP, merkHtml].map(s => s.includes('<svg')), [true, true, true]);
+    // Het merkje is een échte knop en het icoon erin draagt `aria-hidden="true"` (zo levert `ico()`
+    // ze). Er is dus geen tekst meer over waar een schermlezer een naam uit kan halen: zonder de
+    // aria-label op de KNOP zou dit een naamloze knop worden. De twee handvatten is dat juist wél
+    // de bedoeling — zie de toelichting bij STAPEL_GREEP — dus die staan hier niet bij.
+    eq('iconen: het merkje houdt zijn toegankelijke naam', /aria-label="[^"]+"/.test(merkHtml), true);
+    eq('iconen: en het icoon erin telt daar niet in mee',
+       /<svg[^>]*aria-hidden="true"/.test(merkHtml), true);
   })();
 
   // ── De gestapelde rij in de tabel ──
@@ -4658,7 +4677,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       eq('bedrading: een zoekterm maakt de lijst plat — beide treffers staan er los',
          tel('tr[data-row]'), 2);
       eq('bedrading: … zonder telpill of stapelrandjes', [tel('.bdl-pill'), tel('.bdl-peek')], [0, 0]);
-      eq('bedrading: … maar mét het ⛓-merkje als enige aanwijzing',
+      eq('bedrading: … maar mét het bundel-merkje als enige aanwijzing',
          tel('[data-action="bundel-spring"]'), 2);
     } finally {
       D.ntd = bewaardNtd; D.af = bewaardAf; state.activeNtd = bewaardSec;
@@ -4668,7 +4687,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
 
   // ── Open- en dichtklappen ──
   // De twee acties apart getoetst: ze zitten alleen als data-action in de HTML (chevron en
-  // ⛓-merkje), dus een hernoemde of vergeten sleutel geeft geen fout — de knop doet dan niets.
+  // bundel-merkje), dus een hernoemde of vergeten sleutel geeft geen fout — de knop doet dan niets.
   (() => {
     eq('toggle: bundel-toggle bestaat als actie', typeof ACTIONS['bundel-toggle'], 'function');
     eq('toggle: bundel-spring bestaat als actie', typeof ACTIONS['bundel-spring'], 'function');
@@ -4744,7 +4763,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       eq('toggle: de tweede klik komt óók aan', state.bundelOpen.has('Tkop'), false);
       eq('toggle: nog een klik sluit het paneel weer', panelen(), 0);
 
-      // Het ⛓-merkje: kop in een ánder tabblad dan de subtaak, en met een filter aan. Juist die
+      // Het bundel-merkje: kop in een ánder tabblad dan de subtaak, en met een filter aan. Juist die
       // stand is waar het merkje voor bestaat: een filter maakt de lijst plat, dus er is geen
       // paneel, geen chevron en geen stapel — het merkje is dan de enige aanwijzing (§4.2).
       // Drie dingen moeten gebeuren en alleen samen leveren ze iets op: van tabblad wisselen, de
@@ -4870,11 +4889,11 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       eq('nieuw: een volledig afgeronde bundel krijgt er niets bij',
          [state._nieuwBundel, document.getElementById('modal-bg').classList.contains('open')],
          [null, false]);
-      // …maar niet zwijgend. Het ⛓-merkje op ditzelfde paneel meldt zo'n verdwenen bundel wél
+      // …maar niet zwijgend. Het bundel-merkje op ditzelfde paneel meldt zo'n verdwenen bundel wél
       // (springNaarBundel), en twee knoppen naast elkaar horen zich hetzelfde te gedragen: tot de
       // eerstvolgende render staat de knop gewoon in beeld, en een knop die niets doet én niets
       // zegt leest als een kapot dashboard.
-      eq('nieuw: en zegt waarom, net als het ⛓-merkje op hetzelfde paneel',
+      eq('nieuw: en zegt waarom, net als het bundel-merkje op hetzelfde paneel',
          [...document.querySelectorAll('.toast-title')].map(el => el.textContent)
            .includes('Deze bundel bestaat niet meer'), true);
       document.querySelectorAll('.toast').forEach(el => el.remove());
@@ -5794,6 +5813,79 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         const rijHoog=kopMeet.getBoundingClientRect().height;   // gemeten: 47
         truthy(`stapel-e2e: de tabelrij is hoger dan de aanraakhalo (rij ${rijHoog}px)`,
                rijHoog >= gMeet.height+12);
+
+        // 19-nulmeting-ter. De doos van het handvat zelf. Sinds het handvat een SVG uit icons.js is
+        //      en geen ⠿-glyph meer, brengt hij geen regelhoogte en geen tekstbasislijn mee — en
+        //      juist die twee zetten dit ding in de cel op zijn plaats. Twee regels in styles.css
+        //      vervangen ze, en allebei zijn ze alleen aan een meting te zien:
+        //        - `.stapel-h svg{display:block;margin:0 auto}` — een inline SVG gaat op de
+        //          basislijn staan en zet er onderlengte onder; gemeten wordt de doos dan 19,2px in
+        //          plaats van 14px, en dan klopt de halo-marge hierboven niet meer. De `margin`
+        //          centreert het 14px icoon in de 16px kolom; vandaar de 1px in de assert.
+        //        - `.stapel-h{vertical-align:-2px}` — zonder die staat het handvat 1,65px hoger dan
+        //          de chevron en de VvE-code waar het pal naast staat.
+        //      Beide mutaties zijn gedraaid; deze twee asserts gaan er allebei van af. Wat er
+        //      NIET bij staat is een `line-height`: die is hier gemeten inert zolang de SVG een
+        //      blok is, en een assert op een inerte regel zou een zekerheid voorspiegelen.
+        // De SVG apart en met een vangnet eromheen. `ico()` geeft bij een vertypte icoonnaam een
+        // LEGE string terug zonder fout, en dan staat de span er wel maar zonder icoon; een kale
+        // `.querySelector('svg').getBoundingClientRect()` gooit dan een TypeError midden in dit
+        // async blok. Deze suite breekt daarop af zonder samenvattingsregel — precies de val die in
+        // het rij-blok hierboven al beschreven staat. Gemeten: mét het vangnet faalt deze assert
+        // netjes en loopt de rest van blok 19/20 gewoon door.
+        const grSvg=greep(kopMeet).querySelector('svg');
+        eq('stapel-e2e: het rij-handvat meet 16 × 14px met het icoon in het midden',
+           [gMeet.width, gMeet.height,
+            grSvg ? Math.round(grSvg.getBoundingClientRect().left - gMeet.left) : 'geen icoon'],
+           [16, 14, 1]);
+        const midY=el=>{ const b=el.getBoundingClientRect(); return b.top+b.height/2; };
+        const chevY=midY(kopMeet.querySelector('.bdl-chev'));
+        truthy('stapel-e2e: handvat, chevron en VvE-code delen hun middellijn',
+               Math.abs(midY(greep(kopMeet))-chevY) < 0.5
+               && Math.abs(midY(kopMeet.querySelector('.code-klik'))-chevY) < 0.5);
+
+        // 19-nulmeting-quater. Hetzelfde handvat, maar dan in het bundelpaneel (`.bdl-h`). Zelfde
+        //      icoon op dezelfde 14px, andere doos: daar staat verticale padding omheen, en dát is
+        //      de enige reden dat de aanraakhalo op 24 + 2×6 = 36px uitkomt in plaats van op 26.
+        //      Valt die padding weg, dan krimpt het vingerdoel stil mee — de klasse blijft staan en
+        //      geen enkele bestaande assert merkt het.
+        //      De afgeronde subtaak staat er met opzet bij: die krijgt géén handvat maar een LEGE
+        //      plaatshouder, en als die niet even breed blijft verspringt de hele regel naar links.
+        //      Op de gemeten linkerrand van `.bdl-num` en niet op de breedte van de plaatshouder
+        //      zelf, want dat is wat de gebruiker ziet: staan de kolommen recht?
+        state.bundelOpen=new Set(['Tkop']);
+        const afLid=t(24,'Tc','Af-werk'); afLid.bundelId='Tkop'; afLid.bundelVolg='20';
+        D.af={ ...leeg, OPPAKKEN:[afLid] };
+        renderNtd();
+        const pRegels=[...document.querySelectorAll('#ntd-tbody .bdl-paneel .bdl-sub')];
+        eq('stapel-e2e: de open bundel toont een open en een afgerond lid',
+           pRegels.map(el=>el.classList.contains('af')), [false, true]);
+        const pGreep=(pRegels[0]||document.createElement('i')).querySelector('.bdl-h');
+        const pMeet=pGreep ? pGreep.getBoundingClientRect() : { width:-1, height:-1 };
+        eq('stapel-e2e: het paneel-handvat meet 16 × 24px', [pMeet.width, pMeet.height], [16, 24]);
+        const numX=el=>{ const n=el.querySelector('.bdl-num'); return n ? Math.round(n.getBoundingClientRect().left) : -1; };
+        truthy('stapel-e2e: de plaatshouder van het afgeronde lid houdt de kolommen recht',
+               pRegels.length===2 && numX(pRegels[0])===numX(pRegels[1]) && numX(pRegels[0])>0);
+        state.bundelOpen=new Set(); D.af={ ...leeg };
+
+        // 19-nulmeting-quinquies. Het derde icoon: het bundel-merkje. Dat bestaat alleen in de
+        //      PLATTE weergave (§4.2), vandaar de zoekterm — in de gestapelde stand hierboven staat
+        //      het er per definitie niet en valt er dus niets te meten.
+        //      Het is nu een pil om een SVG in plaats van om de ⛓-glyph, en een SVG heeft geen
+        //      tekstregel om in te staan. Zonder de `inline-flex` uit styles.css blijft het een
+        //      inline-doos op de basislijn en wordt de pil 23,2px hoog in plaats van 17 — precies
+        //      het soort verschil dat je in een tabelrij ziet als 'die pil hangt scheef'. Daarom
+        //      allebei gemeten: de maat én de middellijn t.o.v. de VvE-naam waar hij achter staat.
+        document.getElementById('s-ntd').value='werk';
+        renderNtd();
+        const merkEl=document.querySelector('#ntd-tbody .bdl-merk');
+        const mMeet=merkEl ? merkEl.getBoundingClientRect() : { width:-1, height:-1 };
+        eq('stapel-e2e: het bundel-merkje is een pil van 28 × 17px', [mMeet.width, mMeet.height], [28, 17]);
+        const merkNaam=merkEl && merkEl.closest('td') && merkEl.closest('td').querySelector('.ct');
+        truthy('stapel-e2e: en staat op dezelfde middellijn als de VvE-naam ernaast',
+               !!merkNaam && Math.abs(midY(merkEl)-midY(merkNaam)) < 0.5);
+        document.getElementById('s-ntd').value='';
+
         // Terug naar twee losse rijen; alles hieronder begint bij die beginstand.
         ({ kop, sub } = opnieuw());
         renderNtd();
@@ -6022,8 +6114,9 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         truthy('stapel-e2e: en de rijen staan er nog steeds', !!bronEl && !!doelEl);
         truthy('stapel-e2e: maar zonder sleep-handvat', !greep(bronEl) && !greep(doelEl));
         // Nu met de hand een handvat in de rij zetten, zodat de tweede rem alléén overblijft.
-        bronEl.querySelector('td').insertAdjacentHTML('afterbegin',
-          '<span class="stapel-h" data-stapel-grip="1">⠿</span>');
+        // Precies het handvat dat rowNtd zou tekenen, en geen nagebouwde span: een eigen kopie zou
+        // de dag na een wijziging in `STAPEL_GREEP` een ander element toetsen dan er in de app staat.
+        bronEl.querySelector('td').insertAdjacentHTML('afterbegin', STAPEL_GREEP);
         pak(bronEl); beweeg(doelEl);
         truthy('stapel-e2e: in platte weergave wordt de rij ook mét handvat niet opgepakt',
                !bronEl.classList.contains('sleep'));
@@ -6070,6 +6163,18 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         const dosHoog=doelEl.getBoundingClientRect().height;    // gemeten: 70
         truthy(`stapel-e2e: en de dossierrij is hoger dan de aanraakhalo (rij ${dosHoog}px)`,
                dosHoog >= dosGreep.height+12);
+        // Waar het handvat verticaal staat is hier een ánder verhaal dan in de tabel: deze rij is
+        // een grid die op BASISLIJNEN uitlijnt (`align-items:baseline`, van `.tk`), en een doos met
+        // alleen een SVG erin heeft geen tekstbasislijn. De browser leidt er dan één af uit de
+        // onderkant van de doos en het handvat schiet omhoog; `align-self:center` is óók fout, want
+        // die hangt hem aan de 28px van het ✓-knopje en zet hem 4px te laag. `align-self:start` plus
+        // 2px marge zet hem op het midden van de taaktekst — precies waar hij met de glyph stond.
+        // Alledrie de standen zijn gemeten; alleen de laatste haalt deze assert.
+        const dosNmEl=doelEl.querySelector('.nm');
+        const dosNm=dosNmEl ? dosNmEl.getBoundingClientRect() : { top:NaN, height:NaN };
+        const dosVersch=(dosGreep.top+dosGreep.height/2)-(dosNm.top+dosNm.height/2);
+        truthy(`stapel-e2e: het handvat staat op het midden van de taaktekst (${dosVersch.toFixed(2)}px ernaast)`,
+               Math.abs(dosVersch) <= 1);
         // Ook hier eerst de tegenproef: het ✓-knopje in de rij mag geen sleepactie beginnen. Sinds
         // het handvat de enige ingang is volgt dat uit dezelfde regel als voor de rest van de rij,
         // maar juist hier is het het meten waard — de rij is één grote knop naar het bewerkscherm.
@@ -6886,7 +6991,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   // ── De twee spring-meldingen mogen niet ontdubbeld worden ──
   // showToast slikt 15 seconden lang een gelijkluidende melding in. Voor deze twee is dat verkeerd:
   // het zijn geen gebeurtenissen maar uitleg bij een handeling die de gebruiker net zélf deed. Wie
-  // twee keer op een ⛓-merkje klikt, ziet de tweede keer anders zijn filters zonder één woord
+  // twee keer op een bundel-merkje klikt, ziet de tweede keer anders zijn filters zonder één woord
   // verdwijnen — of klikt twee keer op een dode bundel en krijgt de tweede keer niets.
   (() => {
     const bewaardNtd=D.ntd, bewaardAf=D.af, bewaardSec=state.activeNtd, bewaardPg=pgs.ntd;

@@ -50,6 +50,15 @@ const ICONS={
   klok:_s+'<circle cx="12" cy="13" r="8" fill="currentColor" fill-opacity="0.18"/><path d="M12 9v4l2.5 2"/><path d="M4.5 5.5l3-2M19.5 5.5l-3-2"/></svg>',
   pijlOmhoog:_s+'<path d="M12 19V5.5M5.5 12L12 5.5 18.5 12"/></svg>',
   pijlLinks:_s+'<path d="M19 12H5.5M12 5.5L5.5 12 12 18.5"/></svg>',
+  // Takenbundel. Gestapelde lagen en géén schakelketting: de stapel ís de metafoor van het
+  // ontwerp (de kop-rij krijgt 'papierrandjes' onder zich), dus het merkje hoort hetzelfde te
+  // zeggen. De bovenste laag is het accentvlak (0.35), de twee lijnen eronder zijn de rest van
+  // de stapel — zo blijft hij ook op 11px leesbaar, waar drie losse vlakken dichtslibben.
+  bundel:_s+'<path d="M12 4.2 4.4 8.1 12 12l7.6-3.9z" fill="currentColor" fill-opacity="0.35"/><path d="m4.4 12.2 7.6 3.9 7.6-3.9"/><path d="m4.4 16.1 7.6 3.9 7.6-3.9"/></svg>',
+  // Sleep-handvat. Zes bolletjes is de conventie die iedereen meteen als 'hier vastpakken'
+  // leest. Bewust gevuld en zonder lijn: met de 1.8-lijn van de set eromheen lopen bolletjes
+  // van deze maat dicht en wordt het één grijze vlek.
+  sleepGreep:_s+'<g fill="currentColor" stroke="none"><circle cx="9.3" cy="6.6" r="1.35"/><circle cx="14.7" cy="6.6" r="1.35"/><circle cx="9.3" cy="12" r="1.35"/><circle cx="14.7" cy="12" r="1.35"/><circle cx="9.3" cy="17.4" r="1.35"/><circle cx="14.7" cy="17.4" r="1.35"/></g></svg>',
 };
 // Vaste maat nodig (bv. in een knoplabel)? ico('naam', 13). Zonder maat schaalt CSS.
 const ico=(naam,maat)=>{

@@ -148,7 +148,7 @@ function zetKopOpen(aan){
 // gezocht, gefilterd, op een kolomkop gesorteerd of bulk-geselecteerd, tonen we plat.
 // Reden: een treffer mag niet verstopt zitten in een dichtgeklapte bundel, een vaste groepering
 // is in strijd met een gekozen sortering, en in bulk-modus moet élke taak aanvinkbaar zijn.
-// Plat betekent níet 'geen bundels meer': het ⛓-merkje blijft staan als aanwijzing en als weg
+// Plat betekent níet 'geen bundels meer': het bundel-merkje blijft staan als aanwijzing en als weg
 // terug (§4.2). Wat plat precies uitzet staat bij `bundelWeergave` in bundel.js.
 // Puur, dus los testbaar.
 function isPlatteWeergave({ q, fCode, beh, prio, status, sortKey, bulk }){
@@ -170,9 +170,9 @@ function erIsGefilterd({ q, fCode, beh, prio, status }){
 
 // Haal subtaken uit de vlakke lijst weg wanneer hun zichtbare kop in HETZELFDE tabblad staat —
 // die worden dan in het bundelpaneel onder die kop getekend. Staat de kop in een ander tabblad,
-// dan blijft de rij gewoon staan, met het ⛓-merkje erop (§4.1). Zo wordt elke taak per tabblad
+// dan blijft de rij gewoon staan, met het bundel-merkje erop (§4.1). Zo wordt elke taak per tabblad
 // precies één keer getoond en blijven de tellers kloppen.
-// Het predikaat zelf staat in bundel.js, gedeeld met het ⛓-merkje: precies de rijen die hier
+// Het predikaat zelf staat in bundel.js, gedeeld met het bundel-merkje: precies de rijen die hier
 // blijven staan krijgen daar een merkje, en omgekeerd (zie `wordtGeabsorbeerd`).
 // Krijgt de hele weergave en niet alleen de index, want zonder stapel is er geen paneel om
 // subtaken in op te nemen en hoeft er dus ook niets uit de lijst te verdwijnen. Die toets hoort
@@ -214,7 +214,7 @@ function openBundel(bundelId){
 // Alles wat de NTD-lijst plat maakt terug op de standaardstand. Geeft terug of er daadwerkelijk
 // iets stond, zodat de aanroeper kan uitleggen waarom het filter van de gebruiker weg is.
 // Bulk-modus staat er bewust niet bij: die zet je aan om een selectie te maken, en zo'n halve
-// selectie mag niet als bijvangst van een andere handeling sneuvelen. Daarom tekent het ⛓-merkje
+// selectie mag niet als bijvangst van een andere handeling sneuvelen. Daarom tekent het bundel-merkje
 // in bulk-modus niet eens (zie `bundelWeergave`) — dan kan deze weg daar ook niet vandaan komen.
 function wisNtdFilters(){
   let gewist = false;
@@ -227,7 +227,7 @@ function wisNtdFilters(){
   return gewist;
 }
 
-// Het ⛓-merkje: laat de bundel zien waar deze taak bij hoort.
+// Het bundel-merkje: laat de bundel zien waar deze taak bij hoort.
 //
 // Drie dingen moeten gebeuren, en alleen samen leveren ze iets op: naar het tabblad van de
 // zichtbare kop, de bundel daar openzetten, en de lijst uit de platte weergave halen. Dat laatste

@@ -61,7 +61,7 @@ export const ACTIONS = {
                                      state.ntdStatus = state.ntdStatus===s ? '' : s;
                                      pgs.ntd=1; renderNtd(); renderNtdStats(); },
   'ntd-kop-toggle':        ()   => zetKopOpen(!kopOpen()),
-  // Chevron op de kop-rij van een bundel, en het ⛓-merkje op een lid ervan. Allebei niets meer dan
+  // Chevron op de kop-rij van een bundel, en het bundel-merkje op een lid ervan. Allebei niets meer dan
   // de sleutel doorgeven: het normaliseren én het omschakelen gebeuren in render-lijsten.js, zodat
   // lezen en schrijven van `state.bundelOpen` gegarandeerd dezelfde sleutel gebruiken.
   'bundel-toggle':         (el) => toggleBundel(el.dataset.bundel),

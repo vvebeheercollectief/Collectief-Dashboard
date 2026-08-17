@@ -746,7 +746,16 @@
        bij kolom 2 en niet bij 1, zodat sectie/behandelaar en deadline onder de tekst uitlijnen in
        plaats van onder het handvat. */
     .tk-taak{display:grid;grid-template-columns:auto 1fr auto;column-gap:10px;row-gap:3px}
-    .tk-taak .stapel-h{grid-column:1;grid-row:1}
+    /* De twee regels achter `grid-row` zijn de tegenhanger van de `vertical-align:-2px` op
+       `.stapel-h`: sinds het handvat een SVG is heeft het geen tekstbasislijn meer, en deze grid
+       lijnt op basislijnen uit (`align-items:baseline`, van `.tk`). Zonder tekst leidt de browser
+       een basislijn af uit de onderkant van de doos, en dan schoot het handvat omhoog.
+       `align-self:start` zet het bovenaan de rij, de 2px marge erbij zet het op exact dezelfde plek
+       als voorheen: gemeten staat het dan 0,75px boven het midden van de taaktekst, precies waar de
+       ⠿-glyph stond. Niet `center`: die centreert op de rij-hoogte van 28px — de maat van het
+       ✓-knopje ernaast — en zet het handvat 4,25px ónder de tekst waar het bij hoort. Zonder deze
+       regel is het 2,75px erboven. Alle drie gemeten; blok 20 van tests.js houdt het vast. */
+    .tk-taak .stapel-h{grid-column:1;grid-row:1;align-self:start;margin-top:2px}
     .tk-taak .nm{grid-column:2;grid-row:1}
     .tk-taak .tk-af{grid-column:3;grid-row:1;align-self:center}
     .tk-taak .tk-onder{grid-column:2/-1;grid-row:2;min-width:0;display:flex;flex-wrap:wrap;
@@ -1260,23 +1269,34 @@ body.bulk #chat-fab{display:none}
 .bdl-sub.af .bdl-txt{text-decoration:line-through}
 .bdl-sub.sleep{opacity:.55;background:var(--sur);box-shadow:0 6px 18px rgba(0,0,0,.13)}
 /* Vaste breedte, want een afgerond lid krijgt hier een LEGE plaatshouder in plaats van het
-   ⠿-handvat (zie subRegel in render-bundel.js). Liet je de breedte aan de inhoud over, dan is die
-   plaatshouder nul breed (de padding hieronder is horizontaal 0) en schuiven nummer, bolletje en
-   tekst van élk afgerond lid ruim 9px naar links t.o.v. de open leden. */
-.bdl-h{cursor:grab;color:var(--fnt);font-size:14px;flex:none;box-sizing:border-box;width:16px;
-  padding:2px 0;text-align:center;user-select:none;touch-action:none;position:relative}
+   sleep-handvat (zie subRegel in render-bundel.js). Liet je de breedte aan de inhoud over, dan is
+   die plaatshouder nul breed (de padding hieronder is horizontaal 0) en schuiven nummer, bolletje
+   en tekst van élk afgerond lid ruim 9px naar links t.o.v. de open leden.
+   De padding is 5px en niet 2px sinds het handvat een SVG van 14px is in plaats van een ⠿-glyph:
+   die glyph bracht zijn eigen regelhoogte mee (14px letter → 19,6px regel → 23,6px doos), een SVG
+   niet. 14 + 2×5 geeft 24px terug, dus de aanraakhalo hieronder houdt zijn maat (35,6 → 36px).
+   Voor de LEGE plaatshouder van een afgerond lid is dat 10px in plaats van 4px — dat mag, want de
+   hoogte van zo'n regel wordt bepaald door zijn tekst (17,5px gemeten), niet door deze span. */
+.bdl-h{cursor:grab;color:var(--fnt);flex:none;box-sizing:border-box;width:16px;
+  padding:5px 0;user-select:none;touch-action:none;position:relative}
 .bdl-h:active{cursor:grabbing}
-/* Het handvat meet 16 × 25 px (gemeten) en is als aanraakdoel dus te smal — richtlijn is 24px+.
+/* `display:block` zodat de SVG geen inline-doos wordt: een inline replaced element gaat op de
+   basislijn staan en zet er dan nog een strook onderlengte onder — gemeten wordt deze span dan
+   28,5px hoog in plaats van 24, en dan klopt de halo hieronder niet meer. `margin:0 auto` centreert
+   de 14px SVG in de 16px kolom — dat deed `text-align:center` voor de glyph. */
+.bdl-h svg{display:block;margin:0 auto}
+/* Het handvat meet 16 × 24 px (gemeten) en is als aanraakdoel dus te smal — richtlijn is 24px+.
    Het gebied groeit met een pseudo-element in plaats van met echte maten: de vaste breedte
    hierboven houdt de kolom recht voor de lege plaatshouder van een afgerond lid, en een
    pseudo-element is zelf geen event-doel — de pointerdown komt gewoon op .bdl-h binnen, waar
-   `[data-bdl-grip]` op staat. 6px eromheen maakt er 28 × 37 van en blijft aan alle kanten binnen
-   de regel: horizontaal past het in de 9px gap naar het nummer, verticaal in de 7px padding van
-   de 40px hoge regel. Het overlapt dus geen tekst en geen buurregel. Alleen op een écht handvat:
-   de plaatshouder van een afgerond lid start geen sleepgebaar. */
+   `[data-bdl-grip]` op staat. 6px eromheen maakt er 28 × 36 van en blijft aan alle kanten binnen
+   de regel: horizontaal past het in de 9px gap naar het nummer, verticaal in de 43px hoge regel
+   (gemeten; 28px actieknoppen + 2×7px padding + de 1px scheidingslijn erboven — het handvat is met
+   zijn 24px dus niet wat deze regel hoog maakt). Het overlapt dus geen tekst en geen buurregel.
+   Alleen op een écht handvat: de plaatshouder van een afgerond lid start geen sleepgebaar. */
 .bdl-h[data-bdl-grip]::after{content:'';position:absolute;inset:-6px}
 /* De plaatshouder houdt alleen de kolom bezet; de grijp-cursor zou een sleepgebaar beloven dat er
-   voor een afgerond lid niet is. Dimmen heeft geen zin — er staat geen glyph in. */
+   voor een afgerond lid niet is. Dimmen heeft geen zin — er staat geen icoon in. */
 .bdl-sub.af .bdl-h{cursor:default}
 .bdl-num{color:var(--mut);width:13px;text-align:right;flex:none;font-size:12px}
 .bdl-dot{width:7px;height:7px;border-radius:50%;flex:none}
@@ -1290,8 +1310,18 @@ body.bulk #chat-fab{display:none}
 .bdl-addb{font-size:12px;color:var(--mut);border:1px solid var(--bor);border-radius:6px;
   padding:4px 10px;background:none;cursor:pointer}
 .bdl-addb:hover{background:var(--sur)}
-.bdl-merk{background:var(--sec-l,var(--ac-l));color:var(--sec,var(--ac));font-size:11px;
-  padding:1px 7px;border-radius:20px;cursor:pointer;border:0;margin-left:6px}
+/* De pil om het bundel-icoon. `inline-flex` + `align-items:center` in plaats van een tekstregel:
+   de knop heeft geen tekst meer, dus er is ook geen tekstregel meer om het icoon in te zetten.
+   Zonder die twee blijft de SVG een inline replaced element dat op de basislijn gaat staan, en
+   staat er een strook onderlengte onder — gemeten wordt de pil dan 23,2px hoog in plaats van 17.
+   Die 17 is de maat die hij met de ⛓-glyph ook had (gemeten 28 × 17,39): een icoon van 12px plus
+   2×2,5px en 2×8px. `font-size` staat er niet meer bij — er is geen tekst die hij nog zou schalen,
+   en een SVG met vaste width/height trekt zich er niets van aan.
+   `vertical-align:middle` omdat de pil in de naamcel tússen tekst staat; gemeten staat hij daarmee
+   op precies dezelfde middellijn als de VvE-naam ernaast. */
+.bdl-merk{background:var(--sec-l,var(--ac-l));color:var(--sec,var(--ac));
+  display:inline-flex;align-items:center;vertical-align:middle;
+  padding:2.5px 8px;border-radius:20px;cursor:pointer;border:0;margin-left:6px}
 /* Rij op rij slepen om te stapelen: de opgepakte rij dimt, de rij eronder licht op als doel.
    De terugval --sec → --ac is dezelfde als bij de rest van de bundel-opmaak: --sec/--sec-l worden
    per sectie op de NTD-kaart gezet, maar op de VvE-dossierpagina bestaan ze niet.
@@ -1311,28 +1341,42 @@ tr.stapel-doel>td{background:var(--sec-l,var(--ac-l))!important;
 .tk.sleep{opacity:.55}
 .tk.stapel-doel{background:var(--sec-l,var(--ac-l));box-shadow:inset 0 0 0 2px var(--sec,var(--ac))}
 /* Het sleep-handvat op een taakrij (STAPEL_GREEP in render-bundel.js) — de enige plek waar het
-   stapelgebaar begint. Zelfde glyph, breedte, cursor en aanraakhalo als `.bdl-h` hierboven; de
+   stapelgebaar begint. Zelfde icoon, breedte, cursor en aanraakhalo als `.bdl-h` hierboven; de
    verschillen zijn er drie: `display:inline-block` in plaats van `flex:none` (dit handvat staat in
-   een gewone tabelcel, niet in een flexregel), `line-height:1` in plaats van `padding:2px 0`, en een
-   andere kleur. Dat tweede verschil is meteen de verklaring voor de uiteenlopende gemeten hoogtes —
-   14px hier, 25px bij `.bdl-h` — en die twee getallen dragen allebei een halo-berekening, hier en in
-   het comment hierboven. In de grid van `.tk-taak` op de dossierpagina wordt het handvat vanzelf een
-   blok — grid-items worden geblokkeerd — maar het rekt niet mee: daar is het even hoog als hier
-   (14px, gemeten in blok 20 van tests.js) en houdt het zijn 16px breedte.
+   een gewone tabelcel, niet in een flexregel), géén verticale padding in plaats van `padding:5px 0`,
+   en een andere kleur. Dat tweede verschil is meteen de verklaring voor de uiteenlopende gemeten
+   hoogtes — 14px hier, 24px bij `.bdl-h` — en die twee getallen dragen allebei een halo-berekening,
+   hier en in het comment hierboven; ze staan allebei als assert in blok 19 van tests.js. In de grid
+   van `.tk-taak` op de dossierpagina wordt het handvat vanzelf een blok — grid-items worden
+   geblokkeerd — maar het rekt niet mee: daar is het even hoog als hier (14px, gemeten in blok 20
+   van tests.js) en houdt het zijn 16px breedte.
    De kleur is bewust --mut en niet de --fnt van `.bdl-h`, en dat is méér contrast en niet minder:
    --mut is in BEIDE standen de sterkere van de twee (licht #5b6675 op wit, donker #9aa1ad op
-   donker). Dat is hier ook de bedoeling — dit glyph staat op 14px in een rij vol tekst en is de
+   donker). Dat is hier ook de bedoeling — dit icoon staat op 14px in een rij vol tekst en is de
    enige ingang naar het gebaar, dus het mag opvallen. Dat --fnt op klein formaat te zwak is staat
    elders in dit bestand al twee keer vastgelegd (zie `.kop-pil.pil-dof b` en
    `.search-box input::placeholder`, allebei om die reden op --mut).
    `touch-action:none` staat hier en NERGENS anders. Dat is precies de winst van een eigen handvat:
    de browser leidt het scrollgedrag af uit het element waar de aanraking landt samen met zijn
-   voorouders, dus op dit glyph kost de regel niets, terwijl hij op de hele rij élke aanraking zou
+   voorouders, dus op dit icoon kost de regel niets, terwijl hij op de hele rij élke aanraking zou
    doodmaken voor de verticale paginascroll én voor de horizontale pan van .tbl-wrap — precies hoe je
-   op een telefoon de rechterkolommen van de takentabel bereikt. */
-.stapel-h{display:inline-block;box-sizing:border-box;width:16px;text-align:center;
-  color:var(--mut);font-size:14px;line-height:1;cursor:grab;user-select:none;touch-action:none;
+   op een telefoon de rechterkolommen van de takentabel bereikt.
+   `vertical-align:-2px` vervangt wat de ⠿-glyph gratis meebracht. Die glyph gaf de span een eigen
+   tekstbasislijn, en dáárop stonden handvat, chevron en VvE-code in de cel precies gecentreerd
+   (alle drie op hetzelfde middelpunt, gemeten). Een doos met alleen een SVG erin heeft geen
+   tekstbasislijn; de browser leidt er dan één af uit de ONDERKANT van de doos, waardoor het handvat
+   1,65px omhoog schoot t.o.v. zijn buren. De -2px zet hem terug — gemeten staan de drie daarmee
+   weer op hetzelfde middelpunt. Er staat bewust géén `line-height` bij: zolang de SVG hieronder
+   `display:block` is heeft deze span helemaal geen regel, en dan doet regelhoogte niets (gemeten:
+   met `line-height:1` erbij verandert er niets aan de doos). */
+.stapel-h{display:inline-block;box-sizing:border-box;width:16px;
+  vertical-align:-2px;color:var(--mut);cursor:grab;user-select:none;touch-action:none;
   position:relative}
+/* Zelfde reden als bij `.bdl-h svg`: block, want een inline SVG gaat op de basislijn staan en zet
+   er nog een strook onderlengte onder — gemeten wordt de doos dan 19,2px in plaats van 14px, en
+   daarmee klopt de halo-marge hieronder niet meer. `margin:0 auto` centreert de 14px SVG in de 16px
+   kolom, wat hier eerder `text-align:center` deed. */
+.stapel-h svg{display:block;margin:0 auto}
 .stapel-h:active{cursor:grabbing}
 /* Zelfde aanraakhalo-truc als bij `.bdl-h`: het handvat meet 16 × 14 px (gemeten) en is als
    aanraakdoel dus te klein — richtlijn is 24px+. Het gebied groeit met een pseudo-element in plaats

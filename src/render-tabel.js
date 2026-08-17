@@ -167,7 +167,7 @@ function rowNtd(r,sec){
   const _isKop = !!(_bw && _bw.stapel && _kop && zelfdeTaak(_kop.r, r));
   const _extra = _isKop ? bundelKopExtra(_leden, _kop) : { chevron:'', pill:'', open:false };
   const bdlChev = _extra.chevron;
-  // Op de kop de telpill; verder het ⛓-merkje — wie dat krijgt beslist bundelMerkje zelf.
+  // Op de kop de telpill; verder het bundel-merkje — wie dat krijgt beslist bundelMerkje zelf.
   const bdlNaam = _isKop ? _extra.pill : bundelMerkje(r, _bw, sec);
   // Het sleep-handvat om deze rij onder een andere te hangen. Het hangt aan dezelfde `stapel`-vlag
   // als de rest van de gestapelde weergave: bij een zoekterm, filter, kolomsortering of

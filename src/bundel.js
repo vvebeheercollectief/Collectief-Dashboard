@@ -82,7 +82,7 @@ export function bouwBundelIndex(ntd, af){
 //    paneel én de absorptie van subtaken uit de vlakke lijst. Dat gaat uit zodra de lijst plat is
 //    (zoeken, filteren, kolomsortering, bulk): een treffer mag niet verstopt zitten in een
 //    dichtgeklapte bundel en een vaste groepering is in strijd met een gekozen sortering (§4.2).
-//  - `merk` (het ⛓-merkje) blijft in platte weergave juist wél staan — daar is het volgens §4.2 de
+//  - `merk` (het bundel-merkje) blijft in platte weergave juist wél staan — daar is het volgens §4.2 de
 //    ENIGE aanwijzing dat een taak bij een bundel hoort. Een eerdere versie loste 'plat' op door de
 //    index leeg te maken; dat zette met de stapel ook het merkje uit, en dan was een bundel vanuit
 //    een gefilterde lijst helemaal niet meer te bereiken.
@@ -149,7 +149,7 @@ export const zelfdeTaak = (a, b) => {
 //
 // Eén predikaat voor twee beslissingen die elkaars exacte tegenpool MOETEN blijven: `absorbeer`
 // (render-lijsten.js) haalt de rij uit de lijst, `bundelMerkje` (render-bundel.js) laat het
-// ⛓-merkje juist weg. Leidde elk dat zelf af, dan lopen ze bij de eerstvolgende wijziging stil
+// bundel-merkje juist weg. Leidde elk dat zelf af, dan lopen ze bij de eerstvolgende wijziging stil
 // uit elkaar: een merkje op een rij die nergens meer staat, of een rij die blijft staan zonder
 // enige aanwijzing dat hij bij een bundel hoort. Beide gevallen geven geen fout — ze zien er
 // alleen verkeerd uit.
@@ -255,7 +255,7 @@ export function openSubtaken(index, r){
 // Op het SCHERM is er wél een gat, en de melding belooft daar niets over: `doCompleteTask` haalt de
 // rij optimistisch uit D.ntd en zet hem niet in D.af. Bij een bundel van twee zakt de index daardoor
 // naar één lid, waarmee `isBundel` false wordt — de overgebleven subtaak toont zich dan een paar
-// seconden als gewone rij, zonder paneel en zonder ⛓, tot de `loadAll(true)` ná de schrijfactie hem
+// seconden als gewone rij, zonder paneel en zonder merkje, tot de `loadAll(true)` ná de schrijfactie hem
 // uit 'Afgerond' terugleest. Dat komt uit fase C en staat hier alleen genoteerd zodat een latere
 // lezer het niet als storing aanziet.
 //

@@ -32,8 +32,8 @@ const tekst = bundelSleutel;
 // een gebruiker het gebaar op de ene lijst anders ziet werken dan op de andere, terwijl het
 // dezelfde handeling is; bovendien hangt het attribuut aan de sleepcode, niet aan de lijst.
 //
-// Dezelfde ⠿-glyph als het handvat in het bundelpaneel (`.bdl-h`), want het is voor de gebruiker
-// hetzelfde soort ding: pak hier op om te slepen.
+// Hetzelfde `sleepGreep`-icoon als het handvat in het bundelpaneel (`.bdl-h`), en op dezelfde maat
+// (14), want het is voor de gebruiker hetzelfde soort ding: pak hier op om te slepen.
 //
 // `aria-hidden`, net als bij `.bdl-h`: het handvat draagt geen eigen actie, alleen een
 // aanwijzer-gebaar, en een schermlezer zou hier dus een element aankondigen dat met het toetsenbord
@@ -48,9 +48,14 @@ const tekst = bundelSleutel;
 // dossierpagina is dat het bewerkscherm (de rij draagt daar `data-action="taak-bewerken"`), in de
 // takentabel het uitklappen van de volledige tekst. Beide delegaties slaan een element met een eigen
 // `data-action` over, dus dit ene attribuut maakt het handvat voor allebei inert.
+//
+// De `aria-hidden` hierboven blijft op de SPAN staan, ook al draagt de SVG die `ico()` levert er
+// zelf ook één. Dat is geen dubbelop: aria-hidden dekt het element en zijn subboom, en de SPAN met
+// zijn `title` valt daar niet onder. Wie hem hier weghaalt omdat "het icoon hem al heeft", zet de
+// title dus alsnog terug in de toegankelijkheidsboom — precies wat de vorige alinea niet wil.
 export const STAPEL_GREEP =
   `<span class="stapel-h" data-stapel-grip="1" data-action="stapel-greep"`
-  + ` title="Sleep om onder een andere taak te hangen" aria-hidden="true">⠿</span>`;
+  + ` title="Sleep om onder een andere taak te hangen" aria-hidden="true">${ico('sleepGreep',14)}</span>`;
 
 // Stand van de bundel: alles behalve de zichtbare kop zelf — dus precies wat in het paneel staat.
 // Zo blijft het getal stabiel terwijl een bundel vordert en de kop doorschuift.
@@ -92,7 +97,7 @@ function subRegel(m, i){
   if (m.af){
     // `data-taak` óók hier: een afgerond lid is bij het hernummeren een VAST ANKER
     // (zie hernummerLeden), dus de sleepcode moet hem in de volgorde kunnen terugvinden.
-    // Maar géén ⠿-handvat — een afgerond lid slepen zou niets doen, en een dood handvat
+    // Maar géén sleep-handvat — een afgerond lid slepen zou niets doen, en een dood handvat
     // belooft iets wat de functie niet waarmaakt. De lege plaatshouder houdt de kolommen recht
     // omdat `.bdl-h` in styles.css een VASTE breedte heeft; haalt iemand die weg, dan krimpt deze
     // span tot niets (de padding daar is horizontaal 0) en verspringt elke afgeronde regel
@@ -109,7 +114,7 @@ function subRegel(m, i){
   // muisgebaar. Herordenen met het toetsenbord kan dus (nog) niet — die weg hoort bij het slepen
   // zelf en moet daar bewust gekozen worden, niet stil overgeslagen.
   return `<div class="bdl-sub" data-taak="${esc(tekst(r.taakId))}">`
-       + `<span class="bdl-h" data-bdl-grip="1" title="Sleep om de volgorde te wijzigen" aria-hidden="true">⠿</span>`
+       + `<span class="bdl-h" data-bdl-grip="1" title="Sleep om de volgorde te wijzigen" aria-hidden="true">${ico('sleepGreep',14)}</span>`
        + `<span class="bdl-num">${i+1}</span>`
        + `<span class="bdl-dot" style="background:${kleur}"></span>`
        + `<button type="button" class="bdl-txt" data-action="taak-bewerken" data-rid="${rid}" title="Bewerken">${esc(taakTitel(r))}</button>`
@@ -132,7 +137,7 @@ export function bundelPaneelHtml(leden, kop){
        + `</div>`;
 }
 
-// Het ⛓-merkje op een taakrij. Krijgt `bw` (uit `bundelWeergave`) en niet los de index, want de
+// Het bundel-merkje op een taakrij. Krijgt `bw` (uit `bundelWeergave`) en niet los de index, want de
 // vraag "krijgt deze rij een merkje" hangt van álle drie de onderdelen daarvan af — en het antwoord
 // hoort op één plek te staan, niet half hier en half bij de aanroeper.
 //
@@ -159,5 +164,8 @@ export function bundelMerkje(r, bw, sec){
   }
   const titel = (zelfdeTaak(kop.r, r) ? `Bundel van ${leden.length} taken` : `Hoort bij: ${taakTitel(kop.r)}`)
               + ' — klik om de bundel te openen';
-  return `<button type="button" class="bdl-merk" data-action="bundel-spring" data-bundel="${esc(tekst(r.bundelId))}" title="${esc(titel)}" aria-label="${esc(titel)}">⛓</button>`;
+  // De `aria-label` blijft nodig: het icoon dat `ico()` levert draagt zelf `aria-hidden="true"`, dus
+  // zonder dat label heeft deze knop géén toegankelijke naam meer (de `title` alleen is een zwakke
+  // laatste terugval die niet elke schermlezer voorleest).
+  return `<button type="button" class="bdl-merk" data-action="bundel-spring" data-bundel="${esc(tekst(r.bundelId))}" title="${esc(titel)}" aria-label="${esc(titel)}">${ico('bundel',12)}</button>`;
 }

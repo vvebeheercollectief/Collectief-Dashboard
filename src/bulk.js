@@ -3,7 +3,7 @@
 // ══════════════════════════════════════
 import { state, D } from "./state.js";
 import { renderNtd } from "./render-lijsten.js";
-import { toDutchDate, berekenPrioriteit, _parseAnyDate, _vandaagAmsterdam, _verschilInKalenderdagen, parseDt } from "./util.js";
+import { toDutchDate, berekenPrioriteit, _parseAnyDate, _vandaagAmsterdam, _verschilInKalenderdagen, parseDt, kiesAfgerondRij } from "./util.js";
 import { SECS, SID } from "./config.js";
 import { ensureToken } from "./auth.js";
 import { _shiftNtdRows, _herstelShift, assertRowsMatch, _veiligeRij } from "./api.js";
@@ -156,15 +156,17 @@ function bulkAfronden(rows){
     });
   },'Bulk-afronden mislukt');
 }
-// Pure helper (testbaar): kies per item de ZOJUIST afgeronde Afgerond-rij — de nieuwste op
-// code. afPerSec[sec] is nieuwste-eerst gesorteerd (zoals D.af in data.js), dus de eerste
-// code-match is de nieuwste. Claim per rij zodat twee items met dezelfde code verschillende
-// rijen pakken. Resultaat hoog→laag _row, zodat verwijderen de indexen niet door elkaar schuift.
+// Pure helper (testbaar): kies per item de ZOJUIST afgeronde Afgerond-rij. De keuze zelf staat in
+// `kiesAfgerondRij` (util.js) en is gedeeld met de losse undo in notifications.js: eerst op het
+// vaste taaknummer uit `ntdValues[16]`, en pas als dat er niet is op de VvE-code binnen de
+// nieuwste-eerst gesorteerde lijst. Op code alleen is dat een gok zodra twee afrondingen van
+// dezelfde VvE op dezelfde dag in dezelfde sectie staan — zie de toelichting bij die functie.
+// Claim per rij zodat twee items met dezelfde code verschillende rijen pakken.
+// Resultaat hoog→laag _row, zodat verwijderen de indexen niet door elkaar schuift.
 function _bulkUndoAfDoelRijen(items, afPerSec){
   const claimed=new Set(), doel=[];
   for(const it of items){
-    const entries=afPerSec[it.sec]||[];
-    const r=entries.find(x=>x.code===it.code && !claimed.has(x));
+    const r=kiesAfgerondRij(afPerSec[it.sec]||[], (it.ntdValues||[])[16], it.code, claimed);
     if(r){ claimed.add(r); doel.push(r); }
   }
   return doel.sort((a,b)=>b._row-a._row);

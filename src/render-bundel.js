@@ -16,7 +16,7 @@
 // niet, terwijl elke bundel-toggle, sortering, paginawissel en toetsaanslag in het zoekveld een
 // renderNtd is. Dat kost geheugen, geen correctheid; behandel `state._rowCache` daarom niet als
 // een eindige of volledige lijst van wat er nú op het scherm staat.
-import { esc, taakTitel, kortDatum, taakActieKnoppen } from "./util.js";
+import { esc, taakTitel, kortDatum, taakActieKnoppen, opvolgStatus, berekenPrioriteit } from "./util.js";
 import { SECS } from "./config.js";
 import { zichtbareKop, bundelVan, wordtGeabsorbeerd, bundelSleutel, zelfdeTaak } from "./bundel.js";
 import { ico } from "./icons.js";
@@ -41,8 +41,11 @@ const tekst = bundelSleutel;
 // `aria-hidden`, net als bij `.bdl-h`: het handvat draagt geen eigen actie, alleen een
 // aanwijzer-gebaar, en een schermlezer zou hier dus een element aankondigen dat met het toetsenbord
 // niets doet. Anders dan bij het herordenen is er hier wél een volwaardige weg zonder muis: het
-// veld 'Hoort bij' in het bewerkscherm (§6.1) maakt exact dezelfde koppeling en is gewoon met de
-// Tab-toets te bereiken. De `title` blijft staan voor wie met de muis over het handvat gaat.
+// veld 'Hoort bij' in het bewerkscherm (§6.1) maakt exact dezelfde koppeling. Dat veld is met Tab
+// te bereiken én de suggestielijst eronder is met ↓/↑ en Enter te bedienen (`initVveZoekveld`,
+// vve-zoekveld.js) — die tweede helft ontbrak, en zonder haar was deze zin een lege belofte: de
+// koppeling loopt uitsluitend via `state._hbDoel`, en dat werd alleen door een muisklik gezet.
+// De `title` blijft staan voor wie met de muis over het handvat gaat.
 //
 // De `data-action` is met opzet een lege actie (zie ACTIONS in actions.js). Een handvat hoort
 // alleen te slepen: pak je hem op en laat je weer los zónder te verplaatsen, dan volgt er een gewone
@@ -118,16 +121,37 @@ function subRegel(m, i){
   // een die nog vrij lag. Een stil label en nadrukkelijk geen knop: het zegt iets, het doet niets —
   // de knoppenrij rechts is al vol en dit is achtergrondinformatie, geen handeling.
   const ibPil = r.inBehandeling === 'TRUE' ? `<span class="bdl-ib">In behandeling</span>` : '';
+  // 'Weggelegd' bestaat in de TABEL als een eigen groep onderaan de lijst, met een gedempte rij en
+  // een pil met de opvolgdatum. In het paneel bestaat die groep niet — sterker nog, `absorbeer`
+  // haalt de rij uit de vlakke lijst, dus hij komt daar ook niet meer in de groep 'Weggelegd'
+  // terecht. Zonder deze pil stond een subtaak die tot volgende maand geparkeerd is er dus precies
+  // zo bij als werk dat nu moet gebeuren, terwijl de teller in de paginakop hem wél als weggelegd
+  // meetelt. Dezelfde bron als de tabelrij (`opvolgStatus`), zodat 'weggelegd' hier en daar
+  // hetzelfde betekent, en dezelfde actie op de pil — in de tabel is dat de snelle weg om de
+  // opvolgdatum aan te passen, en dat hoort hier niet anders te werken.
+  const ov = opvolgStatus(r);
+  const snoozePil = ov.weggelegd
+    ? `<span class="pill-snooze" data-action="taak-wegleggen" data-rid="${rid}" title="Weggelegd tot ${esc(r.opvolgdatum)}">${ico('pauze',11)}${esc(kortDatum(r.opvolgdatum))}</span>`
+    : '';
+  // De deadline via dezelfde berekening als de tabel (`deadlineCel` → `berekenPrioriteit`), en niet
+  // als kale datum. Een kale datum liet achterstallig werk er in het paneel precies zo uitzien als
+  // werk dat nog ruim op tijd is: de kop-pil zei 'N te laat' terwijl er in de hele lijst geen enkele
+  // rij te zien was die dat liet zien. Eén bron voor 'wat is te laat', dus alleen opmaak hier.
+  const prio = berekenPrioriteit(r.deadline, r._sec);
+  const dlTekst = !r.deadline
+    ? `<span class="warn-geen-deadline">Geen deadline</span>`
+    : (prio.teLaat ? `<span class="s-telaat">Te laat (${Math.abs(prio.dagenTot)}d)</span>`
+                   : esc(kortDatum(r.deadline)));
   // Het handvat is voor een schermlezer verborgen: het draagt geen eigen actie, alleen een
   // muisgebaar. Herordenen met het toetsenbord kan dus (nog) niet — die weg hoort bij het slepen
   // zelf en moet daar bewust gekozen worden, niet stil overgeslagen.
-  return `<div class="bdl-sub" data-taak="${esc(tekst(r.taakId))}">`
+  return `<div class="bdl-sub${ov.weggelegd?' snooze-row':''}" data-taak="${esc(tekst(r.taakId))}">`
        + `<span class="bdl-h" data-bdl-grip="1" title="Sleep om de volgorde te wijzigen" aria-hidden="true">${ico('sleepGreep',14)}</span>`
        + `<span class="bdl-num">${i+1}</span>`
        + `<span class="bdl-dot" style="background:${kleur}"></span>`
        + `<button type="button" class="bdl-txt" data-action="taak-bewerken" data-rid="${rid}" title="Bewerken">${esc(taakTitel(r))}</button>`
-       + ibPil
-       + `<span class="bdl-meta">${esc(label)}${r.deadline?' · '+esc(kortDatum(r.deadline)):''}</span>`
+       + ibPil + snoozePil
+       + `<span class="bdl-meta">${esc(label)} · ${dlTekst}</span>`
        // Exact dezelfde drie knoppen als op een tabelrij, uit één helper: ze staan op hetzelfde
        // scherm pal onder elkaar, dus een eigen variant hier zou meteen als verschil opvallen.
        + `<span class="bdl-acts">${taakActieKnoppen(rid)}</span></div>`;

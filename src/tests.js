@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { taakTitel, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel } from "./util.js";
+import { taakTitel, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel, kiesAfgerondRij } from "./util.js";
 import { verwerkMeldingRijen, toonMeldingen, MAX_TOAST_BURST, _whoSleutel, getCurrentWho } from "./notifications.js";
 import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek, logEvents, renderOntw } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM } from "./config.js";
@@ -999,6 +999,51 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('bulkUndoAf: geen match → geen doelrij', (()=>{
     const afPerSec={OPPAKKEN:[{code:'X',_row:4}]};
     return _bulkUndoAfDoelRijen([{sec:'OPPAKKEN',code:'A'}],afPerSec).length===0;
+  })());
+
+  // ── De Afgerond-rij kiezen: op TAAKNUMMER, niet op code + datum ──
+  // Beide undo-wegen (undoComplete in notifications.js en de bulk-undo hierboven) WISSEN een rij in
+  // het archief. Op code kiezen leunt erop dat de lijst nieuwste-eerst gesorteerd is, en dat kan de
+  // vraag niet beantwoorden zodra er twee afrondingen van dezelfde VvE op dezelfde dag in dezelfde
+  // sectie staan: de datum-comparator geeft dan 0, Array.sort is stabiel, dus beslist de FYSIEKE
+  // bladvolgorde. En die is niet aan de datum gekoppeld — getAfInsertRow plakt een nieuwe rij achter
+  // het laatste lid van een op datum gesorteerde lijst, dus achter het OUDST gedateerde. Uitkomst:
+  // een oudere afronding verdwijnt én de zojuist afgeronde taak staat dubbel. De rij-guard eronder
+  // vangt dat niet; die bevestigt alleen dat de gekozen rij nog op zijn plek staat.
+  // Sinds de Takenbundel staat het vaste taaknummer óók in kolom Q van 'Afgerond' (afrondWaarden)
+  // en zit het in de undo-gegevens (ntdValues[16]) — dus is er een echte identiteit om op te kiezen.
+  truthy('afrij: het taaknummer wint van de code', (()=>{
+    const rijen=[{code:'A',_row:3,datum:'1 jun 2026',taakId:'Toud'},      // ouder, maar fysiek eerst
+                 {code:'A',_row:10,datum:'1 jun 2026',taakId:'Tnieuw'}];  // dít is de zojuist afgeronde
+    const r=kiesAfgerondRij(rijen,'Tnieuw','A');
+    return !!r && r._row===10;
+  })());
+  truthy('afrij: zonder taaknummer blijft de code de terugval', (()=>{
+    const rijen=[{code:'A',_row:4},{code:'B',_row:6}];
+    const r=kiesAfgerondRij(rijen,'','A');
+    return !!r && r._row===4;
+  })());
+  truthy('afrij: een taaknummer dat in het archief niet voorkomt valt óók terug op de code', (()=>{
+    // Rijen van vóór deze functie hebben geen kolom Q, en de legacy onEdit-trigger schrijft er zijn
+    // eigen archiefrijen bij. Zonder deze terugval zou een undo dáár stil niets meer wissen.
+    const rijen=[{code:'A',_row:4}];
+    const r=kiesAfgerondRij(rijen,'Tweg','A');
+    return !!r && r._row===4;
+  })());
+  truthy('afrij: een al geclaimde rij telt niet meer mee', (()=>{
+    const eerste={code:'A',_row:10}, tweede={code:'A',_row:5};
+    const bezet=new Set([eerste]);
+    return kiesAfgerondRij([eerste,tweede],'','A',bezet)===tweede;
+  })());
+  truthy('afrij: niets gevonden geeft null', () => true && kiesAfgerondRij([{code:'X',_row:1}],'T1','A')===null);
+  // En dezelfde regel via de bulk-weg, want die geeft het nummer uit `ntdValues[16]` door — één
+  // index ernaast en de keuze valt stil terug op de code zonder dat er iets afgaat.
+  truthy('bulkUndoAf: twee afrondingen van dezelfde VvE op dezelfde dag → het taaknummer beslist', (()=>{
+    const afPerSec={OPPAKKEN:[{code:'A',_row:3,datum:'1 jun 2026',taakId:'Toud'},
+                              {code:'A',_row:10,datum:'1 jun 2026',taakId:'Tnieuw'}]};
+    const vals=[]; vals[16]='Tnieuw';
+    const doel=_bulkUndoAfDoelRijen([{sec:'OPPAKKEN',code:'A',ntdValues:vals}],afPerSec);
+    return doel.length===1 && doel[0]._row===10;
   })());
 
   // ── parseSections: legacy 5-koloms Afgerond-rijen (oude onEdit-vinkjes, datum op kolom E) ──
@@ -4615,6 +4660,46 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const afHtml = bundelPaneelHtml(bouwBundelIndex(bronNtd, { ...bronAf, OPPAKKEN:[afIb] }).get('Tkop'),
                                     zichtbareKop(bouwBundelIndex(bronNtd, { ...bronAf, OPPAKKEN:[afIb] }).get('Tkop')));
     eq('paneel: een afgerond lid krijgt het label nooit', afHtml.includes('bdl-ib'), false);
+    // 3c. Wegleggen. In de TABEL verhuist zo'n taak naar een eigen groep onderaan de lijst, met een
+    //     gedempte rij en een pil met de opvolgdatum. In het paneel bestaat die groep niet — sterker
+    //     nog, `absorbeer` haalt de rij uit de vlakke lijst, dus hij komt daar ook niet meer in die
+    //     groep terecht. Zonder eigen pil stond een subtaak die tot volgend jaar geparkeerd is er
+    //     precies zo bij als werk dat nu moet gebeuren, terwijl de pil in de paginakop hem wél als
+    //     'weggelegd' meetelde: de teller klopte niet met de lijst eronder.
+    //     Door de HTML heen parsen en niet op de string splitsen: de klasse staat vóór `data-taak`,
+    //     dus een split op dat attribuut laat juist de demping die hier getoetst wordt buiten beeld.
+    const paneelMet = (extra) => {
+      const l = bouwBundelIndex({ ...bronNtd, OPPAKKEN:[s1, extra] }, bronAf).get('Tkop');
+      const host = document.createElement('div');
+      host.innerHTML = bundelPaneelHtml(l, zichtbareKop(l));
+      return host;
+    };
+    const regelVan = (host, taakId) => host.querySelector(`.bdl-sub[data-taak="${taakId}"]`);
+    const wgSub = t('Twg','Tkop','30','OPPAKKEN','Tot volgend jaar'); wgSub.opvolgdatum='1-1-2099';
+    const wgHost = paneelMet(wgSub), wgRegel = regelVan(wgHost, 'Twg');
+    truthy('paneel: een weggelegde subtaak draagt de wegleg-pil',
+           !!wgRegel && !!wgRegel.querySelector('.pill-snooze'));
+    truthy('paneel: … met dezelfde actie als in de tabel, zodat de datum ook hier te wijzigen is',
+           !!wgRegel && (wgRegel.querySelector('.pill-snooze')||{}).dataset?.action === 'taak-wegleggen');
+    truthy('paneel: … en de regel zelf is gedempt, net als de tabelrij',
+           !!wgRegel && wgRegel.classList.contains('snooze-row'));
+    truthy('paneel: een subtaak zónder opvolgdatum krijgt geen van beide',
+           !regelVan(wgHost,'Tb').querySelector('.pill-snooze')
+           && !regelVan(wgHost,'Tb').classList.contains('snooze-row'));
+
+    // 3d. Te laat. De meta-regel toonde een KALE datum, terwijl de tabelrij via `deadlineCel` een
+    //     'Te laat (Xd)' neerzet. Omdat `absorbeer` de rij uit de vlakke lijst haalt, was er binnen
+    //     dat tabblad geen enkele plek meer waar die status te zien was: de kop-pil zei 'N te laat'
+    //     en er stond geen enkele rij in beeld die het liet zien.
+    const laatSub = t('Tlaat','Tkop','30','OPPAKKEN','Had al af gemoeten'); laatSub.deadline='1-1-2026';
+    const laatHost = paneelMet(laatSub);
+    truthy('paneel: een te late subtaak wordt als te laat gemarkeerd',
+           /^Te laat \(\d+d\)$/.test((regelVan(laatHost,'Tlaat').querySelector('.s-telaat')||{}).textContent||''));
+    truthy('paneel: een subtaak die nog op tijd is niet',
+           !regelVan(laatHost,'Tb').querySelector('.s-telaat'));
+    const geenDl = t('Tgeen','Tkop','30','OPPAKKEN','Zonder deadline'); geenDl.deadline='';
+    truthy('paneel: en zonder deadline dezelfde amber waarschuwing als in de tabel',
+           !!regelVan(paneelMet(geenDl),'Tgeen').querySelector('.warn-geen-deadline'));
     // 4. Of er gestapeld wordt beslist rowNtd op één vlag (`stapel` uit bundelWeergave); deze
     //    functie heeft daar geen eigen mening over en krijgt bij een platte render simpelweg geen
     //    beurt. Wat hij wél moet overleven is een lege index — bij een vroege render zijn de
@@ -5957,10 +6042,21 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
             grSvg ? Math.round(grSvg.getBoundingClientRect().left - gMeet.left) : 'geen icoon'],
            [16, 14, 1]);
         const midY=el=>{ const b=el.getBoundingClientRect(); return b.top+b.height/2; };
-        const chevY=midY(kopMeet.querySelector('.bdl-chev'));
+        const chevEl=kopMeet.querySelector('.bdl-chev');
+        const chevY=midY(chevEl);
         truthy('stapel-e2e: handvat, chevron en VvE-code delen hun middellijn',
                Math.abs(midY(greep(kopMeet))-chevY) < 0.5
                && Math.abs(midY(kopMeet.querySelector('.code-klik'))-chevY) < 0.5);
+        // De chevron meet 22 × 18px en is als aanraakdoel dus te klein (richtlijn 24px+), net als
+        // het merkje verderop — terwijl de twee sleep-handvatten in hetzelfde blok daar wél een halo
+        // voor kregen. Op een telefoon is dit de ENIGE manier om een bundel open en dicht te klappen.
+        // De halo zelf zit in een @media(pointer:coarse)-blok en is op een muis-testronde niet te
+        // méten; wat hier wél te meten valt is het ANKER — zonder `position:relative` hangt dat
+        // pseudo-element aan een willekeurige voorouder en landt het raakvlak ergens anders in de
+        // rij. De regel zelf wordt bij het merkje in de stylesheet opgezocht.
+        eq('stapel-e2e: de chevron meet 22 × 18px en is het anker voor zijn aanraakhalo',
+           [Math.round(chevEl.getBoundingClientRect().width), Math.round(chevEl.getBoundingClientRect().height),
+            getComputedStyle(chevEl).position], [22, 18, 'relative']);
 
         // 19-nulmeting-quater. Hetzelfde handvat, maar dan in het bundelpaneel (`.bdl-h`). Zelfde
         //      icoon op dezelfde 14px, andere doos: daar staat verticale padding omheen, en dát is
@@ -6019,6 +6115,39 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         const merkEl=document.querySelector('#ntd-tbody .bdl-merk');
         const mMeet=merkEl ? merkEl.getBoundingClientRect() : { width:-1, height:-1 };
         eq('stapel-e2e: het bundel-merkje is een pil van 28 × 17px', [mMeet.width, mMeet.height], [28, 17]);
+        // 28 × 17 en de chevron 22 × 18: allebei onder de 24px-richtlijn voor een aanraakdoel,
+        // terwijl de twee sleep-handvatten in hetzelfde blok daar wél een halo voor kregen en de
+        // actieknoppen ernaast onder pointer:coarse naar 36 × 36 groeien. Op een telefoon is de
+        // chevron de enige manier om een bundel open en dicht te klappen en het merkje volgens §4.2
+        // 'de enige weg terug' naar de gestapelde weergave; misklikken landt op de VvE-code, en die
+        // opent het VvE-dossier.
+        // De halo zelf staat in een @media(pointer:coarse)-blok en is op een muis-testronde dus niet
+        // te méten. Daarom twee toetsen die er wél bij kunnen: de gerenderde `position:relative` —
+        // zonder dat anker landt het raakvlak bij een willekeurige voorouder in plaats van om de
+        // knop heen — en de regel zelf, opgezocht in de stylesheet. Samen dekken ze allebei de
+        // helften die los van elkaar stil kunnen sneuvelen.
+        // Het merkje hier; de chevron staat in de GESTAPELDE weergave en is in deze platte render
+        // per definitie niet aanwezig (§4.2), dus die krijgt zijn eigen assert hierboven.
+        eq('stapel-e2e: het merkje is het anker voor zijn eigen aanraakhalo',
+           merkEl && getComputedStyle(merkEl).position, 'relative');
+        const coarseRegels=(()=>{
+          const uit=[];
+          for(const blad of document.styleSheets){
+            let regels; try{ regels=blad.cssRules; }catch(_){ continue; }   // vreemde origin
+            for(const r of regels||[]){
+              if(r.type===CSSRule.MEDIA_RULE && /coarse/.test(r.conditionText||''))
+                for(const k of r.cssRules||[]) uit.push(k.selectorText||'');
+            }
+          }
+          return uit;
+        })();
+        truthy('stapel-e2e: en krijgen op een aanraakscherm allebei een grotere klikzone',
+               coarseRegels.includes('.bdl-chev::after') && coarseRegels.includes('.bdl-merk::after'));
+        // Tegenproef: de opzoeker moet ook echt iets kunnen vinden. Zonder deze assert zou een
+        // onleesbare stylesheet of een gewijzigde media-vraag een lege lijst opleveren en zou de
+        // toets hierboven stil altijd rood — of, na een 'reparatie', stil altijd groen — staan.
+        truthy('stapel-e2e: de stylesheet-opzoeker las een niet-leeg coarse-blok',
+               coarseRegels.includes('.cb::before'));
         const merkNaam=merkEl && merkEl.closest('td') && merkEl.closest('td').querySelector('.ct');
         truthy('stapel-e2e: en staat op dezelfde middellijn als de VvE-naam ernaast',
                !!merkNaam && Math.abs(midY(merkEl)-midY(merkNaam)) < 0.5);
@@ -6565,6 +6694,50 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       eq('hoortbij: het veld leegmaken laat de keuze los', state._hbDoel, null);
       eq('hoortbij: en het kruisje verdwijnt, want er ligt geen koppeling onder',
          wisKnop.style.display, 'none');
+
+      // 2b. Dezelfde keuze, maar dan ZONDER MUIS. Koppelen loopt uitsluitend via `state._hbDoel`,
+      //     en dat werd alleen door `onSelect` gezet — dus door een klik. Er bestond dus geen
+      //     toetsenbordweg om een taak onder een andere te hangen: slepen kan zonder muis al niet,
+      //     en dít was in §6.3 en in het comment bij STAPEL_GREEP juist het alternatief dat dat
+      //     goedpraatte. De suggesties waren kale div's: geen rol, geen id, geen toetsafhandeling
+      //     behalve Escape.
+      //     Met de ECHTE toetsen en niet met `onSelect` rechtstreeks: het gat zat precies tussen
+      //     de toets en die aanroep, dus een test die `onSelect` aanroept meet het niet.
+      ({ kop, sub } = opnieuw());
+      openModal(true, sub);
+      const sugLijst=document.getElementById('m-hoortbij-sug');
+      const toets=(k)=>veld.dispatchEvent(new KeyboardEvent('keydown',{ key:k, bubbles:true, cancelable:true }));
+      veld.value='Kop';
+      veld.dispatchEvent(new Event('input', { bubbles:true }));
+      eq('hoortbij: het veld is een combobox die zegt dat zijn lijst openstaat',
+         [veld.getAttribute('role'), veld.getAttribute('aria-expanded'),
+          veld.getAttribute('aria-controls'), sugLijst.getAttribute('role')],
+         ['combobox','true','m-hoortbij-sug','listbox']);
+      toets('ArrowDown');
+      const actiefEl=sugLijst.querySelector('.vve-sug-item.actief');
+      truthy('hoortbij: pijl-omlaag wijst de eerste suggestie aan', !!actiefEl);
+      eq('hoortbij: … en het veld verwijst ernaar voor de schermlezer',
+         [veld.getAttribute('aria-activedescendant'), actiefEl && actiefEl.getAttribute('role'),
+          actiefEl && actiefEl.getAttribute('aria-selected')],
+         [actiefEl && actiefEl.id, 'option', 'true']);
+      truthy('hoortbij: de focus blijft in het invoerveld, de suggesties staan niet in de tabvolgorde',
+             !sugLijst.querySelector('[tabindex]'));
+      toets('Enter');
+      truthy('hoortbij: Enter kiest de aangewezen taak — zonder één muisklik', state._hbDoel===kop);
+      eq('hoortbij: … zet de titel in het veld en sluit de lijst',
+         [veld.value, sugLijst.style.display, veld.getAttribute('aria-expanded')],
+         [taakTitel(kop), 'none', 'false']);
+      // Enter zonder pijltjes hoort níets te kiezen: het veld staat dan vol met een half getypte
+      // term, en de eerste treffer ongevraagd overnemen is precies het soort stille koppeling dat
+      // deze hele naloop moest wegnemen.
+      state._hbDoel=null;
+      veld.value='Kop';
+      veld.dispatchEvent(new Event('input', { bubbles:true }));
+      toets('Enter');
+      eq('hoortbij: Enter zonder aanwijzing kiest niets', state._hbDoel, null);
+      toets('Escape');
+      eq('hoortbij: en Escape sluit de lijst weer',
+         [sugLijst.style.display, veld.getAttribute('aria-expanded')], ['none','false']);
 
       // 3. En dan de hele keten: opslaan met een gekozen doeltaak. De bewerking zelf schrijft A..K
       //    (Q, R en S liggen daarbuiten — anders veegt elke gewone bewerking het taaknummer en de

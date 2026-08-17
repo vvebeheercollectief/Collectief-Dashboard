@@ -25,6 +25,37 @@ function filt(rows,q){
 const _zonderLeidendSymbool=(s)=>(s||'').toString().replace(/^[^\p{L}\p{N}]+/u,'').trim();
 const meldSleutel=(titel,msg)=>_zonderLeidendSymbool(titel)+'|'+_zonderLeidendSymbool(msg);
 
+// Welke rij in 'Afgerond' hoort bij DEZE zojuist afgeronde taak? Puur, en bewust één bron voor de
+// twee undo-wegen (undoComplete in notifications.js en _bulkUndoAfDoelRijen in bulk.js): allebei
+// wissen ze een archiefrij, en een verkeerde keuze is daar onherstelbaar.
+//
+// Eerst op het vaste TAAKNUMMER. Dat staat sinds de Takenbundel óók in kolom Q van 'Afgerond'
+// (`afrondWaarden`, crud.js) en is de enige echte identiteit die een archiefrij heeft.
+// Zoeken op VvE-code leunt erop dat de lijst nieuwste-eerst gesorteerd is, en die sortering kan de
+// vraag niet beantwoorden zodra er twee afrondingen van dezelfde VvE op dezelfde dag in dezelfde
+// sectie staan: `parseDt(b.datum)-parseDt(a.datum)` geeft dan 0, `Array.sort` is stabiel, en dus
+// beslist de FYSIEKE bladvolgorde wie 'de nieuwste' heet. Die volgorde is niet aan de datum
+// gekoppeld — `getAfInsertRow` (crud.js) plakt een nieuwe rij achter het laatste lid van een op
+// datum gesorteerde lijst, dus achter het OUDST gedateerde. Het gevolg is dan dubbel raak: een
+// oudere afronding verdwijnt én de zojuist afgeronde taak blijft in 'Afgerond' staan terwijl hij
+// ook terugkomt in Nog Te Doen. De rij-guard eronder vangt dat niet: die bevestigt alleen dat de
+// GEKOZEN rij nog op zijn plek staat, niet dat de keuze klopt.
+//
+// De code blijft de terugval, en dat is geen luxe: rijen van vóór deze functie hebben geen kolom Q,
+// en de legacy onEdit-trigger schrijft er zijn eigen archiefrijen bij.
+// `bezet` (optioneel) is een Set met al geclaimde rijen, zodat twee items met dezelfde code in één
+// bulk-undo niet dezelfde rij pakken.
+function kiesAfgerondRij(rijen, taakId, code, bezet){
+  const lijst = rijen || [];
+  const vrij = r => !bezet || !bezet.has(r);
+  const nr = ((taakId ?? '') + '').trim();
+  if (nr){
+    const opNummer = lijst.find(r => r && (((r.taakId ?? '') + '').trim() === nr) && vrij(r));
+    if (opNummer) return opNummer;
+  }
+  return lijst.find(r => r && r.code === code && vrij(r)) || null;
+}
+
 // ══════════════════════════════════════
 //  AUTO-PRIORITEIT (zie docs/superpowers/specs/2026-06-02-auto-prioriteit-design.md)
 // ══════════════════════════════════════
@@ -369,5 +400,5 @@ export {
   emptyRow, esc, vveCodeSpan, subBadge, taakActieKnoppen, coerceDagenVooraf,
   parseOff, offerteFase,
   parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, aannSleutel,
-  meldSleutel, _zonderLeidendSymbool,
+  meldSleutel, _zonderLeidendSymbool, kiesAfgerondRij,
 };

@@ -528,7 +528,12 @@
     .vve-suggestions{position:absolute;top:100%;left:0;right:0;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rs);box-shadow:var(--shm);z-index:10;max-height:180px;overflow-y:auto;display:none}
     .vve-sug-item{padding:8px 11px;cursor:pointer;font-size:13px;transition:background var(--tr);border-bottom:1px solid var(--bor)}
     .vve-sug-item:last-child{border-bottom:none}
-    .vve-sug-item:hover{background:var(--ac-l);color:var(--ac)}
+    /* `.actief` = de suggestie die met de pijltjestoetsen is aangewezen. Dezelfde opmaak als hover,
+       want het is voor de gebruiker hetzelfde: 'dit kies je als je nu doorgaat'. De focus blijft in
+       het invoerveld (combobox-patroon, zie vve-zoekveld.js), dus :focus-visible zou hier niets
+       tonen — zonder deze regel wijst er dus zichtbaar niets aan terwijl de schermlezer het wél
+       voorleest. */
+    .vve-sug-item:hover,.vve-sug-item.actief{background:var(--ac-l);color:var(--ac)}
     .vve-sug-code{font-weight:700;font-size:12px}
     .vve-sug-naam{font-size:11px;color:var(--mut);margin-top:1px}
 
@@ -1014,6 +1019,20 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,.search-box inpu
   .cb::before{content:'';position:absolute;inset:-10px}
   /* Vlagknoppen zijn badge-formaat; het raakvlak blijft 40px hoog en 44-61px breed. */
   .flag-toggle::after{content:'';position:absolute;inset:-9px -8px}
+  /* De twee bundel-knoppen. Gemeten op 375px met pointer:coarse: de chevron 22 × 18px en het
+     merkje 28 × 17px, allebei onder de 24px-richtlijn, terwijl de twee sleep-handvatten uit
+     hetzelfde blok daar wél een halo voor kregen en de actieknoppen ernaast naar 36 × 36 groeien.
+     Op een telefoon is de chevron de enige manier om een bundel open en dicht te klappen, en het
+     merkje volgens §4.2 zelfs 'de enige weg terug' naar de gestapelde weergave vanuit een
+     gefilterde of gezochte lijst. Misklikken landt op de VvE-code ernaast, en die opent het dossier.
+     Verticaal is er ruimte zat (de tabelrij meet 47px), horizontaal niet: de chevron houdt 3px
+     over naar de VvE-code en het merkje 6px naar de badge ervóór, dus daar blijft de marge klein —
+     een onzichtbare halo vangt wél de hit-test en zou die buren anders stil onklikbaar maken
+     (zelfde afweging als bij `td>.stapel-h{margin-right:9px}` verderop).
+     Alleen hier en niet in de basisregel: met een muis is 18px prima aan te wijzen, en dan is het
+     inslikken van een strook buurtekst pure schade zonder winst. */
+  .bdl-chev::after{content:'';position:absolute;inset:-6px -1px}
+  .bdl-merk::after{content:'';position:absolute;inset:-4px -2px}
 }
 
 /* ── Mobiel: uitlijning, touch-targets en afbreek-gedrag ── */
@@ -1240,8 +1259,12 @@ body.bulk #chat-fab{display:none}
    --sec/--sec-l zijn de kleuren van het actieve tabblad: renderNtd zet ze met
    style.setProperty op #ntd-card, dus binnen de takentabel erven pill en merkje ze.
    Buiten die kaart (VvE-dossier) bestaan ze niet en valt alles terug op het accent. */
+/* `position:relative` is hier geen opmaak maar het ANKER voor de aanraakhalo in het
+   @media(pointer:coarse)-blok hierboven; zonder hem hangt dat pseudo-element aan de eerste
+   voorouder met een positie en landt het raakvlak ergens anders in de rij. Zelfde constructie als
+   bij `.bdl-h` en `.stapel-h`. */
 .bdl-chev{background:none;border:0;padding:2px 5px;margin:-2px 3px -2px -5px;cursor:pointer;
-  color:var(--mut);border-radius:4px;line-height:1;transition:transform var(--tr)}
+  color:var(--mut);border-radius:4px;line-height:1;transition:transform var(--tr);position:relative}
 .bdl-chev:hover{background:var(--sur2);color:var(--txt)}
 .bdl-chev.open{transform:rotate(90deg)}
 .bdl-pill{background:var(--sec-l,var(--ac-l));color:var(--sec,var(--ac));font-size:11px;
@@ -1266,6 +1289,10 @@ body.bulk #chat-fab{display:none}
 .bdl-sub{display:flex;align-items:center;gap:9px;padding:7px 10px 7px 22px;
   border-top:1px solid var(--bor);font-size:12.5px}
 .bdl-sub.af{color:var(--mut)}
+/* Weggelegd = bewust geparkeerd, en in de tabel dimt zo'n rij (`tr.snooze-row td`, `.tk.snooze-row`).
+   Die twee regels zijn aan hun eigen element gebonden, dus de paneelregel heeft een eigen nodig —
+   anders draagt hij de klasse wel maar ziet niemand er iets van. Zelfde .55 als de andere twee. */
+.bdl-sub.snooze-row{opacity:.55}
 .bdl-sub.af .bdl-txt{text-decoration:line-through}
 .bdl-sub.sleep{opacity:.55;background:var(--sur);box-shadow:0 6px 18px rgba(0,0,0,.13)}
 /* Vaste breedte, want een afgerond lid krijgt hier een LEGE plaatshouder in plaats van het
@@ -1317,6 +1344,10 @@ body.bulk #chat-fab{display:none}
 .bdl-ib{display:inline-flex;align-items:center;background:var(--am-l);color:var(--am);
   font-size:10.5px;font-weight:600;padding:1px 6px;border-radius:10px;margin-left:6px;
   white-space:nowrap;flex:none}
+/* De wegleg-pil uit de tabel, hergebruikt in het paneel. `flex:none` om dezelfde reden als bij
+   `.bdl-ib` hierboven: `.bdl-txt` is het enige element dat mag krimpen, en zonder dit zou een lange
+   taaktekst deze pil tot een streepje persen. */
+.bdl-sub .pill-snooze{flex:none}
 .bdl-meta{color:var(--mut);font-size:11.5px;white-space:nowrap}
 .bdl-klaar{color:var(--gn);font-size:12px;white-space:nowrap;display:flex;align-items:center;gap:3px}
 .bdl-acts{display:flex;gap:3px;flex:none}
@@ -1332,9 +1363,12 @@ body.bulk #chat-fab{display:none}
    2×2,5px en 2×8px. `font-size` staat er niet meer bij — er is geen tekst die hij nog zou schalen,
    en een SVG met vaste width/height trekt zich er niets van aan.
    `vertical-align:middle` omdat de pil in de naamcel tússen tekst staat; gemeten staat hij daarmee
-   op precies dezelfde middellijn als de VvE-naam ernaast. */
+   op precies dezelfde middellijn als de VvE-naam ernaast.
+   `position:relative` is het anker voor de aanraakhalo in het @media(pointer:coarse)-blok
+   hierboven — zonder hem landt dat raakvlak bij een willekeurige voorouder in plaats van om deze
+   pil heen. Zelfde constructie als bij `.bdl-chev`, `.bdl-h` en `.stapel-h`. */
 .bdl-merk{background:var(--sec-l,var(--ac-l));color:var(--sec,var(--ac));
-  display:inline-flex;align-items:center;vertical-align:middle;
+  display:inline-flex;align-items:center;vertical-align:middle;position:relative;
   padding:2.5px 8px;border-radius:20px;cursor:pointer;border:0;margin-left:6px}
 /* Rij op rij slepen om te stapelen: de opgepakte rij dimt, de rij eronder licht op als doel.
    De terugval --sec → --ac is dezelfde als bij de rest van de bundel-opmaak: --sec/--sec-l worden

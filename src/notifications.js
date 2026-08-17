@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  NOTIFICATIONS — meldingen (wachtrij/push) + in-app toasts
 // ══════════════════════════════════════
-import { esc, displayName, parseDt, meldSleutel } from "./util.js";
+import { esc, displayName, parseDt, meldSleutel, kiesAfgerondRij } from "./util.js";
 import { state, D, _shownToasts } from "./state.js";
 import { SID, ONESIGNAL_APP_ID } from "./config.js";
 import { ensureToken } from "./auth.js";
@@ -196,11 +196,14 @@ async function undoComplete(undoData) {
       const ids = await getSheetIds();
       const afId = ids['Afgerond'];
       // Verse Afgerond-data en de ZOJUIST afgeronde rij zoeken (nieuwste datum eerst, zelfde
-      // sortering als D.af). D.af kan nog verouderd zijn; we matchen op code én pakken de
-      // nieuwste, zodat we niet per ongeluk een óúdere afronding met dezelfde code wissen.
+      // sortering als D.af). D.af kan nog verouderd zijn.
+      // De keuze zelf staat in `kiesAfgerondRij` (util.js), gedeeld met de bulk-undo: die matcht
+      // eerst op het vaste taaknummer uit `ntdValues[16]` en valt alleen daarna terug op de code.
+      // Zoeken op code + datum is namelijk een GOK zodra er twee afrondingen van dezelfde VvE op
+      // dezelfde dag in dezelfde sectie staan — zie de toelichting daar.
       const afData = (parseSections(await fetchSheet('Afgerond')).data[sec] || [])
         .slice().sort((a, b) => parseDt(b.datum) - parseDt(a.datum));
-      const doelAf = afData.find(x => x.code === undoData.code) || null;
+      const doelAf = kiesAfgerondRij(afData, (ntdValues || [])[16], undoData.code);
       // EERST terugzetten, DAN pas weghalen. Breekt de verbinding ertussen, dan staat de taak
       // dubbel (zichtbaar, herstelbaar) in plaats van nergens (onzichtbaar, verloren).
       const insertRow = getInsertRow(sec);

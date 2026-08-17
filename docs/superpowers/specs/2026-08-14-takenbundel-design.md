@@ -197,8 +197,18 @@ Per lid, op volgnummer:
 - volgnummer
 - gekleurd bolletje in de kleur van de categorie
 - omschrijving (klikbaar → bewerkscherm)
-- categorie + deadline
+- amber label **"In behandeling"** als de taak is opgepakt — een mededeling, geen knop
+- wegleg-pil met de opvolgdatum als de taak is weggelegd; de regel is dan gedempt, net als de
+  tabelrij
+- categorie + deadline, met **"Te laat (Xd)"** in plaats van de datum zodra die verstreken is en
+  **"Geen deadline"** als er geen staat — dezelfde berekening als de tabelrij
 - dezelfde drie actieknoppen als een tabelrij: **bewerken**, **wegleggen**, **afronden**
+
+Die drie statussen staan er omdat het paneel geen van de dragers heeft die de tabel er wél voor
+heeft: geen groepskop "In behandeling", geen groep "Weggelegd" onderaan, geen deadline-kolom. En
+omdat een subtaak in het paneel uit de vlakke lijst verdwijnt (§4.1), was er binnen dat tabblad
+anders geen énkele plek meer waar ze te zien waren — terwijl de tellers in de paginakop ze wel
+meetellen.
 
 Afgeronde leden: doorgestreept en gedempt, met de afronddatum; geen actieknoppen (net als in
 "Afgerond"). Onderaan het paneel: **`+ Voeg een subtaak toe`**.
@@ -317,8 +327,12 @@ en omdat het gebaar op het handvat begint (`touch-action: none`) neemt de slepen
 ook niet mee. Bron- en doelrij moeten dus tegelijk in beeld staan op het moment van loslaten — het
 doel wordt met `elementFromPoint` in venstercoördinaten bepaald. In de takentabel zijn dat er op een
 telefoon een handvol. Dat is bewust geen bezwaar: weg 2 uit §6.1 — het veld **"Hoort bij"**
-in het bewerkscherm — maakt exact dezelfde koppeling, werkt altijd en is ook met het toetsenbord te
-bereiken. Slepen is de snelle weg voor twee rijen die je toch al naast elkaar ziet, niet de enige.
+in het bewerkscherm — maakt exact dezelfde koppeling en werkt altijd. Ook zonder muis: het veld is
+met Tab te bereiken, en de suggestielijst eronder is sinds de naloop volledig met het toetsenbord te
+bedienen (↓/↑ wijzen een taak aan, Enter kiest hem, Escape sluit de lijst; `src/vve-zoekveld.js`,
+combobox-patroon met `aria-activedescendant`). Dát is wat het muis-only sleepgebaar draagbaar maakt —
+eerst was die belofte er wél en de bediening niet, en dan is slepen in de praktijk de enige weg.
+Slepen is de snelle weg voor twee rijen die je toch al naast elkaar ziet, niet de enige.
 
 **Ook bewust: de VvE-dossierpagina geeft na een geslaagde stapelactie geen zichtbare terugkoppeling
 in de lijst.** `render-vve.js` importeert uit `render-bundel.js` alleen `STAPEL_GREEP` — dus wel het

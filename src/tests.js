@@ -3730,7 +3730,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '10.16');
+  eq('versie opgehoogd', APP_VERSION, '10.17');
 
   // ── Pushmeldingen: de twee schakels die stil kapot waren (audit 2026-08-06) ──
   // Beide defecten waren onzichtbaar: de app meldde "Notificaties zijn aan!" terwijl er nooit
@@ -4558,6 +4558,24 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     //    belooft iets wat de functie niet waarmaakt.
     eq('paneel: afgerond lid heeft geen sleep-handvat', afRegel.includes('data-bdl-grip'), false);
     eq('paneel: een open lid heeft dat handvat wél', openRegel.includes('data-bdl-grip'), true);
+    // 3b. 'In behandeling' is in de tabel af te lezen aan de groepskop en de grijzere rij; in het
+    //     paneel bestaat geen van beide. Zonder een eigen label staat een taak die iemand al heeft
+    //     opgepakt er precies zo bij als een die nog vrij ligt — door de gebruiker gemeld.
+    eq('paneel: een vrije subtaak draagt geen in-behandeling-label', openRegel.includes('bdl-ib'), false);
+    const ibSub = t('Tib','Tkop','30','OPPAKKEN','Al opgepakt'); ibSub.inBehandeling='TRUE';
+    const ibNtd = { ...bronNtd, OPPAKKEN:[s1, ibSub] };
+    const ibHtml = bundelPaneelHtml(bouwBundelIndex(ibNtd, bronAf).get('Tkop'),
+                                    zichtbareKop(bouwBundelIndex(ibNtd, bronAf).get('Tkop')));
+    eq('paneel: een subtaak in behandeling draagt het label wél',
+       (ibHtml.match(/class="bdl-ib"/g)||[]).length, 1);
+    eq('paneel: … en het is een mededeling, geen knop',
+       /class="bdl-ib"[^>]*data-action/.test(ibHtml), false);
+    // Een afgerond lid is per definitie niet meer in behandeling; die tak mag het label nooit
+    // tekenen, ook niet als de vlag in de Sheet is blijven staan.
+    const afIb = t('Taf','Tkop','40','OPPAKKEN','Klaar maar vlag stond aan'); afIb.inBehandeling='TRUE';
+    const afHtml = bundelPaneelHtml(bouwBundelIndex(bronNtd, { ...bronAf, OPPAKKEN:[afIb] }).get('Tkop'),
+                                    zichtbareKop(bouwBundelIndex(bronNtd, { ...bronAf, OPPAKKEN:[afIb] }).get('Tkop')));
+    eq('paneel: een afgerond lid krijgt het label nooit', afHtml.includes('bdl-ib'), false);
     // 4. Of er gestapeld wordt beslist rowNtd op één vlag (`stapel` uit bundelWeergave); deze
     //    functie heeft daar geen eigen mening over en krijgt bij een platte render simpelweg geen
     //    beurt. Wat hij wél moet overleven is een lege index — bij een vroege render zijn de

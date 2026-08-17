@@ -110,6 +110,11 @@ function subRegel(m, i){
          + `<span class="bdl-klaar" title="Afgerond${r.datum?' '+esc(kortDatum(r.datum)):''}">${ico('vinkCirkel',13)}${r.datum?' '+esc(kortDatum(r.datum)):''}</span></div>`;
   }
   const rid = state._rowCache.length; state._rowCache.push(r);
+  // 'In behandeling' is in de TABEL af te lezen aan de groepskop en de grijzere rij; in het paneel
+  // bestaat geen van beide, dus stond een subtaak die iemand al had opgepakt er precies zo bij als
+  // een die nog vrij lag. Een stil label en nadrukkelijk geen knop: het zegt iets, het doet niets —
+  // de knoppenrij rechts is al vol en dit is achtergrondinformatie, geen handeling.
+  const ibPil = r.inBehandeling === 'TRUE' ? `<span class="bdl-ib">In behandeling</span>` : '';
   // Het handvat is voor een schermlezer verborgen: het draagt geen eigen actie, alleen een
   // muisgebaar. Herordenen met het toetsenbord kan dus (nog) niet — die weg hoort bij het slepen
   // zelf en moet daar bewust gekozen worden, niet stil overgeslagen.
@@ -118,6 +123,7 @@ function subRegel(m, i){
        + `<span class="bdl-num">${i+1}</span>`
        + `<span class="bdl-dot" style="background:${kleur}"></span>`
        + `<button type="button" class="bdl-txt" data-action="taak-bewerken" data-rid="${rid}" title="Bewerken">${esc(taakTitel(r))}</button>`
+       + ibPil
        + `<span class="bdl-meta">${esc(label)}${r.deadline?' · '+esc(kortDatum(r.deadline)):''}</span>`
        // Exact dezelfde drie knoppen als op een tabelrij, uit één helper: ze staan op hetzelfde
        // scherm pal onder elkaar, dus een eigen variant hier zou meteen als verschil opvallen.

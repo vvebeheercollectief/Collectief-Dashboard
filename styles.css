@@ -1303,6 +1303,13 @@ body.bulk #chat-fab{display:none}
 .bdl-txt{flex:1;min-width:0;text-align:left;background:none;border:0;padding:0;
   color:inherit;font:inherit;cursor:pointer}
 .bdl-txt:hover{text-decoration:underline}
+/* 'In behandeling' in het bundelpaneel. Amber uit de eigen set (--am/--am-l), dus hij kleurt in
+   de donkere stand vanzelf mee. Bewust geen `cursor:pointer` en geen data-action: dit is een
+   mededeling, geen knop — de rij heeft rechts al drie echte knoppen. `flex:none` zodat hij bij een
+   lange taaktekst niet meekrimpt tot een streepje. */
+.bdl-ib{display:inline-flex;align-items:center;background:var(--am-l);color:var(--am);
+  font-size:10.5px;font-weight:600;padding:1px 6px;border-radius:10px;margin-left:6px;
+  white-space:nowrap;flex:none}
 .bdl-meta{color:var(--mut);font-size:11.5px;white-space:nowrap}
 .bdl-klaar{color:var(--gn);font-size:12px;white-space:nowrap;display:flex;align-items:center;gap:3px}
 .bdl-acts{display:flex;gap:3px;flex:none}

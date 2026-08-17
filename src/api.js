@@ -284,14 +284,24 @@ function _rowMismatch(vals, minRow, checks, maak){
   return null;
 }
 // Bouwt de A1-range over de vingerafdruk-kolommen; escapet apostrofs in de tabblad-naam
-// (bv. "ALV's overzicht" → 'ALV''s overzicht'!A..). Altijd t/m I: dat dekt élke kolom die in
-// FP_KOLOMMEN voorkomt, plus kolom Q met het vaste taaknummer. Het blijft ÉÉN aaneengesloten
-// range en dus één leesverzoek — de guard wordt er niet duurder van.
+// (bv. "ALV's overzicht" → 'ALV''s overzicht'!A..). Altijd t/m S: dat dekt élke kolom die in
+// FP_KOLOMMEN voorkomt (die blijven binnen A..I), plus kolom Q met het vaste taaknummer en
+// R/S met het bundelnummer en volgnummer. Het blijft ÉÉN aaneengesloten range en dus één
+// leesverzoek — de guard wordt er niet duurder van; alleen twee cellen per rij breder.
+//
+// R en S doen in de VINGERAFDRUK niet mee en dat blijft zo (zie de kop van bundel-acties.js:
+// wat wij zelf wijzigen mag de guard niet als verschil zien). Ze worden gelezen omdat
+// `assertRowsMatch` de gelezen rijen teruggeeft en `koppelTaak` de bundelstand van de DOELrij
+// uit de Sheet moet kunnen aflezen in plaats van uit zijn eigen, mogelijk verouderde geheugen.
 function _a1Bereik(sheetName, minR, maxR){
-  return `'${(sheetName||'').replace(/'/g,"''")}'!A${minR}:Q${maxR}`;
+  return `'${(sheetName||'').replace(/'/g,"''")}'!A${minR}:S${maxR}`;
 }
 // Leest de vingerafdruk-kolommen van de doelrij(en) terug en gooit een ROW_MISMATCH-fout als een
 // rij niet meer dezelfde taak bevat. Eén GET dekt het hele rijbereik. backgroundWrite vangt de fout.
+// Geeft de teruggelezen rijen terug als Map<rijnummer, cel-array>, zodat een aanroeper een kolom
+// die BUITEN de vingerafdruk valt alsnog kan aflezen zonder een tweede leesverzoek. Dat is geen
+// extraatje: `koppelTaak` moet weten wat er nú in kolom R van de doelrij staat, en die vraag is
+// per definitie niet met de vingerafdruk te beantwoorden.
 // Een check is óf {row, r} met het rij-OBJECT (volle vingerafdruk) óf {row, code} (alleen kolom A,
 // de oude vorm — nog in gebruik op de tabbladen waar kolom A al onderscheidend genoeg is).
 // Let op: deze guard zit binnen de writeFn en dus binnen _withRetry — bij een 429/5xx draait hij
@@ -310,7 +320,7 @@ async function assertRowsMatch(checks, sheetName='Nog Te Doen'){
     if(c.r) return { row:c.row, code:((c.r.code ?? c.r.id ?? c.r.titel ?? c.r.timestamp ?? '')+'').trim() };
     return { row:c.row, code:(c.code||'').toString().trim() };
   });
-  if(!cs.length) return;
+  if(!cs.length) return new Map();
   const rows=cs.map(c=>c.row), minR=Math.min(...rows), maxR=Math.max(...rows);
   const vals=await fetchSheet(_a1Bereik(sheetName, minR, maxR));
   const mm=_rowMismatch(vals, minR, cs, (ruw,c)=>c.fp
@@ -329,6 +339,7 @@ async function assertRowsMatch(checks, sheetName='Nog Te Doen'){
       : 'De lijst was net gewijzigd — opnieuw geladen, probeer nog eens.';
     throw err;
   }
+  return new Map(cs.map(c=>[c.row, vals[c.row-minR]||[]]));
 }
 // Achterwaarts compatibel: een STRING blijft de oude kolom-A-controle, een rij-OBJECT geeft de
 // volle vingerafdruk. Zo kon elke callsite los mee, zonder big-bang.

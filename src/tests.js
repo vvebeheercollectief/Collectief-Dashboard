@@ -18,7 +18,7 @@ import { _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, veil
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
-import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, _sheetBreedtes, getSheetIds, kiesSectie, deleteTaskRow, deleteCurrentEditTask, completeCurrentEditTask } from "./crud.js";
+import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _eindKolom, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, _sheetBreedtes, getSheetIds, kiesSectie, deleteTaskRow, deleteCurrentEditTask, completeCurrentEditTask } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages, renderChat } from "./dossier-chat.js";
 import { shouldPromptReload, maakHerlaadKern, zelfdeWorker } from "./sw-update.js";
@@ -1167,7 +1167,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
        rijVingerafdruk('Nog Te Doen', {_sec:'OPPAKKEN', code:'311198', naam:'VvE A',
          actiepunt:'dak nakijken', deadline:'17-06-2026', taakId:'Tabc123'}),
        vingerafdruk('Nog Te Doen', ['311198','VvE A','dak nakijken','17 juni 2026','','','','','','','','','','','','','Tabc123'], 'OPPAKKEN'));
-    truthy('taaknummer: het gelezen bereik loopt t/m Q', /!A5:Q9/.test(_a1Bereik('Nog Te Doen',5,9)));
+    truthy('taaknummer: het gelezen bereik loopt t/m S', /!A5:S9/.test(_a1Bereik('Nog Te Doen',5,9)));
     truthy('taaknummer: nieuwTaakId geeft telkens iets anders', nieuwTaakId() !== nieuwTaakId());
     truthy('taaknummer: nieuwTaakId begint met T en is kort', /^T[a-z0-9]{8,16}$/.test(nieuwTaakId()));
 
@@ -1213,6 +1213,15 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
        [RASTER_MIN['Nog Te Doen'], RASTER_MIN['Afgerond'],
         serializeNtdUndo({_sec:'OPPAKKEN',code:'1',naam:'X'}).length,
         afrondWaarden({code:'1',naam:'X'},'OPPAKKEN','2026-08-14','').length], [19,19,19,19]);
+    // Datzelfde 'volgt de breedste schrijfactie' voor 'Logboek', en dáár klopte het niet: de undo
+    // van een verwijderde logregel geeft insertAndWriteRow ACHT waarden, maar `_eindKolom` klemt
+    // het bereik op minimaal A..I. RASTER_MIN stond op 8, dus de structuurcheck zou 'in orde'
+    // melden op een blad waarop juist die undo stil mislukt — precies het scenario waarvoor die
+    // bewaking bestaat. Hier gekoppeld en niet als los getal herhaald: haalt iemand de ondergrens
+    // weg, dan gaat deze assert af in plaats van dat de tabel er ongemerkt naast komt te staan.
+    eq('structuur: Logboek volgt de ONDERGRENS van insertAndWriteRow, niet het aantal waarden',
+       [_eindKolom(new Array(8)).charCodeAt(0)-64, RASTER_MIN['Logboek']], [9, 9]);
+    eq('structuur: en de 19-koloms NTD-write komt op kolom S uit', _eindKolom(new Array(19)), 'S');
 
     // ── De rasterbewaking moet ook echt AANGESLOTEN zijn ──
     // Tot 2026-08-14 riep niets in de app checkRaster aan: de hele RASTER_MIN-tabel was
@@ -1574,8 +1583,8 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   eq('rij-guard: ontbrekende rij telt als mismatch (got leeg)', (_rowMismatch([], 5, [{row:5,code:'CH1'}])||{}).got, '');
   eq('rij-guard: whitespace-tolerant → null', _rowMismatch([[' CH1 ']], 5, [{row:5,code:'CH1'}]), null);
   // ── Rij-guard A1-range: apostrof in tabblad-naam escapen ──
-  eq('a1: gewone tabblad-naam', _a1Bereik('Nog Te Doen',5,5), "'Nog Te Doen'!A5:Q5");
-  eq('a1: apostrof wordt geëscaped (ALV)', _a1Bereik("ALV's overzicht",3,7), "'ALV''s overzicht'!A3:Q7");
+  eq('a1: gewone tabblad-naam', _a1Bereik('Nog Te Doen',5,5), "'Nog Te Doen'!A5:S5");
+  eq('a1: apostrof wordt geëscaped (ALV)', _a1Bereik("ALV's overzicht",3,7), "'ALV''s overzicht'!A3:S7");
 
   // ── Vingerafdruk-guard: 'zelfde taak', niet alleen 'zelfde VvE'. ──
   // De oude guard las alleen kolom A en bewees daarmee hooguit 'zelfde VvE'. Deze blokjes
@@ -1666,7 +1675,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       stub(['311198','VvE A','dak nakijken','17 juni 2026','Jer','Hoog','iets','TRUE','','','','','','T1:28-07-2026']);
       let door=true; try{ await assertRowMatch(12, taak); }catch(e){ door=false; }
       truthy('guard e2e: ongewijzigde rij mag door (ondanks andere datumvorm en escalatiestempel)', door);
-      truthy('guard e2e: er wordt A..Q gelezen, niet alleen kolom A', /!A12:Q12/.test(gevraagd));
+      truthy('guard e2e: er wordt A..S gelezen, niet alleen kolom A', /!A12:S12/.test(gevraagd));
 
       // 2. Iemand heeft de tekst in kolom C met de hand aangepast → moet blokkeren.
       stub(['311198','VvE A','GOOT nakijken','17 juni 2026','Jer','Hoog','iets']);
@@ -4029,10 +4038,29 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const solo = { ...leeg, OPPAKKEN:[ t('Tb','Tkop','10','OPPAKKEN') ] };
     eq('bundel: één lid is geen bundel', isBundel(bouwBundelIndex(solo, leeg).get('Tkop')), false);
 
-    // Rijen zonder taakId mogen de index niet laten omvallen.
+    // Rijen zonder taakId mogen de index niet laten omvallen. (De naam beloofde hier eerst een
+    // sorteervolgorde, maar met één lid valt er geen volgorde te zien — die belofte staat nu
+    // hieronder, met twee leden.)
     const raar = { ...leeg, OPPAKKEN:[ { bundelId:'Tkop', bundelVolg:'', _sec:'OPPAKKEN', code:'1' } ] };
-    eq('index: lid zonder volgnummer valt achteraan',
+    eq('index: een lid zonder volgnummer laat de index niet omvallen',
        bouwBundelIndex(raar, leeg).get('Tkop').length, 1);
+
+    // …en zo'n lid sorteert ACHTERAAN. Dat is de regel uit §3.4 — 'een afgerond lid met een
+    // leeggemaakt volgnummer is geen vast punt: het sorteert achteraan' — en hij hangt volledig aan
+    // één terugval in `volgVan` (Number.MAX_SAFE_INTEGER). Die stond nergens vast: gemeten door hem
+    // naar 0 om te zetten bleef de hele suite groen. Draait de regel om, dan wordt een lid met een
+    // lege S-cel juist de zichtbare kop en verhuist de hele bundel naar het tabblad van díe taak;
+    // een afgerond lid met een lege cel wordt dan een vast anker op 0 en blokkeert elke sleepactie
+    // in die bundel ('Deze volgorde kan niet'). Het lege lid staat hieronder met opzet VOORAAN in
+    // de invoer, anders bewijst een groene uitslag alleen dat er niets gesorteerd hoefde te worden.
+    const leegVolg = { ...leeg, OPPAKKEN:[
+      { taakId:'Tleeg', bundelId:'Tkop', bundelVolg:'',   _sec:'OPPAKKEN', code:'1' },
+      { taakId:'Tmet',  bundelId:'Tkop', bundelVolg:'10', _sec:'OPPAKKEN', code:'2' } ] };
+    const ixLeegVolg = bouwBundelIndex(leegVolg, leeg);
+    eq('index: een lid zonder volgnummer sorteert achter een lid dát er een heeft',
+       ixLeegVolg.get('Tkop').map(m => m.r.taakId), ['Tmet','Tleeg']);
+    eq('kop: en de zichtbare kop is dus het lid mét volgnummer',
+       zichtbareKop(ixLeegVolg.get('Tkop')).r.taakId, 'Tmet');
 
     // Vangrail (spec §3.2b): een AFGERONDE rij zonder taaknummer telt niet mee. Zo kan
     // historische rommel in kolom R van 'Afgerond' geen spookbundel maken.
@@ -4702,6 +4730,13 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         const kolommen = kopTr ? kopTr.cells.length : -1;
         eq(`rij (${sec}): stapelrandjes overspannen de hele rij`,
            [...tb.querySelectorAll('.bdl-peek td')].map(td => td.colSpan), [kolommen, kolommen]);
+        // Ze zijn zuiver decoratief: een lege cel, geen tekst, niets bedienbaars. Zonder
+        // `aria-hidden` staan het wél twee volwaardige rijen in de toegankelijkheidsboom, en meldt
+        // een schermlezer na élke dichtgeklapte bundel twee lege rijen — plus een rijaantal dat niet
+        // meer met het aantal taken klopt.
+        eq(`rij (${sec}): en zijn voor een schermlezer verborgen`,
+           [...tb.querySelectorAll('.bdl-peek')].map(tr => tr.getAttribute('aria-hidden')),
+           ['true', 'true']);
 
         state.bundelOpen = new Set(['Tkop']);
         renderNtd();
@@ -5234,7 +5269,10 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       // kolom Q. R en S staan er bewust NIET in — die doen in de vingerafdruk niet mee, en dat is
       // precies wat deze test moet bewijzen: de guard slaat niet alarm op de kolommen die we zelf
       // aan het wijzigen zijn.
-      const bladRij=(actie, taakId) => { const c=['311212','Testflat',actie,'','','','','']; c[16]=taakId; return c; };
+      // `bundelId` is de derde parameter en landt op index 17 (kolom R). Hij doet in de
+      // vingerafdruk NIET mee — dat is juist het punt — maar `koppelTaak` leest hem sinds de
+      // R-guard wél uit deze lezing terug.
+      const bladRij=(actie, taakId, bundelId) => { const c=['311212','Testflat',actie,'','','','','']; c[16]=taakId; c[17]=bundelId||''; return c; };
       let blad={};
       window.fetch=async (url, opt) => {
         const u=decodeURIComponent(String(url)), methode=(opt&&opt.method)||'GET';
@@ -5244,7 +5282,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
           return new Response(JSON.stringify({error:{message:'geen leesverkeer in deze test'}}),{status:403});
         if(methode==='GET'){                    // de rij-controle van assertRowsMatch
           volgorde.push('lees');
-          const m=/!A(\d+):Q(\d+)/.exec(u)||[];
+          const m=/!A(\d+):S(\d+)/.exec(u)||[];
           const rijen=[];
           for(let r=+m[1]; r<=+m[2]; r++) rijen.push(blad[r]||[]);
           // Haakje voor geval 15: een ándere actie die MIDDEN in de rij-controle rijnummers
@@ -5359,6 +5397,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       //    kan de zojuist gesleepte taak zomaar bovenaan komen te staan.
       ({ kop, sub } = opnieuw());
       kop.bundelId='Tweg'; kop.bundelVolg='10';        // enig overgebleven lid van bundel 'Tweg'
+      blad[12]=bladRij('Kop-werk', kop.taakId, 'Tweg');  // en zo staat het óók in de Sheet
       await koppelTaak(sub, kop);
       eq('koppel-e2e: nieuwe subtaak landt áchter het laatste lid van een gekrompen bundel',
          [sub.bundelId, sub.bundelVolg], ['Tweg','20']);
@@ -5372,6 +5411,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       //    vanaf dat moment ketst élke schrijfactie op die rij af op de rij-guard.
       ({ kop, sub } = opnieuw(false));                 // beide zonder taaknummer
       kop.bundelId='Tweg'; kop.bundelVolg='0';
+      blad[12]=bladRij('Kop-werk', '', 'Tweg');        // en zo staat het óók in de Sheet
       await koppelTaak(sub, kop);
       await state._writeChain;
       eq('koppel-e2e: een kop die niet geschreven wordt krijgt geen taaknummer', kop.taakId, '');
@@ -5952,6 +5992,18 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         const numX=el=>{ const n=el.querySelector('.bdl-num'); return n ? Math.round(n.getBoundingClientRect().left) : -1; };
         truthy('stapel-e2e: de plaatshouder van het afgeronde lid houdt de kolommen recht',
                pRegels.length===2 && numX(pRegels[0])===numX(pRegels[1]) && numX(pRegels[0])>0);
+        // En de KLEUR van datzelfde handvat. Die stond op --fnt terwijl het identieke handvat één
+        // rij hoger bewust --mut gebruikt; gemeten haalde --fnt in de lichte stand 2,42:1 op de
+        // paneelachtergrond, onder de 3:1 van WCAG 1.4.11 voor niet-tekstuele bedieningselementen.
+        // Op 'dezelfde kleur als .stapel-h' toetsen en niet op een vaste hex: de twee horen bij
+        // elkaar (zelfde icoon, zelfde gebaar) en het is precies dat verschil dat hier ontstond.
+        // Een contrastgetal zou bovendien per thema anders zijn en deze assert aan de stand binden.
+        // Beide elementen uit DEZE render halen: `renderNtd` hierboven heeft de hele tbody
+        // vervangen, en getComputedStyle op een losgekoppeld element geeft geen bruikbare kleur.
+        const rijGreepNu=document.querySelector('#ntd-tbody tr[data-row] .stapel-h');
+        const kleurVan=el=>getComputedStyle(el).color;
+        truthy('stapel-e2e: het paneel-handvat heeft dezelfde kleur als het rij-handvat',
+               !!pGreep && !!rijGreepNu && kleurVan(pGreep)===kleurVan(rijGreepNu));
         state.bundelOpen=new Set(); D.af={ ...leeg };
 
         // 19-nulmeting-quinquies. Het derde icoon: het bundel-merkje. Dat bestaat alleen in de
@@ -6311,6 +6363,67 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         D.af={ ...leeg };
       }
 
+      // 20. De bundelstand van de DOELrij komt uit de SHEET en niet uit ons geheugen. `kopHadBundel`
+      //     wordt afgeleid uit `doel.bundelId`, en dat geheugen kan minuten oud zijn: main.js slaat
+      //     de 8s-poll over zolang er een modal openstaat, en 'Hoort bij' wijst met `state._hbDoel`
+      //     naar een rij-object uit die oude ronde. Is de doeltaak intussen zélf subtaak geworden,
+      //     dan schreef koppelBereiken een volledig bereik Q:S over die rij heen en rukte hem stil
+      //     uit zijn eigen bundel — de undo (`ontkoppelTaak(sub)`) raakt alleen de subtaak en
+      //     herstelt dat niet. De rij-guard ziet het niet: R en S vallen buiten de vingerafdruk.
+      ({ kop, sub } = opnieuw());
+      blad[12]=bladRij('Kop-werk', 'Tkop', 'Tw');      // in de Sheet zit de doeltaak in bundel 'Tw'
+      document.querySelectorAll('#toast-container .toast').forEach(el => el.remove());
+      await koppelTaak(sub, kop);
+      await state._writeChain;
+      eq('koppel-e2e: een doeltaak die intussen in een ándere bundel zit wordt niet overschreven',
+         geschreven.map(g=>g.range), []);
+      eq('koppel-e2e: er is dus wél gelezen en daarna gestopt', volgorde, ['lees']);
+      eq('koppel-e2e: en het scherm staat terug op vóór de klik',
+         [sub.bundelId, sub.bundelVolg, kop.bundelId, kop.bundelVolg], ['','','','']);
+      truthy('koppel-e2e: de gebruiker krijgt te horen waaróm er niets gebeurde',
+             [...document.querySelectorAll('#toast-container .toast-msg')]
+               .some(el => /zelf in een bundel/.test(el.textContent)));
+
+      // 20b. De ontsnapping die dezelfde toets veilig maakt voor een HERKANSING: `assertRowsMatch`
+      //      zit binnen `_withRetry`, dus na een 429/5xx waarbij de POST tóch geland was staat ons
+      //      eigen bundelnummer er al. Dat mag geen weigering worden — anders faalt elke tweede
+      //      poging na een storing.
+      ({ kop, sub } = opnieuw());
+      blad[12]=bladRij('Kop-werk', 'Tkop', 'Tkop');    // precies wat we zelf gaan schrijven
+      await koppelTaak(sub, kop);
+      await state._writeChain;
+      eq('koppel-e2e: staat ons eigen bundelnummer er al, dan gaat de koppeling gewoon door',
+         geschreven.map(g=>g.range), ["'Nog Te Doen'!Q12:S12", "'Nog Te Doen'!Q20:S20"]);
+
+      // 20c. En de andere kant op: ons geheugen zegt dat de doeltaak in een bundel zit, de Sheet
+      //      zegt van niet (iemand heeft hem net ontkoppeld). Dan zou de subtaak een bundelnummer
+      //      krijgen waar verder niemand meer in zit — een lid zonder bundel, en de doeltaak staat
+      //      er buiten. Ook dat is stil, want de kop-rij wordt in dit geval niet eens beschreven.
+      ({ kop, sub } = opnieuw());
+      kop.bundelId='Tweg'; kop.bundelVolg='0';
+      blad[12]=bladRij('Kop-werk', 'Tkop', '');
+      await koppelTaak(sub, kop);
+      await state._writeChain;
+      eq('koppel-e2e: een doeltaak die intussen ontkoppeld is levert ook geen schrijfactie op',
+         geschreven.map(g=>g.range), []);
+      eq('koppel-e2e: en de subtaak blijft los', [sub.bundelId, sub.bundelVolg], ['','']);
+
+      // 21. Kolom Q mag nooit overschreven worden met een ánder nummer. Kent ons geheugen geen
+      //     taaknummer, dan kent koppelTaak er één toe — en precies dán zet assertRowsMatch de
+      //     Q-vergelijking uit (`heeftNr`), want 'ik weet het niet' is geen bewijs van een
+      //     verkeerde rij. Staat er in de Sheet wél een nummer, dan werd dat stil vervangen: het
+      //     vaste taaknummer is de identiteit waar de rij-guard én het hele bundelmechanisme op
+      //     leunen, dus elke rij die er via bundelId naar wees werd een wees. `ontkoppelBereiken`
+      //     dicht ditzelfde gat door kolom Q buiten zijn bereik te houden.
+      ({ kop, sub } = opnieuw(false));                 // geheugen kent géén taaknummers
+      blad={ 12: bladRij('Kop-werk','Toud'), 20: bladRij('Sub-werk','Tsub') };
+      await koppelTaak(sub, kop);
+      await state._writeChain;
+      eq('koppel-e2e: een taaknummer dat al in de Sheet staat wordt niet vervangen',
+         geschreven.map(g=>g.values[0]), [['Toud','Toud','0'], ['Tsub','Toud','10']]);
+      eq('koppel-e2e: en het scherm draagt daarna dezelfde nummers als de Sheet',
+         [kop.taakId, sub.taakId, kop.bundelId, sub.bundelId], ['Toud','Tsub','Toud','Toud']);
+
       // De stille resync van backgroundWrite laten leeglopen mét de stub nog actief (zie de
       // _loadInFlight-les hierboven).
       for(let i=0;i<100 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,5));
@@ -6361,7 +6474,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
           return new Response(JSON.stringify({error:{message:'geen leesverkeer in deze test'}}),{status:403});
         if(methode==='GET'){                 // de rij-controle van assertRowMatch/assertRowsMatch
           volgorde.push('lees');
-          const m=/!A(\d+):Q(\d+)/.exec(u)||[];
+          const m=/!A(\d+):S(\d+)/.exec(u)||[];
           const rijen=[];
           for(let r=+m[1]; r<=+m[2]; r++) rijen.push(blad[r]||[]);
           return new Response(JSON.stringify({values:rijen}),{status:200});
@@ -7346,19 +7459,27 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
          [bg.classList.contains('open'), actieVeld.value], [true, 'half getypte wijziging']);
       closeModal();
 
-      // 8. Het aantal in de verwijdervraag vanuit het bewerkscherm moet op het KLIKMOMENT kloppen.
+      // 8. De knop Verwijderen moet op het KLIKMOMENT op de VERSE rij aangrijpen.
       //    `state.editRowData` blijft over het open scherm heen staan, en `backgroundWrite` doet in
       //    zijn finally een `loadAll(true)` zónder te kijken of er een modal openstaat — dan zijn
-      //    álle rij-objecten in D vervangen door verse met dezelfde inhoud. `subtakenVan` filtert de
-      //    taak zélf op object-identiteit, dus een oud object telt zichzelf mee: de vraag noemt er
-      //    dan één te veel. Hieronder precies die situatie, en hij hoort '1 subtaak' te blijven.
+      //    álle rij-objecten in D vervangen door verse met dezelfde inhoud, en wijst het bewaarde
+      //    object nergens meer naar. `deleteTaskRow` haalt de rij optimistisch weg met
+      //    `arr.indexOf(r)`; met het oude object doet dat niets (de rij blijft op het scherm staan
+      //    terwijl hij uit de Sheet verdwijnt) en zou de rollback hem er bij een fout als duplicaat
+      //    bíj zetten. Daarom her-ankert `_bewerkRijVers` en legt hij het resultaat meteen vast.
+      //    Op `state.editRowData` toetsen en niet op het aantal in de vraag: die telling loopt via
+      //    `openSubtaken`, dat de taak zelf met `zelfdeTaak` (op TAAKNUMMER) uitfiltert en dus ook
+      //    met een verouderd object gewoon 1 geeft — een assert daarop staat los van het
+      //    her-ankeren en blijft groen als je dat weghaalt. Gemeten, niet aangenomen.
       const versKop={ ...kop }, versSub={ ...sub };
       openModal(true, kop);                       // het scherm bewaart het OUDE object
       D.ntd={ ...leeg, OPPAKKEN:[versKop, versSub] };   // …en dan komt de verse parse langs
       state._rowCache=[versKop, versSub];
       antwoord=false; vragen=[];
       await vraag(()=>deleteCurrentEditTask());
-      eq('bewerkscherm: na een verse parse telt de vraag de taak zelf niet mee', vragen,
+      truthy('bewerkscherm: na een verse parse grijpt Verwijderen op het VERSE rij-object aan',
+             state.editRowData===versKop);
+      eq('bewerkscherm: en de vraag telt de taak zelf niet mee', vragen,
          ['Taak verwijderen? | Deze taak heeft nog 1 subtaak. Die wordt niet mee verwijderd. | Toch verwijderen']);
       closeModal();
 

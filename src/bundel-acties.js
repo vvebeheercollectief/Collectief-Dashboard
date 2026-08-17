@@ -17,13 +17,20 @@
 //     `koppelTaak` kent hem soms pas net toe. Zie daar.
 // Wordt FP_KOLOMMEN ooit tot R/S uitgebreid, dan gaan de checks hieronder vals alarm slaan
 // (zichtbaar als 'De lijst was net gewijzigd' bij élke stapelactie) en moeten ze meeveranderen.
+//
+// Diezelfde blindheid is óók een gat, en dat is niet met een vingerafdruk te dichten: wat de
+// guard niet ziet, kan hij ook niet beschermen. Kolom R van de DOELrij mag deze module wél
+// overschrijven (dat is de hele handeling), maar alleen als hij weet wat er staat — en dat weet
+// hij niet uit `doel.bundelId`, want dat geheugen kan minuten oud zijn. `assertRowsMatch` leest
+// daarom t/m S en geeft de rijen terug; `koppelTaak` toetst kolom Q en R daarop vóór hij schrijft.
+// Eén lezing, geen extra verzoek.
 import { SID, SKEYS } from "./config.js";
 import { state, D } from "./state.js";
 import { _veiligeRij, assertRowsMatch } from "./api.js";
 import { backgroundWrite, blokkeerOffline } from "./data.js";
 import { ensureToken } from "./auth.js";
 import { showUndoToast, showToast } from "./notifications.js";
-import { nieuwTaakId, taakTitel } from "./util.js";
+import { nieuwTaakId, taakTitel, leegBijErfenis } from "./util.js";
 import { bouwBundelIndex, volgendeVolg, hernummerLeden, magKoppelen, bundelSleutel, zichtbareKop } from "./bundel.js";
 import { renderAll } from "./main.js";
 
@@ -111,15 +118,16 @@ function heeftRij(...rijen){
 // het blad waar de rij vandaan komt — rij 12 van 'Afgerond' is dus een wildvreemde taak in
 // 'Nog Te Doen'.
 //
-// De route die hier vandaag écht langs kán komen is het herordenen: `herordenBundel` krijgt de
-// gesleepte volgorde van de aanroeper mét een `af`-vlag per lid, en die vlag komt uit de DOM.
-// Afgeronde leden staan wel degelijk in die lijst — ze zijn bij het hernummeren VASTE ANKERS en
-// dragen daarom `data-taak` in het paneel (zie `hernummerLeden` en `subRegel`) — alleen hóórt er
-// `af:true` bij. Klopt dat niet, dan laat `hernummerLeden` zo'n lid niet weg en wordt zijn
-// regelnummer als 'Nog Te Doen'-rij beschreven. Dat staat twintig regels lager bij `herordenBundel`
-// verder uitgewerkt.
+// Ook bij het herordenen is dit vandaag een vangnet en geen bestaande route (nagemeten
+// 2026-08-18). Uit de DOM komt alleen de VOLGORDE: `paneelTaaknummers` leest `data-taak`, en
+// `sleepUitslag` haalt daarmee de LEDEN uit de lijst die `bouwBundelIndex` net heeft opgeleverd
+// (`voorraad.splice`) — het index-object gaat ongewijzigd door, dus de `af`-vlag komt van daar en
+// is per definitie waarheidsgetrouw. Afgeronde leden staan wel degelijk in die lijst: ze zijn bij
+// het hernummeren VASTE ANKERS en dragen daarom `data-taak` in het paneel (zie `hernummerLeden` en
+// `subRegel`). Bouwt een latere aanroeper de vlag tóch zelf, dan laat `hernummerLeden` zo'n lid
+// niet weg en wordt zijn regelnummer als 'Nog Te Doen'-rij beschreven — daarvóór staat deze guard.
 //
-// Bij koppelen en ontkoppelen is dit een vangnet en geen bestaande route (nagelopen 2026-08-15):
+// Bij koppelen en ontkoppelen is het om een andere reden een vangnet (nagelopen 2026-08-15):
 // de `m.af`-tak van `subRegel` (render-bundel.js) geeft een afgerond lid géén actieknoppen, géén
 // `data-action` en géén sleep-handvat, en beide wegen beginnen bij een rij uit `state._rowCache`
 // of `state.editRowData` — daar komen alleen openstaande rijen in (rowNtd, de open tak van
@@ -216,11 +224,63 @@ export async function koppelTaak(sub, doel){
       // vergelijkt de guard 'T:<nieuw>' met een rij zónder nummer en zou élke koppeling op een
       // rij van vóór de backfill gegarandeerd afketsen. (Voor bundelId/bundelVolg is dezelfde
       // omkering niet nodig — zie de kop van dit bestand.)
-      await assertRowsMatch([
+      const rijen = await assertRowsMatch([
         { row: opdracht.subRij, r: { ...sub,  taakId: oudSubNr } },
         { row: opdracht.kopRij, r: { ...doel, taakId: oudKopNr } },
       ]);
-      await schrijfBereiken(koppelBereiken(opdracht));
+      // Wat er NÚ in kolom Q en R van de twee rijen staat. Dezelfde normalisatie als
+      // `parseSections` (leegBijErfenis voor Q en R, dat wist een geërfde TRUE/FALSE), want anders
+      // vergelijken geheugen en verse lezing niet hetzelfde.
+      const cel = (rij, i) => leegBijErfenis((rijen.get(rij) || [])[i]);
+      const kopQnu = cel(opdracht.kopRij, 16), subQnu = cel(opdracht.subRij, 16);
+      const kopRnu = cel(opdracht.kopRij, 17);
+
+      // ── Kolom Q mag NOOIT overschreven worden met een ander nummer ──
+      // Kent ons geheugen geen taaknummer, dan is er hierboven een vers nummer toegekend — en
+      // precies in dat geval zet `assertRowsMatch` de Q-vergelijking uit (`heeftNr`), want 'ik
+      // weet het niet' is geen bewijs van een verkeerde rij. Staat er in de Sheet intussen wél
+      // een nummer (de backfill, een collega, handmatig), dan zou dat hier stil vervangen worden.
+      // Het vaste taaknummer is de identiteit waar de rij-guard én het hele bundelmechanisme op
+      // leunen: elke rij die er via bundelId naar wees — ook rijen in 'Afgerond' — werd dan een
+      // wees. Daarom telt het nummer uit de Sheet, en niet dat van ons.
+      // `ontkoppelBereiken` dicht ditzelfde gat door kolom Q buiten zijn bereik te houden; hier
+      // kan dat niet, want voor een rij van vóór de backfill is dit juist de plek waar het verse
+      // nummer moet landen.
+      const kopNr = kopQnu || opdracht.kopNr;
+      const subNr = subQnu || opdracht.subNr;
+      // Nieuwe bundel? Dan is het bundelnummer het taaknummer van de kop, dus dat schuift mee.
+      const echtBundelId = opdracht.schrijfKop ? bundelSleutel(kopNr) : opdracht.bundelId;
+
+      // ── En de bundelstand van de DOELrij komt uit de Sheet, niet uit ons geheugen ──
+      // `kopHadBundel` is hierboven uit `doel.bundelId` afgeleid, en dat geheugen kan minuten oud
+      // zijn: main.js slaat de 8s-poll over zolang er een modal openstaat, en via 'Hoort bij'
+      // wijst `state._hbDoel` naar een rij-object uit die oude ronde. Zegt ons geheugen 'geen
+      // bundel' terwijl de doeltaak intussen zélf subtaak is geworden, dan schreef `koppelBereiken`
+      // een volledig bereik Q:S over die rij heen en rukte de doeltaak stil uit haar bundel — de
+      // aangeboden undo (`ontkoppelTaak(sub)`) raakt alleen de subtaak en herstelt dat niet.
+      // De rij-guard kan dit niet zien: R en S vallen bewust buiten de vingerafdruk.
+      // Niet stil aansluiten bij die andere bundel maar wéigeren: het volgnummer is hierboven
+      // berekend op een bundel die we niet kennen, dus we zouden een botsing uitdelen. Na de
+      // rollback leest `backgroundWrite` alles opnieuw in en werkt dezelfde handeling gewoon.
+      // Toegestaan is óók het bundelnummer dat we zelf aan het schrijven zijn: bij een herkansing
+      // binnen `_withRetry` (429/5xx nadat de POST tóch geland was) staat het er dan al.
+      if (kopRnu !== echtBundelId && !(opdracht.schrijfKop && !kopRnu)){
+        const err = new Error('De bundel van de doeltaak is net gewijzigd.');
+        err.rowMismatch = true;   // zelfde afhandeling als de rij-guard: rollback + eigen melding
+        err.melding = 'Deze taak zit intussen zelf in een bundel. Je scherm is bijgewerkt — probeer opnieuw.';
+        throw err;
+      }
+      // Het scherm meeschuiven naar wat er écht geschreven gaat worden. Week het hierboven af van
+      // ons geheugen, dan draagt het rij-object anders een taaknummer of bundelnummer dat in de
+      // Sheet niet bestaat, en ketst élke volgende schrijfactie op die rij af op de rij-guard.
+      // Geen renderAll: in het gewone geval verandert er niets, en in het zeldzame geval waarin
+      // dat wél zo is tekent de stille resync van `backgroundWrite` het scherm zo meteen opnieuw.
+      // De rollback hieronder zet ook deze waarden terug — die leest de OUDE waarden, niet deze.
+      sub.taakId = subNr; doel.taakId = kopNr;
+      sub.bundelId = echtBundelId;
+      if (opdracht.schrijfKop) doel.bundelId = echtBundelId;
+      state.bundelOpen.add(echtBundelId);
+      await schrijfBereiken(koppelBereiken({ ...opdracht, kopNr, subNr, bundelId: echtBundelId }));
     },
     () => { sub.bundelId = oudSub.bundelId; sub.bundelVolg = oudSub.bundelVolg; sub.taakId = oudSubNr;
             doel.bundelId = oudKop.bundelId; doel.bundelVolg = oudKop.bundelVolg; doel.taakId = oudKopNr; },
@@ -296,8 +356,11 @@ export async function herordenBundel(nieuweVolgorde, volgordeGewijzigd){
   }
   if (!heeftRij(...wijzigingen.map(w => w.r))) return;
   // Vangnet op de af-vlag: `hernummerLeden` laat afgeronde leden weg op grond van de `af` die de
-  // AANROEPER meegeeft, en die komt bij het slepen uit de DOM. Klopt hij niet, dan zou hier een rij
-  // uit 'Afgerond' in de lijst staan en zijn regelnummer als 'Nog Te Doen'-rij beschreven worden.
+  // AANROEPER meegeeft. Bij het slepen komt die vlag NIET uit de DOM — daar komt alleen de volgorde
+  // vandaan (`data-taak`), waarna `sleepUitslag` de leden ongewijzigd uit de verse `bouwBundelIndex`
+  // haalt. Voor die weg is dit dus een vangnet. Bouwt een latere aanroeper de lijst zelf op en zet
+  // hij de vlag verkeerd, dan zou hier een rij uit 'Afgerond' in de lijst staan en zijn regelnummer
+  // als 'Nog Te Doen'-rij beschreven worden.
   if (blokkeerAfgerond(...wijzigingen.map(w => w.r))) return;
   // De oude nummers in dezelfde vorm als `wijzigingen`, zodat de undo exact dezelfde weg loopt.
   // `?? ''` en niet `|| ''`: alleen het GETAL 0 maakt hier verschil, en 0 is een echt volgnummer —

@@ -11,8 +11,11 @@
 // praktijk: alleen aanroepen vanuit rowNtd.
 // Nadrukkelijk NIET vereist is dat de cache vooraf leeg is. renderNtd bouwt de hele tbody opnieuw
 // op, dus elke getekende `data-rid` krijgt in die ronde een verse index en wijst naar de juiste
-// taak. Een renderNtd zonder voorafgaande renderAll (die de cache leegt) laat de cache alleen
-// groeien tot de eerstvolgende renderAll uit de poll — dat kost geheugen, geen correctheid.
+// taak. Wél groeit de cache dan door: alleen `renderAll` leegt hem (main.js), en de poll roept die
+// uitsluitend aan als de datahash veranderde (data.js) — op een rustige middag dus mogelijk uren
+// niet, terwijl elke bundel-toggle, sortering, paginawissel en toetsaanslag in het zoekveld een
+// renderNtd is. Dat kost geheugen, geen correctheid; behandel `state._rowCache` daarom niet als
+// een eindige of volledige lijst van wat er nú op het scherm staat.
 import { esc, taakTitel, kortDatum, taakActieKnoppen } from "./util.js";
 import { SECS } from "./config.js";
 import { zichtbareKop, bundelVan, wordtGeabsorbeerd, bundelSleutel, zelfdeTaak } from "./bundel.js";

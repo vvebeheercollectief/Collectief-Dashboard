@@ -41,7 +41,11 @@ const RASTER_MIN = {
   'Herhaalregels':    12,  // A:L
   'Kenmerken':         6,  // A:F
   'Ontwikkeling':      6,  // A:F
-  'Logboek':           8,  // A:H
+  // 9 en niet 8, en dat komt NIET uit het aantal waarden: `undoDeleteLog` (render-overig.js) geeft
+  // insertAndWriteRow acht waarden, maar `_eindKolom` (crud.js) klemt het bereik op minimaal A..I.
+  // De breedste schrijfactie op dit blad reikt dus tot kolom I, ook al staat er in kolom I niets.
+  // Alle andere wegen naar 'Logboek' blijven bij H (appendRange "'Logboek'!A:H", logEditWrite E:G).
+  'Logboek':           9,  // A:I — zie _eindKolom; de logregel zelf is 8 breed (A:H)
   'Notif-wachtrij':    4,  // A:D
   "ALV's overzicht":   7,  // t/m Klaargezet (G)
   "ALV's afgerond":    3,

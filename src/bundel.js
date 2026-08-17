@@ -90,9 +90,11 @@ export function bouwBundelIndex(ntd, af){
 //    tabblad en `setNtd` wist daarbij de selectie; een half gemaakte bulk-selectie mag niet met één
 //    misklik verdwijnen. In bulk-modus is elke rij een aanvinkbaar item en verder niets.
 //
-// Als eigen functie en niet als ternary in `renderNtd`, omdat juist die koppeling stil kan
-// wegvallen: `renderNtd` leest de DOM en draait niet mee in de testronde, dus een vlag die niets
-// meer doet zou pas opvallen als een gezochte subtaak uit de trefferlijst verdwijnt.
+// Als eigen functie en niet als twee ternary's in `renderNtd`: dan is er één producent voor de
+// twee vlaggen en kan er geen render bestaan die de ene helft van de weergave aanzet en de andere
+// niet. Los ernaast staat dat de vlaggen zo zónder DOM te toetsen zijn; de bedrading naar
+// `renderNtd` zelf ligt wél vast in de testronde — die roept hem echt aan (zie het `bedrading:`-blok
+// in tests.js, dat na een zoekterm de platte lijst, de ontbrekende telpill en het merkje meet).
 export function bundelWeergave({ plat, bulk }, ntd, af){
   return { ix: bouwBundelIndex(ntd, af), stapel: !plat, merk: !bulk };
 }
@@ -169,21 +171,21 @@ export function wordtGeabsorbeerd(r, index, sec){
   return kop.r._sec === sec;                       // kop in hetzelfde tabblad → het paneel tekent hem
 }
 
-// De subtaken van een taak: de leden die naar zíjn taaknummer wijzen — open én afgerond, want welke
-// van de twee telt verschilt per aanroeper. `magKoppelen` gebruikt de lijst als vangrail (mag deze
-// taak zelf nog ergens onder?), `openSubtaken` telt er alleen de openstaande van.
+// De subtaken van een taak: de leden die naar zíjn taaknummer wijzen — open én afgerond.
+// Eén aanroeper: `magKoppelen`, die de lijst ongefilterd als nesting-vangrail gebruikt (mag deze
+// taak zelf nog ergens onder hangen?). Afgeronde subtaken tellen daar gewoon mee; ze bewijzen net
+// zo goed dat deze taak een hoofdtaak is.
 //
-// Eén functie voor die twee, omdat het exact dezelfde vraag is: wie draagt mijn taaknummer als
-// bundelnummer? Dat is de regel uit de kop van deze module, en twee plekken die hem elk zelf
-// afleiden gaan er bij de eerstvolgende wijziging stil van uit elkaar lopen.
+// `openSubtaken` stelde deze vraag ooit ook, maar is bij commit f9d003f omgebouwd naar
+// `bundelVan` + `zichtbareKop` — zie de toelichting daar. Deze functie is dus geen gedeelde bron
+// meer; hij staat apart omdat `magKoppelen` een wezenlijk andere vraag stelt dan 'wie is de kop'.
 //
 // Voorwaarde aan de aanroeper: `index` en `r` komen uit dezelfde momentopname. De taak zélf valt uit
 // de lijst op object-identiteit (`m.r !== r`), want twee rijen kunnen hetzelfde taaknummer dragen
 // (een dubbele rij in de Sheet, precies wat `checkNummers` meldt) en dán is dat wél een echte
 // subtaak-achtige verwijzing. Geef je een `r` mee uit een ándere leesronde dan waaruit
-// `bouwBundelIndex` is gebouwd, dan telt de taak zichzelf als 'andere rij': `magKoppelen` weigert
-// dan élke koppeling (zichtbaar als een melding over subtaken die er niet zijn) en de waarschuwing
-// bij afronden noemt er één te veel.
+// `bouwBundelIndex` is gebouwd, dan telt de taak zichzelf als 'andere rij' en weigert `magKoppelen`
+// élke koppeling — zichtbaar als een melding over subtaken die er niet zijn.
 function subtakenVan(index, r){
   const nr = tekst(r && r.taakId);
   // Geen taaknummer = niets om naar te wijzen, dus per definitie geen subtaken. Deze regel kan het
@@ -336,12 +338,18 @@ function verdeelRuimte(laag, boven, k, bezet){
   //    leden landen er in beeld áchter in plaats van ervoor. Dat is de enige plek waar de
   //    getoonde volgorde van de gesleepte kan afwijken, en het blijft bij een verkeerde volgorde
   //    (§5) — botsen doen de nummers niet, want de reeks slaat bezette nummers over. Het aantal
-  //    pogingen is begrensd op het aantal bezette nummers: een astronomisch getal uit een
-  //    handmatig bewerkte cel schuift in drijvende komma niet meer op, en dan is een verkeerde
-  //    volgorde oneindig veel beter dan een vastloper.
+  //    pogingen is begrensd op het aantal bezette nummers PLUS ÉÉN, en die +1 is precies wat de
+  //    botsingsvrijheid draagt: elke poging levert een strikt oplopend, uniek veelvoud van tien,
+  //    dus pas bij `bezet.size + 1` kandidaten garandeert het duivenhokprincipe dat er één vrij
+  //    tussen zit. Met exact `bezet.size` pogingen kunnen ze in het slechtste geval állemaal
+  //    bezet zijn en pusht de lus alsnog een bezet nummer. Een bovengrens is er wél nodig: een
+  //    astronomisch getal uit een handmatig bewerkte cel schuift in drijvende komma niet meer op,
+  //    en dan is een verkeerde volgorde oneindig veel beter dan een vastloper.
   const uit = [];
   let n = laag;
   for (let t = 0; t < k; t++) {
+    // De + 1 hoort bij de duivenhok-redenering hierboven; hem 'opruimen' haalt de enige reden weg
+    // waarom deze tak niet kan botsen.
     for (let poging = bezet.size + 1; poging > 0; poging--) {
       n = (Math.floor(n / 10) + 1) * 10;
       if (!bezet.has(n)) break;
@@ -371,7 +379,9 @@ function verdeelRuimte(laag, boven, k, bezet){
 // voorbij dat lid (zie geval 3 daar).
 //
 // Voorwaarde aan de aanroeper: `af` moet waarheidsgetrouw meekomen, zoals `bouwBundelIndex` hem
-// zet. Bouw je de sleepvolgorde uit de DOM, neem die vlag dan mee — hij is het enige onderscheid.
+// zet. De sleepweg voldoet daaraan omdat hij de LEDEN uit die index hergebruikt en alleen de
+// VOLGORDE uit de DOM haalt (zie `sleepUitslag`); bouw je zo'n lijst zelf op, neem de vlag dan
+// over — hij is het enige onderscheid.
 // Een afgerond lid met een onleesbaar volgnummer (handmatig gewiste cel) is géén vast punt: er is
 // dan niets om omheen te tellen. Zo'n lid sorteert via `volgVan` achteraan en zakt dus naar de
 // staart van de bundel — rommel hoort achteraan (§5), en het alternatief zou zijn dat één lege

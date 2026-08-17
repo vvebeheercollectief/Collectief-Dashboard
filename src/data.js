@@ -42,7 +42,10 @@ function backgroundWrite(writeFn, rollback, foutTitel){
       if(e&&e.offline){
         showToast(foutTitel,'Geen verbinding — de wijziging is teruggezet. Probeer het opnieuw zodra je weer online bent.','var(--rd)');
       }else if(e&&e.rowMismatch){
-        // De doelrij was verschoven (Sheet tussentijds gewijzigd) → niet geschreven, teruggedraaid.
+        // De Sheet is tussentijds gewijzigd op een manier die deze schrijfactie onveilig maakt —
+        // de doelrij is verschoven of iemand heeft de taak aangepast (assertRowsMatch), of de
+        // doeltaak zit intussen zelf in een bundel (koppelTaak). Niet geschreven, teruggedraaid;
+        // de melding komt van de werper, want alleen die weet wát er mis was.
         showToast(foutTitel, e.melding || 'De lijst was net gewijzigd — opnieuw geladen, probeer nog eens.','var(--rd)');
       }else if(msg.includes('authentication')||msg.includes('unauthenticated')||msg.includes('unauthorized')){
         state.oauthToken=null;state.oauthExpiry=0;

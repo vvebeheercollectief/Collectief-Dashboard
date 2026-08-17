@@ -1277,7 +1277,14 @@ body.bulk #chat-fab{display:none}
    niet. 14 + 2×5 geeft 24px terug, dus de aanraakhalo hieronder houdt zijn maat (35,6 → 36px).
    Voor de LEGE plaatshouder van een afgerond lid is dat 10px in plaats van 4px — dat mag, want de
    hoogte van zo'n regel wordt bepaald door zijn tekst (17,5px gemeten), niet door deze span. */
-.bdl-h{cursor:grab;color:var(--fnt);flex:none;box-sizing:border-box;width:16px;
+/* De kleur is --mut en niet --fnt, om exact dezelfde reden als bij `.stapel-h` verderop: --mut is
+   in BEIDE standen de sterkere van de twee (licht #5b6675 op wit, donker #9aa1ad op donker).
+   Gemeten met --fnt haalde dit handvat in de lichte stand 2,42:1 op de paneelachtergrond — onder de
+   3:1 die WCAG 1.4.11 voor niet-tekstuele bedieningselementen vraagt — terwijl het identieke
+   handvat één rij hoger op 5,83:1 stond. Met --mut komen ze allebei boven 5:1. Dat weegt hier
+   zwaarder dan elders: herordenen kán alleen met dit handvat (er is bewust geen toetsenbordweg,
+   zie subRegel in render-bundel.js), dus wie hem niet ziet, vindt de functie niet. */
+.bdl-h{cursor:grab;color:var(--mut);flex:none;box-sizing:border-box;width:16px;
   padding:5px 0;user-select:none;touch-action:none;position:relative}
 .bdl-h:active{cursor:grabbing}
 /* `display:block` zodat de SVG geen inline-doos wordt: een inline replaced element gaat op de

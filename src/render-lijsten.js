@@ -176,8 +176,8 @@ function erIsGefilterd({ q, fCode, beh, prio, status }){
 // blijven staan krijgen daar een merkje, en omgekeerd (zie `wordtGeabsorbeerd`).
 // Krijgt de hele weergave en niet alleen de index, want zonder stapel is er geen paneel om
 // subtaken in op te nemen en hoeft er dus ook niets uit de lijst te verdwijnen. Die toets hoort
-// hier en niet in een ternary bij de aanroeper: renderNtd leest de DOM en draait niet mee in de
-// testronde, dus daar zou hij ongemerkt om kunnen gaan.
+// hier en niet in een ternary bij de aanroeper, zodat absorptie en paneel gegarandeerd op dezelfde
+// vlag besluiten — één antwoord, niet twee die uit elkaar kunnen lopen.
 function absorbeer(rows, sec, bw){
   if (!bw || !bw.stapel || !bw.ix.size) return rows;
   return rows.filter(r => !wordtGeabsorbeerd(r, bw.ix, sec));
@@ -259,9 +259,12 @@ function springNaarBundel(bundelId){
   // nabouwen: een tweede kopie van filteren/sorteren/absorberen loopt bij de eerste wijziging
   // stil uit de pas. Staat de kop er niet in, dan laten we de pagina met rust; springen naar een
   // rij die er niet is heeft geen zin.
-  const i = (zichtbaar || []).indexOf(kop.r);
-  if (i >= 0){
-    const pg = Math.floor(i / PG) + 1;
+  // Via `ntdPagina` en niet met een eigen `Math.floor(i / PG) + 1`: die afspraak (0/1-basis, wat
+  // 'staat er niet in' betekent, hoe PG erin zit) hoort op één plek te staan. Twee kopieën lopen
+  // bij de eerste wijziging aan de paginering stil uit de pas, en het gevolg — op de verkeerde
+  // pagina landen — geeft geen fout maar een knop die niets lijkt te doen.
+  const pg = ntdPagina(zichtbaar, kop.r);
+  if (pg){
     if (pg !== pgs.ntd){ pgs.ntd = pg; renderNtd(); }
     const tr = document.querySelector(`#ntd-tbody tr[data-row="${kop.r._row}"]`);
     if (tr && tr.scrollIntoView) tr.scrollIntoView({ block:'center' });
@@ -282,8 +285,8 @@ function renderNtd(){
   const fPrio=document.getElementById('f-prio-ntd').value;
 
   // Eén bundelweergave per render: de index plus de vlaggen `stapel` en `merk`. Wat die betekenen
-  // en waarom ze samen bepaald worden staat bij `bundelWeergave` — bewust dáár, zodat het getest
-  // kan worden (deze functie zelf niet — die leest de DOM).
+  // en waarom ze samen bepaald worden staat bij `bundelWeergave` — bewust dáár, zodat er één
+  // producent voor beide vlaggen is en ze los van de DOM te toetsen zijn.
   // Eén set filterwaarden voor beide vragen ('is de lijst plat?' en 'is er gefilterd?'), zodat de
   // gedeelde termen niet op twee plekken los uitgeschreven staan — zie `erIsGefilterd`.
   const filters={ q, fCode, beh:fBeh, prio:fPrio, status:state.ntdStatus };
@@ -390,7 +393,8 @@ function setNtd(s){
 // dus in exact de volgorde waarin `renderTbody` de rijen over de pagina's verdeelt. Bewust als
 // parameter en niet zelf opnieuw opgebouwd — een tweede kopie van die pijplijn loopt bij de eerste
 // wijziging stil uit de pas (zelfde afweging als in `springNaarBundel`, dat om die reden op de
-// teruggave van `setNtd` leunt). Zo blijft dit bovendien een pure functie.
+// teruggave van `setNtd` leunt en deze functie gebruikt in plaats van de rekensom over te schrijven).
+// Zo blijft dit bovendien een pure functie.
 function ntdPagina(zichtbaar, r){
   const i=(zichtbaar||[]).indexOf(r);
   return i<0 ? 0 : Math.floor(i/PG)+1;

@@ -249,8 +249,12 @@ function rowNtd(r,sec){
     const kolommen = SECS[sec].cols.length + 1 + (state.bulkMode?1:0);
     bdlNa = _extra.open
       ? `<tr class="bdl-tr"><td colspan="${kolommen}">${bundelPaneelHtml(_leden, _kop)}</td></tr>`
-      : `<tr class="bdl-peek"><td colspan="${kolommen}"><span class="l"></span></td></tr>`
-      + `<tr class="bdl-peek d2"><td colspan="${kolommen}"><span class="l"></span></td></tr>`;
+      // `aria-hidden` op de twee stapelrandjes: het zijn zuiver decoratieve rijen met een lege cel,
+      // dus zonder dat meldt een schermlezer na élke dichtgeklapte bundel twee lege rijen en klopt
+      // het rijaantal dat hij noemt niet meer met het aantal taken. Visueel verandert er niets.
+      // De paneelrij hierboven krijgt hem juist NIET — daar staat echte, bedienbare inhoud in.
+      : `<tr class="bdl-peek" aria-hidden="true"><td colspan="${kolommen}"><span class="l"></span></td></tr>`
+      + `<tr class="bdl-peek d2" aria-hidden="true"><td colspan="${kolommen}"><span class="l"></span></td></tr>`;
   }
   // `data-rid` op de <tr>: het slepen (Taak 15) moet van de gesleepte rij naar het taak-object
   // komen. `rid` is een directe index in state._rowCache — precies het mechanisme waarmee elke

@@ -329,6 +329,16 @@ export function toevoegWaarden(values, r){
   ]);
 }
 
+// De laatste kolomletter van het bereik dat `insertAndWriteRow` beschrijft. Puur en geëxporteerd,
+// zodat RASTER_MIN (structuurcheck.js) hier écht aan vast te pinnen is in plaats van op papier:
+// die tabel belooft de BREEDSTE SCHRIJFACTIE per tabblad te volgen, en voor 'Logboek' is dat niet
+// het aantal waarden (acht) maar deze ONDERGRENS van negen. Zonder die koppeling zei de
+// structuurcheck 'in orde' op een acht kolommen breed Logboek, terwijl juist daar het ongedaan
+// maken van een verwijderde logregel stil zou mislukken — het scenario waarvoor die bewaking
+// bestaat. De ondergrens zelf blijft staan: hem weghalen is een gedragswijziging aan een levende
+// schrijfweg, en de bewaking gelijktrekken kost niets.
+export function _eindKolom(values){ return String.fromCharCode(64+Math.max((values||[]).length,9)); }
+
 async function insertAndWriteRow(sheetName,afterRow,values){
   if(!state.oauthToken) throw new Error('Niet ingelogd');
   const ids=await getSheetIds();
@@ -340,7 +350,7 @@ async function insertAndWriteRow(sheetName,afterRow,values){
     body:JSON.stringify({requests:[{insertDimension:{range:{sheetId,dimension:'ROWS',startIndex:afterRow,endIndex:afterRow+1},inheritFromBefore:true}}]})
   });
   if(!insResp.ok){const e=await insResp.json();if(insResp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Invoegfout');err.status=insResp.status;throw err}
-  const endCol=String.fromCharCode(64+Math.max(values.length,9));
+  const endCol=_eindKolom(values);
   try{
     await writeRange(`'${sheetName}'!A${afterRow+1}:${endCol}${afterRow+1}`,values);
   }catch(e){
@@ -501,12 +511,21 @@ function _herankerRij(r, ntd){
 // in closeModal). Loopt er dus nog een schrijfactie van een eerdere handeling, dan zijn álle
 // rij-objecten in D intussen vervangen door verse met dezelfde inhoud, en wijst het bewaarde object
 // nergens meer naar. Wat er dan misgaat verschilt per knop:
-//   • Verwijderen en Afronden bouwen hun bundelindex vers uit D, en `subtakenVan` filtert de taak
-//     zélf op object-identiteit: een oud object telt daar als 'andere rij', dus de vraag over
-//     openstaande subtaken noemt er één te veel.
+//   • Verwijderen haalt de rij optimistisch uit D.ntd met `arr.indexOf(r)`. Een oud object staat
+//     daar niet meer in, dus dat doet niets: de rij blijft op het scherm staan terwijl hij uit de
+//     Sheet verdwijnt, en de rollback (`if(arr.indexOf(r)===-1)`) zou hem er bij een fout als
+//     duplicaat bíj zetten.
+//   • Afronden legt de rij in `state._completeRow` en het afrond-scherm haalt hem daar seconden
+//     later weer uit. `doCompleteTask` her-ankert dan zelf nog een keer, maar op INHOUD, en
+//     `_herankerRij` geeft het op zodra er twee inhoudelijk gelijke rijen in dezelfde sectie
+//     staan — dan krijgt de gebruiker 'Taak niet gevonden' nadat hij datum en toelichting al
+//     had ingevuld.
 //   • Opslaan schreef naar het `_row` van het oude object. Dat rijnummer kan intussen een andere
 //     taak zijn — `assertRowMatch` vangt dat af, maar dan als mislukte schrijfactie in plaats van
 //     als een die gewoon op de juiste rij landt.
+// Wat hier NIET aan hangt: het aantal in de vraag over openstaande subtaken. Die telling loopt via
+// `openSubtaken`, en dat filtert de taak zélf met `zelfdeTaak` — dus op TAAKNUMMER, niet op
+// object-identiteit. Een verouderd rij-object met hetzelfde nummer valt daar gewoon uit de telling.
 //
 // Getoetst op D.ntd en niet op state._rowCache: dát is de bron waaruit de bundelindex gebouwd wordt,
 // en het Ctrl+K-palet opent dit scherm met een rij die wél in D staat maar niet per se in de cache

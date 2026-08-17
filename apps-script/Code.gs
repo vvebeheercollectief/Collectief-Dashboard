@@ -14,15 +14,23 @@ function verplaatsAfgerond(e) {
   if (range.getValue() !== true) return;
 
   var row = range.getRow();
-  var lastCol = 9;
-  var rowData = sheet.getRange(row, 1, 1, lastCol).getValues()[0];
+  var vinkKolom = 9;   // kolom I — het afvink-hokje (heette hier `lastCol` toen A:I álles was)
+  // Lees t/m S en niet t/m I. De kolommen Q (taakId), R (bundelId) en S (bundelVolg) moeten mee
+  // naar het archief: zonder taaknummer heeft een afgeronde rij geen identiteit meer en laat
+  // bouwBundelIndex (src/bundel.js, §3.2b van het ontwerp) hem per definitie buiten de bundel
+  // vallen. Vinkte iemand hier een bundellid af, dan verdween dat lid dus helemaal uit de bundel
+  // in plaats van doorgestreept bovenin het paneel te blijven staan — en bij een bundel van twee
+  // bleef er geen bundel over. Achteraf niet meer te herstellen: de archiefrij had geen identiteit.
+  // Nooit breder lezen dan het blad is; getRange gooit anders een fout en legt de hele trigger stil.
+  var leesBreedte = Math.min(19, sheet.getMaxColumns());
+  var rowData = sheet.getRange(row, 1, 1, leesBreedte).getValues()[0];
 
   // Herverifieer binnen de lock dat de afvink-checkbox (kolom 9) op rij `row` NOG aan staat.
   // `row` komt uit het onEdit-event (vastgelegd vóór de lock); een frontend-write via de
   // Sheets-API loopt buiten de Apps Script-lock en kan in dat venster rijen verschoven hebben,
   // waardoor `row` nu een ándere taak aanwijst. Staat kolom 9 daar niet (meer) op TRUE, dan is
   // dit niet de zojuist-afgevinkte rij → niet kopiëren/verwijderen (resync corrigeert).
-  if (rowData[lastCol - 1] !== true) return;
+  if (rowData[vinkKolom - 1] !== true) return;
 
   if (rowData[0] === "" && rowData[1] === "") return;
 
@@ -43,6 +51,9 @@ function verplaatsAfgerond(e) {
   var behandelaar = rowData[4];
   var datumAfgerond = new Date();
   var newRow = [vveCode, vveNaam, actiepunt, behandelaar, datumAfgerond];
+  // Q, R en S van de afgevinkte rij, in dezelfde volgorde als afrondWaarden (src/crud.js) ze op
+  // 'Afgerond' zet: 1-gebaseerd kolom 17, 18 en 19. Leeg als het blad ze niet had.
+  var bundelStaart = [rowData[16] || "", rowData[17] || "", rowData[18] || ""];
 
   var targetSheet = e.source.getSheetByName("Afgerond");
   if (!targetSheet) {
@@ -103,6 +114,13 @@ function verplaatsAfgerond(e) {
 
   targetSheet.insertRowBefore(insertRow);
   targetSheet.getRange(insertRow, 1, 1, 5).setValues([newRow]);
+  // Q/R/S apart en niet als één rij van 19 breed: dan zouden F t/m P met lege strings beschreven
+  // worden, en die kolommen raakt deze functie nu bewust niet aan. 'Afgerond' is 26 kolommen breed
+  // (gemeten), maar de klem blijft staan — schrijven buiten het raster mislukt in Apps Script met
+  // een fout die de hele trigger stillegt.
+  if (targetSheet.getMaxColumns() >= 19) {
+    targetSheet.getRange(insertRow, 17, 1, 3).setValues([bundelStaart]);
+  }
 
   sheet.deleteRow(row);
  });

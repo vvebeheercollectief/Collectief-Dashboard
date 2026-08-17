@@ -717,7 +717,17 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   // Geen _row → _bewaar keert terug vóór elk netwerkverkeer; puur de doel-keuze wordt getest.
   (()=>{
     const vR=D.ntd['OFFERTE-TRAJECTEN'], vO=new Set(state.offerteAannOpen);
+    const cacheOud=state._uitCache, nfOud=state._netwerkFouten;
     try{
+      // `addAannemer` en `verwijderAannemer` gaan door `blokkeerOffline()`, en die weigert te
+      // schrijven zolang het scherm op de leescache staat (state._uitCache) of de netwerkteller op
+      // 'offline' staat. Ingelogd zet `laadUitCache()` die rem bij het opstarten áán tot de eerste
+      // verse ronde binnen is — een seconde of twee — en de testronde begint daar middenin. Zonder
+      // deze twee regels keren beide functies stil terug vóór de mutatie en meet dit blok niets:
+      // het viel door de mand op de testomgeving, waar de suite lang genoeg is om in dat venster te
+      // landen, terwijl hij lokaal (niet ingelogd, dus geen cache-rem) altijd groen was.
+      // Dezelfde ingreep als in de latere blokken rond regel 5006 en 5220.
+      state._uitCache=false; state._netwerkFouten=0;
       state.offerteAannOpen.clear();
       const r1={code:'DUP-1',taakId:'Tdak',naam:'VvE Dubbel',aannemers:'Jansen|0',_sec:'OFFERTE-TRAJECTEN'};
       const r2={code:'DUP-1',taakId:'Tverf',naam:'VvE Dubbel',aannemers:'',_sec:'OFFERTE-TRAJECTEN'};
@@ -730,7 +740,8 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       eq('twee trajecten zelfde VvE: verwijderen laat het andere traject staan', r2.aannemers, 'Pietersen|0');
       truthy('twee trajecten zelfde VvE: alleen het aangeklikte paneel staat open',
         state.offerteAannOpen.has(aannSleutel(r2)) && !state.offerteAannOpen.has(aannSleutel(r1)));
-    } finally { D.ntd['OFFERTE-TRAJECTEN']=vR; state.offerteAannOpen=vO; }
+    } finally { D.ntd['OFFERTE-TRAJECTEN']=vR; state.offerteAannOpen=vO;
+                state._uitCache=cacheOud; state._netwerkFouten=nfOud; }
   })();
   // De knoppen moeten de sleutel dragen, niet de kale VvE-code — anders valt de dispatcher
   // alsnog terug op de code en is bovenstaande winst op het scherm weer weg.
@@ -3730,7 +3741,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '10.17');
+  eq('versie opgehoogd', APP_VERSION, '10.18');
 
   // ── Pushmeldingen: de twee schakels die stil kapot waren (audit 2026-08-06) ──
   // Beide defecten waren onzichtbaar: de app meldde "Notificaties zijn aan!" terwijl er nooit

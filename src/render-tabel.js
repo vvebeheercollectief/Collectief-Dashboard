@@ -10,7 +10,7 @@ import { offerteAannSamenvatting, offerteAannemerPaneel } from "./render-offerte
 import { ico } from "./icons.js";
 import { faseRijHtml } from "./subsidie-fase.js";
 import { zichtbareKop, bundelVan, zelfdeTaak } from "./bundel.js";
-import { bundelKopExtra, bundelPaneelHtml, bundelMerkje } from "./render-bundel.js";
+import { bundelKopExtra, bundelPaneelHtml, bundelMerkje, STAPEL_GREEP } from "./render-bundel.js";
 
 // Zie de toelichting bij het gebruik in rowNtd().
 const GEEN_STIL_PILL = ['OFFERTE-TRAJECTEN', 'SUBSIDIE-TRAJECTEN'];
@@ -169,9 +169,17 @@ function rowNtd(r,sec){
   const bdlChev = _extra.chevron;
   // Op de kop de telpill; verder het ⛓-merkje — wie dat krijgt beslist bundelMerkje zelf.
   const bdlNaam = _isKop ? _extra.pill : bundelMerkje(r, _bw, sec);
+  // Het sleep-handvat om deze rij onder een andere te hangen. Het hangt aan dezelfde `stapel`-vlag
+  // als de rest van de gestapelde weergave: bij een zoekterm, filter, kolomsortering of
+  // bulk-selectie staat die uit en kan er niet gestapeld worden (§4.2), dus dan hoort er ook geen
+  // handvat te staan dat het tegendeel belooft.
+  // Bewust dezelfde `_bw.stapel` die `initStapelSlepen` via zijn `magSlepen` leest (main.js), en
+  // geen eigen afleiding ernaast: zo kunnen het zichtbare handvat en het toegestane gebaar niet uit
+  // elkaar lopen.
+  const bdlGreep = (_bw && _bw.stapel) ? STAPEL_GREEP : '';
   switch(sec){
     case'OPPAKKEN':
-      cells=`<td>${bdlChev}${vveCodeSpan(r.code, css)}</td>
+      cells=`<td>${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
         <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}${bdlNaam}</td>
         <td class="cell-txt"><span class="ct" title="${esc(r.actiepunt)}">${esc(r.actiepunt)}</span>${extraPills}</td>
         ${deadlineCel(r, 'OPPAKKEN')}
@@ -180,7 +188,7 @@ function rowNtd(r,sec){
         <td>${editBtn}</td>`;
       break;
     case'VERGADERVERZOEKEN':
-      cells=`<td>${bdlChev}${vveCodeSpan(r.code, css)}</td>
+      cells=`<td>${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
         <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}${bdlNaam}</td>
         <td><span class="badge" style="background:var(--am-l);color:var(--am)">${esc(r.periode||r.agendapunten||'')}</span></td>
         <td class="cell-txt"><span class="ct" title="${esc(r.agendapunten||r.actiepunt||'')}">${esc(r.agendapunten||r.actiepunt||'')}</span>${extraPills}</td>
@@ -190,7 +198,7 @@ function rowNtd(r,sec){
         <td>${editBtn}</td>`;
       break;
     case'OFFERTE-TRAJECTEN':
-      cells=`<td>${bdlChev}${vveCodeSpan(r.code, css)}</td>
+      cells=`<td>${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
         <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}${bdlNaam}</td>
         <td class="cell-sm">${esc(r.datumAangevraagd||'')}</td>
         <td>${offProg(r.offertes)}<div class="of-aann-tbl-tog">${offerteAannSamenvatting(r)}</div></td>
@@ -200,7 +208,7 @@ function rowNtd(r,sec){
         <td>${editBtn}</td>`;
       break;
     case'LOD':
-      cells=`<td>${bdlChev}${vveCodeSpan(r.code, css)}</td>
+      cells=`<td>${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
         <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}${bdlNaam}</td>
         <td class="cell-txt"><span class="ct" title="${esc(r.actiepunt||'')}">${esc(r.actiepunt||'')}</span>${extraPills}</td>
         <td class="cell-txt" style="font-style:italic"><span class="ct" title="${esc(r.status||'')}">${esc(r.status||'')}</span></td>
@@ -213,7 +221,7 @@ function rowNtd(r,sec){
     // bewust niet in de tabel — de fase-bolletjes hebben die ruimte nodig en de rij
     // moet rustig blijven. Houd dit gelijk aan SECS['SUBSIDIE-TRAJECTEN'].cols.
     case'SUBSIDIE-TRAJECTEN':
-      cells=`<td>${bdlChev}${vveCodeSpan(r.code, css)}</td>
+      cells=`<td>${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
         <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}${bdlNaam}</td>
         <td class="cell-txt"><span class="ct" title="${esc(r.subsidie||'')}">${esc(r.subsidie||'')}</span>${extraPills}</td>
         <td>${faseRijHtml(r.subsidieFase, rid)}</td>

@@ -24,6 +24,34 @@ import { state } from "./state.js";
 // de open-stand op precies deze sleutel wordt bewaard.
 const tekst = bundelSleutel;
 
+// Het sleep-handvat op een gewone taakrij: hiermee — en alleen hiermee — hang je een taak onder
+// een andere. `initStapelSlepen` (bundel-acties.js) toetst op precies dit attribuut en ketst elke
+// pointerdown erbuiten af, dus de HTML en die toets horen bij elkaar te blijven.
+//
+// Eén gedeelde constante voor de takentabel én de dossierpagina. Twee kopieën zou betekenen dat
+// een gebruiker het gebaar op de ene lijst anders ziet werken dan op de andere, terwijl het
+// dezelfde handeling is; bovendien hangt het attribuut aan de sleepcode, niet aan de lijst.
+//
+// Dezelfde ⠿-glyph als het handvat in het bundelpaneel (`.bdl-h`), want het is voor de gebruiker
+// hetzelfde soort ding: pak hier op om te slepen.
+//
+// `aria-hidden`, net als bij `.bdl-h`: het handvat draagt geen eigen actie, alleen een
+// aanwijzer-gebaar, en een schermlezer zou hier dus een element aankondigen dat met het toetsenbord
+// niets doet. Anders dan bij het herordenen is er hier wél een volwaardige weg zonder muis: het
+// veld 'Hoort bij' in het bewerkscherm (§6.1) maakt exact dezelfde koppeling en is gewoon met de
+// Tab-toets te bereiken. De `title` blijft staan voor wie met de muis over het handvat gaat.
+//
+// De `data-action` is met opzet een lege actie (zie ACTIONS in actions.js). Een handvat hoort
+// alleen te slepen: pak je hem op en laat je weer los zónder te verplaatsen, dan volgt er een gewone
+// `click` — die het gebaar niet tegenhoudt (preventDefault op pointerdown onderdrukt alleen de
+// muis-compatibiliteitsevents) en die anders bij de klik-afhandeling van de rij zelf uitkomt. Op de
+// dossierpagina is dat het bewerkscherm (de rij draagt daar `data-action="taak-bewerken"`), in de
+// takentabel het uitklappen van de volledige tekst. Beide delegaties slaan een element met een eigen
+// `data-action` over, dus dit ene attribuut maakt het handvat voor allebei inert.
+export const STAPEL_GREEP =
+  `<span class="stapel-h" data-stapel-grip="1" data-action="stapel-greep"`
+  + ` title="Sleep om onder een andere taak te hangen" aria-hidden="true">⠿</span>`;
+
 // Stand van de bundel: alles behalve de zichtbare kop zelf — dus precies wat in het paneel staat.
 // Zo blijft het getal stabiel terwijl een bundel vordert en de kop doorschuift.
 export function bundelStand(leden, kop){

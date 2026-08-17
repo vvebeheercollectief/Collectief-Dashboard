@@ -5672,15 +5672,24 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
          document.querySelectorAll('#toast-container .toast').length, 0);
       D.af={ ...leeg };
 
-      // 19. Rij op rij slepen om te stapelen, langs de ÉCHTE weg: de rijen zoals renderNtd ze
-      //     tekent, de selector en de rij-cache-vertaling uit main.js, en pointer-events zoals de
-      //     browser ze stuurt. De stukken hierboven bewijzen elk hun eigen helft; dát een
-      //     sleepgebaar bij `koppelTaak` uitkomt hangt aan `data-rid` op de <tr> (render-tabel.js)
-      //     en aan de bedrading in main.js, en dat blijkt alleen hieruit.
+      // 19. Slepen om te stapelen, langs de ÉCHTE weg: de rijen zoals renderNtd ze tekent, het
+      //     handvat dat rowNtd erin zet, de selector en de rij-cache-vertaling uit main.js, en
+      //     pointer-events zoals de browser ze stuurt. De stukken hierboven bewijzen elk hun eigen
+      //     helft; dát een sleepgebaar bij `koppelTaak` uitkomt hangt aan `[data-stapel-grip]` en
+      //     `data-rid` op de <tr> (render-tabel.js) en aan de bedrading in main.js, en dat blijkt
+      //     alleen hieruit.
       const veldIds=['s-ntd','f-code-ntd','f-beh-ntd','f-prio-ntd'];
       const veldOud=veldIds.map(id=>document.getElementById(id).value);
       const sortOud=state.ntdSort, statusOud=state.ntdStatus, bulkOud=state.bulkMode, vveOud=state.vveCode;
+      // Het inlogscherm even weg. Een testronde draait niet ingelogd, en `#login-gate` ligt dan als
+      // schermvullende laag ovér het dashboard: de tabel heeft wél gewoon layout (de rijen hebben
+      // echte rechthoeken) maar is niet aanwijsbaar, en `document.elementFromPoint` — waarmee
+      // `doelOnder` het doel bepaalt — geeft dus altijd de inlogkaart terug. Zonder dit meet dit hele
+      // blok niets meer dan dat er een overlay is. Gemeten en niet aangenomen: de diagnose gaf
+      // letterlijk DIV.lg-card op de plek van de doelrij.
+      const poort=document.getElementById('login-gate'), poortOud=poort?poort.style.display:'';
       try {
+        if(poort) poort.style.display='none';
         // De lijst op de standaardstand: alleen dán staat de gestapelde weergave aan, en alleen
         // dán mag er in de tabel gesleept worden (§4.2). Een achtergebleven zoekterm uit een
         // eerdere test zou dit blok anders stil overslaan.
@@ -5689,80 +5698,139 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         ({ kop, sub } = opnieuw());
         goTo('ntd'); renderNtd();
         const tabelRij=r=>document.querySelector(`#ntd-tbody tr[data-row="${r._row}"]`);
-        // Elk pointer-event gaat naar een KIND van de rij en borrelt vanaf daar omhoog — precies
-        // zoals de browser ze stuurt: zonder pointer-capture landt een event op het element waar de
-        // muis op staat. Op de <tr> of op window mikken zou de twee dingen overslaan die deze
-        // toetsen juist moeten meten: de rem op knoppen kijkt naar het aangeraakte element, en het
-        // doel van de sleepactie is het element waar het loslaten op binnenkomt. De naamcel (tabel)
-        // en de omschrijving (dossier) zijn de plekken in een rij zonder eigen actie.
+        // Toasts van eerdere blokken weg: ze staan met z-index 700 over de pagina en zouden de
+        // metingen hieronder kunnen verstoren (zie de toelichting bij `punt`).
+        document.querySelectorAll('#toast-container .toast').forEach(el=>el.remove());
+        // Het sleep-handvat van een rij — de ENIGE plek waar een stapelgebaar mag beginnen.
+        const greep=el=>el.querySelector('[data-stapel-grip]');
+        // De tekstcel van een rij: geen eigen actie, en breed genoeg om betrouwbaar aan te wijzen.
+        // Precies de plek waar een gebruiker met de muis loslaat.
         const grijp=el=>el.querySelector('td.cell-name, .nm')||el;
-        const ev=(el,soort,d)=>el.dispatchEvent(new PointerEvent(soort,{ bubbles:true, pointerId:1, clientX:d, clientY:d }));
-        // Coördinaten tellen alleen nog voor de 6px-drempel: 0 bij het oppakken, `d` daarna.
-        const pak=el=>ev(el,'pointerdown',0);
-        const beweeg=(el,d=40)=>ev(el,'pointermove',d);
-        const laatLos=(el,d=40)=>ev(el,'pointerup',d);
+        // Het midden van een element in venstercoördinaten, ná het in beeld te hebben gescrold.
+        // Die coördinaten zijn geen opsmuk: `doelOnder` bepaalt het doel met
+        // document.elementFromPoint, niet met `e.target`. Dat moest wel, want bij aanraking en pen
+        // zet de browser bij pointerdown een IMPLICIETE pointer-capture op het aangeraakte element
+        // en komt élke volgende pointermove/pointerup dus op de BRON-rij binnen. Een synthetisch
+        // event met clientX/clientY op 0 zou hier daarom altijd 'geen doel' opleveren en zouden
+        // deze toetsen dus niets meten.
+        const punt=el=>{ el.scrollIntoView({ block:'center' });
+                         const b=el.getBoundingClientRect();
+                         return { x:b.left+b.width/2, y:b.top+b.height/2 }; };
+        const ev=(el,soort,p,extra)=>el.dispatchEvent(new PointerEvent(soort,
+          { bubbles:true, pointerId:1, clientX:p.x, clientY:p.y, ...(extra||{}) }));
+        // Elk event gaat naar een KIND van de rij en borrelt vanaf daar omhoog, precies zoals de
+        // browser ze voor de muis stuurt.
+        const opPunt=(el,soort,extra)=>ev(el,soort,punt(el),extra);
+        const vlakPunt=el=>punt(grijp(el));
+        const pak=(el,extra)=>opPunt(greep(el),'pointerdown',extra);
+        const beweeg=el=>opPunt(grijp(el),'pointermove');
+        const laatLos=el=>opPunt(grijp(el),'pointerup');
 
         let bronEl=tabelRij(sub), doelEl=tabelRij(kop);
         truthy('stapel-e2e: beide taken staan als rij in de tabel', !!bronEl && !!doelEl);
+        truthy('stapel-e2e: en allebei met een sleep-handvat', !!greep(bronEl) && !!greep(doelEl));
+        // Nulmeting op het meetinstrument zelf. Alles hieronder mikt met echte coördinaten, en als
+        // die de doelrij niet raken — de rij buiten beeld, een laag eroverheen — dan levert élke
+        // sleepactie stilzwijgend 'geen doel' op en zou dit hele blok groen blijven zonder iets te
+        // bewijzen. Precies dat gebeurde bij de eerste opzet: `#login-gate` lag over het dashboard.
+        const wijstNaar=(el,rij)=>{ const p=vlakPunt(el), h=document.elementFromPoint(p.x,p.y);
+                                    return !!(h && h.closest && h.closest(rij)); };
+        truthy('stapel-e2e: de doelrij is ook echt aanwijsbaar op het scherm',
+               wijstNaar(doelEl,'tr[data-row]'));
 
-        // 19a. Een klik met een trillende muis is geen sleepactie. De hele rij is hier het
-        //      handvat, dus zonder drempel zou élke klik in de tabel een bundel kunnen maken.
-        pak(grijp(bronEl));
-        beweeg(grijp(doelEl), 2);
+        // 19a. Een klik met een trillende hand is geen sleepactie. Zonder drempel gaat de rij bij
+        //      de kleinste beweging tijdens een gewone klik op het handvat al dimmen en licht de
+        //      rij eronder op als doel, terwijl er niets verschuift.
+        pak(bronEl);
+        const bijGreep=punt(greep(bronEl));
+        ev(greep(bronEl),'pointermove',{ x:bijGreep.x+2, y:bijGreep.y+1 });
         truthy('stapel-e2e: onder de drempel wordt de rij niet opgepakt', !bronEl.classList.contains('sleep'));
-        laatLos(grijp(doelEl), 2);
+        ev(greep(bronEl),'pointerup',{ x:bijGreep.x+2, y:bijGreep.y+1 });
         await naSleep();
         eq('stapel-e2e: en er wordt niets geschreven', volgorde, []);
 
-        // 19a-bis. Slepen BINNEN één rij is geen stapelgebaar maar een tekstselectie: een VvE-naam,
-        //      code of actiepunt uit de tabel selecteren en kopiëren is een doodgewone
-        //      leeshandeling. Twee dingen moeten daarvoor kloppen. De selectie mag niet opgeruimd
-        //      worden — dat sluit meteen de twee grovere reparaties uit die dit gat óók zouden
-        //      dichten (`preventDefault()` op pointerdown zoals initBundelSlepen doet, of de rem al
-        //      bij de 6px-drempel): allebei maken ze selecteren binnen een rij onmogelijk. En het
-        //      loslaten op je eigen rij mag niet bij `koppelTaak(r, r)` uitkomen, want dat levert
-        //      een melding 'Een taak kan niet onder zichzelf hangen' op bij niet meer dan een klik
-        //      met een trillende muis.
+        // 19a-bis. Buiten het handvat begint er niets. Dat is de hele reden dat het handvat er is:
+        //      stapelen is een SCHRIJFACTIE naar de Sheet, en tekst selecteren in een rij — een
+        //      VvE-naam, code of actiepunt kopiëren is een doodgewone leeshandeling — mocht daar
+        //      nooit toe kunnen leiden. Toen de rij zelf het handvat was moest die botsing met
+        //      remmen onwaarschijnlijk gemaakt worden; nu bestaat ze niet. De selectie loopt hier
+        //      dwars over de rijgrens heen en moet gewoon blijven staan.
         const sel=window.getSelection();
         const kies=el=>{ const rg=document.createRange(); rg.selectNodeContents(el);
                          sel.removeAllRanges(); sel.addRange(rg); };
         meldingen=[];
         kies(grijp(bronEl));
-        pak(grijp(bronEl)); beweeg(grijp(bronEl));
-        eq('stapel-e2e: binnen één rij blijft de tekstselectie staan', sel.rangeCount, 1);
-        truthy('stapel-e2e: en de selectie-rem blijft uit',
-               !document.body.classList.contains('stapel-slepen'));
-        laatLos(grijp(bronEl));
+        opPunt(grijp(bronEl),'pointerdown'); beweeg(doelEl);
+        truthy('stapel-e2e: een pointerdown náást het handvat pakt de rij niet op',
+               !bronEl.classList.contains('sleep'));
+        truthy('stapel-e2e: en licht ook geen doelrij op', !doelEl.classList.contains('stapel-doel'));
+        eq('stapel-e2e: de tekstselectie over de rijgrens blijft staan', sel.rangeCount, 1);
+        laatLos(doelEl);
+        await naSleep();
+        eq('stapel-e2e: en loslaten op een andere rij schrijft niets', volgorde, []);
+        eq('stapel-e2e: zonder melding', meldingen, []);
+        eq('stapel-e2e: de taken blijven dus los', [sub.bundelId, kop.bundelId], ['','']);
+
+        // 19a-ter. Ook op het handvat loslaten waar je begon doet niets: `doelOnder` geeft null op
+        //      je eigen rij, anders zou een klik met een trillende muis `koppelTaak(r, r)` opleveren
+        //      en dus een melding 'Een taak kan niet onder zichzelf hangen'.
+        pak(bronEl); beweeg(bronEl); laatLos(bronEl);
         await naSleep();
         eq('stapel-e2e: op je eigen rij loslaten schrijft niets', volgorde, []);
         eq('stapel-e2e: en levert geen melding op', meldingen, []);
-        eq('stapel-e2e: de taken blijven dus los', [sub.bundelId, kop.bundelId], ['','']);
 
-        // 19b. En nu de echte sleepactie. Zodra de muis de eigen rij verlaat is dit gebaar
-        //      aantoonbaar geen tekstselectie meer: de lopende selectie hoort weg en het selecteren
-        //      hoort stil te liggen tot het loslaten. Zonder die rem trekt de muis een blauwe
-        //      selectie over elke rij die hij passeert — in Chrome nagespeeld met een echte
-        //      muissleep over drie rijen — dwars door de dim-opmaak en de doel-markering heen, en
-        //      die blijft daarna staan in alle takken waar `koppelTaak` géén renderAll doet.
+        // 19b. En nu de echte sleepactie, aan het handvat.
         kies(grijp(bronEl));
-        pak(grijp(bronEl));
-        beweeg(grijp(doelEl));
-        eq('stapel-e2e: over de rijgrens heen wordt de selectie opgeruimd', sel.rangeCount, 0);
-        truthy('stapel-e2e: en ligt het selecteren stil',
-               document.body.classList.contains('stapel-slepen'));
+        pak(bronEl);
+        beweeg(doelEl);
         truthy('stapel-e2e: de opgepakte rij is gemarkeerd', bronEl.classList.contains('sleep'));
         truthy('stapel-e2e: en de rij eronder licht op als doel', doelEl.classList.contains('stapel-doel'));
-        laatLos(grijp(doelEl));
+        // Een lopende selectie elders op de pagina blijft met rust. De oude opzet ruimde die
+        // onderweg op (`removeAllRanges` + `body.stapel-slepen`) omdat de rij zelf het handvat was
+        // en de muis anders een blauwe selectie over elke gepasseerde rij trok; met een eigen
+        // handvat begint de browser er niet eens aan en hoort er dus ook niets opgeruimd te worden.
+        eq('stapel-e2e: een lopende tekstselectie wordt niet meer opgeruimd', sel.rangeCount, 1);
+        laatLos(doelEl);
         truthy('stapel-e2e: na het loslaten is de markering weg',
                !bronEl.classList.contains('sleep') && !doelEl.classList.contains('stapel-doel'));
-        truthy('stapel-e2e: en mag er weer geselecteerd worden',
-               !document.body.classList.contains('stapel-slepen'));
         await naSleep();
         eq('stapel-e2e: het scherm toont de bundel',
            [sub.bundelId, sub.bundelVolg, kop.bundelId, kop.bundelVolg], ['Tkop','10','Tkop','0']);
         eq('stapel-e2e: eerst de rij-controle, dan pas schrijven', volgorde, ['lees','schrijf']);
         eq('stapel-e2e: de gesleepte rij wordt de subtaak van de rij eronder',
            geschreven.map(g=>g.values[0]), [['Tkop','Tkop','0'], ['Tb','Tkop','10']]);
+        // Het vangnet uit §6.4 hoort er ook bij een gesleepte koppeling te zijn: sleep je mis, dan
+        // is dat één klik terug.
+        eq('stapel-e2e: en er staat een ongedaan-maken-melding klaar',
+           document.querySelectorAll('#toast-container .toast-undo').length, 1);
+        document.querySelectorAll('#toast-container .toast').forEach(el=>el.remove());
+
+        // 19b-bis. Hetzelfde gebaar met een VINGER. Dat werkte tot nu toe niet, en het zat DUBBEL
+        //      dicht: zonder `touch-action:none` neemt de browser de beweging over als scroll-gebaar
+        //      (nu staat die regel op `.stapel-h`, en alléén daar — op de rij zou hij de horizontale
+        //      pan van .tbl-wrap doodmaken), en `doelOnder` keek naar `e.target`. Dat tweede is hier
+        //      het meetpunt: bij aanraking zet de browser een IMPLICIETE pointer-capture op het
+        //      element van de pointerdown, dus pointermove en pointerup komen binnen op het HANDVAT
+        //      van de bronrij — precies zoals hieronder nagespeeld, mét de coördinaten van de
+        //      doelrij. Met `e.target` zou het doel dan altijd de eigen rij zijn en gebeurde er niets.
+        //      `button:0` hoort erbij: de Pointer Events-spec geeft aanraak-contact knop 0, dus de
+        //      kale `e.button !== 0`-toets laat een vinger door.
+        ({ kop, sub } = opnieuw());
+        renderNtd();
+        bronEl=tabelRij(sub); doelEl=tabelRij(kop);
+        const vinger={ pointerType:'touch', button:0, isPrimary:true };
+        pak(bronEl, vinger);
+        ev(greep(bronEl),'pointermove',punt(grijp(doelEl)),vinger);
+        truthy('stapel-e2e: een vinger pakt de rij op', bronEl.classList.contains('sleep'));
+        truthy('stapel-e2e: en vindt de doelrij ondanks de impliciete pointer-capture',
+               doelEl.classList.contains('stapel-doel'));
+        ev(greep(bronEl),'pointerup',punt(grijp(doelEl)),vinger);
+        await naSleep();
+        eq('stapel-e2e: stapelen met een vinger levert dezelfde twee bereiken op',
+           geschreven.map(g=>g.range), ["'Nog Te Doen'!Q12:S12", "'Nog Te Doen'!Q20:S20"]);
+        eq('stapel-e2e: en dezelfde bundel',
+           [sub.bundelId, sub.bundelVolg, kop.bundelId, kop.bundelVolg], ['Tkop','10','Tkop','0']);
+        document.querySelectorAll('#toast-container .toast').forEach(el=>el.remove());
 
         // 19c. Wordt de lijst MIDDEN in het gebaar opnieuw getekend, dan hangt de opgepakte rij
         //      niet meer in het document en moet dit gebaar stoppen. Dat is geen bedacht geval: de
@@ -5772,12 +5840,12 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         //      losgeraakte rij wijst daarna naar de zoveelste taak van de níeuwe ronde.
         ({ kop, sub } = opnieuw());
         renderNtd();
-        pak(grijp(tabelRij(sub)));
-        beweeg(grijp(tabelRij(kop)));
+        pak(tabelRij(sub));
+        beweeg(tabelRij(kop));
         renderNtd();                                  // ← de hertekening die de rij losmaakt
         // Loslaten op een VERSE rij: een losgeraakt element bereikt `window` niet meer, dus daarop
         // mikken zou deze rem ook groen laten zien als hij er niet was.
-        laatLos(grijp(tabelRij(kop)));
+        laatLos(tabelRij(kop));
         await naSleep();
         eq('stapel-e2e: loslaten na een hertekening koppelt niets', volgorde, []);
         eq('stapel-e2e: en de taken blijven los', [sub.bundelId, kop.bundelId], ['','']);
@@ -5790,112 +5858,124 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         D.ntd={ ...leeg, OPPAKKEN:[kop, sub, los] };
         renderNtd();
         bronEl=tabelRij(kop); doelEl=tabelRij(los);
-        pak(grijp(bronEl)); beweeg(grijp(doelEl)); laatLos(grijp(doelEl));
+        pak(bronEl); beweeg(doelEl); laatLos(doelEl);
         await naSleep();
         eq('stapel-e2e: een taak met eigen subtaken slepen levert geen enkel verzoek op', volgorde, []);
         eq('stapel-e2e: en de gebruiker hoort waarom', meldingen,
            ['Deze taak heeft zelf subtaken; ontkoppel die eerst.']);
 
-        // 19e. Wat BINNEN de rij zit start geen sleepgebaar. De VvE-code is de gemene: hij ziet
-        //      eruit als tekst maar draagt `data-action="vve-open"` en opent het dossier, dus een
-        //      sleepactie die daar begint zou de klik eronder in de weg zitten.
+        // 19e. De VvE-code als tegenproef op 19a-bis. Hij ziet eruit als tekst maar draagt
+        //      `data-action="vve-open"` en opent het dossier; toen de hele rij nog het handvat was
+        //      moest dat apart uitgezonderd worden. Nu volgt het uit dezelfde regel als alle andere
+        //      plekken in de rij — hij is het handvat niet — en dat is precies wat hier gemeten
+        //      wordt: één positieve toets in plaats van een lijst uitzonderingen.
         ({ kop, sub } = opnieuw());
         renderNtd();
         bronEl=tabelRij(sub); doelEl=tabelRij(kop);
-        pak(bronEl.querySelector('.code-klik')); beweeg(grijp(doelEl));
+        opPunt(bronEl.querySelector('.code-klik'),'pointerdown'); beweeg(doelEl);
         truthy('stapel-e2e: op de VvE-code begint geen sleepactie', !bronEl.classList.contains('sleep'));
-        laatLos(grijp(doelEl));
+        laatLos(doelEl);
         await naSleep();
         eq('stapel-e2e: en dat schrijft dus niets', volgorde, []);
 
-        // 19f. Een afgebroken gebaar laat géén pointerup achter: de browser stuurt pointercancel
-        //      zodra hij de beweging zelf overneemt (op een touchscreen als scroll-gebaar). Zonder
-        //      opruiming blijft de rij gedimd staan, blijft het selecteren stilliggen én blijft de
-        //      sleepstand gevuld — en dan koppelt het eerstvolgende loslaten, waar dan ook, alsnog
-        //      een rij die niemand meer vasthield.
+        // 19f. Een afgebroken gebaar laat géén pointerup achter: de browser stuurt dan
+        //      pointercancel. Zonder opruiming blijft de rij gedimd staan én blijft de sleepstand
+        //      gevuld — en dan koppelt het eerstvolgende loslaten, waar dan ook, alsnog een rij die
+        //      niemand meer vasthield.
         ({ kop, sub } = opnieuw());
         renderNtd();
         bronEl=tabelRij(sub); doelEl=tabelRij(kop);
-        pak(grijp(bronEl)); beweeg(grijp(doelEl));
+        pak(bronEl); beweeg(doelEl);
         truthy('stapel-e2e: de rij is opgepakt', bronEl.classList.contains('sleep'));
         window.dispatchEvent(new PointerEvent('pointercancel',{ pointerId:1 }));
         truthy('stapel-e2e: pointercancel haalt de markering weg',
                !bronEl.classList.contains('sleep') && !doelEl.classList.contains('stapel-doel'));
-        truthy('stapel-e2e: en laat het selecteren weer toe',
-               !document.body.classList.contains('stapel-slepen'));
         // Bewijst dat de sleepstand echt LOSGELATEN is en niet alleen even opgeruimd: bleef
         // `_stapel` gevuld, dan koppelt dit loslaten de twee taken alsnog.
-        laatLos(grijp(doelEl));
+        laatLos(doelEl);
         await naSleep();
         eq('stapel-e2e: na het afbreken koppelt een loslaten niets meer', volgorde, []);
         eq('stapel-e2e: en de taken blijven los', [sub.bundelId, kop.bundelId], ['','']);
 
-        // 19g. Een rechtermuisklik mag géén sleepstand zetten, om precies dezelfde reden als bij het
+        // 19g. Knop 2 mag géén sleepstand zetten, om precies dezelfde reden als bij het
         //      paneel-handvat: daarna opent het contextmenu en komt er op de meeste platforms geen
-        //      pointerup meer, dus die stand zou blíjven staan. De toets op pointerType hoort erbij
-        //      omdat `button` bij een gewone aanraking of pen-contact óók 0 is.
-        ({ kop, sub } = opnieuw());
-        renderNtd();
-        bronEl=tabelRij(sub); doelEl=tabelRij(kop);
-        grijp(bronEl).dispatchEvent(new PointerEvent('pointerdown',
-          { bubbles:true, pointerId:1, pointerType:'mouse', button:2, clientX:0, clientY:0 }));
-        beweeg(grijp(doelEl));
-        truthy('stapel-e2e: een rechtermuisklik pakt de rij niet op', !bronEl.classList.contains('sleep'));
-        laatLos(grijp(doelEl));
-        await naSleep();
-        eq('stapel-e2e: en koppelt dus niets', volgorde, []);
-        eq('stapel-e2e: de taken blijven los na een rechtermuisklik',
-           [sub.bundelId, kop.bundelId], ['','']);
+        //      pointerup meer, dus die stand zou blíjven staan. De toets is bewust kaal (`button !==
+        //      0`) en kijkt níet naar pointerType: de Pointer Events-spec legt knop 0 vast voor de
+        //      linker muisknop, voor aanraak-contact én voor pen-contact, en geeft de pen-zijknop
+        //      knop 2. Een `pointerType === 'mouse'`-voorwaarde ervóór — zoals hier tot deze ronde
+        //      stond — liet die pen-zijknop dus wél door, inclusief hetzelfde contextmenu.
+        for (const [wat, soort] of [['rechtermuisklik','mouse'], ['pen-zijknop','pen']]){
+          ({ kop, sub } = opnieuw());
+          renderNtd();
+          bronEl=tabelRij(sub); doelEl=tabelRij(kop);
+          pak(bronEl, { pointerType:soort, button:2 });
+          beweeg(doelEl);
+          truthy(`stapel-e2e: een ${wat} pakt de rij niet op`, !bronEl.classList.contains('sleep'));
+          laatLos(doelEl);
+          await naSleep();
+          eq(`stapel-e2e: en een ${wat} koppelt dus niets`, volgorde, []);
+          eq(`stapel-e2e: de taken blijven los na een ${wat}`, [sub.bundelId, kop.bundelId], ['','']);
+        }
 
         // 19h. Loslaten op een rij uit een ÁNDERE lijst koppelt niets. `taakVanEl` hoort bij de
         //      container waar het gebaar begon, dus op een vreemde rij losgelaten zou hij een vreemd
-        //      rij-nummer naar een wildvreemde taak vertalen. #ontw-tbody is écht een tweede tabel
-        //      met `tr[data-row]` in dit document (render-overig.js) — maar hij staat op een andere
-        //      pagina en zijn rijen dragen geen `data-rid`, dus vandaag zou de vertaling daar toch
-        //      al niets opleveren. Deze toets zet dat attribuut er met opzet wél op, en wel op de
-        //      rid van de KOP: alleen dán meet hij de containergrens zelf, en niet het toeval dat
-        //      de vertaling leeg uitkomt.
+        //      rij-nummer naar een wildvreemde taak vertalen. Er ís zo'n tweede tabel met
+        //      `tr[data-row]` in dit document (#ontw-tbody, render-overig.js), maar die staat op een
+        //      andere pagina en is dus niet zichtbaar — en sinds `doelOnder` het doel met
+        //      elementFromPoint bepaalt zou een onzichtbare rij deze toets groen laten zien zonder
+        //      iets te meten. Vandaar een nagebootste vreemde lijst die wél in beeld staat, met
+        //      `data-rid` van de KOP erop: alleen dán meet dit de containergrens zelf en niet het
+        //      toeval dat de vertaling leeg uitkomt.
         ({ kop, sub } = opnieuw());
         renderNtd();
         bronEl=tabelRij(sub);
-        const vreemdeTbody=document.getElementById('ontw-tbody'), ontwOud=vreemdeTbody.innerHTML;
-        vreemdeTbody.innerHTML=`<tr data-row="${kop._row}" data-rid="${tabelRij(kop).dataset.rid}">`
-          +`<td class="cell-name">Ontwikkel-item</td></tr>`;
-        const vreemdeRij=vreemdeTbody.querySelector('tr[data-row]');
-        pak(grijp(bronEl)); beweeg(grijp(vreemdeRij));
+        const vreemdeTabel=document.createElement('table');
+        vreemdeTabel.style.cssText='position:fixed;left:24px;bottom:24px;z-index:900;background:var(--sur)';
+        vreemdeTabel.innerHTML=`<tbody><tr data-row="${kop._row}" data-rid="${tabelRij(kop).dataset.rid}">`
+          +`<td class="cell-name">Vreemde lijst</td></tr></tbody>`;
+        document.body.appendChild(vreemdeTabel);
+        const vreemdeRij=vreemdeTabel.querySelector('tr[data-row]');
+        pak(bronEl); beweeg(vreemdeRij);
         truthy('stapel-e2e: een rij uit een andere lijst licht niet op als doel',
                !vreemdeRij.classList.contains('stapel-doel'));
-        laatLos(grijp(vreemdeRij));
-        // Meteen terug, vóór het wachten: een koppeling die tóch doorging zou via renderAll ook
-        // renderOntw laten draaien, en dan zette het herstel hieronder een verse tabel weer terug
-        // op deze nepregel.
-        vreemdeTbody.innerHTML=ontwOud;
+        laatLos(vreemdeRij);
+        vreemdeTabel.remove();
         await naSleep();
         eq('stapel-e2e: loslaten buiten de eigen lijst koppelt niets', volgorde, []);
         eq('stapel-e2e: en ook daar blijven de taken los', [sub.bundelId, kop.bundelId], ['','']);
 
         // 19i. Platte weergave: zodra er gezocht, gefilterd, gesorteerd of bulk-geselecteerd wordt
-        //      staat de stapelweergave uit, en dan mag er ook niet gestapeld worden (§4.2). De
-        //      rijen staan er dan gewoon nog, dus zonder rem zou het gebaar gewoon werken.
+        //      staat de stapelweergave uit, en dan kan er niet gestapeld worden (§4.2). De rijen
+        //      staan er dan gewoon nog. Twee dingen horen dat dicht te houden, en ze worden apart
+        //      gemeten omdat de één de ander anders verbergt: rowNtd tekent géén handvat, én
+        //      `initStapelSlepen` toetst nog eens op dezelfde `stapel`-vlag (de DOM loopt achter op
+        //      de state tot de eerstvolgende render).
         ({ kop, sub } = opnieuw());
         document.getElementById('s-ntd').value='testflat';
         renderNtd();
         truthy('stapel-e2e: de lijst staat plat door de zoekterm', !state._bundelWeergave.stapel);
         bronEl=tabelRij(sub); doelEl=tabelRij(kop);
         truthy('stapel-e2e: en de rijen staan er nog steeds', !!bronEl && !!doelEl);
-        pak(grijp(bronEl)); beweeg(grijp(doelEl));
-        truthy('stapel-e2e: in platte weergave wordt de rij niet opgepakt', !bronEl.classList.contains('sleep'));
-        laatLos(grijp(doelEl));
+        truthy('stapel-e2e: maar zonder sleep-handvat', !greep(bronEl) && !greep(doelEl));
+        // Nu met de hand een handvat in de rij zetten, zodat de tweede rem alléén overblijft.
+        bronEl.querySelector('td').insertAdjacentHTML('afterbegin',
+          '<span class="stapel-h" data-stapel-grip="1">⠿</span>');
+        pak(bronEl); beweeg(doelEl);
+        truthy('stapel-e2e: in platte weergave wordt de rij ook mét handvat niet opgepakt',
+               !bronEl.classList.contains('sleep'));
+        laatLos(doelEl);
         await naSleep();
         eq('stapel-e2e: en er is niets geschreven', volgorde, []);
         eq('stapel-e2e: de taak is dus ook niet gekoppeld', [sub.bundelId, kop.bundelId], ['','']);
 
         // 20. Hetzelfde gebaar op de VvE-dossierpagina — dwars door de categorieën heen, want dáár
         //     staan alle taken van één VvE onder elkaar (het hoofdvoorbeeld uit §6.1: een offerte
-        //     onder een vergaderverzoek). Twee dingen die in de tabel niet te meten zijn:
-        //       - de taakrij draagt daar ZELF `data-action="taak-bewerken"`, dus een rem die alleen
-        //         naar de dichtstbijzijnde [data-action] kijkt zou hier élk gebaar afwijzen;
-        //       - de zoekterm van 19f staat nog aan. Het dossier kent de gestapelde weergave
+        //     onder een vergaderverzoek). Drie dingen die in de tabel niet te meten zijn:
+        //       - de rijen daar zijn geen tabelrijen maar `.tk-taak`-divs in een eigen grid, dus dat
+        //         `taakRij` het handvat mee tekent en dat het daar te pakken is blijkt alleen hier;
+        //       - de taakrij draagt daar ZELF `data-action="taak-bewerken"` — de rij ís de knop naar
+        //         het bewerkscherm — en het handvat zit dáárbinnen;
+        //       - de zoekterm van 19i staat nog aan. Het dossier kent de gestapelde weergave
         //         helemaal niet, dus een filter in de takentabel mag het slepen hier niet stilleggen.
         const offerte=t(28, 'Toff', '');
         offerte._sec='OFFERTE-TRAJECTEN'; offerte.datumAangevraagd=''; offerte.opmerkingen='Offerte-werk';
@@ -5910,24 +5990,55 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
           .find(el=>state._rowCache[+el.dataset.rid]===r);
         bronEl=dosRij(offerte); doelEl=dosRij(kop);
         truthy('stapel-e2e: beide taken staan op de dossierpagina', !!bronEl && !!doelEl);
-        // Ook hier eerst de tegenproef: het ✓-knopje in de rij mag geen sleepactie beginnen. De rem
-        // kijkt alleen naar wat er tússen het aangeraakte element en de rij zit, dus dat de rij
-        // zélf een data-action heeft mag hem niet blind maken voor de knop erin.
-        pak(bronEl.querySelector('.tk-af')); beweeg(grijp(doelEl));
+        truthy('stapel-e2e: en ook daar met een sleep-handvat', !!greep(bronEl) && !!greep(doelEl));
+        // Dezelfde nulmeting als in de tabel: deze pagina heeft een eigen indeling (drie panelen in
+        // een grid), dus dat de rijen dáár aanwijsbaar zijn volgt er niet uit.
+        truthy('stapel-e2e: en de dossierrij is aanwijsbaar op het scherm', wijstNaar(doelEl,'.tk-taak'));
+        // Ook hier eerst de tegenproef: het ✓-knopje in de rij mag geen sleepactie beginnen. Sinds
+        // het handvat de enige ingang is volgt dat uit dezelfde regel als voor de rest van de rij,
+        // maar juist hier is het het meten waard — de rij is één grote knop naar het bewerkscherm.
+        opPunt(bronEl.querySelector('.tk-af'),'pointerdown'); beweeg(doelEl);
         truthy('stapel-e2e: op het afrond-knopje begint geen sleepactie', !bronEl.classList.contains('sleep'));
-        laatLos(grijp(doelEl));
+        laatLos(doelEl);
         await naSleep();
         eq('stapel-e2e: en ook dat schrijft niets', volgorde, []);
-        pak(grijp(bronEl)); beweeg(grijp(doelEl));
-        truthy('stapel-e2e: de dossierrij wordt opgepakt ondanks zijn eigen data-action',
+
+        // Een greep die niet verplaatst eindigt in een gewone `click`: `preventDefault()` op
+        // pointerdown onderdrukt de muis-compatibiliteitsevents, niet de klik erna. Op déze pagina ís
+        // de rij de knop naar het bewerkscherm (`data-action="taak-bewerken"` op de rij zelf), dus
+        // zonder eigen data-action op het handvat opende elke mislukte greep dat scherm. Beide
+        // klik-delegaties (actions.js en de rij-uitklap in main.js) slaan een element met een eigen
+        // data-action over; de lege actie in ACTIONS zorgt dat er daarna ook echt niets gebeurt.
+        eq('stapel-e2e: het handvat draagt een eigen, lege actie',
+           [greep(bronEl).dataset.action, typeof ACTIONS[greep(bronEl).dataset.action]],
+           ['stapel-greep','function']);
+        const mbg=document.getElementById('modal-bg');
+        greep(bronEl).dispatchEvent(new MouseEvent('click',{ bubbles:true }));
+        truthy('stapel-e2e: klikken op het handvat opent het bewerkscherm niet',
+               !mbg.classList.contains('open'));
+        // Tegenproef, anders bewijst het bovenstaande alleen dat de klik-afhandeling hier niet leeft:
+        // exact dezelfde klik op de tekst van de rij hoort dat scherm juist wél te openen.
+        grijp(bronEl).dispatchEvent(new MouseEvent('click',{ bubbles:true }));
+        truthy('stapel-e2e: dezelfde klik op de rijtekst doet dat wél',
+               mbg.classList.contains('open'));
+        closeModal();
+        bronEl=dosRij(offerte); doelEl=dosRij(kop);
+
+        // Ook met een vinger, want de dossierpagina is juist de plek waar dit gebaar op de telefoon
+        // zin heeft: alle categorieën van één VvE staan er onder elkaar.
+        pak(bronEl, vinger);
+        ev(greep(bronEl),'pointermove',punt(grijp(doelEl)),vinger);
+        truthy('stapel-e2e: de dossierrij wordt aan zijn handvat opgepakt ondanks zijn eigen data-action',
                bronEl.classList.contains('sleep'));
-        laatLos(grijp(doelEl));
+        truthy('stapel-e2e: en de doelrij op het dossier licht op', doelEl.classList.contains('stapel-doel'));
+        ev(greep(bronEl),'pointerup',punt(grijp(doelEl)),vinger);
         await naSleep();
         eq('stapel-e2e: een offerte-traject hangt nu onder de Oppakken-taak',
            [offerte.bundelId, offerte.bundelVolg, kop.bundelId, kop.bundelVolg], ['Tkop','10','Tkop','0']);
         eq('stapel-e2e: en dat gaat als twee bereiken de Sheet in', geschreven.map(g=>g.range),
            ["'Nog Te Doen'!Q12:S12", "'Nog Te Doen'!Q28:S28"]);
       } finally {
+        if(poort) poort.style.display=poortOud;
         veldIds.forEach((id,i)=>{ document.getElementById(id).value=veldOud[i]; });
         state.ntdSort=sortOud; state.ntdStatus=statusOud; state.bulkMode=bulkOud; state.vveCode=vveOud;
         D.af={ ...leeg };

@@ -510,11 +510,13 @@ export function initBundelSlepen(container){
 }
 
 // ── Slepen om te stapelen ─────────────────────────────────────────────────────
-// Rij op rij slepen maakt van de gesleepte taak een subtaak van de rij waar hij landt. Er is hier
-// geen tweede betekenis van slepen: noch de takentabel noch de dossierpagina kent een handmatige
-// volgorde, dus élke drop op een ándere rij betekent 'stapelen'. Dit gebaar en het paneel-slepen
-// hierboven kunnen elkaar niet in de weg zitten: een `.bdl-sub` staat in een `<tr class="bdl-tr">`
-// zónder `data-row` (render-tabel.js), dus hij valt buiten de rijselector van de takentabel.
+// Een rij aan zijn handvat op een andere rij slepen maakt van de gesleepte taak een subtaak van de
+// rij waar hij landt. Er is hier geen tweede betekenis van slepen: noch de takentabel noch de
+// dossierpagina kent een handmatige volgorde, dus élke drop op een ándere rij betekent 'stapelen'.
+// Dit gebaar en het paneel-slepen hierboven kunnen elkaar niet in de weg zitten: ze toetsen op
+// verschillende attributen (`[data-stapel-grip]` tegen `[data-bdl-grip]`), en bovendien staat een
+// `.bdl-sub` in een `<tr class="bdl-tr">` zónder `data-row` (render-tabel.js) en valt hij dus ook
+// buiten de rijselector van de takentabel.
 //
 // Vier dingen komen van de aanroeper, omdat ze per lijst verschillen: de container (die een
 // hertekening overleeft), de selector van één rij, de weg van rij-element naar taak-object, en of er
@@ -522,24 +524,26 @@ export function initBundelSlepen(container){
 // niet als één vlag op `state`: de takentabel mag alleen slepen zolang de gestapelde weergave
 // aanstaat (§4.2 — zoeken, filteren, sorteren of bulk zet die uit), terwijl de dossierpagina die
 // weergave helemaal niet kent en dus altijd mag. Eén gedeelde vlag zou het stapelen op het dossier
-// stilleggen zodra er in de takentabel een filter aanstond.
+// stilleggen zodra er in de takentabel een filter aanstond. Diezelfde vlag bepaalt of de rij het
+// handvat überhaupt tékent (zie `bdlGreep` in rowNtd), zodat het zichtbare handvat en het
+// toegestane gebaar één antwoord delen.
 //
-// Op pointer-events om dezelfde reden als het paneel-slepen. Maar bewust GEEN `touch-action:none`
-// op de rijen: die regel zou élke aanraking op een taakrij doodmaken voor de verticale
-// paginascroll én voor de horizontale pan van .tbl-wrap (zie de toelichting bij .bdl-sub in
-// styles.css) — bij het paneel kon dat nog omdat het gebaar daar op een 16px-handvat begint, hier
-// is de hele rij het handvat. Gevolg: met een vinger stapel je niet (de browser leest de beweging
-// als scrollen en stuurt een pointercancel). Dat is de bewuste ruil — de twee andere wegen naar een
-// bundel, 'Hoort bij' en '+ Voeg een subtaak toe', werken op de telefoon gewoon.
-// Wie het gebaar later tóch op de telefoon wil, is met `touch-action:none` alléén niet klaar: de
-// touch-route zit DUBBEL dicht, want ook `doelOnder` werkt daar niet — zie de tweede helft van de
-// toelichting bij die functie.
-
-// Wat BINNEN een rij geen sleepgebaar mag starten. De rij zélf mag deze kenmerken wel dragen, en
-// dat is geen theorie: op de dossierpagina staat `data-action="taak-bewerken"` op de taakrij zelf
-// (render-vve.js). Een toets die simpelweg de dichtstbijzijnde [data-action] opzoekt zou daar dus
-// élk sleepgebaar afwijzen — vandaar de wandeling hieronder, die bij de rij stopt.
-const GEEN_SLEEP = 'button,a,input,select,textarea,[data-action]';
+// HET GEBAAR BEGINT ALLEEN OP HET HANDVAT, niet ergens op de rij. Dat is de kern van deze opzet en
+// lost twee dingen tegelijk op:
+//   - Tekst selecteren in een rij en daarbij een rijgrens passeren kan geen stapelactie meer zijn,
+//     en stapelen is een SCHRIJFACTIE naar de Sheet. Toen de hele rij het handvat was moest die
+//     botsing met remmen onwaarschijnlijk gemaakt worden (drempel, opgelichte doelrij, ongedaan
+//     maken); nu bestaat ze niet meer. Selecteren en kopiëren van een VvE-naam of actiepunt is
+//     gewoon weer een doodgewone leeshandeling, óók dwars over rijen heen.
+//   - `touch-action:none` hoeft alleen op het handvat (`.stapel-h`, styles.css) en niet op de rij.
+//     Zonder die regel leest de browser een vingerbeweging als scroll-gebaar en stuurt hij een
+//     pointercancel in plaats van pointermove; mét die regel op de hele rij zou juist élke
+//     aanraking op een taakrij doodgaan voor de verticale paginascroll én voor de horizontale pan
+//     van .tbl-wrap, precies waar de takentabel op een smal scherm van leeft. Op een 16px-handvat
+//     kost hij niets. Stapelen werkt daardoor óók met een vinger — in de tabel én op de
+//     dossierpagina. Zie `doelOnder` voor het tweede stuk dat daarvoor nodig was.
+//
+// Op pointer-events om dezelfde reden als het paneel-slepen.
 
 // Eén sleepstand voor de hele pagina, net als bij het paneel-slepen: er is maar één muis.
 let _stapel = null;
@@ -549,13 +553,25 @@ export function initStapelSlepen(container, rijSelector, taakVanEl, magSlepen){
   if (!container || container._bdlStapel) return;
   container._bdlStapel = true;
   container.addEventListener('pointerdown', e => {
-    // Alleen de linkerknop, om precies dezelfde reden als bij initBundelSlepen.
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    // Alleen knop 0, om precies dezelfde reden als bij initBundelSlepen: een rechtermuisklik zou de
+    // sleepstand zetten waarna het contextmenu opengaat, en daarna komt er op de meeste platforms
+    // géén pointerup meer — die stand bleef dan staan en de eerstvolgende beweging verplaatste een
+    // rij die niemand vasthield. Kaal en zonder toets op pointerType, ook net als daar: `button` is
+    // invoer-onafhankelijk (de Pointer Events-spec legt 0 vast voor de linker muisknop, voor
+    // aanraak-contact én voor pen-contact, en geeft de pen-zijknop 2 en de pen-gum 5), dus een
+    // `pointerType === 'mouse'`-voorwaarde ervoor liet die pen-zijknop wél door — inclusief hetzelfde
+    // contextmenu dat voor de muis juist was afgevangen.
+    if (e.button !== 0) return;
+    // Alleen vanaf het handvat, net als `initBundelSlepen` met `[data-bdl-grip]` doet. Een eigen
+    // attribuut, zodat de twee sleepsoorten elkaar niet kunnen kapen: een subtaakregel in een
+    // bundelpaneel draagt het handvat van het herordenen, een taakrij dat van het stapelen.
+    if (!e.target.closest('[data-stapel-grip]')) return;
+    // Tweede slot op dezelfde vlag die het handvat tekent (`stapel` uit bundelWeergave, zie rowNtd).
+    // Niet overbodig: de DOM loopt achter op de state tot de eerstvolgende render, dus tussen een
+    // filterwissel en die render kan er nog een handvat in beeld staan.
     if (magSlepen && !magSlepen()) return;
     const el = e.target.closest(rijSelector);
     if (!el) return;
-    for (let n = e.target; n && n !== el; n = n.parentElement)
-      if (n.matches && n.matches(GEEN_SLEEP)) return;
     // De taak meteen erbij zoeken. Levert dat niets op, dan valt er niets te stapelen en hoort de
     // rij niet te gaan dimmen alsof er wél iets gaat gebeuren.
     // Vangnet en geen bestaande route (nagelopen 2026-08-15): beide aanroepers geven élke rij die
@@ -566,6 +582,15 @@ export function initStapelSlepen(container, rijSelector, taakVanEl, magSlepen){
     const r = taakVanEl(el);
     if (!r) return;
     _stapel = { container, el, rijSelector, taakVanEl, r, x:e.clientX, y:e.clientY, actief:false };
+    // Net als bij initBundelSlepen. Zonder dit begint de muis vanaf het handvat alsnog een
+    // tekstselectie en trekt die onderweg over elke rij die hij passeert — precies wat het handvat
+    // moest voorkomen. `preventDefault` op pointerdown onderdrukt de muis-compatibiliteitsevents
+    // (waaronder mousedown, dat de selectie start); de `click` erna blijft wél komen, en dáárvoor
+    // draagt het handvat een eigen lege `data-action` (zie STAPEL_GREEP in render-bundel.js).
+    // Vroeger kon dit hier niet: toen was de hele rij het handvat en moest selecteren bínnen een rij
+    // juist mogelijk blijven. Nu kost het niets — op het handvat zelf valt met `user-select:none`
+    // (styles.css) toch al niets te selecteren.
+    e.preventDefault();
   });
   if (_stapelGlobaal) return;
   _stapelGlobaal = true;
@@ -576,10 +601,6 @@ export function initStapelSlepen(container, rijSelector, taakVanEl, magSlepen){
     _stapel = null;
     s.el.classList.remove('sleep');
     s.container.querySelectorAll('.stapel-doel').forEach(x => x.classList.remove('stapel-doel'));
-    // Onvoorwaardelijk, ook als de selectie-rem nooit aanging: elke weg terug loopt hier langs
-    // (pointerup, pointercancel én `losgeraakt`), en een achtergebleven klasse zou het selecteren
-    // op de hele pagina permanent stilleggen.
-    document.body.classList.remove('stapel-slepen');
     return s;
   };
 
@@ -596,25 +617,24 @@ export function initStapelSlepen(container, rijSelector, taakVanEl, magSlepen){
     return true;
   };
 
-  // De rij onder de muis, of null. Die hoeft niet uitgerekend te worden: zonder pointer-capture
-  // komt een pointer-event binnen op het element waar de muis op staat en borrelt van daar naar
-  // `window`, dus `e.target` ís het antwoord al. Zelf hit-testen op de rechthoeken van de rijen zou
-  // dat antwoord naboetseren én slechter zijn zodra er iets vóór de tabel ligt dat bij geen enkele
-  // rij hoort: een toast staat met z-index 700 over de tabel en vangt zelf pointer-events
-  // (styles.css). Dan levert `closest` hier niets op en gebeurt er niets — beter dan een koppeling
-  // met een rij die de gebruiker op dat moment niet eens kon zien.
+  // De rij onder de aanwijzer, of null. Bewust via `document.elementFromPoint` en NIET via
+  // `e.target`. Voor de muis geven die twee hetzelfde antwoord — zonder pointer-capture komt een
+  // pointer-event binnen op het element waar de muis op staat, en dat is precies het element dat
+  // elementFromPoint teruggeeft — maar voor aanraking en pen niet: voor die 'direct
+  // manipulation'-invoer zet de browser bij pointerdown zélf een IMPLICIETE pointer-capture op het
+  // aangeraakte element, waarna élke pointermove/pointerup bij de BRON-rij binnenkomt. `e.target`
+  // levert daar dus altijd de eigen rij op en deze functie per definitie null: het gebaar zou met
+  // een vinger zichtbaar meebewegen en bij het loslaten stil niets doen.
   //
-  // LET OP: dat gaat alleen op voor de MUIS. Voor aanraking en pen — de 'direct manipulation'-invoer
-  // uit de Pointer Events-spec — zet de browser bij pointerdown zélf een IMPLICIETE pointer-capture
-  // op het aangeraakte element, en gaan alle volgende pointermove/pointerup dus naar de BRON-rij.
-  // `e.target.closest(...)` geeft daar altijd de eigen rij terug en deze functie levert per
-  // definitie null. Vandaag valt dat niet op omdat een vingergebaar hier sowieso niet aankomt (geen
-  // touch-action:none, zie de kop hierboven), maar die twee horen bij elkaar: wie straks alleen
-  // `touch-action:none` toevoegt, krijgt op de telefoon een gebaar dat nog steeds niets doet en dat
-  // ook niets meldt. Daar hoort dan `document.elementFromPoint(e.clientX, e.clientY)` bij — precies
-  // de weg die hierboven voor de muis bewust is afgewezen.
+  // Dat dit géén hit-test op de rechthoeken van de rijen is, is het punt. Zo'n eigen berekening zou
+  // een rij aanwijzen die de gebruiker niet kan zien zodra er iets vóór de tabel ligt: een toast
+  // staat met z-index 700 over de tabel en vangt zelf pointer-events (`#toast-container>*` heeft
+  // `pointer-events:all`, styles.css). elementFromPoint geeft dan de toast, `closest` levert niets
+  // op en er gebeurt niets — dezelfde uitkomst als voorheen met `e.target`. Buiten het venster
+  // loslaten geeft om dezelfde reden null, en dus ook geen koppeling.
   const doelOnder = e => {
-    const doelEl = e.target && e.target.closest ? e.target.closest(_stapel.rijSelector) : null;
+    const onder = document.elementFromPoint(e.clientX, e.clientY);
+    const doelEl = onder && onder.closest ? onder.closest(_stapel.rijSelector) : null;
     // Op jezelf laten vallen betekent niets — anders levert een klik met een trillende muis
     // `koppelTaak(r, r)` op en dus een melding 'Een taak kan niet onder zichzelf hangen'.
     // En de rij moet uit dezelfde lijst komen: selector én rij-cache-vertaling horen bij de
@@ -629,40 +649,13 @@ export function initStapelSlepen(container, rijSelector, taakVanEl, magSlepen){
 
   window.addEventListener('pointermove', e => {
     if (!_stapel || losgeraakt()) return;
-    // Pas na 6px echt slepen. Hier is de hele rij het handvat, dus zonder drempel zou een muis die
-    // tijdens het klikken een pixel verschuift al een bundel maken.
+    // Pas na 6px echt slepen. Een trillende hand op het handvat mag geen sleepactie worden: zonder
+    // drempel gaat de rij bij de kleinste beweging tijdens een gewone klik al dimmen en licht de rij
+    // eronder op als doel, terwijl er niets verschuift. Dat de rem óók een onbedoelde koppeling
+    // tegenhoudt telt mee maar is niet meer de hoofdreden — daarvoor zorgt het handvat zelf al.
     if (!_stapel.actief && Math.abs(e.clientY - _stapel.y) + Math.abs(e.clientX - _stapel.x) < 6) return;
     _stapel.actief = true;
     _stapel.el.classList.add('sleep');
-    // Verlaat de muis de rij waar het gebaar begon, dan is dit geen 'tekst in deze regel
-    // selecteren' meer maar een sleep over rijgrenzen heen — en die twee kunnen hier niet naast
-    // elkaar bestaan, want de hele rij is het handvat. Vanaf dat moment de lopende selectie
-    // opruimen en het selecteren stilleggen (`body.stapel-slepen`, styles.css). Zonder deze rem
-    // trekt de muis een blauwe selectie over elke rij die hij passeert, dwars door de dim-opmaak en
-    // de doel-markering heen, en blijft die staan in alle takken waar `koppelTaak` géén renderAll
-    // doet: een geweigerde koppeling, offline, of loslaten naast een rij.
-    //
-    // Bewust NIET met `preventDefault()` op pointerdown zoals `initBundelSlepen` dat doet, en ook
-    // niet al bij de 6px-drempel: allebei maken ze het selecteren BINNEN één rij onmogelijk, en een
-    // VvE-naam of actiepunt uit de tabel selecteren en kopiëren is een doodgewone leeshandeling.
-    // Bij het paneel-handvat speelt dat niet — daar is het handvat een leeg 16px-glyph.
-    //
-    // De ruil die hiermee vastligt: een selectie die een rijgrens overschrijdt kán niet meer, want
-    // dat gebaar betekent hier stapelen. Wat het wél oplevert is dat de gebruiker dat vóór het
-    // loslaten ziet (dim + opgelichte doelrij, zonder tegenstrijdige blauwe selectie) en dat de
-    // undo-toast erna klaarstaat.
-    //
-    // Eenmalig, met een vlag. Die vlag doet precies één ding: hij houdt `removeAllRanges()` tegen
-    // bij élke vólgende pointermove buiten de bronrij — één keer opruimen is genoeg. Hij is
-    // nadrukkelijk NIET wat voorkomt dat het selecteren hervat zodra de muis terugkeert naar de
-    // eigen rij: dat volgt uit `body.stapel-slepen` zelf, want die klasse gaat nergens af behalve
-    // in `opruimen`.
-    if (!_stapel.selRem && !_stapel.el.contains(e.target)){
-      _stapel.selRem = true;
-      document.body.classList.add('stapel-slepen');
-      const sel = window.getSelection && window.getSelection();
-      if (sel) sel.removeAllRanges();
-    }
     const doelEl = doelOnder(e);
     _stapel.container.querySelectorAll('.stapel-doel').forEach(x => x.classList.remove('stapel-doel'));
     if (doelEl) doelEl.classList.add('stapel-doel');
@@ -684,9 +677,11 @@ export function initStapelSlepen(container, rijSelector, taakVanEl, magSlepen){
     if (doel) koppelTaak(s.r, doel);
   };
   window.addEventListener('pointerup', stop);
-  // Een afgebroken gebaar laat géén pointerup achter — de browser stuurt pointercancel zodra hij de
-  // beweging zelf overneemt (op een touchscreen als scroll-gebaar, zie de kop hierboven). Zonder
-  // deze opruiming bleef de rij gedimd staan en hield de volgende beweging een rij vast die niemand
-  // meer oppakte.
+  // Een afgebroken gebaar laat géén pointerup achter: de browser stuurt dan pointercancel. Dat het
+  // handvat `touch-action:none` draagt haalt één oorzaak weg (hij neemt een vingerbeweging die dáár
+  // begint niet meer over als scroll-gebaar), maar niet alle: de Pointer Events-spec noemt onder meer
+  // een draaiend scherm en een aanwijzer waarvan de browser besluit dat er geen events meer van
+  // komen. Zonder deze opruiming bleef de rij gedimd staan en hield de volgende beweging een rij
+  // vast die niemand meer oppakte.
   window.addEventListener('pointercancel', () => opruimen());
 }

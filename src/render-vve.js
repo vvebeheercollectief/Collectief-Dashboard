@@ -10,6 +10,7 @@ import { fmtLogTs, logItemHtml, logDayLabel, logPaginaSoort } from "./render-ove
 import { vveKenmerken, KENMERK_WAARDEN } from "./kenmerken.js";
 import { backgroundWrite, blokkeerOffline } from "./data.js";
 import { initStapelSlepen } from "./bundel-acties.js";
+import { STAPEL_GREEP } from "./render-bundel.js";
 import { appendRange } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { getCurrentWho } from "./notifications.js";
@@ -227,7 +228,12 @@ function renderVve(){
       : r.deadline
         ? `${esc(r.deadline)}${p.teLaat?` <span class="pill-telaat">Te laat (${Math.abs(p.dagenTot)}d)</span>`:''}`
         : '<span class="warn-geen-deadline">Geen deadline</span>';
+    // Het sleep-handvat staat er hier ONVOORWAARDELIJK, anders dan in de takentabel: het dossier
+    // kent de gestapelde weergave niet (geen chevron, geen paneel, geen filters die hem uitzetten),
+    // dus er is ook geen stand waarin het gebaar hier niet mag. Dat is dezelfde afweging als bij de
+    // aanroep van `initStapelSlepen` onderaan, die om die reden géén `magSlepen` meekrijgt.
     return `<div class="tk tk-taak${weg?' snooze-row':''}" data-action="taak-bewerken" data-rid="${rid}" style="cursor:pointer">
+      ${STAPEL_GREEP}
       <span class="nm">${esc(taakTitel(r,sec))}</span>
       <div class="tk-onder">
         <span class="mt">${esc(meta.label)}${r.behandelaar?' · '+esc(r.behandelaar):''}</span>
@@ -321,7 +327,8 @@ function renderVve(){
     const t=document.querySelector('#vve-inhoud .log-edit-tekst'); if(t) t.value=_leBewaar.tekst;
     const w=document.querySelector('#vve-inhoud .log-edit-wie'); if(w&&_leBewaar.wie) w.value=_leBewaar.wie;
   }
-  // Rij op rij slepen om te stapelen. Dit is de plek waar het hoofdvoorbeeld uit de spec werkt:
+  // Slepen aan het handvat van een rij om hem onder een andere te hangen. Dit is de plek waar het
+  // hoofdvoorbeeld uit de spec werkt:
   // hier staan alle categorieën van één VvE onder elkaar, dus een offerte-traject kan onder een
   // vergaderverzoek. De listener hangt aan #vve-inhoud zelf — die blijft bestaan, alleen zijn
   // inhoud wordt hierboven vervangen — en initStapelSlepen bedraadt hem maar één keer.

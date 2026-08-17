@@ -196,6 +196,12 @@ export const ACTIONS = {
   'opmaak-vet':            (el) => doeOpmaak(el,'vet'),
   'opmaak-schuin':         (el) => doeOpmaak(el,'schuin'),
   'opmaak-lijst':          (el) => doeOpmaak(el,'lijst'),
+  // Het sleep-handvat op een taakrij (STAPEL_GREEP, render-bundel.js). Bewust een LEGE actie en niet
+  // gewoon geen data-action: het attribuut is er om de klik-afhandeling van de rij eronder te laten
+  // afketsen — die van deze delegatie én die van de takentabel in main.js slaan allebei een element
+  // met een eigen data-action over. Zonder dit opent een mislukte greep op de dossierpagina het
+  // bewerkscherm. Hier geregistreerd zodat de naam niet als losse eindjes-actie leest.
+  'stapel-greep':          ()   => {},
 };
 
 export function initActions() {

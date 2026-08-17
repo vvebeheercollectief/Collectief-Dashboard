@@ -224,13 +224,22 @@ sleepactie is een verkeerde vólgorde — nooit verloren werk.
    VvE-code en naam al ingevuld. Je kiest de categorie en de omschrijving.
 2. **Veld "Hoort bij"** in het bewerkscherm van een bestaande taak → hoofdtaak opzoeken via het
    bestaande VvE-zoekveldpatroon. Een kruisje ontkoppelt weer.
-3. **Slepen, rij op rij**:
+3. **Slepen aan het handvat van een rij**, en dat handvat op een andere rij loslaten:
    - in de takentabel: binnen één categorie
    - op de VvE-dossierpagina: dwars door alle categorieën heen — dáár werkt het hoofdvoorbeeld
      (offerte onder vergaderverzoek) met slepen
 
+   Elke sleepbare rij draagt vooraan een eigen greepje (⠿), net als de subtaakregels in het
+   bundelpaneel. Oppakken kan **alleen** daar; de rest van de rij blijft gewoon tekst die je kunt
+   selecteren en kopiëren. Zie §6.3 voor het waarom. Het gebaar werkt met de muis én met een
+   vinger, in de tabel en op de dossierpagina.
+
 ### 6.2 Regels bij slepen
 
+- **Het gebaar begint alleen op het handvat.** Een `pointerdown` ergens anders in de rij — op de
+  tekst, op de VvE-code, op een van de icoon-knoppen — start niets. In platte weergave (zoeken,
+  filteren, kolomsortering, bulk) staat er ook geen handvat, want dan kan er niet gestapeld worden
+  (§4.2); op de VvE-dossierpagina staat het er altijd, want die kent de gestapelde weergave niet.
 - **Op een rij die al in een bundel zit** → je voegt je toe aan díe bundel (achteraan). Zo kan er
   geen fout ontstaan door "op de verkeerde helft" te mikken.
 - **Een taak die zelf al subtaken heeft** kun je nergens onder slepen → melding *"Deze taak heeft
@@ -240,10 +249,14 @@ sleepactie is een verkeerde vólgorde — nooit verloren werk.
 - **Andere VvE** wordt niet geblokkeerd. Het gebeurt zelden, en de ongedaan-maken-melding is hier
   een beter vangnet dan een extra bevestigingsvraag.
 
-### 6.3 Sleep-techniek (volgorde wijzigen in het bundelpaneel)
+### 6.3 Sleep-techniek
 
-> Bijgewerkt na de bouw (`src/bundel-acties.js`, `initBundelSlepen`). Deze paragraaf beschrijft
-> alleen het slepen om te **sorteren**; het slepen om te **stapelen** staat in §6.1/§6.2.
+> Bijgewerkt na de bouw (`src/bundel-acties.js`). Er zijn twee sleepgebaren en ze staan hieronder
+> los van elkaar: **sorteren** binnen het bundelpaneel (`initBundelSlepen`) en **stapelen** van een
+> taak onder een andere (`initStapelSlepen`). Ze kunnen elkaar niet kapen — ze toetsen op een eigen
+> attribuut, `[data-bdl-grip]` tegen `[data-stapel-grip]`.
+
+#### Volgorde wijzigen in het bundelpaneel
 
 Slepen wordt gebouwd op **pointer-events** (`pointerdown` / `pointermove` / `pointerup` /
 `pointercancel`), niet op de HTML5-sleepfunctie van de browser — die werkt niet op een touchscreen,
@@ -270,6 +283,42 @@ weggeschreven. Is er niets verschoven, dan wordt er ook niets geschreven: `hernu
 namelijk óók zonder sleepbeweging nieuwe nummers uit zodra een bundel nog op zijn startwaarden
 staat (0 en 10 worden 10 en 20), dus een kale klik op het handvat zou anders een schrijfronde en een
 ongedaan-maken-melding opleveren voor een verplaatsing die niemand deed.
+
+#### Stapelen: een eigen handvat per rij
+
+Eerst was de **hele rij** het handvat. Dat is teruggedraaid: elke sleepbare rij draagt nu vooraan
+zijn eigen greepje (`[data-stapel-grip]`), en een `pointerdown` daarbuiten ketst af — net zoals
+`initBundelSlepen` alleen vanaf `[data-bdl-grip]` oppakt. Twee redenen, en ze wegen allebei zwaar
+genoeg om er de rij-brede variant voor op te geven:
+
+- **Tekst selecteren mag nooit een schrijfactie worden.** Stapelen schrijft naar de Sheet. Toen de
+  rij het handvat was, was "tekst selecteren en daarbij een rijgrens passeren" hetzelfde gebaar als
+  "stapelen". Remmen (een drempel van 6px, de opgelichte doelrij, de ongedaan-maken-melding) maakten
+  een ongeluk onwaarschijnlijk, niet onmogelijk. Met een eigen handvat kán het niet meer, en een
+  VvE-naam of actiepunt selecteren en kopiëren is weer een doodgewone leeshandeling — ook dwars over
+  rijen heen.
+- **`touch-action: none` blijft beperkt tot het handvat.** Zonder die regel leest de browser een
+  vingerbeweging als scroll-gebaar en stuurt hij een `pointercancel` in plaats van `pointermove`. Op
+  de hele rij gezet zou hij élke aanraking op een taakrij doodmaken voor de verticale paginascroll
+  én voor de horizontale pan van `.tbl-wrap` — precies hoe je op een telefoon de rechterkolommen van
+  de takentabel bereikt. Op een greepje van 16px kost hij niets.
+
+**Gevolg: stapelen werkt óók met een vinger** — in de takentabel én op de VvE-dossierpagina. Daar
+was één ding extra voor nodig. Bij aanraking en pen zet de browser bij `pointerdown` zélf een
+*impliciete pointer-capture* op het aangeraakte element, waardoor elke volgende `pointermove` en
+`pointerup` op de bron-rij binnenkomt; `e.target` wijst dan altijd naar de eigen rij en nooit naar
+een doel. De drop wordt daarom bepaald met `document.elementFromPoint(e.clientX, e.clientY)`. Voor
+de muis verandert dat niets — dat geeft hetzelfde element als `e.target`, inclusief het gedrag dat
+een toast vóór de tabel (z-index 700, vangt zelf pointer-events) een drop eronder blokkeert.
+
+De 6px-drempel blijft staan: een trillende hand op het handvat mag geen sleepactie worden, anders
+dimt de rij en licht de rij eronder op bij een gewone klik.
+
+Eén detail dat makkelijk over het hoofd te zien is: een greep die niet verplaatst eindigt gewoon in
+een `click` — `preventDefault()` op `pointerdown` onderdrukt de muis-compatibiliteitsevents, niet de
+klik erna. Het handvat draagt daarom een eigen (lege) `data-action`, zodat die klik niet doorschiet
+naar de afhandeling van de rij eronder. Op de VvE-dossierpagina is de rij namelijk zélf de knop naar
+het bewerkscherm; zonder dat attribuut opende elke mislukte greep dat scherm.
 
 ### 6.4 Elke stapel-actie krijgt een ongedaan-maken-melding
 

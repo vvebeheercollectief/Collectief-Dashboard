@@ -738,10 +738,14 @@
        behandelaar links en de deadline rechts. Op één regel (tekst | datum + 'Te laat'-pil
        | ✓) hield de tekst in het 330px-paneel maar ~58px over, waardoor woorden middenin
        afbraken. Deze regels staan ná .tk, want ze overschrijven de flex-opzet. */
-    .tk-taak{display:grid;grid-template-columns:1fr auto;column-gap:10px;row-gap:3px}
-    .tk-taak .nm{grid-column:1;grid-row:1}
-    .tk-taak .tk-af{grid-column:2;grid-row:1;align-self:center}
-    .tk-taak .tk-onder{grid-column:1/-1;grid-row:2;min-width:0;display:flex;flex-wrap:wrap;
+    /* Drie kolommen sinds het sleep-handvat erbij kwam: handvat | tekst | ✓. De onderregel begint
+       bij kolom 2 en niet bij 1, zodat sectie/behandelaar en deadline onder de tekst uitlijnen in
+       plaats van onder het handvat. */
+    .tk-taak{display:grid;grid-template-columns:auto 1fr auto;column-gap:10px;row-gap:3px}
+    .tk-taak .stapel-h{grid-column:1;grid-row:1}
+    .tk-taak .nm{grid-column:2;grid-row:1}
+    .tk-taak .tk-af{grid-column:3;grid-row:1;align-self:center}
+    .tk-taak .tk-onder{grid-column:2/-1;grid-row:2;min-width:0;display:flex;flex-wrap:wrap;
       align-items:baseline;justify-content:space-between;gap:2px 10px}
     .tk-taak .mt{font-size:11px;color:var(--mut);min-width:0}
     .tk.rij-puls-groen{background:var(--puls-gn);color:var(--puls-gn-t);transition:background .15s ease}
@@ -1302,12 +1306,26 @@ tr.stapel-doel>td{background:var(--sec-l,var(--ac-l))!important;
 [data-theme=dark] tr.stapel-doel>td{background:var(--sec-l,var(--ac-l))!important}
 .tk.sleep{opacity:.55}
 .tk.stapel-doel{background:var(--sec-l,var(--ac-l));box-shadow:inset 0 0 0 2px var(--sec,var(--ac))}
-/* Staat aan zolang een stapelgebaar de rij waarop het begon verlaten heeft (zie initStapelSlepen).
-   Zonder deze rem smeert de muis onderweg een blauwe tekstselectie over elke rij die hij passeert,
-   bovenop de dim-opmaak en de doel-markering — en in de takken waar `koppelTaak` géén renderAll
-   doet (weigering, offline, geen doel) blijft die selectie daarna gewoon staan.
-   Op de body en niet op de rijen: de selectie kan ook buiten de lijst doorlopen zodra de muis naast
-   de tabel komt, en `user-select` erft door naar alles eronder.
-   De -webkit-vorm erbij omdat oudere Safari-versies alleen die kennen; het gebaar is muis-only
-   (zie de kop bij initStapelSlepen) en draait dus op de desktopbrowser. */
-body.stapel-slepen{-webkit-user-select:none;user-select:none}
+/* Het sleep-handvat op een taakrij (STAPEL_GREEP in render-bundel.js) — de enige plek waar het
+   stapelgebaar begint. Zelfde glyph, breedte, cursor en aanraakhalo als `.bdl-h` hierboven; anders
+   zijn alleen `display:inline-block` (dit handvat staat in een gewone tabelcel, niet in een
+   flexregel, dus `flex:none` doet daar niets) en de gedempte kleur, want in een tabelrij vol tekst
+   hoort het handvat niet mee te schreeuwen. In de grid van `.tk-taak` op de dossierpagina wordt het
+   vanzelf een blok — grid-items worden geblokkeerd — en houdt het gewoon zijn 16px.
+   `touch-action:none` staat hier en NERGENS anders. Dat is precies de winst van een eigen handvat:
+   de browser leidt het scrollgedrag af uit het element waar de aanraking landt samen met zijn
+   voorouders, dus op dit glyph kost de regel niets, terwijl hij op de hele rij élke aanraking zou
+   doodmaken voor de verticale paginascroll én voor de horizontale pan van .tbl-wrap — precies hoe je
+   op een telefoon de rechterkolommen van de takentabel bereikt. */
+.stapel-h{display:inline-block;box-sizing:border-box;width:16px;text-align:center;
+  color:var(--mut);font-size:14px;line-height:1;cursor:grab;user-select:none;touch-action:none;
+  position:relative}
+.stapel-h:active{cursor:grabbing}
+/* Zelfde aanraakhalo-truc als bij `.bdl-h`: het handvat meet 16 × 14 px (gemeten) en is als
+   aanraakdoel dus te klein — richtlijn is 24px+. Het gebied groeit met een pseudo-element in plaats
+   van met echte maten, want dat is zelf geen event-doel: de pointerdown komt gewoon op `.stapel-h`
+   binnen, waar `[data-stapel-grip]` op staat, en de rij eromheen verschuift niet. 6px eromheen maakt
+   er 28 × 26 van. Dat blijft binnen de rij — gemeten 47px in de takentabel en 77px op de
+   dossierpagina (die rijen staan op twee regels) — dus het handvat van de ene rij steekt niet in de
+   andere. */
+.stapel-h::after{content:'';position:absolute;inset:-6px}

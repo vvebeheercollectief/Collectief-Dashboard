@@ -3730,7 +3730,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '10.15');
+  eq('versie opgehoogd', APP_VERSION, '10.16');
 
   // ── Pushmeldingen: de twee schakels die stil kapot waren (audit 2026-08-06) ──
   // Beide defecten waren onzichtbaar: de app meldde "Notificaties zijn aan!" terwijl er nooit
@@ -4325,11 +4325,14 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   })();
 
   (() => {
-    // De waarschuwing bij afronden/verwijderen. "Heeft deze taak subtaken?" is dezelfde vraag als
-    // in `magKoppelen` en wordt dus op dezelfde manier beantwoord: wie draagt míjn taaknummer als
-    // bundelnummer? Nadrukkelijk NIET "wie zit er verder nog in mijn bundel" — dan zou élke subtaak
-    // die je afvinkt een bevestigingsvraag opleveren over taken die niet van hem zijn, terwijl het
-    // ontwerp (§5) juist vastlegt dat je subtaak 3 mag afronden terwijl 1 en 2 nog openstaan.
+    // De waarschuwing bij afronden/verwijderen. De vraag is "laat ík openstaand werk achter?", en
+    // alleen de ZICHTBARE KOP stelt hem: een subtaak afvinken is de dagelijkse handeling en moet
+    // stil blijven — §5 legt vast dat je subtaak 3 mag afronden terwijl 1 en 2 nog openstaan.
+    //
+    // Nadrukkelijk NIET "wie draagt mijn taaknummer als bundelnummer" (zoals `magKoppelen` het
+    // vraagt). Dat klopt alleen voor de OORSPRONKELIJKE hoofdtaak; zodra de kop doorschuift (§3.3)
+    // wijst niemand meer naar de zichtbare kop en bleef de waarschuwing stil weg. Zie het blok
+    // 'kop doorgeschoven' onderaan — dat is het geval dat live op de testomgeving misging.
     const t = (taakId, bundelId, volg, sec) => ({ taakId, bundelId, bundelVolg:volg, _sec:sec, code:'311212' });
     const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
     const kop = t('Tkop','Tkop','0','VERGADERVERZOEKEN');
@@ -4364,6 +4367,21 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
        openSubtaken(ix, t('','Tkop','30','OPPAKKEN')), 0);
     eq('waarschuwing: geen index is geen fout', openSubtaken(null, kop), 0);
     eq('waarschuwing: geen taak is geen fout', openSubtaken(ix, null), 0);
+
+    // ── Kop doorgeschoven (§3.3) — hier ging het live mis ──────────────────────────────────
+    // De hoofdtaak is afgerond, dus Tb is nu de zichtbare kop terwijl Tc nog openstaat. Tb draagt
+    // 'Tkop' als bundelnummer en niet zijn eigen, dus een opzoeking op taaknummer vindt niets. Dit
+    // is geen randgeval maar de gewone stand ná het eerste vinkje in een bundel.
+    const ixDoor = bouwBundelIndex({ ...leeg, OPPAKKEN:[subB, subC] },
+                                   { ...leeg, VERGADERVERZOEKEN:[kop] });
+    eq('waarschuwing: de doorgeschoven kop telt de rest van zijn bundel', openSubtaken(ixDoor, subB), 1);
+    eq('waarschuwing: … en waarschuwt dus wél', bundelWaarschuwing(ixDoor, subB),
+       'Er staat nog 1 subtaak open.');
+    // …en de taak die géén kop is blijft stil, óók in deze stand. Zonder deze tegenproef zou
+    // "waarschuw altijd over de rest van de bundel" er net zo goed doorheen komen.
+    eq('waarschuwing: de subtaak eronder blijft stil', openSubtaken(ixDoor, subC), 0);
+    // De afgeronde hoofdtaak zelf is geen kop meer en stelt dus ook geen vraag.
+    eq('waarschuwing: een afgerond lid stelt geen vraag', openSubtaken(ixDoor, kop), 0);
   })();
 
   (() => {

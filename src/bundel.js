@@ -232,16 +232,25 @@ export function magKoppelen(bron, doel, index){
   return { mag:true, reden:'', bundelId: doelBundel || tekst(doel.taakId) || null };
 }
 
-// Hoeveel subtaken van déze taak staan er nog open? Alleen de openstaande leden, want een afgeronde
-// subtaak laat niets liggen om voor te waarschuwen — dáárin verschilt deze telling van de vangrail
-// in `magKoppelen`, die dezelfde lijst juist ongefilterd gebruikt.
+// Hoeveel openstaande leden laat déze taak achter als je hem afvinkt? Alleen de zichtbare kop
+// stelt die vraag; een subtaak afvinken is de dagelijkse handeling en moet stil blijven — §5 legt
+// vast dat subtaak 3 afgerond mag worden terwijl 1 en 2 nog openstaan.
 //
-// Nadrukkelijk niet "de rest van mijn bundel" (`bundelVan`): die twee vallen alleen samen voor de
-// hoofdtaak. Voor een subtaak zou dat de kop en de broers meetellen, en dan zou élk vinkje in een
-// bundel een bevestigingsvraag opleveren over taken die niet van hem zijn — terwijl §5 van het
-// ontwerp juist vastlegt dat subtaak 3 afgerond mag worden terwijl 1 en 2 nog openstaan.
+// Op ZICHTBARE KOP toetsen en niet op `subtakenVan` (dat opzoekt wie er naar mijn taaknummer
+// wijst). Dat laatste stond hier eerst en klopte alleen voor de OORSPRONKELIJKE hoofdtaak: alleen
+// díe draagt zijn eigen taaknummer als bundelnummer. Zodra de kop doorschuift — precies wat §3.3
+// voorschrijft zodra de hoofdtaak is afgerond of verwijderd — vindt zo'n opzoeking niets meer en
+// bleef de waarschuwing stil weg. Live gevangen op de testomgeving, met een bundel waarvan de kop
+// was doorgeschoven; dat is geen randgeval maar de gewone stand ná het eerste vinkje.
+//
+// Afgeronde leden tellen niet mee: die laten niets liggen om voor te waarschuwen. Daarin verschilt
+// deze telling van de vangrail in `magKoppelen`, die dezelfde lijst juist ongefilterd gebruikt.
 export function openSubtaken(index, r){
-  return subtakenVan(index, r).filter(m => !m.af).length;
+  const leden = bundelVan(index, r);
+  if (!leden) return 0;
+  const kop = zichtbareKop(leden);
+  if (!kop || !zelfdeTaak(kop.r, r)) return 0;   // geen kop = geen vraag
+  return leden.filter(m => !m.af && !zelfdeTaak(m.r, r)).length;
 }
 
 // Waarschuwingstekst bij het afronden van een taak met openstaande subtaken. Lege string = niets te

@@ -32,7 +32,8 @@ import { renderVve } from './render-vve.js';
 import { openChat, closeChat, setChatVve } from './dossier-chat.js';
 import { initPalette } from './palette.js';
 import { initSwUpdate } from './sw-update.js';
-import { initModalA11y } from './modal-a11y.js';
+import { initModalA11y, bovensteModal } from './modal-a11y.js';
+import { beantwoordBevestiging } from './bevestig.js';
 import { ico } from './icons.js';
 import { groeiVelden } from './opmaak.js';
 
@@ -47,6 +48,9 @@ const MODAL_SLUITERS = {
   'alvoreset-bg': closeResetModal,
   'notif-bg': closeNotifModal,
   'ai-bg': closeAiHelp,
+  // Escape op de bevestigingsvraag is 'nee'. Alleen de .open-class weghalen zou de wachtende
+  // aanroeper eeuwig laten hangen — die staat op een Promise die alleen hierlangs afloopt.
+  'bevestig-bg': () => beantwoordBevestiging(false),
 };
 
 // ── Clickjacking-bescherming (frame-buster) ────────────────────────────
@@ -242,9 +246,21 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(e.key!=='Escape') return;
     if(document.getElementById('chat-bg')?.classList.contains('open')){ closeChat(); return; }
     if(document.getElementById('sb').classList.contains('open')){ closeSb(); return; }
-    const open=document.querySelector('.modal-bg.open');
+    // `bovensteModal` i.p.v. querySelector: er kunnen er twee openstaan (de verwijdervraag komt
+    // vanuit het bewerkscherm) en dan hoort Escape de bovenste te sluiten, niet de eerste in de HTML.
+    const open=bovensteModal();
     if(open && open.id!=='pal-bg'){ const fn=MODAL_SLUITERS[open.id]; fn?fn():open.classList.remove('open'); }
   });
+
+  // Bevestigingsvenster. Vier uitwegen, één functie: alleen de bevestigknop is 'ja'.
+  document.getElementById('bevestig-ja').onclick=()=>beantwoordBevestiging(true);
+  document.getElementById('bevestig-nee').onclick=()=>beantwoordBevestiging(false);
+  document.getElementById('bevestig-sluit').onclick=()=>beantwoordBevestiging(false);
+  // Klik náást het venster telt ook als 'nee' — zelfde mousedown/click-paar als bij de andere
+  // vensters, zodat een slepende selectie die búiten eindigt het venster niet dichtgooit.
+  let _bevMouseDown=null;
+  document.getElementById('bevestig-bg').addEventListener('mousedown',e=>{_bevMouseDown=e.target});
+  document.getElementById('bevestig-bg').addEventListener('click',e=>{if(e.target.id==='bevestig-bg'&&_bevMouseDown?.id==='bevestig-bg')beantwoordBevestiging(false)});
 
   // Afgerond modal
   document.getElementById('complete-close').onclick=closeCompleteModal;

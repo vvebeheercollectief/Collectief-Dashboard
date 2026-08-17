@@ -258,12 +258,16 @@ export function openSubtaken(index, r){
 // seconden als gewone rij, zonder paneel en zonder ⛓, tot de `loadAll(true)` ná de schrijfactie hem
 // uit 'Afgerond' terugleest. Dat komt uit fase C en staat hier alleen genoteerd zodat een latere
 // lezer het niet als storing aanziet.
+//
+// Alleen de constatering, zonder de vraag erachter ('… — toch afronden?'). Die staat sinds het
+// eigen bevestigingsvenster op het knoplabel ('Toch afronden'), en in de tekst ernaast zou hij
+// dubbel staan. Bij `window.confirm()` kon dat niet: die knoppen heten OK en Annuleren.
 export function bundelWaarschuwing(index, r){
   const n = openSubtaken(index, r);
   if (!n) return '';
   return n === 1
-    ? 'Er staat nog 1 subtaak open — toch afronden?'
-    : `Er staan nog ${n} subtaken open — toch afronden?`;
+    ? 'Er staat nog 1 subtaak open.'
+    : `Er staan nog ${n} subtaken open.`;
 }
 
 // ── De taakkiezer van 'Hoort bij' ────────────────────────────────────────────

@@ -32,6 +32,8 @@ import { toggleHerhaalStatus } from "./render-herhaal.js";
 import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
 import { bouwBundelIndex, bundelWeergave, zichtbareKop, isBundel, bundelVan, bundelMetId, hernummerLeden, volgendeVolg, magKoppelen, wordtGeabsorbeerd, koppelKandidaten, taakFilter, openSubtaken, bundelWaarschuwing } from "./bundel.js";
 import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra } from "./render-bundel.js";
+import { vraagBevestiging, beantwoordBevestiging, _vraagStaatOpen } from "./bevestig.js";
+import { bovensteModal } from "./modal-a11y.js";
 import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkoppelTaak, herordenBundel, sleepDoel, paneelTaaknummers, sleepUitslag, initBundelSlepen } from "./bundel-acties.js";
 
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
@@ -3728,7 +3730,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '10.13');
+  eq('versie opgehoogd', APP_VERSION, '10.14');
 
   // ── Pushmeldingen: de twee schakels die stil kapot waren (audit 2026-08-06) ──
   // Beide defecten waren onzichtbaar: de app meldde "Notificaties zijn aan!" terwijl er nooit
@@ -4303,11 +4305,13 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const subB = t('Tb','Tkop','10','OPPAKKEN'), subC = t('Tc','Tkop','20','OPPAKKEN');
     const ix = bouwBundelIndex({ ...leeg, VERGADERVERZOEKEN:[kop], OPPAKKEN:[subB, subC] }, leeg);
     eq('waarschuwing: twee open subtaken', openSubtaken(ix, kop), 2);
+    // Alleen de constatering: de vraag ('Toch afronden') staat op de knop van het
+    // bevestigingsvenster, en zou er in de tekst ernaast dubbel bij staan.
     eq('waarschuwing: tekst benoemt het aantal', bundelWaarschuwing(ix, kop),
-       'Er staan nog 2 subtaken open — toch afronden?');
+       'Er staan nog 2 subtaken open.');
     eq('waarschuwing: enkelvoud bij één', bundelWaarschuwing(
        bouwBundelIndex({ ...leeg, VERGADERVERZOEKEN:[kop], OPPAKKEN:[subB] }, leeg), kop),
-       'Er staat nog 1 subtaak open — toch afronden?');
+       'Er staat nog 1 subtaak open.');
     eq('waarschuwing: geen melding zonder open subtaken',
        bundelWaarschuwing(bouwBundelIndex({ ...leeg, VERGADERVERZOEKEN:[kop] }, leeg), kop), '');
 
@@ -6963,23 +6967,49 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
 
   // ── De waarschuwing zit ook écht aan de twee knoppen vast ──
   // `openSubtaken` en `bundelWaarschuwing` zijn pure functies: die blijven groen terwijl niemand ze
-  // aanroept. Hier gaan `completeTask` en `deleteTaskRow` daarom langs de echte weg, met een
-  // gestubde `confirm`. Beide teksten staan hier voluit — dat is de enige plek waar ze vastliggen,
+  // aanroept. Hier gaan `completeTask` en `deleteTaskRow` daarom langs de echte weg, mét het echte
+  // bevestigingsvenster. Beide vragen staan hier voluit — dat is de enige plek waar ze vastliggen,
   // en het aantal is precies waar de gebruiker zijn besluit op neemt.
   //
-  // De `deleteTaskRow`-aanroepen worden geAWAIT, en dat is geen netheid maar de kern van de toets:
-  // die functie remt pas ná `await ensureToken()` af, dus een 'nee' die het `return` níet haalt
-  // verwijdert de taak alsnog — één tik later. Zonder await meet de assert eronder de stand van
-  // vóór die tik en blijft groen, wat adversarieel is vastgesteld.
+  // Het venster wordt niet gestubd maar bediend: `vraag()` start de actie, leest af wát er in beeld
+  // staat en klikt dan de gevraagde knop. Dat toetst meteen de bedrading (main.js) mee — een stub
+  // op `vraagBevestiging` zou groen blijven terwijl de knoppen nergens aan hingen.
+  //
+  // De aanroepen worden geAWAIT, en dat is geen netheid maar de kern van de toets: `deleteTaskRow`
+  // remt pas ná `await ensureToken()` af, dus een 'nee' die het `return` níet haalt verwijdert de
+  // taak alsnog — één tik later. Zonder await meet de assert eronder de stand van vóór die tik en
+  // blijft groen, wat adversarieel is vastgesteld.
   await (async () => {
-    const _confirm=window.confirm, _alert=window.alert;
+    const _alert=window.alert;
     let vragen=[], antwoord=false, meldingen=[];
     const cacheOud=state._rowCache, ntdOud=D.ntd, afOud=D.af;
     const uitCacheOud=state._uitCache, tokenOud=state.oauthToken, expiryOud=state.oauthExpiry;
     const completeOud=state._completeRow, ridOud=state._completeRid, voorModalOud=state._ntdVoorModal;
     const chainOud=state._writeChain, pendingOud=state.pendingWrites, bewerkOud=state.editRowData;
+    // Titel, tekst én knoplabel samen: de vraag staat sinds het eigen venster over drie plekken
+    // verdeeld, en alleen de tekst vastleggen zou de helft ongetoetst laten.
+    const bevBg=document.getElementById('bevestig-bg');
+    const leesVraag=()=>[document.getElementById('bevestig-titel').textContent,
+                         document.getElementById('bevestig-tekst').textContent,
+                         document.getElementById('bevestig-ja').textContent].join(' | ');
+    // Start de actie, noteer de vraag die verschijnt en klik de knop die bij `antwoord` hoort.
+    // Verschijnt er geen venster, dan loopt de actie gewoon door — precies wat een subtaak hoort te
+    // doen. De aanroeper staat op dat moment stil op `await vraagBevestiging(…)`; de klik laat hem
+    // verder, en de `await klaar` hieronder wacht die afloop af.
+    // Blijft de actie na de klik toch hangen — het antwoord komt alleen via
+    // `beantwoordBevestiging`, dus een losgeraakte knop laat hem staan — dan is dat een bevinding,
+    // maar zónder deze wachttijd zou de hele suite stilvallen en helemaal niets melden. Nu loopt hij
+    // door en slaan de asserts eronder aan op de half-afgemaakte stand.
+    const hooguit=(p)=>Promise.race([p, new Promise(r=>setTimeout(r,400))]);
+    const vraag=async (start)=>{
+      const klaar=start();
+      if(bevBg.classList.contains('open')){
+        vragen.push(leesVraag());
+        document.getElementById(antwoord?'bevestig-ja':'bevestig-nee').click();
+      }
+      await hooguit(klaar);
+    };
     try {
-      window.confirm=m=>{ vragen.push(m); return antwoord; };
       // De meldingen worden meegelezen i.p.v. weggegooid: de drie knoppen in het bewerkscherm horen
       // bij een verdwenen rij dezelfde tekst te geven, en dat is alleen te toetsen als je 'm ziet.
       window.alert=m=>{ meldingen.push(m); };
@@ -7001,16 +7031,23 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       state._rowCache=[kop, sub];
 
       // 1. De hoofdtaak afronden: vraag mét het aantal, en 'nee' laat het afrond-scherm dicht.
-      completeTask(0);
+      await vraag(()=>completeTask(0));
       eq('afrondvraag: de hoofdtaak stelt de vraag', vragen,
-         ['Er staat nog 1 subtaak open — toch afronden?']);
+         ['Taak afronden? | Er staat nog 1 subtaak open. | Toch afronden']);
       eq('afrondvraag: bij nee blijft het afrond-scherm dicht',
          document.getElementById('complete-bg').classList.contains('open'), false);
       eq('afrondvraag: bij nee wordt er ook geen taak onthouden', state._completeRow, null);
+      eq('afrondvraag: … en het bevestigingsvenster is weer dicht',
+         bevBg.classList.contains('open'), false);
+      // Afronden is niet 'gevaarlijk': een 'ja' opent alleen het afrond-scherm. De tegenhanger van
+      // deze assert staat bij de verwijdervraag hieronder — samen leggen ze vast dat de vlag écht
+      // per aanroeper verschilt en niet toevallig één kant op staat.
+      eq('afrondvraag: … met de gewone (niet-rode) bevestigknop',
+         document.getElementById('bevestig-ja').className, 'btn btn-pri');
 
       // 2. 'Ja' laat de gewone flow ongemoeid doorlopen.
       antwoord=true; vragen=[];
-      completeTask(0);
+      await vraag(()=>completeTask(0));
       eq('afrondvraag: bij ja gaat het scherm alsnog open',
          document.getElementById('complete-bg').classList.contains('open'), true);
       truthy('afrondvraag: … op de aangeklikte taak', state._completeRow===kop);
@@ -7018,7 +7055,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
 
       // 3. Een subtaak afvinken hoort niets te vragen — dat is de dagelijkse handeling.
       vragen=[];
-      completeTask(1);
+      await vraag(()=>completeTask(1));
       eq('afrondvraag: een subtaak afvinken vraagt niets', vragen, []);
       eq('afrondvraag: en opent meteen het scherm',
          document.getElementById('complete-bg').classList.contains('open'), true);
@@ -7028,25 +7065,29 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       //    'blijft als bundel bestaan' — met één overgebleven lid is er geen bundel meer
       //    (`isBundel` telt er twee), en dan zou de melding iets beloven wat niet gebeurt.
       antwoord=false; vragen=[];
-      await deleteTaskRow(kop);
+      await vraag(()=>deleteTaskRow(kop));
       eq('verwijdervraag: de hoofdtaak stelt de vraag', vragen,
-         ['Deze taak heeft nog 1 subtaak. Die wordt niet mee verwijderd. Toch verwijderen?']);
+         ['Taak verwijderen? | Deze taak heeft nog 1 subtaak. Die wordt niet mee verwijderd. | Toch verwijderen']);
       truthy('verwijdervraag: bij nee staat de taak er nog', D.ntd.OPPAKKEN.indexOf(kop)===0);
+      // De rode knop hoort bij verwijderen en alleen bij verwijderen: de afrondvraag hierboven ging
+      // langs hetzelfde venster, en zonder deze toets kon de kleur van de vórige vraag blijven staan.
+      eq('verwijdervraag: … met de rode bevestigknop',
+         document.getElementById('bevestig-ja').className, 'btn btn-del');
 
       // 5. Meervoud, en de tegenproef: een subtaak verwijderen vraagt niets.
       const derde={ ...sub, _row:7, taakId:'Tw3', bundelVolg:'20', actiepunt:'derde' };
       D.ntd={ ...leeg, OPPAKKEN:[kop, sub, derde] };
       vragen=[];
-      await deleteTaskRow(kop);
+      await vraag(()=>deleteTaskRow(kop));
       eq('verwijdervraag: meervoud bij twee subtaken', vragen,
-         ['Deze taak heeft nog 2 subtaken. Die worden niet mee verwijderd. Toch verwijderen?']);
+         ['Taak verwijderen? | Deze taak heeft nog 2 subtaken. Die worden niet mee verwijderd. | Toch verwijderen']);
       // Zónder vraag loopt de verwijdering gewoon dóór, en die mag hier niet echt gaan schrijven.
       // De cache-rem van `blokkeerOffline` staat daarom voor deze ene aanroep dicht — die zit ná de
       // vraag, dus hij kan het antwoord niet maskeren: bleef de guard hangen op 'de rest van mijn
       // bundel', dan stond de vraag hieronder al in de lijst.
       state._uitCache=true;
       vragen=[];
-      await deleteTaskRow(sub);
+      await vraag(()=>deleteTaskRow(sub));
       eq('verwijdervraag: een subtaak verwijderen vraagt niets', vragen, []);
       truthy('verwijdervraag: … en de rem heeft de rij inderdaad niet aangeraakt',
              D.ntd.OPPAKKEN.indexOf(sub)===1);
@@ -7055,15 +7096,15 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       //    Anders beantwoordt de gebruiker eerst een vraag over subtaken om dán pas te horen dat er
       //    geen verbinding is — een 'nee' hoort niets te kosten. Zelfde volgorde als bij het
       //    wegleggen: `snoozeOpslaan` vraagt, `schrijfOpvolgdatum` remt op offline.
-      //    Die volgorde stond alleen als comment in de code: adversarieel bleek het confirm-blok
+      //    Die volgorde stond alleen als comment in de code: adversarieel bleek het vraag-blok
       //    naar ná `blokkeerOffline`/`ensureToken` te verplaatsen zonder dat de suite rood werd.
       //    Deze assert houdt hem vast — de offline-rem staat dicht en de vraag hoort er tóch te zijn.
       state._uitCache=true;                       // staat hierboven al aan; expliciet voor de leesbaarheid
       D.ntd={ ...leeg, OPPAKKEN:[kop, sub] };
       antwoord=false; vragen=[];
-      await deleteTaskRow(kop);
+      await vraag(()=>deleteTaskRow(kop));
       eq('verwijdervraag: de vraag komt vóór de offline-rem', vragen,
-         ['Deze taak heeft nog 1 subtaak. Die wordt niet mee verwijderd. Toch verwijderen?']);
+         ['Taak verwijderen? | Deze taak heeft nog 1 subtaak. Die wordt niet mee verwijderd. | Toch verwijderen']);
       truthy('verwijdervraag: … en offline blijft de taak hoe dan ook staan',
              D.ntd.OPPAKKEN.indexOf(kop)===0);
 
@@ -7076,22 +7117,22 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       D.ntd={ ...leeg, OPPAKKEN:[kop, sub] }; state._rowCache=[kop, sub];
       antwoord=false; vragen=[];
       openModal(true, kop);
-      await deleteCurrentEditTask();
+      await vraag(()=>deleteCurrentEditTask());
       eq('bewerkscherm: nee op de verwijdervraag laat het scherm openstaan',
          [vragen.length, bg.classList.contains('open')], [1, true]);
       antwoord=true; vragen=[];
-      await deleteCurrentEditTask();
+      await vraag(()=>deleteCurrentEditTask());
       eq('bewerkscherm: ja sluit het scherm alsnog',
          [vragen.length, bg.classList.contains('open')], [1, false]);
 
       antwoord=false; vragen=[];
       openModal(true, kop);
-      await completeCurrentEditTask();
+      await vraag(()=>completeCurrentEditTask());
       eq('bewerkscherm: nee op de afrondvraag laat het scherm openstaan, zonder afrond-scherm',
          [vragen.length, bg.classList.contains('open'), cbg.classList.contains('open')],
          [1, true, false]);
       antwoord=true; vragen=[];
-      await completeCurrentEditTask();
+      await vraag(()=>completeCurrentEditTask());
       eq('bewerkscherm: ja sluit het bewerkscherm en opent het afrond-scherm',
          [vragen.length, bg.classList.contains('open'), cbg.classList.contains('open')],
          [1, false, true]);
@@ -7106,10 +7147,10 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       antwoord=false; vragen=[];
       openModal(true, kop);
       actieVeld.value='half getypte wijziging';
-      await deleteCurrentEditTask();
+      await vraag(()=>deleteCurrentEditTask());
       eq('bewerkscherm: nee op de verwijdervraag laat de getypte wijziging staan',
          [bg.classList.contains('open'), actieVeld.value], [true, 'half getypte wijziging']);
-      await completeCurrentEditTask();
+      await vraag(()=>completeCurrentEditTask());
       eq('bewerkscherm: nee op de afrondvraag laat de getypte wijziging óók staan',
          [bg.classList.contains('open'), actieVeld.value], [true, 'half getypte wijziging']);
       closeModal();
@@ -7125,9 +7166,9 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       D.ntd={ ...leeg, OPPAKKEN:[versKop, versSub] };   // …en dan komt de verse parse langs
       state._rowCache=[versKop, versSub];
       antwoord=false; vragen=[];
-      await deleteCurrentEditTask();
+      await vraag(()=>deleteCurrentEditTask());
       eq('bewerkscherm: na een verse parse telt de vraag de taak zelf niet mee', vragen,
-         ['Deze taak heeft nog 1 subtaak. Die wordt niet mee verwijderd. Toch verwijderen?']);
+         ['Taak verwijderen? | Deze taak heeft nog 1 subtaak. Die wordt niet mee verwijderd. | Toch verwijderen']);
       closeModal();
 
       // 9. Dezelfde verse parse, maar nu op de knop Afronden. Die her-ankerde niet en zocht het
@@ -7140,11 +7181,11 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       D.ntd={ ...leeg, OPPAKKEN:[vers2Kop, vers2Sub] }; // …en dan komt de verse parse langs
       state._rowCache=[vers2Kop, vers2Sub];
       antwoord=true; vragen=[]; meldingen=[];
-      await completeCurrentEditTask();
+      await vraag(()=>completeCurrentEditTask());
       truthy('bewerkscherm: afronden pakt ná een verse parse de VERSE rij',
              state._completeRow===vers2Kop);
       eq('bewerkscherm: … zonder melding, en met de vraag die de taak zelf niet meetelt',
-         [meldingen, vragen], [[], ['Er staat nog 1 subtaak open — toch afronden?']]);
+         [meldingen, vragen], [[], ['Taak afronden? | Er staat nog 1 subtaak open. | Toch afronden']]);
       closeCompleteModal();
 
       // 10. En Afronden hoort óók te werken op een taak die helemaal niet getekend is. In
@@ -7157,7 +7198,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       state._rowCache=[];                               // niets uit deze sectie getekend
       openModal(true, vers2Kop);
       antwoord=true; vragen=[]; meldingen=[];
-      await completeCurrentEditTask();
+      await vraag(()=>completeCurrentEditTask());
       truthy('bewerkscherm: afronden werkt ook op een taak buiten de getekende lijst (Ctrl+K)',
              state._completeRow===vers2Kop);
       eq('bewerkscherm: … met rid -1, zodat de groene puls stil uitblijft en niets meldt',
@@ -7173,7 +7214,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       state._rowCache=[vers2Sub, vers2Kop];             // de kop op index 1, niet vooraan
       openModal(true, vers2Kop);
       antwoord=true; vragen=[]; meldingen=[];
-      await completeCurrentEditTask();
+      await vraag(()=>completeCurrentEditTask());
       eq('bewerkscherm: afronden geeft het rid van de getekende rij mee (groene puls)',
          [state._completeRid, meldingen], [1, []]);
       closeCompleteModal();
@@ -7185,7 +7226,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       state._rowCache=[vers2Sub, vers2Kop, vers2Sub, vers2Kop];
       openModal(true, vers2Kop);
       antwoord=true; vragen=[]; meldingen=[];
-      await completeCurrentEditTask();
+      await vraag(()=>completeCurrentEditTask());
       eq('bewerkscherm: … en bij een dubbele cache wijst het meegegeven rid nog naar dezelfde taak',
          [state._completeRid, state._rowCache[state._completeRid]===vers2Kop], [1, true]);
       closeCompleteModal();
@@ -7233,7 +7274,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         state._rowCache=[sub];
         document.getElementById('m-actie').value='nog niet opgeslagen';
         antwoord=true; vragen=[]; meldingen=[];
-        await knop();
+        await vraag(()=>knop());
         eq(`bewerkscherm: ${naam} geeft dezelfde melding als de rij weg is`, meldingen, [weesMelding]);
         eq(`bewerkscherm: … en ${naam} laat het scherm mét tekst staan`,
            [bg.classList.contains('open'), document.getElementById('m-actie').value],
@@ -7249,7 +7290,11 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       closeModal();
     } finally {
       state._writeChain=chainOud; state.pendingWrites=pendingOud; state.editRowData=bewerkOud;
-      window.confirm=_confirm; window.alert=_alert;
+      window.alert=_alert;
+      // Is er onderweg een assert geklapt, dan kan er een onbeantwoorde vraag blijven staan. Die
+      // is meteen de dubbelklik-rem van `vraagBevestiging`, dus zonder dit antwoord zouden álle
+      // vragen ná dit blok stil op 'nee' uitkomen en zou de rest van de suite iets anders meten.
+      beantwoordBevestiging(false);
       state._rowCache=cacheOud; D.ntd=ntdOud; D.af=afOud;
       state._uitCache=uitCacheOud; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
       state._completeRow=completeOud; state._completeRid=ridOud;
@@ -7260,6 +7305,94 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       clearModal();
       state._ntdVoorModal=voorModalOud;
       document.querySelectorAll('.toast').forEach(el => el.remove());
+    }
+  })();
+
+  // ── Het bevestigingsvenster zelf ──
+  // Het venster dat `window.confirm()` verving. Het blok hierboven toetst de twee aanroepers; dit
+  // blok het venster: de vier uitwegen (twee knoppen, kruisje, klik ernaast — Escape hoort daar ook
+  // bij en staat verderop met het stapel-geval erbij), de focus en de dubbelklik-rem.
+  // Alles langs de echte DOM en de echte bedrading uit main.js.
+  await (async () => {
+    const bg=document.getElementById('bevestig-bg');
+    const nee=document.getElementById('bevestig-nee'), ja=document.getElementById('bevestig-ja');
+    const titelEl=document.getElementById('bevestig-titel'), tekstEl=document.getElementById('bevestig-tekst');
+    const bewerk=document.getElementById('modal-bg');
+    // Een antwoord dat uitblijft is óók een bevinding, maar zou de suite laten hangen: de Promise
+    // van `vraagBevestiging` loopt alleen via `beantwoordBevestiging` af. Vandaar een korte
+    // wachttijd eromheen — komt er niets, dan levert dit 'geen antwoord' en slaat de assert aan.
+    const antw=(p)=>Promise.race([p, new Promise(r=>setTimeout(()=>r('geen antwoord'),400))]);
+    try {
+      // 1. Openen vult titel, tekst én knoplabel. Alle drie: de vraag staat sinds dit venster over
+      //    drie plekken verdeeld, waar `confirm()` één string had.
+      const p1=vraagBevestiging({ titel:'Kop', tekst:'De uitleg.', bevestigTekst:'Doe het', gevaarlijk:true });
+      eq('bevestig: het venster staat in beeld met titel, tekst en knoplabel',
+         [bg.classList.contains('open'), titelEl.textContent, tekstEl.textContent, ja.textContent, ja.className],
+         [true, 'Kop', 'De uitleg.', 'Doe het', 'btn btn-del']);
+
+      // 2. De veilige knop krijgt de focus, niet de bevestigknop: dit venster verschijnt juist als er
+      //    iets op het spel staat. modal-a11y zet die focus ~30 ms ná het openen, vandaar de wacht.
+      //    Het gaat om de éérste focusbare knop overslaan — zonder `data-autofocus` landt hij op het
+      //    kruisje, en dan zou Enter niets doen in plaats van annuleren.
+      await new Promise(r=>setTimeout(r,90));
+      truthy('bevestig: bij openen staat de focus op Annuleren', document.activeElement===nee);
+
+      // 3. Dubbelklik-rem: een tweede vraag terwijl de eerste nog staat wordt niet gesteld en krijgt
+      //    'nee'. De eerste blijft ongemoeid in beeld — daar wacht de gebruiker immers op.
+      const p2=vraagBevestiging({ titel:'Tweede', tekst:'Overschrijft de eerste?' });
+      eq('bevestig: een tweede vraag over de eerste heen wordt niet gesteld',
+         [await antw(p2), titelEl.textContent, tekstEl.textContent, bg.classList.contains('open')],
+         [false, 'Kop', 'De uitleg.', true]);
+
+      // 4. Annuleren = nee, en het venster gaat dicht.
+      nee.click();
+      eq('bevestig: Annuleren is nee en sluit het venster',
+         [await antw(p1), bg.classList.contains('open'), _vraagStaatOpen()], [false, false, false]);
+
+      // 5. De bevestigknop is ja. Meteen de tegenproef op de knopkleur: zonder `gevaarlijk` moet hij
+      //    terug naar de gewone knop en niet het rood van de vorige vraag meeslepen.
+      const p3=vraagBevestiging({ titel:'T', tekst:'…', bevestigTekst:'Ja doen' });
+      eq('bevestig: zonder gevaarlijk staat de knop weer op de gewone kleur', ja.className, 'btn btn-pri');
+      ja.click();
+      eq('bevestig: de bevestigknop is ja', [await antw(p3), bg.classList.contains('open')], [true, false]);
+
+      // 6. Het kruisje is nee. En zonder titel valt hij terug op de neutrale vraag.
+      const p4=vraagBevestiging({ tekst:'…' });
+      eq('bevestig: zonder titel een neutrale kop', titelEl.textContent, 'Weet je het zeker?');
+      document.getElementById('bevestig-sluit').click();
+      eq('bevestig: het kruisje is nee', [await antw(p4), bg.classList.contains('open')], [false, false]);
+
+      // 7. Een klik náást het venster ook. Het mousedown/click-paar uit main.js wil dat de klik op de
+      //    achtergrond BEGINT — een selectie die binnen begint en buiten eindigt sluit niets.
+      const p5=vraagBevestiging({ tekst:'…' });
+      bg.dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));
+      bg.dispatchEvent(new MouseEvent('click',{bubbles:true}));
+      eq('bevestig: een klik naast het venster is nee',
+         [await antw(p5), bg.classList.contains('open')], [false, false]);
+
+      // 8. Escape is nee. Zonder deze weg zou een gebruiker die Escape gewend is een venster
+      //    houden dat nergens meer op reageert: de aanroeper wacht op een antwoord dat alleen via
+      //    `beantwoordBevestiging` komt, en alleen de klasse weghalen geeft dat antwoord niet.
+      const p6=vraagBevestiging({ tekst:'…' });
+      document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
+      eq('bevestig: Escape is nee', [await antw(p6), bg.classList.contains('open')], [false, false]);
+
+      // 9. En hetzelfde mét een venster eronder — precies wat er gebeurt bij Verwijderen ín het
+      //    bewerkscherm. De Escape-handler en de focus-trap zoeken allebei 'het bovenste open
+      //    venster'; zonder `data-bovenop` komt `querySelector` op HTML-volgorde uit en sloot Escape
+      //    het bewerkscherm ónder de vraag, met de vraag verweesd in beeld.
+      bewerk.classList.add('open');
+      const p7=vraagBevestiging({ tekst:'…' });
+      truthy('bevestig: de vraag is het bovenste venster', bovensteModal()===bg);
+      document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
+      eq('bevestig: Escape sluit de vraag en laat het scherm eronder staan',
+         [await antw(p7), bg.classList.contains('open'), bewerk.classList.contains('open')],
+         [false, false, true]);
+      // …en zodra de vraag weg is, wijst 'het bovenste venster' weer naar het scherm eronder.
+      truthy('bevestig: daarna is het scherm eronder weer het bovenste', bovensteModal()===bewerk);
+    } finally {
+      bewerk.classList.remove('open');
+      beantwoordBevestiging(false);
     }
   })();
 

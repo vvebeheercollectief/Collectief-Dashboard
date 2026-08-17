@@ -497,6 +497,10 @@
     .modal-close:hover{background:var(--sur2)}
     .modal-body{padding:18px 20px;max-height:70vh;overflow-y:auto}
     .modal-foot{padding:13px 20px;border-top:1px solid var(--bor);display:flex;justify-content:flex-end;gap:8px}
+    /* Het bevestigingsvenster kan bovenóp een ander venster staan — de verwijdervraag komt vanuit
+       het bewerkscherm. Alle .modal-bg's delen z-index 500, en dan wint de laatste in de HTML;
+       dit blok maakt de stapeling onafhankelijk van die volgorde. */
+    #bevestig-bg{z-index:520}
 
     /* Form */
     .fld{margin-bottom:13px}

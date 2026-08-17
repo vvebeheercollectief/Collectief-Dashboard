@@ -907,6 +907,34 @@
   </div>
 </div>
 
+<!-- ═══════ BEVESTIGINGSVENSTER ═══════
+     Eén ja/nee-venster voor de hele app, in plaats van window.confirm(). Chrome tekent zo'n
+     browserdialoog bovenaan het scherm met de URL erboven; dit venster staat in het midden, met
+     dezelfde overlay, randen en knoppen als de andere vensters hier.
+     Staat ná alle andere .modal-bg-blokken, want de vraag kan bovenóp een ander venster komen (de
+     verwijdervraag komt vanuit het bewerkscherm) en bij gelijke z-index wint de laatste in de HTML.
+     Strikt nodig is die plek niet — #bevestig-bg krijgt in styles.css een eigen z-index — maar zo
+     klopt de stapeling ook zonder dat je die regel kent. `data-bovenop` zegt hetzelfde tegen Escape
+     en de focus-trap (modal-a11y.js), die allebei 'het bovenste open venster' opzoeken.
+     Titel, tekst en het label van de bevestigknop worden per vraag gezet — zie src/bevestig.js. -->
+<div class="modal-bg" id="bevestig-bg" data-bovenop>
+  <div class="modal" style="max-width:420px">
+    <div class="modal-hdr">
+      <h2 id="bevestig-titel">Weet je het zeker?</h2>
+      <button class="modal-close" id="bevestig-sluit" aria-label="Sluiten">×</button>
+    </div>
+    <div class="modal-body">
+      <p id="bevestig-tekst" style="line-height:1.6;margin:0"></p>
+    </div>
+    <!-- Annuleren krijgt de focus (`data-autofocus`), niet de bevestigknop: dit venster verschijnt
+         juist wanneer er iets op het spel staat, en dan hoort een blinde Enter géén 'ja' te zijn. -->
+    <div class="modal-foot">
+      <button class="btn btn-sec" id="bevestig-nee" data-autofocus>Annuleren</button>
+      <button class="btn btn-pri" id="bevestig-ja">Doorgaan</button>
+    </div>
+  </div>
+</div>
+
 <button id="chat-fab" title="Vraag over een VvE" aria-label="Vraag over een VvE" aria-expanded="false" aria-controls="chat-bg">
   <img src="icon-192.png" alt=""/>
 </button>

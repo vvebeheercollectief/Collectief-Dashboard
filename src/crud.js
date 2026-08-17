@@ -13,6 +13,7 @@ import { backgroundWrite, loadAll, blokkeerOffline } from "./data.js";
 import { faseIndex, faseWoord, faseRijHtml, faseWijziging } from "./subsidie-fase.js";
 import { bouwBundelIndex, bundelVan, zichtbareKop, zelfdeTaak, openSubtaken, bundelWaarschuwing } from "./bundel.js";
 import { koppelTaak } from "./bundel-acties.js";
+import { vraagBevestiging } from "./bevestig.js";
 import { setNtd, renderNtd, ntdPagina } from "./render-lijsten.js";
 
 // Welke formuliergroep hoort bij welke sectie. Eén bron: openModal verbergt ze
@@ -385,9 +386,14 @@ async function deleteTaskRow(r, bijDoorgaan){
   // De vraag staat vóór `blokkeerOffline`: een 'nee' kost dan niets, en andersom zou je eerst een
   // vraag over subtaken beantwoorden om dán pas te horen dat er geen verbinding is. Zelfde volgorde
   // als bij het wegleggen: `snoozeOpslaan` vraagt, en pas `schrijfOpvolgdatum` remt op offline.
+  // De staart van de vraag ('Toch verwijderen?') zit in het knoplabel en niet in de tekst: het
+  // venster stelt zijn vraag mét knoppen, en dan zou hij er twee keer staan.
   const nSub=openSubtaken(bouwBundelIndex(D.ntd, D.af), r);
-  if(nSub && !confirm(`Deze taak heeft nog ${nSub} ${nSub===1?'subtaak':'subtaken'}. `+
-                      `${nSub===1?'Die wordt':'Die worden'} niet mee verwijderd. Toch verwijderen?`)) return;
+  if(nSub && !await vraagBevestiging({
+      titel:'Taak verwijderen?',
+      tekst:`Deze taak heeft nog ${nSub} ${nSub===1?'subtaak':'subtaken'}. `+
+            `${nSub===1?'Die wordt':'Die worden'} niet mee verwijderd.`,
+      bevestigTekst:'Toch verwijderen', gevaarlijk:true })) return;
   if(bijDoorgaan) bijDoorgaan();
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){alert('Inloggen mislukt. Probeer het opnieuw.');return}
@@ -542,8 +548,12 @@ async function completeTaskRow(r, rid, bijDoorgaan){
   // blokkade (§5: de volgorde is een leidraad). De vraag staat hier en niet in doCompleteTask,
   // zodat je hem krijgt vóórdat je een datum en toelichting invult. Alleen de hoofdtaak stelt hem —
   // een subtaak afvinken is de dagelijkse handeling en moet stil blijven (zie `openSubtaken`).
+  // Net als bij verwijderen: `bundelWaarschuwing` levert alleen de constatering, de vraag zelf
+  // staat op de knop. Niet 'gevaarlijk' (de rode knop): een 'ja' rondt hier nog niets af, hij opent
+  // het afrond-scherm — daar staat pas de knop die het echt doet, mét datum en toelichting.
   const waarschuwing=bundelWaarschuwing(bouwBundelIndex(D.ntd, D.af), r);
-  if(waarschuwing && !confirm(waarschuwing)) return;
+  if(waarschuwing && !await vraagBevestiging({
+      titel:'Taak afronden?', tekst:waarschuwing, bevestigTekst:'Toch afronden' })) return;
   if(bijDoorgaan) bijDoorgaan();
   // Rij-OBJECT bewaren, geen index: terwijl de modal open staat kan een vertraagde
   // renderAll (animateRowOut, ~1,2s) of de stille resync _rowCache herbouwen — een

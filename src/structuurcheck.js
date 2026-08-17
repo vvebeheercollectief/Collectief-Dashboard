@@ -27,11 +27,16 @@ import { SKEYS, SECS } from "./config.js";
 // al: serializeNtdUndo levert 19 waarden (insertAndWriteRow schrijft dan A..S) en afrondWaarden
 // evengoed (updateCells met endColumnIndex 19). 'Afgerond' ging mee naar 19 omdat het afronden
 // nu Q/R/S meeschrijft; dat blad is al 26 kolommen breed, daar hoeft niets te gebeuren.
-// LET OP: 'Nog Te Doen' is op TEST en PROD nog 17 breed — de handmatige verbreding staat als
-// Taak 1 van de Takenbundel open. Tot die gedraaid is meldt deze controle dat blad terecht als
-// te smal: schrijven naar R/S loopt daar nú stil in het niets.
+// Het raster is op 2026-08-17 daadwerkelijk verbreed naar 19 op TEST én PROD, en na de
+// verbreding op beide bladen nagemeten via de API. Kolom Q, R en S staan daar verborgen — net
+// als Q dat al was; het zijn interne boekhoudkolommen en geen invoervelden. Verborgen kolommen
+// worden gewoon gelezen en geschreven, dus dat raakt niets.
+// Let bij een volgende verbreding op twee dingen die hier tijd kostten: de laatste kolom kan
+// VERBORGEN zijn (dan lijkt het blad smaller dan het is en weigert het naamvak erheen te
+// springen), en 'kolom rechts invoegen' erft de opmaak van de kolom LINKS — vandaar dat R en S
+// schoon binnenkwamen zonder de TRUE/FALSE-validatie van hun buren.
 const RASTER_MIN = {
-  'Nog Te Doen':      19,  // kolom S (bundelVolg) — schrijfcode is er, raster nog te verbreden
+  'Nog Te Doen':      19,  // kolom S (bundelVolg) — verbreed en nagemeten op TEST én PROD 2026-08-17
   'Afgerond':         19,  // A:S — taakId/bundelId/bundelVolg op Q/R/S (raster is al 26 breed)
   'Herhaalregels':    12,  // A:L
   'Kenmerken':         6,  // A:F

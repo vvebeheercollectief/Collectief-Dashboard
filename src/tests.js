@@ -6973,13 +6973,16 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   // vóór die tik en blijft groen, wat adversarieel is vastgesteld.
   await (async () => {
     const _confirm=window.confirm, _alert=window.alert;
-    let vragen=[], antwoord=false;
+    let vragen=[], antwoord=false, meldingen=[];
     const cacheOud=state._rowCache, ntdOud=D.ntd, afOud=D.af;
     const uitCacheOud=state._uitCache, tokenOud=state.oauthToken, expiryOud=state.oauthExpiry;
     const completeOud=state._completeRow, ridOud=state._completeRid, voorModalOud=state._ntdVoorModal;
+    const chainOud=state._writeChain, pendingOud=state.pendingWrites, bewerkOud=state.editRowData;
     try {
       window.confirm=m=>{ vragen.push(m); return antwoord; };
-      window.alert=()=>{};
+      // De meldingen worden meegelezen i.p.v. weggegooid: de drie knoppen in het bewerkscherm horen
+      // bij een verdwenen rij dezelfde tekst te geven, en dat is alleen te toetsen als je 'm ziet.
+      window.alert=m=>{ meldingen.push(m); };
       // De twee remmen die vóór de vraag staan open: `blokkeerOffline` mag hier niet als eerste
       // terugkeren, anders meet dit blok stilte in plaats van een vraag.
       state._uitCache=false;
@@ -7094,6 +7097,23 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
          [1, false, true]);
       closeCompleteModal();
 
+      //    Dat het scherm blijft staan is niet het punt op zich — het gaat om wat erin staat. Dáár
+      //    is die volgorde voor gemaakt: een 'nee' mag de nog niet opgeslagen tekst niet kosten.
+      //    Zonder deze twee asserts lag alleen de gesloten/open-stand vast en zou een `clearModal`
+      //    op de afbreekweg ongemerkt door de suite komen (adversarieel nagegaan: dan slaan ze aan).
+      const actieVeld=document.getElementById('m-actie');
+      D.ntd={ ...leeg, OPPAKKEN:[kop, sub] }; state._rowCache=[kop, sub];
+      antwoord=false; vragen=[];
+      openModal(true, kop);
+      actieVeld.value='half getypte wijziging';
+      await deleteCurrentEditTask();
+      eq('bewerkscherm: nee op de verwijdervraag laat de getypte wijziging staan',
+         [bg.classList.contains('open'), actieVeld.value], [true, 'half getypte wijziging']);
+      await completeCurrentEditTask();
+      eq('bewerkscherm: nee op de afrondvraag laat de getypte wijziging óók staan',
+         [bg.classList.contains('open'), actieVeld.value], [true, 'half getypte wijziging']);
+      closeModal();
+
       // 8. Het aantal in de verwijdervraag vanuit het bewerkscherm moet op het KLIKMOMENT kloppen.
       //    `state.editRowData` blijft over het open scherm heen staan, en `backgroundWrite` doet in
       //    zijn finally een `loadAll(true)` zónder te kijken of er een modal openstaat — dan zijn
@@ -7109,7 +7129,90 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       eq('bewerkscherm: na een verse parse telt de vraag de taak zelf niet mee', vragen,
          ['Deze taak heeft nog 1 subtaak. Die wordt niet mee verwijderd. Toch verwijderen?']);
       closeModal();
+
+      // 9. Dezelfde verse parse, maar nu op de knop Afronden. Die her-ankerde niet en zocht het
+      //    bewaarde object op in `state._rowCache`; na een verse parse staat daar een ánder object
+      //    met dezelfde inhoud, dus brak hij af met een melding terwijl de taak gewoon bestond.
+      //    Binnen één scherm gaven twee knoppen zo een verschillende uitkomst op dezelfde situatie.
+      D.ntd={ ...leeg, OPPAKKEN:[kop, sub] }; state._rowCache=[kop, sub];
+      openModal(true, kop);                             // het scherm bewaart het OUDE object
+      const vers2Kop={ ...kop }, vers2Sub={ ...sub };
+      D.ntd={ ...leeg, OPPAKKEN:[vers2Kop, vers2Sub] }; // …en dan komt de verse parse langs
+      state._rowCache=[vers2Kop, vers2Sub];
+      antwoord=true; vragen=[]; meldingen=[];
+      await completeCurrentEditTask();
+      truthy('bewerkscherm: afronden pakt ná een verse parse de VERSE rij',
+             state._completeRow===vers2Kop);
+      eq('bewerkscherm: … zonder melding, en met de vraag die de taak zelf niet meetelt',
+         [meldingen, vragen], [[], ['Er staat nog 1 subtaak open — toch afronden?']]);
+      closeCompleteModal();
+
+      // 10. En Afronden hoort óók te werken op een taak die helemaal niet getekend is. Het
+      //     Ctrl+K-palet zoekt in D en opent dit scherm met een rij uit een ánder tabblad; die
+      //     staat per definitie niet in `state._rowCache` (daar zit alleen de getekende sectie in),
+      //     dus liep deze knop daar altijd vast op zijn melding. Verwijderen kon het al wél.
+      D.ntd={ ...leeg, OPPAKKEN:[vers2Kop, vers2Sub] };
+      state._rowCache=[];                               // niets uit deze sectie getekend
+      openModal(true, vers2Kop);
+      antwoord=true; vragen=[]; meldingen=[];
+      await completeCurrentEditTask();
+      truthy('bewerkscherm: afronden werkt ook op een taak buiten de getekende lijst (Ctrl+K)',
+             state._completeRow===vers2Kop);
+      eq('bewerkscherm: … met rid -1, zodat de groene puls stil uitblijft en niets meldt',
+         [state._completeRid, meldingen], [-1, []]);
+      closeCompleteModal();
+
+      // 11. Opslaan her-ankert nu ook. Het schreef naar het `_row` van het bewaarde object, en dat
+      //     nummer is precies wat een verse parse kan verzetten (iemand voegde er een rij boven in).
+      //     De rij die het scherm bijwerkt is dezelfde die straks geschreven wordt, dus 'wélk object
+      //     muteert' is hier de scherpste toets — en meteen de reden dat vers3Kop een ánder _row
+      //     krijgt: `_herankerRij` vergelijkt inhoud, niet rijnummer, en moet hem juist zó vinden.
+      //     De achtergrond-schrijfactie mag daarbij niet écht lopen: die wil het netwerk op en zou
+      //     bij de onvermijdelijke fout de zojuist gemeten mutatie terugdraaien. `backgroundWrite`
+      //     hangt zijn werk achter `state._writeChain`, dus een ketting die nooit afloopt houdt hem
+      //     in de wachtrij; de teller die hij synchroon ophoogt zetten we in de finally terug.
+      const vers3Kop={ ...kop, _row:9 }, vers3Sub={ ...sub, _row:10 };
+      D.ntd={ ...leeg, OPPAKKEN:[kop, sub] }; state._rowCache=[kop, sub];
+      openModal(true, kop);
+      D.ntd={ ...leeg, OPPAKKEN:[vers3Kop, vers3Sub] };
+      state._rowCache=[vers3Kop, vers3Sub];
+      document.getElementById('m-actie').value='aangepast via opslaan';
+      state._uitCache=false;                            // de offline-rem staat vóór het her-ankeren
+      state._writeChain=new Promise(()=>{});
+      meldingen=[];
+      await submitTask();
+      eq('bewerkscherm: opslaan werkt de VERSE rij bij, niet het bewaarde object',
+         [vers3Kop.actiepunt, kop.actiepunt, meldingen],
+         ['aangepast via opslaan', 'hoofdtaak', []]);
+      truthy('bewerkscherm: … en het scherm houdt die verse rij vast voor een volgende knop',
+             state.editRowData===vers3Kop);
+
+      // 12. Is de taak écht weg, dan geven de drie knoppen dezelfde melding en blijft het scherm
+      //     staan — met de getypte tekst erin. Afronden had hier zijn eigen tekst ('Vernieuw de
+      //     pagina en probeer opnieuw'), en dat las als een ander soort probleem dan het is.
+      //     Opslaan mag daarbij vooral niet dóórvallen naar de toevoeg-tak: dan zou een mislukte
+      //     bewerking er stilletjes een tweede taak van maken.
+      const weesMelding='Taak niet gevonden. De lijst is intussen ververst — probeer opnieuw.';
+      for(const [naam, knop] of [['verwijderen', deleteCurrentEditTask],
+                                 ['afronden', completeCurrentEditTask],
+                                 ['opslaan', submitTask]]){
+        D.ntd={ ...leeg, OPPAKKEN:[kop, sub] }; state._rowCache=[kop, sub];
+        openModal(true, kop);
+        D.ntd={ ...leeg, OPPAKKEN:[sub] };              // de taak zelf is verdwenen
+        state._rowCache=[sub];
+        document.getElementById('m-actie').value='nog niet opgeslagen';
+        antwoord=true; vragen=[]; meldingen=[];
+        await knop();
+        eq(`bewerkscherm: ${naam} geeft dezelfde melding als de rij weg is`, meldingen, [weesMelding]);
+        eq(`bewerkscherm: … en ${naam} laat het scherm mét tekst staan`,
+           [bg.classList.contains('open'), document.getElementById('m-actie').value],
+           [true, 'nog niet opgeslagen']);
+      }
+      eq('bewerkscherm: opslaan valt daarbij niet door naar de toevoeg-tak',
+         D.ntd.OPPAKKEN.length, 1);
+      closeModal();
     } finally {
+      state._writeChain=chainOud; state.pendingWrites=pendingOud; state.editRowData=bewerkOud;
       window.confirm=_confirm; window.alert=_alert;
       state._rowCache=cacheOud; D.ntd=ntdOud; D.af=afOud;
       state._uitCache=uitCacheOud; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;

@@ -393,6 +393,13 @@ document.addEventListener('DOMContentLoaded',()=>{
 // ══════════════════════════════════════
 // renderAll woont bewust in main.js (orchestrator); data.js/crud.js importeren
 // hem als live binding (kringverwijzing is ok — aanroep gebeurt op runtime).
+//
+// Geeft de getekende NTD-lijst door, net als `renderNtd`/`setNtd` zelf al deden (zie daar): een
+// aanroeper die wil weten op welke pagina een rij beland is, hoeft er dan geen tweede volledige
+// NTD-render voor te doen. Alleen die lijst en niet de andere — meer gepagineerde lijsten hebben ze
+// wel (af, alvo, alfa, ontw, logboek), maar `renderNtd` is de enige render hieronder die zijn
+// getekende lijst teruggeeft. Vraagt een andere lijst er ooit om, dan hoort die eerst hetzelfde te
+// doen; hier iets nabouwen zou een tweede kopie van die filter/sorteer-pijplijn opleveren.
 export function renderAll(){
   state._rowCache=[];
   const ntdTotal=SKEYS.reduce((s,k)=>s+(D.ntd[k]?.length||0),0);
@@ -400,7 +407,7 @@ export function renderAll(){
   renderNtdStats();
   syncKop();
   zetKopOpen(kopOpen());
-  renderNtd();
+  const zichtbaar=renderNtd();
   renderAf();
   renderAlvo();
   renderAlfa();
@@ -409,6 +416,7 @@ export function renderAll(){
   renderHerhaal();
   renderVve();
   groeiVelden();   // de poll hertekent de velden; hun meegroei-hoogte moet terug
+  return zichtbaar;
 }
 
 // ══════════════════════════════════════

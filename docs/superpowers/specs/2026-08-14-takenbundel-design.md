@@ -420,6 +420,15 @@ Daarnaast: ingelogd doortesten op staging vóór productie, volgens de vaste rou
 
 ## 12. Bewust niet gebouwd
 
+- **Een bundel op zijn plek houden als de kop doorschuift.** Schuift de kop door naar een taak die
+  'in behandeling' is, dan zakt de hele bundel mee naar het in-behandeling-blok onderaan. Dat is
+  even schrikken — je rondt iets af en het blok verdwijnt uit beeld — maar het volgt uit de
+  bestaande sorteerregel, die losse taken precies zo behandelt. De gebruiker is hier op
+  2026-08-17 expliciet mee geconfronteerd (met een echt geval op de testomgeving) en koos ervoor
+  het zo te laten. Een bundel volgt dus altijd zijn zichtbare kop; er is geen aparte
+  bundel-sortering. **Niet 'repareren' zonder dat opnieuw voor te leggen.**
+  Wat wél is opgelost: je kón niet zien dát een subtaak in behandeling was, waardoor de
+  verspringing willekeurig aanvoelde (§4.4, het amber label).
 - **Blokkerende volgorde** — de praktijk wijkt te vaak af; je gaat vechten met je eigen dashboard
 - **Meerdere niveaus diep** — bundels-in-bundels worden zelden gebruikt en maken slepen,
   afronden en tellen fors ingewikkelder

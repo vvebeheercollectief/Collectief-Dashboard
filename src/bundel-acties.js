@@ -567,8 +567,14 @@ export function initStapelSlepen(container, rijSelector, taakVanEl, magSlepen){
     // bundelpaneel draagt het handvat van het herordenen, een taakrij dat van het stapelen.
     if (!e.target.closest('[data-stapel-grip]')) return;
     // Tweede slot op dezelfde vlag die het handvat tekent (`stapel` uit bundelWeergave, zie rowNtd).
-    // Niet overbodig: de DOM loopt achter op de state tot de eerstvolgende render, dus tussen een
-    // filterwissel en die render kan er nog een handvat in beeld staan.
+    // Vangnet en geen bestaande route (nagelopen 2026-08-17): `state._bundelWeergave` wordt gezet in
+    // renderNtd zélf (render-lijsten.js) en verderop in diezelfde doorloop synchroon gevolgd door
+    // `renderTbody('ntd-tbody', …)`, zonder tussenliggende return — er valt dus geen event tussen.
+    // Bovendien ís die vlag de momentopname van de laatste render, dus hij kan alleen mét de DOM
+    // achterlopen, nooit erop vooruit. En elke ingang van de platte weergave hertekent meteen:
+    // 'ntd-sorteer' en 'ntd-stat' roepen renderNtd() direct aan (actions.js), toggleBulkMode en
+    // bulkVink doen dat ook en _eindBulk doet renderAll() (bulk.js), en setupSearch koppelt renderNtd
+    // aan de zoek- en codevelden (main.js). De guard staat er voor de lijst die er straks bijkomt.
     if (magSlepen && !magSlepen()) return;
     const el = e.target.closest(rijSelector);
     if (!el) return;

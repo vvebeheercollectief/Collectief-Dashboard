@@ -1307,11 +1307,20 @@ tr.stapel-doel>td{background:var(--sec-l,var(--ac-l))!important;
 .tk.sleep{opacity:.55}
 .tk.stapel-doel{background:var(--sec-l,var(--ac-l));box-shadow:inset 0 0 0 2px var(--sec,var(--ac))}
 /* Het sleep-handvat op een taakrij (STAPEL_GREEP in render-bundel.js) — de enige plek waar het
-   stapelgebaar begint. Zelfde glyph, breedte, cursor en aanraakhalo als `.bdl-h` hierboven; anders
-   zijn alleen `display:inline-block` (dit handvat staat in een gewone tabelcel, niet in een
-   flexregel, dus `flex:none` doet daar niets) en de gedempte kleur, want in een tabelrij vol tekst
-   hoort het handvat niet mee te schreeuwen. In de grid van `.tk-taak` op de dossierpagina wordt het
-   vanzelf een blok — grid-items worden geblokkeerd — en houdt het gewoon zijn 16px.
+   stapelgebaar begint. Zelfde glyph, breedte, cursor en aanraakhalo als `.bdl-h` hierboven; de
+   verschillen zijn er drie: `display:inline-block` in plaats van `flex:none` (dit handvat staat in
+   een gewone tabelcel, niet in een flexregel), `line-height:1` in plaats van `padding:2px 0`, en een
+   andere kleur. Dat tweede verschil is meteen de verklaring voor de uiteenlopende gemeten hoogtes —
+   14px hier, 25px bij `.bdl-h` — en die twee getallen dragen allebei een halo-berekening, hier en in
+   het comment hierboven. In de grid van `.tk-taak` op de dossierpagina wordt het handvat vanzelf een
+   blok — grid-items worden geblokkeerd — maar het rekt niet mee: daar is het even hoog als hier
+   (14px, gemeten in blok 20 van tests.js) en houdt het zijn 16px breedte.
+   De kleur is bewust --mut en niet de --fnt van `.bdl-h`, en dat is méér contrast en niet minder:
+   --mut is in BEIDE standen de sterkere van de twee (licht #5b6675 op wit, donker #9aa1ad op
+   donker). Dat is hier ook de bedoeling — dit glyph staat op 14px in een rij vol tekst en is de
+   enige ingang naar het gebaar, dus het mag opvallen. Dat --fnt op klein formaat te zwak is staat
+   elders in dit bestand al twee keer vastgelegd (zie `.kop-pil.pil-dof b` en
+   `.search-box input::placeholder`, allebei om die reden op --mut).
    `touch-action:none` staat hier en NERGENS anders. Dat is precies de winst van een eigen handvat:
    de browser leidt het scrollgedrag af uit het element waar de aanraking landt samen met zijn
    voorouders, dus op dit glyph kost de regel niets, terwijl hij op de hele rij élke aanraking zou
@@ -1325,7 +1334,36 @@ tr.stapel-doel>td{background:var(--sec-l,var(--ac-l))!important;
    aanraakdoel dus te klein — richtlijn is 24px+. Het gebied groeit met een pseudo-element in plaats
    van met echte maten, want dat is zelf geen event-doel: de pointerdown komt gewoon op `.stapel-h`
    binnen, waar `[data-stapel-grip]` op staat, en de rij eromheen verschuift niet. 6px eromheen maakt
-   er 28 × 26 van. Dat blijft binnen de rij — gemeten 47px in de takentabel en 77px op de
-   dossierpagina (die rijen staan op twee regels) — dus het handvat van de ene rij steekt niet in de
-   andere. */
+   er 28 × 26 van.
+   Verticaal blijft dat binnen de rij — gemeten 47px in de takentabel en 70px op de dossierpagina
+   (die rijen staan op twee regels, en worden hoger zodra de tekst omslaat) — dus het handvat van de
+   ene rij steekt niet in de andere. Beide maten staan als assert in tests.js (19-nulmeting-bis en
+   blok 20), zodat het geen aanname op papier blijft.
+   Horizontaal moet er ruimte VRIJGEHOUDEN worden, en dat is de reden voor de twee regels hieronder.
+   Deze halo is onzichtbaar (`content:''`, geen achtergrond) maar vangt wél de hit-test, en omdat
+   `.stapel-h` position:relative is schildert hij bovenóp de statische buren in dezelfde cel — die
+   worden daar dan stil onklikbaar. */
 .stapel-h::after{content:'';position:absolute;inset:-6px}
+/* De 9px die in het bundelpaneel van de flex-gap komen. In een tabelcel is er geen gap: rowNtd zet
+   `${bdlGreep}${bdlChev}${vveCodeSpan(...)}` zonder tussenruimte achter elkaar, en dan lag de 6px
+   halo over de buurknop. Gemeten vóór deze regel: 6 van de 45px van de klikbare VvE-code kwamen uit
+   bij de lege actie 'stapel-greep' (dus stil niets), en op een telefoon was juist dát stukje ook
+   niet verticaal scrollbaar door `touch-action:none`. Met 9px houdt de halo 3px over — dezelfde
+   marge als `.bdl-h` in zijn 9px gap.
+   Alleen in de tabelcel: op de dossierpagina zorgt `column-gap:10px` van `.tk-taak` al voor ruimte,
+   en een marge erbovenop zou die kolom onnodig verder uit elkaar trekken. Die gap is daar dus
+   lastdragend geworden voor iets waar hij niet voor gekozen is — daarom staat er in tests.js (blok
+   20) een assert op; zakt hij ooit onder de 6px, dan slikt de halo de eerste strook rijtekst in, en
+   dáár is de rij zelf de knop naar het bewerkscherm. */
+td>.stapel-h{margin-right:9px}
+/* En de chevron eet 5px van die 9px weer op: `.bdl-chev` heeft `margin-left:-5px`, dat zijn eigen
+   `padding-left:5px` cancelt zodat het pijltje aan de linkerrand van de cel uitlijnt — zinnig toen de
+   chevron daar als eerste stond, schadelijk zodra er een handvat vóór komt. Gemeten met de regel
+   hierboven maar zónder deze: 2 van de 22px van de chevron blijven dood; zonder allebei zijn het er
+   11, bijna de helft van een knop die met 22 × 18px al krap is. Beide getallen komen uit een
+   mutatietest — de assert in tests.js gaat in beide gevallen af.
+   Als siblingregel en niet in `.bdl-chev` zelf, zodat de oorspronkelijke uitlijning blijft gelden als
+   de chevron ooit wél weer vooraan staat. Vandaag staat er in de tabel altijd een handvat vóór hem:
+   rowNtd tekent chevron én handvat op dezelfde `_bw.stapel`-vlag, en op de dossierpagina bestaat de
+   chevron niet. */
+.stapel-h+.bdl-chev{margin-left:0}

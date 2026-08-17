@@ -232,7 +232,8 @@ sleepactie is een verkeerde vólgorde — nooit verloren werk.
    Elke sleepbare rij draagt vooraan een eigen greepje (⠿), net als de subtaakregels in het
    bundelpaneel. Oppakken kan **alleen** daar; de rest van de rij blijft gewoon tekst die je kunt
    selecteren en kopiëren. Zie §6.3 voor het waarom. Het gebaar werkt met de muis én met een
-   vinger, in de tabel en op de dossierpagina.
+   vinger, in de tabel en op de dossierpagina — met één beperking op een klein scherm: bron- en
+   doelrij moeten samen in beeld staan (§6.3). Weg 2 kent die beperking niet.
 
 ### 6.2 Regels bij slepen
 
@@ -310,6 +311,23 @@ was één ding extra voor nodig. Bij aanraking en pen zet de browser bij `pointe
 een doel. De drop wordt daarom bepaald met `document.elementFromPoint(e.clientX, e.clientY)`. Voor
 de muis verandert dat niets — dat geeft hetzelfde element als `e.target`, inclusief het gedrag dat
 een toast vóór de tabel (z-index 700, vangt zelf pointer-events) een drop eronder blokkeert.
+
+**Wat het gebaar op een telefoon níet doet: meescrollen.** Er is geen auto-scroll bij de schermrand,
+en omdat het gebaar op het handvat begint (`touch-action: none`) neemt de slepende vinger de pagina
+ook niet mee. Bron- en doelrij moeten dus tegelijk in beeld staan op het moment van loslaten — het
+doel wordt met `elementFromPoint` in venstercoördinaten bepaald. In de takentabel zijn dat er op een
+telefoon een handvol. Dat is bewust geen bezwaar: weg 2 uit §6.1 — het veld **"Hoort bij"**
+in het bewerkscherm — maakt exact dezelfde koppeling, werkt altijd en is ook met het toetsenbord te
+bereiken. Slepen is de snelle weg voor twee rijen die je toch al naast elkaar ziet, niet de enige.
+
+**Ook bewust: de VvE-dossierpagina geeft na een geslaagde stapelactie geen zichtbare terugkoppeling
+in de lijst.** `render-vve.js` importeert uit `render-bundel.js` alleen `STAPEL_GREEP` — dus wel het
+handvat, maar geen chevron, geen bundelpaneel en geen ⛓-merkje (§4.2b, §4.3, §4.4). De
+ongedaan-maken-melding uit §6.4 is daar het enige bewijs dat er iets veranderd is; de rijen zien er
+daarna hetzelfde uit. Het resultaat staat wél meteen goed in de takentabel. Dit volgt uit de keuze in
+fase C om het dossier een platte takenlijst te laten en het bundelbeeld in de takentabel te houden,
+en het weegt zwaarder nu juist deze pagina de plek is waar het vingergebaar het nuttigst is. Blijkt
+het alsnog storend, dan is de kleinste stap het ⛓-merkje op een lid, niet het hele paneel.
 
 De 6px-drempel blijft staan: een trillende hand op het handvat mag geen sleepactie worden, anders
 dimt de rij en licht de rij eronder op bij een gewone klik.
@@ -411,3 +429,7 @@ Daarnaast: ingelogd doortesten op staging vóór productie, volgens de vaste rou
   poll; die leeslast is net met 64% teruggebracht
 - **Cascade-afronden of cascade-verwijderen** — één klik mag nooit werk wegvegen dat nog niet
   gedaan is
+- **Bundelbeeld op de VvE-dossierpagina** (chevron, paneel, ⛓-merkje) — die pagina blijft een
+  platte takenlijst; alleen het sleep-handvat staat er. Gevolg en afweging staan in §6.3
+- **Auto-scroll tijdens het slepen** — bron en doel moeten samen in beeld staan; wie verder moet
+  reiken gebruikt "Hoort bij" (§6.1, weg 2). Zie §6.3

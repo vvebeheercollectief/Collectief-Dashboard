@@ -5738,6 +5738,63 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         truthy('stapel-e2e: de doelrij is ook echt aanwijsbaar op het scherm',
                wijstNaar(doelEl,'tr[data-row]'));
 
+        // 19-nulmeting-bis. Hetzelfde principe, maar over de VOLLE BREEDTE van een element in plaats
+        //      van op één punt in het midden. Het handvat draagt een onzichtbare aanraakhalo
+        //      (`.stapel-h::after`, 6px rondom), en `.stapel-h` is position:relative — dus die halo
+        //      wordt bovenóp de STATISCHE buren in dezelfde tabelcel geschilderd en vangt daar de
+        //      hit-test. Dat gaat stil mis: het handvat draagt een LEGE data-action, dus een klik in
+        //      dat strookje doet gewoon niets, en op een telefoon is datzelfde vlak ook nog eens niet
+        //      scrollbaar (`touch-action:none`). Elke andere chevron-toets in dit bestand vuurt zijn
+        //      click rechtstreeks op het element af (`klik('[data-action="bundel-toggle"]')`) en kan
+        //      dit dus per definitie niet zien; alleen een meting met echte coördinaten wel.
+        //      Gemeten toen de cel nog `${bdlGreep}${bdlChev}${vveCodeSpan(...)}` zonder tussenruimte
+        //      was: 11 van de 22px van de chevron dood (die trekt zichzelf met `margin-left:-5px` nóg
+        //      verder onder het handvat) en 6 van de 45px van de klikbare VvE-code. De reparatie
+        //      staat in styles.css: `td>.stapel-h{margin-right:9px}` plus `.stapel-h+.bdl-chev{
+        //      margin-left:0}`.
+        //      De ondergrens van 10px is geen opsmuk: een element zonder breedte laat de lus nul keer
+        //      draaien en levert dan nul dode pixels op — groen om precies de verkeerde reden.
+        const dodePixels=el=>{ el.scrollIntoView({ block:'center' });
+                               const b=el.getBoundingClientRect(), y=b.top+b.height/2;
+                               if(b.width<10) return `te smal om te meten (${b.width}px)`;
+                               let n=0;
+                               for(let x=Math.ceil(b.left); x<b.right; x++){
+                                 const h=document.elementFromPoint(x,y);
+                                 if(!(h===el || el.contains(h))) n++;
+                               }
+                               return n; };
+        // Een kop-rij (handvat + chevron + code) én een losse rij (handvat + code): de twee cellen
+        // die in de tabel bestaan. De sub wordt geabsorbeerd, vandaar de derde taak.
+        kop.bundelId='Tkop'; kop.bundelVolg='0'; sub.bundelId='Tkop'; sub.bundelVolg='10';
+        const losMeet=t(28,'Tlos','Los-werk'); blad[28]=bladRij('Los-werk','Tlos');
+        D.ntd={ ...leeg, OPPAKKEN:[kop, sub, losMeet] };
+        renderNtd();
+        const kopMeet=tabelRij(kop), losRij=tabelRij(losMeet);
+        truthy('stapel-e2e: de kop-rij tekent een chevron naast het handvat',
+               !!(kopMeet && kopMeet.querySelector('.bdl-chev') && greep(kopMeet)));
+        truthy('stapel-e2e: en de losse rij een klikbare VvE-code naast het hare',
+               !!(losRij && losRij.querySelector('.code-klik') && greep(losRij)));
+        eq('stapel-e2e: de bundel-chevron is over zijn volle breedte aan te wijzen',
+           dodePixels(kopMeet.querySelector('.bdl-chev')), 0);
+        eq('stapel-e2e: en de VvE-code naast een handvat ook',
+           dodePixels(losRij.querySelector('.code-klik')), 0);
+        // Tegenproef, anders is deze toets ook groen te krijgen door de halo wég te halen — en dan
+        // is het handvat weer kaal 16 × 14px en dus te klein voor een vinger. 3px links van de rand
+        // hoort nog altijd bij het handvat.
+        const gMeet=greep(kopMeet).getBoundingClientRect();
+        truthy('stapel-e2e: en het handvat blijft ruimer aanwijsbaar dan zijn eigen 16px',
+               document.elementFromPoint(gMeet.left-3, gMeet.top+gMeet.height/2)===greep(kopMeet));
+        // De andere as van dezelfde halo. Hij is 14 + 2×6 = 26px hoog; past dat niet in de rij, dan
+        // steekt het handvat van de ene rij in de andere en vangt het dáár de hit-test. De marge
+        // staat in styles.css opgeschreven als gemeten rijhoogte, dus die hoort hier bewaakt.
+        const rijHoog=kopMeet.getBoundingClientRect().height;   // gemeten: 47
+        truthy(`stapel-e2e: de tabelrij is hoger dan de aanraakhalo (rij ${rijHoog}px)`,
+               rijHoog >= gMeet.height+12);
+        // Terug naar twee losse rijen; alles hieronder begint bij die beginstand.
+        ({ kop, sub } = opnieuw());
+        renderNtd();
+        bronEl=tabelRij(sub); doelEl=tabelRij(kop);
+
         // 19a. Een klik met een trillende hand is geen sleepactie. Zonder drempel gaat de rij bij
         //      de kleinste beweging tijdens een gewone klik op het handvat al dimmen en licht de
         //      rij eronder op als doel, terwijl er niets verschuift.
@@ -5948,8 +6005,11 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         //      staat de stapelweergave uit, en dan kan er niet gestapeld worden (§4.2). De rijen
         //      staan er dan gewoon nog. Twee dingen horen dat dicht te houden, en ze worden apart
         //      gemeten omdat de één de ander anders verbergt: rowNtd tekent géén handvat, én
-        //      `initStapelSlepen` toetst nog eens op dezelfde `stapel`-vlag (de DOM loopt achter op
-        //      de state tot de eerstvolgende render).
+        //      `initStapelSlepen` toetst nog eens op dezelfde `stapel`-vlag. Die tweede toets is een
+        //      vangnet zonder bestaande route — renderNtd zet de vlag zelf en hertekent in dezelfde
+        //      doorloop, zie de toelichting in bundel-acties.js — en juist daarom wordt hij hier met
+        //      een handmatig ingezet handvat apart gemeten: anders staat er een rem in de code die
+        //      niets bewijst.
         ({ kop, sub } = opnieuw());
         document.getElementById('s-ntd').value='testflat';
         renderNtd();
@@ -5994,6 +6054,18 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         // Dezelfde nulmeting als in de tabel: deze pagina heeft een eigen indeling (drie panelen in
         // een grid), dus dat de rijen dáár aanwijsbaar zijn volgt er niet uit.
         truthy('stapel-e2e: en de dossierrij is aanwijsbaar op het scherm', wijstNaar(doelEl,'.tk-taak'));
+        // En dezelfde halo-meting als in de tabel. Hier zit géén `margin-right` op het handvat: de
+        // `column-gap:10px` van de `.tk-taak`-grid houdt de 6px halo al van de tekst af. Dat is dus
+        // een geërfde eigenschap van een maat die om een ándere reden gekozen is, en precies daarom
+        // het meten waard — zakt die gap ooit naar 6px of minder, dan wordt de eerste strook van de
+        // rijtekst stil onklikbaar. Op deze pagina telt dat dubbel: de rij ís de knop naar het
+        // bewerkscherm, en het handvat draagt een lege actie.
+        eq('stapel-e2e: het handvat slikt de tekst van zijn eigen dossierrij niet in',
+           dodePixels(doelEl.querySelector('.nm')), 0);
+        const dosGreep=greep(doelEl).getBoundingClientRect();
+        const dosHoog=doelEl.getBoundingClientRect().height;    // gemeten: 70
+        truthy(`stapel-e2e: en de dossierrij is hoger dan de aanraakhalo (rij ${dosHoog}px)`,
+               dosHoog >= dosGreep.height+12);
         // Ook hier eerst de tegenproef: het ✓-knopje in de rij mag geen sleepactie beginnen. Sinds
         // het handvat de enige ingang is volgt dat uit dezelfde regel als voor de rest van de rij,
         // maar juist hier is het het meten waard — de rij is één grote knop naar het bewerkscherm.

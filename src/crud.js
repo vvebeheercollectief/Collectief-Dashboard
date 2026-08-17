@@ -447,13 +447,13 @@ function getAfInsertRow(sec){
 
 // Afronden vanuit de bewerk-modal: zelfde flow als de ✓-knop op een rij, maar met de RIJ in plaats
 // van een _rowCache-index — zie `_bewerkRijVers`. Dit leunde op `_rowCache.indexOf`, en die cache
-// houdt precies wat de laatste render als eigen regel getekend heeft: `renderTbody` snijdt eerst op
+// houdt de rijen die de laatste render als eigen, KLIKBARE regel tekende: `renderTbody` snijdt eerst op
 // PAGINA (`rows.slice((p-1)*PG,p*PG)`) en van die slice duwt `rowNtd` de rijen erin. Een taak die
 // daar niet tussen staat, stond dus niet in de cache en liep hier vast op de melding. Dat is breder
 // dan alleen een taak uit een ánder tabblad (Ctrl+K): net zo goed een taak op pagina 2 of verder, een
 // taak die door zoekterm/filter buiten de lijst valt, of een subtaak in een DICHTE bundel — die
-// haalt `absorbeer` uit de lijst, en alleen een ópen paneel duwt zijn subtaken alsnog in de cache
-// (zie subRegel in render-bundel.js). Verwijderen kon dat alles al wél: dat toetst op D.ntd.
+// haalt `absorbeer` uit de lijst, en binnen dít tabblad duwt alleen een ópen paneel zijn subtaken
+// alsnog in de cache (zie subRegel in render-bundel.js). Verwijderen kon dat alles al wél: dat toetst op D.ntd.
 // Andersom is de cache óók niet tót de getekende sectie beperkt — de 'Ook hier'-crosslist
 // (render-lijsten.js) en de taakrijen op de VvE-dossierpagina (render-vve.js) vullen dezelfde cache
 // met rijen uit álle secties.

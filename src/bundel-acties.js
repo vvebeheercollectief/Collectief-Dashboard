@@ -574,7 +574,10 @@ export function initStapelSlepen(container, rijSelector, taakVanEl, magSlepen){
     // achterlopen, nooit erop vooruit. En elke ingang van de platte weergave hertekent meteen:
     // 'ntd-sorteer' en 'ntd-stat' roepen renderNtd() direct aan (actions.js), toggleBulkMode en
     // bulkVink doen dat ook en _eindBulk doet renderAll() (bulk.js), en setupSearch koppelt renderNtd
-    // aan de zoek- en codevelden (main.js). De guard staat er voor de lijst die er straks bijkomt.
+    // aan de zoek- en codevelden (main.js). De behandelaar- en prioriteitsfilters lopen NIET via
+    // setupSearch maar via eigen onchange-handlers (main.js) — die doen hetzelfde (pgs.ntd=1 +
+    // renderNtd()). Vier van de vier filtervelden die isPlatteWeergave leest zijn daarmee gedekt.
+    // De guard staat er voor de lijst die er straks bijkomt.
     if (magSlepen && !magSlepen()) return;
     const el = e.target.closest(rijSelector);
     if (!el) return;

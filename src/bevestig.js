@@ -63,8 +63,11 @@ export function vraagBevestiging(opties = {}) {
  */
 export function beantwoordBevestiging(ja) {
   const resolve = _openVraag;
-  // Meteen leegzetten, vóór de resolve: hij is de rem uit `vraagBevestiging`, en die moet los zijn
-  // zodra dit venster dicht is. Twee keer beantwoorden (Escape ná een klik) doet dan niets meer.
+  // Leegzetten hoort bij het SLUITEN, niet bij het antwoord: `_openVraag` is de rem uit
+  // `vraagBevestiging`, en zolang hij gezet is telt het venster als open. Twee keer beantwoorden
+  // (Escape ná een klik) doet daardoor niets meer. Dat dit vóór de `resolve` staat is netjes maar
+  // niet dragend — `resolve` laat de wachtende `await` pas als microtask verdergaan, dus er is
+  // geen moment waarop de aanroeper loopt terwijl de rem nog vastzit.
   _openVraag = null;
   document.getElementById('bevestig-bg')?.classList.remove('open');
   if (resolve) resolve(!!ja);

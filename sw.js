@@ -74,6 +74,12 @@ const APP_SHELL = [
   './src/offerte-aannemers.js',
   './src/vve-zoekveld.js',
   './src/opmaak.js',
+  // Takenbundel. Alle drie horen tot de modulegraaf die main.js binnentrekt, dus zonder deze
+  // regels laadt de schil niet bij 'eerste bezoek en meteen offline' — de fetch-handler is
+  // network-first en vult de cache pas ná een geslaagde ophaal, en die is er dan juist niet.
+  './src/bundel.js',
+  './src/bundel-acties.js',
+  './src/render-bundel.js',
 ];
 
 self.addEventListener('install', e => {

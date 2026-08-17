@@ -3757,6 +3757,37 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     }
   })();
 
+  // ── De app-schil moet de hele modulegraaf dekken ──
+  // Bij de Takenbundel kwamen er drie modules bij (bundel, bundel-acties, render-bundel) en die
+  // belandden NIET in APP_SHELL. Het praktische effect is klein — de fetch-handler is network-first
+  // en cachet elk opgehaald bestand alsnog — maar bij 'eerste bezoek en meteen offline' laadt de
+  // schil dan niet. Er stond niets op wacht, dus dat gat keert terug bij élke volgende module.
+  // Daarom hier geen vaste lijst maar de gráaf: vanaf main.js de imports aflopen en vergelijken.
+  await (async()=>{
+    try{
+      const lees = async n => (await fetch(new URL(n, document.baseURI), {cache:'no-store'})).text();
+      const blok = ((await lees('sw.js')).match(/APP_SHELL\s*=\s*\[([\s\S]*?)\]/)||[])[1] || '';
+      const inSchil = new Set([...blok.matchAll(/['"]\.\/src\/([\w.-]+\.js)['"]/g)].map(m=>m[1]));
+      // tests.js hoort er bewust NIET in: die wordt alleen met ?test=1 geladen.
+      const gezien = new Set(), tedoen = ['main.js'];
+      while (tedoen.length){
+        const naam = tedoen.pop();
+        if (gezien.has(naam) || naam === 'tests.js') continue;
+        gezien.add(naam);
+        const bron = await lees('src/' + naam);
+        for (const m of bron.matchAll(/from\s*["']\.\/([\w.-]+\.js)["']/g)) tedoen.push(m[1]);
+        for (const m of bron.matchAll(/import\(\s*["']\.\/([\w.-]+\.js)["']\s*\)/g)) tedoen.push(m[1]);
+      }
+      const ontbreekt = [...gezien].filter(n => !inSchil.has(n)).sort();
+      eq('app-schil dekt elke module uit de graaf', ontbreekt, []);
+      // Tegenproef: de wachtpost moet ook echt iets kunnen vinden. Zonder deze assert zou een
+      // kapotte regex een lege graaf opleveren en zou de test altijd groen staan.
+      truthy('app-schil-wachtpost las een niet-triviale modulegraaf', gezien.size > 20);
+    }catch(e){
+      truthy('app-schil-wachtpost kon de bestanden lezen', false);
+    }
+  })();
+
   // ── De rauwe batchUpdate in undoComplete moet zijn antwoord controleren ──
   // Dit was de énige plek in de app die dat niet deed: bij een mislukte delete op 'Afgerond'
   // meldde hij tóch 'Ongedaan gemaakt' en schreef hij een logregel 'Teruggezet', terwijl de
@@ -5863,6 +5894,14 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         const pGreep=(pRegels[0]||document.createElement('i')).querySelector('.bdl-h');
         const pMeet=pGreep ? pGreep.getBoundingClientRect() : { width:-1, height:-1 };
         eq('stapel-e2e: het paneel-handvat meet 16 × 24px', [pMeet.width, pMeet.height], [16, 24]);
+        // Óók de linkerrand van het icoon meten, net als bij het rij-handvat hierboven. Het icoon
+        // is 14px in een doos van 16, dus zonder de `margin:0 auto` uit styles.css plakt het tegen
+        // de linkerrand in plaats van in het midden. Dat scheelt maar 1px en valt met het blote oog
+        // nauwelijks op — maar zonder deze meting kan die regel eruit zonder dat er iets afgaat, en
+        // dan belooft het comment erbij iets wat niemand bewaakt.
+        const pSvg = pGreep ? pGreep.querySelector('svg') : null;
+        eq('stapel-e2e: het icoon staat in het midden van het paneel-handvat',
+           pSvg ? Math.round(pSvg.getBoundingClientRect().left - pMeet.left) : 'geen icoon', 1);
         const numX=el=>{ const n=el.querySelector('.bdl-num'); return n ? Math.round(n.getBoundingClientRect().left) : -1; };
         truthy('stapel-e2e: de plaatshouder van het afgeronde lid houdt de kolommen recht',
                pRegels.length===2 && numX(pRegels[0])===numX(pRegels[1]) && numX(pRegels[0])>0);
@@ -5871,7 +5910,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         // 19-nulmeting-quinquies. Het derde icoon: het bundel-merkje. Dat bestaat alleen in de
         //      PLATTE weergave (§4.2), vandaar de zoekterm — in de gestapelde stand hierboven staat
         //      het er per definitie niet en valt er dus niets te meten.
-        //      Het is nu een pil om een SVG in plaats van om de ⛓-glyph, en een SVG heeft geen
+        //      Het is nu een pil om een SVG in plaats van om een kaal teken, en een SVG heeft geen
         //      tekstregel om in te staan. Zonder de `inline-flex` uit styles.css blijft het een
         //      inline-doos op de basislijn en wordt de pil 23,2px hoog in plaats van 17 — precies
         //      het soort verschil dat je in een tabelrij ziet als 'die pil hangt scheef'. Daarom
@@ -7495,6 +7534,30 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
          [false, false, true]);
       // …en zodra de vraag weg is, wijst 'het bovenste venster' weer naar het scherm eronder.
       truthy('bevestig: daarna is het scherm eronder weer het bovenste', bovensteModal()===bewerk);
+
+      // 10. Focus-terugkeer bij GESTAPELDE vensters. Elk venster onthoudt zijn eigen herkomst (de
+      //     WeakMap in modal-a11y.js). Met één gedeelde variabele overschreef de vraag bij openen
+      //     de herkomst van het bewerkscherm eronder, en gaf dát scherm de focus daarna terug aan
+      //     een veld in zichzelf in plaats van aan de knop die het opende. De WeakMap is er, maar
+      //     niets hield hem vast — deze keten doet dat wel. Eigen knop in plaats van een bestaand
+      //     element: die is gegarandeerd focusbaar en beïnvloedt geen ander blok.
+      const wacht=ms=>new Promise(r=>setTimeout(r,ms));
+      const start=document.createElement('button');
+      start.id='__focusherkomst'; document.body.appendChild(start);
+      try {
+        // Geval 9 hierboven liet het bewerkscherm open staan; zonder dit eerst te sluiten is de
+        // `add('open')` hieronder geen klasse-wijziging, vuurt de observer niet en legt hij dus ook
+        // geen herkomst vast — dan meet deze keten niets.
+        bewerk.classList.remove('open'); await wacht(60);
+        start.focus();
+        bewerk.classList.add('open'); await wacht(60);   // observer + de 30ms-autofocus
+        const p8=vraagBevestiging({ tekst:'…' });        // vraag bovenop
+        await wacht(60);
+        beantwoordBevestiging(false); await antw(p8); await wacht(60);
+        bewerk.classList.remove('open'); await wacht(60);
+        truthy('bevestig: het scherm onder een gestapelde vraag geeft de focus aan zijn eigen opener terug',
+               document.activeElement===start);
+      } finally { start.remove(); }
     } finally {
       bewerk.classList.remove('open');
       beantwoordBevestiging(false);

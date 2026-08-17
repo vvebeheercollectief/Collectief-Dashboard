@@ -164,8 +164,8 @@ export function bundelMerkje(r, bw, sec){
   }
   const titel = (zelfdeTaak(kop.r, r) ? `Bundel van ${leden.length} taken` : `Hoort bij: ${taakTitel(kop.r)}`)
               + ' — klik om de bundel te openen';
-  // De `aria-label` blijft nodig: het icoon dat `ico()` levert draagt zelf `aria-hidden="true"`, dus
-  // zonder dat label heeft deze knop géén toegankelijke naam meer (de `title` alleen is een zwakke
-  // laatste terugval die niet elke schermlezer voorleest).
+  // De `aria-label` blijft nodig: het icoon dat `ico()` levert draagt zelf `aria-hidden="true"`,
+  // dus er is verder geen tekst in de knop. Zonder label valt hij terug op zijn `title`, en dat is
+  // de laatste stap in de naam-berekening — een terugval die niet elke schermlezer voorleest.
   return `<button type="button" class="bdl-merk" data-action="bundel-spring" data-bundel="${esc(tekst(r.bundelId))}" title="${esc(titel)}" aria-label="${esc(titel)}">${ico('bundel',12)}</button>`;
 }

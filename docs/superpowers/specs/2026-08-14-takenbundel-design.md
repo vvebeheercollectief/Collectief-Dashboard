@@ -141,7 +141,7 @@ van de bundel, in plaats van dat één lege cel de hele reeks gijzelt.
 - Staat de zichtbare kop in **hetzelfde** tabblad → de subtaak zit in het bundelpaneel en niet
   óók nog als losse rij in de vlakke lijst.
 - Staat de kop in een **ander** tabblad → de subtaak staat gewoon als rij in zijn eigen tabblad,
-  met een ⛓-merkje achter de VvE-naam. Klikken springt naar het tabblad van de kop en klapt de
+  met een bundelmerkje achter de VvE-naam. Klikken springt naar het tabblad van de kop en klapt de
   bundel open.
 
 De tellers per tabblad tellen elke taak dus precies één keer, net als nu.
@@ -150,7 +150,7 @@ De tellers per tabblad tellen elke taak dus precies één keer, net als nu.
 
 De gestapelde weergave verschijnt **alleen in de ongefilterde standaardlijst**. Bij een actief
 zoekveld, een gezet filter, kolomsortering (`sort.key` is gezet) of bulk-modus wordt de lijst
-**plat** getoond: elke taak als gewone rij, met het ⛓-merkje als enige aanwijzing van het
+**plat** getoond: elke taak als gewone rij, met het bundelmerkje als enige aanwijzing van het
 verband. In platte weergave kan er ook niet gesleept worden — noch om te sorteren, noch om te
 stapelen.
 
@@ -159,9 +159,9 @@ kolomsortering is een vaste groepering per definitie in strijd met de gekozen so
 bulk-modus moet élke taak aanvinkbaar zijn. Deze regel snijdt een groot deel van de mogelijke
 foutsituaties in één keer weg.
 
-### 4.2b Uitzondering: geen ⛓-merkje in bulk-modus
+### 4.2b Uitzondering: geen bundelmerkje in bulk-modus
 
-In bulk-modus wordt het ⛓-merkje wél weggelaten, anders dan de overige platte standen.
+In bulk-modus wordt het bundelmerkje wél weggelaten, anders dan de overige platte standen.
 
 Reden: klikken op het merkje springt naar het tabblad van de kop, en dat wist via `setNtd` een
 half gemaakte bulk-selectie. Een knop die je selectie stilletjes weggooit is erger dan een
@@ -193,7 +193,7 @@ bijkomt.
 
 Per lid, op volgnummer:
 
-- ⠿ sleep-handvat
+- sleep-handvat (icoon `sleepGreep`)
 - volgnummer
 - gekleurd bolletje in de kleur van de categorie
 - omschrijving (klikbaar → bewerkscherm)
@@ -229,7 +229,7 @@ sleepactie is een verkeerde vólgorde — nooit verloren werk.
    - op de VvE-dossierpagina: dwars door alle categorieën heen — dáár werkt het hoofdvoorbeeld
      (offerte onder vergaderverzoek) met slepen
 
-   Elke sleepbare rij draagt vooraan een eigen greepje (⠿), net als de subtaakregels in het
+   Elke sleepbare rij draagt vooraan een eigen greepje (sleep-handvat), net als de subtaakregels in het
    bundelpaneel. Oppakken kan **alleen** daar; de rest van de rij blijft gewoon tekst die je kunt
    selecteren en kopiëren. Zie §6.3 voor het waarom. Het gebaar werkt met de muis én met een
    vinger, in de tabel en op de dossierpagina — met één beperking op een klein scherm: bron- en
@@ -322,12 +322,12 @@ bereiken. Slepen is de snelle weg voor twee rijen die je toch al naast elkaar zi
 
 **Ook bewust: de VvE-dossierpagina geeft na een geslaagde stapelactie geen zichtbare terugkoppeling
 in de lijst.** `render-vve.js` importeert uit `render-bundel.js` alleen `STAPEL_GREEP` — dus wel het
-handvat, maar geen chevron, geen bundelpaneel en geen ⛓-merkje (§4.2b, §4.3, §4.4). De
+handvat, maar geen chevron, geen bundelpaneel en geen bundelmerkje (§4.2b, §4.3, §4.4). De
 ongedaan-maken-melding uit §6.4 is daar het enige bewijs dat er iets veranderd is; de rijen zien er
 daarna hetzelfde uit. Het resultaat staat wél meteen goed in de takentabel. Dit volgt uit de keuze in
 fase C om het dossier een platte takenlijst te laten en het bundelbeeld in de takentabel te houden,
 en het weegt zwaarder nu juist deze pagina de plek is waar het vingergebaar het nuttigst is. Blijkt
-het alsnog storend, dan is de kleinste stap het ⛓-merkje op een lid, niet het hele paneel.
+het alsnog storend, dan is de kleinste stap het bundelmerkje op een lid, niet het hele paneel.
 
 De 6px-drempel blijft staan: een trillende hand op het handvat mag geen sleepactie worden, anders
 dimt de rij en licht de rij eronder op bij een gewone klik.
@@ -429,7 +429,7 @@ Daarnaast: ingelogd doortesten op staging vóór productie, volgens de vaste rou
   poll; die leeslast is net met 64% teruggebracht
 - **Cascade-afronden of cascade-verwijderen** — één klik mag nooit werk wegvegen dat nog niet
   gedaan is
-- **Bundelbeeld op de VvE-dossierpagina** (chevron, paneel, ⛓-merkje) — die pagina blijft een
+- **Bundelbeeld op de VvE-dossierpagina** (chevron, paneel, bundelmerkje-merkje) — die pagina blijft een
   platte takenlijst; alleen het sleep-handvat staat er. Gevolg en afweging staan in §6.3
 - **Auto-scroll tijdens het slepen** — bron en doel moeten samen in beeld staan; wie verder moet
   reiken gebruikt "Hoort bij" (§6.1, weg 2). Zie §6.3

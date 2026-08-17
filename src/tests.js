@@ -7147,10 +7147,12 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
          [meldingen, vragen], [[], ['Er staat nog 1 subtaak open — toch afronden?']]);
       closeCompleteModal();
 
-      // 10. En Afronden hoort óók te werken op een taak die helemaal niet getekend is. Het
-      //     Ctrl+K-palet zoekt in D en opent dit scherm met een rij uit een ánder tabblad; die
-      //     staat per definitie niet in `state._rowCache` (daar zit alleen de getekende sectie in),
-      //     dus liep deze knop daar altijd vast op zijn melding. Verwijderen kon het al wél.
+      // 10. En Afronden hoort óók te werken op een taak die helemaal niet getekend is. In
+      //     `state._rowCache` staat alleen wat de laatste render als eigen regel tekende, en
+      //     `renderTbody` snijdt eerst op PAGINA — dus dit gaat verder dan het Ctrl+K-palet (dat in
+      //     D zoekt en een rij uit een ánder tabblad aanlevert): ook een taak op pagina 2 of verder,
+      //     een weggefilterde taak en een subtaak in een dichte bundel stonden er niet in, en daar
+      //     liep deze knop dus net zo goed vast op zijn melding. Verwijderen kon het al wél.
       D.ntd={ ...leeg, OPPAKKEN:[vers2Kop, vers2Sub] };
       state._rowCache=[];                               // niets uit deze sectie getekend
       openModal(true, vers2Kop);
@@ -7160,6 +7162,32 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
              state._completeRow===vers2Kop);
       eq('bewerkscherm: … met rid -1, zodat de groene puls stil uitblijft en niets meldt',
          [state._completeRid, meldingen], [-1, []]);
+      closeCompleteModal();
+
+      // 10b. En de andere kant op: is de taak wél getekend, dan hoort dát rid mee te gaan. Alleen
+      //      het -1-geval vastleggen dekt de gewone weg niet — `indexOf` hard op -1 zetten liet de
+      //      rést van de suite groen (gemeten). Het rid is de énige weg naar de groene puls zodra de
+      //      NTD-tabel niet in beeld is: vanuit een dossierrij zoekt doCompleteTask op
+      //      `.tk[data-rid]`. Bewust een index die noch 0 noch -1 is, zodat een 'altijd 0'-mutatie
+      //      er net zo goed op afgaat.
+      state._rowCache=[vers2Sub, vers2Kop];             // de kop op index 1, niet vooraan
+      openModal(true, vers2Kop);
+      antwoord=true; vragen=[]; meldingen=[];
+      await completeCurrentEditTask();
+      eq('bewerkscherm: afronden geeft het rid van de getekende rij mee (groene puls)',
+         [state._completeRid, meldingen], [1, []]);
+      closeCompleteModal();
+
+      // 10c. Staat dezelfde rij twee keer in de cache, dan pakt `indexOf` de eerste treffer — en die
+      //      wijst nog steeds naar de juiste taak. Dat is precies de afruil die submitTask bewust
+      //      accepteert: zijn correctie-render VULT de cache AAN in plaats van hem te legen, dus dan
+      //      staat er een NTD-pagina dubbel in. Die afweging stond daar alleen als comment.
+      state._rowCache=[vers2Sub, vers2Kop, vers2Sub, vers2Kop];
+      openModal(true, vers2Kop);
+      antwoord=true; vragen=[]; meldingen=[];
+      await completeCurrentEditTask();
+      eq('bewerkscherm: … en bij een dubbele cache wijst het meegegeven rid nog naar dezelfde taak',
+         [state._completeRid, state._rowCache[state._completeRid]===vers2Kop], [1, true]);
       closeCompleteModal();
 
       // 11. Opslaan her-ankert nu ook. Het schreef naar het `_row` van het bewaarde object, en dat
@@ -7190,9 +7218,12 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       // 12. Is de taak écht weg, dan geven de drie knoppen dezelfde melding en blijft het scherm
       //     staan — met de getypte tekst erin. Afronden had hier zijn eigen tekst ('Vernieuw de
       //     pagina en probeer opnieuw'), en dat las als een ander soort probleem dan het is.
-      //     Opslaan mag daarbij vooral niet dóórvallen naar de toevoeg-tak: dan zou een mislukte
-      //     bewerking er stilletjes een tweede taak van maken.
+      //     Precies ÉÉN melding per knop, en dat is bij Opslaan de scherpe kant: zonder zijn
+      //     `return` crasht `keys.forEach` op de null-rij en zet de catch er een tweede melding
+      //     ('Fout: …') bovenop (gemeten). Doorvallen naar de toevoeg-tak kan daar niet — die is de
+      //     `else` van de tak waar Opslaan in staat.
       const weesMelding='Taak niet gevonden. De lijst is intussen ververst — probeer opnieuw.';
+      const pendingVoor=state.pendingWrites;
       for(const [naam, knop] of [['verwijderen', deleteCurrentEditTask],
                                  ['afronden', completeCurrentEditTask],
                                  ['opslaan', submitTask]]){
@@ -7208,8 +7239,13 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
            [bg.classList.contains('open'), document.getElementById('m-actie').value],
            [true, 'nog niet opgeslagen']);
       }
-      eq('bewerkscherm: opslaan valt daarbij niet door naar de toevoeg-tak',
-         D.ntd.OPPAKKEN.length, 1);
+      // En de verdwenen rij blijft ongemoeid. Dít is wat er te toetsen valt: een 'los de melding op
+      // door terug te vallen op `state.editRowData`'-mutatie schrijft de getypte tekst alsnog in het
+      // wees-object én zet er een schrijfactie naar dat oude rijnummer in de wachtrij — een nummer
+      // dat intussen van een ándere taak kan zijn. Beide helften slaan dan aan (gemeten).
+      eq('bewerkscherm: een mislukte bewerking laat de verdwenen rij en de wachtrij ongemoeid',
+         [kop.actiepunt, state.pendingWrites-pendingVoor, D.ntd.OPPAKKEN.length],
+         ['hoofdtaak', 0, 1]);
       closeModal();
     } finally {
       state._writeChain=chainOud; state.pendingWrites=pendingOud; state.editRowData=bewerkOud;

@@ -447,9 +447,19 @@ function getAfInsertRow(sec){
 
 // Afronden vanuit de bewerk-modal: zelfde flow als de ✓-knop op een rij, maar met de RIJ in plaats
 // van een _rowCache-index — zie `_bewerkRijVers`. Dit leunde op `_rowCache.indexOf`, en die cache
-// bevat alleen de getekende sectie: een taak die via Ctrl+K vanuit een ánder tabblad geopend werd
-// stond er nooit in, dus deze knop liep daar altijd op de melding vast.
+// houdt precies wat de laatste render als eigen regel getekend heeft: `renderTbody` snijdt eerst op
+// PAGINA (`rows.slice((p-1)*PG,p*PG)`) en van die slice duwt `rowNtd` de rijen erin. Een taak die
+// daar niet tussen staat, stond dus niet in de cache en liep hier vast op de melding. Dat is breder
+// dan alleen een taak uit een ánder tabblad (Ctrl+K): net zo goed een taak op pagina 2 of verder, een
+// taak die door zoekterm/filter buiten de lijst valt, of een subtaak in een DICHTE bundel — die
+// haalt `absorbeer` uit de lijst, en alleen een ópen paneel duwt zijn subtaken alsnog in de cache
+// (zie subRegel in render-bundel.js). Verwijderen kon dat alles al wél: dat toetst op D.ntd.
+// Andersom is de cache óók niet tót de getekende sectie beperkt — de 'Ook hier'-crosslist
+// (render-lijsten.js) en de taakrijen op de VvE-dossierpagina (render-vve.js) vullen dezelfde cache
+// met rijen uit álle secties.
 // De index gaat nog wél mee als `rid`, puur om straks de groene puls te plaatsen; -1 is daar prima.
+// In de NTD-tabel wordt die rij toch op `_row` gezocht — het rid is de weg naar een dossierrij
+// (`.tk[data-rid]`, zie doCompleteTask), en dát is dus het geval waarin hij écht iets doet.
 // Hij wordt vóór de aanroep bepaald, want `closeModal` (dat als `bijDoorgaan` meegaat) kan de
 // NTD-lijst hertekenen en daarmee `state._rowCache` herbouwen.
 // Het sluiten gaat als `bijDoorgaan` mee naar completeTaskRow: die stelt eerst de vraag over
@@ -494,7 +504,8 @@ function _herankerRij(r, ntd){
 //
 // Getoetst op D.ntd en niet op state._rowCache: dát is de bron waaruit de bundelindex gebouwd wordt,
 // en het Ctrl+K-palet opent dit scherm met een rij die wél in D staat maar niet per se in de cache
-// van de laatste render (die bevat alleen de getekende sectie). In `state.editRowData` komen
+// van de laatste render (daarin staat alleen wat die render als eigen regel tekende — zie de
+// toelichting bij `completeCurrentEditTask`). In `state.editRowData` komen
 // uitsluitend openstaande NTD-rijen — de wegen ernaartoe zijn nagelopen in bundel-acties.js.
 // Vinden we hem daar niet meer, dan her-ankeren op inhoud; lukt ook dat niet, dan één melding voor
 // alle drie de knoppen. Het scherm blijft in dat geval staan (alle drie de aanroepers keren
@@ -704,14 +715,18 @@ async function submitTask(){
       // ── Bewerken: lokale rij meteen bijwerken, dan op de achtergrond opslaan ──
       // Op het KLIKMOMENT vers opzoeken, net als de twee andere knoppen in dit scherm (zie
       // `_bewerkRijVers`): anders schrijft dit naar het `_row` van een object dat een verse parse
-      // allang vervangen heeft. Vindt de helper hem niet, dan hier meteen terug — en vooral NIET
-      // doorvallen naar de toevoeg-tak hieronder, want dan zou een mislukte bewerking er een
-      // tweede taak van maken.
+      // allang vervangen heeft. Vindt de helper hem niet, dan hier meteen terug.
+      //
+      // Niet omdat het anders naar de toevoeg-tak zou doorvallen — dat kán niet, die is de `else`
+      // van de `if` waar we in staan, en `_bewerkRijVers` laat `state.editRowData` staan als hij
+      // null teruggeeft. De reden is prozaïscher: `keys.forEach` een paar regels lager crasht op
+      // `doelRow[k]=`, de catch onderaan submitTask vangt dat en zet er een tweede melding
+      // ('Fout: Cannot set properties of null…') bovenop de melding die `_bewerkRijVers` net gaf.
+      // Eén verdwenen taak leest dan als twee losse problemen. Gemeten door de `return` weg te
+      // halen: geen tweede taak, wél die tweede melding.
       const doelRow=_bewerkRijVers();
       if(!doelRow) return;
-      // De snapshot voor `assertRowMatch` komt uit de rij die we zojuist vers hebben opgezocht, en
-      // niet uit het bewaarde object: dít is wat er op dit moment nog in de Sheet hoort te staan.
-      const oudeWaarden={...doelRow};
+      const oudeWaarden={...doelRow};   // snapshot vóór de optimistische mutatie hieronder
       // De in 'Hoort bij' aangewezen doeltaak NU vastpakken: het closeModal/clearModal hieronder
       // wist die keuze (een leeg formulier hoort bij geen bundel), en dan is hij weg.
       const hbDoel=state._hbDoel;
@@ -828,7 +843,9 @@ async function submitTask(){
       // rij wijst naar zijn eigen plek, en elke andere lezer haalt de rij óf via zo'n rid op óf
       // vraagt alleen 'zit hij erin?' (`_verseRijIdx`). De enige `indexOf` die een dubbele treffer
       // kan krijgen is die van completeCurrentEditTask hierboven, en die levert alleen het rid voor
-      // de puls — waarvoor de NTD-tabel toch al op `_row` wordt gezocht en niet op rid.
+      // de puls — waarvoor de NTD-tabel toch al op `_row` wordt gezocht en niet op rid. Dat het
+      // meegegeven rid ook bij een dubbele cache nog naar de juiste taak wijst ligt vast in een
+      // assert (tests.js, bij de knoppen van het bewerkscherm), niet alleen in dit comment.
       let naWissel = null;
       if(opNtd){
         state._ntdVoorModal=null;

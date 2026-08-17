@@ -207,7 +207,12 @@ function sorteerOfferteTrajecten(e) {
 // op 2026-07-29: een sortering die het volledige gevulde bereik dekt verplaatst de rijen zelf
 // (inclusief hun vaste taaknummer); een smaller bereik verplaatst alleen celwaarden.
 // Bij een nieuwe kolom rechts: dit getal MEE ophogen, anders zakt die kolom weer weg.
-const NTD_SORT_KOLOMMEN = 17;   // A t/m Q
+// Op 2026-08-17 van 17 naar 19 voor de Takenbundel: R (bundelId) en S (bundelVolg) zijn sinds
+// dat traject de laatste gevulde kolommen, en bij 17 bleven ze bij een handmatige bewerking
+// liggen terwijl A..Q wél herschikten — dan draagt taak X het bundelnummer van taak Y, zonder
+// enige melding. Dit getal hoort dus gelijk te lopen met RASTER_MIN['Nog Te Doen'] in
+// src/structuurcheck.js (ook 19); dát getal volgt de breedste schrijfactie van de app.
+const NTD_SORT_KOLOMMEN = 19;   // A t/m S
 function _sorteerOfferteTrajectenImpl(e) {
   var ss = e ? e.source : SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName("Nog Te Doen");

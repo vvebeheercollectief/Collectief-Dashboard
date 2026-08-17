@@ -293,6 +293,9 @@ function _rowMismatch(vals, minRow, checks, maak){
 // wat wij zelf wijzigen mag de guard niet als verschil zien). Ze worden gelezen omdat
 // `assertRowsMatch` de gelezen rijen teruggeeft en `koppelTaak` de bundelstand van de DOELrij
 // uit de Sheet moet kunnen aflezen in plaats van uit zijn eigen, mogelijk verouderde geheugen.
+// Nagemeten op 2026-08-18 via de API, op PROD én TEST: élk tabblad waar deze guard vandaag op
+// draait is minstens 19 kolommen breed ('Nog Te Doen' precies 19, de rest 26). Komt er ooit een
+// smaller blad bij, kijk dan eerst of values.get daar niet op struikelt.
 function _a1Bereik(sheetName, minR, maxR){
   return `'${(sheetName||'').replace(/'/g,"''")}'!A${minR}:S${maxR}`;
 }

@@ -10,6 +10,7 @@ import { _shiftNtdRows, _herstelShift, assertRowsMatch, _veiligeRij } from "./ap
 import { getSheetIds, getAfInsertRow, getInsertRow, insertAndWriteRow, serializeNtdUndo, afrondWaarden } from "./crud.js";
 import { backgroundWrite, loadAll, metWriteMarkering, blokkeerOffline } from "./data.js";
 import { showToast, showUndoToast } from "./notifications.js";
+import { vraagBevestiging } from "./bevestig.js";
 import { logEvents } from "./render-overig.js";
 import { renderAll } from "./main.js";
 
@@ -89,7 +90,22 @@ async function bulkDoe(el){
     const p=_parseAnyDate(nieuw); const dWeg=p?new Date(p.y,p.m-1,p.d):null;
     if(!dWeg||_verschilInKalenderdagen(dWeg,_vandaagAmsterdam())<=0){ alert('Kies een datum in de toekomst.'); return; }
     const naDeadline=rows.filter(r=>{ const dl=parseDt(r.deadline); return dl && dWeg.getTime()>dl; });
-    if(naDeadline.length && !confirm(`Let op: voor ${naDeadline.length} van de ${rows.length} ${rows.length===1?'taak':'taken'} ligt deze opvolgdatum ná de deadline.\nDie ${naDeadline.length===1?'taak wordt':'taken worden'} op de deadline gewoon "Te laat". Toch wegleggen?`)) return;
+    // De staart van de vraag ('Toch wegleggen?') zit in het knoplabel en niet in de tekst: het
+    // venster stelt zijn vraag mét knoppen, en dan zou hij er twee keer staan. Waar `confirm()` de
+    // twee zinnen met een `\n` scheidde, doet het venster dat met titel/tekst — dit venster zet zijn
+    // tekst via `textContent`, dus een `\n` zou daar geen regelovergang meer geven.
+    // Niet 'gevaarlijk' (de rode knop): wegleggen verplaatst een datum en is met dezelfde knop terug
+    // te draaien. Het rood hangt in deze app aan de drie verwijder-vragen en aan niets anders —
+    // zelfs afronden vraagt met de gewone knop (crud.js), want dat opent alleen het afrond-scherm.
+    // De vraag blijft staan wáár `confirm()` stond: ná `blokkeerOffline`/`ensureToken` bovenaan
+    // `bulkDoe`. Dat is de omgekeerde volgorde van de losse snooze (die vraagt eerst), maar
+    // veranderen zou hier meer omgooien dan dit traject beoogt — beide poorten gelden voor álle
+    // bulk-acties samen en staan daarom vóór de vertakking.
+    if(naDeadline.length && !await vraagBevestiging({
+        titel:'Wegleggen ná de deadline?',
+        tekst:`Voor ${naDeadline.length} van de ${rows.length} ${rows.length===1?'taak':'taken'} ligt deze opvolgdatum ná de deadline. `+
+              `${naDeadline.length===1?'Die taak wordt':'Die taken worden'} op de deadline gewoon "Te laat".`,
+        bevestigTekst:'Toch wegleggen' })) return;
     bulkVeld(rows,'wegleggen',nieuw);
   }
   else if(wat==='deadline'){
@@ -97,7 +113,12 @@ async function bulkDoe(el){
     if(!iso){ alert('Kies een datum.'); return; }
     bulkVeld(rows,'deadline',toDutchDate(iso));
   }
-  else if(wat==='verwijderen') bulkVerwijderen(rows);
+  // Als enige tak geAWAIT: `bulkVerwijderen` is sinds de eigen bevestigingsvraag async, en de
+  // andere takken zijn dat niet. Zonder `await` zou `bulkDoe` al klaar zijn terwijl de vraag nog in
+  // beeld staat — de zelftest hangt daaraan (die wacht op `bulkDoe` om de stand ná het antwoord te
+  // meten). Voor de app maakt het niets uit: de klik-delegatie in actions.js negeert wat hier
+  // terugkomt.
+  else if(wat==='verwijderen') await bulkVerwijderen(rows);
 }
 
 // ── Afronden (verplaats naar 'Afgerond') ────────────────────────────────
@@ -217,8 +238,19 @@ async function bulkUndoAfronden(items){
 }
 
 // ── Verwijderen ─────────────────────────────────────────────────────────
-function bulkVerwijderen(rows){
-  if(!confirm(`${rows.length} ${rows.length===1?'taak':'taken'} verwijderen?`)) return;
+// Async sinds de eigen bevestigingsvraag; zie de `await` bij de aanroep in `bulkDoe`.
+async function bulkVerwijderen(rows){
+  // Het aantal staat in de TITEL en niet op de knop: dat getal is waar de gebruiker zijn besluit op
+  // neemt, en boven het venster is het niet te missen. De knop houdt het bij de handeling zelf.
+  // `gevaarlijk` (de rode knop) omdat dit rijen uit de Sheet haalt — dezelfde keuze als bij het
+  // losse verwijderen in crud.js. Er is een undo-toast, maar die is een vangnet en geen vrijbrief.
+  // Bewust géén opsomming van de codes in de tekst: bij twintig taken wordt dat een muur waar de
+  // vraag zelf in verdwijnt. Ze staan wél in de undo-toast hieronder.
+  if(!await vraagBevestiging({
+      titel:`${rows.length} ${rows.length===1?'taak':'taken'} verwijderen?`,
+      tekst:`${rows.length===1?'Deze taak wordt':'Deze taken worden'} uit 'Nog Te Doen' gehaald. `+
+            `Je kunt dit met de knop in de melding nog ongedaan maken.`,
+      bevestigTekst:'Verwijderen', gevaarlijk:true })) return;
   const items=rows.map(r=>({r,sec:r._sec,origRow:r._row,ntdValues:_ntdValues(r),code:r.code}));
   items.forEach(it=>{
     const arr=D.ntd[it.sec]||[]; const pos=arr.indexOf(it.r);

@@ -10,6 +10,7 @@ import { backgroundWrite, blokkeerOffline } from "./data.js";
 import { renderAll } from "./main.js";
 import { showToast } from "./notifications.js";
 import { logEvent } from "./render-overig.js";
+import { vraagBevestiging } from "./bevestig.js";
 
 const OPVOLG_KOLOM = 'L'; // Nog Te Doen: L=Opvolgdatum (M=Herhaal-ID, N=Esc)
 
@@ -32,7 +33,10 @@ function snoozeKies(dagen){
     `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   snoozeOpslaan();
 }
-function snoozeOpslaan(){
+// Async sinds de eigen bevestigingsvraag. Beide aanroepers laten het resultaat liggen — de
+// Wegleggen-knop (main.js) en `snoozeKies` — en er gebeurt bij allebei niets ná de aanroep, dus
+// die hoefden niet mee te veranderen.
+async function snoozeOpslaan(){
   const r = state._snoozeRow; if(!r) return;
   const iso = document.getElementById('snooze-datum').value;
   if(!iso){ alert('Kies een datum.'); return; }
@@ -41,8 +45,24 @@ function snoozeOpslaan(){
   const d = new Date(p.y, p.m-1, p.d);
   if(_verschilInKalenderdagen(d, _vandaagAmsterdam()) <= 0){ alert('Kies een datum in de toekomst.'); return; }
   const dl = parseDt(r.deadline);
+  // De constatering in de tekst, de vraag zelf op de knop — het venster stelt zijn vraag mét
+  // knoppen, en de `\n` uit de oude `confirm()`-tekst zou hier toch geen regelovergang meer geven
+  // (het venster zet zijn tekst via `textContent`). Niet 'gevaarlijk': wegleggen zet een datum en
+  // is met dezelfde knop terug te draaien.
+  // De vraag staat vóór `schrijfOpvolgdatum`, en die remt pas daarbinnen op offline — zelfde
+  // volgorde als hiervoor, en dezelfde als bij `deleteTaskRow` in crud.js: een 'nee' kost dan
+  // niets, en andersom zou je eerst deze vraag beantwoorden om dán pas te horen dat er geen
+  // verbinding is.
   if(dl && d.getTime() > dl &&
-     !confirm(`Let op: deze opvolgdatum ligt ná de deadline (${r.deadline}).\nDe taak wordt op de deadline gewoon "Te laat". Toch wegleggen?`)) return;
+     !await vraagBevestiging({
+       titel:'Wegleggen ná de deadline?',
+       tekst:`Deze opvolgdatum ligt ná de deadline (${r.deadline}). `+
+             `De taak wordt op de deadline gewoon "Te laat".`,
+       bevestigTekst:'Toch wegleggen' })) return;
+  // `schrijfOpvolgdatum` bewust NIET geAWAIT: die is al async en liep ook vóór dit traject door
+  // terwijl het venster hieronder al sloot (hij komt tot `await ensureToken()` en geeft dan terug).
+  // Een `await` erbij zou het venster pas laten sluiten als de schrijfactie in de wachtrij staat —
+  // een zichtbare vertraging die er niet was.
   schrijfOpvolgdatum(r, nieuw, 'Weggelegd');
   closeSnoozeModal();
 }

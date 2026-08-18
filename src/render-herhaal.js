@@ -11,6 +11,7 @@ import { getSheetIds } from "./crud.js";
 import { showToast } from "./notifications.js";
 import { logEvent } from "./render-overig.js";
 import { backgroundWrite, blokkeerOffline } from "./data.js";
+import { vraagBevestiging } from "./bevestig.js";
 
 const TYPE_LABELS = { week:'Elke week', maand:'Elke maand', kwartaal:'Elk kwartaal',
                       halfjaar:'Elk half jaar', jaar:'Elk jaar' };
@@ -120,7 +121,18 @@ function toggleHerhaalStatus(hid){
 
 async function deleteHerhaal(){
   const r=state.herhaalEditRow; if(!r) return;
-  if(!confirm(`Herhaalregel "${r.omschrijving}" definitief verwijderen?\nTip: pauzeren kan ook.`)) return;
+  // De vraag staat vóór `closeHerhaalModal()`, precies zoals de oude `confirm()`: bij 'nee' hoort
+  // het bewerkscherm te blijven staan, mét wat de gebruiker er had ingevuld. Een `bijDoorgaan`-
+  // callback zoals in crud.js is hier niet nodig — daar zit de vraag in een gedeelde kern die twee
+  // ingangen bedient, hier staan vraag en sluiten in dezelfde functie.
+  // 'Pauzeren kan ook' verhuist naar de tekst: het is de zachte uitweg, en die hoort bij de uitleg
+  // en niet op de knop (de knoppen zijn de twee antwoorden op déze vraag). Pauzeren zit achter de
+  // status-knop in de lijst — zie `toggleHerhaalStatus`.
+  if(!await vraagBevestiging({
+      titel:'Herhaalregel verwijderen?',
+      tekst:`"${r.omschrijving}" wordt definitief verwijderd. Wil je hem alleen even stilzetten, `+
+            `dan kan pauzeren ook.`,
+      bevestigTekst:'Definitief verwijderen', gevaarlijk:true })) return;
   closeHerhaalModal();
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){alert('Inloggen mislukt.');return}

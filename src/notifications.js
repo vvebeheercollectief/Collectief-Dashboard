@@ -500,6 +500,19 @@ async function subscribeNotifs() {
   }
 }
 
+// De ENIGE `window.confirm()` die in de app is blijven staan — bewust, niet vergeten.
+// Alle andere ja/nee-vragen lopen via `vraagBevestiging` (bevestig.js), en die geeft een Promise:
+// de aanroeper komt dan pas ná een `await` bij de regels hieronder. `confirm()` is synchroon, dus
+// nu wordt `optOut()` nog in dezelfde taak als de klik bereikt.
+// Dat verschil is hier niet vrijblijvend: sommige browser-API's werken alleen binnen een
+// 'user gesture', en die vervalt over een `await` heen. Of `OneSignal.User.PushSubscription.optOut()`
+// daar één van is, is hier NIET vastgesteld — de SDK komt van het CDN (geen bron in de repo om na
+// te lezen) en de zelftest draait zonder toestemming en zonder echte push-registratie, dus het is
+// langs deze weg ook niet te meten. Uitzetten is de weg waarlangs iemand van de meldingen af wil;
+// die stilletjes laten mislukken is duurder dan één venster dat afwijkt van de rest.
+// Wie dit alsnog wil omzetten: eerst op een echt apparaat met werkende pushmeldingen aanzetten,
+// dan uitzetten ná een `await`, en controleren dat er daarna écht geen meldingen meer binnenkomen —
+// `state.isSubscribed` op false zetten lukt hoe dan ook en bewijst dus niets.
 async function unsubscribeNotifs() {
   if (!confirm('Push-meldingen uitzetten op dit apparaat?')) return;
   try {

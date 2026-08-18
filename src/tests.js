@@ -13,7 +13,7 @@ import { state, D, pgs } from "./state.js";
 import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel, renderVve } from "./render-vve.js";
 import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN, saveKenmerken } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
-import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen, bulkSelectie, bulkWis, renderBulkUi } from "./bulk.js";
+import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen, bulkSelectie, bulkWis, renderBulkUi, bulkDoe, bulkVink } from "./bulk.js";
 import { _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, veiligeCel, _veiligeRij, fetchSheet, fetchSheets, vingerafdruk, rijVingerafdruk, _normCel, _rijNaarCellen, assertRowMatch, NTD_DATUM, _isOffline, _isNetwerkFout, appendRange, appendRows } from "./api.js";
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
@@ -28,7 +28,8 @@ import { opmaakHtml, htmlNaarMarkers, zonderOpmaak, pasToe, opmaakBalk } from ".
 import { goTo } from "./ui.js";
 import { checkSecties, checkRaster, checkRasters, checkNummers, checkAlles, RASTER_MIN } from "./structuurcheck.js";
 import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from "./subsidie-fase.js";
-import { toggleHerhaalStatus } from "./render-herhaal.js";
+import { toggleHerhaalStatus, renderHerhaal, openHerhaalModal, deleteHerhaal } from "./render-herhaal.js";
+import { openSnoozeModal, snoozeOpslaan, closeSnoozeModal } from "./snooze.js";
 import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
 import { bouwBundelIndex, bundelWeergave, zichtbareKop, isBundel, bundelVan, bundelMetId, hernummerLeden, volgendeVolg, magKoppelen, wordtGeabsorbeerd, koppelKandidaten, taakFilter, openSubtaken, bundelWaarschuwing } from "./bundel.js";
 import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra, STAPEL_GREEP } from "./render-bundel.js";
@@ -3795,7 +3796,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '10.20');
+  eq('versie opgehoogd', APP_VERSION, '10.21');
 
   // ── Pushmeldingen: de twee schakels die stil kapot waren (audit 2026-08-06) ──
   // Beide defecten waren onzichtbaar: de app meldde "Notificaties zijn aan!" terwijl er nooit
@@ -7913,6 +7914,302 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     } finally {
       bewerk.classList.remove('open');
       beantwoordBevestiging(false);
+    }
+  })();
+
+  // ── De laatste vier ja/nee-vragen die `window.confirm()` verlieten ──
+  // Bulk-wegleggen, bulk-verwijderen, het losse wegleggen en het verwijderen van een herhaalregel.
+  // Voor alle vier hetzelfde drieluik: de vraag staat er mét de juiste tekst, 'nee' laat ÁLLES
+  // ongemoeid (geen schrijfactie, geen gesloten scherm, geen gewiste selectie) en 'ja' doet wat de
+  // oude `confirm()`-tak deed. De vragen staan hier voluit — dit is de enige plek waar ze vastliggen.
+  //
+  // Net als bij de twee vragen in crud.js hierboven wordt het venster niet gestubd maar bediend: een
+  // stub op `vraagBevestiging` zou groen blijven terwijl de knoppen nergens aan vastzaten.
+  //
+  // Twee valkuilen die dit blok anders maken dan dat van crud.js:
+  //
+  // 1. `bulkDoe` doet éérst `await ensureToken()` en komt dus pas ná een microtask bij de vraag.
+  //    Meteen na `start()` kijken of het venster openstaat levert daar 'er is niets gevraagd' op
+  //    terwijl de vraag een tik later gewoon verschijnt — de 'nee'-knop zou dan nooit geklikt
+  //    worden en de assert eronder zou de stand van een dóórgelopen actie meten. `vraag()` wacht
+  //    daarom op het venster, of op de actie die zónder vraag afloopt (anders zou een terechte
+  //    'er wordt niets gevraagd' 200 tikken kosten).
+  // 2. Bij de twee bulk-acties MOET de schrijfactie slagen. Met een falende stub draait
+  //    `backgroundWrite` zijn rollback, en die zet de verwijderde taken gewoon terug — dan meet de
+  //    assert de teruggedraaide stand in plaats van de bulk-actie. Dat is geen theorie: met een
+  //    403-op-alles stub sloeg precies dat aan — 'verwacht [0,0,false], kreeg [2,0,false]', oftewel
+  //    de twee taken stonden er na de rollback weer. Vandaar een blad-stub die de rij-controle laat
+  //    kloppen, en asserts die de wachtrij eerst laten leeglopen.
+  await (async () => {
+    const _fetch=window.fetch, _alert=window.alert;
+    const cacheOud=state._uitCache, tokenOud=state.oauthToken, expiryOud=state.oauthExpiry;
+    const ntdOud=D.ntd, afOud=D.af, herhaalOud=D.herhaal, rowCacheOud=state._rowCache;
+    const bulkOud=state.bulkMode, snoozeOud=state._snoozeRow, herhaalEditOud=state.herhaalEditRow;
+    const secOud=state.activeNtd, pgOud=pgs.ntd, syncOud=state._syncFails, idsOud=state._sheetIds;
+    const chainOud=state._writeChain, pendingOud=state.pendingWrites;
+    const paginaVoor=(document.querySelector('.page.active')?.id || 'page-ntd').replace('page-','');
+    const bevBg=document.getElementById('bevestig-bg');
+    const snoozeBg=document.getElementById('snooze-bg'), hhBg=document.getElementById('hh-bg');
+    let vragen=[], antwoord=false, meldingen=[], knopKleur='';
+    let blad={}, posts=[];
+    // Titel, tekst én knoplabel samen: de vraag staat sinds het eigen venster over drie plekken
+    // verdeeld, en alleen de tekst vastleggen zou de helft ongetoetst laten.
+    const leesVraag=()=>[document.getElementById('bevestig-titel').textContent,
+                         document.getElementById('bevestig-tekst').textContent,
+                         document.getElementById('bevestig-ja').textContent].join(' | ');
+    // Eén macrotask, óók in een verborgen tabblad (zie de toelichting bij de 'Hoort bij'-tests).
+    const tik=()=>new Promise(r=>{const k=new MessageChannel();k.port1.onmessage=()=>r();k.port2.postMessage(0);});
+    const wachtTot=async(klaar)=>{ for(let i=0;i<200 && !klaar();i++) await tik(); };
+    const hooguit=(p)=>Promise.race([p, new Promise(r=>setTimeout(r,400))]);
+    const vraag=async(start)=>{
+      let af=false;
+      const klaar=Promise.resolve(start()).then(()=>{af=true;});
+      await wachtTot(()=>af || bevBg.classList.contains('open'));
+      if(bevBg.classList.contains('open')){
+        vragen.push(leesVraag());
+        knopKleur=document.getElementById('bevestig-ja').className;
+        document.getElementById(antwoord?'bevestig-ja':'bevestig-nee').click();
+      }
+      await hooguit(klaar);
+    };
+    // De wachtrij én de stille resync die erop volgt laten leeglopen, mét de stub nog actief (zie
+    // de _loadInFlight-les elders): anders draait die resync pas ná de `finally` en gaat er alsnog
+    // een echt verzoek de deur uit, met de teruggezette D eronder.
+    const leeglopen=async()=>{ await state._writeChain; await wachtTot(()=>!state._loadInFlight); };
+    // Datums t.o.v. de ECHTE dag: `snoozeOpslaan` en `bulkDoe` toetsen tegen `_vandaagAmsterdam()`,
+    // niet tegen de vaste testdatum bovenaan dit bestand. Een hardgecodeerde datum zou deze tests
+    // op een dag stil laten afketsen op 'Kies een datum in de toekomst'.
+    const isoOver=n=>{const d=new Date();d.setDate(d.getDate()+n);
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
+    const nlOver =n=>{const d=new Date();d.setDate(d.getDate()+n);
+      return `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;};
+    const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const taak=(row,actie,deadline)=>({ _sec:'OPPAKKEN', _row:row, code:'311212', naam:'Testflat',
+      actiepunt:actie, deadline:deadline||'', behandelaar:'', prioriteit:'', opmerkingen:'',
+      inBehandeling:'', subcategorie:'', opvolgdatum:'', taakId:'T'+row, bundelId:'', bundelVolg:'' });
+    // Het nagebootste tabblad langs dezelfde bron als de guard zelf (`_rijNaarCellen`): met een
+    // handgeschreven cel-array zou deze test omvallen zodra de kolomvolgorde wijzigt, terwijl de
+    // app het gewoon zou doen.
+    const zetBlad=rows=>{ blad={}; rows.forEach(r=>{ blad[r._row]=_rijNaarCellen('Nog Te Doen', r).map(v=>String(v ?? '')); }); };
+    // Wat is er naar de Sheet gestuurd? Sterker dan `state.pendingWrites` tellen: dat zegt alleen
+    // dát er iets in de wachtrij kwam, niet of de júiste rijen geraakt zijn.
+    const schrijfRanges=()=>posts.filter(p=>p.url.includes('values:batchUpdate'))
+      .flatMap(p=>((p.body&&p.body.data)||[]).map(d=>d.range));
+    const wisRijen=()=>posts.filter(p=>p.body&&p.body.requests)
+      .flatMap(p=>p.body.requests.filter(r=>r.deleteDimension).map(r=>r.deleteDimension.range.startIndex+1));
+    try {
+      window.alert=m=>{ meldingen.push(m); };
+      state.oauthToken='stub'; state.oauthExpiry=Date.now()+3600e3;
+      state.activeNtd='OPPAKKEN'; pgs.ntd=1;
+      state._sheetIds={ 'Nog Te Doen':0, 'Afgerond':1, 'Logboek':2 };   // scheelt een fetch in getSheetIds
+      window.fetch=async(url, opt)=>{
+        const u=decodeURIComponent(String(url)), methode=(opt&&opt.method)||'GET';
+        // De leesronde blijft dicht. De stille resync ná een geslaagde schrijfactie zou D anders
+        // vullen met wat deze stub teruggeeft, en dan meet de assert eronder de resync in plaats
+        // van de bulk-actie. 403 en niet 5xx: niet-transient, dus `_withRetry` herkanst niet en de
+        // wachtrij is meteen leeg (een 5xx zou drie keer met backoff opnieuw proberen).
+        if(u.includes('values:batchGet'))
+          return new Response(JSON.stringify({error:{message:'geen leesronde in deze test'}}),{status:403});
+        if(methode==='GET'){                 // de rij-controle van assertRowsMatch
+          const m=/!A(\d+):S(\d+)/.exec(u)||[];
+          const rijen=[]; for(let r=+m[1]; r<=+m[2]; r++) rijen.push(blad[r]||[]);
+          return new Response(JSON.stringify({values:rijen}),{status:200});
+        }
+        posts.push({ url:u, body:(opt&&opt.body)?JSON.parse(opt.body):null });
+        return new Response('{}',{status:200});
+      };
+
+      // ══ 1. Wegleggen ná de deadline — de losse snooze (snooze.js) ══
+      // `state._uitCache` staat AAN: de offline/cache-rem zit in `schrijfOpvolgdatum`, dus ná de
+      // vraag. Een 'ja' loopt daarmee tot precies waar de oude code ook kwam, zónder te schrijven.
+      // Dat die rem ná de vraag staat is meteen wat hier vastligt: zou de vraag naar achteren
+      // verhuizen, dan bleef het venster stil en zou `vragen` leeg zijn.
+      state._uitCache=true;
+      const wegTaak=taak(5,'Dakgoot',nlOver(10));
+      D.af={ ...leeg }; D.ntd={ ...leeg, OPPAKKEN:[wegTaak] };
+      state._rowCache=[wegTaak];
+      let pendingVoor=state.pendingWrites;
+
+      antwoord=false; vragen=[];
+      openSnoozeModal(0);
+      document.getElementById('snooze-datum').value=isoOver(30);
+      await vraag(()=>snoozeOpslaan());
+      eq('wegleggen: de vraag noemt de deadline en zet de vraag zelf op de knop', vragen,
+         [`Wegleggen ná de deadline? | Deze opvolgdatum ligt ná de deadline (${nlOver(10)}). `+
+          `De taak wordt op de deadline gewoon "Te laat". | Toch wegleggen`]);
+      // Niet 'gevaarlijk': wegleggen zet een datum en is met dezelfde knop terug te draaien. De
+      // tegenhanger staat bij de twee verwijdervragen hieronder — samen leggen ze vast dat de vlag
+      // écht per aanroeper verschilt en niet toevallig één kant op staat.
+      eq('wegleggen: … met de gewone (niet-rode) bevestigknop', knopKleur, 'btn btn-pri');
+      eq('wegleggen: nee laat het wegleg-scherm staan en schrijft niets',
+         [snoozeBg.classList.contains('open'), wegTaak.opvolgdatum, state.pendingWrites-pendingVoor],
+         [true, '', 0]);
+      eq('wegleggen: … en het bevestigingsvenster is weer dicht',
+         bevBg.classList.contains('open'), false);
+
+      // 'Ja' sluit het wegleg-scherm — dat is wat er ná de vraag gebeurt en wat een 'nee' hierboven
+      // juist niet doet. Verder komt deze tak niet: de cache-rem staat dicht.
+      antwoord=true; vragen=[];
+      await vraag(()=>snoozeOpslaan());
+      eq('wegleggen: ja sluit het wegleg-scherm alsnog',
+         [vragen.length, snoozeBg.classList.contains('open')], [1, false]);
+
+      // Tegenproef: ligt de opvolgdatum vóór de deadline, dan hoort er niets gevraagd te worden.
+      // Zonder deze assert zou een vraag die ALTIJD wordt gesteld hier gewoon groen blijven.
+      antwoord=false; vragen=[];
+      openSnoozeModal(0);
+      document.getElementById('snooze-datum').value=isoOver(3);
+      await vraag(()=>snoozeOpslaan());
+      eq('wegleggen: vóór de deadline wordt er niets gevraagd',
+         [vragen, snoozeBg.classList.contains('open')], [[], false]);
+      closeSnoozeModal();
+
+      // ══ 2. Herhaalregel verwijderen (render-herhaal.js) ══
+      // Ook hier staat de cache-rem ná de vraag (in `deleteHerhaal` zelf, ná `closeHerhaalModal`),
+      // dus een 'ja' komt tot het sluiten en schrijft niets.
+      const regel={ _row:4, id:'HR-TEST', omschrijving:'Dakgoot schoonmaken', code:'311212',
+                    naam:'Testflat', behandelaar:'Jer', sectie:'OPPAKKEN', type:'kwartaal',
+                    interval:'', dagenVooraf:14, volgendeDeadline:nlOver(40), status:'ACTIEF',
+                    laatstKlaargezet:'' };
+      D.herhaal=[regel];
+      pendingVoor=state.pendingWrites;
+
+      antwoord=false; vragen=[];
+      openHerhaalModal(4);
+      await vraag(()=>deleteHerhaal());
+      eq('herhaalregel: de vraag noemt de regel en biedt pauzeren als uitweg', vragen,
+         ['Herhaalregel verwijderen? | "Dakgoot schoonmaken" wordt definitief verwijderd. '+
+          'Wil je hem alleen even stilzetten, dan kan pauzeren ook. | Definitief verwijderen']);
+      eq('herhaalregel: … met de rode bevestigknop', knopKleur, 'btn btn-del');
+      // Dít is de volgorde-assert: `closeHerhaalModal()` staat ná de vraag, dus een 'nee' hoort het
+      // bewerkscherm te laten staan. Zet je het sluiten ervóór — de verleiding bij het omzetten —
+      // dan antwoordt de gebruiker 'nee' op een scherm dat al weg is.
+      eq('herhaalregel: nee laat het bewerkscherm staan en de regel bestaan',
+         [hhBg.classList.contains('open'), (D.herhaal||[]).length, state.pendingWrites-pendingVoor],
+         [true, 1, 0]);
+      truthy('herhaalregel: … en de regel is nog steeds de bewerkte regel', state.herhaalEditRow===regel);
+
+      antwoord=true; vragen=[];
+      await vraag(()=>deleteHerhaal());
+      eq('herhaalregel: ja sluit het bewerkscherm alsnog',
+         [vragen.length, hhBg.classList.contains('open')], [1, false]);
+
+      // ══ 3 en 4. De twee bulk-acties (bulk.js) ══
+      // Hier moet de cache-rem juist OPEN: bij bulk staan `blokkeerOffline`/`ensureToken` bovenaan
+      // `bulkDoe` en dus VÓÓR de vraag (anders dan bij de twee hierboven). Met de rem dicht zou
+      // `bulkDoe` afbreken vóórdat er iets gevraagd is en zou dit blok stilte meten.
+      state._uitCache=false;
+      const bulkKnop=document.createElement('button');
+      // Twee taken, waarvan er één een deadline heeft: zo toetst de vraag meteen het verschil
+      // tussen 'hoeveel er ná de deadline liggen' (enkelvoud) en 'hoeveel er geselecteerd zijn'
+      // (meervoud) — met twee gelijke getallen zou een verwisseling van die twee niet opvallen.
+      const kiesTwee=()=>{
+        const a=taak(5,'Met deadline',nlOver(10)), b=taak(6,'Zonder deadline','');
+        D.af={ ...leeg }; D.ntd={ ...leeg, OPPAKKEN:[a, b] };
+        zetBlad([a, b]); posts=[];
+        state.bulkMode=true;
+        // Twee keer opnieuw zetten: `bulkVink` hertekent, en de selectie is dus alleen betrouwbaar
+        // als _rowCache er vlak vóór elke tik staat zoals de test hem bedoelt.
+        state._rowCache=[a, b]; bulkVink(0);
+        state._rowCache=[a, b]; bulkVink(1);
+        return { a, b };
+      };
+
+      let { a, b } = kiesTwee();
+      // De selectie is de voorwaarde voor alles hieronder; klopt die niet, dan zou `bulkDoe` op
+      // `if(!rows.length) return` afketsen en zouden de asserts stilte meten in plaats van een vraag.
+      eq('bulk: er staan twee taken geselecteerd', bulkSelectie().length, 2);
+      pendingVoor=state.pendingWrites;
+
+      bulkKnop.dataset.wat='wegleggen';
+      document.getElementById('bb-datum-weg').value=isoOver(30);
+      antwoord=false; vragen=[];
+      await vraag(()=>bulkDoe(bulkKnop));
+      eq('bulk-wegleggen: de vraag telt de taken ná de deadline apart van de selectie', vragen,
+         ['Wegleggen ná de deadline? | Voor 1 van de 2 taken ligt deze opvolgdatum ná de deadline. '+
+          'Die taak wordt op de deadline gewoon "Te laat". | Toch wegleggen']);
+      eq('bulk-wegleggen: … met de gewone (niet-rode) bevestigknop', knopKleur, 'btn btn-pri');
+      // De selectie is het punt: `_eindBulk()` wist hem én zet de bulk-modus uit, en dat mag een
+      // 'nee' niet kosten — je zou je hele selectie opnieuw moeten aanklikken.
+      eq('bulk-wegleggen: nee laat de selectie, de bulk-modus en de datums ongemoeid',
+         [bulkSelectie().length, state.bulkMode, a.opvolgdatum, b.opvolgdatum,
+          state.pendingWrites-pendingVoor, posts.length],
+         [2, true, '', '', 0, 0]);
+
+      antwoord=true; vragen=[];
+      await vraag(()=>bulkDoe(bulkKnop));
+      await leeglopen();
+      eq('bulk-wegleggen: ja legt beide taken weg en sluit de bulk-modus af',
+         [a.opvolgdatum, b.opvolgdatum, bulkSelectie().length, state.bulkMode],
+         [nlOver(30), nlOver(30), 0, false]);
+      // Hoog→laag (`_bulkVolgorde`) en kolom L (opvolgdatum) — dat het scherm klopt zegt niets
+      // over wat er in de Sheet belandt.
+      eq('bulk-wegleggen: … en beide opvolgdatums gaan naar kolom L, hoog→laag',
+         schrijfRanges(), ["'Nog Te Doen'!L6", "'Nog Te Doen'!L5"]);
+
+      // Tegenproef: een datum vóór de deadline vraagt niets en legt gewoon weg.
+      ({ a, b } = kiesTwee());
+      document.getElementById('bb-datum-weg').value=isoOver(3);
+      antwoord=false; vragen=[];
+      await vraag(()=>bulkDoe(bulkKnop));
+      await leeglopen();
+      eq('bulk-wegleggen: vóór de deadline wordt er niets gevraagd en gebeurt het gewoon',
+         [vragen, a.opvolgdatum, state.bulkMode], [[], nlOver(3), false]);
+
+      // ══ 4. Bulk verwijderen — de destructieve ══
+      ({ a, b } = kiesTwee());
+      eq('bulk-verwijderen: er staan twee taken geselecteerd', bulkSelectie().length, 2);
+      pendingVoor=state.pendingWrites;
+      bulkKnop.dataset.wat='verwijderen';
+
+      antwoord=false; vragen=[];
+      await vraag(()=>bulkDoe(bulkKnop));
+      eq('bulk-verwijderen: de vraag zet het aantal in de titel', vragen,
+         [`2 taken verwijderen? | Deze taken worden uit 'Nog Te Doen' gehaald. `+
+          `Je kunt dit met de knop in de melding nog ongedaan maken. | Verwijderen`]);
+      eq('bulk-verwijderen: … met de rode bevestigknop', knopKleur, 'btn btn-del');
+      eq('bulk-verwijderen: nee laat de taken staan, mét selectie en bulk-modus',
+         [D.ntd.OPPAKKEN.length, bulkSelectie().length, state.bulkMode,
+          state.pendingWrites-pendingVoor, posts.length],
+         [2, 2, true, 0, 0]);
+
+      antwoord=true; vragen=[];
+      await vraag(()=>bulkDoe(bulkKnop));
+      await leeglopen();
+      eq('bulk-verwijderen: ja haalt beide taken weg en sluit de bulk-modus af',
+         [D.ntd.OPPAKKEN.length, bulkSelectie().length, state.bulkMode],
+         [0, 0, false]);
+      // En het zijn de júiste rijen, hoog→laag zodat de delete-indexen elkaar niet verschuiven.
+      eq('bulk-verwijderen: … en precies rij 6 en 5 gaan eruit, in die volgorde', wisRijen(), [6, 5]);
+
+      // Enkelvoud in titel én tekst — die komen uit dezelfde tak, dus zonder deze assert zou een
+      // vast 'taken'/'worden' hier niet opvallen.
+      const alleen=taak(5,'In mijn eentje','');
+      D.ntd={ ...leeg, OPPAKKEN:[alleen] }; zetBlad([alleen]); posts=[];
+      state.bulkMode=true; state._rowCache=[alleen]; bulkVink(0);
+      antwoord=false; vragen=[];
+      await vraag(()=>bulkDoe(bulkKnop));
+      eq('bulk-verwijderen: één taak krijgt enkelvoud in titel én tekst', vragen,
+         [`1 taak verwijderen? | Deze taak wordt uit 'Nog Te Doen' gehaald. `+
+          `Je kunt dit met de knop in de melding nog ongedaan maken. | Verwijderen`]);
+      await leeglopen();
+    } finally {
+      window.fetch=_fetch; window.alert=_alert;
+      // Is er onderweg een assert geklapt, dan kan er een onbeantwoorde vraag blijven staan. Die is
+      // meteen de dubbelklik-rem van `vraagBevestiging`, dus zonder dit antwoord zouden álle vragen
+      // ná dit blok stil op 'nee' uitkomen en zou de rest van de suite iets anders meten.
+      beantwoordBevestiging(false);
+      snoozeBg.classList.remove('open'); hhBg.classList.remove('open');
+      state._uitCache=cacheOud; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
+      state._snoozeRow=snoozeOud; state.herhaalEditRow=herhaalEditOud; state._sheetIds=idsOud;
+      state.bulkMode=bulkOud; bulkWis();
+      document.getElementById('bulk-btn').classList.remove('on');
+      document.body.classList.remove('bulk');
+      D.ntd=ntdOud; D.af=afOud; D.herhaal=herhaalOud; state._rowCache=rowCacheOud;
+      state.activeNtd=secOud; pgs.ntd=pgOud; state._syncFails=syncOud;
+      state._writeChain=chainOud; state.pendingWrites=pendingOud;
+      document.querySelectorAll('.toast').forEach(el => el.remove());
+      renderBulkUi(); renderNtd(); renderNtdStats(); renderHerhaal(); goTo(paginaVoor);
     }
   })();
 

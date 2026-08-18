@@ -5935,6 +5935,19 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         // Toasts van eerdere blokken weg: ze staan met z-index 700 over de pagina en zouden de
         // metingen hieronder kunnen verstoren (zie de toelichting bij `punt`).
         document.querySelectorAll('#toast-container .toast').forEach(el=>el.remove());
+        // Wachtpost vóór de metingen hieronder. In een tab die op de ACHTERGROND staat is
+        // `innerWidth` 0: er is dan geen opmaak, `elementFromPoint` wijst niets aan en elke
+        // rechthoek is 0×0. Eenentwintig metingen hieronder vielen daardoor om met uitkomsten die
+        // nergens naar wezen ("kreeg 0", "kreeg false", "te smal om te meten") — dat kostte een
+        // ronde zoeken naar een codefout die er niet was. Deze regel zet die oorzaak bovenaan, vóór
+        // de rode regels die er onvermijdelijk op volgen.
+        // Bewust GÉÉN stille oversla van het blok: een meting die in zo'n tab groen meldt is
+        // gevaarlijker dan een rode, want dan denk je dat het gedekt is terwijl er niets gemeten is.
+        // In een normale tab voegt deze regel niets toe — het aantal blijft dus gelijk.
+        if(innerWidth===0 || innerHeight===0)
+          truthy(`stapel-e2e: LET OP — de metingen hierna hebben een ZICHTBARE tab nodig `+
+                 `(innerWidth=${innerWidth}, innerHeight=${innerHeight}). De rode regels hieronder `+
+                 `zeggen niets over de code; haal de tab naar voren en draai opnieuw`, false);
         // Het sleep-handvat van een rij — de ENIGE plek waar een stapelgebaar mag beginnen.
         const greep=el=>el.querySelector('[data-stapel-grip]');
         // De tekstcel van een rij: geen eigen actie, en breed genoeg om betrouwbaar aan te wijzen.

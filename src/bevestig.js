@@ -22,9 +22,14 @@
 // (data.js). Loopt er dus nog een schrijfactie van een vórige handeling af terwijl deze vraag
 // openstaat, dan bouwt `parseSections`/`parseHerhaal` een VERS D — en de rij-objecten die de
 // aanroeper over de `await` heen vasthoudt (`rows` in bulk.js, `state._snoozeRow`,
-// `state.herhaalEditRow`) zitten daar niet meer in. Gevolg bij 'ja': `arr.indexOf(r)` geeft -1, de
-// optimistische mutatie blijft dus uit, en `_shiftNtdRows(origRow,…)` schuift verse objecten op een
-// verouderd rijnummer.
+// `state.herhaalEditRow`) zitten daar niet meer in. Het gevolg bij 'ja' verschilt per weg — alle
+// drie nagelopen, want één symptoom voor alle drie opschrijven zou hier onwaar zijn:
+//   - `bulkVerwijderen` (bulk.js): `arr.indexOf(it.r)` geeft -1, de rij verdwijnt dus niet uit het
+//     scherm, én `_shiftNtdRows(it.origRow,-1)` schuift verse objecten op een verouderd rijnummer.
+//   - `deleteHerhaal` (render-herhaal.js): ook een `indexOf`, maar op `D.herhaal` en met een eigen
+//     `x._row--`-lus; `_shiftNtdRows` komt daar niet aan te pas.
+//   - `schrijfOpvolgdatum` (snooze.js): geen van beide. Daar wordt `r.opvolgdatum` op het
+//     losgeraakte object gezet, waarna `renderAll()` het simpelweg niet toont.
 //
 // Niet gerepareerd, wel bewust. De Sheet zelf is gedekt: élke schrijfweg hierachter draait eerst
 // `assertRowMatch`/`assertRowsMatch`, en die vergelijkt de doelrij vóór het schrijven en geeft

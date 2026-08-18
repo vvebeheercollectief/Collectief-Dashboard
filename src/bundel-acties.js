@@ -26,7 +26,7 @@
 // Eén lezing, geen extra verzoek.
 import { SID, SKEYS } from "./config.js";
 import { state, D } from "./state.js";
-import { _veiligeRij, assertRowsMatch } from "./api.js";
+import { _veiligeRij, assertRowsMatch, fetchSheet } from "./api.js";
 import { backgroundWrite, blokkeerOffline } from "./data.js";
 import { ensureToken } from "./auth.js";
 import { showUndoToast, showToast } from "./notifications.js";
@@ -276,6 +276,36 @@ export async function koppelTaak(sub, doel){
       // Geen renderAll: in het gewone geval verandert er niets, en in het zeldzame geval waarin
       // dat wél zo is tekent de stille resync van `backgroundWrite` het scherm zo meteen opnieuw.
       // De rollback hieronder zet ook deze waarden terug — die leest de OUDE waarden, niet deze.
+      // ── En is de BRON intussen zélf hoofdtaak geworden? ──
+      // `magKoppelen` beantwoordt die vraag uit `bouwBundelIndex`, en die index komt uit de laatste
+      // leesronde. Dat geheugen kan minuten oud zijn: main.js slaat de 8s-poll over zolang er een
+      // modal openstaat — precies de situatie bij 'Hoort bij'. Hing er in die tijd elders een
+      // subtaak onder de bron, dan zou hier alsnog twee lagen diep gestapeld worden (§6.2).
+      // Wat er dan kapot gaat is niet de volgorde maar het lidmaatschap: `bouwBundelIndex` groepeert
+      // strikt op bundelnummer, dus zodra de bron het nummer van de KOP gaat dragen, blijft haar
+      // eigen subtaak alleen achter in een groep van één — en `isBundel` eist er twee. Die subtaak
+      // valt dus stil uit haar bundel en wordt weer als losse taak getekend.
+      // Eén smalle lezing van kolom R beantwoordt het exact: draagt een ándere rij het taaknummer
+      // van de bron als bundelnummer? Dat is dezelfde vraag die `subtakenVan` op het geheugen
+      // stelt, nu op de Sheet. Bewust op IDENTITEIT en niet op positie — zie de toelichting daar.
+      // Kosten: één extra leesverzoek per stapelactie. Stapelen is een bewust sleepgebaar en geen
+      // achtergrondwerk; naast de 8s-poll valt dit weg.
+      // Niet gedekt: subtaken die op 'Afgerond' staan. Die zouden een tweede lezing van dat blad
+      // vragen (1200+ rijen), en om er één te krijgen moet iemand in datzelfde venster een subtaak
+      // koppelen én afvinken. Het geheugen dekt dat geval wel; alleen de verse controle niet.
+      if (subNr){
+        const bronSleutel = bundelSleutel(subNr);
+        const kolomR = await fetchSheet("'Nog Te Doen'!R:R");
+        const heeftSub = (kolomR||[]).some((rij, i) =>
+          (i + 1) !== opdracht.subRij && leegBijErfenis((rij||[])[0]) === bronSleutel);
+        if (heeftSub){
+          const err = new Error('De gesleepte taak heeft intussen zelf subtaken.');
+          err.rowMismatch = true;   // zelfde afhandeling als de rij-guard: rollback + eigen melding
+          err.melding = 'Deze taak heeft intussen zelf subtaken gekregen. Je scherm is bijgewerkt — ontkoppel die eerst.';
+          throw err;
+        }
+      }
+
       sub.taakId = subNr; doel.taakId = kopNr;
       sub.bundelId = echtBundelId;
       if (opdracht.schrijfKop) doel.bundelId = echtBundelId;

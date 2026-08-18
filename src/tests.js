@@ -3796,7 +3796,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '10.21');
+  eq('versie opgehoogd', APP_VERSION, '10.22');
 
   // ── Pushmeldingen: de twee schakels die stil kapot waren (audit 2026-08-06) ──
   // Beide defecten waren onzichtbaar: de app meldde "Notificaties zijn aan!" terwijl er nooit
@@ -5366,6 +5366,14 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         // met lege antwoorden en de tests hierna slopen. 403 is niet transient → geen herkansing.
         if(u.includes('values:batchGet'))
           return new Response(JSON.stringify({error:{message:'geen leesverkeer in deze test'}}),{status:403});
+        // De smalle kolom-R-lezing van de nesting-guard in `koppelTaak`. Apart gemerkt: zo blijft
+        // in de asserts hieronder te zien WELKE lezing wanneer langskwam.
+        if(methode==='GET' && /!R:R/.test(u)){
+          volgorde.push('leesR');
+          const laatste=Math.max(0, ...Object.keys(blad).map(Number));
+          const kolom=[]; for(let r=1; r<=laatste; r++) kolom.push([(blad[r]||[])[17]||'']);
+          return new Response(JSON.stringify({values:kolom}),{status:200});
+        }
         if(methode==='GET'){                    // de rij-controle van assertRowsMatch
           volgorde.push('lees');
           const m=/!A(\d+):S(\d+)/.exec(u)||[];
@@ -5405,11 +5413,46 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
          [sub.bundelId, sub.bundelVolg, kop.bundelId, kop.bundelVolg], ['Tkop','10','Tkop','0']);
       truthy('koppel-e2e: en de nieuwe bundel staat open', state.bundelOpen.has('Tkop'));
       await state._writeChain;
-      eq('koppel-e2e: eerst de rij-controle, dan pas schrijven', volgorde, ['lees','schrijf']);
+      // 'leesR' ertussen is de nesting-guard: die moet ná de rij-controle en vóór de POST komen.
+      eq('koppel-e2e: eerst de rij-controle, dan de nesting-guard, dan pas schrijven',
+         volgorde, ['lees','leesR','schrijf']);
       eq('koppel-e2e: twee bereiken weggeschreven', geschreven.map(g=>g.range),
          ["'Nog Te Doen'!Q12:S12", "'Nog Te Doen'!Q20:S20"]);
       eq('koppel-e2e: de cellen die erin gaan', geschreven.map(g=>g.values[0]),
          [['Tkop','Tkop','0'], ['Tb','Tkop','10']]);
+
+      // 1c. De nesting-guard op een VERSE lezing. `magKoppelen` beantwoordt 'heeft de bron zelf
+      //     subtaken?' uit `bouwBundelIndex`, en die index komt uit de laatste leesronde. Hier zegt
+      //     het geheugen 'nee' (rij 31 zit niet in D) terwijl de Sheet 'ja' zegt — precies de stand
+      //     nadat de poll is overgeslagen omdat er een modal openstond. Zonder de verse controle
+      //     wordt hier twee lagen diep gestapeld en valt de subtaak op rij 31 stil uit haar bundel:
+      //     `bouwBundelIndex` groepeert strikt op bundelnummer, dus zodra 'Tb' het nummer van de
+      //     kop gaat dragen, blijft rij 31 alleen achter in een groep van één.
+      ({ kop, sub } = opnieuw());
+      blad[31]=bladRij('Stille-subtaak','Tc','Tb');   // wél in de Sheet, NIET in het geheugen
+      await koppelTaak(sub, kop);
+      await state._writeChain;
+      eq('koppel-nesting: een bron die intussen zelf subtaken kreeg wordt geweigerd',
+         geschreven.map(g=>g.range), []);
+      eq('koppel-nesting: … en de lezing kwam wél langs, het schrijven niet', volgorde,
+         ['lees','leesR']);
+      // De rollback moet het scherm terugzetten, anders blijft er een bundel staan die in de Sheet
+      // niet bestaat en ketst élke volgende schrijfactie op die rij af op de rij-guard.
+      eq('koppel-nesting: … en het scherm staat terug op los',
+         [sub.bundelId, sub.bundelVolg, kop.bundelId, kop.bundelVolg], ['','','','']);
+
+      // 1d. Tegenproef, en niet vrijblijvend: een kop die zijn LAATSTE subtaak kwijt is HOUDT zijn
+      //     bundelnummer (zie de toelichting bij de undo in koppelTaak — met één lid is het geen
+      //     bundel meer en wordt de rij weer gewoon getekend). Kolom R van die rij is dus gelijk
+      //     aan haar eigen kolom Q. Een guard die alleen 'staat er iets in R' zou zo'n taak nooit
+      //     meer laten koppelen. Hier draagt géén ándere rij 'Tb', dus het mag gewoon.
+      ({ kop, sub } = opnieuw());
+      sub.bundelId='Tb'; sub.bundelVolg='0';
+      blad[20]=bladRij('Sub-werk','Tb','Tb');
+      await koppelTaak(sub, kop);
+      await state._writeChain;
+      eq('koppel-nesting: een oud-hoofdtaak zonder leden mag wél gewoon gekoppeld worden',
+         geschreven.map(g=>g.range), ["'Nog Te Doen'!Q12:S12", "'Nog Te Doen'!Q20:S20"]);
 
       // 2. Ontkoppelen: alleen de rij van de subtaak, taaknummer blijft staan.
       ({ kop, sub } = opnieuw());
@@ -5461,7 +5504,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       await koppelTaak(sub, kop);
       await state._writeChain;
       eq('koppel-e2e: een rij zónder taaknummer komt langs de guard en wordt geschreven',
-         volgorde, ['lees','schrijf']);
+         volgorde, ['lees','leesR','schrijf']);
       truthy('koppel-e2e: kop én subtaak krijgen een vers taaknummer', !!kop.taakId && !!sub.taakId);
       eq('koppel-e2e: dat nummer gaat in kolom Q mee, en de kop wordt het bundelnummer',
          geschreven.map(g=>g.values[0]), [[kop.taakId, kop.taakId, '0'], [sub.taakId, kop.taakId, '10']]);
@@ -6237,7 +6280,8 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         await naSleep();
         eq('stapel-e2e: het scherm toont de bundel',
            [sub.bundelId, sub.bundelVolg, kop.bundelId, kop.bundelVolg], ['Tkop','10','Tkop','0']);
-        eq('stapel-e2e: eerst de rij-controle, dan pas schrijven', volgorde, ['lees','schrijf']);
+        eq('stapel-e2e: eerst de rij-controle, dan de nesting-guard, dan pas schrijven',
+           volgorde, ['lees','leesR','schrijf']);
         eq('stapel-e2e: de gesleepte rij wordt de subtaak van de rij eronder',
            geschreven.map(g=>g.values[0]), [['Tkop','Tkop','0'], ['Tb','Tkop','10']]);
         // Het vangnet uit §6.4 hoort er ook bij een gesleepte koppeling te zijn: sleep je mis, dan
@@ -6626,6 +6670,12 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         const u=decodeURIComponent(String(url)), methode=(opt&&opt.method)||'GET';
         if(u.includes('values:batchGet'))    // zie de schrijfweg-tests hierboven: geen leesverkeer
           return new Response(JSON.stringify({error:{message:'geen leesverkeer in deze test'}}),{status:403});
+        if(methode==='GET' && /!R:R/.test(u)){   // de nesting-guard van koppelTaak; zie hierboven
+          volgorde.push('leesR');
+          const laatste=Math.max(0, ...Object.keys(blad).map(Number));
+          const kolom=[]; for(let r=1; r<=laatste; r++) kolom.push([(blad[r]||[])[17]||'']);
+          return new Response(JSON.stringify({values:kolom}),{status:200});
+        }
         if(methode==='GET'){                 // de rij-controle van assertRowMatch/assertRowsMatch
           volgorde.push('lees');
           const m=/!A(\d+):S(\d+)/.exec(u)||[];
@@ -6775,7 +6825,8 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       await submitTask();
       await wacht(() => posts.length>0);
       await state._writeChain;
-      eq('hoortbij: eerst de gewone bewerking, dan pas de koppeling', volgorde, ['lees','put','lees','post']);
+      eq('hoortbij: eerst de gewone bewerking, dan pas de koppeling',
+         volgorde, ['lees','put','lees','leesR','post']);
       eq('hoortbij: de bewerking schrijft tot en met kolom K', puts.map(p=>p.bereik), ["'Nog Te Doen'!A20:K20"]);
       eq('hoortbij: de koppeling schrijft de bundelkolommen van beide rijen',
          posts.map(p=>p.range), ["'Nog Te Doen'!Q12:S12", "'Nog Te Doen'!Q20:S20"]);

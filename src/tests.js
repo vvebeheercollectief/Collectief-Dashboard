@@ -7997,6 +7997,12 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       .flatMap(p=>((p.body&&p.body.data)||[]).map(d=>d.range));
     const wisRijen=()=>posts.filter(p=>p.body&&p.body.requests)
       .flatMap(p=>p.body.requests.filter(r=>r.deleteDimension).map(r=>r.deleteDimension.range.startIndex+1));
+    // Het losse wegleggen schrijft ÉÉN cel en gaat daarom via `writeRange` — een PUT op
+    // /values/<bereik>, niet via values:batchUpdate. `schrijfRanges` hierboven ziet die dus niet.
+    // Filteren op de methode en niet op de URL, omdat de logboek-append (POST) langs dezelfde
+    // /values/-route loopt en er anders tussen zou zitten.
+    const putBereiken=()=>posts.filter(p=>p.methode==='PUT')
+      .map(p=>p.url.replace(/^.*\/values\//,'').replace(/\?.*$/,''));
     try {
       window.alert=m=>{ meldingen.push(m); };
       state.oauthToken='stub'; state.oauthExpiry=Date.now()+3600e3;
@@ -8015,7 +8021,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
           const rijen=[]; for(let r=+m[1]; r<=+m[2]; r++) rijen.push(blad[r]||[]);
           return new Response(JSON.stringify({values:rijen}),{status:200});
         }
-        posts.push({ url:u, body:(opt&&opt.body)?JSON.parse(opt.body):null });
+        posts.push({ url:u, methode, body:(opt&&opt.body)?JSON.parse(opt.body):null });
         return new Response('{}',{status:200});
       };
 
@@ -8053,6 +8059,30 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       await vraag(()=>snoozeOpslaan());
       eq('wegleggen: ja sluit het wegleg-scherm alsnog',
          [vragen.length, snoozeBg.classList.contains('open')], [1, false]);
+
+      // Tweede doorloop, nu met de cache-rem OPEN. De doorloop hierboven komt namelijk niet verder
+      // dan het sluiten van het scherm: `blokkeerOffline` in `schrijfOpvolgdatum` breekt af vóór de
+      // schrijfactie. Haal je die `schrijfOpvolgdatum(r, nieuw, 'Weggelegd')` uit `snoozeOpslaan`
+      // weg, dan blijft alles hierboven groen — het wegleggen zélf was nergens geraakt. Dit is de
+      // enige doorloop die dat wél afdekt; de rem-stand hierboven blijft staan omdat die de VOLGORDE
+      // vastlegt (vraag vóór de rem).
+      state._uitCache=false;
+      const wegTaak2=taak(5,'Dakgoot',nlOver(10));
+      D.ntd={ ...leeg, OPPAKKEN:[wegTaak2] }; state._rowCache=[wegTaak2];
+      zetBlad([wegTaak2]); posts=[];
+      antwoord=true; vragen=[];
+      openSnoozeModal(0);
+      document.getElementById('snooze-datum').value=isoOver(30);
+      await vraag(()=>snoozeOpslaan());
+      await leeglopen();
+      eq('wegleggen: ja zet de opvolgdatum écht en sluit het scherm',
+         [vragen.length, wegTaak2.opvolgdatum, snoozeBg.classList.contains('open')],
+         [1, nlOver(30), false]);
+      // En in de Sheet in kolom L van de rij van déze taak — dat het scherm klopt zegt niets over
+      // wat er weggeschreven wordt (zelfde reden als bij de bulk-variant verderop).
+      eq('wegleggen: … en schrijft naar kolom L van precies die rij', putBereiken(),
+         ["'Nog Te Doen'!L5:L5"]);
+      state._uitCache=true;   // het herhaal-blok hieronder rekent weer op een dichte rem
 
       // Tegenproef: ligt de opvolgdatum vóór de deadline, dan hoort er niets gevraagd te worden.
       // Zonder deze assert zou een vraag die ALTIJD wordt gesteld hier gewoon groen blijven.
@@ -8093,6 +8123,26 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       await vraag(()=>deleteHerhaal());
       eq('herhaalregel: ja sluit het bewerkscherm alsnog',
          [vragen.length, hhBg.classList.contains('open')], [1, false]);
+
+      // Ook hier een tweede doorloop met de rem open, en om dezelfde reden: hierboven staat
+      // `blokkeerOffline` ná `closeHerhaalModal()`, dus àlles wat er na het sluiten volgt (de regel
+      // uit D halen, de rij wissen) kon je weghalen zonder dat er één assert afging.
+      state._uitCache=false;
+      const regel2={ ...regel };
+      D.herhaal=[regel2];
+      // Kolom A = het id: `assertRowMatch` krijgt hier een STRING mee (`r.id`) en valt dan terug op
+      // de kale kolom-A-vergelijking, niet op de vingerafdruk. Eén rij volstaat dus.
+      blad={ 4:[regel2.id] };
+      state._sheetIds={ ...state._sheetIds, 'Herhaalregels':3 };
+      posts=[];
+      antwoord=true; vragen=[];
+      openHerhaalModal(4);
+      await vraag(()=>deleteHerhaal());
+      await leeglopen();
+      eq('herhaalregel: ja haalt de regel écht weg — uit de lijst én uit het tabblad',
+         [vragen.length, (D.herhaal||[]).length, hhBg.classList.contains('open'), wisRijen()],
+         [1, 0, false, [4]]);
+      state._uitCache=true;
 
       // ══ 3 en 4. De twee bulk-acties (bulk.js) ══
       // Hier moet de cache-rem juist OPEN: bij bulk staan `blokkeerOffline`/`ensureToken` bovenaan
@@ -8166,19 +8216,36 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       await vraag(()=>bulkDoe(bulkKnop));
       eq('bulk-verwijderen: de vraag zet het aantal in de titel', vragen,
          [`2 taken verwijderen? | Deze taken worden uit 'Nog Te Doen' gehaald. `+
-          `Je kunt dit met de knop in de melding nog ongedaan maken. | Verwijderen`]);
+          `Meteen daarna kun je dit nog ongedaan maken met de knop in de melding. | Verwijderen`]);
       eq('bulk-verwijderen: … met de rode bevestigknop', knopKleur, 'btn btn-del');
       eq('bulk-verwijderen: nee laat de taken staan, mét selectie en bulk-modus',
          [D.ntd.OPPAKKEN.length, bulkSelectie().length, state.bulkMode,
           state.pendingWrites-pendingVoor, posts.length],
          [2, 2, true, 0, 0]);
 
-      antwoord=true; vragen=[];
-      await vraag(()=>bulkDoe(bulkKnop));
-      await leeglopen();
+      // Deze 'ja' loopt BEWUST niet via `vraag()`. Die helper wacht op `af || venster open`, en het
+      // venster gaat al open binnen `bulkVerwijderen` zélf — hij kan dus niet zien of `bulkDoe` te
+      // vroeg teruggeeft. En precies dát is wat de `await` bij `bulkVerwijderen` in `bulkDoe`
+      // garandeert. Nagemeten: haal je die `await` weg en laat je dit blok zoals het was, dan blijft
+      // de héle suite groen. Vandaar hier `bulkDoe` echt awaiten, met een meting ertussen.
+      vragen=[];
+      let bulkDoeAf=false;
+      const lopend=bulkDoe(bulkKnop).then(()=>{ bulkDoeAf=true; });
+      await wachtTot(()=>bevBg.classList.contains('open'));
+      // Twee tikken: een te vroeg opgeloste `bulkDoe` zet `bulkDoeAf` pas in een microtask, en die
+      // moet de kans krijgen te lopen. Zonder deze tikken zou de assert hieronder ook groen zijn
+      // omdat we simpelweg te snel kijken — en dan toetst hij niets.
+      await tik(); await tik();
+      eq('bulk-verwijderen: bulkDoe blijft lopen zolang de vraag onbeantwoord openstaat',
+         [bevBg.classList.contains('open'), bulkDoeAf], [true, false]);
+      document.getElementById('bevestig-ja').click();
+      await lopend;
+      // Meteen ná `await bulkDoe(…)`, zónder tussentijdse tikken: als `bulkDoe` teruggeeft hoort de
+      // handeling gedaan te zijn, niet pas een tik later.
       eq('bulk-verwijderen: ja haalt beide taken weg en sluit de bulk-modus af',
          [D.ntd.OPPAKKEN.length, bulkSelectie().length, state.bulkMode],
          [0, 0, false]);
+      await leeglopen();
       // En het zijn de júiste rijen, hoog→laag zodat de delete-indexen elkaar niet verschuiven.
       eq('bulk-verwijderen: … en precies rij 6 en 5 gaan eruit, in die volgorde', wisRijen(), [6, 5]);
 
@@ -8191,7 +8258,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       await vraag(()=>bulkDoe(bulkKnop));
       eq('bulk-verwijderen: één taak krijgt enkelvoud in titel én tekst', vragen,
          [`1 taak verwijderen? | Deze taak wordt uit 'Nog Te Doen' gehaald. `+
-          `Je kunt dit met de knop in de melding nog ongedaan maken. | Verwijderen`]);
+          `Meteen daarna kun je dit nog ongedaan maken met de knop in de melding. | Verwijderen`]);
       await leeglopen();
     } finally {
       window.fetch=_fetch; window.alert=_alert;

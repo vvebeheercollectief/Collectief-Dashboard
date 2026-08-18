@@ -13,6 +13,26 @@
 // Het grote verschil met `confirm()`: die blokkeert de hele pagina tot er geklikt is, en kon dus
 // midden in een gewone functie staan. Dit venster niet — `vraagBevestiging` geeft een Promise die
 // pas afloopt bij de klik. Aanroepers worden daarmee `if(!await vraagBevestiging(…)) return;`.
+//
+// En dat verschil heeft een staart die nergens anders staat opgeschreven. `confirm()` legde de
+// JS-thread stil, dus er kón tijdens de vraag geen achtergrondcode lopen. Over een `await` heen kan
+// dat wél. De 8s-poll is daar tegen beschermd (main.js remt op `.modal-bg.open` — #bevestig-bg
+// draagt die class — en op `state.bulkMode`), maar de stille resync in de `finally` van
+// `backgroundWrite` niet: die doet onvoorwaardelijk `if(state.pendingWrites===0){ loadAll(true) }`
+// (data.js). Loopt er dus nog een schrijfactie van een vórige handeling af terwijl deze vraag
+// openstaat, dan bouwt `parseSections`/`parseHerhaal` een VERS D — en de rij-objecten die de
+// aanroeper over de `await` heen vasthoudt (`rows` in bulk.js, `state._snoozeRow`,
+// `state.herhaalEditRow`) zitten daar niet meer in. Gevolg bij 'ja': `arr.indexOf(r)` geeft -1, de
+// optimistische mutatie blijft dus uit, en `_shiftNtdRows(origRow,…)` schuift verse objecten op een
+// verouderd rijnummer.
+//
+// Niet gerepareerd, wel bewust. De Sheet zelf is gedekt: élke schrijfweg hierachter draait eerst
+// `assertRowMatch`/`assertRowsMatch`, en die vergelijkt de doelrij vóór het schrijven en geeft
+// anders de 'lijst was net gewijzigd'-melding. Het scherm wordt bij de eerstvolgende resync weer
+// recht getrokken. En het is niet met dit venster ontstaan: `deleteTaskRow` (crud.js) houdt zijn
+// rij-object al even lang vast over een `await` en staat zo op productie. Wie het toch wil
+// dichtzetten: geef die resync dezelfde remmen als de poll — en regel dán dat hij alsnog een keer
+// komt, want hij zet ook de statusbalk terug op 'Live'.
 
 // De nog niet beantwoorde vraag: de resolve-functie van de openstaande Promise, of null als er
 // geen venster staat. Dit is meteen de dubbelklik-rem — zie `vraagBevestiging`.

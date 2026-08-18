@@ -115,9 +115,13 @@ async function bulkDoe(el){
   }
   // Als enige tak geAWAIT: `bulkVerwijderen` is sinds de eigen bevestigingsvraag async, en de
   // andere takken zijn dat niet. Zonder `await` zou `bulkDoe` al klaar zijn terwijl de vraag nog in
-  // beeld staat — de zelftest hangt daaraan (die wacht op `bulkDoe` om de stand ná het antwoord te
-  // meten). Voor de app maakt het niets uit: de klik-delegatie in actions.js negeert wat hier
-  // terugkomt.
+  // beeld staat. Voor de app maakt dat vandaag niets uit — de klik-delegatie in actions.js doet
+  // `if (fn) fn(el, e);` en kijkt niet naar wat er terugkomt — maar het houdt het contract van
+  // `bulkDoe` heel: hij is pas klaar als de handeling klaar is. Dat contract staat of valt met één
+  // assert in de zelftest ('bulkDoe blijft lopen zolang de vraag onbeantwoord is'), die `bulkDoe`
+  // ECHT await en meet dat hij nog loopt terwijl het venster openstaat. Zonder die ene assert zou
+  // het weghalen van deze `await` de hele suite groen laten: de testhelper `vraag()` wacht op het
+  // ÓPENEN van het venster, en dat gebeurt al synchroon binnen `bulkVerwijderen`.
   else if(wat==='verwijderen') await bulkVerwijderen(rows);
 }
 
@@ -246,10 +250,15 @@ async function bulkVerwijderen(rows){
   // losse verwijderen in crud.js. Er is een undo-toast, maar die is een vangnet en geen vrijbrief.
   // Bewust géén opsomming van de codes in de tekst: bij twintig taken wordt dat een muur waar de
   // vraag zelf in verdwijnt. Ze staan wél in de undo-toast hieronder.
+  // 'Meteen daarna' is geen stijlkeuze maar een grens: die knop zit in de undo-toast, en die ruimt
+  // zichzelf op na UNDO_DURATION — 8 seconden (notifications.js). Een kale belofte dat het 'nog
+  // ongedaan te maken is' leest als onbeperkt, en dat is op een verwijdervraag precies de zin
+  // waarop iemand te makkelijk doorklikt. De tijd zelf staat er niet in: de toast kan ook eerder
+  // weg zijn, en een getal in deze tekst zou stil verouderen zodra die constante wijzigt.
   if(!await vraagBevestiging({
       titel:`${rows.length} ${rows.length===1?'taak':'taken'} verwijderen?`,
       tekst:`${rows.length===1?'Deze taak wordt':'Deze taken worden'} uit 'Nog Te Doen' gehaald. `+
-            `Je kunt dit met de knop in de melding nog ongedaan maken.`,
+            `Meteen daarna kun je dit nog ongedaan maken met de knop in de melding.`,
       bevestigTekst:'Verwijderen', gevaarlijk:true })) return;
   const items=rows.map(r=>({r,sec:r._sec,origRow:r._row,ntdValues:_ntdValues(r),code:r.code}));
   items.forEach(it=>{

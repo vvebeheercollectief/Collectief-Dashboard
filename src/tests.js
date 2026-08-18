@@ -3795,7 +3795,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '10.19');
+  eq('versie opgehoogd', APP_VERSION, '10.20');
 
   // ── Pushmeldingen: de twee schakels die stil kapot waren (audit 2026-08-06) ──
   // Beide defecten waren onzichtbaar: de app meldde "Notificaties zijn aan!" terwijl er nooit
@@ -5914,7 +5914,14 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       // blok niets meer dan dat er een overlay is. Gemeten en niet aangenomen: de diagnose gaf
       // letterlijk DIV.lg-card op de plek van de doelrij.
       const poort=document.getElementById('login-gate'), poortOud=poort?poort.style.display:'';
+      // De rijdichtheid vastzetten voor de duur van dit blok. Dit blok meet exacte pixelmaten, en
+      // `data-density` (Compact/Standaard/Ruim) verandert die: het is een persoonlijke voorkeur die
+      // per apparaat in localStorage staat. Zonder deze regel meet dezelfde code op de ene machine
+      // 18px en op de andere 19 — op productie stond 'compact' en viel de chevron-assert om terwijl
+      // er niets mis was. Een test die afhangt van iemands weergavevoorkeur meet niet de code.
+      const dichtOud=document.documentElement.dataset.density;
       try {
+        document.documentElement.dataset.density='standaard';
         if(poort) poort.style.display='none';
         // De lijst op de standaardstand: alleen dán staat de gestapelde weergave aan, en alleen
         // dán mag er in de tabel gesleept worden (§4.2). Een achtergebleven zoekterm uit een
@@ -6486,6 +6493,10 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         eq('stapel-e2e: en dat gaat als twee bereiken de Sheet in', geschreven.map(g=>g.range),
            ["'Nog Te Doen'!Q12:S12", "'Nog Te Doen'!Q28:S28"]);
       } finally {
+        // Alleen het attribuut terug, NIET via applyDensity: die schrijft ook localStorage en zou
+        // de voorkeur van de gebruiker overschrijven met wat deze test toevallig nodig had.
+        if(dichtOud===undefined) delete document.documentElement.dataset.density;
+        else document.documentElement.dataset.density=dichtOud;
         if(poort) poort.style.display=poortOud;
         veldIds.forEach((id,i)=>{ document.getElementById(id).value=veldOud[i]; });
         state.ntdSort=sortOud; state.ntdStatus=statusOud; state.bulkMode=bulkOud; state.vveCode=vveOud;

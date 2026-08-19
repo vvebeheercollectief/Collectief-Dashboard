@@ -159,21 +159,30 @@ export function zetHoortBij(r){
   // omdat het vak bij een nieuwe taak verborgen is, maar het is een val zodra dat verandert.
   veld.disabled=false;
   veld.placeholder=HB_PLACEHOLDER;
-  if(!r){ veld.value=''; return; }
+  // De tooltip hoort bij de waarde en moet hier dus óók leeg: bleef hij staan, dan zweeft bij een
+  // nieuwe taak nog de verwijzing van de vórige bewerking boven een leeg veld.
+  if(!r){ veld.value=''; veld.title=''; return; }
   // Eén bron voor 'wat is deze rij binnen haar bundel' (zie bundelVerwijzing in bundel.js). Hier
   // stond diezelfde afleiding met de hand uitgeschreven — twee plekken die hetzelfde antwoord
   // moeten geven, en dat is precies het soort stil verschil waar deze functie voor bestaat.
-  const bv=bundelVerwijzing(r, bouwBundelIndex(D.ntd,D.af));
-  const isKop=!!bv && bv.rol==='kop';
+  // (En dit is de aanroeper die twee momentopnames mengt: de index is vers uit `D`, terwijl `r`
+  // uit state._rowCache van de laatste render komt. bundelVerwijzing staat dat toe — het is
+  // precies waarom hij op taaknummer vergelijkt en niet op objectidentiteit.)
+  const verw=bundelVerwijzing(r, bouwBundelIndex(D.ntd,D.af));
+  const isKop=!!verw && verw.rol==='kop';
+  const isSub=!!verw && verw.rol==='sub';
   // De VOLLEDIGE verwijzing, niet alleen `taakTitel`: koppelen mag over VvE's heen, dus zonder de
   // code kan de gebruiker niet zien wélke taak dit is.
-  veld.value=(bv && bv.rol==='sub') ? taakVerwijzing(bv.kopRij) : '';
+  veld.value=isSub ? taakVerwijzing(verw.kopRij) : '';
+  // De regel is langer dan het veld breed is, en een <input> scrollt naar het BEGIN — dan valt
+  // juist de omschrijving weg, het deel dat twee taken van dezelfde VvE uit elkaar houdt.
+  veld.title=veld.value;
   // Een taak met subtaken kan nergens onder — dat weigert `magKoppelen` toch al. Het veld op slot
   // zetten voorkomt dat de gebruiker eerst een doel uitzoekt en pas bij het opslaan hoort dat het
   // niet mag.
   veld.disabled=isKop;
   veld.placeholder=isKop?'Deze taak is de hoofdtaak van een bundel':HB_PLACEHOLDER;
-  if(wis&&bv&&bv.rol==='sub') wis.style.display='';
+  if(wis&&isSub) wis.style.display='';
 }
 
 function fillModalFields(sec,r){

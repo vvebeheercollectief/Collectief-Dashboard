@@ -5707,6 +5707,12 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       volgorde.length=0; geschreven=[];
       const undoKoppel=document.querySelector('#toast-container .toast-undo');
       truthy('koppel-e2e: er wordt een undo aangeboden', !!undoKoppel);
+      // De melding noemt de doeltaak met soort én VvE. Zonder deze assert kan hij stil terugvallen
+      // op `doel.naam||doel.code` — dan staat er alleen een VvE-naam en niet wélke taak van die VvE.
+      // Letterlijk uitgeschreven en niet via `taakVerwijzing(kop)`: die zou zichzelf toetsen.
+      eq('stapelen: de melding noemt de doeltaak met soort en VvE',
+         document.querySelector('#toast-container .toast-msg')?.textContent,
+         'Sub-werk onder Taak · 311212 Testflat — Kop-werk');
       if(undoKoppel) await undoKoppel.onclick();
       await state._writeChain;
       eq('koppel-undo: de subtaak is weer los', [sub.bundelId, sub.bundelVolg], ['','']);

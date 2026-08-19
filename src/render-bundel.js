@@ -16,9 +16,9 @@
 // niet, terwijl elke bundel-toggle, sortering, paginawissel en toetsaanslag in het zoekveld een
 // renderNtd is. Dat kost geheugen, geen correctheid; behandel `state._rowCache` daarom niet als
 // een eindige of volledige lijst van wat er nú op het scherm staat.
-import { esc, taakTitel, kortDatum, taakActieKnoppen, opvolgStatus, berekenPrioriteit } from "./util.js";
+import { esc, taakTitel, taakVerwijzing, kortDatum, taakActieKnoppen, opvolgStatus, berekenPrioriteit } from "./util.js";
 import { SECS } from "./config.js";
-import { zichtbareKop, bundelVan, wordtGeabsorbeerd, bundelSleutel, zelfdeTaak, bundelStand } from "./bundel.js";
+import { wordtGeabsorbeerd, bundelSleutel, bundelStand, bundelVerwijzing } from "./bundel.js";
 import { ico } from "./icons.js";
 import { state } from "./state.js";
 
@@ -163,9 +163,11 @@ export function bundelPaneelHtml(leden, kop){
        + `</div>`;
 }
 
-// Het bundel-merkje op een taakrij. Krijgt `bw` (uit `bundelWeergave`) en niet los de index, want de
-// vraag "krijgt deze rij een merkje" hangt van álle drie de onderdelen daarvan af — en het antwoord
-// hoort op één plek te staan, niet half hier en half bij de aanroeper.
+// Het bundel-merkje op een taakrij: een leesbaar labeltje, geen kaal icoontje. Krijgt `bw` (uit
+// `bundelWeergave`) en niet los de index, want de vraag "krijgt deze rij een merkje" hangt van álle
+// drie de onderdelen daarvan af — en het antwoord hoort op één plek te staan, niet half hier en half
+// bij de aanroeper. Wélk lid van de bundel deze rij is, komt uit `bundelVerwijzing` (bundel.js), zodat
+// "wie is de kop" ook hier maar op één plek beantwoord wordt.
 //
 // Twee standen:
 //  - Gestapeld (`stapel`): alleen een subtaak waarvan de kop in een ánder tabblad zit. De kop draagt
@@ -175,23 +177,35 @@ export function bundelPaneelHtml(leden, kop){
 //    telpill, dus dit is de enige aanwijzing dát er een bundel is (§4.2) — en de enige weg terug
 //    naar de gestapelde weergave. Ook de kop, want een hoofdtaak met drie subtaken zou anders in een
 //    gefilterde lijst als een gewone losse taak staan.
+//
+// De `aria-label` staat er nog steeds, maar niet meer om de oude reden. Die was: het icoon dat `ico()`
+// levert draagt `aria-hidden="true"`, dus de knop was leeg en viel voor zijn naam terug op de `title`
+// — de laatste stap in de naam-berekening, en een terugval die niet elke schermlezer voorleest. Nu
+// staat de tekst wél in de knop en is er hoe dan ook een naam. Het label blijft omdat de zichtbare
+// tekst wordt AFGEKAPT (`text-overflow:ellipsis` op `.bdl-merk-t`) en niet zegt wat klikken doet: het
+// vult die zin aan en levert de hele verwijzing, ook als er op het scherm nog 'stap in: Vergaderverz…'
+// staat. Het begint met exact de zichtbare tekst, zodat de naam die tekst blijft bevatten (WCAG 2.5.3,
+// 'label in name') en wie de knop met zijn stem aanwijst begrepen wordt.
 export function bundelMerkje(r, bw, sec){
   if (!bw || !bw.merk) return '';
-  const leden = bundelVan(bw.ix, r);
-  if (!leden) return '';
-  const kop = zichtbareKop(leden);
-  if (!kop) return '';
-  // 'Ben ik zelf de kop' via dezelfde `zelfdeTaak` als de absorptie, en niet via objectidentiteit:
-  // deze twee moeten elkaars tegenpool blijven, dus ze horen een rij op precies dezelfde manier
-  // te herkennen (zie de voorwaarde bij `wordtGeabsorbeerd`).
+  const verw = bundelVerwijzing(r, bw.ix);
+  if (!verw) return '';
+  // In de gestapelde weergave draagt de kop zijn telpill al en staat een stap uit hetzelfde
+  // tabblad al in het paneel. `wordtGeabsorbeerd` is de exacte tegenpool van de absorptie in
+  // render-lijsten.js — die twee horen dezelfde rijen aan te wijzen.
   if (bw.stapel){
-    if (zelfdeTaak(kop.r, r)) return '';
+    if (verw.rol === 'kop') return '';
     if (wordtGeabsorbeerd(r, bw.ix, sec)) return '';
   }
-  const titel = (zelfdeTaak(kop.r, r) ? `Bundel van ${leden.length} taken` : `Hoort bij: ${taakTitel(kop.r)}`)
-              + ' — klik om de bundel te openen';
-  // De `aria-label` blijft nodig: het icoon dat `ico()` levert draagt zelf `aria-hidden="true"`,
-  // dus er is verder geen tekst in de knop. Zonder label valt hij terug op zijn `title`, en dat is
-  // de laatste stap in de naam-berekening — een terugval die niet elke schermlezer voorleest.
-  return `<button type="button" class="bdl-merk" data-action="bundel-spring" data-bundel="${esc(tekst(r.bundelId))}" title="${esc(titel)}" aria-label="${esc(titel)}">${ico('bundel',12)}</button>`;
+  // De tekst staat in de KNOP, niet alleen in de title. Als kaal icoontje was dit in een
+  // gefilterde lijst de enige aanwijzing dát er een bundel is, en dan nog een die je alleen met
+  // de muis kon lezen — met daarin alleen de kale omschrijving van de hoofdtaak.
+  const label = verw.rol === 'kop'
+    ? `Bundel · ${verw.klaar} van ${verw.totaal} klaar`
+    : `stap in: ${taakVerwijzing(verw.kopRij)}`;
+  const titel = `${label} — klik om de bundel te openen`;
+  // Een stap krijgt een eigen klasse: zijn regel is lang en hoort onder de VvE-naam te vallen,
+  // terwijl de telling van een kop kort is en ernaast past.
+  const cls = verw.rol === 'kop' ? 'bdl-merk' : 'bdl-merk bdl-merk-sub';
+  return `<button type="button" class="${cls}" data-action="bundel-spring" data-bundel="${esc(tekst(r.bundelId))}" title="${esc(titel)}" aria-label="${esc(titel)}">${ico('bundel',12)}<span class="bdl-merk-t">${esc(label)}</span></button>`;
 }

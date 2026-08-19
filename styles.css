@@ -1370,6 +1370,26 @@ body.bulk #chat-fab{display:none}
 .bdl-merk{background:var(--sec-l,var(--ac-l));color:var(--sec,var(--ac));
   display:inline-flex;align-items:center;vertical-align:middle;position:relative;
   padding:2.5px 8px;border-radius:20px;cursor:pointer;border:0;margin-left:6px}
+/* De tekst in het merkje. Kort bij een kop ("Bundel · 0 van 1 klaar"), lang bij een stap — daar
+   valt hij daarom op een eigen regel onder de VvE-naam en wordt hij afgekapt. De volledige zin
+   blijft in de `title` en de `aria-label` staan. */
+.bdl-merk-t{margin-left:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Een stap: geen pil maar een gedempte regel, zodat de VvE-naam de rij blijft dragen.
+   `display:flex` maakt de knop blok-niveau en dus een eigen regel — nodig, want `.cell-name` staat
+   op `white-space:nowrap`. De `max-width` samen met de ellipsis hierboven houdt hem in de kolom.
+   Die max-width staat in PIXELS en niet op 100%, want een percentage doet hier niets: de takentabel
+   heeft een automatische kolomindeling, en dan rekent de browser eerst uit hoe breed de cel van
+   nature wil zijn — een percentage van een breedte die hij nog niet weet telt daarbij als 'geen
+   grens'. Gemeten liep de VvE-kolom daardoor van 182 naar 527px en moest de hele tabel horizontaal
+   schuiven (993 → 1331px), terwijl de regel zelf niet eens werd afgekapt.
+   240px is niet willekeurig: de telpill van een kop-rij rekt diezelfde kolom in de gestapelde
+   weergave al tot 269px op, dus tot die maat kost deze regel niets extra's. Er past ongeveer
+   'stap in: Vergaderverzoek · 381005 VvE Oudema…' in — de soort en de VvE-code, precies wat er
+   ontbrak toen hier alleen een icoontje met de kale omschrijving van de hoofdtaak stond. De rest
+   blijft in de `title` en de `aria-label`. */
+.bdl-merk-sub{display:flex;max-width:240px;margin:2px 0 0;padding:0;
+  background:none;color:var(--mut);font-size:11px;border-radius:4px}
+.bdl-merk-sub:hover{color:var(--txt)}
 /* Rij op rij slepen om te stapelen: de opgepakte rij dimt, de rij eronder licht op als doel.
    De terugval --sec → --ac is dezelfde als bij de rest van de bundel-opmaak: --sec/--sec-l worden
    per sectie op de NTD-kaart gezet, maar op de VvE-dossierpagina bestaan ze niet.

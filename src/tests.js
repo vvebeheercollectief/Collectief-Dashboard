@@ -4701,8 +4701,30 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     eq('plat: élk lid krijgt een merkje, de kop incluis',
        [subZelfde, subAnder, kop].map(r => bundelMerkje(r, vlak, r._sec).includes('bundel-spring')),
        [true, true, true]);
-    eq('plat: het merkje op de kop noemt de bundel en niet zichzelf',
-       bundelMerkje(kop, vlak, 'OPPAKKEN').includes('Bundel van 3 taken'), true);
+    // Het merkje is in de platte lijst de ENIGE aanwijzing dat er een bundel is (§4.2). Als kaal
+    // icoontje met alleen een `title` was dat onvindbaar: de gebruiker zag een pictogram en moest
+    // er met de muis op blijven staan om te lezen wát het betekende — en dan stond er nog alleen
+    // de kale omschrijving van de hoofdtaak.
+    truthy('plat: het merkje op de kop toont de telling als leesbare tekst',
+       bundelMerkje(kop, vlak, 'OPPAKKEN').includes('Bundel · 0 van 2 klaar'));
+    truthy('plat: een stap noemt de taak waar hij bij hoort, mét soort en VvE',
+       bundelMerkje(subAnder, vlak, 'OFFERTE-TRAJECTEN').includes('stap in: Taak · 311212 Testflat'));
+    // De tekst staat in het KNOPLICHAAM, niet alleen in de `title`. Een assert op de hele
+    // HTML-string blijft groen terwijl het merkje op het scherm een kaal icoontje blijft — die
+    // tekst zit dan immers al in het title-attribuut. Daarom hier op wat er tussen de sluithaak
+    // van de opening-tag en `</button>` staat.
+    const _merkLijf = h => h.slice(h.indexOf('>') + 1, h.lastIndexOf('</button>'));
+    truthy('plat: … en die tekst staat in de knop zelf, niet alleen in de tooltip',
+       _merkLijf(bundelMerkje(subAnder, vlak, 'OFFERTE-TRAJECTEN')).includes('stap in: Taak'));
+    truthy('plat: … ook bij de kop',
+       _merkLijf(bundelMerkje(kop, vlak, 'OPPAKKEN')).includes('0 van 2 klaar'));
+    // Het blijft dezelfde knop: klikken springt nog steeds naar de bundel.
+    truthy('plat: het blijft dezelfde spring-knop',
+       bundelMerkje(subAnder, vlak, 'OFFERTE-TRAJECTEN').includes('data-action="bundel-spring"'));
+    // In de GESTAPELDE lijst houdt de kop zijn telpill en krijgt hij dus geen merkje — anders
+    // staat de telling er twee keer.
+    eq('plat: in de gestapelde lijst krijgt de kop nog steeds geen merkje',
+       bundelMerkje(kop, gestapeld, 'OPPAKKEN'), '');
     // In bulk-modus geen merkje: klikken springt naar een ander tabblad en `setNtd` wist daarbij de
     // bulk-selectie. Een half gemaakte selectie mag niet met één misklik verdwijnen.
     eq('bulk: in bulk-modus staat er geen merkje in de rij',
@@ -6284,22 +6306,32 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         // 19-nulmeting-quinquies. Het derde icoon: het bundel-merkje. Dat bestaat alleen in de
         //      PLATTE weergave (§4.2), vandaar de zoekterm — in de gestapelde stand hierboven staat
         //      het er per definitie niet en valt er dus niets te meten.
-        //      Het is nu een pil om een SVG in plaats van om een kaal teken, en een SVG heeft geen
-        //      tekstregel om in te staan. Zonder de `inline-flex` uit styles.css blijft het een
-        //      inline-doos op de basislijn en wordt de pil 23,2px hoog in plaats van 17 — precies
-        //      het soort verschil dat je in een tabelrij ziet als 'die pil hangt scheef'. Daarom
-        //      allebei gemeten: de maat én de middellijn t.o.v. de VvE-naam waar hij achter staat.
+        //      Het is geen kaal icoontje meer maar een pil met leesbare tekst, en die tekst moet ook
+        //      écht ruimte innemen: staat de `<span class="bdl-merk-t">` er wel maar valt hij op nul
+        //      breedte weg, dan ziet de gebruiker weer alleen een pictogram terwijl elke assert op de
+        //      HTML-string groen blijft. Vandaar de breedte van de SPAN erbij, en niet alleen die van
+        //      de knop.
+        //      De vaste maat 28 × 17 is hier vervallen: dat was de maat van de icoon-only-versie, en
+        //      een pil die met zijn tekst meegroeit heeft er geen. Wat wél vast moet blijven is de
+        //      UITLIJNING — zonder de `inline-flex` uit styles.css blijft de SVG een inline-doos op de
+        //      basislijn en hangt de pil scheef in de rij. Dat vangt de middellijn-assert hieronder,
+        //      die dus het halve werk van de oude maat-assert overneemt.
         document.getElementById('s-ntd').value='werk';
         renderNtd();
         const merkEl=document.querySelector('#ntd-tbody .bdl-merk');
         const mMeet=merkEl ? merkEl.getBoundingClientRect() : { width:-1, height:-1 };
-        eq('stapel-e2e: het bundel-merkje is een pil van 28 × 17px', [mMeet.width, mMeet.height], [28, 17]);
-        // 28 × 17 en de chevron 22 × 18: allebei onder de 24px-richtlijn voor een aanraakdoel,
-        // terwijl de twee sleep-handvatten in hetzelfde blok daar wél een halo voor kregen en de
-        // actieknoppen ernaast onder pointer:coarse naar 36 × 36 groeien. Op een telefoon is de
-        // chevron de enige manier om een bundel open en dicht te klappen en het merkje volgens §4.2
-        // 'de enige weg terug' naar de gestapelde weergave; misklikken landt op de VvE-code, en die
-        // opent het VvE-dossier.
+        const merkT=merkEl && merkEl.querySelector('.bdl-merk-t');
+        truthy('stapel-e2e: het bundel-merkje toont zijn tekst en is dus breder dan het kale icoon',
+               !!merkT && merkT.getBoundingClientRect().width > 0 && mMeet.width > 28);
+        eq('stapel-e2e: en die tekst is de telling van de bundel',
+           merkT && merkT.textContent, 'Bundel · 0 van 1 klaar');
+        // De chevron meet 22 × 18 en het merkje is 23px hoog: allebei onder de 24px-richtlijn voor
+        // een aanraakdoel, terwijl de twee sleep-handvatten in hetzelfde blok daar wél een halo voor
+        // kregen en de actieknoppen ernaast onder pointer:coarse naar 36 × 36 groeien. Breed genoeg
+        // is het merkje sinds het zijn label draagt; het is de HOOGTE die de halo nog nodig maakt. Op
+        // een telefoon is de chevron de enige manier om een bundel open en dicht te klappen en het
+        // merkje volgens §4.2 'de enige weg terug' naar de gestapelde weergave; misklikken landt op
+        // de VvE-code, en die opent het VvE-dossier.
         // De halo zelf staat in een @media(pointer:coarse)-blok en is op een muis-testronde dus niet
         // te méten. Daarom twee toetsen die er wél bij kunnen: de gerenderde `position:relative` —
         // zonder dat anker landt het raakvlak bij een willekeurige voorouder in plaats van om de

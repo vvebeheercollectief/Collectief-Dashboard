@@ -766,6 +766,13 @@
     .tk-taak .tk-onder{grid-column:2/-1;grid-row:2;min-width:0;display:flex;flex-wrap:wrap;
       align-items:baseline;justify-content:space-between;gap:2px 10px}
     .tk-taak .mt{font-size:11px;color:var(--mut);min-width:0}
+    /* Een stap springt in onder zijn kop. Streepje links, dezelfde metafoor als de linkerrand van
+       `.bdl-paneel` in de takentabel. */
+    .tk-taak.tk-stap{margin-left:20px;padding-left:10px;border-left:2px solid var(--bor)}
+    /* Derde grid-rij, uitgelijnd onder de tekst (kolom 2) en niet onder het sleep-handvat. */
+    .tk-taak .tk-stapin{grid-column:2/-1;grid-row:3;font-size:11px;color:var(--mut);
+      min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .tk-taak .tk-stapin svg{vertical-align:-1.5px;margin-right:3px}
     .tk.rij-puls-groen{background:var(--puls-gn);color:var(--puls-gn-t);transition:background .15s ease}
     .tk.rij-fade-weg{opacity:0;transition:opacity .4s ease}
     .tk-leeg{padding:10px 0;color:var(--mut);font-size:12.5px}

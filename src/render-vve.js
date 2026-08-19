@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  PER-VVE-PAGINA — alles van één VvE op één scherm (Fase 5)
 // ══════════════════════════════════════
-import { esc, displayName, persBadges, berekenPrioriteit, opvolgStatus, parseDt, taakTitel, _vandaagAmsterdam, _verschilInKalenderdagen } from "./util.js";
+import { esc, displayName, persBadges, berekenPrioriteit, opvolgStatus, parseDt, taakTitel, taakVerwijzing, _vandaagAmsterdam, _verschilInKalenderdagen } from "./util.js";
 import { ico } from "./icons.js";
 import { SECS, SKEYS, PAGE_META } from "./config.js";
 import { state, D } from "./state.js";
@@ -11,6 +11,7 @@ import { vveKenmerken, KENMERK_WAARDEN } from "./kenmerken.js";
 import { backgroundWrite, blokkeerOffline } from "./data.js";
 import { initStapelSlepen } from "./bundel-acties.js";
 import { STAPEL_GREEP } from "./render-bundel.js";
+import { bouwBundelIndex, bundelVerwijzing, bundelSleutel, zelfdeTaak, opBundelVolg } from "./bundel.js";
 import { appendRange } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { getCurrentWho } from "./notifications.js";
@@ -196,6 +197,53 @@ function composerHtml(code){
   </div>`;
 }
 
+// Stappen schuiven onder hun zichtbare kop — maar alleen als die kop óók in déze lijst staat.
+// Koppelen mag over VvE's heen, en een kop kan weggelegd of afgerond zijn; in al die gevallen
+// staat hij niet in `o.open` en blijft de stap gewoon op zijn eigen plek. De verwijzingsregel
+// onder de rij is dan de enige aanwijzing — vandaar dat die er ook staat als er níet ingesprongen
+// wordt.
+//
+// Geeft `{r, diep}` terug in tekenvolgorde. `diep` is 0 of 1: één laag diep, net als de bundel
+// zelf.
+//
+// Harde eis: er verdwijnt nooit een rij. Wat de index ook beweert, elke binnengekomen rij komt
+// er weer uit — een taak die stil uit het dossier valt is het ergste wat deze functie kan doen.
+function groepeerBundels(rows, index){
+  const lijst = rows || [];
+  const kinderen = new Map();     // bundelsleutel → [rij, …]
+  const romp = [];
+  lijst.forEach(r => {
+    const verw = bundelVerwijzing(r, index);
+    if (verw && verw.rol === 'sub' && lijst.some(x => zelfdeTaak(x, verw.kopRij))){
+      const k = bundelSleutel(r.bundelId);
+      if (!kinderen.has(k)) kinderen.set(k, []);
+      kinderen.get(k).push(r);
+      return;
+    }
+    romp.push(r);
+  });
+  kinderen.forEach(k => k.sort(opBundelVolg));
+  const uit = [];
+  romp.forEach(r => {
+    uit.push({ r, diep:0 });
+    const verw = bundelVerwijzing(r, index);
+    if (verw && verw.rol === 'kop'){
+      const mijn = kinderen.get(bundelSleutel(r.bundelId)) || [];
+      mijn.forEach(c => uit.push({ r:c, diep:1 }));
+      kinderen.delete(bundelSleutel(r.bundelId));
+    }
+  });
+  // Vangnet: kinderen waarvan de kop tóch niet in de romp bleek te staan. Kan vandaag niet
+  // gebeuren (de `some`-toets hierboven eist hem), maar het gevolg zou zijn dat een taak
+  // ongemerkt uit het dossier verdwijnt. Liever onderaan dan weg.
+  //
+  // Staat een taaknummer per ongeluk twee keer in de Sheet (`checkNummers` meldt dat aan de
+  // gebruiker), dan matcht `zelfdeTaak` op béíde en springt de stap in onder de eerste. Dat is
+  // de veilige kant op — er verdwijnt niets, hij staat hooguit onder de verkeerde tweelinghelft.
+  kinderen.forEach(rest => rest.forEach(r => uit.push({ r, diep:0 })));
+  return uit;
+}
+
 function renderVve(){
   const wrap=document.getElementById('vve-inhoud');
   if(!wrap) return;
@@ -219,7 +267,10 @@ function renderVve(){
   // De topbar houdt de vaste paginatitel uit PAGE_META ("VvE-dossier");
   // code + naam staan al groot in de kop hieronder — niet dubbel tonen.
 
-  const taakRij=(r,weg)=>{
+  // Eén index per render, gedeeld door de groepering en de labels eronder.
+  const bIx = bouwBundelIndex(D.ntd, D.af);
+
+  const taakRij=(r,weg,diep)=>{
     const rid=state._rowCache.length; state._rowCache.push(r);
     const sec=r._sec, p=berekenPrioriteit(r.deadline,sec);
     const meta=SECS[sec]||{css:'',label:(sec||'?')}; // vangnet: één rij zonder geldige sectie mag niet de hele dossierpagina blanco maken
@@ -228,17 +279,29 @@ function renderVve(){
       : r.deadline
         ? `${esc(r.deadline)}${p.teLaat?` <span class="pill-telaat">Te laat (${Math.abs(p.dagenTot)}d)</span>`:''}`
         : '<span class="warn-geen-deadline">Geen deadline</span>';
+    // Wat deze rij binnen haar bundel is. Dezelfde bron als het merkje in de takentabel, dus
+    // beide schermen kunnen niet iets anders beweren.
+    const verw = bundelVerwijzing(r, bIx);
+    const bdlPil = (verw && verw.rol === 'kop')
+      ? `<span class="bdl-pill">${verw.klaar} van ${verw.totaal} klaar</span>` : '';
+    // De verwijzingsregel staat er ÓÓK als de rij al is ingesprongen: bij inspringen alleen zie je
+    // niet wélke taak het is zodra er twee bundels onder elkaar staan, en zonder inspringen (kop
+    // bij een andere VvE, weggelegd of afgerond) is dit de enige aanwijzing.
+    const stapIn = (verw && verw.rol === 'sub')
+      ? `<div class="tk-stapin">${ico('bundel',11)} stap in: ${esc(taakVerwijzing(verw.kopRij))}</div>` : '';
+
     // Het sleep-handvat staat er hier ONVOORWAARDELIJK, anders dan in de takentabel: het dossier
     // kent de gestapelde weergave niet (geen chevron, geen paneel, geen filters die hem uitzetten),
     // dus er is ook geen stand waarin het gebaar hier niet mag. Dat is dezelfde afweging als bij de
     // aanroep van `initStapelSlepen` onderaan, die om die reden géén `magSlepen` meekrijgt.
-    return `<div class="tk tk-taak${weg?' snooze-row':''}" data-action="taak-bewerken" data-rid="${rid}" style="cursor:pointer">
+    return `<div class="tk tk-taak${weg?' snooze-row':''}${diep?' tk-stap':''}" data-action="taak-bewerken" data-rid="${rid}" style="cursor:pointer">
       ${STAPEL_GREEP}
-      <span class="nm">${esc(taakTitel(r,sec))}</span>
+      <span class="nm">${esc(taakTitel(r,sec))}${bdlPil}</span>
       <div class="tk-onder">
         <span class="mt">${esc(meta.label)}${r.behandelaar?' · '+esc(r.behandelaar):''}</span>
         <span class="dl">${dl}</span>
       </div>
+      ${stapIn}
       <button class="act-af act-ico tk-af" data-action="taak-afronden" data-rid="${rid}" title="Afronden" aria-label="Afronden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 12 4 4 10-10"/></svg></button></div>`;
   };
   const afLimiet=state._vveAfAlles?o.afgerond.length:5;
@@ -298,7 +361,7 @@ function renderVve(){
 
       <div class="vve-paneel">
         <div class="vve-sectie">Open taken <span class="n">${o.open.length}</span></div>
-        ${o.open.map(r=>taakRij(r,false)).join('')||`<div class="tk-leeg">Geen open taken ${ico('feest',14).replace('<svg ','<svg style="vertical-align:-2.5px" ')}</div>`}
+        ${groepeerBundels(o.open, bIx).map(x=>taakRij(x.r,false,x.diep)).join('')||`<div class="tk-leeg">Geen open taken ${ico('feest',14).replace('<svg ','<svg style="vertical-align:-2.5px" ')}</div>`}
         ${o.weggelegd.length?`<div class="vve-sectie" style="margin-top:20px">Weggelegd <span class="n">${o.weggelegd.length}</span></div>
         ${o.weggelegd.map(r=>taakRij(r,true)).join('')}`:''}
         <div class="vve-sectie" style="margin-top:20px">Laatst afgerond <span class="n">${o.afgerond.length}</span></div>
@@ -341,4 +404,4 @@ function renderVve(){
     el => state._rowCache[+el.dataset.rid] || null);
 }
 
-export { vveOverzicht, openVvePagina, renderVve, filterDossierLog, dossierFeed, addContactLog, afOmschrijving, terugDoel, terugVanDossier };
+export { vveOverzicht, openVvePagina, renderVve, filterDossierLog, dossierFeed, addContactLog, afOmschrijving, terugDoel, terugVanDossier, groepeerBundels };

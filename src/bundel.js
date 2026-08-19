@@ -49,6 +49,11 @@ const volgVan = r => {
 const opVolgorde = (a, b) =>
   (volgVan(a.r) - volgVan(b.r)) || tekst(a.r.taakId).localeCompare(tekst(b.r.taakId));
 
+// Dezelfde volgorde, maar over kale rijen in plaats van indexleden. Het dossier groepeert rijen
+// die het uit zijn eigen deadline-sortering haalt; die moeten binnen de bundel weer op
+// bundelVolg komen te staan, en wel volgens exact dezelfde regel als het paneel in de tabel.
+export const opBundelVolg = (a, b) => opVolgorde({ r:a }, { r:b });
+
 // Alle bundels uit de huidige gegevens. Geeft Map<bundelId, Array<{r, af}>>, per bundel
 // gesorteerd op volgnummer. `af` = dit lid komt uit 'Afgerond'.
 // Leden uit 'Afgerond' tellen volwaardig mee: zonder hen zou een bundel leeglopen zodra er

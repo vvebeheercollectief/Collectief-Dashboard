@@ -10,7 +10,7 @@ import { filterVves } from "./vve-zoekveld.js";
 import { filterNtd, setNtd, renderNtd, ntdPagina, renderNtdStats, renderAf, setAf, bepaalStil, bouwStilIndex, _zetStilIndex, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey, kopOpen, zetKopOpen, toggleBundel, springNaarBundel, wisNtdFilters, absorbeer, isPlatteWeergave, erIsGefilterd, rowNtd } from "./render-lijsten.js";
 import { HERO_VIEWS } from "./render-analytics.js";
 import { state, D, pgs } from "./state.js";
-import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel, renderVve } from "./render-vve.js";
+import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel, renderVve, groepeerBundels } from "./render-vve.js";
 import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN, saveKenmerken } from "./kenmerken.js";
 import { zoekAlles } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen, bulkSelectie, bulkWis, renderBulkUi, bulkDoe, bulkVink } from "./bulk.js";
@@ -4576,6 +4576,35 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
        (bundelVerwijzing({ ...kop }, ix) || {}).rol, 'kop');
     eq('bundelverwijzing: geen index is geen fout', bundelVerwijzing(kop, null), null);
     eq('bundelverwijzing: geen rij is geen fout', bundelVerwijzing(null, ix), null);
+  })();
+
+  // ── Dossier: stappen schuiven onder hun kop ─────────────────────────────────────────────
+  // De gebruiker sleept in het dossier, dus dit is de plek waar het resultaat het eerst te zien
+  // hoort te zijn. Vóór deze wijziging toonde die pagina van de hele bundel niets.
+  (() => {
+    const t = (taakId, bundelId, volg, sec, over) => ({ taakId, bundelId, bundelVolg:volg,
+      _sec:sec, code:'381005', naam:'VvE Oudemansstraat', deadline:'', ...over });
+    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const kop  = t('Tkop','Tkop','0','VERGADERVERZOEKEN', { periode:'sept/okt' });
+    const s2   = t('Ts2','Tkop','20','OFFERTE-TRAJECTEN',  { opmerkingen:'Offertes' });
+    const s1   = t('Ts1','Tkop','10','OPPAKKEN',           { actiepunt:'Agenderen' });
+    const los  = t('Tlos','','','LOD', { actiepunt:'Losse taak' });
+    const ix   = bouwBundelIndex({ ...leeg, VERGADERVERZOEKEN:[kop], 'OFFERTE-TRAJECTEN':[s2],
+                                   OPPAKKEN:[s1], LOD:[los] }, leeg);
+
+    // Volgorde binnen de bundel komt uit bundelVolg, niet uit de deadline-sortering van de lijst.
+    eq('dossier: stappen staan onder hun kop, op bundelvolgorde',
+       groepeerBundels([los, kop, s2, s1], ix).map(x => x.r.taakId + ':' + x.diep),
+       ['Tlos:0','Tkop:0','Ts1:1','Ts2:1']);
+    // Staat de kop NIET in deze lijst (andere VvE, weggelegd, afgerond), dan blijft de stap op
+    // zijn eigen plek staan — hij mag niet stil verdwijnen.
+    eq('dossier: zonder kop in de lijst blijft de stap gewoon staan',
+       groepeerBundels([s1, los], ix).map(x => x.r.taakId + ':' + x.diep), ['Ts1:0','Tlos:0']);
+    // Vangnet: geen enkele rij mag uit de lijst vallen, wat de index ook zegt.
+    eq('dossier: er verdwijnt nooit een rij',
+       groepeerBundels([los, kop, s2, s1], ix).length, 4);
+    eq('dossier: zonder bundels verandert er niets',
+       groepeerBundels([los], ix).map(x => x.r.taakId + ':' + x.diep), ['Tlos:0']);
   })();
 
   (() => {

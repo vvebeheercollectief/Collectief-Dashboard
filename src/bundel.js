@@ -112,6 +112,13 @@ export function zichtbareKop(leden){
 // Eén lid is geen bundel — dan tekenen we gewoon een normale taakrij.
 export function isBundel(leden){ return !!leden && leden.length >= 2; }
 
+// Stand van de bundel: alles behalve de zichtbare kop zelf — dus precies wat in het paneel staat.
+// Zo blijft het getal stabiel terwijl een bundel vordert en de kop doorschuift.
+export function bundelStand(leden, kop){
+  const rest = (leden||[]).filter(m => m !== kop);
+  return { klaar: rest.filter(m => m.af).length, totaal: rest.length };
+}
+
 // De bundel met dít nummer, of null. Een ontbrekende index is geen fout maar een vroege render
 // (de gegevens zijn er nog niet) — dan hoort er simpelweg geen bundel te zijn.
 // Gaat langs `isBundel`, dus ook een bundel die tot één lid gekrompen is levert null: tussen
@@ -169,6 +176,32 @@ export function wordtGeabsorbeerd(r, index, sec){
   const kop = zichtbareKop(leden);
   if (!kop || zelfdeTaak(kop.r, r)) return false;  // geen open lid meer, of zelf de kop → blijft staan
   return kop.r._sec === sec;                       // kop in hetzelfde tabblad → het paneel tekent hem
+}
+
+// Wat is deze rij binnen haar bundel? Eén antwoord voor álle plekken die dat willen tonen: het
+// platte bundelmerkje, de dossierrij, het veld 'Hoort bij' en de melding na het slepen.
+//
+//   null                            → zit in geen bundel (of de bundel is tot één lid gekrompen)
+//   { rol:'kop', klaar, totaal }    → is de zichtbare kop; telling zoals de telpill hem toont
+//   { rol:'sub', kop }              → is een stap; `kop` is de RIJ van de zichtbare kop
+//
+// Bewust géén eigen regels: wie de kop is komt uit `zichtbareKop`, wat een bundel is uit
+// `bundelVan`/`isBundel`, en de telling uit `bundelStand`. Zou deze functie dat zelf afleiden,
+// dan kan het label straks iets anders zeggen dan de stapel eronder laat zien — en dat is een
+// stil verschil, precies het soort fout waar deze hele wijziging op reageert.
+//
+// Voorwaarde aan de aanroeper: GEEN. `r` en `index` hoeven niet uit dezelfde momentopname te
+// komen; de vergelijking loopt daarom via `zelfdeTaak` (taaknummer) en niet via objectidentiteit.
+export function bundelVerwijzing(r, index){
+  const leden = bundelVan(index, r);
+  if (!leden) return null;
+  const kop = zichtbareKop(leden);
+  if (!kop) return null;                       // alles afgerond
+  if (zelfdeTaak(kop.r, r)){
+    const { klaar, totaal } = bundelStand(leden, kop);
+    return { rol:'kop', klaar, totaal };
+  }
+  return { rol:'sub', kop: kop.r };
 }
 
 // De subtaken van een taak: de leden die naar zíjn taaknummer wijzen — open én afgerond.

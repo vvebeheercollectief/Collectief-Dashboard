@@ -18,7 +18,7 @@
 // een eindige of volledige lijst van wat er nú op het scherm staat.
 import { esc, taakTitel, kortDatum, taakActieKnoppen, opvolgStatus, berekenPrioriteit } from "./util.js";
 import { SECS } from "./config.js";
-import { zichtbareKop, bundelVan, wordtGeabsorbeerd, bundelSleutel, zelfdeTaak } from "./bundel.js";
+import { zichtbareKop, bundelVan, wordtGeabsorbeerd, bundelSleutel, zelfdeTaak, bundelStand, bundelVerwijzing } from "./bundel.js";
 import { ico } from "./icons.js";
 import { state } from "./state.js";
 
@@ -62,13 +62,6 @@ const tekst = bundelSleutel;
 export const STAPEL_GREEP =
   `<span class="stapel-h" data-stapel-grip="1" data-action="stapel-greep"`
   + ` title="Sleep om onder een andere taak te hangen" aria-hidden="true">${ico('sleepGreep',14)}</span>`;
-
-// Stand van de bundel: alles behalve de zichtbare kop zelf — dus precies wat in het paneel staat.
-// Zo blijft het getal stabiel terwijl een bundel vordert en de kop doorschuift.
-export function bundelStand(leden, kop){
-  const rest = (leden||[]).filter(m => m !== kop);
-  return { klaar: rest.filter(m => m.af).length, totaal: rest.length };
-}
 
 // Extra's op de kop-rij: chevron vóór de VvE-code en de telpill achter de naam.
 // De chevron is een EIGEN knop met data-action; de klik op de rij zelf is al bezet

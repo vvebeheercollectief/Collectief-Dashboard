@@ -31,8 +31,8 @@ import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from
 import { toggleHerhaalStatus, renderHerhaal, openHerhaalModal, deleteHerhaal } from "./render-herhaal.js";
 import { openSnoozeModal, snoozeOpslaan, closeSnoozeModal } from "./snooze.js";
 import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
-import { bouwBundelIndex, bundelWeergave, zichtbareKop, isBundel, bundelVan, bundelMetId, hernummerLeden, volgendeVolg, magKoppelen, wordtGeabsorbeerd, koppelKandidaten, taakFilter, openSubtaken, bundelWaarschuwing } from "./bundel.js";
-import { bundelStand, bundelPaneelHtml, bundelMerkje, bundelKopExtra, STAPEL_GREEP } from "./render-bundel.js";
+import { bouwBundelIndex, bundelWeergave, zichtbareKop, isBundel, bundelVan, bundelMetId, hernummerLeden, volgendeVolg, magKoppelen, wordtGeabsorbeerd, koppelKandidaten, taakFilter, openSubtaken, bundelWaarschuwing, bundelVerwijzing, bundelStand } from "./bundel.js";
+import { bundelPaneelHtml, bundelMerkje, bundelKopExtra, STAPEL_GREEP } from "./render-bundel.js";
 import { vraagBevestiging, beantwoordBevestiging, _vraagStaatOpen } from "./bevestig.js";
 import { bovensteModal } from "./modal-a11y.js";
 import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkoppelTaak, herordenBundel, sleepDoel, paneelTaaknummers, sleepUitslag, initBundelSlepen } from "./bundel-acties.js";
@@ -4532,6 +4532,50 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     eq('verwijzing: geen enkele sectie valt terug op het meervoudslabel',
        SKEYS.filter(s => s !== 'LOD' && taakVerwijzing({ _sec:s, code:'1', naam:'',
          actiepunt:'x', opmerkingen:'x', status:'x', subsidie:'x' }).startsWith(SECS[s].label + ' ·')), []);
+  })();
+
+  // ── bundelVerwijzing: zit deze rij in een bundel, en als wat? ────────────────────────────
+  // Eén antwoord voor vier weergaveplekken. Bouwt volledig op bundelVan → zichtbareKop →
+  // zelfdeTaak, zodat "wie is de kop" één bron houdt.
+  (() => {
+    const t = (taakId, bundelId, volg, sec, over) => ({ taakId, bundelId, bundelVolg:volg,
+      _sec:sec, code:'381005', naam:'VvE Oudemansstraat', periode:'sept/okt', deadline:'', ...over });
+    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const kop  = t('Tkop','Tkop','0','VERGADERVERZOEKEN');
+    const sub  = t('Tsub','Tkop','10','OFFERTE-TRAJECTEN', { opmerkingen:'Agenderen' });
+    const los  = t('Tlos','','','OPPAKKEN');
+    const ix   = bouwBundelIndex({ ...leeg, VERGADERVERZOEKEN:[kop],
+                                   'OFFERTE-TRAJECTEN':[sub], OPPAKKEN:[los] }, leeg);
+
+    eq('bundelverwijzing: de kop meldt zich als kop, met de telling',
+       bundelVerwijzing(kop, ix), { rol:'kop', klaar:0, totaal:1 });
+    eq('bundelverwijzing: een stap wijst naar de rij van zijn kop',
+       (bundelVerwijzing(sub, ix) || {}).rol, 'sub');
+    eq('bundelverwijzing: … en die kop is de echte rij, niet een kopie',
+       (bundelVerwijzing(sub, ix) || {}).kop.taakId, 'Tkop');
+    eq('bundelverwijzing: een losse taak zit in geen enkele bundel',
+       bundelVerwijzing(los, ix), null);
+    // Eén lid is geen bundel (isBundel eist er twee): een kop die zijn laatste stap kwijt is
+    // HOUDT zijn bundelnummer, en zou anders eeuwig een label blijven dragen.
+    eq('bundelverwijzing: een bundel van één lid telt niet',
+       bundelVerwijzing(kop, bouwBundelIndex({ ...leeg, VERGADERVERZOEKEN:[kop] }, leeg)), null);
+    // Kop afgerond → de kop schuift door. De stap is dan zélf de kop en moet dat ook melden;
+    // dit is de gewone stand ná het eerste vinkje, geen randgeval.
+    const ixDoor = bouwBundelIndex({ ...leeg, 'OFFERTE-TRAJECTEN':[sub] },
+                                   { ...leeg, VERGADERVERZOEKEN:[kop] });
+    eq('bundelverwijzing: is de kop afgerond, dan meldt de doorgeschoven kop zich als kop',
+       bundelVerwijzing(sub, ixDoor), { rol:'kop', klaar:1, totaal:1 });
+    // Alles afgerond → geen zichtbare kop → niets te melden.
+    eq('bundelverwijzing: alles afgerond geeft niets',
+       bundelVerwijzing(sub, bouwBundelIndex(leeg, { ...leeg, VERGADERVERZOEKEN:[kop],
+                                                     'OFFERTE-TRAJECTEN':[sub] })), null);
+    // Momentopname-voorwaarde, zelfde als bij wordtGeabsorbeerd: `r` kan uit een oudere
+    // leesronde komen dan de index. Op objectidentiteit zou zo'n kop zichzelf als 'stap' zien
+    // en naar zichzelf gaan verwijzen.
+    eq('bundelverwijzing: een kop uit een andere momentopname is nog steeds de kop',
+       (bundelVerwijzing({ ...kop }, ix) || {}).rol, 'kop');
+    eq('bundelverwijzing: geen index is geen fout', bundelVerwijzing(kop, null), null);
+    eq('bundelverwijzing: geen rij is geen fout', bundelVerwijzing(null, ix), null);
   })();
 
   (() => {

@@ -4508,6 +4508,27 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     eq('verwijzing: opmaak-sterretjes blijven eruit',
        taakVerwijzing({ _sec:'OPPAKKEN', code:'1', naam:'', actiepunt:'**Bellen** met bestuur' }),
        'Taak · 1 — Bellen met bestuur');
+    // Een offerte-traject zonder opmerkingen valt in `taakTitel` terug op het WOORD
+    // 'Offerte-traject' — niet op het meervoudslabel. Een filter die alleen het label kent laat
+    // die er stil doorheen, en dan staat de soort er twee keer.
+    eq('verwijzing: de offerte-terugval telt óók als dubbele soort',
+       taakVerwijzing({ _sec:'OFFERTE-TRAJECTEN', code:'1', naam:'', opmerkingen:'' }),
+       'Offerte-traject · 1');
+    // …maar de teller erachter is echte informatie en hoort te blijven staan.
+    eq('verwijzing: … en de offerte-teller blijft wel staan',
+       taakVerwijzing({ _sec:'OFFERTE-TRAJECTEN', code:'1', naam:'', opmerkingen:'', offertes:'1/3' }),
+       'Offerte-traject · 1 — 1 van 3 binnen');
+    // Wachtpost: `SOORT_ENKELVOUD` moet élke sectie kennen. Zonder deze toets blijft de suite
+    // groen als er een zesde tabblad bijkomt en niemand aan deze tabel denkt — de regel valt dan
+    // stil terug op het meervoud uit SECS.
+    // LOD is hier bewust uitgezonderd: als afkorting heeft die geen apart meervoud, dus het
+    // ENKELVOUD in SOORT_ENKELVOUD is toevallig letterlijk gelijk aan SECS.LOD.label ('LOD'). Deze
+    // toets kan dan niet meer onderscheiden tussen "correct opgezocht" en "per ongeluk
+    // teruggevallen" — dat gat blijft gedekt doordat 'elke sectie heeft een eigen enkelvoud'
+    // hierboven de waarde voor LOD al letterlijk vastpint.
+    truthy('verwijzing: geen enkele sectie valt terug op het meervoudslabel',
+       SKEYS.filter(s => s !== 'LOD').every(s => !taakVerwijzing({ _sec:s, code:'1', naam:'',
+         actiepunt:'x', opmerkingen:'x', status:'x', subsidie:'x' }).startsWith(SECS[s].label + ' ·')));
   })();
 
   (() => {

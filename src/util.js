@@ -416,12 +416,15 @@ function taakVerwijzing(r, sec){
   sec = sec || r._sec || '';
   const soort = SOORT_ENKELVOUD[sec] || (SECS[sec] && SECS[sec].label) || '';
   const vve = [String(r.code ?? '').trim(), String(r.naam ?? '').trim()].filter(Boolean).join(' ');
-  // `taakTitel` valt bij een taak zónder enige omschrijving terug op het sectielabel. Hier zou
-  // dat de soort een tweede keer neerzetten, in het meervoud: "Vergaderverzoek · 381005 —
-  // Vergaderverzoeken". Die terugval hoort in een verwijzing dus weg te vallen.
+  // `taakTitel` valt bij een taak zónder eigen omschrijving terug op een SOORTNAAM: het
+  // sectielabel in het meervoud ('Vergaderverzoeken'), en bij een offerte-traject letterlijk
+  // 'Offerte-traject' — daar eventueel nog met de X/N-teller erachter. Allebei zetten ze de
+  // soort een tweede keer neer, het meervoud ook nog fout vervoegd. Alleen die kop hoort er
+  // dus af; wat erachter staat is wél informatie.
   const label = (SECS[sec] || {}).label || '';
-  const oms = taakTitel(r, sec);
-  const echteOms = (oms && oms !== label) ? oms : '';
+  const delen = taakTitel(r, sec).split(' — ');
+  if (delen[0] === label || delen[0] === soort) delen.shift();
+  const echteOms = delen.join(' — ');
   // filter(Boolean) op beide niveaus: nooit een losse ' · ' en nooit een losse ' — '.
   return [[soort, vve].filter(Boolean).join(' · '), echteOms].filter(Boolean).join(' — ');
 }

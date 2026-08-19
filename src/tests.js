@@ -6349,22 +6349,28 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         //      De vaste maat 28 × 17 is hier vervallen: dat was de maat van de icoon-only-versie, en
         //      een pil die met zijn tekst meegroeit heeft er geen. De UITLIJNING moet wel vast
         //      blijven, maar niet meer op de plek waar de oude assert hem ving. Nagemeten met de
-        //      `inline-flex` uit styles.css weggehaald: de pil blijft 163,63 × 23,19px en zijn
-        //      middellijn t.o.v. de VvE-naam schuift 0,000px — de tekstregel in de knop reserveert de
-        //      onderlengte nu zelf, dus het oude faalbeeld bestáát niet meer. Wat er wél van schuift
-        //      is het ICOON binnen de knop: dat zakt 2,09px terug naar de basislijn van het label
-        //      (`icoonTop` 5,59 → 3,5). Diezelfde 2,09px komt eruit als alleen `align-items:center`
-        //      sneuvelt. Daarom hieronder een assert op icoon-vs-label; zonder die assert was er na
-        //      het schrappen van de maat-assert niets meer dat de `inline-flex` bewaakte.
+        //      flex-display uit styles.css weggehaald: de pil blijft 163,63 × 23,19px en verschuift
+        //      als geheel niet — de tekstregel in de knop reserveert de onderlengte nu zelf, dus het
+        //      oude faalbeeld bestáát niet meer. Wat er wél van schuift is het ICOON binnen de knop.
+        //      Dit blok is de ENIGE plek waar die maten staan; styles.css verwijst hierheen in
+        //      plaats van ze te herhalen, zodat er bij een font- of dichtheidswijziging niet stil
+        //      een tweede, onware kopie achterblijft. Gemeten, icoon t.o.v. het midden van het
+        //      label: flex-display weg → 1,50px omlaag; `align-items:center` weg (dus `stretch`,
+        //      waarbij de SVG met zijn vaste height=12 niet meerekt maar op flex-start gaat staan
+        //      terwijl de span de volle lijndoos vult) → 3,09px. Allebei ruim boven de 0,5-drempel
+        //      hieronder. Zonder die assert was er na het schrappen van de maat-assert niets meer
+        //      dat de flex-display bewaakte.
+        //      Let op: die hoogte geldt in de STANDAARD dichtheid; de schakelaar `html[data-density=…]`
+        //      maakt er 21,25 (compact) of 27,4 (ruim) van, want de pil erft `--row-fs`/`--row-lh`.
         document.getElementById('s-ntd').value='werk';
         renderNtd();
-        // `:not(.bdl-merk-sub)` want een STAP draagt beide klassen. De fixture heeft kop én stap in
-        // OPPAKKEN en allebei 'werk' in hun tekst, dus er staan hier twee merkjes; een kale
-        // `.bdl-merk` pakt het eerste en dat is alleen toevallig de kop. Toen beide varianten nog
-        // dezelfde 28×17-pil waren maakte dat niets uit, maar de stap staat nu op een eigen regel
-        // ónder de VvE-naam — de middellijn-assert verderop zou dan rood worden om de verkeerde
-        // reden, en de telling in de textContent-assert klopt sowieso alleen voor een kop.
-        const merkEl=document.querySelector('#ntd-tbody .bdl-merk:not(.bdl-merk-sub)');
+        // Op `.bdl-merk-kop` en niet op `.bdl-merk`: de fixture heeft kop én stap in OPPAKKEN met
+        // allebei 'werk' in hun tekst, dus er staan hier twee merkjes en `.bdl-merk` (de gedeelde
+        // klasse, waar de aanraakhalo op mikt) pakt het eerste — dat is alleen toevallig de kop.
+        // Dit stond er eerder als `:not(.bdl-merk-sub)`; sinds elke variant een eigen klasse heeft
+        // is de val weg in plaats van omzeild. De telling in de textContent-assert hieronder klopt
+        // sowieso alleen voor een kop.
+        const merkEl=document.querySelector('#ntd-tbody .bdl-merk-kop');
         const mMeet=merkEl ? merkEl.getBoundingClientRect() : { width:-1, height:-1 };
         const merkT=merkEl && merkEl.querySelector('.bdl-merk-t');
         truthy('stapel-e2e: het bundel-merkje toont zijn tekst en is dus breder dan het kale icoon',
@@ -6375,17 +6381,19 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         truthy('stapel-e2e: en het icoon staat op de middellijn van dat label, niet op zijn basislijn',
                !!merkIco && !!merkT && Math.abs(midY(merkIco)-midY(merkT)) < 0.5);
         // De chevron meet 22 × 18. Het merkje bestaat sinds het label in twee maten, en die moeten
-        // allebei langs de 24px-richtlijn voor een aanraakdoel: de kop-pil is gemeten 163,63 × 23,19
-        // en de stap-regel 240 × 15,39 (die heeft `padding:0` en `font-size:11px`, vandaar het
-        // verschil). Breed genoeg zijn ze allebei ruimschoots sinds ze hun label dragen — het is de
-        // HOOGTE die bij allebei nog onder de richtlijn zit, en dus de halo nodig maakt. De stap
-        // heeft hem het hardst nodig: met de -4px erbij komt hij op 23,39, de kop op 31,19.
-        // Horizontaal kost de -2px niets. De stap is blok-niveau en heeft geen buur op zijn eigen
-        // regel; de kop-pil houdt zijn 6px marge naar de badge ervóór, dus 2px erbij raakt die niet.
-        // Verticaal reikt de -4px van de stap 2px in de VvE-naamregel erboven (zijn `margin-top` is
-        // 2px), maar die `<span class="ct">` draagt geen eigen `data-action`: een klik daar valt door
-        // naar de rij-handler die de tekst uitklapt. De klikbare VvE-code staat in de vórige `<td>`
-        // en blijft buiten bereik. De halo slikt dus niets in wat hij niet al inslikte.
+        // allebei langs de 24px-richtlijn voor een aanraakdoel: de kop-pil in de maat hierboven, en
+        // de stap-regel 240 × 15,39 (die zet een eigen, kleinere font-size en heeft geen padding,
+        // vandaar het verschil). Breed genoeg zijn ze allebei ruimschoots sinds ze hun label dragen
+        // — het is de HOOGTE die bij allebei nog onder de richtlijn zit, en dus de halo nodig maakt.
+        // De stap heeft hem het hardst nodig: met de -4px erbij komt hij op ruim 23px, de kop op
+        // ruim 31. Horizontaal kost de -2px niets: allebei de varianten staan sinds §4.1 op een
+        // eigen regel onder de VvE-naam en hebben daar geen buur naast zich.
+        // Verticaal reikt de -4px 2px in de regel erboven (de marge tussen de twee is 2px), en dat
+        // is niet gratis: die strook gaat af van het uitklappen van de rij. Onschadelijk, want de
+        // `<span class="ct">` daar draagt geen eigen `data-action` — een klik valt door naar de
+        // rij-handler, en dat uitklappen kan overal elders op de rij ook. De klikbare VvE-code staat
+        // in de vórige `<td>` en blijft buiten bereik. Prijs en baat zijn hier dus 2px rij-uitklap
+        // tegen een merkje dat op een telefoon aan te wijzen is.
         // Waarom het de moeite waard blijft: op een telefoon is de chevron de enige manier om een
         // bundel open en dicht te klappen en het merkje volgens §4.2 'de enige weg terug' naar de
         // gestapelde weergave; misklikken landt op de VvE-code, en die opent het VvE-dossier.
@@ -6416,9 +6424,35 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         // toets hierboven stil altijd rood — of, na een 'reparatie', stil altijd groen — staan.
         truthy('stapel-e2e: de stylesheet-opzoeker las een niet-leeg coarse-blok',
                coarseRegels.includes('.cb::before'));
+        // Hier stond 'staat op dezelfde middellijn als de VvE-naam ernaast'. Die assert beschreef de
+        // stand waarin de kop-pil NAAST de naam stond, en juist die is bewust weg: naast de naam
+        // telde zijn breedte op bij de al op 160px geklemde naam en werd de VvE-kolom 165px breder
+        // (§4.1 wil hem op een eigen regel; de meting staat bij `.bdl-merk-kop` in styles.css).
+        // De twee asserts eronder nemen het over: de plaatsing, en het gevolg dat ertoe doet.
         const merkNaam=merkEl && merkEl.closest('td') && merkEl.closest('td').querySelector('.ct');
-        truthy('stapel-e2e: en staat op dezelfde middellijn als de VvE-naam ernaast',
-               !!merkNaam && Math.abs(midY(merkEl)-midY(merkNaam)) < 0.5);
+        const _naamB=merkNaam && merkNaam.getBoundingClientRect();
+        const _pilB=merkEl && merkEl.getBoundingClientRect();
+        truthy('stapel-e2e: en staat op een eigen regel ónder de VvE-naam, niet ernaast',
+               !!merkNaam && _pilB.top >= _naamB.bottom - 0.5);
+        // Het gevolg, en de eigenlijke garantie: de pil mag niet OPTELLEN bij de naam. Op een eigen
+        // regel vraagt de cel de BREEDSTE van de twee; ernaast vraagt hij de SOM, en dat is precies
+        // de 165px waarmee de VvE-kolom groeide.
+        // Gemeten wordt de omhullende van naam + pil, en nadrukkelijk NIET de breedte van de <td>.
+        // Die laatste is hier onbruikbaar: `table-layout:auto` deelt overgebleven ruimte uit over de
+        // kolommen, dus in deze fixture meet de cel 293px terwijl hij er maar 184 nodig heeft — en
+        // dan staat er hetzelfde getal of de pil nu naast of onder de naam hangt. Een assert daarop
+        // was stil altijd groen geweest (nagemeten: 293 in beide standen). De omhullende van de twee
+        // kinderen kent die speling niet en is dus wél gevoelig: gemeten 164px op een eigen regel
+        // tegen 209 ernaast bij een korte VvE-naam, en 164 tegen 324 bij een naam die de 160px-klem
+        // van `.cell-name>.ct` vult — de stand die op productie de regel is, niet de uitzondering.
+        // De gemeten waarden staan in de melding, zodat een FAIL meteen leesbaar is in plaats van
+        // 'verwacht waar, kreeg false'.
+        const _unie=(_naamB && _pilB)
+          ? Math.max(_naamB.right,_pilB.right) - Math.min(_naamB.left,_pilB.left) : -1;
+        const _breedste=(_naamB && _pilB) ? Math.max(_naamB.width,_pilB.width) : 0;
+        truthy(`stapel-e2e: en de VvE-kolom groeit er niet van (naam+pil beslaan ${Math.round(_unie)}px, `
+               + `de breedste van de twee is ${Math.round(_breedste)})`,
+               _unie > 0 && _unie <= _breedste + 1);
         document.getElementById('s-ntd').value='';
 
         // Terug naar twee losse rijen; alles hieronder begint bij die beginstand.

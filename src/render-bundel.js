@@ -204,8 +204,15 @@ export function bundelMerkje(r, bw, sec){
     ? `Bundel · ${verw.klaar} van ${verw.totaal} klaar`
     : `stap in: ${taakVerwijzing(verw.kopRij)}`;
   const titel = `${label} — klik om de bundel te openen`;
-  // Een stap krijgt een eigen klasse: zijn regel is lang en hoort onder de VvE-naam te vallen,
-  // terwijl de telling van een kop kort is en ernaast past.
-  const cls = verw.rol === 'kop' ? 'bdl-merk' : 'bdl-merk bdl-merk-sub';
+  // Elke variant zijn eigen klasse, met `bdl-merk` als gedeelde noemer. Die noemer draagt alleen
+  // wat écht van allebei is — de aanraakhalo mikt erop; het uiterlijk staat in de varianten. Eerder
+  // was de kop 'bdl-merk' kaal en overschreef de stap zes van de tien declaraties daarvan; dat las
+  // als "een pil die geen pil is" en dwong de tests tot een `:not(.bdl-merk-sub)`-selector.
+  // Beide varianten staan op een EIGEN REGEL onder de VvE-naam (§4.1) — ook de kop, die eerst naast
+  // de naam stond. Naast de naam telde zijn breedte op bij de al op 160px geklemde naam en werd de
+  // VvE-kolom 165px breder; zie de meting bij `.bdl-merk-kop` in styles.css.
+  // Wat wél verschilt is het uiterlijk, en dat hoort ook te verschillen: een kop springt eruit
+  // (accentpil: dit ís een bundel), een stap is gedempt (dit hoort ergens bij).
+  const cls = verw.rol === 'kop' ? 'bdl-merk bdl-merk-kop' : 'bdl-merk bdl-merk-sub';
   return `<button type="button" class="${cls}" data-action="bundel-spring" data-bundel="${esc(tekst(r.bundelId))}" title="${esc(titel)}" aria-label="${esc(titel)}">${ico('bundel',12)}<span class="bdl-merk-t">${esc(label)}</span></button>`;
 }

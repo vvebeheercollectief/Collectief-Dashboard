@@ -1362,35 +1362,45 @@ body.bulk #chat-fab{display:none}
 .bdl-addb{font-size:12px;color:var(--mut);border:1px solid var(--bor);border-radius:6px;
   padding:4px 10px;background:none;cursor:pointer}
 .bdl-addb:hover{background:var(--sur)}
-/* De pil om het bundel-icoon en zijn label. `inline-flex` + `align-items:center` zetten het icoon
-   en de tekst op één middellijn. Wat die twee doen is MET het label veranderd, en dat is bij het
-   lezen van oudere commits de valkuil: toen droeg de knop alleen een SVG van 12px en bepaalde de
-   `inline-flex` de HOOGTE — zonder haar ging de SVG als inline replaced element op de basislijn
-   staan met een strook onderlengte eronder, en werd de pil 23,2px hoog in plaats van 17 (28 × 17,39,
-   dezelfde maat als met de ⛓-glyph ervóór: een icoon van 12px plus 2×2,5px en 2×8px).
-   Dat kan niet meer gebeuren: de tekstregel in de knop reserveert die onderlengte zelf al. Gemeten
-   is de kop-pil in beide standen 163,63 × 23,19px, en die 23,19 is nu de JUISTE hoogte — 13px × 1,4
-   regelhoogte + 2 × 2,5px padding. Wie dat getal in een oud commentaar als alarmsignaal tegenkomt:
-   dat gold voor de icoon-only-versie, niet meer voor deze.
-   Wat de `inline-flex` wél nog draagt, is de uitlijning BINNEN de knop: haal haar (of de
-   `align-items:center`) weg en het icoon zakt 2,09px t.o.v. het midden van de pil terug naar de
-   basislijn van het label. Dat is de garantie, en daar staat in tests.js dan ook een assert op —
-   niet meer op de hoogte, want die verandert er niet meer van.
-   `font-size` staat er bewust niet bij: `button{font:inherit}` bovenaan dit bestand laat het
-   kop-label de 13px/1,4 én de `font-weight:600` van `.cell-name` erven, en zo hoort het ook — het
-   label staat pal achter die naam. De stap-variant hieronder zet er wél een eigen, kleinere maat op.
-   `vertical-align:middle` omdat de pil in de naamcel tússen tekst staat; gemeten staat hij daarmee
-   op precies dezelfde middellijn als de VvE-naam ernaast.
-   `position:relative` is het anker voor de aanraakhalo in het @media(pointer:coarse)-blok
-   hierboven — zonder hem landt dat raakvlak bij een willekeurige voorouder in plaats van om deze
-   pil heen. Zelfde constructie als bij `.bdl-chev`, `.bdl-h` en `.stapel-h`. */
-.bdl-merk{background:var(--sec-l,var(--ac-l));color:var(--sec,var(--ac));
-  display:inline-flex;align-items:center;vertical-align:middle;position:relative;
-  padding:2.5px 8px;border-radius:20px;cursor:pointer;border:0;margin-left:6px}
-/* De tekst in het merkje. Kort bij een kop ("Bundel · 0 van 1 klaar"), lang bij een stap — daar
-   valt hij daarom op een eigen regel onder de VvE-naam en wordt hij afgekapt. De volledige zin
-   blijft in de `title` en de `aria-label` staan. */
+/* Gedeeld door de twee varianten van het merkje — en met opzet niet méér dan dat. De kop-pil en de
+   stap-regel zetten allebei hun eigen display, kleur, marge en maat, dus alles wat hier verder zou
+   staan moest één van de twee toch weer overschrijven. Zo'n half overschreven basisregel las als
+   "een pil die geen pil is", maakte `vertical-align` inert en dwong tests.js tot een
+   `:not(.bdl-merk-sub)`-selector om de twee uit elkaar te houden.
+   Dat de twee tóch een klasse delen is geen restant: op DEZE klasse mikt de aanraakhalo
+   `.bdl-merk::after` in het @media(pointer:coarse)-blok hierboven, en die geldt voor allebei. Ruim
+   hem dus niet op omdat er "bijna niets" meer in staat — dan valt de halo van beide varianten af.
+   `position:relative` is het anker voor die halo; zonder hem landt het raakvlak bij een
+   willekeurige voorouder in plaats van om de knop heen. Zelfde constructie als bij `.bdl-chev`,
+   `.bdl-h` en `.stapel-h`.
+   `align-items:center` werkt voor allebei, want ze zetten allebei een flex-display. Het zet het
+   icoon op de middellijn van het label in plaats van op zijn basislijn, en dat is meetbaar: haal
+   deze regel of de flex-display weg en het icoon verschuift zichtbaar. De getallen staan bij de
+   assert die ze bewaakt — zie 'het icoon staat op de middellijn van dat label' in tests.js. */
+.bdl-merk{position:relative;align-items:center;cursor:pointer;border:0}
+/* De tekst in het merkje. Kort bij een kop ("Bundel · 0 van 1 klaar"), lang bij een stap — die
+   wordt afgekapt. De volledige zin blijft in de `title` en de `aria-label` staan. */
 .bdl-merk-t{margin-left:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* De kop: een accentpil, want dit ÍS een bundel en dat mag opvallen.
+   `display:flex` zet hem op een EIGEN REGEL onder de VvE-naam (§4.1), en dat is geen cosmetiek.
+   Op dezelfde regel als de naam was hij een harde ondergrens voor de kolom: `.cell-name>.ct` is al
+   op 160px geklemd, en de pil draagt `white-space:nowrap` zonder max-width, dus die twee telden bij
+   elkaar op. Gemeten in de platte lijst (zoekterm, één bundel, een VvE-naam die de 160px vult):
+   VvE-kolom 350px en tabel 1300px, tegen 180 en 1130 met helemaal geen merkje. Op een eigen regel
+   wordt het max(naam, pil) in plaats van de som: 184 en 1134, vier pixels boven de stand van vóór
+   dit label. Juist in de gefilterde lijst — de enige stand waarin dit merkje bestáát — deed die
+   165px het meeste pijn. Er staat een assert op; zie 'de VvE-kolom groeit er niet van' in tests.js.
+   Krimpen om de tekst heen hoeft niet apart geregeld: een <button> is shrink-to-fit, ook met
+   `display:flex`. Nagemeten in een cel van 254px blijft de pil op zijn eigen tekstbreedte staan,
+   dus hij wordt geen accentkleurige balk over de hele cel. Wie hier ooit een <span> of <div> van
+   maakt, moet er `width:fit-content` bij zetten.
+   `font-size` staat er bewust niet bij: `button{font:inherit}` bovenaan dit bestand laat het label
+   de regelmaat van de tabel erven — de 13px/1,4 komt van `td` en de `font-weight:600` van
+   `.cell-name`. Zo blijft de pil meelopen met de dichtheidsschakelaar
+   (`html[data-density=...]`), die `--row-fs`/`--row-lh` verzet. De stap-variant hieronder zet er
+   wél een eigen, kleinere maat op. */
+.bdl-merk-kop{display:flex;margin:2px 0 0;padding:2.5px 8px;border-radius:20px;
+  background:var(--sec-l,var(--ac-l));color:var(--sec,var(--ac))}
 /* Een stap: geen pil maar een gedempte regel, zodat de VvE-naam de rij blijft dragen.
    `display:flex` maakt de knop blok-niveau en dus een eigen regel — nodig, want `.cell-name` staat
    op `white-space:nowrap`. De `max-width` samen met de ellipsis hierboven houdt hem in de kolom.
@@ -1398,13 +1408,13 @@ body.bulk #chat-fab{display:none}
    heeft een automatische kolomindeling, en dan rekent de browser eerst uit hoe breed de cel van
    nature wil zijn — een percentage van een breedte die hij nog niet weet telt daarbij als 'geen
    grens'. Gemeten liep de VvE-kolom daardoor van 182 naar 527px en moest de hele tabel horizontaal
-   schuiven (993 → 1331px), terwijl de regel zelf niet eens werd afgekapt.
+   schuiven (993 -> 1331px), terwijl de regel zelf niet eens werd afgekapt.
    240px is niet willekeurig: de telpill van een kop-rij rekt diezelfde kolom in de gestapelde
    weergave al tot 269px op, dus tot die maat kost deze regel niets extra's. Er past ongeveer
    'stap in: Vergaderverzoek · 381005 VvE Oudema…' in — de soort en de VvE-code, precies wat er
    ontbrak toen hier alleen een icoontje met de kale omschrijving van de hoofdtaak stond. De rest
    blijft in de `title` en de `aria-label`. */
-.bdl-merk-sub{display:flex;max-width:240px;margin:2px 0 0;padding:0;
+.bdl-merk-sub{display:flex;max-width:240px;margin:2px 0 0;
   background:none;color:var(--mut);font-size:11px;border-radius:4px}
 .bdl-merk-sub:hover{color:var(--txt)}
 /* Uitgeklapt hoort de verwijzing er hélemaal te staan. Een klik op de rij haalt bij `.ct` de
@@ -1416,7 +1426,7 @@ body.bulk #chat-fab{display:none}
    staan, dan groeit de knop wel maar blijft de tekst één onafgebroken regel en kapt hij nog steeds
    af. `display:flex` blijft, zodat de knop een eigen regel houdt; de tekst wikkelt er nu binnenin. */
 tr.expanded .bdl-merk-sub{max-width:none}
-tr.expanded .bdl-merk-t{white-space:normal;overflow:visible;text-overflow:clip}
+tr.expanded .bdl-merk-sub .bdl-merk-t{white-space:normal;overflow:visible;text-overflow:clip}
 /* Rij op rij slepen om te stapelen: de opgepakte rij dimt, de rij eronder licht op als doel.
    De terugval --sec → --ac is dezelfde als bij de rest van de bundel-opmaak: --sec/--sec-l worden
    per sectie op de NTD-kaart gezet, maar op de VvE-dossierpagina bestaan ze niet.

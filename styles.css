@@ -1355,13 +1355,23 @@ body.bulk #chat-fab{display:none}
 .bdl-addb{font-size:12px;color:var(--mut);border:1px solid var(--bor);border-radius:6px;
   padding:4px 10px;background:none;cursor:pointer}
 .bdl-addb:hover{background:var(--sur)}
-/* De pil om het bundel-icoon. `inline-flex` + `align-items:center` in plaats van een tekstregel:
-   de knop heeft geen tekst meer, dus er is ook geen tekstregel meer om het icoon in te zetten.
-   Zonder die twee blijft de SVG een inline replaced element dat op de basislijn gaat staan, en
-   staat er een strook onderlengte onder — gemeten wordt de pil dan 23,2px hoog in plaats van 17.
-   Die 17 is de maat die hij met de ⛓-glyph ook had (gemeten 28 × 17,39): een icoon van 12px plus
-   2×2,5px en 2×8px. `font-size` staat er niet meer bij — er is geen tekst die hij nog zou schalen,
-   en een SVG met vaste width/height trekt zich er niets van aan.
+/* De pil om het bundel-icoon en zijn label. `inline-flex` + `align-items:center` zetten het icoon
+   en de tekst op één middellijn. Wat die twee doen is MET het label veranderd, en dat is bij het
+   lezen van oudere commits de valkuil: toen droeg de knop alleen een SVG van 12px en bepaalde de
+   `inline-flex` de HOOGTE — zonder haar ging de SVG als inline replaced element op de basislijn
+   staan met een strook onderlengte eronder, en werd de pil 23,2px hoog in plaats van 17 (28 × 17,39,
+   dezelfde maat als met de ⛓-glyph ervóór: een icoon van 12px plus 2×2,5px en 2×8px).
+   Dat kan niet meer gebeuren: de tekstregel in de knop reserveert die onderlengte zelf al. Gemeten
+   is de kop-pil in beide standen 163,63 × 23,19px, en die 23,19 is nu de JUISTE hoogte — 13px × 1,4
+   regelhoogte + 2 × 2,5px padding. Wie dat getal in een oud commentaar als alarmsignaal tegenkomt:
+   dat gold voor de icoon-only-versie, niet meer voor deze.
+   Wat de `inline-flex` wél nog draagt, is de uitlijning BINNEN de knop: haal haar (of de
+   `align-items:center`) weg en het icoon zakt 2,09px t.o.v. het midden van de pil terug naar de
+   basislijn van het label. Dat is de garantie, en daar staat in tests.js dan ook een assert op —
+   niet meer op de hoogte, want die verandert er niet meer van.
+   `font-size` staat er bewust niet bij: `button{font:inherit}` bovenaan dit bestand laat het
+   kop-label de 13px/1,4 én de `font-weight:600` van `.cell-name` erven, en zo hoort het ook — het
+   label staat pal achter die naam. De stap-variant hieronder zet er wél een eigen, kleinere maat op.
    `vertical-align:middle` omdat de pil in de naamcel tússen tekst staat; gemeten staat hij daarmee
    op precies dezelfde middellijn als de VvE-naam ernaast.
    `position:relative` is het anker voor de aanraakhalo in het @media(pointer:coarse)-blok
@@ -1390,6 +1400,16 @@ body.bulk #chat-fab{display:none}
 .bdl-merk-sub{display:flex;max-width:240px;margin:2px 0 0;padding:0;
   background:none;color:var(--mut);font-size:11px;border-radius:4px}
 .bdl-merk-sub:hover{color:var(--txt)}
+/* Uitgeklapt hoort de verwijzing er hélemaal te staan. Een klik op de rij haalt bij `.ct` de
+   afkapping eraf (zie `tr.expanded .cell-name>.ct` bovenaan dit bestand) en de verwijzing hoort bij
+   dat groepje: wie uitklapt doet dat juist om de volledige tekst te lezen, en dan was dit de enige
+   cel in de rij die op `…` bleef staan.
+   Alle drie de remmen moeten los, anders verandert er zichtbaar niets. De `max-width` op de knop —
+   die knijpt hem op 240px. En de `nowrap` plus de ellipsis op de span erin — laat je de `nowrap`
+   staan, dan groeit de knop wel maar blijft de tekst één onafgebroken regel en kapt hij nog steeds
+   af. `display:flex` blijft, zodat de knop een eigen regel houdt; de tekst wikkelt er nu binnenin. */
+tr.expanded .bdl-merk-sub{max-width:none}
+tr.expanded .bdl-merk-t{white-space:normal;overflow:visible;text-overflow:clip}
 /* Rij op rij slepen om te stapelen: de opgepakte rij dimt, de rij eronder licht op als doel.
    De terugval --sec → --ac is dezelfde als bij de rest van de bundel-opmaak: --sec/--sec-l worden
    per sectie op de NTD-kaart gezet, maar op de VvE-dossierpagina bestaan ze niet.

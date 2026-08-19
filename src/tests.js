@@ -4886,9 +4886,15 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     eq('iconen: paneel-handvat, rij-handvat en merkje zijn alle drie een SVG',
        [openRegel, STAPEL_GREEP, merkHtml].map(s => s.includes('<svg')), [true, true, true]);
     // Het merkje is een échte knop en het icoon erin draagt `aria-hidden="true"` (zo levert `ico()`
-    // ze). Er is dus geen tekst meer over waar een schermlezer een naam uit kan halen: zonder de
-    // aria-label op de KNOP zou dit een naamloze knop worden. De twee handvatten is dat juist wél
-    // de bedoeling — zie de toelichting bij STAPEL_GREEP — dus die staan hier niet bij.
+    // ze). Vroeger was dát de hele reden voor de `aria-label`: de knop had verder niets, dus zonder
+    // label was hij naamloos. Sinds het merkje een leesbaar label draagt is die reden vervallen —
+    // er staat tekst in de knop en dus is er hoe dan ook een naam. De `aria-label` blijft om een
+    // andere reden staan, en die is bewust: de zichtbare tekst wordt AFGEKAPT en zegt niet wat
+    // klikken doet, terwijl het label de hele verwijzing plus 'klik om de bundel te openen' geeft.
+    // Het begint met exact de zichtbare tekst, zodat de naam die tekst blijft bevatten (WCAG 2.5.3).
+    // Zie de volledige afweging bij `bundelMerkje` in render-bundel.js; deze assert bewaakt alleen
+    // dát er een naam staat. Bij de twee handvatten is naamloos juist wél de bedoeling — zie de
+    // toelichting bij STAPEL_GREEP — dus die staan hier niet bij.
     eq('iconen: het merkje houdt zijn toegankelijke naam', /aria-label="[^"]+"/.test(merkHtml), true);
     eq('iconen: en het icoon erin telt daar niet in mee',
        /<svg[^>]*aria-hidden="true"/.test(merkHtml), true);
@@ -6312,26 +6318,48 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         //      HTML-string groen blijft. Vandaar de breedte van de SPAN erbij, en niet alleen die van
         //      de knop.
         //      De vaste maat 28 × 17 is hier vervallen: dat was de maat van de icoon-only-versie, en
-        //      een pil die met zijn tekst meegroeit heeft er geen. Wat wél vast moet blijven is de
-        //      UITLIJNING — zonder de `inline-flex` uit styles.css blijft de SVG een inline-doos op de
-        //      basislijn en hangt de pil scheef in de rij. Dat vangt de middellijn-assert hieronder,
-        //      die dus het halve werk van de oude maat-assert overneemt.
+        //      een pil die met zijn tekst meegroeit heeft er geen. De UITLIJNING moet wel vast
+        //      blijven, maar niet meer op de plek waar de oude assert hem ving. Nagemeten met de
+        //      `inline-flex` uit styles.css weggehaald: de pil blijft 163,63 × 23,19px en zijn
+        //      middellijn t.o.v. de VvE-naam schuift 0,000px — de tekstregel in de knop reserveert de
+        //      onderlengte nu zelf, dus het oude faalbeeld bestáát niet meer. Wat er wél van schuift
+        //      is het ICOON binnen de knop: dat zakt 2,09px terug naar de basislijn van het label
+        //      (`icoonTop` 5,59 → 3,5). Diezelfde 2,09px komt eruit als alleen `align-items:center`
+        //      sneuvelt. Daarom hieronder een assert op icoon-vs-label; zonder die assert was er na
+        //      het schrappen van de maat-assert niets meer dat de `inline-flex` bewaakte.
         document.getElementById('s-ntd').value='werk';
         renderNtd();
-        const merkEl=document.querySelector('#ntd-tbody .bdl-merk');
+        // `:not(.bdl-merk-sub)` want een STAP draagt beide klassen. De fixture heeft kop én stap in
+        // OPPAKKEN en allebei 'werk' in hun tekst, dus er staan hier twee merkjes; een kale
+        // `.bdl-merk` pakt het eerste en dat is alleen toevallig de kop. Toen beide varianten nog
+        // dezelfde 28×17-pil waren maakte dat niets uit, maar de stap staat nu op een eigen regel
+        // ónder de VvE-naam — de middellijn-assert verderop zou dan rood worden om de verkeerde
+        // reden, en de telling in de textContent-assert klopt sowieso alleen voor een kop.
+        const merkEl=document.querySelector('#ntd-tbody .bdl-merk:not(.bdl-merk-sub)');
         const mMeet=merkEl ? merkEl.getBoundingClientRect() : { width:-1, height:-1 };
         const merkT=merkEl && merkEl.querySelector('.bdl-merk-t');
         truthy('stapel-e2e: het bundel-merkje toont zijn tekst en is dus breder dan het kale icoon',
                !!merkT && merkT.getBoundingClientRect().width > 0 && mMeet.width > 28);
         eq('stapel-e2e: en die tekst is de telling van de bundel',
            merkT && merkT.textContent, 'Bundel · 0 van 1 klaar');
-        // De chevron meet 22 × 18 en het merkje is 23px hoog: allebei onder de 24px-richtlijn voor
-        // een aanraakdoel, terwijl de twee sleep-handvatten in hetzelfde blok daar wél een halo voor
-        // kregen en de actieknoppen ernaast onder pointer:coarse naar 36 × 36 groeien. Breed genoeg
-        // is het merkje sinds het zijn label draagt; het is de HOOGTE die de halo nog nodig maakt. Op
-        // een telefoon is de chevron de enige manier om een bundel open en dicht te klappen en het
-        // merkje volgens §4.2 'de enige weg terug' naar de gestapelde weergave; misklikken landt op
-        // de VvE-code, en die opent het VvE-dossier.
+        const merkIco=merkEl && merkEl.querySelector('svg');
+        truthy('stapel-e2e: en het icoon staat op de middellijn van dat label, niet op zijn basislijn',
+               !!merkIco && !!merkT && Math.abs(midY(merkIco)-midY(merkT)) < 0.5);
+        // De chevron meet 22 × 18. Het merkje bestaat sinds het label in twee maten, en die moeten
+        // allebei langs de 24px-richtlijn voor een aanraakdoel: de kop-pil is gemeten 163,63 × 23,19
+        // en de stap-regel 240 × 15,39 (die heeft `padding:0` en `font-size:11px`, vandaar het
+        // verschil). Breed genoeg zijn ze allebei ruimschoots sinds ze hun label dragen — het is de
+        // HOOGTE die bij allebei nog onder de richtlijn zit, en dus de halo nodig maakt. De stap
+        // heeft hem het hardst nodig: met de -4px erbij komt hij op 23,39, de kop op 31,19.
+        // Horizontaal kost de -2px niets. De stap is blok-niveau en heeft geen buur op zijn eigen
+        // regel; de kop-pil houdt zijn 6px marge naar de badge ervóór, dus 2px erbij raakt die niet.
+        // Verticaal reikt de -4px van de stap 2px in de VvE-naamregel erboven (zijn `margin-top` is
+        // 2px), maar die `<span class="ct">` draagt geen eigen `data-action`: een klik daar valt door
+        // naar de rij-handler die de tekst uitklapt. De klikbare VvE-code staat in de vórige `<td>`
+        // en blijft buiten bereik. De halo slikt dus niets in wat hij niet al inslikte.
+        // Waarom het de moeite waard blijft: op een telefoon is de chevron de enige manier om een
+        // bundel open en dicht te klappen en het merkje volgens §4.2 'de enige weg terug' naar de
+        // gestapelde weergave; misklikken landt op de VvE-code, en die opent het VvE-dossier.
         // De halo zelf staat in een @media(pointer:coarse)-blok en is op een muis-testronde dus niet
         // te méten. Daarom twee toetsen die er wél bij kunnen: de gerenderde `position:relative` —
         // zonder dat anker landt het raakvlak bij een willekeurige voorouder in plaats van om de

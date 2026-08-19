@@ -4526,9 +4526,12 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     // toets kan dan niet meer onderscheiden tussen "correct opgezocht" en "per ongeluk
     // teruggevallen" — dat gat blijft gedekt doordat 'elke sectie heeft een eigen enkelvoud'
     // hierboven de waarde voor LOD al letterlijk vastpint.
-    truthy('verwijzing: geen enkele sectie valt terug op het meervoudslabel',
-       SKEYS.filter(s => s !== 'LOD').every(s => !taakVerwijzing({ _sec:s, code:'1', naam:'',
-         actiepunt:'x', opmerkingen:'x', status:'x', subsidie:'x' }).startsWith(SECS[s].label + ' ·')));
+    // `eq` op de lijst overtreders en niet `truthy` op een `every`: een FAIL noemt dan de vergeten
+    // sectie bij naam in plaats van alleen "verwacht waar, kreeg false". Wie hier ooit tegenaan
+    // loopt, leest de oorzaak meteen af en hoeft niet vijf tabbladen na te lopen.
+    eq('verwijzing: geen enkele sectie valt terug op het meervoudslabel',
+       SKEYS.filter(s => s !== 'LOD' && taakVerwijzing({ _sec:s, code:'1', naam:'',
+         actiepunt:'x', opmerkingen:'x', status:'x', subsidie:'x' }).startsWith(SECS[s].label + ' ·')), []);
   })();
 
   (() => {

@@ -24,7 +24,7 @@ import { initActions } from './actions.js';
 import { initVveZoekveld } from './vve-zoekveld.js';
 import { bouwBundelIndex, koppelKandidaten, taakFilter } from './bundel.js';
 import { initBundelSlepen, initStapelSlepen } from './bundel-acties.js';
-import { esc, taakTitel } from './util.js';
+import { esc, taakTitel, taakVerwijzing } from './util.js';
 import { closeSnoozeModal, snoozeOpslaan, snoozeWis } from './snooze.js';
 import { closeResetModal } from './alv-reset.js';
 import { renderHerhaal, openHerhaalModal, closeHerhaalModal, syncHerhaalVelden, submitHerhaal } from './render-herhaal.js';
@@ -302,7 +302,7 @@ document.addEventListener('DOMContentLoaded',()=>{
       + `<div class="vve-sug-naam">${esc(r.code)}${r.naam ? ' — ' + esc(r.naam) : ''}</div></div>`).join(''),
     onSelect: (taak) => {
       state._hbDoel = taak;              // het rij-OBJECT: een koppeling wijst één rij aan
-      hbVeld.value = taakTitel(taak);
+      hbVeld.value = taakVerwijzing(taak);
       document.getElementById('m-hoortbij-x').style.display = '';
     },
   });
@@ -310,7 +310,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   // opslaan alsnog aan de taak die er even stond (zelfde valkuil als bij de VvE-koppeling van de
   // AI-hulp hierboven).
   hbVeld.addEventListener('input', () => {
-    if (!state._hbDoel || hbVeld.value === taakTitel(state._hbDoel)) return;
+    if (!state._hbDoel || hbVeld.value === taakVerwijzing(state._hbDoel)) return;
     state._hbDoel = null;
     // Het kruisje mag alleen blijven staan als er nog een échte koppeling onder ligt om te wissen.
     if (!String((state.editRowData || {}).bundelId || '').trim())

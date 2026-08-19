@@ -6844,8 +6844,25 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       let { kop, sub } = opnieuw();
       sub.bundelId='Tkop'; sub.bundelVolg='10'; kop.bundelId='Tkop'; kop.bundelVolg='0';
       openModal(true, sub);
-      eq('hoortbij: een subtaak toont de hoofdtaak van zijn bundel', veld.value, taakTitel(kop));
+      // Het veld toont de VOLLEDIGE verwijzing, niet alleen de omschrijving. Er stond eerst
+      // letterlijk 'sept/okt': de gebruiker kon daaraan niet zien om welke taak van welke VvE het
+      // ging, terwijl `magKoppelen` koppelen over VvE's heen toestaat.
+      eq('hoortbij: een subtaak toont de hoofdtaak van zijn bundel', veld.value, taakVerwijzing(kop));
+      eq('hoortbij: … met soort, VvE-code en VvE-naam erin', veld.value,
+         'Taak · 311212 Testflat — Kop-werk');
+      // Een letterlijke tegenproef: de oude, kale titel is nadrukkelijk niet meer wat er staat.
+      truthy('hoortbij: … en dus niet alleen de kale omschrijving', veld.value !== taakTitel(kop));
       truthy('hoortbij: en biedt een kruisje om te ontkoppelen', wisKnop.style.display!=='none');
+      // De 'overtypen = keuze los'-luisteraar vergelijkt de veldwaarde met de gekozen taak. Blijft
+      // die op `taakTitel` staan terwijl het veld een `taakVerwijzing` toont, dan wijken ze per
+      // definitie af en gooit élke toetsaanslag — ook een pijltje — de net gemaakte keuze weg.
+      state._hbDoel = kop;
+      veld.value = taakVerwijzing(kop);
+      veld.dispatchEvent(new Event('input'));
+      truthy('hoortbij: een ongewijzigd veld laat de gekozen taak staan', state._hbDoel === kop);
+      veld.value = taakVerwijzing(kop) + 'x';
+      veld.dispatchEvent(new Event('input'));
+      eq('hoortbij: overtypen gooit de keuze wél los', state._hbDoel, null);
       openModal(true, kop);
       eq('hoortbij: de hoofdtaak zelf staat leeg en op slot', [veld.value, veld.disabled], ['', true]);
       eq('hoortbij: en heeft niets te ontkoppelen', wisKnop.style.display, 'none');
@@ -6870,7 +6887,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       eq('hoortbij: de kiezer stelt taken voor, en de taak zelf staat er niet bij', items.length, 1);
       if(items[0]) items[0].dispatchEvent(new MouseEvent('click', { bubbles:true }));
       truthy('hoortbij: de klik onthoudt de taak zélf, niet alleen zijn code', state._hbDoel===kop);
-      eq('hoortbij: en zet de titel in het veld', veld.value, taakTitel(kop));
+      eq('hoortbij: en zet de volledige verwijzing in het veld', veld.value, taakVerwijzing(kop));
       // Leegmaken moet de keuze meenemen. Zonder dat koppelt een leeggemaakt veld bij het opslaan
       // alsnog aan de taak die er even stond.
       veld.value='';
@@ -6908,9 +6925,9 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
              !sugLijst.querySelector('[tabindex]'));
       toets('Enter');
       truthy('hoortbij: Enter kiest de aangewezen taak — zonder één muisklik', state._hbDoel===kop);
-      eq('hoortbij: … zet de titel in het veld en sluit de lijst',
+      eq('hoortbij: … zet de volledige verwijzing in het veld en sluit de lijst',
          [veld.value, sugLijst.style.display, veld.getAttribute('aria-expanded')],
-         [taakTitel(kop), 'none', 'false']);
+         [taakVerwijzing(kop), 'none', 'false']);
       // Enter zonder pijltjes hoort níets te kiezen: het veld staat dan vol met een half getypte
       // term, en de eerste treffer ongevraagd overnemen is precies het soort stille koppeling dat
       // deze hele naloop moest wegnemen.
@@ -6975,14 +6992,14 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       sub.bundelId='Tkop'; sub.bundelVolg='10'; kop.bundelId='Tkop'; kop.bundelVolg='0';
       const los=t(31,'Tlos','Ander werk'); D.ntd.OPPAKKEN.push(los);
       openModal(true, sub);
-      state._hbDoel=los; veld.value=taakTitel(los);
+      state._hbDoel=los; veld.value=taakVerwijzing(los);
       wisKnop.dispatchEvent(new MouseEvent('click', { bubbles:true }));
       // Ruim genoeg voor de awaits die ontkoppelTaak vóór zijn eerste verzoek aflegt: hier hoort
       // er nooit één te komen, dus er valt niets op te wachten — alleen tijd te geven.
       for(let i=0;i<20;i++) await tik();
       eq('hoortbij: een nog niet opgeslagen keuze wegklikken schrijft niets', volgorde, []);
       eq('hoortbij: de keuze is losgelaten', state._hbDoel, null);
-      eq('hoortbij: en het veld toont weer de echte bundel', veld.value, taakTitel(kop));
+      eq('hoortbij: en het veld toont weer de echte bundel', veld.value, taakVerwijzing(kop));
       eq('hoortbij: de taak zit dus nog gewoon in zijn bundel', sub.bundelId, 'Tkop');
 
       // 7. Een GEWEIGERDE ontkoppeling. ontkoppelTaak heeft vier poorten die hem laten terugkeren
@@ -7003,10 +7020,10 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         veldNaKlik=veld.value;
         for(let i=0;i<20;i++) await tik();   // ruim genoeg; er hoort niets te gebeuren
       } finally { state._uitCache=false; }
-      eq('hoortbij: het veld loopt niet vooruit op de actie', veldNaKlik, taakTitel(kop));
+      eq('hoortbij: het veld loopt niet vooruit op de actie', veldNaKlik, taakVerwijzing(kop));
       eq('hoortbij: een geweigerde ontkoppeling schrijft niets', volgorde, []);
       eq('hoortbij: en laat het veld op de werkelijke bundel staan',
-         [veld.value, wisKnop.style.display], [taakTitel(kop), '']);
+         [veld.value, wisKnop.style.display], [taakVerwijzing(kop), '']);
       eq('hoortbij: de taak zit er dan ook nog gewoon in', [sub.bundelId, sub.bundelVolg], ['Tkop','10']);
 
       // 8. De schrijfactie mislukt alsnog. De rollback zet de taak terug en tekent het dashboard
@@ -7022,7 +7039,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       } finally { faalPost=false; }
       eq('hoortbij: het veld gaat wél meteen leeg, al tijdens de schrijfactie', veldTijdensPost, '');
       eq('hoortbij: een mislukte ontkoppeling zet het veld terug',
-         [veld.value, wisKnop.style.display], [taakTitel(kop), '']);
+         [veld.value, wisKnop.style.display], [taakVerwijzing(kop), '']);
       eq('hoortbij: en de taak zit weer in zijn bundel', [sub.bundelId, sub.bundelVolg], ['Tkop','10']);
       await state._writeChain;
 
@@ -7038,13 +7055,13 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       D.ntd.OPPAKKEN.push(nieuwDoel); blad[31]=bladRij('Nieuw doel','Tn');
       openModal(true, sub);
       // Precies wat de kiezer doet als de gebruiker een suggestie aanklikt (zie onSelect in main.js).
-      tijdensPost=() => { state._hbDoel=nieuwDoel; veld.value=taakTitel(nieuwDoel); };
+      tijdensPost=() => { state._hbDoel=nieuwDoel; veld.value=taakVerwijzing(nieuwDoel); };
       wisKnop.dispatchEvent(new MouseEvent('click', { bubbles:true }));
       await wacht(() => posts.length>0);
       await state._writeChain;
       for(let i=0;i<20;i++) await tik();   // de verversing ná de schrijfactie zijn beurt geven
       eq('hoortbij: een keuze die tijdens het ontkoppelen is gemaakt blijft staan',
-         [state._hbDoel===nieuwDoel, veld.value], [true, taakTitel(nieuwDoel)]);
+         [state._hbDoel===nieuwDoel, veld.value], [true, taakVerwijzing(nieuwDoel)]);
       eq('hoortbij: en het ontkoppelen zelf is gewoon doorgegaan',
          [sub.bundelId, posts.map(p=>p.range)], ['', ["'Nog Te Doen'!R20:S20"]]);
       state._hbDoel=null;
@@ -7065,12 +7082,12 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       wisKnop.dispatchEvent(new MouseEvent('click', { bubbles:true }));
       // Synchroon: `dispatchEvent` keert terug zodra de async handler op zijn eerste await staat, en
       // dat await is precies het inloggen in ontkoppelTaak.
-      state._hbDoel=vroegDoel; veld.value=taakTitel(vroegDoel);
+      state._hbDoel=vroegDoel; veld.value=taakVerwijzing(vroegDoel);
       await wacht(() => posts.length>0);
       await state._writeChain;
       for(let i=0;i<20;i++) await tik();
       eq('hoortbij: een keuze uit het wachten op de login blijft óók staan',
-         [state._hbDoel===vroegDoel, veld.value], [true, taakTitel(vroegDoel)]);
+         [state._hbDoel===vroegDoel, veld.value], [true, taakVerwijzing(vroegDoel)]);
       eq('hoortbij: en er is gewoon ontkoppeld',
          [sub.bundelId, posts.map(p=>p.range)], ['', ["'Nog Te Doen'!R20:S20"]]);
       state._hbDoel=null;
@@ -7095,7 +7112,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       // ontkoppeld — en dat is precies de leugen: dit venster gaat over sub2, die nog in zijn
       // eigen bundel zit.
       eq('hoortbij: een verversing van de vórige taak raakt het nieuwe scherm niet',
-         veld.value, taakTitel(kop2));
+         veld.value, taakVerwijzing(kop2));
       eq('hoortbij: en die vorige taak is wél ontkoppeld',
          [sub.bundelId, posts.map(p=>p.range)], ['', ["'Nog Te Doen'!R20:S20"]]);
 

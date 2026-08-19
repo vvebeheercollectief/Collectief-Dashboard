@@ -30,7 +30,7 @@ import { _veiligeRij, assertRowsMatch, fetchSheet } from "./api.js";
 import { backgroundWrite, blokkeerOffline } from "./data.js";
 import { ensureToken } from "./auth.js";
 import { showUndoToast, showToast } from "./notifications.js";
-import { nieuwTaakId, taakTitel, leegBijErfenis } from "./util.js";
+import { nieuwTaakId, taakTitel, taakVerwijzing, leegBijErfenis } from "./util.js";
 import { bouwBundelIndex, volgendeVolg, hernummerLeden, magKoppelen, bundelSleutel, zichtbareKop } from "./bundel.js";
 import { renderAll } from "./main.js";
 
@@ -207,7 +207,7 @@ export async function koppelTaak(sub, doel){
   // herhaalt — ook via deze undo zelf — en dan bleef de tweede toast stil. De gebruiker zag dan
   // niets dubbels; hij zag niets, en had geen weg terug. Zelfde afweging als bij blokkeerOffline
   // (data.js): stilte leest als 'er valt niets te doen'.
-  showUndoToast('Gestapeld', `${taakTitel(sub)} onder ${doel.naam||doel.code}`,
+  showUndoToast('Gestapeld', `${taakTitel(sub)} onder ${taakVerwijzing(doel)}`,
     async () => { await state._writeChain; await ontkoppelTaak(sub); }, 'plus', { geenDedup:true });
   backgroundWrite(
     async () => {

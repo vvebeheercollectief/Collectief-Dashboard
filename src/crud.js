@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  CRUD — taak-modals, sheet-helpers, toevoegen/afronden/verwijderen
 // ══════════════════════════════════════
-import { esc, berekenPrioriteit, toISODate, toDutchDate, nieuwTaakId, taakTitel } from "./util.js";
+import { esc, berekenPrioriteit, toISODate, toDutchDate, nieuwTaakId, taakVerwijzing } from "./util.js";
 import { state, D, pgs } from "./state.js";
 import { SECS, SKEYS, SID } from "./config.js";
 import { writeRange, _shiftNtdRows, _herstelShift, assertRowMatch } from "./api.js";
@@ -11,7 +11,7 @@ import { animateRowOut, flashRow } from "./anim.js";
 import { logEvent, renderTaskHistory } from "./render-overig.js";
 import { backgroundWrite, loadAll, blokkeerOffline } from "./data.js";
 import { faseIndex, faseWoord, faseRijHtml, faseWijziging } from "./subsidie-fase.js";
-import { bouwBundelIndex, bundelVan, zichtbareKop, zelfdeTaak, openSubtaken, bundelWaarschuwing } from "./bundel.js";
+import { bouwBundelIndex, bundelVerwijzing, openSubtaken, bundelWaarschuwing } from "./bundel.js";
 import { koppelTaak } from "./bundel-acties.js";
 import { vraagBevestiging } from "./bevestig.js";
 import { setNtd, renderNtd, ntdPagina } from "./render-lijsten.js";
@@ -160,21 +160,20 @@ export function zetHoortBij(r){
   veld.disabled=false;
   veld.placeholder=HB_PLACEHOLDER;
   if(!r){ veld.value=''; return; }
-  const leden=bundelVan(bouwBundelIndex(D.ntd,D.af), r);
-  const kop=leden&&zichtbareKop(leden);
-  // 'Ben ik zelf de kop?' via zelfdeTaak en niet op objectidentiteit. De index wordt hier vers uit
-  // D gebouwd, maar `r` komt uit state._rowCache van de laatste render; zijn dat ooit twee
-  // objecten met hetzelfde taaknummer, dan zou een identiteitsvergelijking de kop niet herkennen
-  // en het veld de hoofdtaak uitnodigen om onder zichzelf te gaan hangen (zie de toelichting bij
-  // zelfdeTaak in bundel.js).
-  const isKop=!!(kop&&zelfdeTaak(kop.r,r));
-  veld.value=(kop&&!isKop)?taakTitel(kop.r):'';
+  // Eén bron voor 'wat is deze rij binnen haar bundel' (zie bundelVerwijzing in bundel.js). Hier
+  // stond diezelfde afleiding met de hand uitgeschreven — twee plekken die hetzelfde antwoord
+  // moeten geven, en dat is precies het soort stil verschil waar deze functie voor bestaat.
+  const bv=bundelVerwijzing(r, bouwBundelIndex(D.ntd,D.af));
+  const isKop=!!bv && bv.rol==='kop';
+  // De VOLLEDIGE verwijzing, niet alleen `taakTitel`: koppelen mag over VvE's heen, dus zonder de
+  // code kan de gebruiker niet zien wélke taak dit is.
+  veld.value=(bv && bv.rol==='sub') ? taakVerwijzing(bv.kopRij) : '';
   // Een taak met subtaken kan nergens onder — dat weigert `magKoppelen` toch al. Het veld op slot
   // zetten voorkomt dat de gebruiker eerst een doel uitzoekt en pas bij het opslaan hoort dat het
   // niet mag.
   veld.disabled=isKop;
   veld.placeholder=isKop?'Deze taak is de hoofdtaak van een bundel':HB_PLACEHOLDER;
-  if(wis&&kop&&!isKop) wis.style.display='';
+  if(wis&&bv&&bv.rol==='sub') wis.style.display='';
 }
 
 function fillModalFields(sec,r){

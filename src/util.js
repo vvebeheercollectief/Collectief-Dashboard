@@ -391,8 +391,43 @@ function taakTitel(r, sec){
   return _kort(eigen || (SECS[sec] && SECS[sec].label) || '');
 }
 
+// De soort taak in ENKELVOUD. `SECS[...].label` is meervoud omdat het tabbladen benoemt, en
+// "Vergaderverzoeken · 381005" leest fout zodra het over één taak gaat. 'Oppakken' is bovendien
+// geen zelfstandig naamwoord — een rij uit dat tabblad is gewoon een taak.
+// Terugval op het meervoud, zodat een sectie die hier ooit vergeten wordt een leesbare soort
+// houdt in plaats van een regel die met ' · ' begint.
+const SOORT_ENKELVOUD = {
+  OPPAKKEN:'Taak', VERGADERVERZOEKEN:'Vergaderverzoek', 'OFFERTE-TRAJECTEN':'Offerte-traject',
+  LOD:'LOD', 'SUBSIDIE-TRAJECTEN':'Subsidie-traject',
+};
+
+// De volledige verwijzing naar ÉÉN taak: soort · VvE — omschrijving.
+//
+// Bestaat naast `taakTitel` en niet in plaats daarvan. `taakTitel` beantwoordt "hoe heet deze
+// taak" en wordt gebruikt op plekken waar de soort en de VvE al in beeld staan (de tabelrij, het
+// bundelpaneel, de dossierrij). Deze functie beantwoordt "welke taak is dit, voor iemand die er
+// niet naar kijkt" — en dat is precies de vraag zodra er naar een ándere taak verwezen wordt.
+//
+// Waarom de VvE erbij hoort: `magKoppelen` staat koppelen OVER VvE'S HEEN toe. De hoofdtaak van
+// een bundel kan dus een heel andere VvE betreffen dan de rij waar je naar kijkt, en dan is de
+// code het enige wat dat verraadt.
+function taakVerwijzing(r, sec){
+  if(!r) return '';
+  sec = sec || r._sec || '';
+  const soort = SOORT_ENKELVOUD[sec] || (SECS[sec] && SECS[sec].label) || '';
+  const vve = [String(r.code ?? '').trim(), String(r.naam ?? '').trim()].filter(Boolean).join(' ');
+  // `taakTitel` valt bij een taak zónder enige omschrijving terug op het sectielabel. Hier zou
+  // dat de soort een tweede keer neerzetten, in het meervoud: "Vergaderverzoek · 381005 —
+  // Vergaderverzoeken". Die terugval hoort in een verwijzing dus weg te vallen.
+  const label = (SECS[sec] || {}).label || '';
+  const oms = taakTitel(r, sec);
+  const echteOms = (oms && oms !== label) ? oms : '';
+  // filter(Boolean) op beide niveaus: nooit een losse ' · ' en nooit een losse ' — '.
+  return [[soort, vve].filter(Boolean).join(' · '), echteOms].filter(Boolean).join(' — ');
+}
+
 export {
-  taakTitel, kortDatum,
+  taakTitel, taakVerwijzing, kortDatum,
   displayName, filt, PRIO_REGELS, STIL_DREMPEL_DAGEN, STIL_ESCALATIE_REGELS,
   opvolgStatus, volgendeDeadline, HERHAAL_MAANDEN, _vandaagAmsterdam, isoWeek,
   _verschilInKalenderdagen, berekenPrioriteit, prioBadge, persBadges,

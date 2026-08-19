@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { taakTitel, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel, kiesAfgerondRij } from "./util.js";
+import { taakTitel, taakVerwijzing, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel, kiesAfgerondRij } from "./util.js";
 import { verwerkMeldingRijen, toonMeldingen, MAX_TOAST_BURST, _whoSleutel, getCurrentWho } from "./notifications.js";
 import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek, logEvents, renderOntw } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM } from "./config.js";
@@ -4467,6 +4467,47 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     eq('waarschuwing: de subtaak eronder blijft stil', openSubtaken(ixDoor, subC), 0);
     // De afgeronde hoofdtaak zelf is geen kop meer en stelt dus ook geen vraag.
     eq('waarschuwing: een afgerond lid stelt geen vraag', openSubtaken(ixDoor, kop), 0);
+  })();
+
+  // ── taakVerwijzing: de volledige verwijzing naar één taak ───────────────────────────────
+  // Eén zin die overal gebruikt wordt waar naar een ÁNDERE taak verwezen wordt. Los toetsbaar,
+  // want alles wat hem gebruikt (het 'Hoort bij'-veld, het platte merkje, de dossierregel, de
+  // sleep-melding) is opmaak eromheen.
+  (() => {
+    const v = (over) => taakVerwijzing({ _sec:'VERGADERVERZOEKEN', code:'381005',
+      naam:'VvE Oudemansstraat 123/125/127', periode:'sept/okt', ...over });
+
+    eq('verwijzing: soort, VvE en omschrijving in één regel', v({}),
+       'Vergaderverzoek · 381005 VvE Oudemansstraat 123/125/127 — sept/okt');
+    // De soort staat in ENKELVOUD. SECS[...].label is meervoud omdat het tabbladen benoemt;
+    // "Vergaderverzoeken · 381005" leest fout zodra het over één taak gaat.
+    truthy('verwijzing: de soort staat in enkelvoud',
+       !v({}).includes('Vergaderverzoeken'));
+    // taakTitel valt terug op het SECTIELABEL als een taak geen enkele omschrijving heeft.
+    // Ongefilterd zou de regel dan "Vergaderverzoek · 381005 … — Vergaderverzoeken" worden:
+    // de soort twee keer, één keer fout vervoegd. Die terugval hoort hier weggelaten te worden.
+    eq('verwijzing: geen omschrijving → geen losse streep en geen dubbele soort',
+       v({ periode:'' }), 'Vergaderverzoek · 381005 VvE Oudemansstraat 123/125/127');
+    eq('verwijzing: zonder VvE-naam blijft de code over',
+       v({ naam:'' }), 'Vergaderverzoek · 381005 — sept/okt');
+    eq('verwijzing: zonder code en naam blijft soort en omschrijving over',
+       v({ code:'', naam:'' }), 'Vergaderverzoek — sept/okt');
+    // Elke sectie een eigen enkelvoud; 'Oppakken' is geen zelfstandig naamwoord.
+    eq('verwijzing: elke sectie heeft een eigen enkelvoud',
+       ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN']
+         .map(s => taakVerwijzing({ _sec:s, code:'1', naam:'', actiepunt:'x', opmerkingen:'x',
+                                    status:'x', subsidie:'x' }).split(' · ')[0]),
+       ['Taak','Vergaderverzoek','Offerte-traject','LOD','Subsidie-traject']);
+    // Een onbekende sectie mag geen lege soort geven — dan begint de regel met ' · '.
+    truthy('verwijzing: onbekende sectie begint niet met een scheidingsteken',
+       !taakVerwijzing({ _sec:'ONZIN', code:'1', naam:'X' }).startsWith(' ·'));
+    eq('verwijzing: geen taak is geen fout', taakVerwijzing(null), '');
+    // De opslagvorm van opgemaakte velden is platte tekst met **vet**; die sterretjes horen
+    // niet in een verwijzing. taakTitel haalt ze al weg — dit pint vast dat de laag eromheen
+    // dat niet ongedaan maakt.
+    eq('verwijzing: opmaak-sterretjes blijven eruit',
+       taakVerwijzing({ _sec:'OPPAKKEN', code:'1', naam:'', actiepunt:'**Bellen** met bestuur' }),
+       'Taak · 1 — Bellen met bestuur');
   })();
 
   (() => {

@@ -215,32 +215,47 @@ function groepeerBundels(rows, index){
   lijst.forEach(r => {
     const verw = bundelVerwijzing(r, index);
     if (verw && verw.rol === 'sub' && lijst.some(x => zelfdeTaak(x, verw.kopRij))){
-      const k = bundelSleutel(r.bundelId);
-      if (!kinderen.has(k)) kinderen.set(k, []);
-      kinderen.get(k).push(r);
+      const sleutel = bundelSleutel(r.bundelId);
+      if (!kinderen.has(sleutel)) kinderen.set(sleutel, []);
+      kinderen.get(sleutel).push(r);
       return;
     }
-    romp.push(r);
+    // `verw` verhuist mee naar de vlechtlus hieronder. Hem daar opnieuw ophalen betekende twee
+    // plekken die hetzelfde moesten opleveren — precies wat deze functie voor het scherm juist
+    // wil voorkómen.
+    romp.push({ r, verw });
   });
-  kinderen.forEach(k => k.sort(opBundelVolg));
+  kinderen.forEach(leden => leden.sort(opBundelVolg));
   const uit = [];
-  romp.forEach(r => {
+  romp.forEach(({ r, verw }) => {
     uit.push({ r, diep:0 });
-    const verw = bundelVerwijzing(r, index);
     if (verw && verw.rol === 'kop'){
-      const mijn = kinderen.get(bundelSleutel(r.bundelId)) || [];
-      mijn.forEach(c => uit.push({ r:c, diep:1 }));
-      kinderen.delete(bundelSleutel(r.bundelId));
+      const sleutel = bundelSleutel(r.bundelId);
+      (kinderen.get(sleutel) || []).forEach(c => uit.push({ r:c, diep:1 }));
+      kinderen.delete(sleutel);
     }
   });
-  // Vangnet: kinderen waarvan de kop tóch niet in de romp bleek te staan. Kan vandaag niet
-  // gebeuren (de `some`-toets hierboven eist hem), maar het gevolg zou zijn dat een taak
-  // ongemerkt uit het dossier verdwijnt. Liever onderaan dan weg.
+  // Vangnet: kinderen waarvan de kop tóch niet in de romp bleek te staan. Dit is DRAGENDE code en
+  // geen dode regel, want de twee toetsen hierboven stellen verschillende vragen: `some` zoekt een
+  // rij die volgens `zelfdeTaak` dezelfde taak is als de kop, terwijl de vlechtlus een rij nodig
+  // heeft die zélf `rol:'kop'` meldt én dezelfde bundelsleutel draagt. Twee standen laten die
+  // uiteenlopen, en allebei kunnen ze vandaag op productie voorkomen:
   //
-  // Staat een taaknummer per ongeluk twee keer in de Sheet (`checkNummers` meldt dat aan de
-  // gebruiker), dan matcht `zelfdeTaak` op béíde en springt de stap in onder de eerste. Dat is
-  // de veilige kant op — er verdwijnt niets, hij staat hooguit onder de verkeerde tweelinghelft.
-  kinderen.forEach(rest => rest.forEach(r => uit.push({ r, diep:0 })));
+  //  - Bij twee rijen ZONDER taaknummer valt `zelfdeTaak` terug op `_row`, en dat is volgens de
+  //    voorwaarde die daar in bundel.js staat alleen betrouwbaar BINNEN één tabblad. Deze functie
+  //    is de eerste aanroeper die die voorwaarde schendt: `o.open` mengt de rijen van alle vijf de
+  //    secties door elkaar. Rij 12 van 'Oppakken' en rij 12 van 'LOD' gelden dan als dezelfde taak,
+  //    dus `some` vindt een rij die met de bundel niets te maken heeft en die zich verderop
+  //    natuurlijk niet als kop meldt.
+  //  - Staat een taaknummer per ongeluk twee keer in de Sheet (`checkNummers` meldt dat aan de
+  //    gebruiker), dan matcht `zelfdeTaak` op béíde rijen. Is die tweelinghelft zelf geen bundellid,
+  //    dan gebeurt hier hetzelfde.
+  //
+  // In beide standen landt de stap hierdoor ONDERAAN in plaats van te verdwijnen. Dat is de veilige
+  // kant op: een taak die stil uit het dossier valt is het ergste wat deze functie kan doen. De
+  // eerste stand staat nagebouwd in de assert `dossier: een stap zonder échte kop valt onderaan,
+  // niet weg` — die valt om zodra deze regel verdwijnt.
+  kinderen.forEach(groep => groep.forEach(r => uit.push({ r, diep:0 })));
   return uit;
 }
 
@@ -282,13 +297,22 @@ function renderVve(){
     // Wat deze rij binnen haar bundel is. Dezelfde bron als het merkje in de takentabel, dus
     // beide schermen kunnen niet iets anders beweren.
     const verw = bundelVerwijzing(r, bIx);
+    // Letterlijk dezelfde pil als in de takentabel, tooltip incluis: op deze pagina staat nergens
+    // het woord 'bundel' of 'subtaken', dus '0 van 1 klaar' achter een taaktitel is zonder
+    // voorkennis een raadsel.
     const bdlPil = (verw && verw.rol === 'kop')
-      ? `<span class="bdl-pill">${verw.klaar} van ${verw.totaal} klaar</span>` : '';
+      ? `<span class="bdl-pill" title="${verw.klaar} van ${verw.totaal} subtaken klaar">${verw.klaar} van ${verw.totaal} klaar</span>` : '';
     // De verwijzingsregel staat er ÓÓK als de rij al is ingesprongen: bij inspringen alleen zie je
     // niet wélke taak het is zodra er twee bundels onder elkaar staan, en zonder inspringen (kop
     // bij een andere VvE, weggelegd of afgerond) is dit de enige aanwijzing.
-    const stapIn = (verw && verw.rol === 'sub')
-      ? `<div class="tk-stapin">${ico('bundel',11)} stap in: ${esc(taakVerwijzing(verw.kopRij))}</div>` : '';
+    //
+    // De hele zin staat ÓÓK in `title`, net als bij `bundelMerkje` in de takentabel. In het
+    // 330px-paneel wordt de regel afgekapt (gemeten: 240 van 418px zichtbaar) en juist de
+    // omschrijving — het enige dat de taak echt onderscheidt — valt er dan af. Zonder tooltip is
+    // 'de enige aanwijzing' dus een aanwijzing die je niet kunt lezen.
+    const stapZin = (verw && verw.rol === 'sub') ? `stap in: ${taakVerwijzing(verw.kopRij)}` : '';
+    const stapIn = stapZin
+      ? `<div class="tk-stapin" title="${esc(stapZin)}">${ico('bundel',11)} ${esc(stapZin)}</div>` : '';
 
     // Het sleep-handvat staat er hier ONVOORWAARDELIJK, anders dan in de takentabel: het dossier
     // kent de gestapelde weergave niet (geen chevron, geen paneel, geen filters die hem uitzetten),

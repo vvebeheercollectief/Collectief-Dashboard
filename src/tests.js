@@ -31,7 +31,7 @@ import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from
 import { toggleHerhaalStatus, renderHerhaal, openHerhaalModal, deleteHerhaal } from "./render-herhaal.js";
 import { openSnoozeModal, snoozeOpslaan, closeSnoozeModal } from "./snooze.js";
 import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
-import { bouwBundelIndex, bundelWeergave, zichtbareKop, isBundel, bundelVan, bundelMetId, hernummerLeden, volgendeVolg, magKoppelen, wordtGeabsorbeerd, koppelKandidaten, taakFilter, openSubtaken, bundelWaarschuwing, bundelVerwijzing, bundelStand } from "./bundel.js";
+import { bouwBundelIndex, bundelWeergave, zichtbareKop, isBundel, bundelVan, bundelMetId, hernummerLeden, volgendeVolg, magKoppelen, wordtGeabsorbeerd, koppelKandidaten, taakFilter, openSubtaken, bundelWaarschuwing, bundelVerwijzing, bundelStand, zelfdeTaak } from "./bundel.js";
 import { bundelPaneelHtml, bundelMerkje, bundelKopExtra, STAPEL_GREEP } from "./render-bundel.js";
 import { vraagBevestiging, beantwoordBevestiging, _vraagStaatOpen } from "./bevestig.js";
 import { bovensteModal } from "./modal-a11y.js";
@@ -4605,6 +4605,72 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
        groepeerBundels([los, kop, s2, s1], ix).length, 4);
     eq('dossier: zonder bundels verandert er niets',
        groepeerBundels([los], ix).map(x => x.r.taakId + ':' + x.diep), ['Tlos:0']);
+
+    // En de stand die het VANGNET onderaan groepeerBundels raakt — dus niet de `some`-toets, maar
+    // de regel die overgebleven kinderen alsnog uitstuurt. Twee toetsen die verschillende vragen
+    // stellen kunnen uiteenlopen: `some` zoekt een rij die volgens `zelfdeTaak` de kop is, de
+    // vlechtlus wil een rij die zich zélf als kop meldt.
+    //
+    // Hier gebeurt dat via de `_row`-terugval in `zelfdeTaak`: twee rijen ZONDER taaknummer gelden
+    // als dezelfde taak zodra hun rijnummer gelijk is, en die terugval is volgens zijn eigen
+    // voorwaarde in bundel.js alleen betrouwbaar binnen één tabblad. Het dossier zet de vijf
+    // secties door elkaar, dus rij 12 van 'LOD' en rij 12 van 'Vergaderverzoeken' botsen daar echt.
+    // De lokvogel is dan wél de treffer van `some`, maar zit zelf in geen enkele bundel — zonder
+    // vangnet valt de stap stil uit het dossier.
+    const nr = (o) => ({ taakId:'', bundelId:'', bundelVolg:'', code:'381005',
+                         naam:'VvE Oudemansstraat', deadline:'', ...o });
+    const echteKop = nr({ bundelId:'B1', bundelVolg:'0',  _sec:'VERGADERVERZOEKEN', _row:12, periode:'sept/okt' });
+    const stap     = nr({ bundelId:'B1', bundelVolg:'10', _sec:'OFFERTE-TRAJECTEN', _row:30, taakId:'Ts9', opmerkingen:'Offertes' });
+    const lokvogel = nr({ _sec:'LOD', _row:12, actiepunt:'Toevallig ook rij 12' });
+    const ixNr = bouwBundelIndex({ ...leeg, VERGADERVERZOEKEN:[echteKop],
+                                   'OFFERTE-TRAJECTEN':[stap], LOD:[lokvogel] }, leeg);
+    // Eerst de val zelf aantonen, anders bewijst de assert eronder niet wat hij belooft: de
+    // lokvogel MOET voor `zelfdeTaak` als de kop doorgaan, en zich tegelijk niet als kop melden.
+    truthy('dossier: de rijnummer-terugval laat twee tabbladen echt botsen',
+           zelfdeTaak(lokvogel, echteKop) && bundelVerwijzing(lokvogel, ixNr) === null);
+    eq('dossier: een stap zonder échte kop valt onderaan, niet weg',
+       groepeerBundels([lokvogel, stap], ixNr).map(x => x.r.taakId + ':' + x.diep),
+       [':0','Ts9:0']);
+  })();
+
+  // ── Dossier: de bundel-labels moeten ook te LEZEN zijn ───────────────────────────────────
+  // De verwijzingsregel staat in een paneel van 330px met `text-overflow:ellipsis`; gemeten bleef
+  // er 240 van 418px over, en dan valt juist de omschrijving eraf — het enige dat de taak
+  // onderscheidt. `bundelMerkje` in de takentabel zet de volledige zin daarom in `title`, en deze
+  // rij hoort dat net zo te doen. Zonder deze asserts sluipt zo'n tooltip er bij een volgende
+  // opmaakronde stil weer uit; op het scherm is dat niet te zien.
+  (() => {
+    const vC=state.vveCode, vN=D.ntd, vA=D.af;
+    try{
+      const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const t = (o) => ({ code:'DOS1', naam:'VvE Dossierhof', deadline:'', behandelaar:'',
+                          inBehandeling:'FALSE', opvolgdatum:'', taakId:'', bundelId:'',
+                          bundelVolg:'', ...o });
+      const kop = t({ _sec:'VERGADERVERZOEKEN', _row:9401, taakId:'Tdk', bundelId:'Tdk',
+                      bundelVolg:'0',  periode:'sept/okt' });
+      const sub = t({ _sec:'OFFERTE-TRAJECTEN', _row:9402, taakId:'Tds', bundelId:'Tdk',
+                      bundelVolg:'10', opmerkingen:'Offertes schilderwerk opvragen' });
+      D.ntd={ ...leeg, VERGADERVERZOEKEN:[kop], 'OFFERTE-TRAJECTEN':[sub] };
+      D.af={ ...leeg };
+      state.vveCode='DOS1';
+      renderVve();
+      const regel=document.querySelector('#vve-inhoud .tk-stapin');
+      // Niet met de hand uitgeschreven maar via `taakVerwijzing`: een eigen kopie van die zin gaat
+      // er bij de eerstvolgende wijziging in util.js stil vanaf lopen.
+      const zin='stap in: '+taakVerwijzing(kop);
+      eq('dossier: de verwijzingsregel draagt de volledige zin in title',
+         regel && regel.getAttribute('title'), zin);
+      eq('dossier: … en op het scherm staat exact diezelfde zin',
+         regel && regel.textContent.trim(), zin);
+      // En de telpil op de kop-rij, met dezelfde tooltip als in de takentabel: op deze pagina
+      // staat het woord 'subtaken' nergens, dus '0 van 1 klaar' is zonder tooltip een raadsel.
+      const pil=document.querySelector('#vve-inhoud .bdl-pill');
+      eq('dossier: de telpil zegt in haar tooltip waarover ze telt',
+         [pil && pil.textContent, pil && pil.getAttribute('title')],
+         ['0 van 1 klaar', '0 van 1 subtaken klaar']);
+    } finally {
+      D.ntd=vN; D.af=vA; state.vveCode=vC; renderVve();
+    }
   })();
 
   (() => {

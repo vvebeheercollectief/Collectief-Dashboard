@@ -216,7 +216,7 @@ Voeg in `src/tests.js` toe, direct ná het IIFE van Task 1:
     eq('bundelverwijzing: een stap wijst naar de rij van zijn kop',
        (bundelVerwijzing(sub, ix) || {}).rol, 'sub');
     eq('bundelverwijzing: … en die kop is de echte rij, niet een kopie',
-       (bundelVerwijzing(sub, ix) || {}).kop.taakId, 'Tkop');
+       (bundelVerwijzing(sub, ix) || {}).kopRij.taakId, 'Tkop');
     eq('bundelverwijzing: een losse taak zit in geen enkele bundel',
        bundelVerwijzing(los, ix), null);
     // Eén lid is geen bundel (isBundel eist er twee): een kop die zijn laatste stap kwijt is
@@ -374,18 +374,41 @@ Expected: de twee nieuwe asserts falen — het veld bevat nog `sept/okt`.
 
 - [ ] **Step 3: Schrijf de implementatie**
 
-`src/crud.js` — in `zetHoortBij`, vervang:
+`src/crud.js` — `zetHoortBij` leidt de bundelstand vandaag met de hand af (`bundelVan` →
+`zichtbareKop` → `zelfdeTaak` → `isKop`), inclusief een eigen commentaarblok dat diezelfde
+`zelfdeTaak`-redenering nog eens uitschrijft. Dat is precies de dubbele afleiding die
+`bundelVerwijzing` (taak 2) moest wegnemen — laat dit dus óók via die ene bron lopen.
+
+Vervang het blok
 
 ```js
+  const leden=bundelVan(bouwBundelIndex(D.ntd,D.af), r);
+  const kop=leden&&zichtbareKop(leden);
+  // …commentaarblok over zelfdeTaak…
+  const isKop=!!(kop&&zelfdeTaak(kop.r,r));
   veld.value=(kop&&!isKop)?taakTitel(kop.r):'';
 ```
+
 door:
+
 ```js
-  // De VOLLEDIGE verwijzing, niet alleen `taakTitel`. Zie taakVerwijzing (util.js): koppelen mag
-  // over VvE's heen, dus zonder de code kan de gebruiker niet zien wélke taak dit is.
-  veld.value=(kop&&!isKop)?taakVerwijzing(kop.r):'';
+  // Eén bron voor 'wat is deze rij binnen haar bundel' (zie bundelVerwijzing in bundel.js). Hier
+  // stond diezelfde afleiding met de hand uitgeschreven — twee plekken die hetzelfde antwoord
+  // moeten geven, en dat is precies het soort stil verschil waar deze functie voor bestaat.
+  const bv=bundelVerwijzing(r, bouwBundelIndex(D.ntd,D.af));
+  const isKop=!!bv && bv.rol==='kop';
+  // De VOLLEDIGE verwijzing, niet alleen `taakTitel`: koppelen mag over VvE's heen, dus zonder de
+  // code kan de gebruiker niet zien wélke taak dit is.
+  veld.value=(bv && bv.rol==='sub') ? taakVerwijzing(bv.kopRij) : '';
 ```
-en zet `taakVerwijzing` in de bestaande import uit `./util.js` bovenaan `crud.js`.
+
+De regels eronder (`veld.disabled=isKop`, de `placeholder` en de zichtbaarheid van het kruisje)
+blijven ongewijzigd — alleen de voorwaarde van het kruisje gaat van `kop&&!isKop` naar
+`bv && bv.rol==='sub'`.
+
+Zet `taakVerwijzing` in de bestaande import uit `./util.js` bovenaan `crud.js`, en
+`bundelVerwijzing` in die uit `./bundel.js`. Raken `zichtbareKop`, `zelfdeTaak` of `bundelVan`
+daardoor ongebruikt in dit bestand? Controleer dat met `grep -n` en haal ze dan uit de import.
 
 `src/main.js` — in de `initVveZoekveld`-aanroep voor `hbVeld`:
 
@@ -510,7 +533,7 @@ export function bundelMerkje(r, bw, sec){
   // aanwijzing in een gefilterde lijst, en dan nog een die je alleen met de muis kon lezen.
   const label = verw.rol === 'kop'
     ? `Bundel · ${verw.klaar} van ${verw.totaal} klaar`
-    : `stap in: ${taakVerwijzing(verw.kop)}`;
+    : `stap in: ${taakVerwijzing(verw.kopRij)}`;
   const titel = `${label} — klik om de bundel te openen`;
   // Een stap krijgt een eigen klasse: zijn regel is lang en hoort onder de VvE-naam te vallen,
   // terwijl de telling van een kop kort is en ernaast past.
@@ -641,7 +664,7 @@ function groepeerBundels(rows, index){
   const romp = [];
   lijst.forEach(r => {
     const v = bundelVerwijzing(r, index);
-    if (v && v.rol === 'sub' && lijst.some(x => zelfdeTaak(x, v.kop))){
+    if (v && v.rol === 'sub' && lijst.some(x => zelfdeTaak(x, v.kopRij))){
       const k = bundelSleutel(r.bundelId);
       if (!kinderen.has(k)) kinderen.set(k, []);
       kinderen.get(k).push(r);
@@ -663,6 +686,10 @@ function groepeerBundels(rows, index){
   // Vangnet: kinderen waarvan de kop tóch niet in de romp bleek te staan. Kan vandaag niet
   // gebeuren (de `some`-toets hierboven eist hem), maar het gevolg zou zijn dat een taak
   // ongemerkt uit het dossier verdwijnt. Liever onderaan dan weg.
+  //
+  // Staat een taaknummer per ongeluk twee keer in de Sheet (`checkNummers` meldt dat aan de
+  // gebruiker), dan matcht `zelfdeTaak` op béíde en springt de stap in onder de eerste. Dat is
+  // de veilige kant op — er verdwijnt niets, hij staat hooguit onder de verkeerde tweelinghelft.
   kinderen.forEach(rest => rest.forEach(r => uit.push({ r, diep:0 })));
   return uit;
 }
@@ -694,7 +721,7 @@ Wijzig de signatuur van `taakRij` naar `(r, weg, diep)` en voeg vlak vóór de `
     // niet wélke taak het is zodra er twee bundels onder elkaar staan, en zonder inspringen (kop
     // bij een andere VvE, weggelegd of afgerond) is dit de enige aanwijzing.
     const stapIn = (bv && bv.rol === 'sub')
-      ? `<div class="tk-stapin">${ico('bundel',11)} stap in: ${esc(taakVerwijzing(bv.kop))}</div>` : '';
+      ? `<div class="tk-stapin">${ico('bundel',11)} stap in: ${esc(taakVerwijzing(bv.kopRij))}</div>` : '';
 ```
 
 en gebruik ze in de HTML:

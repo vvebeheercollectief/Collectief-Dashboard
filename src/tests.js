@@ -4551,8 +4551,8 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
        bundelVerwijzing(kop, ix), { rol:'kop', klaar:0, totaal:1 });
     eq('bundelverwijzing: een stap wijst naar de rij van zijn kop',
        (bundelVerwijzing(sub, ix) || {}).rol, 'sub');
-    eq('bundelverwijzing: … en die kop is de echte rij, niet een kopie',
-       (bundelVerwijzing(sub, ix) || {}).kop.taakId, 'Tkop');
+    eq('bundelverwijzing: … en `kopRij` is de echte rij, niet een kopie',
+       (bundelVerwijzing(sub, ix) || {}).kopRij.taakId, 'Tkop');
     eq('bundelverwijzing: een losse taak zit in geen enkele bundel',
        bundelVerwijzing(los, ix), null);
     // Eén lid is geen bundel (isBundel eist er twee): een kop die zijn laatste stap kwijt is

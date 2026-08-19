@@ -18,7 +18,7 @@
 // een eindige of volledige lijst van wat er nú op het scherm staat.
 import { esc, taakTitel, kortDatum, taakActieKnoppen, opvolgStatus, berekenPrioriteit } from "./util.js";
 import { SECS } from "./config.js";
-import { zichtbareKop, bundelVan, wordtGeabsorbeerd, bundelSleutel, zelfdeTaak, bundelStand, bundelVerwijzing } from "./bundel.js";
+import { zichtbareKop, bundelVan, wordtGeabsorbeerd, bundelSleutel, zelfdeTaak, bundelStand } from "./bundel.js";
 import { ico } from "./icons.js";
 import { state } from "./state.js";
 

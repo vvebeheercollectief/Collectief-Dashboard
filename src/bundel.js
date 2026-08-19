@@ -178,12 +178,13 @@ export function wordtGeabsorbeerd(r, index, sec){
   return kop.r._sec === sec;                       // kop in hetzelfde tabblad → het paneel tekent hem
 }
 
-// Wat is deze rij binnen haar bundel? Eén antwoord voor álle plekken die dat willen tonen: het
-// platte bundelmerkje, de dossierrij, het veld 'Hoort bij' en de melding na het slepen.
+// Wat is deze rij binnen haar bundel? Eén antwoord voor de drie plekken die dat tonen: het platte
+// bundelmerkje in de takenlijst, de rij op de VvE-dossierpagina en het veld 'Hoort bij' in het
+// bewerkscherm. (De melding na het slepen leest alleen de zín uit `taakVerwijzing`, niet de stand.)
 //
 //   null                            → zit in geen bundel (of de bundel is tot één lid gekrompen)
 //   { rol:'kop', klaar, totaal }    → is de zichtbare kop; telling zoals de telpill hem toont
-//   { rol:'sub', kop }              → is een stap; `kop` is de RIJ van de zichtbare kop
+//   { rol:'sub', kopRij }           → is een stap; `kopRij` is de RIJ van de zichtbare kop
 //
 // Bewust géén eigen regels: wie de kop is komt uit `zichtbareKop`, wat een bundel is uit
 // `bundelVan`/`isBundel`, en de telling uit `bundelStand`. Zou deze functie dat zelf afleiden,
@@ -201,7 +202,7 @@ export function bundelVerwijzing(r, index){
     const { klaar, totaal } = bundelStand(leden, kop);
     return { rol:'kop', klaar, totaal };
   }
-  return { rol:'sub', kop: kop.r };
+  return { rol:'sub', kopRij: kop.r };
 }
 
 // De subtaken van een taak: de leden die naar zíjn taaknummer wijzen — open én afgerond.

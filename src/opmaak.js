@@ -63,14 +63,23 @@ const TAG_BLOK   = new Set(['P','DIV','UL','OL','TABLE','TR','BLOCKQUOTE','PRE',
                             'SECTION','ARTICLE','H1','H2','H3','H4','H5','H6']);
 const TAG_WEG    = new Set(['SCRIPT','STYLE','HEAD','NOSCRIPT','TEMPLATE']);
 
+// De eigen stijl gaat vóór de tagnaam, en niet andersom. Google Docs wikkelt een kopie ALTIJD in
+// één <b style="font-weight:normal" id="docs-internal-guid-…"> om de hele selectie heen. Op tagnaam
+// alleen werd een geplakte mail daardoor in z'n geheel vet, met de echte accenten als verdwaalde
+// sterretjes ertussen: `**Beste bestuur. **Let op de garantie.****`.
+// Alleen een EXPLICIET gewicht telt als tegenbewijs; bij 'inherit' of iets onbekends valt hij terug
+// op de tagnaam, want dan zegt de stijl niets.
 function isVet(el){
-  if(TAG_VET.has(el.tagName)) return true;
   const w=String(el.style?.fontWeight||'').toLowerCase();
-  return w==='bold'||w==='bolder'||(/^\d+$/.test(w)&&+w>=600);
+  if(w==='bold'||w==='bolder'||(/^\d+$/.test(w)&&+w>=600)) return true;
+  if(w==='normal'||w==='lighter'||(/^\d+$/.test(w)&&+w<600)) return false;
+  return TAG_VET.has(el.tagName);
 }
 function isSchuin(el){
-  if(TAG_SCHUIN.has(el.tagName)) return true;
-  return String(el.style?.fontStyle||'').toLowerCase()==='italic';
+  const s=String(el.style?.fontStyle||'').toLowerCase();
+  if(s==='italic'||s==='oblique') return true;
+  if(s==='normal') return false;   // zelfde regel als hierboven: <i style="font-style:normal"> is niet schuin
+  return TAG_SCHUIN.has(el.tagName);
 }
 
 // Zet de markering strak om de tekst en laat spaties er buiten staan: "**vet **"

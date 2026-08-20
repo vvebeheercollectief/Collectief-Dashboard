@@ -198,7 +198,13 @@ function fillModalFields(sec,r){
       tog('tog-ib-v',r.inBehandeling==='TRUE');break;
     case'OFFERTE-TRAJECTEN':
       setv('m-daang',toISODate(r.datumAangevraagd));setv('m-beh-o',r.behandelaar);
-      {const[ontv,totaal]=(r.offertes||'').split('/').map(s=>parseInt(s)||0);
+      // `_offertesManual` vóór `offertes`: dat eerste IS kolom D, het tweede is wat het scherm
+      // ervan maakt. `_verrijkOfferteRij` tilt de teller in het geheugen op tot het aantal
+      // aangevinkte aannemers (kolom D telt daarbij als ondergrens) en schrijft dat in `offertes`.
+      // Las dit veld die afgeleide waarde, dan zette één keer opslaan hem alsnog in kolom D — en
+      // omdat de ondergrens met Math.max werkt, kwam je daar nooit meer onder: een vinkje weghalen
+      // veranderde de teller daarna niet meer. Gemeten: kolom D '0/3' met twee vinkjes toonde '2/3'.
+      {const[ontv,totaal]=((r._offertesManual!==undefined?r._offertesManual:r.offertes)||'').split('/').map(s=>parseInt(s)||0);
       setv('m-off-recv',ontv||0);setv('m-off-total',totaal||0);}
       setv('m-dl-o',toISODate(r.deadline));setv('m-opm-o',r.opmerkingen);setv('m-sub-off',r.subcategorie);break;
     case'LOD':
@@ -216,6 +222,13 @@ function setv(id,v){const el=document.getElementById(id);if(el)el.value=(v===und
 
 function clearModal(){
   document.querySelectorAll('.modal-body input,.modal-body select,.modal-body textarea').forEach(el=>{if(!el.readOnly)el.value=''});
+  // 'm-naam' is het enige readonly veld in het venster en viel daardoor buiten de regel hierboven:
+  // een toevoegscherm opende met de VvE-naam van de taak die je daarvóór bekeek, terwijl 'm-code'
+  // er wél leeg naast stond. Kies je de nieuwe VvE uit de suggestielijst, dan overschrijft die
+  // beide velden en merk je er niets van — maar tik of plak je de code met de hand (een VvE die
+  // nog niet in de lijst staat), dan leest submitTask hier de náám van de vorige VvE en belandt
+  // die in de Sheet.
+  ['m-naam'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
   ['m-off-recv','m-off-total'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='0'});
   ['tog-ib','tog-ib-v','tog-ib-l','tog-ib-s'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('on')});
   zetModalFase('');   // terug naar Voorbereiden, anders erft een nieuwe taak de vorige fase

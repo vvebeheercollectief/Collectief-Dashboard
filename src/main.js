@@ -30,7 +30,7 @@ import { closeResetModal } from './alv-reset.js';
 import { renderHerhaal, openHerhaalModal, closeHerhaalModal, syncHerhaalVelden, submitHerhaal } from './render-herhaal.js';
 import { renderVve } from './render-vve.js';
 import { openChat, closeChat, setChatVve } from './dossier-chat.js';
-import { initPalette } from './palette.js';
+import { initPalette, palOpen } from './palette.js';
 import { initSwUpdate } from './sw-update.js';
 import { initModalA11y, bovensteModal } from './modal-a11y.js';
 import { beantwoordBevestiging } from './bevestig.js';
@@ -246,6 +246,14 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(e.key!=='Escape') return;
     if(document.getElementById('chat-bg')?.classList.contains('open')){ closeChat(); return; }
     if(document.getElementById('sb').classList.contains('open')){ closeSb(); return; }
+    // Staat het commandopalet open, dan is het klaar: palette.js sluit zichzelf op Escape. Zonder
+    // deze regel deed één Escape twee dingen. Het palet is óók een .modal-bg, maar het staat in de
+    // HTML ná het bewerkscherm — `bovensteModal` gaf dus het BEWERKSCHERM terug, de guard op
+    // 'pal-bg' hieronder greep niet, en wie tijdens het bewerken Ctrl+K aantikte en zich bedacht,
+    // raakte met één toets ook zijn halve zin kwijt.
+    // Twee controles, zodat de volgorde van aanmelden niet uitmaakt: staat het palet nog open dan
+    // is hij van hen, en is hij al gesloten dan heeft palette.js dat op het event gemerkt.
+    if(palOpen() || e._paletSlootZichzelf) return;
     // `bovensteModal` i.p.v. querySelector: er kunnen er twee openstaan (de verwijdervraag komt
     // vanuit het bewerkscherm) en dan hoort Escape de bovenste te sluiten, niet de eerste in de HTML.
     const open=bovensteModal();
@@ -363,7 +371,14 @@ document.addEventListener('DOMContentLoaded',()=>{
     // F4: alle modal-achtergronden delen class 'modal-bg' (index.html); één check volstaat.
     // Nieuwe modals hoeven hier niet meer te worden toegevoegd zolang ze .modal-bg gebruiken.
     if(document.querySelector('.modal-bg.open')) return;
-    if(document.getElementById('dot').classList.contains('loading')) return;
+    // 'Loopt er al een ronde?' — aan de toestand vragen, niet aan een CSS-klasse. Dit stond hier
+    // als `dot.classList.contains('loading')`, en dat was een dodelijke koppeling: `setSaving()`
+    // zet die klasse ook bij een schrijfactie, en de stille resync die daarná loopt zet hem alleen
+    // weer weg als hij slaagt. Faalde die ene resync (netwerkhapering, 429) terwijl de teller nog
+    // op één stond, dan bleef de bol op 'Laden…' — en sloeg déze regel daarna élke ronde af. Het
+    // dashboard ververste vanaf dat moment nooit meer uit zichzelf, zonder één melding; alleen een
+    // klik op Vernieuwen bracht het terug. `_loadInFlight` zegt hetzelfde en kan niet blijven hangen.
+    if(state._loadInFlight) return;
     if(state.pendingWrites>0) return;
     if(state.bulkMode) return;
     if(state._animBusy) return;

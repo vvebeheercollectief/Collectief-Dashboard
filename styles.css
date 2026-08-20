@@ -224,8 +224,10 @@
     thead th{background:var(--sur2);padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--bor);white-space:nowrap}
     /* Sorteerbare kolomkoppen (NTD): knop erft de th-typografie; pijl toont de richting */
     .th-sort{background:none;border:0;padding:0;font:inherit;color:inherit;text-transform:inherit;letter-spacing:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
-    .th-sort:hover{color:var(--tx)}
-    .th-sort.aan{color:var(--sec,var(--tx))}
+    /* --txt, niet --tx: die variabele bestaat niet, dus de hover viel stil terug op de erfkleur
+       en het kopje reageerde nergens op. Ook in de terugval van .aan hieronder. */
+    .th-sort:hover{color:var(--txt)}
+    .th-sort.aan{color:var(--sec,var(--txt))}
     .th-sort:focus-visible{outline:2px solid var(--ac);outline-offset:2px;border-radius:3px}
     .th-pijl{font-size:8px;line-height:1}
     tbody tr{border-bottom:1px solid var(--row-divider);transition:background var(--tr)}
@@ -482,8 +484,12 @@
     .empty-ico{font-size:32px;margin-bottom:8px}
 
     /* Modal */
-    .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;display:flex;align-items:flex-start;justify-content:center;padding:32px 16px;overflow-y:auto;opacity:0;pointer-events:none;transition:opacity .2s}
-    .modal-bg.open{opacity:1;pointer-events:all}
+        /* visibility hoort hier bij opacity en pointer-events. Zonder die derde blijven de velden van
+       een GESLOTEN venster gewoon in de toetsenbordvolgorde staan: gemeten 116 focusbare velden in
+       tien dichte vensters, waar een Tab-gebruiker doorheen moest voor hij bij de tabel was.
+       De vertraging van 0,2s bij het sluiten laat de uitfade eerst aflopen. */
+    .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;display:flex;align-items:flex-start;justify-content:center;padding:32px 16px;overflow-y:auto;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .2s,visibility 0s .2s}
+    .modal-bg.open{opacity:1;visibility:visible;pointer-events:all;transition:opacity .2s,visibility 0s}
     /* Verticaal centreren via auto-marges, NIET via align-items:center. Deze laag scrollt
        (overflow-y:auto), en bij align-items:center raakt de bovenkant van een venster dat hoger
        is dan het scherm onbereikbaar — je kunt er dan niet naartoe scrollen. Auto-marges vallen
@@ -846,7 +852,10 @@
     .cb:hover{border-color:var(--ac)}
     .cb.aan{background:var(--ac);border-color:var(--ac)}
     .cb.aan::after{content:'✓';color:#fff;font-size:10px;font-weight:800;line-height:1}
-    #bulk-balk{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:600;background:var(--nv);color:#fff;border-radius:14px;box-shadow:var(--shl);display:flex;align-items:center;gap:4px;padding:9px 13px}
+        /* z-index 450: boven de inhoud en de zijbalk (200), maar ONDER de vensters (500/520). Op 600
+       lag de balk bovenop een open bevestigingsvraag en was zijn 'Afronden' daar aanklikbaar —
+       precies de tweede bulk-actie die de vraag moest tegenhouden. */
+#bulk-balk{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:450;background:var(--nv);color:#fff;border-radius:14px;box-shadow:var(--shl);display:flex;align-items:center;gap:4px;padding:9px 13px}
     .bb-knop{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:#fff;border-radius:8px;padding:7px 11px;background:transparent;white-space:nowrap;transition:background var(--tr)}
     .bb-knop:hover{background:rgba(255,255,255,.12)}
     .bb-groen{background:var(--gn)}

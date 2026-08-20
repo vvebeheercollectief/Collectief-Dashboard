@@ -126,7 +126,7 @@ function kenmerkenKaart(code){
       <div class="kmk-rij"><span>Kozijnen</span>${sel('kmk-kozijnen',k.kozijnen)}</div>
       <div class="kmk-bron-lbl">Bron</div>
       <div class="opmaak-veld">
-        <textarea id="kmk-bron" rows="2" placeholder="bv. splitsingsakte art. 17, mail gemeente 03-2024">${esc(k.bron)}</textarea>
+        <textarea id="kmk-bron" data-code="${esc(code)}" rows="2" placeholder="bv. splitsingsakte art. 17, mail gemeente 03-2024">${esc(k.bron)}</textarea>
         ${opmaakBalk()}
       </div>
       <div class="kmk-knoppen">
@@ -279,6 +279,30 @@ function renderVve(){
   const _leTekstEl=_leBox?.querySelector('.log-edit-tekst');
   const _leEntry=state.logEdit?(D.logboek||[]).find(x=>x._row===state.logEdit):null;
   const _leBewaar=(_leTekstEl && _leEntry && _leBox.dataset.ts===(_leEntry.timestamp||''))?{tekst:_leTekstEl.value,wie:_leBox.querySelector('.log-edit-wie')?.value}:null;
+  // Kenmerken-behoud, om precies dezelfde reden als de composer hierboven — dit formulier had het
+  // alleen nog niet. Het leest zijn waarden uit D, dus elke poll zette een half ingetypte bron en
+  // een net gekozen waarde terug naar wat er in de Sheet stond. Gemeten: 'splitsingsakte artikel 17'
+  // was na één hertekening leeg en Balkons stond weer op 'Onbekend'. Zelfde code-vergelijking als
+  // bij de composer: wissel je van VvE, dan hoort de tekst niet mee te verhuizen.
+  const _oudBron=document.getElementById('kmk-bron');
+  const _kmkBewaar=(state.kenmerkenEdit && _oudBron && _oudBron.dataset.code===code)
+    ? { bron:_oudBron.value,
+        balkons:document.getElementById('kmk-balkons')?.value,
+        kozijnen:document.getElementById('kmk-kozijnen')?.value } : null;
+  // Waar stond de cursor? De waarde bewaren was maar de helft: het element zelf wordt vervangen,
+  // dus de focus viel terug op <body> en de volgende aanslagen kwamen nergens terecht. Wie midden
+  // in een zin zat, typte de rest in het niets. Alleen binnen dit paneel, en alleen voor velden
+  // die we hierboven ook echt terugzetten.
+  const _act=document.activeElement;
+  const _focusHerstel=(()=>{
+    if(!_act || !wrap.contains(_act)) return null;
+    const opId=['dos-tekst','dos-wie','kmk-bron','kmk-balkons','kmk-kozijnen'].includes(_act.id);
+    const opKlasse=['log-edit-tekst','log-edit-wie'].find(k=>_act.classList && _act.classList.contains(k));
+    if(!opId && !opKlasse) return null;
+    // selectionStart bestaat niet op een <select>; dan is er ook geen cursor om terug te zetten.
+    return { id:opId?_act.id:null, klasse:opKlasse||null,
+             start:_act.selectionStart ?? null, eind:_act.selectionEnd ?? null };
+  })();
   // De topbar houdt de vaste paginatitel uit PAGE_META ("VvE-dossier");
   // code + naam staan al groot in de kop hieronder — niet dubbel tonen.
 
@@ -413,6 +437,21 @@ function renderVve(){
   if(_leBewaar){
     const t=document.querySelector('#vve-inhoud .log-edit-tekst'); if(t) t.value=_leBewaar.tekst;
     const w=document.querySelector('#vve-inhoud .log-edit-wie'); if(w&&_leBewaar.wie) w.value=_leBewaar.wie;
+  }
+  if(_kmkBewaar){
+    const b=document.getElementById('kmk-bron');     if(b) b.value=_kmkBewaar.bron;
+    const ba=document.getElementById('kmk-balkons'); if(ba&&_kmkBewaar.balkons) ba.value=_kmkBewaar.balkons;
+    const ko=document.getElementById('kmk-kozijnen');if(ko&&_kmkBewaar.kozijnen) ko.value=_kmkBewaar.kozijnen;
+  }
+  if(_focusHerstel){
+    const el=_focusHerstel.id ? document.getElementById(_focusHerstel.id)
+                              : wrap.querySelector('.'+_focusHerstel.klasse);
+    if(el){
+      try{ el.focus(); }catch(_){}
+      // Pas ná focus(): een setSelectionRange vóór de focus wordt door de browser genegeerd.
+      if(_focusHerstel.start!=null && el.setSelectionRange)
+        try{ el.setSelectionRange(_focusHerstel.start,_focusHerstel.eind); }catch(_){}
+    }
   }
   // Slepen aan het handvat van een rij om hem onder een andere te hangen. Dit is de plek waar het
   // hoofdvoorbeeld uit de spec werkt:

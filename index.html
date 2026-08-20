@@ -800,7 +800,10 @@
   </div>
 </div>
 
-<div id="toast-container"></div>
+<!-- aria-live: zonder deze regel is geen enkele terugkoppeling van het dashboard hoorbaar —
+     ook niet de melding met 8 seconden om iets ongedaan te maken. 'polite' en niet 'assertive':
+     de meldingen komen soms met meerdere tegelijk en mogen elkaar niet afkappen. -->
+<div id="toast-container" aria-live="polite" aria-atomic="false"></div>
 
 <!-- ═══════ NOTIFICATIE INSTELLINGEN ═══════ -->
 <div class="modal-bg" id="notif-bg">

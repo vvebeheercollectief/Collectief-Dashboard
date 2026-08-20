@@ -140,7 +140,14 @@ function initPalette(){
   document.getElementById('zoek-btn').onclick=openPalette;
   document.addEventListener('keydown',e=>{
     if((e.ctrlKey||e.metaKey)&&(e.key==='k'||e.key==='K')){ e.preventDefault(); palOpen()?closePalette():openPalette(); }
-    else if(e.key==='Escape'&&palOpen()){ closePalette(); }
+    // Een merkje op het event als seintje aan de Escape-handler in main.js: 'deze toets is hier al
+    // afgehandeld'. Beide luisteraars hangen aan document en het palet is óók een .modal-bg,
+    // maar het staat in de HTML ná het bewerkscherm — zonder seintje sloot main.js daarnaast
+    // ook nog het scherm eronder. Samen met de palOpen()-controle daar klopt het in beide
+    // volgordes, zodat het niet afhangt van wie zich het eerst heeft aangemeld. Bewust een eigen
+    // merkje en niet preventDefault(): dat werkt alleen op een cancelable event, en daarmee zou
+    // het seintje afhangen van hoe de toets is opgewekt.
+    else if(e.key==='Escape'&&palOpen()){ closePalette(); e._paletSlootZichzelf=true; }
     else if(e.key==='Escape'&&state.bulkMode){
       // F3: geen bulk-toggle als er een modal open staat (snooze, edit, etc.)
       if(document.querySelector('.modal-bg.open')) return;

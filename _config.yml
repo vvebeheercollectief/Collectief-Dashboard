@@ -5,6 +5,12 @@
 # losse logo-*.png in de root) heeft geen underscore-prefix en staat niet in de lijst,
 # dus die wordt gewoon gepubliceerd.
 exclude:
+  # De broncode van de Vercel-proxy hoort niet op de publieke site. Er staan geen sleutels in
+  # (die komen uit process.env), maar de hele toegangscontrole — origins, verwachte OAuth-client,
+  # allowlist-logica — stond zo wél te lezen op vvebeheercollectief.github.io/.../api/chat.js
+  # (nagemeten: HTTP 200). Vercel leest deze regel niet, dus de functie zelf blijft gewoon draaien.
+  # 'api' weert geen ander bestand: apple-touch-icon.png begint met 'app', niet met 'api'.
+  - api
   - mockups
   - logo-pakket
   - vrijdagsoverzicht.html

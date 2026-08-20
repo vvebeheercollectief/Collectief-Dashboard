@@ -643,6 +643,18 @@ async function _loadRonde(silent){
   }
   finally{
     state._loadInFlight=false;
+    // Vangnet voor de statusbalk: een afgeronde ronde mag hem nooit op 'Laden…' laten staan.
+    // Die stand komt van `setSaving()` (schrijfactie) of `setSyncing()` (handmatige verversing);
+    // een STILLE ronde die faalt terwijl de fouten-teller nog op één staat zet noch 'Fout' noch
+    // 'Live' — dan blijft 'Laden…' staan en liegt de balk over wat er aan de hand is. Alleen als
+    // er niets meer loopt: een tweede schrijfactie of een ingeplande vervolgronde hoort hem juist
+    // wél op 'Laden…' te houden.
+    if(state.pendingWrites===0 && !state._loadAgain
+       && document.getElementById('dot')?.classList.contains('loading')){
+      if(isOffline()) setSyncOffline();
+      else if((state._syncFails||0)>0) setSyncErr();
+      else setSynced();
+    }
     if(state._loadAgain){
       // Onderdrukte aanroep alsnog uitvoeren; luid als er een handmatige verversing tussen zat.
       const loud=state._loadAgainLoud; state._loadAgain=false; state._loadAgainLoud=false;

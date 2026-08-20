@@ -12,7 +12,7 @@ import { HERO_VIEWS } from "./render-analytics.js";
 import { state, D, pgs } from "./state.js";
 import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel, renderVve, groepeerBundels } from "./render-vve.js";
 import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN, saveKenmerken } from "./kenmerken.js";
-import { zoekAlles } from "./palette.js";
+import { zoekAlles, openPalette, closePalette, palOpen } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen, bulkSelectie, bulkWis, renderBulkUi, bulkDoe, bulkVink } from "./bulk.js";
 import { _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, veiligeCel, _veiligeRij, fetchSheet, fetchSheets, vingerafdruk, rijVingerafdruk, _normCel, _rijNaarCellen, assertRowMatch, NTD_DATUM, _isOffline, _isNetwerkFout, appendRange, appendRows } from "./api.js";
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
@@ -31,6 +31,7 @@ import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from
 import { toggleHerhaalStatus, renderHerhaal, openHerhaalModal, deleteHerhaal } from "./render-herhaal.js";
 import { openSnoozeModal, snoozeOpslaan, closeSnoozeModal } from "./snooze.js";
 import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
+import { _verrijkOfferteRij } from "./render-offerte.js";
 import { bouwBundelIndex, bundelWeergave, zichtbareKop, isBundel, bundelVan, bundelMetId, hernummerLeden, volgendeVolg, magKoppelen, wordtGeabsorbeerd, koppelKandidaten, taakFilter, openSubtaken, bundelWaarschuwing, bundelVerwijzing, bundelStand, zelfdeTaak } from "./bundel.js";
 import { bundelPaneelHtml, bundelMerkje, bundelKopExtra, STAPEL_GREEP } from "./render-bundel.js";
 import { vraagBevestiging, beantwoordBevestiging, _vraagStaatOpen } from "./bevestig.js";
@@ -46,6 +47,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     else { _tFail++; console.error(`FAIL: ${label} → verwacht ${e}, kreeg ${g}`); }
   };
   const truthy = (label, got) => { if (got) { _tOk++; } else { _tFail++; console.error(`FAIL: ${label} → verwacht waar, kreeg ${JSON.stringify(got)}`); } };
+  const waardeVan = id => { const el = document.getElementById(id); return el ? el.value : '<geen veld ' + id + '>'; };
   // Antwoord op een values:batchGet-URL bouwen dat de gevraagde reeksen respecteert: vul alleen
   // het tabblad waar de test om gaat, de rest leeg. Naam-gestuurd, zodat een stub niet omvalt
   // (of groen blijft om de verkeerde reden) zodra loadAll een andere reeks vraagt.
@@ -3796,7 +3798,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '10.23');
+  eq('versie opgehoogd', APP_VERSION, '10.24');
 
   // ── Pushmeldingen: de twee schakels die stil kapot waren (audit 2026-08-06) ──
   // Beide defecten waren onzichtbaar: de app meldde "Notificaties zijn aan!" terwijl er nooit
@@ -8737,6 +8739,206 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   })();
 
   // ══════════════════════════════════════════════════════════════════════════
+  //  OFFERTE-TELLER — het bewerkscherm toont kolom D, niet de afgeleide stand
+  // ══════════════════════════════════════════════════════════════════════════
+  // `_verrijkOfferteRij` tilt de X/N-teller in het GEHEUGEN op tot het aantal aangevinkte
+  // aannemers; kolom D blijft de handmatige ondergrens. Het bewerkscherm las die opgetilde waarde,
+  // dus één keer openen en opslaan zette hem alsnog in kolom D. En omdat de ondergrens met
+  // Math.max werkt, kom je daar nooit meer onder: een vinkje weghalen deed daarna niets meer.
+  (() => {
+    console.log('%c[TESTS] Offerte-teller in het bewerkscherm', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const editOud = state.editRowData;
+    try {
+      const r = { code: '311212', naam: 'X', datumAangevraagd: '1 aug 2026', offertes: '0/3',
+                  behandelaar: 'Jer', deadline: '', opmerkingen: '',
+                  aannemers: 'Jansen|1\nPietersen|1\nDe Vries|0', _row: 9, _sec: 'OFFERTE-TRAJECTEN' };
+      _verrijkOfferteRij(r);
+      eq('offerte: het scherm toont de afgeleide stand, kolom D blijft de handmatige',
+         [r._offertesManual, r.offertes], ['0/3', '2/3']);
+      openModal(true, r);
+      eq('offerte: het bewerkscherm vult de teller met kolom D en niet met de afgeleide stand',
+         [waardeVan('m-off-recv'), waardeVan('m-off-total')], ['0', '3']);
+      closeModal();
+      // Tegenproef: een rij die nooit verrijkt is (geen aannemerslijst) heeft geen _offertesManual
+      // en moet gewoon zijn eigen waarde tonen.
+      openModal(true, { code: '311213', naam: 'Y', datumAangevraagd: '', offertes: '1/2',
+                        behandelaar: '', deadline: '', opmerkingen: '', _row: 10, _sec: 'OFFERTE-TRAJECTEN' });
+      eq('offerte: zonder aannemerslijst blijft de eigen waarde staan',
+         [waardeVan('m-off-recv'), waardeVan('m-off-total')], ['1', '2']);
+      closeModal();
+    } finally { state.editRowData = editOud; closeModal(); }
+  })();
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  GEPLAKTE OPMAAK — Google Docs wikkelt alles in één <b>
+  // ══════════════════════════════════════════════════════════════════════════
+  // Een kopie uit Google Docs zit ALTIJD in één <b style="font-weight:normal" id="docs-internal-…">
+  // om de hele selectie heen. `isVet` keek eerst naar de tagnaam, dus een geplakte mail werd in
+  // z'n geheel vet en de échte accenten kwamen als verdwaalde sterretjes in beeld.
+  (() => {
+    console.log('%c[TESTS] Plakken met opmaak', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const gdocs = '<meta charset="utf-8"><b style="font-weight:normal" id="docs-internal-guid-1a2b">'
+      + '<p dir="ltr"><span style="font-size:11pt;font-weight:400">Beste bestuur, hierbij de offerte. </span>'
+      + '<span style="font-size:11pt;font-weight:700">Let op de garantie.</span></p></b>';
+    eq('plakken: een Google-Docs-plak wordt niet in z\'n geheel vet',
+       htmlNaarMarkers(gdocs), 'Beste bestuur, hierbij de offerte. **Let op de garantie.**');
+    // Tegenproef 1: een gewone <b> zónder eigen gewicht blijft gewoon vet.
+    eq('plakken: een gewone <b> blijft vet', htmlNaarMarkers('Los <b>vet</b> stuk'), 'Los **vet** stuk');
+    // Tegenproef 2: hetzelfde voor schuin, en een <i> die zichzelf op normaal zet telt niet mee.
+    eq('plakken: schuin volgt dezelfde regel',
+       [htmlNaarMarkers('Los <i>schuin</i> stuk'), htmlNaarMarkers('<i style="font-style:normal">plat</i>')],
+       ['Los _schuin_ stuk', 'plat']);
+    // Tegenproef 3: een kop is nog steeds vet — daar zegt de stijl niets over het gewicht.
+    eq('plakken: een kop blijft vet', htmlNaarMarkers('<h2>Kopje</h2>'), '**Kopje**');
+  })();
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  ESCAPE — één toets sluit één ding
+  // ══════════════════════════════════════════════════════════════════════════
+  // Het commandopalet is óók een .modal-bg, maar het staat in de HTML ná het bewerkscherm. Escape
+  // liep dus langs twee luisteraars: palette.js sloot het palet, en main.js vroeg `bovensteModal()`
+  // — dat op HTML-volgorde uitkwam bij het BEWERKSCHERM. Wie tijdens het bewerken Ctrl+K aantikte
+  // en zich bedacht, raakte met één toets ook zijn half ingetypte taak kwijt.
+  await (async () => {
+    console.log('%c[TESTS] Escape sluit één ding', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const editOud = state.editRowData;
+    const esc = () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    try {
+      openModal(true, { code: '311212', naam: 'X', actiepunt: 'Halve zin', deadline: '',
+                        behandelaar: 'Jer', _row: 5, _sec: 'OPPAKKEN' });
+      openPalette();
+      await new Promise(r => setTimeout(r, 50));
+      eq('escape: palet én bewerkscherm staan open', [palOpen(), document.getElementById('modal-bg').classList.contains('open')], [true, true]);
+      esc();
+      await new Promise(r => setTimeout(r, 50));
+      eq('escape: sluit alleen het palet, het bewerkscherm blijft staan',
+         [palOpen(), document.getElementById('modal-bg').classList.contains('open')], [false, true]);
+      // En de tweede Escape doet wél wat je verwacht.
+      esc();
+      await new Promise(r => setTimeout(r, 50));
+      eq('escape: de tweede sluit het bewerkscherm', document.getElementById('modal-bg').classList.contains('open'), false);
+    } finally { closePalette(); closeModal(); state.editRowData = editOud; }
+  })();
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  VVE-DOSSIER — half ingevulde velden overleven de 8s-poll
+  // ══════════════════════════════════════════════════════════════════════════
+  // De composer en het logregel-bewerkveld hadden dit al; het kenmerken-formulier niet. Dat leest
+  // zijn waarden uit D, dus elke hertekening zette een half ingetypte bron en een net gekozen
+  // waarde terug naar wat er in de Sheet stond — om de acht seconden. En de waarde bewaren was
+  // maar de helft: het element zelf wordt vervangen, dus de focus viel terug op <body> en de rest
+  // van de zin kwam nergens terecht.
+  await (async () => {
+    console.log('%c[TESTS] VvE-dossier: veldbehoud', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const ntdOud = D.ntd, afOud = D.af, alvoOud = D.alvo, kmkOud = D.kenmerken;
+    const codeOud = state.vveCode, editOud = state.kenmerkenEdit;
+    const paginaOud = (document.querySelector('.page.active') || {}).id;
+    const leeg = { OPPAKKEN: [], VERGADERVERZOEKEN: [], 'OFFERTE-TRAJECTEN': [], LOD: [], 'SUBSIDIE-TRAJECTEN': [] };
+    try {
+      D.ntd = { ...leeg }; D.af = { ...leeg }; D.kenmerken = [];
+      D.alvo = [{ code: 'KM-01', naam: 'Kenmerkhof', datum: '', status: '', opmerkingen: '', _row: 2 },
+                { code: 'KM-02', naam: 'Andershof',  datum: '', status: '', opmerkingen: '', _row: 3 }];
+      goTo('vve');
+      state.vveCode = 'KM-01'; state.kenmerkenEdit = true; renderVve();
+      const bron = document.getElementById('kmk-bron'), balkons = document.getElementById('kmk-balkons');
+      truthy('dossier: het kenmerken-formulier staat in beeld', !!bron && !!balkons);
+      bron.value = 'splitsingsakte artikel 17'; balkons.value = 'Gemeenschappelijk';
+      bron.focus(); bron.setSelectionRange(8, 8);
+      renderVve();   // dit is wat de poll doet
+      const bron2 = document.getElementById('kmk-bron'), balkons2 = document.getElementById('kmk-balkons');
+      eq('dossier: getypte bron en gekozen waarde overleven een hertekening',
+         [bron2.value, balkons2.value], ['splitsingsakte artikel 17', 'Gemeenschappelijk']);
+      eq('dossier: en de cursor staat nog waar hij stond',
+         [document.activeElement === bron2, bron2.selectionStart], [true, 8]);
+      // Tegenproef: wissel je van VvE, dan hoort de tekst NIET mee te verhuizen — anders schrijf je
+      // de bron van de ene VvE bij de andere.
+      state.vveCode = 'KM-02'; renderVve();
+      eq('dossier: bij een andere VvE begint het formulier weer leeg',
+         document.getElementById('kmk-bron').value, '');
+    } finally {
+      D.ntd = ntdOud; D.af = afOud; D.alvo = alvoOud; D.kenmerken = kmkOud;
+      state.vveCode = codeOud; state.kenmerkenEdit = editOud;
+      renderVve(); if (paginaOud) goTo(paginaOud.replace(/^page-/, ''));
+    }
+  })();
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  BEWERKSCHERM — een leeg toevoegscherm is ook echt leeg
+  // ══════════════════════════════════════════════════════════════════════════
+  // `clearModal` sloeg readonly-velden over, en 'm-naam' is het enige readonly veld in het venster.
+  // Een toevoegscherm opende dus met de VvE-naam van de taak die je daarvóór bekeek, terwijl
+  // 'm-code' er leeg naast stond. Kies je de nieuwe VvE uit de suggestielijst dan wordt de naam
+  // overschreven en merk je niets — maar tik of plak je de code met de hand (een VvE die nog niet
+  // in de lijst staat), dan leest submitTask hier de náám van de vórige VvE.
+  (() => {
+    console.log('%c[TESTS] Bewerkscherm leegmaken', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const editOud = state.editRowData;
+    try {
+      openModal(true, { code: '311212', naam: 'VvE Weimarstraat 12-18', actiepunt: 'Iets',
+                        deadline: '', behandelaar: 'Jer', _row: 5, _sec: 'OPPAKKEN' });
+      eq('bewerkscherm: het bewerken van een taak vult code én naam',
+         [waardeVan('m-code'), waardeVan('m-naam')], ['311212', 'VvE Weimarstraat 12-18']);
+      closeModal();
+      openModal(false);
+      eq('bewerkscherm: een toevoegscherm daarna begint met beide velden leeg',
+         [waardeVan('m-code'), waardeVan('m-naam')], ['', '']);
+      closeModal();
+      // En een toevoegscherm mét vooraf ingevulde VvE (de +-knop op de dossierpagina) blijft werken.
+      openModal(false, null, { sec: 'OPPAKKEN', code: '311999', naam: 'Andere VvE' });
+      eq('bewerkscherm: een vooraf ingevulde VvE komt er wél in',
+         [waardeVan('m-code'), waardeVan('m-naam')], ['311999', 'Andere VvE']);
+      closeModal();
+    } finally { state.editRowData = editOud; closeModal(); }
+  })();
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  STATUSBALK — een afgeronde ronde laat nooit 'Laden…' staan
+  // ══════════════════════════════════════════════════════════════════════════
+  // De 8s-poll sloeg af op `dot.classList.contains('loading')`. `setSaving()` zet die klasse ook
+  // bij een schrijfactie, en de stille resync die daarná loopt haalde hem alleen weg als hij
+  // sláágde: een stille ronde die faalt terwijl de fouten-teller nog op één staat zet noch 'Fout'
+  // noch 'Live'. Eén netwerkhapering op het verkeerde moment liet de bol dus voorgoed op 'Laden…'
+  // staan — en daarmee lag de poll stil tot iemand op Vernieuwen klikte. Twee dingen zijn
+  // veranderd: de poll vraagt het nu aan `state._loadInFlight`, en de ronde zet de balk in het
+  // finally-blok altijd in een eerlijke eindstand.
+  await (async () => {
+    console.log('%c[TESTS] Statusbalk na een schrijfactie', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const _fetch = window.fetch, tokenOud = state.oauthToken, expiryOud = state.oauthExpiry;
+    const pwOud = state.pendingWrites, failsOud = state._syncFails, uitCacheOud = state._uitCache;
+    const dotEl = document.getElementById('dot'), lblEl = document.getElementById('sync-lbl');
+    const wachtKlaar = async () => { await state._writeChain;
+      for (let i = 0; i < 200 && (state._loadInFlight || state.pendingWrites > 0); i++) await new Promise(r => setTimeout(r, 5)); };
+    try {
+      state.oauthToken = 'nep'; state.oauthExpiry = Date.now() + 3600e3; state._uitCache = false;
+
+      // 1. Schrijfactie lukt, de stille resync erna FAALT (403 — geen herkansing, geen terugval).
+      //    Dit is precies het scenario dat de poll doodlegde.
+      state._syncFails = 0;
+      window.fetch = async (url, opt) => (opt && opt.method === 'PUT')
+        ? new Response('{}', { status: 200 })
+        : new Response(JSON.stringify({ error: { message: 'geen leesverkeer in deze test' } }), { status: 403 });
+      backgroundWrite(async () => {}, () => {}, 'Test');
+      await wachtKlaar();
+      eq('statusbalk: een mislukte stille resync laat de bol niet op Laden staan',
+         [dotEl.classList.contains('loading'), lblEl.textContent], [false, 'Fout']);
+
+      // 2. En de gewone gang van zaken blijft gewoon 'Live · HH:MM'.
+      state._syncFails = 0;
+      window.fetch = async (url, opt) => (opt && opt.method === 'PUT')
+        ? new Response('{}', { status: 200 })
+        : new Response(JSON.stringify(_batchGetStub(url, 'Nog Te Doen', [])), { status: 200 });
+      backgroundWrite(async () => {}, () => {}, 'Test');
+      await wachtKlaar();
+      eq('statusbalk: na een geslaagde resync staat hij weer op Live',
+         [dotEl.classList.contains('loading'), lblEl.textContent.startsWith('Live')], [false, true]);
+    } finally {
+      window.fetch = _fetch; state.oauthToken = tokenOud; state.oauthExpiry = expiryOud;
+      state.pendingWrites = pwOud; state._syncFails = failsOud; state._uitCache = uitCacheOud;
+      document.querySelectorAll('.toast').forEach(t => t.remove());
+    }
+  })();
+
+  // ══════════════════════════════════════════════════════════════════════════
   //  TOEGANKELIJKHEID — namen en koppelingen in de echte schil
   // ══════════════════════════════════════════════════════════════════════════
   // Deze blok toetst niet één functie maar de UITKOMST op de echte index.html, want dat is waar
@@ -8758,8 +8960,12 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     eq('a11y: geen enkel invoerveld zonder naam', naamloos, []);
 
     // 2. Elke knop ook. Een icoon-only knop zonder naam heet 'knop' en verder niets.
+    // textContent en NIET innerText: innerText leest de opgemaakte tekst en geeft '' terug voor alles
+    // wat niet getekend wordt. Gesloten vensters staan sinds deze ronde op visibility:hidden (om ze
+    // uit de tabvolgorde te halen), en daarmee zou innerText vijftien knoppen met een prima label
+    // — 'Annuleren', 'Toevoegen' — als naamloos aanmerken.
     const knoploos = [...document.querySelectorAll('button,[role="button"]')].filter(b =>
-      !(b.innerText || '').trim() && !b.getAttribute('aria-label')
+      !(b.textContent || '').trim() && !b.getAttribute('aria-label')
       && !b.getAttribute('title') && !b.getAttribute('aria-labelledby')).map(b => b.id || b.className);
     eq('a11y: geen enkele knop zonder naam', knoploos, []);
 

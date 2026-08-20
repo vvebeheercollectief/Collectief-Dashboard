@@ -190,6 +190,13 @@
 
     /* Card */
     .card{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;margin-bottom:18px}
+    /* overflow:hidden maakt van de kaart een scroll-container, en dáárbinnen heeft
+       `position:sticky` niets om aan vast te houden: de datumkoppen in het Logboek schoven
+       gewoon mee omhoog (gemeten: bij volledig doorscrollen stond de kop op -936px i.p.v. te
+       blijven staan). `overflow:clip` knipt precies hetzelfde af maar maakt géén scroll-container,
+       dus dan plakken ze wél — aan #content, de echte scroller. In @supports omdat Safari 15 het
+       nog niet kent; daar blijft het bij hidden en dus bij de oude situatie. */
+    @supports (overflow: clip){ .card{overflow:clip} }
     .card-hdr{padding:13px 16px;border-bottom:1px solid var(--bor);display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-height:52px}
     .card-hdr h2{font-size:14px;font-weight:700;flex:1;min-width:0}
 

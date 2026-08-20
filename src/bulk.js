@@ -4,7 +4,7 @@
 import { state, D } from "./state.js";
 import { renderNtd } from "./render-lijsten.js";
 import { toDutchDate, berekenPrioriteit, _parseAnyDate, _vandaagAmsterdam, _verschilInKalenderdagen, parseDt, kiesAfgerondRij } from "./util.js";
-import { SECS, SID } from "./config.js";
+import { SID } from "./config.js";
 import { ensureToken } from "./auth.js";
 import { _shiftNtdRows, _herstelShift, assertRowsMatch, _veiligeRij } from "./api.js";
 import { getSheetIds, getAfInsertRow, getInsertRow, insertAndWriteRow, serializeNtdUndo, afrondWaarden } from "./crud.js";

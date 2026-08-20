@@ -119,6 +119,20 @@ self.addEventListener('fetch', e => {
         caches.open(CACHE_VERSION).then(c => c.put(e.request, clone));
       }
       return resp;
-    }).catch(() => caches.match(e.request).then(r => r || caches.match('./index.html')))
+    }).catch(err => {
+      // Alleen een GET mag uit de cache worden beantwoord. Hier stond één regel die op ÉLK
+      // mislukt verzoek de gecachete index.html teruggaf, mét status 200 — ook op de POST naar
+      // de chat-proxy. De aanroeper probeerde daar JSON van te maken en kreeg een
+      // onbegrijpelijke SyntaxError, in plaats van te merken dat er geen verbinding was.
+      if (e.request.method !== 'GET') throw err;
+      return caches.match(e.request).then(r => {
+        if (r) return r;
+        // En index.html is alleen een goed antwoord op een PAGINA-verzoek. Op een gemiste module
+        // of stylesheet leverde het HTML op waar JavaScript werd verwacht — weer een verwarrende
+        // parseerfout in plaats van een eerlijke netwerkfout.
+        if (e.request.mode === 'navigate') return caches.match('./index.html');
+        throw err;
+      });
+    })
   );
 });

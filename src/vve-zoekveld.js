@@ -130,6 +130,12 @@ function initVveZoekveld({input, lijstEl, minTekens=0, maxItems=null, onSelect,
       kies(actief);
     }
   });
+  // De muisknop indrukken ín de lijst mag het veld niet laten vervagen. Zonder deze regel liep
+  // het kiezen via een tijdslot van 200 ms: druk je iets langer op een suggestie, of sleep je de
+  // lijst omlaag om verder te kijken, dan was hij bij het loslaten al gesloten en gebeurde er
+  // niets. preventDefault op mousedown houdt de focus in het veld, zodat 'blur' pas afgaat als de
+  // gebruiker écht ergens anders heen gaat — dan is het tijdslot alleen nog een vangnet.
+  lijstEl.addEventListener('mousedown', e=>e.preventDefault());
   input.addEventListener('blur', ()=>setTimeout(sluit, 200));
 }
 

@@ -116,7 +116,14 @@ async function submitOntwItem(){
   const who=getCurrentWho()||'?';
   const d=new Date();
   const today=`${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;
-  const values=[titel,cat,inhoud,who,today,status];
+  // Bij BEWERKEN blijven 'Door' en 'Datum' van de oorspronkelijke schrijver staan. Ze werden
+  // onvoorwaardelijk overschreven met de huidige gebruiker en de dag van vandaag, dus wie een
+  // typefout van een collega verbeterde, zette zijn eigen naam en datum onder diens item — de
+  // herkomst was daarmee weg. Een oude regel zonder die velden krijgt ze alsnog (vandaar de ||).
+  const bewerken = !!(state.ontwEditMode && state.ontwEditRow?._row);
+  const door  = bewerken ? ((state.ontwEditRow.door  || '').trim() || who)   : who;
+  const datum = bewerken ? ((state.ontwEditRow.datum || '').trim() || today) : today;
+  const values=[titel,cat,inhoud,door,datum,status];
   try{
     await metWriteMarkering(async()=>{
       if(state.ontwEditMode&&state.ontwEditRow?._row){

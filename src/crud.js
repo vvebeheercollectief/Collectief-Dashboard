@@ -218,7 +218,24 @@ function fillModalFields(sec,r){
       zetModalFase(r.subsidieFase);break;
   }
 }
-function setv(id,v){const el=document.getElementById(id);if(el)el.value=(v===undefined||v===null)?'':v} // 0 blijft '0' (geen falsy-coercie)
+// Zet een waarde in een veld. Bij een <select> geldt een extra regel: staat de opgeslagen waarde
+// niet in de keuzelijst, dan zet de browser de select stilletjes op '' — en schrijft submitTask die
+// leegte even stilletjes terug naar de Sheet. Zo verdween de behandelaar van élke taak van Cihan
+// (die stond niet in de lijst, wél in het bulk-menu) en van elke combinatie in de 'verkeerde'
+// volgorde: 'Cihad, Jer' stond er wel, 'Jer, Cihad' niet. Eén keer openen en opslaan om alleen de
+// deadline te wijzigen was genoeg. Een waarde die er al is mag nooit verdampen omdat een lijstje
+// hem niet kent; we voegen hem dan toe.
+function setv(id,v){
+  const el=document.getElementById(id);
+  if(!el) return;
+  const w=(v===undefined||v===null)?'':v;   // 0 blijft '0' (geen falsy-coercie)
+  if(el.tagName==='SELECT' && w!=='' && ![...el.options].some(o=>o.value===String(w))){
+    const opt=document.createElement('option');
+    opt.value=String(w); opt.textContent=String(w);
+    el.appendChild(opt);
+  }
+  el.value=w;
+}
 
 // Waar de OMSCHRIJVING van een taak thuishoort, per sectie. Eén bron, want deze koppeling stond op
 // twee plekken en maar één ervan klopte: de AI-hulp vulde het juiste veld, het commandopalet
@@ -307,15 +324,6 @@ async function getSheetIds(){
   return state._sheetIds;
 }
 
-// Bestaat het blok van deze sectie fysiek in 'Nog Te Doen'? Een sectie die wel in
-// SECS staat maar (nog) geen kop + kolomkoprij in de Sheet heeft, levert géén
-// colHeaderRow op. Zonder deze controle valt getInsertRow terug op rij 2 en landt
-// een nieuwe taak middenin OPPAKKEN — precies het gat tussen "nieuwe code live" en
-// "blok toegevoegd aan de Sheet" bij het uitrollen van een nieuwe sectie.
-function sectieBestaatInSheet(sec){
-  if((D.ntd[sec]||[]).length>0) return true;          // er staan al rijen, dus het blok bestaat
-  return !!(D.ntdSecInfo && D.ntdSecInfo[sec] && D.ntdSecInfo[sec].colHeaderRow);
-}
 
 function getInsertRow(sec){
   const entries=D.ntd[sec]||[];
@@ -405,12 +413,6 @@ async function insertAndWriteRow(sheetName,afterRow,values){
     }catch(_){ /* opruimen mislukte; de stille resync (loadAll) negeert de lege rij toch */ }
     throw e;
   }
-}
-
-async function deleteTask(idx){
-  const r=state._rowCache[idx];
-  if(!r) return;
-  await deleteTaskRow(r);
 }
 
 async function deleteCurrentEditTask(){
@@ -596,7 +598,8 @@ async function completeTask(idx, bijDoorgaan){
   await completeTaskRow(r, idx, bijDoorgaan);
 }
 
-// Twee ingangen op één kern, net als bij verwijderen (`deleteTask` → `deleteTaskRow`): een klik op
+// Twee ingangen op één kern, net als bij verwijderen (de knop in de rij en die in het bewerkscherm
+// komen allebei op `deleteTaskRow` uit): een klik op
 // een getekende rij komt met een _rowCache-index binnen, het bewerkscherm met de rij zelf.
 // `rid` dient alléén om straks de groene puls op de aangeklikte DOM-rij terug te vinden; is de taak
 // niet getekend (-1), dan vindt die selector niets en blijft de puls stil — `animateRowOut` valt bij
@@ -806,23 +809,35 @@ async function submitTask(){
       renderAll();
       flashRow('ntd-tbody', doelRow._row);
       closeModal();clearModal();
+      // Vlaggen per stap, zoals doCompleteTask ze al had. `backgroundWrite` draait deze functie
+      // opnieuw bij een tijdelijke fout (429/5xx), en dan is de rij-controle níet meer wat hij
+      // was: de write is dan al geslaagd, dus de Sheet bevat de NIEUWE waarden terwijl de guard
+      // nog met de oude vergelijkt. Dat gaf een valse 'Iemand heeft deze taak net gewijzigd',
+      // een teruggerolde bewerking op het scherm — en de schuld bij een collega die niets deed.
+      // De logregels dragen om dezelfde reden hun eigen vlag: een append is niet idempotent.
+      let geschreven=false, behGelogd=false, faseGelogd=false;
       backgroundWrite(
         async ()=>{
-          await assertRowMatch(doelRow._row, oudeWaarden); // bescherming: rij nog dezelfde TAAK vóór overschrijven
-          // oudeWaarden is de snapshot VÓÓR de optimistische mutatie van doelRow — precies wat
-          // er op dit moment nog in de Sheet hoort te staan.
-          await writeRange(`'Nog Te Doen'!A${doelRow._row}:${endCol}${doelRow._row}`,values);
-          if(newBeh && newBeh!==(oudeWaarden.behandelaar||'')){
+          if(!geschreven){
+            await assertRowMatch(doelRow._row, oudeWaarden); // bescherming: rij nog dezelfde TAAK vóór overschrijven
+            // oudeWaarden is de snapshot VÓÓR de optimistische mutatie van doelRow — precies wat
+            // er op dit moment nog in de Sheet hoort te staan.
+            await writeRange(`'Nog Te Doen'!A${doelRow._row}:${endCol}${doelRow._row}`,values);
+            geschreven=true;
+          }
+          if(newBeh && newBeh!==(oudeWaarden.behandelaar||'') && !behGelogd){
             fireNotifEvent('assigned',{sec,code,naam,behandelaar:newBeh});
             await logEvent(code,sec,'Behandelaar gewijzigd','behandelaar',oudeWaarden.behandelaar,newBeh);
+            behGelogd=true;
           }
           // Fase-wijziging vanuit het bewerkscherm ook vastleggen. Klikken op een
           // bolletje in de tabelrij logt al via zetSubsidieFase; zonder dit blok bleef
           // dezelfde wijziging via Opslaan onzichtbaar in het logboek, en juist het
           // verloop van een subsidietraject wil je later kunnen terugzien.
-          if(sec==='SUBSIDIE-TRAJECTEN'){
+          if(sec==='SUBSIDIE-TRAJECTEN' && !faseGelogd){
             const w=faseWijziging(oudeWaarden.subsidieFase, doelRow.subsidieFase);
             if(w) await logEvent(code,sec,'Fase gewijzigd','fase',w.van,w.naar);
+            faseGelogd=true;
           }
           // Bevestiging pas hier: vóór de write was 'Opgeslagen' een belofte, geen feit.
           // Helemaal onderaan de writeFn, zodat een _withRetry-herkansing er geen tweede
@@ -983,7 +998,7 @@ async function zetSubsidieFase(rid, stap){
 
 export {
   openModal, editRow, closeModal, fillModalFields, setv, clearModal, kiesSectie,
-  getSheetIds, _sheetBreedtes, getInsertRow, insertAndWriteRow, deleteTask, deleteCurrentEditTask, deleteTaskRow,
+  getSheetIds, _sheetBreedtes, getInsertRow, insertAndWriteRow, deleteCurrentEditTask, deleteTaskRow,
   getAfInsertRow, completeTask, completeCurrentEditTask, doCompleteTask, closeCompleteModal, submitTask, gv,
   OMSCHRIJVING_VELD, zetOmschrijving,
   _verseRijIdx, _herankerRij, zetSubsidieFase, kiesModalFase, _modalFaseWoord,

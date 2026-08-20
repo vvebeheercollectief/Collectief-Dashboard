@@ -423,7 +423,10 @@ function renderVve(){
       </div>
 
       <div class="vve-paneel tl-paneel">
-        <div class="vve-sectie">Geschiedenis <span class="n">${o.logboek.length}</span>
+        <!-- De teller telt wat je ziet (dosEntries), niet het hele logboek. Met het filter
+             'Alleen contactmomenten' aan stond hier het totaal van álles, terwijl de knop eronder
+             'Alle 3 tonen' zei en er drie regels stonden: drie getallen die elkaar tegenspreken. -->
+        <div class="vve-sectie">Geschiedenis <span class="n">${dosEntries.length}</span>
           <span class="dos-filters">
             <button class="dos-filter${state.vveLogFilter!=='contact'?' aan':''}" data-action="vve-log-filter" data-modus="alles">Alles</button>
             <button class="dos-filter${state.vveLogFilter==='contact'?' aan':''}" data-action="vve-log-filter" data-modus="contact">Alleen contactmomenten</button>

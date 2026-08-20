@@ -3,7 +3,7 @@
 // ══════════════════════════════════════
 import { taakTitel, taakVerwijzing, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel, kiesAfgerondRij, filt } from "./util.js";
 import { verwerkMeldingRijen, toonMeldingen, MAX_TOAST_BURST, _whoSleutel, getCurrentWho } from "./notifications.js";
-import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek, logEvents, renderOntw } from "./render-overig.js";
+import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek, logEvents, renderOntw, openOntwModal, closeOntwModal, submitOntwItem } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
@@ -8736,6 +8736,189 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       velden.forEach((id,i)=>{ document.getElementById(id).value=oudeWaarden[i]; });
       document.querySelectorAll('.vve-suggestions').forEach(el=>{ el.innerHTML=''; el.style.display='none'; });
     }
+  })();
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  BEHANDELAAR — een opgeslagen waarde kan niet verdampen
+  // ══════════════════════════════════════════════════════════════════════════
+  // De keuzelijsten stonden met de hand in index.html en liepen achter: Cihan ontbrak (wél in het
+  // bulk-menu), en van de duo's stond 'Cihad, Jer' er wel maar 'Jer, Cihad' niet. Een taak met zo'n
+  // waarde toonde een LEEG veld, en submitTask schreef die leegte terug naar kolom E. Eén keer
+  // openen om de deadline te wijzigen was genoeg om de behandelaar kwijt te raken.
+  (() => {
+    console.log('%c[TESTS] Behandelaar blijft staan', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const editOud = state.editRowData;
+    try {
+      // 1. Iedereen uit het team is te kiezen — in het filter én in elk bewerkscherm.
+      const filterNamen = [...document.getElementById('f-beh-ntd').options].map(o => o.value).filter(Boolean);
+      eq('behandelaar: het filter kent het hele team', filterNamen, TEAM);
+      ['m-beh', 'm-beh-v', 'm-beh-o', 'm-beh-l', 'm-beh-s'].forEach(id => {
+        const namen = [...document.getElementById(id).options].map(o => o.value);
+        eq(`behandelaar: ${id} kent iedereen`, TEAM.filter(n => !namen.includes(n)), []);
+      });
+      // 2. Elke combinatie van twee, in beide leesrichtingen bereikbaar via de vangnet-regel.
+      const proef = (beh) => {
+        openModal(true, { code: '311212', naam: 'X', actiepunt: 'Iets', deadline: '', behandelaar: beh,
+                          opmerkingen: '', inBehandeling: 'FALSE', subcategorie: '', _row: 5, _sec: 'OPPAKKEN' });
+        const v = waardeVan('m-beh'); closeModal(); return v;
+      };
+      eq('behandelaar: een losse naam blijft staan', proef(TEAM[3] || 'Cihan'), TEAM[3] || 'Cihan');
+      eq('behandelaar: een duo in de andere volgorde blijft staan', proef('Jer, Cihad'), 'Jer, Cihad');
+      // 3. En zelfs een naam die nergens in een lijst staat — een oud-collega, een stagiair —
+      //    verdwijnt niet. Dat is het verschil tussen 'onbekend' en 'gewist'.
+      eq('behandelaar: een onbekende naam verdwijnt niet', proef('Iemand Anders'), 'Iemand Anders');
+      // 4. Een leeg veld blijft leeg en krijgt géén lege optie erbij.
+      const voorAantal = document.getElementById('m-beh').options.length;
+      eq('behandelaar: leeg blijft leeg', proef(''), '');
+      eq('behandelaar: en dat voegt geen optie toe', document.getElementById('m-beh').options.length, voorAantal);
+    } finally { state.editRowData = editOud; closeModal(); }
+  })();
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  BEWERKEN — een herkansing beschuldigt geen collega
+  // ══════════════════════════════════════════════════════════════════════════
+  // backgroundWrite draait de schrijffunctie opnieuw bij een tijdelijke fout (429/5xx). Ging de
+  // write zélf al goed en struikelde pas de logregel erna, dan vergeleek de rij-controle bij die
+  // tweede poging de OUDE waarden met een Sheet die de nieuwe al bevatte. Resultaat: 'Iemand heeft
+  // deze taak net gewijzigd', een teruggerolde bewerking, en de schuld bij een collega die niets
+  // deed. Hier laten we precies dat gebeuren: de write slaagt, de logregel faalt één keer.
+  await (async () => {
+    console.log('%c[TESTS] Bewerken met een herkansing', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const _fetch = window.fetch, tokenOud = state.oauthToken, expiryOud = state.oauthExpiry;
+    const ntdOud = D.ntd, editOud = state.editRowData, modeOud = state.editMode, secOud = state.editSec;
+    const uitCacheOud = state._uitCache, pwOud = state.pendingWrites;
+    const wachtKlaar = async () => { await state._writeChain;
+      for (let i = 0; i < 300 && (state._loadInFlight || state.pendingWrites > 0); i++) await new Promise(r => setTimeout(r, 5)); };
+    try {
+      state.oauthToken = 'nep'; state.oauthExpiry = Date.now() + 3600e3; state._uitCache = false;
+      const taak = { code: 'HK-01', naam: 'Herkanshof', actiepunt: 'oude tekst', deadline: '', behandelaar: 'Jer',
+                     opmerkingen: '', inBehandeling: 'FALSE', subcategorie: '', _row: 5, _sec: 'OPPAKKEN' };
+      D.ntd = { OPPAKKEN: [taak], VERGADERVERZOEKEN: [], 'OFFERTE-TRAJECTEN': [], LOD: [], 'SUBSIDIE-TRAJECTEN': [] };
+      state._rowCache = [taak];
+      // Vastgelegde kopie: submitTask muteert `taak` optimistisch nog vóór de schrijffunctie
+      // draait, dus zonder deze bevriezing zou de nagebootste Sheet de nieuwe tekst al bevatten
+      // en de rij-controle terecht afgaan — dan meet de toets iets anders dan hij bedoelt.
+      const zoalsInSheet = { ...taak };
+      let schrijfPogingen = 0, logPogingen = 0, guardLezingen = 0;
+      window.fetch = async (url, opt) => {
+        const u = decodeURIComponent(String(url));
+        if (opt && opt.method === 'PUT') { schrijfPogingen++; return new Response('{}', { status: 200 }); }
+        if (opt && opt.method === 'POST' && /:append/.test(u)) {
+          logPogingen++;
+          // Eerste logpoging struikelt op een tijdelijke fout; daarna gaat hij goed.
+          if (logPogingen === 1) return new Response(JSON.stringify({ error: { message: 'Quota exceeded' } }), { status: 429 });
+          return new Response('{}', { status: 200 });
+        }
+        // De rij-controle leest de rij terug. Hij geeft de stand in de SHEET, dus ná een geslaagde
+        // write de nieuwe tekst — precies de situatie die de valse melding veroorzaakte.
+        const m = u.match(/'Nog Te Doen'!A(\d+):/);
+        if (m) { guardLezingen++;
+          const inSheet = schrijfPogingen ? { ...zoalsInSheet, actiepunt: 'nieuwe tekst', behandelaar: 'Cihad' } : zoalsInSheet;
+          return new Response(JSON.stringify({ values: [_rijNaarCellen('Nog Te Doen', inSheet)] }), { status: 200 }); }
+        return new Response(JSON.stringify(_batchGetStub(url, 'Nog Te Doen', [])), { status: 200 });
+      };
+      openModal(true, taak);
+      document.getElementById('m-actie').value = 'nieuwe tekst';
+      document.getElementById('m-beh').value = 'Cihad';
+      await submitTask();
+      await wachtKlaar();
+      eq('bewerken: de write gebeurt precies één keer, ook mét herkansing', schrijfPogingen, 1);
+      eq('bewerken: de rij-controle loopt niet nog een keer op verouderde waarden', guardLezingen, 1);
+      eq('bewerken: de tekst blijft staan en wordt niet teruggerold',
+         [taak.actiepunt, taak.behandelaar], ['nieuwe tekst', 'Cihad']);
+      const foutmelding = [...document.querySelectorAll('.toast-title')].map(t => t.textContent);
+      eq('bewerken: en er komt geen mislukt-melding', foutmelding.filter(t => /mislukt/i.test(t)), []);
+    } finally {
+      window.fetch = _fetch; state.oauthToken = tokenOud; state.oauthExpiry = expiryOud;
+      D.ntd = ntdOud; state.editRowData = editOud; state.editMode = modeOud; state.editSec = secOud;
+      state._uitCache = uitCacheOud; state.pendingWrites = pwOud;
+      closeModal(); document.querySelectorAll('.toast').forEach(t => t.remove());
+    }
+  })();
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  ONTWIKKELING — bewerken laat de herkomst staan
+  // ══════════════════════════════════════════════════════════════════════════
+  // 'Door' en 'Datum' werden bij élke opslag overschreven met de huidige gebruiker en de dag van
+  // vandaag. Wie een typefout van een collega verbeterde, zette daarmee zijn eigen naam en datum
+  // onder diens item en de herkomst was weg.
+  await (async () => {
+    console.log('%c[TESTS] Ontwikkeling: herkomst blijft', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const _fetch = window.fetch, tokenOud = state.oauthToken, expiryOud = state.oauthExpiry;
+    const editOud = state.ontwEditRow, modeOud = state.ontwEditMode, ontwOud = D.ontw;
+    const geschreven = [];
+    try {
+      state.oauthToken = 'nep'; state.oauthExpiry = Date.now() + 3600e3;
+      window.fetch = async (url, opt) => {
+        const u = decodeURIComponent(String(url));
+        if (opt && opt.method === 'PUT') { geschreven.push({ u, v: JSON.parse(opt.body).values[0] }); return new Response('{}', { status: 200 }); }
+        if (opt && opt.method === 'POST' && /:append/.test(u)) { geschreven.push({ u, v: JSON.parse(opt.body).values[0] }); return new Response('{}', { status: 200 }); }
+        if (/'Ontwikkeling'!/.test(u)) return new Response(JSON.stringify({ values: [['Bestaand idee']] }), { status: 200 });
+        return new Response(JSON.stringify(_batchGetStub(url, 'Ontwikkeling', [])), { status: 200 });
+      };
+      const rij = { titel: 'Bestaand idee', categorie: 'Idee', inhoud: 'oud', door: 'Jer',
+                    datum: '03-06-2026', status: 'Open', _row: 7 };
+      D.ontw = [rij];
+      // Bewerken door iemand anders.
+      openOntwModal(true, rij);
+      document.getElementById('ontw-m-inhoud').value = 'met een typefout eruit';
+      state.ontwEditMode = true; state.ontwEditRow = rij;
+      await submitOntwItem();
+      const put = geschreven.find(g => /'Ontwikkeling'!A7:F7/.test(g.u));
+      eq('ontwikkeling: bewerken laat Door en Datum van de schrijver staan',
+         put ? [put.v[3], put.v[4]] : [], ['Jer', '03-06-2026']);
+      eq('ontwikkeling: en de bewerkte tekst gaat wél mee', put ? put.v[2] : '', 'met een typefout eruit');
+      // Een NIEUW item krijgt gewoon de huidige gebruiker en de dag van vandaag.
+      geschreven.length = 0;
+      state.ontwEditMode = false; state.ontwEditRow = null;
+      openOntwModal(false, null);
+      document.getElementById('ontw-m-titel').value = 'Vers idee';
+      const catKiezer = document.getElementById('ontw-m-cat');
+      catKiezer.value = [...catKiezer.options].map(o => o.value).find(Boolean) || '';
+      await submitOntwItem();
+      const app = geschreven.find(g => /:append/.test(g.u));
+      truthy('ontwikkeling: een nieuw item krijgt wél de huidige datum',
+             !!app && /^\d{2}-\d{2}-\d{4}$/.test(app.v[4] || ''));
+    } finally {
+      window.fetch = _fetch; state.oauthToken = tokenOud; state.oauthExpiry = expiryOud;
+      state.ontwEditRow = editOud; state.ontwEditMode = modeOud; D.ontw = ontwOud;
+      closeOntwModal();
+    }
+  })();
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  'STIL'-PIL — een contactmoment telt ook mee
+  // ══════════════════════════════════════════════════════════════════════════
+  // Een handmatig contactmoment uit het VvE-dossier komt zonder sectie in het logboek (kolom C
+  // blijft leeg). De stil-index vergeleek strikt op sectie en gooide die regels dus weg: je belde
+  // 's ochtends met de aannemer, legde het vast, en de taak bleef 'Stil 6d' melden. Dat is erger
+  // dan geen pil — het beweert iets dat aantoonbaar niet klopt.
+  (() => {
+    console.log('%c[TESTS] Stil-pil en contactmomenten', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const nu = new Date();
+    const dagenGeleden = n => new Date(nu.getFullYear(), nu.getMonth(), nu.getDate() - n, 12, 0, 0).toISOString();
+    const taak = { code: 'ST-01', _sec: 'OPPAKKEN', inBehandeling: 'TRUE' };
+    const oudeRegel  = { code: 'ST-01', sectie: 'OPPAKKEN', actie: 'Opmerking', timestamp: dagenGeleden(9) };
+    const contact    = { code: 'ST-01', sectie: '',         actie: 'Contact',   timestamp: dagenGeleden(1) };
+    // Zonder het contactmoment: negen dagen stil, dus de pil hoort er te staan.
+    _zetStilIndex(bouwStilIndex([oudeRegel], 'OPPAKKEN'));
+    eq('stil: zonder recente activiteit telt hij de dagen', bepaalStil(taak, 'OPPAKKEN'), 9);
+    // Mét het contactmoment van gisteren: geen pil meer.
+    _zetStilIndex(bouwStilIndex([oudeRegel, contact], 'OPPAKKEN'));
+    eq('stil: een contactmoment zonder sectie telt als activiteit', bepaalStil(taak, 'OPPAKKEN'), null);
+    // En hetzelfde langs de terugval zónder index (losse aanroepers).
+    _zetStilIndex(null);
+    const logOud = D.logboek;
+    try {
+      D.logboek = [oudeRegel, contact];
+      eq('stil: ook zonder index telt het contactmoment mee', bepaalStil(taak, 'OPPAKKEN'), null);
+      D.logboek = [oudeRegel];
+      eq('stil: en zonder dat contactmoment staat de teller er weer', bepaalStil(taak, 'OPPAKKEN'), 9);
+    } finally { D.logboek = logOud; }
+    // Een regel van een ÁNDERE sectie telt nog steeds niet mee — dat onderscheid moet blijven.
+    _zetStilIndex(bouwStilIndex([oudeRegel, { code: 'ST-01', sectie: 'LOD', actie: 'Opmerking', timestamp: dagenGeleden(1) }], 'OPPAKKEN'));
+    eq('stil: een regel uit een andere sectie telt niet mee', bepaalStil(taak, 'OPPAKKEN'), 9);
+    _zetStilIndex(null);
   })();
 
   // ══════════════════════════════════════════════════════════════════════════

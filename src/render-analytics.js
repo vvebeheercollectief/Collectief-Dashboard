@@ -39,6 +39,31 @@ function ensureChartJs(){
   return _chartJsPromise;
 }
 
+// Chart.js komt van een CDN. Lukt dat niet — geen internet, een filter op kantoor, een storing bij
+// jsDelivr — dan bleef de hele pagina leeg met alleen een regel in de console: geen grafieken,
+// geen cijfers, geen uitleg. Dat leest als een kapotte app. Deze melding zet in de pagina zelf wat
+// er aan de hand is, met een knop om het opnieuw te proberen zodra de verbinding er weer is.
+function toonGrafiekFout(paginaId, opnieuw){
+  const pagina=document.getElementById(paginaId);
+  if(!pagina) return;
+  let box=pagina.querySelector('.grafiek-fout');
+  if(!box){
+    box=document.createElement('div');
+    box.className='grafiek-fout load-err';
+    box.setAttribute('role','alert');
+    box.style.position='static';
+    box.style.transform='none';
+    box.style.margin='0 0 16px';
+    box.innerHTML='<span>'+ico('waarschuwing',15)
+      +' De grafieken konden niet geladen worden (het onderdeel komt van een externe bron). '
+      +'De cijfers in de lijsten kloppen gewoon.</span>'
+      +'<button class="btn btn-sec btn-sm" type="button">Opnieuw proberen</button>';
+    box.querySelector('button').addEventListener('click',()=>{ box.remove(); opnieuw(); });
+    pagina.insertBefore(box, pagina.firstChild);
+  }
+}
+const _wisGrafiekFout=(paginaId)=>document.getElementById(paginaId)?.querySelector('.grafiek-fout')?.remove();
+
 const PERIODS=['dag','week','maand','kwartaal'];
 const MAAND_KORT=['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
 const PERIODE_LABEL_NU={dag:'vandaag',week:'deze week',maand:'deze maand',kwartaal:'dit kwartaal'};
@@ -345,7 +370,9 @@ function renderMetricToggle(){
 function _try(label,fn){try{fn()}catch(e){console.error('[Analytics]',label,e)}}
 
 function buildAnalytics(){
-  if(!window.Chart){ ensureChartJs().then(buildAnalytics).catch(e=>console.warn(e)); return; }
+  if(!window.Chart){ ensureChartJs().then(buildAnalytics)
+    .catch(e=>{ console.warn(e); toonGrafiekFout('page-analytics', buildAnalytics); }); return; }
+  _wisGrafiekFout('page-analytics');
   _try('periode-bar',()=>renderPeriodBar());
   _try('metric-toggle',()=>renderMetricToggle());
 
@@ -593,7 +620,9 @@ function renderHeroDonut(){
 }
 
 function buildDash(){
-  if(!window.Chart){ ensureChartJs().then(buildDash).catch(e=>console.warn(e)); return; }
+  if(!window.Chart){ ensureChartJs().then(buildDash)
+    .catch(e=>{ console.warn(e); toonGrafiekFout('page-dash', buildDash); }); return; }
+  _wisGrafiekFout('page-dash');
   const uitnD=D.alvo.filter(r=>r.uitnodiging).length;
   const notulenD=D.alvo.filter(r=>r.notulen).length;
   const ntdTotal=SKEYS.reduce((s,k)=>s+(D.ntd[k]?.length||0),0);

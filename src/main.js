@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  MAIN — boot/orchestrator
 // ══════════════════════════════════════
-import { IS_STAGING, ALLOWED_EMAILS, SKEYS, APP_VERSION } from './config.js';
+import { IS_STAGING, ALLOWED_EMAILS, SKEYS, APP_VERSION, TEAM } from './config.js';
 import { D, pgs, state } from './state.js';
 import { ensureToken, doOAuth } from './auth.js';
 import { startSplash } from './login-splash.js';
@@ -70,6 +70,30 @@ document.addEventListener('DOMContentLoaded',()=>{
   initActions();
   initPalette();
   initModalA11y();
+
+  // Behandelaar-kiezers uit TEAM (config.js) i.p.v. handgeschreven <option>-lijstjes. Die lijstjes
+  // liepen achter: Cihan stond er niet in — wél in het bulk-menu — en van de duo's stond alleen
+  // 'Cihad, Jer' erin en niet 'Jer, Cihad'. Een taak met zo'n waarde toonde een LEEG veld, en
+  // opslaan schreef die leegte terug naar de Sheet. `setv` (crud.js) vangt dat nu op als vangnet;
+  // dit zorgt dat de waarde überhaupt te KIEZEN is. Eén bron, dus een nieuwe collega in
+  // EMAIL_NAMES verschijnt vanzelf overal.
+  // Het filter krijgt alleen losse namen: filterNtd vergelijkt met `includes`, dus 'Jer' vindt
+  // ook 'Jer, Gabos'. De bewerkschermen krijgen de duo's er wél bij.
+  {
+    const duos = TEAM.flatMap((a,i)=>TEAM.slice(i+1).map(b=>`${a}, ${b}`));
+    const vul = (id, waarden) => {
+      const el = document.getElementById(id);
+      if(!el) return;
+      const eerste = el.options[0];                    // 'Selecteer…' / 'Alle behandelaars' blijft
+      const gekozen = el.value;
+      el.innerHTML = '';
+      if(eerste) el.appendChild(eerste);
+      waarden.forEach(w=>{ const o=document.createElement('option'); o.value=w; o.textContent=w; el.appendChild(o); });
+      if(gekozen) el.value = gekozen;                  // een al ingevulde keuze niet omgooien
+    };
+    vul('f-beh-ntd', TEAM);
+    ['m-beh','m-beh-v','m-beh-o','m-beh-l','m-beh-s'].forEach(id=>vul(id, TEAM.concat(duos)));
+  }
 
   // Zichtbaar versienummer overal gelijk zetten (één bron: APP_VERSION)
   document.querySelectorAll('#app-version, #app-version-login, #app-version-splash').forEach(el => el.textContent = APP_VERSION);

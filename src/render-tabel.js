@@ -74,10 +74,15 @@ function renderTbody(tbodyId,rows,sec,page,isAf,filtered){
 // werkelijke verhouding (een handvol in-behandeling-rijen per pagina) juist trager dan de scan
 // die het vervangt. Het aantal Date-objecten blijft zo exact gelijk; alleen het herhaalde
 // doorlopen verdwijnt. Puur, dus los testbaar.
+// Een regel ZONDER sectie telt voor élke sectie van die VvE. Dat zijn de handmatige
+// contactmomenten uit het VvE-dossier (addContactLog schrijft kolom C leeg) — precies het bewijs
+// dat er wél iets gebeurd is. Met de oude, strikte vergelijking vielen ze buiten elke sectie en
+// bleef een taak 'Stil 6d' tonen nadat je er die ochtend nog over had gebeld. Dat is erger dan
+// geen pil: het beweert iets dat aantoonbaar niet klopt.
 function bouwStilIndex(logboek, sec){
   const m = new Map();
   (logboek || []).forEach(e => {
-    if (sec && e.sectie !== sec) return;
+    if (sec && e.sectie && e.sectie !== sec) return;
     const v = m.get(e.code);
     if (v) v.push(e); else m.set(e.code, [e]);
   });
@@ -94,7 +99,7 @@ function bepaalStil(r, sec){
   if (r.inBehandeling !== 'TRUE') return null;
   const entries = _stilIndex
     ? (_stilIndex.get(r.code) || [])
-    : (D.logboek || []).filter(e => e.code === r.code && (!sec || e.sectie === sec));
+    : (D.logboek || []).filter(e => e.code === r.code && (!sec || !e.sectie || e.sectie === sec));
   if (!entries.length) return null; // geen activiteit-data → niet markeren
   let laatst = null;
   entries.forEach(e => {
@@ -290,12 +295,15 @@ function renderPag(id,total,cur,doel){
     :cur<=4?[1,2,3,4,5,'…',tp]
     :cur>=tp-3?[1,'…',tp-4,tp-3,tp-2,tp-1,tp]
     :[1,'…',cur-1,cur,cur+1,'…',tp];
+  // aria-label op de pijltjes ('‹' en '›' worden voorgelezen als 'kleiner dan'-achtige tekens of
+  // helemaal niet) en aria-current op het paginanummer waar je staat — dat was alleen aan de
+  // kleur te zien. Het '…' is een span en geen knop, dus die krijgt aria-hidden.
   el.innerHTML=`<div class="pag-info">Toont ${s}–${e} van ${total}</div>
     <div class="pag-btns">
-      <button class="pb" data-action="pagineer" data-doel="${doel}" data-pg="${cur-1}" ${cur<=1?'disabled':''}>‹</button>
-      ${rng.map(p=>p==='…'?`<span class="pb" style="border:none;cursor:default">…</span>`
-        :`<button class="pb ${p===cur?'on':''}" data-action="pagineer" data-doel="${doel}" data-pg="${p}">${p}</button>`).join('')}
-      <button class="pb" data-action="pagineer" data-doel="${doel}" data-pg="${cur+1}" ${cur>=tp?'disabled':''}>›</button>
+      <button class="pb" data-action="pagineer" data-doel="${doel}" data-pg="${cur-1}" aria-label="Vorige pagina" ${cur<=1?'disabled':''}>‹</button>
+      ${rng.map(p=>p==='…'?`<span class="pb" style="border:none;cursor:default" aria-hidden="true">…</span>`
+        :`<button class="pb ${p===cur?'on':''}" data-action="pagineer" data-doel="${doel}" data-pg="${p}" aria-label="Pagina ${p}"${p===cur?' aria-current="page"':''}>${p}</button>`).join('')}
+      <button class="pb" data-action="pagineer" data-doel="${doel}" data-pg="${cur+1}" aria-label="Volgende pagina" ${cur>=tp?'disabled':''}>›</button>
     </div>`;
 }
 

@@ -82,7 +82,10 @@ function flagPill(idx,field,val){
   const lbl=val?'✓ Ja':'–';
   const aria=val?'true':'false';
   const title=`Klik om ${ALVO_LABELS[field]} ${val?'uit':'aan'} te zetten`;
-  return`<button type="button" class="flag-toggle ${cls}" data-action="alvo-flag" data-idx="${idx}" data-field="${field}" aria-pressed="${aria}" title="${title}">${lbl}</button>`;
+  // aria-label naast de zichtbare '✓ Ja' / '–': de naam van een knop komt uit zijn inhoud, en die
+  // is voor alle vier de kolommen gelijk. Een schermlezer las dus vier keer 'Ja, knop, ingedrukt'
+  // zonder te zeggen wáárvan. Het label wint van de inhoud én van title.
+  return`<button type="button" class="flag-toggle ${cls}" data-action="alvo-flag" data-idx="${idx}" data-field="${field}" aria-pressed="${aria}" aria-label="${ALVO_LABELS[field]}" title="${title}">${lbl}</button>`;
 }
 
 function _recomputeAlvoStatus(r){

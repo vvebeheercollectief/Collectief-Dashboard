@@ -67,7 +67,7 @@
     .sb-brand{font-size:14px;font-weight:700;line-height:1.25;color:#f2f4f7}
     .sb-brand span{display:block;font-size:11px;font-weight:500;color:#8b929e}
     .sb-nav{flex:1;padding:14px 12px;overflow-y:auto}
-    .sb-lbl{font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#7c828e;padding:16px 10px 6px}
+    .sb-lbl{font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#828894;padding:16px 10px 6px} /* #828894 i.p.v. #7c828e: op de zijbalk-achtergrond (#1b1e24) haalt dat 4,69:1 i.p.v. 4,33:1 — 10px hoofdletters vragen de gewone AA-eis van 4,5:1 */
     .sb-nav>.sb-lbl:first-child{padding-top:2px}
     .ni{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:7px 10px;border-radius:7px;color:#8b929e;font-weight:500;font-size:13px;cursor:pointer;transition:background var(--tr),color var(--tr);user-select:none}
     .ni:hover{background:rgba(255,255,255,.05);color:#cfd5df}
@@ -177,7 +177,7 @@
     .stat-item.stat-klik:hover .stat-cap{color:var(--txt)}
     .stat-item.stat-klik.aan{box-shadow:inset 0 -2px 0 var(--ac)}
     .stat-val{font-size:30px;font-weight:900;letter-spacing:-.06em;line-height:1;color:var(--txt);font-variant-numeric:tabular-nums}
-    .stat-val.red{color:var(--rd)} .stat-val.amber{color:var(--am)} .stat-val.green{color:var(--gn)} .stat-val.teal{color:var(--ac)} .stat-val.muted{color:var(--fnt)}
+    .stat-val.red{color:var(--rd)} .stat-val.amber{color:var(--am)} .stat-val.green{color:var(--gn)} .stat-val.teal{color:var(--ac)} .stat-val.muted{color:var(--mut)} /* --fnt gaf 2,6:1 op wit; een cijfer van 30px valt onder 'grote tekst' en moet 3:1 halen. --mut blijft duidelijk gedempt t.o.v. --txt en haalt het in beide thema's */
     .stat-meta{display:flex;flex-direction:column;gap:1px;padding-bottom:2px}
     .stat-cap{font-size:11px;font-weight:700;color:var(--mut);white-space:nowrap}
     .stat-hint{font-size:11px;font-weight:700;color:var(--ac-500);white-space:nowrap}
@@ -643,7 +643,7 @@
     .ai-prompt .k{color:var(--sbglow);font-weight:700}
     .ai-prompt .empty{color:#8b929e;font-style:italic}
     .ai-send{display:flex;gap:8px;margin-top:11px;flex-wrap:wrap}
-    .ai-claude{background:#C96442;color:#fff}
+    .ai-claude{background:#bb5634;color:#fff} /* iets dieper dan het merk-oranje #C96442: wit op 12,5px haalde daar 3,9:1, hier 4,67:1 */
     .ai-gemini{background:#3a6df0;color:#fff}
     .ai-send .btn{font-size:12.5px;padding:9px 13px}
     .ai-result{margin-top:14px;display:flex;flex-direction:column;gap:11px}
@@ -936,11 +936,11 @@
     [data-theme=dark] .lchip .av[style*="--nv"],[data-theme=dark] .log-av[style*="--nv"]{color:#fff}
 
 /* ── VvE-dossier chat-agent ── */
-#chat-fab{position:fixed;right:20px;bottom:20px;width:56px;height:56px;border-radius:50%;
-  border:none;background:var(--sur);box-shadow:var(--shm);cursor:pointer;z-index:900;
-  display:flex;align-items:center;justify-content:center;padding:0;overflow:hidden}
-#chat-fab img{width:100%;height:100%;object-fit:cover}
-#chat-bg{position:fixed;right:20px;bottom:88px;z-index:901;display:none}
+/* De chat-knop is een gewone icoonknop in de bovenbalk (.ico-btn doet de opmaak). Tot v10.24 was
+   het een zwevend knopje rechtsonder; dat lag over de actiekolom van de takentabel heen en maakte
+   het vinkje 'afronden' van de rij eronder onklikbaar. Zie de toelichting in index.html. */
+/* Het paneel hangt nu ónder zijn knop in plaats van erboven: rechts uitgelijnd, net onder de balk. */
+#chat-bg{position:fixed;right:20px;top:calc(var(--hh) + 8px);z-index:901;display:none}
 #chat-bg.open{display:block}
 #chat-paneel{width:380px;max-width:calc(100vw - 40px);max-height:70vh;display:flex;flex-direction:column;
   background:var(--sur);border:1px solid var(--bor);border-radius:16px;box-shadow:var(--shm);overflow:hidden}
@@ -1010,15 +1010,12 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,.search-box inpu
 
 /* ── Druk-feedback op knoppen (vooral op touch) + chat-knop-feedback ── */
 .btn:active,.ico-btn:active,.bb-knop:active,#chat-send:active,.pb:active,.act-af:active,.act-bw:active,.ni:active,.tab:active,.cb:active,.fase-bol:active{transform:scale(.97)}
-#chat-fab{transition:transform var(--tr),box-shadow var(--tr)}
-#chat-fab:hover{transform:scale(1.06);box-shadow:var(--shl)}
-#chat-fab:active{transform:scale(.95)}
 
 /* ── 'Verminder beweging' respecteren (dekt alle 60+ overgangen/animaties) ── */
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}
   .dot,.dot.loading{animation:none!important}
-  .kpi:hover,#chat-fab:hover{transform:none!important}
+  .kpi:hover{transform:none!important}
 }
 
 /* ── Grotere klikzone voor kleine bedienelementen op touch ── */
@@ -1088,8 +1085,10 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,.search-box inpu
 #toast-container{z-index:700}
 #toast-container>*{pointer-events:all}
 .log-day{box-shadow:0 1px 0 var(--bor)}
-body:has(.modal-bg.open) #chat-fab,body:has(.modal-bg.open) #chat-bg{display:none}
-body.bulk #chat-fab{display:none}
+/* Alleen nog het PANEEL wegstoppen achter een open venster. De knop zelf hoefde weg zolang hij
+   zweefde (hij lag over de vensterrand); in de bovenbalk ligt hij achter de vensterachtergrond, en
+   hem verbergen zou de andere icoonknoppen laten verspringen. */
+body:has(.modal-bg.open) #chat-bg{display:none}
 
 /* ── Foutbanner bij mislukte (eerste) lading ── */
 .load-err{position:fixed;top:72px;left:50%;transform:translateX(-50%);z-index:750;background:var(--sur);border:1px solid var(--rd-b);border-left:4px solid var(--rd);border-radius:var(--r);box-shadow:var(--shl);padding:12px 16px;display:flex;align-items:center;gap:14px;font-size:13px;font-weight:500;color:var(--txt);max-width:calc(100vw - 32px)}

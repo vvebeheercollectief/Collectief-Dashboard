@@ -4,6 +4,12 @@
 //  veld, houdt Tab binnen het venster (focus-trap) en geeft de focus bij sluiten
 //  terug aan het element dat het venster opende. Geen wijziging aan de losse
 //  open/sluit-functies nodig: het werkt op de gedeelde .modal-bg + .open-class.
+//
+//  Daarnaast loopt hier bij het opstarten één pas over het scherm die drie dingen
+//  koppelt die in de HTML alleen VISUEEL bij elkaar staan: het label bij zijn veld,
+//  de schakelaar bij zijn tekst, en het venster bij zijn kop. Bewust hier en niet
+//  50× met de hand in index.html — dan moet elk nieuw veld er zelf aan denken, en
+//  dat is precies wat er tot nu toe misging (48 labels zonder `for`).
 // ══════════════════════════════════════
 
 // Waar de focus vandaan kwam, PER venster. Vensters kunnen gestapeld openstaan — het
@@ -28,12 +34,81 @@ export function bovensteModal() {
       || document.querySelector('.modal-bg.open');
 }
 
+// Een id waar we er een nodig hebben om naar te wijzen. Alleen uitdelen als het element er
+// nog geen heeft: bestaande id's zijn overal aanknopingspunten voor code en tests.
+let _hulpTeller = 0;
+function _zorgVoorId(el, voorvoegsel) {
+  if (!el.id) el.id = `${voorvoegsel}-${++_hulpTeller}`;
+  return el.id;
+}
+
+// ── Label ↔ veld ────────────────────────────────────────────────────────
+// De vensters schrijven `<div class="fld"><label>Deadline</label><input id="m-dl"></div>`:
+// het label staat NAAST het veld, niet eromheen, en zonder `for`. Voor het oog klopt dat,
+// maar de koppeling bestaat alleen in de opmaak. Gevolg: een schermlezer noemt het veld
+// naamloos ("invoerveld, leeg") en een klik op het woord 'Deadline' zet de cursor nergens.
+// Deze pas legt de koppeling alsnog, per veldvak.
+export function koppelFormulierLabels(root = document) {
+  let gekoppeld = 0;
+  root.querySelectorAll('label:not([for])').forEach(label => {
+    // Een label dat zijn veld al ómvat is programmatisch wél gekoppeld; `for` zou daar niets
+    // toevoegen (de Budgetpakket-vinkjes doen het zo).
+    if (label.querySelector('input, select, textarea')) return;
+    const vak = label.parentElement;
+    if (!vak) return;
+    const velden = [...vak.querySelectorAll('input:not([type=hidden]), select, textarea')];
+    if (!velden.length) return;                    // een kop boven knoppen, geen veldlabel
+    label.setAttribute('for', _zorgVoorId(velden[0], 'veld'));
+    gekoppeld++;
+    // Staan er méér bedieningen in hetzelfde vak (de offerte-teller, 'Wie ben jij?' met het
+    // eigen-naam-veld), dan wijst `for` er maar één aan. De rest krijgt dezelfde tekst als
+    // eigen naam, anders blijven ze naamloos — met hun plaatshouder erachter als die er is,
+    // want dat is precies wat ze onderscheidt.
+    velden.slice(1).forEach(veld => {
+      if (veld.getAttribute('aria-label') || veld.getAttribute('aria-labelledby')) return;
+      const kern = (label.textContent || '').trim();
+      const extra = (veld.placeholder || '').trim();
+      veld.setAttribute('aria-label', extra ? `${kern} — ${extra}` : kern);
+    });
+  });
+  return gekoppeld;
+}
+
+// ── Schakelaar ↔ tekst ──────────────────────────────────────────────────
+// `<button role="switch" class="tog"></button><span>In behandeling</span>`: de knop is leeg,
+// de betekenis staat ernaast. Zonder koppeling kondigt een schermlezer 'schakelaar, uit' aan
+// zonder te zeggen wáárvan. Negen stuks: vier keer 'In behandeling' en vijf meldingsvoorkeuren.
+export function benoemSchakelaars(root = document) {
+  let benoemd = 0;
+  root.querySelectorAll('[role="switch"]').forEach(knop => {
+    if (knop.getAttribute('aria-label') || knop.getAttribute('aria-labelledby')) return;
+    if ((knop.textContent || '').trim()) return;   // heeft zelf al tekst
+    const tekstEl = [...(knop.parentElement ? knop.parentElement.children : [])]
+      .find(el => el !== knop && (el.textContent || '').trim());
+    if (!tekstEl) return;
+    knop.setAttribute('aria-labelledby', _zorgVoorId(tekstEl, 'schakelaar-tekst'));
+    benoemd++;
+  });
+  return benoemd;
+}
+
 export function initModalA11y() {
+  koppelFormulierLabels();
+  benoemSchakelaars();
   document.querySelectorAll('.modal-bg').forEach(bg => {
     const venster = bg.querySelector('.modal, .pal') || bg.firstElementChild;
     if (venster) {
       venster.setAttribute('role', 'dialog');
       venster.setAttribute('aria-modal', 'true');
+      // Een dialoog zonder naam wordt aangekondigd als kaal 'dialoog'. Elk venster hééft een
+      // zichtbare kop; die is meteen de naam. Niet overschrijven als het venster er zelf al een
+      // meegekregen heeft — het commandopalet doet dat, want zijn kop is een invoerveld.
+      const kop = bg.querySelector('.modal-hdr h2');
+      if (kop && !venster.getAttribute('aria-label') && !venster.getAttribute('aria-labelledby'))
+        venster.setAttribute('aria-labelledby', _zorgVoorId(kop, 'venster-kop'));
+      // Het sluitkruisje is een '×'. Voorgelezen wordt dat 'maal' of 'vermenigvuldigingsteken';
+      // een echte naam maakt er 'Sluiten, knop' van.
+      bg.querySelectorAll('.modal-close:not([aria-label])').forEach(k => k.setAttribute('aria-label', 'Sluiten'));
     }
     const obs = new MutationObserver(() => {
       const open = bg.classList.contains('open');

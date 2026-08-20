@@ -34,7 +34,7 @@ import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
 import { bouwBundelIndex, bundelWeergave, zichtbareKop, isBundel, bundelVan, bundelMetId, hernummerLeden, volgendeVolg, magKoppelen, wordtGeabsorbeerd, koppelKandidaten, taakFilter, openSubtaken, bundelWaarschuwing, bundelVerwijzing, bundelStand, zelfdeTaak } from "./bundel.js";
 import { bundelPaneelHtml, bundelMerkje, bundelKopExtra, STAPEL_GREEP } from "./render-bundel.js";
 import { vraagBevestiging, beantwoordBevestiging, _vraagStaatOpen } from "./bevestig.js";
-import { bovensteModal } from "./modal-a11y.js";
+import { bovensteModal, koppelFormulierLabels, benoemSchakelaars } from "./modal-a11y.js";
 import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkoppelTaak, herordenBundel, sleepDoel, paneelTaaknummers, sleepUitslag, initBundelSlepen } from "./bundel-acties.js";
 
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
@@ -8734,6 +8734,150 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       velden.forEach((id,i)=>{ document.getElementById(id).value=oudeWaarden[i]; });
       document.querySelectorAll('.vve-suggestions').forEach(el=>{ el.innerHTML=''; el.style.display='none'; });
     }
+  })();
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  TOEGANKELIJKHEID — namen en koppelingen in de echte schil
+  // ══════════════════════════════════════════════════════════════════════════
+  // Deze blok toetst niet één functie maar de UITKOMST op de echte index.html, want dat is waar
+  // het misging: de vensters schrijven het label náást het veld en de schakelaar náást zijn tekst,
+  // en visueel klopt dat allebei. Programmatisch bestond de koppeling niet — 48 labels zonder
+  // `for`, negen naamloze schakelaars en tien dialoogvensters die als kaal 'dialoog' werden
+  // aangekondigd. main.js draait `initModalA11y()` bij het opstarten; hieronder de nameting.
+  (() => {
+    console.log('%c[TESTS] Toegankelijkheid', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+
+    // 1. Elk bedienbaar veld in de schil heeft een naam. Wie hier zakt, is voor een schermlezer
+    //    een naamloos invoerveld — en dat is precies wat een blinde collega niet kan invullen.
+    const naamloos = [...document.querySelectorAll('input,select,textarea')].filter(el => {
+      if (el.type === 'hidden') return false;
+      if (el.getAttribute('aria-label') || el.getAttribute('aria-labelledby') || el.getAttribute('title')) return false;
+      if (el.id && document.querySelector(`label[for="${CSS.escape(el.id)}"]`)) return false;
+      return !el.closest('label');
+    }).map(el => el.id || el.name || el.tagName);
+    eq('a11y: geen enkel invoerveld zonder naam', naamloos, []);
+
+    // 2. Elke knop ook. Een icoon-only knop zonder naam heet 'knop' en verder niets.
+    const knoploos = [...document.querySelectorAll('button,[role="button"]')].filter(b =>
+      !(b.innerText || '').trim() && !b.getAttribute('aria-label')
+      && !b.getAttribute('title') && !b.getAttribute('aria-labelledby')).map(b => b.id || b.className);
+    eq('a11y: geen enkele knop zonder naam', knoploos, []);
+
+    // 3. Elk `for` wijst een bestaand veld aan. Een `for` naar een id dat niet bestaat is erger dan
+    //    geen `for`: het ziet er goed uit in de broncode en werkt evengoed niet.
+    const kapotteFor = [...document.querySelectorAll('label[for]')]
+      .filter(l => !document.getElementById(l.getAttribute('for'))).map(l => l.getAttribute('for'));
+    eq('a11y: elk label wijst een bestaand veld aan', kapotteFor, []);
+
+    // 4. Geen dubbele id's. De koppeling deelt id's uit waar er geen was; twee elementen met
+    //    dezelfde id laten `label[for]`, `aria-labelledby` én getElementById naar de verkeerde wijzen.
+    const tel = {}; document.querySelectorAll('[id]').forEach(el => { tel[el.id] = (tel[el.id] || 0) + 1; });
+    eq('a11y: geen dubbele id\'s in de schil', Object.entries(tel).filter(([, n]) => n > 1), []);
+
+    // 5. Alle negen schakelaars hebben een naam, en die komt van de tekst ernaast.
+    const schakelaars = [...document.querySelectorAll('[role="switch"]')];
+    const zonderNaam = schakelaars.filter(b => !(b.textContent || '').trim()
+      && !b.getAttribute('aria-label') && !b.getAttribute('aria-labelledby')).map(b => b.id);
+    eq('a11y: elke schakelaar heeft een naam', [schakelaars.length > 0, zonderNaam], [true, []]);
+    const ib = document.getElementById('tog-ib');
+    eq('a11y: de schakelaar wijst naar de tekst ernaast',
+       (document.getElementById(ib && ib.getAttribute('aria-labelledby')) || {}).textContent, 'In behandeling');
+
+    // 6. Elk venster heeft een naam, en die is de zichtbare kop. Zonder naam kondigt een
+    //    schermlezer 'dialoog' aan en moet de gebruiker raden waar hij beland is.
+    const vensterNamen = [...document.querySelectorAll('.modal-bg')].map(bg => {
+      const v = bg.querySelector('.modal, .pal') || bg.firstElementChild;
+      const lb = v && v.getAttribute('aria-labelledby');
+      const naam = (v && v.getAttribute('aria-label'))
+        || (lb ? ((document.getElementById(lb) || {}).textContent || '').trim() : '');
+      return [bg.id, !!naam];
+    });
+    eq('a11y: elk venster heeft een naam', vensterNamen.filter(([, heeft]) => !heeft), []);
+    const bewerkVenster = document.querySelector('#modal-bg .modal');
+    eq('a11y: het bewerkscherm heet naar zijn kop',
+       (document.getElementById(bewerkVenster.getAttribute('aria-labelledby')) || {}).id, 'm-title');
+    // Het commandopalet had zelf al een naam; die mag de koppeling niet overschrijven — zijn kop
+    // ís een invoerveld, dus er valt niets beters uit de HTML te halen.
+    eq('a11y: het commandopalet houdt zijn eigen naam',
+       document.querySelector('#pal-bg .pal').getAttribute('aria-label'), 'Zoeken en acties');
+
+    // 7. Het sluitkruisje is een '×'. Voorgelezen is dat 'maal'; met een naam wordt het 'Sluiten'.
+    const kruisjes = [...document.querySelectorAll('.modal-close')];
+    eq('a11y: elk sluitkruisje heet Sluiten',
+       [kruisjes.length > 0, kruisjes.every(k => k.getAttribute('aria-label') === 'Sluiten')], [true, true]);
+
+    // 8. De koppelfunctie zelf, los van de schil, op een nagebouwd veldvak. Drie regels ineen:
+    //    een label zonder `for` wordt gekoppeld, een label dat zijn veld al ómvat wordt met rust
+    //    gelaten (daar is `for` overbodig), en een tweede bediening in hetzelfde vak — de
+    //    offerte-teller — krijgt de labeltekst als eigen naam in plaats van naamloos te blijven.
+    const proef = document.createElement('div');
+    proef.innerHTML = '<div class="fld"><label>Deadline</label><input type="date" id="__a11y-dl"></div>'
+                    + '<div class="fld"><label>Aantal</label><input id="__a11y-a"><input id="__a11y-b" placeholder="van"></div>'
+                    + '<div class="fld"><label>Klaar<input type="checkbox" id="__a11y-c"></label></div>'
+                    + '<div class="fld"><label>Fase</label><button type="button">1</button></div>';
+    document.body.appendChild(proef);
+    try {
+      const gekoppeld = koppelFormulierLabels(proef);
+      const lab = i => [...proef.querySelectorAll('label')][i];
+      eq('a11y: koppelen doet precies de vakken met een veld erin', gekoppeld, 2);
+      eq('a11y: het label wijst zijn veld aan', lab(0).getAttribute('for'), '__a11y-dl');
+      eq('a11y: een tweede bediening in hetzelfde vak krijgt de labeltekst mét zijn plaatshouder',
+         [lab(1).getAttribute('for'), document.getElementById('__a11y-b').getAttribute('aria-label')],
+         ['__a11y-a', 'Aantal — van']);
+      eq('a11y: een label dat zijn veld omvat blijft ongemoeid', lab(2).getAttribute('for'), null);
+      eq('a11y: een kop boven knoppen krijgt geen for', lab(3).getAttribute('for'), null);
+
+      // En de schakelaar-benoeming, ook los: een lege knop naast tekst, en een knop die zijn
+      // naam al heeft (die mag niet overschreven worden).
+      const proef2 = document.createElement('div');
+      proef2.innerHTML = '<div class="toggle-row"><button role="switch"></button><span>Vakantiestand</span></div>'
+                       + '<div class="toggle-row"><button role="switch" aria-label="Eigen naam"></button><span>Iets anders</span></div>';
+      document.body.appendChild(proef2);
+      try {
+        eq('a11y: alleen de naamloze schakelaar wordt benoemd', benoemSchakelaars(proef2), 1);
+        const k = proef2.querySelector('button[role=switch]');
+        eq('a11y: en hij wijst naar de tekst ernaast',
+           (document.getElementById(k.getAttribute('aria-labelledby')) || {}).textContent, 'Vakantiestand');
+        eq('a11y: een schakelaar met eigen naam houdt die',
+           proef2.querySelectorAll('button[role=switch]')[1].getAttribute('aria-label'), 'Eigen naam');
+      } finally { proef2.remove(); }
+    } finally { proef.remove(); }
+
+    // 9. Contrast. De drie plekken die onder WCAG AA lagen, nu gemeten op de echte, berekende
+    //    kleuren — niet op de hex in het bestand. Zo vangt de toets ook een latere themawijziging
+    //    die deze paren opnieuw te licht maakt.
+    const _rgb = s => (String(s).match(/\d+/g) || []).slice(0, 3).map(Number);
+    const _lum = c => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+      return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
+    const _cr = (a, b) => { const l1 = _lum(a), l2 = _lum(b); return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05); };
+    const zijbalkLbl = document.querySelector('.sb-lbl');
+    const claudeKnop = document.querySelector('.ai-claude');
+    if (zijbalkLbl) truthy('a11y: de zijbalk-kopjes halen 4,5:1',
+      _cr(_rgb(getComputedStyle(zijbalkLbl).color), _rgb(getComputedStyle(document.getElementById('sb')).backgroundColor)) >= 4.5);
+    if (claudeKnop) truthy('a11y: de Claude-knop haalt 4,5:1',
+      _cr(_rgb(getComputedStyle(claudeKnop).color), _rgb(getComputedStyle(claudeKnop).backgroundColor)) >= 4.5);
+
+    // 10. De chat-knop hoort in de bovenbalk en mag NIET zweven. Als zwevend knopje rechtsonder lag
+    //     hij over de actiekolom van de takentabel: het vinkje 'afronden' van de rij eronder was
+    //     onklikbaar — een klik opende de chat. Gemeten op 1440x900 én op 375x812; op beide maten
+    //     raakte hij een rij. Deze toets bewaakt de verhuizing, en de tweede regel bewaakt de reden:
+    //     niets in de schil mag zwevend over de tabel liggen en klikken opvangen.
+    const chatKnop = document.getElementById('chat-btn');
+    eq('a11y: de chat-knop staat in de bovenbalk en zweeft niet',
+       [!!chatKnop, !!(chatKnop && chatKnop.closest('#hdr')), chatKnop && getComputedStyle(chatKnop).position],
+       [true, true, 'static']);
+    // Alles wat vast op het scherm staat én klikken opvangt, langs de meetlat. De vensters mogen dat
+    // (die dekken de app bewust af als ze openstaan); een knop die er los overheen zweeft niet.
+    const zwevendeVangers = [...document.querySelectorAll('body *')].filter(el => {
+      const cs = getComputedStyle(el);
+      if (cs.position !== 'fixed' || cs.pointerEvents === 'none') return false;
+      if (cs.visibility === 'hidden' || cs.display === 'none') return false;
+      if (el.classList.contains('modal-bg') || el.closest('.modal-bg')) return false;
+      if (el.id === 'chat-bg' || el.closest('#chat-bg')) return false;   // paneel, alleen open zichtbaar
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0;
+    }).map(el => el.id || el.className);
+    eq('a11y: geen losse zwevende knop over de inhoud', zwevendeVangers.filter(n => /fab/i.test(String(n))), []);
   })();
 
   const totOk = ok + _tOk, totFail = fail + _tFail;

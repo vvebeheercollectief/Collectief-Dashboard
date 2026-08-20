@@ -156,7 +156,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   let _aiMouseDown=null;
   document.getElementById('ai-bg').addEventListener('mousedown',e=>{_aiMouseDown=e.target});
   document.getElementById('ai-bg').addEventListener('click',e=>{if(e.target.id==='ai-bg'&&_aiMouseDown?.id==='ai-bg')closeAiHelp()});
-  document.getElementById('chat-fab').onclick=openChat;
+  document.getElementById('chat-btn').onclick=openChat;
   document.getElementById('chat-close').onclick=closeChat;
   initVveZoekveld({ input: document.getElementById('chat-vve-zoek'), lijstEl: document.getElementById('chat-vve-sug'),
     minTekens: 0, onSelect: ({code}) => setChatVve(code) });

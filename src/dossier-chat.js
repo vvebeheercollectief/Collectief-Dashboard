@@ -103,14 +103,20 @@ function openChat(){
   if(!state._chatHistorie) state._chatHistorie = [];
   if(!state._chatVve) state._chatVve = state.vveCode || '';
   renderChat();
-  document.getElementById('chat-bg').classList.add('open');
-  document.getElementById('chat-fab')?.setAttribute('aria-expanded','true');
+  const bg = document.getElementById('chat-bg');
+  // Het paneel hangt onder de bovenbalk. Die staat niet altijd op dezelfde hoogte: in de
+  // testomgeving duwt de TESTOMGEVING-balk hem 34px omlaag. Vandaar de echte onderkant meten
+  // in plaats van een vaste waarde in de CSS — anders overlapt het paneel daar zijn eigen knop.
+  const hdr = document.getElementById('hdr');
+  if (hdr) bg.style.top = Math.round(hdr.getBoundingClientRect().bottom + 8) + 'px';
+  bg.classList.add('open');
+  document.getElementById('chat-btn')?.setAttribute('aria-expanded','true');
   const inp = document.getElementById('chat-input'); if(inp) setTimeout(()=>inp.focus(), 30);
 }
 function closeChat(){
   document.getElementById('chat-bg')?.classList.remove('open');
-  const fab=document.getElementById('chat-fab');
-  if(fab){ fab.setAttribute('aria-expanded','false'); try{fab.focus()}catch(_){} }
+  const knop=document.getElementById('chat-btn');
+  if(knop){ knop.setAttribute('aria-expanded','false'); try{knop.focus()}catch(_){} }
 }
 
 function setChatVve(code){

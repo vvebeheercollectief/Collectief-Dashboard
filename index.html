@@ -107,6 +107,13 @@
     <button class="ico-btn" id="ai-btn" title="AI-hulp — mail plakken">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" fill="currentColor" fill-opacity="0.18"/><path d="M18.5 14.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" fill="currentColor" fill-opacity="0.18"/></svg>
     </button>
+    <!-- Chat over een VvE-dossier. Stond tot v10.24 als zwevend knopje rechtsonder, maar lag daar
+         bovenop de actiekolom van de takentabel: het vinkje 'afronden' van de rij eronder was niet
+         aanklikbaar, je opende de chat. Gemeten op 1440x900 en op 375x812 — in de bovenbalk kan dat
+         niet meer gebeuren. -->
+    <button class="ico-btn" id="chat-btn" title="Vraag over een VvE" aria-label="Vraag over een VvE" aria-expanded="false" aria-controls="chat-bg">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 11.8a8.2 8.2 0 0 1-8.8 8.2 8.6 8.6 0 0 1-3.6-.9L3.5 20.5l1.4-4.6a8.6 8.6 0 0 1-.9-3.6 8.2 8.2 0 0 1 8.2-8.8 8.2 8.2 0 0 1 8.3 8.3z" fill="currentColor" fill-opacity="0.16"/></svg>
+    </button>
     <button class="ico-btn" id="density-btn" title="Weergave: dichtheid">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
     </button>
@@ -139,14 +146,14 @@
           <div class="filter-bar">
             <div class="search-box">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-              <input type="text" id="s-ntd" placeholder="Zoek…"/>
+              <input type="text" id="s-ntd" placeholder="Zoek…" aria-label="Zoek in openstaande taken"/>
             </div>
             <div class="search-box" style="min-width:120px;max-width:150px">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 5.523-8 13-8 13S4 15.523 4 10a8 8 0 0116 0z"/><circle cx="12" cy="10" r="3"/></svg>
-              <input type="text" id="f-code-ntd" placeholder="VvE Code…"/>
+              <input type="text" id="f-code-ntd" placeholder="VvE Code…" aria-label="Filter op VvE-code"/>
             </div>
-            <select class="filter-select" id="f-beh-ntd"><option value="">Alle behandelaars</option><option>Jer</option><option>Cihad</option><option>Gabos</option></select>
-            <select class="filter-select" id="f-prio-ntd"><option value="">Alle prioriteiten</option><option>Hoog</option><option>Midden</option><option>Laag</option></select>
+            <select class="filter-select" id="f-beh-ntd" aria-label="Filter op behandelaar"><option value="">Alle behandelaars</option><option>Jer</option><option>Cihad</option><option>Gabos</option></select>
+            <select class="filter-select" id="f-prio-ntd" aria-label="Filter op prioriteit"><option value="">Alle prioriteiten</option><option>Hoog</option><option>Midden</option><option>Laag</option></select>
             <span id="bulk-teller" class="bulk-teller" style="display:none">0 geselecteerd</span>
             <button class="btn btn-sec btn-sm" id="bulk-btn" data-action="bulk-toggle" title="Meerdere taken selecteren"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4.5" y="4.5" width="15" height="15" rx="3" fill="currentColor" fill-opacity="0.18"/><path d="M8.5 12.3l2.6 2.6 4.9-5.4"/></svg> Selecteren</button>
             <button class="btn btn-pri btn-sm" id="btn-add"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Toevoegen</button>
@@ -168,7 +175,7 @@
           <div class="filter-bar">
             <div class="search-box">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-              <input type="text" id="s-af" placeholder="Zoek…"/>
+              <input type="text" id="s-af" placeholder="Zoek…" aria-label="Zoek in afgeronde taken"/>
             </div>
           </div>
         </div>
@@ -187,9 +194,9 @@
           <div class="filter-bar">
             <div class="search-box">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-              <input type="text" id="s-alvo" placeholder="Zoek VvE…"/>
+              <input type="text" id="s-alvo" placeholder="Zoek VvE…" aria-label="Zoek VvE in het ALV-overzicht"/>
             </div>
-            <select class="filter-select" id="f-status-alvo"><option value="">Alle statussen</option><option>Open</option><option>Klaargezet</option><option>Gepland</option><option>Afgerond</option></select>
+            <select class="filter-select" id="f-status-alvo" aria-label="Filter op ALV-status"><option value="">Alle statussen</option><option>Open</option><option>Klaargezet</option><option>Gepland</option><option>Afgerond</option></select>
             <label class="filter-check"><input type="checkbox" id="f-budget-alvo"/> Budgetpakket</label>
             <button class="btn btn-sec btn-sm" data-action="alvo-reset-open" title="Alle vinkjes wissen voor een nieuwe vergaderronde">Nieuwe ronde starten</button>
           </div>
@@ -219,7 +226,7 @@
           <h2>ALV's Afgerond</h2>
           <div class="search-box">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-            <input type="text" id="s-alfa" placeholder="Zoek…"/>
+            <input type="text" id="s-alfa" placeholder="Zoek…" aria-label="Zoek in afgeronde ALV's"/>
           </div>
         </div>
         <div class="tbl-wrap">
@@ -244,7 +251,7 @@
           <div class="filter-bar">
             <div class="search-box">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-              <input type="text" id="s-ontw" placeholder="Zoeken…"/>
+              <input type="text" id="s-ontw" placeholder="Zoeken…" aria-label="Zoek in ontwikkelitems"/>
             </div>
             <button class="btn btn-pri btn-sm" id="btn-add-ontw" style="background:var(--pk)">+ Nieuw item</button>
           </div>
@@ -301,7 +308,7 @@
           <div class="filter-bar">
             <div class="search-box">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-              <input type="text" id="s-logboek" placeholder="Zoek op VvE, woord of naam…"/>
+              <input type="text" id="s-logboek" placeholder="Zoek op VvE, woord of naam…" aria-label="Zoek in het logboek"/>
             </div>
           </div>
         </div>
@@ -619,7 +626,7 @@
         <div class="logboek-add">
           <!-- Knoppenbalk staat hier letterlijk (statische markup); houd 'm gelijk aan opmaakBalk() in src/opmaak.js -->
           <div class="opmaak-veld">
-            <textarea id="hist-note" rows="3" placeholder="Typ hier je notitie… (Enter = nieuwe regel)"></textarea>
+            <textarea id="hist-note" rows="3" placeholder="Typ hier je notitie… (Enter = nieuwe regel)" aria-label="Notitie bij deze taak"></textarea>
             <div class="opmaak-balk">
               <button type="button" class="opmaak-knop" data-action="opmaak-vet" title="Vet (Ctrl+B)" aria-label="Vet"><b>B</b></button>
               <button type="button" class="opmaak-knop" data-action="opmaak-schuin" title="Schuin (Ctrl+I)" aria-label="Schuin"><i>I</i></button>
@@ -767,13 +774,13 @@
       <button data-action="bulk-doe" data-wat="wegleggen" data-dagen="3">+3 dagen</button>
       <button data-action="bulk-doe" data-wat="wegleggen" data-dagen="7">+1 week</button>
       <button data-action="bulk-doe" data-wat="wegleggen" data-dagen="14">+2 weken</button>
-      <div class="bb-datum"><input type="date" id="bb-datum-weg"><button data-action="bulk-doe" data-wat="wegleggen">OK</button></div>
+      <div class="bb-datum"><input type="date" id="bb-datum-weg" aria-label="Wegleggen tot datum"><button data-action="bulk-doe" data-wat="wegleggen">OK</button></div>
     </div>
   </div>
   <div class="bb-wrap">
     <button class="bb-knop" data-action="bulk-menu" data-menu="deadline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="2" fill="currentColor" fill-opacity="0.18"/><path d="M4 9.5h16"/><path d="M8 3v4M16 3v4"/></svg> Deadline <svg class="caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
     <div class="bb-menu" id="bb-menu-deadline">
-      <div class="bb-datum"><input type="date" id="bb-datum-dl"><button data-action="bulk-doe" data-wat="deadline">OK</button></div>
+      <div class="bb-datum"><input type="date" id="bb-datum-dl" aria-label="Nieuwe deadline"><button data-action="bulk-doe" data-wat="deadline">OK</button></div>
     </div>
   </div>
   <button class="bb-knop bb-rood" data-action="bulk-doe" data-wat="verwijderen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 7.5l.7 11.6a2 2 0 0 0 2 1.9h5.6a2 2 0 0 0 2-1.9l.7-11.6z" fill="currentColor" fill-opacity="0.18"/><path d="M4 7.5h16"/><path d="M9.5 7.5V6a1.8 1.8 0 0 1 1.8-1.8h1.4A1.8 1.8 0 0 1 14.5 6v1.5"/><path d="M10 11.5v5M14 11.5v5"/></svg> Verwijderen</button>
@@ -785,7 +792,7 @@
   <div class="pal" role="dialog" aria-label="Zoeken en acties">
     <div class="pal-zoek">
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      <input id="pal-input" type="text" placeholder="Zoek VvE, taak of logboek…" autocomplete="off" role="combobox" aria-expanded="true" aria-controls="pal-bd" aria-autocomplete="list"/>
+      <input id="pal-input" type="text" placeholder="Zoek VvE, taak of logboek…" autocomplete="off" role="combobox" aria-expanded="true" aria-controls="pal-bd" aria-autocomplete="list" aria-label="Zoek VvE, taak of logboek"/>
       <span class="pal-esc">ESC</span>
     </div>
     <div class="pal-bd" id="pal-bd" role="listbox" aria-label="Zoekresultaten"></div>
@@ -869,7 +876,7 @@
         <!-- LINKS -->
         <div>
           <p class="ai-step"><span class="dot">1</span> Plak de e-mail of tekst</p>
-          <textarea id="ai-mail" class="ai-ta" rows="6" placeholder="Plak hier de e-mail…"></textarea>
+          <textarea id="ai-mail" class="ai-ta" rows="6" placeholder="Plak hier de e-mail…" aria-label="Plak hier de e-mail"></textarea>
 
           <p class="ai-step" style="margin-top:16px"><span class="dot">2</span> Wat heb je nodig?</p>
           <div class="ai-chips" id="ai-chips">
@@ -881,7 +888,7 @@
 
           <p class="ai-step" style="margin-top:16px"><span class="dot">3</span> Koppel een VvE <span style="font-weight:500;text-transform:none;letter-spacing:0;color:var(--mut)">— optioneel, geeft live context</span></p>
           <div class="ai-vve-wrap">
-            <input type="text" id="ai-vve-input" placeholder="Zoek op code of naam… (klik voor de hele lijst)" autocomplete="off"/>
+            <input type="text" id="ai-vve-input" placeholder="Zoek op code of naam… (klik voor de hele lijst)" autocomplete="off" aria-label="Koppel een VvE aan deze e-mail"/>
             <button type="button" id="ai-vve-wis" title="Koppeling wissen" aria-label="Koppeling wissen" style="display:none">×</button>
             <div class="vve-suggestions" id="ai-vve-sug"></div>
           </div>
@@ -899,7 +906,7 @@
           <p style="font-size:11.5px;color:var(--mut);margin:9px 0 0">De vraag staat dan op je klembord — plak met <kbd>Ctrl/⌘+V</kbd>.</p>
 
           <p class="ai-step" style="margin-top:16px"><span class="dot">5</span> Plak het antwoord van de AI terug</p>
-          <textarea id="ai-answer" class="ai-ta" rows="4" placeholder="Plak hier wat Claude/Gemini teruggeeft…"></textarea>
+          <textarea id="ai-answer" class="ai-ta" rows="4" placeholder="Plak hier wat Claude/Gemini teruggeeft…" aria-label="Plak hier het antwoord van de AI"></textarea>
           <div class="ai-result" id="ai-result" style="display:none"></div>
         </div>
       </div>
@@ -935,9 +942,6 @@
   </div>
 </div>
 
-<button id="chat-fab" title="Vraag over een VvE" aria-label="Vraag over een VvE" aria-expanded="false" aria-controls="chat-bg">
-  <img src="icon-192.png" alt=""/>
-</button>
 <div id="chat-bg">
   <div id="chat-paneel" role="dialog" aria-modal="false" aria-label="VvE-dossier chat-assistent">
     <div class="chat-hdr">
@@ -948,12 +952,12 @@
       <button class="modal-close" id="chat-close" aria-label="Sluiten">×</button>
     </div>
     <div class="chat-vve-wrap">
-      <input type="text" id="chat-vve-zoek" placeholder="Andere VvE kiezen… (code of naam)" autocomplete="off"/>
+      <input type="text" id="chat-vve-zoek" placeholder="Andere VvE kiezen… (code of naam)" autocomplete="off" aria-label="Kies een andere VvE"/>
       <div class="vve-suggestions" id="chat-vve-sug"></div>
     </div>
     <div id="chat-bubbles" class="chat-bubbles"></div>
     <div class="chat-invoer">
-      <input type="text" id="chat-input" placeholder="Stel een vraag…" autocomplete="off"/>
+      <input type="text" id="chat-input" placeholder="Stel een vraag…" autocomplete="off" aria-label="Stel een vraag over dit dossier"/>
       <button id="chat-send" data-action="chat-send" aria-label="Versturen"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5.5M5.5 12L12 5.5 18.5 12"/></svg></button>
     </div>
     <div class="chat-foot"><svg width="13" height="13" style="vertical-align:-2.5px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.8 12S6.5 5.7 12 5.7 21.2 12 21.2 12 17.5 18.3 12 18.3 2.8 12 2.8 12z" fill="currentColor" fill-opacity="0.18"/><circle cx="12" cy="12" r="2.7"/></svg> Leest alleen mee · verandert niets · via Claude (Haiku)</div>

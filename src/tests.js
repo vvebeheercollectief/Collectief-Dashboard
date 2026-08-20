@@ -9456,7 +9456,9 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       proef.innerHTML = '<table><tbody><tr class="row-telaat" style="--prio:var(--rd)"><td class="cell-txt">'
         + '<span class="pill-telaat">Te laat</span><span class="pill-stil">Stil</span>'
         + '<span class="pill-opvolg">Vandaag</span><span class="pill-snooze">Weggelegd</span>'
-        + '</td><td><div class="acts"><button class="act-bw act-ico">B</button></div></td></tr></tbody></table>';
+        + '<span class="code">311200</span>'
+        + '</td><td><div class="acts"><button class="act-bw act-ico">B</button></div></td></tr>'
+        + '<tr><td class="grp-kop">In behandeling (5)</td></tr></tbody></table>';
       const kaart = document.querySelector('#page-ntd .card') || document.body;
       kaart.appendChild(proef);
       const rem = document.createElement('style');
@@ -9475,7 +9477,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         for (let i = st.length - 1; i >= 0; i--) b = _over(st[i], { r:b[0], g:b[1], b:b[2] });
         return b; };
       const meet = () => { const uit = {};
-        proef.querySelectorAll('span,button').forEach(el => {
+        proef.querySelectorAll('span,button,td.grp-kop').forEach(el => {
           const fg = _parse(getComputedStyle(el).color); const bg = _effBg(el);
           uit[el.className.split(' ')[0]] = _cr(_over(fg, { r:bg[0], g:bg[1], b:bg[2] }), bg); });
         return uit; };
@@ -9483,7 +9485,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         applyTheme('light'); const licht = meet();
         applyTheme('dark');  const donker = meet();
         // Een pictogram mag op 3:1; de pillen zijn tekst van 11px en moeten 4,5:1 halen.
-        const eis = k => k === 'act-bw' ? 3 : 4.5;
+        const eis = k => k === 'act-bw' ? 3 : 4.5;   // pictogram 3:1, tekst 4,5:1
         const gezakt = [];
         Object.keys(licht).forEach(k => {
           if (licht[k] < eis(k)) gezakt.push(`${k} licht ${licht[k].toFixed(2)}`);

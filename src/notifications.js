@@ -317,7 +317,12 @@ function verwerkMeldingRijen(koppen, rijen, watermerk, who, prefs) {
     .filter(n => n.ts > watermerk)
     // Persoonsgerichte melding alleen aan de juiste persoon. Op een apparaat zonder ingestelde
     // naam (who==='') NIET tonen (geen 'who &&'-kortsluiting → anders lekt het).
-    .filter(n => !(n.voor && n.voor !== 'allen' && n.voor !== who))
+    // Hoofdletter- en spatie-ongevoelig vergelijken. De 'voor'-waarde komt uit een Sheet-cel die
+    // door Apps Script wordt gevuld en de eigen naam uit een instelling die de gebruiker zelf
+    // typt; ' jer' of 'JER' liet de melding stil verdwijnen bij precies de persoon voor wie hij
+    // bedoeld was. 'allen' blijft de vaste sleutel.
+    .filter(n => { const v = String(n.voor || '').trim().toLowerCase();
+                   return !(v && v !== 'allen' && v !== String(who || '').trim().toLowerCase()); })
     .filter(n => { const k = TYPE_NAAR_PREFS[n.type]; return !(k && prefs[k] === false); })
     .sort((a, b) => a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0);   // nieuwste bovenaan
 

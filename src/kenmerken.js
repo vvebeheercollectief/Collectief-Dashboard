@@ -96,7 +96,13 @@ async function saveKenmerken(){
       }
     },
     ()=>{
+      // Het rijnummer NIET terugdraaien. Slaagde de append maar struikelde de logregel erna op een
+      // niet-tijdelijke fout, dan bestaat die rij écht in de Sheet — en zou de momentopname hem
+      // weer op 0 zetten. De eerstvolgende opslag koos dan opnieuw de append-tak en maakte een
+      // TWEEDE rij voor dezelfde VvE, waarna vveKenmerken er willekeurig één van leest.
+      const rijNu=rec._row;
       Object.assign(rec,sn);
+      if(rijNu>0) rec._row=rijNu;
       // Ook de optimistische logregels terugnemen — alleen die van deze poging (op identiteit,
       // niet op inhoud), zodat een gelijkluidende regel van een andere opslag blijft staan.
       optLog.forEach(r=>{ const i=D.logboek.indexOf(r); if(i>-1) D.logboek.splice(i,1); });

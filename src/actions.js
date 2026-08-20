@@ -142,7 +142,13 @@ export const ACTIONS = {
     await state._writeChain;
     ververs();
   },
-  'taak-bewerken':         (el) => openModal(true, state._rowCache[+el.dataset.rid]),
+  // Dezelfde null-controle als 'taak-afronden' en 'taak-wegleggen' hierboven. De rij-cache wordt
+  // bij elke hertekening opnieuw opgebouwd; klik je op een knop uit een net vervangen render (of
+  // op een rij die door de poll uit de lijst is gevallen), dan is dit `undefined` en liep openModal
+  // stuk op `rowData._sec` — een lege pagina met een console-fout in plaats van een uitleg.
+  'taak-bewerken':         (el) => { const r=state._rowCache[+el.dataset.rid];
+                                     if(!r){ alert('Taak niet gevonden. Vernieuw de pagina en probeer opnieuw.'); return; }
+                                     openModal(true, r); },
   'taak-afronden':         (el) => completeTask(+el.dataset.rid),
   'pagineer':              (el) => { const d=el.dataset.doel; pgs[d]=+el.dataset.pg; PAG_RENDER[d](); },
   'ai-overnemen':          (el) => aiOvernemen(el.dataset.sec),

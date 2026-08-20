@@ -249,7 +249,9 @@
     tbody tr[data-prio=hoog]{--prio-bar:var(--prio)}
     tbody tr[data-prio=midden]{--prio-bar:#b88a32}
     tbody tr[data-prio=laag],tbody tr[data-prio=geen]{--prio-bar:var(--bor-input)}
-    .code{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12.5px;font-weight:500;letter-spacing:0;color:#6b7280;background:none;padding:0;white-space:nowrap}
+    /* #69707e i.p.v. #6b7280: op een kaart haalde het 4,83:1, maar op de dossierpagina staat de
+       VvE-code rechtstreeks op de paginakleur (#f4f5f7) en dan bleef er 4,43:1 over. */
+    .code{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12.5px;font-weight:500;letter-spacing:0;color:#69707e;background:none;padding:0;white-space:nowrap}
     /* Inklapbare tekstcellen — Operator: 1 regel met …; klik op de rij klapt uit.
        Clamp zit op een inline-block .ct (td blijft table-cell, zodat kolommen netjes uitlijnen). */
     .cell-name{font-weight:600;color:var(--txt)}
@@ -319,7 +321,11 @@
        gezet. De eerste bleef daardoor op #4b5563 staan: 1,76:1 op de donkere achtergrond. */
     [data-theme=dark] .pill-stil,[data-theme=dark] .pill-snooze{color:#9ca3af}
     tr.snooze-row td{opacity:.55}
-    .grp-kop{background:var(--group-bg);padding:9px 26px;font-size:11.5px;font-weight:600;color:#7c8694;text-transform:uppercase;letter-spacing:.04em;border:none}
+    /* Eén kleur haalt het hier niet in beide thema's: de strook is licht (#f5f7f9) én donker
+       (#1c2026). Op #7c8694 kwam de kop uit op 3,43:1 in licht en 4,44:1 in donker; 11,5px
+       hoofdletters vragen 4,5:1. Vandaar per thema een eigen waarde, zoals bij de pillen. */
+    .grp-kop{background:var(--group-bg);padding:9px 26px;font-size:11.5px;font-weight:600;color:#66707e;text-transform:uppercase;letter-spacing:.04em;border:none}
+    [data-theme=dark] .grp-kop{color:#808a98}
     .status-open{background:var(--rd-l);color:var(--rd)}
     .status-klaargezet{background:var(--ac-l);color:var(--ac)}
     .status-gepland{background:var(--am-l);color:var(--am)}

@@ -9,7 +9,7 @@ import { ensureToken } from "./auth.js";
 import { _shiftNtdRows, _herstelShift, assertRowsMatch, _veiligeRij } from "./api.js";
 import { getSheetIds, getAfInsertRow, getInsertRow, insertAndWriteRow, serializeNtdUndo, afrondWaarden } from "./crud.js";
 import { backgroundWrite, loadAll, metWriteMarkering, blokkeerOffline } from "./data.js";
-import { showToast, showUndoToast } from "./notifications.js";
+import { showToast, showUndoToast, fireNotifEvent } from "./notifications.js";
 import { vraagBevestiging } from "./bevestig.js";
 import { logEvents } from "./render-overig.js";
 import { renderAll } from "./main.js";
@@ -331,7 +331,7 @@ function bulkVeld(rows,soort,waarde){
   // De `gelogd`-vlag (één voor de hele batch) overleeft _withRetry-herkansingen en houdt logEvent
   // (een append) idempotent: de updateCells zelf zijn idempotent (vaste waarde overschrijven).
   const schrijf=(welkeWaarde)=>{
-    let gelogd=false;
+    let gelogd=false, gemeld=false;
     return async()=>{
       // Bescherming: alle rijen nog dezelfde TAAK vóór bulk-celschrijf.
       // Let op de richting. Deze closure schrijft zowel de nieuwe waarde als (bij undo) de oude
@@ -365,6 +365,21 @@ function bulkVeld(rows,soort,waarde){
         body:JSON.stringify({valueInputOption:'USER_ENTERED', data})});
       if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Bulk-actie fout');err.status=resp.status;throw err}
       if(!gelogd){ await logEvents(items.map(it=>({code:it.code,sec:it.sec,actie:conf.log,veld:conf.veld,oudeWaarde:welkeWaarde==='oud'?waarde:it.oud,nieuweWaarde:welkeWaarde==='oud'?it.oud:waarde}))); gelogd=true; }
+      // Melding aan de nieuwe behandelaar. Eén taak toewijzen deed dit al (crud.js, submitTask);
+      // bulk deed het helemaal niet, dus wie acht taken in één keer kreeg hoorde er niets van.
+      // Bewust ÉÉN melding en niet acht: acht pushes voor één handeling leest als een storing.
+      // De tekst noemt het aantal en de eerste codes, zodat de ontvanger weet waar hij moet kijken.
+      // Alleen bij 'nieuw' — een ongedaan-making hoort niet als een nieuwe toewijzing te klinken.
+      // Wie aan zichzelf toewijst krijgt niets: de ontvanger-is-de-actor-regel zit in
+      // fireNotifEvent en in Apps Script (name !== actor).
+      if(soort==='geven' && waarde && welkeWaarde==='nieuw' && !gemeld){
+        const codes=[...new Set(items.map(it=>it.code).filter(Boolean))];
+        const kop  = items.length===1 ? (codes[0]||'') : `${items.length} taken`;
+        const rest = items.length===1 ? (items[0].r.naam||'')
+                   : codes.slice(0,3).join(', ') + (codes.length>3 ? ` en ${codes.length-3} andere` : '');
+        fireNotifEvent('assigned',{sec:items[0].sec, code:kop, naam:rest, behandelaar:waarde});
+        gemeld=true;
+      }
     };
   };
   showUndoToast(conf.titel,items.map(i=>i.code).join(', '),async()=>{
@@ -380,4 +395,4 @@ function bulkVeld(rows,soort,waarde){
 }
 
 export { _bulkVolgorde, bulkGeselecteerd, bulkSelectie, toggleBulkMode, bulkVink, bulkWis,
-         renderBulkUi, toggleBulkMenu, _sluitMenus, bulkDoe, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen };
+         renderBulkUi, toggleBulkMenu, _sluitMenus, bulkDoe, bulkVeld, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen };

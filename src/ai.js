@@ -5,7 +5,7 @@ import { esc, displayName } from "./util.js";
 import { state, D } from "./state.js";
 import { SECS, SKEYS } from "./config.js";
 import { goTo } from "./ui.js";
-import { openModal } from "./crud.js";
+import { openModal, zetOmschrijving } from "./crud.js";
 import { showToast } from "./notifications.js";
 import { fmtLogTs } from "./render-overig.js";
 import { ico } from "./icons.js";
@@ -175,13 +175,8 @@ function prefillNieuweTaak(sec, code, naam, actiepunt){
   openModal(false);
   const setIf=(id,v)=>{const el=document.getElementById(id);if(el&&v)el.value=v;};
   setIf('m-code',code); setIf('m-naam',naam);
-  if(actiepunt){
-    if(sec==='OPPAKKEN') setIf('m-actie',actiepunt);
-    else if(sec==='VERGADERVERZOEKEN') setIf('m-agenda',actiepunt);
-    else if(sec==='OFFERTE-TRAJECTEN') setIf('m-opm-o',actiepunt);
-    else if(sec==='LOD') setIf('m-actie-l',actiepunt);
-    else if(sec==='SUBSIDIE-TRAJECTEN') setIf('m-subsidie',actiepunt);
-  }
+  if(actiepunt) zetOmschrijving(sec, actiepunt);   // welk veld dat is, weet crud.js
+
 }
 function aiOvernemen(sec){ prefillNieuweTaak(sec,state._aiLastCode,state._aiLastNaam,''); }
 function aiActieTaak(btn){

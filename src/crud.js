@@ -220,6 +220,25 @@ function fillModalFields(sec,r){
 }
 function setv(id,v){const el=document.getElementById(id);if(el)el.value=(v===undefined||v===null)?'':v} // 0 blijft '0' (geen falsy-coercie)
 
+// Waar de OMSCHRIJVING van een taak thuishoort, per sectie. Eén bron, want deze koppeling stond op
+// twee plekken en maar één ervan klopte: de AI-hulp vulde het juiste veld, het commandopalet
+// schreef altijd naar 'm-actie' — het veld van Oppakken. Stond je op een ander tabblad, dan
+// belandde de tekst die je net in Ctrl+K typte in een VERBORGEN veld en gooide submitTask hem weg
+// (die leest uitsluitend de velden van state.editSec). Welk veld de omschrijving draagt volgt
+// dezelfde volgorde als taakTitel() in util.js.
+const OMSCHRIJVING_VELD = {
+  'OPPAKKEN':           'm-actie',
+  'VERGADERVERZOEKEN':  'm-agenda',
+  'OFFERTE-TRAJECTEN':  'm-opm-o',
+  'LOD':                'm-actie-l',
+  'SUBSIDIE-TRAJECTEN': 'm-subsidie',
+};
+function zetOmschrijving(sec, tekst){
+  const el = document.getElementById(OMSCHRIJVING_VELD[sec] || '');
+  if(el && tekst) el.value = tekst;
+  return !!el;
+}
+
 function clearModal(){
   document.querySelectorAll('.modal-body input,.modal-body select,.modal-body textarea').forEach(el=>{if(!el.readOnly)el.value=''});
   // 'm-naam' is het enige readonly veld in het venster en viel daardoor buiten de regel hierboven:
@@ -966,5 +985,6 @@ export {
   openModal, editRow, closeModal, fillModalFields, setv, clearModal, kiesSectie,
   getSheetIds, _sheetBreedtes, getInsertRow, insertAndWriteRow, deleteTask, deleteCurrentEditTask, deleteTaskRow,
   getAfInsertRow, completeTask, completeCurrentEditTask, doCompleteTask, closeCompleteModal, submitTask, gv,
+  OMSCHRIJVING_VELD, zetOmschrijving,
   _verseRijIdx, _herankerRij, zetSubsidieFase, kiesModalFase, _modalFaseWoord,
 };

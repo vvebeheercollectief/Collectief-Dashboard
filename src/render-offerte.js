@@ -18,7 +18,11 @@ function offerteAannSamenvatting(r){
   const lbl=lijst.length
     ? `Aannemers · ${lijst.filter(a=>a.binnen).length} van ${lijst.length} binnen`
     : 'Aannemers toevoegen';
-  return `<span class="of-aann-tog" data-action="offerte-aann-open" data-aann="${esc(sl)}">${open?ico('chevronOnder',12):ico('chevronRechts',12)} ${lbl}</span>`;
+  // tabindex + role: dit is een echte bediening (het paneel eronder open/dicht) en was met alleen
+  // een <span> uitsluitend met de muis te bereiken. Eén tabstop per offerte-rij; de Enter/spatie-
+  // afhandeling zit centraal in actions.js. Geen <button>: deze span staat in een cel naast andere
+  // tekst en een knop zou daar zijn eigen opmaak meebrengen.
+  return `<span class="of-aann-tog" role="button" tabindex="0" aria-expanded="${open}" data-action="offerte-aann-open" data-aann="${esc(sl)}">${open?ico('chevronOnder',12):ico('chevronRechts',12)} ${lbl}</span>`;
 }
 
 // Uitklapbaar aannemers-lijstje voor één traject (gemount als extra <tr> onder de rij).

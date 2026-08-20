@@ -5,7 +5,7 @@ import { esc, displayName, berekenPrioriteit } from "./util.js";
 import { SECS, SKEYS } from "./config.js";
 import { state, D } from "./state.js";
 import { goTo } from "./ui.js";
-import { openModal } from "./crud.js";
+import { openModal, zetOmschrijving } from "./crud.js";
 import { openVvePagina, vveOverzicht } from "./render-vve.js";
 import { logZin } from "./render-overig.js";
 import { toggleBulkMode } from "./bulk.js";
@@ -108,7 +108,10 @@ function renderPal(q){
     html+=_groep('Acties',
       _item(`<span class="pal-ico pal-ico-act">${ico('plus')}</span><div class="pal-tekst"><b>Nieuwe taak aanmaken met "${esc(q)}"</b></div><span class="pal-hint">opent invulscherm</span>`,
         ()=>{ closePalette(); goTo('ntd'); openModal(false);
-              const f=document.getElementById('m-actie'); if(f) f.value=q; }));
+              // Naar het veld van de sectie waar de gebruiker staat, niet vast naar 'm-actie'.
+              // Dat laatste is het veld van Oppakken; op elk ander tabblad is het verborgen en
+              // gooide submitTask de zojuist getypte tekst weg (die leest alleen state.editSec).
+              zetOmschrijving(state.editSec || state.activeNtd, q); }));
   }
   bd.innerHTML=html||'<div class="pal-leeg">Geen resultaten</div>';
   if(_palSel>=_palItems.length) _palSel=Math.max(0,_palItems.length-1);

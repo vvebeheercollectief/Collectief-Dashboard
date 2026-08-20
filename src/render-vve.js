@@ -342,7 +342,11 @@ function renderVve(){
     // kent de gestapelde weergave niet (geen chevron, geen paneel, geen filters die hem uitzetten),
     // dus er is ook geen stand waarin het gebaar hier niet mag. Dat is dezelfde afweging als bij de
     // aanroep van `initStapelSlepen` onderaan, die om die reden géén `magSlepen` meekrijgt.
-    return `<div class="tk tk-taak${weg?' snooze-row':''}${diep?' tk-stap':''}" data-action="taak-bewerken" data-rid="${rid}" style="cursor:pointer">
+    // role+tabindex: deze rij is de enige weg om een taak vanuit het dossier te openen en was met
+    // alleen een klikbare <div> niet met het toetsenbord te bereiken. Geen <button>: er zit al een
+    // afrond-knop ín deze rij en een knop in een knop is ongeldig. Enter/spatie loopt via de
+    // centrale afhandeling in actions.js.
+    return `<div class="tk tk-taak${weg?' snooze-row':''}${diep?' tk-stap':''}" role="button" tabindex="0" data-action="taak-bewerken" data-rid="${rid}" aria-label="Taak openen: ${esc(taakTitel(r,sec))}" style="cursor:pointer">
       ${STAPEL_GREEP}
       <span class="nm">${esc(taakTitel(r,sec))}${bdlPil}</span>
       <div class="tk-onder">

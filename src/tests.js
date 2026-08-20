@@ -13,12 +13,12 @@ import { state, D, pgs } from "./state.js";
 import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel, renderVve, groepeerBundels } from "./render-vve.js";
 import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN, saveKenmerken } from "./kenmerken.js";
 import { zoekAlles, openPalette, closePalette, palOpen } from "./palette.js";
-import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen, bulkSelectie, bulkWis, renderBulkUi, bulkDoe, bulkVink } from "./bulk.js";
+import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen, bulkSelectie, bulkWis, renderBulkUi, bulkDoe, bulkVink, bulkVeld } from "./bulk.js";
 import { _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, _shiftNtdRows, veiligeCel, _veiligeRij, fetchSheet, fetchSheets, vingerafdruk, rijVingerafdruk, _normCel, _rijNaarCellen, assertRowMatch, NTD_DATUM, _isOffline, _isNetwerkFout, appendRange, appendRows } from "./api.js";
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
-import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _eindKolom, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, getAfInsertRow, _sheetBreedtes, getSheetIds, kiesSectie, deleteTaskRow, deleteCurrentEditTask, completeCurrentEditTask } from "./crud.js";
+import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _eindKolom, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, getAfInsertRow, OMSCHRIJVING_VELD, zetOmschrijving, _sheetBreedtes, getSheetIds, kiesSectie, deleteTaskRow, deleteCurrentEditTask, completeCurrentEditTask } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages, renderChat } from "./dossier-chat.js";
 import { shouldPromptReload, maakHerlaadKern, zelfdeWorker } from "./sw-update.js";
@@ -8736,6 +8736,99 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       velden.forEach((id,i)=>{ document.getElementById(id).value=oudeWaarden[i]; });
       document.querySelectorAll('.vve-suggestions').forEach(el=>{ el.innerHTML=''; el.style.display='none'; });
     }
+  })();
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  BULK 'AAN IEMAND GEVEN' — de ontvanger hoort er ook van
+  // ══════════════════════════════════════════════════════════════════════════
+  // Eén taak toewijzen stuurde een melding (crud.js, submitTask); dezelfde handeling in bulk deed
+  // dat helemaal niet. Wie acht taken in één keer kreeg, hoorde er niets van. Bewust één melding
+  // en niet acht — acht pushes voor één handeling leest als een storing.
+  await (async () => {
+    console.log('%c[TESTS] Bulk toewijzen meldt', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const _fetch = window.fetch, tokenOud = state.oauthToken, expiryOud = state.oauthExpiry;
+    const ntdOud = D.ntd, pwOud = state.pendingWrites, uitCacheOud = state._uitCache;
+    const wachtKlaar = async () => { await state._writeChain;
+      for (let i = 0; i < 200 && (state._loadInFlight || state.pendingWrites > 0); i++) await new Promise(r => setTimeout(r, 5)); };
+    try {
+      state.oauthToken = 'nep'; state.oauthExpiry = Date.now() + 3600e3; state._uitCache = false;
+      const rijen = [
+        { code: 'BK-01', naam: 'Eenhof',  behandelaar: 'Jer', _row: 5, _sec: 'OPPAKKEN' },
+        { code: 'BK-02', naam: 'Tweehof', behandelaar: 'Jer', _row: 6, _sec: 'OPPAKKEN' },
+        { code: 'BK-03', naam: 'Driehof', behandelaar: 'Jer', _row: 7, _sec: 'OPPAKKEN' },
+        { code: 'BK-04', naam: 'Vierhof', behandelaar: 'Jer', _row: 8, _sec: 'OPPAKKEN' },
+      ];
+      D.ntd = { OPPAKKEN: rijen, VERGADERVERZOEKEN: [], 'OFFERTE-TRAJECTEN': [], LOD: [], 'SUBSIDIE-TRAJECTEN': [] };
+      // Alles slaagt; we vangen op wat er naar de Notif-wachtrij gaat.
+      const wachtrij = [];
+      window.fetch = async (url, opt) => {
+        const u = decodeURIComponent(String(url));
+        if (opt && opt.method === 'POST' && /:append/.test(u)) {
+          wachtrij.push(JSON.parse(opt.body).values[0]); return new Response('{}', { status: 200 });
+        }
+        if (opt && opt.method === 'POST') return new Response('{}', { status: 200 });   // batchUpdate
+        // De rij-controle (assertRowsMatch) leest 'Nog Te Doen'!A5:S8 terug. Zonder een antwoord
+        // dat op die rijen lijkt slaat de guard aan en komt de schrijfactie er nooit doorheen —
+        // dan zou deze toets groen kunnen staan om de verkeerde reden.
+        const m = u.match(/'Nog Te Doen'!A(\d+):[A-Z]+(\d+)/);
+        if (m) {
+          const van = +m[1], tot = +m[2], uit = [];
+          for (let rr = van; rr <= tot; rr++) {
+            const rij = rijen.find(x => x._row === rr);
+            uit.push(rij ? _rijNaarCellen('Nog Te Doen', rij) : []);
+          }
+          return new Response(JSON.stringify({ values: uit }), { status: 200 });
+        }
+        return new Response(JSON.stringify(_batchGetStub(url, 'Nog Te Doen', [])), { status: 200 });
+      };
+      bulkVeld(rijen, 'geven', 'Cihad');
+      await wachtKlaar();
+      const meldingen = wachtrij.filter(r => r[1] === 'assigned').map(r => JSON.parse(r[2]));
+      eq('bulk geven: er gaat precies één toewijzingsmelding uit', meldingen.length, 1);
+      eq('bulk geven: de melding noemt de ontvanger, het aantal en de eerste codes',
+         meldingen.length ? [meldingen[0].behandelaar, meldingen[0].code, meldingen[0].naam] : [],
+         ['Cihad', '4 taken', 'BK-01, BK-02, BK-03 en 1 andere']);
+      // Eén taak blijft lezen als één taak, niet als '1 taken'.
+      wachtrij.length = 0;
+      bulkVeld([rijen[0]], 'geven', 'Gabos');
+      await wachtKlaar();
+      const een = wachtrij.filter(r => r[1] === 'assigned').map(r => JSON.parse(r[2]));
+      eq('bulk geven: één taak leest als die ene taak',
+         een.length ? [een[0].code, een[0].naam] : [], ['BK-01', 'Eenhof']);
+    } finally {
+      window.fetch = _fetch; state.oauthToken = tokenOud; state.oauthExpiry = expiryOud;
+      D.ntd = ntdOud; state.pendingWrites = pwOud; state._uitCache = uitCacheOud;
+      document.querySelectorAll('.toast').forEach(t => t.remove());
+    }
+  })();
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  OMSCHRIJVING-VELD — één koppeling voor Ctrl+K én de AI-hulp
+  // ══════════════════════════════════════════════════════════════════════════
+  // De koppeling 'welk veld draagt de omschrijving' stond op twee plekken en maar één ervan
+  // klopte. Het commandopalet schreef altijd naar 'm-actie' — het veld van Oppakken. Stond je op
+  // een ander tabblad, dan belandde de tekst die je net in Ctrl+K typte in een VERBORGEN veld en
+  // gooide submitTask hem weg (die leest uitsluitend de velden van state.editSec).
+  (() => {
+    console.log('%c[TESTS] Omschrijving-veld per sectie', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const secOud = state.activeNtd, editOud = state.editRowData;
+    try {
+      // Elke sectie wijst een bestaand veld aan, en het is hetzelfde veld dat taakTitel leest.
+      eq('omschrijving: elke sectie heeft een veld dat echt bestaat',
+         SKEYS.filter(s => !document.getElementById(OMSCHRIJVING_VELD[s])), []);
+      // De echte weg: open een toevoegscherm per sectie en zet er tekst in.
+      SKEYS.forEach(sec => {
+        state.activeNtd = sec;
+        openModal(false);
+        zetOmschrijving(sec, 'Proeftekst ' + sec);
+        const veld = document.getElementById(OMSCHRIJVING_VELD[sec]);
+        eq('omschrijving: ' + sec + ' krijgt de tekst in zijn eigen veld', veld.value, 'Proeftekst ' + sec);
+        // En dat veld staat ook echt in beeld in deze sectie — anders zou submitTask hem alsnog
+        // negeren, en dát was precies de fout.
+        truthy('omschrijving: ' + sec + ' toont dat veld ook', veld.offsetParent !== null);
+        closeModal();
+      });
+    } finally { state.activeNtd = secOud; state.editRowData = editOud; closeModal(); }
   })();
 
   // ══════════════════════════════════════════════════════════════════════════

@@ -236,6 +236,19 @@ export function initActions() {
       const box = e.target.closest('.log-edit');
       if (box) saveLogboek(+box.dataset.row, box);
     }
+    // Enter/spatie op een aanklikbaar element dat GEEN knop is. Een <div> of <span> met
+    // data-action krijgt van de browser geen toetsenbordbediening; met tabindex="0" komt hij wél
+    // in de tabvolgorde en dan hoort hij ook te reageren. Bewust alleen op elementen die zichzelf
+    // met tabindex hebben aangemeld — anders zou élke aanklikbare pil een tabstop worden en wordt
+    // Tab in een lijst van 25 rijen onbruikbaar. Echte knoppen slaan we over: die doen dit zelf,
+    // en meedoen zou de actie twee keer uitvoeren.
+    if ((e.key === 'Enter' || e.key === ' ') && e.target instanceof Element) {
+      const kb = e.target.closest('[data-action][tabindex]');
+      if (kb && kb === e.target && !kb.closest('button') && kb.tagName !== 'BUTTON' && kb.tagName !== 'A') {
+        const fn = ACTIONS[kb.dataset.action];
+        if (fn) { e.preventDefault(); fn(kb, e); }
+      }
+    }
   });
   initOpmaak();
 }

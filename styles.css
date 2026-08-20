@@ -143,7 +143,9 @@
     .act-af{height:28px;padding:0 11px;border-radius:6px;background:#eef6f1;border:1px solid #cfe0d6;color:#3a7a55;font-family:inherit;font-size:11.5px;font-weight:600;letter-spacing:0;cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;transition:all var(--tr)}
     .act-af:hover{background:#3a7a55;border-color:#3a7a55;color:#fff}
     .act-af svg{width:14px;height:14px}
-    .act-bw{height:28px;padding:0 11px;border-radius:6px;background:var(--sur);border:1px solid #e8eaee;color:#9aa1ad;font-family:inherit;font-size:11.5px;font-weight:600;letter-spacing:0;cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;transition:all var(--tr)}
+        /* #888f9b i.p.v. #9aa1ad: dit pictogram haalde 2,60:1 op wit en een pictogram moet 3:1 halen.
+       Op de donkere kaart komt dezelfde kleur op 4,7:1 uit, dus één waarde volstaat. */
+    .act-bw{height:28px;padding:0 11px;border-radius:6px;background:var(--sur);border:1px solid #e8eaee;color:#888f9b;font-family:inherit;font-size:11.5px;font-weight:600;letter-spacing:0;cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;transition:all var(--tr)}
     .act-bw:hover{background:var(--sur2);color:var(--txt);border-color:var(--bor-input)}
     .act-bw svg{width:13px;height:13px}
     .act-ico{padding:0;width:28px;justify-content:center}
@@ -291,7 +293,10 @@
     .prio-mid{color:#946d1f}
     .prio-laag{color:var(--mut)}
     .row-telaat td{background:color-mix(in srgb,var(--prio) 7%,transparent)}
+    /* In de donkere modus is --rd lichtzalm (#F0746F) en haalt wit erop maar 2,83:1. Donkere tekst
+       op diezelfde pil haalt 6,30:1 — zelfde truc als bij .staging-balk en de logboek-avatars. */
     .pill-telaat{display:inline-block;background:var(--prio);color:#fff;font-size:11px;font-weight:600;padding:2px 7px;border-radius:6px;margin-left:6px;letter-spacing:.02em}
+    [data-theme=dark] .pill-telaat{color:#15181d}
     .warn-geen-deadline{display:inline-flex;align-items:center;color:var(--am);font-size:12px;font-weight:600;font-family:'IBM Plex Mono',ui-monospace,monospace}
     .warn-geen-deadline::before{content:''}
     /* Deadline/status als gewone mono-tekst (geen pill) */
@@ -300,9 +305,12 @@
     .s-normal{font-size:12.5px;font-weight:500;color:#48505c;white-space:nowrap}
     .pill-stil{display:inline-flex;align-items:center;gap:3px;background:rgba(107,114,128,0.15);color:#4b5563;font-size:11px;font-weight:600;padding:1px 6px;border-radius:10px;margin-left:5px;cursor:pointer;vertical-align:middle}
     /* Fase 4 — opvolging & herhaling */
-    .pill-opvolg{display:inline-flex;align-items:center;gap:3px;background:#16a34a;color:#fff;font-size:11px;font-weight:700;padding:1px 6px;border-radius:10px;margin-left:5px;cursor:pointer;vertical-align:middle}
+    /* #00872e i.p.v. #16a34a: wit erop haalde 3,30:1 en dat is te weinig voor tekst van 11px. */
+    .pill-opvolg{display:inline-flex;align-items:center;gap:3px;background:#00872e;color:#fff;font-size:11px;font-weight:700;padding:1px 6px;border-radius:10px;margin-left:5px;cursor:pointer;vertical-align:middle}
     .pill-snooze{display:inline-flex;align-items:center;gap:3px;background:rgba(107,114,128,0.15);color:#4b5563;font-size:11px;font-weight:600;padding:1px 6px;border-radius:10px;margin-left:5px;cursor:pointer;white-space:nowrap;vertical-align:middle}
-    [data-theme=dark] .pill-snooze{color:#9ca3af}
+    /* .pill-stil en .pill-snooze delen hun kleuren; de donkere variant was alleen voor de tweede
+       gezet. De eerste bleef daardoor op #4b5563 staan: 1,76:1 op de donkere achtergrond. */
+    [data-theme=dark] .pill-stil,[data-theme=dark] .pill-snooze{color:#9ca3af}
     tr.snooze-row td{opacity:.55}
     .grp-kop{background:var(--group-bg);padding:9px 26px;font-size:11.5px;font-weight:600;color:#7c8694;text-transform:uppercase;letter-spacing:.04em;border:none}
     .status-open{background:var(--rd-l);color:var(--rd)}

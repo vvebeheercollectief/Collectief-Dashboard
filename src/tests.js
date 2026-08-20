@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { taakTitel, taakVerwijzing, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel, kiesAfgerondRij } from "./util.js";
+import { taakTitel, taakVerwijzing, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel, kiesAfgerondRij, filt } from "./util.js";
 import { verwerkMeldingRijen, toonMeldingen, MAX_TOAST_BURST, _whoSleutel, getCurrentWho } from "./notifications.js";
 import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek, logEvents, renderOntw } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM } from "./config.js";
@@ -14,18 +14,18 @@ import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel,
 import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN, saveKenmerken } from "./kenmerken.js";
 import { zoekAlles, openPalette, closePalette, palOpen } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen, bulkSelectie, bulkWis, renderBulkUi, bulkDoe, bulkVink } from "./bulk.js";
-import { _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, veiligeCel, _veiligeRij, fetchSheet, fetchSheets, vingerafdruk, rijVingerafdruk, _normCel, _rijNaarCellen, assertRowMatch, NTD_DATUM, _isOffline, _isNetwerkFout, appendRange, appendRows } from "./api.js";
+import { _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, _shiftNtdRows, veiligeCel, _veiligeRij, fetchSheet, fetchSheets, vingerafdruk, rijVingerafdruk, _normCel, _rijNaarCellen, assertRowMatch, NTD_DATUM, _isOffline, _isNetwerkFout, appendRange, appendRows } from "./api.js";
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
-import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _eindKolom, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, _sheetBreedtes, getSheetIds, kiesSectie, deleteTaskRow, deleteCurrentEditTask, completeCurrentEditTask } from "./crud.js";
+import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _eindKolom, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, getAfInsertRow, _sheetBreedtes, getSheetIds, kiesSectie, deleteTaskRow, deleteCurrentEditTask, completeCurrentEditTask } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages, renderChat } from "./dossier-chat.js";
 import { shouldPromptReload, maakHerlaadKern, zelfdeWorker } from "./sw-update.js";
 import { doOAuth } from "./auth.js";
 import { SPLASH_MS, _setFase } from "./login-splash.js";
 import { opmaakHtml, htmlNaarMarkers, zonderOpmaak, pasToe, opmaakBalk } from "./opmaak.js";
-import { goTo } from "./ui.js";
+import { goTo, applyTheme } from "./ui.js";
 import { checkSecties, checkRaster, checkRasters, checkNummers, checkAlles, RASTER_MIN } from "./structuurcheck.js";
 import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from "./subsidie-fase.js";
 import { toggleHerhaalStatus, renderHerhaal, openHerhaalModal, deleteHerhaal } from "./render-herhaal.js";
@@ -8739,6 +8739,73 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   })();
 
   // ══════════════════════════════════════════════════════════════════════════
+  //  RIJNUMMERS — de sectiekoppen schuiven mee, en een ontbrekend blok geeft een fout
+  // ══════════════════════════════════════════════════════════════════════════
+  // Twee gaten in dezelfde familie. (1) `_shiftNtdRows` verzette wel de taken maar niet de
+  // koprijen van de secties, terwijl `colHeaderRow` het ENIGE houvast is voor een sectie zónder
+  // taken: één afronding eerder in dezelfde ronde en een nieuwe taak in een lege sectie kon
+  // voorbij de kop van de volgende sectie belanden. (2) `getAfInsertRow` viel bij een ontbrekend
+  // blok stil terug op het blok van een ándere sectie — precies de verwisseling die de tegenhanger
+  // voor 'Nog Te Doen' juist met een harde fout weigert.
+  (() => {
+    console.log('%c[TESTS] Rijnummers en sectieblokken', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const ntdOud = D.ntd, secOud = D.ntdSecInfo, afOud = D.af, afSecOud = D.afSecInfo;
+    const leeg = () => ({ OPPAKKEN: [], VERGADERVERZOEKEN: [], 'OFFERTE-TRAJECTEN': [], LOD: [], 'SUBSIDIE-TRAJECTEN': [] });
+    try {
+      D.ntd = leeg();
+      D.ntd.OPPAKKEN = [{ code: 'A', _row: 10, _sec: 'OPPAKKEN' }];
+      D.ntdSecInfo = { OPPAKKEN: { colHeaderRow: 2 }, VERGADERVERZOEKEN: { colHeaderRow: 40 },
+                       'OFFERTE-TRAJECTEN': { colHeaderRow: 60 }, LOD: { colHeaderRow: 80 },
+                       'SUBSIDIE-TRAJECTEN': { colHeaderRow: 100 } };
+      // Een taak op rij 5 verdwijnt (afgerond): alles eronder schuift één omhoog.
+      _shiftNtdRows(5, -1);
+      eq('rijnummers: de taak schuift mee', D.ntd.OPPAKKEN[0]._row, 9);
+      eq('rijnummers: de koprijen onder de wijziging schuiven óók mee',
+         SKEYS.map(s => D.ntdSecInfo[s].colHeaderRow), [2, 39, 59, 79, 99]);
+      // En de lege sectie krijgt daarmee het juiste invoegpunt.
+      eq('rijnummers: een lege sectie wijst na de verschuiving de goede rij aan',
+         getInsertRow('SUBSIDIE-TRAJECTEN'), 99);
+      // De kop bóven de wijziging blijft staan — anders zou de eerste sectie mee gaan lopen.
+      _shiftNtdRows(1000, -1);
+      eq('rijnummers: een wijziging onder alles raakt niets',
+         SKEYS.map(s => D.ntdSecInfo[s].colHeaderRow), [2, 39, 59, 79, 99]);
+
+      // Afgerond: een ontbrekend blok is een harde fout, geen stille terugval naar een ander blok.
+      D.af = leeg();
+      D.af.OPPAKKEN = [{ code: 'B', _row: 12, _sec: 'OPPAKKEN' }];
+      D.afSecInfo = { OPPAKKEN: { colHeaderRow: 2 } };   // de rest ontbreekt
+      eq('afgerond: een bestaand blok met rijen plakt achter de laatste rij',
+         getAfInsertRow('OPPAKKEN'), 12);
+      let melding = '';
+      try { getAfInsertRow('SUBSIDIE-TRAJECTEN'); } catch (e) { melding = e.message; }
+      truthy('afgerond: een ontbrekend blok geeft een fout i.p.v. het blok van een andere sectie',
+             /bestaat nog niet in het tabblad 'Afgerond'/.test(melding));
+      truthy('afgerond: en de melding noemt de sectie bij naam', /Subsidie-trajecten/.test(melding));
+    } finally { D.ntd = ntdOud; D.ntdSecInfo = secOud; D.af = afOud; D.afSecInfo = afSecOud; }
+  })();
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  ZOEKEN IN AFGEROND — alleen op wat er te zien is
+  // ══════════════════════════════════════════════════════════════════════════
+  // `filt` liep met Object.values over de HELE rij, inclusief boekhouding. Zoeken op '12' vond
+  // daardoor elke rij met rijnummer 12, 'oppakken' vond alles (elke rij draagt zijn sectie mee) en
+  // 't7' vond een taak waarin die tekst nergens te zien is. Op de Afgerond-pagina zoek je nu net
+  // vaak op een getal — een VvE-code is er ook een.
+  (() => {
+    console.log('%c[TESTS] Zoeken in Afgerond', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const rij = { _row: 12, _sec: 'OPPAKKEN', code: '340580', naam: 'VvE Weimarstraat',
+                  actiepunt: 'Schilderwerk', behandelaar: 'Jer', datum: '1 aug 2026', opmerking: '',
+                  taakId: 'T7', bundelId: 'T3', bundelVolg: '20', herhaalId: 'HR-9',
+                  esc: '2026-08-01', fase: 'gegund', aannemers: 'Jansen|1' };
+    const R = [rij];
+    eq('zoeken: boekhouding levert geen treffer',
+       ['12', 'oppakken', 't7', 'hr-9', 'gegund', 't3'].map(q => filt(R, q).length), [0, 0, 0, 0, 0, 0]);
+    eq('zoeken: wat wél op het scherm staat levert wél een treffer',
+       ['weimar', 'schilder', 'jer', '340580', 'aug', 'jansen'].map(q => filt(R, q).length), [1, 1, 1, 1, 1, 1]);
+    eq('zoeken: zonder zoekterm blijft alles staan', filt(R, '').length, 1);
+  })();
+
+  // ══════════════════════════════════════════════════════════════════════════
   //  OFFERTE-TELLER — het bewerkscherm toont kolom D, niet de afgeleide stand
   // ══════════════════════════════════════════════════════════════════════════
   // `_verrijkOfferteRij` tilt de X/N-teller in het GEHEUGEN op tot het aantal aangevinkte
@@ -8889,6 +8956,46 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
          [waardeVan('m-code'), waardeVan('m-naam')], ['311999', 'Andere VvE']);
       closeModal();
     } finally { state.editRowData = editOud; closeModal(); }
+  })();
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  SHEETS-VERZOEK — er komt altijd een einde aan
+  // ══════════════════════════════════════════════════════════════════════════
+  // `fetch` kent geen eigen tijdslimiet. Een verzoek dat nooit antwoordt (wifi zonder internet, een
+  // portal die de verbinding vasthoudt) liet `_loadInFlight` voor altijd staan: de 8s-poll sloeg
+  // daarna elke ronde over en de Vernieuwen-knop lift op diezelfde ronde mee. Alleen een herlading
+  // hielp, en niets vertelde de gebruiker waarom.
+  await (async () => {
+    console.log('%c[TESTS] Tijdslimiet op een Sheets-verzoek', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const _fetch = window.fetch, tokenOud = state.oauthToken, expiryOud = state.oauthExpiry;
+    const timeoutOud = state._fetchTimeoutMs, nfOud = state._netwerkFouten;
+    try {
+      state.oauthToken = 'nep'; state.oauthExpiry = Date.now() + 3600e3;
+      state._fetchTimeoutMs = 60;   // de test wacht niet twintig seconden
+      state._netwerkFouten = 0;
+      // Een fetch die nooit antwoordt, behalve als hij wordt afgebroken.
+      window.fetch = (url, opt) => new Promise((_, af) => {
+        const sig = opt && opt.signal;
+        if (sig) sig.addEventListener('abort', () => af(Object.assign(new Error('afgebroken'), { name: 'AbortError' })));
+      });
+      let fout = null;
+      const begin = Date.now();
+      try { await fetchSheet('Nog Te Doen'); } catch (e) { fout = e; }
+      const duur = Date.now() - begin;
+      truthy('sheets: een verzoek dat blijft hangen wordt afgebroken', !!fout);
+      truthy('sheets: en dat gebeurt binnen de gestelde tijd', duur < 3000);
+      eq('sheets: de melding zegt wat er aan de hand is', /binnen 20 seconden/.test((fout || {}).message || ''), true);
+      // Een afgebroken verzoek telt als netwerkfout — van buiten niet te onderscheiden van
+      // 'verbinding weg', en dat is precies wat de gebruiker ervaart.
+      eq('sheets: het telt mee als netwerkfout', state._netwerkFouten, 1);
+      // Tegenproef: een verzoek dat wél op tijd antwoordt wordt niet afgebroken en zet de teller terug.
+      window.fetch = async () => new Response(JSON.stringify({ values: [['a']] }), { status: 200 });
+      eq('sheets: een normaal verzoek komt gewoon door', await fetchSheet('Nog Te Doen'), [['a']]);
+      eq('sheets: en de netwerkfout-teller staat weer op nul', state._netwerkFouten, 0);
+    } finally {
+      window.fetch = _fetch; state.oauthToken = tokenOud; state.oauthExpiry = expiryOud;
+      state._fetchTimeoutMs = timeoutOud; state._netwerkFouten = nfOud;
+    }
   })();
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -9062,6 +9169,53 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       _cr(_rgb(getComputedStyle(zijbalkLbl).color), _rgb(getComputedStyle(document.getElementById('sb')).backgroundColor)) >= 4.5);
     if (claudeKnop) truthy('a11y: de Claude-knop haalt 4,5:1',
       _cr(_rgb(getComputedStyle(claudeKnop).color), _rgb(getComputedStyle(claudeKnop).backgroundColor)) >= 4.5);
+
+    // De pillen en de icoonknop in de taakrij, in BEIDE thema's. Vier van de vijf zakten door de
+    // norm en drie daarvan alleen in de donkere modus — precies het gat dat je met het blote oog
+    // in de lichte modus nooit ziet. Gemeten stand vóór de fix: 'Te laat' 2,83 en 'Stil' 1,76 in
+    // donker, 'Vandaag' 3,30 in allebei, en het bewerk-pictogram 2,60 in licht.
+    // Overgangen uit: getComputedStyle geeft anders de waarde van vóór de themawissel terug.
+    (() => {
+      const proef = document.createElement('div');
+      proef.innerHTML = '<table><tbody><tr class="row-telaat" style="--prio:var(--rd)"><td class="cell-txt">'
+        + '<span class="pill-telaat">Te laat</span><span class="pill-stil">Stil</span>'
+        + '<span class="pill-opvolg">Vandaag</span><span class="pill-snooze">Weggelegd</span>'
+        + '</td><td><div class="acts"><button class="act-bw act-ico">B</button></div></td></tr></tbody></table>';
+      const kaart = document.querySelector('#page-ntd .card') || document.body;
+      kaart.appendChild(proef);
+      const rem = document.createElement('style');
+      rem.textContent = '*{transition:none !important}';
+      document.head.appendChild(rem);
+      const themaOud = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+      const _parse = s2 => { const m = String(s2).match(/rgba?\(([^)]+)\)/); if (!m) return null;
+        const p2 = m[1].split(/[,\s\/]+/).filter(Boolean).map(Number);
+        return { r: p2[0], g: p2[1], b: p2[2], a: p2.length > 3 ? p2[3] : 1 }; };
+      const _over = (fg, bg) => [0,1,2].map(i => Math.round([fg.r,fg.g,fg.b][i]*fg.a + [bg.r,bg.g,bg.b][i]*(1-fg.a)));
+      const _effBg = el => { let n = el; const st = [];
+        while (n && n !== document.documentElement) { const c = _parse(getComputedStyle(n).backgroundColor);
+          if (c && c.a > 0) { st.push(c); if (c.a === 1) break; } n = n.parentElement; }
+        const h = _parse(getComputedStyle(document.documentElement).backgroundColor) || { r:255, g:255, b:255, a:1 };
+        let b = [h.r, h.g, h.b];
+        for (let i = st.length - 1; i >= 0; i--) b = _over(st[i], { r:b[0], g:b[1], b:b[2] });
+        return b; };
+      const meet = () => { const uit = {};
+        proef.querySelectorAll('span,button').forEach(el => {
+          const fg = _parse(getComputedStyle(el).color); const bg = _effBg(el);
+          uit[el.className.split(' ')[0]] = _cr(_over(fg, { r:bg[0], g:bg[1], b:bg[2] }), bg); });
+        return uit; };
+      try {
+        applyTheme('light'); const licht = meet();
+        applyTheme('dark');  const donker = meet();
+        // Een pictogram mag op 3:1; de pillen zijn tekst van 11px en moeten 4,5:1 halen.
+        const eis = k => k === 'act-bw' ? 3 : 4.5;
+        const gezakt = [];
+        Object.keys(licht).forEach(k => {
+          if (licht[k] < eis(k)) gezakt.push(`${k} licht ${licht[k].toFixed(2)}`);
+          if (donker[k] < eis(k)) gezakt.push(`${k} donker ${donker[k].toFixed(2)}`);
+        });
+        eq('a11y: elke pil en de icoonknop in de taakrij halen de norm in beide thema\'s', gezakt, []);
+      } finally { applyTheme(themaOud); rem.remove(); proef.remove(); }
+    })();
 
     // 10. De chat-knop hoort in de bovenbalk en mag NIET zweven. Als zwevend knopje rechtsonder lag
     //     hij over de actiekolom van de takentabel: het vinkje 'afronden' van de rij eronder was

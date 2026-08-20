@@ -23,12 +23,31 @@ function _isOffline(browserOnline, netwerkFouten){
 // blijven hangen en door bestaande tests nooit teruggezet worden.
 const isOffline = () => _isOffline(navigator.onLine, state._netwerkFouten||0);
 
+// Hoe lang een enkel Sheets-verzoek hoogstens mag duren. Zonder deze grens hangt een verzoek dat
+// nooit antwoordt (wifi zonder internet, een portal die de verbinding vasthoudt, een slapende
+// mobiele verbinding) voor altijd: `fetch` kent geen eigen tijdslimiet. Eén zo'n verzoek zette het
+// hele dashboard stil — `_loadInFlight` bleef staan, dus de 8s-poll sloeg elke ronde over, en de
+// Vernieuwen-knop lift op diezelfde ronde mee en gaf dus ook niets meer. Alleen een herlading hielp.
+// 20 seconden is ruim: een leesronde duurt normaal onder de seconde, en twee polls verder is een
+// antwoord toch niet meer interessant. Tests verlagen hem via state._fetchTimeoutMs.
+const FETCH_TIMEOUT_MS = 20_000;
+
 // Elke Sheets-fetch loopt hierlangs, zodat de teller op één plek klopt: een reject is een echte
 // netwerkfout, en élk antwoord (ook 4xx en 5xx) bewijst dat er verbinding ís.
+// Een afgebroken verzoek telt bewust als netwerkfout: van buitenaf is 'antwoordt niet binnen 20s'
+// niet te onderscheiden van 'verbinding weg', en beide betekenen hetzelfde voor de gebruiker.
+// AbortController i.p.v. AbortSignal.timeout(): dat laatste kent Safari pas vanaf 16.
 async function _fetchGeteld(url, opts){
+  const ac = new AbortController();
+  const klok = setTimeout(() => ac.abort(), state._fetchTimeoutMs || FETCH_TIMEOUT_MS);
   let r;
-  try{ r=await fetch(url, opts); }
-  catch(e){ state._netwerkFouten=(state._netwerkFouten||0)+1; throw e; }
+  try{ r=await fetch(url, { ...(opts||{}), signal: ac.signal }); }
+  catch(e){
+    state._netwerkFouten=(state._netwerkFouten||0)+1;
+    if(e && e.name==='AbortError') throw new Error('Geen antwoord van Google binnen 20 seconden');
+    throw e;
+  }
+  finally{ clearTimeout(klok); }
   state._netwerkFouten=0;
   return r;
 }
@@ -116,8 +135,18 @@ const appendRange=(range,values)=>appendRows(range,[values]);
 // Verschuift lokale _row-nummers mee bij invoegen/verwijderen van een Sheet-rij,
 // zodat een volgende optimistische actie de juiste rij raakt. "Nog Te Doen" is één
 // sheet met meerdere secties; alle rijen onder `fromRow` schuiven `delta` op.
+// De koprijen van de secties schuiven MEE. Ze stonden er niet in, en dat is een stil gat: een
+// sectie zonder taken heeft geen enkel rij-object, dus `colHeaderRow` is dan het énige houvast dat
+// `getInsertRow` heeft. Werd er daarvóór in deze ronde een rij verwijderd (een taak afgerond), dan
+// wees dat nummer één rij te laag en kon een nieuwe taak in een LEGE sectie voorbij de kop van de
+// volgende sectie belanden — precies de verwisseling waarvoor getInsertRow liever een harde fout
+// geeft. De stille resync repareert het binnen een seconde, maar niet als die faalt.
 function _shiftNtdRows(fromRow, delta){
   SKEYS.forEach(s=>{ (D.ntd[s]||[]).forEach(row=>{ if(row._row>fromRow) row._row+=delta; }); });
+  SKEYS.forEach(s=>{
+    const info=(D.ntdSecInfo||{})[s];
+    if(info && info.colHeaderRow>fromRow) info.colHeaderRow+=delta;
+  });
 }
 
 // Herstel-idioom voor de rollback van een mislukte rij-DELETE (pure, testbaar):

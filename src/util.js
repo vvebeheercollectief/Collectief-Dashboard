@@ -10,9 +10,18 @@ function displayName(s){
   return EMAIL_NAMES[key] || s;
 }
 
+// Velden die de gebruiker NIET ziet en dus ook niet hoort te doorzoeken. Zonder deze lijst gaf
+// `Object.values` valse treffers op boekhouding: zoeken op '12' vond elke rij met rijnummer 12,
+// 'oppakken' vond álles (elke rij draagt zijn sectie mee), en 't7' of 'hr-9' vonden een taak
+// waarin die tekst nergens te zien is. Precies het soort zoekopdracht dat op de Afgerond-pagina
+// voor de hand ligt — een VvE-code is óók een getal.
+// De aannemerslijst staat er bewust NIET bij: 'Jansen' is een naam die je wilt kunnen zoeken.
+const NIET_ZOEKBAAR = new Set(['_row','_sec','_offertesManual','_aannemers',
+                               'taakId','bundelId','bundelVolg','herhaalId','esc','fase']);
 function filt(rows,q){
   if(!q)return rows;
-  return rows.filter(r=>Object.values(r).some(v=>String(v??'').toLowerCase().includes(q)));
+  return rows.filter(r=>Object.entries(r).some(([k,v])=>
+    !NIET_ZOEKBAAR.has(k) && !k.startsWith('_') && String(v??'').toLowerCase().includes(q)));
 }
 
 // Sleutel voor het ontdubbelen van toasts, ongevoelig voor een leidend symbool.

@@ -146,7 +146,13 @@ async function deleteOntwItem(){
   if(pos>-1) D.ontw.splice(pos,1);
   D.ontw.forEach(x=>{ if(x._row>oudeRow) x._row--; });
   closeOntwModal();
-  showUndoToast('Item verwijderd', r.titel||'', ()=>undoOntwDelete(values, r.titel), 'prullenbak');
+  // De melding met 'ongedaan maken' verschijnt meteen, maar de verwijdering in de Sheet loopt nog.
+  // Mislukt die, dan draait de rollback hieronder het item lokaal terug — en stáát de rij dus nog
+  // in de Sheet. Wie dán op 'ongedaan maken' klikte, kreeg er een TWEEDE rij bij: undoOntwDelete
+  // voegt de waarden immers gewoon opnieuw toe. Deze stand reist mee naar de undo, die er (ná het
+  // afwachten van de schrijfketen) op kan afgaan.
+  const stand={gelukt:false};
+  showUndoToast('Item verwijderd', r.titel||'', ()=>undoOntwDelete(values, r.titel, stand), 'prullenbak');
   backgroundWrite(
     async ()=>{
       const ids=await getSheetIds();
@@ -159,6 +165,7 @@ async function deleteOntwItem(){
         body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:oudeRow-1,endIndex:oudeRow}}}]})
       });
       if(!resp.ok){const e=await resp.json();const err=new Error(e.error?.message||'Verwijderfout');err.status=resp.status;throw err}
+      stand.gelukt=true;
     },
     ()=>{ if(echte&&D.ontw.indexOf(echte)===-1){ D.ontw.forEach(x=>{ if(x._row>=oudeRow) x._row++; }); D.ontw.splice(Math.min(pos<0?D.ontw.length:pos,D.ontw.length),0,echte); } },
     'Verwijderen mislukt'
@@ -167,11 +174,19 @@ async function deleteOntwItem(){
   animateRowOut(tr,'rij-puls-rood',renderOntw);
 }
 
-async function undoOntwDelete(values, titel){
+async function undoOntwDelete(values, titel, stand){
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){alert('Inloggen mislukt.');return}
   try{
     await state._writeChain;
+    // Pas ná de schrijfketen is bekend of de verwijdering ècht doorging. Ging hij níet door, dan
+    // heeft de rollback het item al teruggezet en stáát de rij nog in de Sheet — dan zou dit er een
+    // tweede van maken. Niets doen is hier het goede antwoord, mét een woord van uitleg.
+    if(stand && !stand.gelukt){
+      showToast('Niets terug te zetten', 'De verwijdering is niet doorgegaan; het item staat er nog.',
+                'var(--am)', 'waarschuwing', {geenDedup:true, geenSysteemmelding:true});
+      return;
+    }
     await metWriteMarkering(()=>appendRange("'Ontwikkeling'!A:F", values));
     showToast('Ongedaan gemaakt', `"${titel||''}" teruggezet`, 'var(--am)', 'ongedaan');
     await loadAll();

@@ -473,13 +473,12 @@ function getAfInsertRow(sec){
   if(entries.length>0) return entries[entries.length-1]._row;
   const info=D.afSecInfo[sec];
   if(info?.colHeaderRow) return info.colHeaderRow;
-  const idx=SKEYS.indexOf(sec);
-  for(let i=idx-1;i>=0;i--){
-    const prev=D.af[SKEYS[i]]||[];
-    if(prev.length>0) return prev[prev.length-1]._row;
-    if(D.afSecInfo[SKEYS[i]]?.colHeaderRow) return D.afSecInfo[SKEYS[i]].colHeaderRow;
-  }
-  return 2;
+  // Vroeger liep hier een terugval die het blok van een ÁNDERE sectie opzocht, en anders rij 2.
+  // Dat is precies de verwisseling die `getInsertRow` (hierboven, voor 'Nog Te Doen') bewust
+  // weigert: een afgeronde taak zou stil onder de verkeerde kop belanden en daar ook zo gelezen
+  // worden. Vandaag hebben beide tabbladen alle vijf de blokken, dus dit pad is onbereikbaar —
+  // maar het was een landmijn voor de zesde sectie. Dezelfde harde fout, zelfde bewoording.
+  throw new Error(`De sectie ${SECS[sec]?.label||sec} bestaat nog niet in het tabblad 'Afgerond'. Voeg daar eerst het blok toe (een regel met ${sec} in kolom A, met daaronder een kolomkoprij).`);
 }
 
 // Afronden vanuit de bewerk-modal: zelfde flow als de ✓-knop op een rij, maar met de RIJ in plaats

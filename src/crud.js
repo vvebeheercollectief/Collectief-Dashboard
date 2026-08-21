@@ -913,7 +913,12 @@ async function submitTask(){
     // vraag over. Die hoort per definitie bij een taak die er al staat — dat is precies wat de
     // gebruiker net aanwees — en hij lijkt er dus vaak sterk op. De vraag zou daar altijd komen en
     // altijd weggeklikt worden, en een waarschuwing die je leert wegklikken is erger dan geen.
-    if(!state.editMode && !state._nieuwBundel){
+    // `state._dubbelcheckUit` is een TESTHAAK, zelfde soort als `_fetchTimeoutMs` en `_uitCache`.
+    // De zelftest maakt in tientallen oudere blokken taken aan die op elkaar lijken en beantwoordt
+    // die vraag niet; zonder deze schakelaar blijft de hele suite hangen op een venster dat niemand
+    // wegklikt. Het blok dat de dubbelcheck zélf toetst zet hem tijdelijk uit. In de app staat hij
+    // nooit aan.
+    if(!state.editMode && !state._nieuwBundel && !state._dubbelcheckUit){
       const kandidaat={ _sec:sec };
       keys.forEach((k,i)=>{ kandidaat[k]=norm(values[i]); });
       const dubbels=zoekDubbels(code, taakTitel(kandidaat, sec), D.ntd);

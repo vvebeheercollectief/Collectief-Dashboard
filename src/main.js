@@ -25,6 +25,7 @@ import { initVveZoekveld } from './vve-zoekveld.js';
 import { voegExtraVveToe } from './meervve.js';
 import { verplaatsTaak } from './verplaats.js';
 import { renderBulkUi } from './bulk.js';
+import { vulPeriodeKeuze } from './render-lijsten.js';
 import { bouwBundelIndex, koppelKandidaten, taakFilter } from './bundel.js';
 import { initBundelSlepen, initStapelSlepen } from './bundel-acties.js';
 import { esc, taakTitel, taakVerwijzing } from './util.js';
@@ -99,6 +100,9 @@ document.addEventListener('DOMContentLoaded',()=>{
     // Hetzelfde filter op de Afgerond-pagina, uit dezelfde ene bron: een nieuwe collega staat er
     // dan meteen in, op beide pagina's tegelijk.
     vul('f-beh-af', TEAM);
+    // En de periodekeuze meteen erbij, om dezelfde reden: een filterbalk met een gat erin ziet
+    // eruit als een halfgeladen pagina.
+    vulPeriodeKeuze();
     ['m-beh','m-beh-v','m-beh-o','m-beh-l','m-beh-s'].forEach(id=>vul(id, TEAM.concat(duos)));
   }
 

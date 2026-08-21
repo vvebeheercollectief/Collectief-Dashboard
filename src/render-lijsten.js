@@ -285,7 +285,10 @@ function springNaarBundel(bundelId){
 function renderNtd(){
   // Eerst de selectie ontdoen van rij-objecten die na een verversing niet meer bestaan; anders
   // tekent de tabel lege vinkjes terwijl de balk nog een aantal noemt (zie bulkHerstel).
-  bulkHerstel(D.ntd);
+  // Viel er iets weg, dan moet de balk mee: de teller en de knoppen horen bij dezelfde selectie.
+  // `renderAll` doet dat toch al, maar niet elke render loopt daarlangs (sorteren, bladeren,
+  // een bundel openklappen) — en dan zou de teller alsnog een verouderd getal tonen.
+  if(bulkHerstel(D.ntd)) renderBulkUi();
   const q=document.getElementById('s-ntd').value.toLowerCase().trim();
   const fCode=document.getElementById('f-code-ntd').value.toLowerCase().trim();
   const fBeh=document.getElementById('f-beh-ntd').value;
@@ -488,6 +491,20 @@ function sorteerNtd(rows,sort){
 // ══════════════════════════════════════
 //  AFGEROND
 // ══════════════════════════════════════
+// De keuzelijst met periodes uit één bron (AF_PERIODES in util.js) i.p.v. handgeschreven
+// <option>'s in index.html: de rekenregel en het label horen bij elkaar te blijven.
+//
+// Bij het OPSTARTEN vullen en niet pas bij de eerste `renderAf`. Gemeten: op een verse lading had
+// `#f-per-af` nul opties en nul breedte totdat renderAf voor het eerst draaide. Mislukt die eerste
+// lading (offline, verlopen token, Sheets-storing) en is er geen cache, dan bleef er een gat in de
+// filterbalk staan naast een behandelaar-filter dat wél gevuld was.
+// Alleen de eerste keer, anders zou de keuze van de gebruiker bij elke render terugspringen.
+function vulPeriodeKeuze(){
+  const el=document.getElementById('f-per-af');
+  if(!el || el.options.length) return;
+  el.innerHTML=AF_PERIODES.map(([v,l])=>`<option value="${v}">${esc(l)}</option>`).join('');
+}
+
 // De vier filtervelden van de Afgerond-pagina uitgelezen en vertaald naar één plat object.
 // Apart van `filterAf` zodat dat filter PUUR blijft (geen DOM) en los te toetsen is — dezelfde
 // scheiding als tussen `renderNtd` en `filterNtd`.
@@ -512,9 +529,16 @@ function afFilterWaarden(){
 //
 // De behandelaar via `splitBehandelaar` en niet met `includes`: het veld kan 'Cihad, Jer' zijn, en
 // een kale `includes('Jer')` zou ook 'Jeroen' raken.
+// Wél hoofdletter-ONgevoelig vergelijken. Kolom E wordt met de hand getypt en soms door Apps
+// Script gevuld; een rij met 'cihad' viel bij het filter 'Cihad' zonder melding weg en dan leest
+// 'Niets gevonden' als 'die taak bestaat niet meer'. Op Nog Te Doen werd diezelfde rij wél
+// gevonden (filterNtd vergelijkt in kleine letters), dus de twee pagina's spraken elkaar tegen.
 function filterAf(rows, f){
   let uit = filt(rows||[], (f&&f.q)||'');
-  if(f&&f.beh) uit = uit.filter(r=>splitBehandelaar(r.behandelaar).includes(f.beh));
+  if(f&&f.beh){
+    const doel = String(f.beh).toLowerCase();
+    uit = uit.filter(r=>splitBehandelaar(r.behandelaar).some(n=>n.toLowerCase()===doel));
+  }
   const b = f && f.bereik;
   if(b && (b.van || b.tot)){
     uit = uit.filter(r=>{
@@ -529,12 +553,9 @@ function filterAf(rows, f){
 }
 
 function renderAf(){
-  // De keuzelijst met periodes uit één bron (AF_PERIODES in util.js) i.p.v. handgeschreven
-  // <option>'s in index.html: de rekenregel en het label horen bij elkaar te blijven. Alleen de
-  // eerste keer vullen — anders zou de keuze van de gebruiker bij elke render terugspringen.
-  const perEl=document.getElementById('f-per-af');
-  if(perEl && !perEl.options.length)
-    perEl.innerHTML=AF_PERIODES.map(([v,l])=>`<option value="${v}">${esc(l)}</option>`).join('');
+  // De keuzelijst met periodes staat er al vóór de eerste lading (vulPeriodeKeuze wordt bij het
+  // opstarten aangeroepen); hier alleen een vangnet voor het geval renderAf eerder draait.
+  vulPeriodeKeuze();
   const f=afFilterWaarden();
   // De twee datumvelden alleen tonen bij 'Eigen bereik'. `hidden` en geen inline display: de
   // stylesheet regelt het, en `#af-eigen[hidden]` houdt het standaardgedrag overeind.
@@ -559,7 +580,7 @@ function setAf(s){state.activeAf=s;pgs.af=1;renderAf()}
 
 export {
   renderNtdStats, renderNtdDonut, renderNtd, setNtd, ntdPagina, filterNtd, sorteerNtd, ntdSorteerKey, renderAf, setAf,
-  filterAf, afFilterWaarden,
+  filterAf, afFilterWaarden, vulPeriodeKeuze,
   kopOpen, zetKopOpen, toggleBundel, springNaarBundel, wisNtdFilters, absorbeer, isPlatteWeergave, erIsGefilterd,
   offerteAannemerPaneel, offerteAannSamenvatting,
   ALVO_ICONS, renderAlvo, ALVO_COLS, ALVO_LABELS, flagPill, _recomputeAlvoStatus, toggleAlvoFlag, statusIco, renderAlfa,

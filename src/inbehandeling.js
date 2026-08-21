@@ -12,6 +12,7 @@
 // Bewust een eigen bestandje en geen regel erbij in crud.js: dit is één schrijfweg naar één kolom,
 // precies zoals snooze.js dat voor de opvolgdatum is. Zo staan de twee rij-acties die één cel
 // schrijven naast elkaar in plaats van verspreid door het grootste bestand van de app.
+import { state } from "./state.js";
 import { SECS } from "./config.js";
 import { writeRange, assertRowMatch } from "./api.js";
 import { ensureToken } from "./auth.js";
@@ -53,6 +54,18 @@ async function zetInBehandeling(rid){
   if(blokkeerOffline()) return;            // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){ alert('Inloggen mislukt. Probeer het opnieuw.'); return; }
 
+  // Dubbelklik-rem, per taak. Zonder deze rem geven twee snelle klikken twee tegengestelde
+  // schrijfacties: de eindstand klopt (de wachtrij is serieel) maar er komen twee logboekregels
+  // ('Aangevinkt' én 'Uitgevinkt'), en die zetten allebei de stil-teller op nul. Een taak zou
+  // daarmee met heen-en-weer klikken eeuwig 'niet stil' blijven en nooit escaleren.
+  // Een vlag en géén klasse op de knop: `renderAll()` hieronder gooit die knop weg, dus zo'n
+  // klasse leeft nul milliseconden. Zelfde idioom als `_alvoFlagBezig` in render-alv.js, en om
+  // dezelfde reden NÁ `ensureToken` — een hangende inlogpopup zou de vlag anders eeuwig vastzetten.
+  const sleutel = r.taakId || (r._sec + ':' + r._row);
+  if(!state._ibBezig) state._ibBezig = new Set();
+  if(state._ibBezig.has(sleutel)) return;
+  state._ibBezig.add(sleutel);
+
   const oud = r.inBehandeling === 'TRUE' ? 'TRUE' : 'FALSE';
   const nieuw = volgendeStand(r.inBehandeling);
   r.inBehandeling = nieuw;
@@ -85,6 +98,9 @@ async function zetInBehandeling(rid){
     ()=>{ r.inBehandeling = oud === 'TRUE' ? 'TRUE' : ''; },
     'Wijzigen mislukt'
   );
+  // De rem lossen zodra de schrijfactie klaar is — geslaagd of niet. Niet eerder: tussen de klik en
+  // het einde van de write is precies het venster waarin een tweede klik schade doet.
+  state._writeChain.finally(()=>{ state._ibBezig.delete(sleutel); });
 }
 
 export { zetInBehandeling, inBehandelingKolom, heeftInBehandeling, volgendeStand };

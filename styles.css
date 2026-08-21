@@ -1101,7 +1101,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,.search-box inpu
 #sb :focus-visible{outline-color:var(--sbglow)}
 
 /* ── Druk-feedback op knoppen (vooral op touch) + chat-knop-feedback ── */
-.btn:active,.ico-btn:active,.bb-knop:active,#chat-send:active,.pb:active,.act-af:active,.act-bw:active,.ni:active,.tab:active,.cb:active,.fase-bol:active{transform:scale(.97)}
+.btn:active,.ico-btn:active,.bb-knop:active,#chat-send:active,.pb:active,.act-af:active,.act-bw:active,.act-ib:active,.ni:active,.tab:active,.cb:active,.fase-bol:active{transform:scale(.97)}
 
 /* ── 'Verminder beweging' respecteren (dekt alle 60+ overgangen/animaties) ── */
 @media (prefers-reduced-motion: reduce){
@@ -1137,7 +1137,13 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,.search-box inpu
   .grp-kop{padding:9px 12px}
   #content{padding:14px}
   .ico-btn{width:38px;height:38px}
-  .act-af,.act-bw,.act-ico,.btn-edit,.btn-done{height:36px;min-width:36px}
+  .act-af,.act-bw,.act-ico,.act-ib,.btn-edit,.btn-done{height:36px;min-width:36px}
+  /* De vierde knop ('In behandeling') valt op een telefoon weg. Gemeten op een venster van 378px:
+     mét die knop is de vaste actiekolom 159px van de 378 — 42% van het scherm, en die kolom staat
+     aan de rechterrand vastgezet. Dat kost precies de ruimte die het actiepunt nodig heeft.
+     De functie zelf verdwijnt niet: op een telefoon zet je hem net als vroeger in het
+     bewerkscherm. De snelknop is er waar er ruimte voor is. */
+  .act-ib{display:none}
   #bulk-balk{left:8px;right:8px;transform:none;flex-wrap:wrap;justify-content:center;max-width:none;bottom:78px}
 }
 @media(max-width:560px){

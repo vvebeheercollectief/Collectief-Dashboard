@@ -124,12 +124,15 @@ function bulkWis(){ _sel.clear(); _anker=null; }
 // bewust niet gedaan (zie `wisNtdFilters` in render-lijsten.js): een weggefilterde taak bestáát nog
 // en mag in je selectie blijven, zodat je met twee zoektermen achter elkaar een selectie kunt
 // opbouwen. Hier gaat het om objecten die helemaal niet meer bestaan.
+// Geeft terug HOEVEEL er weggevallen is, zodat de aanroeper weet of de balk hertekend moet worden.
 function bulkHerstel(ntd){
-  if(!_sel.size) return;
+  if(!_sel.size) return 0;
   const bestaat = new Set();
   Object.keys(ntd || {}).forEach(sec => (ntd[sec] || []).forEach(r => bestaat.add(r)));
-  [..._sel].forEach(r => { if(!bestaat.has(r)) _sel.delete(r); });
+  let weg = 0;
+  [..._sel].forEach(r => { if(!bestaat.has(r)){ _sel.delete(r); weg++; } });
   if(_anker && !bestaat.has(_anker)) _anker = null;
+  return weg;
 }
 function renderBulkUi(){
   const teller=document.getElementById('bulk-teller');

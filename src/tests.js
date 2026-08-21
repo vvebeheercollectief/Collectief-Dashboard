@@ -45,6 +45,22 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   // De 8s-poll uitzetten zolang de suite draait: die deelt `window.fetch` en de statusbalk met de
   // toetsen hieronder, en maakte er twee wisselvallig (zie de toelichting bij de timer in main.js).
   state._zelftestLoopt = true;
+  // VOORTGANGSSPOOR. In een browsertabblad dat op de achtergrond staat knijpt de browser elke timer
+  // af — na vijf minuten tot één keer per minuut — en dan duurt een ronde niet veertig seconden
+  // maar tien minuten of meer. Zonder spoor is 'nog bezig' dan niet te onderscheiden van
+  // 'vastgelopen', en dat kostte een halve middag zoeken naar een fout die er niet was. Elke
+  // blokkop schrijft zich hier weg, zodat van buitenaf te zien is hoe ver hij is.
+  // De dubbelcheck (voorstel 5) onderschept `submitTask` met een vraag. Tientallen oudere blokken
+  // in dit bestand maken taken aan die op elkaar lijken en beantwoorden die vraag niet — dan blijft
+  // de hele suite hangen op een venster dat niemand wegklikt, zonder één regel uitvoer. Standaard
+  // dus uit; het blok dat de dubbelcheck zélf toetst zet hem tijdelijk aan.
+  state._dubbelcheckUit = true;
+  const _origLog = console.log;
+  console.log = function(...a){
+    const m = String(a[0] || '');
+    if(m.includes('[TESTS]')) window._testVoortgang = m.replace('%c', '');
+    return _origLog.apply(console, a);
+  };
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
   // ── mini-assert helper (Fase 1 testnet) ──
   let _tOk = 0, _tFail = 0;
@@ -9602,7 +9618,8 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         + '<span class="pill-telaat">Te laat</span><span class="pill-stil">Stil</span>'
         + '<span class="pill-opvolg">Vandaag</span><span class="pill-snooze">Weggelegd</span>'
         + '<span class="code">311200</span>'
-        + '</td><td><div class="acts"><button class="act-bw act-ico">B</button></div></td></tr>'
+        + '</td><td><div class="acts"><button class="act-bw act-ico">B</button>'
+        + '<button class="act-ib act-ico">I</button><button class="act-ib act-ico aan">A</button></div></td></tr>'
         + '<tr><td class="grp-kop">In behandeling (5)</td></tr></tbody></table>';
       const kaart = document.querySelector('#page-ntd .card') || document.body;
       kaart.appendChild(proef);
@@ -9630,7 +9647,10 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         applyTheme('light'); const licht = meet();
         applyTheme('dark');  const donker = meet();
         // Een pictogram mag op 3:1; de pillen zijn tekst van 11px en moeten 4,5:1 halen.
-        const eis = k => k === 'act-bw' ? 3 : 4.5;   // pictogram 3:1, tekst 4,5:1
+        // De twee 'In behandeling'-knoppen dragen allebei de klasse `act-ib`, dus de meting van de
+        // tweede overschrijft die van de eerste. Dat is precies goed: de AAN-stand is de zwakste
+        // van de twee (gemeten: aan 4,51 tegen uit 3,26) en die moet de norm halen.
+        const eis = k => (k === 'act-bw' || k === 'act-ib') ? 3 : 4.5;   // pictogram 3:1, tekst 4,5:1
         const gezakt = [];
         Object.keys(licht).forEach(k => {
           if (licht[k] < eis(k)) gezakt.push(`${k} licht ${licht[k].toFixed(2)}`);
@@ -9794,8 +9814,6 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
          [bulkSelectie().length, document.getElementById('bulk-teller').textContent,
           document.getElementById('bulk-balk').style.display],
          [0, '0 geselecteerd', 'none']);
-    } catch(err){ window._blokFout = String(err && err.stack || err); throw err;
-    } catch(err){ window._blokFout = String(err && err.stack || err); throw err;
     } finally {
       state.bulkMode = bulkOud; bulkWis();
       D.ntd = ntdOud; D.af = afOud; state.activeNtd = secOud; pgs.ntd = pagOud;
@@ -9851,6 +9869,18 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     truthy('in-behandeling: aan en uit tekenen een ander pictogram, niet alleen een andere kleur',
            knopAan.split('taak-inbehandeling')[1].split('</button>')[0]
              !== knopUit.split('taak-inbehandeling')[1].split('</button>')[0]);
+    // Op een telefoon valt deze knop weg: gemeten op een venster van 378px werd de vaste
+    // actiekolom 159px van de 378 — 42% van het scherm, en die kolom staat aan de rechterrand
+    // vastgezet. De functie blijft bestaan (het bewerkscherm), alleen de snelknop niet.
+    // Op de mediaregel toetsen en niet op de gemeten breedte: die laatste hangt af van het venster
+    // waarin de suite draait, en zo'n assert meet je eigen venster in plaats van de code.
+    // De stylesheet zelf lezen en niet de gemeten breedte: die laatste hangt af van het venster
+    // waarin de suite draait, en zo'n assert meet je eigen venster in plaats van de code.
+    let _css = '';
+    try { _css = await (await fetch(new URL('../styles.css', import.meta.url), {cache:'no-store'})).text(); }
+    catch(_){ /* geen fetch mogelijk → de assert hieronder meldt het */ }
+    truthy('in-behandeling: op een smal scherm valt de knop weg zodat de actiekolom niet uitdijt',
+           /@media\(max-width:680px\)[\s\S]*?\.act-ib\{display:none\}/.test(_css));
 
     // ── En de hele schrijfweg, met een nagebootst tabblad ──
     const fetchOud = window.fetch, tokenOud = state.oauthToken, expOud = state.oauthExpiry;
@@ -10080,6 +10110,12 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     // 'Cihad, Jer' zijn (dan telt Jer mee), maar 'Jeroen' is een andere persoon.
     eq('afgerond-filter: "Jer" pakt ook het duo "Cihad, Jer" maar niet "Jeroen"',
        namen({ beh:'Jer' }).sort(), ['Alpha','Bravo','Echo']);
+    // Kolom E wordt met de hand getypt en soms door Apps Script gevuld. Een rij met 'cihad' viel
+    // bij het filter 'Cihad' zonder melding weg, en dan leest 'Niets gevonden' als 'die taak
+    // bestaat niet meer'. Op Nog Te Doen werd diezelfde rij wél gevonden — twee pagina's die
+    // elkaar tegenspreken is erger dan één die te weinig toont.
+    eq('afgerond-filter: een naam met een kleine letter valt niet stil weg',
+       filterAf([r('Foxtrot','cihad','19 aug 2026')], { beh:'Cihad' }).map(x=>x.naam), ['Foxtrot']);
     eq('afgerond-filter: een periode knipt op de afronddatum, grenzen meegerekend',
        namen({ bereik:{ van:'2026-08-17', tot:'2026-08-23' } }).sort(), ['Alpha','Bravo','Delta']);
     // Een rij zonder leesbare datum valt BUITEN elke periode. Andersom (stil meenemen) zou het
@@ -10105,8 +10141,10 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       velden.forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
       goTo('af'); renderAf();
       // De keuzelijst met periodes komt uit AF_PERIODES en staat niet met de hand in index.html:
-      // de rekenregel en het label horen bij elkaar te blijven.
-      eq('afgerond-filter: de periodekeuzes komen uit één bron',
+      // de rekenregel en het label horen bij elkaar te blijven. En hij is al gevuld vóór de eerste
+      // lading — gemeten stond hij anders op nul opties en nul breedte tot renderAf voor het eerst
+      // draaide, en na een mislukte eerste lading bleef dat gat gewoon staan.
+      eq('afgerond-filter: de periodekeuzes komen uit één bron en staan er meteen',
          document.getElementById('f-per-af').options.length, AF_PERIODES.length);
       // De twee datumvelden horen pas te verschijnen bij 'Eigen bereik'. `[hidden]` moet het écht
       // doen — een display-regel in de stylesheet wint anders van het standaardgedrag.
@@ -10174,9 +10212,14 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
        [gelijkenis('','Lekkage dak'), gelijkenis('de en van','Lekkage dak')], [0, 0]);
 
     // ── Zoeken in de open taken ──
-    const mk = (code, actie, sec) => ({ _sec:sec||'OPPAKKEN', code, naam:'Testflat', actiepunt:actie,
-                                        deadline:'', behandelaar:'', prioriteit:'', opmerkingen:'',
-                                        inBehandeling:'', subcategorie:'', opvolgdatum:'',
+    // Mét een rijnummer: `getInsertRow` neemt het `_row` van de laatste rij als invoegplek, en
+    // zonder dat getal schrijft submitTask naar rij NaN. Dat mislukt niet zichtbaar — het levert
+    // een schrijfactie op met een leeg bereik die pas veel later, in een ánder testblok, in de
+    // metingen opduikt.
+    let _mkRij = 100;
+    const mk = (code, actie, sec) => ({ _sec:sec||'OPPAKKEN', _row:++_mkRij, code, naam:'Testflat',
+                                        actiepunt:actie, deadline:'', behandelaar:'', prioriteit:'',
+                                        opmerkingen:'', inBehandeling:'', subcategorie:'', opvolgdatum:'',
                                         taakId:'T'+actie, bundelId:'', bundelVolg:'' });
     // De tweede regel: alle woorden van de kortste zitten in de langste. Zonder die regel valt het
     // klassieke dubbele geval net buiten de boot — de een noteert 'Lekkage dak', de ander schrijft
@@ -10229,9 +10272,16 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
     let vragen = [];
     const hooguit = p => Promise.race([p, new Promise(r=>setTimeout(r,400))]);
+    // Het venster gaat pas ópen ná de `await`s bovenin `submitTask` (offline-rem, token). Direct
+    // na `start()` staat het er dus nog niet, en een synchrone controle meet dan stilte. Even
+    // doorwachten met lege microtaken tot het er staat — of tot het duidelijk is dat er niets komt.
+    const wachtOpVenster = async () => {
+      for(let i=0; i<50 && !bevBg.classList.contains('open'); i++) await Promise.resolve();
+      return bevBg.classList.contains('open');
+    };
     const vraagEnAntwoord = async (start, ja) => {
       const klaar = start();
-      if(bevBg.classList.contains('open')){
+      if(await wachtOpVenster()){
         vragen.push(document.getElementById('bevestig-tekst').textContent);
         document.getElementById(ja?'bevestig-ja':'bevestig-nee').click();
       }
@@ -10245,6 +10295,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       // dáár wél zo kan.) In plaats daarvan een nagebootst tabblad, zodat een 'ja' ook echt tot
       // een taak leidt en dat te toetsen is.
       state._uitCache = false;
+      state._dubbelcheckUit = false;    // dít blok toetst de dubbelcheck juist wél
       state.oauthToken = 'stub'; state.oauthExpiry = Date.now()+3600e3;
       state._sheetIds = { 'Nog Te Doen':0, 'Afgerond':1, 'Logboek':2 };
       window.fetch = async(url, opt)=>{
@@ -10308,8 +10359,11 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       //    Dit is meteen de reden dat de bestaande subtaak-toets in dit bestand niet vastloopt op
       //    een vraag die nooit beantwoord wordt.
       state.editMode = false; state.editRowData = null; state.editSec = null;
-      state._nieuwBundel = { bundelId:'Tkop', volg:'10' };
       openModal(false, null, { sec:'OPPAKKEN' });
+      // De vlag PAS NA het openen zetten: `clearModal` (dat openModal aanroept) wist hem juist —
+      // een leeg formulier hoort bij géén bundel. De echte weg doet het net zo; zie de toelichting
+      // bij 'bundel-nieuw' in actions.js. Andersom om zou dit blok stil het gewone geval toetsen.
+      state._nieuwBundel = { bundelId:'Tkop', volg:'10' };
       document.getElementById('m-code').value = '311212';
       document.getElementById('m-actie').value = 'Lekkage dak repareren';
       vragen = [];
@@ -10320,7 +10374,13 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     } finally {
       if(bevBg.classList.contains('open')) document.getElementById('bevestig-nee').click();
       closeModal(); clearModal();
+      // Eerst de schrijfwachtrij leeg laten lopen. Blijft daar een schrijfactie van dít blok in
+      // staan, dan draait hij pas in het VOLGENDE blok — met de stub van dát blok, en dan meet dat
+      // blok posts die er niet bij horen. Precies zo verscheen hier een invoeging met een leeg
+      // rijbereik in de meting van 'meer-vve'.
+      await state._writeChain.catch(()=>{});
       window.alert = alertOud; state._uitCache = uitCacheOud; window.fetch = fetchOud;
+      state._dubbelcheckUit = true;     // en de rest van de suite mag er weer geen last van hebben
       state.oauthToken = tokenOud; state.oauthExpiry = expOud; state._sheetIds = idsOud;
       D.ntd = ntdOud; D.af = afOud; D.ntdSecInfo = infoOud;
       state.activeNtd = secOud; state.editMode = modeOud;
@@ -10404,6 +10464,9 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       voegExtraVveToe('311200','Flat A','311212');
       voegExtraVveToe('311201','Flat B','311212');
       renderExtraVves();
+      // Vangnet voor hetzelfde: alles wat nog van een vorig blok in de wachtrij staat eerst laten
+      // aflopen, zodat `posts` alleen deze handeling bevat.
+      await state._writeChain.catch(()=>{});
       posts=[];
       await submitTask();
       await state._writeChain;
@@ -10415,11 +10478,18 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       // Zouden ze er één delen, dan wijst elke rij-controle straks naar de verkeerde rij.
       eq('meer-vve: elke taak krijgt een eigen taaknummer en géén bundel',
          [new Set(gemaakt.map(r=>r.taakId)).size, gemaakt.every(r=>!r.bundelId)], [3, true]);
-      // Drie rijen betekent drie invoegingen in de Sheet, ieder op een eigen rijnummer.
-      const invoegingen = posts.filter(p=>p.body && p.body.requests
-        && p.body.requests.some(q=>q.insertDimension)).length;
-      eq('meer-vve: … en ook drie rij-invoegingen in de Sheet, op oplopende rijnummers',
-         [invoegingen, new Set(gemaakt.map(r=>r._row)).size], [3, 3]);
+      // De drie rijen gaan als ÉÉN blok naar de Sheet: één invoeging van drie rijen, en daarna één
+      // schrijfactie voor het hele blok. Twaalf losse invoegingen zouden twaalf momenten opleveren
+      // waarop het halverwege kan stukgaan, en elke volgende zou rekenen op rijnummers die de
+      // vorige verschoof — dan belandt een taak in het verkeerde sectieblok.
+      const invoegVerzoeken = posts.filter(p=>p.body && p.body.requests
+        && p.body.requests.some(q=>q.insertDimension));
+      const bereik = invoegVerzoeken.length
+        ? invoegVerzoeken[0].body.requests.find(q=>q.insertDimension).insertDimension.range : null;
+      eq('meer-vve: … als ÉÉN invoeging van drie rijen, op drie eigen rijnummers',
+         [invoegVerzoeken.length, bereik && (bereik.endIndex - bereik.startIndex),
+          new Set(gemaakt.map(r=>r._row)).size],
+         [1, 3, 3]);
       // De lijst wordt bij het volgende scherm niet meegedragen: één klik op Toevoegen zou er
       // anders nog eens twaalf bij maken.
       eq('meer-vve: na het aanmaken is de lijst leeg', extraVves().length, 0);
@@ -10495,13 +10565,22 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
     let posts = [], vragen = [];
     const hooguit = p => Promise.race([p, new Promise(r=>setTimeout(r,400))]);
+    // Zie de toelichting bij `wachtOpVenster` in het dubbelcheck-blok: het venster gaat pas open
+    // ná de `await`s in de aanroeper, dus een synchrone controle meet stilte.
+    const wachtOpVenster = async () => {
+      for(let i=0; i<50 && !bevBg.classList.contains('open'); i++) await Promise.resolve();
+      return bevBg.classList.contains('open');
+    };
+    // BEGRENSD wachten, net als bij de andere vraag-blokken in dit bestand. Een aanroeper die na de
+    // klik tóch blijft hangen is een bevinding, maar zónder deze grens zou de héle suite stilvallen
+    // en helemaal niets melden — dan meet je niets meer, ook niet de blokken erna.
     const vraagEnAntwoord = async (start, ja) => {
       const klaar = start();
-      if(bevBg.classList.contains('open')){
+      if(await wachtOpVenster()){
         vragen.push(document.getElementById('bevestig-tekst').textContent);
         document.getElementById(ja?'bevestig-ja':'bevestig-nee').click();
       }
-      return hooguit(klaar).then(()=>klaar);
+      await hooguit(klaar);
     };
     try {
       window.alert = ()=>{};
@@ -10569,6 +10648,8 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     }
   })();
 
+  console.log = _origLog;         // het voortgangsspoor weer los
+  state._dubbelcheckUit = false;  // de testhaak weer los
   state._zelftestLoopt = false;   // de poll mag weer; de suite is klaar
 
   const totOk = ok + _tOk, totFail = fail + _tFail;

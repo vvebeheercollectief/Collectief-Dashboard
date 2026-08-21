@@ -159,8 +159,11 @@
             <button class="btn btn-pri btn-sm" id="btn-add"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Toevoegen</button>
           </div>
         </div>
-        <div class="tabs" id="ntd-tabs"></div>
-        <div class="tbl-wrap" id="ntd-tbl-wrap"><table><thead id="ntd-thead"></thead><tbody id="ntd-tbody"></tbody></table></div>
+        <!-- role=tablist: de knoppen erin dragen role="tab", en een tab zonder tablist eromheen is
+             ongeldige ARIA — een schermlezer negeert de rol dan of leest hem verkeerd voor. Het
+             paneel eronder is wat ze omschakelen, dus dat krijgt role=tabpanel. -->
+        <div class="tabs" id="ntd-tabs" role="tablist" aria-label="Categorie"></div>
+        <div class="tbl-wrap" id="ntd-tbl-wrap" role="tabpanel" aria-label="Openstaande taken in de gekozen categorie"><table><thead id="ntd-thead"></thead><tbody id="ntd-tbody"></tbody></table></div>
         <div class="pag" id="ntd-pag"></div>
         <!-- Cross-list (bug #2): taken die via Subcategorie óók in dit scherm horen -->
         <div id="ntd-crosslist"></div>
@@ -179,8 +182,8 @@
             </div>
           </div>
         </div>
-        <div class="tabs" id="af-tabs"></div>
-        <div class="tbl-wrap"><table><thead id="af-thead"></thead><tbody id="af-tbody"></tbody></table></div>
+        <div class="tabs" id="af-tabs" role="tablist" aria-label="Categorie"></div>
+        <div class="tbl-wrap" role="tabpanel" aria-label="Afgeronde taken in de gekozen categorie"><table><thead id="af-thead"></thead><tbody id="af-tbody"></tbody></table></div>
         <div class="pag" id="af-pag"></div>
       </div>
     </div>
@@ -256,8 +259,8 @@
             <button class="btn btn-pri btn-sm" id="btn-add-ontw" style="background:var(--pk)">+ Nieuw item</button>
           </div>
         </div>
-        <div class="tabs" id="ontw-tabs"></div>
-        <div class="tbl-wrap">
+        <div class="tabs" id="ontw-tabs" role="tablist" aria-label="Categorie"></div>
+        <div class="tbl-wrap" role="tabpanel" aria-label="Ontwikkelitems in de gekozen categorie">
           <table><thead id="ontw-thead"></thead><tbody id="ontw-tbody"></tbody></table>
         </div>
         <div class="pag" id="ontw-pag"></div>

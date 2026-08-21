@@ -3806,7 +3806,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '10.24');
+  eq('versie opgehoogd', APP_VERSION, '10.25');
 
   // ── Pushmeldingen: de twee schakels die stil kapot waren (audit 2026-08-06) ──
   // Beide defecten waren onzichtbaar: de app meldde "Notificaties zijn aan!" terwijl er nooit
@@ -9267,7 +9267,10 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       try { await fetchSheet('Nog Te Doen'); } catch (e) { fout = e; }
       const duur = Date.now() - begin;
       truthy('sheets: een verzoek dat blijft hangen wordt afgebroken', !!fout);
-      truthy('sheets: en dat gebeurt binnen de gestelde tijd', duur < 3000);
+      // Ruime grens, en met opzet. Wat deze regel moet bewijzen is dat de INGESTELDE tijd is
+      // gebruikt (60 ms) en niet de standaard van 20 seconden. Een strakkere grens meet vooral hoe
+      // druk de machine op dat moment is — die stond hier één keer op 3 s en sloeg toen vals aan.
+      truthy('sheets: en er is niet op de standaardtijd van 20 seconden gewacht', duur < 10000);
       eq('sheets: de melding zegt wat er aan de hand is', /binnen 20 seconden/.test((fout || {}).message || ''), true);
       // Een afgebroken verzoek telt als netwerkfout — van buiten niet te onderscheiden van
       // 'verbinding weg', en dat is precies wat de gebruiker ervaart.

@@ -19,6 +19,11 @@ exclude:
   - apps-script
   - apps-script-backup
   - apps-script-klaarstaand
+  # `tools/` staat er sinds v10.31 bij: tools/syntaxcheck.js was publiek op te vragen
+  # (nagemeten: HTTP 200). Geen sleutels, wel intern gereedschap dat niets op de
+  # publieke site te zoeken heeft. Let op: 'tools' matcht op PREFIX, dus zet hier nooit
+  # een kortere variant neer.
+  - tools
   - README.md
   - BRAND-GUIDELINES.md
   - beheer-playbook.md

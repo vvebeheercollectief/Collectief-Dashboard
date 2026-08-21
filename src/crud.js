@@ -69,7 +69,7 @@ function zetSectieKiezer(sec,isEdit){
   const hint=document.getElementById('m-sec-hint');
   if(lbl) lbl.textContent = isEdit ? 'Categorie — kies een andere om te verplaatsen' : 'Categorie';
   if(hint) hint.textContent = isEdit
-    ? 'Taaknummer, subtaken en geschiedenis gaan mee. Velden die de nieuwe categorie niet kent, vervallen — je krijgt ze eerst te zien.'
+    ? 'Taaknummer en subtaken gaan mee. Velden die de nieuwe categorie niet kent vervallen, en oudere logboekregels blijven bij de oude categorie — je krijgt het eerst te zien.'
     : '';
   if(!kies.options.length)
     kies.innerHTML=SKEYS.filter(s=>FG_PER_SECTIE[s])

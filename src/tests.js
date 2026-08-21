@@ -3826,7 +3826,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '10.29');
+  eq('versie opgehoogd', APP_VERSION, '10.30');
 
   // ── Pushmeldingen: de twee schakels die stil kapot waren (audit 2026-08-06) ──
   // Beide defecten waren onzichtbaar: de app meldde "Notificaties zijn aan!" terwijl er nooit
@@ -7450,8 +7450,10 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       eq('categorie: bij bewerken staat de kiezer er wél, met een bijschrift dat verplaatsen aankondigt',
          [document.getElementById('fld-sectie').style.display,
           document.getElementById('m-sec-label').textContent.includes('verplaatsen'),
-          document.getElementById('m-sec-hint').textContent.includes('vervallen')],
-         ['', true, true]);
+          document.getElementById('m-sec-hint').textContent.includes('vervallen'),
+          // …en dat bijschrift belooft niet dat oude logboekregels meeverhuizen.
+          document.getElementById('m-sec-hint').textContent.includes('logboekregels')],
+         ['', true, true, true]);
       closeModal(); clearModal();
       // …en bij TOEVOEGEN staat er geen verplaats-bijschrift; daar kies je alleen waar de taak komt.
       openModal(false, null, { sec:'OPPAKKEN' });
@@ -10626,6 +10628,14 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
        [['Status', 'Wacht op gemeente']]);
     truthy('verplaatsen: en de vraag toont ze met naam en waarde',
            verplaatsVraagTekst(lod, 'LOD', 'OPPAKKEN').includes('Status: Wacht op gemeente'));
+    // De vraag mag niet méér beloven dan er gebeurt. Het Logboek kent geen taaknummer, dus het
+    // geschiedenisblok filtert op VvE-code ÉN categorie: regels van vóór de verhuizing blijven bij
+    // de oude categorie staan. 'De geschiedenis gaat mee' was dus te veel gezegd.
+    const _vraag = verplaatsVraagTekst(lod, 'LOD', 'OPPAKKEN');
+    eq('verplaatsen: de vraag belooft niet dat oude logboekregels meeverhuizen',
+       [_vraag.includes('geschiedenis gaan mee'), _vraag.includes('logboek'),
+        _vraag.includes('LOD'), _vraag.includes('Oppakken')],
+       [false, true, true, true]);
     // Een leeg veld verliezen is geen verlies en hoort de vraag niet langer te maken.
     eq('verplaatsen: een leeg veld staat niet in de lijst',
        verlorenVelden({ ...lod, status:'' }, 'LOD', 'OPPAKKEN').length, 0);

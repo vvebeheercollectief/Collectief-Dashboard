@@ -108,8 +108,16 @@ function verplaatsWaarden(r, bronSec, doelSec, nieuwRow){
 // De tekst van de vraag. Los, zodat hij te toetsen is zonder venster.
 function verplaatsVraagTekst(r, bronSec, doelSec){
   const verloren = verlorenVelden(r, bronSec, doelSec);
+  // WAT DE VRAAG BELOOFT MOET WAAR ZIJN. Eerder stond hier 'de geschiedenis gaat mee', en dat was
+  // te veel gezegd: het Logboek kent geen taaknummer (kolommen: tijd, VvE-code, sectie, actie, …),
+  // dus het geschiedenisblok in dit scherm filtert op VvE-code ÉN categorie (renderTaskHistory in
+  // render-overig.js). Regels van vóór de verhuizing blijven daardoor bij de oude categorie staan.
+  // De verhuizing zelf wordt wél onder de nieuwe categorie vastgelegd, dus het spoor loopt door —
+  // maar de oude notities verhuizen niet mee, en dat hoort de gebruiker te weten vóór hij klikt.
   const kop = `"${taakTitel(r, bronSec)}" gaat van ${SECS[bronSec].label} naar ${SECS[doelSec].label}.`
-            + `\nHet taaknummer, de subtaken en de geschiedenis gaan mee.`;
+            + `\nHet taaknummer en de subtaken gaan mee.`
+            + `\nHet logboek houdt de regels van vóór deze verhuizing bij ${SECS[bronSec].label}; `
+            + `de verhuizing zelf komt bij ${SECS[doelSec].label} te staan.`;
   if(!verloren.length) return kop;
   return kop + `\n\nDeze velden kent ${SECS[doelSec].label} niet en vervallen:\n`
              + verloren.map(v => `• ${v.label}: ${v.waarde}`).join('\n');

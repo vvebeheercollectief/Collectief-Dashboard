@@ -11,6 +11,7 @@ import { getSheetIds, getAfInsertRow, getInsertRow, insertAndWriteRow, serialize
 import { backgroundWrite, loadAll, metWriteMarkering, blokkeerOffline } from "./data.js";
 import { showToast, showUndoToast, fireNotifEvent } from "./notifications.js";
 import { vraagBevestiging } from "./bevestig.js";
+import { bouwBundelIndex, openSubtaken } from "./bundel.js";
 import { logEvents } from "./render-overig.js";
 import { renderAll } from "./main.js";
 
@@ -30,19 +31,116 @@ function toggleBulkMode(){
   renderNtd();
   renderBulkUi();
 }
-function bulkVink(rid){
+// Het laatst aangeklikte vinkje: het ANKER voor shift-klik. Bewust een rij-object en geen `rid`:
+// elke render bouwt `state._rowCache` opnieuw op, dus een bewaard nummer wijst na de eerstvolgende
+// render naar een wíllekeurige andere taak — en dan selecteert shift-klik stilletjes het verkeerde
+// blok. Het object overleeft een render wél (het komt uit D en wordt niet vervangen), en een
+// object dat door een poll tóch vervangen wordt, vinden we hieronder simpelweg niet meer terug:
+// dan valt shift-klik terug op een gewone klik in plaats van iets verkeerds te doen.
+let _anker=null;
+
+// De vinkjes van de rijen die NU in de tabel staan, in de volgorde waarin ze getekend zijn.
+// Uit de DOM en niet uit `state._rowCache`: die cache bevat na de tabel óók de 'Ook hier'-rijen
+// (renderNtdCrossList) en op andere pagina's nog meer, en die hebben geen vinkje. Een reeks over
+// rid-nummers zou daar dwars doorheen lopen.
+function _vinkjesInTabel(){
+  return [...document.querySelectorAll('#ntd-tbody [data-action="bulk-vink"]')]
+    .map(el=>state._rowCache[+el.dataset.rid])
+    .filter(Boolean);
+}
+
+// Shift-klik: alles tussen het vorige vinkje en dit vinkje erbij. Bewust altijd TOEVOEGEN en nooit
+// weghalen — een reeks die half aan- en half uitzet is niet te voorspellen, en de gebruiker die
+// zich vergist heeft, heeft 'Selecteren' uit-en-aan als vangnet.
+// Werkt binnen de getoonde pagina; rijen op een andere pagina staan niet in de DOM. Voor "alles"
+// over de paginagrens heen is er het kopvinkje.
+function _selecteerReeks(r){
+  const rijen=_vinkjesInTabel();
+  const a=rijen.indexOf(_anker), b=rijen.indexOf(r);
+  if(a<0||b<0) return false;                      // anker staat niet meer in beeld → gewone klik
+  const van=Math.min(a,b), tot=Math.max(a,b);
+  for(let i=van;i<=tot;i++) _sel.add(rijen[i]);
+  return true;
+}
+
+function bulkVink(rid, e){
   const r=state._rowCache[rid]; if(!r) return;
-  _sel.has(r)?_sel.delete(r):_sel.add(r);
+  // `e` is het klik-event uit de delegatie in actions.js (die roept `fn(el, e)` aan). Toetsenbord-
+  // bediening levert hetzelfde event met shiftKey=false, dus die blijft een gewone klik.
+  if(e&&e.shiftKey&&_anker&&_anker!==r&&_selecteerReeks(r)){
+    // Anker NIET verzetten: zo kun je met een tweede shift-klik de reeks vanaf hetzelfde punt
+    // groter maken, precies zoals in een bestandsvenster.
+  }else{
+    _sel.has(r)?_sel.delete(r):_sel.add(r);
+    _anker=r;
+  }
   renderNtd();
   renderBulkUi();
 }
-function bulkWis(){ _sel.clear(); }
+
+// Alles in de HELE gefilterde lijst aan- of uitzetten — dus ook wat op pagina 2 en verder staat.
+// Staat alles al aan, dan zet deze knop alles uit; anders vult hij aan tot alles.
+function bulkAlles(){
+  const rijen=state._ntdZichtbaar||[];
+  if(!rijen.length) return;
+  if(rijen.every(r=>_sel.has(r))) rijen.forEach(r=>_sel.delete(r));
+  else rijen.forEach(r=>_sel.add(r));
+  _anker=null;                      // de reeks-anker slaat nergens meer op na een blok-actie
+  renderNtd();
+  renderBulkUi();
+}
+
+// Drie standen, en die moeten alle drie te ZIEN zijn: niets, een deel, alles. Zonder de
+// tussenstand ('deels') lijkt een half gevulde selectie op een lege, en dan klikt de gebruiker
+// het kopvinkje aan in de veronderstelling dat hij begint — terwijl hij zijn selectie juist
+// aanvult. `aria-checked="mixed"` is de standaardnaam voor die tussenstand.
+function allesVinkjeStand(rijen, gekozen){
+  const n=(rijen||[]).length;
+  if(!n) return 'leeg';
+  const aan=(rijen||[]).filter(r=>(gekozen||new Set()).has(r)).length;
+  return aan===0?'leeg':(aan===n?'alles':'deels');
+}
+
+function allesVinkjeHtml(rijen){
+  const stand=allesVinkjeStand(rijen,_sel);
+  const klasse=stand==='alles'?' aan':(stand==='deels'?' deels':'');
+  const uitleg=stand==='alles'?'Selectie leegmaken'
+              :`Alles selecteren (${(rijen||[]).length} ${((rijen||[]).length===1)?'taak':'taken'}, ook op de volgende pagina's)`;
+  return `<button type="button" class="cb${klasse}" data-action="bulk-alles" role="checkbox" `+
+         `aria-checked="${stand==='alles'?'true':(stand==='deels'?'mixed':'false')}" `+
+         `title="${uitleg}" aria-label="${uitleg}"></button>`;
+}
+
+function bulkWis(){ _sel.clear(); _anker=null; }
+
+// SPOOKSELECTIE OPRUIMEN. `_sel` bewaart rij-OBJECTEN, en een verversing (de Herladen-knop, of de
+// stille resync na een schrijfactie) vervangt élk object in D door een vers exemplaar. De selectie
+// wees daarna naar objecten die nergens meer in staan: de vinkjes tekenden leeg, maar de balk bleef
+// '30 geselecteerd' zeggen — en die balk verwijderde die 30 ook echt, met rijnummers van vóór de
+// verversing. Met de hand aanvinken maakte daar een spook van drie taken van; sinds het kopvinkje
+// van veertig.
+//
+// Dit is nadrukkelijk iets ANDERS dan de selectie snoeien op een filterwijziging. Dat laatste is
+// bewust niet gedaan (zie `wisNtdFilters` in render-lijsten.js): een weggefilterde taak bestáát nog
+// en mag in je selectie blijven, zodat je met twee zoektermen achter elkaar een selectie kunt
+// opbouwen. Hier gaat het om objecten die helemaal niet meer bestaan.
+function bulkHerstel(ntd){
+  if(!_sel.size) return;
+  const bestaat = new Set();
+  Object.keys(ntd || {}).forEach(sec => (ntd[sec] || []).forEach(r => bestaat.add(r)));
+  [..._sel].forEach(r => { if(!bestaat.has(r)) _sel.delete(r); });
+  if(_anker && !bestaat.has(_anker)) _anker = null;
+}
 function renderBulkUi(){
   const teller=document.getElementById('bulk-teller');
   const balk=document.getElementById('bulk-balk');
   teller.style.display=state.bulkMode?'':'none';
-  teller.textContent=`${_sel.size} geselecteerd`;
-  balk.style.display=(state.bulkMode&&_sel.size>0)?'flex':'none';
+  // De teller telt wat er ECHT geselecteerd is. Sinds `bulkHerstel` kunnen er geen verdwenen
+  // objecten meer in staan, maar de teller hoort ook zonder die aanname te kloppen: hij is het
+  // enige dat de gebruiker vertelt hoeveel taken de knoppen ernaast gaan raken.
+  const n=_sel.size;
+  teller.textContent=`${n} geselecteerd`;
+  balk.style.display=(state.bulkMode&&n>0)?'flex':'none';
   document.body.classList.toggle('bulk', state.bulkMode); // zwevende chat-knop wijkt voor de bulk-balk
   if(!state.bulkMode) _sluitMenus();
 }
@@ -255,10 +353,21 @@ async function bulkVerwijderen(rows){
   // ongedaan te maken is' leest als onbeperkt, en dat is op een verwijdervraag precies de zin
   // waarop iemand te makkelijk doorklikt. De tijd zelf staat er niet in: de toast kan ook eerder
   // weg zijn, en een getal in deze tekst zou stil verouderen zodra die constante wijzigt.
+  // Hangen er subtaken onder een van de geselecteerde taken? De losse verwijderweg (deleteTaskRow
+  // in crud.js) vraagt dat al met zoveel woorden; deze weg deed dat niet, en dat viel niet op
+  // zolang je elk vinkje met de hand zette. Sinds er een kopvinkje is dat de hele lijst in één
+  // klik selecteert — bundelkoppen en subtaken door elkaar, want bulk zet de lijst plat — is die
+  // belofte van de één-taak-weg te makkelijk te omzeilen. Eén extra zin, geen extra vraag.
+  const ix = bouwBundelIndex(D.ntd, D.af);
+  const metSub = rows.reduce((n,r)=> n + (openSubtaken(ix, r) > 0 ? 1 : 0), 0);
+  const subZin = metSub
+    ? ` Let op: bij ${metSub===1?'één van deze taken':`${metSub} van deze taken`} `+
+      `${metSub===1?'hangen':'hangen'} nog subtaken. Die blijven staan.`
+    : '';
   if(!await vraagBevestiging({
       titel:`${rows.length} ${rows.length===1?'taak':'taken'} verwijderen?`,
       tekst:`${rows.length===1?'Deze taak wordt':'Deze taken worden'} uit 'Nog Te Doen' gehaald. `+
-            `Meteen daarna kun je dit nog ongedaan maken met de knop in de melding.`,
+            `Meteen daarna kun je dit nog ongedaan maken met de knop in de melding.`+subZin,
       bevestigTekst:'Verwijderen', gevaarlijk:true })) return;
   const items=rows.map(r=>({r,sec:r._sec,origRow:r._row,ntdValues:_ntdValues(r),code:r.code}));
   items.forEach(it=>{
@@ -403,4 +512,5 @@ function bulkVeld(rows,soort,waarde){
 }
 
 export { _bulkVolgorde, bulkGeselecteerd, bulkSelectie, toggleBulkMode, bulkVink, bulkWis,
+         bulkAlles, allesVinkjeHtml, allesVinkjeStand, bulkHerstel,
          renderBulkUi, toggleBulkMenu, _sluitMenus, bulkDoe, bulkVeld, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen };

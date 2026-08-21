@@ -9,6 +9,7 @@ import { bulkGeselecteerd } from "./bulk.js";
 import { offerteAannSamenvatting, offerteAannemerPaneel } from "./render-offerte.js";
 import { ico } from "./icons.js";
 import { faseRijHtml } from "./subsidie-fase.js";
+import { heeftInBehandeling } from "./inbehandeling.js";
 import { zichtbareKop, bundelVan, zelfdeTaak } from "./bundel.js";
 import { bundelKopExtra, bundelPaneelHtml, bundelMerkje, STAPEL_GREEP } from "./render-bundel.js";
 
@@ -39,7 +40,9 @@ function renderTbody(tbodyId,rows,sec,page,isAf,filtered){
   const sl=rows.slice((p-1)*PG,p*PG);
   const el=document.getElementById(tbodyId);
   // Lege-rij colspan dynamisch: af-tabel heeft 6 kolommen, NTD = cols+1 (+1 in bulk).
-  const leegCols=isAf?6:(SECS[sec].cols.length+1+(state.bulkMode?1:0));
+  // 7 sinds de Behandelaar-kolom erbij kwam; dit getal is de colspan van de 'niets gevonden'-rij
+  // en moet dus gelijk lopen met `cols` in renderAf.
+  const leegCols=isAf?7:(SECS[sec].cols.length+1+(state.bulkMode?1:0));
   if(!sl.length){el.innerHTML=`<tr><td colspan="${leegCols}">${emptyRow(leegCols,true,filtered)}</td></tr>`;return}
   if(isAf){el.innerHTML=sl.map(r=>rowAf(r,sec)).join('');return}
   // Eén opzoeklijst voor de hele render i.p.v. een logboekscan per rij (zie bouwStilIndex).
@@ -126,7 +129,11 @@ function rowNtd(r,sec){
   const bulkCel=state.bulkMode
     ?`<td class="bulk-cel"><button type="button" class="cb${bulkGeselecteerd(r)?' aan':''}" data-action="bulk-vink" data-rid="${rid}" role="checkbox" aria-checked="${bulkGeselecteerd(r)}" aria-label="Selecteer ${esc(taakTitel(r,sec))}"></button></td>`
     :'';
-  const editBtn=`<div class="acts">${taakActieKnoppen(rid)}</div>`;
+  // De vierde knop (In behandeling) alleen waar de sectie dat veld kent. Offerte-trajecten
+  // hebben 'inBehandeling' niet in hun keys en hun bewerkscherm heeft er ook geen schakelaar
+  // voor; daar zou de knop een kolom schrijven die die sectie niet gebruikt.
+  const ibStand = heeftInBehandeling(sec) ? (r.inBehandeling==='TRUE'?'TRUE':'FALSE') : null;
+  const editBtn=`<div class="acts">${taakActieKnoppen(rid, ibStand)}</div>`;
   let cells='';
   const _stilDagen = bepaalStil(r, sec);
   // De offerte-tab is bewust kaal (v6.2): daar geen berekend stil-label. De andere secties
@@ -275,6 +282,7 @@ function rowAf(r,sec){
     <td class="cell-name">${esc(r.naam)}</td>
     <td class="cell-txt">${esc(taakTitel(r,r._sec))}</td>
     <td class="cell-sm">${esc(r.subcategorie||'')}</td>
+    <td>${persBadges(r.behandelaar)}</td>
     <td class="cell-sm">${esc(r.datum||'')}</td>
     <td class="cell-txt">${r.opmerking?`<span style="font-size:12px">${esc(r.opmerking)}</span>`:''}</td>
   </tr>`;

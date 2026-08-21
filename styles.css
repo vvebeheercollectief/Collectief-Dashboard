@@ -149,6 +149,15 @@
     .act-bw:hover{background:var(--sur2);color:var(--txt);border-color:var(--bor-input)}
     .act-bw svg{width:13px;height:13px}
     .act-ico{padding:0;width:28px;justify-content:center}
+    /* 'In behandeling' vanaf de rij. Uit staat hij precies zo neutraal als de bewerk- en
+       weglegknop ernaast (`.act-bw`), aan kleurt hij amber — dezelfde twee kleurtokens als het
+       'In behandeling'-label in het bundelpaneel (`.bdl-ib`), zodat dezelfde toestand op twee
+       plekken niet twee kleuren krijgt. */
+    .act-ib{height:28px;padding:0;width:28px;justify-content:center;border-radius:6px;background:var(--sur);border:1px solid #e8eaee;color:#888f9b;font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;transition:all var(--tr)}
+    .act-ib:hover{background:var(--sur2);color:var(--txt);border-color:var(--bor-input)}
+    .act-ib svg{width:13px;height:13px}
+    .act-ib.aan{background:var(--am-l);border-color:var(--am-b);color:var(--am)}
+    .act-ib.aan:hover{background:var(--am);border-color:var(--am);color:#fff}
     tr.ib-row td{background:#fafbfc!important;border-color:var(--row-divider)!important}
     tr.ib-row .code{background:none!important;color:#6b7280!important}
     [data-theme=dark] tr.ib-row td{background:#1c2026!important;border-color:var(--row-divider)!important}
@@ -212,6 +221,17 @@
     .filter-select{height:36px;background:var(--sur);border:1px solid var(--bor);border-radius:9px;padding:0 34px 0 12px;color:var(--txt);font-size:13px;font-weight:600;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;transition:border var(--tr),box-shadow var(--tr)}
     .filter-select:hover{border-color:var(--ac-b)}
     .filter-select:focus{border-color:var(--ac);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 14%,transparent)}
+    /* Datumvelden in een filterbalk. Zelfde maat en rand als .filter-select ernaast, zodat de
+       balk één regel blijft in plaats van drie verschillende hoogtes. */
+    .filter-datum{height:36px;background:var(--sur);border:1px solid var(--bor);border-radius:9px;padding:0 10px;color:var(--txt);font-size:13px;font-weight:600;font-family:inherit;outline:none}
+    .filter-datum:hover{border-color:var(--ac-b)}
+    .filter-datum:focus{border-color:var(--ac);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 14%,transparent)}
+    #af-eigen{display:inline-flex;align-items:center;gap:6px}
+    /* Verplicht, niet cosmetisch: de regel hierboven zet `display` en wint anders van het
+       standaardgedrag van [hidden] — dan staat het 'eigen bereik' er altijd. Zelfde val als
+       elders in dit bestand al beschreven staat. */
+    #af-eigen[hidden]{display:none}
+    .af-tot{font-size:12.5px;font-weight:600;color:var(--mut)}
     .filter-check{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 13px;background:var(--sur);border:1px solid var(--bor);border-radius:9px;color:var(--txt);font-size:13px;font-weight:600;cursor:pointer;user-select:none;white-space:nowrap;transition:border var(--tr),box-shadow var(--tr)}
     .filter-check:hover{border-color:var(--ac-b)}
     .filter-check:focus-within{border-color:var(--ac);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 14%,transparent)}
@@ -536,10 +556,34 @@
        het bewerkscherm. Alle .modal-bg's delen z-index 500, en dan wint de laatste in de HTML;
        dit blok maakt de stapeling onafhankelijk van die volgorde. */
     #bevestig-bg{z-index:520}
+    /* De vraagtekst wordt met `textContent` gezet (bevestig.js), dus een `\n` erin geeft van
+       zichzelf geen regelovergang. Met `pre-line` wél — nodig sinds de dubbelcheck de gevonden
+       taken als lijstje toont: een waarschuwing zonder het gevonden werk erbij is niet te
+       beoordelen en wordt weggeklikt. Alleen dít element; overal elders blijft tekst gewoon
+       doorlopen. */
+    #bevestig-tekst{white-space:pre-line}
 
     /* Form */
     .fld{margin-bottom:13px}
     .fld label{display:block;font-size:11.5px;font-weight:700;color:var(--mut);margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em}
+    /* Het zinnetje onder een deadline-veld: 'dit is een voorstel' of, bij LOD en subsidie, waaróm
+       er geen voorstel staat. Bewust klein en gedempt — het is uitleg, geen waarschuwing — maar
+       niet zó licht dat het onleesbaar wordt: var(--mut) haalt op beide thema's de contrastnorm.
+       Leeg blijft hij onzichtbaar zonder ruimte in te nemen (:empty). */
+    .dl-hint{display:block;margin-top:5px;font-size:11px;line-height:1.4;color:var(--mut)}
+    /* De gekozen extra VvE's als merkjes. Leeg neemt de rij geen ruimte in (:empty), zodat het
+       veld er bij een gewone taak niet als een half ingevuld blok bij staat. */
+    .mv-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+    .mv-chips:empty{display:none}
+    .mv-chip{display:inline-flex;align-items:center;gap:6px;background:var(--ac-l);border:1px solid var(--ac-b);color:var(--ac);border-radius:20px;padding:3px 5px 3px 10px;font-size:12px;font-weight:700;line-height:1.4}
+    .mv-naam{font-weight:600;opacity:.8;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    /* Het kruisje is 20x20 en daarmee kleiner dan de aanraadnorm; de halo eromheen (::after) maakt
+       het aanraakvlak 32px zonder de merkjes uit elkaar te duwen — zelfde truc als bij de
+       chevron van een bundel. */
+    .mv-x{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border:0;border-radius:50%;background:transparent;color:inherit;cursor:pointer;position:relative;transition:background var(--tr)}
+    .mv-x::after{content:'';position:absolute;inset:-6px}
+    .mv-x:hover{background:var(--ac);color:#fff}
+    .dl-hint:empty{display:none}
     .fld input,.fld select,.fld textarea{width:100%;background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rs);padding:8px 11px;color:var(--txt);font-size:13px;outline:none;transition:border var(--tr)}
     .fld input:focus,.fld select:focus,.fld textarea:focus{border-color:var(--modal-sec,var(--ac));box-shadow:0 0 0 3px color-mix(in srgb,var(--modal-sec,var(--ac)) 16%,transparent)}
     .fld textarea{resize:vertical;min-height:68px}
@@ -881,6 +925,12 @@
     .cb:hover{border-color:var(--ac)}
     .cb.aan{background:var(--ac);border-color:var(--ac)}
     .cb.aan::after{content:'✓';color:#fff;font-size:10px;font-weight:800;line-height:1}
+    /* Tussenstand van het kopvinkje: een deel van de lijst staat aan. Zonder eigen beeld is
+       'een deel' niet te onderscheiden van 'niets', en dan denkt de gebruiker dat hij begint
+       terwijl hij zijn selectie aanvult. Een streep i.p.v. een vinkje — dezelfde vulling, zodat
+       het één familie blijft. */
+    .cb.deels{background:var(--ac);border-color:var(--ac)}
+    .cb.deels::after{content:'';width:8px;height:2px;border-radius:1px;background:#fff}
         /* z-index 450: boven de inhoud en de zijbalk (200), maar ONDER de vensters (500/520). Op 600
        lag de balk bovenop een open bevestigingsvraag en was zijn 'Afronden' daar aanklikbaar —
        precies de tweede bulk-actie die de vraag moest tegenhouden. */
@@ -944,6 +994,7 @@
     [data-theme=dark] .prio-laag{color:#8b929e}
     [data-theme=dark] .pers,[data-theme=dark] .pers-jer,[data-theme=dark] .pers-cihad,[data-theme=dark] .pers-gabos,[data-theme=dark] .pers-default,[data-theme=dark] .ib-yes{background:#2a2f38;color:#cfd5df}
     [data-theme=dark] .act-bw{background:var(--sur);border-color:var(--bor-input);color:var(--mut)}
+    [data-theme=dark] .act-ib{background:var(--sur);border-color:var(--bor-input);color:var(--mut)}
     [data-theme=dark] .act-af{background:#12302a;border-color:#1f4a3c;color:#34d39a}
     [data-theme=dark] .act-af:hover{background:#34d39a;border-color:#34d39a;color:#0f1b1a}
     [data-theme=dark] tbody tr[data-prio=laag]{--prio-bar:#3a414d}
@@ -966,6 +1017,9 @@
     [data-theme=dark] #chat-send,
     [data-theme=dark] .kc-plus,
     [data-theme=dark] .staging-balk{color:#15181d}
+    /* De streep van het kopvinkje is een vlakje en geen tekst, dus de kleurregel hierboven
+       (die `color` zet) raakt hem niet. Apart, met dezelfde donkere inkt. */
+    [data-theme=dark] .cb.deels::after{background:#15181d}
     /* Het getal in een actieve pil zet zelf color:#fff en is specifieker — hier terugdraaien. */
     [data-theme=dark] .kop-pil-klik.aan b{color:#15181d}
     /* Avatars kleuren per persoon via inline background (pastel in donker) → donkere initiaal;

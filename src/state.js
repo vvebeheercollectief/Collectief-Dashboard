@@ -46,6 +46,11 @@ export const state = {
   activeHeroView: 'alv',
   // rij-cache / undo
   _rowCache: [],
+  // De lijst die renderNtd als laatste tekende: ná filteren, sorteren én absorberen, dus ALLE
+  // pagina's van het huidige tabblad. 'Alles selecteren' leunt hierop, want dat moet de hele
+  // gefilterde lijst pakken en niet alleen de 25 rijen die nu in beeld staan — precies het punt
+  // waarop bulk nu stukliep (22 taken = 22 vinkjes, en na pagina 1 opnieuw beginnen).
+  _ntdZichtbaar: [],
   // schrijf-pijplijn
   pendingWrites: 0,
   _writeChain: Promise.resolve(),

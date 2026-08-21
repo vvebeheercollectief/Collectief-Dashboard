@@ -5,7 +5,7 @@ import { ALLOWED_EMAILS } from '../allowed-emails.js';
 
 // ── Versie (zichtbaar in de UI) ────────────────────────────────────────
 // Ophogen bij ELKE wijziging: 4.1, 4.2, … 5.0 voor grote sprongen.
-export const APP_VERSION = '10.26';
+export const APP_VERSION = '10.27';
 
 // ── Omgeving (productie vs. testomgeving) ──────────────────────────────
 // Fail-safe: alleen deze exacte hosts zijn PRODUCTIE; al het andere
@@ -76,6 +76,19 @@ export const SECS = {
     keys:['code','naam','subsidie','subsidieFase','behandelaar','deadline','opmerkingen','inBehandeling']},
 };
 export const SKEYS = Object.keys(SECS);
+
+// Waar staat de OMSCHRIJVING van een taak, per categorie — als VELDNAAM (niet als DOM-id).
+// Dit is dezelfde afspraak als OMSCHRIJVING_VELD in crud.js (dat de invoervelden aanwijst) en als
+// CD_OMSCHRIJVING_COL in apps-script/Notifications.gs (dat de kolomnummers aanwijst). Hier staat
+// hij als sleutel, want het verplaatsen van een taak naar een andere categorie moet weten wélk
+// veld de tekst draagt — die heet in elke categorie anders en zou anders stil verdwijnen.
+export const OMSCHRIJVING_SLEUTEL = {
+  'OPPAKKEN':           'actiepunt',
+  'VERGADERVERZOEKEN':  'agendapunten',
+  'OFFERTE-TRAJECTEN':  'opmerkingen',
+  'LOD':                'actiepunt',
+  'SUBSIDIE-TRAJECTEN': 'subsidie',
+};
 
 // Fase van een offerte-traject (kolom O). Het dashboard schrijft deze kolom sinds v6.2 niet
 // meer — offerteFase() leidt 'aangevraagd'/'ontvangen' af uit de X/N-teller; 'bij_vve' en

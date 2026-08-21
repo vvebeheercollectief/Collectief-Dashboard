@@ -1,14 +1,16 @@
 // ══════════════════════════════════════
 //  CRUD — taak-modals, sheet-helpers, toevoegen/afronden/verwijderen
 // ══════════════════════════════════════
-import { esc, berekenPrioriteit, toISODate, toDutchDate, nieuwTaakId, taakVerwijzing } from "./util.js";
+import { esc, berekenPrioriteit, toISODate, toDutchDate, nieuwTaakId, taakVerwijzing, voorgesteldeDeadline, DEADLINE_HINT, taakTitel } from "./util.js";
+import { zoekDubbels, dubbelVraagTekst } from "./dubbelcheck.js";
+import { extraVves, wisExtraVves, extraVvesHtml, extraVvesUitleg } from "./meervve.js";
 import { state, D, pgs } from "./state.js";
 import { SECS, SKEYS, SID } from "./config.js";
-import { writeRange, _shiftNtdRows, _herstelShift, assertRowMatch } from "./api.js";
+import { writeRange, writeRows, _shiftNtdRows, _herstelShift, assertRowMatch } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { showToast, showUndoToast, fireNotifEvent, undoComplete, undoDelete } from "./notifications.js";
 import { animateRowOut, flashRow } from "./anim.js";
-import { logEvent, renderTaskHistory } from "./render-overig.js";
+import { logEvent, logEvents, renderTaskHistory } from "./render-overig.js";
 import { backgroundWrite, loadAll, blokkeerOffline } from "./data.js";
 import { faseIndex, faseWoord, faseRijHtml, faseWijziging } from "./subsidie-fase.js";
 import { bouwBundelIndex, bundelVerwijzing, openSubtaken, bundelWaarschuwing } from "./bundel.js";
@@ -53,10 +55,22 @@ function toonSectie(sec,isEdit){
 // die filter bood de kiezer hem toch aan, toonde `toonSectie` géén enkel veldblok en viel
 // Toevoegen om op een lege `values` ('Fout: …'). Eén keer vullen is genoeg; daarna alleen de stand
 // zetten.
+// De categorie-kiezer. Bij TOEVOEGEN kiest hij waar de taak komt te staan; bij BEWERKEN verplaatst
+// hij hem daadwerkelijk — met zijn taaknummer, subtaken en geschiedenis mee (zie verplaats.js).
+// Vroeger stond hij bij bewerken verborgen, en dan was de enige weg naar een andere categorie:
+// weggooien en opnieuw intypen. Dat kostte precies díe drie dingen.
+// Het bijschrift verschilt daarom per stand: 'kiezen' is iets anders dan 'verhuizen', en dat
+// verschil hoort in beeld te staan vóórdat er iets gebeurt.
 function zetSectieKiezer(sec,isEdit){
   const vak=document.getElementById('fld-sectie'), kies=document.getElementById('m-sec');
   if(!vak||!kies) return;
-  vak.style.display=isEdit?'none':'';
+  vak.style.display='';
+  const lbl=document.getElementById('m-sec-label');
+  const hint=document.getElementById('m-sec-hint');
+  if(lbl) lbl.textContent = isEdit ? 'Categorie — kies een andere om te verplaatsen' : 'Categorie';
+  if(hint) hint.textContent = isEdit
+    ? 'Taaknummer, subtaken en geschiedenis gaan mee. Velden die de nieuwe categorie niet kent, vervallen — je krijgt ze eerst te zien.'
+    : '';
   if(!kies.options.length)
     kies.innerHTML=SKEYS.filter(s=>FG_PER_SECTIE[s])
       .map(s=>`<option value="${esc(s)}">${esc(SECS[s].label)}</option>`).join('');
@@ -70,6 +84,64 @@ function zetSectieKiezer(sec,isEdit){
 function kiesSectie(sec){
   if(!SECS[sec]||state.editMode) return;
   toonSectie(sec,false);
+  // Van sectie wisselen in een nieuw-taakscherm is een nieuwe keuze, dus ook een nieuw voorstel.
+  // Zonder deze regel bleef de datum van de vorige sectie staan (of, bij LOD, bleef er een
+  // voorstel staan dat daar juist NIET hoort).
+  zetDeadlineVoorstel(sec,false);
+}
+
+// Sectie → het deadline-invoerveld en het zinnetje eronder. Dezelfde ids die `fillModalFields` en
+// `submitTask` gebruiken; op één plek, zodat een nieuw scherm niet op drie plekken bijgewerkt hoeft.
+const DEADLINE_VELD = { OPPAKKEN:'m-dl', VERGADERVERZOEKEN:'m-dl-v', 'OFFERTE-TRAJECTEN':'m-dl-o',
+                        LOD:'m-dl-l', 'SUBSIDIE-TRAJECTEN':'m-dl-s' };
+const DEADLINE_HINT_VELD = { OPPAKKEN:'dl-hint', VERGADERVERZOEKEN:'dl-hint-v', 'OFFERTE-TRAJECTEN':'dl-hint-o',
+                             LOD:'dl-hint-l', 'SUBSIDIE-TRAJECTEN':'dl-hint-s' };
+
+// Het deadline-voorstel bij een NIEUWE taak. Alleen daar: bij bewerken staat er een echte datum en
+// zou een voorstel die overschrijven — dat is geen hulp maar gegevensverlies.
+//
+// Bewust ná `clearModal()` aangeroepen (die maakt élk veld leeg) en vóór het openen van het
+// venster, zodat de gebruiker de datum meteen ziet staan en hem kan wissen. `voorgesteldeDeadline`
+// geeft '' voor LOD en Subsidie; het veld blijft dan leeg en alleen het zinnetje verschijnt.
+function zetDeadlineVoorstel(sec, isEdit){
+  const hintEl = document.getElementById(DEADLINE_HINT_VELD[sec]);
+  const veldEl = document.getElementById(DEADLINE_VELD[sec]);
+  // Élk zinnetje leegmaken, niet alleen dat van deze sectie: de vijf schermen delen één venster en
+  // een achtergebleven zin van een vorige sectie zou bij de verkeerde datum blijven staan.
+  Object.values(DEADLINE_HINT_VELD).forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent=''; });
+  if(isEdit || !veldEl || !hintEl) return;
+  const iso = voorgesteldeDeadline(sec);
+  if(iso && !veldEl.value) veldEl.value = iso;
+  hintEl.textContent = DEADLINE_HINT[sec] || '';
+}
+
+// De merkjes en het uitlegregeltje van 'ook voor andere VvE's' opnieuw tekenen. Eén functie, zodat
+// toevoegen, weghalen en het openen van het scherm allemaal langs dezelfde weg lopen.
+function renderExtraVves(){
+  const lijst=extraVves();
+  const chips=document.getElementById('m-extra-chips');
+  const uitleg=document.getElementById('m-extra-uitleg');
+  if(chips) chips.innerHTML=extraVvesHtml(lijst);
+  if(uitleg) uitleg.textContent=extraVvesUitleg(lijst.length);
+}
+
+// Het hele blok verbergen waar het niet hoort. Twee gevallen:
+//   BEWERKEN — een bestaande taak kun je niet alsnog over meer VvE's uitsmeren; dat zou een
+//     tweede taak aanmaken vanuit een scherm dat 'Opslaan' heet.
+//   EEN SUBTAAK — die hangt aan één bepaalde bundel bij één VvE. Twaalf subtaken van twaalf
+//     verschillende VvE's in één bundel is geen bundel meer.
+// LET OP — de id begint bewust NIET met `fg-`. Dat voorvoegsel is in dit venster gereserveerd voor
+// de veldblokken per categorie, en er is een toets die eist dat er precies ÉÉN `fg-`-blok tegelijk
+// zichtbaar is (zie 'categorie: elke aangeboden categorie heeft ook echt een veldblok'). Een
+// tweede zichtbaar `fg-`-blok laat die omvallen — gemeten, niet bedacht.
+function toonMeerVve(isEdit){
+  const blok=document.getElementById('meervve-blok');
+  if(!blok) return;
+  const mag = !isEdit && !state._nieuwBundel;
+  blok.style.display = mag ? '' : 'none';
+  const veld=document.getElementById('m-extra-vve');
+  if(veld) veld.value='';
+  renderExtraVves();
 }
 
 function openModal(isEdit,rowData,opts){
@@ -103,6 +175,8 @@ function openModal(isEdit,rowData,opts){
   // Ná de tak hierboven: `clearModal` zet élk veld in de modal-body op '' en dat geldt ook voor
   // een <select>, die daarmee op 'geen selectie' zou blijven staan.
   zetSectieKiezer(sec,isEdit);
+  zetDeadlineVoorstel(sec,isEdit);
+  toonMeerVve(isEdit);
 
   document.getElementById('modal-bg').classList.add('open');
 }
@@ -276,6 +350,12 @@ function clearModal(){
   // En de andere kant van dezelfde belofte: een in 'Hoort bij' aangewezen doeltaak hoort bij het
   // scherm waarin hij is aangewezen. submitTask leest hem daarom vóór het sluiten uit (zie daar).
   state._hbDoel=null;
+  // Om precies dezelfde reden de extra VvE's: een leeg formulier hoort bij één VvE. Zonder deze
+  // regel zou het volgende toevoegscherm de twaalf VvE's van de vorige ronde meedragen en er bij
+  // één klik op Toevoegen twaalf taken bij maken.
+  wisExtraVves();
+  const chips=document.getElementById('m-extra-chips'); if(chips) chips.innerHTML='';
+  const uitleg=document.getElementById('m-extra-uitleg'); if(uitleg) uitleg.textContent='';
 }
 
 // ── Fase-kiezer in het bewerkscherm ──
@@ -387,32 +467,51 @@ export function toevoegWaarden(values, r){
 // schrijfweg, en de bewaking gelijktrekken kost niets.
 export function _eindKolom(values){ return String.fromCharCode(64+Math.max((values||[]).length,9)); }
 
-async function insertAndWriteRow(sheetName,afterRow,values){
+// N rijen ineens invoegen en vullen. Eén `insertDimension` voor het hele blok en één PUT voor alle
+// rijen samen — dus twee verzoeken, ongeacht of het er één is of twaalf.
+//
+// WAAROM ALS BLOK EN NIET N KEER ACHTER ELKAAR. Bij twaalf losse invoegingen zijn er twaalf
+// momenten waarop het halverwege kan stukgaan, en erger: elke volgende invoeging rekent op de
+// rijnummers die de vórige heeft opgeschoven. Mislukt nummer drie en wordt die teruggedraaid, dan
+// wijzen de ankers van vier tot en met twaalf één rij te laag — en dan belandt een taak in het
+// verkeerde sectieblok. Als blok kan dat niet: het lukt voor alle rijen of voor geen enkele.
+async function insertAndWriteRows(sheetName,afterRow,rijen){
   if(!state.oauthToken) throw new Error('Niet ingelogd');
+  const lijst=(rijen||[]).filter(Boolean);
+  if(!lijst.length) return;
   const ids=await getSheetIds();
   const sheetId=ids[sheetName];
   if(sheetId==null) throw new Error('Sheet niet gevonden: '+sheetName);
+  const n=lijst.length;
   const insResp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
     method:'POST',
     headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
-    body:JSON.stringify({requests:[{insertDimension:{range:{sheetId,dimension:'ROWS',startIndex:afterRow,endIndex:afterRow+1},inheritFromBefore:true}}]})
+    body:JSON.stringify({requests:[{insertDimension:{range:{sheetId,dimension:'ROWS',startIndex:afterRow,endIndex:afterRow+n},inheritFromBefore:true}}]})
   });
   if(!insResp.ok){const e=await insResp.json();if(insResp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Invoegfout');err.status=insResp.status;throw err}
-  const endCol=_eindKolom(values);
+  // De breedste rij bepaalt het bereik: alle rijen komen uit dezelfde `toevoegWaarden` en zijn dus
+  // even breed, maar één bron voor de eindkolom voorkomt dat een smallere rij het bereik verkleint.
+  const endCol=_eindKolom(lijst.reduce((a,b)=>b.length>a.length?b:a, lijst[0]));
   try{
-    await writeRange(`'${sheetName}'!A${afterRow+1}:${endCol}${afterRow+1}`,values);
+    await writeRows(`'${sheetName}'!A${afterRow+1}:${endCol}${afterRow+n}`,lijst);
   }catch(e){
-    // De rij is wél ingevoegd maar niet gevuld → ruim de lege rij weer op zodat de Sheet niet
-    // vervuilt met een ghost-rij. Schrijfacties zijn geserialiseerd, dus deze delete is veilig.
+    // De rijen zijn wél ingevoegd maar niet gevuld → ruim ze weer op zodat de Sheet niet vervuilt
+    // met ghost-rijen. Schrijfacties zijn geserialiseerd, dus deze delete is veilig.
     try{
       await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
         method:'POST',
         headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
-        body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:afterRow,endIndex:afterRow+1}}}]})
+        body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:afterRow,endIndex:afterRow+n}}}]})
       });
-    }catch(_){ /* opruimen mislukte; de stille resync (loadAll) negeert de lege rij toch */ }
+    }catch(_){ /* opruimen mislukte; de stille resync (loadAll) negeert de lege rijen toch */ }
     throw e;
   }
+}
+
+// De bestaande één-rij-weg, ongewijzigd van buiten gezien: hij loopt nu door dezelfde poort, zodat
+// er niet twee invoegwegen naast elkaar staan die uit de pas kunnen lopen.
+async function insertAndWriteRow(sheetName,afterRow,values){
+  return insertAndWriteRows(sheetName,afterRow,[values]);
 }
 
 async function deleteCurrentEditTask(){
@@ -801,6 +900,29 @@ async function submitTask(){
     const keys=SECS[sec].keys;
     const norm=v=>v===true?'TRUE':v===false?'FALSE':v; // boolean → Sheets-stringvorm
     const newBeh=(sec==='OPPAKKEN'?gv('m-beh'):sec==='VERGADERVERZOEKEN'?gv('m-beh-v'):sec==='OFFERTE-TRAJECTEN'?gv('m-beh-o'):sec==='SUBSIDIE-TRAJECTEN'?gv('m-beh-s'):gv('m-beh-l'));
+
+    // ── Lijkt deze nieuwe taak al te bestaan? ──
+    // Alleen bij TOEVOEGEN, en alleen als vraag: twee taken die op elkaar lijken zijn soms écht
+    // twee taken. Zie dubbelcheck.js voor de maatstaf en waarom hij uitlegbaar moet zijn.
+    //
+    // Deze vraag staat hier, ná `values` en vóór élke mutatie: op dit punt is er nog niets
+    // veranderd, dus een 'nee' laat het venster staan mét alles wat de gebruiker net intypte.
+    // Zou hij later staan (ná `_shiftNtdRows` of de optimistische push in D.ntd), dan zou 'nee'
+    // een half aangemaakte taak achterlaten.
+    // Een SUBTAAK die aan een bestaande bundel wordt gehangen ('+ Voeg een subtaak toe') slaat deze
+    // vraag over. Die hoort per definitie bij een taak die er al staat — dat is precies wat de
+    // gebruiker net aanwees — en hij lijkt er dus vaak sterk op. De vraag zou daar altijd komen en
+    // altijd weggeklikt worden, en een waarschuwing die je leert wegklikken is erger dan geen.
+    if(!state.editMode && !state._nieuwBundel){
+      const kandidaat={ _sec:sec };
+      keys.forEach((k,i)=>{ kandidaat[k]=norm(values[i]); });
+      const dubbels=zoekDubbels(code, taakTitel(kandidaat, sec), D.ntd);
+      if(dubbels.length && !await vraagBevestiging({
+          titel:'Bestaat deze taak al?',
+          tekst:dubbelVraagTekst(dubbels),
+          bevestigTekst:'Toch aanmaken' })) return;
+    }
+
     if(state.editMode&&state.editRowData?._row){
       // ── Bewerken: lokale rij meteen bijwerken, dan op de achtergrond opslaan ──
       // Op het KLIKMOMENT vers opzoeken, net als de twee andere knoppen in dit scherm (zie
@@ -963,15 +1085,71 @@ async function submitTask(){
         if(pg && pg!==pgs.ntd){ pgs.ntd = pg; renderNtd(); }
       }
       flashRow('ntd-tbody', nieuw._row, 'rij-flits-groen');
+      // De extra VvE's NU uitlezen: het `clearModal` hieronder wist ze, net als de bundelkeuze en
+      // de 'Hoort bij'-doeltaak. Dezelfde afweging, dezelfde plek.
+      const extra = extraVves();
       closeModal();clearModal();
+      // De extra's krijgen ieder een EIGEN rij en een EIGEN taaknummer, en géén bundel: het zijn
+      // losse dossiers die ieder hun eigen gang gaan (zie meervve.js). Ze worden hier direct ACHTER
+      // de eerste rij gezet, als één aaneengesloten blok — dat is precies wat `insertAndWriteRows`
+      // straks in één keer invoegt.
+      //
+      // Taaknummers binnen dit blok gegarandeerd uniek. `nieuwTaakId` is tijd + drie willekeurige
+      // tekens, en in een lus is die tijd identiek: bij twintig VvE's is de kans op een botsing
+      // klein maar niet nul, en het gevolg is stil en naar — twee rijen met hetzelfde nummer in
+      // kolom Q laten de rij-controle naar de verkéérde rij schrijven.
+      const gebruikteIds = new Set([nieuw.taakId]);
+      const uniekTaakId = () => { let id=nieuwTaakId();
+                                  while(gebruikteIds.has(id)) id=nieuwTaakId();
+                                  gebruikteIds.add(id); return id; };
+      const rijen = [nieuw], blokValues = [addValues];
+      extra.forEach(v=>{
+        const vals = values.slice();
+        vals[0] = v.code;                       // kolom A = VvE-code
+        vals[1] = v.naam;                       // kolom B = VvE-naam
+        const extraRij = { _sec:sec, _row:rijen[rijen.length-1]._row + 1 };
+        keys.forEach((k,j)=>{ extraRij[k]=norm(vals[j]); });
+        extraRij.subcategorie = vals[vals.length-1];
+        extraRij.taakId = uniekTaakId();
+        extraRij.bundelId = ''; extraRij.bundelVolg = '';
+        blokValues.push(toevoegWaarden(vals, extraRij));
+        rijen.push(extraRij);
+      });
+      if(extra.length){
+        // De rijen ná het blok schuiven één keer op met het TOTAAL — niet één keer per rij. De
+        // eerste rij is hierboven al met +1 verwerkt; hier komt alleen de rest bij.
+        _shiftNtdRows(afterRow+1, +extra.length);
+        rijen.slice(1).forEach(r=>{ (D.ntd[sec]=D.ntd[sec]||[]).push(r); });
+        renderAll();     // pas nu hertekenen, anders flitst de lijst twaalf keer
+      }
+      const totaal = rijen.length;
+      // Idempotent: `backgroundWrite` draait deze functie opnieuw bij een tijdelijke fout (429/5xx),
+      // en zonder deze vlag zou één quota-hik het blok twee of drie keer invoegen. Zelfde idioom
+      // als de bewerk-tak hierboven.
+      let ingevoegd=false;
       backgroundWrite(
         async ()=>{
-          await insertAndWriteRow('Nog Te Doen',afterRow,addValues);
+          if(!ingevoegd){
+            await insertAndWriteRows('Nog Te Doen',afterRow,blokValues);
+            ingevoegd=true;
+          }
+          // Eén push, ook bij twaalf VvE's. Elke taak apart melden zou bij een subsidieronde
+          // twaalf pushmeldingen op de telefoon van elke collega opleveren; dat leert mensen de
+          // meldingen uit te zetten. Het logboek krijgt wél een regel per taak — dat is een
+          // journaal en hoort volledig te zijn.
           fireNotifEvent('newtask',{sec,code,naam,behandelaar:newBeh});
-          await logEvent(code,sec,'Aangemaakt','','',newBeh||'');
-          showToast('Taak toegevoegd',`${code} — ${naam||''}`,null,'plus',{geenDedup:true,geenSysteemmelding:true});
+          await logEvents(rijen.map(r=>({ code:r.code, sec, actie:'Aangemaakt', veld:'',
+                                          oudeWaarde:'', nieuweWaarde:newBeh||'' })));
+          showToast(totaal===1 ? 'Taak toegevoegd' : `${totaal} taken toegevoegd`,
+                    totaal===1 ? `${code} — ${naam||''}` : `Dezelfde taak voor ${totaal} VvE's`,
+                    null,'plus',{geenDedup:true,geenSysteemmelding:true});
         },
-        ()=>{ const a=D.ntd[sec]||[]; const p=a.indexOf(nieuw); if(p>-1){ a.splice(p,1); _shiftNtdRows(afterRow,-1); } },
+        ()=>{ const a=D.ntd[sec]||[];
+              rijen.forEach(r=>{ const p=a.indexOf(r); if(p>-1) a.splice(p,1); });
+              // Eén keer terugschuiven met het totaal, ná het verwijderen. Per rij schuiven of
+              // schuiven vóór het verwijderen laat de rijnummers van de hele sectie scheef achter,
+              // en dan schrijft de VOLGENDE actie naar een verkeerde rij.
+              _shiftNtdRows(afterRow,-totaal); },
         'Toevoegen mislukt'
       );
     }
@@ -1017,8 +1195,9 @@ async function zetSubsidieFase(rid, stap){
 
 export {
   openModal, editRow, closeModal, fillModalFields, setv, clearModal, kiesSectie,
-  getSheetIds, _sheetBreedtes, getInsertRow, insertAndWriteRow, deleteCurrentEditTask, deleteTaskRow,
+  getSheetIds, _sheetBreedtes, getInsertRow, insertAndWriteRow, insertAndWriteRows, deleteCurrentEditTask, deleteTaskRow,
   getAfInsertRow, completeTask, completeCurrentEditTask, doCompleteTask, closeCompleteModal, submitTask, gv,
   OMSCHRIJVING_VELD, zetOmschrijving, taakUitCache,
   _verseRijIdx, _herankerRij, zetSubsidieFase, kiesModalFase, _modalFaseWoord,
+  zetDeadlineVoorstel, DEADLINE_VELD, DEADLINE_HINT_VELD, renderExtraVves, toonMeerVve,
 };

@@ -17,11 +17,14 @@ import {
   subscribeNotifs, unsubscribeNotifs, sendTestNotif, getCurrentWho, initMeldingen,
 } from './notifications.js';
 import {
-  openModal, closeModal, submitTask, doCompleteTask, closeCompleteModal, kiesSectie,
+  openModal, closeModal, submitTask, doCompleteTask, closeCompleteModal, kiesSectie, renderExtraVves,
 } from './crud.js';
 import { loadAll, magPollen, schrijfActieLoopt, setSyncOffline, showOfflineBanner, clearOfflineBanner, laadUitCache } from './data.js';
 import { initActions } from './actions.js';
 import { initVveZoekveld } from './vve-zoekveld.js';
+import { voegExtraVveToe } from './meervve.js';
+import { verplaatsTaak } from './verplaats.js';
+import { renderBulkUi } from './bulk.js';
 import { bouwBundelIndex, koppelKandidaten, taakFilter } from './bundel.js';
 import { initBundelSlepen, initStapelSlepen } from './bundel-acties.js';
 import { esc, taakTitel, taakVerwijzing } from './util.js';
@@ -93,6 +96,9 @@ document.addEventListener('DOMContentLoaded',()=>{
       if(gekozen) el.value = gekozen;                  // een al ingevulde keuze niet omgooien
     };
     vul('f-beh-ntd', TEAM);
+    // Hetzelfde filter op de Afgerond-pagina, uit dezelfde ene bron: een nieuwe collega staat er
+    // dan meteen in, op beide pagina's tegelijk.
+    vul('f-beh-af', TEAM);
     ['m-beh','m-beh-v','m-beh-o','m-beh-l','m-beh-s'].forEach(id=>vul(id, TEAM.concat(duos)));
   }
 
@@ -134,6 +140,12 @@ document.addEventListener('DOMContentLoaded',()=>{
   setupSearch('f-code-ntd',()=>{pgs.ntd=1;renderNtd()});
   document.getElementById('f-beh-ntd').onchange=()=>{pgs.ntd=1;renderNtd()};
   document.getElementById('f-prio-ntd').onchange=()=>{pgs.ntd=1;renderNtd()};
+  // De filters op Afgerond. Terug naar pagina 1 bij elke wijziging: blijf je op pagina 3 staan
+  // terwijl er nog maar één pagina over is, dan zie je een lege lijst en lijkt het filter kapot.
+  ['f-beh-af','f-per-af','f-van-af','f-tot-af'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.onchange=()=>{pgs.af=1;renderAf()};
+  });
   // Operator: klik op een taakrij klapt de volledige tekst uit/in (negeer knoppen, code-link, checkbox)
   document.getElementById('ntd-tbody').addEventListener('click',e=>{
     if(e.target.closest('button,a,input,select,textarea,[data-action],.code-klik,.of-aann-tbl-tog')) return;
@@ -229,7 +241,19 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('m-submit').onclick=submitTask;
   // Categorie-kiezer: een <select> geeft `change`, geen `click`, en komt dus niet langs de
   // delegatie in actions.js (zelfde reden als bij hh-type hieronder).
-  document.getElementById('m-sec').onchange=e=>kiesSectie(e.target.value);
+  // Eén kiezer, twee betekenissen. Bij TOEVOEGEN wisselt hij alleen het veldblok (kiesSectie);
+  // bij BEWERKEN is hij de verplaats-knop. Die tweede weg stelt eerst een vraag en zet de kiezer
+  // netjes terug als het antwoord 'nee' is — anders zou het scherm een categorie tonen waar de
+  // taak niet staat.
+  document.getElementById('m-sec').onchange=async e=>{
+    const doel=e.target.value;
+    if(!state.editMode){ kiesSectie(doel); return; }
+    const r=state.editRowData;
+    const bron=r&&r._sec;
+    const gelukt=await verplaatsTaak(r, doel);
+    if(gelukt){ closeModal(); }
+    else if(bron){ e.target.value=bron; }
+  };
 
   // Ontwikkeling modal + search
   document.getElementById('btn-add-ontw').onclick=()=>openOntwModal(false);
@@ -322,6 +346,21 @@ document.addEventListener('DOMContentLoaded',()=>{
     onSelect: ({code,naam}) => {
       document.getElementById('m-code').value = code;
       document.getElementById('m-naam').value = naam;
+    },
+  });
+
+  // 'Ook voor andere VvE's': dezelfde component als de VvE-kiezer erboven. Bewust via
+  // initVveZoekveld en niet met eigen suggestiecode — een tweede kiezer naast deze loopt op eigen
+  // toetsafhandeling, eigen blur-gedrag en eigen opmaak uit de pas (zie de toelichting daar).
+  // Het veld leegmaken ná het kiezen: zo kun je meteen de volgende intypen zonder eerst te wissen.
+  initVveZoekveld({
+    input: document.getElementById('m-extra-vve'),
+    lijstEl: document.getElementById('m-extra-sug'),
+    minTekens: 2, maxItems: 8,
+    onSelect: ({code,naam}) => {
+      voegExtraVveToe(code, naam, document.getElementById('m-code').value.trim());
+      document.getElementById('m-extra-vve').value = '';
+      renderExtraVves();
     },
   });
 
@@ -496,6 +535,10 @@ export function renderAll(){
   renderHerhaal();
   renderVve();
   groeiVelden();   // de poll hertekent de velden; hun meegroei-hoogte moet terug
+  // De bulk-balk hoort bij de lijst en moet dus mee-hertekend worden. Zonder deze regel bleef hij
+  // na een verversing '30 geselecteerd' zeggen terwijl `renderNtd` alle vinkjes al leeg had
+  // getekend — en die balk werkte gewoon, op rijen die niemand meer aangevinkt zag staan.
+  renderBulkUi();
   return zichtbaar;
 }
 

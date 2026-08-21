@@ -12,13 +12,15 @@ import {
   setOntw, renderOntw, editOntwItem, addTaskNote, renderLogboek,
   editLogboek, saveLogboek, cancelLogboek, setLogSoort, deleteLogboek,
 } from './render-overig.js';
-import { openModal, completeTask, completeCurrentEditTask, deleteCurrentEditTask, zetSubsidieFase, kiesModalFase, zetHoortBij, taakUitCache } from './crud.js';
+import { openModal, completeTask, completeCurrentEditTask, deleteCurrentEditTask, zetSubsidieFase, kiesModalFase, zetHoortBij, taakUitCache, renderExtraVves } from './crud.js';
 import { ontkoppelTaak } from './bundel-acties.js';
 import { adjOff } from './util.js';
 import { copyAiPrompt, aiOvernemen, aiActieTaak, aiKopieerConcept, prefillNieuweTaak } from './ai.js';
 import { dismissToast, saveNotifPrefs, showToast } from './notifications.js';
 import { doLogin } from './auth.js';
 import { openSnoozeModal, snoozeKies } from './snooze.js';
+import { zetInBehandeling } from './inbehandeling.js';
+import { verwijderExtraVve } from './meervve.js';
 import { openResetModal, closeResetModal, doeReset } from './alv-reset.js';
 import { addAannemer, toggleAannemerBinnen, verwijderAannemer } from './offerte-aannemers.js';
 import { openHerhaalModal, toggleHerhaalStatus, deleteHerhaal } from './render-herhaal.js';
@@ -26,7 +28,7 @@ import { openVvePagina, renderVve, addContactLog, terugVanDossier } from './rend
 import { vraagChat, chatSuggestie } from './dossier-chat.js';
 import { saveKenmerken } from './kenmerken.js';
 import { palKies, closePalette } from './palette.js';
-import { toggleBulkMode, bulkVink, toggleBulkMenu, bulkDoe } from './bulk.js';
+import { toggleBulkMode, bulkVink, bulkAlles, toggleBulkMenu, bulkDoe } from './bulk.js';
 import { doeOpmaak, initOpmaak } from './opmaak.js';
 
 const PAG_RENDER = { ntd:renderNtd, af:renderAf, alvo:renderAlvo, alfa:renderAlfa, ontw:renderOntw, logboek:renderLogboek };
@@ -174,7 +176,11 @@ export const ACTIONS = {
   'vve-af-alles':          ()   => { state._vveAfAlles=true; renderVve(); },
   'pal-kies':              (el) => palKies(+el.dataset.idx),
   'bulk-toggle':           ()   => toggleBulkMode(),
-  'bulk-vink':             (el) => bulkVink(+el.dataset.rid),
+  // Het event gaat mee: `bulkVink` leest er shiftKey uit voor het selecteren van een reeks.
+  'bulk-vink':             (el, e) => bulkVink(+el.dataset.rid, e),
+  'bulk-alles':            ()   => bulkAlles(),
+  'taak-inbehandeling':    (el) => zetInBehandeling(+el.dataset.rid),
+  'extra-vve-weg':         (el) => { verwijderExtraVve(el.dataset.code); renderExtraVves(); },
   'bulk-menu':             (el) => toggleBulkMenu(el.dataset.menu),
   'bulk-doe':              (el) => bulkDoe(el),
   'composer-openen':       ()   => { state.dosComposerOpen=true; renderVve();

@@ -1,0 +1,48 @@
+# Klaarstaande Apps Script-code (wordt NIET uitgerold)
+
+Deze map wordt met opzet **niet** meegenomen door de automatische uitrol. De uitrol duwt alleen
+`apps-script/` naar het live script (zie `.github/workflows/apps-script-deploy.yml`, `rootDir` staat
+daarop ingesteld). Wat hier staat is af, maar wacht op een beslissing.
+
+## Mailintake.gs — de mail-intake-motor (Deel C)
+
+**Wat het is.** De laatste ontbrekende schakel van de mail-intake: iets dat elke paar minuten de
+post op info@ leest, met Claude bepaalt over welke VvE het gaat en wat er moet gebeuren, en er een
+taak van maakt. Het aanmaken zelf (Deel A) en de regels (Deel B, `beheer-playbook.md`) waren al af
+en staan al live.
+
+**Waarom het hier staat en niet in `apps-script/`.** Zodra er code in het live script staat die
+Gmail aanraakt, vraagt Google om nieuwe toestemming. Tot iemand die geeft, kunnen de automatische
+taken die er nu draaien (deadline-meldingen, sortering, afronden-in-de-Sheet) op een
+autorisatiefout stuklopen. Dat risico hoort niet bij een gewone uitrol te horen; het hoort bij een
+moment dat jij kiest.
+
+## Aanzetten — de stappen op een rij
+
+1. **Kijk eerst of er post te lezen valt.** Ga naar gmail.com en log in als
+   `info@vvebeheercollectief.nl`. Zie je daar jullie eigen postvak met de mail van vandaag? Dan kan
+   het. Zie je een melding dat Gmail niet aanstaat, dan komt de post ergens anders binnen en is er
+   eerst een doorstuurregel (of Google Workspace) nodig. Zonder postvak kan deze motor niets.
+2. Verplaats `Mailintake.gs` naar de map `apps-script/` en push naar `staging` (dus eerst de
+   TEST-omgeving, niet productie).
+3. Open het TEST-script, draai `test_mailIntakeProef` één keer met de hand en geef toestemming
+   wanneer Google erom vraagt.
+4. Zet in Projectinstellingen → Scripteigenschappen:
+   - `ANTHROPIC_API_KEY` — een sleutel mét uitgavenplafond.
+   - `BEHEER_PLAYBOOK` — de volledige inhoud van `beheer-playbook.md`.
+   - `MAILINTAKE_AAN` — eerst op `proef`.
+5. Laat hem een week op `proef` staan. Hij maakt dan niets aan; in Uitvoeringen staat per mail wat
+   hij zou hebben gedaan. Dat is het moment om te zien of de VvE-herkenning klopt.
+6. Klopt het? Zet `MAILINTAKE_AAN` op `ja` en hang een tijd-trigger op `cd_mailIntakeRonde`
+   (elke 5 minuten). Pas dán gebeurt er echt iets.
+
+## Wat versie 1 bewust niet doet
+
+- **Geen concept-antwoorden.** Het playbook heeft er sjablonen voor, maar mail schrijven namens
+  het kantoor is een eigen brok met een eigen risico. Eerst alleen taken.
+- **Alleen Oppakken en LOD.** Vergaderverzoeken, offertes en subsidies bewaren hun omschrijving in
+  een andere kolom. Die weg is nu wél gerepareerd (`CD_OMSCHRIJVING_COL` in `Notifications.gs`),
+  maar nog niet met echte post beproefd. Alles wat daarop lijkt wordt een Oppakken-taak met
+  `🔎 controleren` ervoor — zichtbaar, zodat niemand hoeft te raden waarom hij daar staat.
+- **Een mail waarvan de VvE niet herkend wordt, blijft gewoon staan** — geen taak, geen label. Dan
+  ziet een mens hem nog.

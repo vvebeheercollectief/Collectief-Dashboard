@@ -22,7 +22,7 @@ try {
 // loginscherm vervangen, en urgentie.js wordt alleen nog door de testsuite geïmporteerd. Beide
 // werden bij iedereen meegedownload en gecached. De BESTANDEN blijven wél staan: src/tests.js
 // hangt aan urgentie.js.
-const CACHE_VERSION = 'cd-v121';
+const CACHE_VERSION = 'cd-v122';
 const APP_SHELL = [
   './',
   './index.html',
@@ -57,6 +57,10 @@ const APP_SHELL = [
   './src/crud.js',
   './src/bulk.js',
   './src/snooze.js',
+  './src/inbehandeling.js',
+  './src/dubbelcheck.js',
+  './src/meervve.js',
+  './src/verplaats.js',
   './src/kenmerken.js',
   './src/ai.js',
   './src/dossier-chat.js',

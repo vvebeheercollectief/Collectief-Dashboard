@@ -1,24 +1,24 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { taakTitel, taakVerwijzing, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel, kiesAfgerondRij, filt, splitBehandelaar, persBadges } from "./util.js";
+import { taakTitel, taakVerwijzing, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel, kiesAfgerondRij, filt, splitBehandelaar, persBadges, taakActieKnoppen, voorgesteldeDeadline, DEADLINE_VOORSTEL, DEADLINE_HINT, periodeBereik, AF_PERIODES } from "./util.js";
 import { verwerkMeldingRijen, toonMeldingen, MAX_TOAST_BURST, _whoSleutel, getCurrentWho } from "./notifications.js";
 import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek, logEvents, renderOntw, openOntwModal, closeOntwModal, submitOntwItem } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
-import { filterNtd, setNtd, renderNtd, ntdPagina, renderNtdStats, renderAf, setAf, bepaalStil, bouwStilIndex, _zetStilIndex, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey, kopOpen, zetKopOpen, toggleBundel, springNaarBundel, wisNtdFilters, absorbeer, isPlatteWeergave, erIsGefilterd, rowNtd } from "./render-lijsten.js";
+import { filterNtd, setNtd, renderNtd, ntdPagina, renderNtdStats, renderAf, setAf, bepaalStil, bouwStilIndex, _zetStilIndex, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey, kopOpen, zetKopOpen, toggleBundel, springNaarBundel, wisNtdFilters, absorbeer, isPlatteWeergave, erIsGefilterd, rowNtd, filterAf, afFilterWaarden } from "./render-lijsten.js";
 import { HERO_VIEWS } from "./render-analytics.js";
 import { state, D, pgs } from "./state.js";
 import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel, renderVve, groepeerBundels } from "./render-vve.js";
 import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN, saveKenmerken } from "./kenmerken.js";
 import { zoekAlles, openPalette, closePalette, palOpen } from "./palette.js";
-import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen, bulkSelectie, bulkWis, renderBulkUi, bulkDoe, bulkVink, bulkVeld } from "./bulk.js";
+import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen, bulkSelectie, bulkWis, renderBulkUi, bulkDoe, bulkVink, bulkVeld, bulkAlles, allesVinkjeHtml, allesVinkjeStand } from "./bulk.js";
 import { _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, _shiftNtdRows, veiligeCel, _veiligeRij, fetchSheet, fetchSheets, vingerafdruk, rijVingerafdruk, _normCel, _rijNaarCellen, assertRowMatch, NTD_DATUM, _isOffline, _isNetwerkFout, appendRange, appendRows } from "./api.js";
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
-import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _eindKolom, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, getAfInsertRow, OMSCHRIJVING_VELD, zetOmschrijving, _sheetBreedtes, getSheetIds, kiesSectie, deleteTaskRow, deleteCurrentEditTask, completeCurrentEditTask } from "./crud.js";
+import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _eindKolom, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, getAfInsertRow, OMSCHRIJVING_VELD, zetOmschrijving, _sheetBreedtes, getSheetIds, kiesSectie, deleteTaskRow, deleteCurrentEditTask, completeCurrentEditTask, renderExtraVves, toonMeerVve } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages, renderChat } from "./dossier-chat.js";
 import { shouldPromptReload, maakHerlaadKern, zelfdeWorker } from "./sw-update.js";
@@ -30,6 +30,10 @@ import { checkSecties, checkRaster, checkRasters, checkNummers, checkAlles, RAST
 import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from "./subsidie-fase.js";
 import { toggleHerhaalStatus, renderHerhaal, openHerhaalModal, deleteHerhaal } from "./render-herhaal.js";
 import { openSnoozeModal, snoozeOpslaan, closeSnoozeModal } from "./snooze.js";
+import { zetInBehandeling, inBehandelingKolom, heeftInBehandeling, volgendeStand } from "./inbehandeling.js";
+import { zoekDubbels, gelijkenis, zitErinVervat, lijktOp, woorden, dubbelVraagTekst, DUBBEL_DREMPEL } from "./dubbelcheck.js";
+import { extraVves, wisExtraVves, voegExtraVveToe, verwijderExtraVve, extraVvesHtml, extraVvesUitleg } from "./meervve.js";
+import { verplaatsTaak, verplaatsWaarden, verlorenVelden, verplaatsVraagTekst } from "./verplaats.js";
 import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
 import { _verrijkOfferteRij } from "./render-offerte.js";
 import { bouwBundelIndex, bundelWeergave, zichtbareKop, isBundel, bundelVan, bundelMetId, hernummerLeden, volgendeVolg, magKoppelen, wordtGeabsorbeerd, koppelKandidaten, taakFilter, openSubtaken, bundelWaarschuwing, bundelVerwijzing, bundelStand, zelfdeTaak } from "./bundel.js";
@@ -3806,7 +3810,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '10.26');
+  eq('versie opgehoogd', APP_VERSION, '10.27');
 
   // ── Pushmeldingen: de twee schakels die stil kapot waren (audit 2026-08-06) ──
   // Beide defecten waren onzichtbaar: de app meldde "Notificaties zijn aan!" terwijl er nooit
@@ -7421,11 +7425,23 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
           document.getElementById('fg-verg').style.display], ['OFFERTE-TRAJECTEN', '', 'none']);
       closeModal(); clearModal();
 
-      // Bij BEWERKEN hoort de kiezer er niet te staan: een bestaande taak van categorie wisselen is
-      // een andere rij in een ander blok van de Sheet en bestaat niet als functie.
+      // Bij BEWERKEN staat de kiezer er sinds v10.27 wél — hij verplaatst de taak dan (verplaats.js).
+      // Daarvóór was hij verborgen omdat 'van categorie wisselen' simpelweg niet bestond; de enige
+      // weg was weggooien en opnieuw intypen, en dat kostte het taaknummer, de subtaken en de
+      // geschiedenis. Het bijschrift verschilt per stand: 'kiezen' is iets anders dan 'verhuizen',
+      // en dat verschil hoort in beeld te staan vóórdat er iets gebeurt.
       openModal(true, D.ntd.VERGADERVERZOEKEN[1]);
-      eq('categorie: bij bewerken staat de kiezer er niet',
-         document.getElementById('fld-sectie').style.display, 'none');
+      eq('categorie: bij bewerken staat de kiezer er wél, met een bijschrift dat verplaatsen aankondigt',
+         [document.getElementById('fld-sectie').style.display,
+          document.getElementById('m-sec-label').textContent.includes('verplaatsen'),
+          document.getElementById('m-sec-hint').textContent.includes('vervallen')],
+         ['', true, true]);
+      closeModal(); clearModal();
+      // …en bij TOEVOEGEN staat er geen verplaats-bijschrift; daar kies je alleen waar de taak komt.
+      openModal(false, null, { sec:'OPPAKKEN' });
+      eq('categorie: bij toevoegen is het gewoon een keuze, geen verhuizing',
+         [document.getElementById('m-sec-label').textContent, document.getElementById('m-sec-hint').textContent],
+         ['Categorie', '']);
       closeModal(); clearModal();
 
       // En het tabblad. `prefillNieuweTaak` verzet het al bij het ÓPENEN — dat moet, want openModal
@@ -7649,7 +7665,14 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       const nieuwOpp=D.ntd.OPPAKKEN[D.ntd.OPPAKKEN.length-1];
       eq('wissel: zonder sectiewissel blijft de bulk-selectie staan',
          [state.activeNtd, bulkSelectie().length], ['OPPAKKEN', 3]);
-      eq('wissel: … en de teller bladert naar de pagina van de nieuwe taak', pgs.ntd, 2);
+      // Het paginanummer wordt AFGELEID en niet vastgelegd op 2. Sinds een nieuwe Oppakken-taak een
+      // voorgestelde deadline meekrijgt (v10.27), sorteert hij op urgentie mee in de lijst in
+      // plaats van achteraan te blijven liggen — en dan is 'de pagina van de nieuwe taak' niet
+      // meer per definitie de laatste. De belofte die hier bewaakt wordt is ongewijzigd: de teller
+      // wijst de pagina aan waar de rij ECHT staat. De regel eronder toetst dat aan de DOM, en dat
+      // is de scherpste van de twee.
+      eq('wissel: … en de teller bladert naar de pagina van de nieuwe taak',
+         pgs.ntd, ntdPagina(renderNtd(), nieuwOpp));
       truthy('wissel: … die daardoor ook binnen dezelfde sectie echt in de tabel staat',
              !!document.querySelector(`#ntd-tbody tr[data-row="${nieuwOpp._row}"]`));
       await state._writeChain;
@@ -8635,6 +8658,20 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
           state.pendingWrites-pendingVoor, posts.length],
          [2, 2, true, 0, 0]);
 
+      // Hangen er subtaken onder een van de geselecteerde taken, dan hoort de vraag dat te zeggen.
+      // De losse verwijderweg (deleteTaskRow) doet dat al; deze weg deed het niet, en dat viel niet
+      // op zolang je elk vinkje met de hand zette. Sinds er een kopvinkje is dat de hele lijst in
+      // één klik selecteert — bundelkoppen en subtaken door elkaar, want bulk zet de lijst plat —
+      // is die belofte van de één-taak-weg te makkelijk te omzeilen.
+      a.taakId='T-KOP'; a.bundelId='B-1'; a.bundelVolg='0';
+      b.taakId='T-SUB'; b.bundelId='B-1'; b.bundelVolg='10';
+      antwoord=false; vragen=[];
+      await vraag(()=>bulkDoe(bulkKnop));
+      truthy('bulk-verwijderen: de vraag meldt het als er nog subtaken onder hangen',
+             (vragen[0]||'').includes('nog subtaken'));
+      a.taakId=''; a.bundelId=''; a.bundelVolg='';
+      b.taakId=''; b.bundelId=''; b.bundelVolg='';
+
       // Deze 'ja' loopt BEWUST niet via `vraag()`. Die helper wacht op `af || venster open`, en het
       // venster gaat al open binnen `bulkVerwijderen` zélf — hij kan dus niet zien of `bulkDoe` te
       // vroeg teruggeeft. En precies dát is wat de `await` bij `bulkVerwijderen` in `bulkDoe`
@@ -9024,6 +9061,21 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       // Elke sectie wijst een bestaand veld aan, en het is hetzelfde veld dat taakTitel leest.
       eq('omschrijving: elke sectie heeft een veld dat echt bestaat',
          SKEYS.filter(s => !document.getElementById(OMSCHRIJVING_VELD[s])), []);
+      // ── En dezelfde afspraak, maar dan als KOLOMNUMMER ──
+      // De backend maakt óók taken aan (mail-intake, herhaalregels: cd_createTaskRow in
+      // apps-script/Notifications.gs) en moet de omschrijving in dezelfde kolom zetten. Die kant
+      // leest deze suite niet: apps-script/ staat bewust niet op de publieke site (_config.yml),
+      // dus een fetch erop zou op productie 404'en. Wat hier wél vastligt is de FRONTEND-helft van
+      // het paar — de kolomnummers die CD_OMSCHRIJVING_COL daar letterlijk overneemt. Schuift
+      // iemand een sleutel in SECS, dan valt dit om en is meteen duidelijk dat de .gs mee moet.
+      // Gemeten: C=3 voor Oppakken/LOD/Subsidie, D=4 voor Vergaderverzoeken, G=7 voor Offertes.
+      const VELD_NAAR_SLEUTEL = { 'm-actie':'actiepunt', 'm-agenda':'agendapunten',
+                                  'm-opm-o':'opmerkingen', 'm-actie-l':'actiepunt',
+                                  'm-subsidie':'subsidie' };
+      const kolomVan = sec => SECS[sec].keys.indexOf(VELD_NAAR_SLEUTEL[OMSCHRIJVING_VELD[sec]]) + 1;
+      eq('omschrijving: de kolom per sectie is dezelfde als die de backend gebruikt (CD_OMSCHRIJVING_COL)',
+         SKEYS.map(kolomVan),
+         [3, 4, 7, 3, 3]);
       // De echte weg: open een toevoegscherm per sectie en zet er tekst in.
       SKEYS.forEach(sec => {
         state.activeNtd = sec;
@@ -9287,7 +9339,19 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       // Ruime grens, en met opzet. Wat deze regel moet bewijzen is dat de INGESTELDE tijd is
       // gebruikt (60 ms) en niet de standaard van 20 seconden. Een strakkere grens meet vooral hoe
       // druk de machine op dat moment is — die stond hier één keer op 3 s en sloeg toen vals aan.
-      truthy('sheets: en er is niet op de standaardtijd van 20 seconden gewacht', duur < 10000);
+      //
+      // En in een tabblad dat op de ACHTERGROND staat meet deze regel helemaal niets meer: de
+      // browser knijpt daar elke timer af tot minstens een seconde en na vijf minuten tot één keer
+      // per minuut. De ingestelde 60 ms wordt dan tientallen seconden en deze assert slaat vals
+      // aan — precies zoals de 0x0-val bij de pixelmetingen verderop. Daarom hier dezelfde
+      // oplossing: niet stil overslaan (dan lijkt het gedekt terwijl er niets gemeten is) maar
+      // hardop zeggen dat de meting een zichtbaar tabblad nodig heeft. Het aantal asserts blijft
+      // gelijk, alleen de tekst verschilt.
+      if (document.visibilityState === 'hidden')
+        truthy('sheets: LET OP — de tijdslimiet is NIET gemeten; dit tabblad staat op de achtergrond '
+               + 'en de browser knijpt daar elke timer af. Haal het tabblad naar voren en draai opnieuw', true);
+      else
+        truthy('sheets: en er is niet op de standaardtijd van 20 seconden gewacht', duur < 10000);
       eq('sheets: de melding zegt wat er aan de hand is', /binnen 20 seconden/.test((fout || {}).message || ''), true);
       // Een afgebroken verzoek telt als netwerkfout — van buiten niet te onderscheiden van
       // 'verbinding weg', en dat is precies wat de gebruiker ervaart.
@@ -9597,6 +9661,912 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       return r.width > 0 && r.height > 0;
     }).map(el => el.id || el.className);
     eq('a11y: geen losse zwevende knop over de inhoud', zwevendeVangers.filter(n => /fab/i.test(String(n))), []);
+  })();
+
+
+  // ══════════════════════════════════════
+  //  VOORSTEL 1 — alles selecteren + shift-klik (v10.27)
+  // ══════════════════════════════════════
+  // Waarom dit blok de echte tabel tekent en niet alleen de functies aanroept: shift-klik leest de
+  // VOLGORDE van de vinkjes uit de DOM (`#ntd-tbody [data-action="bulk-vink"]`) en niet uit
+  // `state._rowCache`. Die cache bevat na de tabel ook de 'Ook hier'-rijen en groeit bij élke
+  // render aan; een reeks over rid-nummers zou daar dwars doorheen lopen. Alleen een echte render
+  // toetst dus wat de gebruiker doet.
+  (function(){
+    const paginaVoorBulk = (document.querySelector('.page.active')?.id || 'page-ntd').replace('page-','');
+    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const ntdOud = D.ntd, afOud = D.af, bulkOud = state.bulkMode, secOud = state.activeNtd;
+    const pagOud = pgs.ntd, cacheOud = state._rowCache, zichtOud = state._ntdZichtbaar;
+    const veldIds = ['s-ntd','f-code-ntd','f-beh-ntd','f-prio-ntd'];
+    const veldOud = veldIds.map(id => document.getElementById(id).value);
+    const sortOud = state.ntdSort, statusOud = state.ntdStatus;
+    // Zes taken: meer dan één en genoeg om een reeks in het MIDDEN te kunnen kiezen. Met drie
+    // taken zou een reeks 0..2 gelijk zijn aan 'alles' en zou een verwisseling van die twee wegen
+    // niet opvallen.
+    const mk = (n) => ({ _row: 100 + n, _sec:'OPPAKKEN', code:'3112'+n, naam:'Testflat '+n,
+                         actiepunt:'Punt '+n, deadline:'', behandelaar:'', prioriteit:'',
+                         opmerkingen:'', inBehandeling:'', taakId:'B'+n, bundelId:'', bundelVolg:'' });
+    const rijen = [0,1,2,3,4,5].map(mk);
+    // De vinkjes van de getekende tabel, in tekenvolgorde. Na ELKE klik opnieuw ophalen: `bulkVink`
+    // hertekent, en dan wijzen de oude rid-nummers naar de vorige render.
+    const vinkjes = () => [...document.querySelectorAll('#ntd-tbody [data-action="bulk-vink"]')];
+    const tik = (i, shift) => { const v = vinkjes()[i]; if(!v) return false;
+                                bulkVink(+v.dataset.rid, shift ? { shiftKey:true } : undefined); return true; };
+    try {
+      veldIds.forEach(id => { document.getElementById(id).value = ''; });
+      state.ntdSort = { key:null, asc:true }; state.ntdStatus = ''; state.activeNtd = 'OPPAKKEN';
+      pgs.ntd = 1; state._rowCache = [];
+      D.af = { ...leeg }; D.ntd = { ...leeg, OPPAKKEN: rijen };
+      state.bulkMode = true; bulkWis();
+      goTo('ntd'); renderNtd();
+
+      // ── De stand van het kopvinkje is een pure functie; die eerst, los van de DOM ──
+      const set = new Set([rijen[0]]);
+      eq('bulk-alles: het kopvinkje kent drie standen — niets, een deel, alles',
+         [allesVinkjeStand(rijen, new Set()), allesVinkjeStand(rijen, set), allesVinkjeStand(rijen, new Set(rijen)),
+          allesVinkjeStand([], new Set())],
+         ['leeg', 'deels', 'alles', 'leeg']);
+      // Met een lege selectie hoort het kopvinkje kaal te zijn — geen 'aan', geen 'deels' — en
+      // moet zijn opschrift verklappen dat hij óók de volgende pagina's pakt. Zonder die tekst
+      // klikt de gebruiker hem aan in de veronderstelling dat het over de 25 zichtbare rijen gaat.
+      const leegHtml = allesVinkjeHtml(rijen);
+      eq('bulk-alles: leeg kopvinkje is kaal en zegt dat het over alle pagina\'s gaat',
+         [/class="cb"/.test(leegHtml), leegHtml.includes('aria-checked="false"'),
+          leegHtml.includes("volgende pagina's"), leegHtml.includes('6 taken')],
+         [true, true, true, true]);
+
+      // ── Het kopvinkje staat in de tabelkop en niet in een rij ──
+      const kopVink = document.querySelector('#ntd-thead [data-action="bulk-alles"]');
+      eq('bulk-alles: er staat een kopvinkje in de tabelkop zodra je gaat selecteren',
+         [!!kopVink, kopVink ? kopVink.getAttribute('aria-checked') : null,
+          vinkjes().length],
+         [true, 'false', 6]);
+
+      // ── Shift-klik: van 1 tot en met 4 = vier taken, niet twee ──
+      tik(1);                       // anker
+      eq('bulk-shift: één gewone klik selecteert precies één taak', bulkSelectie().length, 1);
+      tik(4, true);                 // shift naar beneden
+      eq('bulk-shift: shift-klik pakt de hele reeks tussen anker en klik',
+         bulkSelectie().map(r => r.naam).sort(),
+         ['Testflat 1','Testflat 2','Testflat 3','Testflat 4']);
+      // Het anker blijft staan, zodat een tweede shift-klik de reeks vanaf hetzelfde punt
+      // vergroot in plaats van een nieuwe reeks te beginnen — zoals in een bestandsvenster.
+      tik(5, true);
+      eq('bulk-shift: een tweede shift-klik rekt de reeks op vanaf hetzelfde anker',
+         bulkSelectie().length, 5);
+      // Omhoog werkt net zo goed als omlaag: het anker staat op 1, dus 0..1 komt erbij.
+      tik(0, true);
+      eq('bulk-shift: en de reeks mag ook omhoog lopen', bulkSelectie().length, 6);
+
+      // ── Alles selecteren gaat over de PAGINAGRENS heen ──
+      // Dit is de kern van het voorstel: 22 taken aanvinken hield na 25 rijen op, want dan begon
+      // pagina 2. `state._ntdZichtbaar` is de hele gefilterde lijst, niet de getoonde pagina.
+      bulkWis(); renderNtd();
+      eq('bulk-alles: de lijst waarop "alles" werkt is de hele gefilterde lijst',
+         state._ntdZichtbaar.length, 6);
+      bulkAlles();
+      eq('bulk-alles: één klik selecteert ze allemaal', bulkSelectie().length, 6);
+      eq('bulk-alles: en het kopvinkje staat dan op "alles"',
+         document.querySelector('#ntd-thead [data-action="bulk-alles"]').getAttribute('aria-checked'), 'true');
+      bulkAlles();
+      eq('bulk-alles: nog een klik maakt de selectie weer leeg', bulkSelectie().length, 0);
+
+      // ── Een halve selectie mag het kopvinkje niet als leeg tonen ──
+      tik(2);
+      const halfVink = document.querySelector('#ntd-thead [data-action="bulk-alles"]');
+      eq('bulk-alles: bij een halve selectie staat het kopvinkje op de tussenstand',
+         [halfVink.getAttribute('aria-checked'), halfVink.classList.contains('deels'),
+          halfVink.classList.contains('aan')],
+         ['mixed', true, false]);
+      // ... en vult 'alles' aan in plaats van de bestaande selectie weg te gooien.
+      bulkAlles();
+      eq('bulk-alles: vanuit een halve selectie vult hij aan tot alles', bulkSelectie().length, 6);
+
+      // ── Een filter beperkt "alles" tot wat er staat ──
+      bulkWis();
+      document.getElementById('s-ntd').value = 'Punt 3';
+      renderNtd();
+      bulkAlles();
+      eq('bulk-alles: met een zoekterm pakt hij alleen de gevonden taken',
+         [state._ntdZichtbaar.length, bulkSelectie().map(r => r.naam)],
+         [1, ['Testflat 3']]);
+
+      // ── Shift-klik zonder anker mag niets vreemds doen ──
+      document.getElementById('s-ntd').value = '';
+      bulkWis(); renderNtd();
+      tik(3, true);
+      eq('bulk-shift: shift zonder eerder vinkje gedraagt zich als een gewone klik',
+         bulkSelectie().length, 1);
+
+      // ── Een verversing mag geen SPOOKSELECTIE achterlaten ──
+      // `_sel` bewaart rij-OBJECTEN, en een verversing vervangt élk object in D door een vers
+      // exemplaar. Zonder opruiming tekent de tabel alle vinkjes leeg terwijl de balk nog
+      // 'N geselecteerd' zegt — en die balk verwijdert die N ook echt, op rijnummers van vóór de
+      // verversing. Met de hand aanvinken maakte daar een spook van drie taken van; sinds het
+      // kopvinkje van veertig.
+      bulkWis(); renderNtd();
+      bulkAlles();
+      eq('bulk-spook: er staat een volle selectie klaar', bulkSelectie().length, 6);
+      // Een verversing nabootsen: dezelfde inhoud, maar allemaal nieuwe objecten.
+      D.ntd = { ...leeg, OPPAKKEN: rijen.map(r => ({ ...r })) };
+      renderNtd();
+      eq('bulk-spook: na een verversing is de selectie leeg in plaats van onzichtbaar gevuld',
+         [bulkSelectie().length, document.getElementById('bulk-teller').textContent,
+          document.getElementById('bulk-balk').style.display],
+         [0, '0 geselecteerd', 'none']);
+    } catch(err){ window._blokFout = String(err && err.stack || err); throw err;
+    } catch(err){ window._blokFout = String(err && err.stack || err); throw err;
+    } finally {
+      state.bulkMode = bulkOud; bulkWis();
+      D.ntd = ntdOud; D.af = afOud; state.activeNtd = secOud; pgs.ntd = pagOud;
+      state._rowCache = cacheOud; state._ntdZichtbaar = zichtOud;
+      veldIds.forEach((id,i) => { document.getElementById(id).value = veldOud[i]; });
+      state.ntdSort = sortOud; state.ntdStatus = statusOud;
+      // NIET alleen de state terugzetten maar ook HERTEKENEN. Zonder deze regel bleven de zes
+      // neptaken ('Testflat 0..5') gewoon in de tabel staan, met het kopvinkje erboven, de
+      // bulk-balk eronder en de klasse `bulk` op de pagina — en dat is wat de gebruiker ziet als
+      // hij ?test=1 opent. De suite kent geen slot-render die dat alsnog opruimt.
+      renderNtd(); renderBulkUi(); goTo(paginaVoorBulk);
+    }
+  })();
+
+
+  // ══════════════════════════════════════
+  //  VOORSTEL 2 — 'In behandeling' vanaf de taakrij (v10.27)
+  // ══════════════════════════════════════
+  await (async()=>{
+    console.log('%c[TESTS] In behandeling vanaf de rij', 'background:#B45309;color:white;padding:2px 6px;border-radius:3px');
+    // ── Eerst de pure kant: welke kolom, welke secties, welke omslag ──
+    // De kolomletter wordt AFGELEID uit SECS[sec].keys en niet als 'H' opgeschreven. Deze assert is
+    // de vangrail onder die keuze: zet iemand ooit een veld tussen de sleutels, dan verschuift de
+    // kolom mee en valt dit om — in plaats van dat de app stil naar de verkeerde cel schrijft.
+    eq('in-behandeling: de kolom komt uit de sectiedefinitie, niet uit een vaste letter',
+       ['OPPAKKEN','VERGADERVERZOEKEN','LOD','SUBSIDIE-TRAJECTEN','OFFERTE-TRAJECTEN'].map(inBehandelingKolom),
+       ['H','H','H','H',null]);
+    // Offerte-trajecten kennen het veld niet (7 sleutels, geen `inBehandeling`) en hun bewerkscherm
+    // heeft er ook geen schakelaar voor. Daar hoort dus geen knop te staan.
+    eq('in-behandeling: offerte-trajecten hebben de vlag niet en krijgen dus geen knop',
+       ['OPPAKKEN','OFFERTE-TRAJECTEN','SUBSIDIE-TRAJECTEN'].map(heeftInBehandeling),
+       [true, false, true]);
+    eq('in-behandeling: alles wat niet exact TRUE is telt als "niet in behandeling"',
+       ['TRUE','FALSE','','x',undefined].map(volgendeStand),
+       ['FALSE','TRUE','TRUE','TRUE','TRUE']);
+
+    // ── De knop zelf ──
+    const knopUit = taakActieKnoppen(3, 'FALSE');
+    const knopAan = taakActieKnoppen(3, 'TRUE');
+    const knopGeen = taakActieKnoppen(3);
+    const tel = (h, naald) => (h.match(new RegExp(naald,'g'))||[]).length;
+    eq('in-behandeling: zonder stand blijft de knoppenrij ongewijzigd (bundelpaneel)',
+       [tel(knopGeen,'<button'), knopGeen.includes('taak-inbehandeling')], [3, false]);
+    eq('in-behandeling: met een stand komt er één knop bij, mét aria-pressed',
+       [tel(knopUit,'<button'), knopUit.includes('aria-pressed="false"'), knopAan.includes('aria-pressed="true"')],
+       [4, true, true]);
+    // De volgorde is geen smaak: het ✓ (afronden) staat al maanden pal tegen de rechterrand en is
+    // de meest gebruikte knop van de rij. De nieuwe knop hoort ervóór, anders schuift het ✓ op.
+    truthy('in-behandeling: de nieuwe knop staat vóór het afrondvinkje, niet erachter',
+           knopUit.indexOf('taak-inbehandeling') < knopUit.indexOf('taak-afronden'));
+    // Aan en uit verschillen niet alleen in kleur maar in PICTOGRAM. Kleur alleen is geen
+    // betekenisdrager voor wie hem niet ziet.
+    truthy('in-behandeling: aan en uit tekenen een ander pictogram, niet alleen een andere kleur',
+           knopAan.split('taak-inbehandeling')[1].split('</button>')[0]
+             !== knopUit.split('taak-inbehandeling')[1].split('</button>')[0]);
+
+    // ── En de hele schrijfweg, met een nagebootst tabblad ──
+    const fetchOud = window.fetch, tokenOud = state.oauthToken, expOud = state.oauthExpiry;
+    const ntdOud = D.ntd, afOud = D.af, cacheOud = state._rowCache, idsOud = state._sheetIds;
+    const uitCacheOud = state._uitCache, alertOud = window.alert;
+    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    let blad = {}, posts = [], faalPut = false;
+    const mk = () => ({ _sec:'OPPAKKEN', _row:7, code:'311212', naam:'Testflat', actiepunt:'Dakgoot',
+                        deadline:'', behandelaar:'', prioriteit:'', opmerkingen:'', inBehandeling:'',
+                        subcategorie:'', opvolgdatum:'', taakId:'T7', bundelId:'', bundelVolg:'' });
+    const putBereiken = () => posts.filter(p=>p.methode==='PUT')
+      .map(p=>p.url.replace(/^.*\/values\//,'').replace(/\?.*$/,''));
+    const putWaarden  = () => posts.filter(p=>p.methode==='PUT').map(p=>p.body && p.body.values);
+    const logRegels   = () => posts.filter(p=>p.methode==='POST' && /Logboek/.test(p.url))
+      .flatMap(p=>((p.body&&p.body.values)||[]));
+    try {
+      window.alert = ()=>{};
+      state.oauthToken='stub'; state.oauthExpiry=Date.now()+3600e3;
+      state._sheetIds={ 'Nog Te Doen':0, 'Afgerond':1, 'Logboek':2 };
+      state._uitCache=false;
+      window.fetch = async(url, opt)=>{
+        const u=decodeURIComponent(String(url)), methode=(opt&&opt.method)||'GET';
+        if(u.includes('values:batchGet'))
+          return new Response(JSON.stringify({error:{message:'geen leesronde in deze test'}}),{status:403});
+        if(methode==='GET'){                                   // de rij-controle van assertRowMatch
+          const m=/!A(\d+):S(\d+)/.exec(u)||[];
+          const rijen=[]; for(let r=+m[1]; r<=+m[2]; r++) rijen.push(blad[r]||[]);
+          return new Response(JSON.stringify({values:rijen}),{status:200});
+        }
+        posts.push({ url:u, methode, body:(opt&&opt.body)?JSON.parse(opt.body):null });
+        if(methode==='PUT' && faalPut)
+          return new Response(JSON.stringify({error:{message:'nep-fout voor de rollback'}}),{status:403});
+        return new Response('{}',{status:200});
+      };
+
+      // 1. Aanzetten schrijft precies één cel, in kolom H van de juiste rij.
+      let taak = mk();
+      D.af={ ...leeg }; D.ntd={ ...leeg, OPPAKKEN:[taak] };
+      blad = { 7: _rijNaarCellen('Nog Te Doen', taak).map(v=>String(v ?? '')) };
+      state._rowCache=[taak]; posts=[];
+      await zetInBehandeling(0);
+      await state._writeChain;
+      // `writeRange` verpakt één rij als [[cel]] — het Sheets-formaat voor een bereik.
+      eq('in-behandeling: aanzetten schrijft één cel in kolom H van de eigen rij',
+         [putBereiken(), putWaarden(), taak.inBehandeling],
+         [["'Nog Te Doen'!H7:H7"], [[['TRUE']]], 'TRUE']);
+      // De logregel is functioneel en geen boekhouding: het stil-signaal rekent vanaf de LAATSTE
+      // logregel van een taak. Zonder deze regel staat een net opgepakte taak meteen op 'Stil 40d'.
+      // 'Aangevinkt' is een BESTAANDE actienaam — die heeft in het Logboek al een zin en een kleur.
+      eq('in-behandeling: er komt een logregel met een actienaam die het Logboek al kent',
+         logRegels().map(r=>[r[3], r[4], r[5], r[6]]),
+         [['Aangevinkt', 'In behandeling', 'FALSE', 'TRUE']]);
+
+      // 2. Nog een keer klikken zet hem weer uit — dat ís het ongedaan maken.
+      posts=[]; blad = { 7: _rijNaarCellen('Nog Te Doen', taak).map(v=>String(v ?? '')) };
+      state._rowCache=[taak];
+      await zetInBehandeling(0);
+      await state._writeChain;
+      eq('in-behandeling: nog een klik zet hem weer uit',
+         [putWaarden(), taak.inBehandeling, logRegels().map(r=>r[3])],
+         [[[['FALSE']]], 'FALSE', ['Uitgevinkt']]);
+
+      // 3. Mislukt de schrijfactie, dan moet de rij terug naar zijn oude stand. Zonder rollback
+      //    staat er 'In behandeling' op het scherm terwijl de Sheet dat niet weet — en dat is
+      //    precies het soort stille leugen waar de groep 'In behandeling' op leunt.
+      taak = mk();
+      D.ntd={ ...leeg, OPPAKKEN:[taak] };
+      blad = { 7: _rijNaarCellen('Nog Te Doen', taak).map(v=>String(v ?? '')) };
+      state._rowCache=[taak]; posts=[]; faalPut=true;
+      await zetInBehandeling(0);
+      await state._writeChain.catch(()=>{});
+      eq('in-behandeling: mislukt de schrijfactie, dan staat de rij weer op de oude stand',
+         taak.inBehandeling === 'TRUE', false);
+      faalPut=false;
+
+      // 4. Offline: niets wijzigen, ook niet optimistisch. Zelfde rem als bij wegleggen.
+      taak = mk();
+      D.ntd={ ...leeg, OPPAKKEN:[taak] };
+      state._rowCache=[taak]; posts=[]; state._uitCache=true;
+      await zetInBehandeling(0);
+      await state._writeChain;
+      eq('in-behandeling: offline verandert er niets — ook niet op het scherm',
+         [taak.inBehandeling, posts.length], ['', 0]);
+      state._uitCache=false;
+
+      // 5. Een rij die intussen verdwenen is geeft één melding en schrijft niets.
+      posts=[]; state._rowCache=[];
+      await zetInBehandeling(0);
+      await state._writeChain;
+      eq('in-behandeling: een verdwenen rij schrijft niets', posts.length, 0);
+    } finally {
+      window.fetch=fetchOud; window.alert=alertOud;
+      state.oauthToken=tokenOud; state.oauthExpiry=expOud;
+      D.ntd=ntdOud; D.af=afOud; state._rowCache=cacheOud; state._sheetIds=idsOud;
+      state._uitCache=uitCacheOud;
+    }
+  })();
+
+
+  // ══════════════════════════════════════
+  //  VOORSTEL 3 — een deadline VOORSTELLEN bij een nieuwe taak (v10.27)
+  // ══════════════════════════════════════
+  (function(){
+    console.log('%c[TESTS] Deadline-voorstel', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    // De getallen komen uit beheer-playbook.md §3 en niet uit een inval. Deze assert is het
+    // koppelstuk: wijzigt iemand de code zonder het playbook, dan valt dit om.
+    eq('deadline-voorstel: de termijnen komen uit het playbook (7 / 14 / 14) en niet uit de lucht',
+       [DEADLINE_VOORSTEL['OPPAKKEN'], DEADLINE_VOORSTEL['VERGADERVERZOEKEN'], DEADLINE_VOORSTEL['OFFERTE-TRAJECTEN']],
+       [7, 14, 14]);
+    // LOD en subsidie krijgen bewust GEEN voorstel. Bij LOD staat er een officiële hersteltermijn
+    // in de brief van de gemeente en zegt het playbook letterlijk 'niet gokken'; een verzonnen
+    // datum ziet er daar even betrouwbaar uit als een echte. Subsidie heeft geen termijn in het
+    // playbook. Ze krijgen wél een zin die uitlegt wat er dan wél verwacht wordt — zwijgen zou
+    // als een vergeten veld lezen.
+    eq('deadline-voorstel: LOD en subsidie krijgen geen datum maar wél uitleg',
+       [DEADLINE_VOORSTEL['LOD'], DEADLINE_VOORSTEL['SUBSIDIE-TRAJECTEN'],
+        (DEADLINE_HINT['LOD']||'').length > 20, (DEADLINE_HINT['SUBSIDIE-TRAJECTEN']||'').length > 20],
+       [null, null, true, true]);
+    // De rekensom zelf, met een vaste dag erin zodat hij niet van de kalender afhangt.
+    // 2026-02-24 + 7 = 2026-03-03: over een maandgrens én in een schrikkeljaar.
+    eq('deadline-voorstel: de datum rekent over maandgrenzen heen',
+       [voorgesteldeDeadline('OPPAKKEN', new Date(2026,1,24)),
+        voorgesteldeDeadline('VERGADERVERZOEKEN', new Date(2026,11,25)),
+        voorgesteldeDeadline('LOD', new Date(2026,1,24))],
+       ['2026-03-03', '2027-01-08', '']);
+
+    // ── En hoe het scherm zich gedraagt ──
+    const modeOud = state.editMode, rowOud = state.editRowData, secOud = state.editSec, actOud = state.activeNtd;
+    try {
+      // 1. Nieuwe taak in Oppakken: de datum staat er, met het zinnetje eronder.
+      state.activeNtd = 'OPPAKKEN';
+      openModal(false, null, { sec:'OPPAKKEN' });
+      eq('deadline-voorstel: een nieuwe Oppakken-taak opent mét voorgestelde datum en uitleg',
+         [document.getElementById('m-dl').value === voorgesteldeDeadline('OPPAKKEN'),
+          document.getElementById('dl-hint').textContent.includes('Voorstel')],
+         [true, true]);
+      closeModal();
+
+      // 2. LOD: leeg veld, maar wél de uitleg waaróm.
+      openModal(false, null, { sec:'LOD' });
+      eq('deadline-voorstel: LOD opent leeg, met de reden erbij',
+         [document.getElementById('m-dl-l').value,
+          document.getElementById('dl-hint-l').textContent.includes('hersteltermijn')],
+         ['', true]);
+      closeModal();
+
+      // 3. BEWERKEN mag nooit overschreven worden. Dit is de belangrijkste van de drie: een
+      //    voorstel dat een bestaande deadline overschrijft is geen hulp maar gegevensverlies.
+      const bestaand = { _sec:'OPPAKKEN', _row:9, code:'311212', naam:'Testflat', actiepunt:'Dakgoot',
+                         deadline:'15-01-2026', behandelaar:'', prioriteit:'', opmerkingen:'',
+                         inBehandeling:'', subcategorie:'', opvolgdatum:'', taakId:'T9',
+                         bundelId:'', bundelVolg:'' };
+      openModal(true, bestaand);
+      eq('deadline-voorstel: bij BEWERKEN blijft de eigen deadline staan en verschijnt er geen zin',
+         [document.getElementById('m-dl').value, document.getElementById('dl-hint').textContent],
+         ['2026-01-15', '']);
+      closeModal();
+
+      // 4. Een taak met een LEGE deadline bewerken krijgt óók geen voorstel. Anders zou het scherm
+      //    een datum invullen die er niet stond, en één klik op Opslaan legt die vast.
+      const zonder = { ...bestaand, deadline:'' };
+      openModal(true, zonder);
+      eq('deadline-voorstel: bewerken van een taak zónder deadline vult er ook geen in',
+         [document.getElementById('m-dl').value, document.getElementById('dl-hint').textContent],
+         ['', '']);
+      closeModal();
+
+      // 5. Van sectie wisselen in een nieuw scherm is een nieuwe keuze: het zinnetje moet mee, en
+      //    dat van de vorige sectie mag niet blijven hangen.
+      openModal(false, null, { sec:'OPPAKKEN' });
+      kiesSectie('LOD');
+      eq('deadline-voorstel: wisselen van sectie verzet de uitleg en laat de oude niet staan',
+         [document.getElementById('dl-hint-l').textContent.includes('hersteltermijn'),
+          document.getElementById('dl-hint').textContent],
+         [true, '']);
+      closeModal();
+    } finally {
+      state.editMode = modeOud; state.editRowData = rowOud; state.editSec = secOud; state.activeNtd = actOud;
+    }
+  })();
+
+
+  // ══════════════════════════════════════
+  //  VOORSTEL 4 — filteren op behandelaar en periode in Afgerond (v10.27)
+  // ══════════════════════════════════════
+  (function(){
+    console.log('%c[TESTS] Filters op Afgerond', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    // ── De periodes zijn een pure rekensom; die eerst, met een vaste dag ──
+    // 19 augustus 2026 is een WOENSDAG. Weken lopen maandag t/m zondag, gelijk aan `isoWeek` en aan
+    // de weekregel op Nog Te Doen — twee weekbegrippen in één dashboard is een bron van cijfers
+    // die niet op elkaar aansluiten.
+    const wo = new Date(2026, 7, 19);
+    eq('afgerond-filter: deze week loopt maandag t/m zondag',
+       periodeBereik('dezeweek', wo), { van:'2026-08-17', tot:'2026-08-23' });
+    eq('afgerond-filter: vorige week is de week ervóór, ook maandag t/m zondag',
+       periodeBereik('vorigeweek', wo), { van:'2026-08-10', tot:'2026-08-16' });
+    // Zondag is de LAATSTE dag van de week, niet de eerste. Met de standaard getDay()-telling
+    // (0 = zondag) zou zondag 23 augustus in de week erná vallen en zou het maandagoverleg de
+    // zondag ervoor missen.
+    eq('afgerond-filter: zondag hoort bij de week die net eindigde, niet bij de volgende',
+       periodeBereik('dezeweek', new Date(2026, 7, 23)), { van:'2026-08-17', tot:'2026-08-23' });
+    eq('afgerond-filter: maanden lopen van de 1e tot en met de laatste dag',
+       [periodeBereik('dezemaand', wo), periodeBereik('vorigemaand', wo)],
+       [{ van:'2026-08-01', tot:'2026-08-31' }, { van:'2026-07-01', tot:'2026-07-31' }]);
+    // Over de jaargrens: 'vorige maand' in januari is december van het jaar ervóór.
+    eq('afgerond-filter: vorige maand rekent over de jaargrens heen',
+       periodeBereik('vorigemaand', new Date(2027, 0, 8)), { van:'2026-12-01', tot:'2026-12-31' });
+    eq('afgerond-filter: zonder keuze (of bij eigen bereik) is er geen periodegrens',
+       [periodeBereik('', wo), periodeBereik('eigen', wo), periodeBereik('onzin', wo)],
+       [null, null, null]);
+    truthy('afgerond-filter: de keuzelijst begint met "alles" en eindigt met een eigen bereik',
+           AF_PERIODES[0][0] === '' && AF_PERIODES[AF_PERIODES.length-1][0] === 'eigen');
+
+    // ── En het filter zelf, puur ──
+    const r = (naam, beh, datum) => ({ _sec:'OPPAKKEN', code:'311212', naam, behandelaar:beh,
+                                       datum, actiepunt:'Werk aan '+naam, opmerking:'', subcategorie:'' });
+    const lijst = [
+      r('Alpha',  'Jer',        '17 aug 2026'),
+      r('Bravo',  'Cihad, Jer', '23 aug 2026'),
+      r('Charlie','Cihad',      '10 aug 2026'),
+      r('Delta',  'Jeroen',     '19 aug 2026'),   // lijkt op Jer, maar is iemand anders
+      r('Echo',   'Jer',        ''),              // geen leesbare afronddatum
+    ];
+    const namen = f => filterAf(lijst, f).map(x => x.naam);
+    eq('afgerond-filter: zonder filters komt alles terug', namen({}).length, 5);
+    // De behandelaar wordt op HELE namen vergeleken en niet met `includes`: het veld kan
+    // 'Cihad, Jer' zijn (dan telt Jer mee), maar 'Jeroen' is een andere persoon.
+    eq('afgerond-filter: "Jer" pakt ook het duo "Cihad, Jer" maar niet "Jeroen"',
+       namen({ beh:'Jer' }).sort(), ['Alpha','Bravo','Echo']);
+    eq('afgerond-filter: een periode knipt op de afronddatum, grenzen meegerekend',
+       namen({ bereik:{ van:'2026-08-17', tot:'2026-08-23' } }).sort(), ['Alpha','Bravo','Delta']);
+    // Een rij zonder leesbare datum valt BUITEN elke periode. Andersom (stil meenemen) zou het
+    // weekoverzicht rijen tonen waarvan niemand weet wanneer ze af zijn.
+    truthy('afgerond-filter: een rij zonder afronddatum valt buiten elke periode',
+           !namen({ bereik:{ van:'2026-01-01', tot:'2026-12-31' } }).includes('Echo'));
+    eq('afgerond-filter: de filters stapelen (behandelaar én periode én zoekterm)',
+       namen({ beh:'Jer', bereik:{ van:'2026-08-17', tot:'2026-08-23' }, q:'bravo' }), ['Bravo']);
+    // Alleen een ondergrens of alleen een bovengrens mag ook — dat is het 'eigen bereik' waar de
+    // gebruiker maar één van de twee datums invult.
+    eq('afgerond-filter: een half ingevuld eigen bereik werkt als open einde',
+       [namen({ bereik:{ van:'2026-08-19', tot:'' } }).sort(), namen({ bereik:{ van:'', tot:'2026-08-10' } })],
+       [['Bravo','Delta'], ['Charlie']]);
+
+    // ── En het scherm ──
+    const afOud = D.af, secOud = state.activeAf, pagOud = pgs.af;
+    const velden = ['s-af','f-beh-af','f-per-af','f-van-af','f-tot-af'];
+    const veldOud = velden.map(id => { const el=document.getElementById(id); return el?el.value:''; });
+    try {
+      const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      D.af = { ...leeg, OPPAKKEN: lijst };
+      state.activeAf = 'OPPAKKEN'; pgs.af = 1;
+      velden.forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+      goTo('af'); renderAf();
+      // De keuzelijst met periodes komt uit AF_PERIODES en staat niet met de hand in index.html:
+      // de rekenregel en het label horen bij elkaar te blijven.
+      eq('afgerond-filter: de periodekeuzes komen uit één bron',
+         document.getElementById('f-per-af').options.length, AF_PERIODES.length);
+      // De twee datumvelden horen pas te verschijnen bij 'Eigen bereik'. `[hidden]` moet het écht
+      // doen — een display-regel in de stylesheet wint anders van het standaardgedrag.
+      const eigen = document.getElementById('af-eigen');
+      eq('afgerond-filter: het eigen bereik staat verborgen tot je erom vraagt',
+         [eigen.hidden, getComputedStyle(eigen).display], [true, 'none']);
+      document.getElementById('f-per-af').value = 'eigen';
+      renderAf();
+      eq('afgerond-filter: … en verschijnt zodra je "eigen bereik" kiest',
+         [eigen.hidden, getComputedStyle(eigen).display !== 'none'], [false, true]);
+      // Filteren op iemand die in de tabel niet te zien was, is niet te controleren. Daarom staat
+      // de behandelaar nu ook als kolom in de lijst.
+      document.getElementById('f-per-af').value = '';
+      document.getElementById('f-beh-af').value = 'Cihad';
+      renderAf();
+      const rijen = [...document.querySelectorAll('#af-tbody tr')];
+      eq('afgerond-filter: het scherm toont alleen de gefilterde rijen, mét een behandelaar-kolom',
+         [rijen.length, document.getElementById('af-thead').textContent.includes('Behandelaar'),
+          rijen[0].querySelectorAll('td').length],
+         [2, true, 7]);
+      // De tab-tellers boven de tabel moeten hetzelfde filter volgen; anders zegt de teller 12
+      // terwijl er 2 rijen staan.
+      truthy('afgerond-filter: de tellers op de tabbladen tellen hetzelfde filter mee',
+             document.getElementById('af-tabs').textContent.includes('2'));
+      // En de lege-lijst-tekst moet weten dát er gefilterd is: 'niets gevonden' mag niet lezen als
+      // 'er is niets afgerond'.
+      document.getElementById('f-beh-af').value = 'Gabos';
+      renderAf();
+      truthy('afgerond-filter: een leeg resultaat zegt dat het aan het filter ligt',
+             /filter|zoek/i.test(document.getElementById('af-tbody').textContent));
+    } finally {
+      D.af = afOud; state.activeAf = secOud; pgs.af = pagOud;
+      velden.forEach((id,i) => { const el=document.getElementById(id); if(el) el.value=veldOud[i]; });
+    }
+  })();
+
+
+  // ══════════════════════════════════════
+  //  VOORSTEL 5 — waarschuwen bij een taak die al lijkt te bestaan (v10.27)
+  // ══════════════════════════════════════
+  await (async()=>{
+    console.log('%c[TESTS] Dubbele taak', 'background:#B45309;color:white;padding:2px 6px;border-radius:3px');
+    // ── De maatstaf, en waarom hij uitlegbaar moet zijn ──
+    // Stopwoorden en korte woorden eruit: zonder die stap halen 'De dakgoot van het pand' en
+    // 'De brief van de gemeente' een hoge score op 'de', 'van' en 'het' alleen.
+    eq('dubbelcheck: stopwoorden en korte woorden tellen niet mee',
+       woorden('De dakgoot van het pand is lek'), ['dakgoot','pand','lek']);
+    eq('dubbelcheck: hoofdletters, leestekens en dubbele spaties maken geen verschil',
+       woorden('Dakgoot,  LEK!!'), woorden('dakgoot lek'));
+    // Letters met accenten mogen niet in tweeën vallen.
+    truthy('dubbelcheck: een woord met een accent blijft één woord', woorden('geërfde balkons').includes('geërfde'));
+    // De drie gemeten voorbeelden uit de toelichting bij DUBBEL_DREMPEL. Ze staan hier met hun
+    // uitkomst, zodat een latere wijziging aan de maatstaf zichtbaar wordt en niet alleen 'anders
+    // voelt'.
+    const rond = x => Math.round(x*100)/100;
+    eq('dubbelcheck: de score is 1 bij gelijke tekst, 0 zonder gedeeld woord',
+       [rond(gelijkenis('Offerte schilderwerk','Offerte schilderwerk')),
+        rond(gelijkenis('Lekkage dak','Jaarrekening opstellen'))],
+       [1, 0]);
+    eq('dubbelcheck: bijna hetzelfde werk scoort hoog, ánder werk aan hetzelfde ding niet',
+       [rond(gelijkenis('Lekkage dak reparatie','Lekkage dak')) >= DUBBEL_DREMPEL,
+        rond(gelijkenis('Dakgoot schoonmaken','Dakgoot vervangen')) >= DUBBEL_DREMPEL],
+       [true, false]);
+    eq('dubbelcheck: een omschrijving zonder betekenisvolle woorden geeft geen score',
+       [gelijkenis('','Lekkage dak'), gelijkenis('de en van','Lekkage dak')], [0, 0]);
+
+    // ── Zoeken in de open taken ──
+    const mk = (code, actie, sec) => ({ _sec:sec||'OPPAKKEN', code, naam:'Testflat', actiepunt:actie,
+                                        deadline:'', behandelaar:'', prioriteit:'', opmerkingen:'',
+                                        inBehandeling:'', subcategorie:'', opvolgdatum:'',
+                                        taakId:'T'+actie, bundelId:'', bundelVolg:'' });
+    // De tweede regel: alle woorden van de kortste zitten in de langste. Zonder die regel valt het
+    // klassieke dubbele geval net buiten de boot — de een noteert 'Lekkage dak', de ander schrijft
+    // er een zin omheen.
+    eq('dubbelcheck: de een noteert kort, de ander uitgebreid — dat is hetzelfde werk',
+       [rond(gelijkenis('Lekkage dak','Lekkage dak spoedig laten oplossen')) >= DUBBEL_DREMPEL,
+        zitErinVervat('Lekkage dak','Lekkage dak spoedig laten oplossen'),
+        lijktOp('Lekkage dak','Lekkage dak spoedig laten oplossen')],
+       [false, true, true]);
+    // …en die regel mag ánder werk aan hetzelfde ding niet alsnog binnenhalen.
+    eq('dubbelcheck: "vervat" haalt ander werk aan hetzelfde ding er niet bij',
+       [zitErinVervat('Dakgoot schoonmaken','Dakgoot vervangen'),
+        lijktOp('Dakgoot schoonmaken','Dakgoot vervangen')], [false, false]);
+
+    const ntd = {
+      OPPAKKEN:[ mk('311212','Lekkage dak repareren'), mk('311212','Jaarrekening opstellen'),
+                 mk('999999','Lekkage dak repareren') ],   // andere VvE — mag niet meetellen
+      VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[],
+      LOD:[ mk('311212','Lekkage dak','LOD') ],            // korter genoteerd, zelfde werk
+      'SUBSIDIE-TRAJECTEN':[],
+    };
+    // Over ALLE secties: een dubbele taak belandt juist vaak in een andere categorie.
+    const gevonden = zoekDubbels('311212', 'Lekkage dak repareren', ntd);
+    eq('dubbelcheck: dezelfde taak wordt gevonden, ook in een andere categorie, en alleen bij DEZE VvE',
+       [gevonden.length, gevonden[0].r.actiepunt, gevonden.every(t=>t.r.code==='311212')],
+       [2, 'Lekkage dak repareren', true]);
+    truthy('dubbelcheck: de sterkste treffer staat vooraan',
+           gevonden[0].score >= gevonden[gevonden.length-1].score);
+    // Dit is de kant van de voorzichtigheid: 'Jaarrekening 2026 controleren' en 'Jaarrekening
+    // opstellen' delen alleen hun onderwerp, en dat is te weinig om iemand mee lastig te vallen.
+    eq('dubbelcheck: werk dat alleen zijn onderwerp deelt geeft geen waarschuwing',
+       zoekDubbels('311212', 'Jaarrekening 2026 controleren', ntd).map(t=>t.r.actiepunt), []);
+    eq('dubbelcheck: zonder VvE-code of zonder omschrijving zwijgt hij',
+       [zoekDubbels('', 'Lekkage dak', ntd).length, zoekDubbels('311212','',ntd).length], [0, 0]);
+    // De taak zelf mag zichzelf niet als dubbel aanmerken.
+    eq('dubbelcheck: een uitgesloten rij telt niet mee',
+       zoekDubbels('311212','Lekkage dak repareren', ntd, ntd.OPPAKKEN[0]).length, 1);
+    // De vraag LAAT ZIEN waar de twijfel over gaat. Een waarschuwing zonder het gevonden werk
+    // erbij is niet te beoordelen en wordt weggeklikt.
+    const vraagTekst = dubbelVraagTekst(gevonden);
+    truthy('dubbelcheck: de vraag noemt de gevonden taken bij naam, met hun categorie',
+           vraagTekst.includes('Lekkage dak repareren') && vraagTekst.includes('LOD'));
+
+    // ── En de vraag in het echte scherm ──
+    const bevBg = document.getElementById('bevestig-bg');
+    const ntdOud = D.ntd, afOud = D.af, secOud = state.activeNtd, modeOud = state.editMode;
+    const uitCacheOud = state._uitCache, alertOud = window.alert, fetchOud = window.fetch;
+    const tokenOud = state.oauthToken, expOud = state.oauthExpiry, idsOud = state._sheetIds;
+    const infoOud = D.ntdSecInfo;
+    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    let vragen = [];
+    const hooguit = p => Promise.race([p, new Promise(r=>setTimeout(r,400))]);
+    const vraagEnAntwoord = async (start, ja) => {
+      const klaar = start();
+      if(bevBg.classList.contains('open')){
+        vragen.push(document.getElementById('bevestig-tekst').textContent);
+        document.getElementById(ja?'bevestig-ja':'bevestig-nee').click();
+      }
+      await hooguit(klaar);
+    };
+    try {
+      window.alert = ()=>{};
+      // GEEN `state._uitCache = true` hier: `blokkeerOffline()` staat als ALLEREERSTE regel in
+      // `submitTask`, dus met de offline-rem aan komt de vraag nooit in beeld en zou dit blok
+      // stilte meten. (Bij het losse wegleggen staat die rem juist ná de vraag; vandaar dat het
+      // dáár wél zo kan.) In plaats daarvan een nagebootst tabblad, zodat een 'ja' ook echt tot
+      // een taak leidt en dat te toetsen is.
+      state._uitCache = false;
+      state.oauthToken = 'stub'; state.oauthExpiry = Date.now()+3600e3;
+      state._sheetIds = { 'Nog Te Doen':0, 'Afgerond':1, 'Logboek':2 };
+      window.fetch = async(url, opt)=>{
+        const u=decodeURIComponent(String(url)), methode=(opt&&opt.method)||'GET';
+        if(u.includes('values:batchGet'))
+          return new Response(JSON.stringify({error:{message:'geen leesronde in deze test'}}),{status:403});
+        if(methode==='GET') return new Response(JSON.stringify({values:[]}),{status:200});
+        return new Response('{}',{status:200});
+      };
+      state.activeNtd = 'OPPAKKEN'; state.editMode = false;
+      D.af = { ...leeg };
+      D.ntd = { ...leeg, OPPAKKEN:[ mk('311212','Lekkage dak repareren') ] };
+      D.ntdSecInfo = { OPPAKKEN:{ colHeaderRow:2 } };
+
+      // 1. Een gelijkende taak: er komt een vraag, en 'nee' maakt niets aan.
+      openModal(false, null, { sec:'OPPAKKEN' });
+      document.getElementById('m-code').value = '311212';
+      document.getElementById('m-actie').value = 'Lekkage dak reparatie';
+      vragen = [];
+      await vraagEnAntwoord(()=>submitTask(), false);
+      eq('dubbelcheck: een gelijkende nieuwe taak levert één vraag op, en "nee" maakt niets aan',
+         [vragen.length, D.ntd.OPPAKKEN.length], [1, 1]);
+      // 'Nee' mag de ingevulde tekst niet kosten: de vraag staat vóór élke mutatie, dus het
+      // venster hoort er nog te staan mét wat je net typte.
+      eq('dubbelcheck: … en het scherm staat er nog, met de ingetypte tekst',
+         [document.getElementById('modal-bg').classList.contains('open'),
+          document.getElementById('m-actie').value],
+         [true, 'Lekkage dak reparatie']);
+
+      // 1b. En met 'ja' wordt de taak alsnog aangemaakt — het is een vraag, geen blokkade.
+      vragen = [];
+      await vraagEnAntwoord(()=>submitTask(), true);
+      await state._writeChain;
+      eq('dubbelcheck: met "toch aanmaken" komt de taak er gewoon',
+         [vragen.length, D.ntd.OPPAKKEN.length], [1, 2]);
+      // Terug naar één taak voor de vervolgtoetsen.
+      D.ntd = { ...leeg, OPPAKKEN:[ mk('311212','Lekkage dak repareren') ] };
+      openModal(false, null, { sec:'OPPAKKEN' });
+      document.getElementById('m-code').value = '311212';
+
+      // 2. Werk dat er niets mee te maken heeft: géén vraag.
+      document.getElementById('m-actie').value = 'Jaarrekening 2025 controleren';
+      vragen = [];
+      await vraagEnAntwoord(()=>submitTask(), false);
+      eq('dubbelcheck: ander werk bij dezelfde VvE levert geen vraag op', vragen.length, 0);
+
+      // 3. Bewerken vraagt nooit. Een bestaande taak lijkt per definitie op zichzelf, en een vraag
+      //    bij élke keer opslaan zou de waarschuwing waardeloos maken.
+      state.editMode = true;
+      state.editRowData = D.ntd.OPPAKKEN[0];
+      state.editSec = 'OPPAKKEN';
+      document.getElementById('m-code').value = '311212';
+      document.getElementById('m-actie').value = 'Lekkage dak repareren';
+      vragen = [];
+      await vraagEnAntwoord(()=>submitTask(), false);
+      eq('dubbelcheck: bij BEWERKEN wordt er niets gevraagd', vragen.length, 0);
+
+      // 4. Een SUBTAAK bij een bestaande bundel vraagt ook niets. Die hoort per definitie bij een
+      //    taak die er al staat — dat is precies wat de gebruiker aanwees — en lijkt er dus vaak
+      //    sterk op. Een waarschuwing die je élke keer wegklikt is erger dan geen waarschuwing.
+      //    Dit is meteen de reden dat de bestaande subtaak-toets in dit bestand niet vastloopt op
+      //    een vraag die nooit beantwoord wordt.
+      state.editMode = false; state.editRowData = null; state.editSec = null;
+      state._nieuwBundel = { bundelId:'Tkop', volg:'10' };
+      openModal(false, null, { sec:'OPPAKKEN' });
+      document.getElementById('m-code').value = '311212';
+      document.getElementById('m-actie').value = 'Lekkage dak repareren';
+      vragen = [];
+      await vraagEnAntwoord(()=>submitTask(), false);
+      eq('dubbelcheck: een subtaak bij een bestaande bundel wordt niet als dubbel aangemerkt',
+         vragen.length, 0);
+      state._nieuwBundel = null;
+    } finally {
+      if(bevBg.classList.contains('open')) document.getElementById('bevestig-nee').click();
+      closeModal(); clearModal();
+      window.alert = alertOud; state._uitCache = uitCacheOud; window.fetch = fetchOud;
+      state.oauthToken = tokenOud; state.oauthExpiry = expOud; state._sheetIds = idsOud;
+      D.ntd = ntdOud; D.af = afOud; D.ntdSecInfo = infoOud;
+      state.activeNtd = secOud; state.editMode = modeOud;
+      state.editRowData = null; state.editSec = null; state._nieuwBundel = null;
+    }
+  })();
+
+
+  // ══════════════════════════════════════
+  //  VOORSTEL 6 — dezelfde taak voor meerdere VvE's (v10.27)
+  // ══════════════════════════════════════
+  await (async()=>{
+    console.log('%c[TESTS] Meerdere VvE\'s', 'background:#6D5BD0;color:white;padding:2px 6px;border-radius:3px');
+    // ── De lijst zelf ──
+    wisExtraVves();
+    eq('meer-vve: dezelfde VvE twee keer kiezen levert niet twee taken op',
+       [voegExtraVveToe('311200','Flat A','311212'), voegExtraVveToe('311200','Flat A','311212'), extraVves().length],
+       [true, false, 1]);
+    // De VvE die al bovenaan het scherm staat mag er niet nóg een keer bij: dat zou twee identieke
+    // taken voor dezelfde VvE opleveren — precies het dubbele werk dat de dubbelcheck tegenhoudt.
+    eq('meer-vve: de VvE die al gekozen is kan er niet nog een keer bij',
+       [voegExtraVveToe('311212','Testflat','311212'), extraVves().length], [false, 1]);
+    eq('meer-vve: een lege code doet niets', [voegExtraVveToe('','','311212'), extraVves().length], [false, 1]);
+    voegExtraVveToe('311201','Flat B','311212');
+    // Het uitlegregeltje telt de HOOFD-VvE mee. 'Er staan twee merkjes' is niet hetzelfde als
+    // 'ik maak straks drie taken aan', en juist dat verschil verrast.
+    truthy('meer-vve: de uitleg telt de hoofd-VvE mee (2 merkjes → 3 taken)',
+           extraVvesUitleg(extraVves().length).includes('3 keer'));
+    eq('meer-vve: een merkje is weg te halen',
+       [verwijderExtraVve('311200'), extraVves().map(v=>v.code)], [true, ['311201']]);
+    eq('meer-vve: iets weghalen dat er niet staat verandert niets',
+       [verwijderExtraVve('999999'), extraVves().length], [false, 1]);
+    truthy('meer-vve: elk merkje heeft een eigen weghaal-knop met zijn code erin',
+           extraVvesHtml(extraVves()).includes('data-action="extra-vve-weg"')
+           && extraVvesHtml(extraVves()).includes('data-code="311201"'));
+    eq('meer-vve: zonder keuzes is er niets te tekenen en niets uit te leggen',
+       [extraVvesHtml([]), extraVvesUitleg(0)], ['', '']);
+    wisExtraVves();
+
+    // ── Het blok hoort alleen bij een NIEUWE, losse taak te staan ──
+    const blok = document.getElementById('meervve-blok');
+    const bundelOud = state._nieuwBundel;
+    toonMeerVve(true);
+    eq('meer-vve: bij bewerken staat het blok er niet', blok.style.display, 'none');
+    state._nieuwBundel = { bundelId:'Tkop', volg:'10' };
+    toonMeerVve(false);
+    // Twaalf subtaken van twaalf verschillende VvE's in één bundel is geen bundel meer.
+    eq('meer-vve: bij een subtaak staat het blok er ook niet', blok.style.display, 'none');
+    state._nieuwBundel = bundelOud;
+    toonMeerVve(false);
+    eq('meer-vve: bij een gewone nieuwe taak staat het er wel', blok.style.display, '');
+
+    // ── En het aanmaken zelf ──
+    const fetchOud = window.fetch, tokenOud = state.oauthToken, expOud = state.oauthExpiry;
+    const ntdOud = D.ntd, afOud = D.af, idsOud = state._sheetIds, secOud = state.activeNtd;
+    const infoOud = D.ntdSecInfo, alertOud = window.alert, uitCacheOud = state._uitCache;
+    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    let posts = [];
+    try {
+      window.alert = ()=>{};
+      state.oauthToken='stub'; state.oauthExpiry=Date.now()+3600e3;
+      state._sheetIds={ 'Nog Te Doen':0, 'Afgerond':1, 'Logboek':2 };
+      state._uitCache=false;
+      state.activeNtd='OPPAKKEN'; state.editMode=false;
+      D.af={ ...leeg }; D.ntd={ ...leeg };
+      // Zonder sectie-info weet `getInsertRow` niet waar de rij heen moet en gooit hij bewust een
+      // harde fout — dan zou dit blok stilte meten in plaats van drie taken.
+      D.ntdSecInfo={ OPPAKKEN:{ colHeaderRow:2 } };
+      window.fetch = async(url, opt)=>{
+        const u=decodeURIComponent(String(url)), methode=(opt&&opt.method)||'GET';
+        if(u.includes('values:batchGet'))
+          return new Response(JSON.stringify({error:{message:'geen leesronde in deze test'}}),{status:403});
+        if(methode==='GET') return new Response(JSON.stringify({values:[]}),{status:200});
+        posts.push({ url:u, methode, body:(opt&&opt.body)?JSON.parse(opt.body):null });
+        return new Response('{}',{status:200});
+      };
+      openModal(false, null, { sec:'OPPAKKEN' });
+      document.getElementById('m-code').value='311212';
+      document.getElementById('m-naam').value='Testflat';
+      document.getElementById('m-actie').value='Subsidieronde 2026 klaarzetten';
+      voegExtraVveToe('311200','Flat A','311212');
+      voegExtraVveToe('311201','Flat B','311212');
+      renderExtraVves();
+      posts=[];
+      await submitTask();
+      await state._writeChain;
+      const gemaakt = D.ntd.OPPAKKEN;
+      eq('meer-vve: er komen drie losse taken, één per VvE, met dezelfde omschrijving',
+         [gemaakt.length, gemaakt.map(r=>r.code), new Set(gemaakt.map(r=>r.actiepunt)).size],
+         [3, ['311212','311200','311201'], 1]);
+      // Ieder een EIGEN taaknummer: daar hangt de schrijf-bescherming en de bundelkoppeling aan.
+      // Zouden ze er één delen, dan wijst elke rij-controle straks naar de verkeerde rij.
+      eq('meer-vve: elke taak krijgt een eigen taaknummer en géén bundel',
+         [new Set(gemaakt.map(r=>r.taakId)).size, gemaakt.every(r=>!r.bundelId)], [3, true]);
+      // Drie rijen betekent drie invoegingen in de Sheet, ieder op een eigen rijnummer.
+      const invoegingen = posts.filter(p=>p.body && p.body.requests
+        && p.body.requests.some(q=>q.insertDimension)).length;
+      eq('meer-vve: … en ook drie rij-invoegingen in de Sheet, op oplopende rijnummers',
+         [invoegingen, new Set(gemaakt.map(r=>r._row)).size], [3, 3]);
+      // De lijst wordt bij het volgende scherm niet meegedragen: één klik op Toevoegen zou er
+      // anders nog eens twaalf bij maken.
+      eq('meer-vve: na het aanmaken is de lijst leeg', extraVves().length, 0);
+    } finally {
+      window.fetch=fetchOud; window.alert=alertOud;
+      state.oauthToken=tokenOud; state.oauthExpiry=expOud; state._sheetIds=idsOud;
+      D.ntd=ntdOud; D.af=afOud; D.ntdSecInfo=infoOud; state.activeNtd=secOud;
+      state._uitCache=uitCacheOud; state.editMode=false; state.editRowData=null; state.editSec=null;
+      wisExtraVves(); closeModal(); clearModal();
+    }
+  })();
+
+
+  // ══════════════════════════════════════
+  //  VOORSTEL 7 — een taak naar een andere categorie verplaatsen (v10.27)
+  // ══════════════════════════════════════
+  await (async()=>{
+    console.log('%c[TESTS] Verplaatsen', 'background:#B91C1C;color:white;padding:2px 6px;border-radius:3px');
+    const lod = { _sec:'LOD', _row:40, code:'311212', naam:'Testflat', actiepunt:'Gemeentebrief beantwoorden',
+                  status:'Wacht op gemeente', behandelaar:'Jer', deadline:'01-09-2026',
+                  opmerkingen:'Brief van 3 juli', inBehandeling:'TRUE', subcategorie:'Onderhoud',
+                  opvolgdatum:'15-08-2026', herhaalId:'H-9', taakId:'T-VAST-1', bundelId:'B-7', bundelVolg:'20' };
+
+    // ── Wat gaat er mee, en wat niet ──
+    // De identiteit is het hele punt: taaknummer (Q), bundel (R en S) en de logboek-geschiedenis
+    // hangen daaraan. Zou dat niet meeverhuizen, dan is 'verplaatsen' hetzelfde als weggooien en
+    // opnieuw intypen — precies wat dit moest vervangen.
+    const naarOpp = verplaatsWaarden(lod, 'LOD', 'OPPAKKEN', 5);
+    eq('verplaatsen: taaknummer en bundel verhuizen mee (kolom Q, R en S)',
+       [naarOpp.rij[16], naarOpp.rij[17], naarOpp.rij[18]], ['T-VAST-1', 'B-7', '20']);
+    eq('verplaatsen: opvolgdatum en herhaalregel gaan ook mee (kolom L en M)',
+       [naarOpp.rij[11], naarOpp.rij[12]], ['15-08-2026', 'H-9']);
+    // De velden staan in de DOELcategorie op hun eigen plek: Oppakken heeft de deadline op D en de
+    // prioriteit op F, LOD heeft daar heel andere dingen staan. Op positie kopiëren zou een
+    // deadline in het statusveld zetten.
+    eq('verplaatsen: elk veld belandt op de plek die de nieuwe categorie ervoor heeft',
+       [naarOpp.rij[0], naarOpp.rij[2], naarOpp.rij[3], naarOpp.rij[4], naarOpp.rij[6], naarOpp.rij[7], naarOpp.rij[10]],
+       ['311212', 'Gemeentebrief beantwoorden', '01-09-2026', 'Jer', 'Brief van 3 juli', 'TRUE', 'Onderhoud']);
+    // De prioriteit wordt OPNIEUW berekend: de drempels verschillen per categorie, dus een
+    // meegenomen waarde zou meteen onwaar zijn.
+    eq('verplaatsen: de prioriteit wordt opnieuw berekend voor de nieuwe categorie',
+       naarOpp.rij[5], berekenPrioriteit('01-09-2026', 'OPPAKKEN').prioriteit);
+    // 'Status' bestaat niet in Oppakken en vervalt dus — maar niet stil.
+    eq('verplaatsen: velden die de nieuwe categorie niet kent worden benoemd, niet stil gewist',
+       verlorenVelden(lod, 'LOD', 'OPPAKKEN').map(v => [v.label, v.waarde]),
+       [['Status', 'Wacht op gemeente']]);
+    truthy('verplaatsen: en de vraag toont ze met naam en waarde',
+           verplaatsVraagTekst(lod, 'LOD', 'OPPAKKEN').includes('Status: Wacht op gemeente'));
+    // Een leeg veld verliezen is geen verlies en hoort de vraag niet langer te maken.
+    eq('verplaatsen: een leeg veld staat niet in de lijst',
+       verlorenVelden({ ...lod, status:'' }, 'LOD', 'OPPAKKEN').length, 0);
+
+    // De omschrijving heet in elke categorie anders. Van Oppakken (actiepunt) naar
+    // Vergaderverzoeken (agendapunten) mag de tekst niet onderweg verdampen.
+    const opp = { _sec:'OPPAKKEN', _row:9, code:'311212', naam:'Testflat', actiepunt:'Dakgoot vervangen',
+                  deadline:'', behandelaar:'', prioriteit:'', opmerkingen:'', inBehandeling:'',
+                  subcategorie:'', opvolgdatum:'', taakId:'T-VAST-2', bundelId:'', bundelVolg:'' };
+    const naarVerg = verplaatsWaarden(opp, 'OPPAKKEN', 'VERGADERVERZOEKEN', 20);
+    eq('verplaatsen: de omschrijving verhuist naar het veld dat de nieuwe categorie ervoor heeft',
+       naarVerg.rij[3], 'Dakgoot vervangen');
+    // En naar een categorie die de tekst in de opmerkingen bewaart (offertes) ook.
+    eq('verplaatsen: … ook als dat veld in de nieuwe categorie "Opmerkingen" heet',
+       verplaatsWaarden(opp, 'OPPAKKEN', 'OFFERTE-TRAJECTEN', 30).rij[6], 'Dakgoot vervangen');
+    // Delen bron en doel hetzelfde veld, dan komt de tekst er één keer in te staan.
+    eq('verplaatsen: bij een gedeeld veld komt de tekst er niet dubbel in',
+       verplaatsWaarden(opp, 'OPPAKKEN', 'LOD', 40).rij[2], 'Dakgoot vervangen');
+
+    // ── En de echte verplaatsing ──
+    const fetchOud = window.fetch, tokenOud = state.oauthToken, expOud = state.oauthExpiry;
+    const ntdOud = D.ntd, afOud = D.af, idsOud = state._sheetIds, infoOud = D.ntdSecInfo;
+    const alertOud = window.alert, uitCacheOud = state._uitCache;
+    const bevBg = document.getElementById('bevestig-bg');
+    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    let posts = [], vragen = [];
+    const hooguit = p => Promise.race([p, new Promise(r=>setTimeout(r,400))]);
+    const vraagEnAntwoord = async (start, ja) => {
+      const klaar = start();
+      if(bevBg.classList.contains('open')){
+        vragen.push(document.getElementById('bevestig-tekst').textContent);
+        document.getElementById(ja?'bevestig-ja':'bevestig-nee').click();
+      }
+      return hooguit(klaar).then(()=>klaar);
+    };
+    try {
+      window.alert = ()=>{};
+      state.oauthToken='stub'; state.oauthExpiry=Date.now()+3600e3;
+      state._sheetIds={ 'Nog Te Doen':0, 'Afgerond':1, 'Logboek':2 };
+      state._uitCache=false;
+      const taak = { ...lod, _row:40 };
+      D.af={ ...leeg }; D.ntd={ ...leeg, LOD:[taak] };
+      // Twee sectieblokken: het LOD-blok waar de taak staat en het Oppakken-blok waar hij heen moet.
+      D.ntdSecInfo={ OPPAKKEN:{ colHeaderRow:2 }, LOD:{ colHeaderRow:38 } };
+      window.fetch = async(url, opt)=>{
+        const u=decodeURIComponent(String(url)), methode=(opt&&opt.method)||'GET';
+        if(u.includes('values:batchGet'))
+          return new Response(JSON.stringify({error:{message:'geen leesronde in deze test'}}),{status:403});
+        if(methode==='GET'){
+          const m=/!A(\d+):S(\d+)/.exec(u)||[];
+          const rijen=[]; for(let rw=+m[1]; rw<=+m[2]; rw++)
+            rijen.push(rw===40 ? _rijNaarCellen('Nog Te Doen', taak).map(v=>String(v ?? '')) : []);
+          return new Response(JSON.stringify({values:rijen}),{status:200});
+        }
+        posts.push({ url:u, methode, body:(opt&&opt.body)?JSON.parse(opt.body):null });
+        return new Response('{}',{status:200});
+      };
+
+      // 'Nee' laat alles staan.
+      vragen=[]; posts=[];
+      await vraagEnAntwoord(()=>verplaatsTaak(taak, 'OPPAKKEN'), false);
+      eq('verplaatsen: "nee" verandert niets',
+         [vragen.length, D.ntd.LOD.length, D.ntd.OPPAKKEN.length, posts.length], [1, 1, 0, 0]);
+
+      // 'Ja' verhuist hem echt.
+      vragen=[]; posts=[];
+      await vraagEnAntwoord(()=>verplaatsTaak(taak, 'OPPAKKEN'), true);
+      await state._writeChain;
+      eq('verplaatsen: "ja" haalt hem uit de oude categorie en zet hem in de nieuwe',
+         [D.ntd.LOD.length, D.ntd.OPPAKKEN.length, D.ntd.OPPAKKEN[0] && D.ntd.OPPAKKEN[0].taakId],
+         [0, 1, 'T-VAST-1']);
+      // Eén batchUpdate met drie stappen: invoegen, vullen, verwijderen. Alles-of-niets — er mag
+      // geen moment bestaan waarop de taak twee keer of nul keer in het blad staat.
+      const batch = posts.find(p=>p.body && p.body.requests);
+      const soorten = batch ? batch.body.requests.map(q=>Object.keys(q)[0]) : [];
+      eq('verplaatsen: het gebeurt in één alles-of-niets-opdracht',
+         soorten, ['insertDimension','updateCells','deleteDimension']);
+      // De verwijderindex houdt rekening met de rij die er net is bijgekomen. Zonder die correctie
+      // verdwijnt de BUURRIJ in plaats van de verhuisde taak — de duurste denkfout in dit bestand.
+      // De taak stond op rij 40, de invoegplek is rij 3 (kop 2 + 1), dus de oude rij schuift op
+      // naar 41 → 0-gebaseerde index 40.
+      eq('verplaatsen: de oude rij wordt verwijderd ná de verschuiving door de invoeging',
+         batch.body.requests[2].deleteDimension.range.startIndex, 40);
+      // Het logboek houdt vast wat er verviel — de enige plek waar dat later nog te lezen is.
+      const logRegels = posts.filter(p=>p.methode==='POST' && /Logboek/.test(p.url))
+        .flatMap(p=>((p.body&&p.body.values)||[]));
+      eq('verplaatsen: het logboek noteert de verhuizing én wat erbij verviel',
+         logRegels.map(r=>[r[3], r[4]]),
+         [['Verplaatst','categorie'], ['Vervallen bij verplaatsen','Status']]);
+      // Naar dezelfde categorie verplaatsen is geen handeling.
+      vragen=[]; posts=[];
+      await vraagEnAntwoord(()=>verplaatsTaak(D.ntd.OPPAKKEN[0], 'OPPAKKEN'), true);
+      eq('verplaatsen: naar dezelfde categorie gebeurt er niets', [vragen.length, posts.length], [0, 0]);
+    } finally {
+      if(bevBg.classList.contains('open')) document.getElementById('bevestig-nee').click();
+      window.fetch=fetchOud; window.alert=alertOud;
+      state.oauthToken=tokenOud; state.oauthExpiry=expOud; state._sheetIds=idsOud;
+      D.ntd=ntdOud; D.af=afOud; D.ntdSecInfo=infoOud; state._uitCache=uitCacheOud;
+    }
   })();
 
   state._zelftestLoopt = false;   // de poll mag weer; de suite is klaar

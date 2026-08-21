@@ -18,6 +18,7 @@ exclude:
   - .superpowers
   - apps-script
   - apps-script-backup
+  - apps-script-klaarstaand
   - README.md
   - BRAND-GUIDELINES.md
   - beheer-playbook.md

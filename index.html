@@ -180,6 +180,13 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
               <input type="text" id="s-af" placeholder="Zoek…" aria-label="Zoek in afgeronde taken"/>
             </div>
+            <select class="filter-select" id="f-beh-af" aria-label="Filter op behandelaar"><option value="">Alle behandelaars</option></select>
+            <select class="filter-select" id="f-per-af" aria-label="Filter op periode"></select>
+            <span class="af-eigen" id="af-eigen" hidden>
+              <input type="date" class="filter-datum" id="f-van-af" aria-label="Afgerond vanaf"/>
+              <span class="af-tot">t/m</span>
+              <input type="date" class="filter-datum" id="f-tot-af" aria-label="Afgerond tot en met"/>
+            </span>
           </div>
         </div>
         <div class="tabs" id="af-tabs" role="tablist" aria-label="Categorie"></div>
@@ -495,6 +502,17 @@
           <input type="text" id="m-naam" placeholder="Automatisch ingevuld" readonly style="opacity:.7"/>
         </div>
       </div>
+      <!-- Dezelfde taak voor meerdere VvE's. Alleen bij een NIEUWE taak; crud.js zet dit blok
+           weg bij bewerken en bij een subtaak. -->
+      <div class="fld" id="meervve-blok">
+        <label>Ook voor andere VvE's</label>
+        <div class="vve-wrap">
+          <input type="text" id="m-extra-vve" placeholder="Typ code of naam om erbij te zetten…" autocomplete="off"/>
+          <div class="vve-suggestions" id="m-extra-sug"></div>
+        </div>
+        <div class="mv-chips" id="m-extra-chips"></div>
+        <small class="dl-hint" id="m-extra-uitleg"></small>
+      </div>
 
       <!-- Categorie — alleen bij TOEVOEGEN (openModal verbergt hem bij bewerken).
            Een subtaak is een volwaardige taak in zijn eigen categorie (§2 van het ontwerp), dus
@@ -502,15 +520,16 @@
            gebruiker hem. De opties worden gevuld met de secties die hieronder ook echt een veldblok
            hebben — zie zetSectieKiezer in src/crud.js. -->
       <div class="fld" id="fld-sectie" style="display:none">
-        <label for="m-sec">Categorie</label>
+        <label for="m-sec"><span id="m-sec-label">Categorie</span></label>
         <select id="m-sec"></select>
+        <small class="dl-hint" id="m-sec-hint"></small>
       </div>
 
       <!-- OPPAKKEN -->
       <div id="fg-opp">
         <div class="fld"><label>Actiepunt *</label><textarea id="m-actie"></textarea></div>
         <div class="fld-row">
-          <div class="fld"><label>Deadline</label><input type="date" id="m-dl"/></div>
+          <div class="fld"><label>Deadline</label><input type="date" id="m-dl"/><small class="dl-hint" id="dl-hint"></small></div>
           <div class="fld"><label>Behandelaar</label>
             <select id="m-beh"><option value="">Selecteer…</option><option>Jer</option><option>Cihad</option><option>Gabos</option><option>Cihad, Jer</option><option>Jer, Gabos</option><option>Cihad, Gabos</option></select>
           </div>
@@ -532,7 +551,7 @@
         </div>
         <div class="fld"><label>Agendapunten</label><textarea id="m-agenda"></textarea></div>
         <div class="fld-row">
-          <div class="fld"><label>Deadline uitschrijven</label><input type="date" id="m-dl-v"/></div>
+          <div class="fld"><label>Deadline uitschrijven</label><input type="date" id="m-dl-v"/><small class="dl-hint" id="dl-hint-v"></small></div>
           <div class="fld"><label>Opmerkingen</label><input type="text" id="m-opm-v"/></div>
         </div>
         <div class="fld"><label>Subcategorie</label><select id="m-sub-verg"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option><option>Subsidie-trajecten</option></select></div>
@@ -566,7 +585,7 @@
               </div>
             </div>
           </div>
-          <div class="fld"><label>Deadline</label><input type="date" id="m-dl-o"/></div>
+          <div class="fld"><label>Deadline</label><input type="date" id="m-dl-o"/><small class="dl-hint" id="dl-hint-o"></small></div>
         </div>
         <div class="fld"><label>Opmerkingen</label><textarea id="m-opm-o"></textarea></div>
         <div class="fld"><label>Subcategorie</label><select id="m-sub-off"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option><option>Subsidie-trajecten</option></select></div>
@@ -582,7 +601,7 @@
           </div>
         </div>
         <div class="fld-row">
-          <div class="fld"><label>Deadline LOD</label><input type="date" id="m-dl-l"/></div>
+          <div class="fld"><label>Deadline LOD</label><input type="date" id="m-dl-l"/><small class="dl-hint" id="dl-hint-l"></small></div>
           <div class="fld"><label>Opmerkingen</label><input type="text" id="m-opm-l"/></div>
         </div>
         <div class="fld"><label>Subcategorie</label><select id="m-sub-lod"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option><option>Subsidie-trajecten</option></select></div>
@@ -596,7 +615,7 @@
           <div id="m-fase"></div>
         </div>
         <div class="fld-row">
-          <div class="fld"><label>Deadline</label><input type="date" id="m-dl-s"/></div>
+          <div class="fld"><label>Deadline</label><input type="date" id="m-dl-s"/><small class="dl-hint" id="dl-hint-s"></small></div>
           <div class="fld"><label>Behandelaar</label>
             <select id="m-beh-s"><option value="">Selecteer…</option><option>Jer</option><option>Cihad</option><option>Gabos</option><option>Cihad, Jer</option><option>Jer, Gabos</option><option>Cihad, Gabos</option></select>
           </div>

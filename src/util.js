@@ -81,6 +81,52 @@ const PRIO_REGELS = {
 const STIL_DREMPEL_DAGEN = 4;
 
 // ══════════════════════════════════════
+//  VOORGESTELDE DEADLINE BIJ EEN NIEUWE TAAK
+// ══════════════════════════════════════
+// LET OP — BRON: beheer-playbook.md, §3 'Deadline bepalen'. Die getallen staan daar en niet hier;
+// dit is de vertaling ervan naar code. Wie ze wil wijzigen, wijzigt eerst het playbook.
+//
+// WAAROM DIT ER IS. Een taak zonder deadline is voor het hele dashboard onzichtbaar werk: hij
+// krijgt geen prioriteit (berekenPrioriteit geeft '' terug bij een lege deadline), hij wordt nooit
+// 'Te laat', en de deadline-melding uit Apps Script gaat er nooit voor af. Hij zakt stil naar de
+// bodem van de lijst. Een VOORSTEL — niet een verplichting — haalt die stilte weg zonder iemand
+// een datum op te dringen: het veld is gewoon te wissen of te overschrijven.
+//
+// TWEE SECTIES KRIJGEN BEWUST GEEN VOORSTEL:
+//   LOD — daar geldt de hersteltermijn uit de brief van de gemeente. Het playbook is er
+//         uitgesproken over: "niet gokken bij officiële termijnen". Een verzonnen datum zou hier
+//         erger zijn dan geen datum, want hij ziet er even betrouwbaar uit als een echte.
+//   SUBSIDIE-TRAJECTEN — het playbook noemt er geen termijn voor, en de looptijd hangt aan de
+//         regeling, niet aan ons. Liever geen getal dan een getal zonder bron.
+// Ze krijgen wél een zinnetje in beeld dat uitlegt wat er dan wél verwacht wordt; zie
+// DEADLINE_HINT. Zwijgen zou als een vergeten veld lezen.
+const DEADLINE_VOORSTEL = {
+  'OPPAKKEN':           7,
+  'VERGADERVERZOEKEN': 14,
+  'OFFERTE-TRAJECTEN': 14,
+  'LOD':               null,
+  'SUBSIDIE-TRAJECTEN':null,
+};
+const DEADLINE_HINT = {
+  'OPPAKKEN':           'Voorstel: over 7 dagen. Aanpassen of leegmaken mag.',
+  'VERGADERVERZOEKEN':  'Voorstel: over 14 dagen. Aanpassen of leegmaken mag.',
+  'OFFERTE-TRAJECTEN':  'Voorstel: over 14 dagen. Aanpassen of leegmaken mag.',
+  'LOD':                'Neem de hersteltermijn uit de brief over — die vullen we niet zelf in.',
+  'SUBSIDIE-TRAJECTEN': 'Geen vaste termijn; vul in wat de regeling voorschrijft.',
+};
+
+// De voorgestelde deadline als ISO-datum (yyyy-mm-dd, de vorm die een <input type="date"> wil),
+// of '' als deze sectie geen voorstel kent. `vandaag` is injecteerbaar zodat dit los te toetsen is
+// zonder van de kalender af te hangen.
+function voorgesteldeDeadline(sec, vandaag){
+  const dagen = DEADLINE_VOORSTEL[sec];
+  if(!Number.isFinite(dagen)) return '';
+  const basis = vandaag || _vandaagAmsterdam();
+  const d = new Date(basis.getFullYear(), basis.getMonth(), basis.getDate() + dagen);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+// ══════════════════════════════════════
 //  FASE 4 — OPVOLGING & HERHALING (zie docs/superpowers/specs/2026-06-11-fase4-opvolging-herhaling-design.md)
 // ══════════════════════════════════════
 // LET OP — SYNC: gelijk houden aan CD_STIL_ESCALATIE_REGELS in apps-script/Opvolging.gs
@@ -91,6 +137,44 @@ const STIL_ESCALATIE_REGELS = {
   'LOD':               { trap1: 30, trap2: 60 },
   'SUBSIDIE-TRAJECTEN': { trap1: 21, trap2: 42 },
 };
+
+// ══════════════════════════════════════
+//  PERIODEFILTER (Afgerond-pagina)
+// ══════════════════════════════════════
+// Voor het maandagoverleg is de vraag steevast dezelfde: wat is er vórige week afgerond? Dat was
+// alleen te beantwoorden door vijf tabbladen door te scrollen en datums met het oog af te lezen.
+//
+// Weken lopen MAANDAG t/m ZONDAG, gelijk aan `isoWeek` hierboven en aan de weekregel op de
+// Nog-Te-Doen-pagina. Twee verschillende weekbegrippen in één dashboard is een bron van
+// verwarring die je pas ontdekt als de cijfers niet kloppen.
+const AF_PERIODES = [
+  ['',          'Alle periodes'],
+  ['dezeweek',  'Deze week'],
+  ['vorigeweek','Vorige week'],
+  ['dezemaand', 'Deze maand'],
+  ['vorigemaand','Vorige maand'],
+  ['eigen',     'Eigen bereik…'],
+];
+
+// {van, tot} als jjjj-mm-dd, BEIDE grenzen meegerekend — of null als er niet op periode gefilterd
+// wordt ('' en 'eigen' regelt de aanroeper zelf). `vandaag` is injecteerbaar, dezelfde afspraak als
+// bij berekenPrioriteit en opvolgStatus: anders hangen de toetsen aan de klok van de machine.
+function periodeBereik(sleutel, vandaag){
+  const nu = vandaag || _vandaagAmsterdam();
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const dag = (d,n) => new Date(d.getFullYear(), d.getMonth(), d.getDate()+n);
+  // getDay(): 0=zondag. Maandag als eerste dag, dus zondag telt als dag 7 van de vórige week.
+  const naarMaandag = d => dag(d, -((d.getDay()+6)%7));
+  switch(sleutel){
+    case 'dezeweek':   { const ma=naarMaandag(nu);            return { van:iso(ma), tot:iso(dag(ma,6)) }; }
+    case 'vorigeweek': { const ma=dag(naarMaandag(nu),-7);    return { van:iso(ma), tot:iso(dag(ma,6)) }; }
+    case 'dezemaand':  { const a=new Date(nu.getFullYear(),nu.getMonth(),1);
+                         return { van:iso(a), tot:iso(new Date(nu.getFullYear(),nu.getMonth()+1,0)) }; }
+    case 'vorigemaand':{ const a=new Date(nu.getFullYear(),nu.getMonth()-1,1);
+                         return { van:iso(a), tot:iso(new Date(nu.getFullYear(),nu.getMonth(),0)) }; }
+    default: return null;
+  }
+}
 
 // Status van de opvolgdatum: weggelegd (toekomst) of opvolgen-vandaag (vandaag/verleden).
 function opvolgStatus(r, vandaag){
@@ -346,9 +430,29 @@ function subBadge(v){return v?`<span class="badge" style="background:var(--sur2)
 // vandaag toont (dunne lijn), terwijl de duotone-set voor 'wegleggen' een wekker heeft en voor
 // 'bewerken' een gevuld potlood. De maten komen uit .act-bw svg / .act-af svg in styles.css.
 // De aanroeper zet er zelf de wikkel omheen (.acts in de tabel, .bdl-acts in het paneel).
-function taakActieKnoppen(rid){
+// `ib` is de huidige waarde van 'In behandeling' ('TRUE' / 'FALSE' / '') als deze plek die knop
+// hoort te tonen, en null/undefined als niet. Standaard NIET: het bundelpaneel heeft er bewust
+// geen ruimte voor (zie de toelichting bij `ibPil` in render-bundel.js) en offerte-trajecten
+// kennen het veld niet eens.
+//
+// De knop komt TUSSEN wegleggen en afronden en niet erachter. Het ✓ staat al maanden pal tegen
+// de rechterrand van de rij; dat is de meest gebruikte knop van de drie en zit in de vingers.
+// Een vierde knop erachter zou hem elke keer een plek opschuiven.
+function taakActieKnoppen(rid, ib){
+  const ibAan = ib === 'TRUE';
+  // Een driehoekje 'afspelen' voor aan en twee streepjes 'pauze' voor uit: het gaat om 'ben ik
+  // hier mee bezig'. Twee verschillende pictogrammen en niet alleen een kleurverschil — kleur
+  // alleen is geen betekenisdrager voor wie hem niet ziet.
+  const ibIcoon = ibAan
+    ? `<svg viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><rect x="6.5" y="4.5" width="4" height="15" rx="1.2"/><rect x="13.5" y="4.5" width="4" height="15" rx="1.2"/></svg>`
+    : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M8 5.4v13.2a.8.8 0 0 0 1.2.7l10-6.6a.8.8 0 0 0 0-1.4l-10-6.6a.8.8 0 0 0-1.2.7z"/></svg>`;
+  const ibKnop = (ib === null || ib === undefined) ? ''
+    : `<button class="act-ib act-ico${ibAan?' aan':''}" data-action="taak-inbehandeling" data-rid="${rid}" `
+      + `aria-pressed="${ibAan}" title="${ibAan?'Niet meer in behandeling':'In behandeling nemen'}" `
+      + `aria-label="${ibAan?'Niet meer in behandeling':'In behandeling nemen'}">${ibIcoon}</button>`;
   return `<button class="act-bw act-ico" data-action="taak-bewerken" data-rid="${rid}" title="Bewerken" aria-label="Bewerken"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>`
        + `<button class="act-bw act-ico" data-action="taak-wegleggen" data-rid="${rid}" title="Wegleggen / opvolgdatum" aria-label="Wegleggen of opvolgdatum"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 13.5"/></svg></button>`
+       + ibKnop
        + `<button class="act-af act-ico" data-action="taak-afronden" data-rid="${rid}" title="Afronden" aria-label="Afronden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 12 4 4 10-10"/></svg></button>`;
 }
 // 'Dagen vooraf zichtbaar' (herhaalregels): bewust 0 toestaan (taak pas op de deadline-dag
@@ -450,6 +554,7 @@ function taakVerwijzing(r, sec){
 export {
   taakTitel, taakVerwijzing, kortDatum,
   displayName, filt, splitBehandelaar, PRIO_REGELS, STIL_DREMPEL_DAGEN, STIL_ESCALATIE_REGELS,
+  DEADLINE_VOORSTEL, DEADLINE_HINT, voorgesteldeDeadline, AF_PERIODES, periodeBereik,
   opvolgStatus, volgendeDeadline, HERHAAL_MAANDEN, _vandaagAmsterdam, isoWeek,
   _verschilInKalenderdagen, berekenPrioriteit, prioBadge, persBadges,
   adjOff, offProg, _MAANDEN, _parseAnyDate, parseDt, toISODate, toDutchDate, leegBijErfenis, nieuwTaakId,

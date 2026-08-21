@@ -655,6 +655,18 @@ function cd_sha256Hex(s) {
   return hex;
 }
 
+// In welke kolom staat de OMSCHRIJVING van een taak, per categorie?
+// LET OP — SYNC: dit is de kolomvertaling van OMSCHRIJVING_VELD in src/crud.js:
+//   OPPAKKEN → m-actie (C) · VERGADERVERZOEKEN → m-agenda (D) · OFFERTE-TRAJECTEN → m-opm-o (G)
+//   LOD → m-actie-l (C) · SUBSIDIE-TRAJECTEN → m-subsidie (C)
+var CD_OMSCHRIJVING_COL = {
+  'OPPAKKEN': 3,
+  'VERGADERVERZOEKEN': 4,
+  'OFFERTE-TRAJECTEN': 7,
+  'LOD': 3,
+  'SUBSIDIE-TRAJECTEN': 3
+};
+
 function cd_createTaskRow(categorie, code, naam, actiepunt, behandelaar, deadline, herhaalId) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(NTD_SHEET); // 'Nog Te Doen'
@@ -682,11 +694,22 @@ function cd_createTaskRow(categorie, code, naam, actiepunt, behandelaar, deadlin
   }
 
   // 3) rij invoegen (erft opmaak/checkbox-validatie van de rij erboven)
-  //    Kolommen: A=code B=naam C=actiepunt E=behandelaar (alle secties).
+  //    Kolommen: A=code B=naam E=behandelaar (alle secties).
   //    Deadline verschilt per sectie: OPPAKKEN→D(4), overige→F(6) — zie
   //    DEADLINE_COL in cd_checkDeadlines.
+  //    De OMSCHRIJVING verschilt óók per sectie, en dat ging hier mis: de tekst ging altijd naar
+  //    kolom C. Dat klopt voor Oppakken en LOD (C = Actiepunt) en voor Subsidie (C = Subsidie),
+  //    maar bij Vergaderverzoeken is C de PERIODE — daar overschreef een mail-intake-taak dus de
+  //    periode met de omschrijving en bleef het agendapunt (D) leeg. Bij Offerte-trajecten is C
+  //    de datum van aanvragen; de omschrijving hoort daar in G (Opmerkingen), precies zoals het
+  //    dashboard zelf doet.
+  //    LET OP — SYNC: gelijk houden aan OMSCHRIJVING_VELD in src/crud.js. Dat is dezelfde afspraak
+  //    over 'waar staat de omschrijving van deze categorie', en twee antwoorden daarop laten de
+  //    backend stil in een ander veld schrijven dan het scherm leest.
   sheet.insertRowBefore(insertRow);
-  sheet.getRange(insertRow, 1, 1, 3).setValues([[cd_safeCell(code), cd_safeCell(naam), cd_safeCell(actiepunt)]]);
+  sheet.getRange(insertRow, 1, 1, 2).setValues([[cd_safeCell(code), cd_safeCell(naam)]]);
+  var omschrijvingCol = CD_OMSCHRIJVING_COL[sectie] || 3;
+  if (actiepunt) sheet.getRange(insertRow, omschrijvingCol).setValue(cd_safeCell(actiepunt));
   sheet.getRange(insertRow, 5).setValue(cd_safeCell(behandelaar)); // E = behandelaar
   const deadlineCol = (sectie === 'OPPAKKEN') ? 4 : 6;      // D voor Oppakken, F voor rest
   if (deadline) sheet.getRange(insertRow, deadlineCol).setValue(cd_safeCell(deadline));

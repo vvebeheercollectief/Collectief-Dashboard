@@ -3,10 +3,10 @@
 //  + re-export van render-offerte / render-alv / render-tabel (publieke interface stabiel).
 //  Batch D / punt 11: offerte/ALV/tabel-render zijn naar eigen modules verplaatst.
 // ══════════════════════════════════════
-import { esc, filt, berekenPrioriteit, parseDt, opvolgStatus, _vandaagAmsterdam, toISODate, isoWeek, vveCodeSpan } from "./util.js";
+import { esc, filt, berekenPrioriteit, parseDt, opvolgStatus, _vandaagAmsterdam, toISODate, isoWeek, vveCodeSpan, splitBehandelaar, periodeBereik, AF_PERIODES } from "./util.js";
 import { SECS, SKEYS, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
-import { bulkWis, renderBulkUi } from "./bulk.js";
+import { bulkWis, renderBulkUi, allesVinkjeHtml, bulkHerstel } from "./bulk.js";
 import { showToast } from "./notifications.js";
 import { renderThead, renderTbody, renderPag, bepaalStil, bouwStilIndex, _zetStilIndex, deadlineCel, rowNtd, rowAf } from "./render-tabel.js";
 import { _verrijkOfferteRij, offerteAannemerPaneel, offerteAannSamenvatting } from "./render-offerte.js";
@@ -283,6 +283,9 @@ function springNaarBundel(bundelId){
 }
 
 function renderNtd(){
+  // Eerst de selectie ontdoen van rij-objecten die na een verversing niet meer bestaan; anders
+  // tekent de tabel lege vinkjes terwijl de balk nog een aantal noemt (zie bulkHerstel).
+  bulkHerstel(D.ntd);
   const q=document.getElementById('s-ntd').value.toLowerCase().trim();
   const fCode=document.getElementById('f-code-ntd').value.toLowerCase().trim();
   const fBeh=document.getElementById('f-beh-ntd').value;
@@ -323,7 +326,11 @@ function renderNtd(){
   // krimpt. De tab-tellers hierboven blijven bewust op de ONgeabsorbeerde lijst staan — een
   // geabsorbeerde subtaak is niet verdwenen, alleen anders getekend, en moet dus meetellen.
   const zichtbaar=absorbeer(sorteerNtd(filterNtd(D.ntd[state.activeNtd]||[],q,fCode,fBeh,fPrio,state.activeNtd,state.ntdStatus),state.ntdSort),state.activeNtd,bw);
-  renderThead('ntd-thead',[...(state.bulkMode?['']:[]),...SECS[state.activeNtd].cols,''],SECS[state.activeNtd].css,
+  // Dezelfde lijst die hieronder over de pagina's verdeeld wordt, ook op state — daar leest
+  // 'alles selecteren' hem. Bewust hier en niet in `renderTbody`: die krijgt alleen de rijen van
+  // ÉÉN pagina, en 'alles' moet juist over de paginagrens heen gaan.
+  state._ntdZichtbaar=zichtbaar;
+  renderThead('ntd-thead',[...(state.bulkMode?[allesVinkjeHtml(zichtbaar)]:[]),...SECS[state.activeNtd].cols,''],SECS[state.activeNtd].css,
     {active:state.ntdSort, keyFor:ntdSorteerKey});
   renderTbody('ntd-tbody',zichtbaar,state.activeNtd,pgs.ntd,false,erIsGefilterd(filters));
   renderPag('ntd-pag',zichtbaar.length,pgs.ntd,'ntd');
@@ -481,22 +488,78 @@ function sorteerNtd(rows,sort){
 // ══════════════════════════════════════
 //  AFGEROND
 // ══════════════════════════════════════
+// De vier filtervelden van de Afgerond-pagina uitgelezen en vertaald naar één plat object.
+// Apart van `filterAf` zodat dat filter PUUR blijft (geen DOM) en los te toetsen is — dezelfde
+// scheiding als tussen `renderNtd` en `filterNtd`.
+function afFilterWaarden(){
+  const el=id=>document.getElementById(id);
+  const per=(el('f-per-af')&&el('f-per-af').value)||'';
+  // 'Eigen bereik' leest de twee datumvelden; de vaste periodes rekent `periodeBereik` uit.
+  const bereik = per==='eigen'
+    ? { van:(el('f-van-af')&&el('f-van-af').value)||'', tot:(el('f-tot-af')&&el('f-tot-af').value)||'' }
+    : periodeBereik(per);
+  return { q:((el('s-af')&&el('s-af').value)||'').toLowerCase().trim(),
+           beh:(el('f-beh-af')&&el('f-beh-af').value)||'',
+           per, bereik };
+}
+
+// Puur: rijen → gefilterde rijen. Geen DOM, geen state.
+//
+// De datumvergelijking gaat over ISO-strings (jjjj-mm-dd) en niet over Date-objecten. Dat mag,
+// omdat die vorm links-naar-rechts vergelijkbaar is, en het scheelt honderden Date-constructies
+// per render. `toISODate` kent de Nederlandse long-date die Google Sheets teruggeeft ("19 aug
+// 2026"); een rij zonder leesbare datum valt buiten élk bereik in plaats van er stil in te vallen.
+//
+// De behandelaar via `splitBehandelaar` en niet met `includes`: het veld kan 'Cihad, Jer' zijn, en
+// een kale `includes('Jer')` zou ook 'Jeroen' raken.
+function filterAf(rows, f){
+  let uit = filt(rows||[], (f&&f.q)||'');
+  if(f&&f.beh) uit = uit.filter(r=>splitBehandelaar(r.behandelaar).includes(f.beh));
+  const b = f && f.bereik;
+  if(b && (b.van || b.tot)){
+    uit = uit.filter(r=>{
+      const d = toISODate(r.datum||'');
+      if(!d) return false;                 // geen leesbare afronddatum → niet in een periode
+      if(b.van && d < b.van) return false;
+      if(b.tot && d > b.tot) return false;
+      return true;
+    });
+  }
+  return uit;
+}
+
 function renderAf(){
-  const q=document.getElementById('s-af').value.toLowerCase().trim();
+  // De keuzelijst met periodes uit één bron (AF_PERIODES in util.js) i.p.v. handgeschreven
+  // <option>'s in index.html: de rekenregel en het label horen bij elkaar te blijven. Alleen de
+  // eerste keer vullen — anders zou de keuze van de gebruiker bij elke render terugspringen.
+  const perEl=document.getElementById('f-per-af');
+  if(perEl && !perEl.options.length)
+    perEl.innerHTML=AF_PERIODES.map(([v,l])=>`<option value="${v}">${esc(l)}</option>`).join('');
+  const f=afFilterWaarden();
+  // De twee datumvelden alleen tonen bij 'Eigen bereik'. `hidden` en geen inline display: de
+  // stylesheet regelt het, en `#af-eigen[hidden]` houdt het standaardgedrag overeind.
+  const eigen=document.getElementById('af-eigen');
+  if(eigen) eigen.hidden = f.per!=='eigen';
   document.getElementById('af-tabs').innerHTML=SKEYS.map(s=>{
-    const rows=filt(D.af[s]||[],q);
+    const rows=filterAf(D.af[s]||[],f);
     return`<button type="button" class="tab ${s===state.activeAf?'on':''}" role="tab" aria-selected="${s===state.activeAf}" style="${s===state.activeAf?SECS[s].css:''}" data-action="af-sectie" data-sec="${s}">${SECS[s].label}<span class="cnt">${rows.length}</span></button>`;
   }).join('');
-  const cols=['VvE Code','VvE','Taak','Subcategorie','Afgerond op','Opmerking'];  // 'Categorie' stond boven de taakomschrijving
+  // 'Behandelaar' als kolom erbij: je kunt nu op iemand filteren, en dan hoort in de lijst te
+  // staan op wie. Zonder die kolom is een filter dat rijen weghaalt niet te controleren.
+  const cols=['VvE Code','VvE','Taak','Subcategorie','Behandelaar','Afgerond op','Opmerking'];
   renderThead('af-thead',cols,SECS[state.activeAf].css);
-  const rows=filt(D.af[state.activeAf]||[],q);
-  renderTbody('af-tbody',rows,state.activeAf,pgs.af,true,!!q);
+  const rows=filterAf(D.af[state.activeAf]||[],f);
+  // De lege-lijst-tekst moet weten dát er gefilterd is, anders leest 'niets gevonden' als 'er is
+  // niets afgerond'. Alle vier de filters tellen mee, niet alleen de zoekterm.
+  const gefilterd = !!(f.q || f.beh || (f.bereik && (f.bereik.van || f.bereik.tot)));
+  renderTbody('af-tbody',rows,state.activeAf,pgs.af,true,gefilterd);
   renderPag('af-pag',rows.length,pgs.af,'af');
 }
 function setAf(s){state.activeAf=s;pgs.af=1;renderAf()}
 
 export {
   renderNtdStats, renderNtdDonut, renderNtd, setNtd, ntdPagina, filterNtd, sorteerNtd, ntdSorteerKey, renderAf, setAf,
+  filterAf, afFilterWaarden,
   kopOpen, zetKopOpen, toggleBundel, springNaarBundel, wisNtdFilters, absorbeer, isPlatteWeergave, erIsGefilterd,
   offerteAannemerPaneel, offerteAannSamenvatting,
   ALVO_ICONS, renderAlvo, ALVO_COLS, ALVO_LABELS, flagPill, _recomputeAlvoStatus, toggleAlvoFlag, statusIco, renderAlfa,

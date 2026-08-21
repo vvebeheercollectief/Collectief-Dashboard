@@ -28,7 +28,7 @@
 // niet zeker weet, en een waarschuwing die te vaak onterecht komt leert je hem weg te klikken.
 // De drempel staat als één getal in de code, niet verspreid, juist omdat hij een afweging is en
 // geen natuurwet.
-import { SECS, SKEYS } from "./config.js";
+import { SECS, SKEYS, OMSCHRIJVING_SLEUTEL } from "./config.js";
 import { taakTitel } from "./util.js";
 
 const DUBBEL_DREMPEL = 0.6;
@@ -55,8 +55,12 @@ function _normaliseer(tekst){
 
 // De betekenisvolle woorden van een omschrijving. Woorden van twee letters of korter vallen af:
 // dat zijn in de praktijk afkortingen en resten van leestekens, geen onderwerp.
+// GETALLEN blijven wél staan, hoe kort ook. Zonder die uitzondering vielen 'Stap 1' en 'Stap 2'
+// allebei terug op {stap} en waren ze voor deze maatstaf identiek — terwijl juist het nummer het
+// verschil is. Hetzelfde geldt voor huisnummers en jaartallen.
 function woorden(tekst){
-  return _normaliseer(tekst).split(' ').filter(w => w.length > 2 && !STOPWOORDEN.has(w));
+  return _normaliseer(tekst).split(' ')
+    .filter(w => (/^\d+$/.test(w) || w.length > 2) && !STOPWOORDEN.has(w));
 }
 
 // 0 = niets gemeen, 1 = dezelfde woorden. Twee keer de overlap gedeeld door het totaal
@@ -83,6 +87,10 @@ function zitErinVervat(a, b){
   const A = woorden(a), B = woorden(b);
   if(!A.length || !B.length) return false;
   const [kort, lang] = A.length <= B.length ? [A, new Set(B)] : [B, new Set(A)];
+  // Minstens TWEE woorden gemeen. Met één woord slaat deze regel al aan op 'Dak' tegen
+  // 'Dak schilderen offerte', en dan waarschuwt hij bij elk tweede klusje aan hetzelfde
+  // bouwdeel — precies het soort treffer waar je doorheen leert klikken.
+  if(kort.length < 2) return false;
   return kort.every(w => lang.has(w));
 }
 
@@ -96,6 +104,16 @@ function lijktOp(a, b){ return gelijkenis(a, b) >= DUBBEL_DREMPEL || zitErinVerv
 // `sluitUit` is een rij die niet mee mag doen — bij het bewerken van een bestaande taak zou die
 // zichzelf anders als dubbel aanmerken. Vandaag draait deze controle alleen bij nieuwe taken, maar
 // de parameter houdt hem bruikbaar als dat verandert.
+// De omschrijving van een bestaande taak, en NIET via `taakTitel`. Die valt bij een lege
+// omschrijving terug op de status, de periode en uiteindelijk op de CATEGORIENAAM — en dan lijken
+// twee lege Oppakken-taken van dezelfde VvE voor 100% op elkaar en komt de vraag gegarandeerd.
+// Twee LOD-taken zonder actiepunt maar allebei met status 'Loopt' idem. Dat zijn precies de valse
+// waarschuwingen die mensen leren om door de vraag heen te klikken.
+// Leeg = niets te vergelijken, en dan zwijgen we.
+function _omschrijvingVan(r, sec){
+  return String(r[OMSCHRIJVING_SLEUTEL[sec]] || '').trim();
+}
+
 function zoekDubbels(code, omschrijving, ntd, sluitUit){
   const doelCode = String(code == null ? '' : code).trim().toLowerCase();
   if(!doelCode || !woorden(omschrijving).length) return [];
@@ -104,7 +122,8 @@ function zoekDubbels(code, omschrijving, ntd, sluitUit){
     ((ntd && ntd[sec]) || []).forEach(r => {
       if(r === sluitUit) return;
       if(String(r.code || '').trim().toLowerCase() !== doelCode) return;
-      const titel = taakTitel(r, sec);
+      const titel = _omschrijvingVan(r, sec);
+      if(!woorden(titel).length) return;          // geen omschrijving → niets te vergelijken
       if(!lijktOp(omschrijving, titel)) return;
       // De score gaat mee zodat de sterkste treffer vooraan komt te staan. Een treffer die alleen
       // via 'zit erin vervat' binnenkomt heeft een lagere score en zakt dus naar onder — dat klopt

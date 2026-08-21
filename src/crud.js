@@ -5,7 +5,7 @@ import { esc, berekenPrioriteit, toISODate, toDutchDate, nieuwTaakId, taakVerwij
 import { zoekDubbels, dubbelVraagTekst } from "./dubbelcheck.js";
 import { extraVves, wisExtraVves, extraVvesHtml, extraVvesUitleg } from "./meervve.js";
 import { state, D, pgs } from "./state.js";
-import { SECS, SKEYS, SID } from "./config.js";
+import { SECS, SKEYS, SID, OMSCHRIJVING_SLEUTEL } from "./config.js";
 import { writeRange, writeRows, _shiftNtdRows, _herstelShift, assertRowMatch } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { showToast, showUndoToast, fireNotifEvent, undoComplete, undoDelete } from "./notifications.js";
@@ -110,9 +110,23 @@ function zetDeadlineVoorstel(sec, isEdit){
   // een achtergebleven zin van een vorige sectie zou bij de verkeerde datum blijven staan.
   Object.values(DEADLINE_HINT_VELD).forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent=''; });
   if(isEdit || !veldEl || !hintEl) return;
-  const iso = voorgesteldeDeadline(sec);
-  if(iso && !veldEl.value) veldEl.value = iso;
+  // Een SUBTAAK krijgt geen voorstel. Die hoort bij een hoofdtaak die zijn eigen deadline heeft;
+  // 'bel de aannemer terug' erft anders een datum van over zeven dagen die nergens op slaat, telt
+  // mee in de te-laat-pil en krijgt een prioriteit. Zelfde grens als bij 'ook voor andere VvE's'.
+  if(state._nieuwBundel) return;
   hintEl.textContent = DEADLINE_HINT[sec] || '';
+  const iso = voorgesteldeDeadline(sec);
+  if(!iso) return;
+  // MAAR ÉÉN KEER PER SCHERM per categorie. Zonder deze rem kwam een bewust weggehaalde datum
+  // terug zodra de gebruiker in de categorie-kiezer heen en weer ging: het veld was leeg, dus de
+  // regel hieronder vulde hem opnieuw. Het zinnetje eronder belooft woordelijk 'Aanpassen of
+  // leegmaken mag' — en één klik op Toevoegen legde die teruggekeerde datum vast in de Sheet.
+  // Gemeten langs de echte weg: openen → 28-08, wissen → leeg, naar LOD → leeg, terug → 28-08.
+  // De verzameling wordt geleegd door `clearModal`, dus elk NIEUW scherm stelt weer voor.
+  if(!state._dlVoorgesteld) state._dlVoorgesteld = new Set();
+  if(state._dlVoorgesteld.has(sec)) return;
+  state._dlVoorgesteld.add(sec);
+  if(!veldEl.value) veldEl.value = iso;
 }
 
 // De merkjes en het uitlegregeltje van 'ook voor andere VvE's' opnieuw tekenen. Eén functie, zodat
@@ -354,6 +368,9 @@ function clearModal(){
   // regel zou het volgende toevoegscherm de twaalf VvE's van de vorige ronde meedragen en er bij
   // één klik op Toevoegen twaalf taken bij maken.
   wisExtraVves();
+  // En de 'al voorgesteld'-stempels: een NIEUW scherm mag weer een deadline voorstellen, maar
+  // binnen hetzelfde scherm nooit twee keer (zie zetDeadlineVoorstel).
+  state._dlVoorgesteld = new Set();
   const chips=document.getElementById('m-extra-chips'); if(chips) chips.innerHTML='';
   const uitleg=document.getElementById('m-extra-uitleg'); if(uitleg) uitleg.textContent='';
 }
@@ -921,7 +938,9 @@ async function submitTask(){
     if(!state.editMode && !state._nieuwBundel && !state._dubbelcheckUit){
       const kandidaat={ _sec:sec };
       keys.forEach((k,i)=>{ kandidaat[k]=norm(values[i]); });
-      const dubbels=zoekDubbels(code, taakTitel(kandidaat, sec), D.ntd);
+      // De omschrijving uit het EIGEN veld van deze categorie en niet via `taakTitel`: die valt bij
+      // een lege omschrijving terug op de categorienaam, en dan lijkt elke lege taak op elke andere.
+      const dubbels=zoekDubbels(code, kandidaat[OMSCHRIJVING_SLEUTEL[sec]] || '', D.ntd);
       if(dubbels.length && !await vraagBevestiging({
           titel:'Bestaat deze taak al?',
           tekst:dubbelVraagTekst(dubbels),

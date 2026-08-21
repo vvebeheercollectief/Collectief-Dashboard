@@ -18,7 +18,7 @@ import { _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, _shi
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
-import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _eindKolom, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, getAfInsertRow, OMSCHRIJVING_VELD, zetOmschrijving, _sheetBreedtes, getSheetIds, kiesSectie, deleteTaskRow, deleteCurrentEditTask, completeCurrentEditTask, renderExtraVves, toonMeerVve } from "./crud.js";
+import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _eindKolom, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, getAfInsertRow, OMSCHRIJVING_VELD, zetOmschrijving, _sheetBreedtes, getSheetIds, kiesSectie, deleteTaskRow, deleteCurrentEditTask, completeCurrentEditTask, renderExtraVves, toonMeerVve, zetDeadlineVoorstel } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages, renderChat } from "./dossier-chat.js";
 import { shouldPromptReload, maakHerlaadKern, zelfdeWorker } from "./sw-update.js";
@@ -3826,7 +3826,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '10.27');
+  eq('versie opgehoogd', APP_VERSION, '10.28');
 
   // ── Pushmeldingen: de twee schakels die stil kapot waren (audit 2026-08-06) ──
   // Beide defecten waren onzichtbaar: de app meldde "Notificaties zijn aan!" terwijl er nooit
@@ -9874,13 +9874,17 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     // vastgezet. De functie blijft bestaan (het bewerkscherm), alleen de snelknop niet.
     // Op de mediaregel toetsen en niet op de gemeten breedte: die laatste hangt af van het venster
     // waarin de suite draait, en zo'n assert meet je eigen venster in plaats van de code.
-    // De stylesheet zelf lezen en niet de gemeten breedte: die laatste hangt af van het venster
-    // waarin de suite draait, en zo'n assert meet je eigen venster in plaats van de code.
-    let _css = '';
-    try { _css = await (await fetch(new URL('../styles.css', import.meta.url), {cache:'no-store'})).text(); }
-    catch(_){ /* geen fetch mogelijk → de assert hieronder meldt het */ }
+    // De REGEL opzoeken in de stylesheet die de pagina echt geladen heeft, niet de gemeten breedte:
+    // die laatste hangt af van het venster waarin de suite draait, en zo'n assert meet je eigen
+    // venster in plaats van de code. Via de CSSOM en niet via een `fetch` op het bestand: dan is
+    // er geen tweede verzoek, geen cache-vraag en geen afhankelijkheid van een `fetch` die een
+    // eerder testblok vervangen kan hebben.
+    const _mediaRegels = [...document.styleSheets].flatMap(sh => {
+      try { return [...sh.cssRules]; } catch(_) { return []; }   // cross-origin blad → overslaan
+    }).filter(r => r.media && /max-width:\s*680px/.test(r.conditionText || r.media.mediaText || ''));
     truthy('in-behandeling: op een smal scherm valt de knop weg zodat de actiekolom niet uitdijt',
-           /@media\(max-width:680px\)[\s\S]*?\.act-ib\{display:none\}/.test(_css));
+           _mediaRegels.some(m => [...m.cssRules].some(r =>
+             r.selectorText === '.act-ib' && r.style && r.style.display === 'none')));
 
     // ── En de hele schrijfweg, met een nagebootst tabblad ──
     const fetchOud = window.fetch, tokenOud = state.oauthToken, expOud = state.oauthExpiry;
@@ -10047,6 +10051,37 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
          [document.getElementById('m-dl').value, document.getElementById('dl-hint').textContent],
          ['', '']);
       closeModal();
+
+      // 4b. Een bewust WEGGEHAALDE datum mag niet terugkomen. Het zinnetje eronder belooft
+      //     woordelijk 'Aanpassen of leegmaken mag'; kwam de datum terug bij het heen-en-weer
+      //     gaan in de categorie-kiezer, dan legde één klik op Toevoegen hem alsnog vast.
+      openModal(false, null, { sec:'OPPAKKEN' });
+      document.getElementById('m-dl').value = '';       // de gebruiker wist hem bewust
+      kiesSectie('LOD'); kiesSectie('OPPAKKEN');
+      eq('deadline-voorstel: een weggehaalde datum komt niet terug bij het wisselen van categorie',
+         document.getElementById('m-dl').value, '');
+      closeModal(); clearModal();
+      // …maar een NIEUW scherm stelt weer gewoon voor.
+      openModal(false, null, { sec:'OPPAKKEN' });
+      eq('deadline-voorstel: een volgend scherm stelt wel weer voor',
+         document.getElementById('m-dl').value, voorgesteldeDeadline('OPPAKKEN'));
+      closeModal(); clearModal();
+
+      // 4c. Een SUBTAAK krijgt geen voorstel: die hoort bij een hoofdtaak met zijn eigen deadline,
+      //     en 'bel de aannemer terug' erft anders een datum die nergens op slaat.
+      openModal(false, null, { sec:'OPPAKKEN' });
+      state._nieuwBundel = { bundelId:'Tkop', volg:'10' };
+      zetDeadlineVoorstel('OPPAKKEN', false);
+      eq('deadline-voorstel: een subtaak krijgt geen datum en geen zinnetje',
+         [document.getElementById('m-dl').value, document.getElementById('dl-hint').textContent],
+         [voorgesteldeDeadline('OPPAKKEN'), '']);
+      state._nieuwBundel = null;
+      closeModal(); clearModal();
+
+      // 4d. Het zinnetje hoort bij het veld, ook voor wie het scherm niet ziet.
+      eq('deadline-voorstel: het zinnetje is aan het invoerveld gekoppeld',
+         ['m-dl','m-dl-v','m-dl-o','m-dl-l','m-dl-s']
+           .filter(id => !document.getElementById(id).getAttribute('aria-describedby')), []);
 
       // 5. Van sectie wisselen in een nieuw scherm is een nieuwe keuze: het zinnetje moet mee, en
       //    dat van de vorige sectie mag niet blijven hangen.
@@ -10254,6 +10289,23 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
        zoekDubbels('311212', 'Jaarrekening 2026 controleren', ntd).map(t=>t.r.actiepunt), []);
     eq('dubbelcheck: zonder VvE-code of zonder omschrijving zwijgt hij',
        [zoekDubbels('', 'Lekkage dak', ntd).length, zoekDubbels('311212','',ntd).length], [0, 0]);
+    // ── Drie gemeten VALSE treffers die eruit moesten ──
+    // 1. Een BESTAANDE taak zonder omschrijving. De vergelijking liep eerst via `taakTitel`, en
+    //    die valt terug op de status, de periode en uiteindelijk op de CATEGORIENAAM. Twee lege
+    //    Oppakken-taken van dezelfde VvE scoorden daardoor 1,00 op elkaar.
+    const leegNtd = { ...ntd, OPPAKKEN:[ { ...mk('311212','') , actiepunt:'' } ],
+                      LOD:[ { ...mk('311212','','LOD'), actiepunt:'', status:'Loopt' } ] };
+    eq('dubbelcheck: een taak zonder omschrijving lijkt nergens op',
+       zoekDubbels('311212', 'Lekkage dak repareren', leegNtd).length, 0);
+    // 2. Eén gedeeld woord is te weinig voor 'de een zit in de ander'. Anders waarschuwt hij bij
+    //    elk tweede klusje aan hetzelfde bouwdeel.
+    eq('dubbelcheck: één gedeeld woord is geen dubbele taak',
+       [zitErinVervat('Dak','Dak schilderen offerte'), lijktOp('Dak','Dak schilderen offerte')],
+       [false, false]);
+    // 3. Getallen tellen mee. Vielen ze weg, dan waren 'Stap 1' en 'Stap 2' identiek — terwijl
+    //    juist het nummer het verschil is.
+    eq('dubbelcheck: een nummer maakt wél verschil',
+       [woorden('Stap 1'), lijktOp('Stap 1','Stap 2')], [['stap','1'], false]);
     // De taak zelf mag zichzelf niet als dubbel aanmerken.
     eq('dubbelcheck: een uitgesloten rij telt niet mee',
        zoekDubbels('311212','Lekkage dak repareren', ntd, ntd.OPPAKKEN[0]).length, 1);

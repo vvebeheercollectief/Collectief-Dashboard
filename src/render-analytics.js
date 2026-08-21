@@ -377,11 +377,15 @@ function renderPeriodBar(){
 function renderMetricToggle(){
   const el=document.getElementById('hero-metric-toggle'); if(!el) return;
   const metrics=[{k:'vergader',l:'Vergaderingen'},{k:'taken',l:'Taken'}];
-  el.innerHTML=metrics.map(m=>`<button class="metric-btn${state.anaMetric===m.k?' on':''}" data-m="${m.k}">${m.l}</button>`).join('');
+  el.innerHTML=metrics.map(m=>`<button class="metric-btn${state.anaMetric===m.k?' on':''}" aria-pressed="${state.anaMetric===m.k}" data-m="${m.k}">${m.l}</button>`).join('');
   el.querySelectorAll('.metric-btn').forEach(b=>{
     b.onclick=()=>{
       state.anaMetric=b.dataset.m;
-      el.querySelectorAll('.metric-btn').forEach(x=>x.classList.toggle('on',x.dataset.m===state.anaMetric));
+      // aria-pressed samen met de klasse: die klasse was het enige wat verried welke maat aanstaat.
+      el.querySelectorAll('.metric-btn').forEach(x=>{
+        const aan = x.dataset.m===state.anaMetric;
+        x.classList.toggle('on',aan); x.setAttribute('aria-pressed',aan);
+      });
       renderHeroChart(state.anaMetric,state.anaPeriod);
     };
   });

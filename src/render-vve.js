@@ -122,9 +122,12 @@ function kenmerkenKaart(code){
   const k=vveKenmerken(code,D);
   if(state.kenmerkenEdit){
     const sel=(id,val)=>`<select id="${id}">${KENMERK_WAARDEN.map(w=>`<option${(val||'Onbekend')===w?' selected':''}>${w}</option>`).join('')}</select>`;
-    return `<div class="kmk-rij"><span>Balkons</span>${sel('kmk-balkons',k.balkons)}</div>
-      <div class="kmk-rij"><span>Kozijnen</span>${sel('kmk-kozijnen',k.kozijnen)}</div>
-      <div class="kmk-bron-lbl">Bron</div>
+    // Echte <label for=…> en geen <span>: deze drie velden worden pas bij het bewerken getekend en
+    // vielen daarmee buiten de eenmalige koppelpas bij het opstarten (modal-a11y.js). Ze waren de
+    // enige naamloze velden die er nog waren — en een klik op het woord 'Balkons' deed niets.
+    return `<div class="kmk-rij"><label for="kmk-balkons">Balkons</label>${sel('kmk-balkons',k.balkons)}</div>
+      <div class="kmk-rij"><label for="kmk-kozijnen">Kozijnen</label>${sel('kmk-kozijnen',k.kozijnen)}</div>
+      <label class="kmk-bron-lbl" for="kmk-bron">Bron</label>
       <div class="opmaak-veld">
         <textarea id="kmk-bron" data-code="${esc(code)}" rows="2" placeholder="bv. splitsingsakte art. 17, mail gemeente 03-2024">${esc(k.bron)}</textarea>
         ${opmaakBalk()}
@@ -183,7 +186,7 @@ function composerHtml(code){
   }
   return `<div class="dos-composer">
     <div class="opmaak-veld">
-      <textarea id="dos-tekst" data-code="${esc(code)}" rows="2" placeholder="Leg vast wat er gebeurd is — bv. zojuist gebeld met een eigenaar… (Ctrl+Enter = vastleggen)"></textarea>
+      <textarea id="dos-tekst" data-code="${esc(code)}" rows="2" aria-label="Leg vast wat er gebeurd is" placeholder="Leg vast wat er gebeurd is — bv. zojuist gebeld met een eigenaar… (Ctrl+Enter = vastleggen)"></textarea>
       ${opmaakBalk()}
     </div>
     <div class="dos-rij">
@@ -428,8 +431,8 @@ function renderVve(){
              'Alle 3 tonen' zei en er drie regels stonden: drie getallen die elkaar tegenspreken. -->
         <div class="vve-sectie">Geschiedenis <span class="n">${dosEntries.length}</span>
           <span class="dos-filters">
-            <button class="dos-filter${state.vveLogFilter!=='contact'?' aan':''}" data-action="vve-log-filter" data-modus="alles">Alles</button>
-            <button class="dos-filter${state.vveLogFilter==='contact'?' aan':''}" data-action="vve-log-filter" data-modus="contact">Alleen contactmomenten</button>
+            <button class="dos-filter${state.vveLogFilter!=='contact'?' aan':''}" aria-pressed="${state.vveLogFilter!=='contact'}" data-action="vve-log-filter" data-modus="alles">Alles</button>
+            <button class="dos-filter${state.vveLogFilter==='contact'?' aan':''}" aria-pressed="${state.vveLogFilter==='contact'}" data-action="vve-log-filter" data-modus="contact">Alleen contactmomenten</button>
           </span>
         </div>
         ${composerHtml(o.code)}

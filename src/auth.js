@@ -6,10 +6,17 @@ import { state, _shownToasts } from "./state.js";
 import { loadAll, laadUitCache, wisCache } from "./data.js";
 import { toonKaart } from "./login-splash.js";
 
-// Hoe lang een tokenaanvraag zonder antwoord de bezig-teller mag bezetten. Ruim boven een
-// normale inlog (waarbij de gebruiker een venster moet doorlopen), maar eindig — zie het
+// Hoe lang een tokenaanvraag zonder antwoord de bezig-teller mag bezetten. Eindig — zie het
 // vangnet in doOAuth. Tests kunnen dit verlagen via state._authTimeoutMs.
-const AUTH_ANTWOORD_TIMEOUT = 90_000;
+//
+// Twee waarden, want het zijn twee heel verschillende dingen. Een STILLE verversing praat alleen
+// met Google en is binnen een seconde klaar; 90 s is daar al royaal. Een inlog MÉT venster wacht op
+// een mens: accountkeuze, toestemmingsscherm, en bij tweestapsverificatie ook nog even de telefoon
+// erbij pakken. Dat haalt de 90 s regelmatig niet, en dan werd de inlog als 'geannuleerd of
+// mislukt' gemeld terwijl het token even later gewoon binnenkwam — het staat dan al in de sessie,
+// dus een tweede klik lukte meteen, maar de melding klopte niet en dat leest als een storing.
+const AUTH_ANTWOORD_TIMEOUT = 90_000;          // stille verversing
+const AUTH_ANTWOORD_TIMEOUT_VENSTER = 300_000; // inlog met venster: vijf minuten
 
 // Hoogstens ÉÉN lopende aanvraag per prompt-stand. GIS kent per client maar één callback: bindt
 // een tweede aanvraag hem opnieuw, dan landen béíde antwoorden bij de tweede en lost de eerste
@@ -56,7 +63,7 @@ function _doOAuth(forcePrompt){
     tid=setTimeout(()=>{
       console.warn('OAuth: geen antwoord binnen de tijd — aanvraag losgelaten');
       klaar(null);
-    }, state._authTimeoutMs || AUTH_ANTWOORD_TIMEOUT);
+    }, state._authTimeoutMs || (forcePrompt ? AUTH_ANTWOORD_TIMEOUT_VENSTER : AUTH_ANTWOORD_TIMEOUT));
     try{
       if(!state._gsiTokenClient){
         state._gsiTokenClient=google.accounts.oauth2.initTokenClient({

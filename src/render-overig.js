@@ -599,7 +599,13 @@ function renderLogboek(){
   const countEl=document.getElementById('logboek-count');
   if(countEl) countEl.textContent=`${rows.length} ${rows.length===1?'gebeurtenis':'gebeurtenissen'}`;
 
-  const sl=rows.slice((pgs.logboek-1)*PG,pgs.logboek*PG);
+  // Paginanummer klemmen vóór het snijden, net als renderTbody dat doet. renderPag klemt hem ook,
+  // maar pas ná deze regel — dus precies in de ronde waarin de lijst krimpt (een logregel
+  // verwijderd, of een filter aangezet) stond de tijdlijn leeg terwijl de paginabalk eronder al
+  // naar de juiste pagina wees. Pas de volgende hertekening herstelde dat.
+  const _pg=Math.min(Math.max(1,pgs.logboek),Math.max(1,Math.ceil(rows.length/PG)));
+  pgs.logboek=_pg;
+  const sl=rows.slice((_pg-1)*PG,_pg*PG);
   const el=document.getElementById('logboek-feed');
   if(!el) return;
 

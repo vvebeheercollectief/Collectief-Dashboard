@@ -159,15 +159,24 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('f-status-alvo').onchange=()=>{pgs.alvo=1;renderAlvo()};
   document.getElementById('f-budget-alvo').onchange=()=>{pgs.alvo=1;renderAlvo()};
   setupSearch('s-logboek',()=>{pgs.logboek=1;renderLogboek()});
+  // aria-pressed schuift mee met de 'on'-klasse. Die klasse was het énige wat de aan/uit-stand van
+  // deze filterknopjes doorgaf, en dat is alleen te zíen — een schermlezer las vijf identieke
+  // knoppen zonder te melden welke aanstaat.
+  const kiesChip=(groepId, b, zet)=>{
+    document.querySelectorAll(`#${groepId} .lchip`).forEach(x=>{
+      const aan = x===b;
+      x.classList.toggle('on', aan);
+      x.setAttribute('aria-pressed', aan);
+    });
+    zet(); pgs.logboek=1; renderLogboek();
+  };
   document.getElementById('logboek-who').addEventListener('click',e=>{
     const b=e.target.closest('.lchip'); if(!b)return;
-    document.querySelectorAll('#logboek-who .lchip').forEach(x=>x.classList.remove('on'));
-    b.classList.add('on'); state.logWho=b.dataset.who; pgs.logboek=1; renderLogboek();
+    kiesChip('logboek-who', b, ()=>{ state.logWho=b.dataset.who; });
   });
   document.getElementById('logboek-act').addEventListener('click',e=>{
     const b=e.target.closest('.lchip'); if(!b)return;
-    document.querySelectorAll('#logboek-act .lchip').forEach(x=>x.classList.remove('on'));
-    b.classList.add('on'); state.logAct=b.dataset.act; pgs.logboek=1; renderLogboek();
+    kiesChip('logboek-act', b, ()=>{ state.logAct=b.dataset.act; });
   });
 
   // Bewust een wikkel: hing loadAll er rechtstreeks aan, dan gaf de DOM het klik-event
@@ -185,7 +194,9 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('chat-close').onclick=closeChat;
   initVveZoekveld({ input: document.getElementById('chat-vve-zoek'), lijstEl: document.getElementById('chat-vve-sug'),
     minTekens: 0, onSelect: ({code}) => setChatVve(code) });
-  document.getElementById('ai-chips').addEventListener('click',e=>{const b=e.target.closest('.ai-chip');if(!b)return;b.classList.toggle('on');buildAiPrompt();parseAiAnswer();});
+  document.getElementById('ai-chips').addEventListener('click',e=>{const b=e.target.closest('.ai-chip');if(!b)return;
+    b.setAttribute('aria-pressed', b.classList.toggle('on'));   // stand ook hoorbaar, niet alleen zichtbaar
+    buildAiPrompt();parseAiAnswer();});
   document.getElementById('ai-mail').addEventListener('input',buildAiPrompt);
   const aiVveInput=document.getElementById('ai-vve-input');
   const aiVveWis=document.getElementById('ai-vve-wis');

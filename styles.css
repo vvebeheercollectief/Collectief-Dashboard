@@ -182,7 +182,9 @@
     .stat-val.red{color:var(--rd)} .stat-val.amber{color:var(--am)} .stat-val.green{color:var(--gn)} .stat-val.teal{color:var(--ac)} .stat-val.muted{color:var(--mut)} /* --fnt gaf 2,6:1 op wit; een cijfer van 30px valt onder 'grote tekst' en moet 3:1 halen. --mut blijft duidelijk gedempt t.o.v. --txt en haalt het in beide thema's */
     .stat-meta{display:flex;flex-direction:column;gap:1px;padding-bottom:2px}
     .stat-cap{font-size:11px;font-weight:700;color:var(--mut);white-space:nowrap}
-    .stat-hint{font-size:11px;font-weight:700;color:var(--ac-500);white-space:nowrap}
+    /* var(--ac) i.p.v. var(--ac-500): die laatste (#14B8A6) haalde maar 3,93:1 op wit. --ac is de
+       merkkleur die overal elders al voor tekst wordt gebruikt en beweegt netjes mee met het thema. */
+    .stat-hint{font-size:11px;font-weight:700;color:var(--ac);white-space:nowrap}
     /* Huidige weeknummer — staat sinds de compacte kop in .ntd-week (het uitklappaneel);
        "Week 26" naast elkaar, eigen accent zodat 't niet als telling leest */
     .stat-week-cap{font-size:26px;font-weight:900;letter-spacing:-.05em;line-height:1;color:var(--txt);white-space:nowrap}
@@ -492,9 +494,15 @@
     .leaderboard tbody tr:last-child td{border-bottom:none}
     .leaderboard tbody tr:hover{background:var(--sur2)}
     .lb-rank{font-weight:800;color:var(--mut);width:30px;font-variant-numeric:tabular-nums}
-    .lb-rank.gold{color:#D97706}
-    .lb-rank.silver{color:#64748B}
-    .lb-rank.bronze{color:#B45309}
+    /* Medaillekleuren per thema. Eén set haalde het niet in allebei: goud zakte op wit naar 3,19
+       en zilver/brons op de donkere kaart naar 3,28 en 3,10 — allemaal onder de 4,5 die tekst
+       van dit formaat vraagt. Gemeten waarden staan erachter. */
+    .lb-rank.gold{color:#bd5b00}    /* 4,51 op wit */
+    .lb-rank.silver{color:#64748B}  /* 4,76 op wit */
+    .lb-rank.bronze{color:#B45309}  /* 5,02 op wit */
+    [data-theme=dark] .lb-rank.gold{color:#D97706}    /* 4,89 op de donkere kaart */
+    [data-theme=dark] .lb-rank.silver{color:#7c8ca3}  /* 4,56 */
+    [data-theme=dark] .lb-rank.bronze{color:#d27127}  /* 4,55 */
     .lb-name{font-weight:700;color:var(--txt)}
     .lb-now{font-weight:800;color:var(--ac);font-variant-numeric:tabular-nums}
     .lb-prev{color:var(--mut);font-variant-numeric:tabular-nums}
@@ -816,7 +824,7 @@
     .code-klik:hover{filter:brightness(.9);text-decoration:underline}
     /* Beheerderskenmerken (VvE-pagina) */
     .kmk-rij{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--bor);font-size:13px}
-    .kmk-bron-lbl{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);margin:10px 0 4px}
+    .kmk-bron-lbl{display:block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);margin:10px 0 4px}
     .kmk-bron{font-size:12.5px;line-height:1.5;word-break:break-word}
     .kmk-wijz{font-size:11px;color:var(--mut);margin-top:8px}
     .kmk-knoppen{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
@@ -1257,9 +1265,11 @@ body:has(.modal-bg.open) #chat-bg{display:none}
 
 /* Foutregel — geen deel van het ontwerp, maar nodig voor onze flow
    (geannuleerd / geen toegang). Standaard verborgen; JS toont hem. */
+/* Vaste donkerrode kleur en NIET var(--rd): de inlogkaart is altijd wit, ook in donkere modus,
+   maar --rd slaat daar om naar lichtzalm (#F0746F) — en dat haalt op wit maar 2,83:1. */
 .lg-error{
   display:none; margin:14px 0 0; text-align:center;
-  font-size:12.5px; font-weight:500; color:var(--rd, #c0392b);
+  font-size:12.5px; font-weight:500; color:#B91C1C;
 }
 
 .lg-secure{

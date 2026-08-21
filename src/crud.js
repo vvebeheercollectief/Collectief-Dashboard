@@ -454,7 +454,13 @@ async function deleteTaskRow(r, bijDoorgaan){
   const ntdValues=serializeNtdUndo(r);
   const undoData={sec,code:r.code,ntdValues};
   const oudeRow=r._row;
-  const tr=document.querySelector(`#ntd-tbody tr[data-row="${oudeRow}"]`);
+  // Dezelfde manier van zoeken als bij afronden: eerst de rij in de takentabel op de ZICHTBARE
+  // pagina, anders de taakregel op de dossierpagina. Zonder die tweede helft vond dit niets als je
+  // vanuit het dossier verwijderde: de rode puls speelde onzichtbaar in een verborgen tabel en de
+  // rij bleef daar ruim een seconde staan alsof er niets gebeurde.
+  const _rid=state._rowCache.indexOf(r);
+  const tr=document.querySelector(`.page.active #ntd-tbody tr[data-row="${oudeRow}"]`)
+        || (_rid>=0 ? document.querySelector(`.page.active .tk[data-rid="${_rid}"]`) : null);
   // optimistisch: meteen lokaal weg + indexen meeschuiven
   const arr=D.ntd[sec]||[];
   const pos=arr.indexOf(r);

@@ -124,7 +124,7 @@ function rowNtd(r,sec){
   const css=SECS[sec].css;
   const rid=state._rowCache.length; state._rowCache.push(r);
   const bulkCel=state.bulkMode
-    ?`<td class="bulk-cel"><button type="button" class="cb${bulkGeselecteerd(r)?' aan':''}" data-action="bulk-vink" data-rid="${rid}" role="checkbox" aria-checked="${bulkGeselecteerd(r)}" aria-label="Selecteer rij"></button></td>`
+    ?`<td class="bulk-cel"><button type="button" class="cb${bulkGeselecteerd(r)?' aan':''}" data-action="bulk-vink" data-rid="${rid}" role="checkbox" aria-checked="${bulkGeselecteerd(r)}" aria-label="Selecteer ${esc(taakTitel(r,sec))}"></button></td>`
     :'';
   const editBtn=`<div class="acts">${taakActieKnoppen(rid)}</div>`;
   let cells='';

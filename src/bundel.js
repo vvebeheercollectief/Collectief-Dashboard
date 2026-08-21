@@ -286,12 +286,18 @@ export function magKoppelen(bron, doel, index){
 //
 // Afgeronde leden tellen niet mee: die laten niets liggen om voor te waarschuwen. Daarin verschilt
 // deze telling van de vangrail in `magKoppelen`, die dezelfde lijst juist ongefilterd gebruikt.
-export function openSubtaken(index, r){
+// `negeer` (optioneel): een Set met rij-objecten die NIET als achterblijver tellen — bij een
+// bulk-actie zijn dat de taken die in dezelfde handeling worden meegenomen. Zonder dat waarschuwde
+// de vraag 'er blijven nog subtaken staan' óók als die subtaken gewoon in de selectie zaten, en dat
+// is de hoofdzaak en niet het randgeval: het kopvinkje zet de lijst plat en pakt bundelkoppen en
+// subtaken door elkaar. Een waarschuwing die bijna altijd vals afgaat, wordt niet meer gelezen op
+// de dag dat er wél iets blijft staan.
+export function openSubtaken(index, r, negeer){
   const leden = bundelVan(index, r);
   if (!leden) return 0;
   const kop = zichtbareKop(leden);
   if (!kop || !zelfdeTaak(kop.r, r)) return 0;   // geen kop = geen vraag
-  return leden.filter(m => !m.af && !zelfdeTaak(m.r, r)).length;
+  return leden.filter(m => !m.af && !zelfdeTaak(m.r, r) && !(negeer && negeer.has(m.r))).length;
 }
 
 // Waarschuwingstekst bij het afronden van een taak met openstaande subtaken. Lege string = niets te

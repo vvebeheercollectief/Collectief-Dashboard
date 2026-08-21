@@ -166,6 +166,11 @@ function logout(reden){
   // computer verder werken met de basislijn én de al-getoond-lijst van de vórige: meldingen van
   // vóór zijn sessie zouden alsnog als toast langskomen, of juist stil overgeslagen worden.
   state._lastNotifTs=null; state._meldStart=0; state._meldUit=false;
+  // Ook de tellers en vlaggen van de storingsmeldingen terug naar nul: een volgende gebruiker op
+  // dezelfde computer hoort niet te beginnen met de sessiebanner of de structuurmelding van zijn
+  // voorganger, en een blijven-hangen vlag zou de 8s-ronde of het opslaan blokkeren.
+  state._authFails=0; state._renderFails=0; state._structErnstig=null;
+  state._syncLblVoorBulk=null; state._submitBezig=false; state._herinlogBezig=false;
   try{ _shownToasts.clear(); }catch(_){}
   // De 8s-poll, de token-heartbeat en de meldingen-visibilityhandler worden UITSLUITEND bij
   // DOMContentLoaded gestart (main.js). Stopten we ze hier, dan kwamen ze na een tweede inlog

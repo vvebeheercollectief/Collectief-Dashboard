@@ -478,6 +478,14 @@ async function bevestigInvoegPlek(sec, afterRow, tabblad){
   if(laatste && laatste._row !== afterRow) return;
   if(!laatste && info?.[sec]?.colHeaderRow !== afterRow) return;
 
+  // Zolang onze EIGEN schrijfacties nog in de wachtrij staan bewijst een lezing niets: het
+  // geheugen loopt dan bewust vóór op de Sheet (`submitTask` en `verplaatsTaak` muteren
+  // optimistisch, de echte invoeging gaat serieel via `state._writeChain`). De ankerrij draagt dan
+  // nog de vórige taak en de guard zou zijn eigen werk als 'de lijst is verschoven' lezen — met een
+  // melding die bovendien liegt, want `loadAll` keert bij pendingWrites>0 óók meteen terug zonder
+  // iets te laden. Dezelfde regel die loadAll zelf hanteert.
+  if(state.pendingWrites>0) return;
+
   // De lezing MAG mislukken zonder dat het aanmaken stukloopt. Een herkansing bij 429/5xx eerst
   // (lezen is idempotent), maar komt er daarna nog niets, dan gaan we gewoon door: dan is de stand
   // precies zoals hij vóór deze controle altijd al was, en een nieuwe taak die weigert met 'de
@@ -969,6 +977,17 @@ async function submitTask(){
   const sec=state.editSec||state.activeNtd;
   let values;
 
+  // DUBBELKLIK-REM. Zelfde idioom als `doCompleteTask` en `doeReset`. Tot v10.30 was die hier niet
+  // nodig: de enige await vóór de mutatie was `ensureToken`, en die keert bij een geldig token in
+  // een microtask terug — klik 2 kwam altijd op een al gesloten venster. Sinds `bevestigInvoegPlek`
+  // hieronder staat er een ECHTE lezing tussen de klik en de mutatie (200-800 ms, bij een 429 tot
+  // ~2,5 s), en al die tijd staat het venster open en is de knop live. Zonder rem levert een tweede
+  // klik in dat gat twee identieke taken op: de dubbelcheck ziet niets (de eerste staat nog niet in
+  // D.ntd) en de guard leest dezelfde ongewijzigde ankerrij. Precies het duplicaat dat de
+  // dubbelcheck moest voorkomen.
+  if(state._submitBezig) return;
+  state._submitBezig=true;
+
   try{
     const subId={OPPAKKEN:'m-sub-opp',VERGADERVERZOEKEN:'m-sub-verg','OFFERTE-TRAJECTEN':'m-sub-off',LOD:'m-sub-lod','SUBSIDIE-TRAJECTEN':'m-sub-sub'}[sec];
     const sub=gv(subId);
@@ -1286,6 +1305,10 @@ async function submitTask(){
       state.oauthToken=null;state.oauthExpiry=0;
       alert('Je sessie is verlopen. Klik nogmaals op Opslaan om opnieuw in te loggen.');
     }else{alert('Fout: '+e.message)}
+  }finally{
+    // Alle vroege returns (dubbelcheck 'nee', een niet-teruggevonden rij, de mismatch-tak) zitten
+    // binnen deze try en komen dus vanzelf hierlangs.
+    state._submitBezig=false;
   }
 }
 function gv(id){const el=document.getElementById(id);return el?el.value.trim():''}

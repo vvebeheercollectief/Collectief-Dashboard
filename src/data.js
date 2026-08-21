@@ -3,9 +3,9 @@
 // ══════════════════════════════════════
 import { parseDt, _parseAnyDate, coerceDagenVooraf, leegBijErfenis } from "./util.js";
 import { state, D } from "./state.js";
-import { SKEYS, SECS, APP_VERSION } from "./config.js";
+import { SKEYS, SECS, APP_VERSION, ALLOWED_EMAILS } from "./config.js";
 import { fetchSheet, fetchSheets, _withRetry, isOffline } from "./api.js";
-import { ensureToken, doOAuth } from "./auth.js";
+import { ensureToken, doOAuth, fetchUserEmail, logout } from "./auth.js";
 import { buildAnalytics, buildDash } from "./render-analytics.js";
 import { renderNtdDonut } from "./render-lijsten.js";
 import { parseOntw, parseLogboek, _nogNietBevestigd } from "./render-overig.js";
@@ -306,8 +306,34 @@ function showLoadError(opties){
     // uit — ook als de oorzaak maar een hapering was.
     if(soort==='sessie'){
       state._authFails=0;
-      await doOAuth(true);
-      if(!state.oauthToken){ showLoadError({soort:'sessie'}); return; }
+      // REM OP DE 8s-RONDE zolang dit venster openstaat. Zonder deze vlag draait de poll gewoon
+      // door (hij toetst alleen of er een sessie IS, en die is er), doet `ensureToken` →
+      // `doOAuth(false)`, en dat herbindt de callback van de GIS-client. Google kent één callback
+      // per client, dus de aanvraag van DEZE knop wordt dan losgelaten en kan alleen nog op de
+      // vijf-minutentimer aflopen — met `state._authBezig` die al die tijd boven nul blijft en de
+      // versiebalk die daardoor vastzit. Precies de storing van v10.10/v10.11.
+      state._herinlogBezig=true;
+      let email=null;
+      try{
+        await doOAuth(true);
+        if(!state.oauthToken){ showLoadError({soort:'sessie'}); return; }
+        // Hetzelfde als `doLogin`: `doOAuth(true)` toont juist de ACCOUNTKIEZER, en `ensureToken`
+        // komt hier nooit meer aan toe (die keert terug zodra `currentUserEmail` gevuld is). Zonder
+        // deze controle kan iemand per ongeluk zijn privé-Gmail kiezen: er staat dan een geldig
+        // token in de sessie terwijl elke Sheets-lezing 403 geeft, en een herlading herstelt de
+        // oude sessie uit sessionStorage — zonder uitlogknop kom je daar niet meer uit.
+        email=await fetchUserEmail();
+      }finally{
+        state._herinlogBezig=false;
+      }
+      if(!email){ showLoadError({soort:'sessie'}); return; }
+      if(!ALLOWED_EMAILS.includes(email.toLowerCase()) ||
+         (state.currentUserEmail && email.toLowerCase()!==state.currentUserEmail.toLowerCase())){
+        logout('Je logde in met een ander account. Log in met je VvE Beheer Collectief-account.');
+        return;
+      }
+      state.currentUserEmail=email;
+      sessionStorage.setItem('currentUserEmail', email);
     }
     loadAll();
   };
@@ -726,6 +752,16 @@ async function _loadRonde(silent){
         // Zichtbaar maken, óók bij een stille poll: juist hier ziet de gebruiker anders niets.
         // `_lastDHash` blijft op de OUDE waarde staan, dus de volgende ronde probeert opnieuw.
         setSyncErr(); showLoadError({soort:'render'});
+        // `renderAll` is NIET alles-of-niets. Hij begint met een lege `_rowCache` en `rowNtd` duwt
+        // er per rij in, terwijl de tabel in de DOM pas aan het eind in één keer wordt vervangen.
+        // Gooit een renderer daartussenin, dan staat de OUDE tabel in beeld met de rij-nummers van
+        // de vorige render, terwijl `_rowCache` al met de NIEUWE rij-objecten gevuld is — en de
+        // klikweg is een kale index in die cache. Dan rond je een andere taak af dan je aanklikte.
+        // Sinds de vingerafdruk pas ná een geslaagde render wordt genoteerd, gebeurt dat bovendien
+        // elke acht seconden opnieuw: de vertaling rij → taak zou de hele dag meeschuiven met wat
+        // collega's in de Sheet doen. Beide lijsten leeg maken laat elke klik netjes uitkomen op
+        // 'Taak niet gevonden — de lijst is intussen ververst'.
+        state._rowCache=[]; state._ntdZichtbaar=[];
         console.error('[render]', e);
         state._renderFails=(state._renderFails||0)+1;
         return;

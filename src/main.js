@@ -481,6 +481,9 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(state.bulkMode) return;
     if(state._animBusy) return;
     if(state._undoInFlight) return;
+    // Staat het inlogvenster van de 'Opnieuw inloggen'-knop open, dan mag deze ronde geen tweede
+    // tokenaanvraag doen: die herbindt de GIS-callback en laat de aanvraag van de knop los.
+    if(state._herinlogBezig) return;
     // Nog geen sessie → niet pollen. Anders vroeg deze timer op het inlogscherm elke
     // 8 s zélf een token aan en kaapte hij het antwoord van een lopende inlogpoging.
     if(!magPollen(state)) return;

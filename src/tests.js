@@ -8715,10 +8715,25 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       b.taakId='T-SUB'; b.bundelId='B-1'; b.bundelVolg='10';
       antwoord=false; vragen=[];
       await vraag(()=>bulkDoe(bulkKnop));
-      truthy('bulk-verwijderen: de vraag meldt het als er nog subtaken onder hangen',
+      // BEIDE staan geselecteerd, dus er blijft niets achter — en dan hoort die zin er NIET te
+      // staan. Tot v10.31 kwam hij hier wél, want de telling keek niet naar de selectie. Het
+      // kopvinkje zet de lijst plat en pakt koppen en subtaken door elkaar, dus dat was de
+      // hoofdzaak en niet het randgeval: een waarschuwing die bijna altijd vals afgaat, wordt niet
+      // meer gelezen op de dag dat er wél iets blijft staan.
+      truthy('bulk-verwijderen: gaat de subtaak in dezelfde bulk mee, dan zwijgt de zin',
+             !(vragen[0]||'').includes('subtaken'));
+      // Nu de kop ALLEEN: dan blijft de subtaak echt staan en hoort de zin er wel te zijn.
+      state.bulkMode=true; bulkWis(); state._rowCache=[a, b]; bulkVink(0);
+      antwoord=false; vragen=[];
+      await vraag(()=>bulkDoe(bulkKnop));
+      truthy('bulk-verwijderen: blijft de subtaak wél achter, dan meldt de vraag dat',
              (vragen[0]||'').includes('nog subtaken'));
       a.taakId=''; a.bundelId=''; a.bundelVolg='';
       b.taakId=''; b.bundelId=''; b.bundelVolg='';
+      // Selectie terug op twee, zoals de rest van dit blok verwacht.
+      state.bulkMode=true; bulkWis();
+      state._rowCache=[a, b]; bulkVink(0);
+      state._rowCache=[a, b]; bulkVink(1);
 
       // Deze 'ja' loopt BEWUST niet via `vraag()`. Die helper wacht op `af || venster open`, en het
       // venster gaat al open binnen `bulkVerwijderen` zélf — hij kan dus niet zien of `bulkDoe` te
@@ -8829,8 +8844,28 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       state._rowCache=rijen.slice(); bulkVink(3);
       antwoord=false; vragen=[];
       await vraag(()=>bulkDoe(bulkKnop));
-      truthy('bulk-afronden: de vraag meldt het als er nog subtaken onder hangen',
-             (vragen[0]||'').includes('nog subtaken'));
+      truthy('bulk-afronden: de vraag meldt het als er een subtaak achterblijft',
+             (vragen[0]||'').includes('subtaak die niet in deze selectie zit'));
+      // En de tegenproef die de tegenlezing opleverde: zit de subtaak ZELF ook in de selectie, dan
+      // blijft er niets achter en hoort de zin er NIET te staan. `bulkAlles` zet de lijst plat en
+      // pakt koppen en subtaken door elkaar, dus dit is de hoofdzaak en niet het randgeval — een
+      // waarschuwing die bijna altijd vals afgaat, wordt niet meer gelezen.
+      state.bulkMode=true; bulkWis();
+      state._rowCache=rijen.slice(); bulkVink(0);
+      state._rowCache=rijen.slice(); bulkVink(1);
+      state._rowCache=rijen.slice(); bulkVink(2);
+      antwoord=false; vragen=[];
+      await vraag(()=>bulkDoe(bulkKnop));
+      truthy('bulk-afronden: zit de subtaak zélf in de selectie, dan zwijgt die zin',
+             !(vragen[0]||'').includes('subtaak die niet in deze selectie zit'));
+      // Onder de drempel wordt er tóch gevraagd als er een subtaak achterblijft — met enkelvoud.
+      state.bulkMode=true; bulkWis();
+      state._rowCache=rijen.slice(); bulkVink(0);
+      antwoord=false; vragen=[];
+      await vraag(()=>bulkDoe(bulkKnop));
+      truthy('bulk-afronden: één taak met een achterblijvende subtaak vraagt tóch, in enkelvoud',
+             (vragen[0]||'').startsWith('1 taak afronden?') &&
+             (vragen[0]||'').includes('subtaak die niet in deze selectie zit'));
 
       // En de `await` in `bulkDoe`. Zonder die await liep de optimistische verhuizing door terwijl
       // het venster nog openstond — precies de val die bij verwijderen hierboven al beschreven staat.
@@ -11303,6 +11338,183 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       state.oauthToken = tokenOud; state.oauthExpiry = expOud; state._sheetIds = idsOud;
       D.ntd = ntdOud; D.ntdSecInfo = infoOud; state._uitCache = cacheOud;
     }
+  })();
+
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  NA DE TEGENLEZING — de gaten die de toetsers in dit werk zelf vonden
+  // ══════════════════════════════════════════════════════════════════════════
+  (() => {
+    console.log('%c[TESTS] Tegenlezing op de versterkingen', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+
+    // ── D. Geen enkele Sheets-schrijfweg mag nog langs een kaal `fetch` ──
+    // De omzetting ging met een patroon dat de URL op DEZELFDE regel verwachtte; in alv-reset.js
+    // stond hij op de volgende regel en werd hij overgeslagen — uitgerekend binnen
+    // `metWriteMarkering`, waar een hangend verzoek `pendingWrites` voorgoed boven nul laat staan.
+    // Een bron-controle, want het echte gedrag zit verweven met een reset die je niet wilt draaien.
+    truthy('sheetsFetch: deze controle is bruikbaar (de bron is te lezen)', true);
+  })();
+
+  await (async () => {
+    const bestanden = ['api.js','crud.js','bulk.js','verplaats.js','alv-reset.js','bundel-acties.js',
+                       'notifications.js','render-alv.js','render-herhaal.js','render-overig.js','data.js','auth.js'];
+    const overgebleven = [];
+    for(const naam of bestanden){
+      try{
+        const bron = await (await fetch(new URL('src/'+naam, document.baseURI), {cache:'no-store'})).text();
+        // Kaal `fetch(` (niet `sheetsFetch(`, niet `_fetchGeteld(`) met een sheets-URL erachter,
+        // ook als die URL op de volgende regel begint.
+        // GEEN lookbehind: die kent Safari op deze machine niet (de syntaxcheck ving dat), en de
+        // app moet in élke browser laden. Vandaar een gewone groep voor het teken ervóór, zodat
+        // `sheetsFetch(` en `_fetchGeteld(` niet meetellen.
+        const re = /(^|[^A-Za-z0-9_.])fetch\(\s*[`'"]?\s*(?:\r?\n\s*)?[`'"]?https:\/\/sheets\.googleapis\.com/;
+        if(re.test(bron)) overgebleven.push(naam);
+      }catch(e){ overgebleven.push(naam+' (niet te lezen)'); }
+    }
+    eq('sheetsFetch: geen enkel bestand doet nog een kale fetch naar sheets.googleapis.com', overgebleven, []);
+  })();
+
+  // ── A. Dubbelklik op Toevoegen maakt niet twee taken ──
+  // Sinds er een echte lezing tussen de klik en de mutatie staat (`bevestigInvoegPlek`) is het gat
+  // tussen klik 1 en klik 2 honderden milliseconden breed. De dubbelcheck ziet klik 2 niet aankomen
+  // (de eerste taak staat dan nog niet in D.ntd) en de guard leest dezelfde ongewijzigde ankerrij.
+  await (async () => {
+    console.log('%c[TESTS] Dubbelklik op Toevoegen', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const _fetch=window.fetch, _alert=window.alert;
+    const tokenOud=state.oauthToken, expOud=state.oauthExpiry, idsOud=state._sheetIds;
+    const ntdOud=D.ntd, afOud=D.af, infoOud=D.ntdSecInfo, cacheOud=state._uitCache;
+    const dcOud=state._dubbelcheckUit, secOud=state.activeNtd, editOud=state.editMode;
+    const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    let inserts=0;
+    try{
+      window.alert=()=>{};
+      state.oauthToken='stub'; state.oauthExpiry=Date.now()+3600e3;
+      state._sheetIds={ 'Nog Te Doen':0, 'Afgerond':1, 'Logboek':2 };
+      state._uitCache=false; state._dubbelcheckUit=true;
+      state.activeNtd='OPPAKKEN'; state.editMode=false;
+      D.af={ ...leeg }; D.ntd={ ...leeg };
+      D.ntdSecInfo={ OPPAKKEN:{ colHeaderRow:2 } };
+      // De ankerlezing antwoordt met VERTRAGING — dat is precies het gat waar de tweede klik in valt.
+      window.fetch=async(url, opt)=>{
+        const u=decodeURIComponent(String(url)), methode=(opt&&opt.method)||'GET';
+        if(u.includes('values:batchGet'))
+          return new Response(JSON.stringify({error:{message:'geen leesronde in deze test'}}),{status:403});
+        if(methode==='GET'){
+          await new Promise(r=>setTimeout(r,40));   // trage ankerlezing
+          const m=/!A(\d+):S(\d+)/.exec(u)||[];
+          const rijen=[]; for(let rw=+m[1]; rw<=+m[2]; rw++)
+            rijen.push(rw===2 ? ['VvE Code','VvE','Actiepunt','Deadline','Behandelaar','Opmerkingen'] : []);
+          return new Response(JSON.stringify({values:rijen}),{status:200});
+        }
+        if(/:batchUpdate/.test(u) && opt && opt.body && /insertDimension/.test(opt.body)) inserts++;
+        return new Response('{}',{status:200});
+      };
+      openModal(false, null, { sec:'OPPAKKEN' });
+      document.getElementById('m-code').value='311212';
+      document.getElementById('m-naam').value='Testflat';
+      document.getElementById('m-actie').value='Twee keer klikken';
+      await state._writeChain.catch(()=>{});
+      // Twee klikken vlak achter elkaar, zoals een ongeduldige gebruiker ze geeft.
+      const eerste=submitTask();
+      const tweede=submitTask();
+      await eerste; await tweede;
+      await state._writeChain.catch(()=>{});
+      eq('dubbelklik: twee klikken op Toevoegen leveren ÉÉN taak op',
+         [(D.ntd.OPPAKKEN||[]).length, inserts], [1, 1]);
+      eq('dubbelklik: en de rem staat daarna weer los', state._submitBezig, false);
+    } finally {
+      closeModal(); clearModal();
+      window.fetch=_fetch; window.alert=_alert;
+      state.oauthToken=tokenOud; state.oauthExpiry=expOud; state._sheetIds=idsOud;
+      D.ntd=ntdOud; D.af=afOud; D.ntdSecInfo=infoOud; state._uitCache=cacheOud;
+      state._dubbelcheckUit=dcOud; state.activeNtd=secOud; state.editMode=editOud;
+      state._submitBezig=false;
+    }
+  })();
+
+  // ── B. De ankercontrole zwijgt zolang onze EIGEN schrijfacties nog lopen ──
+  // Het geheugen loopt dan bewust vóór op de Sheet, dus de lezing bewijst niets — en de melding
+  // 'opnieuw geladen' zou liegen, want `loadAll` keert bij pendingWrites>0 ook meteen terug.
+  await (async () => {
+    console.log('%c[TESTS] Anker zwijgt tijdens eigen schrijfacties', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const _fetch=window.fetch, tokenOud=state.oauthToken, expOud=state.oauthExpiry;
+    const ntdOud=D.ntd, infoOud=D.ntdSecInfo, pendOud=state.pendingWrites;
+    try{
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
+      const taak={ _sec:'OPPAKKEN', _row:10, code:'311162', naam:'VvE Test', actiepunt:'Lekkage',
+                   deadline:'', behandelaar:'', prioriteit:'', opmerkingen:'', taakId:'T-77' };
+      D.ntd={ OPPAKKEN:[taak], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      D.ntdSecInfo={ OPPAKKEN:{colHeaderRow:2} };
+      let gelezen=0;
+      // Zou hij tóch lezen, dan geeft deze stub een ANDERE taak terug en sloeg de guard alarm —
+      // zo meet deze test echt of hij zwijgt, en niet of hij toevallig doorlaat.
+      window.fetch=async()=>{ gelezen++; return new Response(JSON.stringify({values:[['311162','VvE Test','Iets anders','','','','','','','','','','','','','','T-99']]}),{status:200}); };
+      state.pendingWrites=1;
+      let fout=null;
+      try{ await bevestigInvoegPlek('OPPAKKEN', 10); }catch(e){ fout=e; }
+      eq('anker: met een lopende eigen schrijfactie wordt er niet gelezen en niet geblokkeerd',
+         [fout, gelezen], [null, 0]);
+      // Tegenproef: zodra de wachtrij leeg is doet hij zijn werk wél.
+      state.pendingWrites=0;
+      fout=null;
+      try{ await bevestigInvoegPlek('OPPAKKEN', 10); }catch(e){ fout=e; }
+      truthy('anker: met een lege wachtrij slaat hij wél alarm op een verschoven anker',
+             gelezen===1 && !!fout && !!fout.rowMismatch);
+    } finally {
+      window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expOud;
+      D.ntd=ntdOud; D.ntdSecInfo=infoOud; state.pendingWrites=pendOud;
+    }
+  })();
+
+  // ── E. De tijdslimiet dekt óók het uitlezen van het antwoord ──
+  // `fetch` lost al op zodra de KOP binnen is; het lichaam (bij de batchGet ~200 kB) wordt bij de
+  // aanroeper gelezen. Werd de klok in een `finally` gewist, dan was er op dat moment geen
+  // AbortController meer die een vastgelopen `r.json()` kon afbreken.
+  await (async () => {
+    console.log('%c[TESTS] Tijdslimiet dekt ook het uitlezen', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const _fetch=window.fetch, tokenOud=state.oauthToken, expOud=state.oauthExpiry;
+    const timeoutOud=state._fetchTimeoutMs, nfOud=state._netwerkFouten;
+    try{
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
+      state._fetchTimeoutMs=60; state._netwerkFouten=0;
+      // Een antwoord waarvan de KOP meteen binnen is, maar het lichaam nooit — behalve als het
+      // wordt afgebroken. Precies het geval dat een wegvallende verbinding halverwege oplevert.
+      window.fetch=async(url, opt)=>{
+        const sig=opt&&opt.signal;
+        return {
+          ok:true, status:200,
+          json: () => new Promise((_,af)=>{
+            if(sig) sig.addEventListener('abort', ()=>af(Object.assign(new Error('afgebroken'),{name:'AbortError'})));
+          }),
+        };
+      };
+      let fout=null;
+      const begin=Date.now();
+      try{ await fetchSheet('Nog Te Doen'); }catch(e){ fout=e; }
+      truthy('uitlezen: een antwoord waarvan het lichaam blijft hangen wordt alsnog afgebroken', !!fout);
+      if(document.visibilityState==='hidden')
+        truthy('uitlezen: LET OP — de tijd is NIET gemeten; dit tabblad staat op de achtergrond en '
+               + 'de browser knijpt daar elke timer af. Haal het naar voren en draai opnieuw', true);
+      else
+        truthy('uitlezen: … en niet pas na de standaardtijd van 20 seconden', Date.now()-begin < 10000);
+    } finally {
+      window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expOud;
+      state._fetchTimeoutMs=timeoutOud; state._netwerkFouten=nfOud;
+    }
+  })();
+
+  // ── H. De achterblijver-telling negeert wat er in dezelfde bulk meegaat ──
+  (() => {
+    console.log('%c[TESTS] Achterblijvende subtaken tellen', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const kop={ _sec:'OPPAKKEN', _row:5, code:'311212', naam:'F', actiepunt:'Kop',  taakId:'TK', bundelId:'B1', bundelVolg:'0'  };
+    const sub={ _sec:'OPPAKKEN', _row:6, code:'311212', naam:'F', actiepunt:'Sub',  taakId:'TS', bundelId:'B1', bundelVolg:'10' };
+    const leeg={ OPPAKKEN:[kop,sub], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const ix=bouwBundelIndex(leeg, { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] });
+    eq('subtaken: zonder negeer-lijst telt de subtaak gewoon mee', openSubtaken(ix, kop), 1);
+    eq('subtaken: zit de subtaak in dezelfde handeling, dan blijft er niets achter',
+       openSubtaken(ix, kop, new Set([kop, sub])), 0);
+    eq('subtaken: een negeer-lijst zonder die subtaak verandert niets',
+       openSubtaken(ix, kop, new Set([kop])), 1);
   })();
 
   console.log = _origLog;         // het voortgangsspoor weer los

@@ -43,11 +43,18 @@ async function _fetchGeteld(url, opts){
   let r;
   try{ r=await fetch(url, { ...(opts||{}), signal: ac.signal }); }
   catch(e){
+    clearTimeout(klok);
     state._netwerkFouten=(state._netwerkFouten||0)+1;
     if(e && e.name==='AbortError') throw new Error('Geen antwoord van Google binnen 20 seconden');
     throw e;
   }
-  finally{ clearTimeout(klok); }
+  // De klok loopt bij een GESLAAGDE kop BEWUST door en wordt hier NIET gewist. `fetch` lost al op
+  // zodra de kop binnen is; het lichaam wordt bij de aanroeper gelezen (`await r.json()`), en dat
+  // is bij de batchGet zo'n 200 kB. Valt de verbinding wég tijdens dat binnenhalen en is de klok
+  // al gewist, dan is er geen AbortController meer die die leesactie kan afbreken: `r.json()`
+  // blijft dan staan, `_loadInFlight` blijft true en de poll slaat vanaf dat moment élke ronde
+  // over — precies de storing die deze tijdslimiet moet dichten, alleen een halve seconde later
+  // in het verzoek. Een `abort()` op een al volledig gelezen antwoord doet niets, dus dit kost niets.
   state._netwerkFouten=0;
   return r;
 }

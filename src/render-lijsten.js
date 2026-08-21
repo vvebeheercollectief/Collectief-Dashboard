@@ -329,13 +329,15 @@ function renderNtd(){
   // krimpt. De tab-tellers hierboven blijven bewust op de ONgeabsorbeerde lijst staan — een
   // geabsorbeerde subtaak is niet verdwenen, alleen anders getekend, en moet dus meetellen.
   const zichtbaar=absorbeer(sorteerNtd(filterNtd(D.ntd[state.activeNtd]||[],q,fCode,fBeh,fPrio,state.activeNtd,state.ntdStatus),state.ntdSort),state.activeNtd,bw);
-  // Dezelfde lijst die hieronder over de pagina's verdeeld wordt, ook op state — daar leest
-  // 'alles selecteren' hem. Bewust hier en niet in `renderTbody`: die krijgt alleen de rijen van
-  // ÉÉN pagina, en 'alles' moet juist over de paginagrens heen gaan.
-  state._ntdZichtbaar=zichtbaar;
   renderThead('ntd-thead',[...(state.bulkMode?[allesVinkjeHtml(zichtbaar)]:[]),...SECS[state.activeNtd].cols,''],SECS[state.activeNtd].css,
     {active:state.ntdSort, keyFor:ntdSorteerKey});
   renderTbody('ntd-tbody',zichtbaar,state.activeNtd,pgs.ntd,false,erIsGefilterd(filters));
+  // Dezelfde lijst die hierboven over de pagina's verdeeld is, ook op state — daar leest
+  // 'alles selecteren' hem. Bewust hier en niet in `renderTbody`: die krijgt alleen de rijen van
+  // ÉÉN pagina, en 'alles' moet juist over de paginagrens heen gaan.
+  // En bewust ná `renderTbody`: gooit het tekenen, dan hoort 'alles selecteren' niet te werken op
+  // een lijst die nooit in beeld is gekomen (zie de catch rond renderAll in data.js).
+  state._ntdZichtbaar=zichtbaar;
   renderPag('ntd-pag',zichtbaar.length,pgs.ntd,'ntd');
   renderNtdCrossList(state.activeNtd);
   // De getekende lijst gaat terug naar de aanroeper: na filteren, sorteren én absorberen, dus in

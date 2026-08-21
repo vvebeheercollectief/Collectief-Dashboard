@@ -101,6 +101,15 @@ export const state = {
                            // vanzelf, dus die verdient een eigen melding met een inlogknop.
   _renderFails: 0,         // opeenvolgende mislukte renderAll()-pogingen (data.js). Alleen voor
                            // diagnose; de banner hangt aan de eerste mislukking.
+  _syncLblVoorBulk: null,  // de tekst die in de statusbalk stond vóór de selecteerstand. Bewaren
+                           // i.p.v. straks 'Live · <nu>' schrijven: dat zou liegen over het moment
+                           // van de laatste geslaagde verversing.
+  _submitBezig: false,     // dubbelklik-rem op submitTask. Sinds `bevestigInvoegPlek` staat er een
+                           // echte lezing tussen de klik en de mutatie, en zonder rem levert een
+                           // tweede klik in dat gat twee identieke taken op.
+  _herinlogBezig: false,   // het inlogvenster van de knop 'Opnieuw inloggen' staat open. De 8s-poll
+                           // moet dan zwijgen: een tweede tokenaanvraag herbindt de GIS-callback en
+                           // laat de aanvraag van de knop los (één callback per client).
   _completeRow: null,      // rij-OBJECT waarvoor de afhandel-modal open staat (identiteit, geen index)
   _completeRid: null,      // geklikte data-rid, alléén voor de groene puls op de juiste DOM-rij
   _completeBusy: false,    // afhandelen loopt (dubbelklik-rem over het async-gat)

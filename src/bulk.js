@@ -242,22 +242,25 @@ async function bulkAfronden(rows){
   // één taak afronden waarschuwt via `bundelWaarschuwing` (crud.js). Sinds het kopvinkje de HELE
   // gefilterde lijst pakt — ook de taken op pagina 2 en 3 die je nooit in beeld hebt gehad — ligt
   // de groene knop pal naast een selectie van veertig taken, en de terugweg is er maar 8 seconden.
-  if(rows.length >= BULK_AFROND_VRAAG_VANAF){
-    // Letterlijk hetzelfde blok als bij bulkVerwijderen: bundels die openstaan blijven staan als
-    // de hoofdtaak wegvalt, en dat hoort de gebruiker vooraf te weten.
-    const ix = bouwBundelIndex(D.ntd, D.af);
-    const metSub = rows.reduce((n,r)=> n + (openSubtaken(ix, r) > 0 ? 1 : 0), 0);
-    const subZin = metSub
-      ? ` Let op: bij ${metSub===1?'één van deze taken':`${metSub} van deze taken`} hangen nog `+
-        `subtaken. Die blijven staan.`
+  // De bundeltelling staat BUITEN de drempel: blijft er een subtaak achter, dan is dat ook bij
+  // twee taken het vermelden waard — en dan wordt er dus gevraagd, ook onder de drempel.
+  const ixAf = bouwBundelIndex(D.ntd, D.af);
+  const gekozenAf = new Set(rows);
+  const metSubAf = rows.reduce((n,r)=> n + (openSubtaken(ixAf, r, gekozenAf) > 0 ? 1 : 0), 0);
+  if(rows.length >= BULK_AFROND_VRAAG_VANAF || metSubAf > 0){
+    const subZin = metSubAf
+      ? ` Let op: bij ${metSubAf===1?(rows.length===1?'deze taak':'één van deze taken'):`${metSubAf} van deze taken`} `+
+        `${metSubAf===1?'hangt':'hangen'} nog een subtaak die niet in deze selectie zit. Die blijft staan.`
       : '';
+    // Enkelvoud in titel én tekst: onder de drempel wordt er alleen gevraagd als er een subtaak
+    // achterblijft, en dan kan het om één taak gaan. Zelfde vorm als bij bulk-verwijderen.
     // Niet 'gevaarlijk' (de rode knop): rood hangt in deze app aan de drie verwijdervragen, en
     // afronden is geen verwijderen. Wel dezelfde plek in de volgorde als daar: ná ensureToken en
     // blokkeerOffline, waar `confirm()` vroeger ook stond.
     if(!await vraagBevestiging({
-        titel:`${rows.length} taken afronden?`,
-        tekst:`Deze taken verhuizen naar 'Afgerond'. Meteen daarna kun je dit nog ongedaan maken `+
-              `met de knop in de melding.`+subZin,
+        titel:`${rows.length} ${rows.length===1?'taak':'taken'} afronden?`,
+        tekst:`${rows.length===1?'Deze taak verhuist':'Deze taken verhuizen'} naar 'Afgerond'. `+
+              `Meteen daarna kun je dit nog ongedaan maken met de knop in de melding.`+subZin,
         bevestigTekst:'Afronden' })) return;
   }
   const d=new Date();
@@ -394,7 +397,9 @@ async function bulkVerwijderen(rows){
   // klik selecteert — bundelkoppen en subtaken door elkaar, want bulk zet de lijst plat — is die
   // belofte van de één-taak-weg te makkelijk te omzeilen. Eén extra zin, geen extra vraag.
   const ix = bouwBundelIndex(D.ntd, D.af);
-  const metSub = rows.reduce((n,r)=> n + (openSubtaken(ix, r) > 0 ? 1 : 0), 0);
+  // Subtaken die in DEZELFDE bulk zitten blijven niet achter; die horen dus niet in de telling.
+  const gekozen = new Set(rows);
+  const metSub = rows.reduce((n,r)=> n + (openSubtaken(ix, r, gekozen) > 0 ? 1 : 0), 0);
   const subZin = metSub
     ? ` Let op: bij ${metSub===1?'één van deze taken':`${metSub} van deze taken`} `+
       `${metSub===1?'hangen':'hangen'} nog subtaken. Die blijven staan.`

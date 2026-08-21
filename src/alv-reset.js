@@ -69,7 +69,11 @@ const _isAlvoTab=(titel)=>(titel||'').trim().toLowerCase()===ALVO_TAB.toLowerCas
 // Eén GET met alle tabblad-eigenschappen: nodig voor de invoegpositie, een vrije
 // archiefnaam, de rasterbreedte, én de controle dat het laatste tabblad niet verschuift.
 async function _tabbladen(){
-  const resp=await fetch(
+  // `sheetsFetch` en niet het kale `fetch`: deze lezing draait BINNEN `metWriteMarkering`, dat
+  // `pendingWrites++` doet en pas in zijn finally aftelt. Bleef dit verzoek hangen, dan draaide dat
+  // finally nooit — de 8s-ronde sloeg vanaf dat moment élke keer over, de balk bleef op 'Opslaan…'
+  // en de Reset-knop op 'Bezig…'. De catch eromheen vangt dat niet: een hangende belofte gooit niet.
+  const resp=await sheetsFetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${SID}?fields=sheets.properties(sheetId,title,index,gridProperties)`,
     {headers:{Authorization:`Bearer ${state.oauthToken}`}});
   if(!resp.ok) throw new Error(`Tabbladen ophalen mislukt: HTTP ${resp.status}`);

@@ -46,14 +46,25 @@ function verplaatsAfgerond(e) {
   if (sectie === "") return;
 
   var vveCode = rowData[0];
-  var vveNaam = rowData[1];
-  var actiepunt = rowData[2];
-  var behandelaar = rowData[4];
   var datumAfgerond = new Date();
-  var newRow = [vveCode, vveNaam, actiepunt, behandelaar, datumAfgerond];
-  // Q, R en S van de afgevinkte rij, in dezelfde volgorde als afrondWaarden (src/crud.js) ze op
-  // 'Afgerond' zet: 1-gebaseerd kolom 17, 18 en 19. Leeg als het blad ze niet had.
-  var bundelStaart = [rowData[16] || "", rowData[17] || "", rowData[18] || ""];
+
+  // Het archiefstramien van afrondWaarden (src/crud.js) — NIET meer de oude vijf kolommen.
+  // Twee redenen. (1) Het Herhaal-ID moet mee: cd_hr_verwerkAfrondingen leest dat op kolom L van
+  // 'Afgerond' (zie Opvolging.gs), en dat bleef bij de vijf-koloms vorm leeg. Een taak met een
+  // 'na afronden'-herhaalregel die iemand hier in de Sheet afvinkte, werd dus nooit opnieuw
+  // ingepland — stil, en achteraf niet te zien. (2) De vijf-koloms vorm zette de behandelaar op
+  // kolom D en de datum op E, terwijl het dashboard daar deadline en behandelaar verwacht;
+  // parseSections heeft daar een aparte herkenningsregel voor moeten krijgen. Elke rij die hier
+  // vandaan komt is nu gewoon een normale archiefrij.
+  // A..H kan letterlijk mee: dat is in beide tabbladen exact SECS[sec].keys, in dezelfde volgorde.
+  var archief = rowData.slice(0, 8);
+  while (archief.length < 8) archief.push("");
+  archief.push(datumAfgerond);              // I = afgerond op
+  archief.push("");                         // J = toelichting (bij afvinken in de Sheet is die er niet)
+  archief.push(cd_f4val(rowData[10]));      // K = subcategorie (K in de bron)
+  archief.push(cd_f4val(rowData[12]));      // L = Herhaal-ID (M in de bron)
+  archief.push("", "", "", "");             // M..P blijven leeg, net als bij afrondWaarden
+  archief.push(rowData[16] || "", rowData[17] || "", rowData[18] || "");  // Q/R/S: taaknummer + bundel
 
   var targetSheet = e.source.getSheetByName("Afgerond");
   if (!targetSheet) {
@@ -113,14 +124,12 @@ function verplaatsAfgerond(e) {
   }
 
   targetSheet.insertRowBefore(insertRow);
-  targetSheet.getRange(insertRow, 1, 1, 5).setValues([newRow]);
-  // Q/R/S apart en niet als één rij van 19 breed: dan zouden F t/m P met lege strings beschreven
-  // worden, en die kolommen raakt deze functie nu bewust niet aan. 'Afgerond' is 26 kolommen breed
-  // (gemeten), maar de klem blijft staan — schrijven buiten het raster mislukt in Apps Script met
-  // een fout die de hele trigger stillegt.
-  if (targetSheet.getMaxColumns() >= 19) {
-    targetSheet.getRange(insertRow, 17, 1, 3).setValues([bundelStaart]);
-  }
+  // Eén schrijfactie over A..S. Nooit breder dan het blad: schrijven buiten het raster mislukt in
+  // Apps Script met een fout die de hele trigger stillegt. 'Afgerond' is 26 kolommen breed
+  // (gemeten), dus in de praktijk gaan alle 19 mee; de klem is het vangnet voor een smaller blad.
+  var schrijfBreedte = Math.min(archief.length, targetSheet.getMaxColumns());
+  targetSheet.getRange(insertRow, 1, 1, schrijfBreedte)
+             .setValues([archief.slice(0, schrijfBreedte)]);
 
   sheet.deleteRow(row);
  });
@@ -145,23 +154,14 @@ function setupAfgerondSheet(sheet) {
   sheet.getRange(11, 1, 1, 5).setValues([headers]);
   sheet.getRange(12, 1).setValue("");
 
-  // Vijfde sectie (2026-07-29). Ontbrak hier, waardoor findSectieRow op een vers skelet -1 gaf
-  // en een afgevinkte subsidietaak stil niet gearchiveerd werd. De volgorde LOD vóór
+  // Vijfde sectie (2026-07-29). Ontbrak hier, waardoor het zoeken naar de sectiekop op een vers
+  // skelet niets vond en een afgevinkte subsidietaak stil niet gearchiveerd werd. De volgorde LOD vóór
   // OFFERTE-TRAJECTEN is BEWUST anders dan SKEYS — zo staat het echt op productie, zie de
   // toelichting bovenin src/structuurcheck.js. Niet 'rechttrekken'.
   sheet.getRange(13, 1).setValue("SUBSIDIE-TRAJECTEN");
   sheet.getRange(14, 1, 1, 5).setValues([headers]);
 }
 
-function findSectieRow(sheet, sectie) {
-  var lastRow = Math.max(sheet.getLastRow(), 11);
-  for (var i = 1; i <= lastRow; i++) {
-    if (sheet.getRange(i, 1).getValue().toString().trim().toUpperCase() === sectie) {
-      return i;
-    }
-  }
-  return -1;
-}
 function verplaatsALV(e) {
  cd_lockedRun('verplaatsALV', () => {
   var sheet = e.source.getActiveSheet();

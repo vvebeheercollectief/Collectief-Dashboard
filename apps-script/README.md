@@ -112,12 +112,13 @@ typt. Het sorteerbereik was **`getRange(start, 1, rijen, 9)` — alleen kolom A 
 rijen tot en met kolom P gevuld zijn (K=subcategorie, L=opvolgdatum, M=herhaalID, N=escalatie,
 O=fase, P=aannemers). Wat in J–P stond bleef dus liggen en hoorde daarna bij de verkeerde taak.
 
-Dat is nu `NTD_SORT_KOLOMMEN = 17` (A t/m Q), geklemd op `sheet.getMaxColumns()` zodat de
+Dat is nu `NTD_SORT_KOLOMMEN = 19` (A t/m S), geklemd op `sheet.getMaxColumns()` zodat de
 trigger nooit omvalt op een blad dat nog niet verbreed is. **Bij een nieuwe kolom rechts: dit
 getal mee ophogen**, anders zakt die kolom bij de eerste handmatige bewerking weer weg.
 
 Waarom dit ertoe doet voor fase 4: gemeten op 2026-07-29 (zie
 `docs/superpowers/proeven/2026-07-29-fase4-rij-identiteit.md`) verplaatst een sortering die het
-volledige gevulde bereik dekt de **rijen zelf** — inclusief een vast taaknummer in kolom Q én
+volledige gevulde bereik dekt de **rijen zelf** — inclusief een vast taaknummer in kolom Q, de
+bundelkolommen R en S, én
 inclusief eventuele DeveloperMetadata. Een smaller bereik verplaatst alleen celwaarden en laat
 elk merkteken achter bij de verkeerde taak.

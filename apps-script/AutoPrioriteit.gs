@@ -23,12 +23,17 @@ function ap_berekenPrio(dlVal, today) {
 }
 
 function cd_recalcPrioriteiten() {
-  cd_safeRun('cd_recalcPrioriteiten', () => {
+  // cd_lockedRun i.p.v. cd_safeRun: deze functie MUTEERT het blad en deed dat zonder slot, terwijl
+  // elke andere schrijvende functie hier er wel een neemt. Draaide de opvolgmotor tegelijk (die
+  // voegt rijen in en verwijdert ze), dan wezen de rijnummers uit de momentopname hieronder naar
+  // andere taken en zette deze functie een prioriteit in de verkeerde rij. cd_lockedRun vangt de
+  // fout net zo goed op als cd_safeRun, dus er gaat geen bescherming verloren.
+  cd_lockedRun('cd_recalcPrioriteiten', () => {
     const sheet = SpreadsheetApp.getActive().getSheetByName('Nog Te Doen');
     if (!sheet) return;
     const data = sheet.getDataRange().getValues();
     const today = new Date(); today.setHours(0,0,0,0);
-    let inOppakken = false, updates = 0;
+    let inOppakken = false, updates = 0, overgeslagen = 0;
     for (let i = 0; i < data.length; i++) {
       const first = (data[i][0] || '').toString().trim().toUpperCase();
       if (['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN'].indexOf(first) !== -1) {
@@ -39,11 +44,22 @@ function cd_recalcPrioriteiten() {
       try {
         const nieuw = ap_berekenPrio(data[i][AP_DEADLINE_COL], today);
         const huidig = (data[i][AP_PRIO_COL] || '').toString().trim();
-        if (nieuw !== huidig) { sheet.getRange(i+1, AP_PRIO_COL+1).setValue(nieuw); updates++; }
+        if (nieuw === huidig) continue;
+        // Rij-controle vlak vóór het schrijven, zoals het dashboard die ook doet. De document-lock
+        // houdt alleen ándere Apps Script-runs tegen; het dashboard schrijft via de Sheets-API en
+        // loopt daar volledig buitenom. Verschoof een rij tussen de momentopname en dit moment, dan
+        // zou hier de prioriteit van de ene taak in de rij van een andere belanden — en dat is aan
+        // niets te zien. Eén extra celllezing per WIJZIGING (een handvol per dag), niet per rij.
+        const codeNu = (sheet.getRange(i + 1, 1).getValue() || '').toString().trim();
+        if (codeNu !== (data[i][0] || '').toString().trim()) { overgeslagen++; continue; }
+        sheet.getRange(i+1, AP_PRIO_COL+1).setValue(nieuw); updates++;
       } catch (rowErr) { Logger.log('cd_recalcPrioriteiten rij ' + (i + 1) + ' fout: ' + rowErr); }
     }
-    Logger.log('Auto-prioriteit: ' + updates + ' taken bijgewerkt');
-    try { cd_schrijfLogboek('', '', 'Auto-prioriteit', '', '', 'Bijgewerkt: ' + updates, 'systeem'); } catch(e) {}
+    Logger.log('Auto-prioriteit: ' + updates + ' taken bijgewerkt'
+      + (overgeslagen ? ', ' + overgeslagen + ' overgeslagen (rij verschoven)' : ''));
+    try { cd_schrijfLogboek('', '', 'Auto-prioriteit', '', '',
+      'Bijgewerkt: ' + updates + (overgeslagen ? ' — ' + overgeslagen + ' overgeslagen omdat de rij verschoven was' : ''),
+      'systeem'); } catch(e) {}
   });
 }
 

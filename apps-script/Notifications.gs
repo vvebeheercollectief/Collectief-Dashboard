@@ -507,6 +507,18 @@ function cd_processNotifEvent(data) {
     cd_schrijfMelding('test', title, body, who || 'allen');
   } else if (ev === 'create_task') {
     const rij = cd_withLock(function(){ return cd_createTaskRow(categorie, code, naam, actiepunt, beh, deadline); });
+    // cd_withLock geeft `undefined` terug als de document-lock binnen 10 seconden niet vrijkwam —
+    // dan is er GEEN rij aangemaakt. Dat werd hier stil doorlopen: de mail-intake kreeg
+    // `ok:true` terug, het team kreeg een pushmelding over een taak die niet bestond, en in het
+    // logboek stond 'Aangemaakt via mail-intake'. Drie keer een onwaarheid uit één stille fout.
+    // Nu eerlijk terugmelden, zodat de aanroeper het opnieuw kan aanbieden.
+    if (!rij) {
+      Logger.log('create_task: geen rij aangemaakt (lock niet verkregen) — code ' + code);
+      cd_schrijfLogboek(code, categorie, 'Fout', 'Aangemaakt via mail-intake', '',
+        'Taak NIET aangemaakt: het blad was bezet. De mail is niet verwerkt — bied hem opnieuw aan.',
+        actor || 'mail-intake');
+      return { ok: false, event: ev, fout: 'blad bezet, taak niet aangemaakt' };
+    }
     // zelfde melding als bij een normale nieuwe taak
     cd_notifyByTag('n_newtask', '1', {
       title: '📋 Nieuwe taak — ' + (categorie || '').toLowerCase(),
@@ -679,7 +691,21 @@ function cd_createTaskRow(categorie, code, naam, actiepunt, behandelaar, deadlin
   const deadlineCol = (sectie === 'OPPAKKEN') ? 4 : 6;      // D voor Oppakken, F voor rest
   if (deadline) sheet.getRange(insertRow, deadlineCol).setValue(cd_safeCell(deadline));
   if (herhaalId) sheet.getRange(insertRow, 13).setValue(herhaalId);  // M = Herhaal-ID (Fase 4)
+  // Q = vast taaknummer. Ontbrak hier, waardoor élke taak die de backend aanmaakt (mail-intake,
+  // herhaalregels) zonder identiteit in de lijst kwam. Gevolg: de schrijf-bescherming van het
+  // dashboard valt voor zo'n rij terug op de vingerafdruk van de inhoud in plaats van op het
+  // nummer, en bouwBundelIndex kan hem nooit als bundellid herkennen. Zelfde vorm als
+  // nieuwTaakId() in src/util.js — tijdstempel in base36 plus drie toevalstekens.
+  // Nooit buiten het raster schrijven: dat mislukt in Apps Script met een fout die de hele
+  // trigger stillegt. Beide bladen zijn breed genoeg (gemeten), de klem is het vangnet.
+  if (sheet.getMaxColumns() >= 17) sheet.getRange(insertRow, 17).setValue(cd_nieuwTaakId());
   return insertRow;
+}
+
+// LET OP — SYNC: zelfde vorm als nieuwTaakId() in src/util.js. Beide kanten maken nummers voor
+// dezelfde kolom Q; wijken ze uiteen, dan is aan een nummer niet meer te zien dat het er een is.
+function cd_nieuwTaakId() {
+  return 'T' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 }
 
 function test_createTask() {

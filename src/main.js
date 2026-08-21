@@ -17,7 +17,7 @@ import {
   subscribeNotifs, unsubscribeNotifs, sendTestNotif, getCurrentWho, initMeldingen,
 } from './notifications.js';
 import {
-  openModal, closeModal, submitTask, doCompleteTask, closeCompleteModal, kiesSectie, renderExtraVves,
+  openModal, closeModal, submitTask, doCompleteTask, closeCompleteModal, kiesSectie, renderExtraVves, _bewerkRijVers,
 } from './crud.js';
 import { loadAll, magPollen, schrijfActieLoopt, setSyncOffline, showOfflineBanner, clearOfflineBanner, laadUitCache } from './data.js';
 import { initActions } from './actions.js';
@@ -252,8 +252,14 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('m-sec').onchange=async e=>{
     const doel=e.target.value;
     if(!state.editMode){ kiesSectie(doel); return; }
-    const r=state.editRowData;
+    // De rij VERS opzoeken op het klikmoment, net als de drie andere knoppen in dit scherm doen
+    // (`_bewerkRijVers`). `state.editRowData` rauw pakken is niet veilig: de stille resync na een
+    // schrijfactie remt niet op een open venster, dus D.ntd kan intussen opnieuw geparsed zijn en
+    // wijst het bewaarde object nergens meer naar. Dan haalt de verplaatsing de oude rij niet uit
+    // de lijst maar zet hem er wél bij in de nieuwe — de taak staat dan in twee categorieën.
+    const r=_bewerkRijVers();
     const bron=r&&r._sec;
+    if(!r){ e.target.value = state.editRowData ? state.editRowData._sec : doel; return; }
     const gelukt=await verplaatsTaak(r, doel);
     if(gelukt){ closeModal(); }
     else if(bron){ e.target.value=bron; }

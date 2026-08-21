@@ -36,6 +36,26 @@ moment dat jij kiest.
 6. Klopt het? Zet `MAILINTAKE_AAN` op `ja` en hang een tijd-trigger op `cd_mailIntakeRonde`
    (elke 5 minuten). Pas dán gebeurt er echt iets.
 
+## Vijf dingen die er eerst uit moesten (gedaan)
+
+Een tweede lezer heeft dit bestand nagelopen vóórdat het ergens heen ging. Vijf punten, waarvan één
+fataal:
+
+1. **De taak werd niet aangemaakt, maar de mail wél afgevinkt.** De aanroep om het blad even op slot
+   te zetten kreeg een argument te weinig; die fout werd intern opgevangen, dus er kwam geen taak —
+   terwijl de logboekregel en het label 'verwerkt' er wél kwamen. De mail zou dan uit de inbox
+   verdwijnen en nooit terugkomen.
+2. **Het slot kan gewoon bezet zijn.** Ook na die reparatie geeft de sloth-functie stil niets terug
+   als het blad tien seconden bezet blijft. Nu wordt de uitkomst gecontroleerd: geen taak = geen
+   label, dan blijft de mail staan.
+3. **Het model kon een VvE-code verzinnen.** Die wordt nu getoetst tegen de echte lijst; een
+   onbekende code levert geen taak op en laat de mail staan.
+4. **Niemand zou merken dat de robot iets had neergezet.** Er komt nu een regel in het
+   Meldingen-tabblad. Bewust geen pushbericht per mail: bij tien taken per ronde is dat geen signaal
+   meer maar ruis.
+5. **De logregel stond op naam van "Iemand".** Nu staat er 'mail-intake' bij, zodat in het logboek en
+   het VvE-dossier te zien is dat de robot het deed.
+
 ## Wat versie 1 bewust niet doet
 
 - **Geen concept-antwoorden.** Het playbook heeft er sjablonen voor, maar mail schrijven namens

@@ -95,6 +95,17 @@ function cd_mailIntakeRonde() {
       // stilzwijgend ergens neerzetten.
       if (uitslag.twijfel || uitslag.categorie !== categorie) omschrijving = '🔎 controleren — ' + omschrijving;
 
+      // De VvE-code moet in de ECHTE lijst staan. Het model kan een code verzinnen, en een taak
+      // onder een niet-bestaande code staat wel in de lijst maar hoort bij geen enkel dossier —
+      // en niets in het dashboard geeft daar ooit een signaal over. Dan liever laten staan.
+      var bekend = false;
+      for (var v = 0; v < vves.length; v++) if (vves[v].code === uitslag.vve_code) { bekend = true; break; }
+      if (!bekend) {
+        Logger.log('[mail-intake] overgeslagen (onbekende VvE-code ' + uitslag.vve_code + '): ' + m.getSubject());
+        overgeslagen++;
+        continue;
+      }
+
       if (proef) {
         Logger.log('[mail-intake PROEF] zou aanmaken: ' + categorie + ' | ' + uitslag.vve_code +
                    ' | ' + omschrijving + ' | deadline ' + (uitslag.deadline || '-') +
@@ -103,12 +114,32 @@ function cd_mailIntakeRonde() {
         continue;
       }
 
-      cd_lockedRun(function () {
-        cd_createTaskRow(categorie, uitslag.vve_code, uitslag.vve_naam || '', omschrijving,
-                         '', uitslag.deadline || '');
+      // `cd_lockedRun` verwacht (label, functie). Met één argument is `fn` undefined, gooit
+      // `return fn()`, en vangt cd_lockedRun zijn eigen fout op — dan wordt er GEEN taak
+      // aangemaakt terwijl de logregel en het label er wél komen. De mail verdwijnt dan uit de
+      // inbox en komt nooit terug: drie keer een onwaarheid uit één stille fout, precies wat op
+      // deze codebase al eens is dichtgemetseld (zie het create_task-event in Notifications.gs).
+      // En daarom hieronder ook de UITKOMST toetsen: het document-slot kan gewoon bezet zijn,
+      // en dan geeft cd_lockedRun stil `undefined` terug.
+      var rij = cd_lockedRun('mail-intake', function () {
+        return cd_createTaskRow(categorie, uitslag.vve_code, uitslag.vve_naam || '', omschrijving,
+                                '', uitslag.deadline || '');
       });
+      if (!rij) {
+        Logger.log('[mail-intake] taak NIET aangemaakt (slot bezet of fout) — mail blijft staan: ' + m.getSubject());
+        overgeslagen++;
+        continue;
+      }
+      // Pas nu het journaal en het label. Zevende argument = de gebruiker; zonder dat staat er
+      // 'Iemand' in het Logboek en in het VvE-dossier, en is niet te zien dat de robot het deed.
       cd_schrijfLogboek(uitslag.vve_code, categorie, 'Aangemaakt', 'mail-intake', '',
-                        m.getSubject() || '');
+                        m.getSubject() || '', 'mail-intake');
+      // En een regel in het Meldingen-tabblad, zodat het team ziet dát er iets is bijgekomen.
+      // Bewust GEEN pushbericht: deze motor kan tien taken per ronde neerzetten en dan is een
+      // push per stuk geen signaal meer maar ruis. Stilte is echter net zo fout — dan zet de
+      // robot werk neer dat niemand opmerkt.
+      cd_schrijfMelding('newtask', 'Nieuwe taak uit de mail',
+                        uitslag.vve_code + ' — ' + omschrijving, 'allen');
       draden[i].addLabel(label);
       gedaan++;
     } catch (e) {

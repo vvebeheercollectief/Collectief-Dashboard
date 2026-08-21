@@ -158,6 +158,25 @@ function toonMeerVve(isEdit){
   renderExtraVves();
 }
 
+// Het scherm bijstellen NADAT er besloten is dat dit een subtaak wordt.
+//
+// De volgorde is dwingend en niet vrij te kiezen: `clearModal` wist `state._nieuwBundel` (een leeg
+// formulier hoort bij géén bundel), dus de knop '+ Voeg een subtaak toe' kan die vlag pas ZETTEN
+// nadat het scherm open is. Gevolg: alles wat ín `openModal` op die vlag kijkt, kijkt er te vroeg
+// naar. Twee dingen liepen daardoor stuk, en allebei zonder foutmelding:
+//   - het blok 'Ook voor andere VvE's' bleef staan; koos je daar twee VvE's, dan kreeg je één
+//     subtaak plus twee LOSSE taken buiten de bundel (alleen te zien aan een lege kolom R);
+//   - de subtaak kreeg alsnog een voorgestelde deadline van over zeven dagen.
+// Daarom niet een derde guard erbij, maar deze ene functie die de aanroeper ná het zetten van de
+// vlag draait — dan zien beide beslissingen dezelfde waarheid.
+function herzieAlsSubtaak(sec){
+  toonMeerVve(false);
+  const veldEl = document.getElementById(DEADLINE_VELD[sec]);
+  const hintEl = document.getElementById(DEADLINE_HINT_VELD[sec]);
+  if(veldEl) veldEl.value = '';
+  if(hintEl) hintEl.textContent = '';
+}
+
 function openModal(isEdit,rowData,opts){
   state.editMode=!!isEdit;
   const sec=isEdit?rowData._sec:((opts&&opts.sec)||state.activeNtd);
@@ -1111,7 +1130,12 @@ async function submitTask(){
       flashRow('ntd-tbody', nieuw._row, 'rij-flits-groen');
       // De extra VvE's NU uitlezen: het `clearModal` hieronder wist ze, net als de bundelkeuze en
       // de 'Hoort bij'-doeltaak. Dezelfde afweging, dezelfde plek.
-      const extra = extraVves();
+      // De extra's nog één keer langs de HOOFD-VvE halen. `voegExtraVveToe` vergelijkt op het moment
+      // van kiezen, en die code kan daarna nog wijzigen: kies eerst de extra's, zet dán het
+      // VvE-veld op diezelfde code, en je krijgt twee identieke taken voor dezelfde VvE — precies
+      // wat meervve.js belooft tegen te houden. Gemeten in de draaiende app; ook bereikbaar vanaf
+      // de dossierpagina, waar de code al ingevuld staat en daarna te wijzigen is.
+      const extra = extraVves().filter(v => v.code !== code);
       closeModal();clearModal();
       // De extra's krijgen ieder een EIGEN rij en een EIGEN taaknummer, en géén bundel: het zijn
       // losse dossiers die ieder hun eigen gang gaan (zie meervve.js). Ze worden hier direct ACHTER
@@ -1169,11 +1193,18 @@ async function submitTask(){
                     null,'plus',{geenDedup:true,geenSysteemmelding:true});
         },
         ()=>{ const a=D.ntd[sec]||[];
-              rijen.forEach(r=>{ const p=a.indexOf(r); if(p>-1) a.splice(p,1); });
-              // Eén keer terugschuiven met het totaal, ná het verwijderen. Per rij schuiven of
-              // schuiven vóór het verwijderen laat de rijnummers van de hele sectie scheef achter,
-              // en dan schrijft de VOLGENDE actie naar een verkeerde rij.
-              _shiftNtdRows(afterRow,-totaal); },
+              // Tellen wat er ÉCHT nog stond. Onvoorwaardelijk met `totaal` terugschuiven is een
+              // regressie ten opzichte van de één-rij-versie: is een van de nieuwe taken intussen
+              // afgerond of verwijderd, dan heeft die weg zijn eigen `_shiftNtdRows(-1)` al gedaan
+              // en schuift deze rollback één rij te ver. Vanaf dat moment wijst élk rijnummer
+              // eronder te laag en schrijft de vólgende actie naar een verkeerde rij — en dáár
+              // beschermt de rij-controle niet tegen: die bewaakt overschrijven, niet een
+              // verkeerde rij-KEUZE.
+              let weg=0;
+              rijen.forEach(r=>{ const p=a.indexOf(r); if(p>-1){ a.splice(p,1); weg++; } });
+              // Eén keer terugschuiven, ná het verwijderen. Per rij schuiven of schuiven vóór het
+              // verwijderen laat de rijnummers van de hele sectie scheef achter.
+              if(weg) _shiftNtdRows(afterRow,-weg); },
         'Toevoegen mislukt'
       );
     }
@@ -1223,5 +1254,6 @@ export {
   getAfInsertRow, completeTask, completeCurrentEditTask, doCompleteTask, closeCompleteModal, submitTask, gv,
   OMSCHRIJVING_VELD, zetOmschrijving, taakUitCache,
   _verseRijIdx, _herankerRij, zetSubsidieFase, kiesModalFase, _modalFaseWoord,
-  zetDeadlineVoorstel, DEADLINE_VELD, DEADLINE_HINT_VELD, renderExtraVves, toonMeerVve,
+  zetDeadlineVoorstel, DEADLINE_VELD, DEADLINE_HINT_VELD, renderExtraVves, toonMeerVve, herzieAlsSubtaak,
+  _bewerkRijVers,
 };

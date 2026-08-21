@@ -12,7 +12,7 @@ import {
   setOntw, renderOntw, editOntwItem, addTaskNote, renderLogboek,
   editLogboek, saveLogboek, cancelLogboek, setLogSoort, deleteLogboek,
 } from './render-overig.js';
-import { openModal, completeTask, completeCurrentEditTask, deleteCurrentEditTask, zetSubsidieFase, kiesModalFase, zetHoortBij, taakUitCache, renderExtraVves } from './crud.js';
+import { openModal, completeTask, completeCurrentEditTask, deleteCurrentEditTask, zetSubsidieFase, kiesModalFase, zetHoortBij, taakUitCache, renderExtraVves, herzieAlsSubtaak } from './crud.js';
 import { ontkoppelTaak } from './bundel-acties.js';
 import { adjOff } from './util.js';
 import { copyAiPrompt, aiOvernemen, aiActieTaak, aiKopieerConcept, prefillNieuweTaak } from './ai.js';
@@ -105,6 +105,10 @@ export const ACTIONS = {
     // alleen zichtbaar aan een lege kolom R.
     prefillNieuweTaak(kop.r._sec, kop.r.code, kop.r.naam, '');
     state._nieuwBundel = { bundelId: id, volg: volgendeVolg(leden) };
+    // …en pas nu het scherm bijstellen. Alles wat ín openModal op deze vlag kijkt, keek er te
+    // vroeg naar: het blok 'Ook voor andere VvE's' bleef staan (en maakte er losse taken naast)
+    // en de subtaak kreeg alsnog een voorgestelde deadline. Zie herzieAlsSubtaak in crud.js.
+    herzieAlsSubtaak(kop.r._sec);
   },
   // Het kruisje achter 'Hoort bij' in het bewerkscherm. Twee standen, en het verschil is
   // wezenlijk: staat er een nog niet opgeslagen KEUZE, dan valt er nog niets te ontkoppelen —

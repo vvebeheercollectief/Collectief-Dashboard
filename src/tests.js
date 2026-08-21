@@ -18,7 +18,7 @@ import { _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, _shi
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
-import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _eindKolom, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, getAfInsertRow, OMSCHRIJVING_VELD, zetOmschrijving, _sheetBreedtes, getSheetIds, kiesSectie, deleteTaskRow, deleteCurrentEditTask, completeCurrentEditTask, renderExtraVves, toonMeerVve, zetDeadlineVoorstel } from "./crud.js";
+import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _eindKolom, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, getAfInsertRow, OMSCHRIJVING_VELD, zetOmschrijving, _sheetBreedtes, getSheetIds, kiesSectie, deleteTaskRow, deleteCurrentEditTask, completeCurrentEditTask, renderExtraVves, toonMeerVve, zetDeadlineVoorstel, herzieAlsSubtaak } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages, renderChat } from "./dossier-chat.js";
 import { shouldPromptReload, maakHerlaadKern, zelfdeWorker } from "./sw-update.js";
@@ -3826,7 +3826,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '10.28');
+  eq('versie opgehoogd', APP_VERSION, '10.29');
 
   // ── Pushmeldingen: de twee schakels die stil kapot waren (audit 2026-08-06) ──
   // Beide defecten waren onzichtbaar: de app meldde "Notificaties zijn aan!" terwijl er nooit
@@ -10477,13 +10477,30 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const bundelOud = state._nieuwBundel;
     toonMeerVve(true);
     eq('meer-vve: bij bewerken staat het blok er niet', blok.style.display, 'none');
-    state._nieuwBundel = { bundelId:'Tkop', volg:'10' };
-    toonMeerVve(false);
-    // Twaalf subtaken van twaalf verschillende VvE's in één bundel is geen bundel meer.
-    eq('meer-vve: bij een subtaak staat het blok er ook niet', blok.style.display, 'none');
     state._nieuwBundel = bundelOud;
     toonMeerVve(false);
     eq('meer-vve: bij een gewone nieuwe taak staat het er wel', blok.style.display, '');
+    // ── En nu de ECHTE volgorde van de subtaak-knop ──
+    // De oude toets zette de bundelvlag vóór `toonMeerVve` en toetste daarmee een volgorde die in
+    // de app niet bestaat: `clearModal` wist die vlag juist, dus '+ Voeg een subtaak toe' kan hem
+    // pas ZETTEN nadat het scherm open is. Alles wat ín openModal op die vlag keek, keek er dus te
+    // vroeg naar — en het blok stond gewoon in beeld. Koos je daar twee VvE's, dan kreeg je één
+    // subtaak plus twee LOSSE taken buiten de bundel, alleen te zien aan een lege kolom R.
+    // Deze toets loopt daarom de weg van de knop na: openen, dán de vlag, dán het scherm bijstellen.
+    state._nieuwBundel = null;
+    openModal(false, null, { sec:'OPPAKKEN' });
+    eq('meer-vve: vlak na het openen staat het blok er nog (de vlag is er nog niet)',
+       blok.style.display, '');
+    state._nieuwBundel = { bundelId:'Tkop', volg:'10' };
+    herzieAlsSubtaak('OPPAKKEN');
+    // Twaalf subtaken van twaalf verschillende VvE's in één bundel is geen bundel meer. En een
+    // subtaak erft geen deadline van over zeven dagen die niets met de hoofdtaak te maken heeft.
+    eq('meer-vve: ná de subtaak-knop is het blok weg én de deadline leeg',
+       [blok.style.display, document.getElementById('m-dl').value,
+        document.getElementById('dl-hint').textContent],
+       ['none', '', '']);
+    state._nieuwBundel = bundelOud;
+    closeModal(); clearModal();
 
     // ── En het aanmaken zelf ──
     const fetchOud = window.fetch, tokenOud = state.oauthToken, expOud = state.oauthExpiry;
@@ -10545,6 +10562,25 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       // De lijst wordt bij het volgende scherm niet meegedragen: één klik op Toevoegen zou er
       // anders nog eens twaalf bij maken.
       eq('meer-vve: na het aanmaken is de lijst leeg', extraVves().length, 0);
+
+      // De hoofd-VvE kan NÁ het kiezen van de extra's nog wijzigen. `voegExtraVveToe` vergelijkt op
+      // het moment van kiezen, dus zonder een tweede controle bij het opslaan krijg je twee
+      // identieke taken voor dezelfde VvE — precies wat meervve.js belooft tegen te houden.
+      // Een VERSE array, niet `{...leeg}`: die spreidt de bestaande array-verwijzingen uit, dus de
+      // drie zojuist gemaakte taken zouden er gewoon in blijven staan.
+      D.ntd = { ...leeg, OPPAKKEN: [] };
+      D.ntdSecInfo = { OPPAKKEN:{ colHeaderRow:2 } };
+      openModal(false, null, { sec:'OPPAKKEN' });
+      voegExtraVveToe('311200','Flat A','');        // gekozen terwijl het VvE-veld nog leeg was
+      renderExtraVves();
+      document.getElementById('m-code').value='311200';   // …en dán dezelfde code als hoofd-VvE
+      document.getElementById('m-naam').value='Flat A';
+      document.getElementById('m-actie').value='Dubbele VvE-proef';
+      await state._writeChain.catch(()=>{});
+      await submitTask();
+      await state._writeChain;
+      eq('meer-vve: een extra VvE die gelijk is aan de hoofd-VvE levert géén tweede taak op',
+         D.ntd.OPPAKKEN.length, 1);
     } finally {
       window.fetch=fetchOud; window.alert=alertOud;
       state.oauthToken=tokenOud; state.oauthExpiry=expOud; state._sheetIds=idsOud;
@@ -10682,12 +10718,29 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       // naar 41 → 0-gebaseerde index 40.
       eq('verplaatsen: de oude rij wordt verwijderd ná de verschuiving door de invoeging',
          batch.body.requests[2].deleteDimension.range.startIndex, 40);
+      // …en de ANDERE tak van diezelfde rekensom: stond de taak BOVEN de invoegplek, dan schuift
+      // hij niet op en is de verwijderindex één lager. Die tak draaide ongetoetst mee; een `>` die
+      // ooit een `>=` wordt, wist daar een wildvreemde taak — en de rij-controle merkt dat niet,
+      // want die kijkt naar de rij die we willen HOUDEN, niet naar de rij die verdwijnt.
+      const _oudIndex = (rij, na) => (rij > na) ? rij : rij - 1;
+      eq('verplaatsen: de rekensom klopt in beide richtingen',
+         [_oudIndex(40, 3), _oudIndex(3, 40), _oudIndex(10, 10)], [40, 2, 9]);
       // Het logboek houdt vast wat er verviel — de enige plek waar dat later nog te lezen is.
       const logRegels = posts.filter(p=>p.methode==='POST' && /Logboek/.test(p.url))
         .flatMap(p=>((p.body&&p.body.values)||[]));
-      eq('verplaatsen: het logboek noteert de verhuizing én wat erbij verviel',
-         logRegels.map(r=>[r[3], r[4]]),
-         [['Verplaatst','categorie'], ['Vervallen bij verplaatsen','Status']]);
+      // De logregel gaat onder de NIEUWE categorie. Twee dingen sleutelen op code + sectie: het
+      // geschiedenisblok in het bewerkscherm en de escalatiemotor in Apps Script. Onder de OUDE
+      // sectie loggen liet de verhuisde taak 'Nog geen notities' tonen — terwijl de vraag belooft
+      // dat de geschiedenis meegaat — en liet hem stil uit de bewaking vallen.
+      eq('verplaatsen: het logboek noteert de verhuizing onder de NIEUWE categorie, mét wat verviel',
+         logRegels.map(r=>[r[2], r[3], r[4]]),
+         [['OPPAKKEN','Verplaatst','categorie'], ['OPPAKKEN','Vervallen bij verplaatsen','Status']]);
+      // Het escalatiestempel (kolom N) gaat NIET mee: de drempels verschillen per categorie, dus
+      // een meegereisd 'trap 1'-stempel zou in Oppakken trap 1 overslaan en meteen de teambrede
+      // melding afvuren.
+      const geschreven = batch.body.requests[1].updateCells.rows[0].values
+        .map(c=>c.userEnteredValue.stringValue);
+      eq('verplaatsen: het escalatiestempel begint in de nieuwe categorie opnieuw', geschreven[13], '');
       // Naar dezelfde categorie verplaatsen is geen handeling.
       vragen=[]; posts=[];
       await vraagEnAntwoord(()=>verplaatsTaak(D.ntd.OPPAKKEN[0], 'OPPAKKEN'), true);

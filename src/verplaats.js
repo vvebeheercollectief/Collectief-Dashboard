@@ -130,7 +130,13 @@ async function verplaatsTaak(r, doelSec){
   const sheetId = ids['Nog Te Doen'];
   if(sheetId == null){ alert('Sheet "Nog Te Doen" niet gevonden'); return false; }
 
-  const doelAfterRow = getInsertRow(doelSec);          // 1-gebaseerd: invoegen ná deze rij
+  // `getInsertRow` GOOIT als het sectieblok niet in het tabblad staat — bewust, want een taak die
+  // ongemerkt in een andere sectie belandt is duurder dan een mislukte handeling. Hier opvangen:
+  // zonder deze try komt die fout nergens aan (deze functie wordt niet geawait door de aanroeper)
+  // en gebeurt er zichtbaar niets.
+  let doelAfterRow;
+  try { doelAfterRow = getInsertRow(doelSec); }   // 1-gebaseerd: invoegen ná deze rij
+  catch(e){ alert(e.message); return false; }
   const { doelRij } = verplaatsWaarden(r, bronSec, doelSec, doelAfterRow + 1);
   // De verwijderindex ná de invoeging. Google voert de verzoeken op volgorde uit, dus de oude rij
   // is één plek opgeschoven zodra hij ONDER de invoegplek stond. Zonder deze correctie verdwijnt
@@ -154,7 +160,7 @@ async function verplaatsTaak(r, doelSec){
   // Idempotent, om dezelfde reden als bij afronden: deze batch is POSITIE-gebaseerd. Een
   // herkansing na een tijdelijke fout zou een tweede rij invoegen en een onschuldige buurrij
   // verwijderen.
-  let verplaatst = false;
+  let verplaatst = false, gelogd = false;
   backgroundWrite(
     async ()=>{
       if(!verplaatst){
@@ -176,7 +182,11 @@ async function verplaatsTaak(r, doelSec){
         const rij = verplaatsWaarden(r, bronSec, doelSec, doelAfterRow + 1).rij;
         rij[11] = uitBlad(11, doelRij.opvolgdatum);
         rij[12] = uitBlad(12, doelRij.herhaalId);
-        rij[13] = uitBlad(13, '');
+        // Kolom N (het escalatiestempel) gaat NIET mee. De drempels verschillen sterk per
+        // categorie — Oppakken 7/14 dagen, LOD 30/60 — dus een LOD-taak met een 'trap 1'-stempel
+        // zou in Oppakken trap 1 overslaan en bij veertien dagen meteen de TEAMBREDE melding
+        // afvuren. De klok hoort in de nieuwe categorie opnieuw te beginnen.
+        rij[13] = '';
         rij[14] = uitBlad(14, doelRij.fase);
         rij[15] = uitBlad(15, doelRij.aannemers);
         rij[16] = uitBlad(16, doelRij.taakId);
@@ -196,20 +206,41 @@ async function verplaatsTaak(r, doelSec){
           const err=new Error(e.error?.message||'Verplaatsen mislukt'); err.status=resp.status; throw err; }
         verplaatst = true;
       }
-      await logEvent(r.code, bronSec, 'Verplaatst', 'categorie', SECS[bronSec].label, SECS[doelSec].label);
-      // De vervallen velden apart vastleggen. Dit is de enige plek waar ze nog terug te lezen zijn
-      // nadat de kolom is verdwenen — en juist daarom hoort het in het journaal en niet alleen in
-      // een venster dat de gebruiker wegklikt.
-      for(const v of verloren)
-        await logEvent(r.code, bronSec, 'Vervallen bij verplaatsen', v.label, v.waarde, '');
+      // DE LOGREGEL GAAT ONDER DE NIEUWE CATEGORIE, en dat is geen boekhoudkundige haarkloverij.
+      // Twee dingen sleutelen op code + SECTIE:
+      //   - het geschiedenisblok in het bewerkscherm (renderTaskHistory in render-overig.js), dus
+      //     onder de oude sectie loggen laat de verhuisde taak 'Nog geen notities' tonen terwijl de
+      //     vraag woordelijk belooft dat de geschiedenis meegaat;
+      //   - de escalatiemotor in Apps Script (Opvolging.gs bouwt een kaart `code|SECTIE` en slaat
+      //     een taak zonder activiteit in díe sectie over). Onder de oude sectie loggen laat de
+      //     taak dus stil uit de bewaking vallen — of, als die VvE daar toevallig oudere activiteit
+      //     heeft, laat hem morgen teambreed escaleren zonder aanleiding.
+      // De oude categorie staat als 'oude waarde' in dezelfde regel, dus het spoor blijft leesbaar.
+      // Idempotent: `_withRetry` draait deze functie tot drie keer bij een tijdelijke fout, en een
+      // append is niet idempotent — zonder vlag komt er dan een tweede 'Verplaatst' in het Logboek,
+      // die ook nog eens de stil-teller opnieuw op nul zet.
+      if(!gelogd){
+        await logEvent(r.code, doelSec, 'Verplaatst', 'categorie', SECS[bronSec].label, SECS[doelSec].label);
+        // De vervallen velden apart vastleggen. Dit is de enige plek waar ze nog terug te lezen zijn
+        // nadat de kolom is verdwenen — en juist daarom hoort het in het journaal en niet alleen in
+        // een venster dat de gebruiker wegklikt.
+        for(const v of verloren)
+          await logEvent(r.code, doelSec, 'Vervallen bij verplaatsen', v.label, v.waarde, '');
+        gelogd = true;
+      }
       showToast('Taak verplaatst', `${r.code} — nu bij ${SECS[doelSec].label}`, null, 'label',
                 { geenDedup:true, geenSysteemmelding:true });
     },
-    ()=>{ // terug naar de bronsectie
+    ()=>{ // Exact het spiegelbeeld van de optimistische mutatie hierboven, in omgekeerde volgorde.
+          // De vorige versie zette de taak ACHTERAAN zijn oude categorie en schoof daarbij alles
+          // eronder op terwijl er in de Sheet niets was ingevoegd: elke buurrij tussen de oude plek
+          // en het einde van het blok stond daarna één rijnummer te hoog. Normaal binnen een
+          // seconde rechtgetrokken door de stille resync, maar juist de tak die deze rollback het
+          // vaakst afvuurt is 'offline' — en dan komt die resync per definitie niet.
           const dArr = D.ntd[doelSec] || []; const dp = dArr.indexOf(doelRij);
-          if(dp > -1){ dArr.splice(dp, 1); _shiftNtdRows(doelRij._row, -1); }
-          const bAfter = getInsertRow(bronSec);
-          r._row = bAfter + 1; _shiftNtdRows(bAfter, +1);
+          if(dp > -1) dArr.splice(dp, 1);
+          _shiftNtdRows(naAfterRow, -1);      // de invoeging terugdraaien
+          _shiftNtdRows(r._row, +1);          // en de verwijdering
           (D.ntd[bronSec] = D.ntd[bronSec] || []).push(r); },
     'Verplaatsen mislukt'
   );

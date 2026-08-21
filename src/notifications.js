@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  NOTIFICATIONS — meldingen (wachtrij/push) + in-app toasts
 // ══════════════════════════════════════
-import { esc, displayName, parseDt, meldSleutel, kiesAfgerondRij } from "./util.js";
+import { esc, displayName, parseDt, meldSleutel, kiesAfgerondRij, splitBehandelaar } from "./util.js";
 import { state, D, _shownToasts } from "./state.js";
 import { SID, ONESIGNAL_APP_ID } from "./config.js";
 import { ensureToken } from "./auth.js";
@@ -26,7 +26,7 @@ async function fireNotifEvent(event, payload) {
     const msg = code + (naam ? ' · ' + naam : '') + (beh ? ' → ' + beh : '');
     showToast('Nieuwe taak — ' + sec, msg, 'var(--ac)', 'n_newtask');
   } else if (event === 'assigned' && prefs.assigned && who) {
-    const behs = beh.split(/[,\/]/).map(s => s.trim());
+    const behs = splitBehandelaar(beh);
     if (behs.includes(who)) {
       showToast('Toegewezen aan jou', code + (naam ? ' · ' + naam : ''), 'var(--gn)', 'n_assigned');
     }
@@ -344,6 +344,11 @@ function toonMeldingen(lijst) {
 // De meldingen liften mee op loadAll, dus één ronde haalt hier álles op: verse lijsten én de
 // meldingen die tijdens het verborgen zijn binnenkwamen.
 function onNotifVisibility() {
+  // Zelfde rem als op de 8s-poll: tijdens de zelftest geen eigen laadronde beginnen. De suite
+  // verwisselt `window.fetch` per toets, en een ronde die daar doorheen loopt meet mee met de
+  // verkeerde stub. Dat maakte twee toetsen wisselvallig — juist bij het draaien in een venster
+  // dat afwisselend zichtbaar en verborgen is, want dán vuurt deze gebeurtenis om de haverklap.
+  if (state._zelftestLoopt) return;
   if (document.hidden || !state.oauthToken) return;
   // Zelfde guards als de 8s-poll: een loadAll mag geen open modal / bulk-selectie / lopende
   // animatie / undo onder de gebruiker vandaan trekken (resync gooit _rowCache + D om).

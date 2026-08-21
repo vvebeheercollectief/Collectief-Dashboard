@@ -164,6 +164,10 @@ function isPlatteWeergave({ q, fCode, beh, prio, status, sortKey, bulk }){
 // faalt niets.
 // Sortering en bulk horen hier bewust NIET bij: die maken de lijst wél plat, maar ze halen er geen
 // rij uit. "Pas je filter aan" zou de gebruiker dan naar een filter sturen dat er niet is.
+// De zoektermen komen hier al getrimd binnen (zie de leesregels bovenaan renderNtd). Dat is geen
+// schoonheidsfoutje: één spatie in het zoekveld is een niet-lege string, en dan gold de lijst als
+// 'gefilterd'. De gestapelde bundelweergave klapte plat en er verscheen 'pas je filter aan',
+// terwijl er zichtbaar niets was weggefilterd — een spatie komt in vrijwel elke taak voor.
 function erIsGefilterd({ q, fCode, beh, prio, status }){
   return !!(q || fCode || beh || prio || status);
 }
@@ -279,8 +283,8 @@ function springNaarBundel(bundelId){
 }
 
 function renderNtd(){
-  const q=document.getElementById('s-ntd').value.toLowerCase();
-  const fCode=document.getElementById('f-code-ntd').value.toLowerCase();
+  const q=document.getElementById('s-ntd').value.toLowerCase().trim();
+  const fCode=document.getElementById('f-code-ntd').value.toLowerCase().trim();
   const fBeh=document.getElementById('f-beh-ntd').value;
   const fPrio=document.getElementById('f-prio-ntd').value;
 
@@ -336,8 +340,8 @@ function renderNtd(){
 function renderNtdCrossList(sec){
   const host=document.getElementById('ntd-crosslist'); if(!host) return;
   const label=((SECS[sec]?.label)||'').trim().toLowerCase();
-  const q=(document.getElementById('s-ntd')?.value||'').toLowerCase();
-  const fCode=(document.getElementById('f-code-ntd')?.value||'').toLowerCase();
+  const q=(document.getElementById('s-ntd')?.value||'').toLowerCase().trim();
+  const fCode=(document.getElementById('f-code-ntd')?.value||'').toLowerCase().trim();
   const fBeh=(document.getElementById('f-beh-ntd')?.value||'').toLowerCase();
   const fPrio=(document.getElementById('f-prio-ntd')?.value||''); // exacte waarde (niet lowercasen), net als filterNtd
   const treffers=[];
@@ -478,7 +482,7 @@ function sorteerNtd(rows,sort){
 //  AFGEROND
 // ══════════════════════════════════════
 function renderAf(){
-  const q=document.getElementById('s-af').value.toLowerCase();
+  const q=document.getElementById('s-af').value.toLowerCase().trim();
   document.getElementById('af-tabs').innerHTML=SKEYS.map(s=>{
     const rows=filt(D.af[s]||[],q);
     return`<button type="button" class="tab ${s===state.activeAf?'on':''}" role="tab" aria-selected="${s===state.activeAf}" style="${s===state.activeAf?SECS[s].css:''}" data-action="af-sectie" data-sec="${s}">${SECS[s].label}<span class="cnt">${rows.length}</span></button>`;

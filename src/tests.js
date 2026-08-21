@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { taakTitel, taakVerwijzing, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel, kiesAfgerondRij, filt } from "./util.js";
+import { taakTitel, taakVerwijzing, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel, kiesAfgerondRij, filt, splitBehandelaar, persBadges } from "./util.js";
 import { verwerkMeldingRijen, toonMeldingen, MAX_TOAST_BURST, _whoSleutel, getCurrentWho } from "./notifications.js";
 import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek, logEvents, renderOntw, openOntwModal, closeOntwModal, submitOntwItem } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM } from "./config.js";
@@ -38,15 +38,23 @@ import { vraagBevestiging, beantwoordBevestiging, _vraagStaatOpen } from "./beve
 import { bovensteModal, koppelFormulierLabels, benoemSchakelaars } from "./modal-a11y.js";
 import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkoppelTaak, herordenBundel, sleepDoel, paneelTaaknummers, sleepUitslag, initBundelSlepen } from "./bundel-acties.js";
 
+  // De 8s-poll uitzetten zolang de suite draait: die deelt `window.fetch` en de statusbalk met de
+  // toetsen hieronder, en maakte er twee wisselvallig (zie de toelichting bij de timer in main.js).
+  state._zelftestLoopt = true;
   console.log('%c[TESTS] Auto-prioriteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
   // ── mini-assert helper (Fase 1 testnet) ──
   let _tOk = 0, _tFail = 0;
+  // Mislukte toetsen óók in een lijst op window, niet alleen in de console. De console bewaart de
+  // regels van eerdere runs erbij, en dan is niet te zien welke rode regel bij welke ronde hoort —
+  // dat kostte bij het naslaan meer dan eens een verkeerde conclusie.
+  window._testFails = [];
+  const _faal = (regel) => { _tFail++; window._testFails.push(regel); console.error(regel); };
   const eq = (label, got, exp) => {
     const g = JSON.stringify(got), e = JSON.stringify(exp);
     if (g === e) { _tOk++; }
-    else { _tFail++; console.error(`FAIL: ${label} → verwacht ${e}, kreeg ${g}`); }
+    else { _faal(`FAIL: ${label} → verwacht ${e}, kreeg ${g}`); }
   };
-  const truthy = (label, got) => { if (got) { _tOk++; } else { _tFail++; console.error(`FAIL: ${label} → verwacht waar, kreeg ${JSON.stringify(got)}`); } };
+  const truthy = (label, got) => { if (got) { _tOk++; } else { _faal(`FAIL: ${label} → verwacht waar, kreeg ${JSON.stringify(got)}`); } };
   const waardeVan = id => { const el = document.getElementById(id); return el ? el.value : '<geen veld ' + id + '>'; };
   // Antwoord op een values:batchGet-URL bouwen dat de gevraagde reeksen respecteert: vul alleen
   // het tabblad waar de test om gaat, de rest leeg. Naam-gestuurd, zodat een stub niet omvalt
@@ -9322,6 +9330,59 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   })();
 
   // ══════════════════════════════════════════════════════════════════════════
+  //  AFRONDING — één splitser, getrimde zoektermen, en een eerlijk archiefzoekresultaat
+  // ══════════════════════════════════════════════════════════════════════════
+  (() => {
+    console.log('%c[TESTS] Afronding', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+
+    // 1. Behandelaar splitsen stond op zes plekken los uitgeschreven en op één daarvan (het
+    //    leaderboard) net anders: die splitste óók op een puntkomma. 'Jer; Cihad' was daardoor twee
+    //    personen in de statistiek en één onvindbare naam in de rest van het dashboard.
+    eq('splitser: komma, puntkomma en schuine streep gelden allemaal',
+       splitBehandelaar('Jer, Cihad; Gabos / Cihan'), ['Jer', 'Cihad', 'Gabos', 'Cihan']);
+    eq('splitser: lege stukken en spaties vallen weg', splitBehandelaar(' Jer ,, / Cihad '), ['Jer', 'Cihad']);
+    eq('splitser: niets in, niets uit', [splitBehandelaar(''), splitBehandelaar(null), splitBehandelaar(undefined)], [[], [], []]);
+    // En de weergave gebruikt exact dezelfde regel, zodat er nooit een badge ontstaat die het
+    // filter niet kan vinden.
+    truthy('splitser: de badges volgen dezelfde regel', persBadges('Jer; Cihad').split('</span>').length - 1 === 2);
+
+    // 2. Zoeken in het archief via Ctrl+K: eerst álles verzamelen, dán afkappen. De cap zat in de
+    //    lus en vulde zich met OPPAKKEN (de eerste sectie), dus een sterk matchende afgeronde
+    //    LOD-taak kwam er nooit bij. Ook telde 'status' en kolom G niet mee terwijl dat bij open
+    //    taken wél zo is — dezelfde zoekterm gaf zo een treffer vóór het afronden en geen erna.
+    const afRij = (sec, i, extra) => Object.assign(
+      { code: 'ZK-' + i, naam: 'Zoekhof', actiepunt: 'iets', datum: '1 aug 2026', _sec: sec, _row: 10 + i }, extra || {});
+    const veelOppakken = Array.from({ length: 12 }, (_, i) => afRij('OPPAKKEN', i, { actiepunt: 'dakgoot nakijken' }));
+    const dataAf = {
+      alvo: [], logboek: [], ntd: { OPPAKKEN: [], VERGADERVERZOEKEN: [], 'OFFERTE-TRAJECTEN': [], LOD: [], 'SUBSIDIE-TRAJECTEN': [] },
+      af: { OPPAKKEN: veelOppakken, VERGADERVERZOEKEN: [], 'OFFERTE-TRAJECTEN': [], LOD: [afRij('LOD', 99, { actiepunt: 'dakgoot nakijken', datum: '5 aug 2026' })], 'SUBSIDIE-TRAJECTEN': [] },
+    };
+    const gevonden = zoekAlles('dakgoot', dataAf, { vves: 5, taken: 5, afgerond: 3, logboek: 3 });
+    eq('archiefzoeken: er komen er precies drie terug', gevonden.afgerond.length, 3);
+    truthy('archiefzoeken: de LOD-taak valt niet meer buiten de boot omdat Oppakken eerst komt',
+           gevonden.afgerond.some(r => r._sec === 'LOD'));
+    // De velden lopen nu gelijk op met die van open taken: status en kolom G tellen mee.
+    const opStatus = zoekAlles('gegund', { ...dataAf, af: { ...dataAf.af, LOD: [afRij('LOD', 98, { status: 'gegund' })] } },
+                               { vves: 5, taken: 5, afgerond: 3, logboek: 3 });
+    truthy('archiefzoeken: ook op status wordt gezocht', opStatus.afgerond.length === 1);
+    const opOpm = zoekAlles('bestuurswissel', { ...dataAf, af: { ...dataAf.af, LOD: [afRij('LOD', 97, { opmerkingen: 'bestuurswissel' })] } },
+                            { vves: 5, taken: 5, afgerond: 3, logboek: 3 });
+    truthy('archiefzoeken: en op de opmerkingen uit kolom G', opOpm.afgerond.length === 1);
+
+    // 3. Eén spatie in het zoekveld gold als 'er is gefilterd': de gestapelde bundelweergave klapte
+    //    plat en er verscheen 'pas je filter aan', terwijl er zichtbaar niets weg was.
+    const zoekEl = document.getElementById('s-ntd');
+    const zoekOud = zoekEl.value;
+    try {
+      zoekEl.value = '   ';
+      renderNtd();
+      truthy('zoeken: alleen spaties telt niet als filter', !erIsGefilterd({ q: '', fCode: '', beh: '', prio: '', status: '' }));
+      truthy('zoeken: en de lijst blijft daarmee gestapeld',
+             !(state._bundelWeergave && state._bundelWeergave.stapel === false && !zoekEl.value.trim()));
+    } finally { zoekEl.value = zoekOud; renderNtd(); }
+  })();
+
+  // ══════════════════════════════════════════════════════════════════════════
   //  TOEGANKELIJKHEID — namen en koppelingen in de echte schil
   // ══════════════════════════════════════════════════════════════════════════
   // Deze blok toetst niet één functie maar de UITKOMST op de echte index.html, want dat is waar
@@ -9517,6 +9578,8 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     }).map(el => el.id || el.className);
     eq('a11y: geen losse zwevende knop over de inhoud', zwevendeVangers.filter(n => /fab/i.test(String(n))), []);
   })();
+
+  state._zelftestLoopt = false;   // de poll mag weer; de suite is klaar
 
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');

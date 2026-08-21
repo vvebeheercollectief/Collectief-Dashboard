@@ -113,10 +113,14 @@ export function maakHerlaadKern(deps = {}) {
     probeerHerlaad(d.nu());
   }
 
-  return { klik, annuleer, controllerChange, _gearmd: () => !!armTs };
+  return { klik, annuleer, controllerChange, isBezet: () => d.isBezet(), _gearmd: () => !!armTs };
 }
 
-function toonUpdateBalk(onReload, onDismiss) {
+// Hoe lang 'Bezig…' mag blijven staan voordat de knop zich weer aanbiedt. Ruim boven een normale
+// herlading (die is er binnen een seconde) en boven de tijd die een schrijfactie kost.
+const HERLAAD_WACHTHOND_MS = 25_000;
+
+function toonUpdateBalk(onReload, onDismiss, isBezet) {
   if (document.getElementById('sw-update-bar')) return; // nooit dubbel
   const bar = document.createElement('div');
   bar.id = 'sw-update-bar';
@@ -127,12 +131,26 @@ function toonUpdateBalk(onReload, onDismiss) {
     + '<button type="button" class="sw-update-x" id="sw-update-dismiss" aria-label="Sluiten">×</button>';
   document.body.appendChild(bar);
   const knop = document.getElementById('sw-update-reload');
+  const tekst = bar.querySelector('.sw-update-txt');
   knop.addEventListener('click', () => {
     // Zichtbare bevestiging. Het herladen kan even uitgesteld worden (lopende inlog of
     // schrijfactie, zie maakHerlaadKern), en dan leek de knop kapot: je klikte en er
     // gebeurde niets. Nu zie je dat de klik is aangekomen.
     knop.disabled = true;
     knop.textContent = 'Bezig…';
+    // …maar 'Bezig…' mocht ook voorgoed blijven staan. De kern geeft het op als de nieuwe versie
+    // niet binnen 30 s actief wordt, of na vijf minuten wachten op een bezette pagina — en in
+    // beide gevallen hoorde de gebruiker daar niets meer van. Deze wachthond biedt de knop dan
+    // gewoon opnieuw aan. Is de pagina nog écht bezig (inlog of schrijfactie), dan wachten we
+    // netjes door in plaats van te beweren dat het mislukt is.
+    const wachthond = () => {
+      if (!document.getElementById('sw-update-bar')) return;   // balk is al weg
+      if (isBezet && isBezet()) { setTimeout(wachthond, HERLAAD_WACHTHOND_MS); return; }
+      knop.disabled = false;
+      knop.textContent = 'Opnieuw proberen';
+      if (tekst) tekst.textContent = 'Het herladen kwam niet door. Probeer het nog eens, of ververs de pagina zelf.';
+    };
+    setTimeout(wachthond, HERLAAD_WACHTHOND_MS);
     onReload();
   });
   document.getElementById('sw-update-dismiss').addEventListener('click', () => { bar.remove(); onDismiss(); });
@@ -152,7 +170,7 @@ export function initSwUpdate() {
     const base = location.pathname.replace(/\/[^/]*$/, '') || '';
     pakRegistratie(base + '/sw.js', base + '/').then(reg => {
       const vraagHerladen = () => kern.klik(reg);
-      const balk = () => toonUpdateBalk(vraagHerladen, () => kern.annuleer());
+      const balk = () => toonUpdateBalk(vraagHerladen, () => kern.annuleer(), kern.isBezet);
 
       // Nieuwe versie gevonden tijdens deze sessie
       reg.addEventListener('updatefound', () => {

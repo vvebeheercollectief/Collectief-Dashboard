@@ -12,7 +12,7 @@ import {
   setOntw, renderOntw, editOntwItem, addTaskNote, renderLogboek,
   editLogboek, saveLogboek, cancelLogboek, setLogSoort, deleteLogboek,
 } from './render-overig.js';
-import { openModal, completeTask, completeCurrentEditTask, deleteCurrentEditTask, zetSubsidieFase, kiesModalFase, zetHoortBij } from './crud.js';
+import { openModal, completeTask, completeCurrentEditTask, deleteCurrentEditTask, zetSubsidieFase, kiesModalFase, zetHoortBij, taakUitCache } from './crud.js';
 import { ontkoppelTaak } from './bundel-acties.js';
 import { adjOff } from './util.js';
 import { copyAiPrompt, aiOvernemen, aiActieTaak, aiKopieerConcept, prefillNieuweTaak } from './ai.js';
@@ -146,9 +146,7 @@ export const ACTIONS = {
   // bij elke hertekening opnieuw opgebouwd; klik je op een knop uit een net vervangen render (of
   // op een rij die door de poll uit de lijst is gevallen), dan is dit `undefined` en liep openModal
   // stuk op `rowData._sec` — een lege pagina met een console-fout in plaats van een uitleg.
-  'taak-bewerken':         (el) => { const r=state._rowCache[+el.dataset.rid];
-                                     if(!r){ alert('Taak niet gevonden. Vernieuw de pagina en probeer opnieuw.'); return; }
-                                     openModal(true, r); },
+  'taak-bewerken':         (el) => { const r=taakUitCache(el.dataset.rid); if(r) openModal(true, r); },
   'taak-afronden':         (el) => completeTask(+el.dataset.rid),
   'pagineer':              (el) => { const d=el.dataset.doel; pgs[d]=+el.dataset.pg; PAG_RENDER[d](); },
   'ai-overnemen':          (el) => aiOvernemen(el.dataset.sec),

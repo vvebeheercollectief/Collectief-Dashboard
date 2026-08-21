@@ -8,7 +8,7 @@ import { state, D, pgs } from "./state.js";
 import { ensureToken } from "./auth.js";
 import { writeRange, appendRange, appendRows, assertRowMatch, _herstelShift } from "./api.js";
 import { renderThead, renderPag } from "./render-lijsten.js";
-import { getSheetIds, setv, gv, insertAndWriteRow } from "./crud.js";
+import { getSheetIds, setv, gv, insertAndWriteRow, taakUitCache } from "./crud.js";
 import { loadAll, backgroundWrite, metWriteMarkering, blokkeerOffline } from "./data.js";
 import { getCurrentWho, showToast, showUndoToast } from "./notifications.js";
 import { animateRowOut } from "./anim.js";
@@ -33,7 +33,7 @@ function parseOntw(rows){
 }
 
 function renderOntw(){
-  const q=(document.getElementById('s-ontw')?.value||'').toLowerCase();
+  const q=(document.getElementById('s-ontw')?.value||'').toLowerCase().trim();
   const cats=['Alles',...ONTW_CATS,'Afgerond'];
   const openItems=D.ontw.filter(r=>r.status!=='Afgerond');
   const doneItems=D.ontw.filter(r=>r.status==='Afgerond');
@@ -100,7 +100,7 @@ function openOntwModal(isEdit, rowData){
 function closeOntwModal(){document.getElementById('ontw-modal-bg').classList.remove('open')}
 
 function editOntwItem(idx){
-  const r=state._rowCache[idx];
+  const r=taakUitCache(idx);   // zelfde melding als elders i.p.v. een klik die niets doet
   if(r) openOntwModal(true,r);
 }
 
@@ -584,7 +584,7 @@ function renderLogboek(){
     tekst:_editTekstEl.value,
     wie:_editBox.querySelector('.log-edit-wie')?.value
   }:null;
-  const q=(document.getElementById('s-logboek')?.value||'').toLowerCase();
+  const q=(document.getElementById('s-logboek')?.value||'').toLowerCase().trim();
   const rows=D.logboek.filter(r=>{
     if(!logPaginaSoort(r.actie)) return false;   // ruis weren — alleen notities/contact + afgerond/aangemaakt
     if(state.logWho && displayName(r.gebruiker)!==state.logWho) return false;

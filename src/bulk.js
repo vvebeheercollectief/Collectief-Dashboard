@@ -387,7 +387,15 @@ function bulkVeld(rows,soort,waarde){
     if(blokkeerOffline()) return;   // vóór het terugzetten: anders staat het scherm op 'oud' terwijl de Sheet 'nieuw' houdt
     items.forEach(it=>{ it.r[conf.veld]=it.oud; if(oppDl && it.sec==='OPPAKKEN') it.r.prioriteit=it.oudPrio; });
     renderAll();
-    backgroundWrite(schrijf('oud'),()=>{},'Undo mislukt');
+    // De rollback stond hier op een lege functie. Mislukte het ongedaan maken, dan meldde
+    // backgroundWrite 'wijziging teruggezet' terwijl er niets werd teruggezet: het scherm bleef op
+    // de oude waarde staan en de Sheet hield de nieuwe. Precies andersom als wat de melding zei,
+    // en niet te zien tot de volgende verversing. Nu zet hij de nieuwe waarde terug — dat is
+    // immers wat er dan nog steeds in de Sheet staat.
+    backgroundWrite(schrijf('oud'),
+      ()=>{ items.forEach(it=>{ it.r[conf.veld]=waarde;
+              if(oppDl && it.sec==='OPPAKKEN') it.r.prioriteit=berekenPrioriteit(waarde,'OPPAKKEN').prioriteit; }); },
+      'Ongedaan maken mislukt');
   },conf.icoon);
   backgroundWrite(schrijf('nieuw'),
     ()=>{ items.forEach(it=>{ it.r[conf.veld]=it.oud; if(oppDl && it.sec==='OPPAKKEN') it.r.prioriteit=it.oudPrio; }); },

@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  PER-VVE-PAGINA — alles van één VvE op één scherm (Fase 5)
 // ══════════════════════════════════════
-import { esc, displayName, persBadges, berekenPrioriteit, opvolgStatus, parseDt, taakTitel, taakVerwijzing, _vandaagAmsterdam, _verschilInKalenderdagen } from "./util.js";
+import { esc, displayName, persBadges, splitBehandelaar, berekenPrioriteit, opvolgStatus, parseDt, taakTitel, taakVerwijzing, _vandaagAmsterdam, _verschilInKalenderdagen } from "./util.js";
 import { ico } from "./icons.js";
 import { SECS, SKEYS, PAGE_META } from "./config.js";
 import { state, D } from "./state.js";
@@ -52,7 +52,7 @@ function vveOverzicht(code, data, vandaag){
     .sort((a,b)=>parseDt(b.datum)-parseDt(a.datum)); // nieuwste eerst → alfa[0] = laatst gehouden
   const naam=(open[0]?.naam)||(weggelegd[0]?.naam)||(alvo?.naam)||(afgerond[0]?.naam)||'';
   const behandelaars=[...new Set(open.concat(weggelegd)
-    .flatMap(r=>(r.behandelaar||'').split(/[,\/]/).map(s=>s.trim()).filter(Boolean)))];
+    .flatMap(r=>splitBehandelaar(r.behandelaar)))];
   return { code, naam, behandelaars, open, weggelegd, afgerond, alvo, alfa, logboek,
            budget: !!(alvo&&alvo.budget), // Budgetpakket-markering uit het ALV-overzicht (kolom F)
            cijfers:{ open:open.length, teLaat, weggelegd:weggelegd.length, laatsteDagen } };

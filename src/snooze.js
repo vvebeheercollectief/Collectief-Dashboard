@@ -9,13 +9,17 @@ import { ensureToken } from "./auth.js";
 import { backgroundWrite, blokkeerOffline } from "./data.js";
 import { renderAll } from "./main.js";
 import { showToast } from "./notifications.js";
+import { taakUitCache } from "./crud.js";
 import { logEvent } from "./render-overig.js";
 import { vraagBevestiging } from "./bevestig.js";
 
 const OPVOLG_KOLOM = 'L'; // Nog Te Doen: L=Opvolgdatum (M=Herhaal-ID, N=Esc)
 
 function openSnoozeModal(rid){
-  const r = state._rowCache[rid];
+  // Zelfde antwoord als elders wanneer de aangeklikte rij niet meer bestaat (zie taakUitCache):
+  // hier gebeurde er helemaal niets, en een knop die een venster hoort te openen en dat niet doet
+  // is niet te onderscheiden van een kapotte app.
+  const r = taakUitCache(rid);
   if(!r) return;
   state._snoozeRow = r;
   document.getElementById('snooze-title').textContent = `Wegleggen — ${r.code} ${r.naam||''}`;

@@ -19,12 +19,13 @@ import {
 import {
   openModal, closeModal, submitTask, doCompleteTask, closeCompleteModal, kiesSectie,
 } from './crud.js';
-import { loadAll, magPollen, schrijfActieLoopt, setSyncOffline, showOfflineBanner, laadUitCache } from './data.js';
+import { loadAll, magPollen, schrijfActieLoopt, setSyncOffline, showOfflineBanner, clearOfflineBanner, laadUitCache } from './data.js';
 import { initActions } from './actions.js';
 import { initVveZoekveld } from './vve-zoekveld.js';
 import { bouwBundelIndex, koppelKandidaten, taakFilter } from './bundel.js';
 import { initBundelSlepen, initStapelSlepen } from './bundel-acties.js';
 import { esc, taakTitel, taakVerwijzing } from './util.js';
+import { isOffline } from './api.js';
 import { closeSnoozeModal, snoozeOpslaan, snoozeWis } from './snooze.js';
 import { closeResetModal } from './alv-reset.js';
 import { renderHerhaal, openHerhaalModal, closeHerhaalModal, syncHerhaalVelden, submitHerhaal } from './render-herhaal.js';
@@ -380,8 +381,15 @@ document.addEventListener('DOMContentLoaded',()=>{
   // setSynced de balk en de banner zelf weg.
   window.addEventListener('offline', ()=>{ setSyncOffline(); showOfflineBanner(); });
   window.addEventListener('online',  ()=>{
+    // De banner weg zodra hij niet meer waar is, óók als er geen ronde mag lopen. `isOffline()` is
+    // een LIVE toets, en `blokkeerOffline` gebruikt dezelfde: op dit moment mag er dus alweer
+    // geschreven worden. De banner bleef daar los van staan tot een geslaagde ronde hem opruimde,
+    // en die staat stil zolang er een venster openstaat of een bulk-selectie loopt. Je kon dus
+    // rustig doorwerken met een balk erboven die zei dat dat niet kon.
+    if(!isOffline()) clearOfflineBanner();
     // Dezelfde remmen als de 8s-poll: een verversing mag geen open venster, bulk-selectie of
     // lopende undo onder de gebruiker weghalen. Blijft dit staan, dan haalt de poll het zo op.
+    if(state._zelftestLoopt) return;   // en tijdens de zelftest helemaal niet (zie de timer hieronder)
     if(!magPollen(state)) return;
     if(document.querySelector('.modal-bg.open')) return;
     if(state.pendingWrites>0 || state.bulkMode || state._animBusy || state._undoInFlight) return;
@@ -391,6 +399,12 @@ document.addEventListener('DOMContentLoaded',()=>{
   // Live updates — auto-refresh elke 8 seconden (smart diff voorkomt onnodige re-renders)
   // Id bewaard zodat logout() de poll kan stoppen (anders blijft hij na uitloggen doordraaien).
   state._resyncTimer=setInterval(async ()=>{
+    // Tijdens de zelftest (?test=1) niet pollen. De suite zet `window.fetch` om de beurt naar een
+    // eigen stub en meet dán wat er gevraagd wordt en wat de statusbalk zegt; een ronde die daar
+    // dwars doorheen loopt overschrijft de gemeten URL en zet de balk op 'Live'. Dat gaf twee
+    // toetsen die soms rood en soms groen waren — en een toets die je niet kunt vertrouwen is
+    // erger dan geen toets. De poll zelf wordt in de suite rechtstreeks via loadAll beproefd.
+    if(state._zelftestLoopt) return;
     if(document.hidden) return;
     // F4: alle modal-achtergronden delen class 'modal-bg' (index.html); één check volstaat.
     // Nieuwe modals hoeven hier niet meer te worden toegevoegd zolang ze .modal-bg gebruiken.

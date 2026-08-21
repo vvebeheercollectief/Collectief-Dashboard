@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  AI-HULP — plak mailtekst (slim kopieer-plak)
 // ══════════════════════════════════════
-import { esc, displayName } from "./util.js";
+import { esc, displayName, splitBehandelaar } from "./util.js";
 import { state, D } from "./state.js";
 import { SECS, SKEYS } from "./config.js";
 import { goTo } from "./ui.js";
@@ -38,7 +38,7 @@ function aiVveContext(code){
     (D.ntd[s]||[]).forEach(r=>{
       if(String(r.code||'').toLowerCase()!==c) return;
       if(r.naam && !naam) naam=r.naam;
-      if(r.behandelaar) String(r.behandelaar).split(/[,\/]/).forEach(b=>{const t=b.trim();if(t)behs.add(t);});
+      if(r.behandelaar) splitBehandelaar(r.behandelaar).forEach(b=>behs.add(b));
       const titel=r.actiepunt||r.agendapunten||r.status||r.subsidie||SECS[s].label;
       open.push(`${SECS[s].label}: ${titel}`.trim());
     });

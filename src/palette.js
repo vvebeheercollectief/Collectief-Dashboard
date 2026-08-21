@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  COMMANDOCENTRUM — Ctrl+K: zoek door alles + acties (Fase 5)
 // ══════════════════════════════════════
-import { esc, displayName, berekenPrioriteit } from "./util.js";
+import { esc, displayName, berekenPrioriteit, parseDt } from "./util.js";
 import { SECS, SKEYS } from "./config.js";
 import { state, D } from "./state.js";
 import { goTo } from "./ui.js";
@@ -35,9 +35,23 @@ function zoekAlles(q, data, max){
     return _dt(a)-_dt(b);
   });
   res.taken=alleTaken.slice(0,max.taken);
+  // Zelfde behandeling als de open taken hierboven, en om dezelfde reden: eerst álles verzamelen,
+  // dán cappen. Hier stond de cap nog IN de lus, dus hij vulde zich met OPPAKKEN (de eerste sectie)
+  // en een sterk matchende afgeronde LOD- of offerte-taak kwam er nooit bij.
+  // Ook het veldenlijstje liep uit de pas met dat van de open taken: 'status' ontbrak en
+  // 'opmerkingen' (kolom G) stond er niet bij — alleen 'opmerking' (kolom J, de toelichting bij het
+  // afronden). Dezelfde zoekterm gaf zo een treffer bij een open taak en geen bij dezelfde taak
+  // nadat hij was afgerond. Beide velden tellen nu mee.
+  const alleAf=[];
   SKEYS.forEach(s=>(data.af[s]||[]).forEach(r=>{
-    if(res.afgerond.length<max.afgerond && hit(r.code,r.naam,r.actiepunt,r.periode,r.agendapunten,r.subsidie,r.opmerking)) res.afgerond.push(r);
+    if(hit(r.code,r.naam,r.actiepunt,r.periode,r.agendapunten,r.status,r.subsidie,r.opmerkingen,r.opmerking)) alleAf.push(r);
   }));
+  alleAf.sort((a,b)=>{
+    const ax=(a.code||'').toLowerCase()===z?0:1, bx=(b.code||'').toLowerCase()===z?0:1;
+    if(ax!==bx) return ax-bx;
+    return (parseDt(b.datum)||0)-(parseDt(a.datum)||0);   // daarna: laatst afgerond bovenaan
+  });
+  res.afgerond=alleAf.slice(0,max.afgerond);
   res.logboek=(data.logboek||[])
     .filter(e=>hit(e.code,e.actie,e.veld,e.oudeWaarde,e.nieuweWaarde,displayName(e.gebruiker)))
     .sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp))

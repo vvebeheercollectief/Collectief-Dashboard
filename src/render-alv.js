@@ -44,7 +44,7 @@ function renderAlvo(){
     aKnop(kla,'teal','Klaargezet','Klaargezet')+
     aKnop(opn,opn?'red':'muted','Open','Open');
 
-  const q=document.getElementById('s-alvo').value.toLowerCase();
+  const q=document.getElementById('s-alvo').value.toLowerCase().trim();
   const fs=document.getElementById('f-status-alvo').value;
   const onlyBudget=document.getElementById('f-budget-alvo')?.checked;
   const rows=D.alvo.filter(r=>{
@@ -175,7 +175,7 @@ function statusIco(s){return{Open:ico('zandloper'),Klaargezet:ico('klembord'),Ge
 //  ALV AFGEROND
 // ══════════════════════════════════════
 function renderAlfa(){
-  const q=document.getElementById('s-alfa').value.toLowerCase();
+  const q=document.getElementById('s-alfa').value.toLowerCase().trim();
   const rows=D.alfa.filter(r=>`${r.code} ${r.naam} ${r.datum}`.toLowerCase().includes(q));
   pgs.alfa=Math.min(Math.max(1,pgs.alfa),Math.max(1,Math.ceil(rows.length/PG))); // clamp: geen lege pagina
   const sl=rows.slice((pgs.alfa-1)*PG,pgs.alfa*PG);

@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  RENDER-ANALYTICS — grafieken, KPI's, dashboard
 // ══════════════════════════════════════
-import { esc, displayName, persBadges, emptyRow, parseDt, _parseAnyDate, vveCodeSpan, taakTitel } from "./util.js";
+import { esc, displayName, persBadges, emptyRow, parseDt, _parseAnyDate, vveCodeSpan, taakTitel, splitBehandelaar } from "./util.js";
 import { SECS, SKEYS, TEAM } from "./config.js";
 import { state, D } from "./state.js";
 import { ico } from "./icons.js";
@@ -9,6 +9,12 @@ import { ico } from "./icons.js";
 // Leiblauwe accentkleur uitlezen op render-moment (Chart.js kan geen CSS-var-strings
 // renderen). Volgt zo de huisstijl én het licht/donker-thema, want de grafieken worden
 // opnieuw getekend bij een themawissel (applyTheme in ui.js).
+// Chart.js tekent op een canvas en kan geen CSS-variabele lezen: 'var(--sur)' kwam daar binnen
+// als een onbekende kleur, en dan valt Chart.js terug op zwart. De rand om een segment waar je
+// overheen gaat was dus zwart in plaats van de kaartkleur — het meest zichtbaar in donkere modus.
+function _cssKleur(naam, terugval){
+  return (getComputedStyle(document.documentElement).getPropertyValue(naam)||'').trim() || terugval || '#ffffff';
+}
 function acColor(){ return (getComputedStyle(document.documentElement).getPropertyValue('--ac')||'').trim()||'#4a5b7a'; }
 // Leeg/onbenut donut-segment: licht in lichte modus, donkergrijs in donkere modus
 // (zodat het niet als felle witte vlek op een donkere kaart blijft staan).
@@ -149,8 +155,9 @@ function seriesByPeriod(rows,dateField,period,n){
   return keys.map(k=>({key:k,label:bucketLabel(k,period),count:counts[k]}));
 }
 // behandelaar-veld kan "Jer" of "Cihad, Jer" zijn → split op komma
+// Splitsen doet util.js (splitBehandelaar); hier alleen nog de vertaling naar een weergavenaam.
 function _splitBeh(v){
-  return String(v||'').split(/[,;/]/).map(s=>displayName(s.trim())).filter(Boolean);
+  return splitBehandelaar(v).map(displayName).filter(Boolean);
 }
 // rows + behandelaar-veld → dict {persoon: [{key,label,count}]}
 function seriesPerPersonByPeriod(rows,dateField,persField,period,n){
@@ -320,6 +327,14 @@ function renderLeaderboard(period){
   const tbody=document.getElementById('lb-tbody');
   const medalCls=['gold','silver','bronze',''];
   const totaal=data.reduce((a,b)=>a+b.huidig,0);
+  // Taken zónder behandelaar vallen buiten dit overzicht — een ranglijst per persoon kan ze
+  // nergens kwijt. Maar ze verdwenen ook uit het BEELD: de tegel 'Taken afgerond' erboven telt ze
+  // wél mee, en dan tellen de regels hieronder stilletjes niet op tot dat getal. Nu staat er
+  // onderaan bij hoeveel er niemand op stond, zodat de twee cijfers weer met elkaar te rijmen zijn.
+  const zonderNaam=(()=>{
+    const reeks=seriesByPeriod(rows.filter(r=>!_splitBeh(r.behandelaar).length),'datum',period,2);
+    return reeks.length ? reeks[reeks.length-1].count : 0;
+  })();
   if(totaal===0){
     tbody.innerHTML=`<tr><td colspan="5" class="empty"><div class="empty-ico">${ico('vlag')}</div>Nog geen afgeronde taken in deze periode</td></tr>`;
     return;
@@ -336,6 +351,11 @@ function renderLeaderboard(period){
       <td class="lb-trend"><span class="kpi-trend ${r.trend.dir}"><span class="kpi-trend-arrow">${arrow}</span>${r.trend.label}</span></td>
     </tr>`;
   }).join('');
+  if(zonderNaam){
+    tbody.insertAdjacentHTML('beforeend',
+      `<tr class="lb-rest"><td></td><td class="lb-name">Zonder behandelaar</td>`
+      + `<td class="lb-now">${zonderNaam}</td><td class="lb-prev"></td><td class="lb-trend"></td></tr>`);
+  }
 }
 
 // Globale periode-balk
@@ -398,7 +418,12 @@ function buildAnalytics(){
     const numEl=document.getElementById('kpi-openalv-num');
     const subEl=document.getElementById('kpi-openalv-sub');
     if(numEl) numEl.textContent=openAlv;
-    if(subEl) subEl.textContent=totAlv?`van ${totAlv} ALV's · ${openPct}% nog uit te schrijven`:'geen data';
+    // 'nog niet afgerond' en niet 'nog uit te schrijven': deze tegel telt vergaderingen ZONDER
+    // notulen, en 'uitschrijven' betekent overal elders in het dashboard het versturen van de
+    // UITNODIGING (zie de voortgangsbalk op Nog Te Doen en de donut 'Uitgeschreven'). Het cijfer
+    // was goed — 'open' is precies wat _recomputeAlvoStatus 'niet Afgerond' noemt — maar de
+    // woorden eronder beschreven een andere stap dan de meting.
+    if(subEl) subEl.textContent=totAlv?`van ${totAlv} ALV's · ${openPct}% nog niet afgerond`:'geen data';
     const barEl=document.getElementById('kpi-openalv-bar');
     if(barEl) barEl.style.width=openPct+'%';
   });
@@ -434,18 +459,6 @@ function getWeekNum(d){
   d2.setUTCDate(d2.getUTCDate()+4-dayNum);
   const yearStart=new Date(Date.UTC(d2.getUTCFullYear(),0,1));
   return Math.ceil((((d2-yearStart)/86400000)+1)/7);
-}
-
-function buildBarChart(id,labels,data,color,tc,gc){
-  if(state.charts[id]) state.charts[id].destroy();
-  state.charts[id]=new Chart(document.getElementById(id),{
-    type:'bar',
-    data:{labels,datasets:[{label:'Aantal',data,backgroundColor:color,borderRadius:6,borderSkipped:false}]},
-    options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false}},
-      scales:{x:{grid:{display:false},ticks:{color:tc,font:{size:11}}},
-              y:{grid:{color:gc},ticks:{color:tc,precision:0},beginAtZero:true}}}
-  });
 }
 
 function buildDonut(id,labels,data,colors,tc,centerVal,centerLbl){
@@ -498,7 +511,7 @@ function buildDonut(id,labels,data,colors,tc,centerVal,centerLbl){
   };
   state.charts[id]=new Chart(el,{
     type:'doughnut',
-    data:{labels,datasets:[{data,backgroundColor:gradients,borderWidth:0,hoverOffset:10,hoverBorderWidth:3,hoverBorderColor:'var(--sur)',spacing:2}]},
+    data:{labels,datasets:[{data,backgroundColor:gradients,borderWidth:0,hoverOffset:10,hoverBorderWidth:3,hoverBorderColor:_cssKleur('--sur'),spacing:2}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:'72%',
       animation:{animateRotate:true,animateScale:false,duration:900,easing:'easeOutCubic'},
       plugins:{
@@ -663,5 +676,5 @@ export {
   _toDateObj, bucketKey, bucketLabel, lastBucketKeys, seriesByPeriod, _splitBeh,
   seriesPerPersonByPeriod, computeTrend, renderSparkline, renderKpiTile, renderKpiPersonTile,
   renderHeroChart, renderLeaderboard, renderPeriodBar, renderMetricToggle, _try, buildAnalytics,
-  getWeekNum, buildBarChart, buildDonut, _lightenHex, DASH_ICONS, HERO_VIEWS, renderHeroDonut, buildDash,
+  getWeekNum, buildDonut, _lightenHex, DASH_ICONS, HERO_VIEWS, renderHeroDonut, buildDash,
 };

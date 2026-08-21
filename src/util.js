@@ -172,10 +172,19 @@ function prioBadge(r, sec){
   return`<span class="badge ${cls}">${esc(prioriteit)}</span>`;
 }
 
+// Het veld Behandelaar kan meer dan één persoon bevatten ('Jer, Cihad'). Deze regel stond op zes
+// plekken los uitgeschreven en op één daarvan (het leaderboard) net anders: die splitste óók op een
+// puntkomma. 'Jer; Cihad' was daardoor twee personen in de statistiek en één rare naam in de rest
+// van het dashboard — een naam waar het filter niets mee kon. Eén bron, en de ruimste variant wint:
+// een puntkomma als scheiding is nooit een naam.
+function splitBehandelaar(v){
+  return String(v||'').split(/[,;/]/).map(n=>n.trim()).filter(Boolean);
+}
+
 function persBadges(v){
   if(!v)return'<span style="color:var(--fnt);font-size:12px">–</span>';
   const colors={'jer':'pers-jer','cihad':'pers-cihad','gabos':'pers-gabos'};
-  return v.split(/[,\/]/).map(n=>n.trim()).filter(Boolean).map(n=>{
+  return splitBehandelaar(v).map(n=>{
     const cls=colors[n.toLowerCase()]||'pers-default';
     return`<span class="pers ${cls}">${esc(n)}</span>`;
   }).join('');
@@ -440,7 +449,7 @@ function taakVerwijzing(r, sec){
 
 export {
   taakTitel, taakVerwijzing, kortDatum,
-  displayName, filt, PRIO_REGELS, STIL_DREMPEL_DAGEN, STIL_ESCALATIE_REGELS,
+  displayName, filt, splitBehandelaar, PRIO_REGELS, STIL_DREMPEL_DAGEN, STIL_ESCALATIE_REGELS,
   opvolgStatus, volgendeDeadline, HERHAAL_MAANDEN, _vandaagAmsterdam, isoWeek,
   _verschilInKalenderdagen, berekenPrioriteit, prioBadge, persBadges,
   adjOff, offProg, _MAANDEN, _parseAnyDate, parseDt, toISODate, toDutchDate, leegBijErfenis, nieuwTaakId,

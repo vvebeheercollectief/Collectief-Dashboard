@@ -592,9 +592,22 @@ function _bewerkRijVers(){
 // `bijDoorgaan` (optioneel) draait zodra vaststaat dat het afrond-scherm opengaat — dus ná de vraag
 // over openstaande subtaken. Zie de toelichting bij deleteTaskRow: het bewerkscherm sluit hierop,
 // en zou zonder deze plek al dicht zijn vóórdat de gebruiker 'nee' kon antwoorden.
+// Eén antwoord op 'de rij die je aanklikte bestaat niet meer'. Dat gebeurt als de lijst opnieuw
+// getekend is tussen het tekenen van de knop en de klik erop. Deze situatie werd op vijf plekken
+// verschillend afgehandeld: twee keer een blokkerende alert, drie keer helemaal niets. En 'er
+// gebeurt niets' leest als een kapotte app — juist bij een knop die een venster hoort te openen.
+// Een toast en geen alert(): de rest van het dashboard meldt fouten ook zo, en een alert legt de
+// hele pagina stil voor iets waar je niets aan hoeft te doen behalve opnieuw klikken.
+function taakUitCache(rid){
+  const r = state._rowCache[+rid];
+  if(!r) showToast('Taak niet gevonden', 'De lijst is intussen ververst. Probeer het opnieuw.',
+                   'var(--rd)', 'waarschuwing', {geenDedup:true, geenSysteemmelding:true});
+  return r || null;
+}
+
 async function completeTask(idx, bijDoorgaan){
-  const r=state._rowCache[idx];
-  if(!r){alert('Taak niet gevonden. Vernieuw de pagina en probeer opnieuw.');return}
+  const r=taakUitCache(idx);
+  if(!r) return;
   await completeTaskRow(r, idx, bijDoorgaan);
 }
 
@@ -973,7 +986,7 @@ function gv(id){const el=document.getElementById(id);return el?el.value.trim():'
 // scherm meteen klopt, dan pas de Sheet — met assertRowMatch ertussen, zodat we
 // nooit een ándere taak overschrijven als er intussen rijen zijn verschoven.
 async function zetSubsidieFase(rid, stap){
-  const r = state._rowCache[rid];
+  const r = taakUitCache(rid);
   if(!r || r._sec !== 'SUBSIDIE-TRAJECTEN') return;
   const nieuw = faseWoord(stap), oud = r.subsidieFase || '';
   if(nieuw === oud) return;
@@ -1000,6 +1013,6 @@ export {
   openModal, editRow, closeModal, fillModalFields, setv, clearModal, kiesSectie,
   getSheetIds, _sheetBreedtes, getInsertRow, insertAndWriteRow, deleteCurrentEditTask, deleteTaskRow,
   getAfInsertRow, completeTask, completeCurrentEditTask, doCompleteTask, closeCompleteModal, submitTask, gv,
-  OMSCHRIJVING_VELD, zetOmschrijving,
+  OMSCHRIJVING_VELD, zetOmschrijving, taakUitCache,
   _verseRijIdx, _herankerRij, zetSubsidieFase, kiesModalFase, _modalFaseWoord,
 };

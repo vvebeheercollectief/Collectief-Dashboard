@@ -8,7 +8,7 @@ import { state, D } from "./state.js";
 import { SID } from "./config.js";
 import { ensureToken } from "./auth.js";
 import { loadAll, metWriteMarkering, blokkeerOffline } from "./data.js";
-import { assertRowsMatch } from "./api.js";
+import { assertRowsMatch, sheetsFetch } from "./api.js";
 import { showToast } from "./notifications.js";
 import { logEvent } from "./render-overig.js";
 
@@ -116,7 +116,7 @@ async function doeReset(){
       // Archiveren. Het archief komt DIRECT NA 'ALV's overzicht' — dat navigeert
       // prettiger dan achteraan. (Historisch ook noodzaak: verplaatsALV schreef naar het
       // láátste tabblad; sinds die op naam zoekt is de positie alleen nog voorkeur.)
-      const arch=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+      const arch=await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
         method:'POST',
         headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
         body:JSON.stringify({requests:[{duplicateSheet:{
@@ -134,7 +134,7 @@ async function doeReset(){
         cell:{userEnteredValue:{boolValue:false}},
         fields:'userEnteredValue'
       }});
-      const wis=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+      const wis=await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
         method:'POST',
         headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
         body:JSON.stringify({requests:verzoeken})

@@ -26,7 +26,7 @@
 // Eén lezing, geen extra verzoek.
 import { SID, SKEYS } from "./config.js";
 import { state, D } from "./state.js";
-import { _veiligeRij, assertRowsMatch, fetchSheet } from "./api.js";
+import { _veiligeRij, assertRowsMatch, fetchSheet, sheetsFetch } from "./api.js";
 import { backgroundWrite, blokkeerOffline } from "./data.js";
 import { ensureToken } from "./auth.js";
 import { showUndoToast, showToast } from "./notifications.js";
@@ -89,7 +89,7 @@ export function herordenBereiken(regels){
 
 // ── De schrijfweg zelf ────────────────────────────────────────────────────────
 async function schrijfBereiken(data){
-  const resp = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values:batchUpdate`, {
+  const resp = await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values:batchUpdate`, {
     method:'POST',
     headers:{ Authorization:`Bearer ${state.oauthToken}`, 'Content-Type':'application/json' },
     body: JSON.stringify({ valueInputOption:'USER_ENTERED', data }),

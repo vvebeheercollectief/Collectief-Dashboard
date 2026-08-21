@@ -5,7 +5,7 @@ import { esc, displayName, parseDt, meldSleutel, kiesAfgerondRij, splitBehandela
 import { state, D, _shownToasts } from "./state.js";
 import { SID, ONESIGNAL_APP_ID } from "./config.js";
 import { ensureToken } from "./auth.js";
-import { fetchSheet, appendRange, assertRowMatch } from "./api.js";
+import { fetchSheet, appendRange, assertRowMatch, sheetsFetch } from "./api.js";
 import { logEvent } from "./render-overig.js";
 import { getSheetIds, insertAndWriteRow, getInsertRow } from "./crud.js";
 import { loadAll, parseSections, metWriteMarkering, blokkeerOffline } from "./data.js";
@@ -213,7 +213,7 @@ async function undoComplete(undoData) {
         // maar tussen die lezing en dit verzoek kan de Sheet alsnog verschoven zijn. Klopt de rij
         // niet meer, dan zou hier stil een ándere afronding verdwijnen.
         await assertRowMatch(doelAf._row, doelAf, 'Afgerond');
-        const resp = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`, {
+        const resp = await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${state.oauthToken}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ requests: [{ deleteDimension: { range: { sheetId: afId, dimension: 'ROWS', startIndex: doelAf._row - 1, endIndex: doelAf._row } } }] })

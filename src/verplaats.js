@@ -21,12 +21,12 @@
 import { state, D } from "./state.js";
 import { SECS, SID, OMSCHRIJVING_SLEUTEL } from "./config.js";
 import { berekenPrioriteit, taakTitel } from "./util.js";
-import { assertRowsMatch, _shiftNtdRows } from "./api.js";
+import { assertRowsMatch, _shiftNtdRows, sheetsFetch } from "./api.js";
 import { ensureToken } from "./auth.js";
-import { backgroundWrite, blokkeerOffline } from "./data.js";
+import { backgroundWrite, blokkeerOffline, loadAll } from "./data.js";
 import { renderAll } from "./main.js";
 import { showToast } from "./notifications.js";
-import { getSheetIds, getInsertRow, toevoegWaarden, taakUitCache } from "./crud.js";
+import { getSheetIds, getInsertRow, bevestigInvoegPlek, toevoegWaarden, taakUitCache } from "./crud.js";
 import { logEvent } from "./render-overig.js";
 import { vraagBevestiging } from "./bevestig.js";
 
@@ -134,7 +134,15 @@ async function verplaatsTaak(r, doelSec){
   if(!await ensureToken()){ alert('Inloggen mislukt. Probeer het opnieuw.'); return false; }
 
   const verloren = verlorenVelden(r, bronSec, doelSec);
-  const ids = await getSheetIds();
+  // Zelfde reden als de try rond `getInsertRow` hieronder: deze functie wordt door de
+  // categoriekiezer (main.js) wel geawait maar niet gecatcht, dus een fout hier komt NERGENS aan.
+  // `getSheetIds` gooit bij elk niet-ok antwoord én bij een netwerkfout, en juist bij de EERSTE
+  // schrijfactie van een sessie is de lijst nog niet gevuld en gaat hij echt het net op. Zonder
+  // deze try bleef het venster staan met de nieuwe categorie in de kiezer terwijl er niets was
+  // gebeurd — een stille mislukking die pas dagen later opvalt.
+  let ids;
+  try { ids = await getSheetIds(); }
+  catch(e){ alert('Verplaatsen mislukt: ' + (e && e.message ? e.message : e)); return false; }
   const sheetId = ids['Nog Te Doen'];
   if(sheetId == null){ alert('Sheet "Nog Te Doen" niet gevonden'); return false; }
 
@@ -145,6 +153,11 @@ async function verplaatsTaak(r, doelSec){
   let doelAfterRow;
   try { doelAfterRow = getInsertRow(doelSec); }   // 1-gebaseerd: invoegen ná deze rij
   catch(e){ alert(e.message); return false; }
+  // En klopt die plek nog? Ook deze weg loopt met een OPEN venster, dus met een stilstaande
+  // verversing: het rijnummer hierboven komt uit het geheugen van vóór de vraag die de gebruiker
+  // net beantwoordde. Zie `bevestigInvoegPlek` in crud.js.
+  try { await bevestigInvoegPlek(doelSec, doelAfterRow); }
+  catch(e){ alert(e.melding || e.message); loadAll(); return false; }
   const { doelRij } = verplaatsWaarden(r, bronSec, doelSec, doelAfterRow + 1);
   // De verwijderindex ná de invoeging. Google voert de verzoeken op volgorde uit, dus de oude rij
   // is één plek opgeschoven zodra hij ONDER de invoegplek stond. Zonder deze correctie verdwijnt
@@ -206,7 +219,7 @@ async function verplaatsTaak(r, doelSec){
             rows:[{ values: rij.map(v => ({ userEnteredValue:{ stringValue:String(v) } })) }], fields:'userEnteredValue' } },
           { deleteDimension:{ range:{ sheetId, dimension:'ROWS', startIndex:oudIndex, endIndex:oudIndex+1 } } },
         ]};
-        const resp = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+        const resp = await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
           method:'POST', headers:{ Authorization:`Bearer ${state.oauthToken}`, 'Content-Type':'application/json' },
           body:JSON.stringify(batchBody) });
         if(!resp.ok){ const e=await resp.json().catch(()=>({}));

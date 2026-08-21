@@ -6,7 +6,8 @@ import { zoekDubbels, dubbelVraagTekst } from "./dubbelcheck.js";
 import { extraVves, wisExtraVves, extraVvesHtml, extraVvesUitleg } from "./meervve.js";
 import { state, D, pgs } from "./state.js";
 import { SECS, SKEYS, SID, OMSCHRIJVING_SLEUTEL } from "./config.js";
-import { writeRange, writeRows, _shiftNtdRows, _herstelShift, assertRowMatch } from "./api.js";
+import { writeRange, writeRows, _shiftNtdRows, _herstelShift, assertRowMatch, sheetsFetch, fetchSheet, _a1Bereik, _withRetry } from "./api.js";
+import { isKolomKop, isSectieKop } from "./structuurcheck.js";
 import { ensureToken } from "./auth.js";
 import { showToast, showUndoToast, fireNotifEvent, undoComplete, undoDelete } from "./notifications.js";
 import { animateRowOut, flashRow } from "./anim.js";
@@ -428,7 +429,7 @@ function _sheetBreedtes(d){
 
 async function getSheetIds(){
   if(state._sheetIds) return state._sheetIds;
-  const r=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}`,{headers:{Authorization:`Bearer ${state.oauthToken}`}});
+  const r=await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}`,{headers:{Authorization:`Bearer ${state.oauthToken}`}});
   if(!r.ok){ if(r.status===401){state.oauthToken=null;state.oauthExpiry=0} throw new Error('getSheetIds '+r.status); }
   const d=await r.json();
   state._sheetIds={};
@@ -451,6 +452,69 @@ function getInsertRow(sec){
     throw new Error(`De sectie ${SECS[sec]?.label||sec} bestaat nog niet in het tabblad 'Nog Te Doen'. Voeg daar eerst het blok toe (een regel met ${sec} in kolom A, met daaronder een kolomkoprij).`);
   }
   return info.colHeaderRow;
+}
+
+// ── Klopt de invoegplek NOG? ────────────────────────────────────────────────────────────────
+// `getInsertRow` rekent puur uit het GEHEUGEN: het rijnummer van de laatste taak in het blok, of
+// de kolomkoprij bij een leeg blok. Dat geheugen staat stil zolang er een venster openstaat (de
+// 8s-ronde slaat over, main.js), en intussen kan een collega een taak afronden — dan schuift alles
+// eronder één omhoog en wijst het onthouden rijnummer naar iets anders.
+//
+// De bestaande rij-guard (`assertRowsMatch`) bewaakt alléén het OVERSCHRIJVEN van een bestaande
+// rij, niet de KEUZE van de invoegplek. Zonder deze controle kon een nieuwe taak precies op de
+// plek van de kolomkoppen van de vólgende sectie belanden. `parseSections` gooit de eerste regel
+// ná een sectiekop altijd weg als kolomkoprij — wát er ook in staat — dus die taak is daarna
+// nergens meer te zien: niet in de lijst, niet in het dossier. Opslaan lijkt gewoon gelukt.
+//
+// Eén extra leesverzoek per toevoeging (naast ~7,5 per minuut: verwaarloosbaar).
+async function bevestigInvoegPlek(sec, afterRow, tabblad){
+  tabblad = tabblad || 'Nog Te Doen';
+  const bron = (tabblad==='Afgerond') ? D.af : D.ntd;
+  const info = (tabblad==='Afgerond') ? D.afSecInfo : D.ntdSecInfo;
+  const entries = bron[sec] || [];
+  const laatste = entries.length ? entries[entries.length-1] : null;
+  // Rekende de aanroeper zelf een offset op het anker (de bulk-undo doet dat per sectie), dan valt
+  // over die rij niets te beweren en zwijgen we liever dan vals alarm te slaan.
+  if(laatste && laatste._row !== afterRow) return;
+  if(!laatste && info?.[sec]?.colHeaderRow !== afterRow) return;
+
+  // De lezing MAG mislukken zonder dat het aanmaken stukloopt. Een herkansing bij 429/5xx eerst
+  // (lezen is idempotent), maar komt er daarna nog niets, dan gaan we gewoon door: dan is de stand
+  // precies zoals hij vóór deze controle altijd al was, en een nieuwe taak die weigert met 'de
+  // lijst was net gewijzigd' terwijl er in werkelijkheid een netwerkprobleem is, is een slechtere
+  // ruil. Deze controle is een EXTRA slot, geen nieuwe voorwaarde.
+  let rij;
+  try { rij = (await _withRetry(()=>fetchSheet(_a1Bereik(tabblad, afterRow, afterRow))))[0] || []; }
+  catch(e){ console.warn('[invoegplek] anker niet te lezen, toevoegen gaat door:', e && e.message); return; }
+
+  const mismatch = () => {
+    const err = new Error('De lijst was net gewijzigd — opnieuw geladen, probeer nog eens.');
+    err.rowMismatch = true;
+    err.melding = 'De lijst was net gewijzigd — opnieuw geladen, probeer nog eens.';
+    return err;
+  };
+
+  if(laatste){
+    // IDENTITEIT, niet inhoud. Het vaste taaknummer in kolom Q beantwoordt precies de vraag die
+    // hier telt: 'is rij N nog dezelfde taak?'. De volle vingerafdruk zou óók aanslaan als een
+    // collega de tekst van díe laatste taak heeft bijgewerkt — en dan is de invoegplek nog gewoon
+    // goed. Het aanmaken van een ongerelateerde taak weigeren om een bewerking elders is vals alarm.
+    const nr = ((rij[16] ?? '')+'').trim();
+    if(laatste.taakId){
+      if(nr !== String(laatste.taakId).trim()) throw mismatch();
+      return;
+    }
+    // Geen taaknummer (een rij van vóór fase 4). Dan is het beste bewijs dat we niet op een
+    // structuurrij staan en dat kolom A nog dezelfde VvE-code draagt.
+    if(isSectieKop(rij) || isKolomKop(rij)) throw mismatch();
+    if(((rij[0] ?? '')+'').trim() !== ((laatste.code ?? '')+'').trim()) throw mismatch();
+    return;
+  }
+
+  // Leeg blok → het anker is de kolomkoprij. Toetsen met dezelfde SOEPELE herkenning als de
+  // structuurcheck: op PROD staat boven OPPAKKEN 'VvE-Code' mét streepje en boven de andere
+  // secties 'VvE Code' met spatie. Een exacte vergelijking zou daar vals alarm geven.
+  if(!isKolomKop(rij)) throw mismatch();
 }
 
 // Celwaarde voor een veld waar het GETAL 0 een echte waarde is. `x||''` maakt van 0 een lege
@@ -519,7 +583,7 @@ async function insertAndWriteRows(sheetName,afterRow,rijen){
   const sheetId=ids[sheetName];
   if(sheetId==null) throw new Error('Sheet niet gevonden: '+sheetName);
   const n=lijst.length;
-  const insResp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+  const insResp=await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
     method:'POST',
     headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
     body:JSON.stringify({requests:[{insertDimension:{range:{sheetId,dimension:'ROWS',startIndex:afterRow,endIndex:afterRow+n},inheritFromBefore:true}}]})
@@ -534,7 +598,7 @@ async function insertAndWriteRows(sheetName,afterRow,rijen){
     // De rijen zijn wél ingevoegd maar niet gevuld → ruim ze weer op zodat de Sheet niet vervuilt
     // met ghost-rijen. Schrijfacties zijn geserialiseerd, dus deze delete is veilig.
     try{
-      await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+      await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
         method:'POST',
         headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
         body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:afterRow,endIndex:afterRow+n}}}]})
@@ -613,7 +677,7 @@ async function deleteTaskRow(r, bijDoorgaan){
       if(sheetId==null) throw new Error('Sheet "Nog Te Doen" niet gevonden');
       if(!verwijderd){
         await assertRowMatch(oudeRow, r); // bescherming: rij nog dezelfde TAAK vóór verwijderen
-        const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+        const resp=await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
           method:'POST',
           headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
           body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:oudeRow-1,endIndex:oudeRow}}}]})
@@ -873,7 +937,7 @@ async function doCompleteTask(){
       async ()=>{
         if(!afgerond){
           await assertRowMatch(r._row, r); // bescherming: rij nog dezelfde TAAK vóór afronden
-          const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+          const resp=await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
             method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
             body:JSON.stringify(batchBody)});
           if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Fout bij afhandelen taak');err.status=resp.status;throw err}
@@ -1046,6 +1110,14 @@ async function submitTask(){
     } else {
       // ── Toevoegen: rij meteen lokaal tonen, dan op de achtergrond opslaan ──
       const afterRow=getInsertRow(sec);
+      // Vers narekenen vlak vóór de mutatie. Juist hier is het geheugen het oudst: dit venster
+      // heeft de verversing stilgezet zolang de gebruiker zat te typen.
+      try{ await bevestigInvoegPlek(sec, afterRow); }
+      catch(e){
+        alert(e.melding || e.message);
+        loadAll();          // de lijst is verschoven: verse stand halen, dan kan de gebruiker opnieuw
+        return;
+      }
       const nieuw={_sec:sec,_row:afterRow+1};
       keys.forEach((k,i)=>{ nieuw[k]=norm(values[i]); });
       nieuw.subcategorie=values[values.length-1];
@@ -1250,7 +1322,7 @@ async function zetSubsidieFase(rid, stap){
 
 export {
   openModal, editRow, closeModal, fillModalFields, setv, clearModal, kiesSectie,
-  getSheetIds, _sheetBreedtes, getInsertRow, insertAndWriteRow, insertAndWriteRows, deleteCurrentEditTask, deleteTaskRow,
+  getSheetIds, _sheetBreedtes, getInsertRow, bevestigInvoegPlek, insertAndWriteRow, insertAndWriteRows, deleteCurrentEditTask, deleteTaskRow,
   getAfInsertRow, completeTask, completeCurrentEditTask, doCompleteTask, closeCompleteModal, submitTask, gv,
   OMSCHRIJVING_VELD, zetOmschrijving, taakUitCache,
   _verseRijIdx, _herankerRij, zetSubsidieFase, kiesModalFase, _modalFaseWoord,

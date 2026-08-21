@@ -8,9 +8,17 @@ docs/
 .superpowers/
 apps-script/
 apps-script-backup/
+apps-script-klaarstaand/
+tools/
 mockups/
 logo-pakket/
 vrijdagsoverzicht.html
 OVERDRACHT-subsidie-trajecten.md
 # Let op: dit is gitignore-syntax en matcht NIET op prefix — 'apps-script/' weert
 # apps-script-backup/ dus niet. Elke map hier apart noemen.
+#
+# EN: noem elke nieuwe interne map OOK in _config.yml (die stuurt GitHub Pages). Die twee
+# lijsten staan los van elkaar en liepen uit de pas: apps-script-klaarstaand/ en tools/ stonden
+# wél in _config.yml maar niet hier, en waren daardoor publiek op te vragen op de Vercel-spiegel
+# (nagemeten: HTTP 200). Vercel is geen achterdeurtje — de Vercel-URL staat in de frontend als
+# proxy voor de chat-agent en is dus met een blik in de broncode te vinden.

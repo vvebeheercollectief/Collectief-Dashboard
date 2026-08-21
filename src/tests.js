@@ -14,11 +14,11 @@ import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel,
 import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN, saveKenmerken } from "./kenmerken.js";
 import { zoekAlles, openPalette, closePalette, palOpen } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen, bulkSelectie, bulkWis, renderBulkUi, bulkDoe, bulkVink, bulkVeld, bulkAlles, allesVinkjeHtml, allesVinkjeStand } from "./bulk.js";
-import { _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, _shiftNtdRows, veiligeCel, _veiligeRij, fetchSheet, fetchSheets, vingerafdruk, rijVingerafdruk, _normCel, _rijNaarCellen, assertRowMatch, NTD_DATUM, _isOffline, _isNetwerkFout, appendRange, appendRows } from "./api.js";
-import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
+import { sheetsFetch, NTD_OMSCHRIJVING, _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, _shiftNtdRows, veiligeCel, _veiligeRij, fetchSheet, fetchSheets, vingerafdruk, rijVingerafdruk, _normCel, _rijNaarCellen, assertRowMatch, NTD_DATUM, _isOffline, _isNetwerkFout, appendRange, appendRows } from "./api.js";
+import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, showLoadError, clearLoadError, syncSelecteerStand, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
-import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _eindKolom, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, getAfInsertRow, OMSCHRIJVING_VELD, zetOmschrijving, _sheetBreedtes, getSheetIds, kiesSectie, deleteTaskRow, deleteCurrentEditTask, completeCurrentEditTask, renderExtraVves, toonMeerVve, zetDeadlineVoorstel, herzieAlsSubtaak } from "./crud.js";
+import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _eindKolom, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, getAfInsertRow, OMSCHRIJVING_VELD, zetOmschrijving, _sheetBreedtes, getSheetIds, bevestigInvoegPlek, kiesSectie, deleteTaskRow, deleteCurrentEditTask, completeCurrentEditTask, renderExtraVves, toonMeerVve, zetDeadlineVoorstel, herzieAlsSubtaak } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages, renderChat } from "./dossier-chat.js";
 import { shouldPromptReload, maakHerlaadKern, zelfdeWorker } from "./sw-update.js";
@@ -26,7 +26,7 @@ import { doOAuth } from "./auth.js";
 import { SPLASH_MS, _setFase } from "./login-splash.js";
 import { opmaakHtml, htmlNaarMarkers, zonderOpmaak, pasToe, opmaakBalk } from "./opmaak.js";
 import { goTo, applyTheme } from "./ui.js";
-import { checkSecties, checkRaster, checkRasters, checkNummers, checkAlles, RASTER_MIN } from "./structuurcheck.js";
+import { checkSecties, checkRaster, checkRasters, checkNummers, checkAlles, ernstigeBevindingen, RASTER_MIN } from "./structuurcheck.js";
 import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from "./subsidie-fase.js";
 import { toggleHerhaalStatus, renderHerhaal, openHerhaalModal, deleteHerhaal } from "./render-herhaal.js";
 import { openSnoozeModal, snoozeOpslaan, closeSnoozeModal } from "./snooze.js";
@@ -1638,13 +1638,35 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       // dan keert loadAll meteen terug zónder de tokenvernieuwing te proberen en telt _syncFails
       // niet op. Op een trage verbinding (productie) gebeurde dat.
       for(let i=0;i<200 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,10));
+      state._authFails=0;
       await loadAll(true);
       eq('sync: eerste stille hapering telt mee', state._syncFails, 1);
       eq('sync: eerste stille hapering toont nog geen Fout', isFout(), false);
       await loadAll(true);
       eq('sync: tweede hapering op rij toont wél Fout', isFout(), true);
+      // ── En de sessie zelf. Een ingetrokken Google-sessie herstelt zich NIET vanzelf bij de
+      //    volgende ronde: een stille vernieuwing kan hem niet redden. Voorheen bleef het bij een
+      //    rood 'Fout' met de tekst 'controleer je verbinding' — terwijl het internet prima was —
+      //    en de app kent niet eens een uitlogknop, dus er was geen weg terug. Pas vanaf de derde
+      //    keer melden: `doOAuth` heeft een eigen antwoordtimeout en mag één keer misgrijpen.
+      eq('sessie: na twee mislukkingen staat er nog geen sessiebanner',
+         document.getElementById('load-err-banner'), null);
+      await loadAll(true);
+      const sesBanner=document.getElementById('load-err-banner');
+      truthy('sessie: de derde mislukking op rij meldt dat de sessie verlopen is',
+             !!sesBanner && sesBanner.dataset.soort==='sessie');
+      truthy('sessie: … met een knop om opnieuw in te loggen',
+             !!sesBanner && sesBanner.querySelector('button').textContent==='Opnieuw inloggen');
+      // Tegenproef: zonder ingelogde gebruiker hoort de INLOGKAART het werk te doen, niet deze
+      // banner. Anders krijgt iemand die nog nooit inlogde meteen 'je sessie is verlopen'.
+      document.getElementById('load-err-banner')?.remove();
+      state._authFails=0; state.currentUserEmail='';
+      await loadAll(true); await loadAll(true); await loadAll(true);
+      eq('sessie: zonder ingelogde gebruiker komt die banner er niet',
+         [state._authFails, document.getElementById('load-err-banner')], [0, null]);
     } finally {
       window.google=googleOud; state._gsiTokenClient=clientOud; state._syncFails=failsOud;
+      state._authFails=0; document.getElementById('load-err-banner')?.remove();
       state.oauthToken=tokenOud; state.oauthExpiry=expiryOud; state.currentUserEmail=mailOud;
       document.getElementById('dot').className='dot';
       document.getElementById('load-err-banner')?.remove();
@@ -1693,9 +1715,13 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
        vingerafdruk('Nog Te Doen', basis.concat(['TRUE','','','','','','T1:28-07-2026']), 'OPPAKKEN'), fpBasis);
     eq('vingerafdruk: door Apps Script herberekende prioriteit in F verandert niets',
        vingerafdruk('Nog Te Doen', ['311198','VvE A','dak nakijken','17 juni 2026','Jer','Laag',''], 'OPPAKKEN'), fpBasis);
+    // De deadline zit bij Vergaderverzoeken in kolom F, niet in D — vandaar dat twee schrijfwijzen
+    // van diezelfde datum gelijk zijn en de behandelaar (E) niets uitmaakt. Kolom D staat hier
+    // sinds v10.31 BEWUST gelijk: dat is de omschrijving (Agendapunten) en die telt nu wél mee.
+    // Dat het D láát meetellen wordt apart getoetst bij 'Schrijf-guard: omschrijving per sectie'.
     eq('vingerafdruk: VERGADERVERZOEKEN pakt de deadline in kolom F, niet D',
        vingerafdruk('Nog Te Doen', ['311198','VvE A','sept/okt','agenda','Jer','01-09-2026'], 'VERGADERVERZOEKEN'),
-       vingerafdruk('Nog Te Doen', ['311198','VvE A','sept/okt','ANDERE agenda','Cihad','1 september 2026'], 'VERGADERVERZOEKEN'));
+       vingerafdruk('Nog Te Doen', ['311198','VvE A','sept/okt','agenda','Cihad','1 september 2026'], 'VERGADERVERZOEKEN'));
     eq('vingerafdruk: onbekend tabblad valt terug op kolom A',
        vingerafdruk('Iets anders', ['ABC','rest','doet','niet','mee']), 'ABC');
     // Herhaalregels, Kenmerken, Ontwikkeling en ALV's overzicht hebben een al unieke sleutel in
@@ -3826,7 +3852,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '10.30');
+  eq('versie opgehoogd', APP_VERSION, '10.31');
 
   // ── Pushmeldingen: de twee schakels die stil kapot waren (audit 2026-08-06) ──
   // Beide defecten waren onzichtbaar: de app meldde "Notificaties zijn aan!" terwijl er nooit
@@ -3895,7 +3921,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       const bron = await (await fetch(new URL('src/notifications.js', document.baseURI), {cache:'no-store'})).text();
       // `resp` bestaat in dit bestand alleen bij deze ene delete, dus deze drie zijn specifiek.
       truthy('undo-afronden: het antwoord van de Afgerond-delete wordt gecontroleerd',
-        /const\s+resp\s*=\s*await\s+fetch/.test(bron) && /if\s*\(\s*!\s*resp\.ok\s*\)/.test(bron));
+        /const\s+resp\s*=\s*await\s+sheetsFetch/.test(bron) && /if\s*\(\s*!\s*resp\.ok\s*\)/.test(bron));
       truthy('undo-afronden: een verlopen inlog wist het token, net als elders in de app',
         /resp\.status\s*===\s*401/.test(bron));
       truthy('undo-afronden: de melding vertelt dat de taak nu dubbel staat',
@@ -6819,9 +6845,13 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         //         helemaal niet, dus een filter in de takentabel mag het slepen hier niet stilleggen.
         const offerte=t(28, 'Toff', '');
         offerte._sec='OFFERTE-TRAJECTEN'; offerte.datumAangevraagd=''; offerte.opmerkingen='Offerte-werk';
-        // Voor de vingerafdruk van een offerte-rij tellen A, C en F — bij deze rij alle drie leeg
-        // op de code na (zie NTD_DATUM in api.js), dus een blad-rij zonder actietekst.
-        blad[28]=['311212','Testflat','','','','','','']; blad[28][16]='Toff';
+        // Het nagebootste tabblad langs dezelfde bron als de guard zelf (`_rijNaarCellen`), net als
+        // `zetBlad` verderop in dit bestand. Met een handgeschreven cel-array viel deze rij om zodra
+        // de vingerafdruk een kolom erbij kreeg: sinds v10.31 telt bij offertes óók kolom G
+        // (Opmerkingen) mee, en die stond hier niet in — terwijl het ECHTE tabblad hem wél draagt.
+        // De guard sloeg dus terecht alarm op een tabblad dat de test verkeerd had nagebouwd.
+        blad[28]=_rijNaarCellen('Nog Te Doen', offerte).map(v=>String(v ?? ''));
+        blad[28][16]='Toff';
         D.ntd={ ...leeg, OPPAKKEN:[kop], 'OFFERTE-TRAJECTEN':[offerte] };
         volgorde.length=0; geschreven=[]; meldingen=[];
         state.vveCode='311212';
@@ -8727,6 +8757,99 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
          [`1 taak verwijderen? | Deze taak wordt uit 'Nog Te Doen' gehaald. `+
           `Meteen daarna kun je dit nog ongedaan maken met de knop in de melding. | Verwijderen`]);
       await leeglopen();
+
+      // ══ 5. Bulk-AFRONDEN — de enige bulk-weg die niets vroeg ══
+      // Verwijderen vraagt het al (met de subtaak-zin) en één taak afronden waarschuwt via
+      // `bundelWaarschuwing`. Afronden-in-bulk deed geen van beide, terwijl het kopvinkje de HELE
+      // gefilterde lijst selecteert — ook de taken op pagina 2 en 3 die je nooit in beeld hebt gehad.
+      // De groene knop ligt pal naast een selectie van veertig taken en de terugweg duurt 8 seconden.
+      bulkKnop.dataset.wat='afronden';
+      // VERSE lege arrays, geen `{ ...leeg }`. Die spread kopieert de ARRAY-VERWIJZINGEN uit `leeg`,
+      // dus D.af en D.ntd delen daarna dezelfde lijsten en `_shiftNtdRows` telt op rijen die het
+      // niet aangaan. Gemeten: de rijnummers van deze taken schoven van 5/6/7 naar 21/22/23 en de
+      // rij-guard sloeg terecht alarm. Bij de oudere blokken hierboven valt dat niet op omdat die
+      // alleen naar OPPAKKEN kijken; hier wel, want afronden raakt Afgerond én Nog Te Doen.
+      const versLeeg=()=>({ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] });
+      // Afronden raakt het tabblad 'Afgerond', en `getAfInsertRow` GOOIT als het blok daar niet
+      // bekend is — dan zou dit blok stilte meten in plaats van een afronding. De andere bulk-wegen
+      // hierboven komen nooit bij Afgerond en hadden dit daarom niet nodig.
+      const afSecOud = D.afSecInfo;
+      D.afSecInfo = { OPPAKKEN:{ colHeaderRow:2 }, VERGADERVERZOEKEN:{ colHeaderRow:20 },
+                      'OFFERTE-TRAJECTEN':{ colHeaderRow:40 }, LOD:{ colHeaderRow:60 },
+                      'SUBSIDIE-TRAJECTEN':{ colHeaderRow:80 } };
+      const kiesN=(n)=>{
+        const rijen=[]; for(let i=0;i<n;i++) rijen.push(taak(5+i, 'Taak '+(i+1), ''));
+        D.af=versLeeg(); D.ntd={ ...versLeeg(), OPPAKKEN:rijen };
+        zetBlad(rijen); posts=[];
+        state.bulkMode=true; bulkWis();
+        // `rijen.slice()` en NIET `rijen` zelf: `_rowCache` is de cache die `rowNtd` bij elke render
+        // vólduwt met de getekende rijen. Geef je hier dezelfde array mee als D.ntd.OPPAKKEN, dan
+        // groeit de takenlijst met elke render mee — gemeten: twee taken werden er acht, en daarna
+        // meet dit blok iets heel anders dan het denkt.
+        rijen.forEach((r,i)=>{ state._rowCache=rijen.slice(); bulkVink(i); });
+        return rijen;
+      };
+
+      // Onder de drempel: geen vraag. De dagelijkse kleine bulk mag niet zwaarder worden — een
+      // vraag die je twintig keer per dag wegklikt, lees je op de eenentwintigste keer ook niet.
+      let rijen=kiesN(2);
+      eq('bulk-afronden: er staan twee taken geselecteerd', bulkSelectie().length, 2);
+      antwoord=false; vragen=[];
+      await vraag(()=>bulkDoe(bulkKnop));
+      await leeglopen();
+      eq('bulk-afronden: bij twee taken wordt er niets gevraagd en gaat het gewoon door',
+         [vragen.length, D.ntd.OPPAKKEN.length], [0, 0]);
+
+      // Vanaf drie: wél een vraag, met het aantal in de titel.
+      rijen=kiesN(3);
+      pendingVoor=state.pendingWrites;
+      antwoord=false; vragen=[];
+      await vraag(()=>bulkDoe(bulkKnop));
+      eq('bulk-afronden: vanaf drie taken komt er een vraag, met het aantal in de titel', vragen,
+         [`3 taken afronden? | Deze taken verhuizen naar 'Afgerond'. `+
+          `Meteen daarna kun je dit nog ongedaan maken met de knop in de melding. | Afronden`]);
+      // Niet de rode knop: rood hangt in deze app aan de drie verwijdervragen, en afronden is
+      // geen verwijderen.
+      eq('bulk-afronden: … met de gewone (niet-rode) bevestigknop', knopKleur, 'btn btn-pri');
+      eq('bulk-afronden: nee laat alles staan — taken, selectie én bulk-modus',
+         [D.ntd.OPPAKKEN.length, bulkSelectie().length, state.bulkMode,
+          state.pendingWrites-pendingVoor, posts.length],
+         [3, 3, true, 0, 0]);
+
+      // Hangen er subtaken onder, dan hoort de vraag dat te zeggen — net als bij verwijderen.
+      // VIER taken, zodat er drie geselecteerd kunnen worden (de vraag komt pas vanaf drie) én de
+      // subtaak juist buiten de selectie blijft: dát is het geval waarin zij achterblijft.
+      rijen=kiesN(4);
+      rijen[0].bundelId='B-9'; rijen[0].bundelVolg='0';
+      rijen[1].bundelId='B-9'; rijen[1].bundelVolg='10';
+      zetBlad(rijen); posts=[];
+      state.bulkMode=true; bulkWis();
+      state._rowCache=rijen.slice(); bulkVink(0);
+      state._rowCache=rijen.slice(); bulkVink(2);
+      state._rowCache=rijen.slice(); bulkVink(3);
+      antwoord=false; vragen=[];
+      await vraag(()=>bulkDoe(bulkKnop));
+      truthy('bulk-afronden: de vraag meldt het als er nog subtaken onder hangen',
+             (vragen[0]||'').includes('nog subtaken'));
+
+      // En de `await` in `bulkDoe`. Zonder die await liep de optimistische verhuizing door terwijl
+      // het venster nog openstond — precies de val die bij verwijderen hierboven al beschreven staat.
+      // Nagemeten: haal de await weg en deze assert wordt rood, de rest van het blok blijft groen.
+      rijen=kiesN(3);
+      vragen=[];
+      let afrondAf=false;
+      const lopendAf=bulkDoe(bulkKnop).then(()=>{ afrondAf=true; });
+      await wachtTot(()=>bevBg.classList.contains('open'));
+      await tik(); await tik();
+      eq('bulk-afronden: bulkDoe blijft lopen zolang de vraag onbeantwoord openstaat',
+         [bevBg.classList.contains('open'), afrondAf, D.ntd.OPPAKKEN.length], [true, false, 3]);
+      document.getElementById('bevestig-ja').click();
+      await lopendAf;
+      eq('bulk-afronden: ja rondt de drie taken af en sluit de bulk-modus af',
+         [D.ntd.OPPAKKEN.length, bulkSelectie().length, state.bulkMode], [0, 0, false]);
+      await leeglopen();
+      eq('bulk-afronden: … en precies rij 7, 6 en 5 gaan eruit, hoog→laag', wisRijen(), [7, 6, 5]);
+      D.afSecInfo = afSecOud;
     } finally {
       window.fetch=_fetch; window.alert=_alert;
       // Is er onderweg een assert geklapt, dan kan er een onbeantwoorde vraag blijven staan. Die is
@@ -10356,7 +10479,22 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         const u=decodeURIComponent(String(url)), methode=(opt&&opt.method)||'GET';
         if(u.includes('values:batchGet'))
           return new Response(JSON.stringify({error:{message:'geen leesronde in deze test'}}),{status:403});
-        if(methode==='GET') return new Response(JSON.stringify({values:[]}),{status:200});
+        // Het tabblad LEEFT mee met D.ntd. `bevestigInvoegPlek` leest vlak vóór het invoegen de
+        // ankerrij terug: bij een leeg blok de kolomkoprij (rij 2), en zodra er taken staan de rij
+        // van de laatste taak. Dit blok maakt taken áán, dus dat anker verschuift onderweg — een
+        // vaste lijst zou hier na de eerste taak 'de lijst is verschoven' opleveren. Vandaar
+        // afleiden uit het geheugen, langs dezelfde bron als de guard (`_rijNaarCellen`).
+        if(methode==='GET'){
+          const m=/!A(\d+):S(\d+)/.exec(u)||[];
+          const uitGeheugen=rw=>Object.values(D.ntd||{}).flat().find(r=>r && r._row===rw);
+          const rijen=[]; for(let rw=+m[1]; rw<=+m[2]; rw++){
+            const r=uitGeheugen(rw);
+            rijen.push(r ? _rijNaarCellen('Nog Te Doen', r).map(v=>String(v ?? ''))
+                     : rw===2 ? ['VvE Code','VvE','Actiepunt','Deadline','Behandelaar','Opmerkingen']
+                     : []);
+          }
+          return new Response(JSON.stringify({values:rijen}),{status:200});
+        }
         return new Response('{}',{status:200});
       };
       state.activeNtd = 'OPPAKKEN'; state.editMode = false;
@@ -10524,7 +10662,19 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         const u=decodeURIComponent(String(url)), methode=(opt&&opt.method)||'GET';
         if(u.includes('values:batchGet'))
           return new Response(JSON.stringify({error:{message:'geen leesronde in deze test'}}),{status:403});
-        if(methode==='GET') return new Response(JSON.stringify({values:[]}),{status:200});
+        // Het tabblad leeft mee met D.ntd — `bevestigInvoegPlek` leest vlak vóór het invoegen de
+        // ankerrij terug (bij een leeg blok de kolomkoprij op rij 2), en dit blok maakt taken aan,
+        // dus dat anker verschuift onderweg. Zie dezelfde stub in het dubbelcheck-blok.
+        if(methode==='GET'){
+          const m=/!A(\d+):S(\d+)/.exec(u)||[];
+          const rijen=[]; for(let rw=+m[1]; rw<=+m[2]; rw++){
+            const r=Object.values(D.ntd||{}).flat().find(x=>x && x._row===rw);
+            rijen.push(r ? _rijNaarCellen('Nog Te Doen', r).map(v=>String(v ?? ''))
+                     : rw===2 ? ['VvE Code','VvE','Actiepunt','Deadline','Behandelaar','Opmerkingen']
+                     : []);
+          }
+          return new Response(JSON.stringify({values:rijen}),{status:200});
+        }
         posts.push({ url:u, methode, body:(opt&&opt.body)?JSON.parse(opt.body):null });
         return new Response('{}',{status:200});
       };
@@ -10696,7 +10846,13 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         if(methode==='GET'){
           const m=/!A(\d+):S(\d+)/.exec(u)||[];
           const rijen=[]; for(let rw=+m[1]; rw<=+m[2]; rw++)
-            rijen.push(rw===40 ? _rijNaarCellen('Nog Te Doen', taak).map(v=>String(v ?? '')) : []);
+            // Rij 2 en 38 zijn de KOLOMKOPRIJEN van de twee blokken. Die horen erbij sinds
+            // `bevestigInvoegPlek` vlak vóór het invoegen narekent of de plek nog klopt: bij een
+            // leeg doelblok is de kolomkoprij het anker. Een leeg antwoord zou hier dus 'de lijst
+            // is verschoven' betekenen — en dat is precies wat het tabblad in werkelijkheid niet is.
+            rijen.push(rw===40 ? _rijNaarCellen('Nog Te Doen', taak).map(v=>String(v ?? ''))
+                     : (rw===2 || rw===38) ? ['VvE Code','VvE','Actiepunt','Deadline','Behandelaar','Opmerkingen']
+                     : []);
           return new Response(JSON.stringify({values:rijen}),{status:200});
         }
         posts.push({ url:u, methode, body:(opt&&opt.body)?JSON.parse(opt.body):null });
@@ -10760,6 +10916,392 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       window.fetch=fetchOud; window.alert=alertOud;
       state.oauthToken=tokenOud; state.oauthExpiry=expOud; state._sheetIds=idsOud;
       D.ntd=ntdOud; D.af=afOud; D.ntdSecInfo=infoOud; state._uitCache=uitCacheOud;
+    }
+  })();
+
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  SCHRIJF-GUARD — de omschrijving telt mee, óók waar die niet in kolom C staat
+  // ══════════════════════════════════════════════════════════════════════════
+  // De vingerafdruk vergeleek kolom A, kolom C en de deadlinekolom. Bij Vergaderverzoeken staat de
+  // omschrijving in kolom D (Agendapunten) en bij Offerte-trajecten in kolom G (Opmerkingen) — die
+  // vielen dus buiten de vergelijking, terwijl submitTask de HELE rij A..K terugschrijft. Een
+  // collega die de agendapunten aanvulde terwijl jouw bewerkscherm openstond, werd overschreven
+  // zonder melding en zonder spoor in het Logboek.
+  (() => {
+    console.log('%c[TESTS] Schrijf-guard: omschrijving per sectie', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    // Kolomvolgorde VERGADERVERZOEKEN: A code, B naam, C periode, D agendapunten, E behandelaar,
+    // F deadline, G opmerkingen.
+    const verg = ['311162','VvE Test','sept/okt','Dak bespreken','Jer','01-09-2026','',''];
+    const vergPlus = verg.slice(); vergPlus[3] = 'Dak bespreken + gevelonderhoud';
+    truthy('guard: een aanvulling in Agendapunten (kolom D) verandert de vingerafdruk',
+           vingerafdruk('Nog Te Doen', verg, 'VERGADERVERZOEKEN') !== vingerafdruk('Nog Te Doen', vergPlus, 'VERGADERVERZOEKEN'));
+    // Tegenproef: een kolom die er bewust NIET in zit mag hem niet laten schuiven. E = behandelaar,
+    // die wordt via het bewerkscherm gezet en hoort geen vals alarm te geven op zichzelf.
+    const vergBeh = verg.slice(); vergBeh[4] = 'Cihad';
+    eq('guard: een andere behandelaar (kolom E) verandert de vingerafdruk NIET',
+       vingerafdruk('Nog Te Doen', verg, 'VERGADERVERZOEKEN'), vingerafdruk('Nog Te Doen', vergBeh, 'VERGADERVERZOEKEN'));
+    // Kolomvolgorde OFFERTE-TRAJECTEN: A code, B naam, C datumAangevraagd, D offertes,
+    // E behandelaar, F deadline, G opmerkingen.
+    const off = ['311212','VvE Twee','01-08-2026','2/3','Jer','15-08-2026','Wacht op aannemer'];
+    const offPlus = off.slice(); offPlus[6] = 'Wacht op aannemer — Jansen belt terug';
+    truthy('guard: een aanvulling in Opmerkingen (kolom G) verandert de vingerafdruk bij offertes',
+           vingerafdruk('Nog Te Doen', off, 'OFFERTE-TRAJECTEN') !== vingerafdruk('Nog Te Doen', offPlus, 'OFFERTE-TRAJECTEN'));
+    // Kolom D bij offertes is 'Ontvangen/Aangevraagd' en wordt door Apps Script bijgewerkt
+    // (reconcileOffertes). Die mag er NIET in, anders slaat de guard alarm op werk van de backend.
+    const offD = off.slice(); offD[3] = '3/3';
+    eq('guard: kolom D bij offertes (door Apps Script geschreven) blijft buiten de vingerafdruk',
+       vingerafdruk('Nog Te Doen', off, 'OFFERTE-TRAJECTEN'), vingerafdruk('Nog Te Doen', offD, 'OFFERTE-TRAJECTEN'));
+    // Oppakken verandert niet: daar IS de omschrijving kolom C, die zat er al in. Geen dubbeltelling.
+    const opp = ['311162','VvE Test','Lekkage dak','01-09-2026','Jer','Hoog','opm',''];
+    const oppPlus = opp.slice(); oppPlus[2] = 'Lekkage dak achterzijde';
+    truthy('guard: Oppakken blijft werken zoals altijd (omschrijving is daar kolom C)',
+           vingerafdruk('Nog Te Doen', opp, 'OPPAKKEN') !== vingerafdruk('Nog Te Doen', oppPlus, 'OPPAKKEN'));
+    // De afgeleide tabel zelf, zodat een wijziging in SECS of OMSCHRIJVING_SLEUTEL hier opvalt.
+    eq('guard: de omschrijvingskolom per sectie', NTD_OMSCHRIJVING,
+       { OPPAKKEN:[2], VERGADERVERZOEKEN:[3], 'OFFERTE-TRAJECTEN':[6], LOD:[2], 'SUBSIDIE-TRAJECTEN':[2] });
+  })();
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  INVOEGPLEK — klopt het anker nog vlak vóór het invoegen?
+  // ══════════════════════════════════════════════════════════════════════════
+  // `getInsertRow` rekent puur uit het geheugen, en dat geheugen staat stil zolang er een venster
+  // openstaat. Rondt een collega intussen een taak af, dan schuift alles op en kan de nieuwe taak
+  // op de plek van de kolomkoppen van de VOLGENDE sectie belanden — waar parseSections hem altijd
+  // weggooit. Onzichtbaar in de lijst én in het dossier, terwijl opslaan gelukt lijkt.
+  await (async () => {
+    console.log('%c[TESTS] Invoegplek vers narekenen', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const fetchOud = window.fetch, tokenOud = state.oauthToken, expOud = state.oauthExpiry;
+    const ntdOud = D.ntd, infoOud = D.ntdSecInfo;
+    try {
+      state.oauthToken = 'nep'; state.oauthExpiry = Date.now() + 3600e3;
+      const taak = { _sec:'OPPAKKEN', _row:10, code:'311162', naam:'VvE Test', actiepunt:'Lekkage dak',
+                     deadline:'', behandelaar:'Jer', prioriteit:'', opmerkingen:'', taakId:'T-77' };
+      D.ntd = { OPPAKKEN:[taak], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      D.ntdSecInfo = { OPPAKKEN:{colHeaderRow:2}, VERGADERVERZOEKEN:{colHeaderRow:20},
+                       'OFFERTE-TRAJECTEN':{colHeaderRow:40}, LOD:{colHeaderRow:60}, 'SUBSIDIE-TRAJECTEN':{colHeaderRow:80} };
+      // De rij die de guard terugleest, in de vorm die values.get teruggeeft (A..S).
+      const rijVan = (r) => { const c = _rijNaarCellen('Nog Te Doen', r); c[16] = r.taakId || ''; return c; };
+      let geleverd = null;
+      window.fetch = async () => new Response(JSON.stringify({ values: [geleverd] }), { status: 200 });
+
+      // 1. Het anker is nog dezelfde taak → geen bezwaar.
+      geleverd = rijVan(taak);
+      let fout = null;
+      try { await bevestigInvoegPlek('OPPAKKEN', 10); } catch (e) { fout = e; }
+      eq('invoegplek: het anker is nog dezelfde taak → geen bezwaar', fout, null);
+
+      // 2. Er is boven de taak iets weggevallen, dus rij 10 draagt nu een ANDERE taak.
+      geleverd = rijVan({ ...taak, actiepunt:'Iets heel anders', taakId:'T-99' });
+      fout = null;
+      try { await bevestigInvoegPlek('OPPAKKEN', 10); } catch (e) { fout = e; }
+      truthy('invoegplek: een verschoven anker wordt tegengehouden', !!fout && !!fout.rowMismatch);
+      truthy('invoegplek: met een melding die de gebruiker kan plaatsen', /net gewijzigd/.test((fout||{}).melding||''));
+
+      // 2b. IDENTITEIT, niet inhoud. Heeft een collega de tekst van díe ankertaak bijgewerkt, dan
+      //     is de invoegplek nog gewoon goed — het is dezelfde rij, dezelfde taak. Het aanmaken van
+      //     een ongerelateerde taak weigeren om een bewerking elders is vals alarm, en vals alarm
+      //     leert de gebruiker om meldingen weg te klikken.
+      geleverd = rijVan({ ...taak, actiepunt:'Lekkage dak — aannemer gebeld', behandelaar:'Cihad' });
+      fout = null;
+      try { await bevestigInvoegPlek('OPPAKKEN', 10); } catch (e) { fout = e; }
+      eq('invoegplek: een BEWERKTE ankertaak is geen bezwaar — het nummer telt, niet de tekst', fout, null);
+
+      // 2c. Een rij zónder taaknummer (van vóór fase 4) valt terug op kolom A én op 'staat hier
+      //     geen structuurrij'. Zonder die terugval zou zo'n blok helemaal onbewaakt zijn.
+      const zonderNr = { ...taak, taakId:'' };
+      D.ntd.OPPAKKEN = [zonderNr];
+      geleverd = rijVan(zonderNr);
+      fout = null;
+      try { await bevestigInvoegPlek('OPPAKKEN', 10); } catch (e) { fout = e; }
+      eq('invoegplek: een rij zonder taaknummer valt terug op de VvE-code', fout, null);
+      geleverd = ['VERGADERVERZOEKEN'];        // een sectiekop op de ankerplek: alarm
+      fout = null;
+      try { await bevestigInvoegPlek('OPPAKKEN', 10); } catch (e) { fout = e; }
+      truthy('invoegplek: … en slaat alarm als daar ineens een sectiekop staat', !!fout && !!fout.rowMismatch);
+      D.ntd.OPPAKKEN = [taak];
+
+      // 3. Leeg sectieblok → het anker is de kolomkoprij. Beide spellingen moeten door.
+      geleverd = ['VvE Code','VvE','Actiepunt'];
+      fout = null;
+      try { await bevestigInvoegPlek('VERGADERVERZOEKEN', 20); } catch (e) { fout = e; }
+      eq("invoegplek: een leeg blok met 'VvE Code' is in orde", fout, null);
+      geleverd = ['VvE-Code','VvE','Actiepunt'];   // mét streepje — zo staat het op PROD boven OPPAKKEN
+      fout = null;
+      try { await bevestigInvoegPlek('VERGADERVERZOEKEN', 20); } catch (e) { fout = e; }
+      eq("invoegplek: en 'VvE-Code' mét streepje óók — anders vals alarm op PROD", fout, null);
+
+      // 4. Leeg blok waar de kolomkoprij is weggeschoven → tegenhouden.
+      geleverd = ['311162','VvE Test','Een gewone taak'];
+      fout = null;
+      try { await bevestigInvoegPlek('VERGADERVERZOEKEN', 20); } catch (e) { fout = e; }
+      truthy('invoegplek: staat er iets anders dan de kolomkoprij, dan gaat het niet door', !!fout && !!fout.rowMismatch);
+
+      // 5. Rekende de aanroeper zelf een offset op het anker (de bulk-undo doet dat), dan valt er
+      //    niets te beweren en zwijgt de controle — vals alarm zou daar erger zijn dan zwijgen.
+      let gelezen = 0;
+      window.fetch = async () => { gelezen++; return new Response(JSON.stringify({ values: [geleverd] }), { status: 200 }); };
+      fout = null;
+      try { await bevestigInvoegPlek('OPPAKKEN', 13); } catch (e) { fout = e; }
+      eq('invoegplek: een anker met eigen offset wordt met rust gelaten', [fout, gelezen], [null, 0]);
+
+      // 6. Mislukt de LEZING zelf, dan gaat het toevoegen gewoon door. Deze controle is een EXTRA
+      //    slot, geen nieuwe voorwaarde: een nieuwe taak die weigert met 'de lijst was net
+      //    gewijzigd' terwijl er in werkelijkheid een netwerkstoring is, is een slechtere ruil dan
+      //    de stand van vóór deze controle. 403 en niet 5xx: niet-tijdelijk, dus geen herkansing
+      //    en geen wachttijd in de test.
+      window.fetch = async () => new Response(JSON.stringify({ error:{ message:'weg' } }), { status: 403 });
+      fout = null;
+      try { await bevestigInvoegPlek('OPPAKKEN', 10); } catch (e) { fout = e; }
+      eq('invoegplek: een mislukte lezing houdt het toevoegen NIET tegen', fout, null);
+    } finally {
+      window.fetch = fetchOud; state.oauthToken = tokenOud; state.oauthExpiry = expOud;
+      D.ntd = ntdOud; D.ntdSecInfo = infoOud;
+    }
+  })();
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  STRUCTUURCHECK — wat verdient een melding op het scherm?
+  // ══════════════════════════════════════════════════════════════════════════
+  // De controle vond de schade al, maar schreef hem uitsluitend naar de ontwikkelaarsconsole.
+  // Daar kijkt niemand, en juist deze schade is op het scherm onzichtbaar.
+  (() => {
+    console.log('%c[TESTS] Structuurcheck: melden of zwijgen', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const opKoprij = { regel:21, sectie:'VERGADERVERZOEKEN', tekst:'Regel 21 staat op de plek van de kolomkoppen…' };
+    const dubbelNr = { nummer:'T-12', regels:[8,30], tekst:'Taaknummer T-12 staat op twee regels…' };
+    const raster   = { tabblad:'Nog Te Doen', nodig:19, gevonden:17, tekst:"Tabblad 'Nog Te Doen' is 17 kolommen breed…" };
+    eq('structuurcheck: een regel op de kolomkoppen is ernstig', ernstigeBevindingen([opKoprij]).length, 1);
+    eq('structuurcheck: een dubbel taaknummer is ernstig', ernstigeBevindingen([dubbelNr]).length, 1);
+    eq('structuurcheck: een te smal raster blijft console-only', ernstigeBevindingen([raster]).length, 0);
+    eq('structuurcheck: door elkaar heen blijven alleen de ernstige over',
+       ernstigeBevindingen([raster, opKoprij, dubbelNr]).map(b => b.regel ?? b.nummer), [21, 'T-12']);
+    eq('structuurcheck: niets gevonden is niets melden', ernstigeBevindingen([]).length, 0);
+    eq('structuurcheck: en een lege invoer laat niets omvallen', ernstigeBevindingen(null).length, 0);
+  })();
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  BANNER — drie storingen, drie eerlijke teksten
+  // ══════════════════════════════════════════════════════════════════════════
+  // Bij een ingetrokken Google-sessie stond er 'controleer je verbinding' terwijl het internet
+  // prima was, en er was geen enkele weg terug naar inloggen — de app kent niet eens een
+  // uitlogknop. Bij een mislukte render stond er helemaal niets.
+  (() => {
+    console.log('%c[TESTS] Foutbanner per soort', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    try {
+      showLoadError();
+      const b1 = document.getElementById('load-err-banner');
+      truthy('banner: de gewone laadfout noemt de verbinding', /verbinding/.test(b1.textContent));
+      eq('banner: met de knop Opnieuw proberen', b1.querySelector('button').textContent, 'Opnieuw proberen');
+      // Dezelfde soort nog eens → één banner, niet twee.
+      showLoadError();
+      eq('banner: dezelfde soort stapelt niet', document.querySelectorAll('#load-err-banner').length, 1);
+      // Een ANDERE soort moet er wél overheen: anders blijft 'controleer je verbinding' staan
+      // terwijl de echte oorzaak intussen een verlopen sessie is.
+      showLoadError({ soort:'sessie' });
+      const b2 = document.getElementById('load-err-banner');
+      eq('banner: een andere soort vervangt de vorige', document.querySelectorAll('#load-err-banner').length, 1);
+      truthy('banner: de sessiebanner noemt de sessie, niet de verbinding',
+             /sessie is verlopen/.test(b2.textContent) && !/controleer je verbinding/.test(b2.textContent));
+      eq('banner: en biedt Opnieuw inloggen aan', b2.querySelector('button').textContent, 'Opnieuw inloggen');
+      showLoadError({ soort:'render' });
+      const b3 = document.getElementById('load-err-banner');
+      truthy('banner: de renderfout zegt dat je naar oudere gegevens kijkt', /oudere gegevens/.test(b3.textContent));
+    } finally {
+      clearLoadError();
+    }
+  })();
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  SELECTEREN — de balk liegt niet meer over 'Live'
+  // ══════════════════════════════════════════════════════════════════════════
+  // Zolang de selecteerstand aanstaat slaat élke verversingsronde over, en de meldingen liften op
+  // diezelfde ronde mee. De balk bleef ondertussen 'Live · HH:MM' zeggen. Zet je 'Selecteren' aan
+  // en word je gebeld, dan staat het dashboard een half uur stil terwijl het volhoudt dat het live is.
+  (() => {
+    console.log('%c[TESTS] Selecteerstand in de statusbalk', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const lbl = document.getElementById('sync-lbl');
+    const tekstOud = lbl.textContent, bulkOud = state.bulkMode, bewaardOud = state._syncLblVoorBulk;
+    try {
+      state._syncLblVoorBulk = null;
+      lbl.textContent = 'Live · 09:14';
+      state.bulkMode = true;  syncSelecteerStand();
+      eq('selecteren: de balk zegt dat het verversen stilstaat', lbl.textContent, 'Selecteren — verversen staat stil');
+      // Nog eens aanroepen mag de bewaarde tekst niet overschrijven met de pauzetekst zelf.
+      syncSelecteerStand();
+      eq('selecteren: herhaald aanroepen bewaart de oorspronkelijke tekst', state._syncLblVoorBulk, 'Live · 09:14');
+      state.bulkMode = false; syncSelecteerStand();
+      eq('selecteren: uit → de vorige tekst komt terug, niet een verzonnen nieuwe tijd', lbl.textContent, 'Live · 09:14');
+      eq('selecteren: en het geheugen is opgeruimd', state._syncLblVoorBulk, null);
+    } finally {
+      state.bulkMode = bulkOud; state._syncLblVoorBulk = bewaardOud; lbl.textContent = tekstOud;
+    }
+  })();
+
+  // Een VERGETEN lege selecteerstand legde het hele dashboard stil, ook op andere pagina's — daar
+  // is niet eens een teller die eraan herinnert.
+  (() => {
+    console.log('%c[TESTS] Vergeten selecteerstand', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const bulkOud = state.bulkMode, ntdOud = D.ntd;
+    try {
+      D.ntd = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      goTo('ntd');
+      state.bulkMode = true; bulkWis();
+      goTo('logboek');
+      eq('selecteren: een LEGE stand gaat uit zodra je de takenlijst verlaat', state.bulkMode, false);
+      // Met een gevulde selectie blijft hij staan: die heeft de gebruiker bewust gemaakt, en hij
+      // mag een dossier openen om iets op te zoeken zonder zijn werk kwijt te raken.
+      const taak = { _sec:'OPPAKKEN', _row:10, code:'311162', naam:'VvE Test', actiepunt:'Lekkage' };
+      D.ntd.OPPAKKEN = [taak];
+      goTo('ntd');
+      state.bulkMode = true; bulkWis();
+      state._rowCache = [taak]; bulkVink(0);   // bulkVink neemt een INDEX in _rowCache
+      goTo('vve');
+      eq('selecteren: een GEVULDE selectie blijft staan bij een paginawissel', state.bulkMode, true);
+      eq('selecteren: en de selectie zelf ook', bulkSelectie().length, 1);
+    } finally {
+      state.bulkMode = bulkOud; bulkWis(); D.ntd = ntdOud; goTo('ntd');
+    }
+  })();
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  RENDER — een mislukt hertekenen bevriest het scherm niet meer stil
+  // ══════════════════════════════════════════════════════════════════════════
+  // `state._lastDHash` werd gezet VÓÓR `renderAll()`. Gooide het tekenen één keer, dan stond de
+  // vingerafdruk van de nieuwe gegevens al genoteerd: elke volgende ronde zag 'niets veranderd' en
+  // sloeg het tekenen over. Het scherm bleef de rest van de dag op de oude lijst staan — met een
+  // groen 'Live · HH:MM' ernaast, want de ronde zelf was geslaagd.
+  await (async () => {
+    console.log('%c[TESTS] Mislukt hertekenen', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const _fetch = window.fetch, tokenOud = state.oauthToken, expOud = state.oauthExpiry;
+    const hashOud = state._lastDHash, failsOud = state._syncFails, rfOud = state._renderFails;
+    const alfaOud = state._alfaMs, hwOud = state._logHoogwater, ankOud = state._logAnkerTs;
+    const dOud = {}; Object.keys(D).forEach(k => dOud[k] = D[k]);
+    // `b-ntd` is het teller-element dat renderAll als ALLEREERSTE aanraakt. Even weghalen is de
+    // eerlijkste manier om een renderfout te maken: geen nagebouwde functie, maar de echte weg.
+    const bNtd = document.getElementById('b-ntd');
+    const ouder = bNtd && bNtd.parentNode, buur = bNtd && bNtd.nextSibling;
+    try {
+      state.oauthToken = 'nep'; state.oauthExpiry = Date.now() + 3600e3;
+      state._alfaMs = 0; state._logHoogwater = 0; state._logAnkerTs = '';
+      window.fetch = async (url) => {
+        const d = decodeURIComponent(String(url));
+        if (d.includes('values:batchGet')) return new Response('{}', { status: 400 }); // → losse reads
+        return new Response(JSON.stringify({ values: [] }), { status: 200 });
+      };
+      for (let i = 0; i < 200 && state._loadInFlight; i++) await new Promise(r => setTimeout(r, 10));
+
+      // 1. Met een kapotte render: de vingerafdruk mag NIET bijgewerkt worden.
+      state._lastDHash = 'ANKER-VAN-VOOR-DE-FOUT'; state._syncFails = 0; state._renderFails = 0;
+      if (bNtd) bNtd.remove();
+      await loadAll(true);
+      eq('render: een mislukt hertekenen laat de vingerafdruk op de OUDE waarde staan',
+         state._lastDHash, 'ANKER-VAN-VOOR-DE-FOUT');
+      truthy('render: … zodat de volgende ronde het opnieuw probeert', state._renderFails > 0);
+      const banner = document.getElementById('load-err-banner');
+      truthy('render: en er staat een banner die zegt dat je oudere gegevens ziet',
+             !!banner && /oudere gegevens/.test(banner.textContent));
+      // De balk mag NIET 'Live' zeggen na een mislukte render — dat was de hele stille storing.
+      truthy('render: de statusbalk staat niet op Live',
+             !/^Live/.test(document.getElementById('sync-lbl').textContent));
+
+      // 2. Element terug → de volgende ronde tekent wél en werkt de vingerafdruk bij.
+      if (bNtd && ouder) ouder.insertBefore(bNtd, buur);
+      await loadAll(true);
+      truthy('render: zodra het tekenen weer lukt wordt de vingerafdruk bijgewerkt',
+             state._lastDHash !== 'ANKER-VAN-VOOR-DE-FOUT');
+      eq('render: … en de renderfout-teller staat weer op nul', state._renderFails, 0);
+      eq('render: en de banner is weg', document.getElementById('load-err-banner'), null);
+    } finally {
+      if (bNtd && ouder && !bNtd.parentNode) ouder.insertBefore(bNtd, buur);
+      window.fetch = _fetch; state.oauthToken = tokenOud; state.oauthExpiry = expOud;
+      state._lastDHash = hashOud; state._syncFails = failsOud; state._renderFails = rfOud;
+      state._alfaMs = alfaOud; state._logHoogwater = hwOud; state._logAnkerTs = ankOud;
+      Object.keys(dOud).forEach(k => D[k] = dOud[k]);
+      document.getElementById('load-err-banner')?.remove();
+      // `renderAll` zelf staat in main.js en wordt hier niet geïmporteerd; deze twee zetten de
+      // takenlijst terug in beeld, en dat is wat de blokken hierna nodig hebben.
+      renderNtd(); renderNtdStats();
+    }
+  })();
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  SCHRIJVEN — ook de rij-invoegingen kennen nu een tijdslimiet
+  // ══════════════════════════════════════════════════════════════════════════
+  // De 20-secondengrens gold alleen voor lezen en cel-schrijven. Alle rij-invoegingen en
+  // -verwijderingen gingen langs een kale `fetch` zonder limiet. Een verzoek dat nooit antwoordt
+  // liet `pendingWrites` boven nul staan: de 8s-ronde sloeg daarna élke keer over, de balk bleef op
+  // 'Opslaan…' hangen en alles wat je daarna deed verdween in een wachtrij die nooit meer vertrok.
+  await (async () => {
+    console.log('%c[TESTS] Tijdslimiet op een schrijfverzoek', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const _fetch = window.fetch, timeoutOud = state._fetchTimeoutMs, nfOud = state._netwerkFouten;
+    try {
+      state._fetchTimeoutMs = 60;
+      state._netwerkFouten = 0;
+      window.fetch = (url, opt) => new Promise((_, af) => {
+        const sig = opt && opt.signal;
+        if (sig) sig.addEventListener('abort', () => af(Object.assign(new Error('afgebroken'), { name: 'AbortError' })));
+      });
+      let fout = null;
+      try {
+        await sheetsFetch('https://sheets.googleapis.com/v4/spreadsheets/X:batchUpdate', { method: 'POST', body: '{}' });
+      } catch (e) { fout = e; }
+      truthy('schrijven: een batchUpdate die blijft hangen wordt afgebroken', !!fout);
+      eq('schrijven: met dezelfde melding als aan de leeskant',
+         /binnen 20 seconden/.test((fout || {}).message || ''), true);
+      // CRUCIAAL. De rij-batches (invoegen + schrijven + verwijderen) zijn NIET idempotent: een
+      // herkansing zou een tweede rij invoegen en een onschuldige buurrij verwijderen. De
+      // afbreekmelding mag dus NOOIT als 'tijdelijk' gelden. Zou iemand hem ooit aan `_isTransient`
+      // toevoegen, dan kan één taak twee keer afgerond worden — deze regel vangt dat.
+      eq('schrijven: een afgebroken verzoek geldt NIET als tijdelijk (geen herkansing)',
+         _isTransient(fout), false);
+    } finally {
+      window.fetch = _fetch; state._fetchTimeoutMs = timeoutOud; state._netwerkFouten = nfOud;
+    }
+  })();
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  VERPLAATSEN — de eerste schrijfactie van een sessie mislukt niet meer stil
+  // ══════════════════════════════════════════════════════════════════════════
+  // `await getSheetIds()` stond buiten elke try, terwijl de regel eronder wél is afgeschermd. De
+  // aanroeper (de categoriekiezer) vangt niets op, dus een fout kwam NERGENS aan: het venster bleef
+  // staan met de nieuwe categorie in de kiezer en de gebruiker dacht dat het gelukt was.
+  await (async () => {
+    console.log('%c[TESTS] Verplaatsen: getSheetIds faalt', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const _fetch = window.fetch, _alert = window.alert, bevBg = document.getElementById('bevestig-bg');
+    const tokenOud = state.oauthToken, expOud = state.oauthExpiry, idsOud = state._sheetIds;
+    const ntdOud = D.ntd, infoOud = D.ntdSecInfo, cacheOud = state._uitCache;
+    const meldingen = [];
+    try {
+      window.alert = m => meldingen.push(String(m));
+      state._uitCache = false;
+      state.oauthToken = 'stub'; state.oauthExpiry = Date.now() + 3600e3;
+      state._sheetIds = null;                    // dwingt getSheetIds het net op
+      const taak = { _sec:'OPPAKKEN', _row:10, code:'311212', naam:'Testflat', actiepunt:'Lekkage',
+                     deadline:'', behandelaar:'', prioriteit:'', opmerkingen:'', taakId:'T-10' };
+      D.ntd = { OPPAKKEN:[taak], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      D.ntdSecInfo = { OPPAKKEN:{colHeaderRow:2}, VERGADERVERZOEKEN:{colHeaderRow:20},
+                       'OFFERTE-TRAJECTEN':{colHeaderRow:40}, LOD:{colHeaderRow:60}, 'SUBSIDIE-TRAJECTEN':{colHeaderRow:80} };
+      // Een quotumfout op de spreadsheets-GET die getSheetIds doet. 403: niet-tijdelijk, dus
+      // `_withRetry` probeert het niet opnieuw en de test wacht niet.
+      window.fetch = async () => new Response(JSON.stringify({ error:{ message:'Quota exceeded' } }), { status: 403 });
+      const bezig = verplaatsTaak(taak, 'LOD');
+      for (let i = 0; i < 60 && !bevBg.classList.contains('open'); i++) await Promise.resolve();
+      truthy('verplaatsen: de vraag komt in beeld', bevBg.classList.contains('open'));
+      document.getElementById('bevestig-ja').click();
+      const uitkomst = await Promise.race([bezig, new Promise(r => setTimeout(() => r('TIMEOUT'), 600))]);
+      eq('verplaatsen: een mislukte getSheetIds geeft netjes false terug', uitkomst, false);
+      truthy('verplaatsen: … en zegt tegen de gebruiker dát het mislukte',
+             meldingen.some(m => /Verplaatsen mislukt/.test(m)));
+      // De taak mag NIET stil verhuisd zijn: de optimistische mutatie hoort na deze fout niet te
+      // zijn gebeurd.
+      eq('verplaatsen: de taak staat nog gewoon in de oude categorie',
+         [D.ntd.OPPAKKEN.length, D.ntd.LOD.length], [1, 0]);
+    } finally {
+      if (bevBg.classList.contains('open')) document.getElementById('bevestig-nee').click();
+      beantwoordBevestiging(false);
+      window.fetch = _fetch; window.alert = _alert;
+      state.oauthToken = tokenOud; state.oauthExpiry = expOud; state._sheetIds = idsOud;
+      D.ntd = ntdOud; D.ntdSecInfo = infoOud; state._uitCache = cacheOud;
     }
   })();
 

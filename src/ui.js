@@ -8,6 +8,9 @@ import { renderOntw, renderLogboek } from "./render-overig.js";
 import { renderHerhaal } from "./render-herhaal.js";
 import { renderVve } from "./render-vve.js";
 import { showToast } from "./notifications.js";
+// Kringverwijzing ui ⇄ bulk: alleen op runtime aangeroepen (in goTo), dus live bindings — veilig,
+// net als de andere kringen in dit project.
+import { bulkSelectie, toggleBulkMode } from "./bulk.js";
 
 let _pagina = 'ntd';   // laatst geopende pagina, zodat renderAll de kop kan bijwerken
 
@@ -31,6 +34,16 @@ function goTo(page){
   // Nogmaals klikken op de huidige pagina telt niet — dat mag geen getypte tekst wissen.
   const _huidige=document.querySelector('.page.active')?.id;
   if(_huidige!=='page-'+page && state.logEdit!=null){ state.logEdit=null; state.logEditSoort=null; }
+  // Een VERGETEN lege selecteerstand legt het hele dashboard stil: de 8s-ronde slaat over zolang
+  // `bulkMode` aanstaat, en de meldingen liften op diezelfde ronde mee. Buiten de takenlijst is er
+  // niet eens een teller meer die eraan herinnert (die staat in page-ntd). Weg van 'ntd' en niets
+  // geselecteerd → stand uit.
+  // Een GEVULDE selectie laten we staan: die heeft de gebruiker bewust gemaakt, en hij mag een
+  // VvE-dossier openen om iets op te zoeken zonder zijn werk kwijt te raken. De balk zegt dan
+  // eerlijk dat het verversen stilstaat (syncSelecteerStand).
+  if(_huidige!=='page-'+page && page!=='ntd' && state.bulkMode && bulkSelectie().length===0){
+    toggleBulkMode();
+  }
   document.querySelectorAll('.ni[data-page]').forEach(el=>{
     const actief=el.dataset.page===page;
     el.classList.toggle('on',actief);

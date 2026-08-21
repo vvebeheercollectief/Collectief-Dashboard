@@ -5,7 +5,7 @@
 import { esc, emptyRow, vveCodeSpan, toISODate, toDutchDate, _parseAnyDate, coerceDagenVooraf } from "./util.js";
 import { state, D } from "./state.js";
 import { SID } from "./config.js";
-import { appendRange, writeRange, assertRowMatch } from "./api.js";
+import { appendRange, writeRange, assertRowMatch, sheetsFetch } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { getSheetIds } from "./crud.js";
 import { showToast } from "./notifications.js";
@@ -144,7 +144,7 @@ async function deleteHerhaal(){
     const sheetId=ids['Herhaalregels'];
     if(sheetId==null) throw new Error('Sheet "Herhaalregels" niet gevonden');
     await assertRowMatch(r._row, r.id, 'Herhaalregels'); // bescherming: rij nog dezelfde regel vóór verwijderen
-    const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+    const resp=await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
       method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
       body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:r._row-1,endIndex:r._row}}}]})});
     if(!resp.ok){const e=await resp.json();const err=new Error(e.error?.message||'Verwijderfout');err.status=resp.status;throw err}

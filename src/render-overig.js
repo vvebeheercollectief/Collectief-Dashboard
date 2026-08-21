@@ -6,7 +6,7 @@ import { ico } from "./icons.js";
 import { PG, SID } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { ensureToken } from "./auth.js";
-import { writeRange, appendRange, appendRows, assertRowMatch, _herstelShift } from "./api.js";
+import { writeRange, appendRange, appendRows, assertRowMatch, _herstelShift, sheetsFetch } from "./api.js";
 import { renderThead, renderPag } from "./render-lijsten.js";
 import { getSheetIds, setv, gv, insertAndWriteRow, taakUitCache } from "./crud.js";
 import { loadAll, backgroundWrite, metWriteMarkering, blokkeerOffline } from "./data.js";
@@ -166,7 +166,7 @@ async function deleteOntwItem(){
       const sheetId=ids['Ontwikkeling'];
       if(sheetId==null) throw new Error('Sheet "Ontwikkeling" niet gevonden');
       await assertRowMatch(oudeRow, r.titel, 'Ontwikkeling'); // bescherming: rij nog hetzelfde item vóór verwijderen
-      const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+      const resp=await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
         method:'POST',
         headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
         body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:oudeRow-1,endIndex:oudeRow}}}]})
@@ -528,7 +528,7 @@ async function deleteLogboek(row){
       if(sheetId==null) throw new Error('Sheet "Logboek" niet gevonden');
       if(!verwijderd){
         await assertRowMatch(oudeRow, entry, 'Logboek'); // rij nog dezelfde REGEL (hele inhoud) vóór verwijderen
-        const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+        const resp=await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
           method:'POST',
           headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
           body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:oudeRow-1,endIndex:oudeRow}}}]})

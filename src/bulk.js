@@ -6,9 +6,9 @@ import { renderNtd } from "./render-lijsten.js";
 import { toDutchDate, berekenPrioriteit, _parseAnyDate, _vandaagAmsterdam, _verschilInKalenderdagen, parseDt, kiesAfgerondRij } from "./util.js";
 import { SID } from "./config.js";
 import { ensureToken } from "./auth.js";
-import { _shiftNtdRows, _herstelShift, assertRowsMatch, _veiligeRij } from "./api.js";
+import { _shiftNtdRows, _herstelShift, assertRowsMatch, _veiligeRij, sheetsFetch } from "./api.js";
 import { getSheetIds, getAfInsertRow, getInsertRow, insertAndWriteRow, serializeNtdUndo, afrondWaarden } from "./crud.js";
-import { backgroundWrite, loadAll, metWriteMarkering, blokkeerOffline } from "./data.js";
+import { backgroundWrite, loadAll, metWriteMarkering, blokkeerOffline, syncSelecteerStand } from "./data.js";
 import { showToast, showUndoToast, fireNotifEvent } from "./notifications.js";
 import { vraagBevestiging } from "./bevestig.js";
 import { bouwBundelIndex, openSubtaken } from "./bundel.js";
@@ -145,6 +145,8 @@ function renderBulkUi(){
   teller.textContent=`${n} geselecteerd`;
   balk.style.display=(state.bulkMode&&n>0)?'flex':'none';
   document.body.classList.toggle('bulk', state.bulkMode); // zwevende chat-knop wijkt voor de bulk-balk
+  // Eerlijk zijn over de statusbalk: zolang deze stand aanstaat ligt het verversen stil.
+  syncSelecteerStand();
   if(!state.bulkMode) _sluitMenus();
 }
 function toggleBulkMenu(menu){
@@ -179,7 +181,10 @@ async function bulkDoe(el){
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){ alert('Inloggen mislukt. Probeer het opnieuw.'); return; }
   _sluitMenus();
-  if(wat==='afronden')    bulkAfronden(rows);
+  // AWAIT: `bulkAfronden` stelt sinds v10.31 eerst een vraag. Zonder await liep de optimistische
+  // verwijdering door terwijl het venster nog openstond — precies de val die bij `verwijderen`
+  // hieronder al met zoveel woorden staat beschreven.
+  if(wat==='afronden')    await bulkAfronden(rows);
   else if(wat==='geven')  bulkVeld(rows,'geven',el.dataset.naam);
   else if(wat==='wegleggen'){
     let iso=document.getElementById('bb-datum-weg').value;
@@ -227,7 +232,34 @@ async function bulkDoe(el){
 }
 
 // ── Afronden (verplaats naar 'Afgerond') ────────────────────────────────
-function bulkAfronden(rows){
+// Drempel voor de bevestigingsvraag bij bulk-afronden. Onder deze grens geen vraag: de dagelijkse
+// kleine bulk (twee of drie taken die je net zelf hebt aangevinkt) mag niet zwaarder worden — een
+// vraag die je twintig keer per dag wegklikt, lees je op de eenentwintigste keer ook niet.
+const BULK_AFROND_VRAAG_VANAF = 3;
+
+async function bulkAfronden(rows){
+  // Afronden was de ENIGE bulk-weg zonder poort. Verwijderen vraagt het al (met de subtaak-zin) en
+  // één taak afronden waarschuwt via `bundelWaarschuwing` (crud.js). Sinds het kopvinkje de HELE
+  // gefilterde lijst pakt — ook de taken op pagina 2 en 3 die je nooit in beeld hebt gehad — ligt
+  // de groene knop pal naast een selectie van veertig taken, en de terugweg is er maar 8 seconden.
+  if(rows.length >= BULK_AFROND_VRAAG_VANAF){
+    // Letterlijk hetzelfde blok als bij bulkVerwijderen: bundels die openstaan blijven staan als
+    // de hoofdtaak wegvalt, en dat hoort de gebruiker vooraf te weten.
+    const ix = bouwBundelIndex(D.ntd, D.af);
+    const metSub = rows.reduce((n,r)=> n + (openSubtaken(ix, r) > 0 ? 1 : 0), 0);
+    const subZin = metSub
+      ? ` Let op: bij ${metSub===1?'één van deze taken':`${metSub} van deze taken`} hangen nog `+
+        `subtaken. Die blijven staan.`
+      : '';
+    // Niet 'gevaarlijk' (de rode knop): rood hangt in deze app aan de drie verwijdervragen, en
+    // afronden is geen verwijderen. Wel dezelfde plek in de volgorde als daar: ná ensureToken en
+    // blokkeerOffline, waar `confirm()` vroeger ook stond.
+    if(!await vraagBevestiging({
+        titel:`${rows.length} taken afronden?`,
+        tekst:`Deze taken verhuizen naar 'Afgerond'. Meteen daarna kun je dit nog ongedaan maken `+
+              `met de knop in de melding.`+subZin,
+        bevestigTekst:'Afronden' })) return;
+  }
   const d=new Date();
   const vandaag=`${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;
   const items=rows.map(r=>{
@@ -267,7 +299,7 @@ function bulkAfronden(rows){
         {deleteDimension:{range:{sheetId:ntdSheetId,dimension:'ROWS',startIndex:it.origRow-1,endIndex:it.origRow}}}
       );
     }
-    const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+    const resp=await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
       method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
       body:JSON.stringify({requests})});
     if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Bulk-afronden fout');err.status=resp.status;throw err}
@@ -330,7 +362,7 @@ async function bulkUndoAfronden(items){
         // op de undo-weg: de rij wordt weggegooid op grond van een onthouden rijnummer. Klopte dat
         // nummer niet meer, dan verdween er stil een ándere afronding. Nu eerst controleren.
         await assertRowsMatch(teVerwijderen.map(af=>({row:af._row, r:af})), 'Afgerond');
-        const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+        const resp=await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
           method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
           body:JSON.stringify({requests:teVerwijderen.map(af=>({deleteDimension:{range:{sheetId:ids['Afgerond'],dimension:'ROWS',startIndex:af._row-1,endIndex:af._row}}}))})});
         if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Bulk-undo verwijderfout');err.status=resp.status;throw err}
@@ -386,7 +418,7 @@ async function bulkVerwijderen(rows){
     const sheetId=ids['Nog Te Doen'];
     if(sheetId==null) throw new Error('Sheet "Nog Te Doen" niet gevonden');
     await assertRowsMatch(items.map(it=>({row:it.origRow, r:it.r}))); // bescherming: alle rijen nog dezelfde TAAK vóór bulk-verwijderen
-    const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+    const resp=await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
       method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
       body:JSON.stringify({requests:items.map(it=>({deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:it.origRow-1,endIndex:it.origRow}}}))})});
     if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Bulk-verwijderfout');err.status=resp.status;throw err}
@@ -472,7 +504,7 @@ function bulkVeld(rows,soort,waarde){
           data.push({range:`'Nog Te Doen'!F${it.r._row}`, values:[_veiligeRij([prio])]}); // F=prioriteit, herberekend bij nieuwe deadline
         }
       }
-      const resp=await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values:batchUpdate`,{
+      const resp=await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values:batchUpdate`,{
         method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
         body:JSON.stringify({valueInputOption:'USER_ENTERED', data})});
       if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Bulk-actie fout');err.status=resp.status;throw err}

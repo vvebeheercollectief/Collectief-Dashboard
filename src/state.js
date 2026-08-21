@@ -93,6 +93,14 @@ export const state = {
                            // waarschuwt alleen als die verzameling wijzigt. De poll draait elke
                            // 8 seconden, dus zonder deze vergelijking herhaalt één staande
                            // bevinding zich honderden keren per dag (zie data.js).
+  _structErnstig: null,    // idem, maar alléén de ERNSTIGE bevindingen (regel op de kolomkoppen /
+                           // dubbel taaknummer). Die krijgen sinds v10.31 een zichtbare melding;
+                           // de rasterbreedte blijft console-only omdat die lang kan blijven staan.
+  _authFails: 0,           // opeenvolgende mislukte token-vernieuwingen mét werkende verbinding.
+                           // Los van _syncFails: een ingetrokken Google-sessie herstelt zich NIET
+                           // vanzelf, dus die verdient een eigen melding met een inlogknop.
+  _renderFails: 0,         // opeenvolgende mislukte renderAll()-pogingen (data.js). Alleen voor
+                           // diagnose; de banner hangt aan de eerste mislukking.
   _completeRow: null,      // rij-OBJECT waarvoor de afhandel-modal open staat (identiteit, geen index)
   _completeRid: null,      // geklikte data-rid, alléén voor de groene puls op de juiste DOM-rij
   _completeBusy: false,    // afhandelen loopt (dubbelklik-rem over het async-gat)

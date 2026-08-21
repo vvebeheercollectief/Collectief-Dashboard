@@ -149,4 +149,13 @@ function checkAlles(ntdRows, afRows, ntdRijen, kolommenPerTab){
           ...checkNummers(ntdRijen||[]), ...checkRasters(kolommenPerTab)];
 }
 
-export { checkSecties, checkRaster, checkRasters, checkNummers, checkAlles, RASTER_MIN, isSectieKop, isKolomKop };
+// Welke bevindingen verdienen een MELDING op het scherm, en welke blijven console-only?
+// Ernstig = de twee soorten die stille dataschade betekenen:
+//   - een regel op de plek van de kolomkoppen (heeft .regel) → die taak is onzichtbaar
+//   - hetzelfde taaknummer op twee regels    (heeft .nummer) → een schrijfactie kan de verkeerde raken
+// De rasterbreedte (heeft .tabblad) blijft bewust buiten de melding: dat is de bevinding die
+// langdurig kán blijven staan, en een melding die elke ochtend terugkomt leert de gebruiker om
+// álle meldingen weg te klikken — precies waar deze module zelf voor waarschuwt.
+const ernstigeBevindingen = (bev) => (bev||[]).filter(b => b && (b.regel!=null || b.nummer!=null));
+
+export { checkSecties, checkRaster, checkRasters, checkNummers, checkAlles, ernstigeBevindingen, RASTER_MIN, isSectieKop, isKolomKop };

@@ -5,12 +5,12 @@ import { parseDt, _parseAnyDate, coerceDagenVooraf, leegBijErfenis } from "./uti
 import { state, D } from "./state.js";
 import { SKEYS, SECS, APP_VERSION } from "./config.js";
 import { fetchSheet, fetchSheets, _withRetry, isOffline } from "./api.js";
-import { ensureToken } from "./auth.js";
+import { ensureToken, doOAuth } from "./auth.js";
 import { buildAnalytics, buildDash } from "./render-analytics.js";
 import { renderNtdDonut } from "./render-lijsten.js";
 import { parseOntw, parseLogboek, _nogNietBevestigd } from "./render-overig.js";
 import { parseKenmerken } from "./kenmerken.js";
-import { checkAlles } from "./structuurcheck.js";
+import { checkAlles, ernstigeBevindingen } from "./structuurcheck.js";
 import { ico } from "./icons.js";
 // (kringverwijzing data ⇄ kenmerken: aanroepen gebeuren op runtime — live bindings, veilig)
 import { showToast, verwerkMeldingRijen, toonMeldingen, getCurrentWho, getNotifPrefs } from "./notifications.js";
@@ -239,6 +239,26 @@ function setSynced(){
   document.getElementById('sync-lbl').textContent='Live · '+new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
   clearLoadError();
   clearOfflineBanner();
+  syncSelecteerStand();   // de selecteerstand wint van 'Live': daar staat het verversen stil
+}
+
+// De 8-secondenronde slaat ÉLKE ronde over zolang de selecteerstand aanstaat (main.js), en sinds
+// de opslag-hardening liften de meldingen op diezelfde ronde mee — er komt dan dus ook geen
+// enkele nieuwe melding binnen. De balk bleef ondertussen 'Live · HH:MM' zeggen, want niets zette
+// die tekst om. Zet je 'Selecteren' aan en word je gebeld, dan staat het dashboard een half uur
+// stil terwijl het volhoudt dat het live is. Nu zegt de balk wat er werkelijk gebeurt.
+function syncSelecteerStand(){
+  const lbl=document.getElementById('sync-lbl');
+  if(!lbl) return;
+  if(state.bulkMode){
+    // De vorige tekst bewaren i.p.v. straks 'Live · <nu>' te schrijven: dat laatste zou liegen
+    // over het moment van de laatste geslaagde verversing.
+    if(state._syncLblVoorBulk==null) state._syncLblVoorBulk=lbl.textContent;
+    lbl.textContent='Selecteren — verversen staat stil';
+  }else if(state._syncLblVoorBulk!=null){
+    lbl.textContent=state._syncLblVoorBulk;
+    state._syncLblVoorBulk=null;
+  }
 }
 function setSyncErr(){dot('err');document.getElementById('sync-lbl').textContent='Fout'}
 // 'Fout' suggereert een storing aan de andere kant; 'Offline' benoemt wat er werkelijk aan de
@@ -249,17 +269,56 @@ function dot(cls){const d=document.getElementById('dot');d.className='dot'+(cls?
 // Nette foutmelding in beeld bij een harde laadfout (niet de zwijgende achtergrond-polls).
 // Een verlopen sessie wordt elders al via het inlogscherm afgevangen; dit vangt
 // netwerk-/API-fouten zodat de gebruiker geen blanco scherm ziet maar uitleg + actie.
-function showLoadError(){
+// `opties` maakt dezelfde banner bruikbaar voor de drie storingen die er echt anders uitzien:
+//   (geen)                  → netwerk-/API-fout, knop 'Opnieuw proberen' → loadAll()
+//   {soort:'render'}        → het tekenen van de lijst mislukte; het scherm staat stil op oude data
+//   {soort:'sessie'}        → Google heeft de sessie ingetrokken; knop 'Opnieuw inloggen'
+// Zonder dit onderscheid kreeg de gebruiker bij een verlopen sessie de tekst 'controleer je
+// verbinding' terwijl zijn internet prima was, en bij een renderfout helemaal niets.
+function showLoadError(opties){
   clearOfflineBanner();   // ze staan op dezelfde plek; twee banners over elkaar is onleesbaar
-  if(document.getElementById('load-err-banner')) return;
+  const soort=(opties&&opties.soort)||'laden';
+  const bestaand=document.getElementById('load-err-banner');
+  // Idempotent per SOORT: dezelfde banner niet stapelen, maar een banner die iets anders zegt dan
+  // wat er nu aan de hand is moet wél wijken — anders blijft 'controleer je verbinding' staan
+  // terwijl de echte oorzaak intussen een verlopen sessie is.
+  if(bestaand){
+    if(bestaand.dataset.soort===soort) return;
+    bestaand.remove();
+  }
+  const TEKST={
+    laden:  ico('waarschuwing',15)+' Kon de gegevens niet laden — controleer je verbinding.',
+    render: ico('waarschuwing',15)+' Het scherm kon niet worden bijgewerkt. Je kijkt naar oudere gegevens.',
+    sessie: ico('waarschuwing',15)+' Je Google-sessie is verlopen — je ziet oudere gegevens.',
+  };
+  const KNOP={ laden:'Opnieuw proberen', render:'Opnieuw proberen', sessie:'Opnieuw inloggen' };
   const b=document.createElement('div');
   b.id='load-err-banner'; b.className='load-err'; b.setAttribute('role','alert');
-  b.innerHTML='<span>'+ico('waarschuwing',15)+' Kon de gegevens niet laden — controleer je verbinding.</span>'
-    +'<button class="btn btn-pri btn-sm" id="load-err-retry">Opnieuw proberen</button>';
+  b.dataset.soort=soort;
+  b.innerHTML='<span>'+(TEKST[soort]||TEKST.laden)+'</span>'
+    +'<button class="btn btn-pri btn-sm" id="load-err-retry">'+(KNOP[soort]||KNOP.laden)+'</button>';
   document.body.appendChild(b);
-  b.querySelector('#load-err-retry').onclick=()=>{ clearLoadError(); loadAll(); };
+  b.querySelector('#load-err-retry').onclick=async ()=>{
+    clearLoadError();
+    // Een KLIK is een gebruikersgebaar, en alleen dán mag het inlogvenster van Google open.
+    // Automatisch opnieuw inloggen zou een popup-blokkade opleveren; automatisch UITloggen zou
+    // erger zijn: dat wist de leescache en gooit iemand die net een lange notitie typt de app
+    // uit — ook als de oorzaak maar een hapering was.
+    if(soort==='sessie'){
+      state._authFails=0;
+      await doOAuth(true);
+      if(!state.oauthToken){ showLoadError({soort:'sessie'}); return; }
+    }
+    loadAll();
+  };
 }
 function clearLoadError(){ document.getElementById('load-err-banner')?.remove(); }
+// Alleen de RENDER-banner weghalen. Een geslaagde render zegt niets over de verbinding of de
+// sessie, dus de andere twee banners mogen hier niet door verdwijnen.
+function clearRenderError(){
+  const b=document.getElementById('load-err-banner');
+  if(b && b.dataset.soort==='render') b.remove();
+}
 
 // Herhaal-slot: voorkomt dat twee loadAll-aanroepen tegelijk lopen en elkaars data
 // overschrijven (8s-poll, schrijf-resync, refresh-knop, handmatige awaits).
@@ -497,8 +556,24 @@ async function _loadRonde(silent){
       state._syncFails=(state._syncFails||0)+1;
       if(isOffline()){ setSyncOffline(); showOfflineBanner(); return; }
       if(!silent || state._syncFails>=2) setSyncErr();
-      if(!silent) showLoadError();
+      // Aparte teller voor 'de token lukt niet, maar de verbinding is er wél'. Dat is een ander
+      // verhaal dan een netwerkfout: het herstelt zich NIET vanzelf bij de volgende ronde, want
+      // een stille vernieuwing kan een ingetrokken sessie niet redden — en de app had geen enkele
+      // weg terug naar inloggen. Pas vanaf de derde keer melden: `doOAuth` heeft een eigen
+      // antwoordtimeout en kan één keer misgrijpen zonder dat er iets aan de hand is.
+      // Alleen tellen bij een INGELOGDE sessie: vóór de eerste login hoort de inlogkaart het werk
+      // te doen, niet deze banner.
+      if(state.currentUserEmail){
+        state._authFails=(state._authFails||0)+1;
+        if(state._authFails>=3) showLoadError({soort:'sessie'});
+      }
+      if(!silent && !(state._authFails>=3)) showLoadError();
       return;
+    }
+    // Geslaagd → de sessie is weer in orde. Teller op nul en een staande sessiebanner weg.
+    if(state._authFails){
+      state._authFails=0;
+      if(document.getElementById('load-err-banner')?.dataset.soort==='sessie') clearLoadError();
     }
     if(!silent) setSyncing();
     // Reads met herkansing bij tijdelijke API-fouten (429 / 5xx / netwerk-blip), zodat
@@ -586,6 +661,24 @@ async function _loadRonde(silent){
       // een LEGE uitkomst bijgewerkt, zodat een bevinding die verdwijnt en terugkomt opnieuw meldt.
       const vinger=JSON.stringify(bev);
       if(bev.length && vinger!==state._structLaatst) console.warn('[structuurcheck]', bev);
+      // Trap 2 (2026-08-21). De console was de ENIGE uitgang, en daar kijkt niemand. Juist de
+      // schade die deze controle vindt is onzichtbaar op het scherm: een taak die op de plek van
+      // de kolomkoppen staat verdwijnt gewoon uit de lijst, en pas als de VvE belt komt het uit.
+      //
+      // Welke bevindingen ernstig genoeg zijn voor een melding staat in structuurcheck.js,
+      // naast de controles zelf.
+      const ernstig=ernstigeBevindingen(bev);
+      const eVinger=JSON.stringify(ernstig);
+      if(ernstig.length && eVinger!==state._structErnstig){
+        // geenDedup: de eigen ontdubbeling hierboven (op de vingerafdruk) is scherper dan die van
+        // showToast, die na TOAST_DEDUP_MS vanzelf weer doorlaat. Zo blijft het één melding per
+        // verandering, ook als de bevinding een uur later nog steeds staat.
+        showToast('Er klopt iets niet in de Sheet',
+          ernstig[0].tekst + (ernstig.length>1 ? ` (en nog ${ernstig.length-1} zo'n geval.)` : '')
+          + ' Vraag even om hulp — dit is niet iets om zelf recht te zetten.',
+          'var(--rd)', 'waarschuwing', {geenDedup:true});
+      }
+      state._structErnstig=eVinger;
       state._structLaatst=vinger;
     }catch(e){
       // Dezelfde ontdubbeling als hierboven, en om precies dezelfde reden: gooit checkAlles ooit
@@ -615,16 +708,35 @@ async function _loadRonde(silent){
     setSynced();
     const hash=JSON.stringify([D.ntd,D.af,D.alvo,D.alfa,D.ontw,D.logboek,D.herhaal,D.kenmerken]);
     if(hash!==state._lastDHash){
+      // VOLGORDE IS HIER DE HELE TRUC. Stond `_lastDHash=hash` vóór de render, dan hoefde het
+      // tekenen maar ÉÉN keer te gooien: de vingerafdruk van de nieuwe data stond dan al
+      // genoteerd, elke volgende ronde zag 'niets veranderd' en sloeg het tekenen over. Het
+      // scherm bleef de rest van de dag op de oude lijst staan — met een groen 'Live · HH:MM'
+      // ernaast, want de ronde zelf was geslaagd. Een stille storing zonder enig signaal.
+      // Nu: pas noteren als het tekenen ook echt gelukt is, zodat de volgende ronde het opnieuw
+      // probeert. Hetzelfde geldt voor `bewaarCache`: anders staat er een cache op schijf die
+      // nooit met succes getekend is.
+      try{
+        renderAll();
+        // Re-render actieve detailpagina's met nieuwe data
+        if(document.getElementById('page-analytics')?.classList.contains('active')) buildAnalytics();
+        if(document.getElementById('page-dash')?.classList.contains('active')) buildDash();
+        if(document.getElementById('page-ntd')?.classList.contains('active')) renderNtdDonut();
+      }catch(e){
+        // Zichtbaar maken, óók bij een stille poll: juist hier ziet de gebruiker anders niets.
+        // `_lastDHash` blijft op de OUDE waarde staan, dus de volgende ronde probeert opnieuw.
+        setSyncErr(); showLoadError({soort:'render'});
+        console.error('[render]', e);
+        state._renderFails=(state._renderFails||0)+1;
+        return;
+      }
+      state._renderFails=0;
+      clearRenderError();
       state._lastDHash=hash;
       // Alleen bij een echte wijziging naar de leescache, niet elke 8 seconden: localStorage
       // schrijft synchroon naar schijf en dit is ~1 MB. Zo blijft het een handjevol keer per
       // sessie in plaats van 450 keer per uur.
       bewaarCache(hash);
-      renderAll();
-      // Re-render actieve detailpagina's met nieuwe data
-      if(document.getElementById('page-analytics')?.classList.contains('active')) buildAnalytics();
-      if(document.getElementById('page-dash')?.classList.contains('active')) buildDash();
-      if(document.getElementById('page-ntd')?.classList.contains('active')) renderNtdDonut();
     }
   }catch(e){
     // Eén mislukte stille poll mag de indicator niet meteen op 'Fout' zetten — die
@@ -778,6 +890,6 @@ export {
   backgroundWrite, schrijfActieLoopt, metWriteMarkering, setSyncing, setSaving, setSynced, setSyncErr, dot, loadAll, magPollen, parseSections, parseAlvo, parseAlfa, parseHerhaal,
   POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _zetLogAnker, _verwerkLogboek, _logVolledigNodig, _alfaNodig,
   MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen,
-  blokkeerOffline, showOfflineBanner, clearOfflineBanner, setSyncOffline,
+  blokkeerOffline, showOfflineBanner, clearOfflineBanner, setSyncOffline, syncSelecteerStand, showLoadError, clearLoadError,
   bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade,
 };

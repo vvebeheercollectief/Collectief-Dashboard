@@ -1,5 +1,5 @@
 import { state, D } from "./state.js";
-import { SID, SKEYS, PROXY_URL, SECS } from "./config.js";
+import { SID, SKEYS, PROXY_URL, SECS, OMSCHRIJVING_SLEUTEL } from "./config.js";
 import { _parseAnyDate, leegBijErfenis } from "./util.js";
 
 // ── Offline-signaal ────────────────────────────────────────────────────────
@@ -51,6 +51,19 @@ async function _fetchGeteld(url, opts){
   state._netwerkFouten=0;
   return r;
 }
+
+// Publieke naam van dezelfde helper, voor de SCHRIJF-kant. De leeskant liep hier al langs; de
+// rij-invoegingen en -verwijderingen (batchUpdate) en `getSheetIds` gingen langs een kale `fetch`
+// en hadden dus GEEN tijdslimiet. Een verzoek dat nooit antwoordt liet `pendingWrites` boven nul
+// staan: de 8s-ronde sloeg daarna élke keer over, de balk bleef op 'Opslaan…' hangen en alles wat
+// je daarna deed verdween in een wachtrij die nooit meer vertrok — precies de storing die in
+// augustus alleen voor de leeskant is verholpen.
+//
+// VEILIG bij een niet-idempotente batch: de afbreekfout ('Geen antwoord van Google binnen 20
+// seconden') heeft geen .status en matcht niet op `_isTransient`, dus `_withRetry` probeert hem
+// NIET opnieuw. Zou iemand die melding ooit aan `_isTransient` toevoegen, dan kan één taak twee
+// keer afgerond worden — laat hem daar dus buiten.
+const sheetsFetch = (url, opts) => _fetchGeteld(url, opts);
 
 async function fetchSheet(name){
   if(!state.oauthToken) throw new Error('Niet ingelogd');
@@ -250,6 +263,23 @@ const OBJ_KOLOMMEN = {
 // mag dus geen datumopmaak op.
 const NTD_DATUM = { OPPAKKEN:[3], VERGADERVERZOEKEN:[5], 'OFFERTE-TRAJECTEN':[2,5], LOD:[5], 'SUBSIDIE-TRAJECTEN':[5] };
 
+// Welke kolom de OMSCHRIJVING draagt, per sectie — afgeleid uit OMSCHRIJVING_SLEUTEL (config.js)
+// en de kolomvolgorde in SECS.keys, zodat er geen vierde plek ontstaat waar dezelfde afspraak
+// los kan gaan lopen. Levert: OPPAKKEN/LOD/SUBSIDIE index 2 (kolom C, zat er al in via
+// spec.tekst), VERGADERVERZOEKEN index 3 (kolom D, Agendapunten) en OFFERTE-TRAJECTEN index 6
+// (kolom G, Opmerkingen).
+//
+// WAAROM dit erbij moet: de guard vergeleek alleen A, C en de deadlinekolom. Bij een
+// vergaderverzoek of een offertetraject staat de eigenlijke tekst NIET in C, dus een collega die
+// de agendapunten aanvult veranderde niets aan de vingerafdruk — en submitTask schrijft de HELE
+// rij A..K terug. Zijn aanvulling verdween dan zonder melding en zonder spoor in het Logboek.
+// D en G worden door niets in Apps Script op een bestaande rij geschreven (cd_createTaskRow raakt
+// ze alleen bij het aanmaken), dus ze kunnen geen vals alarm van de backend geven.
+const NTD_OMSCHRIJVING = Object.fromEntries(SKEYS.map(sec=>{
+  const i=(SECS[sec]?.keys||[]).indexOf(OMSCHRIJVING_SLEUTEL[sec]);
+  return [sec, i>=0 ? [i] : []];
+}));
+
 // Eén cel vergelijkbaar maken. isDatum → vergelijk op de GEPARSEERDE datum, nooit op de tekst:
 // het dashboard houdt '17-06-2026' in het geheugen terwijl values.get (FORMATTED_VALUE)
 // '17 juni 2026' teruggeeft. Onherkenbaar als datum → val terug op de tekst ('sept/okt', '2/3').
@@ -275,7 +305,10 @@ function vingerafdruk(sheetName, rij, sec, negeerNummer){
   rij=rij||[];
   if(!spec) return _normCel(rij[0]);
   const datumKol=spec.datum || (sheetName==='Nog Te Doen' ? (NTD_DATUM[sec]||[]) : []);
-  const idx=spec.tekst.concat(datumKol).sort((a,b)=>a-b);
+  // De omschrijvingskolom telt alleen mee op 'Nog Te Doen'; daar is hij per sectie een andere.
+  // Ontdubbelen: bij Oppakken/LOD/Subsidie is het kolom C, en die staat al in spec.tekst.
+  const omsKol=(sheetName==='Nog Te Doen') ? (NTD_OMSCHRIJVING[sec]||[]) : [];
+  const idx=[...new Set(spec.tekst.concat(datumKol, omsKol))].sort((a,b)=>a-b);
   // Ontbrekende cel → '' : values.get kapt afsluitende lege cellen én lege rijen af, dus een rij
   // met lege staartkolommen komt korter terug dan hij in de Sheet staat.
   const inhoud=idx.map(i=>_normCel(rij[i], datumKol.includes(i))).join('\x1f');
@@ -393,4 +426,4 @@ async function assertRowsMatch(checks, sheetName='Nog Te Doen'){
 const assertRowMatch=(row, bronOfCode, sheetName)=>assertRowsMatch(
   [(bronOfCode && typeof bronOfCode==='object') ? { row, r:bronOfCode } : { row, code:bronOfCode }], sheetName);
 
-export { NTD_DATUM, isOffline, _isOffline, _isNetwerkFout, fetchSheet, fetchSheets, writeRange, writeRows, appendRange, appendRows, veiligeCel, _veiligeRij, _shiftNtdRows, _herstelShift, _isTransient, _withRetry, askChat, _rowMismatch, _a1Bereik, vingerafdruk, rijVingerafdruk, _nummerDeel, _normCel, _rijNaarCellen, assertRowsMatch, assertRowMatch };
+export { NTD_DATUM, isOffline, _isOffline, _isNetwerkFout, fetchSheet, fetchSheets, writeRange, writeRows, appendRange, appendRows, veiligeCel, _veiligeRij, _shiftNtdRows, _herstelShift, _isTransient, _withRetry, askChat, _rowMismatch, _a1Bereik, vingerafdruk, rijVingerafdruk, _nummerDeel, _normCel, _rijNaarCellen, assertRowsMatch, assertRowMatch, NTD_OMSCHRIJVING, sheetsFetch };

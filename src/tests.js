@@ -3806,7 +3806,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '10.25');
+  eq('versie opgehoogd', APP_VERSION, '10.26');
 
   // ── Pushmeldingen: de twee schakels die stil kapot waren (audit 2026-08-06) ──
   // Beide defecten waren onzichtbaar: de app meldde "Notificaties zijn aan!" terwijl er nooit
@@ -6356,9 +6356,26 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         const midY=el=>{ const b=el.getBoundingClientRect(); return b.top+b.height/2; };
         const chevEl=kopMeet.querySelector('.bdl-chev');
         const chevY=midY(chevEl);
-        truthy('stapel-e2e: handvat, chevron en VvE-code delen hun middellijn',
-               Math.abs(midY(greep(kopMeet))-chevY) < 0.5
-               && Math.abs(midY(kopMeet.querySelector('.code-klik'))-chevY) < 0.5);
+        // Deze drie staan in ÉÉN tabelcel, en die cel breekt af zodra hij te smal wordt: gemeten
+        // op een 378px-venster is de cel 81,5px en past 16 (handvat) + 9 (marge) + 22 (chevron)
+        // + 45 (code) er niet meer naast elkaar in. Dan zakt de code naar een eigen regel — dat
+        // IS de tweeregelige taakrij, en dan deelt hij per definitie geen middellijn meer. Als
+        // één assert geschreven ging deze daarop rood op een smalle testronde terwijl er niets
+        // stuk was. Dus gesplitst, met bij allebei de regel-situatie erbij, zodat geen van beide
+        // gevallen stil wegvalt: het paar dat ALTIJD naast elkaar staat apart, en de code met
+        // een eigen claim per regelval.
+        //   Gemeten op 378px: handvat mid 292,94 · chevron mid 292,94 · code top 303,1 tegen
+        //   chevron bottom 301,9 (dus eronder) en code.left 35 = handvat.left 35.
+        truthy('stapel-e2e: handvat en chevron delen hun middellijn',
+               Math.abs(midY(greep(kopMeet))-chevY) < 0.5);
+        const codeMeet = kopMeet.querySelector('.code-klik');
+        const codeGewikkeld = codeMeet.getBoundingClientRect().top >= chevEl.getBoundingClientRect().bottom;
+        truthy(codeGewikkeld
+                 ? 'stapel-e2e: en bij een te smalle cel zakt de VvE-code naar een eigen regel, links uitgelijnd met het handvat'
+                 : 'stapel-e2e: en op één regel deelt de VvE-code diezelfde middellijn',
+               codeGewikkeld
+                 ? Math.abs(codeMeet.getBoundingClientRect().left - greep(kopMeet).getBoundingClientRect().left) < 1
+                 : Math.abs(midY(codeMeet)-chevY) < 0.5);
         // De chevron meet 22 × 18px en is als aanraakdoel dus te klein (richtlijn 24px+), net als
         // het merkje verderop — terwijl de twee sleep-handvatten in hetzelfde blok daar wél een halo
         // voor kregen. Op een telefoon is dit de ENIGE manier om een bundel open en dicht te klappen.

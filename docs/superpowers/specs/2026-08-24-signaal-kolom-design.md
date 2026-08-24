@@ -256,12 +256,14 @@ helper zodat beide vormen uit dezelfde bron komen.
 
 | Toets | Wat |
 |---|---|
-| `src/tests.js:3702` | Oppakken heeft 6 koppen → wordt 7 |
-| `src/tests.js:3711` | `cols[5].startsWith('Deadline')` → index schuift op |
-| `src/tests.js:4003` | 7 `<td>` → wordt 8 |
-| `src/tests.js:4005` | 7 `<th>` → wordt 8 |
-| `src/tests.js:4015-4017` | exacte koppenlijst |
-| `src/tests.js:10811-10815` | `_veldLabel` ("Status: Wacht op gemeente") |
+| `src/tests.js:10811-10815` | `_veldLabel` — LOD-`status` staat op `keys[3]`, en `cols[3]` wordt na de invoeging `Actiepunt`. Vandaar §3.2. |
+| `src/tests.js:824-842` | de fixture gebruikt 30 dagen en noemt dat "ruim over elke stil-drempel". Met de nieuwe LOD-drempel van 30 is dat exact de grens. Fixture ophogen naar 45 dagen. |
+
+**Nagelopen in de code, en dus géén probleem:** `src/tests.js:3702`, `:3711`, `:4003`, `:4005`
+en `:4015-4017` toetsen allemaal **Subsidie-trajecten**, en die sectie verandert niet. Een eerdere
+inventarisatie noemde ze als brekend; dat klopt niet. `src/tests.js:10361` telt 7 `<td>` op de
+**Afgerond**-tabel, die ook niet verandert. Er zijn in de hele suite geen toetsen die op
+celindex of `nth-child` van een NTD-rij rekenen (geverifieerd met grep).
 
 ### 5.2 Klassenamen blijven
 

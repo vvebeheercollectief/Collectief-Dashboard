@@ -6,3 +6,6 @@
 .clasp.json
 .clasprc.json
 node_modules/
+
+# Superpowers brainstorm-werkmap (mockups, lokale server-state)
+.superpowers/

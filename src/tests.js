@@ -1064,8 +1064,9 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       // oude situatie terug: een brede kolom met afgekapte tekst erin.
       (() => {
         const ct = document.querySelector('#ntd-tbody .cell-name > .ct');
-        if(ct) eq('kolombreedte: de tekstklem volgt de cel, niet een vast getal',
-                  getComputedStyle(ct).maxWidth, '100%');
+        truthy('kolombreedte: er is een naamcel om aan te meten', !!ct);
+        eq('kolombreedte: de tekstklem volgt de cel, niet een vast getal',
+           ct ? getComputedStyle(ct).maxWidth : null, '100%');
       })();
       // De gewichten worden genormaliseerd, dus de percentages tellen op tot 100. Anders zou een
       // extra kolom (bulkmodus) de som scheeftrekken en de laatste kolom eraf duwen.
@@ -1083,11 +1084,31 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         } finally { state.bulkMode = vBulk; renderNtd(); }
       })();
       // De offerte-cel zette balk en link ónder elkaar: 60px per rij tegen 47 elders.
-      setNtd('OFFERTE-TRAJECTEN');
+      //
+      // GEEN `if(el)` om deze asserts heen. Een toets achter zo'n vangnet verdwijnt geruisloos
+      // zodra het element er niet is, en dan staat de teller stil in plaats van rood — precies de
+      // stille groenheid die in deze branch al vier keer is gevonden. De fixture wordt hier zelf
+      // neergezet, zodat het tabblad gegarandeerd een rij heeft om aan te meten.
       (() => {
-        const of = document.querySelector('#ntd-tbody td.cell-of');
-        if(of) eq('kolombreedte: de offerte-cel zet balk en link naast elkaar',
-                  getComputedStyle(of).display, 'flex');
+        const vOff = D.ntd['OFFERTE-TRAJECTEN'], vA2 = state.activeNtd, vPg2 = pgs.ntd;
+        try{
+          D.ntd['OFFERTE-TRAJECTEN'] = [{ code:'OFB-1', naam:'VvE Offerte Breedte', offertes:'1/3',
+            aannemers:'', fase:'', datumAangevraagd:'1 mei 2026', opmerkingen:'x', behandelaar:'Jer',
+            deadline:'', _sec:'OFFERTE-TRAJECTEN', _row:9801 }];
+          pgs.ntd = 1; setNtd('OFFERTE-TRAJECTEN');
+          const ofTd = document.querySelector('#ntd-tbody td.cell-of');
+          const of   = document.querySelector('#ntd-tbody td.cell-of .of-rij');
+          truthy('kolombreedte: de offerte-rij heeft een cel met een wikkel', !!ofTd && !!of);
+          eq('kolombreedte: de offerte-cel zet balk en link naast elkaar',
+             of ? getComputedStyle(of).display : null, 'flex');
+          // De flex hoort op de WIKKEL te zitten. Op de <td> zelf haalt hij de cel uit de
+          // tabelopmaak en tekende de rijstreep zich dwars onder de inhoud door.
+          eq('kolombreedte: en de cel zelf blijft een gewone tabelcel',
+             ofTd ? getComputedStyle(ofTd).display : null, 'table-cell');
+        } finally {
+          if(vOff === undefined) delete D.ntd['OFFERTE-TRAJECTEN']; else D.ntd['OFFERTE-TRAJECTEN'] = vOff;
+          state.activeNtd = vA2; pgs.ntd = vPg2;
+        }
       })();
       setNtd('SUBSIDIE-TRAJECTEN');
 

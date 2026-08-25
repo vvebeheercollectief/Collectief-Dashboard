@@ -318,7 +318,11 @@
     /* De offerte-cel zette de voortgangsbalk en 'Aannemers toevoegen' ónder elkaar, waardoor élke
        rij op dat tabblad 60px hoog werd tegen 47 op de andere vier — hoge rijen die niets extra's
        lieten zien. Naast elkaar past het ruim en loopt de rijhoogte weer gelijk. */
-    #ntd-tbl-wrap td.cell-of{display:flex;align-items:center;gap:12px;white-space:nowrap}
+    /* De flex zit op een WIKKEL binnen de cel, niet op de <td> zelf. `display:flex` op een td
+       haalt hem uit de tabelopmaak — de browser maakt er dan een anonieme cel omheen, en de
+       rijstreep tekende zich dwars onder de inhoud door. Zichtbaar als een dunne lijn onder elke
+       offerte-cel; met een wikkel blijft de td gewoon een tabelcel. */
+    #ntd-tbl-wrap td.cell-of .of-rij{display:flex;align-items:center;gap:12px;white-space:nowrap}
     #ntd-tbl-wrap td.cell-of .prog-wrap{flex:none}
     #ntd-tbl-wrap td.cell-of .of-aann-tbl-tog{flex:1;min-width:0;margin-top:0;overflow:hidden;text-overflow:ellipsis}
     /* De fase-balk is een flex die de hele cel vulde. Met een vaste kolomindeling werd dat een

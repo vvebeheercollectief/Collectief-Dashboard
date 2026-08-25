@@ -114,9 +114,14 @@ function bepaalStil(r, sec){
   return dagen >= stilDrempel(sec) ? dagen : null;
 }
 
-// Vanaf hoeveel dagen vóór de deadline 'bijna te laat' aangaat. Bewust een vast getal voor alle
-// secties, net als de amberkleur die deadlineCel hiervoor gebruikte: de sectiedrempels
-// (PRIO_REGELS) gaan over hoe lang iets mag liggen, niet over hoe dichtbij een afgesproken datum is.
+// Vanaf hoeveel dagen vóór de deadline 'bijna te laat' aangaat. Bewust ÉÉN vast getal voor alle
+// secties — hetzelfde dat deadlineCel hieronder al gebruikte voor zijn amberkleur, en beide lezen
+// nu deze constante zodat ze niet uit elkaar kunnen lopen.
+//
+// WAAROM NIET PER SECTIE. PRIO_REGELS meebewegen zou voor de hand liggen, maar die drempels zijn
+// veel ruimer: `hoog` is voor LOD 90 dagen. Elke LOD-rij met een deadline binnen drie maanden zou
+// dan permanent 'bijna te laat' roepen, en dat is precies de soort melding-die-altijd-aanstaat
+// waar deze hele kolom vanaf moet.
 const BIJNA_TE_LAAT_DAGEN = 7;
 
 // De signalen van een rij, van zwaar naar licht. PUUR: leest alleen `r` en bestaande helpers,
@@ -129,6 +134,12 @@ const BIJNA_TE_LAAT_DAGEN = 7;
 //
 // Drie tegelijk KAN (te laat + vandaag + stil). Weggelegd sluit vandaag uit (opvolgStatus,
 // util.js) en stil uit (bepaalStil, hierboven), dus met weggelegd blijven het er twee.
+//
+// `kleur` is het vocabulaire dat taak 4 in CSS omzet, en bestaat uit vier standen:
+//   crit     = te laat            -> --prio (baksteen; niet --rd, dat is óók de tabkleur van LOD)
+//   warn     = vandaag opvolgen   -> --am
+//   warn-dof = bijna te laat      -> gedempte amber, mag de echte waarschuwing niet overstemmen
+//   dof      = stil / weggelegd   -> --mut, want dit zegt iets over het verleden, niet over nu
 //
 // `cls` draagt de OUDE klassenaam mee. Die staat er niet voor de opmaak - binnen `.cell-sig`
 // worden ze in styles.css leeggemaakt (taak 4) - maar omdat negen bestaande toetsen op die namen
@@ -159,7 +170,7 @@ function deadlineCel(r, sec){
   const { teLaat, dagenTot } = berekenPrioriteit(r.deadline, sec);
   // V3: status als gewoon vetgedrukt woord, geen pill
   if (teLaat) return `<td><span class="s-telaat">Te laat (${Math.abs(dagenTot)}d)</span></td>`;
-  const soon = dagenTot !== null && dagenTot <= 7;
+  const soon = dagenTot !== null && dagenTot <= BIJNA_TE_LAAT_DAGEN;
   return `<td><span class="${soon ? 's-soon' : 's-normal'}">${esc(r.deadline)}</span></td>`;
 }
 

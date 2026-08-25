@@ -855,7 +855,11 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
                        return `${d.getDate()}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`; };
     const iso = n => new Date(Date.now() + n*864e5).toISOString();
     try{
-      D.logboek = [{ code:'SIG-1', sectie:'OPPAKKEN', timestamp: iso(-20) }];
+      // 30 dagen en niet 20: de offerte-toets verderop moet bewijzen dat GEEN_STIL_PILL het
+      // stil-signaal onderdrukt. Met 20 dagen haalde die rij de offerte-drempel (21) sowieso niet
+      // en bleef de toets groen mét én zónder guard — hij bewees dus niets. Bij 30 wordt hij rood
+      // zodra de guard verdwijnt. Toets 2 kijkt alleen naar `soort`, dus die merkt het verschil niet.
+      D.logboek = [{ code:'SIG-1', sectie:'OPPAKKEN', timestamp: iso(-30) }];
       _zetStilIndex(bouwStilIndex(D.logboek, 'OPPAKKEN'));
 
       const soorten = r => signaalDelen(r, 'OPPAKKEN').map(d => d.soort);
@@ -876,6 +880,21 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
          soorten({ code:'SIG-0', deadline:dat(-1), opvolgdatum:'', inBehandeling:'' }), ['telaat']);
       eq('signaal: een deadline over dertig dagen geeft niets',
          soorten({ code:'SIG-0', deadline:dat(30), opvolgdatum:'', inBehandeling:'' }), []);
+      // Pin de drempel zelf vast, precies op de grens. Zonder deze twee kon BIJNA_TE_LAAT_DAGEN
+      // op 3 of op 14 gezet worden en bleef alles groen — terwijl dat getal gelijk moet lopen met
+      // de amber van deadlineCel. Nu is elke andere waarde meteen rood.
+      eq('signaal: op de grens van zeven dagen gaat bijna-te-laat nog aan',
+         soorten({ code:'SIG-0', deadline:dat(7), opvolgdatum:'', inBehandeling:'' }), ['bijna']);
+      eq('signaal: één dag verder is het stil',
+         soorten({ code:'SIG-0', deadline:dat(8), opvolgdatum:'', inBehandeling:'' }), []);
+      eq('signaal: op de dag zelf leest hij als een datum, niet als een aftelling',
+         signaalDelen({ code:'SIG-0', deadline:dat(0), opvolgdatum:'', inBehandeling:'' },
+                      'OPPAKKEN')[0].tekst, 'Deadline vandaag');
+      // 'vandaag opvolgen' en 'bijna te laat' komen in geen enkele andere toets samen voor, dus
+      // hun onderlinge volgorde lag nergens vast.
+      eq('signaal: vandaag opvolgen weegt zwaarder dan bijna te laat',
+         soorten({ code:'SIG-0', deadline:dat(2), opvolgdatum:dat(0), inBehandeling:'' }),
+         ['vandaag','bijna']);
 
       // 4. Weggelegd sluit vandaag EN stil uit (bestaand gedrag van opvolgStatus/bepaalStil).
       eq('signaal: weggelegd sluit vandaag en stil uit',

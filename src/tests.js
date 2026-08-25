@@ -5165,6 +5165,26 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
            !regelVan(wgHost,'Tb').querySelector('.pill-snooze')
            && !regelVan(wgHost,'Tb').classList.contains('snooze-row'));
 
+    // 3c-bis. Vandaag opvolgen. Zelfde kolom 'opvolgdatum' als hierboven, maar de andere kant op:
+    //     staat hij in de TOEKOMST dan is de taak weggelegd, staat hij op VANDAAG (of eerder) dan
+    //     moet hij juist nu opgepakt worden. Alleen die eerste stand had een eigen merkteken in het
+    //     paneel, dus een subtaak die vandaag nagebeld moest worden stond er precies zo bij als een
+    //     die tot volgend jaar kan wachten — terwijl de tabelrij twee regels hoger het wél zegt.
+    //     De datum t.o.v. de ECHTE dag: `opvolgStatus` toetst tegen `_vandaagAmsterdam()` en laat
+    //     zich via `signaalDelen` niet injecteren. Een hardgecodeerde datum zou deze toets morgen
+    //     stil van 'vandaag' naar 'weggelegd' laten omslaan en dan het tegenovergestelde meten.
+    const _vdBdl = _vandaagAmsterdam();
+    const vandaagSub = t('Tvandaag','Tkop','30','OPPAKKEN','Vandaag nabellen');
+    vandaagSub.opvolgdatum = `${String(_vdBdl.getDate()).padStart(2,'0')}-`
+                           + `${String(_vdBdl.getMonth()+1).padStart(2,'0')}-${_vdBdl.getFullYear()}`;
+    const vandaagHost = paneelMet(vandaagSub);
+    // Het paneel hoort hetzelfde te zeggen als de rij erboven. 'Vandaag opvolgen' en 'stil'
+    // ontbraken; een subtaak die vandaag moet, stond er precies zo bij als een die kan wachten.
+    truthy('bundelpaneel: een subtaak die vandaag opgevolgd moet worden zegt dat ook',
+           !!regelVan(vandaagHost,'Tvandaag').querySelector('.pill-opvolg'));
+    truthy('bundelpaneel: een rustige subtaak krijgt géén opvolg-melding',
+           !regelVan(vandaagHost,'Tb').querySelector('.pill-opvolg'));
+
     // 3d. Te laat. De meta-regel toonde een KALE datum, terwijl de tabelrij via `deadlineCel` een
     //     'Te laat (Xd)' neerzet. Omdat `absorbeer` de rij uit de vlakke lijst haalt, was er binnen
     //     dat tabblad geen enkele plek meer waar die status te zien was: de kop-pil zei 'N te laat'

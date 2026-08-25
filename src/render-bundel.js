@@ -19,6 +19,12 @@
 import { esc, taakTitel, taakVerwijzing, kortDatum, taakActieKnoppen, opvolgStatus, berekenPrioriteit } from "./util.js";
 import { SECS } from "./config.js";
 import { wordtGeabsorbeerd, bundelSleutel, bundelStand, bundelVerwijzing } from "./bundel.js";
+// LET OP — dit is een KRINGETJE: render-tabel.js importeert hierboven al uit render-bundel.js.
+// ES-modules kunnen dat aan zolang `signaalDelen` pas bij het RENDEREN wordt aangeroepen en niet
+// tijdens het laden van deze module: functie-declaraties worden bij het koppelen al klaargezet,
+// waarden op modulehoogte pas bij het uitvoeren. Roep hem hier dus nooit buiten een functie aan —
+// dan hangt het van de laadvolgorde af of je een werkende functie of een crash krijgt.
+import { signaalDelen } from "./render-tabel.js";
 import { ico } from "./icons.js";
 import { state } from "./state.js";
 
@@ -126,10 +132,21 @@ function subRegel(m, i){
   const snoozePil = ov.weggelegd
     ? `<span class="pill-snooze" data-action="taak-wegleggen" data-rid="${rid}" title="Weggelegd tot ${esc(r.opvolgdatum)}">${ico('pauze',11)}${esc(kortDatum(r.opvolgdatum))}</span>`
     : '';
-  // LET OP — deze gelijkloop is sinds de Signaal-kolom niet meer waar: de tabelrij toont 'Te laat'
-  // voortaan in de signaal-cel en houdt in de deadline-kolom een kale datum over, terwijl het
-  // paneel hieronder nog steeds rood 'Te laat (Xd)' zet. Taak 5 van het signaal-kolom-plan trekt
-  // het paneel gelijk; tot dan staat het hier expliciet, zodat het niet als 'klopt al' wordt gelezen.
+  // 'Vandaag opvolgen' en 'stil' ontbraken hier terwijl de tabelrij ze wél toont. Uit dezelfde
+  // bron als de rij (signaalDelen), zodat 'vandaag' en 'stil' hier en daar hetzelfde betekenen.
+  // De deadline en 'weggelegd' worden hieronder al door dlTekst en snoozePil getekend; die twee
+  // slaan we hier over om ze niet dubbel te zetten.
+  const paneelSignalen = signaalDelen(r, r._sec)
+    .filter(d => d.soort === 'vandaag' || d.soort === 'stil')
+    .map(d => `<span class="${d.cls}" title="${esc(d.tekst)}">${esc(d.tekst)}</span>`)
+    .join('');
+  // LET OP — de gelijkloop met de tabel is inhoudelijk hersteld, maar de PLAATS verschilt bewust.
+  // De tabelrij heeft sinds de Signaal-kolom één signaal-cel en houdt in de deadline-kolom een
+  // kale datum over; het paneel heeft die kolommen niet, dus 'Te laat' blijft hier in de meta-regel
+  // staan (hieronder, via dlTekst) en 'vandaag opvolgen'/'stil' staan hierboven bij de pillen.
+  // Wat de gebruiker LEEST is daarmee op beide plekken hetzelfde; alleen de vorm is anders.
+  // Wie hier iets verplaatst: dlTekst en snoozePil zijn met opzet onaangeroerd gebleven — zes
+  // toetsen in src/tests.js hangen aan precies deze markup.
   //
   // De deadline via dezelfde berekening als de tabel (`berekenPrioriteit`), en niet
   // als kale datum. Een kale datum liet achterstallig werk er in het paneel precies zo uitzien als
@@ -148,7 +165,7 @@ function subRegel(m, i){
        + `<span class="bdl-num">${i+1}</span>`
        + `<span class="bdl-dot" style="background:${kleur}"></span>`
        + `<button type="button" class="bdl-txt" data-action="taak-bewerken" data-rid="${rid}" title="Bewerken">${esc(taakTitel(r))}</button>`
-       + ibPil + snoozePil
+       + ibPil + snoozePil + paneelSignalen
        + `<span class="bdl-meta">${esc(label)} · ${dlTekst}</span>`
        // Exact dezelfde drie knoppen als op een tabelrij, uit één helper: ze staan op hetzelfde
        // scherm pal onder elkaar, dus een eigen variant hier zou meteen als verschil opvallen.

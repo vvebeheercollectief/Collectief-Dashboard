@@ -356,7 +356,7 @@ function rowNtd(r,sec){
         <td class="cell-of"><div class="of-rij">${offProg(r.offertes)}<div class="of-aann-tbl-tog">${offerteAannSamenvatting(r)}</div></div></td>
         <td>${persBadges(r.behandelaar)}</td>
         ${deadlineCel(r, 'OFFERTE-TRAJECTEN')}
-        <td class="cell-note"><span class="ct" title="${esc(r.opmerkingen||'')}">${esc(r.opmerkingen||'')}</span>${extraPills}</td>
+        <td class="cell-note"><div class="pil-rij"><span class="ct" title="${esc(r.opmerkingen||'')}">${esc(r.opmerkingen||'')}</span>${extraPills}</div></td>
         <td>${editBtn}</td>`;
       break;
     case'LOD':
@@ -376,7 +376,7 @@ function rowNtd(r,sec){
     case'SUBSIDIE-TRAJECTEN':
       cells=`<td>${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
         <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}${bdlNaam}</td>
-        <td class="cell-txt"><span class="ct" title="${esc(r.subsidie||'')}">${esc(r.subsidie||'')}</span>${extraPills}</td>
+        <td class="cell-txt"><div class="pil-rij"><span class="ct" title="${esc(r.subsidie||'')}">${esc(r.subsidie||'')}</span>${extraPills}</div></td>
         <td>${faseRijHtml(r.subsidieFase, rid)}</td>
         <td>${persBadges(r.behandelaar)}</td>
         ${deadlineCel(r, 'SUBSIDIE-TRAJECTEN')}

@@ -326,6 +326,14 @@
     /* De periode-badge op Vergaderverzoeken is vrije tekst uit de Sheet ("eind juni/begin juli")
        en liep zo de agendapunten-kolom in. `.badge` is inline-flex voor badges mét icoon; deze
        heeft er geen, dus inline-block mag en dan werkt de ellipsis. */
+    /* Offerte en Subsidie houden hun oude pillen naast de tekst in dezelfde cel. Met een vaste
+       kolomindeling telt dat op tot méér dan de kolom breed is, en dan lopen ze de buurkolom in
+       (gemeten: de 'Vandaag'-pil 66px eroverheen). Een flexrij laat de TEKST krimpen en houdt de
+       pil heel — die is het signaal, de opmerking staat ook in het zweeftekstje. */
+    #ntd-tbl-wrap .pil-rij{display:flex;align-items:center;gap:5px;min-width:0}
+    #ntd-tbl-wrap .pil-rij>.ct{flex:1;min-width:0}
+    #ntd-tbl-wrap .pil-rij>.pill-stil,#ntd-tbl-wrap .pil-rij>.pill-opvolg,
+    #ntd-tbl-wrap .pil-rij>.pill-snooze{flex:none;margin-left:0}
     #ntd-tbl-wrap .badge-periode{
       display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;
     }

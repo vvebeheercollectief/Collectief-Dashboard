@@ -5,7 +5,7 @@ import { ALLOWED_EMAILS } from '../allowed-emails.js';
 
 // ── Versie (zichtbaar in de UI) ────────────────────────────────────────
 // Ophogen bij ELKE wijziging: 4.1, 4.2, … 5.0 voor grote sprongen.
-export const APP_VERSION = '10.34';
+export const APP_VERSION = '10.35';
 
 // ── Omgeving (productie vs. testomgeving) ──────────────────────────────
 // Fail-safe: alleen deze exacte hosts zijn PRODUCTIE; al het andere
@@ -61,8 +61,10 @@ export const KORTE_NAMEN = {
 };
 
 // `breedtes` is de kolomverdeling, als GEWICHTEN — één meer dan `cols`, want de actiekolom
-// rechts telt mee. renderThead rekent ze om naar percentages, dus ze hoeven niet op 100 uit te
-// komen en een extra kolom (het bulk-vinkje) schuift er vanzelf tussen.
+// rechts telt mee. Een GETAL is een gewicht (wordt een percentage en groeit mee met het venster),
+// een STRING als '155px' is een vaste breedte. Gewichten hoeven niet op 100 uit te komen — ze
+// delen wat er na de vaste kolommen overblijft — en een extra kolom (het bulk-vinkje) schuift er
+// vanzelf tussen.
 //
 // WAAROM DIT ER IS. De tabel deelde overgebleven ruimte zelf uit, en de tekstkolommen hadden een
 // klem in vaste pixels (`.cell-name>.ct{max-width:160px}` e.d.). Kolommen mét klem konden dus niet
@@ -75,24 +77,26 @@ export const KORTE_NAMEN = {
 // 128px in IBM Plex Mono, en `.s-normal` is `white-space:nowrap` in een cel met `overflow:visible`
 // — de datum werd dus niet afgekapt maar óver de buurkolom heen getekend. Sheets levert lange
 // Nederlandse datums (zie _parseAnyDate), dus dat is de normale vorm en niet de uitzondering.
-// Elke deadline-kolom heeft daarom minstens gewicht 13: bij de smalste tabel (1150px) is dat
-// 149px en past de langste datum er nog in.
+// Elke datumkolom is daarom VAST in pixels ('155px'), niet als gewicht. Een gewicht dat bij 1150
+// precies groot genoeg was, werd bij 1920 een kolom van 212px voor tekst van 85px — dezelfde
+// verspilling, alleen ergens anders. Vast betekent: altijd genoeg, nooit te veel, en al het
+// gewonnen scherm gaat naar de tekstkolommen. Zie kolBreedtes() in render-tabel.js.
 export const SECS = {
   OPPAKKEN:{label:'Oppakken',css:'--sec:var(--ac);--sec-l:var(--ac-l);--sec-b:var(--ac-b)',color:'#0D7377',
     cols:['VvE Code','VvE','Signaal','Actiepunt','Deadline','Wie','Opmerkingen'],
-                   breedtes:[7,19,11,21,13,5,15,9],
+                   breedtes:[7,19,11,24,'155px',5,17,9],
     keys:['code','naam','actiepunt','deadline','behandelaar','prioriteit','opmerkingen','inBehandeling']},
   VERGADERVERZOEKEN:{label:'Vergaderverzoeken',css:'--sec:var(--am);--sec-l:var(--am-l);--sec-b:var(--am-b)',color:'#B45309',
     cols:['VvE Code','VvE','Signaal','Periode','Agendapunten','Wie','Deadline uitschr.','Opmerkingen'],
-                   breedtes:[7,15,11,8,18,5,13,15,8],
+                   breedtes:[7,17,11,8,21,5,'155px',17,8],
     keys:['code','naam','periode','agendapunten','behandelaar','deadline','opmerkingen','inBehandeling']},
   'OFFERTE-TRAJECTEN':{label:'Offerte-trajecten',css:'--sec:var(--pu);--sec-l:var(--pu-l);--sec-b:var(--pu-b)',color:'#6D5BD0',
     cols:['VvE Code','VvE','Datum aangevr.','Ontvangen/Aangevr.','Behandelaar','Deadline','Opmerkingen'],
-                   breedtes:[8,16,13,17,8,13,16,9],
+                   breedtes:[8,19,'165px',19,8,'155px',19,9],
     keys:['code','naam','datumAangevraagd','offertes','behandelaar','deadline','opmerkingen']},
   LOD:{label:'LOD',css:'--sec:var(--rd);--sec-l:var(--rd-l);--sec-b:var(--rd-b)',color:'#B91C1C',
     cols:['VvE Code','VvE','Signaal','Actiepunt','Status','Wie','Deadline LOD','Opmerkingen'],
-                   breedtes:[6,15,11,18,13,5,13,11,8],
+                   breedtes:[6,16,11,21,16,5,'155px',13,8],
     keys:['code','naam','actiepunt','status','behandelaar','deadline','opmerkingen','inBehandeling']},
   // Subsidie-trajecten (2026-07-29). Zelfde kolomstramien als LOD, met 'Status'
   // vervangen door 'Fase'. Twee dingen liggen hier vast en mogen niet losjes wijzigen:
@@ -105,7 +109,7 @@ export const SECS = {
   // de gebruiker koos zes kolommen om de rij rustig te houden.
   'SUBSIDIE-TRAJECTEN':{label:'Subsidie-trajecten',css:'--sec:var(--tl);--sec-l:var(--tl-l);--sec-b:var(--tl-b)',color:'#0F766E',
     cols:['VvE Code','VvE','Subsidie','Fase','Behandelaar','Deadline'],
-                   breedtes:[8,23,15,15,9,13,13],
+                   breedtes:[8,26,17,17,10,'155px',15],
     keys:['code','naam','subsidie','subsidieFase','behandelaar','deadline','opmerkingen','inBehandeling']},
 };
 

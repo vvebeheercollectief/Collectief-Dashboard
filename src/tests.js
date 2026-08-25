@@ -1045,10 +1045,17 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       // productie-achtige data: 'Datum aangevr.' 351px voor één datum, terwijl de VvE-naam en de
       // opmerkingen ernaast afgekapt werden. Deze toetsen leggen de nieuwe verdeling vast.
       ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN'].forEach(sec => {
-        eq(`kolombreedte: ${sec} heeft één gewicht per kolom plus de actiekolom`,
+        eq(`kolombreedte: ${sec} heeft één breedte per kolom plus de actiekolom`,
            (SECS[sec].breedtes || []).length, SECS[sec].cols.length + 1);
-        truthy(`kolombreedte: ${sec} heeft alleen positieve gewichten`,
-               (SECS[sec].breedtes || []).every(w => Number.isFinite(w) && w > 0));
+        truthy(`kolombreedte: ${sec} heeft alleen geldige breedtes`,
+               (SECS[sec].breedtes || []).every(w =>
+                 (Number.isFinite(w) && w > 0) || (typeof w === 'string' && /^\d+px$/.test(w))));
+        // Elke sectie houdt zijn datumkolom VAST in pixels; Offerte heeft er twee (aangevraagd
+        // én deadline). Zonder deze toets kan een vaste kolom stil weer een gewicht worden en
+        // groeit hij mee met het venster — precies de verspilling die dit moest oplossen.
+        eq(`kolombreedte: ${sec} houdt zijn datumkolom(men) vast in pixels`,
+           (SECS[sec].breedtes || []).filter(w => typeof w === 'string').length,
+           sec === 'OFFERTE-TRAJECTEN' ? 2 : 1);
       });
       setNtd('OPPAKKEN');
       const _tbl = document.querySelector('#ntd-tbl-wrap table');
@@ -1068,11 +1075,17 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         eq('kolombreedte: de tekstklem volgt de cel, niet een vast getal',
            ct ? getComputedStyle(ct).maxWidth : null, '100%');
       })();
-      // De gewichten worden genormaliseerd, dus de percentages tellen op tot 100. Anders zou een
-      // extra kolom (bulkmodus) de som scheeftrekken en de laatste kolom eraf duwen.
-      truthy('kolombreedte: de percentages tellen op tot 100',
-             !_cg || Math.abs([..._cg.children]
-               .reduce((a,c) => a + parseFloat(c.style.width), 0) - 100) < 0.05);
+      // Percentages plus vaste pixels moeten samen precies de tabel vullen: de percentages delen
+      // wat er ná de px-kolommen overblijft, gerekend bij de smalste tabelbreedte (1150). Telt het
+      // op tot méér dan 100%, dan wordt de laatste kolom eraf geduwd; tot minder, dan blijft er
+      // rechts een gat staan.
+      truthy('kolombreedte: vaste pixels en percentages vullen samen de tabel', (() => {
+        if(!_cg) return false;
+        const w   = [...(_cg.children)].map(c => c.style.width);
+        const px  = w.filter(v => v.endsWith('px')).reduce((a, v) => a + parseFloat(v), 0);
+        const pct = w.filter(v => v.endsWith('%')).reduce((a, v) => a + parseFloat(v), 0);
+        return Math.abs(pct + (px / 1150 * 100) - 100) < 0.05;
+      })());
       // In bulkmodus komt er een kolom bij; die moet meetellen in de colgroup.
       (() => {
         const vBulk = state.bulkMode;
@@ -4185,7 +4198,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '10.34');
+  eq('versie opgehoogd', APP_VERSION, '10.35');
 
   // ── Pushmeldingen: de twee schakels die stil kapot waren (audit 2026-08-06) ──
   // Beide defecten waren onzichtbaar: de app meldde "Notificaties zijn aan!" terwijl er nooit

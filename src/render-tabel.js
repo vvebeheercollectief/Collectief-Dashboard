@@ -29,6 +29,29 @@ const HEEFT_SIGNAAL_KOLOM = SKEYS.filter(s => SECS[s].cols.includes('Signaal'));
 // ══════════════════════════════════════
 // Optionele 4e parameter maakt kolomkoppen sorteerbaar: {active:{key,asc}, keyFor:(label)=>key|null}.
 // Sorteerbare koppen worden een echte knop (toetsenbord-bedienbaar) met pijl + aria-sort op de th.
+// De breedte die elke kolom in de <colgroup> krijgt, als CSS-waarde.
+//
+// Een getal is een GEWICHT en wordt een percentage: die kolommen groeien mee met het venster.
+// Een string als '150px' is een VASTE breedte en groeit niet mee. Dat onderscheid is nodig omdat
+// een datumkolom een bekende, korte inhoud heeft: als percentage was hij bij 1150px net breed
+// genoeg voor "22 september 2026" (149px) en bij 1920 opeens 212px voor tekst van 85px — dezelfde
+// verspilling waar deze hele wijziging over ging, alleen in een andere kolom.
+//
+// De gewichten delen wat er ná de vaste kolommen overblijft. Dat restant wordt berekend bij
+// TABEL_MIN, de smalste stand die de tabel kan aannemen (styles.css houdt hem daar op). Boven die
+// breedte krijgen de gewicht-kolommen automatisch méér, want hun percentage staat vast terwijl de
+// tabel groeit — precies de bedoeling: de tekstkolommen profiteren van een breder scherm, de
+// datumkolommen blijven zoals ze zijn.
+const TABEL_MIN = 1150;   // gelijk houden aan `min-width` van #ntd-tbl-wrap table in styles.css
+function kolBreedtes(breedtes){
+  const isPx = w => typeof w === 'string';
+  const pxTotaal = breedtes.filter(isPx).reduce((a,w) => a + (parseFloat(w) || 0), 0);
+  const restAandeel = Math.max(0, 100 - (pxTotaal / TABEL_MIN * 100));
+  const gewichtSom = breedtes.filter(w => !isPx(w)).reduce((a,b) => a + b, 0);
+  return breedtes.map(w => isPx(w) ? w
+    : (gewichtSom > 0 ? (w / gewichtSom * restAandeel).toFixed(3) + '%' : 'auto'));
+}
+
 // `breedtes` (optioneel) zijn GEWICHTEN, één per kolom. Ze worden hier omgerekend naar
 // percentages en als <colgroup> vóór de kop gezet. Dat werkt alleen samen met `table-layout:fixed`
 // (styles.css, alleen op de NTD-tabel): zonder dat deelt de browser de ruimte zelf uit en negeert
@@ -36,9 +59,8 @@ const HEEFT_SIGNAAL_KOLOM = SKEYS.filter(s => SECS[s].cols.includes('Signaal'));
 // er als extra kolom tussen kan schuiven zonder dat alle getallen opnieuw moeten kloppen.
 function renderThead(id,cols,css,sort,breedtes){
   const kf=sort&&sort.keyFor;
-  const som=(breedtes||[]).reduce((a,b)=>a+b,0);
-  const cg=(breedtes && breedtes.length===cols.length && som>0)
-    ? `<colgroup>${breedtes.map(w=>`<col style="width:${(w/som*100).toFixed(3)}%">`).join('')}</colgroup>`
+  const cg=(breedtes && breedtes.length===cols.length)
+    ? `<colgroup>${kolBreedtes(breedtes).map(w=>`<col style="width:${w}">`).join('')}</colgroup>`
     : '';
   // De colgroup hoort in de <table>, niet in de <thead>. Hij wordt daarom apart geplaatst.
   const tbl=document.getElementById(id).closest('table');

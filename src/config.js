@@ -79,10 +79,12 @@ export const SECS = {
 // De kolomkop zoals de gebruiker hem ziet, per VELDNAAM in plaats van per kolompositie.
 //
 // WAAROM NIET OP INDEX. `cols` en `keys` liepen nooit echt gelijk op: Oppakken heeft zes koppen
-// en acht sleutels, dus `cols[keys.indexOf('prioriteit')]` gaf 'Opmerkingen' en de
-// verplaats-dialoog zei "Opmerkingen: Hoog". Sinds er een kop 'Signaal' bij is die bij geen veld
-// hoort, zou elke sleutel erna nog een plek opschuiven. Deze afbeelding is expliciet en kan niet
-// stil verkeerd gaan; de toets 'geen enkele kolomkop is uit VELD_LABELS weggelopen' bewaakt drift.
+// en acht sleutels, dus `cols[keys.indexOf('prioriteit')]` gaf al 'Opmerkingen'. Dat bleef
+// onzichtbaar omdat `prioriteit` een boekhoudveld is en dus nooit in de verlies-lijst komt — de
+// vijf velden die de dialoog wél kan noemen zaten toevallig allemaal vóór de eerste scheefstand.
+// Zodra er een kop bijkomt die bij geen veld hoort ('Signaal', taak 4) schuiven ook die vijf op
+// en gaat de dialoog stil de verkeerde veldnaam tonen. Deze afbeelding is expliciet; de toetsen
+// bij 'veldlabel:' in tests.js bewaken drift in beide richtingen.
 //
 // KOP EN LABEL LOPEN GELIJK OP. Wordt een kolomkop hernoemd, dan wijzigt dezelfde tekst hier én
 // in `cols` — anders zegt de tabel iets anders dan de verplaats-vraag en slaat de bewaking alarm.

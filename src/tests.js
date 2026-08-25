@@ -10815,13 +10815,27 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
        _veldLabel('LOD', 'status'), 'Status');
     eq('veldlabel: een onbekend veld valt terug op de sleutel zelf',
        _veldLabel('OPPAKKEN', 'ditbestaatniet'), 'ditbestaatniet');
-    // Driftbewaking: elke kop in `cols` die een veld beschrijft moet ook in VELD_LABELS staan.
-    // 'Signaal' hoort bij geen enkel veld en is daarom de enige uitzondering.
+    // Driftbewaking, kant 1: elke kop in `cols` die een veld beschrijft moet ook in VELD_LABELS
+    // staan. 'Signaal' hoort bij geen enkel veld en is daarom de enige uitzondering.
     eq('veldlabel: geen enkele kolomkop is uit VELD_LABELS weggelopen',
-       Object.keys(SECS).flatMap(s =>
+       SKEYS.flatMap(s =>
          SECS[s].cols.filter(c => c !== 'Signaal' &&
            !Object.values(VELD_LABELS[s] || {}).includes(c)).map(c => `${s}:${c}`)),
        []);
+    // Kant 2: elk veld moet een label hebben. Zonder deze toets valt een nieuw veld stil terug op
+    // zijn ruwe sleutelnaam ("signaal: ja" i.p.v. "Signaal: ja") — dezelfde soort stille fout waar
+    // deze taak voor bestaat, alleen via de terugval in plaats van via de index.
+    eq('veldlabel: elk veld heeft een label, geen enkele valt terug op de sleutelnaam',
+       SKEYS.flatMap(s => SECS[s].keys
+         .filter(k => !(VELD_LABELS[s] || {})[k]).map(k => `${s}:${k}`)), []);
+    // Kant 3 — en dit is de scherpe. De twee toetsen hierboven kijken naar LIDMAATSCHAP: staat de
+    // tekst érgens in de sectie. Ze merken niet of een label aan het VERKEERDE veld hangt. Verwissel
+    // in LOD de labels van `status` en `deadline` en ze blijven allebei groen, terwijl de dialoog
+    // dan 'Deadline LOD: Wacht op gemeente' zegt. Taak 4 hernoemt straks 'Behandelaar' naar 'Wie'
+    // in drie secties; precies dan moet vaststaan aan wélk veld die tekst hangt.
+    eq('veldlabel: de behandelaar-kop hangt in elke sectie aan het veld behandelaar',
+       SKEYS.map(s => _veldLabel(s, 'behandelaar')),
+       SKEYS.map(s => SECS[s].cols.find(c => c === 'Wie' || c === 'Behandelaar')));
     // 'Status' bestaat niet in Oppakken en vervalt dus — maar niet stil.
     eq('verplaatsen: velden die de nieuwe categorie niet kent worden benoemd, niet stil gewist',
        verlorenVelden(lod, 'LOD', 'OPPAKKEN').map(v => [v.label, v.waarde]),

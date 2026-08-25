@@ -319,6 +319,12 @@ function rowNtd(r,sec){
   const bdlChev = _extra.chevron;
   // Op de kop de telpill; verder het bundel-merkje — wie dat krijgt beslist bundelMerkje zelf.
   const bdlNaam = _isKop ? _extra.pill : bundelMerkje(r, _bw, sec);
+  // De telpil ("1 van 1 klaar") staat NAAST de naam, anders dan het merkje dat een eigen regel
+  // krijgt. Naam + pil samen zijn dan breder dan de cel en de pil liep de buurkolom in (gemeten:
+  // 79px bij een venster van 1440). Met deze klasse laat de naam ruimte voor de pil; zonder pil
+  // mag hij de volle celbreedte houden. Een klasse en geen :has(), want dat is op de Safari van
+  // deze werkplek niet te vertrouwen.
+  const naamCls = 'cell-name' + ((_isKop && _extra.pill) ? ' met-telpil' : '');
   // Het sleep-handvat om deze rij onder een andere te hangen. Het hangt aan dezelfde `stapel`-vlag
   // als de rest van de gestapelde weergave: bij een zoekterm, filter, kolomsortering of
   // bulk-selectie staat die uit en kan er niet gestapeld worden (§4.2), dus dan hoort er ook geen
@@ -330,7 +336,7 @@ function rowNtd(r,sec){
   switch(sec){
     case'OPPAKKEN':
       cells=`<td>${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
-        <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie, sec)}${bdlNaam}</td>
+        <td class="${naamCls}"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie, sec)}${bdlNaam}</td>
         ${signaalCel(r, sec, rid)}
         <td class="cell-txt"><span class="ct" title="${esc(r.actiepunt)}">${esc(r.actiepunt)}</span></td>
         ${deadlineCel(r, 'OPPAKKEN')}
@@ -340,7 +346,7 @@ function rowNtd(r,sec){
       break;
     case'VERGADERVERZOEKEN':
       cells=`<td>${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
-        <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie, sec)}${bdlNaam}</td>
+        <td class="${naamCls}"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie, sec)}${bdlNaam}</td>
         ${signaalCel(r, sec, rid)}
         <td><span class="badge badge-periode" style="background:var(--am-l);color:var(--am)">${esc(r.periode||r.agendapunten||'')}</span></td>
         <td class="cell-txt"><span class="ct" title="${esc(r.agendapunten||r.actiepunt||'')}">${esc(r.agendapunten||r.actiepunt||'')}</span></td>
@@ -351,7 +357,7 @@ function rowNtd(r,sec){
       break;
     case'OFFERTE-TRAJECTEN':
       cells=`<td>${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
-        <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}${bdlNaam}</td>
+        <td class="${naamCls}"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}${bdlNaam}</td>
         <td class="cell-sm">${esc(r.datumAangevraagd||'')}</td>
         <td class="cell-of"><div class="of-rij">${offProg(r.offertes)}<div class="of-aann-tbl-tog">${offerteAannSamenvatting(r)}</div></div></td>
         <td>${persBadges(r.behandelaar)}</td>
@@ -361,7 +367,7 @@ function rowNtd(r,sec){
       break;
     case'LOD':
       cells=`<td>${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
-        <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie, sec)}${bdlNaam}</td>
+        <td class="${naamCls}"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie, sec)}${bdlNaam}</td>
         ${signaalCel(r, sec, rid)}
         <td class="cell-txt"><span class="ct" title="${esc(r.actiepunt||'')}">${esc(r.actiepunt||'')}</span></td>
         <td class="cell-txt" style="font-style:italic"><span class="ct" title="${esc(r.status||'')}">${esc(r.status||'')}</span></td>
@@ -375,7 +381,7 @@ function rowNtd(r,sec){
     // moet rustig blijven. Houd dit gelijk aan SECS['SUBSIDIE-TRAJECTEN'].cols.
     case'SUBSIDIE-TRAJECTEN':
       cells=`<td>${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
-        <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}${bdlNaam}</td>
+        <td class="${naamCls}"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}${bdlNaam}</td>
         <td class="cell-txt"><div class="pil-rij"><span class="ct" title="${esc(r.subsidie||'')}">${esc(r.subsidie||'')}</span>${extraPills}</div></td>
         <td>${faseRijHtml(r.subsidieFase, rid)}</td>
         <td>${persBadges(r.behandelaar)}</td>

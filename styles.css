@@ -339,9 +339,12 @@
        plaats van de breedste, en dat liet de VvE-kolom eerder met 165px groeien. Er staat een
        toets op ('stapel-e2e: en staat op een eigen regel ónder de VvE-naam'). Hier alleen een
        klem, zodat een lang merkje of een telpil de buurkolom niet in loopt. */
-    #ntd-tbl-wrap .cell-name .bdl-merk,#ntd-tbl-wrap .cell-name .bdl-pill{
+    #ntd-tbl-wrap .cell-name .bdl-merk{
       max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
     }
+    /* De telpil staat wél naast de naam. Laat de naam daarom ruimte over: 96px is de breedste
+       stand van de pil ("12 van 12 klaar") plus de tussenruimte. */
+    #ntd-tbl-wrap .cell-name.met-telpil>.ct{max-width:calc(100% - 96px)}
     #ntd-tbl-wrap .badge-periode{
       display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;
     }

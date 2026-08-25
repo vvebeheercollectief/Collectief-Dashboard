@@ -1055,9 +1055,11 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         // datums, dus daar zijn het er vier in plaats van drie. Zonder deze toets kan zo'n
         // ondergrens stil weer een gewicht worden en loopt de inhoud de buurkolom in — precies
         // wat er bij een venster van 1440 gebeurde: het vinkje viel van de rij af.
+        // Vier ondergrenzen op de tabbladen mét signaal-kolom (code, signaal, datum, acties),
+        // vier op Offerte (code, twee datums, acties) en drie op Subsidie (code, datum, acties).
         eq(`kolombreedte: ${sec} houdt zijn krappe kolommen op een ondergrens`,
            (SECS[sec].breedtes || []).filter(w => typeof w === 'string').length,
-           sec === 'OFFERTE-TRAJECTEN' ? 4 : 3);
+           sec === 'SUBSIDIE-TRAJECTEN' ? 3 : 4);
         // De eerste kolom (VvE Code) en de laatste (acties) moeten allebei zo'n ondergrens hebben.
         const _b = SECS[sec].breedtes || [];
         truthy(`kolombreedte: ${sec} — code- en actiekolom staan allebei vast`,
@@ -4204,7 +4206,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '10.39');
+  eq('versie opgehoogd', APP_VERSION, '10.40');
 
   // ── Pushmeldingen: de twee schakels die stil kapot waren (audit 2026-08-06) ──
   // Beide defecten waren onzichtbaar: de app meldde "Notificaties zijn aan!" terwijl er nooit

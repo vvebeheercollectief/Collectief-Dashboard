@@ -5,7 +5,7 @@ import { ALLOWED_EMAILS } from '../allowed-emails.js';
 
 // ── Versie (zichtbaar in de UI) ────────────────────────────────────────
 // Ophogen bij ELKE wijziging: 4.1, 4.2, … 5.0 voor grote sprongen.
-export const APP_VERSION = '10.39';
+export const APP_VERSION = '10.40';
 
 // ── Omgeving (productie vs. testomgeving) ──────────────────────────────
 // Fail-safe: alleen deze exacte hosts zijn PRODUCTIE; al het andere
@@ -89,14 +89,17 @@ export const KORTE_NAMEN = {
 //   datums    155px — "22 september 2026" is 128px.
 //   acties    150px — vier knoppen van 28px plus de tussenruimte; op 9% viel het vinkje eraf.
 //                     Offerte-trajecten heeft er drie en houdt het op 120px.
+//   Signaal   140px — "Vandaag opvolgen" is 107px; op de echte productiedata liep die er bij een
+//                     venster van 1440 achtentwintig pixel uit. Alleen op de drie tabbladen die
+//                     de kolom hebben.
 export const SECS = {
   OPPAKKEN:{label:'Oppakken',css:'--sec:var(--ac);--sec-l:var(--ac-l);--sec-b:var(--ac-b)',color:'#0D7377',
     cols:['VvE Code','VvE','Signaal','Actiepunt','Deadline','Wie','Opmerkingen'],
-                   breedtes:['105px',22,12,27,'155px',6,19,'150px'],
+                   breedtes:['105px',23,'140px',29,'155px',7,20,'150px'],
     keys:['code','naam','actiepunt','deadline','behandelaar','prioriteit','opmerkingen','inBehandeling']},
   VERGADERVERZOEKEN:{label:'Vergaderverzoeken',css:'--sec:var(--am);--sec-l:var(--am-l);--sec-b:var(--am-b)',color:'#B45309',
     cols:['VvE Code','VvE','Signaal','Periode','Agendapunten','Wie','Deadline uitschr.','Opmerkingen'],
-                   breedtes:['105px',20,12,9,17,6,'155px',20,'150px'],
+                   breedtes:['105px',21,'140px',9,18,7,'155px',21,'150px'],
     keys:['code','naam','periode','agendapunten','behandelaar','deadline','opmerkingen','inBehandeling']},
   'OFFERTE-TRAJECTEN':{label:'Offerte-trajecten',css:'--sec:var(--pu);--sec-l:var(--pu-l);--sec-b:var(--pu-b)',color:'#6D5BD0',
     cols:['VvE Code','VvE','Datum aangevr.','Ontvangen/Aangevr.','Behandelaar','Deadline','Opmerkingen'],
@@ -104,7 +107,7 @@ export const SECS = {
     keys:['code','naam','datumAangevraagd','offertes','behandelaar','deadline','opmerkingen']},
   LOD:{label:'LOD',css:'--sec:var(--rd);--sec-l:var(--rd-l);--sec-b:var(--rd-b)',color:'#B91C1C',
     cols:['VvE Code','VvE','Signaal','Actiepunt','Status','Wie','Deadline LOD','Opmerkingen'],
-                   breedtes:['105px',18,12,23,17,6,'155px',15,'150px'],
+                   breedtes:['105px',19,'140px',24,18,7,'155px',16,'150px'],
     keys:['code','naam','actiepunt','status','behandelaar','deadline','opmerkingen','inBehandeling']},
   // Subsidie-trajecten (2026-07-29). Zelfde kolomstramien als LOD, met 'Status'
   // vervangen door 'Fase'. Twee dingen liggen hier vast en mogen niet losjes wijzigen:

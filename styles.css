@@ -352,8 +352,12 @@
        is de inhoud breder dan de kolom. De ZWAARSTE melding blijft altijd heel; de tweede kapt af,
        want die is per ontwerp al de bijzaak. */
     #ntd-tbl-wrap .cell-sig .sig{max-width:100%}
-    #ntd-tbl-wrap .cell-sig .sig-hoofd{flex:none}
-    #ntd-tbl-wrap .cell-sig .sig-bij{min-width:0;overflow:hidden;text-overflow:ellipsis}
+    /* Volgorde van inkrimpen: eerst de tweede melding, daarna pas de zwaarste. flex-shrink 100
+       tegen 1 maakt dat verschil groot genoeg dat de bijzaak volledig verdwijnt vóór de
+       hoofdmelding ook maar één letter inlevert. De hoofdmelding kán afkappen — dat is beter dan
+       over de buurkolom heen lopen — maar met de ondergrens van 140px komt het daar niet van. */
+    #ntd-tbl-wrap .cell-sig .sig-hoofd{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+    #ntd-tbl-wrap .cell-sig .sig-bij{flex:0 100 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
     /* De tekst loopt tot de celrand, niet tot een vast getal. */
     #ntd-tbl-wrap .cell-name>.ct,#ntd-tbl-wrap .cell-txt>.ct,#ntd-tbl-wrap .cell-note>.ct{max-width:100%}
     /* De offerte-cel zette de voortgangsbalk en 'Aannemers toevoegen' ónder elkaar, waardoor élke

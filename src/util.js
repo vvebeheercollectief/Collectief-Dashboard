@@ -137,10 +137,18 @@ const STIL_ESCALATIE_REGELS = {
   'SUBSIDIE-TRAJECTEN': { trap1: 21, trap2: 42 },
 };
 
-// Vanaf hoeveel stille dagen het signaal aangaat, per sectie. Bewust dezelfde getallen als trap 1
-// van STIL_ESCALATIE_REGELS hierboven: de gebruiker krijgt op dag N een herinneringsmail, dus het
-// scherm hoort niet op dag 4 al iets anders te roepen. Een vast getal (4) was op LOD vals alarm:
-// daar geeft de gemeente 90 dagen en komt de mail pas op dag 30.
+// Vanaf hoeveel stille KALENDERDAGEN het signaal aangaat, per sectie. Bewust dezelfde getallen als
+// trap 1 van STIL_ESCALATIE_REGELS hierboven: de gebruiker krijgt op dag N een herinneringsmail,
+// dus het scherm hoort niet op dag 4 al iets anders te roepen. Een vast getal (4) was op LOD vals
+// alarm: daar geeft de gemeente 90 dagen en komt de mail pas op dag 30.
+//
+// En het scherm was hierin aantoonbaar de vreemde eend: de dagbriefing telde een taak al als stil
+// bij `dagen >= regels.trap1` (apps-script/Notifications.gs:303). De briefing zei dus "2 stille
+// taken" waar het scherm negen klokjes toonde. Scherm, mail en briefing lopen nu alle drie gelijk.
+//
+// LET OP bij lezen: voor OFFERTE-TRAJECTEN en SUBSIDIE-TRAJECTEN geeft deze functie wel een getal
+// (21), maar in de tabel doet dat niets — GEEN_STIL_PILL (render-tabel.js) onderdrukt het signaal
+// daar hoe dan ook. Levend zijn alleen Oppakken (7), Vergaderverzoeken (14) en LOD (30).
 function stilDrempel(sec){
   const reg = STIL_ESCALATIE_REGELS[sec];
   return (reg && Number.isFinite(reg.trap1)) ? reg.trap1 : 7;

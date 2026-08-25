@@ -9,6 +9,12 @@ import {
 } from './util.js';
 import { SKEYS } from './config.js';
 
+// LET OP — dit is NIET dezelfde grootheid als stilDrempel(sec) in util.js. Die zegt vanaf wanneer
+// het scherm 'stil' róept; deze 4 is de voet van de puntenhelling waarmee urgentieScore weegt.
+// Sinds de pil op trap 1 staat (7/14/30) kan dit bestand dus stil-punten toekennen en "5 dagen geen
+// activiteit" schrijven voor een taak die het scherm niet stil noemt. Vandaag heeft dat nul gevolg:
+// urgentie.js wordt door niets in de app geladen, alleen door de zelftest. Wordt het ooit weer in
+// een scherm gebruikt, dan moet deze 4 eerst stilDrempel(sec) worden — of moet dit bestand weg.
 const STIL_DREMPEL = 4;
 
 // Dagen sinds de laatste logboek-activiteit van deze taak (code + sectie).

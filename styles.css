@@ -323,6 +323,12 @@
        (render-tabel.js). Die viel dus buiten de regel hierboven en had als enige datumkolom geen
        vangnet. De cel zelf afkappen is hier het enige aangrijpingspunt. */
     #ntd-tbl-wrap td.cell-sm{overflow:hidden;text-overflow:ellipsis}
+    /* De periode-badge op Vergaderverzoeken is vrije tekst uit de Sheet ("eind juni/begin juli")
+       en liep zo de agendapunten-kolom in. `.badge` is inline-flex voor badges mét icoon; deze
+       heeft er geen, dus inline-block mag en dan werkt de ellipsis. */
+    #ntd-tbl-wrap .badge-periode{
+      display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;
+    }
     /* Zelfde vangnet voor de signaal-cel: bij twee meldingen ('Te laat (45d)' + 'Vandaag opvolgen')
        is de inhoud breder dan de kolom. De ZWAARSTE melding blijft altijd heel; de tweede kapt af,
        want die is per ontwerp al de bijzaak. */

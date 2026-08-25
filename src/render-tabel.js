@@ -342,7 +342,7 @@ function rowNtd(r,sec){
       cells=`<td>${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
         <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie, sec)}${bdlNaam}</td>
         ${signaalCel(r, sec, rid)}
-        <td><span class="badge" style="background:var(--am-l);color:var(--am)">${esc(r.periode||r.agendapunten||'')}</span></td>
+        <td><span class="badge badge-periode" style="background:var(--am-l);color:var(--am)">${esc(r.periode||r.agendapunten||'')}</span></td>
         <td class="cell-txt"><span class="ct" title="${esc(r.agendapunten||r.actiepunt||'')}">${esc(r.agendapunten||r.actiepunt||'')}</span></td>
         <td>${persBadges(r.behandelaar, true)}</td>
         ${deadlineCel(r, 'VERGADERVERZOEKEN')}

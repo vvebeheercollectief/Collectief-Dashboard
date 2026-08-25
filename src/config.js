@@ -5,7 +5,7 @@ import { ALLOWED_EMAILS } from '../allowed-emails.js';
 
 // ── Versie (zichtbaar in de UI) ────────────────────────────────────────
 // Ophogen bij ELKE wijziging: 4.1, 4.2, … 5.0 voor grote sprongen.
-export const APP_VERSION = '10.35';
+export const APP_VERSION = '10.36';
 
 // ── Omgeving (productie vs. testomgeving) ──────────────────────────────
 // Fail-safe: alleen deze exacte hosts zijn PRODUCTIE; al het andere
@@ -88,7 +88,7 @@ export const SECS = {
     keys:['code','naam','actiepunt','deadline','behandelaar','prioriteit','opmerkingen','inBehandeling']},
   VERGADERVERZOEKEN:{label:'Vergaderverzoeken',css:'--sec:var(--am);--sec-l:var(--am-l);--sec-b:var(--am-b)',color:'#B45309',
     cols:['VvE Code','VvE','Signaal','Periode','Agendapunten','Wie','Deadline uitschr.','Opmerkingen'],
-                   breedtes:[7,19,11,7,18,5,'155px',19,8],
+                   breedtes:[7,19,11,9,16,5,'155px',19,8],
     keys:['code','naam','periode','agendapunten','behandelaar','deadline','opmerkingen','inBehandeling']},
   'OFFERTE-TRAJECTEN':{label:'Offerte-trajecten',css:'--sec:var(--pu);--sec-l:var(--pu-l);--sec-b:var(--pu-b)',color:'#6D5BD0',
     cols:['VvE Code','VvE','Datum aangevr.','Ontvangen/Aangevr.','Behandelaar','Deadline','Opmerkingen'],

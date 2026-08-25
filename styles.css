@@ -334,6 +334,14 @@
     #ntd-tbl-wrap .pil-rij>.ct{flex:1;min-width:0}
     #ntd-tbl-wrap .pil-rij>.pill-stil,#ntd-tbl-wrap .pil-rij>.pill-opvolg,
     #ntd-tbl-wrap .pil-rij>.pill-snooze{flex:none;margin-left:0}
+    /* De naamcel krijgt NADRUKKELIJK GEEN flexrij. Het bundel-merkje hoort daar op een EIGEN
+       REGEL onder de naam te staan: naast elkaar vraagt de cel de SOM van beide breedtes in
+       plaats van de breedste, en dat liet de VvE-kolom eerder met 165px groeien. Er staat een
+       toets op ('stapel-e2e: en staat op een eigen regel ónder de VvE-naam'). Hier alleen een
+       klem, zodat een lang merkje of een telpil de buurkolom niet in loopt. */
+    #ntd-tbl-wrap .cell-name .bdl-merk,#ntd-tbl-wrap .cell-name .bdl-pill{
+      max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    }
     #ntd-tbl-wrap .badge-periode{
       display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;
     }

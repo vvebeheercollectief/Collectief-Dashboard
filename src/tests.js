@@ -1050,12 +1050,18 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         truthy(`kolombreedte: ${sec} heeft alleen geldige breedtes`,
                (SECS[sec].breedtes || []).every(w =>
                  (Number.isFinite(w) && w > 0) || (typeof w === 'string' && /^\d+px$/.test(w))));
-        // Elke sectie houdt zijn datumkolom VAST in pixels; Offerte heeft er twee (aangevraagd
-        // én deadline). Zonder deze toets kan een vaste kolom stil weer een gewicht worden en
-        // groeit hij mee met het venster — precies de verspilling die dit moest oplossen.
-        eq(`kolombreedte: ${sec} houdt zijn datumkolom(men) vast in pixels`,
+        // Drie soorten kolommen hebben een ondergrens in pixels: de VvE-code (kan een kenmerk
+        // dragen), de datum(s), en de actiekolom (vier knoppen van 28px). Offerte heeft twee
+        // datums, dus daar zijn het er vier in plaats van drie. Zonder deze toets kan zo'n
+        // ondergrens stil weer een gewicht worden en loopt de inhoud de buurkolom in — precies
+        // wat er bij een venster van 1440 gebeurde: het vinkje viel van de rij af.
+        eq(`kolombreedte: ${sec} houdt zijn krappe kolommen op een ondergrens`,
            (SECS[sec].breedtes || []).filter(w => typeof w === 'string').length,
-           sec === 'OFFERTE-TRAJECTEN' ? 2 : 1);
+           sec === 'OFFERTE-TRAJECTEN' ? 4 : 3);
+        // De eerste kolom (VvE Code) en de laatste (acties) moeten allebei zo'n ondergrens hebben.
+        const _b = SECS[sec].breedtes || [];
+        truthy(`kolombreedte: ${sec} — code- en actiekolom staan allebei vast`,
+               typeof _b[0] === 'string' && typeof _b[_b.length - 1] === 'string');
       });
       setNtd('OPPAKKEN');
       const _tbl = document.querySelector('#ntd-tbl-wrap table');
@@ -1070,7 +1076,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       // De tekst hoort tot de celrand te lopen. Bleef hier een vast getal staan, dan kregen we de
       // oude situatie terug: een brede kolom met afgekapte tekst erin.
       (() => {
-        const ct = document.querySelector('#ntd-tbody .cell-name > .ct');
+        const ct = document.querySelector('#ntd-tbody .cell-name .ct');
         truthy('kolombreedte: er is een naamcel om aan te meten', !!ct);
         eq('kolombreedte: de tekstklem volgt de cel, niet een vast getal',
            ct ? getComputedStyle(ct).maxWidth : null, '100%');
@@ -4198,7 +4204,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '10.37');
+  eq('versie opgehoogd', APP_VERSION, '10.38');
 
   // ── Pushmeldingen: de twee schakels die stil kapot waren (audit 2026-08-06) ──
   // Beide defecten waren onzichtbaar: de app meldde "Notificaties zijn aan!" terwijl er nooit

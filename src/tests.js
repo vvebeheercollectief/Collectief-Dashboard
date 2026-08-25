@@ -967,6 +967,22 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       eq('signaalkolom: Signaal staat op de derde plek',
          [...document.querySelectorAll('#ntd-thead th')]
            .map(t => t.textContent.trim().replace(/[▲▼]$/, ''))[2], 'Signaal');
+      // En de CEL moet daar ook echt staan. Zonder deze regel kon de signaal-cel met de
+      // actiepunt-cel worden omgewisseld — signaal onder de kop 'Actiepunt' en andersom — en
+      // bleef de hele suite groen: de koppen werden wel geteld, de celvolgorde niet.
+      eq('signaalkolom: de signaal-cel staat op dezelfde plek als zijn kop',
+         [...rij1.querySelectorAll('td')].indexOf(sig1), 2);
+      // De opmaak moet de rangorde ook echt tónen. De zware melding was even groot en even zwaar
+      // als de lichte, doordat het reset-blok (0,2,0) van .sig-hoofd (0,1,0) won. Meet ze allebei
+      // en eis dat ze verschillen; overgangen staan hier niet aan, dus dit is een vaste waarde.
+      (() => {
+        const h = getComputedStyle(sig1.querySelector('.sig-hoofd'));
+        const b = getComputedStyle(sig1.querySelector('.sig-bij'));
+        truthy('signaalkolom: de zwaarste melding is zwaarder gezet dan de tweede',
+               parseInt(h.fontWeight,10) > parseInt(b.fontWeight,10));
+        truthy('signaalkolom: en groter', parseFloat(h.fontSize) > parseFloat(b.fontSize));
+        truthy('signaalkolom: de twee meldingen hebben niet dezelfde kleur', h.color !== b.color);
+      })();
 
       // De deadline-kolom is neutraal geworden: geen 'Te laat' meer, alleen een datum.
       const dlCel = rij1.querySelectorAll('td')[4];
@@ -983,10 +999,36 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       truthy('signaalkolom: de oude klassenamen staan nog in de cel',
              !!sig1.querySelector('.s-telaat') && !!sig1.querySelector('.pill-opvolg'));
 
+      // Vergaderverzoeken en LOD kregen exact dezelfde ingreep op drie plekken, maar niets in de
+      // suite tekende ze. Eén rij per tabblad is genoeg om een scheve kolom te betrappen.
+      [['VERGADERVERZOEKEN', 9, { periode:'sept/okt', agendapunten:'z' }],
+       ['LOD',               9, { actiepunt:'z', status:'' }]].forEach(([sec, kolommen, extra]) => {
+        const bewaard = D.ntd[sec];
+        try{
+          D.ntd[sec] = [{ code:'SIGT-3', naam:'VvE Signaal Drie', deadline:dat(-5),
+                          opvolgdatum:'', behandelaar:'Jer', opmerkingen:'', inBehandeling:'',
+                          _sec:sec, _row:9703, ...extra }];
+          pgs.ntd = 1; setNtd(sec);
+          const tr = document.querySelector('#ntd-tbody tr[data-row="9703"]');
+          const cel = tr && tr.querySelector('.cell-sig');
+          eq(`signaalkolom: ${sec} heeft evenveel koppen als cellen`,
+             [document.querySelectorAll('#ntd-thead th').length,
+              tr ? tr.querySelectorAll('td').length : 0], [kolommen, kolommen]);
+          eq(`signaalkolom: ${sec} zet de signaal-cel op de derde plek`,
+             tr ? [...tr.querySelectorAll('td')].indexOf(cel) : -1, 2);
+          eq(`signaalkolom: ${sec} toont de te-laat-melding in die cel`,
+             cel ? (cel.querySelector('.sig-hoofd')||{}).textContent : null, 'Te laat (5d)');
+        } finally { if(bewaard === undefined) delete D.ntd[sec]; else D.ntd[sec] = bewaard; }
+      });
+
       // Offerte en subsidie blijven zoals ze waren.
       setNtd('SUBSIDIE-TRAJECTEN');
       eq('signaalkolom: subsidie houdt zes koppen en krijgt er géén',
          [...document.querySelectorAll('#ntd-thead th')].length, 7);
+      // En de sectielijst wordt afgeleid uit `cols`, dus die kan niet uit de pas lopen.
+      eq('signaalkolom: precies drie tabbladen dragen de kop',
+         SKEYS.filter(s => SECS[s].cols.includes('Signaal')),
+         ['OPPAKKEN','VERGADERVERZOEKEN','LOD']);
     } finally {
       if (vOpp === undefined) delete D.ntd['OPPAKKEN']; else D.ntd['OPPAKKEN'] = vOpp;
       D.logboek = vLog; state.activeNtd = vA; pgs.ntd = vPg; setNtd(vA);

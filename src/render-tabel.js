@@ -3,7 +3,7 @@
 //  Verplaatst uit render-lijsten.js (Batch D / punt 11) — zuivere refactor, geen gedragswijziging.
 // ══════════════════════════════════════
 import { esc, vveCodeSpan, persBadges, subBadge, taakActieKnoppen, offProg, emptyRow, berekenPrioriteit, opvolgStatus, taakTitel, kortDatum, _verschilInKalenderdagen, _vandaagAmsterdam, stilDrempel, aannSleutel } from "./util.js";
-import { SECS, PG } from "./config.js";
+import { SECS, SKEYS, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { bulkGeselecteerd } from "./bulk.js";
 import { offerteAannSamenvatting, offerteAannemerPaneel } from "./render-offerte.js";
@@ -16,9 +16,13 @@ import { bundelKopExtra, bundelPaneelHtml, bundelMerkje, STAPEL_GREEP } from "./
 // Zie de toelichting bij het gebruik in rowNtd().
 const GEEN_STIL_PILL = ['OFFERTE-TRAJECTEN', 'SUBSIDIE-TRAJECTEN'];
 
-// De secties met een eigen Signaal-kolom. Offerte en subsidie staan er bewust niet bij: daar kan
-// 'stil' per ontwerp niet voorkomen en zou de kolom vrijwel elke rij leeg blijven.
-const HEEFT_SIGNAAL_KOLOM = ['OPPAKKEN', 'VERGADERVERZOEKEN', 'LOD'];
+// De secties met een eigen Signaal-kolom. AFGELEID uit `cols` en met opzet geen eigen handlijst:
+// drie dingen moeten kloppen voor één sectie (de kop in `cols`, deze lijst, en de aanroep van
+// signaalCel in het case-blok), en een handlijst die uit de pas loopt met `cols` levert precies
+// het probleem op dat deze hele kolom oplost — de melding staat dan weer op twee plekken, of
+// nergens, en dat gaat stil. Offerte en subsidie krijgen de kop niet: daar kan 'stil' per ontwerp
+// niet voorkomen (zie GEEN_STIL_PILL) en zou de kolom vrijwel elke rij leeg blijven.
+const HEEFT_SIGNAAL_KOLOM = SKEYS.filter(s => SECS[s].cols.includes('Signaal'));
 
 // ══════════════════════════════════════
 //  TABLE HELPERS

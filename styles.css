@@ -24,6 +24,10 @@
       --fg:#1b1e24;
       /* Eén gedempt 'urgent/te-laat'-rood (baksteen), los van het felle --rd-signaal */
       --prio:#b5544b;
+      /* Een tint donkerder, voor de te-laat-TEKST in de signaal-kolom: --prio zelf haalt daar
+         4,42:1 en dat is net onder de 4,5 die dit project aanhoudt. Vlakken en staafjes blijven
+         --prio, alleen tekst gebruikt deze. */
+      --sig-crit:#9e463e;
       /* Bewegings-schaal: één set duraties + easing voor heel de app */
       --tr-fast:.1s ease;--tr-slow:.3s cubic-bezier(.22,1,.36,1);--ease:cubic-bezier(.22,1,.36,1);
       /* Grotere kaart-radius (was los hardgecodeerd als 14px) */
@@ -44,7 +48,7 @@
       --pk:#F06BAA;--pk-l:#371628;--pk-b:#582441;
       --tl:#5EC8BC;--tl-l:#10302E;--tl-b:#1F5049;
       --ac:#8b9dc4;--ac-l:#262b35;--ac-b:#3a4256;--ac-900:#a8b8d8;--ac-500:#9fb0d4;
-      --fg:#f2f4f7;--prio:#e08b82;
+      --fg:#f2f4f7;--prio:#e08b82;--sig-crit:#f0a29a;
     }
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     html,body{height:100%;font-family:'IBM Plex Sans','Manrope',system-ui,sans-serif;font-size:14px;background:var(--bg);color:var(--txt);line-height:1.5;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
@@ -346,17 +350,24 @@
     /* ── Signaal-kolom ──────────────────────────────────────────────────────
        Eén cel per rij met de zwaarste melding. De kleur zit op de wikkel `.sig-*`, zodat
        bolletje en tekst niet los van elkaar kunnen gaan lopen. */
-    .cell-sig{white-space:nowrap;cursor:pointer;vertical-align:middle}
+    .cell-sig{white-space:nowrap;vertical-align:middle}
+    /* Alleen een gevulde cel is klikbaar. Een lege cel met een wijzende hand belooft een actie
+       die er niet is — daar valt de klik terug op het uitklappen van de rij. */
+    .cell-sig[data-action]{cursor:pointer}
     .sig{display:inline-flex;align-items:baseline;gap:7px}
     .sig-dot{width:7px;height:7px;border-radius:50%;flex:none;align-self:center}
-    .sig-hoofd{font-size:12px;font-weight:600}
-    .sig-bij{font-size:11px;font-weight:500;color:var(--fnt)}
-    /* --prio (baksteen) en niet --rd: op de LOD-tab is --rd óók de tabkleur, en dan valt een
-       rood bolletje juist niet meer op. */
-    .sig-crit{color:var(--prio)}      .sig-crit .sig-dot{background:var(--prio)}
-    .sig-warn{color:var(--am)}        .sig-warn .sig-dot{background:var(--am)}
-    .sig-warn-dof{color:var(--mut)}   .sig-warn-dof .sig-dot{background:var(--am-b)}
-    .sig-dof{color:var(--mut)}        .sig-dof .sig-dot{background:var(--bor-input)}
+    /* --sig-crit is een tint donkerder dan --prio: dit is de zwaarste tekst in de rij en moest
+       4,5:1 halen. --prio zelf bleef op 4,42:1 steken en blijft wél de kleur van het bolletje en
+       van het staafje links, zodat de rij één familie blijft. */
+    .sig-crit{color:var(--sig-crit)} .sig-crit .sig-dot{background:var(--prio)}
+    .sig-warn{color:var(--am)}       .sig-warn .sig-dot{background:var(--am)}
+    /* 'Bijna te laat' krijgt DEZELFDE amber als 'vandaag opvolgen', alleen lichter van gewicht
+       (zie .cell-sig .sig-warn-dof verderop). Een eigen kleur zou een vijfde betekenis
+       suggereren terwijl het dezelfde soort waarschuwing is, alleen minder dringend. Eerder
+       stond hier --mut met een --am-b bolletje: dat was niet te onderscheiden van 'stil'
+       (zelfde tekstkleur) en het bolletje haalde 1,44:1 — praktisch onzichtbaar. */
+    .sig-warn-dof{color:var(--am)}   .sig-warn-dof .sig-dot{background:var(--am)}
+    .sig-dof{color:var(--mut)}       .sig-dof .sig-dot{background:var(--mut)}
     /* Binnen de signaal-cel dragen de oude klassenamen alleen nog BETEKENIS, geen opmaak: negen
        toetsen zoeken op die namen, en zo staat op één plek welke klasse bij welk signaal hoort.
        Zonder deze regel zouden ze hier als pil mét vlak terugkomen - precies wat we weghalen.
@@ -369,11 +380,20 @@
       background:none;color:inherit;padding:0;margin:0;border-radius:0;
       font-size:inherit;font-weight:inherit;font-family:inherit;
     }
+    /* En NÁ het reset-blok de hiërarchie terugzetten. Dit moet met dezelfde specificiteit (0,2,0)
+       en dus lager in het bestand: `.sig-hoofd` alleen is (0,1,0) en verloor van de reset
+       hierboven, waardoor de zware en de lichte melding er exact hetzelfde uitzagen — precies het
+       probleem dat deze kolom oplost, en de hoofdmelding was zelfs zwakker dan de oude pil. */
+    .cell-sig .sig-hoofd{font-size:12.5px;font-weight:700}
+    .cell-sig .sig-warn-dof .sig-hoofd{font-weight:500}
+    .cell-sig .sig-bij{font-size:11px;font-weight:500;color:var(--mut)}
     /* tr.snooze-row td{opacity:.55} dempt élke cel; het signaal is juist de reden dat de rij daar
        staat en moet leesbaar blijven. Hogere specificiteit, dus deze wint. */
     tr.snooze-row .cell-sig{opacity:1}
-    /* 'Geen deadline' is geen urgentie meer nu die in de signaal-kolom staat: grijs i.p.v. amber. */
-    .warn-geen-deadline.geen-dl-dof{color:var(--fnt)}
+    /* 'Geen deadline' is geen urgentie meer nu die in de signaal-kolom staat: grijs i.p.v. amber.
+       --mut en niet --fnt: op --fnt kwam deze tekst uit op 2,60:1 en dit project dwingt 4,5:1 af
+       voor rij-tekst. --mut haalt 5,83 in licht en 6,00 in donker, en dempt nog steeds duidelijk. */
+    .warn-geen-deadline.geen-dl-dof{color:var(--mut)}
     /* Eén kleur haalt het hier niet in beide thema's: de strook is licht (#f5f7f9) én donker
        (#1c2026). Op #7c8694 kwam de kop uit op 3,43:1 in licht en 4,44:1 in donker; 11,5px
        hoofdletters vragen 4,5:1. Vandaar per thema een eigen waarde, zoals bij de pillen. */

@@ -126,7 +126,12 @@ function subRegel(m, i){
   const snoozePil = ov.weggelegd
     ? `<span class="pill-snooze" data-action="taak-wegleggen" data-rid="${rid}" title="Weggelegd tot ${esc(r.opvolgdatum)}">${ico('pauze',11)}${esc(kortDatum(r.opvolgdatum))}</span>`
     : '';
-  // De deadline via dezelfde berekening als de tabel (`deadlineCel` → `berekenPrioriteit`), en niet
+  // LET OP — deze gelijkloop is sinds de Signaal-kolom niet meer waar: de tabelrij toont 'Te laat'
+  // voortaan in de signaal-cel en houdt in de deadline-kolom een kale datum over, terwijl het
+  // paneel hieronder nog steeds rood 'Te laat (Xd)' zet. Taak 5 van het signaal-kolom-plan trekt
+  // het paneel gelijk; tot dan staat het hier expliciet, zodat het niet als 'klopt al' wordt gelezen.
+  //
+  // De deadline via dezelfde berekening als de tabel (`berekenPrioriteit`), en niet
   // als kale datum. Een kale datum liet achterstallig werk er in het paneel precies zo uitzien als
   // werk dat nog ruim op tijd is: de kop-pil zei 'N te laat' terwijl er in de hele lijst geen enkele
   // rij te zien was die dat liet zien. Eén bron voor 'wat is te laat', dus alleen opmaak hier.

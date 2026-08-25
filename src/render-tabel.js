@@ -2,7 +2,7 @@
 //  RENDER-TABEL — generieke tabel/paginering (thead, tbody, rij-render, paginatie)
 //  Verplaatst uit render-lijsten.js (Batch D / punt 11) — zuivere refactor, geen gedragswijziging.
 // ══════════════════════════════════════
-import { esc, vveCodeSpan, persBadges, subBadge, taakActieKnoppen, offProg, emptyRow, berekenPrioriteit, opvolgStatus, taakTitel, kortDatum, _verschilInKalenderdagen, _vandaagAmsterdam, STIL_DREMPEL_DAGEN, aannSleutel } from "./util.js";
+import { esc, vveCodeSpan, persBadges, subBadge, taakActieKnoppen, offProg, emptyRow, berekenPrioriteit, opvolgStatus, taakTitel, kortDatum, _verschilInKalenderdagen, _vandaagAmsterdam, stilDrempel, aannSleutel } from "./util.js";
 import { SECS, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { bulkGeselecteerd } from "./bulk.js";
@@ -111,7 +111,7 @@ function bepaalStil(r, sec){
   });
   if (!laatst) return null;
   const dagen = _verschilInKalenderdagen(_vandaagAmsterdam(), laatst);
-  return dagen >= STIL_DREMPEL_DAGEN ? dagen : null;
+  return dagen >= stilDrempel(sec) ? dagen : null;
 }
 
 function deadlineCel(r, sec){

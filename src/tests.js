@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { taakTitel, taakVerwijzing, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel, kiesAfgerondRij, filt, splitBehandelaar, persBadges, taakActieKnoppen, voorgesteldeDeadline, DEADLINE_VOORSTEL, DEADLINE_HINT, periodeBereik, AF_PERIODES } from "./util.js";
+import { taakTitel, taakVerwijzing, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, stilDrempel, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel, kiesAfgerondRij, filt, splitBehandelaar, persBadges, taakActieKnoppen, voorgesteldeDeadline, DEADLINE_VOORSTEL, DEADLINE_HINT, periodeBereik, AF_PERIODES } from "./util.js";
 import { verwerkMeldingRijen, toonMeldingen, MAX_TOAST_BURST, _whoSleutel, getCurrentWho } from "./notifications.js";
 import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek, logEvents, renderOntw, openOntwModal, closeOntwModal, submitOntwItem } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM, VELD_LABELS } from "./config.js";
@@ -824,7 +824,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('stil-label: weg bij offerte, blijft bij LOD', (()=>{
     try{
       const vA=state.activeNtd, vOff=D.ntd['OFFERTE-TRAJECTEN'], vLod=D.ntd['LOD'], vLog=D.logboek;
-      const oud=new Date(Date.now()-30*864e5).toISOString(); // ruim over elke stil-drempel
+      const oud=new Date(Date.now()-45*864e5).toISOString(); // ruim over elke stil-drempel (LOD staat op 30)
       D.logboek=[
         {code:'STIL-O',sectie:'OFFERTE-TRAJECTEN',timestamp:oud},
         {code:'STIL-L',sectie:'LOD',timestamp:oud},
@@ -839,6 +839,13 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       return !offHtml.includes('pill-stil') && lodHtml.includes('pill-stil');
     }catch(e){ console.error('stil-pill-test:',e); return false; }
   })());
+
+  // De drempel loopt gelijk met trap 1 van de herinneringsmail, zodat het scherm en de mail
+  // niet los van elkaar iets anders beweren.
+  eq('stil-drempel: per sectie gelijk aan trap 1 van de escalatiemail',
+     ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN'].map(stilDrempel),
+     [7, 14, 21, 30, 21]);
+  eq('stil-drempel: een onbekende sectie valt terug op 7', stilDrempel('BESTAAT-NIET'), 7);
 
   // ── subcategorie cross-list: taak óók in het gekozen scherm tonen (bug #2) ──
   truthy('subcategorie cross-list: taak verschijnt in het gekozen scherm', (()=>{

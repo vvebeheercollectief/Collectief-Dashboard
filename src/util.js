@@ -78,7 +78,6 @@ const PRIO_REGELS = {
   // z'n betekenis.
   'SUBSIDIE-TRAJECTEN': { hoog: 14, midden: 45 },
 };
-const STIL_DREMPEL_DAGEN = 4;
 
 // ══════════════════════════════════════
 //  VOORGESTELDE DEADLINE BIJ EEN NIEUWE TAAK
@@ -137,6 +136,15 @@ const STIL_ESCALATIE_REGELS = {
   'LOD':               { trap1: 30, trap2: 60 },
   'SUBSIDIE-TRAJECTEN': { trap1: 21, trap2: 42 },
 };
+
+// Vanaf hoeveel stille dagen het signaal aangaat, per sectie. Bewust dezelfde getallen als trap 1
+// van STIL_ESCALATIE_REGELS hierboven: de gebruiker krijgt op dag N een herinneringsmail, dus het
+// scherm hoort niet op dag 4 al iets anders te roepen. Een vast getal (4) was op LOD vals alarm:
+// daar geeft de gemeente 90 dagen en komt de mail pas op dag 30.
+function stilDrempel(sec){
+  const reg = STIL_ESCALATIE_REGELS[sec];
+  return (reg && Number.isFinite(reg.trap1)) ? reg.trap1 : 7;
+}
 
 // ══════════════════════════════════════
 //  PERIODEFILTER (Afgerond-pagina)
@@ -553,7 +561,7 @@ function taakVerwijzing(r, sec){
 
 export {
   taakTitel, taakVerwijzing, kortDatum,
-  displayName, filt, splitBehandelaar, PRIO_REGELS, STIL_DREMPEL_DAGEN, STIL_ESCALATIE_REGELS,
+  displayName, filt, splitBehandelaar, PRIO_REGELS, stilDrempel, STIL_ESCALATIE_REGELS,
   DEADLINE_VOORSTEL, DEADLINE_HINT, voorgesteldeDeadline, AF_PERIODES, periodeBereik,
   opvolgStatus, volgendeDeadline, HERHAAL_MAANDEN, _vandaagAmsterdam, isoWeek,
   _verschilInKalenderdagen, berekenPrioriteit, prioBadge, persBadges,

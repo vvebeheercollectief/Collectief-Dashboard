@@ -917,6 +917,82 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     } finally { _zetStilIndex(null); D.logboek = vLog; }
   })();
 
+  // ── Signaal-kolom in de tabel ──
+  (() => {
+    const vA = state.activeNtd, vOpp = D.ntd['OPPAKKEN'], vLog = D.logboek, vPg = pgs.ntd;
+    const vandaag = _vandaagAmsterdam();
+    const dat = n => { const d = new Date(vandaag.getFullYear(), vandaag.getMonth(), vandaag.getDate() + n);
+                       return `${d.getDate()}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`; };
+    try{
+      D.logboek = [{ code:'SIGT-1', sectie:'OPPAKKEN', timestamp:new Date(Date.now()-20*864e5).toISOString() }];
+      D.ntd['OPPAKKEN'] = [
+        { code:'SIGT-1', naam:'VvE Signaal Een', actiepunt:'x', deadline:dat(-45),
+          opvolgdatum:dat(0), behandelaar:'Jer', opmerkingen:'', inBehandeling:'TRUE',
+          _sec:'OPPAKKEN', _row:9701 },
+        { code:'SIGT-2', naam:'VvE Signaal Twee', actiepunt:'y', deadline:dat(30),
+          opvolgdatum:'', behandelaar:'Cihad', opmerkingen:'', inBehandeling:'',
+          _sec:'OPPAKKEN', _row:9702 },
+      ];
+      pgs.ntd = 1; setNtd('OPPAKKEN');
+
+      const rij1 = document.querySelector('#ntd-tbody tr[data-row="9701"]');
+      const rij2 = document.querySelector('#ntd-tbody tr[data-row="9702"]');
+      const sig1 = rij1 && rij1.querySelector('.cell-sig');
+
+      truthy('signaalkolom: de rij wordt getekend', !!rij1 && !!rij2);
+      truthy('signaalkolom: er is een signaal-cel', !!sig1);
+      eq('signaalkolom: de zwaarste melding staat groot',
+         sig1 ? (sig1.querySelector('.sig-hoofd')||{}).textContent : null, 'Te laat (45d)');
+      eq('signaalkolom: de tweede melding staat klein erachter',
+         sig1 ? (sig1.querySelector('.sig-bij')||{}).textContent : null, 'Vandaag opvolgen');
+      truthy('signaalkolom: de derde melding staat in de title',
+             !!sig1 && sig1.getAttribute('title').includes('20d stil'));
+      eq('signaalkolom: de cel is een snelkoppeling naar wegleggen',
+         sig1 ? sig1.dataset.action : null, 'taak-wegleggen');
+      eq('signaalkolom: het rid van de cel wijst naar dezelfde taak als de rij',
+         sig1 ? sig1.dataset.rid : null, rij1 ? rij1.dataset.rid : undefined);
+      eq('signaalkolom: een rustige rij heeft een lege signaal-cel',
+         rij2 ? rij2.querySelector('.cell-sig').textContent.trim() : null, '');
+
+      // Elke rij zet precies EEN ingang in _rowCache; signaalCel mag er geen tweede bij pushen.
+      // Math.abs omdat de twee rijen in verschillende groepen vallen (rij2 is 'actief', rij1
+      // staat onder 'In behandeling') en dus in die volgorde getekend worden.
+      eq('signaalkolom: één rid per rij, niet twee',
+         Math.abs(Number(rij2.dataset.rid) - Number(rij1.dataset.rid)), 1);
+
+      // Koppen en cellen moeten gelijk lopen.
+      eq('signaalkolom: evenveel koppen als cellen',
+         [document.querySelectorAll('#ntd-thead th').length,
+          rij1.querySelectorAll('td').length], [8, 8]);
+      eq('signaalkolom: Signaal staat op de derde plek',
+         [...document.querySelectorAll('#ntd-thead th')]
+           .map(t => t.textContent.trim().replace(/[▲▼]$/, ''))[2], 'Signaal');
+
+      // De deadline-kolom is neutraal geworden: geen 'Te laat' meer, alleen een datum.
+      const dlCel = rij1.querySelectorAll('td')[4];
+      truthy('signaalkolom: de deadline-kolom noemt geen "Te laat" meer',
+             !!dlCel && !dlCel.textContent.includes('Te laat'));
+      eq('signaalkolom: de deadline-kolom is nog wel een datum',
+         !!dlCel && dlCel.textContent.trim() === dat(-45), true);
+
+      // Het rode waas over te late rijen blijft: op een telefoon is dat het enige teken.
+      truthy('signaalkolom: het rode waas over te late rijen blijft staan',
+             rij1.classList.contains('row-telaat'));
+
+      // De oude klassenamen blijven bestaan als betekenisdrager.
+      truthy('signaalkolom: de oude klassenamen staan nog in de cel',
+             !!sig1.querySelector('.s-telaat') && !!sig1.querySelector('.pill-opvolg'));
+
+      // Offerte en subsidie blijven zoals ze waren.
+      setNtd('SUBSIDIE-TRAJECTEN');
+      eq('signaalkolom: subsidie houdt zes koppen en krijgt er géén',
+         [...document.querySelectorAll('#ntd-thead th')].length, 7);
+    } finally {
+      if (vOpp === undefined) delete D.ntd['OPPAKKEN']; else D.ntd['OPPAKKEN'] = vOpp;
+      D.logboek = vLog; state.activeNtd = vA; pgs.ntd = vPg; setNtd(vA);
+    }
+  })();
+
   // ── subcategorie cross-list: taak óók in het gekozen scherm tonen (bug #2) ──
   truthy('subcategorie cross-list: taak verschijnt in het gekozen scherm', (()=>{
     try{

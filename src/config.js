@@ -51,16 +51,16 @@ export const TEAM = [...new Set(Object.values(EMAIL_NAMES))];
 
 export const SECS = {
   OPPAKKEN:{label:'Oppakken',css:'--sec:var(--ac);--sec-l:var(--ac-l);--sec-b:var(--ac-b)',color:'#0D7377',
-    cols:['VvE Code','VvE','Actiepunt','Deadline','Behandelaar','Opmerkingen'],
+    cols:['VvE Code','VvE','Signaal','Actiepunt','Deadline','Wie','Opmerkingen'],
     keys:['code','naam','actiepunt','deadline','behandelaar','prioriteit','opmerkingen','inBehandeling']},
   VERGADERVERZOEKEN:{label:'Vergaderverzoeken',css:'--sec:var(--am);--sec-l:var(--am-l);--sec-b:var(--am-b)',color:'#B45309',
-    cols:['VvE Code','VvE','Periode','Agendapunten','Behandelaar','Deadline uitschr.','Opmerkingen'],
+    cols:['VvE Code','VvE','Signaal','Periode','Agendapunten','Wie','Deadline uitschr.','Opmerkingen'],
     keys:['code','naam','periode','agendapunten','behandelaar','deadline','opmerkingen','inBehandeling']},
   'OFFERTE-TRAJECTEN':{label:'Offerte-trajecten',css:'--sec:var(--pu);--sec-l:var(--pu-l);--sec-b:var(--pu-b)',color:'#6D5BD0',
     cols:['VvE Code','VvE','Datum aangevr.','Ontvangen/Aangevr.','Behandelaar','Deadline','Opmerkingen'],
     keys:['code','naam','datumAangevraagd','offertes','behandelaar','deadline','opmerkingen']},
   LOD:{label:'LOD',css:'--sec:var(--rd);--sec-l:var(--rd-l);--sec-b:var(--rd-b)',color:'#B91C1C',
-    cols:['VvE Code','VvE','Actiepunt','Status','Behandelaar','Deadline LOD','Opmerkingen'],
+    cols:['VvE Code','VvE','Signaal','Actiepunt','Status','Wie','Deadline LOD','Opmerkingen'],
     keys:['code','naam','actiepunt','status','behandelaar','deadline','opmerkingen','inBehandeling']},
   // Subsidie-trajecten (2026-07-29). Zelfde kolomstramien als LOD, met 'Status'
   // vervangen door 'Fase'. Twee dingen liggen hier vast en mogen niet losjes wijzigen:
@@ -91,12 +91,12 @@ export const SECS = {
 export const VELD_LABELS = {
   'OPPAKKEN': {
     code:'VvE Code', naam:'VvE', actiepunt:'Actiepunt', deadline:'Deadline',
-    behandelaar:'Behandelaar', prioriteit:'Prioriteit', opmerkingen:'Opmerkingen',
+    behandelaar:'Wie', prioriteit:'Prioriteit', opmerkingen:'Opmerkingen',
     inBehandeling:'In behandeling',
   },
   'VERGADERVERZOEKEN': {
     code:'VvE Code', naam:'VvE', periode:'Periode', agendapunten:'Agendapunten',
-    behandelaar:'Behandelaar', deadline:'Deadline uitschr.', opmerkingen:'Opmerkingen',
+    behandelaar:'Wie', deadline:'Deadline uitschr.', opmerkingen:'Opmerkingen',
     inBehandeling:'In behandeling',
   },
   'OFFERTE-TRAJECTEN': {
@@ -106,7 +106,7 @@ export const VELD_LABELS = {
   },
   'LOD': {
     code:'VvE Code', naam:'VvE', actiepunt:'Actiepunt', status:'Status',
-    behandelaar:'Behandelaar', deadline:'Deadline LOD', opmerkingen:'Opmerkingen',
+    behandelaar:'Wie', deadline:'Deadline LOD', opmerkingen:'Opmerkingen',
     inBehandeling:'In behandeling',
   },
   'SUBSIDIE-TRAJECTEN': {

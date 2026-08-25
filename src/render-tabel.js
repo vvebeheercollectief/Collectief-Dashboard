@@ -16,6 +16,10 @@ import { bundelKopExtra, bundelPaneelHtml, bundelMerkje, STAPEL_GREEP } from "./
 // Zie de toelichting bij het gebruik in rowNtd().
 const GEEN_STIL_PILL = ['OFFERTE-TRAJECTEN', 'SUBSIDIE-TRAJECTEN'];
 
+// De secties met een eigen Signaal-kolom. Offerte en subsidie staan er bewust niet bij: daar kan
+// 'stil' per ontwerp niet voorkomen en zou de kolom vrijwel elke rij leeg blijven.
+const HEEFT_SIGNAAL_KOLOM = ['OPPAKKEN', 'VERGADERVERZOEKEN', 'LOD'];
+
 // ══════════════════════════════════════
 //  TABLE HELPERS
 // ══════════════════════════════════════
@@ -165,10 +169,43 @@ function signaalDelen(r, sec){
   return uit;
 }
 
+// Eén cel met de zwaarste melding groot en de tweede klein en gedempt erachter. Een derde
+// melding past niet en staat alleen in de title - dat is een bewuste keuze: liever één ding dat
+// opvalt dan drie die elkaar verdringen (dat was precies het probleem dat deze kolom oplost).
+//
+// `rid` komt van de aanroeper en wordt hier NIET opnieuw gemaakt: rowNtd zet één rid per rij die
+// gedeeld wordt met de knoppen, het bulk-vinkje en de fase-bolletjes. Een tweede push naar
+// state._rowCache zou de indexOf in crud.js laten verspringen.
+//
+// De hele cel draagt data-action="taak-wegleggen". Vandaag heeft 'Te laat' als enige signaal géén
+// actie, waardoor juist de rijen die het hardst een opvolgdatum nodig hebben die snelweg missen.
+// Zonder data-action zou de cel bovendien de rij-uitklapper van main.js aanspreken.
+function signaalCel(r, sec, rid){
+  const delen = signaalDelen(r, sec);
+  if(!delen.length) return `<td class="cell-sig"></td>`;
+  const eerste = delen[0];
+  const tweede = delen[1];
+  const titel = delen.map(d => d.tekst).join(' · ');
+  const bij = tweede ? `<span class="sig-bij ${tweede.cls}">${esc(tweede.tekst)}</span>` : '';
+  return `<td class="cell-sig" data-action="taak-wegleggen" data-rid="${rid}" title="${esc(titel)}">`
+       + `<span class="sig sig-${eerste.kleur}">`
+       + `<span class="sig-dot" aria-hidden="true"></span>`
+       + `<span class="sig-hoofd ${eerste.cls}">${esc(eerste.tekst)}</span>`
+       + `${bij}</span></td>`;
+}
+
+// De deadline-kolom is een DATUM, meer niet. 'Te laat' en 'bijna te laat' zijn naar de
+// signaal-kolom verhuisd; ze hier óók tonen zou de melding weer op twee plekken zetten.
+// Alleen op de secties zónder signaal-kolom (offerte, subsidie) blijft de oude kleuring staan,
+// want daar is de deadline-kolom de enige plek waar urgentie kan staan.
 function deadlineCel(r, sec){
+  if (HEEFT_SIGNAAL_KOLOM.includes(sec)){
+    return r.deadline
+      ? `<td><span class="s-normal">${esc(r.deadline)}</span></td>`
+      : `<td class="cell-sm"><span class="warn-geen-deadline geen-dl-dof">Geen deadline</span></td>`;
+  }
   if (!r.deadline) return `<td class="cell-sm"><span class="warn-geen-deadline">Geen deadline</span></td>`;
   const { teLaat, dagenTot } = berekenPrioriteit(r.deadline, sec);
-  // V3: status als gewoon vetgedrukt woord, geen pill
   if (teLaat) return `<td><span class="s-telaat">Te laat (${Math.abs(dagenTot)}d)</span></td>`;
   const soon = dagenTot !== null && dagenTot <= BIJNA_TE_LAAT_DAGEN;
   return `<td><span class="${soon ? 's-soon' : 's-normal'}">${esc(r.deadline)}</span></td>`;
@@ -243,19 +280,21 @@ function rowNtd(r,sec){
   switch(sec){
     case'OPPAKKEN':
       cells=`<td>${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
-        <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}${bdlNaam}</td>
-        <td class="cell-txt"><span class="ct" title="${esc(r.actiepunt)}">${esc(r.actiepunt)}</span>${extraPills}</td>
+        <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie, sec)}${bdlNaam}</td>
+        ${signaalCel(r, sec, rid)}
+        <td class="cell-txt"><span class="ct" title="${esc(r.actiepunt)}">${esc(r.actiepunt)}</span></td>
         ${deadlineCel(r, 'OPPAKKEN')}
-        <td>${persBadges(r.behandelaar)}</td>
+        <td>${persBadges(r.behandelaar, true)}</td>
         <td class="cell-note"><span class="ct" title="${esc(r.opmerkingen||'')}">${esc(r.opmerkingen||'')}</span></td>
         <td>${editBtn}</td>`;
       break;
     case'VERGADERVERZOEKEN':
       cells=`<td>${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
-        <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}${bdlNaam}</td>
+        <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie, sec)}${bdlNaam}</td>
+        ${signaalCel(r, sec, rid)}
         <td><span class="badge" style="background:var(--am-l);color:var(--am)">${esc(r.periode||r.agendapunten||'')}</span></td>
-        <td class="cell-txt"><span class="ct" title="${esc(r.agendapunten||r.actiepunt||'')}">${esc(r.agendapunten||r.actiepunt||'')}</span>${extraPills}</td>
-        <td>${persBadges(r.behandelaar)}</td>
+        <td class="cell-txt"><span class="ct" title="${esc(r.agendapunten||r.actiepunt||'')}">${esc(r.agendapunten||r.actiepunt||'')}</span></td>
+        <td>${persBadges(r.behandelaar, true)}</td>
         ${deadlineCel(r, 'VERGADERVERZOEKEN')}
         <td class="cell-note"><span class="ct" title="${esc(r.opmerkingen||'')}">${esc(r.opmerkingen||'')}</span></td>
         <td>${editBtn}</td>`;
@@ -272,10 +311,11 @@ function rowNtd(r,sec){
       break;
     case'LOD':
       cells=`<td>${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
-        <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}${bdlNaam}</td>
-        <td class="cell-txt"><span class="ct" title="${esc(r.actiepunt||'')}">${esc(r.actiepunt||'')}</span>${extraPills}</td>
+        <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie, sec)}${bdlNaam}</td>
+        ${signaalCel(r, sec, rid)}
+        <td class="cell-txt"><span class="ct" title="${esc(r.actiepunt||'')}">${esc(r.actiepunt||'')}</span></td>
         <td class="cell-txt" style="font-style:italic"><span class="ct" title="${esc(r.status||'')}">${esc(r.status||'')}</span></td>
-        <td>${persBadges(r.behandelaar)}</td>
+        <td>${persBadges(r.behandelaar, true)}</td>
         ${deadlineCel(r, 'LOD')}
         <td class="cell-note"><span class="ct" title="${esc(r.opmerkingen||'')}">${esc(r.opmerkingen||'')}</span></td>
         <td>${editBtn}</td>`;

@@ -288,7 +288,7 @@
     .cell-name>.ct{max-width:160px}
     .cell-txt>.ct{max-width:350px}
     .cell-note>.ct{max-width:155px}
-    tr.expanded .cell-name,tr.expanded .cell-txt,tr.expanded .cell-note{white-space:normal}
+    tr.expanded .cell-name,tr.expanded .cell-txt,tr.expanded .cell-note,tr.expanded .cell-sig{white-space:normal}
     tr.expanded .cell-name>.ct,tr.expanded .cell-txt>.ct,tr.expanded .cell-note>.ct{display:inline;max-width:none;white-space:normal;overflow:visible;text-overflow:clip}
     .cell-sm{font-size:12.5px;color:#48505c;white-space:nowrap}
     /* Actiekolom blijft in beeld (v8.9). De takentabel is breder dan het venster, waardoor
@@ -343,6 +343,37 @@
        gezet. De eerste bleef daardoor op #4b5563 staan: 1,76:1 op de donkere achtergrond. */
     [data-theme=dark] .pill-stil,[data-theme=dark] .pill-snooze{color:#9ca3af}
     tr.snooze-row td{opacity:.55}
+    /* ── Signaal-kolom ──────────────────────────────────────────────────────
+       Eén cel per rij met de zwaarste melding. De kleur zit op de wikkel `.sig-*`, zodat
+       bolletje en tekst niet los van elkaar kunnen gaan lopen. */
+    .cell-sig{white-space:nowrap;cursor:pointer;vertical-align:middle}
+    .sig{display:inline-flex;align-items:baseline;gap:7px}
+    .sig-dot{width:7px;height:7px;border-radius:50%;flex:none;align-self:center}
+    .sig-hoofd{font-size:12px;font-weight:600}
+    .sig-bij{font-size:11px;font-weight:500;color:var(--fnt)}
+    /* --prio (baksteen) en niet --rd: op de LOD-tab is --rd óók de tabkleur, en dan valt een
+       rood bolletje juist niet meer op. */
+    .sig-crit{color:var(--prio)}      .sig-crit .sig-dot{background:var(--prio)}
+    .sig-warn{color:var(--am)}        .sig-warn .sig-dot{background:var(--am)}
+    .sig-warn-dof{color:var(--mut)}   .sig-warn-dof .sig-dot{background:var(--am-b)}
+    .sig-dof{color:var(--mut)}        .sig-dof .sig-dot{background:var(--bor-input)}
+    /* Binnen de signaal-cel dragen de oude klassenamen alleen nog BETEKENIS, geen opmaak: negen
+       toetsen zoeken op die namen, en zo staat op één plek welke klasse bij welk signaal hoort.
+       Zonder deze regel zouden ze hier als pil mét vlak terugkomen - precies wat we weghalen.
+       Dit hele blok staat bewust ná `[data-theme=dark] .pill-stil,.pill-snooze` hierboven: die
+       heeft precies dezelfde specificiteit (0,2,0), dus bij gelijke stand wint de laatste. Stond
+       het blok ervóór, dan hield een 'stil'- of 'weggelegd'-signaal in de donkere modus alsnog
+       zijn eigen pil-kleur en liep die uit de pas met het bolletje ernaast. */
+    .cell-sig .pill-stil,.cell-sig .pill-opvolg,.cell-sig .pill-snooze,
+    .cell-sig .s-telaat,.cell-sig .s-soon{
+      background:none;color:inherit;padding:0;margin:0;border-radius:0;
+      font-size:inherit;font-weight:inherit;font-family:inherit;
+    }
+    /* tr.snooze-row td{opacity:.55} dempt élke cel; het signaal is juist de reden dat de rij daar
+       staat en moet leesbaar blijven. Hogere specificiteit, dus deze wint. */
+    tr.snooze-row .cell-sig{opacity:1}
+    /* 'Geen deadline' is geen urgentie meer nu die in de signaal-kolom staat: grijs i.p.v. amber. */
+    .warn-geen-deadline.geen-dl-dof{color:var(--fnt)}
     /* Eén kleur haalt het hier niet in beide thema's: de strook is licht (#f5f7f9) én donker
        (#1c2026). Op #7c8694 kwam de kop uit op 3,43:1 in licht en 4,44:1 in donker; 11,5px
        hoofdletters vragen 4,5:1. Vandaar per thema een eigen waarde, zoals bij de pillen. */

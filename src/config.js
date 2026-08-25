@@ -77,7 +77,7 @@ export const SECS = {
     keys:['code','naam','actiepunt','deadline','behandelaar','prioriteit','opmerkingen','inBehandeling']},
   VERGADERVERZOEKEN:{label:'Vergaderverzoeken',css:'--sec:var(--am);--sec-l:var(--am-l);--sec-b:var(--am-b)',color:'#B45309',
     cols:['VvE Code','VvE','Signaal','Periode','Agendapunten','Wie','Deadline uitschr.','Opmerkingen'],
-                   breedtes:[7,16,10,8,25,5,9,12,8],
+                   breedtes:[7,16,10,8,22,5,9,15,8],
     keys:['code','naam','periode','agendapunten','behandelaar','deadline','opmerkingen','inBehandeling']},
   'OFFERTE-TRAJECTEN':{label:'Offerte-trajecten',css:'--sec:var(--pu);--sec-l:var(--pu-l);--sec-b:var(--pu-b)',color:'#6D5BD0',
     cols:['VvE Code','VvE','Datum aangevr.','Ontvangen/Aangevr.','Behandelaar','Deadline','Opmerkingen'],
@@ -98,7 +98,7 @@ export const SECS = {
   // de gebruiker koos zes kolommen om de rij rustig te houden.
   'SUBSIDIE-TRAJECTEN':{label:'Subsidie-trajecten',css:'--sec:var(--tl);--sec-l:var(--tl-l);--sec-b:var(--tl-b)',color:'#0F766E',
     cols:['VvE Code','VvE','Subsidie','Fase','Behandelaar','Deadline'],
-                   breedtes:[8,22,18,20,9,10,13],
+                   breedtes:[8,24,17,15,9,10,13],
     keys:['code','naam','subsidie','subsidieFase','behandelaar','deadline','opmerkingen','inBehandeling']},
 };
 

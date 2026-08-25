@@ -284,7 +284,9 @@ function splitBehandelaar(v){
 // De korte code van een behandelaar voor de takentabel. Eerst de vaste lijst uit config.js; staat
 // de naam daar niet in (een stagiair, een oud-collega die nog in de data zit), dan de beginletter,
 // maar ALLEEN als geen enkele bestaande code die letter al bezet. Anders de volle naam: twee
-// mensen onder hetzelfde teken is erger dan een brede chip.
+// mensen onder hetzelfde teken is erger dan een brede chip. Let op: die bewaking kijkt naar de
+// VASTE LIJST, niet naar de data — twee onbekende namen met dezelfde beginletter ('Stagiair' en
+// 'Sanne') worden allebei 'S'. Wie vast in beeld komt, hoort in KORTE_NAMEN te staan.
 function korteNaam(naam){
   const n = String(naam || '').trim();
   if(!n) return '';
@@ -295,8 +297,10 @@ function korteNaam(naam){
   return bezet.has(letter.toLowerCase()) ? n : letter;
 }
 
-// `kort` alleen aanzetten waar breedte echt knelt: de takentabel. Het VvE-dossier, de
-// Afgerond-lijst, Analytics en de Ontwikkeling-pagina houden de volle naam — daar is ruimte
+// `kort` alleen aanzetten waar breedte echt knelt: de drie tabbladen met een Signaal-kolom
+// (Oppakken, Vergaderverzoeken, LOD). Alle andere plekken houden de volle naam — dus óók
+// Offerte-trajecten en Subsidie-trajecten, die in dezelfde takentabel staan maar buiten dit
+// ontwerp vielen, plus het VvE-dossier, de Afgerond-lijst, Analytics en de Ontwikkeling-pagina — daar is ruimte
 // genoeg en leest een code alleen maar als een raadsel. De volle naam blijft in de title staan,
 // zodat hij overal met de muis terug te vinden is.
 function persBadges(v, kort){

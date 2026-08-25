@@ -1639,12 +1639,19 @@ tr.stapel-doel>td{background:var(--sec-l,var(--ac-l))!important;
 .stapel-h:active{cursor:grabbing}
 /* Het handvat gebruik je zelden maar het staat op élke rij. Het verschijnt daarom pas als je de
    rij aanwijst — slepen werkt precies zoals het werkte, alleen de rustige lijst wint erbij.
-   :focus-visible staat er nadrukkelijk bij: wie met het toetsenbord navigeert moet hem zien. */
+   :focus-visible staat er alvast bij, maar kan vandaag niet matchen: STAPEL_GREEP is een <span>
+   met aria-hidden en zonder tabindex, dus hij krijgt nooit focus. Zodra herordenen met het
+   toetsenbord bestaat, is die regel er al en hoeft niemand eraan te denken. */
 #ntd-tbody .stapel-h{opacity:0;transition:opacity var(--tr-fast)}
 #ntd-tbody tr:hover .stapel-h,
 #ntd-tbody .stapel-h:focus-visible{opacity:1}
 /* Een aanraakscherm kent geen hover: daar zou het handvat onbereikbaar worden. Halfdoorzichtig
    i.p.v. onzichtbaar, precies zoals `.log-acts` (regel 745) dat al doet. */
+/* Tijdens het slepen matcht `tr:hover` de BRONrij niet meer zodra de aanwijzer naar de doelrij
+   beweegt: de greep die je op dat moment vasthoudt zou dan wegvallen. Het gebaar loopt gewoon door
+   (bundel-acties.js volgt de pointer, niet de opmaak), maar zien verdwijnen wat je vasthoudt is
+   verwarrend. */
+#ntd-tbody tr.sleep .stapel-h{opacity:1}
 @media(hover:none){#ntd-tbody .stapel-h{opacity:.5}}
 /* Zelfde aanraakhalo-truc als bij `.bdl-h`: het handvat meet 16 × 14 px (gemeten) en is als
    aanraakdoel dus te klein — richtlijn is 24px+. Het gebied groeit met een pseudo-element in plaats

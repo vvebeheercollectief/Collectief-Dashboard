@@ -20,10 +20,10 @@ import { esc, taakTitel, taakVerwijzing, kortDatum, taakActieKnoppen, opvolgStat
 import { SECS } from "./config.js";
 import { wordtGeabsorbeerd, bundelSleutel, bundelStand, bundelVerwijzing } from "./bundel.js";
 // LET OP — dit is een KRINGETJE: render-tabel.js importeert hierboven al uit render-bundel.js.
-// ES-modules kunnen dat aan zolang `signaalDelen` pas bij het RENDEREN wordt aangeroepen en niet
-// tijdens het laden van deze module: functie-declaraties worden bij het koppelen al klaargezet,
-// waarden op modulehoogte pas bij het uitvoeren. Roep hem hier dus nooit buiten een functie aan —
-// dan hangt het van de laadvolgorde af of je een werkende functie of een crash krijgt.
+// ES-modules kunnen dat aan. Let op WAAROM: een functie-DECLARATIE is bij het koppelen al
+// klaargezet, dus zelfs een aanroep op modulehoogte zou werken. Het gevaar zit in de omgekeerde
+// richting: zodra `signaalDelen` een `const` wordt, of render-tabel.js iets van hier op
+// modulehoogte gaat gebruiken, klapt de kringloop om. Houd beide dus binnen functielichamen.
 import { signaalDelen } from "./render-tabel.js";
 import { ico } from "./icons.js";
 import { state } from "./state.js";
@@ -136,9 +136,22 @@ function subRegel(m, i){
   // bron als de rij (signaalDelen), zodat 'vandaag' en 'stil' hier en daar hetzelfde betekenen.
   // De deadline en 'weggelegd' worden hieronder al door dlTekst en snoozePil getekend; die twee
   // slaan we hier over om ze niet dubbel te zetten.
+  // Alleen 'vandaag opvolgen' en 'stil': de deadline en 'te laat' staan hieronder al in dlTekst en
+  // 'weggelegd' in snoozePil. Zonder dit filter komt 'Te laat (Nd)' twee keer in dezelfde regel te
+  // staan — met de datum ernaast, en bij een weggelegde subtaak drie datums achter elkaar.
+  //
+  // 'Bijna te laat' laten we hier bewust weg: de meta-regel toont de datum al voluit ("Oppakken ·
+  // 28 aug"), dus een aftelling erbij zegt niets nieuws. Dat is het ENE verschil met de tabelrij,
+  // waar de datum juist neutraal is en de aftelling het signaal draagt.
+  //
+  // Dezelfde data-action als in de tabel (render-tabel.js): een pil met een wijzende hand die
+  // nergens op reageert is de vierde variant die dit bestand niet moet krijgen — snoozePil hier
+  // draagt zijn actie wél, en styles.css legt bij .cell-sig uit waarom een hand zonder actie fout is.
+  const PANEEL_ACTIE = { vandaag:'taak-wegleggen', stil:'taak-bewerken' };
   const paneelSignalen = signaalDelen(r, r._sec)
-    .filter(d => d.soort === 'vandaag' || d.soort === 'stil')
-    .map(d => `<span class="${d.cls}" title="${esc(d.tekst)}">${esc(d.tekst)}</span>`)
+    .filter(d => PANEEL_ACTIE[d.soort])
+    .map(d => `<span class="${d.cls}" data-action="${PANEEL_ACTIE[d.soort]}" data-rid="${rid}"`
+             + ` title="${esc(d.tekst)}">${esc(d.tekst)}</span>`)
     .join('');
   // LET OP — de gelijkloop met de tabel is inhoudelijk hersteld, maar de PLAATS verschilt bewust.
   // De tabelrij heeft sinds de Signaal-kolom één signaal-cel en houdt in de deadline-kolom een
@@ -154,7 +167,7 @@ function subRegel(m, i){
   // rij te zien was die dat liet zien. Eén bron voor 'wat is te laat', dus alleen opmaak hier.
   const prio = berekenPrioriteit(r.deadline, r._sec);
   const dlTekst = !r.deadline
-    ? `<span class="warn-geen-deadline">Geen deadline</span>`
+    ? `<span class="warn-geen-deadline geen-dl-dof">Geen deadline</span>`
     : (prio.teLaat ? `<span class="s-telaat">Te laat (${Math.abs(prio.dagenTot)}d)</span>`
                    : esc(kortDatum(r.deadline)));
   // Het handvat is voor een schermlezer verborgen: het draagt geen eigen actie, alleen een

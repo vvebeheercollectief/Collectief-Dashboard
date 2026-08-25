@@ -97,6 +97,13 @@ function bouwStilIndex(logboek, sec){
     const v = m.get(e.code);
     if (v) v.push(e); else m.set(e.code, [e]);
   });
+  // De index draagt zijn eigen sectie mee. bepaalStil mag hem namelijk alleen gebruiken voor
+  // rijen ván die sectie: hij is gefilterd op `e.sectie`, dus de logregels van een taak uit een
+  // ándere sectie zitten er niet in. Zonder deze stempel las het bundelpaneel — waar een subtaak
+  // uit Oppakken onder een kop uit Vergaderverzoeken kan hangen — een lege trefferlijst en bleef
+  // 'stil' daar altijd uit. Gemeten: index voor VERGADERVERZOEKEN gaf geen pil, index voor
+  // OPPAKKEN gaf '20d stil' voor dezelfde subtaak.
+  m.sectie = sec || null;
   return m;
 }
 
@@ -108,7 +115,10 @@ const _zetStilIndex = ix => { _stilIndex = ix || null; };
 function bepaalStil(r, sec){
   if (opvolgStatus(r).weggelegd) return null; // weggelegd = bewust geparkeerd, niet stil (Fase 4)
   if (r.inBehandeling !== 'TRUE') return null;
-  const entries = _stilIndex
+  // De index alleen gebruiken als hij VOOR DEZE SECTIE gebouwd is. Anders terugvallen op de
+  // volledige scan: langzamer, maar een lege trefferlijst uit de verkeerde index zou stil
+  // 'geen activiteit' betekenen, en dat is precies het signaal dat we niet mogen missen.
+  const entries = (_stilIndex && (!sec || !_stilIndex.sectie || _stilIndex.sectie === sec))
     ? (_stilIndex.get(r.code) || [])
     : (D.logboek || []).filter(e => e.code === r.code && (!sec || !e.sectie || e.sectie === sec));
   if (!entries.length) return null; // geen activiteit-data → niet markeren

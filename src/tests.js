@@ -565,6 +565,10 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('subbadge: een afwijkende subcategorie blijft staan',
      subBadge('Offerte-trajecten', 'OPPAKKEN').includes('Offerte-trajecten'));
   eq('subbadge: leeg blijft leeg', subBadge('', 'OPPAKKEN'), '');
+  // De subcategorie komt uit de Sheet en is dus half-vertrouwd. Zonder deze regel overleeft
+  // `esc(t)` -> `t` alle andere toetsen: precies het soort stille fout waarvoor taak 6 bestond.
+  truthy('subbadge: een tekst met < wordt geëscaped',
+     subBadge('<x>', 'OPPAKKEN').includes('&lt;x&gt;'));
   truthy('subbadge: zonder sectie gedraagt hij zich als vanouds',
      subBadge('Oppakken').includes('Oppakken'));
 
@@ -5195,6 +5199,57 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
            !!regelVan(vandaagHost,'Tvandaag').querySelector('.pill-opvolg'));
     truthy('bundelpaneel: een rustige subtaak krijgt géén opvolg-melding',
            !regelVan(vandaagHost,'Tb').querySelector('.pill-opvolg'));
+    // Dezelfde actie als in de tabel. Een pil met een wijzende hand die nergens op reageert is de
+    // enige variant die dit bestand niet moet krijgen; snoozePil hierboven eist die pariteit al.
+    eq('bundelpaneel: de opvolg-pil opent hetzelfde wegleg-venster als in de tabel',
+       (regelVan(vandaagHost,'Tvandaag').querySelector('.pill-opvolg')||{}).dataset?.action,
+       'taak-wegleggen');
+
+    // 3c-ter. STIL. Zonder deze toetsen overleefde de hele 'stil'-tak elke mutatie: haal hem uit
+    //     het filter en er viel geen enkele regel om, terwijl 'stil' in de taaktitel staat.
+    //     Twee dingen worden hier vastgelegd die allebei apart mis kunnen gaan:
+    //       1. dat 'stil' überhaupt in het paneel verschijnt;
+    //       2. dat hij dat ook doet als de bundel twee SECTIES overspant. De opzoeklijst wordt
+    //          gebouwd voor de sectie van de TABEL, dus een subtaak uit Oppakken onder een kop uit
+    //          Vergaderverzoeken viel er stil uit en kreeg nooit een pil. Gemeten vóór de fix:
+    //          index voor VERGADERVERZOEKEN gaf niets, index voor OPPAKKEN gaf '20d stil'.
+    (() => {
+      const vLog = D.logboek;
+      try{
+        const stilSub = t('Tstil','Tkop','30','OPPAKKEN','Ligt stil');
+        stilSub.inBehandeling = 'TRUE';
+        D.logboek = [{ code: stilSub.code, sectie:'OPPAKKEN',
+                       timestamp: new Date(Date.now() - 20*864e5).toISOString() }];
+        // a. Zonder index (losse render): het gewone pad.
+        _zetStilIndex(null);
+        const losHost = paneelMet(stilSub);
+        truthy('bundelpaneel: een subtaak die stil ligt zegt dat ook',
+               !!regelVan(losHost,'Tstil').querySelector('.pill-stil'));
+        eq('bundelpaneel: … en opent hetzelfde bewerkscherm als in de tabel',
+           (regelVan(losHost,'Tstil').querySelector('.pill-stil')||{}).dataset?.action,
+           'taak-bewerken');
+        truthy('bundelpaneel: een subtaak zonder logboekregels ligt niet stil',
+               !regelVan(losHost,'Tb').querySelector('.pill-stil'));
+        // b. Mét een index die voor een ÁNDERE sectie gebouwd is — de echte renderpad van een
+        //    bundel die twee tabbladen overspant. Die mag het signaal niet laten verdwijnen.
+        _zetStilIndex(bouwStilIndex(D.logboek, 'VERGADERVERZOEKEN'));
+        const kruisHost = paneelMet(stilSub);
+        truthy('bundelpaneel: stil blijft staan als de bundel twee tabbladen overspant',
+               !!regelVan(kruisHost,'Tstil').querySelector('.pill-stil'));
+      } finally { _zetStilIndex(null); D.logboek = vLog; }
+    })();
+
+    // 3c-quater. Het FILTER zelf. Zonder hem zet paneelSignalen 'Te laat (Nd)' een tweede keer
+    //     neer, naast de meta-regel die hem al toont — en bij een weggelegde subtaak drie datums
+    //     achter elkaar. Beide bestaande toetsen bleven daarbij groen, want querySelector pakt de
+    //     eerste treffer en die had toevallig dezelfde tekst.
+    (() => {
+      const laatSub2 = t('Tdubbel','Tkop','30','OPPAKKEN','Al lang te laat');
+      laatSub2.deadline = '1-1-2020';
+      const regel = regelVan(paneelMet(laatSub2), 'Tdubbel');
+      eq('bundelpaneel: "te laat" staat precies één keer in de regel',
+         regel.querySelectorAll('.s-telaat').length, 1);
+    })();
 
     // 3d. Te laat. De meta-regel toonde een KALE datum, terwijl de tabelrij via `deadlineCel` een
     //     'Te laat (Xd)' neerzet. Omdat `absorbeer` de rij uit de vlakke lijst haalt, was er binnen
@@ -6552,10 +6607,26 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
           st.textContent = '*{transition:none !important}';  // anders meet je halverwege de overgang
           document.head.appendChild(st);
           try{
-            const greep = document.querySelector('#ntd-tbody .stapel-h');
-            truthy('handvat: er staat een sleep-handvat in de tabel', !!greep);
-            if(greep) eq('handvat: onzichtbaar zolang je de rij niet aanwijst',
-                         getComputedStyle(greep).opacity, '0');
+            const handvat = document.querySelector('#ntd-tbody .stapel-h');
+            truthy('handvat: er staat een sleep-handvat in de tabel', !!handvat);
+            // NIET getComputedStyle: dat leest de HOVER-stand mee, en die hangt af van waar de
+            // fysieke muis van de gebruiker toevallig ligt. Blijft de aanwijzer na een klik boven
+            // de eerste rij hangen, dan meet je '1' en staat er een rode regel die niets met de
+            // code te maken heeft. Dit is de enige plek in de suite die van :hover zou afhangen.
+            // De regels zelf toetsen is deterministisch én dekt méér: de mutatie 'haal de
+            // hover-regel weg' overleefde de meting wél en laat een handvat achter dat op de
+            // desktop permanent onzichtbaar is.
+            const cssRegels = () => [...document.styleSheets].flatMap(s => {
+              try{ return [...s.cssRules]; }catch(e){ return []; } });
+            truthy('handvat: standaard onzichtbaar',
+                   cssRegels().some(r => /#ntd-tbody\s+\.stapel-h/.test(r.selectorText || '')
+                     && /opacity:\s*0/.test(r.cssText)));
+            truthy('handvat: aanwijzen zet hem weer aan',
+                   cssRegels().some(r => /tr:hover\s+\.stapel-h/.test(r.selectorText || '')
+                     && /opacity:\s*1/.test(r.cssText)));
+            truthy('handvat: en tijdens het slepen blijft de greep die je vasthoudt staan',
+                   cssRegels().some(r => /tr\.sleep\s+\.stapel-h/.test(r.selectorText || '')
+                     && /opacity:\s*1/.test(r.cssText)));
             // Op een aanraakscherm bestaat hover niet; daar mag hij niet onbereikbaar worden.
             // Op de conditie toetsen met een regex en niet met een gelijkteken: de CSSOM serialiseert
             // een mediaquery opnieuw en zet er een spatie achter de dubbele punt. Gemeten in Chrome:
@@ -9876,6 +9947,15 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     eq('kortenaam: geen twee teamleden delen een code',
        new Set(TEAM.map(n => korteNaam(n))).size, TEAM.length);
     // De tabel kort af, de rest van het dashboard niet.
+    // Zonder deze twee overleefde `${rond}` elke mutatie: haal hem uit de template en de klasse
+    // pers-rond — het hele zichtbare punt van deze taak en de enige afnemer van de nieuwe CSS —
+    // verdwijnt zonder dat er iets omvalt.
+    truthy('behandelaar: een korte code wordt een rondje',
+           persBadges('Cihad', true).includes('pers-rond'));
+    truthy('behandelaar: een naam die niet in te korten viel blijft een gewone chip',
+           !persBadges('Gerrit', true).includes('pers-rond'));
+    truthy('behandelaar: buiten de tabel wordt niets een rondje',
+           !persBadges('Jer').includes('pers-rond'));
     truthy('behandelaar: de tabel toont de korte code',
            persBadges('Cihad', true).includes('>JC<'));
     truthy('behandelaar: buiten de tabel blijft de volle naam staan',

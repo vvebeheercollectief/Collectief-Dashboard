@@ -1083,6 +1083,57 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
              cg2 ? cg2.children.length : 0, document.querySelectorAll('#ntd-thead th').length);
         } finally { state.bulkMode = vBulk; renderNtd(); }
       })();
+      // ── Een lange Nederlandse datum moet in zijn kolom passen ──
+      // Dit is de eerste opzet gespiegeld: de datumkolommen werden zó smal dat "22 september 2026"
+      // (128px in IBM Plex Mono) niet meer paste. `.s-normal` is nowrap en de cel is
+      // overflow:visible, dus de datum werd niet afgekapt maar OVER de buurkolom heen getekend.
+      // Sheets levert lange datums, dus dit is de normale vorm.
+      //
+      // Gemeten wordt de KRAPSTE stand: de tabel op zijn minimumbreedte. Zonder die klem meet je
+      // het venster van de testrunner en is de toets groen om de verkeerde reden.
+      (() => {
+        const vNtd = {}, secs = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN'];
+        const vA3 = state.activeNtd, vPg3 = pgs.ntd;
+        const klem = document.createElement('style');
+        klem.textContent = '#ntd-tbl-wrap{width:1150px !important}';
+        document.head.appendChild(klem);
+        try{
+          secs.forEach(sec => {
+            vNtd[sec] = D.ntd[sec];
+            D.ntd[sec] = [{ code:'DLB-1', naam:'VvE Datum Breedte', actiepunt:'x', agendapunten:'x',
+                            subsidie:'x', status:'', periode:'juni', offertes:'0/1', aannemers:'',
+                            datumAangevraagd:'22 september 2026', deadline:'22 september 2026',
+                            opvolgdatum:'', behandelaar:'Jer', opmerkingen:'', inBehandeling:'',
+                            _sec:sec, _row:9901 }];
+            pgs.ntd = 1; setNtd(sec);
+            const ths = [...document.querySelectorAll('#ntd-thead th')];
+            const tr  = document.querySelector('#ntd-tbody tr[data-row]');
+            truthy(`datumbreedte: ${sec} tekent de rij`, !!tr);
+            ths.forEach((th, i) => {
+              const kop = th.textContent.trim().replace(/[▲▼]$/, '');
+              if(!(kop.startsWith('Deadline') || kop.startsWith('Datum'))) return;
+              const td = tr && tr.children[i];
+              // 'Datum aangevr.' op Offerte is KALE tekst zonder span; meet dan de cel zelf.
+              const el = (td && td.querySelector('span')) || td;
+              truthy(`datumbreedte: ${sec} — "${kop}" heeft een datum om te meten`,
+                     !!el && el.textContent.trim().length > 0);
+              if(!el) return;
+              // 1. Loopt hij niet over de buurkolom heen?
+              const over = el.getBoundingClientRect().right - td.getBoundingClientRect().right;
+              truthy(`datumbreedte: ${sec} — "${kop}" blijft binnen zijn kolom `
+                     + `(${Math.round(over)}px over de rand)`, over <= 1);
+              // 2. En hij hoort ook niet afgekapt te zijn: de kolom moet gewoon breed genoeg zijn.
+              truthy(`datumbreedte: ${sec} — "${kop}" kapt de datum niet af `
+                     + `(${el.scrollWidth} in ${el.clientWidth})`, el.scrollWidth <= el.clientWidth + 1);
+            });
+          });
+        } finally {
+          klem.remove();
+          secs.forEach(sec => { if(vNtd[sec] === undefined) delete D.ntd[sec]; else D.ntd[sec] = vNtd[sec]; });
+          state.activeNtd = vA3; pgs.ntd = vPg3; setNtd(vA3);
+        }
+      })();
+
       // De offerte-cel zette balk en link ónder elkaar: 60px per rij tegen 47 elders.
       //
       // GEEN `if(el)` om deze asserts heen. Een toets achter zo'n vangnet verdwijnt geruisloos
@@ -4134,7 +4185,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '10.33');
+  eq('versie opgehoogd', APP_VERSION, '10.34');
 
   // ── Pushmeldingen: de twee schakels die stil kapot waren (audit 2026-08-06) ──
   // Beide defecten waren onzichtbaar: de app meldde "Notificaties zijn aan!" terwijl er nooit

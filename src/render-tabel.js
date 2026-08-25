@@ -31,17 +31,19 @@ const HEEFT_SIGNAAL_KOLOM = SKEYS.filter(s => SECS[s].cols.includes('Signaal'));
 // Sorteerbare koppen worden een echte knop (toetsenbord-bedienbaar) met pijl + aria-sort op de th.
 // De breedte die elke kolom in de <colgroup> krijgt, als CSS-waarde.
 //
-// Een getal is een GEWICHT en wordt een percentage: die kolommen groeien mee met het venster.
-// Een string als '150px' is een VASTE breedte en groeit niet mee. Dat onderscheid is nodig omdat
-// een datumkolom een bekende, korte inhoud heeft: als percentage was hij bij 1150px net breed
-// genoeg voor "22 september 2026" (149px) en bij 1920 opeens 212px voor tekst van 85px — dezelfde
-// verspilling waar deze hele wijziging over ging, alleen in een andere kolom.
+// Een getal is een GEWICHT en wordt een percentage. Een string als '155px' legt een ONDERGRENS
+// vast: bij de smalste tabel is die kolom precies zo breed, ongeacht hoe de gewichten eromheen
+// staan. Dat is nodig voor de datumkolommen, want "22 september 2026" is 128px en moet er altijd
+// in passen — met alleen gewichten was dat een som die bij elke bijstelling opnieuw moest kloppen.
 //
-// De gewichten delen wat er ná de vaste kolommen overblijft. Dat restant wordt berekend bij
-// TABEL_MIN, de smalste stand die de tabel kan aannemen (styles.css houdt hem daar op). Boven die
-// breedte krijgen de gewicht-kolommen automatisch méér, want hun percentage staat vast terwijl de
-// tabel groeit — precies de bedoeling: de tekstkolommen profiteren van een breder scherm, de
-// datumkolommen blijven zoals ze zijn.
+// LET OP wat het NIET doet. Een px-kolom blijft niet op 155 staan. Bij `table-layout:fixed`
+// verdeelt de browser de ruimte bóven de opgegeven som GELIJK over alle kolommen, ook over die met
+// een pixelbreedte — gemeten: 155px bij een tabel van 1150, 220px bij een tabel van 1650. Er is
+// binnen een vaste kolomindeling geen manier om een kolom écht te pinnen. De winst is dus de
+// ondergrens, niet een plafond.
+//
+// De gewichten delen wat er ná de vaste kolommen overblijft, gerekend bij TABEL_MIN — de smalste
+// stand die de tabel kan aannemen (styles.css houdt hem daar op).
 const TABEL_MIN = 1150;   // gelijk houden aan `min-width` van #ntd-tbl-wrap table in styles.css
 function kolBreedtes(breedtes){
   const isPx = w => typeof w === 'string';

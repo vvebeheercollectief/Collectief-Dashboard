@@ -77,10 +77,10 @@ export const KORTE_NAMEN = {
 // 128px in IBM Plex Mono, en `.s-normal` is `white-space:nowrap` in een cel met `overflow:visible`
 // — de datum werd dus niet afgekapt maar óver de buurkolom heen getekend. Sheets levert lange
 // Nederlandse datums (zie _parseAnyDate), dus dat is de normale vorm en niet de uitzondering.
-// Elke datumkolom is daarom VAST in pixels ('155px'), niet als gewicht. Een gewicht dat bij 1150
-// precies groot genoeg was, werd bij 1920 een kolom van 212px voor tekst van 85px — dezelfde
-// verspilling, alleen ergens anders. Vast betekent: altijd genoeg, nooit te veel, en al het
-// gewonnen scherm gaat naar de tekstkolommen. Zie kolBreedtes() in render-tabel.js.
+// Elke datumkolom heeft daarom een ONDERGRENS in pixels ('155px') in plaats van een gewicht dat
+// bij elke bijstelling opnieuw moest kloppen. Let op: dat pint hem niet vast — een vaste
+// kolomindeling verdeelt extra ruimte gelijk over álle kolommen, dus boven de smalste stand groeit
+// hij gewoon mee. Zie kolBreedtes() in render-tabel.js voor wat het wél en niet doet.
 export const SECS = {
   OPPAKKEN:{label:'Oppakken',css:'--sec:var(--ac);--sec-l:var(--ac-l);--sec-b:var(--ac-b)',color:'#0D7377',
     cols:['VvE Code','VvE','Signaal','Actiepunt','Deadline','Wie','Opmerkingen'],
@@ -88,7 +88,7 @@ export const SECS = {
     keys:['code','naam','actiepunt','deadline','behandelaar','prioriteit','opmerkingen','inBehandeling']},
   VERGADERVERZOEKEN:{label:'Vergaderverzoeken',css:'--sec:var(--am);--sec-l:var(--am-l);--sec-b:var(--am-b)',color:'#B45309',
     cols:['VvE Code','VvE','Signaal','Periode','Agendapunten','Wie','Deadline uitschr.','Opmerkingen'],
-                   breedtes:[7,17,11,8,21,5,'155px',17,8],
+                   breedtes:[7,19,11,7,18,5,'155px',19,8],
     keys:['code','naam','periode','agendapunten','behandelaar','deadline','opmerkingen','inBehandeling']},
   'OFFERTE-TRAJECTEN':{label:'Offerte-trajecten',css:'--sec:var(--pu);--sec-l:var(--pu-l);--sec-b:var(--pu-b)',color:'#6D5BD0',
     cols:['VvE Code','VvE','Datum aangevr.','Ontvangen/Aangevr.','Behandelaar','Deadline','Opmerkingen'],

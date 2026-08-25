@@ -6,7 +6,7 @@ import { ico } from "./icons.js";
 import { SECS, SKEYS, PAGE_META } from "./config.js";
 import { state, D } from "./state.js";
 import { goTo } from "./ui.js";
-import { fmtLogTs, logItemHtml, logDayLabel, logPaginaSoort } from "./render-overig.js";
+import { fmtLogTs, logItemHtml, logDayLabel, logPaginaSoort, _herankerLogEdit } from "./render-overig.js";
 import { vveKenmerken, KENMERK_WAARDEN } from "./kenmerken.js";
 import { backgroundWrite, blokkeerOffline } from "./data.js";
 import { initStapelSlepen } from "./bundel-acties.js";
@@ -157,6 +157,11 @@ function terugVanDossier(){
 
 // Navigeer naar het dossier van een VvE (en onthoud 'm voor het commandocentrum)
 function openVvePagina(code){
+  // Zonder VvE-code valt er geen dossier te openen. Het palet hing deze functie onvoorwaardelijk
+  // aan élke logboektreffer, en niet elke logregel heeft een code: de ALV-reset schrijft er
+  // bewust een met een lege kolom B. Klikken gaf dan een leeg dossier én zette een naamloze
+  // regel in "Laatst bezochte VvE's" (localStorage), die daar zonder handmatig wissen bleef staan.
+  if(!String(code||'').trim()) return;
   // Onthoud van welk scherm je kwam (dossier→dossier laat de oorsprong staan).
   const huidig=document.querySelector('.page.active')?.id?.replace('page-','');
   if(huidig&&huidig!=='vve') state.vveTerug=huidig;
@@ -167,6 +172,7 @@ function openVvePagina(code){
   state._vveLogAlles=false;
   state.dosComposerOpen=false;
   state.logEdit=null;          // open bewerkformulier hoort bij het vórige dossier/scherm
+  state.logEditTs=null;
   state.logEditSoort=null;
   try{
     const lijst=JSON.parse(localStorage.getItem('recentVves')||'[]').filter(c=>c!==code);
@@ -280,6 +286,7 @@ function renderVve(){
   // de tekst van de vórige regel niet meeverhuizen (timestamp is shift-bestendig).
   const _leBox=document.querySelector('#vve-inhoud .log-edit');
   const _leTekstEl=_leBox?.querySelector('.log-edit-tekst');
+  _herankerLogEdit();   // zelfde her-ankering als op de Logboek-pagina; zie render-overig.js
   const _leEntry=state.logEdit?(D.logboek||[]).find(x=>x._row===state.logEdit):null;
   const _leBewaar=(_leTekstEl && _leEntry && _leBox.dataset.ts===(_leEntry.timestamp||''))?{tekst:_leTekstEl.value,wie:_leBox.querySelector('.log-edit-wie')?.value}:null;
   // Kenmerken-behoud, om precies dezelfde reden als de composer hierboven — dit formulier had het

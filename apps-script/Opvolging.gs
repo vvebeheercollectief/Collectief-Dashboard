@@ -51,20 +51,74 @@ function cd_volgendeDeadlineStr(huidig, type, intervalMnd) {
 }
 
 // Laatste menselijke logboek-activiteit per taak (key: code|SECTIE). 'systeem' telt niet mee.
+//
+// LET OP — SYNC met `bouwStilIndex`/`bepaalStil` in src/render-tabel.js. Die twee beantwoorden
+// dezelfde vraag ('wanneer is er voor het laatst iets aan deze taak gedaan?') en moeten hetzelfde
+// antwoord geven, anders escaleert de backend over een taak waar het scherm geen enkel signaal bij
+// toont. Dat liep op twee punten uiteen en is hier gelijkgetrokken:
+//
+//  1. EEN LOGREGEL ZONDER SECTIE telt voor ÉLKE sectie van die VvE. `addContactLog` (het
+//     contactmoment op de VvE-dossierpagina) schrijft kolom C leeg — dat is juist het bewijs dát
+//     er iets gebeurd is. Met een sleutel 'code|SECTIE' matchte zo'n regel nooit: je belde 's
+//     ochtends met het bestuur, het scherm haalde het stil-signaal meteen weg, en de volgende
+//     ochtend ging er alsnog een TEAMBREDE escalatiemelding uit over diezelfde taak.
+//     Daarom een tweede kaart op alleen de code; `cd_laatsteActiviteit` neemt de nieuwste van de
+//     twee.
+//  2. 'Bewerkt'-regels tellen niet mee, net als in de frontend (LOG_VERBORGEN in
+//     src/render-overig.js). Ze worden sinds v6.3 niet meer geschreven, maar oude staan er nog.
+// Welke acties tellen als 'werk aan een taak' wanneer de logregel GEEN sectie draagt.
+// LET OP — SYNC met SECTIELOOS_TELT in src/render-tabel.js.
+var CD_SECTIELOOS_TELT = ['Contact', 'Opmerking'];
+
+// Het aantal KALENDERDAGEN tussen twee momenten. LET OP — SYNC met _verschilInKalenderdagen in
+// src/util.js: die rondt AF (Math.round) op twee kale datums, terwijl hier eerder Math.floor op
+// een tijdverschil stond. Dat scheelt precies één dag zodra er een zomertijdgrens tussen zit, en
+// dan zegt het scherm 'stil 7 dagen' terwijl de motor er 6 telt (of andersom) — met een mail die
+// een dag te vroeg of te laat komt.
+function cd_dagenSinds(laatst, today) {
+  var a = new Date(laatst.getFullYear(), laatst.getMonth(), laatst.getDate());
+  var b = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.round((b.getTime() - a.getTime()) / 86400000);
+}
+
 function cd_laatsteActiviteitMap() {
-  const map = {};
+  const map = { _perSectie: {}, _perCode: {} };
   const sheet = SpreadsheetApp.getActive().getSheetByName('Logboek');
   if (!sheet) return map;
   const rows = sheet.getDataRange().getValues();
   for (let i = 1; i < rows.length; i++) {
     const gebruiker = (rows[i][7] || '').toString().trim().toLowerCase();
     if (gebruiker === 'systeem') continue;
+    const actie = (rows[i][3] || '').toString().trim();
+    if (actie === 'Bewerkt') continue;
     const ts = new Date(rows[i][0]);
     if (isNaN(ts)) continue;
-    const key = (rows[i][1] || '').toString().trim() + '|' + (rows[i][2] || '').toString().trim().toUpperCase();
-    if (!map[key] || ts > map[key]) map[key] = ts;
+    const code = (rows[i][1] || '').toString().trim();
+    if (!code) continue;
+    const sectie = (rows[i][2] || '').toString().trim().toUpperCase();
+    if (sectie) {
+      const key = code + '|' + sectie;
+      if (!map._perSectie[key] || ts > map._perSectie[key]) map._perSectie[key] = ts;
+    } else if (CD_SECTIELOOS_TELT.indexOf(actie) !== -1) {
+      // Alleen regels die aantoonbaar over WERK aan een taak gaan. Een sectieloze regel telt voor
+      // élke taak van die VvE, dus dit vangnet moet smal zijn: een kenmerkwijziging op de
+      // dossierpagina ('Kenmerk', kolom C leeg) zou anders in z'n eentje de escalatie stilzetten
+      // voor alle lopende trajecten van die VvE — inclusief het wissen van een al gezet
+      // escalatiestempel. Contact en Opmerking zijn wél bewijs dat er iets gedaan is.
+      // LET OP — SYNC met SECTIELOOS_TELT in src/render-tabel.js.
+      if (!map._perCode[code] || ts > map._perCode[code]) map._perCode[code] = ts;
+    }
   }
   return map;
+}
+
+// De laatste activiteit voor één taak: de nieuwste van 'regel mét deze sectie' en 'regel zonder
+// sectie bij deze VvE'. Eén ingang, zodat de escalatie en de dagbriefing niet uiteen kunnen lopen.
+function cd_laatsteActiviteit(map, code, sectie) {
+  const a = map && map._perSectie ? map._perSectie[code + '|' + sectie] : null;
+  const b = map && map._perCode ? map._perCode[code] : null;
+  if (a && b) return a > b ? a : b;
+  return a || b || null;
 }
 
 // ── 1. Herhaalregels: taken klaarzetten zodra (deadline − dagenVooraf) is bereikt ──
@@ -97,7 +151,14 @@ function cd_hr_zetTakenKlaar() {
       hr.getRange(i + 1, 12).setValue(new Date().toISOString() + ' → ' + dlStr); // L = LaatstKlaargezet
       cd_schrijfLogboek(code, sectie, 'Terugkerende taak klaargezet', '', '', oms, 'systeem');
       cd_splitBehandelaar(beh).forEach(function (name) {
+        // `type` los van de TAG. De tag bepaalt WIE de push krijgt (dat blijft de bestaande
+        // schakelaar), het type bepaalt hoe de regel in het tabblad 'Meldingen' terechtkomt — en
+        // dáár filtert de in-app lijst op (TYPE_NAAR_PREFS in src/notifications.js). Met het kale
+        // 'n_assigned' verdween deze melding óók uit de lijst zodra iemand 'Taak aan mij
+        // toegewezen' uitzette, terwijl het over iets heel anders gaat. Een onbekend type wordt
+        // door die filter niet weggegooid, dus in-app komt hij nu altijd aan.
         cd_notifyByExternalId(name, 'n_assigned', '1', {
+          type: 'n_herhaal',
           title: '🔁 Terugkerende taak klaargezet',
           body: code + (naam ? ' · ' + naam : '') + ' — ' + oms,
           url: APP_URL, dedupKey: 'hr-' + id + '-' + dlStr
@@ -118,6 +179,19 @@ function cd_hr_verwerkAfrondingen() {
   for (let i = 0; i < afData.length; i++) {
     const herhaalId = cd_f4val(afData[i][11]);   // L in 'Afgerond'
     if (!herhaalId) continue;
+    // VERS CONTROLEREN VÓÓR het herplannen, niet erna. `afData` is één momentopname van vóór de
+    // lus, en het dashboard schrijft buiten deze lock om in 'Afgerond' (een undo van een afronding
+    // verwijdert daar een rij). Stond de controle pas ná het try-blok, dan was de volgende deadline
+    // van de herhaalregel al herplant op de afrond-datum van een ándere rij — precies de fout die
+    // niet meer te zien is. Op het taaknummer (kolom Q) én de afrond-datum (kolom I): het
+    // Herhaal-ID zelf is geen identiteit, dat delen alle afrondingen van dezelfde regel.
+    const versRij = af.getRange(i + 1, 1, 1, 17).getValues()[0];
+    if (cd_f4val(versRij[11]) !== herhaalId
+        || (versRij[16] || '').toString().trim() !== (afData[i][16] || '').toString().trim()
+        || (versRij[8] || '').toString().trim() !== (afData[i][8] || '').toString().trim()) {
+      Logger.log('cd_hr_verwerkAfrondingen: rij ' + (i + 1) + ' is verschoven — overgeslagen');
+      continue;
+    }
     try {
       for (let j = 1; j < hrData.length; j++) {
         if ((hrData[j][0] || '').toString().trim() !== herhaalId) continue;
@@ -156,6 +230,7 @@ function cd_opvolgWakker() {
       const beh  = (data[i][4] || '').toString().trim(); // E = behandelaar
       cd_splitBehandelaar(beh).forEach(function (name) {
         cd_notifyByExternalId(name, 'n_assigned', '1', {
+          type: 'n_opvolg',      // eigen type — zie de toelichting bij 'n_herhaal' hierboven
           title: '🔔 Opvolgen vandaag',
           body: code + (naam ? ' · ' + naam : ''),
           url: APP_URL, dedupKey: 'opvolg-' + code + '-' + cd_ddmmyyyy(today)
@@ -190,10 +265,24 @@ function cd_escaleerStilleDossiers() {
       if (!ib && curSec !== 'OFFERTE-TRAJECTEN') continue;
       const opvolg = cd_parseDate(data[i][11]);
       if (opvolg && opvolg.getTime() > today.getTime()) continue; // weggelegd = bewust geparkeerd
-      const laatst = stilMap[code + '|' + curSec];
+      const laatst = cd_laatsteActiviteit(stilMap, code, curSec);
       if (!laatst) continue; // geen activiteit-data → niet escaleren (zelfde keuze als bepaalStil)
-      const dagen = Math.floor((today.getTime() - new Date(laatst.getFullYear(), laatst.getMonth(), laatst.getDate()).getTime()) / 86400000);
+      const dagen = cd_dagenSinds(laatst, today);
       const esc = cd_f4val(data[i][13]);            // N = Esc-stempel
+      // Zelfde verse controle als bij cd_hr_verwerkAfrondingen: `data` is een momentopname van
+      // vóór de lus en er zitten pushmeldingen (0,5-2 s per stuk) tussen. Staat er op rij i+1
+      // inmiddels een andere taak, dan zou het escalatiestempel in kolom N bij de verkeerde taak
+      // landen — en die taak slaat dan de rest van zijn escalaties over.
+      // Op IDENTITEIT en niet alleen op de VvE-code: één VvE heeft vaak meerdere taken in dezelfde
+      // sectie (daar bestaat het vaste taaknummer in kolom Q juist voor), en dan laat een
+      // vergelijking op kolom A een verschoven buurrij gewoon door.
+      const vers = sheet.getRange(i + 1, 1, 1, 17).getValues()[0];
+      const versNr = (vers[16] || '').toString().trim();
+      const oudNr = (data[i][16] || '').toString().trim();
+      if ((vers[0] || '').toString().trim() !== code || versNr !== oudNr) {
+        Logger.log('cd_escaleerStilleDossiers: rij ' + (i + 1) + ' is verschoven — overgeslagen');
+        continue;
+      }
       const cel = sheet.getRange(i + 1, 14);
       if (dagen < regels.trap1) { if (esc) cel.setValue(''); continue; } // activiteit hervat → reset
       if (dagen >= regels.trap2 && esc.indexOf('T2') === -1) {
@@ -201,6 +290,8 @@ function cd_escaleerStilleDossiers() {
         // Trap-2 = teambrede escalatie: behandelaar én alle collega's via de
         // team-tag n_newtask (zelfde audience als een nieuwe taak).
         cd_notifyByTag('n_newtask', '1', {
+          type: 'n_escalatie',   // eigen type: de ZWAARSTE melding die het systeem kent mag niet
+                                 // meeliften op de schakelaar 'Nieuwe taak toegevoegd'
           title: '⚠️ Stil dossier — escalatie',
           body: code + (naam ? ' · ' + naam : '') + ' — ' + dagen + ' dagen geen activiteit (' + (beh || 'geen behandelaar') + ')',
           url: APP_URL, dedupKey: 'esc2-' + code + '-' + cd_ddmmyyyy(today)
@@ -209,6 +300,7 @@ function cd_escaleerStilleDossiers() {
         cel.setValue('T1:' + cd_ddmmyyyy(today));
         cd_splitBehandelaar(beh).forEach(function (name) {
           cd_notifyByExternalId(name, 'n_assigned', '1', {
+            type: 'n_escalatie',
             title: '🔕 Stil dossier — ' + dagen + ' dagen geen activiteit',
             body: code + (naam ? ' · ' + naam : ''),
             url: APP_URL, dedupKey: 'esc1-' + code + '-' + cd_ddmmyyyy(today)

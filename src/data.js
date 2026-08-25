@@ -471,7 +471,20 @@ function _verwerkMeldingen(R, bereik, start){
   // Niets verwerken, basislijn laten staan, volgende ronde vanaf rij 2.
   if(!rijen.length){ if(start>2) state._meldStart=0; return; }
   const uit=verwerkMeldingRijen(kop[0]||[], rijen, state._lastNotifTs, getCurrentWho(), getNotifPrefs());
-  if(uit.kopStuk){ console.warn('[meldingen] koprij mist Timestamp/Titel — niets verwerkt'); return; }
+  if(uit.kopStuk){
+    // Zelfde weg als een onleesbaar tabblad (de 400-tak in loadAll): deze sessie niet meer
+    // meevragen. Zonder die vlag bleef het bij een console-regel die de gebruiker nooit ziet, en
+    // liep `state._meldStart` nooit op — het HELE tabblad werd dan 7,5 keer per minuut opnieuw
+    // gelezen, precies de leeslast die het rollende venster had weggehaald. En de gebruiker kreeg
+    // de rest van de sessie geen enkele in-app melding meer, zonder één woord.
+    console.warn('[meldingen] koprij mist Timestamp/Titel — niets verwerkt');
+    state._meldUit=true;
+    showToast('Meldingen staan uit', "De koprij van het tabblad 'Meldingen' klopt niet meer "
+              + "(kolom 'Timestamp' of 'Titel' ontbreekt). Je krijgt tot een herlading geen "
+              + 'meldingen te zien. Vraag even om hulp.',
+              'var(--rd)', 'waarschuwing', { geenDedup:true, geenSysteemmelding:true });
+    return;
+  }
   // Reikt het venster niet terug tot de basislijn, dan kan er een melding tussen gevallen zijn.
   // Volgende ronde volledig lezen en deze ronde niets tonen; de basislijn blijft staan, dus er
   // gaat niets verloren — het komt hoogstens 8 seconden later.
@@ -570,6 +583,22 @@ function loadAll(silent){
 }
 
 async function _loadRonde(silent){
+  // ÉÉN rem voor álle ingangen. Staat het inlogvenster van de knop 'Opnieuw inloggen' open, dan
+  // mag er geen tweede tokenaanvraag gedaan worden: GIS kent één callback per client, dus zo'n
+  // aanvraag herbindt de callback en laat die van de knop los (de storing van v10.10/v10.11).
+  // Deze rem stond alleen in de 8s-timer, terwijl de 'online'-handler, de Vernieuwen-knop en
+  // onNotifVisibility langs dezelfde weg een ronde starten. Hier staat hij op de plek die ze
+  // allemaal passeren, vóór `ensureToken`, zodat een nieuwe ingang hem niet kan vergeten.
+  // De knop zelf doet zijn eigen `loadAll()` pas ná de finally die de vlag wist.
+  //
+  // ALLEEN op het STILLE pad. `loadAll()` is óók de weg van de Vernieuwen-knop, van de resync na
+  // elke schrijfactie en van elke `await loadAll()` in een undo. Zou de rem daar ook gelden, dan
+  // bleef de statusbalk na een schrijfactie op 'Opslaan…' hangen, deed de Vernieuwen-knop
+  // zichtbaar niets en wachtte een undo tot zijn vangnet-timeout — precies de klasse storing die
+  // deze rem juist moest voorkomen. Een LUIDE ronde vraagt hoogstens een token aan terwijl er een
+  // inlogvenster openstaat; dat is een zeldzaam en zichtbaar geval, en de gebruiker heeft er zelf
+  // om gevraagd.
+  if(silent && state._herinlogBezig) return;
   state._loadInFlight=true;
   try{
     // Altijd een geldige token garanderen (ook bij Vernieuwen-knop / schrijf-resync):
@@ -670,8 +699,8 @@ async function _loadRonde(silent){
     // plaats van door parseX(undefined) leeggeveegd te worden. Vandaag zit alles er elke ronde
     // in; de vorm is er zodat een gemiste of afwijkend gevraagde reeks nooit stil data wist.
     const zetAls=(naam,fn)=>{ if(R[naam]!==undefined) fn(R[naam]); };
-    zetAls('Nog Te Doen', r=>{ const p=parseSections(r); D.ntd=p.data; D.ntdSecInfo=p.secInfo; });
-    zetAls('Afgerond',    r=>{ const p=parseSections(r); D.af=p.data; D.afSecInfo=p.secInfo;
+    zetAls('Nog Te Doen', r=>{ const p=parseSections(r,'Nog Te Doen'); D.ntd=p.data; D.ntdSecInfo=p.secInfo; });
+    zetAls('Afgerond',    r=>{ const p=parseSections(r,'Afgerond'); D.af=p.data; D.afSecInfo=p.secInfo;
                                SKEYS.forEach(s=>{if(D.af[s])D.af[s].sort((a,b)=>parseDt(b.datum)-parseDt(a.datum))}); });
     // Fase 3, trap 1: alleen meekijken. Zodra dit een tijd lang stil blijft op gezonde data
     // gaat de banner aan (trap 2). Nooit blokkerend — dit mag het laden niet beïnvloeden.
@@ -722,9 +751,13 @@ async function _loadRonde(silent){
     // dan behoudt zetAls vanzelf de vorige D.alfa.
     zetAls("ALV's afgerond",  r=>{ D.alfa=parseAlfa(r); state._alfaMs=Date.now(); });
     zetAls('Ontwikkeling',    r=>{ D.ontw=parseOntw(r); });
-    await _verwerkLogboek(R, logNaam, logVolledig, lees);
+    // Het Logboek als LAATSTE van de toekenningen, want alleen dié kan een tweede leesverzoek doen
+    // (de volledige herlezing bij een verschoven anker). Stond hij ervóór, dan liepen de vier
+    // toekenningen erna alsnog met data van vóór een schrijfactie die in dat await-gat begon.
     zetAls('Herhaalregels',   r=>{ D.herhaal=parseHerhaal(r); });
     zetAls('Kenmerken',       r=>{ D.kenmerken=parseKenmerken(r); });
+    await _verwerkLogboek(R, logNaam, logVolledig, lees);
+
     // Verse data staat in D: de leescache-stand is niet langer de basis, dus de schrijf-rem eraf.
     // Bewust hier en niet in het finally: bij een MISLUKTE eerste ronde staat het scherm nog op de
     // cache van gisteren, en dan mag er niet geschreven worden — getInsertRow zou de verouderde
@@ -819,7 +852,14 @@ async function _loadRonde(silent){
 // ══════════════════════════════════════
 //  PARSE
 // ══════════════════════════════════════
-function parseSections(rows){
+// `tabblad` is optioneel en heeft precies één effect: op 'Afgerond' betekent kolom L iets ANDERS.
+// Daar staat het Herhaal-ID (afrondWaarden zet r.herhaalId op index 11, verplaatsAfgerond doet
+// hetzelfde, en cd_hr_verwerkAfrondingen leest én wist afData[i][11]); in 'Nog Te Doen' staat op
+// diezelfde plek de opvolgdatum. Zonder dit onderscheid kreeg élke archiefrij een `opvolgdatum`
+// die in werkelijkheid een herhaal-ID was — zichtbaar in het zoekveld, waar op een herhaal-ID
+// zoeken afgeronde taken opleverde, en een landmijn voor elke latere lezer van dat veld.
+function parseSections(rows, tabblad){
+  const isArchief = tabblad === 'Afgerond';
   const out={};
   const secInfo={};
   SKEYS.forEach(s=>{out[s]=[];secInfo[s]={colHeaderRow:null}});
@@ -844,8 +884,9 @@ function parseSections(rows){
     // Gedeeld met de schrijf-guard in api.js — zie leegBijErfenis in util.js.
     const _f4v=leegBijErfenis;
     entry.subcategorie=_f4v(row[afOff+2]);
-    entry.opvolgdatum=_f4v(row[11]);  // L — Fase 4
-    entry.herhaalId  =_f4v(row[12]);  // M
+    // L en M wisselen van betekenis per tabblad — zie de kop van deze functie.
+    entry.opvolgdatum=isArchief ? '' : _f4v(row[11]);           // L (alleen 'Nog Te Doen')
+    entry.herhaalId  =isArchief ? _f4v(row[11]) : _f4v(row[12]); // L in 'Afgerond', M in 'Nog Te Doen'
     entry.esc        =_f4v(row[13]);  // N (alleen door Apps Script geschreven)
     entry.fase       =_f4v(row[14]);  // O — offerte-fase (offerte-motor)
     entry.aannemers  =_f4v(row[15]);  // P — aannemerslijst (naam|0/1 per regel)

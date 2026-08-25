@@ -3,11 +3,11 @@
 // ══════════════════════════════════════
 import { state, D } from "./state.js";
 import { renderNtd } from "./render-lijsten.js";
-import { toDutchDate, berekenPrioriteit, _parseAnyDate, _vandaagAmsterdam, _verschilInKalenderdagen, parseDt, kiesAfgerondRij } from "./util.js";
+import { toDutchDate, taakTitel, berekenPrioriteit, _parseAnyDate, _vandaagAmsterdam, _verschilInKalenderdagen, parseDt, kiesAfgerondRij } from "./util.js";
 import { SID } from "./config.js";
 import { ensureToken } from "./auth.js";
-import { _shiftNtdRows, _herstelShift, assertRowsMatch, _veiligeRij, sheetsFetch } from "./api.js";
-import { getSheetIds, getAfInsertRow, getInsertRow, insertAndWriteRow, serializeNtdUndo, afrondWaarden } from "./crud.js";
+import { _shiftNtdRows, _shiftAfRows, _herstelShift, assertRowsMatch, _veiligeRij, sheetsFetch } from "./api.js";
+import { getSheetIds, getAfInsertRow, getInsertRow, insertAndWriteRow, serializeNtdUndo, afrondWaarden, bevestigInvoegPlek } from "./crud.js";
 import { backgroundWrite, loadAll, metWriteMarkering, blokkeerOffline, syncSelecteerStand } from "./data.js";
 import { showToast, showUndoToast, fireNotifEvent } from "./notifications.js";
 import { vraagBevestiging } from "./bevestig.js";
@@ -83,7 +83,11 @@ function bulkVink(rid, e){
 function bulkAlles(){
   const rijen=state._ntdZichtbaar||[];
   if(!rijen.length) return;
-  if(rijen.every(r=>_sel.has(r))) rijen.forEach(r=>_sel.delete(r));
+  // Staat alles aan, dan LEEGT deze knop de hele selectie — ook taken die door een filterwissel
+  // buiten beeld zijn geraakt. Dat is wat het label ('Selectie leegmaken') belooft, en het is de
+  // enige lezing waarbij de balk daarna niet blijft staan met een aantal dat nergens te zien is.
+  // (De selectie overleeft een filterwissel bewust; zie wisNtdFilters.)
+  if(rijen.every(r=>_sel.has(r))) bulkWis();
   else rijen.forEach(r=>_sel.add(r));
   _anker=null;                      // de reeks-anker slaat nergens meer op na een blok-actie
   renderNtd();
@@ -104,8 +108,11 @@ function allesVinkjeStand(rijen, gekozen){
 function allesVinkjeHtml(rijen){
   const stand=allesVinkjeStand(rijen,_sel);
   const klasse=stand==='alles'?' aan':(stand==='deels'?' deels':'');
-  const uitleg=stand==='alles'?'Selectie leegmaken'
-              :`Alles selecteren (${(rijen||[]).length} ${((rijen||[]).length===1)?'taak':'taken'}, ook op de volgende pagina's)`;
+  // In de stand 'alles' leegt de knop de HELE selectie, dus ook taken die door een filterwissel
+  // buiten beeld staan. Dat hoort de tooltip te zeggen — anders belooft hij minder dan hij doet.
+  const uitleg=stand==='alles'
+    ? `Selectie leegmaken (${_sel.size} ${_sel.size===1?'taak':'taken'}${_sel.size>(rijen||[]).length?', ook wat nu weggefilterd is':''})`
+    : `Alles selecteren (${(rijen||[]).length} ${((rijen||[]).length===1)?'taak':'taken'}, ook op de volgende pagina's)`;
   return `<button type="button" class="cb${klasse}" data-action="bulk-alles" role="checkbox" `+
          `aria-checked="${stand==='alles'?'true':(stand==='deels'?'mixed':'false')}" `+
          `title="${uitleg}" aria-label="${uitleg}"></button>`;
@@ -180,6 +187,20 @@ async function bulkDoe(el){
   if(!rows.length) return;
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){ alert('Inloggen mislukt. Probeer het opnieuw.'); return; }
+  // DUBBELKLIK-REM, ná ensureToken — zelfde idioom en dezelfde reden als `_submitBezig` in
+  // crud.js. Sinds `bulkAfronden` een echte lezing tussen de klik en de mutatie doet
+  // (`bevestigInvoegPlek`), is het gat honderden milliseconden breed; de knoppen in de bulk-balk
+  // blijven al die tijd gewoon klikbaar en `bulkSelectie()` levert bij klik 2 nog exact dezelfde
+  // rijen, want de selectie wordt pas ná dat gat gewist. Twee rondes archiveren dezelfde taken dan
+  // dubbel en verwijderen de rij eronder. Bewust NIET vóór ensureToken: een geblokkeerde
+  // inlogpopup zou de vlag dan eeuwig op true laten staan.
+  if(state._bulkBezig) return;
+  state._bulkBezig=true;
+  try{ await _bulkDoeKern(el, wat, rows); }
+  finally{ state._bulkBezig=false; }
+}
+
+async function _bulkDoeKern(el, wat, rows){
   _sluitMenus();
   // AWAIT: `bulkAfronden` stelt sinds v10.31 eerst een vraag. Zonder await liep de optimistische
   // verwijdering door terwijl het venster nog openstond — precies de val die bij `verwijderen`
@@ -248,9 +269,11 @@ async function bulkAfronden(rows){
   const gekozenAf = new Set(rows);
   const metSubAf = rows.reduce((n,r)=> n + (openSubtaken(ixAf, r, gekozenAf) > 0 ? 1 : 0), 0);
   if(rows.length >= BULK_AFROND_VRAAG_VANAF || metSubAf > 0){
+    const subTotaalAf = rows.reduce((n,r)=> n + openSubtaken(ixAf, r, gekozenAf), 0);
     const subZin = metSubAf
       ? ` Let op: bij ${metSubAf===1?(rows.length===1?'deze taak':'één van deze taken'):`${metSubAf} van deze taken`} `+
-        `${metSubAf===1?'hangt':'hangen'} nog een subtaak die niet in deze selectie zit. Die blijft staan.`
+        `${subTotaalAf===1?'hangt nog een subtaak die':`hangen nog ${subTotaalAf} subtaken die`} niet in deze selectie ${subTotaalAf===1?'zit':'zitten'}. `+
+        `${subTotaalAf===1?'Die blijft':'Die blijven'} staan.`
       : '';
     // Enkelvoud in titel én tekst: onder de drempel wordt er alleen gevraagd als er een subtaak
     // achterblijft, en dan kan het om één taak gaan. Zelfde vorm als bij bulk-verwijderen.
@@ -273,6 +296,26 @@ async function bulkAfronden(rows){
     const values=afrondWaarden(r, r._sec, vandaag, '');
     return { r, sec:r._sec, origRow:r._row, afValues:values, ntdValues:_ntdValues(r), code:r.code };
   });
+  // Archiefplek vers narekenen — dezelfde controle die `submitTask` op 'Nog Te Doen' doet en die
+  // `doCompleteTask` sinds deze ronde op 'Afgerond' doet. Alle items van een bulk zitten in ÉÉN
+  // sectie (de selectie wordt bij een tabbladwissel gewist), dus één anker volstaat.
+  // BEWUST vóór backgroundWrite: daarbinnen staat pendingWrites al op >0 en bewaakt de guard niets.
+  // De één-sectie-aanname hard maken in plaats van erop vertrouwen. Eén anker, één pre-flight en
+  // één `_shiftAfRows` gelden alleen als álle items in hetzelfde blok van 'Afgerond' landen. Dat
+  // klopt vandaag omdat `setNtd` de selectie bij een tabbladwissel wist, maar dat is een gedrag
+  // elders — verdwijnt het ooit, dan zou dit stil naar het verkeerde blok schrijven.
+  if(new Set(items.map(i=>i.sec)).size!==1){
+    alert('Afronden kan alleen binnen één categorie tegelijk. Maak de selectie leeg en probeer opnieuw.');
+    return;
+  }
+  const standAf={gelukt:false};
+  // `getAfInsertRow` GOOIT als het sectieblok niet in 'Afgerond' staat. Deze functie wordt door de
+  // klik-delegatie niet gecatcht, dus zonder deze try zou de knop zichtbaar niets doen.
+  let afAnker;
+  try{ afAnker=getAfInsertRow(items[0].sec); }
+  catch(e){ alert(e.message || String(e)); return; }
+  try{ await bevestigInvoegPlek(items[0].sec, afAnker, 'Afgerond'); }
+  catch(e){ alert(e.melding || e.message); loadAll(); return; }
   // optimistisch: hoog→laag lokaal verwijderen + indexen meeschuiven
   items.forEach(it=>{
     const arr=D.ntd[it.sec]||[]; const pos=arr.indexOf(it.r);
@@ -280,8 +323,11 @@ async function bulkAfronden(rows){
     _shiftNtdRows(it.origRow,-1);
     it.pos=pos;
   });
+  // …en de rijnummers van 'Afgerond' meeschuiven met de N invoegingen die zo meteen gebeuren,
+  // zodat een losse afronding binnen hetzelfde schrijfvenster niet op een verouderd anker rekent.
   _eindBulk();
-  showUndoToast(`${items.length} taken afgerond`,items.map(i=>i.code).join(', '),()=>bulkUndoAfronden(items),'vinkCirkel');
+  showUndoToast(`${items.length} taken afgerond`,items.map(i=>i.code).join(', '),()=>bulkUndoAfronden(items,standAf),'vinkCirkel',
+                {sleutel:`bulkafrond|${items.map(i=>i.r.taakId||i.origRow).join('_')}`});
   backgroundWrite(async()=>{
     const ids=await getSheetIds();
     const afSheetId=ids['Afgerond'], ntdSheetId=ids['Nog Te Doen'];
@@ -292,9 +338,14 @@ async function bulkAfronden(rows){
     // afgerond terwijl de lokale rollback ze terugzette → spook-dubbels na de resync.
     // Verwerkvolgorde hoog→laag _row (deletes verschuiven elkaar niet); Afgerond-inserts op
     // dezelfde index stapelen correct binnen één batch.
+    // De archiefplek NU pas berekenen, niet bij de klik: `backgroundWrite` voert de wachtrij
+    // serieel uit, dus op dit moment zijn alle eerdere schrijfacties en hun eventuele rollbacks
+    // geweest. Een vooraf bevroren rijnummer kan een rollback van een andere schrijfactie niet
+    // meer volgen en landt dan te laag — mogelijk op de kolomkoprij van het volgende blok.
     const requests=[];
+    let afAfterRow=null;
     for(const it of items){
-      const afAfterRow=getAfInsertRow(it.sec);
+      afAfterRow=getAfInsertRow(it.sec);
       requests.push(
         {insertDimension:{range:{sheetId:afSheetId,dimension:'ROWS',startIndex:afAfterRow,endIndex:afAfterRow+1},inheritFromBefore:true}},
         {updateCells:{range:{sheetId:afSheetId,startRowIndex:afAfterRow,endRowIndex:afAfterRow+1,startColumnIndex:0,endColumnIndex:it.afValues.length},
@@ -305,7 +356,11 @@ async function bulkAfronden(rows){
     const resp=await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
       method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
       body:JSON.stringify({requests})});
-    if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Bulk-afronden fout');err.status=resp.status;throw err}
+    if(!resp.ok){const e=await resp.json().catch(()=>({}));if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Bulk-afronden fout');err.status=resp.status;throw err}
+    standAf.gelukt=true;   // pas nu mag de undo-knop iets terugzetten
+    // Alle items van een bulk zitten in ÉÉN sectie (de selectie wordt bij een tabbladwissel
+    // gewist), dus één anker en N invoegingen. Pas ná een geslaagde batch meeschuiven.
+    if(afAfterRow!=null) _shiftAfRows(afAfterRow,+items.length);
     // for…of i.p.v. forEach: in een forEach-callback kun je niet awaiten, en zonder await valt
     // de schrijfteller naar 0 terwijl de logboek-appends nog lopen (resync te vroeg, regel weg).
     // Eén append voor de hele bulk i.p.v. één per taak: 20 taken kostten zo 20 schrijfverzoeken.
@@ -333,12 +388,17 @@ function _bulkUndoAfDoelRijen(items, afPerSec){
   return doel.sort((a,b)=>b._row-a._row);
 }
 
-async function bulkUndoAfronden(items){
+async function bulkUndoAfronden(items, stand){
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){ alert('Inloggen mislukt.'); return; }
   state._undoInFlight=true; // pauzeer de 8s-poll; deze undo doet z'n eigen loadAll
   try{
     await state._writeChain;
+    if(stand && !stand.gelukt){
+      showToast('Niet ongedaan gemaakt','We konden niet bevestigen dát de taken zijn afgerond, dus er is niets teruggezet. De lijst wordt opnieuw geladen.','var(--am)','label',{geenDedup:true,geenSysteemmelding:true});
+      await loadAll();
+      return;
+    }
     await loadAll(true);                       // verse D.af zodat we de zojuist afgeronde rijen vinden
     // Pas hierná de teller ophogen: bínnen metWriteMarkering zou loadAll zijn verse data
     // weggooien (pendingWrites>0) en werkten we op een stale D.af.
@@ -368,7 +428,7 @@ async function bulkUndoAfronden(items){
         const resp=await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
           method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
           body:JSON.stringify({requests:teVerwijderen.map(af=>({deleteDimension:{range:{sheetId:ids['Afgerond'],dimension:'ROWS',startIndex:af._row-1,endIndex:af._row}}}))})});
-        if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Bulk-undo verwijderfout');err.status=resp.status;throw err}
+        if(!resp.ok){const e=await resp.json().catch(()=>({}));if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Bulk-undo verwijderfout');err.status=resp.status;throw err}
       }
     });
     showToast('Ongedaan gemaakt',`${items.length} taken terug in Nog Te Doen`,'var(--am)','ongedaan');
@@ -400,9 +460,13 @@ async function bulkVerwijderen(rows){
   // Subtaken die in DEZELFDE bulk zitten blijven niet achter; die horen dus niet in de telling.
   const gekozen = new Set(rows);
   const metSub = rows.reduce((n,r)=> n + (openSubtaken(ix, r, gekozen) > 0 ? 1 : 0), 0);
+  // Enkelvoud/meervoud op het AANTAL SUBTAKEN, niet op het aantal taken dat er een heeft. Eén taak
+  // kan er meerdere hebben, en dan zou 'hangt nog een subtaak' aantoonbaar onwaar zijn.
+  const subTotaal = rows.reduce((n,r)=> n + openSubtaken(ix, r, gekozen), 0);
   const subZin = metSub
-    ? ` Let op: bij ${metSub===1?'één van deze taken':`${metSub} van deze taken`} `+
-      `${metSub===1?'hangen':'hangen'} nog subtaken. Die blijven staan.`
+    ? ` Let op: bij ${metSub===1?(rows.length===1?'deze taak':'één van deze taken'):`${metSub} van deze taken`} `+
+      `${subTotaal===1?'hangt':'hangen'} nog ${subTotaal===1?'een subtaak':`${subTotaal} subtaken`}. `+
+      `${subTotaal===1?'Die wordt':'Die worden'} niet mee verwijderd.`
     : '';
   if(!await vraagBevestiging({
       titel:`${rows.length} ${rows.length===1?'taak':'taken'} verwijderen?`,
@@ -410,6 +474,10 @@ async function bulkVerwijderen(rows){
             `Meteen daarna kun je dit nog ongedaan maken met de knop in de melding.`+subZin,
       bevestigTekst:'Verwijderen', gevaarlijk:true })) return;
   const items=rows.map(r=>({r,sec:r._sec,origRow:r._row,ntdValues:_ntdValues(r),code:r.code}));
+  // Eén vlag voor de hele bulk: de batchUpdate is alles-of-niets, dus 'geland' geldt voor alle
+  // items tegelijk. Zonder deze haak voegde de undo-knop na een MISLUKTE bulk alles opnieuw in —
+  // met dezelfde vaste taaknummers erbij. Zie de gelijknamige vlag in crud.js.
+  const stand={gelukt:false};
   items.forEach(it=>{
     const arr=D.ntd[it.sec]||[]; const pos=arr.indexOf(it.r);
     if(pos>-1) arr.splice(pos,1);
@@ -417,7 +485,8 @@ async function bulkVerwijderen(rows){
     it.pos=pos;
   });
   _eindBulk();
-  showUndoToast(`${items.length} taken verwijderd`,items.map(i=>i.code).join(', '),()=>bulkUndoVerwijderen(items),'prullenbak');
+  showUndoToast(`${items.length} taken verwijderd`,items.map(i=>i.code).join(', '),()=>bulkUndoVerwijderen(items,stand),'prullenbak',
+                {sleutel:`bulkverwijder|${items.map(i=>i.r.taakId||i.origRow).join('_')}`});
   backgroundWrite(async()=>{
     const ids=await getSheetIds();
     const sheetId=ids['Nog Te Doen'];
@@ -426,8 +495,12 @@ async function bulkVerwijderen(rows){
     const resp=await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
       method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
       body:JSON.stringify({requests:items.map(it=>({deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:it.origRow-1,endIndex:it.origRow}}}))})});
-    if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Bulk-verwijderfout');err.status=resp.status;throw err}
-    await logEvents(items.map(it=>({code:it.code,sec:it.sec,actie:'Verwijderd',veld:'',oudeWaarde:it.ntdValues[2]||'',nieuweWaarde:'(bulk)'})));
+    if(!resp.ok){const e=await resp.json().catch(()=>({}));if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Bulk-verwijderfout');err.status=resp.status;throw err}
+    stand.gelukt=true;   // pas nu mag de undo-knop iets terugzetten
+    // `taakTitel` en niet de vaste index 2 (kolom C): waar de omschrijving staat verschilt per
+    // categorie. Bij Vergaderverzoeken is kolom C de PERIODE en bij Offerte-trajecten de datum van
+    // aanvraag, dus het logboek noteerde daar iets anders dan de taak.
+    await logEvents(items.map(it=>({code:it.code,sec:it.sec,actie:'Verwijderd',veld:'',oudeWaarde:taakTitel(it.r,it.sec)||'',nieuweWaarde:'(bulk)'})));
   },()=>{
     [...items].reverse().forEach(it=>{
       const a=(D.ntd[it.sec]=D.ntd[it.sec]||[]);
@@ -435,12 +508,17 @@ async function bulkVerwijderen(rows){
     });
   },'Bulk-verwijderen mislukt');
 }
-async function bulkUndoVerwijderen(items){
+async function bulkUndoVerwijderen(items, stand){
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){ alert('Inloggen mislukt.'); return; }
   state._undoInFlight=true; // pauzeer de 8s-poll; deze undo doet z'n eigen loadAll
   try{
     await state._writeChain;
+    if(stand && !stand.gelukt){
+      showToast('Niet ongedaan gemaakt','We konden niet bevestigen dát de taken zijn verwijderd, dus er is niets teruggezet. De lijst wordt opnieuw geladen.','var(--am)','label',{geenDedup:true,geenSysteemmelding:true});
+      await loadAll();
+      return;
+    }
     await metWriteMarkering(async()=>{
       // Offset per sectie: getInsertRow leest D.ntd (verandert niet tussen inserts), dus zonder
       // offset belanden alle rijen op dezelfde positie en stapelen ze in omgekeerde volgorde.
@@ -512,7 +590,7 @@ function bulkVeld(rows,soort,waarde){
       const resp=await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values:batchUpdate`,{
         method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
         body:JSON.stringify({valueInputOption:'USER_ENTERED', data})});
-      if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Bulk-actie fout');err.status=resp.status;throw err}
+      if(!resp.ok){const e=await resp.json().catch(()=>({}));if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Bulk-actie fout');err.status=resp.status;throw err}
       if(!gelogd){ await logEvents(items.map(it=>({code:it.code,sec:it.sec,actie:conf.log,veld:conf.veld,oudeWaarde:welkeWaarde==='oud'?waarde:it.oud,nieuweWaarde:welkeWaarde==='oud'?it.oud:waarde}))); gelogd=true; }
       // Melding aan de nieuwe behandelaar. Eén taak toewijzen deed dit al (crud.js, submitTask);
       // bulk deed het helemaal niet, dus wie acht taken in één keer kreeg hoorde er niets van.

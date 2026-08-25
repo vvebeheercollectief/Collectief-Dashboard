@@ -31,6 +31,35 @@ const isOffline = () => _isOffline(navigator.onLine, state._netwerkFouten||0);
 // 20 seconden is ruim: een leesronde duurt normaal onder de seconde, en twee polls verder is een
 // antwoord toch niet meer interessant. Tests verlagen hem via state._fetchTimeoutMs.
 const FETCH_TIMEOUT_MS = 20_000;
+// De AI-proxy is iets heel anders dan een Sheets-lezing: die doet eerst een tokeninfo-aanroep en
+// daarna een NIET-streamende aanroep naar het model met max_tokens 1024 — het antwoord komt pas
+// als het hele stuk tekst klaar is. Bij een groot dossier is 20 seconden daarvoor te krap, en dan
+// zou de klok een gesprek afbreken dat gewoon onderweg was. Een minuut is ruim en houdt nog steeds
+// de belofte dat de chat niet eeuwig op 'aan het typen…' blijft staan.
+const AI_TIMEOUT_MS = 60_000;
+
+// Dezelfde tijdslimiet, maar ZONDER de netwerkteller — voor verzoeken die niet naar Sheets gaan:
+// het e-mailadres van de ingelogde gebruiker (auth.js) en de AI-proxy (askChat hieronder). Die
+// twee liepen als enige zónder klok, en dat is precies waar deze grens voor bestaat: een `fetch`
+// die nooit antwoordt hangt voor altijd, en beide aanroepers staan in een try/finally waarvan de
+// finally dan óók nooit draait — `_authBezig` bleef 1 (Herladen-knop dood), `_herinlogBezig` bleef
+// true (de 8s-poll sloeg vanaf dat moment élke ronde over) en de chat bleef op 'aan het typen…'.
+// Bewust buiten `_netwerkFouten`: een storing bij de AI-proxy of bij userinfo mag het dashboard
+// niet als 'offline' bestempelen en daarmee alle Sheets-schrijfacties blokkeren.
+async function fetchMetKlok(url, opts, melding, ms){
+  const ac = new AbortController();
+  const klok = setTimeout(() => ac.abort(), state._fetchTimeoutMs || ms || FETCH_TIMEOUT_MS);
+  // De klok wordt BEWUST niet gewist. `fetch` lost al op zodra de kop binnen is; het lichaam
+  // wordt bij de aanroeper gelezen, en valt de verbinding daar weg, dan is de AbortController het
+  // enige wat die leesactie nog kan afbreken. Een abort op een al gelezen antwoord doet niets.
+  // Zelfde afweging als in _fetchGeteld hieronder.
+  try { return await fetch(url, { ...(opts||{}), signal: ac.signal }); }
+  catch(e){
+    clearTimeout(klok);
+    if(e && e.name==='AbortError') throw new Error(melding || 'Geen antwoord binnen 20 seconden');
+    throw e;
+  }
+}
 
 // Elke Sheets-fetch loopt hierlangs, zodat de teller op één plek klopt: een reject is een echte
 // netwerkfout, en élk antwoord (ook 4xx en 5xx) bewijst dat er verbinding ís.
@@ -184,6 +213,23 @@ function _shiftNtdRows(fromRow, delta){
   });
 }
 
+// Dezelfde correctie voor het tabblad 'Afgerond'. Die bestond niet, en dat was een echt gat:
+// `doCompleteTask` en `bulkAfronden` voegen daar wél rijen in, maar D.af hield de rijnummers van
+// vóór die invoeging. De stille resync repareert dat pas als `pendingWrites` op 0 staat, dus twee
+// afrondingen kort na elkaar rekenden allebei op hetzelfde, inmiddels verschoven anker. Landde de
+// tweede archiefregel daardoor pal onder een sectiekop, dan gooit `parseSections` hem altijd weg
+// als kolomkoprij — de taak stond dan in geen van beide tabbladen meer.
+// Bewust een eigen functie en geen parameter op _shiftNtdRows: de twee bladen hebben een andere
+// bron (D.ntd/D.ntdSecInfo tegenover D.af/D.afSecInfo) en de aanroepers verwarren zou precies de
+// verwisseling opleveren die dit moet voorkomen.
+function _shiftAfRows(fromRow, delta){
+  SKEYS.forEach(s=>{ (D.af[s]||[]).forEach(row=>{ if(row._row>fromRow) row._row+=delta; }); });
+  SKEYS.forEach(s=>{
+    const info=(D.afSecInfo||{})[s];
+    if(info && info.colHeaderRow>fromRow) info.colHeaderRow+=delta;
+  });
+}
+
 // Herstel-idioom voor de rollback van een mislukte rij-DELETE (pure, testbaar):
 // schuif alles wat op of onder de oude positie ligt terug omlaag, d.w.z. shiftFn met
 // (oudeRow-1, +1) — de shift-conditie is '>', dus fromRow-1 betekent 'vanaf oudeRow'.
@@ -215,11 +261,11 @@ async function _withRetry(fn){
 // gebruiker (OAuth-token gaat mee voor de allowlist-check in de proxy).
 async function askChat(system, messages){
   if(!state.oauthToken) throw new Error('Niet ingelogd');
-  const r = await fetch(PROXY_URL, {
+  const r = await fetchMetKlok(PROXY_URL, {
     method:'POST',
     headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${state.oauthToken}` },
     body: JSON.stringify({ system, messages }),
-  });
+  }, 'De AI gaf binnen een minuut geen antwoord', AI_TIMEOUT_MS);
   const data = await r.json().catch(()=>({}));
   if(!r.ok){ const e=new Error(data.error||'AI-fout'); e.status=r.status; throw e; }
   return (data.antwoord || '').trim();
@@ -433,4 +479,4 @@ async function assertRowsMatch(checks, sheetName='Nog Te Doen'){
 const assertRowMatch=(row, bronOfCode, sheetName)=>assertRowsMatch(
   [(bronOfCode && typeof bronOfCode==='object') ? { row, r:bronOfCode } : { row, code:bronOfCode }], sheetName);
 
-export { NTD_DATUM, isOffline, _isOffline, _isNetwerkFout, fetchSheet, fetchSheets, writeRange, writeRows, appendRange, appendRows, veiligeCel, _veiligeRij, _shiftNtdRows, _herstelShift, _isTransient, _withRetry, askChat, _rowMismatch, _a1Bereik, vingerafdruk, rijVingerafdruk, _nummerDeel, _normCel, _rijNaarCellen, assertRowsMatch, assertRowMatch, NTD_OMSCHRIJVING, sheetsFetch };
+export { NTD_DATUM, isOffline, fetchMetKlok, _isOffline, _isNetwerkFout, fetchSheet, fetchSheets, writeRange, writeRows, appendRange, appendRows, veiligeCel, _veiligeRij, _shiftNtdRows, _shiftAfRows, _herstelShift, _isTransient, _withRetry, askChat, _rowMismatch, _a1Bereik, vingerafdruk, rijVingerafdruk, _nummerDeel, _normCel, _rijNaarCellen, assertRowsMatch, assertRowMatch, NTD_OMSCHRIJVING, sheetsFetch };

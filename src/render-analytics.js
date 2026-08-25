@@ -335,7 +335,11 @@ function renderLeaderboard(period){
     const reeks=seriesByPeriod(rows.filter(r=>!_splitBeh(r.behandelaar).length),'datum',period,2);
     return reeks.length ? reeks[reeks.length-1].count : 0;
   })();
-  if(totaal===0){
+  // `totaal` telt alléén de per-persoon-cijfers. Waren er wél afrondingen maar stond er op geen
+  // enkele een behandelaar, dan zei deze regel 'nog geen afgeronde taken' terwijl de tegel erboven
+  // er bijvoorbeeld vier telde — precies de tegenspraak die de zonderNaam-regel hieronder juist
+  // moest wegnemen, maar die stond ná deze vroege terugkeer.
+  if(totaal===0 && !zonderNaam){
     tbody.innerHTML=`<tr><td colspan="5" class="empty"><div class="empty-ico">${ico('vlag')}</div>Nog geen afgeronde taken in deze periode</td></tr>`;
     return;
   }
@@ -355,6 +359,16 @@ function renderLeaderboard(period){
     tbody.insertAdjacentHTML('beforeend',
       `<tr class="lb-rest"><td></td><td class="lb-name">Zonder behandelaar</td>`
       + `<td class="lb-now">${zonderNaam}</td><td class="lb-prev"></td><td class="lb-trend"></td></tr>`);
+  }
+  // Een taak met twee behandelaars ('Jer, Cihad' staat als vaste keuze in de kiezers) telt hier bij
+  // ALLEBEI mee, terwijl de tegel 'Taken afgerond' hem één keer telt. De regels tellen dan op tot
+  // méér dan die tegel, zonder dat iets dat verklaart — de 'Zonder behandelaar'-regel hierboven
+  // dekt juist het omgekeerde geval. Eén regel uitleg in plaats van het getal stil veranderen:
+  // welke van de twee tellingen 'goed' is, is een keuze van de gebruiker en niet van de code.
+  if(data.some(r=>r.huidig>0)){
+    tbody.insertAdjacentHTML('beforeend',
+      `<tr class="lb-rest"><td></td><td class="lb-name" colspan="4" style="color:var(--mut);font-size:11.5px">`
+      + `Een taak met twee behandelaars telt bij allebei mee.</td></tr>`);
   }
 }
 
@@ -650,7 +664,12 @@ function buildDash(){
     dItem(ntdTotal,'teal','Open taken','')+
     dItem(afTotal,'green','Taken afgerond','')+
     dItem(uitnD,'amber',"ALV's uitgeschreven",'')+
-    dItem(notulenD,'green','Notulen verstuurd',`van ${uitnD}`);
+    // Noemer geklemd op max(uitnodiging, notulen), precies zoals de donut eronder dat al doet
+    // (HERO_VIEWS 'notulen'). De vier vinkjes in het ALV-overzicht zijn onafhankelijk, dus notulen
+    // kan hoger staan dan uitnodiging — en dan las deze tegel 'Notulen verstuurd 3, van 2' terwijl
+    // de donut op dezelfde pagina '3/3' toonde. Twee getallen die elkaar tegenspreken zonder dat
+    // er iets kapot is.
+    dItem(notulenD,'green','Notulen verstuurd',`van ${Math.max(uitnD, notulenD)}`);
 
   renderHeroDonut();
 

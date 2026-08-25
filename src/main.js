@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  MAIN — boot/orchestrator
 // ══════════════════════════════════════
-import { IS_STAGING, ALLOWED_EMAILS, SKEYS, APP_VERSION, TEAM } from './config.js';
+import { IS_STAGING, ALLOWED_EMAILS, SKEYS, SECS, APP_VERSION, TEAM } from './config.js';
 import { D, pgs, state } from './state.js';
 import { ensureToken, doOAuth } from './auth.js';
 import { startSplash } from './login-splash.js';
@@ -17,7 +17,7 @@ import {
   subscribeNotifs, unsubscribeNotifs, sendTestNotif, getCurrentWho, initMeldingen,
 } from './notifications.js';
 import {
-  openModal, closeModal, submitTask, doCompleteTask, closeCompleteModal, kiesSectie, renderExtraVves, _bewerkRijVers,
+  openModal, closeModal, submitTask, doCompleteTask, closeCompleteModal, kiesSectie, renderExtraVves, _bewerkRijVers, nietOpgeslagenVelden,
 } from './crud.js';
 import { loadAll, magPollen, schrijfActieLoopt, setSyncOffline, showOfflineBanner, clearOfflineBanner, laadUitCache } from './data.js';
 import { initActions } from './actions.js';
@@ -103,7 +103,20 @@ document.addEventListener('DOMContentLoaded',()=>{
     // En de periodekeuze meteen erbij, om dezelfde reden: een filterbalk met een gat erin ziet
     // eruit als een halfgeladen pagina.
     vulPeriodeKeuze();
-    ['m-beh','m-beh-v','m-beh-o','m-beh-l','m-beh-s'].forEach(id=>vul(id, TEAM.concat(duos)));
+    // 'hh-beh' hoort in dezelfde rij: die kiezer had nog een handgeschreven lijst in index.html
+    // zonder Cihan en zonder de meeste duo's. Stond zo'n naam in de herhaalregel, dan kon de
+    // select hem niet kiezen, zette de browser het veld op leeg en schreef submitHerhaal die
+    // leegte terug naar kolom F — waarna de terugkerende taak bij niemand meer terechtkwam.
+    ['m-beh','m-beh-v','m-beh-o','m-beh-l','m-beh-s','hh-beh'].forEach(id=>vul(id, TEAM.concat(duos)));
+    // En de categoriekiezer van de herhaalregel uit dezelfde bron als de rest van de app: die
+    // stond op twee van de vijf secties (OPPAKKEN en LOD) en zette de andere drie bij het openen
+    // stil op leeg. `vul` bewaart de eerste optie niet nodig hier — hh-sectie heeft er geen.
+    {
+      const el=document.getElementById('hh-sectie');
+      if(el){ const gekozen=el.value; el.innerHTML='';
+        SKEYS.forEach(k=>{ const o=document.createElement('option'); o.value=k; o.textContent=SECS[k].label; el.appendChild(o); });
+        if(gekozen) el.value=gekozen; }
+    }
   }
 
   // Zichtbaar versienummer overal gelijk zetten (één bron: APP_VERSION)
@@ -260,7 +273,9 @@ document.addEventListener('DOMContentLoaded',()=>{
     const r=_bewerkRijVers();
     const bron=r&&r._sec;
     if(!r){ e.target.value = state.editRowData ? state.editRowData._sec : doel; return; }
-    const gelukt=await verplaatsTaak(r, doel);
+    // Wat er in de invoervelden staat en nog niet is opgeslagen gaat NIET mee met de verhuizing —
+    // die bouwt de nieuwe rij uit de opgeslagen taak. Dat hoort in de vraag te staan.
+    const gelukt=await verplaatsTaak(r, doel, nietOpgeslagenVelden(r));
     if(gelukt){ closeModal(); }
     else if(bron){ e.target.value=bron; }
   };
@@ -457,7 +472,9 @@ document.addEventListener('DOMContentLoaded',()=>{
   });
 
   // Live updates — auto-refresh elke 8 seconden (smart diff voorkomt onnodige re-renders)
-  // Id bewaard zodat logout() de poll kan stoppen (anders blijft hij na uitloggen doordraaien).
+  // Id bewaard voor diagnose — logout() stopt hem BEWUST niet: dan zou een tweede inlog in
+  // hetzelfde tabblad stil bevriezen. De poll ligt na een uitlog vanzelf stil (magPollen eist
+  // state.currentUserEmail). Zie de toelichting in logout(), auth.js.
   state._resyncTimer=setInterval(async ()=>{
     // Tijdens de zelftest (?test=1) niet pollen. De suite zet `window.fetch` om de beurt naar een
     // eigen stub en meet dán wat er gevraagd wordt en wat de statusbalk zegt; een ronde die daar
@@ -493,7 +510,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   // Token-refresh heartbeat — elke 4 min proactief vernieuwen vóór expiry.
   // Via doOAuth(false) i.p.v. de client direct: dan wordt de callback correct (her)gebonden,
   // zodat een heartbeat geen lopende ensureToken-refresh kapot maakt (gedeelde-callback-race).
-  // Id bewaard zodat logout() de heartbeat kan stoppen.
+  // Id bewaard voor diagnose — logout() stopt hem BEWUST niet; zie de toelichting daar.
   state._heartbeatTimer=setInterval(()=>{
     if(!state.oauthToken) return;
     if(state.oauthExpiry - Date.now() > 5*60*1000) return;

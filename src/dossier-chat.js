@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  VvE-DOSSIER AI-AGENT — vraag-en-antwoord over één VvE (read-only)
 // ══════════════════════════════════════
-import { esc, displayName } from "./util.js";
+import { esc, displayName, taakTitel } from "./util.js";
 import { SECS } from "./config.js";
 import { state, D } from "./state.js";
 import { vveOverzicht } from "./render-vve.js";
@@ -10,10 +10,27 @@ import { askChat } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { zonderOpmaak } from "./opmaak.js";
 
+// Grenzen op de context. De proxy (api/chat.js) weigert een systeem-instructie boven 20.000
+// tekens; de instructie zelf is ~1.500 tekens, dus 15.000 voor de dossiergegevens laat ruimte
+// over en is nog steeds veel meer dan een normaal dossier nodig heeft. LOGREGEL_MAX kapt één
+// geplakte mail af zodat die niet in zijn eentje het hele venster opeet.
+const CONTEXT_MAX = 15000;
+const LOGREGEL_MAX = 400;
+const _kapLog = t => (t.length > LOGREGEL_MAX ? t.slice(0, LOGREGEL_MAX) + '…' : t);
+
 // Pure helper (testbaar): compacte, feitelijke context-tekst over één VvE.
 function dossierContextTekst(code, data, vandaag){
   const o = vveOverzicht(code, data, vandaag);
-  const t = r => (r.actiepunt || r.agendapunten || r.status || r.periode || r.subsidie || '').trim();
+  // Terugval op `taakTitel` voor categorieën die géén van deze vijf velden hebben. Dat is precies
+  // OFFERTE-TRAJECTEN: die kent alleen code/naam/datumAangevraagd/offertes/behandelaar/deadline/
+  // opmerkingen, dus elk offerte-traject ging hier met een LEGE omschrijving de instructie in.
+  // Het model kreeg letterlijk '- [Offerte-trajecten]  (deadline …)' te zien en antwoordde met de
+  // waarheid die het zag: 'er staat geen omschrijving bij' — terwijl het dossierscherm ernaast
+  // gewoon 'Dakrenovatie — 2 van 3 binnen' toont. taakTitel levert dat onderwerp én de teller.
+  // Bewust ná de eigen velden en niet ervóór: die worden hier onverkort meegegeven, terwijl
+  // taakTitel op de eerste regel snijdt en op lengte afkapt.
+  const t = r => (r.actiepunt || r.agendapunten || r.status || r.periode || r.subsidie || '').trim()
+              || taakTitel(r, r._sec);
   const L = [];
   L.push(`VvE: ${o.code}${o.naam ? ' — ' + o.naam : ''}`);
   if(o.behandelaars.length) L.push(`Behandelaar(s): ${o.behandelaars.join(', ')}`);
@@ -45,7 +62,7 @@ function dossierContextTekst(code, data, vandaag){
       const wat = r.actie === 'Contact'
         ? `${r.veld || 'Contact'} met ${r.oudeWaarde || '?'}: ${zonderOpmaak(r.nieuweWaarde)}`
         : `${r.actie}${r.nieuweWaarde ? ': ' + zonderOpmaak(r.nieuweWaarde) : ''}`;
-      L.push(`- ${fmtLogTs(r.timestamp)} (${wie}) ${wat}`);
+      L.push(`- ${fmtLogTs(r.timestamp)} ${_kapLog(`(${wie}) ${wat}`)}`);
     });
   }
   // Prompt-injectie-hardening (deel 1 van 2): de dossier-context is onvertrouwde data en wordt
@@ -54,7 +71,16 @@ function dossierContextTekst(code, data, vandaag){
   // kan niets de delimiter LETTERLIJK breken. LET OP: dit dekt alléén de delimiter-breuk, NIET
   // instructie-achtige vrije tekst ("negeer bovenstaande…") binnen de gegevens — die wordt door
   // de expliciete data/instructie-scheidingsregel in buildChatSysteemPrompt (deel 2) afgevangen.
-  return L.join('\n').replace(/"{3,}/g, '"');
+  // Lengterem, en die hoort HIER en niet alleen bij de server. De proxy weigert een systeem-
+  // instructie boven 20.000 tekens met een kale HTTP 400, en `vraagChat` vertaalt elke fout naar
+  // 'Kon nu geen antwoord ophalen. Probeer het later opnieuw' — een zin die belooft dat het later
+  // wél lukt terwijl het een harde grens is. In dit dashboard worden hele mails in notitievelden
+  // geplakt, dus een druk dossier haalt die 20.000 met gemak. Nu wordt er zichtbaar en
+  // voorspelbaar afgekapt in plaats van dat de chat het bij één VvE altijd laat afweten.
+  const tekst = L.join('\n').replace(/"{3,}/g, '"');
+  return tekst.length > CONTEXT_MAX
+    ? tekst.slice(0, CONTEXT_MAX) + '\n… (de rest van dit dossier is te lang en is weggelaten)'
+    : tekst;
 }
 
 // Pure helper (testbaar): systeem-instructie met harde regels + context.
@@ -162,7 +188,17 @@ async function vraagChat(){
     state._chatHistorie.push({ rol:'assistant', tekst: antwoord || '(leeg antwoord)' });
   }catch(e){
     console.error('chat-fout', e);
-    state._chatHistorie.push({ rol:'assistant', tekst:'Kon nu geen antwoord ophalen. Probeer het later opnieuw.' });
+    // Een 400 van de proxy is geen storing maar een harde grens (te grote invoer). 'Probeer het
+    // later opnieuw' zou dan liegen: later lukt het net zo min.
+    // Een fout ZONDER .status komt niet van de proxy maar van de verbinding of van de klok
+    // (fetchMetKlok gooit dan een eigen, leesbare melding). Die melding tonen in plaats van hem
+    // weg te gooien: 'probeer het later opnieuw' zegt niets over wat er misging.
+    const tekst = (e && e.status === 400)
+      ? 'Dit dossier is te groot voor de chat. Er is al ingekort, maar het past nog steeds niet — stel je vraag over een kleiner stuk, of vraag even om hulp.'
+      : (e && !e.status && e.message)
+        ? `${e.message}. Probeer het zo nog eens.`
+        : 'Kon nu geen antwoord ophalen. Probeer het later opnieuw.';
+    state._chatHistorie.push({ rol:'assistant', tekst });
   }finally{
     state._chatBezig = false; renderChat();
   }

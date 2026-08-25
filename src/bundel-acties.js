@@ -81,6 +81,14 @@ export function ontkoppelBereiken(rij){
   return [{ range:`'Nog Te Doen'!R${rij}:S${rij}`, values:[_veiligeRij(['',''])] }];
 }
 
+// Zet R en S terug op een EERDERE stand. Dit is de tegenhanger van `ontkoppelBereiken` voor het
+// geval dat de gesleepte taak vóór de handeling al in een ándere bundel zat: dan is 'ongedaan
+// maken' niet leegmaken maar terugzetten. Zelfde reden om kolom Q buiten het bereik te houden.
+export function herstelBundelBereiken(rij, oud){
+  return [{ range:`'Nog Te Doen'!R${rij}:S${rij}`,
+            values:[_veiligeRij([oud.bundelId||'', oud.bundelVolg==null?'':String(oud.bundelVolg)])] }];
+}
+
 // Herordenen raakt alleen kolom S, en alleen de leden die daadwerkelijk een ander nummer krijgen.
 export function herordenBereiken(regels){
   return (regels||[]).map(x => ({ range:`'Nog Te Doen'!S${x.rij}`,
@@ -207,8 +215,25 @@ export async function koppelTaak(sub, doel){
   // herhaalt — ook via deze undo zelf — en dan bleef de tweede toast stil. De gebruiker zag dan
   // niets dubbels; hij zag niets, en had geen weg terug. Zelfde afweging als bij blokkeerOffline
   // (data.js): stilte leest als 'er valt niets te doen'.
+  // De undo moet de OUDE stand terugzetten en niet blind ontkoppelen. `magKoppelen` staat namelijk
+  // uitdrukkelijk toe dat een taak van bundel A naar bundel B verhuist; 'ongedaan maken' betekende
+  // dan 'in HELEMAAL geen bundel meer' — en had bundel A maar twee leden, dan bestond A daarna
+  // niet eens meer (isBundel eist er twee) zonder tweede weg terug.
+  // En `stand.gelukt` is de tweede helft: mislukt de koppel-write (rij-guard, netwerk), dan rolt
+  // backgroundWrite het scherm terug maar blijft de toast nog seconden staan mét een werkende
+  // knop — één klik daarop maakte van een geslaagde rollback alsnog dataverlies.
+  const stand = { gelukt:false };
   showUndoToast('Gestapeld', `${taakTitel(sub)} onder ${taakVerwijzing(doel)}`,
-    async () => { await state._writeChain; await ontkoppelTaak(sub); }, 'plus', { geenDedup:true });
+    async () => {
+      await state._writeChain;
+      if (!stand.gelukt){
+        showToast('Niets ongedaan te maken', 'Het stapelen is niet gelukt — er is niets gewijzigd.',
+                  'var(--am)', 'label', { geenDedup:true, geenSysteemmelding:true });
+        return;
+      }
+      if ((oudSub.bundelId||'').trim()) await herstelBundel(sub, oudSub);
+      else await ontkoppelTaak(sub);
+    }, 'plus', { geenDedup:true });
   backgroundWrite(
     async () => {
       // De hele schrijfopdracht in één synchrone momentopname, vóór de eerste await. Zie de
@@ -311,10 +336,33 @@ export async function koppelTaak(sub, doel){
       if (opdracht.schrijfKop) doel.bundelId = echtBundelId;
       state.bundelOpen.add(echtBundelId);
       await schrijfBereiken(koppelBereiken({ ...opdracht, kopNr, subNr, bundelId: echtBundelId }));
+      stand.gelukt = true;      // pas nu mag de undo-knop iets terugzetten
     },
     () => { sub.bundelId = oudSub.bundelId; sub.bundelVolg = oudSub.bundelVolg; sub.taakId = oudSubNr;
             doel.bundelId = oudKop.bundelId; doel.bundelVolg = oudKop.bundelVolg; doel.taakId = oudKopNr; },
     'Stapelen mislukt'
+  );
+}
+
+// Zet een taak terug in de bundel waar hij vóór het stapelen in zat. Zelfde vorm als
+// `ontkoppelTaak`, met dezelfde rij-guard; alleen de waarden verschillen.
+export async function herstelBundel(r, oud){
+  if (blokkeerOffline()) return;
+  if (!await ensureToken()){ alert('Inloggen mislukt. Probeer het opnieuw.'); return; }
+  if (!heeftRij(r)) return;
+  if (blokkeerAfgerond(r)) return;
+  const huidig = { bundelId: r.bundelId, bundelVolg: r.bundelVolg };
+  r.bundelId = oud.bundelId || ''; r.bundelVolg = oud.bundelVolg || '';
+  if (r.bundelId) state.bundelOpen.add(bundelSleutel(r.bundelId));
+  renderAll();
+  backgroundWrite(
+    async () => {
+      const rij = r._row;                 // één keer lezen, vóór de lezing — zie koppelTaak
+      await assertRowsMatch([{ row: rij, r }]);
+      await schrijfBereiken(herstelBundelBereiken(rij, oud));
+    },
+    () => { r.bundelId = huidig.bundelId; r.bundelVolg = huidig.bundelVolg; },
+    'Terugzetten mislukt'
   );
 }
 
@@ -355,8 +403,14 @@ const schrijfVolg = wijzigingen => async () => {
 // veranderd heeft; dat is een andere vraag dan of er nummers wijzigen, en alleen de aanroeper kan
 // hem beantwoorden (zie de melding hieronder).
 export async function herordenBundel(nieuweVolgorde, volgordeGewijzigd){
-  if (blokkeerOffline()) return;
-  if (!await ensureToken()){ alert('Inloggen mislukt. Probeer het opnieuw.'); return; }
+  // BIJ ELKE AFBREKING EERST TERUGTEKENEN. De gesleepte regel staat op dit moment door
+  // `insertBefore` al op zijn nieuwe plek in het paneel, terwijl er nog niets geschreven is en de
+  // volgnummers in het geheugen ongewijzigd zijn. Breken we hier af zonder `renderAll()`, dan
+  // blijft die verkeerde volgorde staan tot er toevallig ergens anders iets verandert — `loadAll`
+  // hertekent alleen bij een gewijzigde datahash, dus offline kan dat de hele reis duren. De tak
+  // 'Deze volgorde kan niet' hieronder doet dit al goed; deze vier deden het niet.
+  if (blokkeerOffline()){ renderAll(); return; }
+  if (!await ensureToken()){ renderAll(); alert('Inloggen mislukt. Probeer het opnieuw.'); return; }
   const wijzigingen = hernummerLeden(nieuweVolgorde);
   if (!wijzigingen.length){                             // niets te schrijven → geen verzoek
     // Nul wijzigingen is normaal zolang de gebruiker niets verschoven heeft. Maar sleepte hij wél
@@ -384,14 +438,14 @@ export async function herordenBundel(nieuweVolgorde, volgordeGewijzigd){
     }
     return;
   }
-  if (!heeftRij(...wijzigingen.map(w => w.r))) return;
+  if (!heeftRij(...wijzigingen.map(w => w.r))){ renderAll(); return; }
   // Vangnet op de af-vlag: `hernummerLeden` laat afgeronde leden weg op grond van de `af` die de
   // AANROEPER meegeeft. Bij het slepen komt die vlag NIET uit de DOM — daar komt alleen de volgorde
   // vandaan (`data-taak`), waarna `sleepUitslag` de leden ongewijzigd uit de verse `bouwBundelIndex`
   // haalt. Voor die weg is dit dus een vangnet. Bouwt een latere aanroeper de lijst zelf op en zet
   // hij de vlag verkeerd, dan zou hier een rij uit 'Afgerond' in de lijst staan en zijn regelnummer
   // als 'Nog Te Doen'-rij beschreven worden.
-  if (blokkeerAfgerond(...wijzigingen.map(w => w.r))) return;
+  if (blokkeerAfgerond(...wijzigingen.map(w => w.r))){ renderAll(); return; }
   // De oude nummers in dezelfde vorm als `wijzigingen`, zodat de undo exact dezelfde weg loopt.
   // `?? ''` en niet `|| ''`: alleen het GETAL 0 maakt hier verschil, en 0 is een echt volgnummer —
   // zo begint een verse bundel. Vandaag levert parseSections altijd strings ('0' overleeft `||`
@@ -404,8 +458,11 @@ export async function herordenBundel(nieuweVolgorde, volgordeGewijzigd){
   // geenDedup om dezelfde reden als bij het stapelen: slepen is bij uitstek de handeling die
   // iemand een paar keer achter elkaar doet, en met de ontdubbeling kreeg elke tweede sleepactie
   // binnen 30 seconden géén toast en dus geen weg terug.
-  showUndoToast('Volgorde gewijzigd',
-    `${wijzigingen.length} ${wijzigingen.length===1?'taak':'taken'} verplaatst`, async () => {
+  // GEEN aantal in de tekst. `wijzigingen.length` telt de leden waarvan het VOLGNUMMER wijzigt,
+  // en omdat de reeks per positie opnieuw wordt uitgedeeld (10, 20, 30 …) schuift één sleepgebaar
+  // bijna altijd alles eronder mee — inclusief de hoofdtaak, die niet eens in het paneel staat.
+  // '4 taken verplaatst' na het verslepen van één regel is dus onwaar.
+  showUndoToast('Volgorde gewijzigd', 'De nieuwe volgorde is opgeslagen', async () => {
     // Eerst de lopende schrijfactie afwachten en dán pas terugzetten: draaide de undo ervoorheen,
     // dan zou de heenweg de teruggezette nummers alsnog overschrijven (zelfde volgorde-eis als bij
     // de bulk-undo). En blokkeerOffline erná, want anders staat het scherm op 'oud' terwijl de
@@ -599,7 +656,18 @@ export function initBundelSlepen(container){
     herordenBundel(uitslag.volgorde, true);
   };
   window.addEventListener('pointerup', stop);
-  window.addEventListener('pointercancel', stop);
+  // `pointercancel` betekent per specificatie dat het gebaar is AFGEBROKEN — de gebruiker heeft
+  // niet losgelaten. De browser stuurt hem bij een systeemvenster, een binnenkomend gesprek, een
+  // aanraking die als scroll wordt overgenomen of een verdwijnend element. Aan `stop` gekoppeld
+  // sloeg zo'n afbreking de halve volgorde alsnog op — de stand waarin de regel toevallig hing.
+  // `initStapelSlepen` verderop maakt dezelfde keuze al bewust andersom.
+  window.addEventListener('pointercancel', () => {
+    if (!_sleep || losgeraakt()) return;
+    const rij = _sleep.rij;
+    _sleep = null;
+    rij.classList.remove('sleep');
+    renderAll();   // de half-versleepte regel terug naar de opgeslagen volgorde
+  });
 }
 
 // ── Slepen om te stapelen ─────────────────────────────────────────────────────

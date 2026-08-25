@@ -35,8 +35,12 @@ function parseOntw(rows){
 function renderOntw(){
   const q=(document.getElementById('s-ontw')?.value||'').toLowerCase().trim();
   const cats=['Alles',...ONTW_CATS,'Afgerond'];
-  const openItems=D.ontw.filter(r=>r.status!=='Afgerond');
-  const doneItems=D.ontw.filter(r=>r.status==='Afgerond');
+  // De zoekterm telt óók mee in de TABTELLERS. Zonder dat zei het tabblad '12' terwijl er drie
+  // regels in beeld stonden — de takenlijst en de Afgerond-lijst doen dit al wél (filterNtd /
+  // filterAf draaien mét zoekterm). Eén helper, zodat teller en lijst niet uiteen kunnen lopen.
+  const zoek=lijst=>q?lijst.filter(r=>`${r.titel} ${r.inhoud} ${r.categorie} ${r.door}`.toLowerCase().includes(q)):lijst;
+  const openItems=zoek(D.ontw.filter(r=>r.status!=='Afgerond'));
+  const doneItems=zoek(D.ontw.filter(r=>r.status==='Afgerond'));
   document.getElementById('ontw-tabs').innerHTML=cats.map(c=>{
     let cnt;
     if(c==='Alles') cnt=openItems.length;
@@ -52,7 +56,7 @@ function renderOntw(){
   if(state.activeOntw==='Afgerond') rows=doneItems;
   else if(state.activeOntw==='Alles') rows=openItems;
   else rows=openItems.filter(r=>r.categorie===state.activeOntw);
-  if(q) rows=rows.filter(r=>`${r.titel} ${r.inhoud} ${r.categorie} ${r.door}`.toLowerCase().includes(q));
+  // (het zoekfilter zit al in openItems/doneItems hierboven)
 
   renderThead('ontw-thead',['Titel','Categorie','Inhoud','Door','Datum','Status',''],'--sec:var(--pk);--sec-l:var(--pk-l);--sec-b:var(--pk-b)');
   // Clamp, zoals de ALV-lijsten al doen: verwijder je op pagina 2 het laatste item, dan wees
@@ -63,7 +67,10 @@ function renderOntw(){
   const el=document.getElementById('ontw-tbody');
   // Ook bij een lege uitkomst de paginabalk bijwerken; anders bleef daar de oude, onjuiste
   // tekst staan en was er geen knop om terug te klikken.
-  if(!sl.length){el.innerHTML=`<tr><td colspan="7">${emptyRow(7,true)}</td></tr>`;renderPag('ontw-pag',rows.length,pgs.ontw,'ontw');return}
+  // `!!q` als derde argument: met een zoekterm hoort er 'Niets gevonden — pas je filter aan' te
+  // staan en niet 'Geen resultaten'. De categoriekeuze is een tabblad en geen filter, dus die telt
+  // hier bewust niet mee — zelfde afweging als `erIsGefilterd` in render-lijsten.js.
+  if(!sl.length){el.innerHTML=`<tr><td colspan="7">${emptyRow(7,true,!!q)}</td></tr>`;renderPag('ontw-pag',rows.length,pgs.ontw,'ontw');return}
   el.innerHTML=sl.map(r=>{
     const rid=state._rowCache.length;state._rowCache.push(Object.assign({},r,{_sec:'ONTW'}));
     const clr=ONTW_CAT_COLORS[r.categorie]||'var(--mut)';
@@ -450,13 +457,19 @@ function _rerenderLog(){
 function editLogboek(row){
   state.logEdit=row;
   const e=(D.logboek||[]).find(x=>x._row===row);
+  // De IDENTITEIT van de bewerkte regel erbij. `state.logEdit` is een Sheet-RIJNUMMER, en dat
+  // schuift op zodra een collega elders een logregel verwijdert of een undo er een invoegt: het
+  // formulier stond dan opeens op de BUURREGEL, met diens tekst erin, en Opslaan schreef jouw
+  // tekst naar die buurregel. `_shiftLogEditRef` dekt alleen de verschuivingen die dit scherm
+  // zélf veroorzaakt, niet die van een ander. De timestamp verschuift nooit.
+  state.logEditTs=e?_logAnkerSleutel(e):'';
   state.logEditSoort=e?e.veld:null;
   _rerenderLog();
   // Focus op de ZICHTBARE instantie (het formulier staat ook in de verborgen andere pagina)
   setTimeout(()=>{ const t=document.querySelector('.page.active .log-edit-tekst'); if(t){ t.focus(); t.setSelectionRange(t.value.length,t.value.length); } },0);
 }
 
-function cancelLogboek(){ state.logEdit=null; state.logEditSoort=null; _rerenderLog(); }
+function cancelLogboek(){ state.logEdit=null; state.logEditTs=null; state.logEditSoort=null; _rerenderLog(); }
 
 function setLogSoort(soort){
   state.logEditSoort=soort;
@@ -481,7 +494,7 @@ async function saveLogboek(row, box){
   // optimistisch bijwerken + sluiten
   if(isContact){ entry.veld=soort; entry.oudeWaarde=wie; }
   entry.nieuweWaarde=tekst;
-  state.logEdit=null; state.logEditSoort=null;
+  state.logEdit=null; state.logEditTs=null; state.logEditSoort=null;
   _rerenderLog();
   const w=logEditWrite(entry.actie, row, soort, wie, tekst);
   backgroundWrite(
@@ -512,7 +525,7 @@ async function deleteLogboek(row){
   //  anders verspringt het en kan Opslaan de verkeerde logregel overschrijven)
   entries.splice(idx,1);
   _shiftLogboekRows(oudeRow,-1);
-  if(state.logEdit===row){ state.logEdit=null; state.logEditSoort=null; }
+  if(state.logEdit===row){ state.logEdit=null; state.logEditTs=null; state.logEditSoort=null; }
   else state.logEdit=_shiftLogEditRef(state.logEdit,oudeRow,-1);
   _rerenderLog();
   // Idempotentie-vlag: deleteDimension is positie-gebaseerd en NIET idempotent (zie
@@ -571,6 +584,29 @@ async function undoDeleteLog(vals, oudeRow, wasVerwijderd){
   finally{ state._undoInFlight=false; }
 }
 
+// Trek het rijnummer van een open bewerkformulier bij naar de regel waar het écht bij hoort.
+// Verschoof de regel doordat iemand ANDERS een logregel verwijderde of terugzette, dan wijst
+// `state.logEdit` naar de buurregel; is de regel zelf weg, dan sluiten we het formulier met een
+// melding in plaats van de tekst stil op een vreemde regel te laten staan.
+// Sleutel van een logregel voor de her-ankering. NIET de timestamp alleen: `deleteLogboek` legt
+// honderd regels hoger al uit dat die géén identiteit is — bulk-acties schrijven meerdere regels
+// met exact dezelfde milliseconde. Met code, actie en gebruiker erbij blijft er in de praktijk één
+// treffer over; is dat niet zo, dan doen we liever niets dan gokken.
+const _logAnkerSleutel = e => [e && e.timestamp, e && e.code, e && e.actie, e && e.gebruiker].join('\x1f');
+
+function _herankerLogEdit(){
+  if(state.logEdit==null || !state.logEditTs) return;
+  const treffers=(D.logboek||[]).filter(x=>_logAnkerSleutel(x)===state.logEditTs);
+  // Precies één treffer → het rijnummer bijtrekken. Meerdere treffers → niets doen: dan is het
+  // rijnummer nog altijd het beste houvast dat we hebben, en een gok zou de bewerking op een
+  // andere regel kunnen laten landen.
+  if(treffers.length===1){ state.logEdit=treffers[0]._row; return; }
+  if(treffers.length>1) return;
+  state.logEdit=null; state.logEditTs=null; state.logEditSoort=null;
+  showToast('De lijst is ververst','De regel die je bewerkte bestaat niet meer — het formulier is gesloten.',
+            'var(--am)','label',{geenDedup:true,geenSysteemmelding:true});
+}
+
 function renderLogboek(){
   // Bescherm half-getypte bewerktekst tegen de 8s-poll (analoog aan de VvE-composer).
   // Gescoped op de eigen feed (hetzelfde formulier staat óók in het dossier) én op
@@ -579,6 +615,7 @@ function renderLogboek(){
   // bestendig (rijnummers verschuiven bij deletes, het tijdstip van de entry nooit).
   const _editBox=document.querySelector('#logboek-feed .log-edit');
   const _editTekstEl=_editBox?.querySelector('.log-edit-tekst');
+  _herankerLogEdit();
   const _editEntry=state.logEdit?(D.logboek||[]).find(x=>x._row===state.logEdit):null;
   const _editBewaar=(_editTekstEl && _editEntry && _editBox.dataset.ts===(_editEntry.timestamp||''))?{
     tekst:_editTekstEl.value,
@@ -716,6 +753,6 @@ export {
   ONTW_CATS, ONTW_CAT_COLORS, parseOntw, renderOntw, setOntw, openOntwModal, closeOntwModal,
   submitOntwItem, deleteOntwItem, editOntwItem, parseLogboek, _logSleutel, _nogNietBevestigd, fmtLogTs, actieBadge, _LOG_AVKLEUR, avatarKleur,
   logDayLabel, logZin, logTijd, logItemHtml, logPaginaSoort, renderLogboek, histNoteKey, renderTaskHistory, addTaskNote, logEvent, logEvents,
-  _shiftRows, _shiftLogboekRows, _shiftLogEditRef, logEditWrite, logDeleteLabel,
+  _shiftRows, _shiftLogboekRows, _shiftLogEditRef, _herankerLogEdit, logEditWrite, logDeleteLabel,
   logEditForm, editLogboek, saveLogboek, cancelLogboek, setLogSoort, deleteLogboek, undoDeleteLog,
 };

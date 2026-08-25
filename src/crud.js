@@ -5,8 +5,8 @@ import { esc, berekenPrioriteit, toISODate, toDutchDate, nieuwTaakId, taakVerwij
 import { zoekDubbels, dubbelVraagTekst } from "./dubbelcheck.js";
 import { extraVves, wisExtraVves, extraVvesHtml, extraVvesUitleg } from "./meervve.js";
 import { state, D, pgs } from "./state.js";
-import { SECS, SKEYS, SID, OMSCHRIJVING_SLEUTEL } from "./config.js";
-import { writeRange, writeRows, _shiftNtdRows, _herstelShift, assertRowMatch, sheetsFetch, fetchSheet, _a1Bereik, _withRetry } from "./api.js";
+import { SECS, SKEYS, SID, OMSCHRIJVING_SLEUTEL, VELD_LABELS } from "./config.js";
+import { writeRange, writeRows, _shiftNtdRows, _shiftAfRows, _herstelShift, assertRowMatch, sheetsFetch, fetchSheet, _a1Bereik, _withRetry } from "./api.js";
 import { isKolomKop, isSectieKop } from "./structuurcheck.js";
 import { ensureToken } from "./auth.js";
 import { showToast, showUndoToast, fireNotifEvent, undoComplete, undoDelete } from "./notifications.js";
@@ -293,6 +293,40 @@ export function zetHoortBij(r){
   if(wis&&isSub) wis.style.display='';
 }
 
+// Welke ZICHTBARE velden van het bewerkscherm wijken af van de opgeslagen rij? De categoriekiezer
+// is bij bewerken de verplaats-knop, en `verplaatsTaak` bouwt de nieuwe rij volledig uit het
+// rij-OBJECT — wat er op dat moment in de invoervelden staat en nog niet is opgeslagen, verdween
+// daarmee zonder één woord. Deze functie levert de veldnamen zoals de gebruiker ze op het scherm
+// ziet, zodat de bevestigingsvraag ze kan noemen.
+// Dezelfde afbeelding als fillModalFields hierboven, maar dan de andere kant op. Bewust niet via
+// `values` uit submitTask: die bouwt kolomwaarden en kent geen labels.
+// Per sectie: [veld-id, sleutel op het rij-object, soort]. Soort 1 = datum (het veld draagt ISO,
+// de rij een Nederlandse datum), soort 2 = schakelaar (aan/uit i.p.v. .value).
+// De subcategorie en de 'In behandeling'-schakelaar staan er nadrukkelijk BIJ: de vraagtekst leest
+// als een volledige opsomming, en `verplaatsWaarden` neemt allebei uit het rij-object over — een
+// wijziging op het scherm die hier niet genoemd wordt, verdwijnt dus zonder één woord.
+const _MODAL_VELDEN = {
+  'OPPAKKEN':           [['m-actie','actiepunt'],['m-dl','deadline',1],['m-beh','behandelaar'],['m-opm','opmerkingen'],['m-sub-opp','subcategorie'],['tog-ib','inBehandeling',2]],
+  'VERGADERVERZOEKEN':  [['m-per','periode'],['m-agenda','agendapunten'],['m-beh-v','behandelaar'],['m-dl-v','deadline',1],['m-opm-v','opmerkingen'],['m-sub-verg','subcategorie'],['tog-ib-v','inBehandeling',2]],
+  'OFFERTE-TRAJECTEN':  [['m-daang','datumAangevraagd',1],['m-beh-o','behandelaar'],['m-dl-o','deadline',1],['m-opm-o','opmerkingen'],['m-sub-off','subcategorie']],
+  'LOD':                [['m-actie-l','actiepunt'],['m-stat-l','status'],['m-beh-l','behandelaar'],['m-dl-l','deadline',1],['m-opm-l','opmerkingen'],['m-sub-lod','subcategorie'],['tog-ib-l','inBehandeling',2]],
+  'SUBSIDIE-TRAJECTEN': [['m-subsidie','subsidie'],['m-beh-s','behandelaar'],['m-dl-s','deadline',1],['m-opm-s','opmerkingen'],['m-sub-sub','subcategorie'],['tog-ib-s','inBehandeling',2]],
+};
+const _MODAL_EXTRA_LABEL = { subcategorie:'Subcategorie', inBehandeling:'In behandeling' };
+export function nietOpgeslagenVelden(r){
+  const spec=_MODAL_VELDEN[r&&r._sec];
+  if(!spec) return [];
+  const labels=VELD_LABELS[r._sec]||{};
+  return spec.filter(([id,sleutel,soort])=>{
+    const el=document.getElementById(id);
+    if(!el) return false;
+    if(soort===2) return el.classList.contains('on') !== (r[sleutel]==='TRUE');
+    const opScherm=String(el.value==null?'':el.value).trim();
+    const opgeslagen=soort===1 ? toISODate(r[sleutel]||'') : String(r[sleutel]==null?'':r[sleutel]).trim();
+    return opScherm!==opgeslagen;
+  }).map(([,sleutel])=>labels[sleutel]||_MODAL_EXTRA_LABEL[sleutel]||sleutel);
+}
+
 function fillModalFields(sec,r){
   const tog=(id,on)=>{const e=document.getElementById(id);if(e){e.classList.toggle('on',!!on);e.setAttribute('aria-checked',!!on);}};
   switch(sec){
@@ -532,6 +566,18 @@ async function bevestigInvoegPlek(sec, afterRow, tabblad){
 // plek in de bundel verliezen — precies de soort schade die dit traject wil voorkomen.
 const nulVeilig = v => (v === 0 || v) ? String(v) : '';
 
+// De RAUWE celwaarde van een veld — dus wat er in de Sheet hoort te staan, niet wat het scherm
+// toont. Er is precies één veld waar die twee verschillen: `offertes` (kolom D). Bij elke render
+// vervangt `_verrijkOfferteRij` (render-offerte.js) dat veld door de gereconcilieerde teller
+// (kolom D als ONDERGRENS, opgehoogd met de aangevinkte aannemers uit kolom P) en bewaart de
+// echte D-waarde in `_offertesManual`. Schrijf je die afgeleide waarde terug, dan wordt hij de
+// nieuwe ondergrens en kan de teller nooit meer omlaag: een vinkje weghalen bij een aannemer
+// verandert er dan niets meer aan, en dat is met de hand in de Sheet te herstellen.
+// `fillModalFields` deed dit al goed; de undo-serialisatie en de archiefrij niet. Eén helper,
+// zodat een vierde plek er niet opnieuw langs kan lopen.
+export const celWaarde = (r, k) =>
+  (k === 'offertes' && r._offertesManual !== undefined) ? (r._offertesManual || '') : (r[k] || '');
+
 // Gedeelde undo-serialisatie van een NTD-taakrij → kolomwaarden A..S.
 // N (placeholder), O (offerte-fase) en P (aannemerslijst) horen erbij: zo verliest een
 // undo van een afgerond/verwijderd OFFERTE-traject niet stil de opgebouwde aannemerslijst
@@ -539,7 +585,7 @@ const nulVeilig = v => (v === 0 || v) ? String(v) : '';
 // Eén bron voor de drie callsites (deleteTaskRow, doCompleteTask, bulk-afronden/-verwijderen),
 // zodat de kolombreedte nooit meer per plek uit elkaar loopt.
 export function serializeNtdUndo(r){
-  const v=SECS[r._sec].keys.map(k=>r[k]||'');
+  const v=SECS[r._sec].keys.map(k=>celWaarde(r,k));
   while(v.length<8) v.push('');                  // OFFERTE heeft 7 velden → vul tot H
   v.push('', '', r.subcategorie||'', r.opvolgdatum||'', r.herhaalId||'', '', r.fase||'', r.aannemers||''); // I, J, K=sub, L, M, N, O=fase, P=aannemers
   v.push(r.taakId||'');   // Q — het vaste taaknummer moet de undo overleven, anders krijgt de
@@ -637,7 +683,12 @@ async function deleteCurrentEditTask(){
 // al onder de gebruiker vandaan sluiten (de aanroeper deed dat toen zélf, nog vóór deze functie
 // begon), dus dáár verandert dit traject niets aan. De vraag is de enige nieuwe afbreekweg.
 async function deleteTaskRow(r, bijDoorgaan){
-  const omschrijving=r.actiepunt||r.periode||r.subsidie||r.code||'deze taak';
+  // Via de centrale `taakTitel` en niet via een eigen terugvalketen: die keten kende
+  // `opmerkingen` (Offerte-trajecten) en `agendapunten` (Vergaderverzoeken) niet en viel daar
+  // terug op de VvE-code. Twee offerte-trajecten van dezelfde VvE gaven dan letterlijk dezelfde
+  // melding — '311212 — 311212' — en met dezelfde ontdubbelsleutel erbovenop verdween de tweede
+  // undo-knop volledig. `taakTitel` volgt OMSCHRIJVING_SLEUTEL en loopt dus niet opnieuw uit de pas.
+  const omschrijving=taakTitel(r, r._sec)||r.code||'deze taak';
   // Er is bewust GEEN cascade: verwijderen raakt nooit meer dan één taak (§6.6). De subtaken blijven
   // dus staan, en dat is precies wat je hier moet weten — je verwijdert de taak waar ze onder
   // hangen. Bewust niet 'de bundel blijft bestaan': houdt er één subtaak over, dan is het na afloop
@@ -659,7 +710,12 @@ async function deleteTaskRow(r, bijDoorgaan){
   const sec=r._sec;
   // undo-data vastleggen vóór de mutatie (zelfde serialisatie als afronden)
   const ntdValues=serializeNtdUndo(r);
-  const undoData={sec,code:r.code,ntdValues};
+  // `gelukt` blijft false tot de schrijfactie écht geland is. Zonder deze haak voegde de
+  // undo-knop de rij onvoorwaardelijk opnieuw in — óók als er niets verwijderd wás (rij-guard,
+  // 401, 5xx). Dat leverde een TWEEDE rij op met hetzelfde vaste taaknummer in kolom Q: precies
+  // de dubbele identiteit waar het hele taaknummer-mechanisme op stukgaat. Zelfde idioom als
+  // `deleteLogboek` in render-overig.js, die de undo al een kijkgaatje op zijn vlag meegeeft.
+  const undoData={sec,code:r.code,ntdValues,gelukt:false};
   const oudeRow=r._row;
   // Dezelfde manier van zoeken als bij afronden: eerst de rij in de takentabel op de ZICHTBARE
   // pagina, anders de taakregel op de dossierpagina. Zonder die tweede helft vond dit niets als je
@@ -673,7 +729,16 @@ async function deleteTaskRow(r, bijDoorgaan){
   const pos=arr.indexOf(r);
   if(pos>-1) arr.splice(pos,1);
   _shiftNtdRows(oudeRow,-1);
-  showUndoToast('Taak verwijderd',`${r.code} — ${omschrijving}`,()=>undoDelete(undoData),'prullenbak');
+  // Ontdubbelen op het vaste TAAKNUMMER en niet op de tekst. Twee offerte-trajecten van dezelfde
+  // VvE leveren letterlijk dezelfde titel+tekst op (`omschrijving` valt daar terug op de code), en
+  // dan slikte de ontdubbeling de tweede undo-toast volledig in — terwijl die knop de enige
+  // beveiliging is bij een handeling die bewust geen bevestigingsvraag heeft.
+  showUndoToast('Taak verwijderd',`${r.code} — ${omschrijving}`,()=>undoDelete(undoData),'prullenbak',
+                // Bij een rij ZONDER vast taaknummer (van vóór de backfill) niet op het kale rijnummer:
+                // dat schuift op bij elke insert/delete en wordt binnen dezelfde 30 seconden opnieuw
+                // uitgedeeld. Dan zou de undo-toast van een ándere taak ingeslikt worden. Code en
+                // omschrijving erbij maken de sleutel weer onderscheidend.
+                {sleutel:`verwijder|${r.taakId||`${r._row}|${r.code}|${omschrijving}`}`});
   // Idempotentie-vlag: een deleteDimension is positie-gebaseerd en NIET idempotent. Zonder
   // deze vlag zou een _withRetry-herkansing (na een transient 429/5xx) de rij eronder — die
   // door de eerste delete naar boven schoof — kunnen verwijderen. (patroon: offerte-aannemers.js)
@@ -692,8 +757,13 @@ async function deleteTaskRow(r, bijDoorgaan){
         });
         if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Verwijderfout');err.status=resp.status;throw err}
         verwijderd=true;
+        undoData.gelukt=true;      // pas nu mag de undo-knop iets terugzetten
       }
-      await logEvent(r.code, sec, 'Verwijderd', '', r.actiepunt||r.periode||r.subsidie||'', '');
+      // Voor de LOGREGEL de rauwe omschrijving, niet `taakTitel`: die snijdt op de eerste regel en
+      // kapt op 90 tekens af — prima voor een melding op het scherm, maar het logboek is het enige
+      // spoor dat na het verwijderen overblijft. Wel via OMSCHRIJVING_SLEUTEL, want dáár ging de
+      // oude vaste veldketen de mist in (bij offerte en vergaderverzoek stond er iets anders).
+      await logEvent(r.code, sec, 'Verwijderd', '', r[OMSCHRIJVING_SLEUTEL[sec]]||taakTitel(r,sec)||'', '');
     },
     ()=>{ if(arr.indexOf(r)===-1){ _herstelShift(_shiftNtdRows,oudeRow); arr.splice(Math.min(pos<0?arr.length:pos,arr.length),0,r); } },
     'Verwijderen mislukt'
@@ -851,7 +921,10 @@ async function completeTaskRow(r, rid, bijDoorgaan){
   const d=new Date();
   document.getElementById('complete-date').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   document.getElementById('complete-comment').value='';
-  document.getElementById('complete-title').textContent=`Taak afhandelen — ${r.actiepunt||r.periode||r.subsidie||r.code||''}`;
+  // Zelfde bron als de meldingen: bij een offerte-traject of vergaderverzoek stond hier anders
+  // alleen de VvE-code (resp. de periode), en dan is op dit scherm niet te zien wélke taak je
+  // afrondt als een VvE er twee heeft.
+  document.getElementById('complete-title').textContent=`Taak afhandelen — ${taakTitel(r, r._sec)||r.code||''}`;
   document.getElementById('complete-bg').classList.add('open');
 }
 
@@ -870,6 +943,12 @@ export function afrondWaarden(r, sec, datum, toelichting){
   // Harde fout i.p.v. terugvallen op een 'default'-sectie: een taak die in het verkeerde
   // kolomstramien in 'Afgerond' belandt is duurder dan een mislukte afronding.
   if(!SECS[sec]) throw new Error('Onbekende sectie: '+sec);
+  // BEWUST `r[k]` en NIET `celWaarde` — anders dan serializeNtdUndo hierboven. Het verschil zit in
+  // wat er méégaat: de undo-rij gaat terug naar 'Nog Te Doen' mét de aannemerslijst in kolom P, dus
+  // daar kan `reconcileOffertes` de teller opnieuw opbouwen uit de rauwe kolom D. De ARCHIEFrij
+  // krijgt M..P leeg (zie hieronder): daar is de afgeleide teller het enige wat er nog van over is.
+  // Schreven we hier de rauwe waarde, dan toonde een afgerond offerte-traject '0 van 3 binnen'
+  // terwijl er drie offertes lagen — en kolom P is dan weg, dus dat is nergens meer terug te halen.
   const v=SECS[sec].keys.map(k=>r[k]||'');
   while(v.length<8) v.push('');               // OFFERTE heeft 7 velden → vul tot H
   return v.concat([
@@ -913,15 +992,43 @@ async function doCompleteTask(){
     if(afSheetId==null) throw new Error('Sheet "Afgerond" niet gevonden');
     if(ntdSheetId==null) throw new Error('Sheet "Nog Te Doen" niet gevonden');
     const afAfterRow=getAfInsertRow(sec);
-    const batchBody={requests:[
-      {insertDimension:{range:{sheetId:afSheetId,dimension:'ROWS',startIndex:afAfterRow,endIndex:afAfterRow+1},inheritFromBefore:true}},
-      {updateCells:{range:{sheetId:afSheetId,startRowIndex:afAfterRow,endRowIndex:afAfterRow+1,startColumnIndex:0,endColumnIndex:values.length},
+    // Vers narekenen of die archiefplek NOG klopt — dezelfde controle die `submitTask` op 'Nog Te
+    // Doen' al doet, nu op 'Afgerond'. `bevestigInvoegPlek` kende het tabblad al, maar werd er
+    // nooit mee aangeroepen. Dit venster is een `.modal-bg`, dus de 8s-poll staat stil zolang de
+    // gebruiker een toelichting typt; rondt een collega intussen iets af, dan wijst het onthouden
+    // rijnummer naar de sectiekop eronder en gooit `parseSections` de archiefregel altijd weg als
+    // kolomkoprij — de taak staat dan in geen van beide tabbladen meer.
+    try{ await bevestigInvoegPlek(sec, afAfterRow, 'Afgerond'); }
+    catch(e){
+      // Eerst herladen, dán melden: de tekst zegt 'opnieuw geladen', en dat hoort waar te zijn
+      // op het moment dat de gebruiker hem leest. (Zelfde volgorde als in submitTask.)
+      await loadAll();
+      // Venster bewust NIET sluiten: de getypte toelichting moet blijven staan.
+      alert(e.melding || e.message);
+      return;
+    }
+    // Deze controle doet een ECHT leesverzoek (met herkansing bij 429/5xx), en al die tijd blijft
+    // het venster open met werkende knoppen 'Annuleren' en '×'. Sluit de gebruiker het in dat gat,
+    // dan zette `closeCompleteModal` alleen `state._completeRow` op null — deze functie liep
+    // gewoon door en rondde de taak alsnog af, mét een groene bevestiging. Vóór deze wijziging was
+    // er geen meetbaar gat (getSheetIds komt uit de cache), dus deze rem hoort bij die await.
+    if(state._completeRow!==r){ closeCompleteModal(); return; }
+    // De batch wordt PAS IN DE WRITEFN gebouwd, met een dan vers berekende archiefplek. Zetten we
+    // het rijnummer hier al vast, dan draagt een tweede afronding die binnen hetzelfde
+    // schrijfvenster start een ABSOLUUT anker in zijn batch dat door een rollback van de eerste
+    // niet meer gecorrigeerd wordt — en dan landt de archiefregel tien rijen te laag, mogelijk pal
+    // onder de sectiekop van het volgende blok (waar parseSections hem altijd weggooit).
+    // In de writeFn kan dat niet: `backgroundWrite` voert de wachtrij SERIEEL uit, dus op dat
+    // moment zijn alle eerdere schrijfacties én hun eventuele rollbacks al geweest.
+    const bouwBatch=(afRij)=>({requests:[
+      {insertDimension:{range:{sheetId:afSheetId,dimension:'ROWS',startIndex:afRij,endIndex:afRij+1},inheritFromBefore:true}},
+      {updateCells:{range:{sheetId:afSheetId,startRowIndex:afRij,endRowIndex:afRij+1,startColumnIndex:0,endColumnIndex:values.length},
         rows:[{values:values.map(v=>({userEnteredValue:{stringValue:String(v)}}))}],fields:'userEnteredValue'}},
       {deleteDimension:{range:{sheetId:ntdSheetId,dimension:'ROWS',startIndex:r._row-1,endIndex:r._row}}}
-    ]};
+    ]});
     // undo-data vastleggen vóór de mutatie
     const ntdValues=serializeNtdUndo(r);
-    const undoData={sec,code:r.code,ntdValues,ntdRow:r._row};
+    const undoData={sec,code:r.code,ntdValues,ntdRow:r._row,gelukt:false};
     // 1) optimistisch: meteen uit de lokale lijst + indexen meeschuiven;
     //    de oude DOM-rij pulst groen en pas daarná hertekenen we (anim.js)
     // Rij voor de groene puls: NTD-tabel, of anders de GEKLIKTE taakrij (bewaard rid)
@@ -935,7 +1042,8 @@ async function doCompleteTask(){
     if(pos>-1) arr.splice(pos,1);
     _shiftNtdRows(r._row,-1);
     closeCompleteModal();
-    showUndoToast('Taak afgerond',`${r.code} — ${r.actiepunt||r.subsidie||r.naam||''}`,()=>undoComplete(undoData),'vinkCirkel');
+    showUndoToast('Taak afgerond',`${r.code} — ${taakTitel(r, sec)||r.naam||''}`,()=>undoComplete(undoData),'vinkCirkel',
+                  {sleutel:`afrond|${r.taakId||`${r._row}|${r.code}|${taakTitel(r,sec)}`}`});
     // 2) op de achtergrond wegschrijven; bij fout de taak terugzetten
     // Idempotentie-vlag: de batch (insert+update+delete) is positie-gebaseerd en NIET
     // idempotent — een retry na een transient fout zou dubbel kunnen afronden / de verkeerde
@@ -945,11 +1053,18 @@ async function doCompleteTask(){
       async ()=>{
         if(!afgerond){
           await assertRowMatch(r._row, r); // bescherming: rij nog dezelfde TAAK vóór afronden
+          // Archiefplek NU berekenen — zie de toelichting bij bouwBatch.
+          const afRij=getAfInsertRow(sec);
           const resp=await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
             method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
-            body:JSON.stringify(batchBody)});
+            body:JSON.stringify(bouwBatch(afRij))});
           if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Fout bij afhandelen taak');err.status=resp.status;throw err}
           afgerond=true;
+          undoData.gelukt=true;    // pas nu mag de undo-knop iets terugzetten
+          // Pas NA een geslaagde invoeging de rijnummers van 'Afgerond' meeschuiven, zodat de
+          // vólgende schrijfactie in de wachtrij op het juiste anker uitkomt. Bij een mislukking
+          // gebeurt er niets en hoeft de rollback dus ook niets terug te draaien.
+          _shiftAfRows(afRij,+1);
         }
         await logEvent(r.code, sec, 'Afgerond', 'status', 'Nog Te Doen', 'Afgerond op ' + today + (comment ? ' — ' + comment : ''));
       },

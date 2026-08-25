@@ -17,6 +17,28 @@ taken die er nu draaien (deadline-meldingen, sortering, afronden-in-de-Sheet) op
 autorisatiefout stuklopen. Dat risico hoort niet bij een gewone uitrol te horen; het hoort bij een
 moment dat jij kiest.
 
+## Wat er in de nacht van 25 augustus 2026 aan is verbeterd (v11.0)
+
+De doorlichting vond drie dingen in deze klaarstaande code. Ze zijn alle drie gerepareerd, dus wat
+hier staat is beter dan wat er lag — maar het is nog steeds niet uitgerold.
+
+1. **Onherkende post ging elke ronde opnieuw door het AI-model.** Een mail waarin geen VvE
+   herkend werd bleef ongelabeld staan (zodat een mens hem ziet) en kwam daardoor bij élke ronde
+   terug. Bij een trigger van vijf minuten is dat ruim 280 keer per dag, per bericht, met het hele
+   playbook en 400 VvE-namen als invoer — uit hetzelfde prepaid-tegoed waar de dossier-chat op
+   draait. Er is nu een tweede label `intake-bekeken`: het bericht blijft gewoon in de inbox staan,
+   maar deze motor slaat hem over. Daarnaast een harde dagrem van 150 modelaanroepen.
+2. **Een mislukt label kon een dubbele taak opleveren.** De volgorde was: taak aanmaken → labelen.
+   Ging het labelen mis, dan stond er wél een taak en geen label, en maakte de volgende ronde
+   dezelfde taak nog een keer. Nu wordt er eerst gelabeld en daarna pas aangemaakt; lukt het
+   aanmaken dan niet, dan komt daar een zichtbare regel over in het Logboek.
+3. **De mailtekst stond onafgeschermd in de instructie aan het model.** Een afzender kon onderaan
+   zijn mail zijn eigen `=== OPDRACHT ===` zetten met een kant-en-klaar antwoord eronder, en dan
+   volgde het model de laatste opdracht die het las — met een taak in jullie werklijst als gevolg.
+   De opdracht staat nu in het `system`-veld (dus buiten het bericht), de mailtekst zit ingesloten
+   tussen een per ronde willekeurig kenmerk, en nagemaakte scheidingsregels worden onschadelijk
+   gemaakt.
+
 ## Aanzetten — de stappen op een rij
 
 1. **Kijk eerst of er post te lezen valt.** Ga naar gmail.com en log in als

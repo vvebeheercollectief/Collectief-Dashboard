@@ -33,7 +33,7 @@ function goTo(page){
   // paginawissel sluiten we 'm, anders kan een verouderd formulier later opslaan.
   // Nogmaals klikken op de huidige pagina telt niet — dat mag geen getypte tekst wissen.
   const _huidige=document.querySelector('.page.active')?.id;
-  if(_huidige!=='page-'+page && state.logEdit!=null){ state.logEdit=null; state.logEditSoort=null; }
+  if(_huidige!=='page-'+page && state.logEdit!=null){ state.logEdit=null; state.logEditTs=null; state.logEditSoort=null; }
   // Een VERGETEN lege selecteerstand legt het hele dashboard stil: de 8s-ronde slaat over zolang
   // `bulkMode` aanstaat, en de meldingen liften op diezelfde ronde mee. Buiten de takenlijst is er
   // niet eens een teller meer die eraan herinnert (die staat in page-ntd). Weg van 'ntd' en niets

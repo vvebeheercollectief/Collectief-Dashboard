@@ -126,9 +126,23 @@ function renderTbody(tbodyId,rows,sec,page,isAf,filtered){
 // dat er wél iets gebeurd is. Met de oude, strikte vergelijking vielen ze buiten elke sectie en
 // bleef een taak 'Stil 6d' tonen nadat je er die ochtend nog over had gebeld. Dat is erger dan
 // geen pil: het beweert iets dat aantoonbaar niet klopt.
+// Welke acties tellen als 'werk aan een taak' wanneer de logregel GEEN sectie draagt. Zo'n regel
+// telt voor élke taak van die VvE, dus dit vangnet moet smal zijn: een kenmerkwijziging op de
+// dossierpagina schrijft óók een sectieloze regel, en die zou anders in haar eentje het
+// stil-signaal van alle lopende taken van die VvE uitzetten.
+// LET OP — SYNC met CD_SECTIELOOS_TELT in apps-script/Opvolging.gs.
+const SECTIELOOS_TELT = new Set(['Contact', 'Opmerking']);
+
 function bouwStilIndex(logboek, sec){
   const m = new Map();
   (logboek || []).forEach(e => {
+    // 'systeem'-regels tellen niet als activiteit — precies zoals `cd_laatsteActiviteitMap` in
+    // apps-script/Opvolging.gs. Ze zijn geen handeling van een mens maar een gevolg van de klok
+    // (Auto-prioriteit) of een foutmelding, en het scherm hield daarmee een taak stil-vrij waar de
+    // escalatiemotor gewoon over doorescaleerde. LET OP — SYNC met die functie: scherm en motor
+    // moeten dezelfde vraag hetzelfde beantwoorden.
+    if (String(e.gebruiker || '').trim().toLowerCase() === 'systeem') return;
+    if (sec && !e.sectie && !SECTIELOOS_TELT.has(e.actie)) return;
     if (sec && e.sectie && e.sectie !== sec) return;
     const v = m.get(e.code);
     if (v) v.push(e); else m.set(e.code, [e]);
@@ -156,7 +170,9 @@ function bepaalStil(r, sec){
   // 'geen activiteit' betekenen, en dat is precies het signaal dat we niet mogen missen.
   const entries = (_stilIndex && (!sec || !_stilIndex.sectie || _stilIndex.sectie === sec))
     ? (_stilIndex.get(r.code) || [])
-    : (D.logboek || []).filter(e => e.code === r.code && (!sec || !e.sectie || e.sectie === sec));
+    : (D.logboek || []).filter(e => e.code === r.code
+        && String(e.gebruiker || '').trim().toLowerCase() !== 'systeem'
+        && (!sec || (e.sectie ? e.sectie === sec : SECTIELOOS_TELT.has(e.actie))));
   if (!entries.length) return null; // geen activiteit-data → niet markeren
   let laatst = null;
   entries.forEach(e => {
@@ -273,26 +289,19 @@ function rowNtd(r,sec){
   const ibStand = heeftInBehandeling(sec) ? (r.inBehandeling==='TRUE'?'TRUE':'FALSE') : null;
   const editBtn=`<div class="acts">${taakActieKnoppen(rid, ibStand)}</div>`;
   let cells='';
-  const _stilDagen = bepaalStil(r, sec);
-  // De offerte-tab is bewust kaal (v6.2): daar geen berekend stil-label. De andere secties
-  // houden 'm wél — daar is het hun signaal dat een taak stil blijft liggen.
-  // De pillen staan in de tekstkolom en aten daar breedte op die het actiepunt beter kan
-  // gebruiken (v8.10). Daarom kort: het icoon draagt de betekenis, de volledige uitleg
-  // staat in de title. "Stil 5d" → "5d", "Opvolgen vandaag" → "Vandaag", en de
-  // wegleg-datum kort ("28 jul") i.p.v. voluit.
-  // Secties waar stilliggen geen signaal is maar de normale toestand: bij offertes
-  // wacht je op een aannemer, bij subsidie op de gemeente. Een klokje bij elke rij
-  // leert de gebruiker alleen maar om het klokje te negeren.
-  const stilPill = (_stilDagen !== null && !GEEN_STIL_PILL.includes(sec))
-    ? `<span class="pill-stil" data-action="taak-bewerken" data-rid="${rid}" title="Stil: geen activiteit in ${_stilDagen} dagen">${ico('belUit',11)}${_stilDagen}d</span>`
-    : '';
+  // GEEN stil-pil meer hier. Sinds de Signaal-kolom (v10.41) draagt die kolom het stil-signaal
+  // voor Oppakken, Vergaderverzoeken en LOD. Wat hier stond kón per definitie nooit op het scherm
+  // komen: `extraPills` wordt alleen gebruikt in de case-blokken van OFFERTE-TRAJECTEN en
+  // SUBSIDIE-TRAJECTEN, en juist voor díe twee secties is de stil-pil onderdrukt (GEEN_STIL_PILL).
+  // De regel zelf leeft door in `signaalDelen` hieronder; daar wordt hij ook echt toegepast.
+  // Het kostte bovendien een volledige logboekscan per rij voor een pil die nergens verscheen.
   const ov = opvolgStatus(r);
   const opvolgPill = ov.vandaag
     ? `<span class="pill-opvolg" data-action="taak-wegleggen" data-rid="${rid}" title="Opvolgen vandaag — opvolgdatum ${esc(r.opvolgdatum)}">${ico('bel',11)}Vandaag</span>`
     : ov.weggelegd
       ? `<span class="pill-snooze" data-action="taak-wegleggen" data-rid="${rid}" title="Weggelegd tot ${esc(r.opvolgdatum)}">${ico('pauze',11)}${esc(kortDatum(r.opvolgdatum))}</span>`
       : '';
-  const extraPills = stilPill + opvolgPill;
+  const extraPills = opvolgPill;
   // ── Takenbundel ──
   // state._bundelWeergave wordt door renderNtd voor déze render klaargezet (zie `bundelWeergave`):
   // de index plus `stapel`/`merk`. Via state en niet via een parameter: renderTbody geeft alleen

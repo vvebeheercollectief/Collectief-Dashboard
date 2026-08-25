@@ -16,8 +16,15 @@ function displayName(s){
 // waarin die tekst nergens te zien is. Precies het soort zoekopdracht dat op de Afgerond-pagina
 // voor de hand ligt — een VvE-code is óók een getal.
 // De aannemerslijst staat er bewust NIET bij: 'Jansen' is een naam die je wilt kunnen zoeken.
+// `inBehandeling` en `prioriteit` staan er sinds v11.0 bij, en dat waren de twee vervelendste:
+// kolom H bevat de LETTERLIJKE tekst 'TRUE' of 'FALSE' (een selectievakje-kolom), dus elke
+// zoekterm die in 'true' of 'false' zit gaf de hele lijst terug. Twee aanslagen van
+// 'Algemene ledenvergadering' is 'al' en van 'Servicekosten' is 'se' — allebei een deelstring
+// van 'false'. Prioriteit staat sinds v8.9 niet meer in beeld; op 'hoog' zoeken vond dan taken
+// waar dat woord nergens te lezen is.
 const NIET_ZOEKBAAR = new Set(['_row','_sec','_offertesManual','_aannemers',
-                               'taakId','bundelId','bundelVolg','herhaalId','esc','fase']);
+                               'taakId','bundelId','bundelVolg','herhaalId','esc','fase',
+                               'inBehandeling','prioriteit']);
 function filt(rows,q){
   if(!q)return rows;
   return rows.filter(r=>Object.entries(r).some(([k,v])=>
@@ -146,6 +153,12 @@ const STIL_ESCALATIE_REGELS = {
 // bij `dagen >= regels.trap1` (apps-script/Notifications.gs:303). De briefing zei dus "2 stille
 // taken" waar het scherm negen klokjes toonde. Scherm, mail en briefing lopen nu alle drie gelijk.
 //
+// De DREMPEL is één ding; waar 'laatste activiteit' vandaan komt is een tweede, en dat liep tot
+// v11.0 apart uiteen: het scherm telde 'systeem'-regels mee en de motor niet, en een logregel
+// zónder sectie (het contactmoment uit het VvE-dossier) telde alleen op het scherm. Die twee zijn
+// nu ook gelijkgetrokken — zie `bouwStilIndex` (render-tabel.js) en `cd_laatsteActiviteitMap`
+// (apps-script/Opvolging.gs), die allebei een LET OP — SYNC dragen.
+//
 // LET OP bij lezen: voor OFFERTE-TRAJECTEN en SUBSIDIE-TRAJECTEN geeft deze functie wel een getal
 // (21), maar in de tabel doet dat niets — GEEN_STIL_PILL (render-tabel.js) onderdrukt het signaal
 // daar hoe dan ook. Levend zijn alleen Oppakken (7), Vergaderverzoeken (14) en LOD (30).
@@ -265,6 +278,10 @@ function berekenPrioriteit(deadlineStr, categorie, vandaag){
   return { prioriteit, dagenTot, teLaat };
 }
 
+// NIET IN GEBRUIK door de app. De Prioriteit-kolom is er sinds v8.9 uit; alleen de zelftest
+// roept deze functie nog aan. Blijft staan omdat de berekening zelf (berekenPrioriteit) wél
+// levend is en dit de enige plek is waar de bijbehorende opmaak beschreven staat — maar bouw er
+// niets nieuws op zonder eerst te controleren of de kolom terugkomt.
 function prioBadge(r, sec){
   const { prioriteit } = berekenPrioriteit(r.deadline, sec);
   if(!prioriteit)return'';
@@ -305,9 +322,14 @@ function korteNaam(naam){
 // zodat hij overal met de muis terug te vinden is.
 function persBadges(v, kort){
   if(!v)return'<span style="color:var(--fnt);font-size:12px">–</span>';
-  const colors={'jer':'pers-jer','cihad':'pers-cihad','gabos':'pers-gabos'};
+  // Er stond hier een kaart naam→klasse ({jer, cihad, gabos}), maar die vier klassen hebben in
+  // styles.css exact dezelfde waarden als de basisklasse `.pers` — licht én donker. De kaart had
+  // dus geen enkel zichtbaar effect en liep bovendien achter op TEAM (Cihan ontbrak). Weg ermee;
+  // de klassen zelf blijven in de CSS staan, zodat een oude opgeslagen HTML-snipper niet opeens
+  // anders oogt. Wil je hier ooit écht kleur per persoon, leid hem dan af uit TEAM (config.js) en
+  // geef de CSS-klassen ook echt verschillende waarden.
   return splitBehandelaar(v).map(n=>{
-    const cls=colors[n.toLowerCase()]||'pers-default';
+    const cls='pers-default';
     const tekst = kort ? korteNaam(n) : n;
     const rond = kort && tekst.length <= 2 ? ' pers-rond' : '';
     const titel = kort && tekst !== n ? ` title="${esc(n)}"` : '';
@@ -362,6 +384,8 @@ function serializeAannemers(lijst){
   return (lijst||[]).map(a=>`${(a.naam||'').replace(/[|\n]/g,' ').trim()}|${a.binnen?1:0}`).join('\n');
 }
 // Afgeleide "X/N binnen": N = aantal aannemers, X = aantal met offerte binnen. Leeg → ''.
+// NIET IN GEBRUIK door de app: `reconcileOffertes` hieronder heeft hem vervangen, want die neemt
+// de handmatig ingevulde kolom-D-waarde als ONDERGRENS mee. Alleen de zelftest roept hem nog aan.
 function deriveOffertes(lijst){
   if(!lijst||!lijst.length) return '';
   return `${lijst.filter(a=>a.binnen).length}/${lijst.length}`;
@@ -541,8 +565,17 @@ function _eersteRegel(s){
 }
 // Opslagvorm van opgemaakte velden is platte tekst met **vet**/*schuin* (zie opmaak.js);
 // in een titel horen die sterretjes niet thuis.
+// Markeringen uit een titel halen. LET OP — SYNC met RE_VET/RE_SCHUIN in opmaak.js: dat is de
+// opslagvorm, en die is '**vet**' en '_schuin_'. Hier stond eerder een tweede paar sterretjes
+// voor schuin ('*x*'), een vorm die de app nergens schrijft — het resultaat was dat een schuin
+// woord met underscores en al in de titel bleef staan, terwijl een enkel sterretje midden in
+// gewone tekst juist stil werd weggeknipt. Bewust een eigen kopie en geen import van
+// `zonderOpmaak`: opmaak.js importeert `esc` uit dit bestand, en een kring erbij zou de
+// laadvolgorde van de modulegraaf laten afhangen van wie er toevallig eerst binnenkomt.
+const _RE_VET_TITEL    = /\*\*([^*\s](?:[^*]*[^*\s])?)\*\*/g;
+const _RE_SCHUIN_TITEL = /(^|[^\w])_([^_\s](?:[^_]*[^_\s])?)_(?![\w])/g;
 function _zonderSterren(s){
-  return s.replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(.+?)\*/g, '$1');
+  return String(s==null?'':s).replace(_RE_VET_TITEL, '$1').replace(_RE_SCHUIN_TITEL, '$1$2');
 }
 function _kort(s){
   return s.length > TAAKTITEL_MAX ? s.slice(0, TAAKTITEL_MAX - 1).trimEnd() + '…' : s;
@@ -604,7 +637,7 @@ function taakVerwijzing(r, sec){
 }
 
 export {
-  taakTitel, taakVerwijzing, kortDatum,
+  taakTitel, taakVerwijzing, kortDatum, NIET_ZOEKBAAR,
   displayName, filt, splitBehandelaar, korteNaam, PRIO_REGELS, stilDrempel, STIL_ESCALATIE_REGELS,
   DEADLINE_VOORSTEL, DEADLINE_HINT, voorgesteldeDeadline, AF_PERIODES, periodeBereik,
   opvolgStatus, volgendeDeadline, HERHAAL_MAANDEN, _vandaagAmsterdam, isoWeek,

@@ -21,7 +21,7 @@
 import { state, D } from "./state.js";
 import { SECS, SID, OMSCHRIJVING_SLEUTEL, VELD_LABELS } from "./config.js";
 import { berekenPrioriteit, taakTitel } from "./util.js";
-import { assertRowsMatch, _shiftNtdRows, sheetsFetch } from "./api.js";
+import { assertRowsMatch, _shiftNtdRows, _herstelShift, sheetsFetch } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { backgroundWrite, blokkeerOffline, loadAll } from "./data.js";
 import { renderAll } from "./main.js";
@@ -74,12 +74,35 @@ function verplaatsWaarden(r, bronSec, doelSec, nieuwRow){
     if(!doelSpec.keys.includes(k) && !['subcategorie','opvolgdatum','herhaalId','fase','aannemers',
                                        'taakId','bundelId','bundelVolg'].includes(k)) delete doel[k];
   });
-  // De omschrijving heet in elke categorie anders. Staat het doelveld leeg, dan gaat de tekst van
-  // de bron erin; is het doelveld al gevuld (bron en doel delen dat veld, zoals Oppakken → LOD),
-  // dan blijft die staan. Zo kan de tekst nooit verdwijnen en ook nooit dubbel komen te staan.
-  const bronTekst = String(r[OMSCHRIJVING_SLEUTEL[bronSec]] || '').trim();
+  // De omschrijving heet in elke categorie anders, en dát is de enige tekst die per se mee MOET:
+  // `verlorenVelden` sluit hem uit van de 'dit vervalt'-lijst met de belofte dat hij altijd
+  // meeverhuist. Die belofte werd op twee manieren gebroken:
+  //
+  //  1. WEG. Stond het doelveld al vol, dan bleef de brontekst achter — en als de doelcategorie
+  //     het bronveld niet kent, gooit de delete-lus hierboven dat veld weg. Naar Offerte-trajecten
+  //     gebeurde dat altijd: de omschrijving heet daar 'opmerkingen', en Opmerkingen is bij
+  //     Oppakken, LOD, Vergaderverzoeken én Subsidie een gewone, meestal gevulde kolom. Het
+  //     Actiepunt verdween dan spoorloos: niet in de Sheet, niet in de vraag, niet in het logboek.
+  //  2. DUBBEL. Andersom (Offerte → Oppakken) kwam dezelfde tekst in Actiepunt én in Opmerkingen
+  //     te staan, want 'opmerkingen' bestaat in de doelcategorie ook gewoon.
+  //
+  // Nu: dragen bron en doel dezelfde veldnaam, dan valt er niets te doen. Verschillen ze, dan
+  // verhuist de tekst écht — vóór een eventuele bestaande doeltekst, met een witregel ertussen —
+  // en wordt het bronveld leeggemaakt als de doelcategorie het óók kent.
+  const bronSleutel = OMSCHRIJVING_SLEUTEL[bronSec];
   const doelSleutel = OMSCHRIJVING_SLEUTEL[doelSec];
-  if(bronTekst && !String(doel[doelSleutel] || '').trim()) doel[doelSleutel] = bronTekst;
+  const bronTekst = String(r[bronSleutel] || '').trim();
+  if(bronTekst && bronSleutel !== doelSleutel){
+    const bestaand = String(doel[doelSleutel] || '').trim();
+    // Was het doelveld al gevuld, dan komen er twee teksten in één cel te staan. Zet er dan een
+    // kopje boven de OUDE tekst, zodat je later nog kunt zien welk stuk waar vandaan komt: zonder
+    // dat merkje is een verhuizing heen én terug niet meer te ontwarren (de tweede reis zou het
+    // hele blok als 'de omschrijving' meenemen).
+    doel[doelSleutel] = bestaand
+      ? `${bronTekst}\n\n— ${_veldLabel(bronSec, doelSleutel)}: ${bestaand}`
+      : bronTekst;
+    if(doelSpec.keys.includes(bronSleutel)) doel[bronSleutel] = '';
+  }
   // De prioriteit is een BEREKEND veld (alleen Oppakken heeft hem als kolom) en de drempels
   // verschillen per categorie. Overnemen zou een verouderde waarde meeslepen.
   if(doelSpec.keys.includes('prioriteit'))
@@ -105,7 +128,7 @@ function verplaatsWaarden(r, bronSec, doelSec, nieuwRow){
 }
 
 // De tekst van de vraag. Los, zodat hij te toetsen is zonder venster.
-function verplaatsVraagTekst(r, bronSec, doelSec){
+function verplaatsVraagTekst(r, bronSec, doelSec, nietOpgeslagen){
   const verloren = verlorenVelden(r, bronSec, doelSec);
   // WAT DE VRAAG BELOOFT MOET WAAR ZIJN. Eerder stond hier 'de geschiedenis gaat mee', en dat was
   // te veel gezegd: het Logboek kent geen taaknummer (kolommen: tijd, VvE-code, sectie, actie, …),
@@ -113,21 +136,40 @@ function verplaatsVraagTekst(r, bronSec, doelSec){
   // render-overig.js). Regels van vóór de verhuizing blijven daardoor bij de oude categorie staan.
   // De verhuizing zelf wordt wél onder de nieuwe categorie vastgelegd, dus het spoor loopt door —
   // maar de oude notities verhuizen niet mee, en dat hoort de gebruiker te weten vóór hij klikt.
+  const bronSleutel = OMSCHRIJVING_SLEUTEL[bronSec];
+  const doelSleutel = OMSCHRIJVING_SLEUTEL[doelSec];
+  // Heet de omschrijving in de doelcategorie anders, zeg dan wáár hij terechtkomt. Anders lijkt
+  // het alsof de tekst verdwijnt: hij staat straks onder een andere kolomkop.
+  const _bronTekst = String(r[bronSleutel]||'').trim();
+  const _doelGevuld = String(r[doelSleutel]||'').trim();
+  const tekstZin = (bronSleutel !== doelSleutel && _bronTekst)
+    ? `\nDe tekst uit '${_veldLabel(bronSec, bronSleutel)}' komt in '${_veldLabel(doelSec, doelSleutel)}' te staan`
+      + (_doelGevuld ? `, boven de tekst die daar nu staat.` : '.')
+    : '';
   const kop = `"${taakTitel(r, bronSec)}" gaat van ${SECS[bronSec].label} naar ${SECS[doelSec].label}.`
+            + tekstZin
             + `\nHet taaknummer en de subtaken gaan mee.`
             + `\nHet logboek houdt de regels van vóór deze verhuizing bij ${SECS[bronSec].label}; `
             + `de verhuizing zelf komt bij ${SECS[doelSec].label} te staan.`;
-  if(!verloren.length) return kop;
+  // Staat er nog niet-opgeslagen typwerk in het scherm? Dan gaat dat NIET mee: de verhuizing bouwt
+  // de nieuwe rij uit de opgeslagen taak. Vroeger verdween die tekst zonder één woord.
+  const onopgeslagen = (nietOpgeslagen && nietOpgeslagen.length)
+    ? `\n\nLET OP: je hebt ${nietOpgeslagen.length===1?'een wijziging':'wijzigingen'} in `
+      + `${nietOpgeslagen.map(v=>`'${v}'`).join(', ')} die nog niet ${nietOpgeslagen.length===1?'is':'zijn'} opgeslagen. `
+      + `${nietOpgeslagen.length===1?'Die gaat':'Die gaan'} NIET mee. Annuleer en klik eerst op Opslaan als je ${nietOpgeslagen.length===1?'hem':'ze'} wilt bewaren.`
+    : '';
+  if(!verloren.length) return kop + onopgeslagen;
   return kop + `\n\nDeze velden kent ${SECS[doelSec].label} niet en vervallen:\n`
-             + verloren.map(v => `• ${v.label}: ${v.waarde}`).join('\n');
+             + verloren.map(v => `• ${v.label}: ${v.waarde}`).join('\n')
+             + onopgeslagen;
 }
 
-async function verplaatsTaak(r, doelSec){
+async function verplaatsTaak(r, doelSec, nietOpgeslagen){
   if(!r || !SECS[doelSec] || r._sec === doelSec) return false;
   const bronSec = r._sec;
   if(!await vraagBevestiging({
       titel:`Verplaatsen naar ${SECS[doelSec].label}?`,
-      tekst:verplaatsVraagTekst(r, bronSec, doelSec),
+      tekst:verplaatsVraagTekst(r, bronSec, doelSec, nietOpgeslagen),
       bevestigTekst:'Verplaatsen' })) return false;
   if(blokkeerOffline()) return false;
   if(!await ensureToken()){ alert('Inloggen mislukt. Probeer het opnieuw.'); return false; }
@@ -212,6 +254,14 @@ async function verplaatsTaak(r, doelSec){
         rij[16] = uitBlad(16, doelRij.taakId);
         rij[17] = uitBlad(17, doelRij.bundelId);
         rij[18] = uitBlad(18, doelRij.bundelVolg);
+        // BEWUST `stringValue` en dus tekst, ondanks dat elke andere schrijfweg naar dit tabblad
+        // USER_ENTERED gebruikt. De reden is de atomiciteit: insert + schrijven + delete zitten
+        // hier in ÉÉN batchUpdate, en die past Sheets alles-of-niets toe. De values-API met
+        // USER_ENTERED kan dat niet in dezelfde opdracht, dus splitsen zou een half verplaatste
+        // taak mogelijk maken — veel duurder dan het gevolg hiervan. Dat gevolg is cosmetisch: de
+        // datumcellen van deze ene rij staan als tekst in de Sheet ('01-09-2026' i.p.v. een echte
+        // datumwaarde). Zowel `_parseAnyDate` (frontend) als `cd_parseDate` (Apps Script) lezen
+        // die vorm gewoon; alleen de uitlijning in de Sheet verschilt.
         const batchBody = { requests:[
           { insertDimension:{ range:{ sheetId, dimension:'ROWS', startIndex:doelAfterRow, endIndex:doelAfterRow+1 }, inheritFromBefore:true } },
           { updateCells:{ range:{ sheetId, startRowIndex:doelAfterRow, endRowIndex:doelAfterRow+1, startColumnIndex:0, endColumnIndex:rij.length },
@@ -260,18 +310,24 @@ async function verplaatsTaak(r, doelSec){
           const dArr = D.ntd[doelSec] || []; const dp = dArr.indexOf(doelRij);
           if(dp > -1) dArr.splice(dp, 1);
           _shiftNtdRows(naAfterRow, -1);      // de invoeging terugdraaien
-          _shiftNtdRows(r._row, +1);          // en de verwijdering
-          (D.ntd[bronSec] = D.ntd[bronSec] || []).push(r); },
+          _herstelShift(_shiftNtdRows, r._row);   // en de verwijdering — via het huisidioom, want de
+                                            // rij die dóór de delete op r._row kwam te staan moet
+                                            // óók terugschuiven (de shift-conditie is '>')
+          // Terug op de OUDE plek in de lijst, niet achteraan: `getInsertRow` leest het rijnummer van
+          // het laatste element, en een teruggezette rij met een laag _row achteraan zou het anker
+          // midden in het blok laten wijzen. Zelfde idioom als de rollbacks in bulk.js.
+          const _bArr=(D.ntd[bronSec] = D.ntd[bronSec] || []);
+          _bArr.splice(Math.min(pos<0?_bArr.length:pos, _bArr.length), 0, r); },
     'Verplaatsen mislukt'
   );
   return true;
 }
 
 // Ingang vanaf een rij-id (de categorie-kiezer in het bewerkscherm werkt met het rij-object zelf).
-async function verplaatsTaakVanRid(rid, doelSec){
+async function verplaatsTaakVanRid(rid, doelSec, nietOpgeslagen){
   const r = taakUitCache(rid);
   if(!r) return false;
-  return verplaatsTaak(r, doelSec);
+  return verplaatsTaak(r, doelSec, nietOpgeslagen);
 }
 
 export { verplaatsTaak, verplaatsTaakVanRid, verplaatsWaarden, verlorenVelden, verplaatsVraagTekst, _veldLabel };

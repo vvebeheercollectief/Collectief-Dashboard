@@ -7,7 +7,7 @@ import { SID, ONESIGNAL_APP_ID } from "./config.js";
 import { ensureToken } from "./auth.js";
 import { fetchSheet, appendRange, assertRowMatch, sheetsFetch } from "./api.js";
 import { logEvent } from "./render-overig.js";
-import { getSheetIds, insertAndWriteRow, getInsertRow } from "./crud.js";
+import { getSheetIds, insertAndWriteRow, getInsertRow, bevestigInvoegPlek } from "./crud.js";
 import { loadAll, parseSections, metWriteMarkering, blokkeerOffline } from "./data.js";
 import { flashRow } from "./anim.js";
 import { ico } from "./icons.js";
@@ -50,9 +50,22 @@ const TOAST_ICONS  = {
   n_deadline:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8" fill="currentColor" fill-opacity="0.18"/><path d="M12 9v4l2.5 2"/><path d="M4.5 5.5l3-2M19.5 5.5l-3-2"/></svg>',
   n_alv:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="8" height="13" rx="1" fill="currentColor" fill-opacity="0.18"/><rect x="11" y="4" width="10" height="17" rx="1" fill="currentColor" fill-opacity="0.18"/><path d="M2 21h20M6 12h2M6 15.5h2M15 8h2M15 11.5h2M15 15h2"/></svg>',
   n_daily:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.5" fill="currentColor" fill-opacity="0.18"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.2 5.2l1.8 1.8M17 17l1.8 1.8M18.8 5.2L17 7M7 17l-1.8 1.8"/></svg>',
-  test:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 0112 0c0 5 2 6 2 6H4s2-1 2-6z" fill="currentColor" fill-opacity="0.18"/><path d="M10 19a2 2 0 004 0"/></svg>'
+  test:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 0112 0c0 5 2 6 2 6H4s2-1 2-6z" fill="currentColor" fill-opacity="0.18"/><path d="M10 19a2 2 0 004 0"/></svg>',
+  // De drie eigen soorten van de opvolgmotor. Uit de centrale set, zodat ze meelopen met elke
+  // latere wijziging daar; zonder deze regels viel `toastIco` terug op een lege string en kwam de
+  // melding zonder icoon binnen.
+  n_escalatie: ico('waarschuwing', 18),
+  n_opvolg:    ico('bel', 18),
+  n_herhaal:   ico('herhaal', 18)
 };
-const TOAST_COLORS = { n_newtask:'var(--ac)', n_assigned:'var(--gn)', n_deadline:'var(--am)', n_alv:'var(--pu)', n_daily:'var(--am)', test:'var(--ac)' };
+// De drie eigen soorten die Apps Script sinds v11.0 meegeeft (n_escalatie, n_opvolg, n_herhaal)
+// staan hier BEWUST met een kleur maar NIET in TYPE_NAAR_PREFS hieronder: een onbekend type wordt
+// door de voorkeurenfilter niet weggegooid, en dat is precies de bedoeling. Ze liften voor de PUSH
+// nog wel mee op een bestaande tag (dat is de enige tag die mensen op hun toestel hebben staan),
+// maar in de app horen ze altijd zichtbaar te zijn — een stil dossier dat escaleert is de zwaarste
+// melding die dit systeem kent en mag niet verdwijnen omdat iemand 'Nieuwe taak' heeft uitgezet.
+const TOAST_COLORS = { n_newtask:'var(--ac)', n_assigned:'var(--gn)', n_deadline:'var(--am)', n_alv:'var(--pu)', n_daily:'var(--am)',
+                       n_escalatie:'var(--rd)', n_opvolg:'var(--am)', n_herhaal:'var(--ac)', test:'var(--ac)' };
 const TOAST_DURATION = 5000;
 // Dedup-venster: vangt de dubbele toast (zelfde event via directe fire én via de meelezende
 // meldingen-ronde), die binnen ~8s arriveert. Bewust korter dan voorheen (30s) zodat twee échte,
@@ -148,7 +161,11 @@ function dismissToast(el) {
 function showUndoToast(title, msg, undoFn, icoNaam, opts) {
   const UNDO_DURATION = 8000;
   if (!(opts||{}).geenDedup) {
-    const key = 'undo|' + title + '|' + msg;
+    // `opts.sleutel` laat de aanroeper ontdubbelen op IDENTITEIT (het vaste taaknummer) in plaats
+    // van op tekst. Twee taken van dezelfde VvE kunnen dezelfde titel+tekst hebben — bij
+    // offerte-trajecten is dat zelfs de regel, want daar valt de omschrijving terug op de code —
+    // en dan slikte deze ontdubbeling de tweede undo-knop in.
+    const key = 'undo|' + ((opts||{}).sleutel || (title + '|' + msg));
     if (_shownToasts.has(key)) return;
     _shownToasts.add(key);
     setTimeout(() => _shownToasts.delete(key), 30000);
@@ -190,6 +207,27 @@ async function undoComplete(undoData) {
   state._undoInFlight = true; // pauzeer de 8s-poll; deze undo doet z'n eigen loadAll
   try {
     await state._writeChain; // de afronding-write moet eerst klaar zijn vóór we de rij zoeken
+    // Is de afronding zélf mislukt (rij-guard, 401, 5xx), dan staat de taak er gewoon nog en zou
+    // deze undo hem een TWEEDE keer invoegen — met hetzelfde vaste taaknummer. De toast blijft na
+    // een mislukking namelijk nog seconden staan mét een werkende knop. Zelfde weigering als
+    // `undoDeleteLog` in render-overig.js.
+    if (!undoData.gelukt) {
+      // De tekst zegt bewust NIET 'hij staat er nog'. `gelukt` is alleen true na een OK-antwoord,
+      // en géén antwoord (een afgebroken verzoek na 20 s) bewijst niet dat de Sheet niets deed —
+      // de schrijfactie kán geland zijn. Terugzetten mag daarom niet, maar het als feit
+      // presenteren evenmin. De lijst wordt opnieuw geladen zodat de gebruiker het zelf ziet.
+      showToast('Niet ongedaan gemaakt',
+                'We konden niet bevestigen dát de taak is afgerond, dus er is niets teruggezet. De lijst wordt opnieuw geladen — kijk of de taak er nog staat.',
+                'var(--am)', 'label', { geenDedup:true, geenSysteemmelding:true });
+      await loadAll();
+      return;
+    }
+    // De invoegplek in 'Nog Te Doen' vers narekenen, net als bij het aanmaken van een taak.
+    // BEWUST vóór metWriteMarkering: daarbinnen staat pendingWrites al op >0 en keert
+    // bevestigInvoegPlek meteen terug zonder iets te bewaken.
+    const insertRowVooraf = getInsertRow(sec);
+    try { await bevestigInvoegPlek(sec, insertRowVooraf); }
+    catch(e){ alert(e.melding || e.message); await loadAll(); return; }
     // Alleen het schrijvende deel onder de teller — de loadAll hieronder moet zijn verse data
     // WÉL kunnen gebruiken (zie de waarschuwing bij metWriteMarkering).
     await metWriteMarkering(async () => {
@@ -201,13 +239,12 @@ async function undoComplete(undoData) {
       // eerst op het vaste taaknummer uit `ntdValues[16]` en valt alleen daarna terug op de code.
       // Zoeken op code + datum is namelijk een GOK zodra er twee afrondingen van dezelfde VvE op
       // dezelfde dag in dezelfde sectie staan — zie de toelichting daar.
-      const afData = (parseSections(await fetchSheet('Afgerond')).data[sec] || [])
+      const afData = (parseSections(await fetchSheet('Afgerond'), 'Afgerond').data[sec] || [])
         .slice().sort((a, b) => parseDt(b.datum) - parseDt(a.datum));
       const doelAf = kiesAfgerondRij(afData, (ntdValues || [])[16], undoData.code);
       // EERST terugzetten, DAN pas weghalen. Breekt de verbinding ertussen, dan staat de taak
       // dubbel (zichtbaar, herstelbaar) in plaats van nergens (onzichtbaar, verloren).
-      const insertRow = getInsertRow(sec);
-      await insertAndWriteRow('Nog Te Doen', insertRow, ntdValues);
+      await insertAndWriteRow('Nog Te Doen', insertRowVooraf, ntdValues);
       if (doelAf) {
         // Guard op 'Afgerond': deze deleteDimension leunt op een rijnummer uit een verse lezing,
         // maar tussen die lezing en dit verzoek kan de Sheet alsnog verschoven zijn. Klopt de rij
@@ -251,8 +288,20 @@ async function undoDelete(undoData) {
   try {
     await state._writeChain;            // delete-write gegarandeerd vóór de re-insert
     const { sec, ntdValues } = undoData;
+    // Is er niets verwijderd (rij-guard, 401, 5xx), dan staat de taak er nog en zou deze undo een
+    // duplicaat met hetzelfde taaknummer maken. Zie de toelichting bij undoComplete.
+    if (!undoData.gelukt) {
+      // Zie de toelichting bij undoComplete: 'geen antwoord' is geen bewijs van 'niets gebeurd'.
+      showToast('Niet ongedaan gemaakt',
+                'We konden niet bevestigen dát de taak is verwijderd, dus er is niets teruggezet. De lijst wordt opnieuw geladen — kijk of de taak er nog staat.',
+                'var(--am)', 'label', { geenDedup:true, geenSysteemmelding:true });
+      await loadAll();
+      return;
+    }
+    const insertRow = getInsertRow(sec);
+    try { await bevestigInvoegPlek(sec, insertRow); }
+    catch(e){ alert(e.melding || e.message); await loadAll(); return; }
     await metWriteMarkering(async () => {
-      const insertRow = getInsertRow(sec);
       await insertAndWriteRow('Nog Te Doen', insertRow, ntdValues);
       await logEvent(undoData.code, sec, 'Teruggezet', 'status', 'Verwijderd', 'Nog Te Doen');
     });
@@ -268,13 +317,8 @@ async function undoDelete(undoData) {
 //  POLLING — toont toasts voor andere gebruikers
 // ══════════════════════════════════════
 function getNotifPrefs() {
-  return {
-    newtask:  localStorage.getItem('notif_newtask')  !== 'false',
-    assigned: localStorage.getItem('notif_assigned') !== 'false',
-    deadline: localStorage.getItem('notif_deadline') !== 'false',
-    alv:      localStorage.getItem('notif_alv')      !== 'false',
-    daily:    localStorage.getItem('notif_daily')    !== 'false',
-  };
+  const g = k => localStorage.getItem(_prefSleutel(k, state.currentUserEmail)) !== 'false';
+  return { newtask:g('newtask'), assigned:g('assigned'), deadline:g('deadline'), alv:g('alv'), daily:g('daily') };
 }
 
 const TYPE_NAAR_PREFS = { n_newtask:'newtask', n_assigned:'assigned', n_deadline:'deadline', n_alv:'alv', n_daily:'daily' };
@@ -366,7 +410,6 @@ function onNotifVisibility() {
 function initMeldingen() {
   document.removeEventListener('visibilitychange', onNotifVisibility);
   document.addEventListener('visibilitychange', onNotifVisibility);
-  state._notifVisibilityHandler = onNotifVisibility; // logout() koppelt 'm via state los
 }
 
 // ══════════════════════════════════════
@@ -384,11 +427,11 @@ function openNotifModal() {
     document.getElementById('notif-who-other').value = who;
   }
   ['newtask','assigned','deadline','alv','daily'].forEach(k => {
-    const v  = localStorage.getItem('notif_' + k);
+    const v  = localStorage.getItem(_prefSleutel(k, state.currentUserEmail));
     const el = document.getElementById('tog-notif-' + k);
     if (el) { const on = v === null ? true : v === 'true'; el.classList.toggle('on', on); el.setAttribute('aria-checked', on); }
   });
-  document.getElementById('notif-deadline-hours').value = localStorage.getItem('notif_deadline_hours') || '1';
+  document.getElementById('notif-deadline-hours').value = localStorage.getItem(_prefSleutel('deadline_hours', state.currentUserEmail)) || '1';
   refreshNotifUI();
   document.getElementById('notif-bg').classList.add('open');
 }
@@ -419,6 +462,14 @@ function onWhoChange() {
 // getCurrentWho hieronder gewoon displayName(state.currentUserEmail) terug, wat voor het vaste
 // team exact dezelfde naam oplevert.
 const _whoSleutel = email => 'notif_who_' + (email || 'onbekend').toLowerCase();
+// …en dezelfde regel voor de VOORKEUREN. Die stonden nog op een kale sleutel ('notif_newtask'),
+// terwijl localStorage aan de ORIGIN hangt en niet aan de gebruiker: op een gedeelde computer
+// erfde de volgende collega de vinkjes én het deadline-uur van zijn voorganger, en met de eerste
+// keer opslaan schreef hij die stand ook nog naar OneSignal onder zijn eigen naam. Precies de
+// reden waarom de naam hierboven al per account bewaard wordt.
+// Geen migratie nodig: elke voorkeur staat standaard AAN, dus een lege sleutel geeft exact het
+// gedrag van een verse installatie.
+const _prefSleutel = (k, email) => 'notif_' + k + '_' + (email || 'onbekend').toLowerCase();
 
 function getCurrentWho() {
   const sel = document.getElementById('notif-who');
@@ -434,10 +485,48 @@ function getCurrentWho() {
   return '';
 }
 
-async function saveNotifPrefs(forceInit) {
+// De tags bij OneSignal gelijkzetten met een gegeven stand. Losgetrokken uit saveNotifPrefs, want
+// er zijn twee soorten aanroepers en die mogen NIET dezelfde bron gebruiken:
+//   · het instellingenvenster → de SCHAKELAARS op het scherm (de gebruiker zet ze net om);
+//   · inloggen en inschrijven → de OPGESLAGEN stand, want dan is dat venster nooit geopend en
+//     staan alle schakelaars in de HTML uit. Las die weg dan de DOM, dan zette één keer inloggen
+//     alle meldingen uit — in de app én bij OneSignal — zonder één woord.
+// `state.isSubscribed` wordt hier VERS opgehaald in plaats van geloofd: `logout()` zet hem op
+// false, en niets zette hem daarna terug behalve een paginalading. Zonder deze verse lezing deed
+// de herstelweg na een uitlog-inlog in hetzelfde tabblad helemaal niets.
+async function _syncNotifTags(who, prefs, deadlineHours) {
+  if (!state.oneSignalReady) return;
+  try {
+    if (window.OneSignal?.User?.PushSubscription?.optedIn === true) state.isSubscribed = true;
+  } catch(_) {}
+  if (!state.isSubscribed) return;
+  try {
+    await OneSignal.User.addTags({
+      behandelaar: who,
+      n_newtask:  prefs.newtask  ? '1' : '0',
+      n_assigned: prefs.assigned ? '1' : '0',
+      n_deadline: prefs.deadline ? '1' : '0',
+      n_alv:      prefs.alv      ? '1' : '0',
+      n_daily:    prefs.daily    ? '1' : '0',
+      deadline_h: deadlineHours,
+    });
+    if (who) await OneSignal.login(who);
+  } catch(e) { console.warn('Tag sync faalde:', e); }
+}
+
+// Herstel de koppeling met OneSignal vanuit de OPGESLAGEN stand. Aangeroepen na een geslaagde
+// inlog (logout() koppelt het toestel los en gooit de tags weg) en na het inschrijven.
+async function herstelNotifKoppeling() {
   const who = getCurrentWho();
-  if (!who && !forceInit) return;
-  if (who) localStorage.setItem(_whoSleutel(state.currentUserEmail), who);
+  const uren = localStorage.getItem(_prefSleutel('deadline_hours', state.currentUserEmail)) || '1';
+  await _syncNotifTags(who, getNotifPrefs(), uren);
+  try { refreshNotifUI(); } catch(_) {}
+}
+
+async function saveNotifPrefs() {
+  const who = getCurrentWho();
+  if (!who) return;
+  localStorage.setItem(_whoSleutel(state.currentUserEmail), who);
   const prefs = {
     newtask:  document.getElementById('tog-notif-newtask').classList.contains('on'),
     assigned: document.getElementById('tog-notif-assigned').classList.contains('on'),
@@ -446,22 +535,9 @@ async function saveNotifPrefs(forceInit) {
     daily:    document.getElementById('tog-notif-daily').classList.contains('on'),
   };
   const deadlineHours = document.getElementById('notif-deadline-hours').value || '1';
-  Object.entries(prefs).forEach(([k, v]) => localStorage.setItem('notif_' + k, v));
-  localStorage.setItem('notif_deadline_hours', deadlineHours);
-  if (state.oneSignalReady && state.isSubscribed) {
-    try {
-      await OneSignal.User.addTags({
-        behandelaar: who,
-        n_newtask:  prefs.newtask  ? '1' : '0',
-        n_assigned: prefs.assigned ? '1' : '0',
-        n_deadline: prefs.deadline ? '1' : '0',
-        n_alv:      prefs.alv      ? '1' : '0',
-        n_daily:    prefs.daily    ? '1' : '0',
-        deadline_h: deadlineHours,
-      });
-      if (who) await OneSignal.login(who);
-    } catch(e) { console.warn('Tag sync faalde:', e); }
-  }
+  Object.entries(prefs).forEach(([k, v]) => localStorage.setItem(_prefSleutel(k, state.currentUserEmail), v));
+  localStorage.setItem(_prefSleutel('deadline_hours', state.currentUserEmail), deadlineHours);
+  await _syncNotifTags(who, prefs, deadlineHours);
 }
 
 async function waitForOneSignal(timeoutMs) {
@@ -494,13 +570,14 @@ async function subscribeNotifs() {
     await OneSignal.User.PushSubscription.optIn();
     await OneSignal.login(who);
     ['newtask','assigned','deadline','alv','daily'].forEach(k => {
-      if (localStorage.getItem('notif_' + k) === null) localStorage.setItem('notif_' + k, 'true');
+      if (localStorage.getItem(_prefSleutel(k, state.currentUserEmail)) === null) localStorage.setItem(_prefSleutel(k, state.currentUserEmail), 'true');
     });
-    if (!localStorage.getItem('notif_deadline_hours')) localStorage.setItem('notif_deadline_hours', '1');
+    if (!localStorage.getItem(_prefSleutel('deadline_hours', state.currentUserEmail))) localStorage.setItem(_prefSleutel('deadline_hours', state.currentUserEmail), '1');
     localStorage.setItem(_whoSleutel(state.currentUserEmail), who);
-    await saveNotifPrefs(true);
+    // EERST de vlag, dán de tags: `_syncNotifTags` keert terug zolang `isSubscribed` false is, en
+    // in die volgorde werden de tags bij het allereerste inschrijven helemaal niet weggeschreven.
     state.isSubscribed = true;
-    refreshNotifUI();
+    await herstelNotifKoppeling();
     sendTestNotif(who, 'Notificaties zijn aan!', 'Je ontvangt voortaan meldingen op dit apparaat.');
   } catch(e) {
     console.error('subscribeNotifs error:', e);
@@ -580,6 +657,6 @@ OneSignalDeferred.push(async function(OneSignal) {
 export {
   fireNotifEvent, TOAST_ICONS, TOAST_COLORS, TOAST_DURATION, MAX_TOAST_BURST, showToast, dismissToast, showUndoToast,
   undoComplete, undoDelete, getNotifPrefs, verwerkMeldingRijen, toonMeldingen, initMeldingen, openNotifModal, closeNotifModal,
-  refreshNotifUI, onWhoChange, getCurrentWho, _whoSleutel, saveNotifPrefs, waitForOneSignal, subscribeNotifs,
+  refreshNotifUI, onWhoChange, getCurrentWho, _whoSleutel, saveNotifPrefs, herstelNotifKoppeling, waitForOneSignal, subscribeNotifs,
   unsubscribeNotifs, sendTestNotif,
 };

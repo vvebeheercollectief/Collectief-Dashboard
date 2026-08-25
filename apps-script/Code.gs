@@ -9,11 +9,38 @@ function verplaatsAfgerond(e) {
   // hem in het echte archief. Hoofdletterongevoelig + trim, zoals _isAlvoTab in src/alv-reset.js.
   if (sheet.getName().trim().toLowerCase() !== NTD_SHEET.toLowerCase()) return;
 
-  if (range.getColumn() !== 9) return;
+  // ALLEEN een bewerking die ÚITSLUITEND over kolom I gaat. Dat is bewust smal: een eerdere opzet
+  // liet elk bereik door dat kolom I ook maar RAAKTE, en dan wordt deze trigger destructief bij een
+  // gewone plakactie. Plak je een blok A:S terug uit een backup-tabblad en staat daar ergens TRUE
+  // in kolom I, dan archiveert hij die rijen en verwijdert ze meteen uit 'Nog Te Doen' — zonder
+  // vraag en zonder undo. Het geval waar het om gaat (meerdere hokjes tegelijk aanvinken) is altijd
+  // één kolom breed.
+  //
+  // Meerdere RIJEN mogen wél: `range.getRow()` en `range.getValue()` geven bij een meercellig
+  // bereik alleen de linkerbovenhoek, dus vier hokjes tegelijk aanvinken (selecteren en Enter,
+  // doortrekken met de vulgreep) leverde één onEdit-event op waarvan alleen de bovenste rij werd
+  // behandeld. De rest bleef afgevinkt in de lijst staan, zonder melding en zonder logregel.
+  if (range.getColumn() !== 9 || range.getNumColumns() !== 1) return;
 
-  if (range.getValue() !== true) return;
+  // GOEDKOPE VOORFILTER. `cd_archiveerRij` doet per rij eerst een brede lezing (A..S) vóórdat hij
+  // op TRUE kan toetsen. Bij een bereik van honderden rijen — één sleepbeweging over kolom I is zo
+  // gemaakt — zijn dat honderden losse Sheet-lezingen binnen de document-lock, terwijl er meestal
+  // één hokje echt is aangevinkt. Eén lezing van het vinkjesbereik vervangt dat.
+  var eersteRij = range.getRow(), aantal = range.getNumRows();
+  var laatsteRij = eersteRij + aantal - 1;
+  var vinkjes = sheet.getRange(eersteRij, 9, aantal, 1).getValues();
+  // Van ONDER naar BOVEN: elke geslaagde archivering verwijdert een rij, en dat zou de nog te
+  // behandelen rijnummers omhoog schuiven. Van onderaf blijven ze kloppen.
+  for (var rr = laatsteRij; rr >= eersteRij; rr--) {
+    if (vinkjes[rr - eersteRij][0] !== true) continue;   // de per-rij-guard in cd_archiveerRij blijft
+    cd_archiveerRij(sheet, rr);
+  }
+ });
+}
 
-  var row = range.getRow();
+// Eén afgevinkte rij naar 'Afgerond'. Los van de trigger zodat een bereik van meerdere rijen er
+// rij voor rij langs kan; elke `return` hierin slaat alleen díé rij over.
+function cd_archiveerRij(sheet, row) {
   var vinkKolom = 9;   // kolom I — het afvink-hokje (heette hier `lastCol` toen A:I álles was)
   // Lees t/m S en niet t/m I. De kolommen Q (taakId), R (bundelId) en S (bundelVolg) moeten mee
   // naar het archief: zonder taaknummer heeft een afgeronde rij geen identiteit meer en laat
@@ -34,10 +61,15 @@ function verplaatsAfgerond(e) {
 
   if (rowData[0] === "" && rowData[1] === "") return;
 
-  // Bepaal in welke sectie de rij zit
+  // Bepaal in welke sectie de rij zit. Kolom A in ÉÉN lezing ophalen, net als de sectiescan op
+  // 'Afgerond' verderop al doet. Cel voor cel omhoog lopen kostte hier tot tientallen losse
+  // getValue-aanroepen per afgevinkte taak — seconden binnen de lock, en juist die seconden zijn
+  // het venster waarin een schrijfactie van het dashboard (die buiten deze lock om gaat) de rijen
+  // kan verschuiven. Zie de her-controle vlak vóór deleteRow onderaan.
+  var kolomABron = sheet.getRange(1, 1, row, 1).getValues();
   var sectie = "";
   for (var i = row - 1; i >= 1; i--) {
-    var cellValue = sheet.getRange(i, 1).getValue().toString().trim().toUpperCase();
+    var cellValue = kolomABron[i - 1][0].toString().trim().toUpperCase();
     if (cellValue === "OPPAKKEN" || cellValue === "VERGADERVERZOEKEN" || cellValue === "LOD" || cellValue === "OFFERTE-TRAJECTEN" || cellValue === "SUBSIDIE-TRAJECTEN") {
       sectie = cellValue;
       break;
@@ -66,9 +98,13 @@ function verplaatsAfgerond(e) {
   archief.push("", "", "", "");             // M..P blijven leeg, net als bij afrondWaarden
   archief.push(rowData[16] || "", rowData[17] || "", rowData[18] || "");  // Q/R/S: taaknummer + bundel
 
-  var targetSheet = e.source.getSheetByName("Afgerond");
+  // Via `sheet.getParent()` en niet via het onEdit-event: deze functie staat sinds de opsplitsing
+  // LOS van de trigger (een bereik van meerdere rijen loopt er rij voor rij langs), dus `e` bestaat
+  // hier niet. Met `e.source` gooide élke handmatige afvink-actie meteen een ReferenceError.
+  var ss = sheet.getParent();
+  var targetSheet = ss.getSheetByName("Afgerond");
   if (!targetSheet) {
-    targetSheet = e.source.insertSheet("Afgerond");
+    targetSheet = ss.insertSheet("Afgerond");
     setupAfgerondSheet(targetSheet);
   }
 
@@ -131,8 +167,42 @@ function verplaatsAfgerond(e) {
   targetSheet.getRange(insertRow, 1, 1, schrijfBreedte)
              .setValues([archief.slice(0, schrijfBreedte)]);
 
+  // ── Is rij `row` NOG steeds dezelfde taak? ──────────────────────────────────────────────
+  // Tussen de controle bovenaan en dit punt zit echt werk: twee sectiescans, een insertRowBefore
+  // en een setValues. Het dashboard schrijft buiten deze document-lock om (de lock serialiseert
+  // alleen Apps Script onderling) en verwijdert daarbij NTD-rijen — bij afronden, bij bulk-
+  // afronden en bij verwijderen. Schoof er in dat venster iets op, dan wees `row` inmiddels naar
+  // een ándere, nog lopende taak: die werd hier stil verwijderd, terwijl de afgevinkte taak
+  // gearchiveerd én in de lijst achterbleef. Geen undo, geen spoor.
+  // Vers herlezen en vergelijken op IDENTITEIT: kolom A (VvE-code) én kolom Q (het vaste
+  // taaknummer) moeten nog gelijk zijn aan wat we zojuist gearchiveerd hebben, en het vinkje in
+  // kolom I moet er nog staan. Dezelfde vraag die assertRowMatch in de frontend stelt.
+  var naData = sheet.getRange(row, 1, 1, leesBreedte).getValues()[0];
+  // Kolom A (VvE-code) + kolom Q (het vaste taaknummer). Heeft de rij geen taaknummer — dat kan bij
+  // rijen van vóór de backfill — dan is kolom A alléén niet genoeg: één VvE heeft vaak meerdere
+  // taken in dezelfde sectie. Dan telt kolom C erbij als tweede bewijsstuk (de omschrijving; bij
+  // Vergaderverzoeken de periode, bij Offerte de aanvraagdatum — in alle gevallen iets dat een
+  // buurrij zelden deelt). Zelfde gedachte als de terugval in bevestigInvoegPlek.
+  var nrOud = leesBreedte >= 17 ? rowData[16].toString().trim() : '';
+  var nrNu  = leesBreedte >= 17 ? naData[16].toString().trim()  : '';
+  var zelfdeTaak = naData[vinkKolom - 1] === true
+                && naData[0].toString().trim() === rowData[0].toString().trim()
+                && (nrOud
+                      ? nrNu === nrOud
+                      : naData[2].toString().trim() === rowData[2].toString().trim());
+  if (!zelfdeTaak) {
+    // Niets verwijderen. De archiefregel staat er al, dus de taak staat nu dubbel — zichtbaar en
+    // met de hand te herstellen. Dat is oneindig veel beter dan een willekeurige andere taak stil
+    // kwijtraken. Een logregel erbij, net als bij de twee andere onverwachte situaties hierboven.
+    Logger.log('verplaatsAfgerond: rij ' + row + ' is niet meer dezelfde taak — niets verwijderd');
+    cd_schrijfLogboek(vveCode, sectie, 'Fout', 'Afgerond', '',
+      "De taak is gearchiveerd, maar regel " + row + " in 'Nog Te Doen' was intussen een andere taak "
+      + "geworden — die regel is NIET verwijderd. De afgeronde taak staat nu dubbel; haal hem met "
+      + "de hand uit 'Nog Te Doen'.", 'systeem');
+    return;
+  }
+
   sheet.deleteRow(row);
- });
 }
 
 function setupAfgerondSheet(sheet) {
@@ -274,7 +344,14 @@ function _sorteerOfferteTrajectenImpl(e) {
   var inLOD = sortAll || (editedRow > lodHeader && (subsidieHeader < 0 || editedRow < subsidieHeader));
   var inSubsidie = sortAll || (subsidieHeader > 0 && editedRow > subsidieHeader);
 
-  // Sorteer OPPAKKEN op kolom H (8)
+  // Sorteer OPPAKKEN op kolom H (8) = het vinkje 'In behandeling'.
+  // LET OP — dit is waarschijnlijk niet bedoeld, maar bewust NIET gewijzigd zonder de gebruiker.
+  // Volgens SECS[...].keys (src/config.js), dat één-op-één de kolomvolgorde van dit tabblad is,
+  // staat de deadline bij OPPAKKEN in kolom D (4) en bij VERGADERVERZOEKEN in F (6). De drie
+  // andere secties sorteren wél op een betekenisvolle kolom (offerte op C = datum aangevraagd,
+  // LOD en subsidie op F = deadline). Sorteren op een TRUE/FALSE-vinkje zet alleen 'nog niet in
+  // behandeling' bovenaan. Wijzigen verandert de volgorde die de gebruiker in de Sheet zélf ziet
+  // — dat is zijn keuze, niet die van een opruimronde. Zie de nachtelijke doorlichting v11.0.
   if (inOppakken && oppakkenHeader > 0) {
     var oppakkenStart = oppakkenHeader + 2;
     var oppakkenEnd = oppakkenStart - 1;

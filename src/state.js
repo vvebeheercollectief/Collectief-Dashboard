@@ -22,9 +22,14 @@ export const state = {
   _lastNotifTs: null,      // basislijn wordt op de eerste ronde op de echte sheet-timestamp gezet (niet op de browserklok)
   _meldStart: 0,           // eerste rij van het meldingen-venster; 0 = nog niet gekalibreerd → volledig lezen
   _meldUit: false,         // tabblad 'Meldingen' onleesbaar (verse Sheet-kopie) → deze sessie niet meer opvragen
-  _notifVisibilityHandler: null, // visibilitychange-listener; logout() koppelt 'm los
-  _resyncTimer: null,      // 8s live-resync-interval (stopbaar bij logout)
-  _heartbeatTimer: null,   // token-refresh heartbeat-interval (stopbaar bij logout)
+  // De twee timer-id's zijn er voor DIAGNOSE, niet om te stoppen. `logout()` (auth.js) legt
+  // uitgebreid uit waarom hij ze bewust laat staan: stoppen zou een tweede inlog in hetzelfde
+  // tabblad stil laten bevriezen, want ze worden alleen bij DOMContentLoaded gestart. Alle drie
+  // hebben ze hun eigen sessiepoort en liggen na een uitlog vanzelf stil.
+  // `_notifVisibilityHandler` stond hier met de tekst "logout() koppelt 'm los" — dat gebeurde
+  // nooit en niets las het veld. Weg; de listener zelf keert terug op !state.oauthToken.
+  _resyncTimer: null,      // 8s live-resync-interval (id alleen voor diagnose — zie logout())
+  _heartbeatTimer: null,   // token-refresh heartbeat-interval (idem)
   // actieve secties / tabs
   activeOntw: 'Alles',
   activeNtd: 'OPPAKKEN',
@@ -104,6 +109,8 @@ export const state = {
   _syncLblVoorBulk: null,  // de tekst die in de statusbalk stond vóór de selecteerstand. Bewaren
                            // i.p.v. straks 'Live · <nu>' schrijven: dat zou liegen over het moment
                            // van de laatste geslaagde verversing.
+  _bulkBezig: false,       // dubbelklik-rem op de knoppen van de bulk-balk (zie bulkDoe). Nodig
+                           // sinds bulkAfronden een echte lezing tussen klik en mutatie doet.
   _submitBezig: false,     // dubbelklik-rem op submitTask. Sinds `bevestigInvoegPlek` staat er een
                            // echte lezing tussen de klik en de mutatie, en zonder rem levert een
                            // tweede klik in dat gat twee identieke taken op.
@@ -154,5 +161,8 @@ export const state = {
   logAct: '',
   // logboek bewerken
   logEdit: null,        // _row van de logregel die nu inline bewerkt wordt (of null)
+  logEditTs: null,      // …en de TIMESTAMP van diezelfde regel. Het rijnummer schuift op zodra een
+                        // ander een logregel verwijdert of terugzet; de timestamp niet. Zie
+                        // _herankerLogEdit in render-overig.js.
   logEditSoort: null,   // gekozen contactsoort tijdens bewerken
 };

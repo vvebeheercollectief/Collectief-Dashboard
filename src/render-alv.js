@@ -6,7 +6,7 @@ import { esc, emptyRow, vveCodeSpan } from "./util.js";
 import { SID, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { getSheetIds } from "./crud.js";
-import { assertRowMatch, sheetsFetch } from "./api.js";
+import { assertRowMatch, sheetsFetch, appendRange } from "./api.js";
 import { logEvent } from "./render-overig.js";
 import { showToast } from "./notifications.js";
 import { ensureToken } from "./auth.js";
@@ -150,6 +150,47 @@ async function toggleAlvoFlag(idx,field){
       });
       if(!resp.ok){const t=await resp.text();throw new Error(`HTTP ${resp.status}: ${t.slice(0,120)}`)}
 
+      // ── De ALV ook in het archief zetten ────────────────────────────────────────────────
+      // 'Notulen' aanvinken IS het afronden van een ALV (_recomputeAlvoStatus zet de status dan op
+      // 'Afgerond'). In de Sheet doet de Apps Script-trigger `verplaatsALV` dat al: die schrijft
+      // [code, naam, vandaag] naar "ALV's afgerond". Maar een onEdit-trigger vuurt NIET op een
+      // schrijfactie via de Sheets-API, en het dashboard zet dit vinkje precies zo. Gevolg: sinds
+      // het vinkje vanuit het scherm gezet wordt, kwam er niets meer in dat archief — gemeten op
+      // productie was de laatste regel van 5 mei 2026, ruim drie maanden oud. Dat archief voedt de
+      // pagina "ALV's Afgerond", de regel 'Laatst gehouden ALV' in het VvE-dossier, de
+      // dossier-chat en de KPI's op Dashboard en Analytics; die stonden dus allemaal stil.
+      //
+      // Ontdubbelen op code + JAAR, want uit- en weer aanvinken mag geen tweede regel geven, en
+      // `verplaatsALV` kan dezelfde regel al gezet hebben als iemand het vinkje in de Sheet zette.
+      // In een EIGEN try: mislukt deze append, dan is het vinkje zelf wél geland en zou de catch
+      // hieronder het scherm terugdraaien terwijl de Sheet het aan heeft staan.
+      if(field==='notulen' && newVal){
+        try{
+          const nu=new Date();
+          const datum=`${String(nu.getDate()).padStart(2,'0')}-${String(nu.getMonth()+1).padStart(2,'0')}-${nu.getFullYear()}`;
+          // Ontdubbelen op code + de EXACTE dag van vandaag, niet op het kalenderjaar. De datum in
+          // het archief is de dag waarop het vinkje gezet wordt, niet de dag van de vergadering:
+          // een ALV van december die pas in januari wordt afgevinkt draagt een januaridatum, en
+          // een jaar-vergelijking zou daarmee de échte ALV van dat nieuwe jaar blokkeren. Waar de
+          // ontdubbeling voor bedoeld is — uit- en meteen weer aanvinken — valt gewoon op dezelfde
+          // dag, en dat dekt deze vergelijking precies.
+          const alBekend=(D.alfa||[]).some(a=>String(a.code||'').trim()===String(r.code||'').trim()
+                                            && String(a.datum||'').trim()===datum);
+          if(!alBekend){
+            // Let op de dubbele apostrof: in A1-notatie moet een apostrof ín een tabbladnaam
+            // verdubbeld worden, anders wijst het bereik nergens naar. Zelfde regel als _a1Bereik.
+            await appendRange("'ALV''s afgerond'!A:C", [r.code, r.naam, datum]);
+            // Meteen lokaal bijwerken, zodat de EERSTVOLGENDE hertekening klopt. Bewust géén render
+            // hier: dit loopt binnen metWriteMarkering en de resync daarna tekent alles opnieuw.
+            (D.alfa=D.alfa||[]).unshift({code:r.code, naam:r.naam, datum});
+          }
+        }catch(archiefFout){
+          console.warn("[alv] archiefregel niet geschreven:", archiefFout);
+          showToast('Archiefregel niet gelukt',
+            `Het vinkje staat aan, maar ${r.code} is niet in "ALV's afgerond" gezet. Zet hem daar met de hand bij.`,
+            'var(--am)','waarschuwing',{geenDedup:true});
+        }
+      }
       await logEvent(r.code,'ALVS',newVal?'Aangevinkt':'Uitgevinkt',ALVO_LABELS[field],oldVal?'TRUE':'FALSE',newVal?'TRUE':'FALSE');
       // geenDedup: hetzelfde vinkje binnen 15 s uit- en weer aanzetten geeft twee keer dezelfde
       // titel+tekst; zonder deze vlag slikt de ontdubbeling de tweede bevestiging in.

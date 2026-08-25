@@ -51,10 +51,14 @@ const RASTER_MIN = {
   "ALV's afgerond":    3,
 };
 
-// Is deze rij een sectiekop? Zelfde herkenning als parseSections: kolom A bevat een
-// sectienaam en de rest van de rij is leeg.
-const isSectieKop = (r) => SKEYS.includes(((r&&r[0])||'').trim().toUpperCase())
-                        && !((r&&r[1])||'').trim();
+// Is deze rij een sectiekop? PRECIES dezelfde herkenning als parseSections (data.js): alleen
+// kolom A telt. De extra eis 'kolom B is leeg' stond hier wél en dáár niet, en dat liep in beide
+// richtingen mis: een sectieregel met per ongeluk iets in kolom B werd door de parser wél als kop
+// gelezen (alles eronder viel dan in die sectie) maar door deze bewaker overgeslagen, dus er ging
+// geen enkel alarm af. Andersom kan niet: een taakrij met letterlijk 'OPPAKKEN' als VvE-code
+// bestaat niet.
+
+const isSectieKop = (r) => SKEYS.includes(((r&&r[0])||'').trim().toUpperCase());
 
 // Is deze rij de kolomkoprij?
 // LET OP — beide spellingen zijn echt in gebruik: op PROD staat boven OPPAKKEN
@@ -75,13 +79,20 @@ function checkSecties(rows){
   for(let i=0;i<rows.length;i++){
     if(!isSectieKop(rows[i])) continue;
     const sectie=((rows[i][0])||'').trim().toUpperCase();
-    const volgende=rows[i+1];
+    // De eerste NIET-LEGE regel eronder, net als parseSections: die slaat een volledig lege rij
+    // over (`if(!row||!row.length) continue`) en pakt pas de regel daarna als kolomkoprij. Deze
+    // bewaker keek strikt naar rows[i+1] en sloeg dus vals alarm op elk blok met een witregel
+    // tussen de sectiekop en de koppen — een melding die onterecht is, leert de gebruiker om álle
+    // meldingen weg te klikken.
+    let j=i+1;
+    while(j<rows.length && (!rows[j] || !rows[j].length)) j++;
+    const volgende=rows[j];
     if(!volgende) continue;               // sectiekop onderaan het blad: niets te zeggen
     if(!isKolomKop(volgende)){
       uit.push({
-        regel: i+2,                       // +1 voor 0-index, +1 omdat we de rij ná de kop bekijken
+        regel: j+1,                       // 1-gebaseerd rijnummer van de regel die we bekeken
         sectie,
-        tekst: `Regel ${i+2} staat op de plek van de kolomkoppen van ${SECS[sectie]?.label||sectie}. `
+        tekst: `Regel ${j+1} staat op de plek van de kolomkoppen van ${SECS[sectie]?.label||sectie}. `
              + `Deze regel is daardoor onzichtbaar in het dashboard.`,
       });
     }

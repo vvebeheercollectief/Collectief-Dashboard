@@ -7,7 +7,7 @@ import { state, D } from "./state.js";
 import { SID } from "./config.js";
 import { appendRange, writeRange, assertRowMatch, sheetsFetch } from "./api.js";
 import { ensureToken } from "./auth.js";
-import { getSheetIds } from "./crud.js";
+import { getSheetIds, setv } from "./crud.js";
 import { showToast } from "./notifications.js";
 import { logEvent } from "./render-overig.js";
 import { backgroundWrite, blokkeerOffline } from "./data.js";
@@ -54,7 +54,12 @@ function openHerhaalModal(hid){
   document.getElementById('hh-title').textContent=r?'Herhaalregel bewerken':'Nieuwe herhaalregel';
   document.getElementById('hh-submit-lbl').textContent=r?'Opslaan':'Toevoegen';
   document.getElementById('hh-del').style.display=r?'inline-flex':'none';
-  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||''};
+  // `setv` uit crud.js en geen eigen `el.value=v` meer: staat de opgeslagen waarde niet in de
+  // optielijst (een behandelaar die er niet in staat, een duo, een sectie die later is bijgekomen),
+  // dan zet de browser de select stil op leeg — en `submitHerhaal` schrijft die leegte daarna
+  // gewoon terug naar de Sheet. `setv` voegt zo'n onbekende waarde toe als extra optie, precies
+  // zoals het Ontwikkeling-scherm dat al doet.
+  const set=(id,v)=>setv(id, v||'');
   set('hh-omschrijving',r?.omschrijving); set('hh-code',r?.code); set('hh-naam',r?.naam);
   set('hh-sectie',r?.sectie||'OPPAKKEN'); set('hh-beh',r?.behandelaar);
   set('hh-type',r?.type||'kwartaal'); set('hh-interval',r?.interval||'6');

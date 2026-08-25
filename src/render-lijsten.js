@@ -3,7 +3,7 @@
 //  + re-export van render-offerte / render-alv / render-tabel (publieke interface stabiel).
 //  Batch D / punt 11: offerte/ALV/tabel-render zijn naar eigen modules verplaatst.
 // ══════════════════════════════════════
-import { esc, filt, berekenPrioriteit, parseDt, opvolgStatus, _vandaagAmsterdam, toISODate, isoWeek, vveCodeSpan, splitBehandelaar, periodeBereik, AF_PERIODES } from "./util.js";
+import { esc, filt, NIET_ZOEKBAAR, berekenPrioriteit, parseDt, opvolgStatus, _vandaagAmsterdam, toISODate, isoWeek, vveCodeSpan, splitBehandelaar, periodeBereik, AF_PERIODES } from "./util.js";
 import { SECS, SKEYS, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { bulkWis, renderBulkUi, allesVinkjeHtml, bulkHerstel } from "./bulk.js";
@@ -329,11 +329,16 @@ function renderNtd(){
   // krimpt. De tab-tellers hierboven blijven bewust op de ONgeabsorbeerde lijst staan — een
   // geabsorbeerde subtaak is niet verdwenen, alleen anders getekend, en moet dus meetellen.
   const zichtbaar=absorbeer(sorteerNtd(filterNtd(D.ntd[state.activeNtd]||[],q,fCode,fBeh,fPrio,state.activeNtd,state.ntdStatus),state.ntdSort),state.activeNtd,bw);
-  // Gewicht 3 voor de bulk-kolom: smal genoeg voor een vinkje, en omdat renderThead normaliseert
-  // schuiven de andere kolommen er evenredig voor opzij in plaats van dat de som scheef gaat.
+  // De bulk-kolom krijgt een px-ONDERGRENS en geen gewicht, precies zoals elke andere kolom met een
+  // bekende minimuminhoud (VvE-code 105, Signaal 150, datums 155, acties 150/120 — zie config.js).
+  // Met een gewicht van 3 deelde hij mee in de ruimte die ná de px-kolommen overblijft, en bij de
+  // smalste stand (min-width 1150) werd dat smaller dan het vinkje zelf plus zijn celopvulling —
+  // dan valt het vinkje van de rij af. 48px: 20 opvulling links + 14 vinkje + 14 rechts, waarbij
+  // die 14 de RUIMSTE stand van --row-px is (de dichtheidsknop zet hem op 10 of 14). Rekenen met
+  // de standaardstand gaf een kolom die in 'Ruim' vier pixels te smal was.
   renderThead('ntd-thead',[...(state.bulkMode?[allesVinkjeHtml(zichtbaar)]:[]),...SECS[state.activeNtd].cols,''],SECS[state.activeNtd].css,
     {active:state.ntdSort, keyFor:ntdSorteerKey},
-    [...(state.bulkMode?[3]:[]),...(SECS[state.activeNtd].breedtes||[])]);
+    [...(state.bulkMode?['48px']:[]),...(SECS[state.activeNtd].breedtes||[])]);
   renderTbody('ntd-tbody',zichtbaar,state.activeNtd,pgs.ntd,false,erIsGefilterd(filters));
   // Dezelfde lijst die hierboven over de pagina's verdeeld is, ook op state — daar leest
   // 'alles selecteren' hem. Bewust hier en niet in `renderTbody`: die krijgt alleen de rijen van
@@ -421,7 +426,12 @@ function ntdPagina(zichtbaar, r){
 
 function filterNtd(rows,q,fCode,beh,prio,sec,status){
   const out=rows.filter(r=>{
-    if(q&&!SECS[sec].keys.some(k=>(r[k]||'').toLowerCase().includes(q))) return false;
+    // Dezelfde uitsluitlijst als `filt` (util.js). Twee velden vallen daarmee buiten de zoekterm:
+    //  · `inBehandeling` draagt letterlijk 'TRUE'/'FALSE', dus elke term die in die twee woorden zit
+    //    ('al', 'se', 'fa', 'ru') gaf de hele lijst terug;
+    //  · `prioriteit` staat sinds v8.9 niet meer in beeld — op 'hoog' zoeken vond taken waar dat
+    //    woord nergens te lezen is. Bewust, en niet stil: zie de toets hieronder.
+    if(q&&!SECS[sec].keys.some(k=>!NIET_ZOEKBAAR.has(k)&&(r[k]||'').toLowerCase().includes(q))) return false;
     if(fCode&&!(r.code||'').toLowerCase().includes(fCode)) return false;
     if(beh&&!(r.behandelaar||'').toLowerCase().includes(beh.toLowerCase())) return false;
     if(prio){

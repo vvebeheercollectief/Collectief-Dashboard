@@ -84,7 +84,20 @@ function isSchuin(el){
 
 // Zet de markering strak om de tekst en laat spaties er buiten staan: "**vet **"
 // zou niet als vet weergegeven worden (inhoud mag niet op een spatie eindigen).
+//
+// PER REGEL, en dat is geen detail. De opslagvorm is regel-lokaal: `opmaakHtml` splitst bij het
+// teruglezen op '\n' en past de vet-/schuin-regex per regel toe. Zette je de markering om een
+// blok van twee regels heen ('**Regel1\nRegel2**'), dan stond de openings-** op regel 1 en de
+// sluitings-** op regel 2 en kon geen van beide ooit nog herkend worden — de gebruiker zag
+// letterlijk '**Regel1' en 'Regel2**' staan, mét sterretjes en zónder vet. Dat gebeurde bij elk
+// meerregelig vet blok uit Word of Outlook (<b>Regel1<br>Regel2</b>), en dat is de normale vorm
+// van een geplakt adres of een 'LET OP'-mededeling.
 function markeer(s, mark){
+  const str=String(s==null?'':s);
+  if(str.indexOf('\n')===-1) return _markeerRegel(str, mark);
+  return str.split('\n').map(r=>_markeerRegel(r, mark)).join('\n');
+}
+function _markeerRegel(s, mark){
   const m=/^(\s*)([\s\S]*?)(\s*)$/.exec(s);
   if(!m||!m[2]) return s;
   if(m[2].startsWith(mark)&&m[2].endsWith(mark)) return s;   // al gemarkeerd (nesting)
@@ -131,12 +144,27 @@ function pasToe(tekst, start, eind, soort){
     const b=nb===-1?t.length:nb;
     const regels=t.slice(a,b).split('\n');
     // Staan ze er al allemaal? Dan is de knop een schakelaar en halen we ze weg.
-    const alAan=regels.every(r=>RE_PUNT.test(r)||!r.trim());
+    // `heeftInhoud` erbij: zonder die eis telde een selectie van alleen LEGE regels als 'staat er
+    // al' (elke lege regel voldoet aan `!r.trim()`), waarna de map-lus diezelfde lege regels ook
+    // nog eens ongemoeid liet. De knop deed dan zichtbaar niets — precies in het meest gewone
+    // geval: een leeg notitieveld waarin je een lijstje wilt beginnen.
+    const heeftInhoud=regels.some(r=>r.trim());
+    const alAan=heeftInhoud && regels.every(r=>RE_PUNT.test(r)||!r.trim());
     const nieuw=regels.map(r=>{
-      if(!r.trim()) return r;
+      // Bij AANzetten krijgt ook een lege regel zijn streepje: dat is de regel waar de cursor
+      // staat als je met een leeg veld begint. Bij UITzetten blijven lege regels leeg.
+      if(!r.trim()) return alAan ? r : (heeftInhoud ? r : '- ');
       const m=RE_PUNT.exec(r);
       return alAan ? (m?m[1]:r) : '- '+r;
     }).join('\n');
+    // Bij AANzetten op een blok ZONDER inhoud (het gewone geval: een leeg notitieveld) staat de
+    // cursor samengevouwen áchter het streepje in plaats van de '- ' te selecteren. Anders wist de
+    // eerste letter die de gebruiker typt het streepje meteen weer — en dan lijkt de knop opnieuw
+    // niets te doen, precies het geval dat deze reparatie moest oplossen.
+    if(!alAan && !heeftInhoud){
+      const eind=a+nieuw.length;
+      return {tekst:t.slice(0,a)+nieuw+t.slice(b), start:eind, eind};
+    }
     return {tekst:t.slice(0,a)+nieuw+t.slice(b), start:a, eind:a+nieuw.length};
   }
   const mk=MARK[soort]; if(!mk) return {tekst:t, start, eind};

@@ -1,7 +1,10 @@
 // ══════════════════════════════════════
 //  COMMANDOCENTRUM — Ctrl+K: zoek door alles + acties (Fase 5)
 // ══════════════════════════════════════
-import { esc, displayName, berekenPrioriteit, parseDt } from "./util.js";
+// `taakTitel` en niet een eigen veldenketen: een offerte-traject heeft geen van die
+// velden (zijn omschrijving staat in `opmerkingen`), dus zulke treffers kwamen met een
+// LEGE vetgedrukte regel in de lijst — terwijl zoekAlles ze wél vindt.
+import { esc, displayName, berekenPrioriteit, parseDt, taakTitel } from "./util.js";
 import { SECS, SKEYS } from "./config.js";
 import { state, D } from "./state.js";
 import { goTo } from "./ui.js";
@@ -53,6 +56,9 @@ function zoekAlles(q, data, max){
   });
   res.afgerond=alleAf.slice(0,max.afgerond);
   res.logboek=(data.logboek||[])
+    // Alleen regels MÉT VvE-code: klikken op een treffer opent het dossier van die code, en een
+    // logregel zonder code (de ALV-reset schrijft er zo een) leidde naar een leeg dossier.
+    .filter(e=>String(e.code||'').trim())
     .filter(e=>hit(e.code,e.actie,e.veld,e.oudeWaarde,e.nieuweWaarde,displayName(e.gebruiker)))
     .sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp))
     .slice(0,max.logboek);
@@ -110,11 +116,11 @@ function renderPal(q){
     html+=_groep('Open taken',res.taken.map(r=>{
       const p=berekenPrioriteit(r.deadline,r._sec);
       const pill=p.teLaat?`<span class="pill-telaat">Te laat (${Math.abs(p.dagenTot)}d)</span>`:esc(r.deadline||'');
-      return _item(`<span class="pal-ico pal-ico-taak">${ico('cirkelOpen')}</span><div class="pal-tekst"><b>${esc(r.actiepunt||r.periode||r.agendapunten||r.status||r.subsidie||'')}</b><span>${esc(r.code)} ${esc(r.naam||'')} · ${esc(SECS[r._sec].label)} · ${esc(r.behandelaar||'—')}</span></div><span class="pal-hint">${pill}</span>`,
+      return _item(`<span class="pal-ico pal-ico-taak">${ico('cirkelOpen')}</span><div class="pal-tekst"><b>${esc(taakTitel(r, r._sec))}</b><span>${esc(r.code)} ${esc(r.naam||'')} · ${esc(SECS[r._sec].label)} · ${esc(r.behandelaar||'—')}</span></div><span class="pal-hint">${pill}</span>`,
         ()=>{ closePalette(); openModal(true,r); });
     }).join(''));
     html+=_groep('Afgerond',res.afgerond.map(r=>
-      _item(`<span class="pal-ico pal-ico-af">${ico('vink')}</span><div class="pal-tekst"><b>${esc(r.actiepunt||r.periode||r.agendapunten||r.subsidie||'')}</b><span>${esc(r.code)} · afgerond ${esc(r.datum||'')}</span></div>`,
+      _item(`<span class="pal-ico pal-ico-af">${ico('vink')}</span><div class="pal-tekst"><b>${esc(taakTitel(r, r._sec))}</b><span>${esc(r.code)} · afgerond ${esc(r.datum||'')}</span></div>`,
         ()=>{ closePalette(); openVvePagina(r.code); })).join(''));
     html+=_groep('Logboek',res.logboek.map(e=>
       _item(`<span class="pal-ico pal-ico-log">${ico('potlood')}</span><div class="pal-tekst"><b class="pal-logzin">${logZin(e)}</b></div>`,

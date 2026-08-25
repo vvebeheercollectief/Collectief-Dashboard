@@ -12,7 +12,7 @@ import {
   setOntw, renderOntw, editOntwItem, addTaskNote, renderLogboek,
   editLogboek, saveLogboek, cancelLogboek, setLogSoort, deleteLogboek,
 } from './render-overig.js';
-import { openModal, completeTask, completeCurrentEditTask, deleteCurrentEditTask, zetSubsidieFase, kiesModalFase, zetHoortBij, taakUitCache, renderExtraVves, herzieAlsSubtaak } from './crud.js';
+import { openModal, completeTask, completeCurrentEditTask, deleteCurrentEditTask, zetSubsidieFase, kiesModalFase, zetHoortBij, taakUitCache, renderExtraVves, herzieAlsSubtaak, _bewerkRijVers } from './crud.js';
 import { ontkoppelTaak } from './bundel-acties.js';
 import { adjOff } from './util.js';
 import { copyAiPrompt, aiOvernemen, aiActieTaak, aiKopieerConcept, prefillNieuweTaak } from './ai.js';
@@ -115,9 +115,15 @@ export const ACTIONS = {
   // dan wordt alleen die keuze losgelaten en toont het veld weer de werkelijke stand. Anders is
   // dit een echte schrijfactie die R en S van deze rij leegmaakt (kolom Q blijft staan).
   'bundel-ontkoppel':      async ()   => {
-    const r = state.editRowData;
-    if (state._hbDoel){ zetHoortBij(r); return; }
-    if (!r) return;
+    // De `_hbDoel`-tak eerst en op het RAUWE object: die raakt de Sheet niet en hoort ook te
+    // werken als de rij niet meer terug te vinden is.
+    if (state._hbDoel){ zetHoortBij(state.editRowData); return; }
+    // Voor de ECHTE schrijfactie de rij vers opzoeken, net als de drie andere knoppen in dit
+    // venster (Opslaan, Afronden, Verwijderen). De stille resync remt niet op een open scherm, dus
+    // `state.editRowData` kan naar een rij-object wijzen dat een verse parse allang vervangen
+    // heeft — en dan zou `ontkoppelTaak` kolom R en S van een verouderd rijnummer leegmaken.
+    const r = _bewerkRijVers();
+    if (!r) return;   // _bewerkRijVers toont zelf al een melding
     // Het veld NIET vooruit leegmaken. `ontkoppelTaak` heeft vier redenen om niets te doen — de
     // offline-/cache-rem, een mislukte login, een rij zonder rijnummer, een afgeronde taak — en
     // keert dan terug zonder de taak te muteren. Een vooraf leeggemaakt veld zou tegelijk met

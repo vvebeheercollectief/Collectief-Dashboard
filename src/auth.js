@@ -5,6 +5,8 @@ import { clientId, ALLOWED_EMAILS } from "./config.js";
 import { state, _shownToasts } from "./state.js";
 import { loadAll, laadUitCache, wisCache } from "./data.js";
 import { toonKaart } from "./login-splash.js";
+import { refreshNotifUI, herstelNotifKoppeling } from "./notifications.js";
+import { fetchMetKlok } from "./api.js";
 
 // Hoe lang een tokenaanvraag zonder antwoord de bezig-teller mag bezetten. Eindig — zie het
 // vangnet in doOAuth. Tests kunnen dit verlagen via state._authTimeoutMs.
@@ -99,7 +101,15 @@ function _doOAuth(forcePrompt){
 async function fetchUserEmail(){
   if(!state.oauthToken) return null;
   try{
-    const r=await fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:`Bearer ${state.oauthToken}`}});
+    // Mét tijdslimiet. Dit was de enige netwerkaanroep van de app zonder klok, en hij staat in
+    // twee try/finally-blokken die de app anders permanent bezet achterlaten: `doLogin` telt
+    // `_authBezig` pas in zijn finally af (de Herladen-knop van de versiebalk leest die vlag) en
+    // de knop 'Opnieuw inloggen' in data.js wist `_herinlogBezig` daar — en zolang die true is
+    // slaat de 8s-poll élke ronde over. Bij een afbreking valt hij gewoon in de catch hieronder
+    // en levert null: beide aanroepers hebben daar al een nette weg voor.
+    const r=await fetchMetKlok('https://www.googleapis.com/oauth2/v3/userinfo',
+                               {headers:{Authorization:`Bearer ${state.oauthToken}`}},
+                               'Geen antwoord van Google binnen 20 seconden');
     if(!r.ok) return null;
     const d=await r.json();
     return d.email||null;
@@ -128,6 +138,17 @@ async function doLogin(){
     state.currentUserEmail=email;
     sessionStorage.setItem('currentUserEmail',email);
     document.getElementById('login-gate').style.display='none';
+    // De OneSignal-koppeling terugzetten. `logout()` gooit de externe id én alle tags weg, en
+    // niets zette ze daarna terug: op een gedeelde computer (of na een uitlog-inlog in hetzelfde
+    // tabblad) kwam er daardoor geen enkele pushmelding meer aan, zonder dat het scherm iets
+    // liet zien.
+    // NADRUKKELIJK `herstelNotifKoppeling` en niet `saveNotifPrefs`: die laatste leest de
+    // SCHAKELAARS van het instellingenvenster, en dat venster is bij het inloggen nog nooit
+    // geopend — alle vijf staan dan uit in de HTML. Eén keer inloggen zou dan alle meldingen
+    // uitzetten, in de app én bij OneSignal. Deze leest de opgeslagen stand.
+    // Bewust NIET geawait: het is een netwerkactie naar OneSignal en mag het inloggen niet ophouden.
+    // De .catch hoort erbij omdat het een async functie is — een try/catch eromheen vangt niets.
+    herstelNotifKoppeling().catch(()=>{});
     laadUitCache();   // meteen de laatst bekende stand in beeld; loadAll vervangt hem
     loadAll();
   }finally{state._authBezig=Math.max(0,state._authBezig-1)}
@@ -181,7 +202,15 @@ function logout(reden){
   //   · de 8s-poll      → magPollen() eist state.currentUserEmail, hierboven leeggemaakt
   //   · de heartbeat    → keert terug op !state.oauthToken
   //   · onNotifVisibility → keert terug op !state.oauthToken
+  // OneSignal.logout() koppelt dit toestel los van de externe id én gooit de tags weg (in v16 komt
+  // de subscriptie op een nieuwe anonieme gebruiker te staan). Het scherm moet dat eerlijk laten
+  // zien: bleef `isSubscribed` op true staan, dan toonde het instellingenpaneel bij de volgende
+  // gebruiker 'meldingen staan aan' terwijl er geen enkele tag meer aan zijn naam hing en er dus
+  // niets meer aankwam. De terugweg loopt via `doLogin`, die na een geslaagde inlog de tags
+  // opnieuw wegschrijft.
   try{ if(window.OneSignal && OneSignal.logout) OneSignal.logout(); }catch(_){}
+  state.isSubscribed=false;
+  try{ refreshNotifUI(); }catch(_){}
   const gate=document.getElementById('login-gate'); if(gate) gate.style.display='';
   toonKaart(); // meteen de login-kaart (geen splash-herhaling bij uitloggen)
   const btn=document.getElementById('login-btn'); if(btn){ btn.classList.remove('is-signing'); btn.disabled=false; }

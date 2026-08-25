@@ -231,6 +231,16 @@ function cd_checkDeadlines() {
         const dl = cd_parseDate(dlVal);
         if (!dl) continue;
 
+        // BEWUST GEEN weggelegd-uitzondering hier — dit is nagelopen en teruggedraaid.
+        // De andere drie motoren (cd_dailySummary, cd_opvolgWakker, cd_escaleerStilleDossiers)
+        // slaan een weggelegde taak wél over, en die inconsistentie leek een gat. Dat is het niet:
+        // 'de deadline wint altijd' is hier een expliciete afspraak. Het wegleg-venster zegt de
+        // gebruiker letterlijk "Deze opvolgdatum ligt ná de deadline — de taak wordt op de deadline
+        // gewoon Te laat" (src/snooze.js), en het scherm toont 'te laat' ook bij een weggelegde
+        // taak. Zou deze functie weggelegde taken overslaan, dan vervielen ALLE vijf deadline-
+        // pushes (48/24/8/4/1 uur) en verstreek de deadline zonder één signaal, op geen enkel
+        // kanaal — precies het tegenovergestelde van wat de app belooft.
+
         const hoursUntil = (dl.getTime() - now.getTime()) / 3600000;
         if (hoursUntil < 0 || hoursUntil > 72) continue;
 
@@ -297,9 +307,9 @@ function cd_dailySummary() {
         if (opvolg && opvolg.getTime() <= today.getTime()) p.opvolgen++;
         const regels = CD_STIL_ESCALATIE_REGELS[sec];
         if (!weggelegd && regels && (ib || sec === 'OFFERTE-TRAJECTEN')) {
-          const laatst = stilMap[code + '|' + sec];
+          const laatst = cd_laatsteActiviteit(stilMap, code, sec);
           if (laatst) {
-            const dagen = Math.floor((today.getTime() - new Date(laatst.getFullYear(), laatst.getMonth(), laatst.getDate()).getTime()) / 86400000);
+            const dagen = cd_dagenSinds(laatst, today);   // zelfde afronding als het scherm
             if (dagen >= regels.trap1) p.stil++;
           }
         }

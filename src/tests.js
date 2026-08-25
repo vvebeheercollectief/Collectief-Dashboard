@@ -4,7 +4,7 @@
 import { taakTitel, taakVerwijzing, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel, kiesAfgerondRij, filt, splitBehandelaar, persBadges, taakActieKnoppen, voorgesteldeDeadline, DEADLINE_VOORSTEL, DEADLINE_HINT, periodeBereik, AF_PERIODES } from "./util.js";
 import { verwerkMeldingRijen, toonMeldingen, MAX_TOAST_BURST, _whoSleutel, getCurrentWho } from "./notifications.js";
 import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek, logEvents, renderOntw, openOntwModal, closeOntwModal, submitOntwItem } from "./render-overig.js";
-import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM } from "./config.js";
+import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM, VELD_LABELS } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
 import { filterNtd, setNtd, renderNtd, ntdPagina, renderNtdStats, renderAf, setAf, bepaalStil, bouwStilIndex, _zetStilIndex, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey, kopOpen, zetKopOpen, toggleBundel, springNaarBundel, wisNtdFilters, absorbeer, isPlatteWeergave, erIsGefilterd, rowNtd, filterAf, afFilterWaarden } from "./render-lijsten.js";
@@ -33,7 +33,7 @@ import { openSnoozeModal, snoozeOpslaan, closeSnoozeModal } from "./snooze.js";
 import { zetInBehandeling, inBehandelingKolom, heeftInBehandeling, volgendeStand } from "./inbehandeling.js";
 import { zoekDubbels, gelijkenis, zitErinVervat, lijktOp, woorden, dubbelVraagTekst, DUBBEL_DREMPEL } from "./dubbelcheck.js";
 import { extraVves, wisExtraVves, voegExtraVveToe, verwijderExtraVve, extraVvesHtml, extraVvesUitleg } from "./meervve.js";
-import { verplaatsTaak, verplaatsWaarden, verlorenVelden, verplaatsVraagTekst } from "./verplaats.js";
+import { verplaatsTaak, verplaatsWaarden, verlorenVelden, verplaatsVraagTekst, _veldLabel } from "./verplaats.js";
 import { addAannemer, verwijderAannemer } from "./offerte-aannemers.js";
 import { _verrijkOfferteRij } from "./render-offerte.js";
 import { bouwBundelIndex, bundelWeergave, zichtbareKop, isBundel, bundelVan, bundelMetId, hernummerLeden, volgendeVolg, magKoppelen, wordtGeabsorbeerd, koppelKandidaten, taakFilter, openSubtaken, bundelWaarschuwing, bundelVerwijzing, bundelStand, zelfdeTaak } from "./bundel.js";
@@ -10807,6 +10807,21 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     // meegenomen waarde zou meteen onwaar zijn.
     eq('verplaatsen: de prioriteit wordt opnieuw berekend voor de nieuwe categorie',
        naarOpp.rij[5], berekenPrioriteit('01-09-2026', 'OPPAKKEN').prioriteit);
+    // _veldLabel mag niet op kolomINDEX werken: `cols` en `keys` lopen niet gelijk op
+    // (Oppakken heeft 6 koppen en 8 sleutels) en er komt een kop bij die geen veld heeft.
+    eq('veldlabel: prioriteit heet Prioriteit, niet Opmerkingen',
+       _veldLabel('OPPAKKEN', 'prioriteit'), 'Prioriteit');
+    eq('veldlabel: LOD-status blijft Status',
+       _veldLabel('LOD', 'status'), 'Status');
+    eq('veldlabel: een onbekend veld valt terug op de sleutel zelf',
+       _veldLabel('OPPAKKEN', 'ditbestaatniet'), 'ditbestaatniet');
+    // Driftbewaking: elke kop in `cols` die een veld beschrijft moet ook in VELD_LABELS staan.
+    // 'Signaal' hoort bij geen enkel veld en is daarom de enige uitzondering.
+    eq('veldlabel: geen enkele kolomkop is uit VELD_LABELS weggelopen',
+       Object.keys(SECS).flatMap(s =>
+         SECS[s].cols.filter(c => c !== 'Signaal' &&
+           !Object.values(VELD_LABELS[s] || {}).includes(c)).map(c => `${s}:${c}`)),
+       []);
     // 'Status' bestaat niet in Oppakken en vervalt dus — maar niet stil.
     eq('verplaatsen: velden die de nieuwe categorie niet kent worden benoemd, niet stil gewist',
        verlorenVelden(lod, 'LOD', 'OPPAKKEN').map(v => [v.label, v.waarde]),

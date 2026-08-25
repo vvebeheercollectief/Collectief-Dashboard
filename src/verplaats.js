@@ -19,7 +19,7 @@
 // `verlorenVelden` ze op een rij en toont de vraag ze met naam en waarde — en het logboek legt ze
 // vast, zodat ze ook achteraf nog terug te lezen zijn.
 import { state, D } from "./state.js";
-import { SECS, SID, OMSCHRIJVING_SLEUTEL } from "./config.js";
+import { SECS, SID, OMSCHRIJVING_SLEUTEL, VELD_LABELS } from "./config.js";
 import { berekenPrioriteit, taakTitel } from "./util.js";
 import { assertRowsMatch, _shiftNtdRows, sheetsFetch } from "./api.js";
 import { ensureToken } from "./auth.js";
@@ -50,13 +50,12 @@ function verlorenVelden(r, bronSec, doelSec){
 }
 
 // De kolomkop zoals de gebruiker hem in de tabel ziet, zodat de vraag niet met interne veldnamen
-// spreekt. `cols` en `keys` lopen in SECS gelijk op vanaf de eerste kolom; is er geen kop (het veld
-// staat wel in keys maar niet in de tabel), dan valt hij terug op de sleutel zelf.
+// spreekt. Uit VELD_LABELS (config.js) en nadrukkelijk NIET uit `cols` op index: die twee lopen
+// niet gelijk op, en sinds er een kop 'Signaal' bij is die bij geen veld hoort al helemaal niet.
+// Kent VELD_LABELS het veld niet, dan valt hij terug op de sleutel zelf.
 function _veldLabel(sec, sleutel){
-  const spec = SECS[sec];
-  if(!spec) return sleutel;
-  const i = spec.keys.indexOf(sleutel);
-  return (i > -1 && spec.cols && spec.cols[i]) ? spec.cols[i] : sleutel;
+  const kaart = VELD_LABELS[sec];
+  return (kaart && kaart[sleutel]) ? kaart[sleutel] : sleutel;
 }
 
 // De celwaarden (A..S) voor de rij zoals hij in de DOELcategorie komt te staan. Puur.

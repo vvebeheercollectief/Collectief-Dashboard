@@ -75,6 +75,45 @@ export const SECS = {
     cols:['VvE Code','VvE','Subsidie','Fase','Behandelaar','Deadline'],
     keys:['code','naam','subsidie','subsidieFase','behandelaar','deadline','opmerkingen','inBehandeling']},
 };
+
+// De kolomkop zoals de gebruiker hem ziet, per VELDNAAM in plaats van per kolompositie.
+//
+// WAAROM NIET OP INDEX. `cols` en `keys` liepen nooit echt gelijk op: Oppakken heeft zes koppen
+// en acht sleutels, dus `cols[keys.indexOf('prioriteit')]` gaf 'Opmerkingen' en de
+// verplaats-dialoog zei "Opmerkingen: Hoog". Sinds er een kop 'Signaal' bij is die bij geen veld
+// hoort, zou elke sleutel erna nog een plek opschuiven. Deze afbeelding is expliciet en kan niet
+// stil verkeerd gaan; de toets 'geen enkele kolomkop is uit VELD_LABELS weggelopen' bewaakt drift.
+//
+// KOP EN LABEL LOPEN GELIJK OP. Wordt een kolomkop hernoemd, dan wijzigt dezelfde tekst hier én
+// in `cols` — anders zegt de tabel iets anders dan de verplaats-vraag en slaat de bewaking alarm.
+export const VELD_LABELS = {
+  'OPPAKKEN': {
+    code:'VvE Code', naam:'VvE', actiepunt:'Actiepunt', deadline:'Deadline',
+    behandelaar:'Behandelaar', prioriteit:'Prioriteit', opmerkingen:'Opmerkingen',
+    inBehandeling:'In behandeling',
+  },
+  'VERGADERVERZOEKEN': {
+    code:'VvE Code', naam:'VvE', periode:'Periode', agendapunten:'Agendapunten',
+    behandelaar:'Behandelaar', deadline:'Deadline uitschr.', opmerkingen:'Opmerkingen',
+    inBehandeling:'In behandeling',
+  },
+  'OFFERTE-TRAJECTEN': {
+    code:'VvE Code', naam:'VvE', datumAangevraagd:'Datum aangevr.',
+    offertes:'Ontvangen/Aangevr.', behandelaar:'Behandelaar', deadline:'Deadline',
+    opmerkingen:'Opmerkingen',
+  },
+  'LOD': {
+    code:'VvE Code', naam:'VvE', actiepunt:'Actiepunt', status:'Status',
+    behandelaar:'Behandelaar', deadline:'Deadline LOD', opmerkingen:'Opmerkingen',
+    inBehandeling:'In behandeling',
+  },
+  'SUBSIDIE-TRAJECTEN': {
+    code:'VvE Code', naam:'VvE', subsidie:'Subsidie', subsidieFase:'Fase',
+    behandelaar:'Behandelaar', deadline:'Deadline', opmerkingen:'Opmerkingen',
+    inBehandeling:'In behandeling',
+  },
+};
+
 export const SKEYS = Object.keys(SECS);
 
 // Waar staat de OMSCHRIJVING van een taak, per categorie — als VELDNAAM (niet als DOM-id).

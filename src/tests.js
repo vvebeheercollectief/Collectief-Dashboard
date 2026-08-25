@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { taakTitel, taakVerwijzing, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, stilDrempel, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, subBadge, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel, kiesAfgerondRij, filt, splitBehandelaar, persBadges, taakActieKnoppen, voorgesteldeDeadline, DEADLINE_VOORSTEL, DEADLINE_HINT, periodeBereik, AF_PERIODES } from "./util.js";
+import { taakTitel, taakVerwijzing, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, stilDrempel, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, subBadge, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel, kiesAfgerondRij, filt, splitBehandelaar, korteNaam, persBadges, taakActieKnoppen, voorgesteldeDeadline, DEADLINE_VOORSTEL, DEADLINE_HINT, periodeBereik, AF_PERIODES } from "./util.js";
 import { verwerkMeldingRijen, toonMeldingen, MAX_TOAST_BURST, _whoSleutel, getCurrentWho } from "./notifications.js";
 import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek, logEvents, renderOntw, openOntwModal, closeOntwModal, submitOntwItem } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM, VELD_LABELS } from "./config.js";
@@ -9831,6 +9831,30 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     // En de weergave gebruikt exact dezelfde regel, zodat er nooit een badge ontstaat die het
     // filter niet kan vinden.
     truthy('splitser: de badges volgen dezelfde regel', persBadges('Jer; Cihad').split('</span>').length - 1 === 2);
+
+    // ── korteNaam: een vaste lijst, geen afleidregel ──
+    eq('kortenaam: de vier teamleden hebben hun eigen code',
+       ['Jer','Gabos','Cihad','Cihan'].map(n => korteNaam(n)), ['J','G','JC','CC']);
+    eq('kortenaam: hoofdletters maken niet uit', korteNaam('cihad'), 'JC');
+    eq('kortenaam: spaties eromheen maken niet uit', korteNaam('  Jer '), 'J');
+    // Een naam buiten de lijst mag niet stil met een bestaande code gaan botsen.
+    eq('kortenaam: een onbekende naam met een vrije beginletter krijgt die letter',
+       korteNaam('Stagiair'), 'S');
+    eq('kortenaam: een onbekende naam die zou botsen blijft voluit',
+       korteNaam('Gerrit'), 'Gerrit');
+    eq('kortenaam: leeg blijft leeg', korteNaam(''), '');
+    // Elke code moet uniek zijn, anders staan er twee mensen onder hetzelfde teken.
+    eq('kortenaam: geen twee teamleden delen een code',
+       new Set(TEAM.map(n => korteNaam(n))).size, TEAM.length);
+    // De tabel kort af, de rest van het dashboard niet.
+    truthy('behandelaar: de tabel toont de korte code',
+           persBadges('Cihad', true).includes('>JC<'));
+    truthy('behandelaar: buiten de tabel blijft de volle naam staan',
+           persBadges('Cihad').includes('>Cihad<'));
+    truthy('behandelaar: de volle naam blijft als zweeftekst bereikbaar',
+           persBadges('Cihad', true).includes('title="Cihad"'));
+    truthy('behandelaar: twee namen blijven twee chips',
+           persBadges('Cihad, Jer', true).match(/class="pers/g).length === 2);
 
     // 2. Zoeken in het archief via Ctrl+K: eerst álles verzamelen, dán afkappen. De cap zat in de
     //    lus en vulde zich met OPPAKKEN (de eerste sectie), dus een sterk matchende afgeronde

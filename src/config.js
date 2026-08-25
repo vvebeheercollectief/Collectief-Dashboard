@@ -49,6 +49,17 @@ export const EMAIL_NAMES = {
 // (nog) niet staan, zodat werk van een stagiair/variant niet stil uit de tellingen valt.
 export const TEAM = [...new Set(Object.values(EMAIL_NAMES))];
 
+// De korte code per behandelaar, zoals hij in de takentabel op de rij staat. Door de gebruiker
+// vastgesteld en bewust een VASTE LIJST, geen afleidregel: Cihad en Cihan lopen pas bij de vijfde
+// letter uiteen, dus geen enkele regel komt op iets korters uit dat ook nog klopt. Staat een naam
+// hier niet in, dan valt korteNaam() terug op de beginletter — maar alleen als die nog vrij is.
+export const KORTE_NAMEN = {
+  'jer':   'J',
+  'gabos': 'G',
+  'cihad': 'JC',
+  'cihan': 'CC',
+};
+
 export const SECS = {
   OPPAKKEN:{label:'Oppakken',css:'--sec:var(--ac);--sec-l:var(--ac-l);--sec-b:var(--ac-b)',color:'#0D7377',
     cols:['VvE Code','VvE','Signaal','Actiepunt','Deadline','Wie','Opmerkingen'],

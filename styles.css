@@ -406,6 +406,10 @@
     .badge.budget-tag{background:var(--bl-l);color:var(--bl);margin-left:8px;vertical-align:middle}
     /* Behandelaar-chip — Operator: één neutrale chip */
     .pers{padding:2px 7px;border-radius:5px;font-size:11.5px;font-weight:600;margin:1px 2px 1px 0;display:inline-flex;align-items:center;background:#eef1f4;color:#5b6675}
+    /* Eén of twee tekens worden een rondje; een naam die niet in te korten viel blijft een gewone
+       chip. Vaste maten, want een rondje met tekstbreedte is een ei. 21px is dezelfde hoogte als
+       de chip ernaast, zodat een gemengde rij (JC naast Gerrit) niet gaat springen. */
+    .pers.pers-rond{width:21px;height:21px;padding:0;border-radius:50%;justify-content:center;font-size:10px;font-weight:700;letter-spacing:-.02em}
     .pers-jer,.pers-cihad,.pers-gabos,.pers-default{background:#eef1f4;color:#5b6675}
     .ib-yes{background:#eef1f4;color:#5b6675;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:600}
     .ib-no{color:var(--mut);font-size:12px}

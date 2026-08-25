@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  UTIL — gedeelde pure helpers (datums, prioriteit, tekst, badges)
 // ══════════════════════════════════════
-import { EMAIL_NAMES, OFFERTE_FASES, SECS } from './config.js';
+import { EMAIL_NAMES, OFFERTE_FASES, SECS, KORTE_NAMEN } from './config.js';
 import { ICONS } from './icons.js';
 
 function displayName(s){
@@ -281,12 +281,33 @@ function splitBehandelaar(v){
   return String(v||'').split(/[,;/]/).map(n=>n.trim()).filter(Boolean);
 }
 
-function persBadges(v){
+// De korte code van een behandelaar voor de takentabel. Eerst de vaste lijst uit config.js; staat
+// de naam daar niet in (een stagiair, een oud-collega die nog in de data zit), dan de beginletter,
+// maar ALLEEN als geen enkele bestaande code die letter al bezet. Anders de volle naam: twee
+// mensen onder hetzelfde teken is erger dan een brede chip.
+function korteNaam(naam){
+  const n = String(naam || '').trim();
+  if(!n) return '';
+  const vast = KORTE_NAMEN[n.toLowerCase()];
+  if(vast) return vast;
+  const bezet = new Set(Object.values(KORTE_NAMEN).map(c => c.toLowerCase()));
+  const letter = n.slice(0, 1);
+  return bezet.has(letter.toLowerCase()) ? n : letter;
+}
+
+// `kort` alleen aanzetten waar breedte echt knelt: de takentabel. Het VvE-dossier, de
+// Afgerond-lijst, Analytics en de Ontwikkeling-pagina houden de volle naam — daar is ruimte
+// genoeg en leest een code alleen maar als een raadsel. De volle naam blijft in de title staan,
+// zodat hij overal met de muis terug te vinden is.
+function persBadges(v, kort){
   if(!v)return'<span style="color:var(--fnt);font-size:12px">–</span>';
   const colors={'jer':'pers-jer','cihad':'pers-cihad','gabos':'pers-gabos'};
   return splitBehandelaar(v).map(n=>{
     const cls=colors[n.toLowerCase()]||'pers-default';
-    return`<span class="pers ${cls}">${esc(n)}</span>`;
+    const tekst = kort ? korteNaam(n) : n;
+    const rond = kort && tekst.length <= 2 ? ' pers-rond' : '';
+    const titel = kort && tekst !== n ? ` title="${esc(n)}"` : '';
+    return`<span class="pers ${cls}${rond}"${titel}>${esc(tekst)}</span>`;
   }).join('');
 }
 
@@ -580,7 +601,7 @@ function taakVerwijzing(r, sec){
 
 export {
   taakTitel, taakVerwijzing, kortDatum,
-  displayName, filt, splitBehandelaar, PRIO_REGELS, stilDrempel, STIL_ESCALATIE_REGELS,
+  displayName, filt, splitBehandelaar, korteNaam, PRIO_REGELS, stilDrempel, STIL_ESCALATIE_REGELS,
   DEADLINE_VOORSTEL, DEADLINE_HINT, voorgesteldeDeadline, AF_PERIODES, periodeBereik,
   opvolgStatus, volgendeDeadline, HERHAAL_MAANDEN, _vandaagAmsterdam, isoWeek,
   _verschilInKalenderdagen, berekenPrioriteit, prioBadge, persBadges,

@@ -114,6 +114,46 @@ function bepaalStil(r, sec){
   return dagen >= stilDrempel(sec) ? dagen : null;
 }
 
+// Vanaf hoeveel dagen vóór de deadline 'bijna te laat' aangaat. Bewust een vast getal voor alle
+// secties, net als de amberkleur die deadlineCel hiervoor gebruikte: de sectiedrempels
+// (PRIO_REGELS) gaan over hoe lang iets mag liggen, niet over hoe dichtbij een afgesproken datum is.
+const BIJNA_TE_LAAT_DAGEN = 7;
+
+// De signalen van een rij, van zwaar naar licht. PUUR: leest alleen `r` en bestaande helpers,
+// raakt geen DOM en geen state. De cel toont er hoogstens twee; deze functie geeft ze allemaal,
+// zodat de derde nog in de title kan.
+//
+// Waarom deze volgorde: 'te laat' is de enige die zegt dat er een afspraak al gebroken is.
+// 'vandaag opvolgen' is een afspraak met jezelf voor vandaag. 'bijna te laat' kijkt vooruit.
+// 'stil' en 'weggelegd' zeggen alleen iets over de geschiedenis van de taak.
+//
+// Drie tegelijk KAN (te laat + vandaag + stil). Weggelegd sluit vandaag uit (opvolgStatus,
+// util.js) en stil uit (bepaalStil, hierboven), dus met weggelegd blijven het er twee.
+//
+// `cls` draagt de OUDE klassenaam mee. Die staat er niet voor de opmaak - binnen `.cell-sig`
+// worden ze in styles.css leeggemaakt (taak 4) - maar omdat negen bestaande toetsen op die namen
+// zoeken en omdat er zo een plek is waar staat welke klasse bij welk signaal hoort.
+function signaalDelen(r, sec){
+  const uit = [];
+  const { teLaat, dagenTot } = berekenPrioriteit(r.deadline, sec);
+  const ov = opvolgStatus(r);
+  if (teLaat)
+    uit.push({ soort:'telaat', kleur:'crit', cls:'s-telaat',
+               tekst:`Te laat (${Math.abs(dagenTot)}d)` });
+  if (ov.vandaag)
+    uit.push({ soort:'vandaag', kleur:'warn', cls:'pill-opvolg', tekst:'Vandaag opvolgen' });
+  if (!teLaat && dagenTot !== null && dagenTot <= BIJNA_TE_LAAT_DAGEN)
+    uit.push({ soort:'bijna', kleur:'warn-dof', cls:'s-soon',
+               tekst: dagenTot === 0 ? 'Deadline vandaag' : `Nog ${dagenTot}d` });
+  const stil = GEEN_STIL_PILL.includes(sec) ? null : bepaalStil(r, sec);
+  if (stil !== null)
+    uit.push({ soort:'stil', kleur:'dof', cls:'pill-stil', tekst:`${stil}d stil` });
+  if (ov.weggelegd)
+    uit.push({ soort:'weggelegd', kleur:'dof', cls:'pill-snooze',
+               tekst:`Terug ${kortDatum(r.opvolgdatum)}` });
+  return uit;
+}
+
 function deadlineCel(r, sec){
   if (!r.deadline) return `<td class="cell-sm"><span class="warn-geen-deadline">Geen deadline</span></td>`;
   const { teLaat, dagenTot } = berekenPrioriteit(r.deadline, sec);
@@ -315,4 +355,4 @@ function renderPag(id,total,cur,doel){
     </div>`;
 }
 
-export { renderThead, renderTbody, bepaalStil, bouwStilIndex, _zetStilIndex, deadlineCel, rowNtd, rowAf, renderPag };
+export { renderThead, renderTbody, bepaalStil, bouwStilIndex, _zetStilIndex, signaalDelen, deadlineCel, rowNtd, rowAf, renderPag };

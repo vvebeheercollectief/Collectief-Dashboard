@@ -7,7 +7,7 @@ import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _s
 import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM, VELD_LABELS } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
-import { filterNtd, setNtd, renderNtd, ntdPagina, renderNtdStats, renderAf, setAf, bepaalStil, bouwStilIndex, _zetStilIndex, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey, kopOpen, zetKopOpen, toggleBundel, springNaarBundel, wisNtdFilters, absorbeer, isPlatteWeergave, erIsGefilterd, rowNtd, filterAf, afFilterWaarden } from "./render-lijsten.js";
+import { filterNtd, setNtd, renderNtd, ntdPagina, renderNtdStats, renderAf, setAf, bepaalStil, bouwStilIndex, _zetStilIndex, signaalDelen, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey, kopOpen, zetKopOpen, toggleBundel, springNaarBundel, wisNtdFilters, absorbeer, isPlatteWeergave, erIsGefilterd, rowNtd, filterAf, afFilterWaarden } from "./render-lijsten.js";
 import { HERO_VIEWS } from "./render-analytics.js";
 import { state, D, pgs } from "./state.js";
 import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel, renderVve, groepeerBundels } from "./render-vve.js";
@@ -846,6 +846,57 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
      ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN'].map(stilDrempel),
      [7, 14, 21, 30, 21]);
   eq('stil-drempel: een onbekende sectie valt terug op 7', stilDrempel('BESTAAT-NIET'), 7);
+
+  // ── Signaal-rangorde ──
+  (() => {
+    const vLog = D.logboek;
+    const vandaag = _vandaagAmsterdam();
+    const dat = n => { const d = new Date(vandaag.getFullYear(), vandaag.getMonth(), vandaag.getDate() + n);
+                       return `${d.getDate()}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`; };
+    const iso = n => new Date(Date.now() + n*864e5).toISOString();
+    try{
+      D.logboek = [{ code:'SIG-1', sectie:'OPPAKKEN', timestamp: iso(-20) }];
+      _zetStilIndex(bouwStilIndex(D.logboek, 'OPPAKKEN'));
+
+      const soorten = r => signaalDelen(r, 'OPPAKKEN').map(d => d.soort);
+
+      // 1. Niets aan de hand -> lege lijst.
+      eq('signaal: geen deadline en geen opvolgdatum geeft niets',
+         soorten({ code:'SIG-0', deadline:'', opvolgdatum:'', inBehandeling:'' }), []);
+
+      // 2. Te laat wint van alles.
+      eq('signaal: te laat staat vooraan',
+         soorten({ code:'SIG-1', deadline:dat(-45), opvolgdatum:dat(0), inBehandeling:'TRUE' }),
+         ['telaat','vandaag','stil']);
+
+      // 3. Bijna te laat telt alleen als hij NIET te laat is.
+      eq('signaal: bijna te laat bij een deadline binnen zeven dagen',
+         soorten({ code:'SIG-0', deadline:dat(3), opvolgdatum:'', inBehandeling:'' }), ['bijna']);
+      eq('signaal: bij te laat komt bijna-te-laat er niet ook nog bij',
+         soorten({ code:'SIG-0', deadline:dat(-1), opvolgdatum:'', inBehandeling:'' }), ['telaat']);
+      eq('signaal: een deadline over dertig dagen geeft niets',
+         soorten({ code:'SIG-0', deadline:dat(30), opvolgdatum:'', inBehandeling:'' }), []);
+
+      // 4. Weggelegd sluit vandaag EN stil uit (bestaand gedrag van opvolgStatus/bepaalStil).
+      eq('signaal: weggelegd sluit vandaag en stil uit',
+         soorten({ code:'SIG-1', deadline:dat(-2), opvolgdatum:dat(9), inBehandeling:'TRUE' }),
+         ['telaat','weggelegd']);
+
+      // 5. Stil kan alleen als de taak is opgepakt.
+      eq('signaal: stil vereist in behandeling',
+         soorten({ code:'SIG-1', deadline:'', opvolgdatum:'', inBehandeling:'' }), []);
+
+      // 6. Op offerte en subsidie bestaat stil niet, ook niet via deze motor.
+      eq('signaal: offerte krijgt nooit een stil-signaal',
+         signaalDelen({ code:'SIG-1', deadline:'', opvolgdatum:'', inBehandeling:'TRUE' },
+                      'OFFERTE-TRAJECTEN').map(d => d.soort), []);
+
+      // 7. De tekst van de zwaarste melding is de tekst die de gebruiker leest.
+      eq('signaal: de te-laat-tekst noemt het aantal dagen',
+         signaalDelen({ code:'SIG-0', deadline:dat(-12), opvolgdatum:'', inBehandeling:'' },
+                      'OPPAKKEN')[0].tekst, 'Te laat (12d)');
+    } finally { _zetStilIndex(null); D.logboek = vLog; }
+  })();
 
   // ── subcategorie cross-list: taak óók in het gekozen scherm tonen (bug #2) ──
   truthy('subcategorie cross-list: taak verschijnt in het gekozen scherm', (()=>{

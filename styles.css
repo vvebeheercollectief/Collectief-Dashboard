@@ -1637,6 +1637,15 @@ tr.stapel-doel>td{background:var(--sec-l,var(--ac-l))!important;
    kolom, wat hier eerder `text-align:center` deed. */
 .stapel-h svg{display:block;margin:0 auto}
 .stapel-h:active{cursor:grabbing}
+/* Het handvat gebruik je zelden maar het staat op élke rij. Het verschijnt daarom pas als je de
+   rij aanwijst — slepen werkt precies zoals het werkte, alleen de rustige lijst wint erbij.
+   :focus-visible staat er nadrukkelijk bij: wie met het toetsenbord navigeert moet hem zien. */
+#ntd-tbody .stapel-h{opacity:0;transition:opacity var(--tr-fast)}
+#ntd-tbody tr:hover .stapel-h,
+#ntd-tbody .stapel-h:focus-visible{opacity:1}
+/* Een aanraakscherm kent geen hover: daar zou het handvat onbereikbaar worden. Halfdoorzichtig
+   i.p.v. onzichtbaar, precies zoals `.log-acts` (regel 745) dat al doet. */
+@media(hover:none){#ntd-tbody .stapel-h{opacity:.5}}
 /* Zelfde aanraakhalo-truc als bij `.bdl-h`: het handvat meet 16 × 14 px (gemeten) en is als
    aanraakdoel dus te klein — richtlijn is 24px+. Het gebied groeit met een pseudo-element in plaats
    van met echte maten, want dat is zelf geen event-doel: de pointerdown komt gewoon op `.stapel-h`

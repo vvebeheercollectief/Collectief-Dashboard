@@ -6539,6 +6539,35 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         let bronEl=tabelRij(sub), doelEl=tabelRij(kop);
         truthy('stapel-e2e: beide taken staan als rij in de tabel', !!bronEl && !!doelEl);
         truthy('stapel-e2e: en allebei met een sleep-handvat', !!greep(bronEl) && !!greep(doelEl));
+
+        // ── Sleep-handvat verschijnt bij aanwijzen ──
+        // Staat hier en niet bij de losse util-toetsen: dit meet echte opmaak, en dat kan alleen
+        // terwijl de NTD-lijst in beeld staat mét de gestapelde weergave aan (geen zoekterm, geen
+        // filter, geen bulkmodus) — precies de stand die dit blok hierboven zelf opbouwt. Zonder
+        // die stand tekent rowNtd het handvat niet (zie `bdlGreep`, render-tabel.js) en zou de
+        // meting groen blijven zonder iets te bewijzen. Vóór de sleepmetingen hieronder, want die
+        // scrollen rijen naar het midden en zetten daarmee zomaar een rij onder de muisaanwijzer.
+        (() => {
+          const st = document.createElement('style');
+          st.textContent = '*{transition:none !important}';  // anders meet je halverwege de overgang
+          document.head.appendChild(st);
+          try{
+            const greep = document.querySelector('#ntd-tbody .stapel-h');
+            truthy('handvat: er staat een sleep-handvat in de tabel', !!greep);
+            if(greep) eq('handvat: onzichtbaar zolang je de rij niet aanwijst',
+                         getComputedStyle(greep).opacity, '0');
+            // Op een aanraakscherm bestaat hover niet; daar mag hij niet onbereikbaar worden.
+            // Op de conditie toetsen met een regex en niet met een gelijkteken: de CSSOM serialiseert
+            // een mediaquery opnieuw en zet er een spatie achter de dubbele punt. Gemeten in Chrome:
+            // `@media(hover:none){…}` uit dit bestand komt er als '(hover: none)' weer uit, dus een
+            // vergelijking op de letterlijke schrijfwijze zou hier rood staan om de verkeerde reden.
+            // Dezelfde voorzorg als bij de 680px-mediaquery verderop in dit bestand.
+            truthy('handvat: er is een uitzondering voor aanraakschermen',
+                   [...document.styleSheets].some(s => { try{
+                     return [...s.cssRules].some(r => /^\(hover:\s*none\)$/.test(r.conditionText || '')
+                       && r.cssText.includes('stapel-h')); }catch(e){ return false; } }));
+          } finally { st.remove(); }
+        })();
         // Nulmeting op het meetinstrument zelf. Alles hieronder mikt met echte coördinaten, en als
         // die de doelrij niet raken — de rij buiten beeld, een laag eroverheen — dan levert élke
         // sleepactie stilzwijgend 'geen doel' op en zou dit hele blok groen blijven zonder iets te

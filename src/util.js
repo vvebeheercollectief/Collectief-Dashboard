@@ -437,7 +437,18 @@ function vveCodeSpan(code, style){
   if(!c||c==='—') return `<span class="code"${st}>${esc(code||'—')}</span>`;
   return `<span class="code code-klik"${st} data-action="vve-open" data-code="${esc(c)}" title="Open VvE-dossier">${esc(c)}</span>`;
 }
-function subBadge(v){return v?`<span class="badge" style="background:var(--sur2);color:var(--mut);font-size:10px;margin-left:4px">${esc(v)}</span>`:''}
+// De subcategorie achter de VvE-naam. Is die gelijk aan het tabblad waar je al staat ("Oppakken"
+// in de Oppakken-tab), dan zegt hij niets nieuws en gaat hij weg — dat is precies de ruis waar
+// deze rij te veel van had. Genormaliseerd vergelijken (trim + kleine letters), net als
+// renderNtdCrossList (render-lijsten.js:354, 363), anders laat één hoofdletter hem terugkomen.
+// `sec` is optioneel: zonder sectie gedraagt hij zich als vanouds.
+function subBadge(v, sec){
+  const t = String(v == null ? '' : v).trim();
+  if(!t) return '';
+  const eigen = (sec && SECS[sec] && SECS[sec].label) ? String(SECS[sec].label).trim().toLowerCase() : '';
+  if(eigen && t.toLowerCase() === eigen) return '';
+  return `<span class="badge" style="background:var(--sur2);color:var(--mut);font-size:10px;margin-left:4px">${esc(t)}</span>`;
+}
 // De drie rij-acties (bewerken / wegleggen / afronden) als knoppentrio, op `rid` uit state._rowCache.
 // Eén definitie, want ze staan op twee plekken die op hetzelfde scherm pal onder elkaar komen: de
 // tabelrij (rowNtd) en de subtaakregel in een bundelpaneel (subRegel). Twee kopieën betekent dat

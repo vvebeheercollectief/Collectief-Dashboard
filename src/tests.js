@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { taakTitel, taakVerwijzing, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, stilDrempel, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel, kiesAfgerondRij, filt, splitBehandelaar, persBadges, taakActieKnoppen, voorgesteldeDeadline, DEADLINE_VOORSTEL, DEADLINE_HINT, periodeBereik, AF_PERIODES } from "./util.js";
+import { taakTitel, taakVerwijzing, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, stilDrempel, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, subBadge, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel, kiesAfgerondRij, filt, splitBehandelaar, persBadges, taakActieKnoppen, voorgesteldeDeadline, DEADLINE_VOORSTEL, DEADLINE_HINT, periodeBereik, AF_PERIODES } from "./util.js";
 import { verwerkMeldingRijen, toonMeldingen, MAX_TOAST_BURST, _whoSleutel, getCurrentWho } from "./notifications.js";
 import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek, logEvents, renderOntw, openOntwModal, closeOntwModal, submitOntwItem } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM, VELD_LABELS } from "./config.js";
@@ -556,6 +556,17 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   eq('vveCodeSpan: placeholder "—" niet klikbaar',   /data-action/.test(vveCodeSpan('—')), false);
   eq('vveCodeSpan: lege code niet klikbaar',         /data-action/.test(vveCodeSpan('')), false);
   eq('vveCodeSpan: code met < wordt geëscaped',      vveCodeSpan('<x>').includes('&lt;x&gt;'), true);
+
+  // ── subBadge: geen label dat herhaalt waar je al bent ──
+  eq('subbadge: gelijk aan het eigen tabblad → weg',
+     subBadge('Oppakken', 'OPPAKKEN'), '');
+  eq('subbadge: ook met andere hoofdletters en spaties → weg',
+     subBadge('  oppakken ', 'OPPAKKEN'), '');
+  truthy('subbadge: een afwijkende subcategorie blijft staan',
+     subBadge('Offerte-trajecten', 'OPPAKKEN').includes('Offerte-trajecten'));
+  eq('subbadge: leeg blijft leeg', subBadge('', 'OPPAKKEN'), '');
+  truthy('subbadge: zonder sectie gedraagt hij zich als vanouds',
+     subBadge('Oppakken').includes('Oppakken'));
 
   // ── filterDossierLog ── (dossier-feed: 'contact' toont alleen handmatige contactmomenten)
   const _dosLog=[{actie:'Contact'},{actie:'Afgerond'},{actie:'Contact'},{actie:'Kenmerk'}];

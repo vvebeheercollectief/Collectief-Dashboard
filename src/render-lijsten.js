@@ -329,8 +329,11 @@ function renderNtd(){
   // krimpt. De tab-tellers hierboven blijven bewust op de ONgeabsorbeerde lijst staan — een
   // geabsorbeerde subtaak is niet verdwenen, alleen anders getekend, en moet dus meetellen.
   const zichtbaar=absorbeer(sorteerNtd(filterNtd(D.ntd[state.activeNtd]||[],q,fCode,fBeh,fPrio,state.activeNtd,state.ntdStatus),state.ntdSort),state.activeNtd,bw);
+  // Gewicht 3 voor de bulk-kolom: smal genoeg voor een vinkje, en omdat renderThead normaliseert
+  // schuiven de andere kolommen er evenredig voor opzij in plaats van dat de som scheef gaat.
   renderThead('ntd-thead',[...(state.bulkMode?[allesVinkjeHtml(zichtbaar)]:[]),...SECS[state.activeNtd].cols,''],SECS[state.activeNtd].css,
-    {active:state.ntdSort, keyFor:ntdSorteerKey});
+    {active:state.ntdSort, keyFor:ntdSorteerKey},
+    [...(state.bulkMode?[3]:[]),...(SECS[state.activeNtd].breedtes||[])]);
   renderTbody('ntd-tbody',zichtbaar,state.activeNtd,pgs.ntd,false,erIsGefilterd(filters));
   // Dezelfde lijst die hierboven over de pagina's verdeeld is, ook op state — daar leest
   // 'alles selecteren' hem. Bewust hier en niet in `renderTbody`: die krijgt alleen de rijen van

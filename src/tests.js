@@ -1040,6 +1040,57 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       setNtd('SUBSIDIE-TRAJECTEN');
       eq('signaalkolom: subsidie houdt zes koppen en krijgt er géén',
          [...document.querySelectorAll('#ntd-thead th')].length, 7);
+      // ── Kolomverdeling ──
+      // De tabel deelde de ruimte zelf uit en de tekst had een klem in vaste pixels. Gemeten op
+      // productie-achtige data: 'Datum aangevr.' 351px voor één datum, terwijl de VvE-naam en de
+      // opmerkingen ernaast afgekapt werden. Deze toetsen leggen de nieuwe verdeling vast.
+      ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN'].forEach(sec => {
+        eq(`kolombreedte: ${sec} heeft één gewicht per kolom plus de actiekolom`,
+           (SECS[sec].breedtes || []).length, SECS[sec].cols.length + 1);
+        truthy(`kolombreedte: ${sec} heeft alleen positieve gewichten`,
+               (SECS[sec].breedtes || []).every(w => Number.isFinite(w) && w > 0));
+      });
+      setNtd('OPPAKKEN');
+      const _tbl = document.querySelector('#ntd-tbl-wrap table');
+      const _cg  = _tbl && _tbl.querySelector('colgroup');
+      truthy('kolombreedte: er staat een colgroup in de tabel', !!_cg);
+      eq('kolombreedte: evenveel kolommen in de colgroup als koppen',
+         _cg ? _cg.children.length : 0, document.querySelectorAll('#ntd-thead th').length);
+      // Zonder table-layout:fixed negeert de browser de colgroup zodra de inhoud breder wil —
+      // dan is alles hierboven decoratie. Dit is de regel die het écht laat werken.
+      eq('kolombreedte: de tabel gebruikt een vaste kolomindeling',
+         _tbl ? getComputedStyle(_tbl).tableLayout : null, 'fixed');
+      // De tekst hoort tot de celrand te lopen. Bleef hier een vast getal staan, dan kregen we de
+      // oude situatie terug: een brede kolom met afgekapte tekst erin.
+      (() => {
+        const ct = document.querySelector('#ntd-tbody .cell-name > .ct');
+        if(ct) eq('kolombreedte: de tekstklem volgt de cel, niet een vast getal',
+                  getComputedStyle(ct).maxWidth, '100%');
+      })();
+      // De gewichten worden genormaliseerd, dus de percentages tellen op tot 100. Anders zou een
+      // extra kolom (bulkmodus) de som scheeftrekken en de laatste kolom eraf duwen.
+      truthy('kolombreedte: de percentages tellen op tot 100',
+             !_cg || Math.abs([..._cg.children]
+               .reduce((a,c) => a + parseFloat(c.style.width), 0) - 100) < 0.05);
+      // In bulkmodus komt er een kolom bij; die moet meetellen in de colgroup.
+      (() => {
+        const vBulk = state.bulkMode;
+        try{
+          state.bulkMode = true; renderNtd();
+          const cg2 = document.querySelector('#ntd-tbl-wrap table colgroup');
+          eq('kolombreedte: in bulkmodus telt het vinkje als eigen kolom',
+             cg2 ? cg2.children.length : 0, document.querySelectorAll('#ntd-thead th').length);
+        } finally { state.bulkMode = vBulk; renderNtd(); }
+      })();
+      // De offerte-cel zette balk en link ónder elkaar: 60px per rij tegen 47 elders.
+      setNtd('OFFERTE-TRAJECTEN');
+      (() => {
+        const of = document.querySelector('#ntd-tbody td.cell-of');
+        if(of) eq('kolombreedte: de offerte-cel zet balk en link naast elkaar',
+                  getComputedStyle(of).display, 'flex');
+      })();
+      setNtd('SUBSIDIE-TRAJECTEN');
+
       // En de sectielijst wordt afgeleid uit `cols`, dus die kan niet uit de pas lopen.
       eq('signaalkolom: precies drie tabbladen dragen de kop',
          SKEYS.filter(s => SECS[s].cols.includes('Signaal')),

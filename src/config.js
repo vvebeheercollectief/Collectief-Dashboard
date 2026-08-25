@@ -60,18 +60,32 @@ export const KORTE_NAMEN = {
   'cihan': 'CC',
 };
 
+// `breedtes` is de kolomverdeling, als GEWICHTEN — één meer dan `cols`, want de actiekolom
+// rechts telt mee. renderThead rekent ze om naar percentages, dus ze hoeven niet op 100 uit te
+// komen en een extra kolom (het bulk-vinkje) schuift er vanzelf tussen.
+//
+// WAAROM DIT ER IS. De tabel deelde overgebleven ruimte zelf uit, en de tekstkolommen hadden een
+// klem in vaste pixels (`.cell-name>.ct{max-width:160px}` e.d.). Kolommen mét klem konden dus niet
+// groeien en kolommen zonder klem slokten alles op. Gemeten op Offerte-trajecten: 'Datum aangevr.'
+// was 351px breed voor "1 oktober 2025", terwijl de VvE-naam (212px) én de opmerkingen (296px)
+// afgekapt werden. Op Oppakken was de VvE-kolom 309px met de tekst afgekapt op 160 — 149px dode
+// ruimte in dezelfde cel waar de naam niet paste.
 export const SECS = {
   OPPAKKEN:{label:'Oppakken',css:'--sec:var(--ac);--sec-l:var(--ac-l);--sec-b:var(--ac-b)',color:'#0D7377',
     cols:['VvE Code','VvE','Signaal','Actiepunt','Deadline','Wie','Opmerkingen'],
+                   breedtes:[7,19,10,27,8,5,15,9],
     keys:['code','naam','actiepunt','deadline','behandelaar','prioriteit','opmerkingen','inBehandeling']},
   VERGADERVERZOEKEN:{label:'Vergaderverzoeken',css:'--sec:var(--am);--sec-l:var(--am-l);--sec-b:var(--am-b)',color:'#B45309',
     cols:['VvE Code','VvE','Signaal','Periode','Agendapunten','Wie','Deadline uitschr.','Opmerkingen'],
+                   breedtes:[7,16,10,8,25,5,9,12,8],
     keys:['code','naam','periode','agendapunten','behandelaar','deadline','opmerkingen','inBehandeling']},
   'OFFERTE-TRAJECTEN':{label:'Offerte-trajecten',css:'--sec:var(--pu);--sec-l:var(--pu-l);--sec-b:var(--pu-b)',color:'#6D5BD0',
     cols:['VvE Code','VvE','Datum aangevr.','Ontvangen/Aangevr.','Behandelaar','Deadline','Opmerkingen'],
+                   breedtes:[8,20,8,19,8,8,20,9],
     keys:['code','naam','datumAangevraagd','offertes','behandelaar','deadline','opmerkingen']},
   LOD:{label:'LOD',css:'--sec:var(--rd);--sec-l:var(--rd-l);--sec-b:var(--rd-b)',color:'#B91C1C',
     cols:['VvE Code','VvE','Signaal','Actiepunt','Status','Wie','Deadline LOD','Opmerkingen'],
+                   breedtes:[6,15,10,22,15,5,8,11,8],
     keys:['code','naam','actiepunt','status','behandelaar','deadline','opmerkingen','inBehandeling']},
   // Subsidie-trajecten (2026-07-29). Zelfde kolomstramien als LOD, met 'Status'
   // vervangen door 'Fase'. Twee dingen liggen hier vast en mogen niet losjes wijzigen:
@@ -84,6 +98,7 @@ export const SECS = {
   // de gebruiker koos zes kolommen om de rij rustig te houden.
   'SUBSIDIE-TRAJECTEN':{label:'Subsidie-trajecten',css:'--sec:var(--tl);--sec-l:var(--tl-l);--sec-b:var(--tl-b)',color:'#0F766E',
     cols:['VvE Code','VvE','Subsidie','Fase','Behandelaar','Deadline'],
+                   breedtes:[8,22,18,20,9,10,13],
     keys:['code','naam','subsidie','subsidieFase','behandelaar','deadline','opmerkingen','inBehandeling']},
 };
 

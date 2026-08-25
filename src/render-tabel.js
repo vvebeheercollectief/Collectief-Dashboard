@@ -29,8 +29,20 @@ const HEEFT_SIGNAAL_KOLOM = SKEYS.filter(s => SECS[s].cols.includes('Signaal'));
 // ══════════════════════════════════════
 // Optionele 4e parameter maakt kolomkoppen sorteerbaar: {active:{key,asc}, keyFor:(label)=>key|null}.
 // Sorteerbare koppen worden een echte knop (toetsenbord-bedienbaar) met pijl + aria-sort op de th.
-function renderThead(id,cols,css,sort){
+// `breedtes` (optioneel) zijn GEWICHTEN, één per kolom. Ze worden hier omgerekend naar
+// percentages en als <colgroup> vóór de kop gezet. Dat werkt alleen samen met `table-layout:fixed`
+// (styles.css, alleen op de NTD-tabel): zonder dat deelt de browser de ruimte zelf uit en negeert
+// hij de colgroup zodra de inhoud breder wil. Omrekenen en niet hardcoderen, zodat het bulk-vinkje
+// er als extra kolom tussen kan schuiven zonder dat alle getallen opnieuw moeten kloppen.
+function renderThead(id,cols,css,sort,breedtes){
   const kf=sort&&sort.keyFor;
+  const som=(breedtes||[]).reduce((a,b)=>a+b,0);
+  const cg=(breedtes && breedtes.length===cols.length && som>0)
+    ? `<colgroup>${breedtes.map(w=>`<col style="width:${(w/som*100).toFixed(3)}%">`).join('')}</colgroup>`
+    : '';
+  // De colgroup hoort in de <table>, niet in de <thead>. Hij wordt daarom apart geplaatst.
+  const tbl=document.getElementById(id).closest('table');
+  if(tbl){ tbl.querySelector('colgroup')?.remove(); if(cg) tbl.insertAdjacentHTML('afterbegin', cg); }
   document.getElementById(id).innerHTML=`<tr>${cols.map(c=>{
     const key=kf?kf(c):null;
     if(!key) return `<th style="${css}">${c}</th>`;
@@ -317,7 +329,7 @@ function rowNtd(r,sec){
       cells=`<td>${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
         <td class="cell-name"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}${bdlNaam}</td>
         <td class="cell-sm">${esc(r.datumAangevraagd||'')}</td>
-        <td>${offProg(r.offertes)}<div class="of-aann-tbl-tog">${offerteAannSamenvatting(r)}</div></td>
+        <td class="cell-of">${offProg(r.offertes)}<div class="of-aann-tbl-tog">${offerteAannSamenvatting(r)}</div></td>
         <td>${persBadges(r.behandelaar)}</td>
         ${deadlineCel(r, 'OFFERTE-TRAJECTEN')}
         <td class="cell-note"><span class="ct" title="${esc(r.opmerkingen||'')}">${esc(r.opmerkingen||'')}</span>${extraPills}</td>

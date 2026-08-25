@@ -289,6 +289,10 @@
        de meeste ruimte; VvE-naam en opmerkingen leveren in. De som is zo gekozen dat de
        tabel op een venster van 1440 past — daaronder vangt de vastgezette actiekolom af.
        Afgekapte tekst blijft bereikbaar: klik op de rij klapt 'm uit, hover toont de titel. */
+    /* Vaste-pixel-klemmen. Ze gelden nog voor de Afgerond-tabel en de dossierlijsten, die hun
+       kolommen wél door de browser laten verdelen. De NTD-tabel overschrijft ze hieronder met
+       `max-width:100%`: daar bepaalt de colgroup de kolombreedte, en dan hoort de tekst tot de
+       CELRAND te lopen in plaats van tot een getal dat er niets mee te maken heeft. */
     .cell-name>.ct{max-width:160px}
     .cell-txt>.ct{max-width:350px}
     .cell-note>.ct{max-width:155px}
@@ -300,6 +304,23 @@
        om iets af te ronden. Alleen de NTD-tabel: daar is de laatste kolom de actiekolom.
        Cellen met colspan (groepskoppen 'In behandeling'/'Weggelegd', lege-lijst-regel)
        scrollen bewust gewoon mee — die hebben geen actieknoppen. */
+    /* ── Kolomverdeling van de takentabel ──────────────────────────────────────────────────
+       `table-layout:fixed` is wat de <colgroup> uit renderThead werkelijk laat gelden. Zonder dit
+       verdeelt de browser de ruimte naar inhoud, en dan won 'Datum aangevr.' (351px voor één
+       datum) het van de VvE-naam en de opmerkingen ernaast, die allebei afgekapt werden.
+
+       `min-width` houdt de tabel leesbaar op een smal scherm: met alleen `width:100%` zou hij op
+       een telefoon van 378px zijn kolommen tot dertig pixel indikken. Nu blijft hij 1180 breed en
+       scrolt hij zijwaarts, precies zoals hij dat vóór deze wijziging ook al deed. */
+    #ntd-tbl-wrap table{table-layout:fixed;min-width:1180px}
+    /* De tekst loopt tot de celrand, niet tot een vast getal. */
+    #ntd-tbl-wrap .cell-name>.ct,#ntd-tbl-wrap .cell-txt>.ct,#ntd-tbl-wrap .cell-note>.ct{max-width:100%}
+    /* De offerte-cel zette de voortgangsbalk en 'Aannemers toevoegen' ónder elkaar, waardoor élke
+       rij op dat tabblad 60px hoog werd tegen 47 op de andere vier — hoge rijen die niets extra's
+       lieten zien. Naast elkaar past het ruim en loopt de rijhoogte weer gelijk. */
+    #ntd-tbl-wrap td.cell-of{display:flex;align-items:center;gap:12px;white-space:nowrap}
+    #ntd-tbl-wrap td.cell-of .prog-wrap{flex:none}
+    #ntd-tbl-wrap td.cell-of .of-aann-tbl-tog{flex:1;min-width:0;margin-top:0;overflow:hidden;text-overflow:ellipsis}
     #ntd-tbl-wrap thead th:last-child{position:sticky;right:0;z-index:3;background:var(--sur2)}
     /* De vastgezette cel moet ondoorzichtig zijn, anders schemeren de wegscrollende cellen
        erdoorheen. Een doorschijnende rijkleur kan daar dus niet: die moet ondoorzichtig

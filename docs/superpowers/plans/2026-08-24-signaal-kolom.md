@@ -6,7 +6,7 @@
 
 **Architecture:** Eén pure functie `signaalDelen(r, sec)` weegt de bestaande signaalbronnen (`berekenPrioriteit`, `opvolgStatus`, `bepaalStil`) tot een geordende lijst; `signaalCel()` tekent daar één `<td>` van met de zwaarste melding groot en de tweede klein erachter. De bestaande klassenamen (`s-telaat`, `pill-opvolg`, `pill-stil`, `pill-snooze`) blijven staan als betekenisdragers maar verliezen binnen de cel hun eigen opmaak — zo blijven negen bestaande toetsen geldig en is er één bron voor "welke klasse hoort bij welk signaal".
 
-**Tech Stack:** Vanilla ES-modules, geen build. Toetsen draaien in de browser via `?test=1` (`src/tests.js`, resultaat in `window._testResult`). Syntaxcontrole via `node tools/syntaxcheck.js`.
+**Tech Stack:** Vanilla ES-modules, geen build. Toetsen draaien in de browser via `?test=1` (`src/tests.js`, resultaat in `window._testResult`). Syntaxcontrole via `osascript -l JavaScript tools/syntaxcheck.js`.
 
 **Spec:** `docs/superpowers/specs/2026-08-24-signaal-kolom-design.md`
 
@@ -20,10 +20,11 @@ Start de lokale server (geen cache, anders zie je je eigen wijziging niet):
 python3 ~/.claude/nocache-server.py 8123 ~/collectief-dashboard
 ```
 
-Syntaxcontrole vóór elke testronde — parseert alle 53 bestanden in een seconde:
+Syntaxcontrole vóór elke testronde — parseert alle 53 bestanden in een seconde. Let op: dit
+draait op JavaScriptCore via osascript, NIET op node (er staat geen node op deze machine):
 
 ```bash
-node tools/syntaxcheck.js
+osascript -l JavaScript tools/syntaxcheck.js
 ```
 
 Toetsen draaien: open `http://localhost:8123/index.html?test=1`, wacht tot
@@ -162,7 +163,7 @@ Breid de import bovenin `src/verplaats.js` uit met `VELD_LABELS` (dezelfde regel
 
 - [ ] **Step 5: Draai de toetsen en zie ze slagen**
 
-Draai eerst `node tools/syntaxcheck.js` (verwacht: geen fouten), dan `?test=1`.
+Draai eerst `osascript -l JavaScript tools/syntaxcheck.js` (verwacht: geen fouten), dan `?test=1`.
 Verwacht: de vier nieuwe regels groen, en `src/tests.js:10811-10815` (`'Status: Wacht op gemeente'`) nog steeds groen.
 
 - [ ] **Step 6: Commit**
@@ -259,7 +260,7 @@ door:
 
 - [ ] **Step 6: Draai de toetsen en zie ze slagen**
 
-`node tools/syntaxcheck.js`, dan `?test=1`.
+`osascript -l JavaScript tools/syntaxcheck.js`, dan `?test=1`.
 Verwacht: beide nieuwe regels groen, `stil-label: weg bij offerte, blijft bij LOD` nog steeds groen.
 
 - [ ] **Step 7: Commit**
@@ -393,7 +394,7 @@ Voeg `signaalDelen` toe aan het exportblok op `src/render-tabel.js:318`, en aan 
 
 - [ ] **Step 4: Draai de toetsen en zie ze slagen**
 
-`node tools/syntaxcheck.js`, dan `?test=1`. Verwacht: alle acht nieuwe regels groen.
+`osascript -l JavaScript tools/syntaxcheck.js`, dan `?test=1`. Verwacht: alle acht nieuwe regels groen.
 
 - [ ] **Step 5: Commit**
 
@@ -681,7 +682,7 @@ En breid de bestaande `tr.expanded`-regel op `styles.css:291` uit met `.cell-sig
 
 - [ ] **Step 8: Draai de toetsen en zie ze slagen**
 
-`node tools/syntaxcheck.js`, dan `?test=1`.
+`osascript -l JavaScript tools/syntaxcheck.js`, dan `?test=1`.
 Verwacht: alle nieuwe regels groen, en `src/tests.js:839` (`stil-label: weg bij offerte, blijft bij LOD`) nog steeds groen omdat `pill-stil` nu in de signaal-cel staat.
 
 - [ ] **Step 9: Kijk er zelf naar**
@@ -766,7 +767,7 @@ renderen wordt aangeroepen en niet tijdens het laden.
 
 - [ ] **Step 4: Draai de toetsen en zie ze slagen**
 
-`node tools/syntaxcheck.js`, dan `?test=1`.
+`osascript -l JavaScript tools/syntaxcheck.js`, dan `?test=1`.
 Verwacht: beide nieuwe regels groen, en `src/tests.js:4964-4985` alle zes nog groen.
 
 - [ ] **Step 5: Commit**
@@ -831,7 +832,7 @@ function subBadge(v, sec){
 
 - [ ] **Step 4: Draai de toetsen en zie ze slagen**
 
-`node tools/syntaxcheck.js`, dan `?test=1`. Verwacht: alle vijf nieuwe regels groen.
+`osascript -l JavaScript tools/syntaxcheck.js`, dan `?test=1`. Verwacht: alle vijf nieuwe regels groen.
 
 - [ ] **Step 5: Commit**
 
@@ -841,21 +842,19 @@ git add src/util.js src/tests.js && git commit -m "subBadge laat een label weg d
 
 ---
 
-## Task 7: Behandelaars korter, maar nooit dubbelzinnig
+## Task 7: Behandelaars als korte code
 
-**Let op — dit wijkt af van wat er in het ontwerp stond.** Daar staat "rondjes met twee letters
-(`Ci`, `Ch`)". Dat kan niet: **Cihad** en **Cihan** verschillen pas bij de vijfde letter (C-i-h-a-d
-tegen C-i-h-a-n), dus twee letters geeft voor allebei `Ci`. Elke afkorting korter dan vijf letters
-is voor deze twee namen een raadsel in plaats van een naam.
+De gebruiker heeft de afkortingen zelf vastgesteld: **Jer → `J`**, **Gabos → `G`**,
+**Cihad → `JC`**, **Cihan → `CC`**. Bewust een vaste lijst en geen slimmigheid: Cihad en Cihan
+lopen pas bij de vijfde letter uiteen (C-i-h-a-**d** tegen C-i-h-a-**n**), dus geen enkele
+afleidregel komt op iets korters uit dat ook nog klopt. Wie het weet, weet het — en die lijst
+staat op één plek.
 
-Daarom: de **kortste afkorting die binnen het team uniek is**. Dat levert `J` voor Jer en `G` voor
-Gabos (echte winst), en voor Cihad/Cihan de volle naam (geen winst, maar ook geen verwarring).
-Wie later een collega toevoegt wiens naam wél te verkorten is, krijgt dat automatisch.
-
-De rondjes komen **alleen in de takentabel**; het VvE-dossier, de Afgerond-lijst, Analytics en de
-Ontwikkeling-pagina houden de volle naam.
+De korte codes komen **alleen in de takentabel**; het VvE-dossier, de Afgerond-lijst, Analytics en
+de Ontwikkeling-pagina houden de volle naam.
 
 **Files:**
+- Modify: `src/config.js` (na `TEAM`, rond regel 51)
 - Modify: `src/util.js` (bij `splitBehandelaar`/`persBadges`, rond regel 260-275)
 - Modify: `src/util.js` (exportblok, regel 556)
 - Modify: `styles.css` (na `.pers`, regel 357)
@@ -864,55 +863,71 @@ Ontwikkeling-pagina houden de volle naam.
 - [ ] **Step 1: Schrijf de falende toets**
 
 ```javascript
-  // ── korteNaam: alleen afkorten als het ondubbelzinnig blijft ──
-  eq('kortenaam: Jer kan naar één letter', korteNaam('Jer', ['Jer','Cihad','Gabos','Cihan']), 'J');
-  eq('kortenaam: Gabos ook', korteNaam('Gabos', ['Jer','Cihad','Gabos','Cihan']), 'G');
-  // Cihad en Cihan verschillen pas bij de vijfde letter; korter is geen naam maar een raadsel.
-  eq('kortenaam: Cihad blijft voluit', korteNaam('Cihad', ['Jer','Cihad','Gabos','Cihan']), 'Cihad');
-  eq('kortenaam: Cihan blijft voluit', korteNaam('Cihan', ['Jer','Cihad','Gabos','Cihan']), 'Cihan');
-  eq('kortenaam: in je eentje mag één letter', korteNaam('Cihad', ['Cihad']), 'C');
-  eq('kortenaam: een naam buiten het team wordt niet ingekort',
-     korteNaam('Stagiair', ['Jer','Cihad']), 'S');
-  eq('kortenaam: leeg blijft leeg', korteNaam('', ['Jer']), '');
+  // ── korteNaam: een vaste lijst, geen afleidregel ──
+  eq('kortenaam: de vier teamleden hebben hun eigen code',
+     ['Jer','Gabos','Cihad','Cihan'].map(n => korteNaam(n)), ['J','G','JC','CC']);
+  eq('kortenaam: hoofdletters maken niet uit', korteNaam('cihad'), 'JC');
+  eq('kortenaam: spaties eromheen maken niet uit', korteNaam('  Jer '), 'J');
+  // Een naam buiten de lijst mag niet stil met een bestaande code gaan botsen.
+  eq('kortenaam: een onbekende naam met een vrije beginletter krijgt die letter',
+     korteNaam('Stagiair'), 'S');
+  eq('kortenaam: een onbekende naam die zou botsen blijft voluit',
+     korteNaam('Gerrit'), 'Gerrit');
+  eq('kortenaam: leeg blijft leeg', korteNaam(''), '');
+  // Elke code moet uniek zijn, anders staan er twee mensen onder hetzelfde teken.
+  eq('kortenaam: geen twee teamleden delen een code',
+     new Set(TEAM.map(n => korteNaam(n))).size, TEAM.length);
   // De tabel kort af, de rest van het dashboard niet.
-  truthy('behandelaar: de tabel toont de korte vorm',
-         persBadges('Jer', true).includes('>J<'));
+  truthy('behandelaar: de tabel toont de korte code',
+         persBadges('Cihad', true).includes('>JC<'));
   truthy('behandelaar: buiten de tabel blijft de volle naam staan',
-         persBadges('Jer').includes('>Jer<'));
+         persBadges('Cihad').includes('>Cihad<'));
+  truthy('behandelaar: de volle naam blijft als zweeftekst bereikbaar',
+         persBadges('Cihad', true).includes('title="Cihad"'));
   truthy('behandelaar: twee namen blijven twee chips',
          persBadges('Cihad, Jer', true).match(/class="pers/g).length === 2);
 ```
 
-Breid de `util.js`-import in `src/tests.js` uit met `korteNaam`.
+Breid de `util.js`-import in `src/tests.js` uit met `korteNaam`, en de `config.js`-import met `TEAM`.
 
 - [ ] **Step 2: Draai de toets en zie hem falen**
 
 Verwacht: `ReferenceError: korteNaam is not defined`.
 
-- [ ] **Step 3: Schrijf `korteNaam` en breid `persBadges` uit**
+- [ ] **Step 3: Zet de lijst in `src/config.js`**
+
+Direct ná `export const TEAM = ...` (regel 51):
+
+```javascript
+// De korte code per behandelaar, zoals hij in de takentabel op de rij staat. Door de gebruiker
+// vastgesteld en bewust een VASTE LIJST, geen afleidregel: Cihad en Cihan lopen pas bij de vijfde
+// letter uiteen, dus geen enkele regel komt op iets korters uit dat ook nog klopt. Staat een naam
+// hier niet in, dan valt korteNaam() terug op de beginletter — maar alleen als die nog vrij is.
+export const KORTE_NAMEN = {
+  'jer':   'J',
+  'gabos': 'G',
+  'cihad': 'JC',
+  'cihan': 'CC',
+};
+```
+
+- [ ] **Step 4: Schrijf `korteNaam` en breid `persBadges` uit**
 
 Voeg toe in `src/util.js`, direct ná `splitBehandelaar` (na regel 275):
 
 ```javascript
-// De kortste afkorting van een naam die binnen het team niet met een andere naam te verwarren is.
-//
-// WAAROM DIT ZO OMSLACHTIG MOET. Eén letter lag voor de hand, maar Cihad en Cihan zouden dan
-// allebei 'C' worden — en de vier kleurklassen (.pers-jer, .pers-cihad, …) hebben tegenwoordig
-// allemaal dezelfde kleur, dus er is niets om op terug te vallen. Deze functie kort af zolang het
-// ondubbelzinnig blijft en houdt de naam anders voluit. Voor Jer en Gabos levert dat 'J' en 'G';
-// voor Cihad en Cihan (die pas bij de vijfde letter uit elkaar lopen) de volle naam. Komt er een
-// collega bij, dan verschuift dat vanzelf mee.
-function korteNaam(naam, team){
+// De korte code van een behandelaar voor de takentabel. Eerst de vaste lijst uit config.js; staat
+// de naam daar niet in (een stagiair, een oud-collega die nog in de data zit), dan de beginletter,
+// maar ALLEEN als geen enkele bestaande code die letter al bezet. Anders de volle naam: twee
+// mensen onder hetzelfde teken is erger dan een brede chip.
+function korteNaam(naam){
   const n = String(naam || '').trim();
   if(!n) return '';
-  const anderen = ((team && team.length) ? team : TEAM)
-    .map(t => String(t || '').trim())
-    .filter(t => t && t.toLowerCase() !== n.toLowerCase());
-  for(let len = 1; len < n.length; len++){
-    const kort = n.slice(0, len);
-    if(!anderen.some(t => t.toLowerCase().startsWith(kort.toLowerCase()))) return kort;
-  }
-  return n;
+  const vast = KORTE_NAMEN[n.toLowerCase()];
+  if(vast) return vast;
+  const bezet = new Set(Object.values(KORTE_NAMEN).map(c => c.toLowerCase()));
+  const letter = n.slice(0, 1);
+  return bezet.has(letter.toLowerCase()) ? n : letter;
 }
 ```
 
@@ -921,43 +936,45 @@ Vervang `persBadges` (`src/util.js:268-275`) door:
 ```javascript
 // `kort` alleen aanzetten waar breedte echt knelt: de takentabel. Het VvE-dossier, de
 // Afgerond-lijst, Analytics en de Ontwikkeling-pagina houden de volle naam — daar is ruimte
-// genoeg en leest een afkorting alleen maar als een raadsel.
+// genoeg en leest een code alleen maar als een raadsel. De volle naam blijft in de title staan,
+// zodat hij overal met de muis terug te vinden is.
 function persBadges(v, kort){
   if(!v)return'<span style="color:var(--fnt);font-size:12px">–</span>';
   const colors={'jer':'pers-jer','cihad':'pers-cihad','gabos':'pers-gabos'};
   return splitBehandelaar(v).map(n=>{
     const cls=colors[n.toLowerCase()]||'pers-default';
     const tekst = kort ? korteNaam(n) : n;
-    const rond = kort && tekst.length === 1 ? ' pers-rond' : '';
+    const rond = kort && tekst.length <= 2 ? ' pers-rond' : '';
     const titel = kort && tekst !== n ? ` title="${esc(n)}"` : '';
     return`<span class="pers ${cls}${rond}"${titel}>${esc(tekst)}</span>`;
   }).join('');
 }
 ```
 
-Voeg `korteNaam` toe aan het exportblok op `src/util.js:556`, en `TEAM` aan de import van
+Voeg `korteNaam` toe aan het exportblok op `src/util.js:556`, en `KORTE_NAMEN` aan de import van
 `./config.js` op `src/util.js:4`.
 
-- [ ] **Step 4: Voeg de opmaak voor het rondje toe**
+- [ ] **Step 5: Voeg de opmaak voor het rondje toe**
 
 In `styles.css`, direct ná de `.pers`-regel (regel 357):
 
 ```css
-    /* Eén letter wordt een rondje; een naam die niet in te korten viel blijft een gewone chip.
-       Vaste maten, want een rondje met tekstbreedte is een ei. */
-    .pers.pers-rond{width:21px;height:21px;padding:0;border-radius:50%;justify-content:center;font-size:10.5px;font-weight:700}
+    /* Eén of twee tekens worden een rondje; een naam die niet in te korten viel blijft een gewone
+       chip. Vaste maten, want een rondje met tekstbreedte is een ei. 21px is dezelfde hoogte als
+       de chip ernaast, zodat een gemengde rij (JC naast Gerrit) niet gaat springen. */
+    .pers.pers-rond{width:21px;height:21px;padding:0;border-radius:50%;justify-content:center;font-size:10px;font-weight:700;letter-spacing:-.02em}
 ```
 
-- [ ] **Step 5: Draai de toetsen en zie ze slagen**
+- [ ] **Step 6: Draai de toetsen en zie ze slagen**
 
-`node tools/syntaxcheck.js`, dan `?test=1`. Verwacht: alle tien nieuwe regels groen, en
-`persBadges`-toetsen die al bestonden ook nog groen (die roepen `persBadges(v)` zonder tweede
-argument aan en krijgen dus de volle naam).
+`osascript -l JavaScript tools/syntaxcheck.js`, dan `?test=1`. Verwacht: alle elf nieuwe regels groen, en de
+bestaande `persBadges`-toetsen ook nog groen (die roepen `persBadges(v)` zonder tweede argument
+aan en krijgen dus de volle naam).
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add src/util.js styles.css src/tests.js && git commit -m "behandelaars korter in de tabel, maar nooit dubbelzinnig"
+git add src/config.js src/util.js styles.css src/tests.js && git commit -m "behandelaars als korte code in de tabel (J/G/JC/CC)"
 ```
 
 ---
@@ -1016,7 +1033,7 @@ In `styles.css`, direct ná `.stapel-h:active{cursor:grabbing}` (regel 1584):
 
 - [ ] **Step 4: Draai de toetsen en zie ze slagen**
 
-`node tools/syntaxcheck.js`, dan `?test=1`. Verwacht: alle drie de nieuwe regels groen.
+`osascript -l JavaScript tools/syntaxcheck.js`, dan `?test=1`. Verwacht: alle drie de nieuwe regels groen.
 
 - [ ] **Step 5: Controleer dat slepen nog werkt**
 
@@ -1056,7 +1073,7 @@ const CACHE_VERSION = 'cd-v127';
 - [ ] **Step 2: Draai de volledige toetsronde**
 
 ```bash
-node tools/syntaxcheck.js
+osascript -l JavaScript tools/syntaxcheck.js
 ```
 
 Open daarna `http://localhost:8123/index.html?test=1` met het browserpaneel-tabblad **zichtbaar**
@@ -1119,16 +1136,16 @@ stap 1). §3.1 → Task 3 + 4. §3.2 → Task 1 + Task 4 stap 3. §3.3 → Task 
 klasse-neutralisatie) en stap 8. §5.3 items 1-12 → verdeeld over Task 2 t/m 8. §5.4 → "Vooraf" en
 Task 8 stap 1, Task 9 stap 3.
 
-**Afwijking van de spec, expliciet.** §1.4 punt 2 schrijft "rondjes met twee letters (`Ci`, `Ch`)".
-Dat is feitelijk onmogelijk: Cihad en Cihan lopen pas bij de vijfde letter uiteen. Task 7
-implementeert in plaats daarvan de kortste ondubbelzinnige afkorting. **Dit moet aan de gebruiker
-gemeld worden voordat Task 7 gebouwd wordt** — het is precies het soort verschil dat pas op het
-scherm opvalt.
+**Afwijking van de spec, opgelost.** §1.4 punt 2 schreef "rondjes met twee letters (`Ci`, `Ch`)".
+Dat kon niet: Cihad en Cihan lopen pas bij de vijfde letter uiteen. Voorgelegd aan de gebruiker,
+die de codes zelf heeft vastgesteld: **J · G · JC · CC**. Task 7 legt die als vaste lijst vast.
+Openstaande vraag aan de gebruiker: of `JC` voor Cihad bewust is (er zit geen J in die naam) —
+gesteld, nog niet beantwoord. Verandert het antwoord iets, dan is dat één regel in `KORTE_NAMEN`.
 
 **Namen die over taken heen kloppen.** `signaalDelen(r, sec)` (Task 3) wordt aangeroepen door
 `signaalCel(r, sec, rid)` (Task 4) en door `src/render-bundel.js` (Task 5) — zelfde naam, zelfde
 handtekening. `stilDrempel(sec)` (Task 2) wordt alleen in `bepaalStil` gebruikt.
-`korteNaam(naam, team)` (Task 7) wordt alleen door `persBadges(v, kort)` gebruikt.
+`korteNaam(naam)` (Task 7) wordt alleen door `persBadges(v, kort)` gebruikt en leest `KORTE_NAMEN`.
 `VELD_LABELS` (Task 1) alleen door `_veldLabel(sec, sleutel)`.
 `HEEFT_SIGNAAL_KOLOM` (Task 4) door `deadlineCel`; `GEEN_STIL_PILL` (bestaand) door `signaalDelen`.
 De twee lijsten zijn bewust apart: "krijgt een signaal-kolom" en "kent het stil-signaal" zijn

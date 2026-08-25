@@ -386,6 +386,10 @@
        maar nog steeds vóór de eigen achtergrond van de cel.) */
     #ntd-tbl-wrap tbody td:not([colspan]):last-child{position:sticky;right:0;z-index:2;background:var(--sur)}
     #ntd-tbl-wrap tbody tr:hover td:not([colspan]):last-child{background:var(--row-hover)}
+    /* Zelfde terugval als bij .row-telaat hieronder: de sticky actiekolom heeft een DEKKENDE
+       achtergrond nodig (anders schijnt de rij eronder erdoorheen), dus hier de gemengde kleur
+       uitgeschreven in plaats van een translucente laag. */
+    #ntd-tbl-wrap tbody tr.row-telaat td:not([colspan]):last-child{background:#f6eceb}
     #ntd-tbl-wrap tbody tr.row-telaat td:not([colspan]):last-child{background:color-mix(in srgb,var(--prio) 7%,var(--sur))}
     #ntd-tbl-wrap tbody tr.row-telaat:hover td:not([colspan]):last-child{background:color-mix(in srgb,var(--prio) 7%,var(--row-hover))}
     /* Bewust géén slagschaduw links van de vastgezette kolom: die tekende een donkere rand
@@ -403,6 +407,12 @@
     .prio-hoog{color:#a8463e}
     .prio-mid{color:#946d1f}
     .prio-laag{color:var(--mut)}
+    /* Terugval vóór de color-mix, voor Safari 15 (dat color-mix nog niet kent — zelfde reden als
+       de @supports rond overflow:clip elders in dit bestand). Zonder deze regel verdwijnt op zo'n
+       browser het rode waas over te late rijen volledig, en dat is op de telefoon het ENIGE
+       urgentieteken dat je zonder vegen ziet. De rgba komt overeen met 7% van --prio in de lichte
+       modus; als translucente laag werkt hij ook op de donkere achtergrond. */
+    .row-telaat td{background:rgba(181,84,75,.07)}
     .row-telaat td{background:color-mix(in srgb,var(--prio) 7%,transparent)}
     /* In de donkere modus is --rd lichtzalm (#F0746F) en haalt wit erop maar 2,83:1. Donkere tekst
        op diezelfde pil haalt 6,30:1 — zelfde truc als bij .staging-balk en de logboek-avatars. */

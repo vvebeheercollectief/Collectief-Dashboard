@@ -1,6 +1,9 @@
-// Hoeveel vinkjes één handmatige bewerking hoogstens mag bevatten. Zie de vangrail in
-// verplaatsAfgerond en verplaatsALV: daarboven doen we niets en melden we het, want een gebaar van
-// die omvang is vrijwel altijd een uitschieter met de vulgreep — en deze wegen verwijderen rijen.
+// Hoeveel vinkjes één handmatige bewerking hoogstens mag bevatten. Boven dat aantal doen beide
+// wegen NIETS en melden ze het in het Logboek: een gebaar van die omvang is vrijwel altijd een
+// uitschieter met de vulgreep, en geen van beide is ongedaan te maken.
+//   · verplaatsAfgerond archiveert én VERWIJDERT de rij uit 'Nog Te Doen';
+//   · verplaatsALV verwijdert niets, maar zou al lang afgevinkte ALV's opnieuw archiveren met de
+//     datum van vandaag — en dat voedt 'Laatst gehouden ALV', de chat en de KPI's.
 var MAX_AFVINK_PER_KEER = 25;
 
 function verplaatsAfgerond(e) {

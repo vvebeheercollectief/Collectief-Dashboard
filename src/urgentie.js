@@ -5,7 +5,7 @@
 // met de zwaarst wegende reden. Gewichten zijn richtinggevend (afgestemd via tests.js).
 import {
   PRIO_REGELS, STIL_ESCALATIE_REGELS, berekenPrioriteit, opvolgStatus,
-  _vandaagAmsterdam, _verschilInKalenderdagen,
+  _vandaagAmsterdam, _verschilInKalenderdagen, splitBehandelaar,
 } from './util.js';
 import { SKEYS } from './config.js';
 
@@ -83,12 +83,14 @@ export function urgentieScore(taak, sec, opts){
 }
 
 // Hoort deze taak bij <naam>? Het behandelaarsveld kan meerdere namen bevatten.
-// Dezelfde scheidingstekens als `splitBehandelaar` in util.js — inclusief de puntkomma. Zonder die
-// puntkomma viel 'Jer; Cihad' hier als ÉÉN naam uit de bus en telde de taak voor niemand mee.
+// Via `splitBehandelaar` uit util.js en niet met een eigen regex: dat is de functie die de rest van
+// het dashboard gebruikt (de badges, de bulk-toewijzing, de escalatiemotor), en twee verschillende
+// definities van 'wie staat hier' lopen vroeg of laat uit de pas. De eigen versie hier splitste
+// eerst alleen op ',' en '/', zodat 'Jer; Cihad' als ÉÉN naam telde en de taak voor niemand meetelde.
 export function isVanMij(taak, naam){
   if (!naam) return false;
   const b = ((taak && taak.behandelaar) || '') + '';
-  return b.split(/[,/;&]|\ben\b/i).map(s => s.trim().toLowerCase()).filter(Boolean).includes(naam.toLowerCase());
+  return splitBehandelaar(b).map(s => s.toLowerCase()).includes(naam.toLowerCase());
 }
 
 // Kantoorbrede signalen voor de let-op-strook.

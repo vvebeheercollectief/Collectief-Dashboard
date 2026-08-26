@@ -260,6 +260,12 @@ function logout(reden){
   // gebruiken: dat zou een kringverwijzing naar main.js opleveren, en de vensters hoeven hier
   // alleen dícht. De bijbehorende toestand wordt hieronder toch al leeggemaakt.
   try{ document.querySelectorAll('.modal-bg.open').forEach(bg=>bg.classList.remove('open')); }catch(_){}
+  // Het chatpaneel draagt geen `.modal-bg` (het is bewust NIET-modaal, zie dossier-chat.js) en
+  // valt dus buiten de query hierboven. Het staat wél buiten #app, dus `inert` raakt het ook niet:
+  // zonder deze regel bleef het gesprek van de vorige gebruiker open en bedienbaar achter de
+  // inlogkaart staan — met de dossiergegevens van een VvE er nog in.
+  try{ document.getElementById('chat-bg')?.classList.remove('open'); }catch(_){}
+  state._chatHistorie=null; state._chatVve=null; state._chatBezig=false;
   state.editMode=false; state.editRowData=null; state.editSec=null;
   state._completeRow=null; state._completeRid=null;
   // Het inlogscherm is een `position:fixed`-overlay: hij dekt het dashboard alleen VISUEEL af.

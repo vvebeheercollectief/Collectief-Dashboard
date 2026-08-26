@@ -97,6 +97,16 @@ function markeer(s, mark){
   if(str.indexOf('\n')===-1) return _markeerRegel(str, mark);
   return str.split('\n').map(r=>_markeerRegel(r, mark)).join('\n');
 }
+// Staat er op deze regel al een echt gemarkeerd stuk? Dezelfde patronen als `inlineHtml`, zodat
+// 'wat de weergave als markering ziet' en 'wat de knop als markering telt' niet uit elkaar lopen.
+function _alGemarkeerd(regel, mark){
+  const re = mark === '**' ? RE_VET : RE_SCHUIN;
+  re.lastIndex = 0;                       // /g-regexen onthouden hun positie
+  const raak = re.test(regel);
+  re.lastIndex = 0;
+  return raak;
+}
+
 function _markeerRegel(s, mark){
   const m=/^(\s*)([\s\S]*?)(\s*)$/.exec(s);
   if(!m||!m[2]) return s;
@@ -105,7 +115,12 @@ function _markeerRegel(s, mark){
   // kwam er nog een paar omheen: '**gewoon **dringend** hoor**'. `opmaakHtml` leest van links naar
   // rechts en maakt daar '<strong>gewoon </strong>dringend<strong> hoor</strong>' van — precies
   // omgekeerd — en in de Sheet stonden er letterlijke sterretjes in de tekst.
-  if(m[2].includes(mark)) return s;   // al gemarkeerd (nesting)
+  //
+  // De toets loopt via dezelfde regels die de WEERGAVE gebruikt, en niet via `includes(mark)`.
+  // Dat laatste leek eenvoudiger maar was fout voor schuinschrift: die markering is één liggend
+  // streepje, dus élke regel met een '_' erin (een bestandsnaam, een e-mailadres) zou dan als
+  // 'al gemarkeerd' gelden en nooit meer schuin te zetten zijn. Nu telt alleen een echt PAAR mee.
+  if(_alGemarkeerd(m[2], mark)) return s;   // al gemarkeerd (nesting)
   return m[1]+mark+m[2]+mark+m[3];
 }
 

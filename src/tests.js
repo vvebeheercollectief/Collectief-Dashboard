@@ -51,6 +51,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   // auth.js). Met dat attribuut kan niets binnen #app nog focus krijgen, en tientallen toetsen
   // hieronder doen dat wél — die meten het gedrag van een INGELOGDE gebruiker, en die heeft geen
   // inerte schil. Het attribuut zelf wordt verderop apart getoetst.
+  const _inertOud = document.getElementById('app')?.hasAttribute('inert');
   document.getElementById('app')?.removeAttribute('inert');
   // VOORTGANGSSPOOR. In een browsertabblad dat op de achtergrond staat knijpt de browser elke timer
   // af — na vijf minuten tot één keer per minuut — en dan duurt een ronde niet veertig seconden
@@ -465,27 +466,22 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const gate = document.getElementById('login-gate');
     if (!app || !gate) { truthy('login-gate: #app en de gate bestaan', false); return; }
     const gOud = gate.style.display, iOud = app.hasAttribute('inert');
+    const knop = document.getElementById('btn-add');
+    const dOud = knop ? knop.style.display : null;
     try {
-      app.setAttribute('inert','');
-      truthy('login-gate: met inert is er niets achter de gate meer focusbaar', (() => {
-        const knop = document.getElementById('btn-add');
-        if (!knop) return false;
-        knop.focus();
-        return document.activeElement !== knop;
-      })());
+      // EERST de nulmeting: zonder inert MOET die knop focus kunnen krijgen. Zonder deze stap zou
+      // de tegenproef hieronder ook groen zijn bij een knop die om een heel andere reden geen
+      // focus krijgt (display:none bijvoorbeeld) — en dan bewijst hij niets over `inert`.
+      if (knop) knop.style.display = 'inline-flex';
       app.removeAttribute('inert');
-      truthy('login-gate: zonder inert is de schil gewoon bedienbaar', (() => {
-        const knop = document.getElementById('btn-add');
-        if (!knop) return false;
-        const zichtbaar = knop.style.display !== 'none';
-        if (!zichtbaar) knop.style.display = 'inline-flex';
-        knop.focus();
-        const ok = document.activeElement === knop;
-        if (!zichtbaar) knop.style.display = 'none';
-        return ok;
-      })());
+      const kanNormaal = (() => { if (!knop) return false; knop.focus(); return document.activeElement === knop; })();
+      truthy('login-gate: zonder inert is de schil gewoon bedienbaar', kanNormaal);
+      app.setAttribute('inert','');
+      truthy('login-gate: met inert is er niets achter de gate meer focusbaar',
+             kanNormaal && (() => { knop.blur(); knop.focus(); return document.activeElement !== knop; })());
     } finally {
       gate.style.display = gOud;
+      if (knop) knop.style.display = dOud;
       if (iOud) app.setAttribute('inert',''); else app.removeAttribute('inert');
     }
   })();
@@ -4392,6 +4388,23 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
 
   // ── markeringen → veilige HTML ──
   eq('opmaakHtml vet', opmaakHtml('dit is **dringend** hoor'), 'dit is <strong>dringend</strong> hoor');
+  // ── Geplakte opmaak: geen dubbele markering, en schuinschrift blijft werken (doorlichting 26-08)
+  // De nesting-guard in `markeer` keek eerst alleen naar de UITEINDEN van de regel; bij een blok
+  // waarin maar een deel vet is kwam er dan nog een paar omheen ('**gewoon **dringend** hoor**'),
+  // en `opmaakHtml` maakte daar precies het omgekeerde van. Een guard op `includes(mark)` loste dat
+  // op maar sloopte schuinschrift: die markering is één liggend streepje, dus élke regel met een
+  // '_' erin zou als 'al gemarkeerd' gelden. Nu telt alleen een ECHT paar, via dezelfde patronen
+  // die de weergave gebruikt.
+  eq('plakken: een deels vet blok krijgt geen tweede paar sterretjes',
+     htmlNaarMarkers('<div>gewoon <b>dringend</b> hoor</div>'), 'gewoon **dringend** hoor');
+  eq('plakken: al gemarkeerde vette tekst blijft zoals hij is',
+     htmlNaarMarkers('<div><b>**al vet**</b></div>'), '**al vet**');
+  eq('plakken: schuin met een liggend streepje in het woord wordt gewoon gemarkeerd',
+     htmlNaarMarkers('<div><i>bestand_naam</i></div>'), '_bestand_naam_');
+  eq('plakken: al gemarkeerde schuine tekst blijft zoals hij is',
+     htmlNaarMarkers('<div><i>_al schuin_</i></div>'), '_al schuin_');
+  eq('plakken: twee losse vette stukken in één zin',
+     htmlNaarMarkers('<div>zie <b>bijlage</b> en <b>bon</b></div>'), 'zie **bijlage** en **bon**');
   eq('opmaakHtml schuin', opmaakHtml('dit is _volgens bestuur_ hoor'), 'dit is <em>volgens bestuur</em> hoor');
   eq('opmaakHtml vet aan het begin', opmaakHtml('**let op** dit'), '<strong>let op</strong> dit');
   eq('opmaakHtml schuin aan het begin', opmaakHtml('_let op_ dit'), '<em>let op</em> dit');
@@ -4840,7 +4853,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '11.3');
+  eq('versie opgehoogd', APP_VERSION, '11.4');
 
   // ── Pushmeldingen: de twee schakels die stil kapot waren (audit 2026-08-06) ──
   // Beide defecten waren onzichtbaar: de app meldde "Notificaties zijn aan!" terwijl er nooit
@@ -6317,6 +6330,9 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         document.getElementById('f-code-ntd').value = '311212';
         state.ntdStatus = 'telaat'; state.ntdSort = { key:'deadline', asc:false };
         eq('wissen: staat er wél iets, dan meldt hij dat', wisNtdFilters().iets, true);
+        eq('wissen: zoekveld, codefilter, statuspil en kolomsortering staan weer op standaard',
+           [document.getElementById('s-ntd').value, document.getElementById('f-code-ntd').value,
+            state.ntdStatus, state.ntdSort.key], ['', '', '', null]);
         // En hij houdt zoekterm/filters uit elkaar van de SORTERING: de melding die erop volgt
         // spreekt alleen over zoekterm en filters, en alleen sorteren is geen filter.
         (() => {
@@ -6328,9 +6344,6 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
             eq('wissen: alleen sorteren telt niet als filter', [w.gewist, w.sortWeg, w.iets], [false, true, true]);
           } finally { state.ntdSort=sOud; }
         })();
-        eq('wissen: zoekveld, codefilter, statuspil en kolomsortering staan weer op standaard',
-           [document.getElementById('s-ntd').value, document.getElementById('f-code-ntd').value,
-            state.ntdStatus, state.ntdSort.key], ['', '', '', null]);
       } finally {
         velden.forEach((id, i) => document.getElementById(id).value = vWaarden[i]);
         state.ntdStatus = vStatus; state.ntdSort = vSort;
@@ -12940,7 +12953,9 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
 
   console.log = _origLog;         // het voortgangsspoor weer los
   state._dubbelcheckUit = false;  // de testhaak weer los
-  state._zelftestLoopt = false;   // de poll mag weer; de suite is klaar
+  state._zelftestLoopt = false;
+  // De schil terug in de stand waarin de suite hem aantrof (zie de removeAttribute bovenaan).
+  if(_inertOud) document.getElementById('app')?.setAttribute('inert',''); else document.getElementById('app')?.removeAttribute('inert');   // de poll mag weer; de suite is klaar
 
   const totOk = ok + _tOk, totFail = fail + _tFail;
   console.log(`%c[TESTS] ${totOk} OK, ${totFail} FAIL`, totFail ? 'background:#dc2626;color:white;padding:2px 6px' : 'background:#16a34a;color:white;padding:2px 6px');

@@ -171,8 +171,9 @@ async function toggleAlvoFlag(idx,field,code){
       // pagina "ALV's Afgerond", de regel 'Laatst gehouden ALV' in het VvE-dossier, de
       // dossier-chat en de KPI's op Dashboard en Analytics; die stonden dus allemaal stil.
       //
-      // Ontdubbelen op code + JAAR, want uit- en weer aanvinken mag geen tweede regel geven, en
-      // `verplaatsALV` kan dezelfde regel al gezet hebben als iemand het vinkje in de Sheet zette.
+      // Ontdubbelen, want uit- en weer aanvinken mag geen tweede regel geven en `verplaatsALV` kan
+      // dezelfde regel al gezet hebben als iemand het vinkje in de Sheet zette. Waaróp precies
+      // staat twaalf regels lager, bij `alBekend` — op code + de exacte dag.
       // In een EIGEN try: mislukt deze append, dan is het vinkje zelf wél geland en zou de catch
       // hieronder het scherm terugdraaien terwijl de Sheet het aan heeft staan.
       if(field==='notulen' && newVal){
@@ -206,7 +207,10 @@ async function toggleAlvoFlag(idx,field,code){
         }
       }
       await logEvent(r.code,'ALVS',newVal?'Aangevinkt':'Uitgevinkt',ALVO_LABELS[field],oldVal?'TRUE':'FALSE',newVal?'TRUE':'FALSE');
-      // De collega's óók laten weten dat de ALV-status verschoof. In de Sheet doet
+      // Het TEAM laten weten dat de ALV-status verschoof — jezelf inbegrepen, precies zoals bij een
+      // nieuwe taak: `cd_notifyByTag` schrijft één regel voor 'allen'. Je ziet die melding dus naast
+      // de lokale bevestiging hieronder; dat is het bestaande gedrag van 'newtask' en niet iets dat
+      // hier apart is bedacht. In de Sheet doet
       // `cd_handleAlvoEdit` (Apps Script) dat al, maar dat is een onEdit-trigger en die vuurt NIET
       // bij een wijziging via de Sheets-API — en zo zet dit dashboard het vinkje. Dezelfde
       // constructie als bij het archief hierboven, en dezelfde weg die 'newtask' en 'assigned' al
@@ -217,8 +221,10 @@ async function toggleAlvoFlag(idx,field,code){
       // Bewust niet geawait en met een eigen .catch: een mislukte melding mag een geland vinkje
       // niet alsnog laten terugdraaien (zie de catch hieronder).
       if(newVal){
-        try{ fireNotifEvent('alv_update',{code:r.code,naam:r.naam,title:`🏢 ${ALVO_LABELS[field]} — ${r.code}`}); }
-        catch(meldFout){ console.warn('[alv] melding niet verstuurd:', meldFout); }
+        // `.catch` en géén try/catch: `fireNotifEvent` is async, dus alles wat daarbinnen misgaat
+        // wordt een verworpen belofte en gaat een synchrone try/catch straal voorbij.
+        fireNotifEvent('alv_update',{code:r.code,naam:r.naam,title:`🏢 ${ALVO_LABELS[field]} — ${r.code}`})
+          .catch(meldFout=>console.warn('[alv] melding niet verstuurd:', meldFout));
       }
       // geenDedup: hetzelfde vinkje binnen 15 s uit- en weer aanzetten geeft twee keer dezelfde
       // titel+tekst; zonder deze vlag slikt de ontdubbeling de tweede bevestiging in.

@@ -544,9 +544,9 @@ function cd_processNotifEvent(data) {
   } else if (ev === 'completed') {
     // Bewust GEEN push en ook GEEN logregel. Het afronden zelf schrijft zijn logregel al vanuit
     // het dashboard (logEvent → het 'logboek'-event hierboven), dus hier zou een tweede regel
-    // ontstaan. De tak blijft staan zodat 'completed' niet in de `else`-tak van een onbekend
-    // event belandt; hij is met opzet leeg. (Het commentaar zei eerder 'alleen loggen', en dát
-    // gebeurde hier juist niet.)
+    // ontstaan. De tak is met opzet leeg en mag gerust verdwijnen: deze keten heeft geen
+    // `else`-tak, dus een onbekend event valt gewoon door naar het `ok`-antwoord onderaan.
+    // (Het commentaar zei eerder 'alleen loggen', en dát gebeurde hier juist niet.)
   } else if (ev === 'alv_update') {
     cd_notifyByTag('n_alv', '1', {
       title: data.title || '🏢 ALV-status verandert',

@@ -200,10 +200,6 @@ async function verplaatsTaak(r, doelSec, nietOpgeslagen){
   try { await bevestigInvoegPlek(doelSec, doelAfterRow); }
   catch(e){ alert(e.melding || e.message); loadAll(); return false; }
   const { doelRij } = verplaatsWaarden(r, bronSec, doelSec, doelAfterRow + 1);
-  // De verwijderindex ná de invoeging. Google voert de verzoeken op volgorde uit, dus de oude rij
-  // is één plek opgeschoven zodra hij ONDER de invoegplek stond. Zonder deze correctie verdwijnt
-  // de buurrij in plaats van de verhuisde taak — de duurste denkfout in dit hele bestand.
-  const oudIndex = (r._row > doelAfterRow) ? r._row : r._row - 1;
 
   // Optimistisch: uit de oude sectie, in de nieuwe, en de rijnummers meeschuiven. Eerst de oude
   // rij eruit en terugschuiven, dán invoegen — in de Sheet gebeurt het andersom, maar in het
@@ -262,9 +258,28 @@ async function verplaatsTaak(r, doelSec, nietOpgeslagen){
         // datumcellen van deze ene rij staan als tekst in de Sheet ('01-09-2026' i.p.v. een echte
         // datumwaarde). Zowel `_parseAnyDate` (frontend) als `cd_parseDate` (Apps Script) lezen
         // die vorm gewoon; alleen de uitlijning in de Sheet verschilt.
+        // DE INVOEGPLEK VERS AFLEIDEN, niet het getal van het klikmoment gebruiken. `doelAfterRow`
+        // is een los getal en schuift nergens in mee; `doelRij` staat in D.ntd en wordt door élke
+        // `_shiftNtdRows` gecorrigeerd — óók door de ROLLBACK van een schrijfactie die vóór deze in
+        // de wachtrij stond. `backgroundWrite` voert die wachtrij serieel uit, dus daar zit echt
+        // tijd tussen. De rij-guard hierboven dekt dit niet: die bewaakt alleen de rij die
+        // VERWIJDERD wordt, niet de plek waar ingevoegd wordt. Landde de invoeging één rij te laag,
+        // dan kwam de taak pal onder een sectiekop en gooit `parseSections` hem weg als kolomkoprij
+        // — verdwenen uit 'Nog Te Doen' én niet in 'Afgerond', inclusief taaknummer en bundel.
+        //
+        // `doelRij._row` staat in de nummering ná het verwijderen van de bronrij; de batch begint
+        // met de INVOEGING en telt dus nog in de nummering van vóór dat verwijderen. Stond de
+        // bronrij bóven de invoegplek, dan telt hij daar nog mee — vandaar de +1. Dat is precies de
+        // rekensom die `naAfterRow` hierboven omgekeerd maakte.
+        const naNu   = doelRij._row - 1;
+        const insIdx = naNu + (r._row <= naNu + 1 ? 1 : 0);
+        // De verwijderindex ná de invoeging. Google voert de verzoeken op volgorde uit, dus de oude
+        // rij is één plek opgeschoven zodra hij ONDER de invoegplek stond. Zonder deze correctie
+        // verdwijnt de buurrij in plaats van de verhuisde taak — de duurste denkfout in dit bestand.
+        const oudIndex = (r._row > insIdx) ? r._row : r._row - 1;
         const batchBody = { requests:[
-          { insertDimension:{ range:{ sheetId, dimension:'ROWS', startIndex:doelAfterRow, endIndex:doelAfterRow+1 }, inheritFromBefore:true } },
-          { updateCells:{ range:{ sheetId, startRowIndex:doelAfterRow, endRowIndex:doelAfterRow+1, startColumnIndex:0, endColumnIndex:rij.length },
+          { insertDimension:{ range:{ sheetId, dimension:'ROWS', startIndex:insIdx, endIndex:insIdx+1 }, inheritFromBefore:true } },
+          { updateCells:{ range:{ sheetId, startRowIndex:insIdx, endRowIndex:insIdx+1, startColumnIndex:0, endColumnIndex:rij.length },
             rows:[{ values: rij.map(v => ({ userEnteredValue:{ stringValue:String(v) } })) }], fields:'userEnteredValue' } },
           { deleteDimension:{ range:{ sheetId, dimension:'ROWS', startIndex:oudIndex, endIndex:oudIndex+1 } } },
         ]};
@@ -308,8 +323,12 @@ async function verplaatsTaak(r, doelSec, nietOpgeslagen){
           // seconde rechtgetrokken door de stille resync, maar juist de tak die deze rollback het
           // vaakst afvuurt is 'offline' — en dan komt die resync per definitie niet.
           const dArr = D.ntd[doelSec] || []; const dp = dArr.indexOf(doelRij);
+          // Het anker VÓÓR het verwijderen aflezen, en uit het levende rij-object: `naAfterRow` is
+          // het bevroren getal van het klikmoment en kan door de rollback van een eerdere
+          // schrijfactie achterhaald zijn — zelfde reden als bij de invoegplek in de writeFn.
+          const naNu2 = (dp > -1 ? doelRij._row : naAfterRow + 1) - 1;
           if(dp > -1) dArr.splice(dp, 1);
-          _shiftNtdRows(naAfterRow, -1);      // de invoeging terugdraaien
+          _shiftNtdRows(naNu2, -1);      // de invoeging terugdraaien
           _herstelShift(_shiftNtdRows, r._row);   // en de verwijdering — via het huisidioom, want de
                                             // rij die dóór de delete op r._row kwam te staan moet
                                             // óók terugschuiven (de shift-conditie is '>')

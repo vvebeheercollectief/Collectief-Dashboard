@@ -8,6 +8,11 @@ import { fetchSheet, fetchSheets, _withRetry, isOffline } from "./api.js";
 import { ensureToken, doOAuth, fetchUserEmail, logout } from "./auth.js";
 import { buildAnalytics, buildDash } from "./render-analytics.js";
 import { renderNtdDonut } from "./render-lijsten.js";
+// Kringverwijzing data ⇄ bulk, net als data ⇄ main en ui ⇄ bulk: bulk.js haalt backgroundWrite en
+// loadAll hiervandaan. Allebei worden ze pas op RUNTIME aangeroepen, dus de live bindings van
+// ES-modules dekken dit — er staat aan geen van beide kanten iets op moduleniveau dat de ander
+// tijdens het laden nodig heeft.
+import { bulkHerstel, renderBulkUi } from "./bulk.js";
 import { parseOntw, parseLogboek, _nogNietBevestigd } from "./render-overig.js";
 import { parseKenmerken } from "./kenmerken.js";
 import { checkAlles, ernstigeBevindingen } from "./structuurcheck.js";
@@ -772,6 +777,15 @@ async function _loadRonde(silent){
     // de rem op zodra er één ronde slaagt.
     state._uitCache=false;
     setSynced();
+    // De selectie opschonen hoort BUITEN de hash-vergelijking hieronder. `bulkHerstel` gooit
+    // geselecteerde rij-objecten weg die na deze ronde niet meer in D staan, en hij hing tot nu
+    // toe volledig aan `renderNtd` — die alleen draait als de datahash wijzigde. De 8s-poll is
+    // tijdens de selecteerstand geremd, maar de Vernieuwen-knop níét: die staat pal naast het
+    // label 'Selecteren — verversen staat stil' en doet gewoon een volledige ronde. Verandert er
+    // niets in de Sheet (de normale uitkomst van handmatig verversen), dan bleef de selectie
+    // wijzen naar de rij-objecten van vóór de ronde, terwijl D er verse heeft. De teller telde
+    // die spoken gewoon mee.
+    if(bulkHerstel(D.ntd)) renderBulkUi();
     const hash=JSON.stringify([D.ntd,D.af,D.alvo,D.alfa,D.ontw,D.logboek,D.herhaal,D.kenmerken]);
     if(hash!==state._lastDHash){
       // VOLGORDE IS HIER DE HELE TRUC. Stond `_lastDHash=hash` vóór de render, dan hoefde het

@@ -93,12 +93,24 @@ function renderThead(id,cols,css,sort,breedtes){
   const tbl=document.getElementById(id).closest('table');
   if(tbl){
     tbl.querySelector('colgroup')?.remove();
-    _kolTabel     = tbl;
-    _kolGewichten = (breedtes && breedtes.length===cols.length) ? breedtes : null;
-    _kolLaatste   = 0;                       // dwing een verse berekening af
-    herzetKolomBreedtes();
-    if(!_kolObs && typeof ResizeObserver === 'function') _kolObs = new ResizeObserver(herzetKolomBreedtes);
-    if(_kolObs){ _kolObs.disconnect(); _kolObs.observe(tbl); }
+    // ALLEEN een tabel MÉT breedtes neemt de registratie over. Dit is geen detail: er is één
+    // registratie voor de hele app, en `renderAll` tekent ná de takentabel ook 'Afgerond' en
+    // 'Ontwikkeling' — allebei zónder breedtes. Die zetten `_kolGewichten` op null en `_kolTabel`
+    // op hún tabel, en dan doet `herzetKolomBreedtes()` daarna helemaal niets meer. Gevolg,
+    // gemeten op een venster van 1900: de takentabel hield de percentages van de vorige,
+    // smallere meting, kwam 173px tekort, en `table-layout:fixed` verdeelde dat verschil GELIJK
+    // over alle kolommen — precies waar v11.1 vanaf wilde. De VvE-code stond op 182px i.p.v. 130,
+    // de deadline op 217 i.p.v. 155 en de actiekolom op 210 i.p.v. 150.
+    // De ResizeObserver hoort om dezelfde reden op de takentabel te blijven staan: die vangt het
+    // geval dat de tabel van maat verandert zonder dat het venster dat doet (tabbladwissel).
+    if(breedtes && breedtes.length===cols.length){
+      _kolTabel     = tbl;
+      _kolGewichten = breedtes;
+      _kolLaatste   = 0;                       // dwing een verse berekening af
+      herzetKolomBreedtes();
+      if(!_kolObs && typeof ResizeObserver === 'function') _kolObs = new ResizeObserver(herzetKolomBreedtes);
+      if(_kolObs){ _kolObs.disconnect(); _kolObs.observe(tbl); }
+    }
   }
   document.getElementById(id).innerHTML=`<tr>${cols.map(c=>{
     const key=kf?kf(c):null;

@@ -8,7 +8,7 @@ import { state, D, pgs } from "./state.js";
 import { getSheetIds } from "./crud.js";
 import { assertRowMatch, sheetsFetch, appendRange } from "./api.js";
 import { logEvent } from "./render-overig.js";
-import { showToast } from "./notifications.js";
+import { showToast, fireNotifEvent } from "./notifications.js";
 import { ensureToken } from "./auth.js";
 import { renderPag } from "./render-tabel.js";
 import { renderNtdDonut } from "./render-lijsten.js";
@@ -61,10 +61,10 @@ function renderAlvo(){
       return`<tr>
         <td>${vveCodeSpan(r.code, '--sec:var(--ac);--sec-l:var(--ac-l)')}</td>
         <td class="cell-name">${esc(r.naam)}${r.budget?' <span class="badge budget-tag" title="Budgetpakket — vergadert zelf">Budget</span>':''}</td>
-        <td>${flagPill(idx,'klaargezet',r.klaargezet)}</td>
-        <td>${flagPill(idx,'uitnodiging',r.uitnodiging)}</td>
-        <td>${flagPill(idx,'notulen',r.notulen)}</td>
-        <td>${flagPill(idx,'begroting',r.begroting)}</td>
+        <td>${flagPill(idx,'klaargezet',r.klaargezet,r.code)}</td>
+        <td>${flagPill(idx,'uitnodiging',r.uitnodiging,r.code)}</td>
+        <td>${flagPill(idx,'notulen',r.notulen,r.code)}</td>
+        <td>${flagPill(idx,'begroting',r.begroting,r.code)}</td>
         <td><span class="badge status-${esc((r.status||'').toLowerCase().replace(/[^a-z0-9]+/g,'-'))}">${statusIco(r.status)} ${esc(r.status)}</span></td>
       </tr>`;
     }).join('')
@@ -77,7 +77,7 @@ function renderAlvo(){
 const ALVO_COLS={uitnodiging:2,notulen:3,begroting:4,klaargezet:6};
 const ALVO_LABELS={uitnodiging:'Uitnodiging',notulen:'Notulen',begroting:'Begroting',klaargezet:'Klaargezet'};
 
-function flagPill(idx,field,val){
+function flagPill(idx,field,val,code){
   const cls=val?'on':'off';
   const lbl=val?'✓ Ja':'–';
   const aria=val?'true':'false';
@@ -85,16 +85,27 @@ function flagPill(idx,field,val){
   // aria-label naast de zichtbare '✓ Ja' / '–': de naam van een knop komt uit zijn inhoud, en die
   // is voor alle vier de kolommen gelijk. Een schermlezer las dus vier keer 'Ja, knop, ingedrukt'
   // zonder te zeggen wáárvan. Het label wint van de inhoud én van title.
-  return`<button type="button" class="flag-toggle ${cls}" data-action="alvo-flag" data-idx="${idx}" data-field="${field}" aria-pressed="${aria}" aria-label="${ALVO_LABELS[field]}" title="${title}">${lbl}</button>`;
+  // De VvE-code gaat MEE op de knop, naast de index. Die index wijst in `D.alvo`, en dat is een
+  // ANDERE lijst dan een seconde geleden: `parseAlvo` bouwt hem bij elke poll opnieuw op. Komt er
+  // in dat venster een VvE bij (of valt er een weg), dan schuiven alle indexen daaronder op en
+  // wees `D.alvo[idx]` na de klik een andere vereniging aan. `assertRowMatch` merkt dat niet: die
+  // toetst of rij `r._row` nog van `r.code` is, en dat klopt dan gewoon — voor de VERKEERDE rij.
+  // Zelfde regel als overal in dit dashboard: identiteit boven positie.
+  return`<button type="button" class="flag-toggle ${cls}" data-action="alvo-flag" data-idx="${idx}" data-code="${esc(code||'')}" data-field="${field}" aria-pressed="${aria}" aria-label="${ALVO_LABELS[field]}" title="${title}">${lbl}</button>`;
 }
 
 function _recomputeAlvoStatus(r){
   r.status=r.notulen?'Afgerond':r.uitnodiging?'Gepland':r.klaargezet?'Klaargezet':'Open';
 }
 
-async function toggleAlvoFlag(idx,field){
-  const r=D.alvo[idx];
-  if(!r){console.warn('toggleAlvoFlag: rij niet gevonden',idx);return}
+async function toggleAlvoFlag(idx,field,code){
+  // Eerst op INDEX, en die daarna toetsen op de code die op de knop stond. Klopt hij niet meer
+  // (de lijst is tussen tekenen en klikken opnieuw opgebouwd), dan alsnog op code zoeken. Levert
+  // dat niets op, dan is de VvE echt weg en gebeurt er bewust niets.
+  let r=D.alvo[idx];
+  const kode=(code||'').trim();
+  if(kode && (!r || (r.code||'').trim()!==kode)) r=D.alvo.find(x=>(x.code||'').trim()===kode)||null;
+  if(!r){console.warn('toggleAlvoFlag: rij niet gevonden',idx,kode);return}
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){showToast('Niet ingelogd','Kan wijziging niet opslaan','var(--rd)');return}
 
@@ -195,6 +206,20 @@ async function toggleAlvoFlag(idx,field){
         }
       }
       await logEvent(r.code,'ALVS',newVal?'Aangevinkt':'Uitgevinkt',ALVO_LABELS[field],oldVal?'TRUE':'FALSE',newVal?'TRUE':'FALSE');
+      // De collega's óók laten weten dat de ALV-status verschoof. In de Sheet doet
+      // `cd_handleAlvoEdit` (Apps Script) dat al, maar dat is een onEdit-trigger en die vuurt NIET
+      // bij een wijziging via de Sheets-API — en zo zet dit dashboard het vinkje. Dezelfde
+      // constructie als bij het archief hierboven, en dezelfde weg die 'newtask' en 'assigned' al
+      // gebruiken: een regel in de Notif-wachtrij, die de backend oppikt. De achterkant lag er al
+      // klaar voor (cd_processNotifEvent kent 'alv_update' en CD_QUEUE_ALLOWED laat het door);
+      // alleen stuurde niemand het ooit. Alleen bij AANzetten: een vinkje weghalen is een
+      // correctie, geen gebeurtenis om iedereen voor te storen.
+      // Bewust niet geawait en met een eigen .catch: een mislukte melding mag een geland vinkje
+      // niet alsnog laten terugdraaien (zie de catch hieronder).
+      if(newVal){
+        try{ fireNotifEvent('alv_update',{code:r.code,naam:r.naam,title:`🏢 ${ALVO_LABELS[field]} — ${r.code}`}); }
+        catch(meldFout){ console.warn('[alv] melding niet verstuurd:', meldFout); }
+      }
       // geenDedup: hetzelfde vinkje binnen 15 s uit- en weer aanzetten geeft twee keer dezelfde
       // titel+tekst; zonder deze vlag slikt de ontdubbeling de tweede bevestiging in.
       showToast(`${ALVO_LABELS[field]} ${newVal?'aan':'uit'}`,`${r.code} – ${r.naam}`,newVal?'var(--gn)':'var(--mut)',newVal?'vink':'cirkelOpen',{geenDedup:true,geenSysteemmelding:true});

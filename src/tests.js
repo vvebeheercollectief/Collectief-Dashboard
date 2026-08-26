@@ -1356,6 +1356,41 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         }
       })();
 
+      // ── De registratie van herzetKolomBreedtes mag niet gekaapt worden (doorlichting 26-08) ──
+      // Er is één registratie (`_kolTabel`/`_kolGewichten`) voor de hele app, en `renderAll` tekent
+      // ná de takentabel óók 'Afgerond' en 'Ontwikkeling' — allebei zónder breedtes. Namen die
+      // registratie over, dan zette `_kolGewichten` zich op null en deed `herzetKolomBreedtes()`
+      // daarna niets meer. Gemeten gevolg op een venster van 1900: de takentabel hield de
+      // percentages van de vorige, smallere meting, kwam 173px tekort, en `table-layout:fixed`
+      // verdeelde dat verschil GELIJK over alle kolommen — de VvE-code op 182 i.p.v. 130, de
+      // deadline op 217 i.p.v. 155, de actiekolom op 210 i.p.v. 150.
+      (() => {
+        const vNtd7 = D.ntd.OPPAKKEN, vA7 = state.activeNtd, vPg7 = pgs.ntd;
+        const breed7 = document.createElement('style');
+        breed7.textContent = '#ntd-tbl-wrap{width:1650px !important}';
+        try{
+          D.ntd.OPPAKKEN = [{ code:'REG-1', naam:'VvE Registratie', actiepunt:'x', deadline:'',
+                              behandelaar:'Jer', opmerkingen:'', inBehandeling:'', _sec:'OPPAKKEN', _row:9801 }];
+          pgs.ntd = 1; setNtd('OPPAKKEN');
+          renderAf();                       // deze twee geven GEEN breedtes mee
+          renderOntw();
+          document.head.appendChild(breed7);   // tabel wordt breder ná die twee renders
+          herzetKolomBreedtes();
+          const ths7 = [...document.querySelectorAll('#ntd-thead th')];
+          const br7 = kop => { const th = ths7.find(t => t.textContent.trim().replace(/[▲▼]$/, '') === kop);
+                               return th ? Math.round(th.getBoundingClientRect().width) : -1; };
+          const code7 = br7('VvE Code'), dl7 = br7('Deadline');
+          const act7 = ths7.length ? Math.round(ths7[ths7.length-1].getBoundingClientRect().width) : -1;
+          truthy(`kolombreedte: de px-kolommen blijven staan ná renderAf/renderOntw `
+                 + `(code ${code7}, deadline ${dl7}, acties ${act7})`,
+                 Math.abs(code7 - 130) <= 1 && Math.abs(dl7 - 155) <= 1 && Math.abs(act7 - 150) <= 1);
+        } finally {
+          breed7.remove();
+          if(vNtd7 === undefined) delete D.ntd.OPPAKKEN; else D.ntd.OPPAKKEN = vNtd7;
+          state.activeNtd = vA7; pgs.ntd = vPg7; setNtd(vA7);
+        }
+      })();
+
       // In bulkmodus komt er een kolom bij; die moet meetellen in de colgroup.
       (() => {
         const vBulk = state.bulkMode;
@@ -3908,6 +3943,51 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       document.querySelectorAll('.toast').forEach(t=>t.remove());
     }
   })();
+  // ── Het ALV-vinkje volgt de VvE-CODE, niet het indexnummer (doorlichting 26-08) ──
+  // `flagPill` zet de positie in `D.alvo` op de knop, en die lijst wordt bij ELKE poll opnieuw
+  // opgebouwd door `parseAlvo`. Komt er in het venster tussen tekenen en klikken een VvE bij, dan
+  // schuiven alle posities daaronder op en wees het indexnummer een ANDERE vereniging aan.
+  // `assertRowMatch` vangt dat niet: die toetst of rij `r._row` nog van `r.code` is, en dat klopt
+  // dan gewoon — voor de verkeerde rij. Sinds deze reparatie gaat de code mee op de knop.
+  await (async()=>{
+    const _fetch=window.fetch, tokenOud=state.oauthToken, expiryOud=state.oauthExpiry;
+    const alvoOud=D.alvo, idsOud=state._sheetIds, pendOud=state.pendingWrites, bezigOud=state._alvoFlagBezig;
+    try{
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
+      state._sheetIds={"ALV's overzicht":22};
+      state._alvoFlagBezig=null;
+      const mk=(code,naam,row)=>({code,naam,uitnodiging:false,notulen:false,begroting:false,
+        klaargezet:false,opmerkingen:'',budget:false,status:'Open',_row:row});
+      D.alvo=[mk('V1','VvE Een',3), mk('V2','VvE Twee',4)];
+      document.getElementById('s-alvo').value='';
+      document.getElementById('f-status-alvo').value='';
+      renderAlvo();
+      const knop=document.querySelector('#alvo-tbody .flag-toggle[data-field="notulen"]');
+      truthy('alvo-vink: de knop draagt de VvE-code', !!(knop && knop.dataset.code==='V1'));
+      const idxV1=knop ? +knop.dataset.idx : 0;
+      // Nu schuift de lijst op: er komt een VvE bóvenaan bij, precies zoals een poll dat kan doen.
+      D.alvo=[mk('V0','VvE Nul',2), mk('V1','VvE Een',3), mk('V2','VvE Twee',4)];
+      const posts=[];
+      window.fetch=async(url,opt)=>{
+        const u=String(url), d=decodeURIComponent(u);
+        if(d.includes('!A') && !u.includes('values:batchGet')) return new Response(JSON.stringify({values:[['V1']]}),{status:200});
+        if(u.includes(':batchUpdate')){ posts.push(JSON.parse(opt.body)); return new Response(JSON.stringify({replies:[{}]}),{status:200}); }
+        if(u.includes(':append')) return new Response(JSON.stringify({}),{status:200});
+        return new Response(JSON.stringify({values:[]}),{status:200});
+      };
+      await toggleAlvoFlag(idxV1,'notulen',knop?knop.dataset.code:'V1');
+      eq('alvo-vink: de opgeschoven index raakt NIET de verkeerde VvE',
+         [D.alvo[0].notulen, D.alvo[1].notulen, D.alvo[2].notulen], [false, true, false]);
+      const rij=posts.length ? posts[0].requests[0].updateCells.range.startRowIndex : -1;
+      eq('alvo-vink: en de schrijfactie gaat naar de rij van die VvE (rij 3 → index 2)', rij, 2);
+    } finally {
+      window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
+      D.alvo=alvoOud; state._sheetIds=idsOud; state.pendingWrites=pendOud;
+      state._alvoFlagBezig=bezigOud;
+      document.querySelectorAll('.toast').forEach(t=>t.remove());
+    }
+  })();
+
   // parseAlfa: slice(1); rij zonder code valt weg.
   (()=>{
     const rows=[['Code','Naam','Datum'],['CH1','VvE 1','2026-05-01'],['','geen code','x'],['CH2','VvE 2','']];
@@ -12169,6 +12249,20 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
                     taakId:'T-off',bundelId:'',bundelVolg:''};
       eq('afrondWaarden: het archief bewaart de teller die het scherm toonde',
          afrondWaarden(offRij,'OFFERTE-TRAJECTEN','01-08-2026','')[3], '3/3');
+      // ── én hij leidt hem zélf af als er nog geen render overheen is gegaan ──
+      // `_verrijkOfferteRij` draait alleen binnen `filterNtd`, en `renderAll` slaat over zolang de
+      // datahash gelijk blijft. Een rij die vers uit `loadAll` komt draagt dus de RAUWE kolom D,
+      // terwijl kolom P (de aannemerslijst) niet mee gaat naar het archief. Zonder eigen afleiding
+      // stond er '0/3' in het archief terwijl er drie offertes binnen waren — en kolom P is dan weg.
+      const offRuw={_sec:'OFFERTE-TRAJECTEN',code:'311212',naam:'VvE Proef',datumAangevraagd:'',
+                    offertes:'0/3',behandelaar:'Jer',deadline:'',opmerkingen:'Dakrenovatie',
+                    aannemers:'Van Dijk BV|1\nGroen|1\nDe Vakman|1',
+                    taakId:'T-off2',bundelId:'',bundelVolg:''};
+      eq('afrondWaarden: leidt de teller zelf af als de rij niet verrijkt is',
+         afrondWaarden(offRuw,'OFFERTE-TRAJECTEN','1-9-2026','')[3], '3/3');
+      // En de undo-weg doet bewust het TEGENOVERGESTELDE: die gaat terug naar 'Nog Te Doen' mét
+      // kolom P, dus daar hoort de rauwe D-waarde te blijven staan.
+      eq('serializeNtdUndo: bewaart juist de RAUWE kolom D', serializeNtdUndo(offRuw)[3], '0/3');
       eq('serializeNtdUndo: de undo-rij bewaart juist de RAUWE kolom D',
          serializeNtdUndo(offRij)[3], '0/3');
 

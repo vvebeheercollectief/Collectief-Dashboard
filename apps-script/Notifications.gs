@@ -248,6 +248,17 @@ function cd_checkDeadlines() {
           if (Math.abs(hoursUntil - h) <= DEADLINE_TOLERANCE_HOURS && beh) {
             const body = code + (naam ? ' · ' + naam : '') + ' — over ' + Math.round(hoursUntil) + ' uur';
             cd_splitBehandelaar(beh).forEach(name => {
+              // ÉÉRST de in-app melding, dan de push. Deze tak was de enige meldingssoort die
+              // rechtstreeks `cd_sendNotification` aanriep in plaats van via `cd_notifyByTag` /
+              // `cd_notifyByExternalId` — en juist die twee helpers schrijven de regel in het
+              // tabblad 'Meldingen'. Er kwam dus nooit een rij van het type 'n_deadline' binnen,
+              // waardoor het hele in-app pad voor deadlines dood was: het icoon, de kleur en het
+              // voorkeurenfilter in notifications.js konden niet bereikt worden. Wie geen push aan
+              // heeft staan — en het instellingenvenster zegt letterlijk 'in-app toasts werken
+              // altijd, ook zonder push' — kreeg van alle vijf de signalen (48/24/8/4/1 uur) niets
+              // te zien. De helpers zelf kunnen deze tak niet dragen: die kennen het derde
+              // tag-filter (deadline_h) niet.
+              cd_schrijfMelding('n_deadline', '⏰ Deadline nadert', body, name);
               cd_sendNotification({
                 filters: [
                   { field: 'tag', key: 'behandelaar', relation: '=', value: name },

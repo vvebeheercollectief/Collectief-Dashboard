@@ -1,6 +1,14 @@
 function verplaatsAfgerond(e) {
  cd_lockedRun('verplaatsAfgerond', () => {
-  var sheet = e.source.getActiveSheet();
+  // `e.range.getSheet()` en NIET `e.source.getActiveSheet()`. Die laatste zegt welk tabblad er in
+  // de spreadsheet-UI vooraan staat op het moment dat de trigger draait, en dat hoeft niet het
+  // tabblad te zijn waar de bewerking op landde: een installeerbare onEdit-trigger draait
+  // asynchroon, in een document waar meerdere mensen tegelijk in werken, en iedereen heeft zijn
+  // eigen actieve tabblad. De rijnummers hieronder komen wél uit `e.range`. Twee bronnen van
+  // waarheid voor één bewerking is precies de fout waar de allowlist eronder tegen bedoeld is:
+  // een vinkje in een BACK-UP van 'Nog Te Doen' zou anders de controle kunnen passeren en met de
+  // rijnummers van die back-up in het échte tabblad gaan knippen en plakken.
+  var sheet = e.range.getSheet();
   var range = e.range;
 
   // Allowlist, net als verplaatsALV verderop: alléén het echte tabblad 'Nog Te Doen'. Een kopie
@@ -234,7 +242,9 @@ function setupAfgerondSheet(sheet) {
 
 function verplaatsALV(e) {
  cd_lockedRun('verplaatsALV', () => {
-  var sheet = e.source.getActiveSheet();
+  // `e.range.getSheet()` om dezelfde reden als bij verplaatsAfgerond hierboven: het tabblad waar de
+  // bewerking op landde, niet het tabblad dat toevallig vooraan staat.
+  var sheet = e.range.getSheet();
   var range = e.range;
 
   // Allowlist: alléén het ALV-overzicht zelf. Reset-archieven en backup-tabbladen
@@ -372,7 +382,19 @@ function _sorteerOfferteTrajectenImpl(e) {
   var sheet = ss.getSheetByName("Nog Te Doen");
 
   if (!sheet) return;
-  if (e && e.source.getActiveSheet().getName() !== "Nog Te Doen") return;
+  // Het tabblad waar de bewerking ECHT op landde (zie verplaatsAfgerond), niet het actieve.
+  if (e && e.range.getSheet().getName() !== "Nog Te Doen") return;
+
+  // NIET sorteren op een bewerking die alleen over kolom I gaat — dat is het afvink-hokje, en daar
+  // hoort `verplaatsAfgerond` bij. Eén handmatige bewerking vuurt namelijk BEIDE triggers af.
+  // Ze delen dezelfde document-lock en draaien dus na elkaar, maar de volgorde ligt niet vast.
+  // Won de sortering, dan verhuisden de rijen en las `verplaatsAfgerond` daarna zijn vinkjes op de
+  // rijnummers van vóór de sortering: kolom I staat daar dan op FALSE, de per-rij-guard stopt, en
+  // er gebeurt NIETS — het vinkje blijft staan, er komt geen archiefregel en geen melding. Sorteren
+  // heeft bij een afvink-actie ook geen doel: die rij verdwijnt juist uit het blad.
+  // Alleen bij een bereik van precies één kolom breed; een bredere bewerking (plakken over H:I)
+  // laat `verplaatsAfgerond` zelf al met rust, dus daar is geen wedloop.
+  if (e && e.range.getColumn() === 9 && e.range.getNumColumns() === 1) return;
 
   var lastRow = sheet.getLastRow();
   if (lastRow < 1) return;                 // lege sheet: getRange(1,1,0,1) zou crashen

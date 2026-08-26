@@ -180,14 +180,24 @@ async function vraagChat(){
   const code = state._chatVve;
   if(!vraag || !code || state._chatBezig) return;
   inp.value = '';
-  state._chatHistorie.push({ rol:'user', tekst:vraag });
+  // De VvE én het gesprek vastleggen zoals ze NU zijn. Tussen de vraag en het antwoord zitten
+  // seconden, en in dat venster kan de gebruiker met 'Andere VvE kiezen…' gewoon omschakelen —
+  // `setChatVve` kijkt niet naar `_chatBezig` en vervangt `state._chatHistorie` door een lege
+  // lijst. Duwden we het antwoord daarna blind in `state._chatHistorie`, dan verscheen een
+  // antwoord over VvE A in het (lege) gesprek van VvE B, met de vraag erboven weggevallen.
+  // Dat is bij een dossier-chat geen schoonheidsfoutje: de tekst noemt bedragen, namen en
+  // afspraken van een ándere vereniging.
+  const gesprek = state._chatHistorie;
+  const vveBijStart = code;
+  gesprek.push({ rol:'user', tekst:vraag });
   state._chatBezig = true; renderChat();
   try{
     if(!await ensureToken()) throw new Error('Niet ingelogd');
     const systeem = buildChatSysteemPrompt(dossierContextTekst(code, D));
-    const messages = _chatMessages(state._chatHistorie);
+    const messages = _chatMessages(gesprek);
     const antwoord = await askChat(systeem, messages);
-    state._chatHistorie.push({ rol:'assistant', tekst: antwoord || '(leeg antwoord)' });
+    if(state._chatVve !== vveBijStart || state._chatHistorie !== gesprek) return;  // omgeschakeld
+    gesprek.push({ rol:'assistant', tekst: antwoord || '(leeg antwoord)' });
   }catch(e){
     console.error('chat-fout', e);
     // Een 400 van de proxy is geen storing maar een harde grens (te grote invoer). 'Probeer het
@@ -200,7 +210,8 @@ async function vraagChat(){
       : (e && !e.status && e.message)
         ? `${e.message}. Probeer het zo nog eens.`
         : 'Kon nu geen antwoord ophalen. Probeer het later opnieuw.';
-    state._chatHistorie.push({ rol:'assistant', tekst });
+    if(state._chatVve !== vveBijStart || state._chatHistorie !== gesprek) return;  // omgeschakeld
+    gesprek.push({ rol:'assistant', tekst });
   }finally{
     state._chatBezig = false; renderChat();
   }

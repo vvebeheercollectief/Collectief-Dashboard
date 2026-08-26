@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  CRUD — taak-modals, sheet-helpers, toevoegen/afronden/verwijderen
 // ══════════════════════════════════════
-import { esc, berekenPrioriteit, toISODate, toDutchDate, nieuwTaakId, taakVerwijzing, voorgesteldeDeadline, DEADLINE_HINT, taakTitel } from "./util.js";
+import { esc, berekenPrioriteit, toISODate, toDutchDate, nieuwTaakId, taakVerwijzing, voorgesteldeDeadline, DEADLINE_HINT, taakTitel, reconcileOffertes, parseAannemers } from "./util.js";
 import { zoekDubbels, dubbelVraagTekst } from "./dubbelcheck.js";
 import { extraVves, wisExtraVves, extraVvesHtml, extraVvesUitleg } from "./meervve.js";
 import { state, D, pgs } from "./state.js";
@@ -964,7 +964,19 @@ export function afrondWaarden(r, sec, datum, toelichting){
   // krijgt M..P leeg (zie hieronder): daar is de afgeleide teller het enige wat er nog van over is.
   // Schreven we hier de rauwe waarde, dan toonde een afgerond offerte-traject '0 van 3 binnen'
   // terwijl er drie offertes lagen — en kolom P is dan weg, dus dat is nergens meer terug te halen.
-  const v=SECS[sec].keys.map(k=>r[k]||'');
+  const v=SECS[sec].keys.map(k=>
+    // De offerteteller wordt hier AFGELEID en niet uit het rij-object overgenomen. Kolom P
+    // (de aannemerslijst) gaat niet mee naar het archief — daar blijven M..P leeg — dus de
+    // afgeleide teller is het enige wat er van die lijst overblijft. Leunen op `r.offertes`
+    // ging mis zodra de rij nog niet door een render was gegaan: `_verrijkOfferteRij` draait
+    // alleen binnen `filterNtd`, en `renderAll` slaat over zolang de datahash gelijk blijft.
+    // Dan stond er de RAUWE kolom D in — '0/3' terwijl er drie offertes binnen waren, en na
+    // het archiveren nergens meer terug te halen. `reconcileOffertes` geeft voor een verrijkte
+    // rij exact dezelfde uitkomst: `reconcileOffertes` neemt per kant het MAXIMUM, en de al
+    // verrijkte `r.offertes` is per definitie al ≥ de telling uit kolom P. Dit verandert dus niets
+    // aan het geval dat vandaag goed ging en repareert alleen het geval zonder render ervoor.
+    k==='offertes' ? reconcileOffertes(r.offertes||'', parseAannemers(r.aannemers)) : (r[k]||'')
+  );
   while(v.length<8) v.push('');               // OFFERTE heeft 7 velden → vul tot H
   return v.concat([
     datum, toelichting, r.subcategorie||'',   // I, J, K
@@ -1402,11 +1414,29 @@ async function submitTask(){
       // Idempotent: `backgroundWrite` draait deze functie opnieuw bij een tijdelijke fout (429/5xx),
       // en zonder deze vlag zou één quota-hik het blok twee of drie keer invoegen. Zelfde idioom
       // als de bewerk-tak hierboven.
+      // Het invoeg-anker VERS afleiden uit de rij-objecten zelf, niet uit het getal dat bij de klik
+      // is uitgerekend. `afterRow` is een los getal en schuift nergens in mee; de rij-objecten
+      // staan in D.ntd en worden door élke `_shiftNtdRows` gecorrigeerd — óók door de rollback van
+      // een schrijfactie die vóór deze in de wachtrij stond. `backgroundWrite` voert die wachtrij
+      // serieel uit, dus tussen de klik en dít moment kan er een invoeging zijn teruggedraaid.
+      // Bleef het bevroren getal staan, dan landde de nieuwe rij één plek te laag: bij een sectie
+      // die direct tegen de volgende sectiekop aanligt (PROD-koprijen 2/22/42/81/99 sluiten op
+      // elkaar aan) belandt hij dan pal ónder die kop, en `parseSections` gooit de eerste regel na
+      // een sectiekop altijd weg als kolomkoprij. De taak was daarna nergens meer te zien, mét
+      // 'Taak toegevoegd' op het scherm. Zelfde reparatie als bij `doCompleteTask` en
+      // `bulkAfronden`, die hun archiefplek al ín de writeFn berekenen.
+      // Alleen rijen die er NOG staan tellen mee: is er intussen één afgerond of verwijderd, dan
+      // heeft die zijn eigen shift al gedaan en zou zijn oude nummer het anker omlaag trekken.
+      const versAnker=()=>{
+        const a2=D.ntd[sec]||[];
+        const levend=rijen.filter(r=>a2.indexOf(r)>-1);
+        return levend.length ? Math.min(...levend.map(r=>r._row))-1 : afterRow;
+      };
       let ingevoegd=false;
       backgroundWrite(
         async ()=>{
           if(!ingevoegd){
-            await insertAndWriteRows('Nog Te Doen',afterRow,blokValues);
+            await insertAndWriteRows('Nog Te Doen',versAnker(),blokValues);
             ingevoegd=true;
           }
           // Eén push, ook bij twaalf VvE's. Elke taak apart melden zou bij een subsidieronde
@@ -1429,10 +1459,14 @@ async function submitTask(){
               // beschermt de rij-controle niet tegen: die bewaakt overschrijven, niet een
               // verkeerde rij-KEUZE.
               let weg=0;
+              // Het anker VÓÓR het verwijderen aflezen: daarna staan de objecten niet meer in D en
+              // schuift `_shiftNtdRows` ze ook niet meer mee. Zelfde verse afleiding als in de
+              // writeFn hierboven, en om dezelfde reden.
+              const ankerNu=versAnker();
               rijen.forEach(r=>{ const p=a.indexOf(r); if(p>-1){ a.splice(p,1); weg++; } });
               // Eén keer terugschuiven, ná het verwijderen. Per rij schuiven of schuiven vóór het
               // verwijderen laat de rijnummers van de hele sectie scheef achter.
-              if(weg) _shiftNtdRows(afterRow,-weg); },
+              if(weg) _shiftNtdRows(ankerNu,-weg); },
         'Toevoegen mislukt'
       );
     }

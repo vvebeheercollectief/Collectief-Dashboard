@@ -52,7 +52,7 @@ export const ACTIONS = {
                                      state.ntdSort = s.key!==k ? {key:k,asc:true} : s.asc ? {key:k,asc:false} : {key:null,asc:true};
                                      pgs.ntd=1; renderNtd(); },
   'af-sectie':             (el) => setAf(el.dataset.sec),
-  'alvo-flag':             (el) => toggleAlvoFlag(+el.dataset.idx, el.dataset.field),
+  'alvo-flag':             (el) => toggleAlvoFlag(+el.dataset.idx, el.dataset.field, el.dataset.code),
   'alvo-reset-open':       ()   => openResetModal(),
   'alvo-reset-annuleer':   ()   => closeResetModal(),
   'alvo-reset-doe':        ()   => doeReset(),

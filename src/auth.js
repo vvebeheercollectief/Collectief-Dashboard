@@ -202,6 +202,17 @@ function logout(reden){
   // computer verder werken met de basislijn én de al-getoond-lijst van de vórige: meldingen van
   // vóór zijn sessie zouden alsnog als toast langskomen, of juist stil overgeslagen worden.
   state._lastNotifTs=null; state._meldStart=0; state._meldUit=false;
+  // ÓÓK de twee 'wie ben ik'-velden in het instellingenvenster leegmaken. `getCurrentWho()` leest
+  // die select EERST en pas daarna de per-account-sleutel in localStorage, en het venster is de
+  // enige plek die hem ooit terugzet. Bleef de naam van de vorige gebruiker staan, dan schreef de
+  // volgende op dezelfde computer zijn logregels, dossiernotities en kenmerk-wijzigingen onder
+  // díé naam, en filterde het 'voor mij'-filter op de verkeerde persoon — precies waar de
+  // per-account-sleutel (_whoSleutel) voor gebouwd is.
+  try{
+    const _who=document.getElementById('notif-who'); if(_who) _who.value='';
+    const _whoAnders=document.getElementById('notif-who-other');
+    if(_whoAnders){ _whoAnders.value=''; _whoAnders.style.display='none'; }
+  }catch(_){}
   // Ook de tellers en vlaggen van de storingsmeldingen terug naar nul: een volgende gebruiker op
   // dezelfde computer hoort niet te beginnen met de sessiebanner of de structuurmelding van zijn
   // voorganger, en een blijven-hangen vlag zou de 8s-ronde of het opslaan blokkeren.

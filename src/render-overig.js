@@ -624,6 +624,20 @@ function renderLogboek(){
     tekst:_editTekstEl.value,
     wie:_editBox.querySelector('.log-edit-wie')?.value
   }:null;
+  // Waar stond de cursor? De WAARDE bewaren is maar de helft: `el.innerHTML=html` hieronder
+  // vervangt het hele formulier, dus de <textarea> waarin iemand staat te typen verdwijnt uit de
+  // DOM en de focus valt terug op <body>. Wie midden in een zin zat, typte de rest in het niets —
+  // en dat gebeurt elke acht seconden, want de poll hertekent deze pagina. `renderVve` loste dit
+  // al zo op (zie `_focusHerstel` daar); alleen deze pagina deed het nog niet.
+  const _actLog=document.activeElement;
+  const _focusLog=(()=>{
+    const feed=document.getElementById('logboek-feed');
+    if(!_actLog || !feed || !feed.contains(_actLog)) return null;
+    const klasse=['log-edit-tekst','log-edit-wie'].find(k=>_actLog.classList && _actLog.classList.contains(k));
+    if(!klasse) return null;
+    // selectionStart bestaat niet op een <select>; dan is er ook geen cursor om terug te zetten.
+    return { klasse, start:_actLog.selectionStart ?? null, eind:_actLog.selectionEnd ?? null };
+  })();
   const q=(document.getElementById('s-logboek')?.value||'').toLowerCase().trim();
   const rows=D.logboek.filter(r=>{
     if(!logPaginaSoort(r.actie)) return false;   // ruis weren — alleen notities/contact + afgerond/aangemaakt
@@ -663,6 +677,15 @@ function renderLogboek(){
   if(_editBewaar){
     const t=document.querySelector('#logboek-feed .log-edit-tekst'); if(t) t.value=_editBewaar.tekst;
     const w=document.querySelector('#logboek-feed .log-edit-wie'); if(w&&_editBewaar.wie) w.value=_editBewaar.wie;
+  }
+  if(_focusLog){
+    const el2=document.querySelector('#logboek-feed .'+_focusLog.klasse);
+    if(el2){
+      try{ el2.focus(); }catch(_){}
+      // Pas ná focus(): een setSelectionRange vóór de focus wordt door de browser genegeerd.
+      if(_focusLog.start!=null && el2.setSelectionRange)
+        try{ el2.setSelectionRange(_focusLog.start,_focusLog.eind); }catch(_){}
+    }
   }
   renderPag('logboek-pag',rows.length,pgs.logboek,'logboek');
 }

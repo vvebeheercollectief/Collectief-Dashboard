@@ -54,7 +54,9 @@ function dossierContextTekst(code, data, vandaag){
       + `uitnodiging ${o.alvo.uitnodiging?'verstuurd':'nog niet'}, `
       + `notulen ${o.alvo.notulen?'ja':'nee'}, begroting ${o.alvo.begroting?'ja':'nee'}.`);
   }
-  if(o.alfa && o.alfa.length) L.push(`Laatst gehouden ALV: ${o.alfa[0].datum}.`);
+  // Zeg tegen het model WAT die datum is, anders presenteert het hem als de vergaderdatum — en
+  // dat is hij niet (zie de toelichting in render-vve.js).
+  if(o.alfa && o.alfa.length) L.push(`Laatste ALV afgerond op ${o.alfa[0].datum} (dat is de dag waarop 'Notulen verstuurd' is afgevinkt, niet per se de vergaderdatum).`);
   if(o.logboek.length){
     L.push('Laatste logboek/contactmomenten (nieuwste eerst):');
     o.logboek.slice(0,15).forEach(r=>{
@@ -118,7 +120,7 @@ function _chatMessages(historie, max=10){
 }
 
 // Voorbeeldvragen voor de lege chat (klikbaar).
-const CHAT_SUGGESTIES = ['Wat staat er nog open?', 'Wanneer was de laatste ALV?', 'Welke offertes lopen er?'];
+const CHAT_SUGGESTIES = ['Wat staat er nog open?', 'Wanneer is de laatste ALV afgerond?', 'Welke offertes lopen er?'];
 
 // ── UI ──
 // A11y-keuze: het chat-paneel is een PERSISTENT, zwevend hulpvenster dat de pagina NIET afdekt.

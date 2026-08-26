@@ -464,7 +464,13 @@ function _sheetBreedtes(d){
 async function getSheetIds(){
   if(state._sheetIds) return state._sheetIds;
   const r=await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}`,{headers:{Authorization:`Bearer ${state.oauthToken}`}});
-  if(!r.ok){ if(r.status===401){state.oauthToken=null;state.oauthExpiry=0} throw new Error('getSheetIds '+r.status); }
+  // `err.status` erbij, net als elke andere schrijfweg in dit bestand. Zonder die eigenschap ziet
+  // `_isTransient` een 429 of 5xx hier niet (die toetst op e.status of op een tekstpatroon dat
+  // 'getSheetIds 429' niet matcht) en doet `_withRetry` geen herkansing — terwijl dezelfde 429 op
+  // de batchUpdate erna wél netjes opnieuw geprobeerd wordt. Dit is de EERSTE aanroep van elke
+  // schrijfweg, dus juist bij een vol leesquotum sneuvelde de hele actie zonder tweede poging.
+  if(!r.ok){ if(r.status===401){state.oauthToken=null;state.oauthExpiry=0}
+             const err=new Error('getSheetIds '+r.status); err.status=r.status; throw err; }
   const d=await r.json();
   state._sheetIds={};
   (d.sheets||[]).forEach(s=>{state._sheetIds[s.properties.title]=s.properties.sheetId});

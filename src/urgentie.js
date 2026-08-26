@@ -82,21 +82,28 @@ export function urgentieScore(taak, sec, opts){
   return { score, reden, label };
 }
 
-// Hoort deze taak bij <naam>? behandelaar kan meerdere namen bevatten (',' of '/').
+// Hoort deze taak bij <naam>? Het behandelaarsveld kan meerdere namen bevatten.
+// Dezelfde scheidingstekens als `splitBehandelaar` in util.js — inclusief de puntkomma. Zonder die
+// puntkomma viel 'Jer; Cihad' hier als ÉÉN naam uit de bus en telde de taak voor niemand mee.
 export function isVanMij(taak, naam){
   if (!naam) return false;
   const b = ((taak && taak.behandelaar) || '') + '';
-  return b.split(/[,/]/).map(s => s.trim().toLowerCase()).filter(Boolean).includes(naam.toLowerCase());
+  return b.split(/[,/;&]|\ben\b/i).map(s => s.trim().toLowerCase()).filter(Boolean).includes(naam.toLowerCase());
 }
 
-// Kantoorbrede signalen voor de let-op-strook. D = de geparste secties (state.D).
+// Kantoorbrede signalen voor de let-op-strook.
+// `D` mag allebei: het hele `state.D` (dan zitten de secties onder `D.ntd`) óf rechtstreeks de
+// sectiekaart. Dat onderscheid was er niet, en dat was stil fataal: de kop zei 'D = state.D',
+// maar op state.D is `D['LOD']` altijd undefined — de functie gaf dan zonder één melding een lege
+// lijst terug. De zelftest dekte dat niet af, want die voert een handgemaakt PLAT object in.
 // Elk signaal: { soort:'danger'|'warning'|'info', icon, tekst }.
 export function letOpSignalen(D, opts){
   opts = opts || {};
   const vandaag = opts.vandaag || _vandaagAmsterdam();
   const logboek = opts.logboek || [];
   const out = [];
-  const lod = (D && D['LOD']) || [];
+  const secties = (D && D.ntd) || D || {};
+  const lod = secties['LOD'] || [];
   const lodNabij = lod
     .map(r => ({ r, p: berekenPrioriteit(r.deadline, 'LOD', vandaag) }))
     .filter(x => x.p.dagenTot !== null && x.p.dagenTot <= 7);
@@ -108,7 +115,7 @@ export function letOpSignalen(D, opts){
   }
   const SECS_ALL = SKEYS;   // afgeleid, zodat een nieuwe sectie hier niet stil buiten valt
   let langStil = 0;
-  SECS_ALL.forEach(sec => ((D && D[sec]) || []).forEach(r => {
+  SECS_ALL.forEach(sec => (secties[sec] || []).forEach(r => {
     const reg = STIL_ESCALATIE_REGELS[sec];
     const dS = dagenStil(r, sec, logboek, vandaag);
     if (dS !== null && reg && dS >= reg.trap2) langStil++;

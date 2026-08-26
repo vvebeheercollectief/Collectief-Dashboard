@@ -241,7 +241,9 @@ function setSaving(){dot('loading');document.getElementById('sync-lbl').textCont
 function setSynced(){
   if(state.pendingWrites>0) return;
   dot('');
-  document.getElementById('sync-lbl').textContent='Live · '+new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
+  const _live='Live · '+new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
+  _bulkLblOnthoud(_live);   // zelfde reden als bij setSyncErr/setSyncOffline
+  document.getElementById('sync-lbl').textContent=_live;
   clearLoadError();
   clearOfflineBanner();
   syncSelecteerStand();   // de selecteerstand wint van 'Live': daar staat het verversen stil
@@ -265,10 +267,14 @@ function syncSelecteerStand(){
     state._syncLblVoorBulk=null;
   }
 }
-function setSyncErr(){dot('err');document.getElementById('sync-lbl').textContent='Fout'}
+// De twee 'slecht nieuws'-standen moeten ook de tekst bijwerken die `syncSelecteerStand` bewaart
+// zolang de selecteerstand aanstaat. Zonder dat zette het verlaten van die stand de tekst van
+// vóór de selectie terug — 'Live · 14:02' — terwijl de verbinding intussen weg was.
+function _bulkLblOnthoud(t){ if(state.bulkMode) state._syncLblVoorBulk=t; }
+function setSyncErr(){dot('err');_bulkLblOnthoud('Fout');document.getElementById('sync-lbl').textContent='Fout'}
 // 'Fout' suggereert een storing aan de andere kant; 'Offline' benoemt wat er werkelijk aan de
 // hand is en waarom wijzigen nu niet lukt.
-function setSyncOffline(){dot('err');document.getElementById('sync-lbl').textContent='Offline'}
+function setSyncOffline(){dot('err');_bulkLblOnthoud('Offline');document.getElementById('sync-lbl').textContent='Offline'}
 function dot(cls){const d=document.getElementById('dot');d.className='dot'+(cls?' '+cls:'')}
 
 // Nette foutmelding in beeld bij een harde laadfout (niet de zwijgende achtergrond-polls).
@@ -513,9 +519,19 @@ function _verwerkMeldingen(R, bereik, start){
 // verborgen acties eruit en keert de lijst om, dus de laatste regel van D.logboek is niet per se
 // de laatste Sheet-rij. Geen bruikbaar anker (lege kolom A) → terug naar volledig lezen; liever
 // een duurdere ronde dan een anker dat op elke rij 'klopt'.
+// De ankerwaarde van één logregel: de HELE regel A..H, niet alleen de tijdstempel in kolom A.
+// Die tijdstempel is niet uniek: `logEvents` schrijft een blok regels met ÉÉN `new Date()` voor
+// alle rijen (bulk-afronden van vijf taken geeft vijf identieke stempels), en de Apps
+// Script-motoren doen hetzelfde. Verdween er dan precies één regel uit dat blok, dan stond op de
+// hoogwaterrij toevallig weer dezelfde stempel en zag de incrementele lezing géén verschuiving —
+// waarna de staart vanaf een verkeerd rijnummer werd ingelezen en bewerken/verwijderen op de
+// verschoven nummers landde. Dezelfde acht kolommen die FP_KOLOMMEN['Logboek'] al vergelijkt.
+const _logAnkerVan = rij => (rij||[]).slice(0,8).map(c=>(c==null?'':c).toString().trim()).join('\x1f');
+
 function _zetLogAnker(rows, eersteRij){
-  const ts=(((rows||[])[(rows||[]).length-1]||[])[0]||'').toString().trim();
-  if(!rows||!rows.length||!ts){ state._logHoogwater=0; state._logAnkerTs=''; return; }
+  const laatste=(rows||[])[(rows||[]).length-1];
+  const ts=_logAnkerVan(laatste);
+  if(!rows||!rows.length||!(((laatste||[])[0]||'').toString().trim())){ state._logHoogwater=0; state._logAnkerTs=''; return; }
   state._logHoogwater=eersteRij+rows.length-1;
   state._logAnkerTs=ts;
 }
@@ -527,7 +543,7 @@ async function _verwerkLogboek(R, naam, volledig, lees){
   let rows=R[naam];
   if(rows===undefined) return;                     // niet gevraagd deze ronde → laat staan
   if(!volledig){
-    const anker=((rows[0]||[])[0]||'').toString().trim();
+    const anker=_logAnkerVan(rows[0]);
     if(!rows.length || !state._logAnkerTs || anker!==state._logAnkerTs){
       console.warn('[logboek] anker verschoven — volledige herlezing');
       rows=await lees('Logboek').catch(()=>undefined);
@@ -673,19 +689,30 @@ async function _loadRonde(silent){
       // waarmee een storing in het meldingenpad het hele dashboard zou meetrekken. Eén keer
       // proberen zonder de meldingenbereiken; lukt dat, dan blijven ze deze sessie achterwege.
       // Alleen bij 400 (onparseerbaar bereik): 429/5xx zijn tijdelijk en heeft _withRetry al gehad.
+      // `laatste` = de fout waarop de terugval-beslissing hieronder genomen wordt. Zonder deze
+      // variabele werd die beslissing genomen op de OORSPRONKELIJKE 400, terwijl de herkansing
+      // zonder de meldingenbereiken intussen op iets heel anders kan stranden (401, netwerk).
+      // Dan viel de ronde alsnog terug op acht losse reads — precies wat `magTerugvalLosseReads`
+      // moet voorkomen.
+      let laatste=e;
       if(e.status===400 && meldBereiken.length && !state._meldUit){
         try{
           R=await fetchSheets(namen);
           state._meldUit=true;
           console.warn('[meldingen] tabblad niet leesbaar — meldingen blijven deze sessie uit');
-        }catch(_){ R=null; }
+          // Zichtbaar melden, net als de kopStuk-tak in `_verwerkMeldingen`. Vanaf hier komt er
+          // deze sessie GEEN enkele melding meer binnen, en stilte is daar niet van 'er gebeurde
+          // niets' te onderscheiden — juist bij meldingen is dat het gevaarlijke misverstand.
+          showToast('Meldingen staan uit','Het tabblad Meldingen is niet leesbaar. Herlaad de pagina om ze terug te krijgen.',
+                    'var(--am)','waarschuwing',{geenDedup:true,geenSysteemmelding:true});
+        }catch(e2){ R=null; laatste=e2; }
       }
       if(!R){
         // Alleen een afgewezen bereik (400) is met losse reads te repareren. Bij 429/5xx/401 of
         // een netwerkfout gooien we door naar de buitenste catch: die telt _syncFails, laat de
         // bestaande gegevens staan en toont vanaf de tweede mislukking 'Fout'. Acht seconden
         // later probeert de poll het gewoon opnieuw — met één verzoek in plaats van acht.
-        if(!magTerugvalLosseReads(e)) throw e;
+        if(!magTerugvalLosseReads(laatste)) throw laatste;
         // Terugval op losse reads. De oude weg levert de optionele tabbladen dan alsnog los aan
         // (duurder, maar werkt). Per tabblad beslissen of hij mag falen: een uniforme .catch zou
         // een ontbrekend 'Nog Te Doen' in stilte als lege lijst doorlaten en het dashboard
@@ -706,7 +733,10 @@ async function _loadRonde(silent){
     _verwerkMeldingen(R, meldBereik, meldStart);
     // Kwam er tijdens het lezen een schrijfactie tussen? Dan is de lokale (optimistische)
     // staat leidend; de eigen resync van die schrijfactie haalt zo de verse data op.
-    if(state.pendingWrites>0){ if(!silent) setSynced(); return; }
+    // `setSaving()` en niet `setSynced()`: die laatste keert per constructie meteen terug (hij
+    // begint met `if(state.pendingWrites>0) return;`), en dat is precies de voorwaarde van deze
+    // tak. De balk bleef daardoor op 'Laden…' staan terwijl er in werkelijkheid opgeslagen werd.
+    if(state.pendingWrites>0){ if(!silent) setSaving(); return; }
     // Toekennen op NAAM. Een tabblad dat niet in deze ronde zat, behoudt zijn vorige waarde in
     // plaats van door parseX(undefined) leeggeveegd te worden. Vandaag zit alles er elke ronde
     // in; de vorm is er zodat een gemiste of afwijkend gevraagde reeks nooit stil data wist.

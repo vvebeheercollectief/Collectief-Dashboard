@@ -529,12 +529,16 @@ document.addEventListener('DOMContentLoaded',()=>{
   if(_st&&Date.now()<_se&&_sm&&ALLOWED_EMAILS.includes(_sm.toLowerCase())){
     state.oauthToken=_st;state.oauthExpiry=_se;state.currentUserEmail=_sm;
     document.getElementById('login-gate').style.display='none';
+    document.getElementById('app')?.removeAttribute('inert');   // zie logout() in auth.js
     laadUitCache();   // meteen de laatst bekende stand in beeld; loadAll vervangt hem
     loadAll();
   } else {
     // Geen geldige sessie → login nodig. Speel de gebrande launch-splash
     // (na ~1,9s → login-kaart). Bewust alleen hier: ingelogde terugkeerders
     // krijgen de gate meteen verborgen en zien dus nooit een splash-flits.
+    // De schil erachter uit de tabvolgorde halen zolang het inlogscherm staat — zie logout()
+    // in auth.js voor de reden. `doLogin` haalt hem er weer af.
+    document.getElementById('app')?.setAttribute('inert','');
     startSplash();
   }
 

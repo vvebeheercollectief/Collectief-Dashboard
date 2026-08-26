@@ -248,17 +248,15 @@ function cd_checkDeadlines() {
           if (Math.abs(hoursUntil - h) <= DEADLINE_TOLERANCE_HOURS && beh) {
             const body = code + (naam ? ' · ' + naam : '') + ' — over ' + Math.round(hoursUntil) + ' uur';
             cd_splitBehandelaar(beh).forEach(name => {
-              // ÉÉRST de in-app melding, dan de push. Deze tak was de enige meldingssoort die
-              // rechtstreeks `cd_sendNotification` aanriep in plaats van via `cd_notifyByTag` /
-              // `cd_notifyByExternalId` — en juist die twee helpers schrijven de regel in het
-              // tabblad 'Meldingen'. Er kwam dus nooit een rij van het type 'n_deadline' binnen,
-              // waardoor het hele in-app pad voor deadlines dood was: het icoon, de kleur en het
-              // voorkeurenfilter in notifications.js konden niet bereikt worden. Wie geen push aan
-              // heeft staan — en het instellingenvenster zegt letterlijk 'in-app toasts werken
-              // altijd, ook zonder push' — kreeg van alle vijf de signalen (48/24/8/4/1 uur) niets
-              // te zien. De helpers zelf kunnen deze tak niet dragen: die kennen het derde
-              // tag-filter (deadline_h) niet.
-              cd_schrijfMelding('n_deadline', '⏰ Deadline nadert', body, name);
+              // BEWUST GEEN cd_schrijfMelding hier, anders dan bij alle andere meldingssoorten.
+              // Dat is geen vergetelheid maar een gevolg van het derde tag-filter hieronder:
+              // `deadline_h` zorgt dat elke collega precies ÉÉN push krijgt, op de voorsprong die
+              // hij zelf koos (1, 4, 8, 24 of 48 uur). Het tabblad 'Meldingen' kent die drempel
+              // niet — `verwerkMeldingRijen` filtert alleen op aan/uit — dus een regel per drempel
+              // zou iedereen VIJF toasts per taak geven en binnen MELDING_MAX (200) andere
+              // meldingen uit het tabblad duwen. De deadline zelf is in de app trouwens niet stil:
+              // hij staat in de deadline-kolom en de statkop heeft een klikbare 'te laat'-pil.
+              // Het instellingenvenster zegt daarom nu dat déze soort alleen via push komt.
               cd_sendNotification({
                 filters: [
                   { field: 'tag', key: 'behandelaar', relation: '=', value: name },
@@ -270,7 +268,11 @@ function cd_checkDeadlines() {
                 title: '⏰ Deadline nadert',
                 body: body,
                 url: APP_URL,
-                dedupKey: 'dl-' + code + '-' + h
+                // Taaknummer (kolom Q) in de sleutel: `web_push_topic` gebruikt deze waarde, en
+                // twee taken van dezelfde VvE binnen hetzelfde tijdvenster deelden er anders één —
+                // de tweede push verving dan de eerste op het toestel. Terugval op de VvE-code voor
+                // rijen van vóór de backfill; dan blijft het gedrag precies zoals het was.
+                dedupKey: 'dl-' + ((data[i][16] || code)) + '-' + h
               });
             });
           }
@@ -512,7 +514,11 @@ function cd_processNotifEvent(data) {
       });
     }
   } else if (ev === 'completed') {
-    // Niet pushen, alleen loggen
+    // Bewust GEEN push en ook GEEN logregel. Het afronden zelf schrijft zijn logregel al vanuit
+    // het dashboard (logEvent → het 'logboek'-event hierboven), dus hier zou een tweede regel
+    // ontstaan. De tak blijft staan zodat 'completed' niet in de `else`-tak van een onbekend
+    // event belandt; hij is met opzet leeg. (Het commentaar zei eerder 'alleen loggen', en dát
+    // gebeurde hier juist niet.)
   } else if (ev === 'alv_update') {
     cd_notifyByTag('n_alv', '1', {
       title: data.title || '🏢 ALV-status verandert',
@@ -526,6 +532,22 @@ function cd_processNotifEvent(data) {
     const title = (data.title || '🔔 Test melding').toString();
     const body  = (data.body  || 'Notificaties werken correct!').toString();
     cd_schrijfMelding('test', title, body, who || 'allen');
+    // ÉN echt pushen. Dit is de knop 'Test melding', en die is er om te toetsen of de PUSH-weg
+    // werkt — de in-app toast toont `sendTestNotif` al zelf, meteen bij de klik, en die lukt ook
+    // zonder abonnement. Zonder deze regel bewees een geslaagde test dus helemaal niets: er
+    // verliet geen enkele melding het systeem. Rechtstreeks `cd_sendNotification` en niet via
+    // `cd_notifyByExternalId`, want die zou hierboven een TWEEDE regel in het tabblad 'Meldingen'
+    // schrijven en de push bovendien achter een voorkeurs-tag zetten die met een test niets te
+    // maken heeft. Zonder `who` is er geen toestel om naartoe te sturen; dan blijft het bij de
+    // in-app regel.
+    if (who) {
+      try {
+        cd_sendNotification({
+          filters: [{ field: 'tag', key: 'behandelaar', relation: '=', value: who }],
+          title: title, body: body, url: APP_URL, dedupKey: 'test-' + who + '-' + uid
+        });
+      } catch (testFout) { Logger.log('test-push mislukt: ' + testFout); }
+    }
   } else if (ev === 'create_task') {
     const rij = cd_withLock(function(){ return cd_createTaskRow(categorie, code, naam, actiepunt, beh, deadline); });
     // cd_withLock geeft `undefined` terug als de document-lock binnen 10 seconden niet vrijkwam —

@@ -3,7 +3,7 @@
 //  Schrijft kolom L in 'Nog Te Doen'; deadline wint altijd (waarschuwing).
 // ══════════════════════════════════════
 import { state } from "./state.js";
-import { toDutchDate, toISODate, _parseAnyDate, _vandaagAmsterdam, _verschilInKalenderdagen, parseDt } from "./util.js";
+import { toDutchDate, toISODate, _parseAnyDate, _vandaagAmsterdam, _verschilInKalenderdagen, parseDt, taakTitel } from "./util.js";
 import { writeRange, assertRowMatch } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { backgroundWrite, blokkeerOffline } from "./data.js";
@@ -88,7 +88,11 @@ async function schrijfOpvolgdatum(r, nieuw, actie){
       await logEvent(r.code, r._sec, actie, 'opvolgdatum', oud, nieuw);
       // Bevestiging pas ná de write; onderaan de writeFn zodat een herkansing er niet twee geeft.
       showToast(nieuw ? 'Weggelegd tot '+nieuw : 'Opvolgdatum gewist',
-                `${r.code} — ${r.actiepunt||r.periode||r.subsidie||r.naam||''}`, null, nieuw ? 'pauze' : 'bel',
+                // Via de centrale `taakTitel` en niet via een eigen terugvalketen: die kende
+                // `opmerkingen` (Offerte-trajecten) niet en viel daar terug op de VvE-naam, zodat
+                // de bevestiging de VERENIGING noemde in plaats van de taak. Zelfde keuze als in
+                // inbehandeling.js en deleteTaskRow.
+                `${r.code} — ${taakTitel(r, r._sec)||r.naam||''}`, null, nieuw ? 'pauze' : 'bel',
                 {geenDedup:true,geenSysteemmelding:true});
     },
     ()=>{ r.opvolgdatum = oud; },

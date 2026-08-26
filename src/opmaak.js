@@ -100,7 +100,12 @@ function markeer(s, mark){
 function _markeerRegel(s, mark){
   const m=/^(\s*)([\s\S]*?)(\s*)$/.exec(s);
   if(!m||!m[2]) return s;
-  if(m[2].startsWith(mark)&&m[2].endsWith(mark)) return s;   // al gemarkeerd (nesting)
+  // Guard over de HELE regel en niet alleen op de uiteinden. Bij geplakte tekst waarin maar een
+  // DEEL vet is ('gewoon **dringend** hoor') begon en eindigde de regel niet met de markering, dus
+  // kwam er nog een paar omheen: '**gewoon **dringend** hoor**'. `opmaakHtml` leest van links naar
+  // rechts en maakt daar '<strong>gewoon </strong>dringend<strong> hoor</strong>' van — precies
+  // omgekeerd — en in de Sheet stonden er letterlijke sterretjes in de tekst.
+  if(m[2].includes(mark)) return s;   // al gemarkeerd (nesting)
   return m[1]+mark+m[2]+mark+m[3];
 }
 
@@ -155,7 +160,10 @@ function pasToe(tekst, start, eind, soort){
       // staat als je met een leeg veld begint. Bij UITzetten blijven lege regels leeg.
       if(!r.trim()) return alAan ? r : (heeftInhoud ? r : '- ');
       const m=RE_PUNT.exec(r);
-      return alAan ? (m?m[1]:r) : '- '+r;
+      // Bij AANzetten een regel die al een streepje draagt met rust laten. Bij een GEMENGDE
+      // selectie (een paar regels met, een paar zonder) is `alAan` false, en dan kreeg een regel
+      // die al '- ' had er nog een bij: '- - schilderwerk'.
+      return alAan ? (m?m[1]:r) : (m ? r : '- '+r);
     }).join('\n');
     // Bij AANzetten op een blok ZONDER inhoud (het gewone geval: een leeg notitieveld) staat de
     // cursor samengevouwen áchter het streepje in plaats van de '- ' te selecteren. Anders wist de

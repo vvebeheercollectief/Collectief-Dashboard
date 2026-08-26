@@ -439,7 +439,7 @@ function logEditForm(r){
   </div>`:'';
   return `<div class="log-item"><div class="log-edit" data-row="${r._row}" data-ts="${esc(r.timestamp||'')}">
     <div class="opmaak-veld">
-      <textarea class="log-edit-tekst" rows="2">${esc(r.nieuweWaarde||'')}</textarea>
+      <textarea class="log-edit-tekst" rows="2" aria-label="Tekst van deze logregel">${esc(r.nieuweWaarde||'')}</textarea>
       ${opmaakBalk()}
     </div>
     ${contactRij}

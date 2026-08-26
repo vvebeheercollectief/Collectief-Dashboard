@@ -50,8 +50,15 @@ function cd_recalcPrioriteiten() {
         // loopt daar volledig buitenom. Verschoof een rij tussen de momentopname en dit moment, dan
         // zou hier de prioriteit van de ene taak in de rij van een andere belanden — en dat is aan
         // niets te zien. Eén extra celllezing per WIJZIGING (een handvol per dag), niet per rij.
-        const codeNu = (sheet.getRange(i + 1, 1).getValue() || '').toString().trim();
-        if (codeNu !== (data[i][0] || '').toString().trim()) { overgeslagen++; continue; }
+        // Op IDENTITEIT en niet alleen op de VvE-code: één VvE heeft vaak meerdere taken in
+        // dezelfde sectie — daar bestaat het vaste taaknummer in kolom Q juist voor — en dan laat
+        // een vergelijking op kolom A een verschoven BUURRIJ van dezelfde VvE gewoon door. Exact
+        // dezelfde controle als cd_escaleerStilleDossiers (Opvolging.gs) en cd_archiveerRij.
+        const versRij = sheet.getRange(i + 1, 1, 1, Math.min(17, sheet.getMaxColumns())).getValues()[0];
+        const codeNu = (versRij[0] || '').toString().trim();
+        const nrNu   = (versRij[16] || '').toString().trim();
+        const nrOud  = (data[i][16] || '').toString().trim();
+        if (codeNu !== (data[i][0] || '').toString().trim() || nrNu !== nrOud) { overgeslagen++; continue; }
         sheet.getRange(i+1, AP_PRIO_COL+1).setValue(nieuw); updates++;
       } catch (rowErr) { Logger.log('cd_recalcPrioriteiten rij ' + (i + 1) + ' fout: ' + rowErr); }
     }

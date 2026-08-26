@@ -380,7 +380,7 @@ function toonMeldingen(lijst) {
   const rest = (lijst || []).length - eerste.length;
   // geenDedup: deze telling MOET verschijnen, ook als er net een gelijkluidende stond — stilte
   // zou hier lezen als 'er was niets meer'.
-  if (rest > 0) showToast(`+ ${rest} meldingen niet getoond`, 'Er kwamen er meer binnen dan er op het scherm passen.', 'var(--ac)', '', { geenDedup: true });
+  if (rest > 0) showToast(`+ ${rest} ${rest === 1 ? 'melding' : 'meldingen'} niet getoond`, 'Er kwamen er meer binnen dan er op het scherm passen.', 'var(--ac)', '', { geenDedup: true });
 }
 
 // Benoemde handler (i.p.v. anoniem) zodat logout() 'm netjes kan loskoppelen, met een

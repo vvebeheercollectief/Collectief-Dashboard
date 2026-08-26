@@ -93,7 +93,14 @@ export default async function handler(req, res){
       res.status(502).json({ error: (data.error && data.error.message) || 'AI-fout' }); return;
     }
     const antwoord = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
-    res.status(200).json({ antwoord });
+    // Liep het antwoord tegen max_tokens aan, dan is het middenin een zin afgebroken. Zonder deze
+    // staart leest dat als een volledig antwoord — en juist bij een dossiervraag ('welke offertes
+    // staan er open?') is een half opgesomde lijst gevaarlijker dan geen lijst: wat er niet staat
+    // lijkt er niet te zijn.
+    const afgekapt = data.stop_reason === 'max_tokens';
+    res.status(200).json({ antwoord: afgekapt
+      ? antwoord + '\n\n… (antwoord afgekapt — stel een gerichtere vraag)'
+      : antwoord });
   } catch (e) {
     console.error('chat: serverfout', (e && e.message) || e);
     res.status(500).json({ error: 'serverfout' });

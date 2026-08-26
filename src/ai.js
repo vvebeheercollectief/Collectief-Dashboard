@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  AI-HULP — plak mailtekst (slim kopieer-plak)
 // ══════════════════════════════════════
-import { esc, displayName, splitBehandelaar } from "./util.js";
+import { esc, displayName, splitBehandelaar, taakTitel } from "./util.js";
 import { state, D } from "./state.js";
 import { SECS, SKEYS } from "./config.js";
 import { goTo } from "./ui.js";
@@ -19,7 +19,7 @@ function openAiHelp(){
   if(!state._aiVveCode) document.getElementById('ai-vve-input').value='';
   document.getElementById('ai-answer').value='';
   const res=document.getElementById('ai-result'); res.style.display='none'; res.innerHTML='';
-  document.querySelectorAll('#ai-chips .ai-chip').forEach(c=>c.classList.add('on'));
+  document.querySelectorAll('#ai-chips .ai-chip').forEach(c=>{ c.classList.add('on'); c.setAttribute('aria-pressed','true'); });
   buildAiPrompt();
   document.getElementById('ai-bg').classList.add('open');
 }
@@ -39,7 +39,10 @@ function aiVveContext(code){
       if(String(r.code||'').toLowerCase()!==c) return;
       if(r.naam && !naam) naam=r.naam;
       if(r.behandelaar) splitBehandelaar(r.behandelaar).forEach(b=>behs.add(b));
-      const titel=r.actiepunt||r.agendapunten||r.status||r.subsidie||SECS[s].label;
+      // `taakTitel` als terugval en niet het sectielabel: bij een Offerte-traject staat de
+      // omschrijving in `opmerkingen` en die stond niet in deze keten, dus elke offerte-regel werd
+      // letterlijk 'Offerte-trajecten: Offerte-trajecten' in de context van de chat-agent.
+      const titel=r.actiepunt||r.agendapunten||r.periode||r.status||r.subsidie||taakTitel(r,s)||SECS[s].label;
       open.push(`${SECS[s].label}: ${titel}`.trim());
     });
   });

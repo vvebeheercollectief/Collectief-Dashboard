@@ -377,7 +377,10 @@ function renderNtdCrossList(sec){
         // Zelfde filterdefinitie als de hoofdtabel (filterNtd): zoek over de sectie-keys van de
         // herkomst-sectie en pas óók het prioriteitsfilter toe — anders toont 'Ook hier' items
         // van álle prioriteiten terwijl de hoofdtabel netjes filtert.
-        if(q && !SECS[s].keys.some(k=>(r[k]||'').toLowerCase().includes(q))) return;
+        // NIET_ZOEKBAAR erbij, net als in `filterNtd`. Kolom H bevat letterlijk 'TRUE'/'FALSE'
+        // en de prioriteit is een woord: zonder deze filter gaf 'al', 'se' of 'fa' hier wél
+        // treffers terwijl de hoofdtabel niets liet zien — dezelfde reparatie die filterNtd al had.
+        if(q && !SECS[s].keys.some(k=>!NIET_ZOEKBAAR.has(k)&&(r[k]||'').toLowerCase().includes(q))) return;
         if(fCode && !((r.code||'').toLowerCase().includes(fCode))) return;
         if(fBeh && !((r.behandelaar||'').toLowerCase().includes(fBeh))) return;
         if(fPrio && berekenPrioriteit(r.deadline,s).prioriteit!==fPrio) return;

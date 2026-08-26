@@ -46,6 +46,12 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   // De 8s-poll uitzetten zolang de suite draait: die deelt `window.fetch` en de statusbalk met de
   // toetsen hieronder, en maakte er twee wisselvallig (zie de toelichting bij de timer in main.js).
   state._zelftestLoopt = true;
+  // De schil weer bedienbaar maken. Een testronde draait per definitie NIET ingelogd, en sinds
+  // 26-08 zet de koude start `inert` op #app zolang het inlogscherm ervoor ligt (zie logout() in
+  // auth.js). Met dat attribuut kan niets binnen #app nog focus krijgen, en tientallen toetsen
+  // hieronder doen dat wél — die meten het gedrag van een INGELOGDE gebruiker, en die heeft geen
+  // inerte schil. Het attribuut zelf wordt verderop apart getoetst.
+  document.getElementById('app')?.removeAttribute('inert');
   // VOORTGANGSSPOOR. In een browsertabblad dat op de achtergrond staat knijpt de browser elke timer
   // af — na vijf minuten tot één keer per minuut — en dan duurt een ronde niet veertig seconden
   // maar tien minuten of meer. Zonder spoor is 'nog bezig' dan niet te onderscheiden van
@@ -431,6 +437,39 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('login-gate: knop heeft default- én signing-state',
     !!document.querySelector('#login-btn .lg-btn-default') && !!document.querySelector('#login-btn .lg-btn-signing'));
   truthy('login-gate: splash-laag bestaat (klik = overslaan)', !!document.querySelector('#login-gate .lg-splash'));
+  // Het inlogscherm is een `position:fixed`-overlay en dekt de schil dus alleen VISUEEL af. Zonder
+  // `inert` bleef alles erachter met Tab bereikbaar én met het toetsenbord te bedienen — dertig
+  // knoppen, waaronder 'afronden' en 'verwijderen'. logout() zet het attribuut, doLogin en het
+  // sessieherstel halen het eraf. (De suite zelf haalt het bovenaan weg; zie de toelichting daar.)
+  (() => {
+    const app = document.getElementById('app');
+    const gate = document.getElementById('login-gate');
+    if (!app || !gate) { truthy('login-gate: #app en de gate bestaan', false); return; }
+    const gOud = gate.style.display, iOud = app.hasAttribute('inert');
+    try {
+      app.setAttribute('inert','');
+      truthy('login-gate: met inert is er niets achter de gate meer focusbaar', (() => {
+        const knop = document.getElementById('btn-add');
+        if (!knop) return false;
+        knop.focus();
+        return document.activeElement !== knop;
+      })());
+      app.removeAttribute('inert');
+      truthy('login-gate: zonder inert is de schil gewoon bedienbaar', (() => {
+        const knop = document.getElementById('btn-add');
+        if (!knop) return false;
+        const zichtbaar = knop.style.display !== 'none';
+        if (!zichtbaar) knop.style.display = 'inline-flex';
+        knop.focus();
+        const ok = document.activeElement === knop;
+        if (!zichtbaar) knop.style.display = 'none';
+        return ok;
+      })());
+    } finally {
+      gate.style.display = gOud;
+      if (iOud) app.setAttribute('inert',''); else app.removeAttribute('inert');
+    }
+  })();
 
   // ── terugDoel ── (terug-pijltje in de dossier-kop: waar kom je uit?)
   eq('terugDoel: onthouden pagina',            terugDoel('alvo'),         'alvo');

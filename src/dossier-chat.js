@@ -114,7 +114,10 @@ function buildChatSysteemPrompt(contextTekst){
 // `max` berichten (kostenrem: voorkomt dat een lang gesprek elke beurt groeit) en
 // startend met een user-bericht (Anthropic-eis).
 function _chatMessages(historie, max=10){
-  let h = (historie||[]).slice(-max);
+  // Foutbubbels ERUIT. Die tekst komt van ons ('Kon nu geen antwoord ophalen…') en niet van het
+  // model; als `assistant`-beurt meesturen zou Haiku laten geloven dat hij dat zelf gezegd heeft.
+  // Eerst filteren, dán afkappen — anders telt een foutbubbel wel mee voor de max van tien.
+  let h = (historie||[]).filter(m => !m.fout).slice(-max);
   if(h.length && h[0].rol !== 'user') h = h.slice(1);
   return h.map(m => ({ role: m.rol==='user'?'user':'assistant', content: m.tekst }));
 }
@@ -130,6 +133,13 @@ const CHAT_SUGGESTIES = ['Wat staat er nog open?', 'Wanneer is de laatste ALV af
 function openChat(){
   if(!state._chatHistorie) state._chatHistorie = [];
   if(!state._chatVve) state._chatVve = state.vveCode || '';
+  // Sta je ÓP een VvE-dossier, dan hoort de chat over díé VvE te gaan. `_chatVve` blijft anders
+  // staan op de VvE van een vorig bezoek: de knop heet 'Vraag over deze VvE', maar het paneel
+  // opende met het dossier van een andere vereniging — en de antwoorden zagen er volkomen normaal
+  // uit. Alleen op de dossierpagina; elders is de laatst gekozen VvE juist de bedoeling.
+  // `setChatVve` maakt het gesprek leeg, dus alleen aanroepen als het echt een andere VvE is.
+  const opDossier = document.querySelector('.page.active')?.id === 'page-vve';
+  if(opDossier && state.vveCode && state.vveCode !== state._chatVve) setChatVve(state.vveCode);
   renderChat();
   const bg = document.getElementById('chat-bg');
   // Het paneel hangt onder de bovenbalk. Die staat niet altijd op dezelfde hoogte: in de
@@ -211,7 +221,11 @@ async function vraagChat(){
         ? `${e.message}. Probeer het zo nog eens.`
         : 'Kon nu geen antwoord ophalen. Probeer het later opnieuw.';
     if(state._chatVve !== vveBijStart || state._chatHistorie !== gesprek) return;  // omgeschakeld
-    gesprek.push({ rol:'assistant', tekst });
+    // `fout:true` zodat `_chatMessages` deze bubbel NIET als antwoord van het model meestuurt.
+    // Zonder die vlag kreeg Haiku bij de volgende vraag te zien dat hij zelf 'Kon nu geen antwoord
+    // ophalen' zou hebben gezegd — een beurt die hij nooit heeft geproduceerd, en waar hij zich
+    // vervolgens naar gaat gedragen ('zoals ik al zei kan ik daar niet bij').
+    gesprek.push({ rol:'assistant', tekst, fout:true });
   }finally{
     state._chatBezig = false; renderChat();
   }

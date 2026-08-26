@@ -273,7 +273,11 @@ function renderHeroChart(metric,period){
   const fullN=n*2;
   let rows,dateField,color,title;
   if(metric==='vergader'){
-    rows=D.alfa||[]; dateField='datum'; color=acColor(); title='Vergaderingen uitgeschreven';
+    // 'afgerond' en niet 'uitgeschreven'. De bron is "ALV's afgerond", en de datum daarin is de dag
+    // waarop het Notulen-vinkje gezet werd — dus wanneer WIJ de vergadering afvinkten, niet wanneer
+    // de uitnodiging de deur uit ging. Dezelfde rechtzetting als bij 'Laatst gehouden ALV' in het
+    // VvE-dossier: de meting blijft precies zoals hij is, alleen het label loog.
+    rows=D.alfa||[]; dateField='datum'; color=acColor(); title='Vergaderingen afgerond';
   }else{
     rows=SKEYS.flatMap(s=>D.af[s]||[]); dateField='datum'; color='#047857'; title='Taken afgerond';
   }
@@ -414,7 +418,7 @@ function buildAnalytics(){
   _try('periode-bar',()=>renderPeriodBar());
   _try('metric-toggle',()=>renderMetricToggle());
 
-  // ── KPI 1: Vergaderingen uitgeschreven (D.alfa, per periode)
+  // ── KPI 1: Vergaderingen afgerond (D.alfa, per periode) — zie de toelichting bij `title` hierboven
   _try('kpi-vergader',()=>{
     const vSeries=seriesByPeriod(D.alfa||[],'datum',state.anaPeriod,SPARK_BUCKETS);
     const vTrend=computeTrend(vSeries);

@@ -143,6 +143,8 @@ async function doLogin(){
     state.currentUserEmail=email;
     sessionStorage.setItem('currentUserEmail',email);
     document.getElementById('login-gate').style.display='none';
+    // De schil weer bedienbaar. Zie `logout()` voor waarom `inert` er überhaupt op gaat.
+    document.getElementById('app')?.removeAttribute('inert');
     // De OneSignal-koppeling terugzetten. `logout()` gooit de externe id én alle tags weg, en
     // niets zette ze daarna terug: op een gedeelde computer (of na een uitlog-inlog in hetzelfde
     // tabblad) kwam er daardoor geen enkele pushmelding meer aan, zonder dat het scherm iets
@@ -198,6 +200,12 @@ function logout(reden){
   state.oauthToken=null; state.oauthExpiry=0; state.currentUserEmail=null;
   try{ ['oauthToken','oauthExpiry','currentUserEmail'].forEach(k=>sessionStorage.removeItem(k)); }catch(_){}
   wisCache();   // anders blijft de stand van de vorige gebruiker op een gedeelde computer staan
+  // De schrijf-rem van de leescache weer AAN. `D` en de getekende tabellen blijven na een uitlog
+  // staan (die worden pas bij de eerste verse ronde vervangen), en `doLogin` verbergt de gate
+  // vóórdat die ronde binnen is. Zonder deze regel mocht er in dat venster geschreven worden op
+  // rijnummers uit een cache van de vórige sessie — en `getInsertRow` zou een nieuwe taak dan in
+  // het verkeerde sectieblok zetten. `loadAll` zet hem op false zodra er verse data staat.
+  state._uitCache=true;
   // Meldingen-stand terug naar koude start. Zonder dit zou een volgende gebruiker op dezelfde
   // computer verder werken met de basislijn én de al-getoond-lijst van de vórige: meldingen van
   // vóór zijn sessie zouden alsnog als toast langskomen, of juist stil overgeslagen worden.
@@ -237,6 +245,12 @@ function logout(reden){
   try{ if(window.OneSignal && OneSignal.logout) OneSignal.logout(); }catch(_){}
   state.isSubscribed=false;
   try{ refreshNotifUI(); }catch(_){}
+  // Het inlogscherm is een `position:fixed`-overlay: hij dekt het dashboard alleen VISUEEL af.
+  // Zonder `inert` bleven alle knoppen erachter met Tab bereikbaar én klikbaar via het
+  // toetsenbord — dertig stuks, gemeten — en die knoppen doen echte dingen (verversen, een taak
+  // afronden). `inert` haalt de hele schil uit de tabvolgorde én uit de toegankelijkheidsboom,
+  // in één attribuut. De twee plekken die de gate verbergen halen hem er weer af.
+  const app=document.getElementById('app'); if(app) app.setAttribute('inert','');
   const gate=document.getElementById('login-gate'); if(gate) gate.style.display='';
   toonKaart(); // meteen de login-kaart (geen splash-herhaling bij uitloggen)
   const btn=document.getElementById('login-btn'); if(btn){ btn.classList.remove('is-signing'); btn.disabled=false; }

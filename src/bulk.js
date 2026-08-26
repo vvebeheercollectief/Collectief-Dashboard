@@ -26,7 +26,11 @@ function bulkSelectie(){ return _bulkVolgorde(_sel); }
 
 function toggleBulkMode(){
   state.bulkMode=!state.bulkMode;
-  _sel.clear();
+  // `bulkWis()` en niet alleen `_sel.clear()`: het shift-klik-ANKER is een rij-object dat gewoon in
+  // D.ntd blijft staan. Bleef het hangen, dan pakte de eerste shift-klik ná het opnieuw aanzetten
+  // van 'Selecteren' een heel blok vanaf een rij die de gebruiker in die stand nooit had
+  // aangeklikt — een selectie die hij niet zelf gemaakt heeft, met knoppen die taken afronden.
+  bulkWis();
   document.getElementById('bulk-btn').classList.toggle('on',state.bulkMode);
   renderNtd();
   renderBulkUi();
@@ -537,10 +541,13 @@ async function bulkUndoVerwijderen(items, stand){
 
 // ── Veld-acties: geven / wegleggen / deadline (cel-schrijfacties) ───────
 function bulkVeld(rows,soort,waarde){
+  // Enkelvoud/meervoud, net als de bevestigingsvensters van afronden en verwijderen. De bulk-balk
+  // verschijnt al vanaf één geselecteerde taak, dus '1 taken aan Jer gegeven' was gewoon te lezen.
+  const _n=rows.length, _tk=_n===1?'taak':'taken', _dl=_n===1?'deadline':'deadlines';
   const conf={
-    geven:    { veld:'behandelaar', kolom:()=> BULK_BEH_KOLOM,             titel:`${rows.length} taken aan ${waarde} gegeven`,  icoon:'persoon',  log:'Behandelaar gewijzigd' },
-    wegleggen:{ veld:'opvolgdatum', kolom:()=> OPVOLG_KOLOM,               titel:`${rows.length} taken weggelegd tot ${waarde}`, icoon:'belUit',   log:'Weggelegd' },
-    deadline: { veld:'deadline',    kolom:(r)=>BULK_DEADLINE_KOLOM[r._sec],titel:`${rows.length} deadlines → ${waarde}`,        icoon:'kalender', log:'Deadline gewijzigd' },
+    geven:    { veld:'behandelaar', kolom:()=> BULK_BEH_KOLOM,             titel:`${_n} ${_tk} aan ${waarde} gegeven`,   icoon:'persoon',  log:'Behandelaar gewijzigd' },
+    wegleggen:{ veld:'opvolgdatum', kolom:()=> OPVOLG_KOLOM,               titel:`${_n} ${_tk} weggelegd tot ${waarde}`, icoon:'belUit',   log:'Weggelegd' },
+    deadline: { veld:'deadline',    kolom:(r)=>BULK_DEADLINE_KOLOM[r._sec],titel:`${_n} ${_dl} → ${waarde}`,             icoon:'kalender', log:'Deadline gewijzigd' },
   }[soort];
   // OPPAKKEN: een nieuwe deadline herberekent de opgeslagen prioriteit-kolom F mee
   // (zoals de losse bewerk-flow). Anders blijft F stale voor externe lezers.
@@ -609,6 +616,12 @@ function bulkVeld(rows,soort,waarde){
       }
     };
   };
+  // Eigen ontdubbelsleutel op de TAAKNUMMERS, net als bij afronden en verwijderen. Zonder sleutel
+  // valt showUndoToast terug op titel+tekst, en die zijn hier louter 'aantal + waarde' en een rij
+  // VvE-codes: twee keer dezelfde deadline zetten op dezelfde selectie gaf dus een identieke
+  // sleutel, en dan slikte de ontdubbeling de tweede toast in — inclusief de enige weg terug voor
+  // een handeling die geen bevestigingsvraag heeft.
+  const _undoSleutel=`bulkveld|${soort}|${items.map(i=>i.r.taakId||i.r._row).join('_')}`;
   showUndoToast(conf.titel,items.map(i=>i.code).join(', '),async()=>{
     await state._writeChain;
     if(blokkeerOffline()) return;   // vóór het terugzetten: anders staat het scherm op 'oud' terwijl de Sheet 'nieuw' houdt
@@ -623,7 +636,7 @@ function bulkVeld(rows,soort,waarde){
       ()=>{ items.forEach(it=>{ it.r[conf.veld]=waarde;
               if(oppDl && it.sec==='OPPAKKEN') it.r.prioriteit=berekenPrioriteit(waarde,'OPPAKKEN').prioriteit; }); },
       'Ongedaan maken mislukt');
-  },conf.icoon);
+  },conf.icoon,{sleutel:_undoSleutel});
   backgroundWrite(schrijf('nieuw'),
     ()=>{ items.forEach(it=>{ it.r[conf.veld]=it.oud; if(oppDl && it.sec==='OPPAKKEN') it.r.prioriteit=it.oudPrio; }); },
     'Bulk-actie mislukt');

@@ -147,6 +147,12 @@ export function initModalA11y() {
     const f = _focusbare(open);
     if (!f.length) return;
     const eerste = f[0], laatste = f[f.length - 1];
+    // Eerst: staat de focus HELEMAAL BUITEN het venster? Dat is niet zeldzaam — klik in een open
+    // venster op iets dat geen focus kan krijgen (een kop, een stuk uitleg) en `activeElement`
+    // valt terug op <body>. Dan matchte geen van de twee takken hieronder, greep de val niet in,
+    // en tabde je gewoon de pagina áchter het venster in: bij een bevestigingsvraag over
+    // verwijderen sta je dan met Tab op de knoppen van de lijst eronder.
+    if (!open.contains(document.activeElement)) { e.preventDefault(); (e.shiftKey ? laatste : eerste).focus(); return; }
     if (e.shiftKey && document.activeElement === eerste) { e.preventDefault(); laatste.focus(); }
     else if (!e.shiftKey && document.activeElement === laatste) { e.preventDefault(); eerste.focus(); }
   });

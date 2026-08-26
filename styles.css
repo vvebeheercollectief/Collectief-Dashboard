@@ -508,6 +508,13 @@
     /* tr.snooze-row td{opacity:.55} dempt élke cel; het signaal is juist de reden dat de rij daar
        staat en moet leesbaar blijven. Hogere specificiteit, dus deze wint. */
     tr.snooze-row .cell-sig{opacity:1}
+    /* En om precies dezelfde reden de VASTGEZETTE actiekolom. Die staat op `position:sticky` met
+       een dekkende achtergrond (zie de toelichting bij `#ntd-tbl-wrap tbody td:last-child`), en
+       `opacity` maakt die achtergrond mee doorschijnend — dan schemeren de wegscrollende cellen
+       er op een smal scherm dwars doorheen. De knoppen zelf blijven wél gedempt, zodat de rij nog
+       steeds als 'weggelegd' leest. */
+    tr.snooze-row td:not([colspan]):last-child{opacity:1}
+    tr.snooze-row td:not([colspan]):last-child .acts{opacity:.55}
     /* 'Geen deadline' is geen urgentie meer nu die in de signaal-kolom staat: grijs i.p.v. amber.
        --mut en niet --fnt: op --fnt kwam deze tekst uit op 2,60:1 en dit project dwingt 4,5:1 af
        voor rij-tekst. --mut haalt 5,83 in licht en 6,00 in donker, en dempt nog steeds duidelijk. */
@@ -1133,7 +1140,13 @@
     .of-aann-naam-inp:focus{outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 14%,transparent)}
     .of-aann-st{font-family:inherit;font-size:11px;font-weight:700;color:var(--mut);background:var(--sur);border:1px solid var(--bor);border-radius:20px;padding:3px 11px;cursor:pointer;white-space:nowrap}
     .of-aann-st.in{color:var(--ac-900);background:var(--ac-l);border-color:var(--ac-b)}
-    .of-aann-x{font-size:16px;line-height:1;color:var(--fnt);background:none;border:none;cursor:pointer;padding:0 2px}
+    /* `position:relative` is hier het ANKER voor de aanraakhalo in het @media(pointer:coarse)-blok
+       verderop; zonder hem hangt dat pseudo-element aan de eerste voorouder met een positie. */
+    /* --mut en niet --fnt: op --fnt haalde dit kruisje 2,53:1 in de lichte stand (#9aa1ad op het
+       paneel #fbfcfd) en 3,50:1 in de donkere. Het is een bedienelement met een tekstglyph, dus de
+       eis is 4,5:1 — met --mut wordt dat 5,8:1 licht en 6,0:1 donker. Zelfde reparatie als eerder
+       bij 'Geen deadline' en de zijbalk-labels. */
+    .of-aann-x{font-size:16px;line-height:1;color:var(--mut);background:none;border:none;cursor:pointer;padding:0 2px;position:relative}
     .of-aann-x:hover{color:var(--rd)}
     .of-aann-add{display:flex;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--bor)}
     .of-aann-input{flex:1;height:30px;font-family:inherit;font-size:13px;color:var(--txt);background:var(--sur);border:1px solid var(--bor);border-radius:7px;padding:0 10px}
@@ -1314,6 +1327,12 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,.search-box inpu
      inslikken van een strook buurtekst pure schade zonder winst. */
   .bdl-chev::after{content:'';position:absolute;inset:-6px -1px}
   .bdl-merk::after{content:'';position:absolute;inset:-4px -2px}
+  /* Het kruisje in de aannemerslijst meet 13,6 × 16px — ruim onder de 24px-richtlijn — en het
+     VERWIJDERT meteen, zonder vraag. Naast een misklik op de statuspil ernaast (die alleen
+     'binnen' omzet, en dat is een klik terug) is dit de enige knop in dat paneel die iets
+     onherstelbaars doet. Horizontaal 4px erbij en verticaal 6px: de gap naar de statuspil is 10px
+     en er zit 12px celopvulling rechts, dus de halo raakt geen buur. */
+  .of-aann-x::after{content:'';position:absolute;inset:-6px -4px}
 }
 
 /* ── Mobiel: uitlijning, touch-targets en afbreek-gedrag ── */
@@ -1330,11 +1349,21 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,.search-box inpu
      bewerkscherm. De snelknop is er waar er ruimte voor is. */
   .act-ib{display:none}
   #bulk-balk{left:8px;right:8px;transform:none;flex-wrap:wrap;justify-content:center;max-width:none;bottom:78px}
+  /* De balk wrapt hierboven, en dan staat de knop 'Deadline' zo ver naar rechts dat zijn menu
+     (min-width 170px, uitlijnend op left:0) op 378px buiten het venster valt. #app staat op
+     overflow:hidden, dus dat afgeknipte stuk is niet terug te scrollen. Rechts uitlijnen houdt het
+     menu binnen de balk, die zelf al op left:8/right:8 staat. */
+  .bb-menu{left:auto;right:0}
 }
 @media(max-width:560px){
   #hdr{padding:0 12px;gap:4px}
   .hdr-info p{display:none}
   #toast-container{top:auto;bottom:88px;left:8px;right:8px;max-width:none}
+  /* In de selecteerstand staat de bulk-balk onderaan, en op een telefoon wrapt die naar twee of
+     drie regels (gemeten ±124px hoog vanaf 78px). Een melding op 88px lag daar middenin: de
+     bevestiging van de bulk-actie dekte precies de knoppen af die je net gebruikt had.
+     `body.bulk` bestaat al — bulk.js zet hem aan zolang de stand aanstaat. */
+  body.bulk #toast-container{bottom:210px}
   .stat-strip{padding:8px 14px}
   .stat-item{border-right:none;margin-right:0;padding:8px 0;flex:1 0 45%}
   .modal-bg{padding:8px}

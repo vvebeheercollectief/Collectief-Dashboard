@@ -233,7 +233,10 @@ function cd_opvolgWakker() {
           type: 'n_opvolg',      // eigen type — zie de toelichting bij 'n_herhaal' hierboven
           title: '🔔 Opvolgen vandaag',
           body: code + (naam ? ' · ' + naam : ''),
-          url: APP_URL, dedupKey: 'opvolg-' + code + '-' + cd_ddmmyyyy(today)
+          // Taaknummer (kolom Q) in de sleutel — die waarde wordt het web_push_topic, en twee
+          // taken van dezelfde VvE op dezelfde dag deelden er anders één: de tweede push verving
+          // dan de eerste op het toestel. Terugval op de code voor rijen zonder taaknummer.
+          url: APP_URL, dedupKey: 'opvolg-' + ((data[i][16] || code)) + '-' + cd_ddmmyyyy(today)
         });
       });
     } catch (e) { Logger.log('cd_opvolgWakker rij ' + (i + 1) + ' fout: ' + e); }
@@ -294,7 +297,7 @@ function cd_escaleerStilleDossiers() {
                                  // meeliften op de schakelaar 'Nieuwe taak toegevoegd'
           title: '⚠️ Stil dossier — escalatie',
           body: code + (naam ? ' · ' + naam : '') + ' — ' + dagen + ' dagen geen activiteit (' + (beh || 'geen behandelaar') + ')',
-          url: APP_URL, dedupKey: 'esc2-' + code + '-' + cd_ddmmyyyy(today)
+          url: APP_URL, dedupKey: 'esc2-' + ((vers[16] || code)) + '-' + cd_ddmmyyyy(today)   // taaknummer: zie de toelichting bij 'opvolg-'
         });
       } else if (dagen >= regels.trap1 && esc.indexOf('T1') === -1) {
         cel.setValue('T1:' + cd_ddmmyyyy(today));
@@ -303,7 +306,7 @@ function cd_escaleerStilleDossiers() {
             type: 'n_escalatie',
             title: '🔕 Stil dossier — ' + dagen + ' dagen geen activiteit',
             body: code + (naam ? ' · ' + naam : ''),
-            url: APP_URL, dedupKey: 'esc1-' + code + '-' + cd_ddmmyyyy(today)
+            url: APP_URL, dedupKey: 'esc1-' + ((vers[16] || code)) + '-' + cd_ddmmyyyy(today)   // idem
           });
         });
       }

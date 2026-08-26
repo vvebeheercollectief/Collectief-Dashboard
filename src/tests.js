@@ -4442,6 +4442,11 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   eq('pasToe lijst op één regel zonder selectie', pasToe('een', 1, 1, 'lijst').tekst, '- een');
   // de knop moet ook werken op een regel midden in een langere notitie
   eq('pasToe lijst pakt alleen de geraakte regel', pasToe('kop\nmidden\nslot', 5, 5, 'lijst').tekst, 'kop\n- midden\nslot');
+  // GEMENGDE selectie: een paar regels hebben al een streepje, een paar niet. `alAan` is dan false
+  // (niet álle regels staan aan), dus de knop zet ze aan — maar de regels die er al één hadden
+  // kregen er nog één bij: '- - schilderwerk'.
+  eq('pasToe lijst zet geen tweede streepje op een regel die er al één heeft',
+     pasToe('- een\ntwee\n- drie', 0, 18, 'lijst').tekst, '- een\n- twee\n- drie');
 
   truthy('opmaakBalk heeft alle drie de knoppen',
     opmaakBalk().includes('data-action="opmaak-vet"') &&

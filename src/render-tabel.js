@@ -31,42 +31,75 @@ const HEEFT_SIGNAAL_KOLOM = SKEYS.filter(s => SECS[s].cols.includes('Signaal'));
 // Sorteerbare koppen worden een echte knop (toetsenbord-bedienbaar) met pijl + aria-sort op de th.
 // De breedte die elke kolom in de <colgroup> krijgt, als CSS-waarde.
 //
-// Een getal is een GEWICHT en wordt een percentage. Een string als '155px' legt een ONDERGRENS
-// vast: bij de smalste tabel is die kolom precies zo breed, ongeacht hoe de gewichten eromheen
-// staan. Dat is nodig voor de datumkolommen, want "22 september 2026" is 128px en moet er altijd
-// in passen — met alleen gewichten was dat een som die bij elke bijstelling opnieuw moest kloppen.
+// Een getal is een GEWICHT en wordt een percentage. Een string als '155px' is een VASTE breedte:
+// die kolom is altijd precies zo breed. Dat is nodig voor de datumkolommen, want
+// "22 september 2026" is 128px en moet er altijd in passen.
 //
-// LET OP wat het NIET doet. Een px-kolom blijft niet op 155 staan. Bij `table-layout:fixed`
-// verdeelt de browser de ruimte bóven de opgegeven som GELIJK over alle kolommen, ook over die met
-// een pixelbreedte — gemeten: 155px bij een tabel van 1150, 220px bij een tabel van 1650. Er is
-// binnen een vaste kolomindeling geen manier om een kolom écht te pinnen. De winst is dus de
-// ondergrens, niet een plafond.
+// DE SOM MOET PRECIES DE TABEL VULLEN, EN DAT KAN ALLEEN MET DE ECHTE BREEDTE ERBIJ. Bij
+// `table-layout:fixed` verdeelt de browser wat er bóven de opgegeven som overschiet GELIJK over
+// álle kolommen — ook over de px-kolommen, die daar niets mee doen. Eerder werden de gewichten
+// omgerekend tegen de smalste tabel (1150px); op een breder venster schoot er dus ruimte over en
+// kreeg elke kolom er evenveel bij. Gemeten bij een tabel van 1650px: de deadline stond op 216px
+// voor een datum van 85px en de actiekolom op 211px voor 127px aan knoppen — twee gaten in de rij,
+// terwijl het actiepunt en de opmerkingen ernaast werden afgekapt. Daarom krijgt kolBreedtes() de
+// GEMETEN tabelbreedte mee: px-kolommen blijven op hun getal en de gewichten delen exact de rest.
 //
-// De gewichten delen wat er ná de vaste kolommen overblijft, gerekend bij TABEL_MIN — de smalste
-// stand die de tabel kan aannemen (styles.css houdt hem daar op).
+// EN NIET MET calc(). `calc((100% - 410px) * 0.29)` op een <col> is geldige CSS en Chrome neemt
+// hem netjes over, maar in een vaste kolomindeling behandelt hij zo'n kolom als `auto` — gemeten:
+// alle vijf de gewichtskolommen kwamen op exact dezelfde 248px uit. Vandaar het narekenen in JS.
 const TABEL_MIN = 1150;   // gelijk houden aan `min-width` van #ntd-tbl-wrap table in styles.css
-function kolBreedtes(breedtes){
+function kolBreedtes(breedtes, tabelBreedte){
   const isPx = w => typeof w === 'string';
+  const breedte = Math.max(TABEL_MIN, tabelBreedte || 0);
   const pxTotaal = breedtes.filter(isPx).reduce((a,w) => a + (parseFloat(w) || 0), 0);
-  const restAandeel = Math.max(0, 100 - (pxTotaal / TABEL_MIN * 100));
+  const restAandeel = Math.max(0, 100 - (pxTotaal / breedte * 100));
   const gewichtSom = breedtes.filter(w => !isPx(w)).reduce((a,b) => a + b, 0);
   return breedtes.map(w => isPx(w) ? w
     : (gewichtSom > 0 ? (w / gewichtSom * restAandeel).toFixed(3) + '%' : 'auto'));
 }
 
-// `breedtes` (optioneel) zijn GEWICHTEN, één per kolom. Ze worden hier omgerekend naar
-// percentages en als <colgroup> vóór de kop gezet. Dat werkt alleen samen met `table-layout:fixed`
-// (styles.css, alleen op de NTD-tabel): zonder dat deelt de browser de ruimte zelf uit en negeert
-// hij de colgroup zodra de inhoud breder wil. Omrekenen en niet hardcoderen, zodat het bulk-vinkje
-// er als extra kolom tussen kan schuiven zonder dat alle getallen opnieuw moeten kloppen.
+// De percentages hangen aan de gemeten tabelbreedte, dus ze moeten opnieuw gezet worden zodra die
+// verandert. Alleen de <colgroup> wordt herschreven — de rijen blijven staan, dus dit is geen
+// hertekening van de tabel. `_kolLaatste` voorkomt werk als de breedte niet echt veranderde.
+let _kolTabel = null, _kolGewichten = null, _kolLaatste = 0, _kolObs = null, _kolTimer = null;
+
+function herzetKolomBreedtes(){
+  if(!_kolTabel || !_kolGewichten || !_kolTabel.isConnected) return;
+  const b = Math.round(_kolTabel.getBoundingClientRect().width);
+  if(!b || b === _kolLaatste) return;
+  _kolLaatste = b;
+  const cg = kolBreedtes(_kolGewichten, b).map(w => `<col style="width:${w}">`).join('');
+  _kolTabel.querySelector('colgroup')?.remove();
+  _kolTabel.insertAdjacentHTML('afterbegin', `<colgroup>${cg}</colgroup>`);
+}
+
+// Twee wekkers, met opzet allebei. Een `resize` van het venster is de gewone weg; de
+// ResizeObserver vangt de gevallen waarin de tabel van maat verandert zónder dat het venster dat
+// doet (een tabblad dat zichtbaar wordt, de zijbalk die inklapt). In de preview-tab tikt een
+// ResizeObserver niet altijd door — daarom is `resize` er ook, en roepen de toetsen
+// herzetKolomBreedtes() rechtstreeks aan.
+if(typeof window !== 'undefined' && typeof window.addEventListener === 'function'){
+  window.addEventListener('resize', () => {
+    clearTimeout(_kolTimer);
+    _kolTimer = setTimeout(herzetKolomBreedtes, 80);
+  });
+}
+
 function renderThead(id,cols,css,sort,breedtes){
   const kf=sort&&sort.keyFor;
-  const cg=(breedtes && breedtes.length===cols.length)
-    ? `<colgroup>${kolBreedtes(breedtes).map(w=>`<col style="width:${w}">`).join('')}</colgroup>`
-    : '';
-  // De colgroup hoort in de <table>, niet in de <thead>. Hij wordt daarom apart geplaatst.
+  // De colgroup hoort in de <table>, niet in de <thead>. Hij wordt daarom apart geplaatst, en
+  // door herzetKolomBreedtes() — die meet de tabel en kan later opnieuw langskomen bij een
+  // vensterwijziging.
   const tbl=document.getElementById(id).closest('table');
-  if(tbl){ tbl.querySelector('colgroup')?.remove(); if(cg) tbl.insertAdjacentHTML('afterbegin', cg); }
+  if(tbl){
+    tbl.querySelector('colgroup')?.remove();
+    _kolTabel     = tbl;
+    _kolGewichten = (breedtes && breedtes.length===cols.length) ? breedtes : null;
+    _kolLaatste   = 0;                       // dwing een verse berekening af
+    herzetKolomBreedtes();
+    if(!_kolObs && typeof ResizeObserver === 'function') _kolObs = new ResizeObserver(herzetKolomBreedtes);
+    if(_kolObs){ _kolObs.disconnect(); _kolObs.observe(tbl); }
+  }
   document.getElementById(id).innerHTML=`<tr>${cols.map(c=>{
     const key=kf?kf(c):null;
     if(!key) return `<th style="${css}">${c}</th>`;
@@ -471,4 +504,4 @@ function renderPag(id,total,cur,doel){
     </div>`;
 }
 
-export { renderThead, renderTbody, bepaalStil, bouwStilIndex, _zetStilIndex, signaalDelen, deadlineCel, rowNtd, rowAf, renderPag };
+export { renderThead, herzetKolomBreedtes, kolBreedtes, renderTbody, bepaalStil, bouwStilIndex, _zetStilIndex, signaalDelen, deadlineCel, rowNtd, rowAf, renderPag };

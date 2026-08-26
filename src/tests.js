@@ -27,6 +27,7 @@ import { SPLASH_MS, _setFase } from "./login-splash.js";
 import { opmaakHtml, htmlNaarMarkers, zonderOpmaak, pasToe, opmaakBalk } from "./opmaak.js";
 import { goTo, applyTheme } from "./ui.js";
 import { checkSecties, checkRaster, checkRasters, checkNummers, checkAlles, ernstigeBevindingen, RASTER_MIN } from "./structuurcheck.js";
+import { herzetKolomBreedtes, kolBreedtes } from "./render-tabel.js";
 import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from "./subsidie-fase.js";
 import { toggleHerhaalStatus, renderHerhaal, openHerhaalModal, deleteHerhaal } from "./render-herhaal.js";
 import { openSnoozeModal, snoozeOpslaan, closeSnoozeModal } from "./snooze.js";
@@ -1060,16 +1061,16 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         truthy(`kolombreedte: ${sec} heeft alleen geldige breedtes`,
                (SECS[sec].breedtes || []).every(w =>
                  (Number.isFinite(w) && w > 0) || (typeof w === 'string' && /^\d+px$/.test(w))));
-        // Drie soorten kolommen hebben een ondergrens in pixels: de VvE-code (kan een kenmerk
+        // Drie soorten kolommen hebben een VASTE breedte in pixels: de VvE-code (kan een kenmerk
         // dragen), de datum(s), en de actiekolom (vier knoppen van 28px). Offerte heeft twee
         // datums, dus daar zijn het er vier in plaats van drie. Zonder deze toets kan zo'n
-        // ondergrens stil weer een gewicht worden en loopt de inhoud de buurkolom in — precies
+        // breedte stil weer een gewicht worden en loopt de inhoud de buurkolom in — precies
         // wat er bij een venster van 1440 gebeurde: het vinkje viel van de rij af.
-        // Vier ondergrenzen op de tabbladen mét signaal-kolom (code, signaal, datum, acties),
-        // vier op Offerte (code, twee datums, acties) en drie op Subsidie (code, datum, acties).
-        eq(`kolombreedte: ${sec} houdt zijn krappe kolommen op een ondergrens`,
+        // En andersom: Signaal hoort GEEN px te zijn. Sinds de breedtes met calc() worden gezet is
+        // px een plafond, en dan kapt "Te laat (47d) Vandaag opvolgen" op een breed scherm af.
+        eq(`kolombreedte: ${sec} houdt zijn krappe kolommen op een vaste breedte`,
            (SECS[sec].breedtes || []).filter(w => typeof w === 'string').length,
-           sec === 'SUBSIDIE-TRAJECTEN' ? 3 : 4);
+           sec === 'OFFERTE-TRAJECTEN' ? 4 : 3);
         // De eerste kolom (VvE Code) en de laatste (acties) moeten allebei zo'n ondergrens hebben.
         const _b = SECS[sec].breedtes || [];
         truthy(`kolombreedte: ${sec} — code- en actiekolom staan allebei vast`,
@@ -1093,17 +1094,89 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         eq('kolombreedte: de tekstklem volgt de cel, niet een vast getal',
            ct ? getComputedStyle(ct).maxWidth : null, '100%');
       })();
-      // Percentages plus vaste pixels moeten samen precies de tabel vullen: de percentages delen
-      // wat er ná de px-kolommen overblijft, gerekend bij de smalste tabelbreedte (1150). Telt het
-      // op tot méér dan 100%, dan wordt de laatste kolom eraf geduwd; tot minder, dan blijft er
-      // rechts een gat staan.
+      // Vaste pixels plus percentages moeten samen precies de tabel vullen — bij ELKE breedte, niet
+      // alleen bij de smalste. Telt het op tot méér dan 100%, dan wordt de laatste kolom eraf
+      // geduwd; tot minder, en de browser verdeelt het restant gelijk over álle kolommen — ook
+      // over de px-kolommen, en dan staan de gaten er weer.
       truthy('kolombreedte: vaste pixels en percentages vullen samen de tabel', (() => {
-        if(!_cg) return false;
-        const w   = [...(_cg.children)].map(c => c.style.width);
+        const cg = document.querySelector('#ntd-tbl-wrap table colgroup');
+        const br = document.querySelector('#ntd-tbl-wrap table');
+        if(!cg || !br) return false;
+        const breedte = Math.max(1150, Math.round(br.getBoundingClientRect().width));
+        const w   = [...(cg.children)].map(c => c.style.width);
         const px  = w.filter(v => v.endsWith('px')).reduce((a, v) => a + parseFloat(v), 0);
         const pct = w.filter(v => v.endsWith('%')).reduce((a, v) => a + parseFloat(v), 0);
-        return Math.abs(pct + (px / 1150 * 100) - 100) < 0.05;
+        return Math.abs(pct + (px / breedte * 100) - 100) < 0.05;
       })());
+      // kolBreedtes() los van de DOM: de px-kolommen blijven op hun getal en de percentages vullen
+      // samen met die pixels precies de tabel — bij elke breedte die je erin stopt.
+      (() => {
+        const b = ['100px', 1, 3, '100px'];
+        const smal = kolBreedtes(b, 1150), breed = kolBreedtes(b, 1650);
+        eq('kolBreedtes: een px-kolom blijft staan, ongeacht de tabelbreedte',
+           [smal[0], breed[0], smal[3], breed[3]], ['100px', '100px', '100px', '100px']);
+        const som = (w, br) => w.reduce((a, v) =>
+          a + (v.endsWith('px') ? parseFloat(v) : parseFloat(v) / 100 * br), 0);
+        truthy(`kolBreedtes: de som vult de tabel bij 1150 (${Math.round(som(smal, 1150))})`,
+               Math.abs(som(smal, 1150) - 1150) < 1);
+        truthy(`kolBreedtes: de som vult de tabel bij 1650 (${Math.round(som(breed, 1650))})`,
+               Math.abs(som(breed, 1650) - 1650) < 1);
+        // Tegenproef: de gewichtskolommen moeten bij een bredere tabel ook écht breder worden,
+        // anders zou een functie die alles op de px-waarde vastzet ook groen zijn.
+        truthy('kolBreedtes: de gewichtskolommen krijgen de extra ruimte',
+               parseFloat(breed[2]) / 100 * 1650 - parseFloat(smal[2]) / 100 * 1150 > 300);
+        // Onder de minimumbreedte rekent hij met 1150, want daar houdt de CSS de tabel op.
+        eq('kolBreedtes: onder de minimumbreedte rekent hij met 1150', kolBreedtes(b, 600), smal);
+      })();
+
+      // ── Op een BREED scherm blijven de vaste kolommen staan ──
+      // Dit is de klacht die het calc() opleverde: bij een tabel van 1650px stond de deadline op
+      // 216px voor een datum van 85px en de actiekolom op 211px voor 127px aan knoppen, terwijl
+      // het actiepunt en de opmerkingen ernaast werden afgekapt. `table-layout:fixed` verdeelt
+      // ruimte bóven de opgegeven som namelijk GELIJK over álle kolommen. Meet daarom bij een
+      // afgedwongen brede tabel, niet bij het venster van de testrunner: op de smalste stand is
+      // deze toets groen om de verkeerde reden.
+      (() => {
+        const vNtd4 = D.ntd.OPPAKKEN, vA4 = state.activeNtd, vPg4 = pgs.ntd;
+        const breed = document.createElement('style');
+        breed.textContent = '#ntd-tbl-wrap{width:1650px !important}';
+        document.head.appendChild(breed);
+        try{
+          D.ntd.OPPAKKEN = [{ code:'BRD-1', naam:'VvE Breed Scherm', actiepunt:'x',
+                              deadline:'22 september 2026', behandelaar:'Jer', opmerkingen:'x',
+                              inBehandeling:'', _sec:'OPPAKKEN', _row:9701 }];
+          pgs.ntd = 1; setNtd('OPPAKKEN');
+          // De colgroup hangt aan de GEMETEN tabelbreedte. De klem hierboven verandert die maat na
+          // de render, en de wekkers die dat normaal opvangen (`resize`, ResizeObserver) tikken in
+          // de testtab niet betrouwbaar door — dus hier rechtstreeks herrekenen.
+          herzetKolomBreedtes();
+          const ths2 = [...document.querySelectorAll('#ntd-thead th')];
+          const br = kop => {
+            const th = ths2.find(t => t.textContent.trim().replace(/[▲▼]$/, '') === kop);
+            return th ? Math.round(th.getBoundingClientRect().width) : -1;
+          };
+          const acties = ths2.length ? Math.round(ths2[ths2.length - 1].getBoundingClientRect().width) : -1;
+          const dl = br('Deadline'), code = br('VvE Code');
+          truthy(`kolombreedte: op 1650px blijft de deadline-kolom 155px (${dl})`,
+                 Math.abs(dl - 155) <= 1);
+          truthy(`kolombreedte: op 1650px blijft de actiekolom 150px (${acties})`,
+                 Math.abs(acties - 150) <= 1);
+          truthy(`kolombreedte: op 1650px blijft de codekolom 105px (${code})`,
+                 Math.abs(code - 105) <= 1);
+          // ... en de ruimte die dat oplevert gaat naar de tekstkolommen. Zonder deze tegenproef
+          // zou een tabel die per ongeluk smaller wordt dan 1650 ook groen zijn.
+          const act = br('Actiepunt'), opm = br('Opmerkingen'), sig = br('Signaal');
+          truthy(`kolombreedte: op 1650px krijgt het actiepunt de vrijgekomen ruimte (${act})`,
+                 act >= 300);
+          truthy(`kolombreedte: op 1650px groeien ook opmerkingen en signaal mee `
+                 + `(${opm} / ${sig})`, opm >= 200 && sig >= 200);
+        } finally {
+          breed.remove();
+          if(vNtd4 === undefined) delete D.ntd.OPPAKKEN; else D.ntd.OPPAKKEN = vNtd4;
+          state.activeNtd = vA4; pgs.ntd = vPg4; setNtd(vA4);
+        }
+      })();
+
       // In bulkmodus komt er een kolom bij; die moet meetellen in de colgroup.
       (() => {
         const vBulk = state.bulkMode;
@@ -1137,6 +1210,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
                             opvolgdatum:'', behandelaar:'Jer', opmerkingen:'', inBehandeling:'',
                             _sec:sec, _row:9901 }];
             pgs.ntd = 1; setNtd(sec);
+            herzetKolomBreedtes();   // zie de brede-scherm-toets: de klem verandert de maat ná de render
             const ths = [...document.querySelectorAll('#ntd-thead th')];
             const tr  = document.querySelector('#ntd-tbody tr[data-row]');
             truthy(`datumbreedte: ${sec} tekent de rij`, !!tr);
@@ -4241,7 +4315,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '11.0');
+  eq('versie opgehoogd', APP_VERSION, '11.1');
 
   // ── Pushmeldingen: de twee schakels die stil kapot waren (audit 2026-08-06) ──
   // Beide defecten waren onzichtbaar: de app meldde "Notificaties zijn aan!" terwijl er nooit

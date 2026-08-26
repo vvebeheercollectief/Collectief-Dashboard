@@ -5,7 +5,7 @@ import { ALLOWED_EMAILS } from '../allowed-emails.js';
 
 // ── Versie (zichtbaar in de UI) ────────────────────────────────────────
 // Ophogen bij ELKE wijziging: 4.1, 4.2, … 5.0 voor grote sprongen.
-export const APP_VERSION = '11.0';
+export const APP_VERSION = '11.1';
 
 // ── Omgeving (productie vs. testomgeving) ──────────────────────────────
 // Fail-safe: alleen deze exacte hosts zijn PRODUCTIE; al het andere
@@ -77,30 +77,35 @@ export const KORTE_NAMEN = {
 // 128px in IBM Plex Mono, en `.s-normal` is `white-space:nowrap` in een cel met `overflow:visible`
 // — de datum werd dus niet afgekapt maar óver de buurkolom heen getekend. Sheets levert lange
 // Nederlandse datums (zie _parseAnyDate), dus dat is de normale vorm en niet de uitzondering.
-// Elke datumkolom heeft daarom een ONDERGRENS in pixels ('155px') in plaats van een gewicht dat
-// bij elke bijstelling opnieuw moest kloppen. Let op: dat pint hem niet vast — een vaste
-// kolomindeling verdeelt extra ruimte gelijk over álle kolommen, dus boven de smalste stand groeit
-// hij gewoon mee. Zie kolBreedtes() in render-tabel.js voor wat het wél en niet doet.
+// Elke datumkolom heeft daarom een VASTE breedte in pixels ('155px') in plaats van een gewicht dat
+// bij elke bijstelling opnieuw moest kloppen.
 //
-// DRIE SOORTEN KOLOMMEN HEBBEN ZO'N ONDERGRENS. Alle drie omdat hun inhoud een bekende
-// minimumbreedte heeft die niet mag afkappen, gemeten op een venster van 1440 (waar de tabel op
-// zijn smalst staat):
+// EEN PX-BREEDTE IS EEN PLAFOND, GEEN ONDERGRENS (sinds v11.1). kolBreedtes() rekent de
+// gewichten om tegen de GEMETEN tabelbreedte, dus alles telt bij élke vensterbreedte op tot
+// precies 100% en een px-kolom blijft op zijn getal staan. Daarvóór werd er gerekend tegen de
+// smalste tabel (1150px); wat er op een breed scherm overschoot verdeelde de browser GELIJK over
+// álle kolommen, dus ook over de px-kolommen. Gemeten bij een tabel van 1650px: de deadline stond
+// op 216px voor een datum van 85px en de actiekolom op 211px voor 127px aan knoppen — twee gaten
+// in de rij, terwijl het actiepunt en de opmerkingen ernaast werden afgekapt.
+//
+// KIES px DUS ALLEEN ALS DE INHOUD EEN BEKEND MAXIMUM HEEFT, want de kolom groeit nooit meer mee:
 //   VvE Code  105px — de code kan een kenmerk dragen ("121034 - G"); op 7% liep hij er 19px uit.
 //   datums    155px — "22 september 2026" is 128px.
 //   acties    150px — vier knoppen van 28px plus de tussenruimte; op 9% viel het vinkje eraf.
 //                     Offerte-trajecten heeft er drie en houdt het op 120px.
-//   Signaal   150px — "Vandaag opvolgen" is 107px en liep er op de echte productiedata bij een
-//                     venster van 1440 achtentwintig pixel uit. 150 en niet 140: op 140 paste hij
-//                     precies niet meer (gemeten: 5 rijen met een afgekapte hoofdmelding, op 150
-//                     nul). Alleen op de drie tabbladen die de kolom hebben.
+// Alle andere kolommen dragen tekst die langer kan worden en krijgen een gewicht — óók Signaal.
+// Die stond op '150px' toen dat nog een ondergrens was; als plafond zou "Te laat (47d) Vandaag
+// opvolgen" op een breed scherm gaan afkappen terwijl er ruimte zat is. De gewichten 20,1 / 19,4 /
+// 21,4 zijn zo gekozen dat de kolom bij de smalste tabel (1150px) nog altijd 150px meet — dat was
+// de gemeten ondergrens: op 140 hielden vijf rijen een afgekapte hoofdmelding over, op 150 nul.
 export const SECS = {
   OPPAKKEN:{label:'Oppakken',css:'--sec:var(--ac);--sec-l:var(--ac-l);--sec-b:var(--ac-b)',color:'#0D7377',
     cols:['VvE Code','VvE','Signaal','Actiepunt','Deadline','Wie','Opmerkingen'],
-                   breedtes:['105px',23,'150px',29,'155px',7,20,'150px'],
+                   breedtes:['105px',23,20.1,29,'155px',7,20,'150px'],
     keys:['code','naam','actiepunt','deadline','behandelaar','prioriteit','opmerkingen','inBehandeling']},
   VERGADERVERZOEKEN:{label:'Vergaderverzoeken',css:'--sec:var(--am);--sec-l:var(--am-l);--sec-b:var(--am-b)',color:'#B45309',
     cols:['VvE Code','VvE','Signaal','Periode','Agendapunten','Wie','Deadline uitschr.','Opmerkingen'],
-                   breedtes:['105px',21,'150px',9,18,7,'155px',21,'150px'],
+                   breedtes:['105px',21,19.4,9,18,7,'155px',21,'150px'],
     keys:['code','naam','periode','agendapunten','behandelaar','deadline','opmerkingen','inBehandeling']},
   'OFFERTE-TRAJECTEN':{label:'Offerte-trajecten',css:'--sec:var(--pu);--sec-l:var(--pu-l);--sec-b:var(--pu-b)',color:'#6D5BD0',
     cols:['VvE Code','VvE','Datum aangevr.','Ontvangen/Aangevr.','Behandelaar','Deadline','Opmerkingen'],
@@ -108,7 +113,7 @@ export const SECS = {
     keys:['code','naam','datumAangevraagd','offertes','behandelaar','deadline','opmerkingen']},
   LOD:{label:'LOD',css:'--sec:var(--rd);--sec-l:var(--rd-l);--sec-b:var(--rd-b)',color:'#B91C1C',
     cols:['VvE Code','VvE','Signaal','Actiepunt','Status','Wie','Deadline LOD','Opmerkingen'],
-                   breedtes:['105px',19,'150px',24,18,7,'155px',16,'150px'],
+                   breedtes:['105px',19,21.4,24,18,7,'155px',16,'150px'],
     keys:['code','naam','actiepunt','status','behandelaar','deadline','opmerkingen','inBehandeling']},
   // Subsidie-trajecten (2026-07-29). Zelfde kolomstramien als LOD, met 'Status'
   // vervangen door 'Fase'. Twee dingen liggen hier vast en mogen niet losjes wijzigen:

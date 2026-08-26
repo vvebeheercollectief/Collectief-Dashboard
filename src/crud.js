@@ -722,12 +722,15 @@ async function deleteCurrentEditTask(){
 // al onder de gebruiker vandaan sluiten (de aanroeper deed dat toen zélf, nog vóór deze functie
 // begon), dus dáár verandert dit traject niets aan. De vraag is de enige nieuwe afbreekweg.
 async function deleteTaskRow(r, bijDoorgaan){
-  // Eerst her-ankeren, net als `doCompleteTask` en `_bewerkRijVers` dat doen. De ingang vanuit een
-  // getekende rij levert een object uit `state._rowCache`, en die cache loopt uit de pas met D:
-  // `loadAll` zet élke ronde verse rij-objecten in D, terwijl `renderAll` (en dus de cache) alleen
-  // draait bij een gewijzigde datahash. Bleef de inhoud gelijk, dan wees dit object nergens meer
-  // naar in D.ntd — `arr.indexOf(r)` gaf -1, de rij bleef ná het verwijderen gewoon in de lijst
-  // staan, en de rollback zette hem er bij een fout als TWEEDE exemplaar bij.
+  // Her-ankeren als VANGNET. Vandaag komt hier maar één ingang binnen — `deleteCurrentEditTask`,
+  // en die heeft zijn rij al door `_bewerkRijVers` gehaald — dus in de praktijk slaat dit blok
+  // nooit aan. Het staat er voor de tweede ingang: tot v8.9 zat er een verwijderknop in de rij
+  // zelf (zie de toelichting bij `taakUitCache`), en zo'n knop levert een object uit
+  // `state._rowCache`. Die cache loopt uit de pas met D — `loadAll` zet élke ronde verse
+  // rij-objecten in D, terwijl `renderAll` (en dus de cache) alleen draait bij een gewijzigde
+  // datahash. Wijst het object nergens meer naar in D.ntd, dan geeft `arr.indexOf(r)` -1: de rij
+  // blijft ná het verwijderen in de lijst staan en de rollback zet hem er bij een fout als TWEEDE
+  // exemplaar bij. Dat is te duur om aan de aanroeper over te laten.
   if(r && SECS[r._sec] && _verseRijIdx(r, D.ntd[r._sec])<0){
     const vers=_herankerRij(r, D.ntd);
     if(!vers){
@@ -1562,6 +1565,7 @@ async function zetSubsidieFase(rid, stap){
 export {
   openModal, editRow, closeModal, fillModalFields, setv, clearModal, kiesSectie,
   getSheetIds, _sheetBreedtes, getInsertRow, bevestigInvoegPlek, insertAndWriteRow, insertAndWriteRows, deleteCurrentEditTask, deleteTaskRow,
+  _naamBijCode, _zetNaamVeld,
   getAfInsertRow, completeTask, completeCurrentEditTask, doCompleteTask, closeCompleteModal, submitTask, gv,
   OMSCHRIJVING_VELD, zetOmschrijving, taakUitCache,
   _verseRijIdx, _herankerRij, zetSubsidieFase, kiesModalFase, _modalFaseWoord,

@@ -7,7 +7,7 @@ import { SKEYS, SECS, APP_VERSION, ALLOWED_EMAILS } from "./config.js";
 import { fetchSheet, fetchSheets, _withRetry, isOffline } from "./api.js";
 import { ensureToken, doOAuth, fetchUserEmail, logout } from "./auth.js";
 import { buildAnalytics, buildDash } from "./render-analytics.js";
-import { renderNtdDonut } from "./render-lijsten.js";
+import { renderNtdDonut, renderNtd } from "./render-lijsten.js";
 // Kringverwijzing data ⇄ bulk, net als data ⇄ main en ui ⇄ bulk: bulk.js haalt backgroundWrite en
 // loadAll hiervandaan. Allebei worden ze pas op RUNTIME aangeroepen, dus de live bindings van
 // ES-modules dekken dit — er staat aan geen van beide kanten iets op moduleniveau dat de ander
@@ -710,8 +710,13 @@ async function _loadRonde(silent){
           // Zichtbaar melden, net als de kopStuk-tak in `_verwerkMeldingen`. Vanaf hier komt er
           // deze sessie GEEN enkele melding meer binnen, en stilte is daar niet van 'er gebeurde
           // niets' te onderscheiden — juist bij meldingen is dat het gevaarlijke misverstand.
-          showToast('Meldingen staan uit','Het tabblad Meldingen is niet leesbaar. Herlaad de pagina om ze terug te krijgen.',
-                    'var(--am)','waarschuwing',{geenDedup:true,geenSysteemmelding:true});
+          // In een EIGEN try: deze aanroep staat binnen de try die `R` vult, en gooit hij (een
+          // ontbrekend toast-element, een fout in de render), dan zou de zojuist geslaagde lezing
+          // in de catch eronder alsnog worden weggegooid.
+          try{
+            showToast('Meldingen staan uit','Het tabblad Meldingen is niet leesbaar. Herlaad de pagina om ze terug te krijgen.',
+                      'var(--am)','waarschuwing',{geenDedup:true,geenSysteemmelding:true});
+          }catch(toastFout){ console.warn('[meldingen] melding niet getoond:', toastFout); }
         }catch(e2){ R=null; laatste=e2; }
       }
       if(!R){
@@ -822,7 +827,13 @@ async function _loadRonde(silent){
     // niets in de Sheet (de normale uitkomst van handmatig verversen), dan bleef de selectie
     // wijzen naar de rij-objecten van vóór de ronde, terwijl D er verse heeft. De teller telde
     // die spoken gewoon mee.
-    if(bulkHerstel(D.ntd)) renderBulkUi();
+    if(bulkHerstel(D.ntd)){
+      // ÉN de tabel hertekenen. De vinkjes worden getekend uit `_sel`, dus zonder deze render
+      // bleven ze aangevinkt staan terwijl de selectie al leeg was — en dat is precies de
+      // spookselectie die deze opruiming moest wegnemen. `renderNtd` roept `bulkHerstel` zelf
+      // nog eens aan; die tweede keer valt er niets meer weg.
+      renderNtd(); renderBulkUi();
+    }
     const hash=JSON.stringify([D.ntd,D.af,D.alvo,D.alfa,D.ontw,D.logboek,D.herhaal,D.kenmerken]);
     if(hash!==state._lastDHash){
       // VOLGORDE IS HIER DE HELE TRUC. Stond `_lastDHash=hash` vóór de render, dan hoefde het

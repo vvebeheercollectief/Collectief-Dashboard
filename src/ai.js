@@ -175,9 +175,11 @@ function prefillNieuweTaak(sec, code, naam, actiepunt){
   state._ntdVoorModal=state.activeNtd;
   state.activeNtd=sec;
   goTo('ntd');
-  openModal(false);
-  const setIf=(id,v)=>{const el=document.getElementById(id);if(el&&v)el.value=v;};
-  setIf('m-code',code); setIf('m-naam',naam);
+  // Code én naam via de OPTIES van openModal en niet met de hand in de velden: `openModal` zet ze
+  // via `_zetNaamVeld`, en dat stempelt de naam met de code waarvoor hij geldt. Zonder die stempel
+  // ziet `submitTask` de naam als 'hoort bij een andere VvE' en gooit hem weg — dan kwam er hier
+  // altijd een lege kolom B uit.
+  openModal(false, null, { code, naam });
   if(actiepunt) zetOmschrijving(sec, actiepunt);   // welk veld dat is, weet crud.js
 
 }

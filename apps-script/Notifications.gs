@@ -207,9 +207,23 @@ function cd_handleAlvoEdit(sheet, row, e) {
   // mijlpaal naar buiten waar het team op moet reageren.
   if (!label) return;
 
+  // Bij een bewerking over MEERDERE rijen (een blok hokjes tegelijk aanzetten) zou deze melding
+  // doen alsof het om die ene bovenste VvE gaat, terwijl `verplaatsALV` er intussen een stuk of
+  // vier archiveert. Eén melding met het AANTAL erin is dan eerlijker dan één met de verkeerde
+  // naam — en eerlijker dan vier losse meldingen, want dat leert mensen de meldingen uit te
+  // zetten. Tellen doen we op de kolom die bewerkt is, over het hele bereik.
+  var nRijen = e.range.getNumRows();
+  var tekst = code + (naam ? ' · ' + naam : '');
+  if (nRijen > 1) {
+    var blok = sheet.getRange(e.range.getRow(), col, nRijen, 1).getValues();
+    var aan = 0;
+    for (var z = 0; z < blok.length; z++) if ((blok[z][0] + '').toString().toUpperCase() === 'TRUE') aan++;
+    if (aan > 1) tekst = aan + " ALV's — o.a. " + tekst;
+  }
+
   cd_notifyByTag('n_alv', '1', {
     title: label,
-    body: code + (naam ? ' · ' + naam : ''),
+    body: tekst,
     url: APP_URL
   });
 }

@@ -621,7 +621,11 @@ function bulkVeld(rows,soort,waarde){
   // VvE-codes: twee keer dezelfde deadline zetten op dezelfde selectie gaf dus een identieke
   // sleutel, en dan slikte de ontdubbeling de tweede toast in — inclusief de enige weg terug voor
   // een handeling die geen bevestigingsvraag heeft.
-  const _undoSleutel=`bulkveld|${soort}|${items.map(i=>i.r.taakId||i.r._row).join('_')}`;
+  // De WAARDE hoort in de sleutel. Zonder haar geeft dezelfde selectie met een ándere deadline
+  // opnieuw dezelfde sleutel — en dan slikt de ontdubbeling precies de undo-knop in die deze
+  // sleutel moest redden. Met `soort` alleen zou 'deadline op 1 sep' en meteen daarna 'deadline op
+  // 8 sep' dus nog steeds stil de tweede toast verliezen.
+  const _undoSleutel=`bulkveld|${soort}|${waarde}|${items.map(i=>i.r.taakId||i.r._row).join('_')}`;
   showUndoToast(conf.titel,items.map(i=>i.code).join(', '),async()=>{
     await state._writeChain;
     if(blokkeerOffline()) return;   // vóór het terugzetten: anders staat het scherm op 'oud' terwijl de Sheet 'nieuw' houdt

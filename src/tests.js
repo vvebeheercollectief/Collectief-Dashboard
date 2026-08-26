@@ -18,7 +18,7 @@ import { sheetsFetch, NTD_OMSCHRIJVING, _isTransient, _rowMismatch, _a1Bereik, _
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, showLoadError, clearLoadError, syncSelecteerStand, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
-import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _eindKolom, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, getAfInsertRow, OMSCHRIJVING_VELD, zetOmschrijving, _sheetBreedtes, getSheetIds, bevestigInvoegPlek, kiesSectie, deleteTaskRow, deleteCurrentEditTask, completeCurrentEditTask, renderExtraVves, toonMeerVve, zetDeadlineVoorstel, herzieAlsSubtaak } from "./crud.js";
+import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _eindKolom, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, getAfInsertRow, OMSCHRIJVING_VELD, zetOmschrijving, _sheetBreedtes, getSheetIds, bevestigInvoegPlek, _naamBijCode, _zetNaamVeld, kiesSectie, deleteTaskRow, deleteCurrentEditTask, completeCurrentEditTask, renderExtraVves, toonMeerVve, zetDeadlineVoorstel, herzieAlsSubtaak } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages, renderChat } from "./dossier-chat.js";
 import { shouldPromptReload, maakHerlaadKern, zelfdeWorker } from "./sw-update.js";
@@ -4294,35 +4294,34 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   // `m-naam` is readonly en wordt alleen door de suggestielijst gevuld; `m-code` is vrij te typen.
   // In het bewerkscherm staan beide gevuld met de bestaande taak. Corrigeer je daar alléén de code
   // met de hand — de gewone weg voor een tikfout — dan bleef de naam van de vórige VvE staan en
-  // ging die zo naar kolom B van de Sheet.
-  await (async()=>{
-    const _alert=window.alert; let alerts=[]; window.alert=m=>alerts.push(m);
-    const alvoOud=D.alvo, tokOud=state.oauthToken, expOud=state.oauthExpiry, _fetch=window.fetch;
-    const secOud=state.editSec, editOud=state.editRowData, modeOud=state.editMode;
+  // ging die zo naar kolom B van de Sheet. Getoetst op de ECHTE functies (`_zetNaamVeld` en
+  // `_naamBijCode`), niet op een nagebouwde ternary — die zou alleen zichzelf bewijzen.
+  (()=>{
+    const alvoOud=D.alvo, ntdOud=D.ntd;
+    const naamEl=document.getElementById('m-naam'), codeEl=document.getElementById('m-code');
+    const nOud=naamEl?naamEl.value:'', cOud=codeEl?codeEl.value:'';
     try{
       D.alvo=[{code:'900001',naam:'VvE Eerste'},{code:'900002',naam:'VvE Tweede'}];
-      const naamEl=document.getElementById('m-naam'), codeEl=document.getElementById('m-code');
-      // 1) stempel klopt → de naam uit het veld wordt gebruikt
-      codeEl.value='900001'; naamEl.value='VvE Eerste'; naamEl.dataset.code='900001';
-      eq('vve-naam: stempel klopt → naam uit het veld',
-         (naamEl.dataset.code===codeEl.value.trim() ? naamEl.value.trim() : ''), 'VvE Eerste');
-      // 2) code met de hand gewijzigd → de naam hoort NIET meer bij die code
-      codeEl.value='900002';
-      truthy('vve-naam: na een handmatige codewijziging klopt de stempel niet meer',
-             naamEl.dataset.code!==codeEl.value.trim());
-      // 3) en dan wordt de naam opgezocht bij de nieuwe code
-      eq('vve-naam: de naam wordt opgezocht bij de nieuwe code',
-         (D.alvo.find(r=>r.code==='900002')||{}).naam, 'VvE Tweede');
-      // 4) onbekende code → leeg, niet de naam van de vorige VvE
-      codeEl.value='999999';
-      eq('vve-naam: een onbekende code levert geen naam van een andere VvE',
-         (D.alvo.find(r=>r.code==='999999')||{}).naam || '', '');
+      D.ntd={OPPAKKEN:[{_sec:'OPPAKKEN',_row:5,code:'900003',naam:'VvE Derde uit de takenlijst'}],
+             VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[]};
+      // _zetNaamVeld stempelt de code waarvoor de naam geldt
+      _zetNaamVeld('900001','VvE Eerste');
+      eq('vve-naam: het veld draagt de code waarvoor de naam geldt',
+         [naamEl.value, naamEl.dataset.code], ['VvE Eerste','900001']);
+      _zetNaamVeld('', '');
+      eq('vve-naam: zonder code blijft er geen stempel achter', naamEl.dataset.code, undefined);
+      // _naamBijCode zoekt in D.alvo en valt terug op de takenlijsten
+      eq('vve-naam: opgezocht in het ALV-overzicht', _naamBijCode('900002'), 'VvE Tweede');
+      eq('vve-naam: hoofdletters en spaties maken niet uit', _naamBijCode('  900002 '), 'VvE Tweede');
+      eq('vve-naam: terugval op de takenlijst voor een VvE zonder ALV-regel',
+         _naamBijCode('900003'), 'VvE Derde uit de takenlijst');
+      eq('vve-naam: een onbekende code levert LEEG op, niet de naam van een andere VvE',
+         _naamBijCode('999999'), '');
+      eq('vve-naam: een lege code levert leeg op', _naamBijCode(''), '');
     } finally {
-      window.alert=_alert; window.fetch=_fetch;
-      D.alvo=alvoOud; state.oauthToken=tokOud; state.oauthExpiry=expOud;
-      state.editSec=secOud; state.editRowData=editOud; state.editMode=modeOud;
-      const nEl=document.getElementById('m-naam'); if(nEl){ nEl.value=''; delete nEl.dataset.code; }
-      const cEl=document.getElementById('m-code'); if(cEl) cEl.value='';
+      D.alvo=alvoOud; D.ntd=ntdOud;
+      if(naamEl){ naamEl.value=nOud; delete naamEl.dataset.code; }
+      if(codeEl) codeEl.value=cOud;
     }
   })();
 

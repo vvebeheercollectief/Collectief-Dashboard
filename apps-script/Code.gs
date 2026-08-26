@@ -1,3 +1,8 @@
+// Hoeveel vinkjes één handmatige bewerking hoogstens mag bevatten. Zie de vangrail in
+// verplaatsAfgerond en verplaatsALV: daarboven doen we niets en melden we het, want een gebaar van
+// die omvang is vrijwel altijd een uitschieter met de vulgreep — en deze wegen verwijderen rijen.
+var MAX_AFVINK_PER_KEER = 25;
+
 function verplaatsAfgerond(e) {
  cd_lockedRun('verplaatsAfgerond', () => {
   // `e.range.getSheet()` en NIET `e.source.getActiveSheet()`. Die laatste zegt welk tabblad er in
@@ -37,6 +42,27 @@ function verplaatsAfgerond(e) {
   var eersteRij = range.getRow(), aantal = range.getNumRows();
   var laatsteRij = eersteRij + aantal - 1;
   var vinkjes = sheet.getRange(eersteRij, 9, aantal, 1).getValues();
+
+  // VANGRAIL OP DE OMVANG. Meerdere hokjes tegelijk afvinken is bedoeld gedrag (zie hierboven),
+  // maar deze weg archiveert én VERWIJDERT per rij, zonder vraag en zonder ongedaan maken. Eén
+  // uitschieter met de vulgreep — hokje aanzetten en per ongeluk doortrekken tot dertig rijen
+  // eronder — zou dus in één gebaar dertig lopende taken uit de lijst halen. Een echte afvinkronde
+  // met de hand gaat over een handjevol rijen; alles daarboven is vrijwel zeker een ongeluk.
+  // Bij twijfel dus NIETS doen, de vinkjes laten staan en het zichtbaar melden — dezelfde keuze
+  // als bij een onverwacht 'Afgerond'-tabblad verderop. De gebruiker kan daarna gewoon in kleinere
+  // stukken afvinken; niets is verloren.
+  var aangevinkt = 0;
+  for (var t = 0; t < vinkjes.length; t++) if (vinkjes[t][0] === true) aangevinkt++;
+  if (aangevinkt > MAX_AFVINK_PER_KEER) {
+    Logger.log('verplaatsAfgerond: ' + aangevinkt + ' vinkjes in één bewerking — niets gedaan');
+    cd_schrijfLogboek('', '', 'Fout', 'Afgerond', '',
+      'Er stonden ' + aangevinkt + ' vinkjes in één bewerking (hoogstens ' + MAX_AFVINK_PER_KEER
+      + ' tegelijk). Er is NIETS gearchiveerd en NIETS verwijderd — de vinkjes staan er nog. '
+      + 'Was dit per ongeluk (doorgetrokken met de vulgreep)? Zet ze dan weer uit. Klopt het wel, '
+      + 'vink dan in kleinere groepjes af.', 'systeem');
+    return;
+  }
+
   // Van ONDER naar BOVEN: elke geslaagde archivering verwijdert een rij, en dat zou de nog te
   // behandelen rijnummers omhoog schuiven. Van onderaf blijven ze kloppen.
   for (var rr = laatsteRij; rr >= eersteRij; rr--) {
@@ -214,37 +240,37 @@ function cd_archiveerRij(sheet, row) {
 }
 
 function setupAfgerondSheet(sheet) {
-  // Het stramien dat cd_archiveerRij en afrondWaarden (src/crud.js) ÉCHT schrijven: A..H zijn de
-  // acht sectievelden, I is de afronddatum, J de toelichting, K de subcategorie en L het
-  // Herhaal-ID. De oude vijf-koloms koprij ('…Behandelaar, Datum afgerond') sloeg vanaf kolom D
-  // de plank mis en zou iemand die dit skelet ooit ziet op het verkeerde been zetten — daar staat
-  // de deadline, niet de behandelaar. Alleen de kop; de rijen eronder komen van de archiveerweg.
-  var headers = ["VvE-Code", "VvE", "Actiepunt", "Deadline", "Behandelaar", "Prioriteit",
-                 "Opmerkingen", "In behandeling", "Datum afgerond", "Toelichting",
-                 "Subcategorie", "Herhaal-ID"];
+  // De koprij PER SECTIE. Kolom A..H zijn de acht sectievelden en die verschillen per sectie —
+  // bij Vergaderverzoeken staat op C de periode en op D de agendapunten, bij Offerte-trajecten op
+  // C de aanvraagdatum. Eén gedeelde koprij zou dus onder vier van de vijf blokken de verkeerde
+  // namen zetten. Deze lijsten spiegelen SECS[sec].keys uit src/config.js; Apps Script kan dat
+  // bestand niet lezen, dus ze staan hier met de hand. Wijzigt daar de kolomvolgorde, dan hoort
+  // dit mee te veranderen (de zelftest bewaakt SECS zelf, deze kop niet).
+  // De staart I..L is voor alle secties gelijk: afronddatum, toelichting, subcategorie, Herhaal-ID.
+  // Dit skelet wordt alleen gebruikt als het tabblad 'Afgerond' ontbreekt; de rijen eronder komen
+  // altijd van cd_archiveerRij of van afrondWaarden.
+  var STAART = ["Datum afgerond", "Toelichting", "Subcategorie", "Herhaal-ID"];
+  var KOPPEN = {
+    'OPPAKKEN':            ["VvE-Code","VvE","Actiepunt","Deadline","Behandelaar","Prioriteit","Opmerkingen","In behandeling"],
+    'VERGADERVERZOEKEN':   ["VvE-Code","VvE","Periode","Agendapunten","Behandelaar","Deadline","Opmerkingen","In behandeling"],
+    'LOD':                 ["VvE-Code","VvE","Actiepunt","Status","Behandelaar","Deadline","Opmerkingen","In behandeling"],
+    'OFFERTE-TRAJECTEN':   ["VvE-Code","VvE","Datum aangevraagd","Ontvangen/Aangevraagd","Behandelaar","Deadline","Opmerkingen",""],
+    'SUBSIDIE-TRAJECTEN':  ["VvE-Code","VvE","Subsidie","Fase","Behandelaar","Deadline","Opmerkingen","In behandeling"]
+  };
+  // De volgorde LOD vóór OFFERTE-TRAJECTEN is BEWUST anders dan SKEYS — zo staat het echt op
+  // productie, zie de toelichting bovenin src/structuurcheck.js. Niet 'rechttrekken'.
+  var BLOKKEN = ['OPPAKKEN', 'VERGADERVERZOEKEN', 'LOD', 'OFFERTE-TRAJECTEN', 'SUBSIDIE-TRAJECTEN'];
 
-  sheet.getRange(1, 1).setValue("OPPAKKEN");
-  sheet.getRange(2, 1, 1, headers.length).setValues([headers]);
-  sheet.getRange(3, 1).setValue("");
-
-  sheet.getRange(4, 1).setValue("VERGADERVERZOEKEN");
-  sheet.getRange(5, 1, 1, headers.length).setValues([headers]);
-  sheet.getRange(6, 1).setValue("");
-
-  sheet.getRange(7, 1).setValue("LOD");
-  sheet.getRange(8, 1, 1, headers.length).setValues([headers]);
-  sheet.getRange(9, 1).setValue("");
-
-  sheet.getRange(10, 1).setValue("OFFERTE-TRAJECTEN");
-  sheet.getRange(11, 1, 1, headers.length).setValues([headers]);
-  sheet.getRange(12, 1).setValue("");
-
-  // Vijfde sectie (2026-07-29). Ontbrak hier, waardoor het zoeken naar de sectiekop op een vers
-  // skelet niets vond en een afgevinkte subsidietaak stil niet gearchiveerd werd. De volgorde LOD vóór
-  // OFFERTE-TRAJECTEN is BEWUST anders dan SKEYS — zo staat het echt op productie, zie de
-  // toelichting bovenin src/structuurcheck.js. Niet 'rechttrekken'.
-  sheet.getRange(13, 1).setValue("SUBSIDIE-TRAJECTEN");
-  sheet.getRange(14, 1, 1, headers.length).setValues([headers]);
+  for (var i = 0; i < BLOKKEN.length; i++) {
+    var sec = BLOKKEN[i];
+    var kop = KOPPEN[sec].concat(STAART);
+    var rij = 1 + i * 3;                       // sectiekop, kolomkoprij, lege regel
+    sheet.getRange(rij, 1).setValue(sec);
+    // Nooit breder schrijven dan het blad is; anders gooit getRange en ligt de hele weg stil.
+    var br = Math.min(kop.length, sheet.getMaxColumns());
+    sheet.getRange(rij + 1, 1, 1, br).setValues([kop.slice(0, br)]);
+    if (i < BLOKKEN.length - 1) sheet.getRange(rij + 2, 1).setValue("");
+  }
 }
 
 function verplaatsALV(e) {
@@ -275,7 +301,20 @@ function verplaatsALV(e) {
     if (vinkjes[i][0] === true && (eersteRij + i) > 1) teDoen.push(eersteRij + i);
   }
   if (!teDoen.length) return;
-  cd_archiveerALVs(sheet, teDoen);
+  // Zelfde vangrail als bij verplaatsAfgerond, en om een verwante reden: bij een bereik lezen we de
+  // HUIDIGE stand van kolom D, niet wat er veranderde — onEdit geeft die oude waarden bij een
+  // meercellig bereik niet. Rijen die al TRUE stonden lopen dus mee. Selecteert iemand D3:D60 en
+  // drukt Enter, dan zet Sheets de héle selectie op de tegenwaarde van de linkerbovenhoek en zouden
+  // er tientallen ALV's opnieuw in het archief belanden, met de datum van vandaag.
+  if (teDoen.length > MAX_AFVINK_PER_KEER) {
+    Logger.log('verplaatsALV: ' + teDoen.length + ' vinkjes in één bewerking — niets gedaan');
+    cd_schrijfLogboek('', 'ALVS', 'Fout', 'Notulen', '',
+      'Er stonden ' + teDoen.length + ' Notulen-vinkjes aan in één bewerking (hoogstens '
+      + MAX_AFVINK_PER_KEER + ' tegelijk). Er is NIETS in "' + ALFA_SHEET + '" gezet. '
+      + 'Vink in kleinere groepjes af.', 'systeem');
+    return;
+  }
+  cd_archiveerALVs(sheet, teDoen, teDoen.length > 1);
  });
 }
 
@@ -294,7 +333,16 @@ function cd_alvDatumTekst(v) {
 // bestaande regels één keer gelezen en alle nieuwe regels in één setValues weggeschreven.
 // Via `sheet.getParent()` en NIET via het onEdit-event: `e` bestaat hier niet (zie de
 // toelichting bij cd_archiveerRij — met `e.source` gooit elke aanroep een ReferenceError).
-function cd_archiveerALVs(sheet, rijen) {
+// `blok` = deze aanroep komt uit een bewerking van MEERDERE rijen. Dan weten we niet welke vinkjes
+// écht van waarde veranderden (onEdit levert de oude waarden van een bereik niet), dus is de
+// dag-ontdubbeling te smal: een ALV die vorig jaar is afgevinkt en nu 'meeliftte' zou een tweede
+// archiefregel krijgen met de datum van vandaag. Bij een blok slaan we daarom élke code over die
+// de laatste ALFA_RECENT_DAGEN al een archiefregel heeft. Bij één cel — de gewone weg, en de enige
+// weg waarop we zéker weten dat er zojuist iets is aangevinkt — blijft de dag-ontdubbeling gelden,
+// precies zoals het dashboard die ook hanteert.
+var ALFA_RECENT_DAGEN = 180;
+
+function cd_archiveerALVs(sheet, rijen, blok) {
   var ss = sheet.getParent();
 
   // Doeltabblad op naam — nooit "het laatste tabblad": de tabbladvolgorde is niet
@@ -310,11 +358,19 @@ function cd_archiveerALVs(sheet, rijen) {
   }
   if (!targetSheet) {
     // Niets schrijven, niets aanmaken (een hernoemd tabblad zou anders een tweede,
-    // concurrerende lijst krijgen). Vinkje blijft staan; zichtbaar melden in Logboek.
-    var eersteCode = sheet.getRange(rijen[0], 1).getValue();
-    Logger.log("verplaatsALV: tabblad '" + ALFA_SHEET + "' niet gevonden — ALV van " + eersteCode + " niet gearchiveerd");
-    cd_schrijfLogboek(eersteCode, 'ALVS', 'Fout', 'Notulen', '',
-      "Tabblad '" + ALFA_SHEET + "' niet gevonden — ALV niet gearchiveerd", 'systeem');
+    // concurrerende lijst krijgen). Vinkjes blijven staan; zichtbaar melden in het Logboek.
+    // ALLE codes noemen en niet alleen de eerste: sinds deze weg meerdere rijen tegelijk aankan,
+    // zou een melding in het enkelvoud de rest stil laten verdwijnen — precies het gedrag dat
+    // hier gerepareerd is.
+    var codes = [];
+    for (var q = 0; q < rijen.length; q++) {
+      var c = (sheet.getRange(rijen[q], 1).getValue() + '').trim();
+      if (c) codes.push(c);
+    }
+    Logger.log("verplaatsALV: tabblad '" + ALFA_SHEET + "' niet gevonden — " + codes.length + " ALV('s) niet gearchiveerd: " + codes.join(', '));
+    cd_schrijfLogboek(codes[0] || '', 'ALVS', 'Fout', 'Notulen', '',
+      "Tabblad '" + ALFA_SHEET + "' niet gevonden — " + codes.length + " ALV('s) niet gearchiveerd ("
+      + codes.join(', ') + "). De vinkjes staan er nog.", 'systeem');
     return;
   }
 
@@ -329,11 +385,19 @@ function cd_archiveerALVs(sheet, rijen) {
   // tweede regel geven, en het dashboard kan de regel van vandaag al gezet hebben. Bewust NIET
   // op kalenderjaar: de datum in dit tabblad is de dag waarop het vinkje gezet werd, dus een ALV
   // van december die pas in januari wordt afgevinkt draagt een januaridatum.
-  var bestaand = {};
+  var bestaand = {}, recent = {};
+  var grens = new Date(); grens.setDate(grens.getDate() - ALFA_RECENT_DAGEN);
   if (lastRow > 1) {
-    var oudeRijen = targetSheet.getRange(2, 1, lastRow - 1, 3).getValues();
+    var leesBr = Math.min(3, targetSheet.getMaxColumns());
+    var oudeRijen = targetSheet.getRange(2, 1, lastRow - 1, leesBr).getValues();
     for (var b = 0; b < oudeRijen.length; b++) {
-      bestaand[(oudeRijen[b][0] + '').trim() + '\u001f' + cd_alvDatumTekst(oudeRijen[b][2])] = true;
+      var bCode = (oudeRijen[b][0] + '').trim();
+      bestaand[bCode + '\u001f' + cd_alvDatumTekst(oudeRijen[b][2])] = true;
+      // Alleen een ECHTE datumwaarde telt mee voor 'recent'. Regels waarin de datum als tekst
+      // staat en niet te lezen is, laten we buiten deze rem: liever een dubbele regel dan een
+      // ontbrekende.
+      var bDat = oudeRijen[b][2];
+      if (bDat instanceof Date && bDat >= grens) recent[bCode] = true;
     }
   }
 
@@ -356,6 +420,7 @@ function cd_archiveerALVs(sheet, rijen) {
     if (vveCode === "" && vveNaam === "") continue;
     var sleutel = (vveCode + '').trim() + '\u001f' + vandaag;
     if (bestaand[sleutel]) continue;      // staat er al — niets doen
+    if (blok && recent[(vveCode + '').trim()]) continue;   // blok-bewerking: zie ALFA_RECENT_DAGEN
     bestaand[sleutel] = true;             // ook binnen dit bereik niet dubbel
     nieuw.push([vveCode, vveNaam, datumAfgerond]);
   }
@@ -365,7 +430,13 @@ function cd_archiveerALVs(sheet, rijen) {
   // bij setValues; appendRow doet dat wel, maar dat zou weer één schrijfactie per regel zijn.
   var tekort = (lastRow + nieuw.length) - targetSheet.getMaxRows();
   if (tekort > 0) targetSheet.insertRowsAfter(targetSheet.getMaxRows(), tekort);
-  targetSheet.getRange(lastRow + 1, 1, nieuw.length, 3).setValues(nieuw);
+  // Ook de BREEDTE klemmen, net als de leesbreedte in cd_archiveerRij. Het tabblad wordt met de
+  // hand beheerd (er is op 26-08 nog met de hand bijgevuld); is het ooit smaller dan drie kolommen,
+  // dan gooit getRange een fout en ligt de hele trigger stil in plaats van alleen deze regel.
+  var br = Math.min(3, targetSheet.getMaxColumns());
+  var uit = [];
+  for (var w = 0; w < nieuw.length; w++) uit.push(nieuw[w].slice(0, br));
+  targetSheet.getRange(lastRow + 1, 1, uit.length, br).setValues(uit);
 }
 function sorteerOfferteTrajecten(e) {
   // Serialiseer t.o.v. de andere mutatie-triggers (verplaatsAfgerond/-ALV, opvolg-motor,

@@ -130,7 +130,12 @@ async function doLogin(){
     await doOAuth(true);
     if(!state.oauthToken){errEl.textContent='Inloggen geannuleerd of mislukt.';errEl.style.display='block';btn.classList.remove('is-signing');btn.disabled=false;return}
     const email=await fetchUserEmail();
-    if(!email){errEl.textContent='Kon e-mailadres niet ophalen.';errEl.style.display='block';btn.classList.remove('is-signing');btn.disabled=false;return}
+    // Token WEG als we niet kunnen vaststellen van wie hij is. `doOAuth(true)` toont de
+    // accountkiezer, dus dit token kan van een heel ander (privé-)account zijn. Bleef hij staan,
+    // dan had de sessie een geldig token zonder gecontroleerd adres — en dat is precies de stand
+    // waarin `ensureToken` meteen `true` teruggeeft en het dashboard achter de inlogkaart alsnog
+    // gaat lezen en schrijven. `ensureToken` ruimt hier al op; deze weg deed dat niet.
+    if(!email){state.oauthToken=null;state.oauthExpiry=0;errEl.textContent='Kon e-mailadres niet ophalen.';errEl.style.display='block';btn.classList.remove('is-signing');btn.disabled=false;return}
     if(!ALLOWED_EMAILS.includes(email.toLowerCase())){
       state.oauthToken=null;state.oauthExpiry=0;
       errEl.textContent='Geen toegang. Gebruik je VvE Beheer Collectief account.';errEl.style.display='block';btn.classList.remove('is-signing');btn.disabled=false;return;
@@ -154,7 +159,16 @@ async function doLogin(){
   }finally{state._authBezig=Math.max(0,state._authBezig-1)}
 }
 
-async function ensureToken(){
+// `magVragen=false` betekent: alléén de STILLE vernieuwing proberen, en bij mislukking gewoon
+// `false` teruggeven. De 8s-poll gebruikt dat. Zonder die rem deed elke stille ronde na een
+// verlopen sessie een `doOAuth(true)`, en dat opent het inlogvenster van Google — zonder klik, dus
+// zonder gebruikersgebaar. De browser blokkeert zo'n venster meestal, maar niet altijd: vlak na
+// een klik ergens anders komt hij er wél doorheen, en dan springt er elke acht seconden een
+// Google-venster op waar niemand om gevraagd heeft. Dat botst bovendien met wat de sessie-banner
+// (data.js, showLoadError) belooft: 'een KLIK is een gebruikersgebaar, en alleen dán mag het
+// inlogvenster open'. De weg terug loopt via die banner, en die verschijnt vanzelf zodra de stille
+// vernieuwing drie keer op rij mislukt.
+async function ensureToken(magVragen=true){
   if(state.oauthToken && Date.now()<state.oauthExpiry) return true;
   // Bezig-teller over de hele vernieuwing: een auto-herlading midden in een
   // token-refresh zou met een verlopen sessie herstarten → terug op het inlogscherm.
@@ -163,6 +177,7 @@ async function ensureToken(){
     state.oauthToken=null; state.oauthExpiry=0;
     await doOAuth(false);
     if(!state.oauthToken){
+      if(!magVragen) return false;
       await doOAuth(true);
       if(!state.oauthToken) return false;
     }

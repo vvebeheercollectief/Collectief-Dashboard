@@ -101,19 +101,19 @@ export const KORTE_NAMEN = {
 export const SECS = {
   OPPAKKEN:{label:'Oppakken',css:'--sec:var(--ac);--sec-l:var(--ac-l);--sec-b:var(--ac-b)',color:'#0D7377',
     cols:['VvE Code','VvE','Signaal','Actiepunt','Deadline','Wie','Opmerkingen'],
-                   breedtes:['105px',23,20.1,29,'155px',7,20,'150px'],
+                   breedtes:['130px',23,20.1,29,'155px',7,20,'150px'],
     keys:['code','naam','actiepunt','deadline','behandelaar','prioriteit','opmerkingen','inBehandeling']},
   VERGADERVERZOEKEN:{label:'Vergaderverzoeken',css:'--sec:var(--am);--sec-l:var(--am-l);--sec-b:var(--am-b)',color:'#B45309',
     cols:['VvE Code','VvE','Signaal','Periode','Agendapunten','Wie','Deadline uitschr.','Opmerkingen'],
-                   breedtes:['105px',21,19.4,9,18,7,'155px',21,'150px'],
+                   breedtes:['130px',21,19.4,9,18,7,'155px',21,'150px'],
     keys:['code','naam','periode','agendapunten','behandelaar','deadline','opmerkingen','inBehandeling']},
   'OFFERTE-TRAJECTEN':{label:'Offerte-trajecten',css:'--sec:var(--pu);--sec-l:var(--pu-l);--sec-b:var(--pu-b)',color:'#6D5BD0',
     cols:['VvE Code','VvE','Datum aangevr.','Ontvangen/Aangevr.','Behandelaar','Deadline','Opmerkingen'],
-                   breedtes:['105px',21,'165px',21,9,'155px',21,'120px'],
+                   breedtes:['130px',21,'165px',21,13,'155px',21,'120px'],
     keys:['code','naam','datumAangevraagd','offertes','behandelaar','deadline','opmerkingen']},
   LOD:{label:'LOD',css:'--sec:var(--rd);--sec-l:var(--rd-l);--sec-b:var(--rd-b)',color:'#B91C1C',
     cols:['VvE Code','VvE','Signaal','Actiepunt','Status','Wie','Deadline LOD','Opmerkingen'],
-                   breedtes:['105px',19,21.4,24,18,7,'155px',16,'150px'],
+                   breedtes:['130px',19,21.4,24,18,7,'155px',16,'150px'],
     keys:['code','naam','actiepunt','status','behandelaar','deadline','opmerkingen','inBehandeling']},
   // Subsidie-trajecten (2026-07-29). Zelfde kolomstramien als LOD, met 'Status'
   // vervangen door 'Fase'. Twee dingen liggen hier vast en mogen niet losjes wijzigen:
@@ -126,7 +126,7 @@ export const SECS = {
   // de gebruiker koos zes kolommen om de rij rustig te houden.
   'SUBSIDIE-TRAJECTEN':{label:'Subsidie-trajecten',css:'--sec:var(--tl);--sec-l:var(--tl-l);--sec-b:var(--tl-b)',color:'#0F766E',
     cols:['VvE Code','VvE','Subsidie','Fase','Behandelaar','Deadline'],
-                   breedtes:['105px',29,19,19,11,'155px','150px'],
+                   breedtes:['130px',29,19,19,11,'155px','150px'],
     keys:['code','naam','subsidie','subsidieFase','behandelaar','deadline','opmerkingen','inBehandeling']},
 };
 

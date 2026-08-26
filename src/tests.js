@@ -22,7 +22,7 @@ import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _eindKolom, _ver
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages, renderChat } from "./dossier-chat.js";
 import { shouldPromptReload, maakHerlaadKern, zelfdeWorker } from "./sw-update.js";
-import { doOAuth } from "./auth.js";
+import { doOAuth, ensureToken } from "./auth.js";
 import { SPLASH_MS, _setFase } from "./login-splash.js";
 import { opmaakHtml, htmlNaarMarkers, zonderOpmaak, pasToe, opmaakBalk } from "./opmaak.js";
 import { goTo, applyTheme } from "./ui.js";
@@ -185,6 +185,11 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('logZin Verwijderd bevat "verwijderde"', logZin({actie:'Verwijderd', code:'TEST01', gebruiker:'info@vvebeheercollectief.nl'}).includes('verwijderde'));
   truthy('logZin Contact bevat "sprak"', logZin({actie:'Contact', code:'TEST01', veld:'Telefoon', oudeWaarde:'Bewoner/eigenaar', gebruiker:'info@vvebeheercollectief.nl'}).includes('sprak'));
   truthy('logZin Contact toont soort', logZin({actie:'Contact', code:'TEST01', veld:'Telefoon', oudeWaarde:'Bestuur', gebruiker:'info@vvebeheercollectief.nl'}).includes('Telefoon'));
+  // Zonder soort hoort de punt-scheiding óók weg te blijven: anders eindigt de zin op een losse
+  // '·'. De app vult dat veld altijd ('Telefoon' is de standaard), maar een met de hand getypte of
+  // oude regel hoeft dat niet te doen — en dan las de zin als afgebroken.
+  truthy('logZin Contact zonder soort laat geen losse punt-scheiding staan',
+         !/·\s*<\/span>/.test(logZin({actie:'Contact', code:'TEST01', veld:'', oudeWaarde:'Bestuur', gebruiker:'info@vvebeheercollectief.nl'})));
   truthy('logZin Kenmerk bevat "kenmerk"', logZin({actie:'Kenmerk', code:'TEST01', veld:'Balkons', gebruiker:'info@vvebeheercollectief.nl'}).includes('kenmerk'));
   truthy('logZin Aangevinkt bevat "vinkte"', logZin({actie:'Aangevinkt', code:'TEST01', veld:'Notulen', gebruiker:'info@vvebeheercollectief.nl'}).includes('vinkte'));
   truthy('logZin Aangevinkt noemt het veld', logZin({actie:'Aangevinkt', code:'TEST01', veld:'Notulen', gebruiker:'info@vvebeheercollectief.nl'}).includes('Notulen'));
@@ -1331,8 +1336,12 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
                  Math.abs(dl - 155) <= 1);
           truthy(`kolombreedte: op 1650px blijft de actiekolom 150px (${acties})`,
                  Math.abs(acties - 150) <= 1);
-          truthy(`kolombreedte: op 1650px blijft de codekolom 105px (${code})`,
-                 Math.abs(code - 105) <= 1);
+          // 130 en niet 105 sinds de doorlichting van 26-08: op een BUNDELKOP staan er drie dingen
+          // in deze cel (sleepgreep 16 + 9 marge, chevron 22 + 3, code 45 = 95px) en in een
+          // contentbox van 75px viel de code naar een tweede regel. 130 - 20 - 10 = 100, dus
+          // dezelfde 5px speling die een gewone rij (70px inhoud in 75) altijd al had.
+          truthy(`kolombreedte: op 1650px blijft de codekolom 130px (${code})`,
+                 Math.abs(code - 130) <= 1);
           // ... en de ruimte die dat oplevert gaat naar de tekstkolommen. Zonder deze tegenproef
           // zou een tabel die per ongeluk smaller wordt dan 1650 ook groen zijn.
           const act = br('Actiepunt'), opm = br('Opmerkingen'), sig = br('Signaal');
@@ -1356,6 +1365,100 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
           eq('kolombreedte: in bulkmodus telt het vinkje als eigen kolom',
              cg2 ? cg2.children.length : 0, document.querySelectorAll('#ntd-thead th').length);
         } finally { state.bulkMode = vBulk; renderNtd(); }
+      })();
+
+      // ── Doorlichting 26-08: op een BUNDELKOP past de eerste cel op één regel ──
+      // In die cel staan drie dingen: sleepgreep (16px + 9px marge), chevron (22px + 3px) en de
+      // VvE-code (45px) = 95px. Met een kolom van 105px bleef daar een contentbox van 75px van
+      // over (padding 20 links, 10 rechts) en viel de code naar een TWEEDE regel — op élke
+      // bundelkop een scheve kolom, gemeten op 1440 én 378 breed. Meet de krapste stand: op een
+      // breed venster is deze toets groen om de verkeerde reden.
+      (() => {
+        const vNtd5 = D.ntd, vAf5 = D.af, vSec5 = state.activeNtd, vPg5 = pgs.ntd, vOpen5 = state.bundelOpen;
+        const klem5 = document.createElement('style');
+        klem5.textContent = '#ntd-tbl-wrap{width:1150px !important}';
+        document.head.appendChild(klem5);
+        try{
+          const leeg5 = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+          const t5 = (taakId, volg) => ({ _row: 20 + (+volg||0)/10, taakId, bundelId:'Tkop', bundelVolg:volg,
+            _sec:'OPPAKKEN', code:'311212', naam:'Vereniging Parkzicht Noord', actiepunt:'Werk',
+            deadline:'', behandelaar:'Jer', opmerkingen:'', inBehandeling:'' });
+          D.af = { ...leeg5 };
+          D.ntd = { ...leeg5, OPPAKKEN: [ t5('Tkop','0'), t5('Tb','10') ] };
+          state.activeNtd = 'OPPAKKEN'; pgs.ntd = 1; state.bundelOpen = new Set();
+          renderNtd(); herzetKolomBreedtes();
+          const tr5 = document.querySelector('#ntd-tbody tr[data-row]');
+          const cel5 = tr5 && tr5.children[0];
+          const code5 = cel5 && cel5.querySelector('.code');
+          truthy('bundelkop: de rij met de VvE-code-cel wordt getekend', !!code5);
+          if(code5){
+            const cs5 = getComputedStyle(cel5);
+            const box5 = cel5.clientWidth - parseFloat(cs5.paddingLeft) - parseFloat(cs5.paddingRight);
+            const inhoud5 = [...cel5.children].reduce((a,k)=>{
+              const s = getComputedStyle(k);
+              return a + k.getBoundingClientRect().width + parseFloat(s.marginLeft) + parseFloat(s.marginRight);
+            }, 0);
+            truthy(`bundelkop: greep + chevron + code passen naast elkaar (${Math.round(inhoud5)} in ${Math.round(box5)})`,
+                   inhoud5 <= box5);
+            // Tegenproef op het GEDRAG en niet alleen op de rekensom: een cel met één regel staat
+            // door `vertical-align:middle` precies in het midden; slaat de code om, dan zakt hij.
+            const rc5 = code5.getBoundingClientRect(), rt5 = cel5.getBoundingClientRect();
+            truthy(`bundelkop: de code staat op de middenlijn van de cel, dus op één regel `
+                   + `(${Math.round(rc5.top + rc5.height/2 - rt5.top - rt5.height/2)}px afwijking)`,
+                   Math.abs((rc5.top + rc5.height/2) - (rt5.top + rt5.height/2)) <= 2);
+            // En de telpil hoort ónder de VvE-naam te staan, niet ernaast. Ernaast hield
+            // `max-width:calc(100% - 96px)` maar 52px over van een kolom van 168px.
+            const naamCel5 = tr5.querySelector('td.cell-name');
+            const ct5 = naamCel5 && naamCel5.querySelector('.ct');
+            const pil5 = naamCel5 && naamCel5.querySelector('.bdl-pill');
+            truthy('bundelkop: naam én telpil staan in de VvE-cel', !!(ct5 && pil5));
+            if(ct5 && pil5){
+              truthy(`bundelkop: de telpil staat op een eigen regel onder de naam `
+                     + `(${Math.round(pil5.getBoundingClientRect().top - ct5.getBoundingClientRect().bottom)}px eronder)`,
+                     pil5.getBoundingClientRect().top >= ct5.getBoundingClientRect().bottom - 1);
+              const csN5 = getComputedStyle(naamCel5);
+              const boxN5 = naamCel5.clientWidth - parseFloat(csN5.paddingLeft) - parseFloat(csN5.paddingRight);
+              truthy(`bundelkop: de naam mag de hele kolom gebruiken `
+                     + `(${Math.round(ct5.getBoundingClientRect().width)} van ${Math.round(boxN5)})`,
+                     ct5.getBoundingClientRect().width >= boxN5 - 2);
+            }
+          }
+        } finally {
+          klem5.remove();
+          D.ntd = vNtd5; D.af = vAf5; state.activeNtd = vSec5; pgs.ntd = vPg5;
+          state.bundelOpen = vOpen5; renderNtd();
+        }
+      })();
+
+      // ── Doorlichting 26-08: geen enkele kolomKOP mag over zijn buurkolom heen lopen ──
+      // De koppen zijn `white-space:nowrap` en `overflow:visible`; een kop die breder is dan zijn
+      // kolom wordt dus niet afgekapt maar OVER de volgende kop getekend. Zo liep 'BEHANDELAAR'
+      // (97px) op Offerte-trajecten over 'DEADLINE' heen in een kolom van 76px. Alle vijf de
+      // secties, op de krapste stand — daar zijn de kolommen het smalst.
+      (() => {
+        const vNtd6 = D.ntd, vSec6 = state.activeNtd, vPg6 = pgs.ntd;
+        const klem6 = document.createElement('style');
+        klem6.textContent = '#ntd-tbl-wrap{width:1150px !important}';
+        document.head.appendChild(klem6);
+        try{
+          const secs6 = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN'];
+          const leeg6 = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+          secs6.forEach(sec => {
+            D.ntd = { ...leeg6, [sec]: [{ _row:30, _sec:sec, code:'311212', naam:'Testflat',
+              actiepunt:'Werk', periode:'Q3 2026', agendapunten:'x', datumAangevraagd:'1-6-2026',
+              offertes:'1/2', status:'x', subsidie:'x', subsidieFase:'2', behandelaar:'Jer',
+              deadline:'', opmerkingen:'', inBehandeling:'' }] };
+            state.activeNtd = sec; pgs.ntd = 1;
+            renderNtd(); herzetKolomBreedtes();
+            const teKrap = [...document.querySelectorAll('#ntd-thead th')]
+              .filter(th => th.scrollWidth > th.clientWidth + 1)
+              .map(th => `${th.textContent.trim()} (${th.scrollWidth}>${th.clientWidth})`);
+            eq(`kolomkop (${sec}): geen kop loopt over zijn kolom heen`, teKrap.join(', '), '');
+          });
+        } finally {
+          klem6.remove();
+          D.ntd = vNtd6; state.activeNtd = vSec6; pgs.ntd = vPg6; renderNtd();
+        }
       })();
       // ── Een lange Nederlandse datum moet in zijn kolom passen ──
       // Dit is de eerste opzet gespiegeld: de datumkolommen werden zó smal dat "22 september 2026"
@@ -2212,6 +2315,33 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       cfg.callback({access_token:'t5',expires_in:3600});
       await enk;
       eq('auth: herhaalde afhandeling telt niet dubbel af', state._authBezig, 0);
+      delete state._authTimeoutMs;
+
+      // ── De STILLE ronde mag nooit een inlogvenster openen (doorlichting 26-08) ──
+      // `ensureToken(false)` is de weg van de 8s-poll. Mislukt de stille vernieuwing, dan hóórt
+      // hij terug te keren met `false` — en NIET door te vallen naar `doOAuth(true)`, want dat
+      // opent het Google-venster zonder klik. De browser blokkeert dat meestal, maar niet altijd,
+      // en dan springt er elke acht seconden een venster op. De weg terug loopt via de
+      // sessie-banner, die na drie mislukte rondes vanzelf verschijnt.
+      state._authTimeoutMs=60;
+      state._gsiTokenClient=null; state._authBezig=0;
+      state.oauthToken=null; state.oauthExpiry=0;
+      // De prompt-stand zit in het ARGUMENT van requestAccessToken, niet in initTokenClient:
+      // `doOAuth` geeft `{prompt:''}` mee voor stil en een leeg object voor mét venster.
+      let luidGevraagd=0;
+      const cfgOud=cfg;
+      window.google={accounts:{oauth2:{initTokenClient:c=>{cfg=c;return{
+        requestAccessToken:(opt)=>{ if(!opt || opt.prompt!=='') luidGevraagd++; },
+        get callback(){return cfg.callback}, set callback(v){cfg.callback=v},
+      }}}}};
+      const stilOnly=ensureToken(false);
+      await Promise.resolve();
+      if(cfg && cfg.error_callback) cfg.error_callback({type:'popup_failed_to_open'});
+      const uitkomst=await Promise.race([stilOnly, new Promise(r=>setTimeout(()=>r('TIMEOUT'),300))]);
+      eq('auth: ensureToken(false) geeft false zonder inlogvenster te openen', uitkomst, false);
+      eq('auth: en heeft dus geen enkele LUIDE aanvraag gedaan', luidGevraagd, 0);
+      cfg=cfgOud;
+      state._authBezig=0;
       delete state._authTimeoutMs;
     } finally {
       window.google=googleOud; state._gsiTokenClient=clientOud; state._authBezig=bezigOud;
@@ -3935,6 +4065,23 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       doCompleteTask();
       truthy('doCompleteTask: wees-rij her-ankerd op het verse object', state._completeRow===vers);
       eq('doCompleteTask: her-anker stopt op lege datum (geen vangnet-alert)', alerts.join('|').includes('Datum is verplicht'), true);
+      // 3) HET GEVAL DAT DE OUDE CONTROLE MISTE (doorlichting 26-08): de rij staat nog wél in
+      //    `state._rowCache` maar niet meer in D. Dat is de normale stand na een stille resync die
+      //    inhoudelijk niets veranderde: `loadAll` zet verse objecten in D, maar `renderAll` — en
+      //    dus de cache — draait alleen bij een gewijzigde datahash. De controle keek naar de
+      //    cache, vond de rij dáár, sloeg het her-ankeren over, en dan deed `arr.indexOf(r)`
+      //    verderop niets: de afgeronde taak bleef in de lijst staan en de rollback zette hem er
+      //    bij een fout als tweede exemplaar bíj.
+      alerts=[];
+      const oud3={_sec:'OPPAKKEN',_row:7,code:'DC-3',naam:'VvE cache',actiepunt:'sta in de cache',deadline:'',behandelaar:'Jer',prioriteit:'',opmerkingen:'',inBehandeling:''};
+      const vers3={...oud3,_row:6};
+      D.ntd={OPPAKKEN:[vers3]};
+      state._rowCache=[oud3];                   // cache liep achter; D is al vervangen
+      state._completeRow=oud3;
+      document.getElementById('complete-date').value='';
+      doCompleteTask();
+      truthy('doCompleteTask: her-ankert óók als de rij nog in de rendercache staat',
+             state._completeRow===vers3);
     } finally {
       window.alert=_alert;
       state._rowCache=cacheOud; D.ntd=ntdOud;
@@ -4010,13 +4157,18 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   //    token zodat de guard de énige stopper is: zonder guard zou getSheetIds fetchen.
   //    (Dit pint de guard vast — de assert faalt als iemand 'm weghaalt.) ──
   await (async()=>{
-    const cacheOud=state._rowCache, sheetIdsOud=state._sheetIds;
+    const cacheOud=state._rowCache, sheetIdsOud=state._sheetIds, ntdOud=D.ntd.OPPAKKEN;
     const tokenOud=state.oauthToken, expiryOud=state.oauthExpiry;
     const _fetch=window.fetch; let fetches=0; window.fetch=()=>{fetches++;return Promise.reject(new Error('geen echt netwerk in test'))};
     const _alert=window.alert; let alerts=0; window.alert=()=>{alerts++};
     try{
       const rX={_sec:'OPPAKKEN',code:'DK-1',_row:4,naam:'VvE DK',actiepunt:'dubbelklik-test',deadline:'',behandelaar:'',prioriteit:'',opmerkingen:'',inBehandeling:''};
       state._rowCache=[rX];
+      // Óók in D.ntd, want dáár toetst `doCompleteTask` de her-ankering op (sinds 26-08; zie de
+      // toelichting daar). Een rij die alleen in de rendercache zit is per definitie een verouderde
+      // rij, en die hóórt 'Taak niet gevonden' te geven — dat is een ander scenario dan de
+      // dubbelklik die dit blok vastpint.
+      D.ntd.OPPAKKEN=[rX];
       state._completeRow=rX;
       state.oauthToken='nep-token'; state.oauthExpiry=Date.now()+3600e3; // ensureToken geeft synchroon true, géén popup
       state._sheetIds=null;                  // zónder guard zou getSheetIds nu fetchen
@@ -4030,6 +4182,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       window.fetch=_fetch; window.alert=_alert;
       state._completeBusy=false; state._completeRow=null; state._completeRid=null;
       state._rowCache=cacheOud; state._sheetIds=sheetIdsOud;
+      if(ntdOud===undefined) delete D.ntd.OPPAKKEN; else D.ntd.OPPAKKEN=ntdOud;
       state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
       document.getElementById('complete-date').value='';
     }

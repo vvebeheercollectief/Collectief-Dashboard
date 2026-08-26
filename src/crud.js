@@ -683,6 +683,21 @@ async function deleteCurrentEditTask(){
 // al onder de gebruiker vandaan sluiten (de aanroeper deed dat toen zélf, nog vóór deze functie
 // begon), dus dáár verandert dit traject niets aan. De vraag is de enige nieuwe afbreekweg.
 async function deleteTaskRow(r, bijDoorgaan){
+  // Eerst her-ankeren, net als `doCompleteTask` en `_bewerkRijVers` dat doen. De ingang vanuit een
+  // getekende rij levert een object uit `state._rowCache`, en die cache loopt uit de pas met D:
+  // `loadAll` zet élke ronde verse rij-objecten in D, terwijl `renderAll` (en dus de cache) alleen
+  // draait bij een gewijzigde datahash. Bleef de inhoud gelijk, dan wees dit object nergens meer
+  // naar in D.ntd — `arr.indexOf(r)` gaf -1, de rij bleef ná het verwijderen gewoon in de lijst
+  // staan, en de rollback zette hem er bij een fout als TWEEDE exemplaar bij.
+  if(r && SECS[r._sec] && _verseRijIdx(r, D.ntd[r._sec])<0){
+    const vers=_herankerRij(r, D.ntd);
+    if(!vers){
+      showToast('Taak niet gevonden','De lijst is intussen ververst. Probeer het opnieuw.',
+                'var(--rd)','waarschuwing',{geenDedup:true, geenSysteemmelding:true});
+      return;
+    }
+    r=vers;
+  }
   // Via de centrale `taakTitel` en niet via een eigen terugvalketen: die keten kende
   // `opmerkingen` (Offerte-trajecten) en `agendapunten` (Vergaderverzoeken) niet en viel daar
   // terug op de VvE-code. Twee offerte-trajecten van dezelfde VvE gaven dan letterlijk dezelfde
@@ -961,7 +976,14 @@ export function afrondWaarden(r, sec, datum, toelichting){
 
 async function doCompleteTask(){
   let r=state._completeRow;
-  if(r && _verseRijIdx(r, state._rowCache)<0){
+  // Toetsen op D.ntd en NIET op state._rowCache — dezelfde regel als in `_bewerkRijVers`, en om
+  // dezelfde reden: wat hieronder telt is of dit object nog ÍN D.ntd staat, want daar wordt hij
+  // straks met `arr.indexOf(r)` uit gehaald. `_rowCache` en D lopen uiteen: `renderAll` (en
+  // daarmee de cache) draait alleen bij een gewijzigde datahash, terwijl `loadAll` élke ronde
+  // verse rij-objecten in D zet. Stond de taak nog in de cache maar niet meer in D, dan sloeg de
+  // her-ankering over, deed de splice niets — de afgeronde taak bleef in de lijst staan — en zette
+  // de rollback bij een fout een TWEEDE exemplaar terug (`if(a.indexOf(r)===-1)`).
+  if(r && _verseRijIdx(r, D.ntd[r._sec])<0){
     // De cache is herbouwd met verse parse-objecten (stille resync) terwijl de modal
     // open stond. Her-anker op inhoud: staat de taak er ongewijzigd in, dan mag de
     // afronding gewoon doorgaan en is de getypte toelichting niet voor niets geweest.

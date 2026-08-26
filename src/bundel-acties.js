@@ -462,20 +462,38 @@ export async function herordenBundel(nieuweVolgorde, volgordeGewijzigd){
   // en omdat de reeks per positie opnieuw wordt uitgedeeld (10, 20, 30 …) schuift één sleepgebaar
   // bijna altijd alles eronder mee — inclusief de hoofdtaak, die niet eens in het paneel staat.
   // '4 taken verplaatst' na het verslepen van één regel is dus onwaar.
+  // `gelukt` blijft false tot de heenweg écht geland is — zelfde haak als bij `undoData.gelukt` in
+  // crud.js. Zonder deze vlag schreef de undo-knop óók na een MISLUKTE herordening: de rollback had
+  // de oude nummers in het geheugen dan al teruggezet, en de undo stuurde diezelfde nummers alsnog
+  // naar de Sheet. In het gunstigste geval een overbodig schrijfverzoek, in het ongunstigste een
+  // tweede 'Undo mislukt' bovenop de eerste foutmelding — voor een handeling die niet gebeurd was.
+  const heenweg = { gelukt:false };
   showUndoToast('Volgorde gewijzigd', 'De nieuwe volgorde is opgeslagen', async () => {
     // Eerst de lopende schrijfactie afwachten en dán pas terugzetten: draaide de undo ervoorheen,
     // dan zou de heenweg de teruggezette nummers alsnog overschrijven (zelfde volgorde-eis als bij
     // de bulk-undo). En blokkeerOffline erná, want anders staat het scherm op 'oud' terwijl de
     // Sheet de nieuwe volgorde houdt.
     await state._writeChain;
+    if (!heenweg.gelukt){
+      // Niets terug te draaien. Wél iets zeggen: stilte na een klik op 'Ongedaan maken' leest als
+      // een kapotte knop, terwijl de foutmelding van de heenweg intussen weggetikt kan zijn.
+      showToast('Niets ongedaan te maken', 'De nieuwe volgorde is niet opgeslagen — er is niets gewijzigd.',
+                'var(--am)', 'label', { geenDedup:true, geenSysteemmelding:true });
+      return;
+    }
     if (blokkeerOffline()) return;
+    // Zelfde poort als élke andere schrijfweg in dit bestand: zonder token loopt de undo tot in
+    // backgroundWrite door en komt er een kale 'Undo mislukt' uit een 401 in plaats van een
+    // melding die zegt wat eraan te doen is.
+    if (!await ensureToken()){ alert('Inloggen mislukt. Probeer het opnieuw.'); return; }
     oud.forEach(o => { o.r.bundelVolg = o.volg; });
     renderAll();
     backgroundWrite(schrijfVolg(oud), () => { wijzigingen.forEach(w => { w.r.bundelVolg = w.volg; }); }, 'Undo mislukt');
   }, 'herhaal', { geenDedup:true });
 
+  const schrijf = schrijfVolg(wijzigingen);
   backgroundWrite(
-    schrijfVolg(wijzigingen),
+    async () => { await schrijf(); heenweg.gelukt = true; },
     () => { oud.forEach(o => { o.r.bundelVolg = o.volg; }); },
     'Volgorde opslaan mislukt'
   );

@@ -60,6 +60,10 @@
 
     /* Layout */
     #app{display:flex;height:100vh;overflow:hidden}
+    /* Testomgeving: de waarschuwingsbalk (34px) staat vóór #app in de bladstroom, dus de schil
+       moet die 34px inleveren. Anders schuift de onderkant van de zijbalk buiten beeld en is de
+       sync-status daar nooit te zien. Alleen op staging — op productie bestaat de balk niet. */
+    body.met-stagingbalk #app{height:calc(100vh - 34px)}
     #overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100}
     #overlay.on{display:block}
 
@@ -355,9 +359,20 @@
     #ntd-tbl-wrap .cell-name .bdl-merk{
       max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
     }
-    /* De telpil staat wél naast de naam. Laat de naam daarom ruimte over: 96px is de breedste
-       stand van de pil ("12 van 12 klaar") plus de tussenruimte. */
-    #ntd-tbl-wrap .cell-name.met-telpil>.ct{max-width:calc(100% - 96px)}
+    /* De telpil krijgt een EIGEN REGEL onder de naam, net als `.bdl-merk-kop` hierboven.
+       Stond hij naast de naam, dan hield `max-width:calc(100% - 96px)` maar 52px over van een
+       kolom van 168px: "Vereniging Parkzicht Noord" werd "Vereni…" — en juist de bundelkop is de
+       rij waarvan je wilt zien om welke VvE het gaat (gemeten op 1440 breed).
+       Het oude bezwaar tegen een pil naast de naam ('de cel vraagt dan de SOM van beide breedtes
+       en de kolom groeit mee') geldt hier niet meer: de takentabel staat sinds v10.41 op
+       `table-layout:fixed` met een vaste colgroup, dus celinhoud verzet geen kolombreedte.
+       De rij wordt hierdoor één regel hoger — precies wat de kop-merkjes in de platte lijst al
+       doen, en in lijn met 'rijen rekken mee met hun inhoud'. */
+    #ntd-tbl-wrap .cell-name.met-telpil>.ct{max-width:100%}
+    #ntd-tbl-wrap .cell-name.met-telpil>.bdl-pill{
+      display:block;width:max-content;max-width:100%;margin:2px 0 0;
+      overflow:hidden;text-overflow:ellipsis;
+    }
     #ntd-tbl-wrap .badge-periode{
       display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;
     }

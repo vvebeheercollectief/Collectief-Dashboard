@@ -241,22 +241,49 @@ function verplaatsALV(e) {
   // hebben óók checkboxes in kolom D en mogen deze trigger niet raken.
   if (sheet.getName().trim().toLowerCase() !== ALVO_SHEET.toLowerCase()) return;
 
-  if (range.getColumn() !== 4) return;
+  // ALLEEN een bewerking die ÚITSLUITEND over kolom D gaat, en meerdere RIJEN mogen wél —
+  // exact dezelfde voorwaarde en dezelfde reden als bij verplaatsAfgerond hierboven.
+  // `range.getValue()` en `range.getRow()` geven bij een meercellig bereik alleen de
+  // LINKERBOVENHOEK. Vinkte iemand vier Notulen-hokjes tegelijk aan (selecteren en Enter,
+  // doortrekken met de vulgreep, of een blok TRUE plakken), dan werd alleen de bovenste ALV
+  // gearchiveerd. De andere drie bleven afgevinkt staan zonder archiefregel — stil, en
+  // achteraf alleen te herstellen door de datum uit het Logboek terug te zoeken (wat op
+  // 26-08-2026 voor 50 regels ook echt is moeten gebeuren).
+  if (range.getColumn() !== 4 || range.getNumColumns() !== 1) return;
 
-  if (range.getValue() !== true) return;
+  var eersteRij = range.getRow(), aantal = range.getNumRows();
+  var vinkjes = sheet.getRange(eersteRij, 4, aantal, 1).getValues();
+  var teDoen = [];
+  for (var i = 0; i < aantal; i++) {
+    if (vinkjes[i][0] === true && (eersteRij + i) > 1) teDoen.push(eersteRij + i);
+  }
+  if (!teDoen.length) return;
+  cd_archiveerALVs(sheet, teDoen);
+ });
+}
 
-  var row = range.getRow();
-  if (row <= 1) return;
+// Eén datumwaarde uit het archief als vergelijkbare tekst 'd-m-jjjj'. Het tabblad bevat allebei
+// de vormen: regels die deze trigger schreef staan er als echte Date in, regels die het dashboard
+// via de Sheets-API aanlegde als tekst '26-8-2026' (die USER_ENTERED óók als datum bewaart).
+// Zonder deze normalisatie zou de ontdubbeling hieronder de twee soorten nooit aan elkaar
+// koppelen. Zonder voorloopnullen, want zo staat de rest van het blad erin.
+function cd_alvDatumTekst(v) {
+  if (v instanceof Date) return v.getDate() + '-' + (v.getMonth() + 1) + '-' + v.getFullYear();
+  return (v === null || v === undefined ? '' : v).toString().trim();
+}
 
-  var vveCode = sheet.getRange(row, 1).getValue();
-  var vveNaam = sheet.getRange(row, 2).getValue();
-
-  if (vveCode === "" && vveNaam === "") return;
+// De ALV's van deze rijen naar "ALV's afgerond". Los van de trigger, zodat een bereik van
+// meerdere rijen er in één keer langs kan: het doeltabblad wordt één keer opgezocht, de
+// bestaande regels één keer gelezen en alle nieuwe regels in één setValues weggeschreven.
+// Via `sheet.getParent()` en NIET via het onEdit-event: `e` bestaat hier niet (zie de
+// toelichting bij cd_archiveerRij — met `e.source` gooit elke aanroep een ReferenceError).
+function cd_archiveerALVs(sheet, rijen) {
+  var ss = sheet.getParent();
 
   // Doeltabblad op naam — nooit "het laatste tabblad": de tabbladvolgorde is niet
   // stabiel (reset-archieven, logboek-backups). Hoofdletterongevoelig + trim, in de
   // stijl van _isAlvoTab in src/alv-reset.js.
-  var alleTabs = e.source.getSheets();
+  var alleTabs = ss.getSheets();
   var targetSheet = null;
   for (var t = 0; t < alleTabs.length; t++) {
     if (alleTabs[t].getName().trim().toLowerCase() === ALFA_SHEET.toLowerCase()) {
@@ -267,22 +294,61 @@ function verplaatsALV(e) {
   if (!targetSheet) {
     // Niets schrijven, niets aanmaken (een hernoemd tabblad zou anders een tweede,
     // concurrerende lijst krijgen). Vinkje blijft staan; zichtbaar melden in Logboek.
-    Logger.log("verplaatsALV: tabblad '" + ALFA_SHEET + "' niet gevonden — ALV van " + vveCode + " niet gearchiveerd");
-    cd_schrijfLogboek(vveCode, 'ALVS', 'Fout', 'Notulen', '',
+    var eersteCode = sheet.getRange(rijen[0], 1).getValue();
+    Logger.log("verplaatsALV: tabblad '" + ALFA_SHEET + "' niet gevonden — ALV van " + eersteCode + " niet gearchiveerd");
+    cd_schrijfLogboek(eersteCode, 'ALVS', 'Fout', 'Notulen', '',
       "Tabblad '" + ALFA_SHEET + "' niet gevonden — ALV niet gearchiveerd", 'systeem');
     return;
   }
-
-  var datumAfgerond = new Date();
-  var newRow = [vveCode, vveNaam, datumAfgerond];
 
   var lastRow = targetSheet.getLastRow();
   if (lastRow === 0) {
     targetSheet.appendRow(["VvE-code", "VvE-naam", "Datum afgerond"]);
     lastRow = 1;
   }
-  targetSheet.getRange(lastRow + 1, 1, 1, 3).setValues([newRow]);
- });
+
+  // Ontdubbelen op code + de EXACTE dag, precies de regel die het dashboard in
+  // toggleAlvoFlag (src/render-alv.js) hanteert. Twee redenen: uit- en weer aanvinken mag geen
+  // tweede regel geven, en het dashboard kan de regel van vandaag al gezet hebben. Bewust NIET
+  // op kalenderjaar: de datum in dit tabblad is de dag waarop het vinkje gezet werd, dus een ALV
+  // van december die pas in januari wordt afgevinkt draagt een januaridatum.
+  var bestaand = {};
+  if (lastRow > 1) {
+    var oudeRijen = targetSheet.getRange(2, 1, lastRow - 1, 3).getValues();
+    for (var b = 0; b < oudeRijen.length; b++) {
+      bestaand[(oudeRijen[b][0] + '').trim() + '\u001f' + cd_alvDatumTekst(oudeRijen[b][2])] = true;
+    }
+  }
+
+  var datumAfgerond = new Date();
+  var vandaag = cd_alvDatumTekst(datumAfgerond);
+  // Code en naam van álle aangevinkte rijen in ÉÉN lezing. Per rij twee losse getValue-aanroepen
+  // zou bij een blok van twintig hokjes veertig leesacties bínnen de document-lock betekenen —
+  // dezelfde afweging als bij de sectiescan in cd_archiveerRij.
+  var minR = rijen[0], maxR = rijen[0];
+  for (var m = 1; m < rijen.length; m++) {
+    if (rijen[m] < minR) minR = rijen[m];
+    if (rijen[m] > maxR) maxR = rijen[m];
+  }
+  var bron = sheet.getRange(minR, 1, maxR - minR + 1, 2).getValues();
+  var nieuw = [];
+  for (var r = 0; r < rijen.length; r++) {
+    var row = rijen[r];
+    var vveCode = bron[row - minR][0];
+    var vveNaam = bron[row - minR][1];
+    if (vveCode === "" && vveNaam === "") continue;
+    var sleutel = (vveCode + '').trim() + '\u001f' + vandaag;
+    if (bestaand[sleutel]) continue;      // staat er al — niets doen
+    bestaand[sleutel] = true;             // ook binnen dit bereik niet dubbel
+    nieuw.push([vveCode, vveNaam, datumAfgerond]);
+  }
+  if (!nieuw.length) return;
+  // Nooit buiten het raster schrijven: getRange gooit dan een fout en legt de hele trigger stil
+  // (zelfde vangnet als de leesbreedte-klem in cd_archiveerRij). Het blad groeit niet vanzelf mee
+  // bij setValues; appendRow doet dat wel, maar dat zou weer één schrijfactie per regel zijn.
+  var tekort = (lastRow + nieuw.length) - targetSheet.getMaxRows();
+  if (tekort > 0) targetSheet.insertRowsAfter(targetSheet.getMaxRows(), tekort);
+  targetSheet.getRange(lastRow + 1, 1, nieuw.length, 3).setValues(nieuw);
 }
 function sorteerOfferteTrajecten(e) {
   // Serialiseer t.o.v. de andere mutatie-triggers (verplaatsAfgerond/-ALV, opvolg-motor,

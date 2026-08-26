@@ -326,7 +326,11 @@ function showLoadError(opties){
       }finally{
         state._herinlogBezig=false;
       }
-      if(!email){ showLoadError({soort:'sessie'}); return; }
+      // Zelfde opruiming als in `doLogin` en `ensureToken`: zonder gecontroleerd adres hoort er
+      // geen token in de sessie te blijven staan. `doOAuth(true)` heeft hierboven de ACCOUNTKIEZER
+      // getoond, dus dit token kan van een ander account zijn dan het ingelogde — en dan zou de
+      // eerstvolgende poll met dat vreemde token gaan lezen en schrijven.
+      if(!email){ state.oauthToken=null; state.oauthExpiry=0; showLoadError({soort:'sessie'}); return; }
       if(!ALLOWED_EMAILS.includes(email.toLowerCase()) ||
          (state.currentUserEmail && email.toLowerCase()!==state.currentUserEmail.toLowerCase())){
         logout('Je logde in met een ander account. Log in met je VvE Beheer Collectief-account.');
@@ -607,7 +611,10 @@ async function _loadRonde(silent){
     // 8s-poll hier stilzwijgend terug en bleef 'Live · HH:MM' staan terwijl er niets
     // meer binnenkwam. Zelfde tolerantie als bij leesfouten: één stille hapering mag,
     // vanaf de tweede op rij (of bij een handmatige verversing) tonen we 'Fout'.
-    if(!await ensureToken()){
+    // `!silent` = een handmatige verversing (de knop in de titelbalk) of de resync ná een
+    // schrijfactie; daar hoort een klik bij en mag Google desnoods om toestemming vragen. De
+    // STILLE 8s-ronde mag dat niet: zie de toelichting bij `ensureToken`.
+    if(!await ensureToken(!silent)){
       state._syncFails=(state._syncFails||0)+1;
       if(isOffline()){ setSyncOffline(); showOfflineBanner(); return; }
       if(!silent || state._syncFails>=2) setSyncErr();

@@ -9,6 +9,7 @@ import { parseAannemers, serializeAannemers, aannSleutel } from "./util.js";
 import { writeRange, assertRowMatch } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { backgroundWrite, blokkeerOffline } from "./data.js";
+import { showToast } from "./notifications.js";
 import { renderNtd } from "./render-lijsten.js";
 import { herstelAannemerFocus } from "./render-offerte.js";
 
@@ -25,7 +26,16 @@ function _vindRij(sleutel){
 async function _bewaar(r, vorige){
   renderNtd();
   if(!r._row) return; // zonder rijnummer geen schrijfdoel (zeldzaam) — alleen lokaal
-  if(!await ensureToken()){ r.aannemers=vorige; renderNtd(); return; }
+  // Mislukte inlog: terugdraaien MÉT melding. Zonder die melding sprong een zojuist getypte
+  // aannemersnaam (of een net gezet vinkje) stil terug naar de oude waarde, en stilte leest als
+  // 'gelukt'. Elke andere ensureToken-aanroeper in de app zegt hier wél iets; dit was de enige
+  // schrijfweg die het niet deed.
+  if(!await ensureToken()){
+    r.aannemers=vorige; renderNtd();
+    showToast('Niet opgeslagen','Inloggen mislukt — de aannemerslijst staat weer zoals hij was',
+              'var(--rd)',null,{geenDedup:true});
+    return;
+  }
   let gedaan=false;
   backgroundWrite(
     async()=>{ if(!gedaan){ await assertRowMatch(r._row, r); await writeRange(`'Nog Te Doen'!P${r._row}`,[r.aannemers]); gedaan=true; } },

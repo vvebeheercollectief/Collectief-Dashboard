@@ -134,6 +134,11 @@ document.addEventListener('DOMContentLoaded',()=>{
   // Zichtbare waarschuwingsbalk in de testomgeving
   if (IS_STAGING) {
     document.title = '[TEST] ' + document.title;
+    // De balk is `position:fixed` en de opvuldiv eronder duwt de héle schil 34px omlaag, terwijl
+    // `#app` op `height:100vh` staat. Zonder deze klasse valt de onderrand van de zijbalk — en
+    // daarmee de sync-status ('Live' / 'verversen staat stil') — precies die 34px buiten beeld.
+    // Gemeten op 1440×900 én 1280×700: voet-onderkant 934 resp. 734.
+    document.body.classList.add('met-stagingbalk');
     document.body.insertAdjacentHTML('afterbegin',
       '<div class="staging-balk">'
       + ico('waarschuwing',14).replace('<svg ','<svg style="vertical-align:-2.5px;margin-right:4px" ')

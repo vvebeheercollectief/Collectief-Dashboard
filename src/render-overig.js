@@ -315,7 +315,10 @@ function logZin(r, opts){
     case'Behandelaar gewijzigd':return A('wees')+(zonderCode?'een taak':chip)+' toe'+(r.nieuweWaarde?` aan <b>${esc(r.nieuweWaarde)}</b>`:'');
     case'Aangemaakt':
     case'Aangemaakt (sheet)':  return A('maakte')+'een nieuwe taak'+bij+(r.nieuweWaarde?` <span style="color:var(--mut)">→ ${esc(r.nieuweWaarde)}</span>`:'');
-    case'Contact':             return A('sprak')+`met ${esc(r.oudeWaarde||'—')}`+bij+` <span style="color:var(--mut)">· ${esc(r.veld||'')}</span>`;
+    // Het soort contact (telefoon/mail/…) staat achter een punt-scheiding. Is dat veld leeg — dat
+    // kan bij regels van vóór deze functie of bij een met de hand getypte regel — dan hoort de
+    // scheiding óók weg te blijven; anders eindigt de zin op een losse '·'.
+    case'Contact':             return A('sprak')+`met ${esc(r.oudeWaarde||'—')}`+bij+(r.veld?` <span style="color:var(--mut)">· ${esc(r.veld)}</span>`:'');
     case'Aangevinkt':          return A('vinkte')+`<b>${esc(r.veld||'')}</b> aan`+bij;
     case'Uitgevinkt':          return A('vinkte')+`<b>${esc(r.veld||'')}</b> uit`+bij;
     case'Kenmerk':             return A('wijzigde')+`kenmerk <b>${esc(r.veld||'')}</b>`+bij+(r.nieuweWaarde?` <span style="color:var(--mut)">→ ${esc(r.nieuweWaarde)}</span>`:'');

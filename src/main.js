@@ -443,7 +443,17 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('notif-bg').addEventListener('mousedown', e => { _notifMouseDown = e.target; });
   document.getElementById('notif-bg').addEventListener('click', e => { if (e.target.id === 'notif-bg' && _notifMouseDown?.id === 'notif-bg') closeNotifModal(); });
   document.getElementById('notif-who').onchange = () => { onWhoChange(); saveNotifPrefs(); };
-  document.getElementById('notif-who-other').oninput = () => saveNotifPrefs();
+  // Met een korte vertraging. `saveNotifPrefs` doet niet alleen een localStorage-schrijfactie maar
+  // ook `_syncNotifTags`, en dat zijn twee netwerkaanroepen naar OneSignal (addTags + login).
+  // Zonder rem gingen die bij ELKE toetsaanslag de deur uit — tien halve namen door elkaar, en
+  // welke er als laatste landt hangt van de netwerkvolgorde af, niet van de typvolgorde.
+  // Een debounce en geen `onchange`: zo blijft de naam ook bewaard als het veld nooit blur krijgt
+  // (Escape, het venster wegklikken).
+  let _whoTimer;
+  document.getElementById('notif-who-other').oninput = () => {
+    clearTimeout(_whoTimer);
+    _whoTimer = setTimeout(saveNotifPrefs, 600);
+  };
   document.getElementById('notif-subscribe-btn').onclick = subscribeNotifs;
   document.getElementById('notif-unsubscribe-btn').onclick = unsubscribeNotifs;
   document.getElementById('notif-test-btn').onclick = () => sendTestNotif(getCurrentWho(), 'Test melding', 'Notificaties werken correct op dit apparaat!');

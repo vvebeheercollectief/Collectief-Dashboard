@@ -18,7 +18,14 @@ import { herstelAannemerFocus } from "./render-offerte.js";
 // dan altijd het eerste — ook als de gebruiker bij het tweede stond. assertRowMatch merkte dat
 // niet, want die controleert de rij die hier gekozen is.
 function _vindRij(sleutel){
-  return (D.ntd['OFFERTE-TRAJECTEN']||[]).find(r=>aannSleutel(r)===sleutel) || null;
+  // Weigeren bij DUBBELZINNIGHEID in plaats van blind de eerste pakken. `aannSleutel` valt bij een
+  // rij zonder taaknummer (van vóór de backfill) terug op de VvE-code, en dan dragen twee
+  // offerte-trajecten van dezelfde VvE dezelfde sleutel — precies het geval waar deze functie
+  // ooit voor gemaakt is. Met een 'nr:'-sleutel is er per definitie hoogstens één treffer, dus de
+  // normale weg verandert hier niet; alleen het onduidelijke geval doet nu niets in plaats van
+  // iets op de verkeerde rij.
+  const t=(D.ntd['OFFERTE-TRAJECTEN']||[]).filter(r=>aannSleutel(r)===sleutel);
+  return t.length===1 ? t[0] : null;
 }
 
 // Render direct (optimistisch) en schrijf de al-gemuteerde r.aannemers weg naar kolom P.
@@ -88,10 +95,13 @@ function toggleAannemerBinnen(sleutel, idx){
 
 // Naam van een bestaande aannemer wijzigen. Zelfde poort en zelfde schrijfweg als toevoegen:
 // de hele lijst gaat als één kolom-P-tekst terug naar de Sheet.
-function hernoemAannemer(sleutel, idx, naam){
+function hernoemAannemer(sleutel, idx, naam, verwacht){
   const r=_vindRij(sleutel); if(!r) return;
   const lijst=parseAannemers(r.aannemers);
   if(!lijst[idx]) return;
+  // Staat op deze plek nog de regel die de gebruiker aanklikte? Zo niet, dan is de lijst tussen
+  // openen en opslaan verschoven en zou deze schrijfactie een ándere aannemer hernoemen.
+  if(verwacht!=null && lijst[idx].naam!==verwacht) return;
   // Dezelfde schoonmaak als bij toevoegen: '|' en regelovergangen zijn de scheidingstekens van
   // kolom P, dus die mogen niet in een naam terechtkomen — één geplakte regelovergang zou van
   // één aannemer er stil twee maken.
@@ -122,7 +132,10 @@ function startHernoem(sleutel, idx){
   const r=_vindRij(sleutel); if(!r) return;
   const lijst=parseAannemers(r.aannemers);
   if(!lijst[idx]) return;
-  state.offerteAannEdit={sleutel, idx};
+  // De naam die er BIJ HET OPENEN stond gaat mee. De poll kan de lijst intussen vervangen (een
+  // collega voegt een aannemer toe of haalt er een weg) en dan wijst het bewaarde INDEXNUMMER een
+  // andere regel aan; zonder deze controle hernoemde de blur-afhandeling dan stil de verkeerde.
+  state.offerteAannEdit={sleutel, idx, oudeNaam:lijst[idx].naam};
   state.offerteAannEditVal=lijst[idx].naam;
   state.offerteAannOpen.add(sleutel);
   renderNtd();
@@ -135,7 +148,7 @@ function stopHernoem(bewaren){
   // Stand EERST wissen, dan pas schrijven: `hernoemAannemer` tekent via `_bewaar` opnieuw, en dat
   // moet de knop terugzetten in plaats van het invoerveld nog eens.
   state.offerteAannEdit=null; state.offerteAannEditVal='';
-  if(bewaren) hernoemAannemer(e.sleutel, e.idx, val);
+  if(bewaren) hernoemAannemer(e.sleutel, e.idx, val, e.oudeNaam);
   renderNtd();
 }
 

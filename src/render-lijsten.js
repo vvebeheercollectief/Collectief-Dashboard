@@ -221,14 +221,18 @@ function openBundel(bundelId){
 // selectie mag niet als bijvangst van een andere handeling sneuvelen. Daarom tekent het bundel-merkje
 // in bulk-modus niet eens (zie `bundelWeergave`) — dan kan deze weg daar ook niet vandaan komen.
 function wisNtdFilters(){
-  let gewist = false;
+  let gewist = false, sortWeg = false;
   ['s-ntd','f-code-ntd','f-beh-ntd','f-prio-ntd'].forEach(id => {
     const el = document.getElementById(id);
     if (el && el.value){ el.value = ''; gewist = true; }
   });
   if (state.ntdStatus){ state.ntdStatus = ''; gewist = true; }
-  if (state.ntdSort.key){ state.ntdSort = { key:null, asc:true }; gewist = true; }
-  return gewist;
+  // De SORTERING apart bijhouden. Een kolomkop-sortering is geen filter — hij haalt geen enkele
+  // rij uit de lijst — en de melding die hierop volgt spreekt alleen over zoekterm en filters.
+  // Zonder dit onderscheid verscheen 'Zoekterm en filters zijn gewist' terwijl er alleen gesorteerd
+  // was, en dan zoekt de gebruiker naar een filter dat hij nooit gezet heeft.
+  if (state.ntdSort.key){ state.ntdSort = { key:null, asc:true }; sortWeg = true; }
+  return { gewist, sortWeg, iets: gewist || sortWeg };
 }
 
 // Het bundel-merkje: laat de bundel zien waar deze taak bij hoort.
@@ -255,9 +259,9 @@ function springNaarBundel(bundelId){
     return;
   }
   openBundel(id);
-  const gewist = wisNtdFilters();
+  const wis = wisNtdFilters();
   const zichtbaar = setNtd(kop.r._sec);   // wist de bulk-selectie en hertekent de hele lijst
-  if (gewist) renderNtdStats();           // de statuspillen dragen hun eigen aan/uit-stand
+  if (wis.iets) renderNtdStats();         // de statuspillen dragen hun eigen aan/uit-stand
   // Pas ná die render is bekend op welke pagina de kop staat — de lijst hangt immers af van de
   // zojuist gewiste filters. Daarom de getekende lijst uit setNtd, en niet de pijplijn hier
   // nabouwen: een tweede kopie van filteren/sorteren/absorberen loopt bij de eerste wijziging
@@ -278,8 +282,15 @@ function springNaarBundel(bundelId){
   // geen ontdubbeling: die bestaat om een herhaalde GEBEURTENIS in te slikken, maar wie binnen
   // vijftien seconden twee keer springt, ziet zijn filters dan de tweede keer zonder uitleg
   // verdwijnen.
-  if (gewist) showToast('Bundel geopend','Zoekterm en filters zijn gewist — anders valt de bundel buiten beeld.',
-                        null,'label',{ geenSysteemmelding:true, geenDedup:true });
+  // De tekst volgt wat er ÉCHT is teruggezet. Alleen sorteren is geen filter, en 'filters zijn
+  // gewist' laat de gebruiker dan zoeken naar iets wat hij nooit heeft gezet.
+  if (wis.iets) showToast('Bundel geopend',
+                          wis.gewist
+                            ? (wis.sortWeg
+                                ? 'Zoekterm, filters en sortering zijn teruggezet — anders valt de bundel buiten beeld.'
+                                : 'Zoekterm en filters zijn gewist — anders valt de bundel buiten beeld.')
+                            : 'De sortering is teruggezet — anders valt de bundel buiten beeld.',
+                          null,'label',{ geenSysteemmelding:true, geenDedup:true });
 }
 
 function renderNtd(){

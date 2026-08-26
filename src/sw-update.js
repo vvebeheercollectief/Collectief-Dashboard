@@ -118,7 +118,11 @@ export function maakHerlaadKern(deps = {}) {
 
 // Hoe lang 'Bezig…' mag blijven staan voordat de knop zich weer aanbiedt. Ruim boven een normale
 // herlading (die is er binnen een seconde) en boven de tijd die een schrijfactie kost.
-const HERLAAD_WACHTHOND_MS = 25_000;
+// 35 en niet 25 seconden: de KERN houdt een klik 30 seconden gearmd (klikTtl in maakHerlaadKern).
+// Met 25 sprak de wachthond dus terwijl de wens nog gewoon geldig was — hij meldde 'het herladen
+// kwam niet door', en vijf seconden later herlaadde de pagina alsnog, onaangekondigd. Deze grens
+// hoort per definitie ná die van de kern te liggen.
+const HERLAAD_WACHTHOND_MS = 35_000;
 
 function toonUpdateBalk(onReload, onDismiss, isBezet) {
   if (document.getElementById('sw-update-bar')) return; // nooit dubbel

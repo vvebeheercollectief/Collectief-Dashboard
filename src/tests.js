@@ -441,6 +441,21 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('login-gate: knop heeft default- én signing-state',
     !!document.querySelector('#login-btn .lg-btn-default') && !!document.querySelector('#login-btn .lg-btn-signing'));
   truthy('login-gate: splash-laag bestaat (klik = overslaan)', !!document.querySelector('#login-gate .lg-splash'));
+  // sw.js draagt APP_VERSION mee, zodat élke uitrol de service worker verandert en de
+  // 'nieuwe versie'-balk verschijnt. Zonder die regel bleef sw.js bij een uitrol die alleen src/
+  // raakt byte-identiek en zag de browser geen nieuwe worker: open sessies draaiden de oude
+  // modules door tot iemand toevallig herlaadde. Deze toets slaat alarm zodra de twee uit elkaar
+  // lopen — precies het moment waarop iemand de bump vergeten is.
+  await (async()=>{
+    try{
+      const bron = await (await fetch('./sw.js', {cache:'no-store'})).text();
+      const m = bron.match(/const\s+APP_VERSION\s*=\s*'([^']+)'/);
+      truthy('sw.js: draagt een APP_VERSION-regel', !!m);
+      if(m) eq('sw.js: APP_VERSION gelijk aan config.js', m[1], APP_VERSION);
+    }catch(e){
+      truthy('sw.js: te lezen voor de versievergelijking ('+(e&&e.message)+')', false);
+    }
+  })();
   // Het inlogscherm is een `position:fixed`-overlay en dekt de schil dus alleen VISUEEL af. Zonder
   // `inert` bleef alles erachter met Tab bereikbaar én met het toetsenbord te bedienen — dertig
   // knoppen, waaronder 'afronden' en 'verwijderen'. logout() zet het attribuut, doLogin en het
@@ -6269,11 +6284,22 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       try {
         velden.forEach(id => document.getElementById(id).value = '');
         state.ntdStatus = ''; state.ntdSort = { key:null, asc:true };
-        eq('wissen: met een schone lijst valt er niets te wissen', wisNtdFilters(), false);
+        eq('wissen: met een schone lijst valt er niets te wissen', wisNtdFilters().iets, false);
         document.getElementById('s-ntd').value = 'dak';
         document.getElementById('f-code-ntd').value = '311212';
         state.ntdStatus = 'telaat'; state.ntdSort = { key:'deadline', asc:false };
-        eq('wissen: staat er wél iets, dan meldt hij dat', wisNtdFilters(), true);
+        eq('wissen: staat er wél iets, dan meldt hij dat', wisNtdFilters().iets, true);
+        // En hij houdt zoekterm/filters uit elkaar van de SORTERING: de melding die erop volgt
+        // spreekt alleen over zoekterm en filters, en alleen sorteren is geen filter.
+        (() => {
+          const sOud=state.ntdSort;
+          try{
+            document.getElementById('s-ntd').value='';
+            state.ntdStatus=''; state.ntdSort={key:'deadline',asc:true};
+            const w=wisNtdFilters();
+            eq('wissen: alleen sorteren telt niet als filter', [w.gewist, w.sortWeg, w.iets], [false, true, true]);
+          } finally { state.ntdSort=sOud; }
+        })();
         eq('wissen: zoekveld, codefilter, statuspil en kolomsortering staan weer op standaard',
            [document.getElementById('s-ntd').value, document.getElementById('f-code-ntd').value,
             state.ntdStatus, state.ntdSort.key], ['', '', '', null]);

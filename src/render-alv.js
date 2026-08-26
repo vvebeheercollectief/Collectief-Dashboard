@@ -167,7 +167,10 @@ async function toggleAlvoFlag(idx,field){
       if(field==='notulen' && newVal){
         try{
           const nu=new Date();
-          const datum=`${String(nu.getDate()).padStart(2,'0')}-${String(nu.getMonth()+1).padStart(2,'0')}-${nu.getFullYear()}`;
+          // Zonder voorloopnullen: zo staan alle bestaande regels in dit tabblad er ook in
+          // ('5-5-2026'), en zo zet `verplaatsALV` in Apps Script zijn datum neer. Eén kolom hoort
+          // er niet in twee schrijfwijzen bij te staan.
+          const datum=`${nu.getDate()}-${nu.getMonth()+1}-${nu.getFullYear()}`;
           // Ontdubbelen op code + de EXACTE dag van vandaag, niet op het kalenderjaar. De datum in
           // het archief is de dag waarop het vinkje gezet wordt, niet de dag van de vergadering:
           // een ALV van december die pas in januari wordt afgevinkt draagt een januaridatum, en

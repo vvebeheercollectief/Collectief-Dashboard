@@ -344,14 +344,14 @@ function _sorteerOfferteTrajectenImpl(e) {
   var inLOD = sortAll || (editedRow > lodHeader && (subsidieHeader < 0 || editedRow < subsidieHeader));
   var inSubsidie = sortAll || (subsidieHeader > 0 && editedRow > subsidieHeader);
 
-  // Sorteer OPPAKKEN op kolom H (8) = het vinkje 'In behandeling'.
-  // LET OP — dit is waarschijnlijk niet bedoeld, maar bewust NIET gewijzigd zonder de gebruiker.
-  // Volgens SECS[...].keys (src/config.js), dat één-op-één de kolomvolgorde van dit tabblad is,
-  // staat de deadline bij OPPAKKEN in kolom D (4) en bij VERGADERVERZOEKEN in F (6). De drie
-  // andere secties sorteren wél op een betekenisvolle kolom (offerte op C = datum aangevraagd,
-  // LOD en subsidie op F = deadline). Sorteren op een TRUE/FALSE-vinkje zet alleen 'nog niet in
-  // behandeling' bovenaan. Wijzigen verandert de volgorde die de gebruiker in de Sheet zélf ziet
-  // — dat is zijn keuze, niet die van een opruimronde. Zie de nachtelijke doorlichting v11.0.
+  // Sorteer OPPAKKEN op kolom H (8) = het vinkje 'In behandeling'. Bij VERGADERVERZOEKEN idem.
+  //
+  // DIT BLIJFT ZO — besloten door de gebruiker op 2026-08-26. Niet opnieuw voorstellen.
+  // De doorlichting merkte op dat het afwijkt: de andere drie secties sorteren op een datum
+  // (offerte op C = datum aangevraagd, LOD en subsidie op F = deadline), en de deadline staat bij
+  // Oppakken in kolom D en bij Vergaderverzoeken in F. Sorteren op het vinkje zet dus 'nog niet in
+  // behandeling' bovenaan in plaats van 'meest urgent'. Dat is gevraagd en gewenst: deze volgorde
+  // is wat de gebruiker in zijn éigen tabblad wil zien, en het dashboard sorteert los daarvan.
   if (inOppakken && oppakkenHeader > 0) {
     var oppakkenStart = oppakkenHeader + 2;
     var oppakkenEnd = oppakkenStart - 1;

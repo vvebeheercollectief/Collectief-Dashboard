@@ -116,6 +116,14 @@ async function fetchUserEmail(){
   }catch(e){return null}
 }
 
+// De twee token-sleutels uit sessionStorage. `state.oauthToken` op null zetten is maar de helft:
+// bij het opstarten leest main.js de sessie uit sessionStorage terug, dus een achtergebleven token
+// komt na één herlading gewoon weer boven — inclusief het geval waarvoor we hem juist weggooiden
+// (een token van een ánder account, want doOAuth(true) toont de accountkiezer).
+function _wisTokenSessie(){
+  try{ sessionStorage.removeItem('oauthToken'); sessionStorage.removeItem('oauthExpiry'); }catch(_){}
+}
+
 async function doLogin(){
   const errEl=document.getElementById('login-error');
   const btn=document.getElementById('login-btn');
@@ -135,7 +143,7 @@ async function doLogin(){
     // dan had de sessie een geldig token zonder gecontroleerd adres — en dat is precies de stand
     // waarin `ensureToken` meteen `true` teruggeeft en het dashboard achter de inlogkaart alsnog
     // gaat lezen en schrijven. `ensureToken` ruimt hier al op; deze weg deed dat niet.
-    if(!email){state.oauthToken=null;state.oauthExpiry=0;errEl.textContent='Kon e-mailadres niet ophalen.';errEl.style.display='block';btn.classList.remove('is-signing');btn.disabled=false;return}
+    if(!email){state.oauthToken=null;state.oauthExpiry=0;_wisTokenSessie();errEl.textContent='Kon e-mailadres niet ophalen.';errEl.style.display='block';btn.classList.remove('is-signing');btn.disabled=false;return}
     if(!ALLOWED_EMAILS.includes(email.toLowerCase())){
       state.oauthToken=null;state.oauthExpiry=0;
       errEl.textContent='Geen toegang. Gebruik je VvE Beheer Collectief account.';errEl.style.display='block';btn.classList.remove('is-signing');btn.disabled=false;return;
@@ -245,6 +253,15 @@ function logout(reden){
   try{ if(window.OneSignal && OneSignal.logout) OneSignal.logout(); }catch(_){}
   state.isSubscribed=false;
   try{ refreshNotifUI(); }catch(_){}
+  // ÉÉRST alle open vensters sluiten. Ze staan buiten #app (rechtstreeks in <body>), dus `inert`
+  // hieronder raakt ze niet: een bewerkscherm dat openstond op het moment van uitloggen blijft
+  // achter de inlogkaart gewoon 'open', en dan trekt de Tab-val in modal-a11y.js de focus er
+  // steeds weer in — het toetsenbord komt niet meer bij de inlogknop. `MODAL_SLUITERS` niet
+  // gebruiken: dat zou een kringverwijzing naar main.js opleveren, en de vensters hoeven hier
+  // alleen dícht. De bijbehorende toestand wordt hieronder toch al leeggemaakt.
+  try{ document.querySelectorAll('.modal-bg.open').forEach(bg=>bg.classList.remove('open')); }catch(_){}
+  state.editMode=false; state.editRowData=null; state.editSec=null;
+  state._completeRow=null; state._completeRid=null;
   // Het inlogscherm is een `position:fixed`-overlay: hij dekt het dashboard alleen VISUEEL af.
   // Zonder `inert` bleven alle knoppen erachter met Tab bereikbaar én klikbaar via het
   // toetsenbord — dertig stuks, gemeten — en die knoppen doen echte dingen (verversen, een taak
@@ -258,4 +275,4 @@ function logout(reden){
   if(errEl && reden){ errEl.textContent=reden; errEl.style.display='block'; }
 }
 
-export { doOAuth, fetchUserEmail, doLogin, ensureToken, logout };
+export { doOAuth, fetchUserEmail, doLogin, ensureToken, logout, _wisTokenSessie };

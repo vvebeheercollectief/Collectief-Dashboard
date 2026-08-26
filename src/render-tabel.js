@@ -378,11 +378,12 @@ function rowNtd(r,sec){
   const bdlChev = _extra.chevron;
   // Op de kop de telpill; verder het bundel-merkje — wie dat krijgt beslist bundelMerkje zelf.
   const bdlNaam = _isKop ? _extra.pill : bundelMerkje(r, _bw, sec);
-  // De telpil ("1 van 1 klaar") staat NAAST de naam, anders dan het merkje dat een eigen regel
-  // krijgt. Naam + pil samen zijn dan breder dan de cel en de pil liep de buurkolom in (gemeten:
-  // 79px bij een venster van 1440). Met deze klasse laat de naam ruimte voor de pil; zonder pil
-  // mag hij de volle celbreedte houden. Een klasse en geen :has(), want dat is op de Safari van
-  // deze werkplek niet te vertrouwen.
+  // De telpil ("1 van 1 klaar") staat sinds 26-08 op een EIGEN REGEL onder de naam, net als het
+  // bundel-merkje. Naast de naam hield hij 96px bezet en bleef er van een kolom van 168px maar
+  // 52px naam over — 'Vereniging Parkzicht Noord' werd 'Vereni…', en juist de bundelkop is de rij
+  // waarvan je wilt zien om wélke VvE het gaat. De klasse zet dat aan (styles.css); de naam houdt
+  // daardoor de volle celbreedte. Een klasse en geen :has(), want dat is op de Safari van deze
+  // werkplek niet te vertrouwen.
   const naamCls = 'cell-name' + ((_isKop && _extra.pill) ? ' met-telpil' : '');
   // Het sleep-handvat om deze rij onder een andere te hangen. Het hangt aan dezelfde `stapel`-vlag
   // als de rest van de gestapelde weergave: bij een zoekterm, filter, kolomsortering of

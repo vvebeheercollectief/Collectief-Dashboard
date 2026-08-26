@@ -89,31 +89,43 @@ export const KORTE_NAMEN = {
 // in de rij, terwijl het actiepunt en de opmerkingen ernaast werden afgekapt.
 //
 // KIES px DUS ALLEEN ALS DE INHOUD EEN BEKEND MAXIMUM HEEFT, want de kolom groeit nooit meer mee:
-//   VvE Code  105px — de code kan een kenmerk dragen ("121034 - G"); op 7% liep hij er 19px uit.
+//   VvE Code  130px — de code kan een kenmerk dragen ("121034 - G"); op 7% liep hij er 19px uit.
+//                     130 en niet 105 sinds 26-08: op een BUNDELKOP staan er drie dingen in die
+//                     cel (sleepgreep 16 + 9 marge, chevron 22 + 3, code 45 = 95px) en in de
+//                     contentbox van 75px viel de code naar een tweede regel.
 //   datums    155px — "22 september 2026" is 128px.
 //   acties    150px — vier knoppen van 28px plus de tussenruimte; op 9% viel het vinkje eraf.
 //                     Offerte-trajecten heeft er drie en houdt het op 120px.
+// De kolomKOP telt ook mee als ondergrens: hij is `white-space:nowrap` en `overflow:visible`, dus
+// een kop die niet past wordt niet afgekapt maar OVER de buurkop heen getekend. 'BEHANDELAAR' is
+// met 97px de breedste; op Offerte-trajecten en Subsidie-trajecten staan de gewichten (14,5 / 11,8)
+// daarom zo dat de kolom ook in de SELECTEERSTAND past — daar komt er een vinkjeskolom van 48px
+// bij en krimpen alle gewichtskolommen mee.
 // Alle andere kolommen dragen tekst die langer kan worden en krijgen een gewicht — óók Signaal.
 // Die stond op '150px' toen dat nog een ondergrens was; als plafond zou "Te laat (47d) Vandaag
-// opvolgen" op een breed scherm gaan afkappen terwijl er ruimte zat is. De gewichten 20,1 / 19,4 /
-// 21,4 zijn zo gekozen dat de kolom bij de smalste tabel (1150px) nog altijd 150px meet — dat was
+// opvolgen" op een breed scherm gaan afkappen terwijl er ruimte zat is. De gewichten 21,0 / 20,2 /
+// 22,3 zijn zo gekozen dat de kolom bij de smalste tabel (1150px) nog altijd 150px meet — dat was
 // de gemeten ondergrens: op 140 hielden vijf rijen een afgekapte hoofdmelding over, op 150 nul.
+// LET OP — deze drie getallen hangen aan de px-SOM van hun sectie. Toen de VvE-code van 105 naar
+// 130px ging, kwam die 25px van de gewichtskolommen af en zakte Signaal stil naar 145px. Verandert
+// er ooit weer een px-kolom, reken deze drie dan opnieuw uit: gewicht w geeft
+// w/(gewichtSom) × (100 − pxSom/1150 × 100) procent van 1150.
 export const SECS = {
   OPPAKKEN:{label:'Oppakken',css:'--sec:var(--ac);--sec-l:var(--ac-l);--sec-b:var(--ac-b)',color:'#0D7377',
     cols:['VvE Code','VvE','Signaal','Actiepunt','Deadline','Wie','Opmerkingen'],
-                   breedtes:['130px',23,20.1,29,'155px',7,20,'150px'],
+                   breedtes:['130px',23,21.0,29,'155px',7,20,'150px'],
     keys:['code','naam','actiepunt','deadline','behandelaar','prioriteit','opmerkingen','inBehandeling']},
   VERGADERVERZOEKEN:{label:'Vergaderverzoeken',css:'--sec:var(--am);--sec-l:var(--am-l);--sec-b:var(--am-b)',color:'#B45309',
     cols:['VvE Code','VvE','Signaal','Periode','Agendapunten','Wie','Deadline uitschr.','Opmerkingen'],
-                   breedtes:['130px',21,19.4,9,18,7,'155px',21,'150px'],
+                   breedtes:['130px',21,20.2,9,18,7,'155px',21,'150px'],
     keys:['code','naam','periode','agendapunten','behandelaar','deadline','opmerkingen','inBehandeling']},
   'OFFERTE-TRAJECTEN':{label:'Offerte-trajecten',css:'--sec:var(--pu);--sec-l:var(--pu-l);--sec-b:var(--pu-b)',color:'#6D5BD0',
     cols:['VvE Code','VvE','Datum aangevr.','Ontvangen/Aangevr.','Behandelaar','Deadline','Opmerkingen'],
-                   breedtes:['130px',21,'165px',21,13,'155px',21,'120px'],
+                   breedtes:['130px',21,'165px',21.7,14.5,'155px',20.3,'120px'],
     keys:['code','naam','datumAangevraagd','offertes','behandelaar','deadline','opmerkingen']},
   LOD:{label:'LOD',css:'--sec:var(--rd);--sec-l:var(--rd-l);--sec-b:var(--rd-b)',color:'#B91C1C',
     cols:['VvE Code','VvE','Signaal','Actiepunt','Status','Wie','Deadline LOD','Opmerkingen'],
-                   breedtes:['130px',19,21.4,24,18,7,'155px',16,'150px'],
+                   breedtes:['130px',19,22.3,24,18,7,'155px',16,'150px'],
     keys:['code','naam','actiepunt','status','behandelaar','deadline','opmerkingen','inBehandeling']},
   // Subsidie-trajecten (2026-07-29). Zelfde kolomstramien als LOD, met 'Status'
   // vervangen door 'Fase'. Twee dingen liggen hier vast en mogen niet losjes wijzigen:
@@ -126,7 +138,7 @@ export const SECS = {
   // de gebruiker koos zes kolommen om de rij rustig te houden.
   'SUBSIDIE-TRAJECTEN':{label:'Subsidie-trajecten',css:'--sec:var(--tl);--sec-l:var(--tl-l);--sec-b:var(--tl-b)',color:'#0F766E',
     cols:['VvE Code','VvE','Subsidie','Fase','Behandelaar','Deadline'],
-                   breedtes:['130px',29,19,19,11,'155px','150px'],
+                   breedtes:['130px',29,19,19,11.8,'155px','150px'],
     keys:['code','naam','subsidie','subsidieFase','behandelaar','deadline','opmerkingen','inBehandeling']},
 };
 

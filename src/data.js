@@ -5,7 +5,7 @@ import { parseDt, _parseAnyDate, coerceDagenVooraf, leegBijErfenis } from "./uti
 import { state, D } from "./state.js";
 import { SKEYS, SECS, APP_VERSION, ALLOWED_EMAILS } from "./config.js";
 import { fetchSheet, fetchSheets, _withRetry, isOffline } from "./api.js";
-import { ensureToken, doOAuth, fetchUserEmail, logout } from "./auth.js";
+import { ensureToken, doOAuth, fetchUserEmail, logout, _wisTokenSessie } from "./auth.js";
 import { buildAnalytics, buildDash } from "./render-analytics.js";
 import { renderNtdDonut, renderNtd } from "./render-lijsten.js";
 // Kringverwijzing data ⇄ bulk, net als data ⇄ main en ui ⇄ bulk: bulk.js haalt backgroundWrite en
@@ -341,7 +341,7 @@ function showLoadError(opties){
       // geen token in de sessie te blijven staan. `doOAuth(true)` heeft hierboven de ACCOUNTKIEZER
       // getoond, dus dit token kan van een ander account zijn dan het ingelogde — en dan zou de
       // eerstvolgende poll met dat vreemde token gaan lezen en schrijven.
-      if(!email){ state.oauthToken=null; state.oauthExpiry=0; showLoadError({soort:'sessie'}); return; }
+      if(!email){ state.oauthToken=null; state.oauthExpiry=0; _wisTokenSessie(); showLoadError({soort:'sessie'}); return; }
       if(!ALLOWED_EMAILS.includes(email.toLowerCase()) ||
          (state.currentUserEmail && email.toLowerCase()!==state.currentUserEmail.toLowerCase())){
         logout('Je logde in met een ander account. Log in met je VvE Beheer Collectief-account.');

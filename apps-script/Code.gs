@@ -55,7 +55,15 @@ function verplaatsAfgerond(e) {
   for (var t = 0; t < vinkjes.length; t++) if (vinkjes[t][0] === true) aangevinkt++;
   if (aangevinkt > MAX_AFVINK_PER_KEER) {
     Logger.log('verplaatsAfgerond: ' + aangevinkt + ' vinkjes in één bewerking — niets gedaan');
-    cd_schrijfLogboek('', '', 'Fout', 'Afgerond', '',
+    // De code van de BOVENSTE aangevinkte rij mee in de logregel. Zonder code komt zo'n regel
+    // nergens in beeld: de Logboek-pagina toont alleen notities en contactmomenten, en het
+    // VvE-dossier filtert op code. Nu is hij tenminste bij één van de betrokken VvE's terug te
+    // vinden, en de tekst noemt het aantal.
+    var eersteCode = '';
+    for (var u = 0; u < vinkjes.length && !eersteCode; u++) {
+      if (vinkjes[u][0] === true) eersteCode = (sheet.getRange(eersteRij + u, 1).getValue() + '').trim();
+    }
+    cd_schrijfLogboek(eersteCode, '', 'Fout', 'Afgerond', '',
       'Er stonden ' + aangevinkt + ' vinkjes in één bewerking (hoogstens ' + MAX_AFVINK_PER_KEER
       + ' tegelijk). Er is NIETS gearchiveerd en NIETS verwijderd — de vinkjes staan er nog. '
       + 'Was dit per ongeluk (doorgetrokken met de vulgreep)? Zet ze dan weer uit. Klopt het wel, '
@@ -308,7 +316,9 @@ function verplaatsALV(e) {
   // er tientallen ALV's opnieuw in het archief belanden, met de datum van vandaag.
   if (teDoen.length > MAX_AFVINK_PER_KEER) {
     Logger.log('verplaatsALV: ' + teDoen.length + ' vinkjes in één bewerking — niets gedaan');
-    cd_schrijfLogboek('', 'ALVS', 'Fout', 'Notulen', '',
+    // Zelfde reden als bij verplaatsAfgerond: een logregel zonder code komt nergens in beeld.
+    var eersteAlvCode = (sheet.getRange(teDoen[0], 1).getValue() + '').trim();
+    cd_schrijfLogboek(eersteAlvCode, 'ALVS', 'Fout', 'Notulen', '',
       'Er stonden ' + teDoen.length + ' Notulen-vinkjes aan in één bewerking (hoogstens '
       + MAX_AFVINK_PER_KEER + ' tegelijk). Er is NIETS in "' + ALFA_SHEET + '" gezet. '
       + 'Vink in kleinere groepjes af.', 'systeem');

@@ -155,7 +155,11 @@ function renderBulkUi(){
   const n=_sel.size;
   teller.textContent=`${n} geselecteerd`;
   balk.style.display=(state.bulkMode&&n>0)?'flex':'none';
-  document.body.classList.toggle('bulk', state.bulkMode); // zwevende chat-knop wijkt voor de bulk-balk
+  // De klasse volgt de ZICHTBARE balk, niet de stand. Twee dingen hangen eraan — de zwevende
+  // chat-knop die ervoor wijkt, en de plek van de meldingen op een telefoon — en allebei gaan ze
+  // over ruimte die alleen bezet is als de balk er ook echt staat. Met `state.bulkMode` alleen
+  // week de chat-knop ook opzij bij nul geselecteerde taken, terwijl er dan niets staat.
+  document.body.classList.toggle('bulk', state.bulkMode && n>0);
   // Eerlijk zijn over de statusbalk: zolang deze stand aanstaat ligt het verversen stil.
   syncSelecteerStand();
   if(!state.bulkMode) _sluitMenus();

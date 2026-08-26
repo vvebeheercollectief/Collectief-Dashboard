@@ -60,9 +60,12 @@
 
     /* Layout */
     #app{display:flex;height:100vh;overflow:hidden}
-    /* Testomgeving: de waarschuwingsbalk (34px) staat vóór #app in de bladstroom, dus de schil
-       moet die 34px inleveren. Anders schuift de onderkant van de zijbalk buiten beeld en is de
-       sync-status daar nooit te zien. Alleen op staging — op productie bestaat de balk niet. */
+    /* Testomgeving. De balk zelf staat op `position:fixed` en neemt dus GEEN ruimte in; de 34px
+       komt van de opvuldiv die main.js er direct achter zet (zie IS_STAGING daar). Die div staat
+       wél in de bladstroom, vóór #app, dus de schil moet die 34px inleveren — anders schuift de
+       onderkant van de zijbalk buiten beeld en is de sync-status daar nooit te zien. Dit getal
+       hoort dus gelijk te blijven aan de hoogte van díé div, niet aan de balk (die meet 31,2px).
+       Alleen op staging: op productie bestaat de balk niet. */
     body.met-stagingbalk #app{height:calc(100vh - 34px)}
     #overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100}
     #overlay.on{display:block}
@@ -508,13 +511,15 @@
     /* tr.snooze-row td{opacity:.55} dempt élke cel; het signaal is juist de reden dat de rij daar
        staat en moet leesbaar blijven. Hogere specificiteit, dus deze wint. */
     tr.snooze-row .cell-sig{opacity:1}
-    /* En om precies dezelfde reden de VASTGEZETTE actiekolom. Die staat op `position:sticky` met
+    /* En om precies dezelfde reden de VASTGEZETTE actiekolom. Gescoped op `#ntd-tbl-wrap`, net als
+       de sticky-regel die hij compenseert: de Herhaalregels-tabel heeft geen vastgezette kolom en
+       hoort daar dus niets van te merken. Die staat op `position:sticky` met
        een dekkende achtergrond (zie de toelichting bij `#ntd-tbl-wrap tbody td:last-child`), en
        `opacity` maakt die achtergrond mee doorschijnend — dan schemeren de wegscrollende cellen
        er op een smal scherm dwars doorheen. De knoppen zelf blijven wél gedempt, zodat de rij nog
        steeds als 'weggelegd' leest. */
-    tr.snooze-row td:not([colspan]):last-child{opacity:1}
-    tr.snooze-row td:not([colspan]):last-child .acts{opacity:.55}
+    #ntd-tbl-wrap tbody tr.snooze-row td:not([colspan]):last-child{opacity:1}
+    #ntd-tbl-wrap tbody tr.snooze-row td:not([colspan]):last-child .acts{opacity:.55}
     /* 'Geen deadline' is geen urgentie meer nu die in de signaal-kolom staat: grijs i.p.v. amber.
        --mut en niet --fnt: op --fnt kwam deze tekst uit op 2,60:1 en dit project dwingt 4,5:1 af
        voor rij-tekst. --mut haalt 5,83 in licht en 6,00 in donker, en dempt nog steeds duidelijk. */
@@ -1349,20 +1354,26 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,.search-box inpu
      bewerkscherm. De snelknop is er waar er ruimte voor is. */
   .act-ib{display:none}
   #bulk-balk{left:8px;right:8px;transform:none;flex-wrap:wrap;justify-content:center;max-width:none;bottom:78px}
-  /* De balk wrapt hierboven, en dan staat de knop 'Deadline' zo ver naar rechts dat zijn menu
-     (min-width 170px, uitlijnend op left:0) op 378px buiten het venster valt. #app staat op
-     overflow:hidden, dus dat afgeknipte stuk is niet terug te scrollen. Rechts uitlijnen houdt het
-     menu binnen de balk, die zelf al op left:8/right:8 staat. */
-  .bb-menu{left:auto;right:0}
+  /* De balk wrapt hierboven, en dan liggen de knoppen zo ver uit elkaar dat een menu van 170px
+     naast zijn eigen knop niet meer past: 'Deadline' liep er rechts uit, en met alleen `right:0`
+     liep 'Wegleggen' er links uit (gemeten -7px). #app staat op overflow:hidden, dus zo'n
+     afgeknipt stuk is niet terug te scrollen — het is definitief weg.
+     Daarom hangen de menu's hier aan de BALK in plaats van aan hun knop: `.bb-wrap` geeft zijn
+     positie op, waardoor `#bulk-balk` (position:fixed) het anker wordt. De balk staat zelf al op
+     left:8/right:8, dus een menu dat daarbinnen blijft, blijft per definitie in beeld. */
+  #bulk-balk .bb-wrap{position:static}
+  .bb-menu{left:8px;right:8px;min-width:0}
 }
 @media(max-width:560px){
   #hdr{padding:0 12px;gap:4px}
   .hdr-info p{display:none}
   #toast-container{top:auto;bottom:88px;left:8px;right:8px;max-width:none}
-  /* In de selecteerstand staat de bulk-balk onderaan, en op een telefoon wrapt die naar twee of
-     drie regels (gemeten ±124px hoog vanaf 78px). Een melding op 88px lag daar middenin: de
-     bevestiging van de bulk-actie dekte precies de knoppen af die je net gebruikt had.
-     `body.bulk` bestaat al — bulk.js zet hem aan zolang de stand aanstaat. */
+  /* Zolang de bulk-balk ZICHTBAAR is, staat hij onderaan en wrapt hij op een telefoon naar twee of
+     drie regels (gemeten ±124px hoog vanaf 78px). Een melding op 88px lag daar middenin en dekte
+     de knoppen af. `body.bulk` volgt sinds 26-08 de zichtbare balk (bulk.js, renderBulkUi).
+     LET OP: de BEVESTIGING van een bulk-actie valt hier bewust buiten — `_eindBulk` sluit de balk
+     synchroon vóór de toast, dus die verschijnt gewoon op zijn normale plek. Deze regel is er voor
+     de meldingen die WÉL tijdens de selecteerstand komen: offline, een mislukte lezing, uitleg. */
   body.bulk #toast-container{bottom:210px}
   .stat-strip{padding:8px 14px}
   .stat-item{border-right:none;margin-right:0;padding:8px 0;flex:1 0 45%}

@@ -1308,6 +1308,21 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         const _b = SECS[sec].breedtes || [];
         truthy(`kolombreedte: ${sec} — code- en actiekolom staan allebei vast`,
                typeof _b[0] === 'string' && typeof _b[_b.length - 1] === 'string');
+        // En de SIGNAAL-kolom moet bij de smalste tabel (1150px) nog altijd 150px halen. Dat is
+        // een gemeten ondergrens: op 140 hielden vijf rijen een afgekapte hoofdmelding over.
+        // Hij is een GEWICHT, dus die 150 hangt aan de px-som van de sectie — toen de VvE-code
+        // van 105 naar 130px ging, zakte hij stil naar 145. Deze toets rekent het na uit config
+        // zelf, zonder DOM, zodat hij ook slaat als iemand alleen een px-kolom verandert.
+        const _sigIdx = (SECS[sec].cols || []).indexOf('Signaal');
+        if (_sigIdx >= 0) {
+          const _br = SECS[sec].breedtes || [];
+          const _px = _br.filter(w => typeof w === 'string').reduce((a,w)=>a+parseFloat(w),0);
+          const _som = _br.filter(w => typeof w !== 'string').reduce((a,w)=>a+w,0);
+          const _rest = 100 - (_px / 1150 * 100);
+          const _sig = _br[_sigIdx] / _som * _rest / 100 * 1150;
+          truthy(`kolombreedte: ${sec} — Signaal haalt 150px op de smalste tabel (${_sig.toFixed(1)})`,
+                 _sig >= 149.5);
+        }
       });
       setNtd('OPPAKKEN');
       const _tbl = document.querySelector('#ntd-tbl-wrap table');
@@ -1536,18 +1551,27 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         try{
           const secs6 = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN'];
           const leeg6 = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
-          secs6.forEach(sec => {
-            D.ntd = { ...leeg6, [sec]: [{ _row:30, _sec:sec, code:'311212', naam:'Testflat',
-              actiepunt:'Werk', periode:'Q3 2026', agendapunten:'x', datumAangevraagd:'1-6-2026',
-              offertes:'1/2', status:'x', subsidie:'x', subsidieFase:'2', behandelaar:'Jer',
-              deadline:'', opmerkingen:'', inBehandeling:'' }] };
-            state.activeNtd = sec; pgs.ntd = 1;
-            renderNtd(); herzetKolomBreedtes();
-            const teKrap = [...document.querySelectorAll('#ntd-thead th')]
-              .filter(th => th.scrollWidth > th.clientWidth + 1)
-              .map(th => `${th.textContent.trim()} (${th.scrollWidth}>${th.clientWidth})`);
-            eq(`kolomkop (${sec}): geen kop loopt over zijn kolom heen`, teKrap.join(', '), '');
+          // MET ÉN ZONDER selecteerstand. In die stand komt er een vinkjeskolom van 48px bij en
+          // krimpen alle gewichtskolommen mee — daar liep 'BEHANDELAAR' nog over 'DEADLINE' heen
+          // terwijl de gewone weergave al klopte.
+          const bulkOud6 = state.bulkMode;
+          [false, true].forEach(bulk => {
+            state.bulkMode = bulk;
+            secs6.forEach(sec => {
+              D.ntd = { ...leeg6, [sec]: [{ _row:30, _sec:sec, code:'311212', naam:'Testflat',
+                actiepunt:'Werk', periode:'Q3 2026', agendapunten:'x', datumAangevraagd:'1-6-2026',
+                offertes:'1/2', status:'x', subsidie:'x', subsidieFase:'2', behandelaar:'Jer',
+                deadline:'', opmerkingen:'', inBehandeling:'' }] };
+              state.activeNtd = sec; pgs.ntd = 1;
+              renderNtd(); herzetKolomBreedtes();
+              const teKrap = [...document.querySelectorAll('#ntd-thead th')]
+                .filter(th => th.scrollWidth > th.clientWidth + 1)
+                .map(th => `${th.textContent.trim()} (${th.scrollWidth}>${th.clientWidth})`);
+              eq(`kolomkop (${sec}${bulk ? ', selecteerstand' : ''}): geen kop loopt over zijn kolom heen`,
+                 teKrap.join(', '), '');
+            });
           });
+          state.bulkMode = bulkOud6;
         } finally {
           klem6.remove();
           D.ntd = vNtd6; state.activeNtd = vSec6; pgs.ntd = vPg6; renderNtd();

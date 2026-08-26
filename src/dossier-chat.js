@@ -119,7 +119,20 @@ function _chatMessages(historie, max=10){
   // Eerst filteren, dán afkappen — anders telt een foutbubbel wel mee voor de max van tien.
   let h = (historie||[]).filter(m => !m.fout).slice(-max);
   if(h.length && h[0].rol !== 'user') h = h.slice(1);
-  return h.map(m => ({ role: m.rol==='user'?'user':'assistant', content: m.tekst }));
+  const uit = h.map(m => ({ role: m.rol==='user'?'user':'assistant', content: m.tekst }));
+  // OPEENVOLGENDE BEURTEN VAN DEZELFDE ROL SAMENVOEGEN. Dit is geen nettigheid: de Messages-API
+  // eist dat user en assistant elkaar afwisselen en weigert het verzoek anders met een 400. En
+  // juist het filteren hierboven maakt zo'n reeks: bij een storing blijft de VRAAG staan en
+  // verdwijnt het (nep-)antwoord, dus staan er daarna twee user-beurten achter elkaar. Zonder
+  // deze stap was de chat na één netwerkhapering permanent stuk — elke volgende vraag gaf weer
+  // een fout, die weer een foutbubbel opleverde, enzovoort.
+  const samen = [];
+  for(const m of uit){
+    const vorige = samen[samen.length-1];
+    if(vorige && vorige.role === m.role) vorige.content += '\n\n' + m.content;
+    else samen.push(m);
+  }
+  return samen;
 }
 
 // Hoogste lengte van één vraag. De proxy (api/chat.js) klemt elk bericht op 8.000 tekens en geeft

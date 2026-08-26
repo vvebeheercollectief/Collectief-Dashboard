@@ -35,8 +35,8 @@ import { zetInBehandeling, inBehandelingKolom, heeftInBehandeling, volgendeStand
 import { zoekDubbels, gelijkenis, zitErinVervat, lijktOp, woorden, dubbelVraagTekst, DUBBEL_DREMPEL } from "./dubbelcheck.js";
 import { extraVves, wisExtraVves, voegExtraVveToe, verwijderExtraVve, extraVvesHtml, extraVvesUitleg } from "./meervve.js";
 import { verplaatsTaak, verplaatsWaarden, verlorenVelden, verplaatsVraagTekst, _veldLabel } from "./verplaats.js";
-import { addAannemer, verwijderAannemer, toggleAannemerBinnen } from "./offerte-aannemers.js";
-import { _verrijkOfferteRij } from "./render-offerte.js";
+import { addAannemer, verwijderAannemer, toggleAannemerBinnen, hernoemAannemer, startHernoem, stopHernoem } from "./offerte-aannemers.js";
+import { _verrijkOfferteRij, herstelAannemerFocus } from "./render-offerte.js";
 import { bouwBundelIndex, bundelWeergave, zichtbareKop, isBundel, bundelVan, bundelMetId, hernummerLeden, volgendeVolg, magKoppelen, wordtGeabsorbeerd, koppelKandidaten, taakFilter, openSubtaken, bundelWaarschuwing, bundelVerwijzing, bundelStand, zelfdeTaak } from "./bundel.js";
 import { bundelPaneelHtml, bundelMerkje, bundelKopExtra, STAPEL_GREEP } from "./render-bundel.js";
 import { vraagBevestiging, beantwoordBevestiging, _vraagStaatOpen } from "./bevestig.js";
@@ -749,6 +749,176 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     offerteAannemerPaneel({code:'Q',_aannemers:[{naam:'X',binnen:false}]}).includes('offerte-aann-verwijder'));
   truthy('aannemer-samenvatting heeft open-actie',
     offerteAannSamenvatting({code:'Q',_aannemers:[]}).includes('offerte-aann-open'));
+
+  // ── Aannemerslijst in-/uitklappen: de klikzone (v11.3) ──────────────────────
+  // De samenvatting IS de in-/uitklapper, maar hij was precies zo breed en hoog als zijn eigen
+  // tekst terwijl hij in een cel van 198x28 staat. Alles eromheen is dode ruimte: de wikkel staat
+  // in de uitzonderingslijst van de rij-uitklapper (main.js) en heeft zelf geen actie. Gemeten op
+  // een venster van 1920: 46% van de cel deed iets, 54% niets — vandaar 'het klapt niet in'.
+  // Deze twee toetsen leggen vast dat de knop de cel VULT en dat zijn tekst binnen de knop afkapt
+  // (zonder dat laatste loopt hij uit de wikkel, die `overflow:hidden` heeft, en wordt de klikzone
+  // bij een smalle kolom juist weer kleiner).
+  truthy('aannemer-samenvatting: het label zit in een eigen span die kan afkappen',
+    offerteAannSamenvatting({code:'Q',_aannemers:[]}).includes('of-aann-lbl'));
+  truthy('aannemer-samenvatting: de knop vult de hele cel', (()=>{
+    const proef=document.createElement('div');
+    proef.innerHTML=`<div style="width:198px"><div class="of-aann-tbl-tog">${offerteAannSamenvatting({code:'Q',_aannemers:[]})}</div></div>`;
+    (document.querySelector('#page-ntd .card')||document.body).appendChild(proef);
+    try{
+      const w=proef.querySelector('.of-aann-tbl-tog').getBoundingClientRect();
+      const k=proef.querySelector('.of-aann-tog').getBoundingClientRect();
+      // Even breed als de wikkel (± 1px afronding) en minstens 24px hoog: een muisdoel dat je
+      // niet hoeft te mikken.
+      return Math.abs(k.width-w.width)<=1 && k.height>=24;
+    } finally { proef.remove(); }
+  })());
+  truthy('aannemer-paneel heeft een eigen inklap-knop',
+    offerteAannemerPaneel({code:'Q',_aannemers:[{naam:'X',binnen:false}]}).includes('of-aann-dicht'));
+  truthy('aannemer-paneel: de inklap-knop gebruikt dezelfde actie en sleutel als de samenvatting',
+    (()=>{
+      const proef=document.createElement('div');
+      proef.innerHTML=offerteAannemerPaneel({taakId:'T-KLAP',_aannemers:[{naam:'X',binnen:false}]});
+      const k=proef.querySelector('.of-aann-dicht');
+      return !!k && k.dataset.action==='offerte-aann-open' && k.dataset.aann==='nr:T-KLAP';
+    })());
+
+  // ── Aannemersnaam aanpassen door erop te klikken (v11.3) ────────────────────
+  // De naam was platte tekst: eenmaal ingevuld kon je hem alleen nog wissen en opnieuw
+  // toevoegen — en dan stond hij onderaan de lijst in plaats van op zijn eigen plek.
+  truthy('aannemer-paneel: de naam is aanklikbaar om aan te passen',
+    offerteAannemerPaneel({code:'Q',_aannemers:[{naam:'X',binnen:false}]}).includes('offerte-aann-hernoem'));
+  truthy('actie offerte-aann-hernoem bestaat', typeof ACTIONS['offerte-aann-hernoem']==='function');
+  truthy('aannemer-paneel: in de bewerkstand staat er een invoerveld i.p.v. de knop', (()=>{
+    const bE=state.offerteAannEdit, bV=state.offerteAannEditVal;
+    try{
+      state.offerteAannEdit={sleutel:'nr:T-HN', idx:1}; state.offerteAannEditVal='Half getypt';
+      const html=offerteAannemerPaneel({taakId:'T-HN',_aannemers:[{naam:'A',binnen:false},{naam:'B',binnen:false}]});
+      const proef=document.createElement('div'); proef.innerHTML=html;
+      const inp=proef.querySelector('.of-aann-naam-inp');
+      const knoppen=proef.querySelectorAll('.of-aann-naam');
+      // Precies één veld (regel 1), en regel 0 blijft gewoon een knop. De waarde komt uit `state`
+      // en niet uit de lijst: dat is wat de gebruiker aan het typen was, en de poll mag dat niet
+      // terugdraaien.
+      return !!inp && inp.value==='Half getypt' && +inp.dataset.idx===1 && knoppen.length===1;
+    } finally { state.offerteAannEdit=bE; state.offerteAannEditVal=bV; }
+  })());
+
+  // De schrijfweg zelf. `_row:0` = geen schrijfdoel, dus `_bewaar` blijft lokaal en er is geen
+  // Google-login nodig; wat we hier meten is precies de tekst die naar kolom P zou gaan.
+  const _hnProef = (start, nieuweNaam, idx) => {
+    const bewaard = D.ntd['OFFERTE-TRAJECTEN'];
+    try{
+      const r={taakId:'T-HERNOEM',code:'ZZ-HN',naam:'VvE Hernoem',aannemers:start,_row:0,_sec:'OFFERTE-TRAJECTEN'};
+      D.ntd['OFFERTE-TRAJECTEN']=[r];
+      hernoemAannemer('nr:T-HERNOEM', idx===undefined?0:idx, nieuweNaam);
+      return r.aannemers;
+    } finally { D.ntd['OFFERTE-TRAJECTEN']=bewaard; }
+  };
+  eq('hernoemen: de naam wordt vervangen, de binnen-vlag blijft',
+     _hnProef('De Lange|1\nMoTec|0','De Lange Bouw BV'), 'De Lange Bouw BV|1\nMoTec|0');
+  eq('hernoemen: op zijn eigen plek in de lijst, niet onderaan',
+     _hnProef('A|0\nB|1\nC|0','B2',1), 'A|0\nB2|1\nC|0');
+  eq('hernoemen: leeg laten wist niets (daar is het kruisje voor)',
+     _hnProef('De Lange|1\nMoTec|0','   '), 'De Lange|1\nMoTec|0');
+  eq('hernoemen: een naam die al in de lijst staat wordt geweigerd',
+     _hnProef('De Lange|1\nMoTec|0','motec'), 'De Lange|1\nMoTec|0');
+  // De scheidingstekens van kolom P mogen nooit in een naam belanden: één geplakte regelovergang
+  // zou van één aannemer er stil twee maken, en een '|' zou de binnen-vlag verplaatsen.
+  eq('hernoemen: | en regelovergang worden geschoond',
+     _hnProef('A|0','B|x\ny'), 'B x y|0');
+  eq('hernoemen: een regel die niet bestaat verandert niets',
+     _hnProef('A|0','Z',7), 'A|0');
+
+  // De index-val. `state.offerteAannEdit` bewaart een INDEX; verschuift de lijst terwijl er nog
+  // een wijziging openstaat, dan zou het wegklikken daarna de VERKEERDE regel hernoemen. Elke
+  // andere handeling rondt de wijziging daarom eerst af (_rondNaamwijzigingAf).
+  truthy('hernoemen: een kruisje tijdens het typen hernoemt niet stil de buurregel', (()=>{
+    const bewaardR=D.ntd['OFFERTE-TRAJECTEN'], bewaardS=state.activeNtd;
+    const bE=state.offerteAannEdit, bV=state.offerteAannEditVal, bO=new Set(state.offerteAannOpen);
+    try{
+      const r={taakId:'T-IDX',code:'ZZ-IDX',naam:'VvE Index',aannemers:'A|0\nB|0\nC|0',_row:0,
+               _sec:'OFFERTE-TRAJECTEN',offertes:'',datumAangevraagd:'1 mei 2026',opmerkingen:'',
+               behandelaar:'',deadline:''};
+      D.ntd['OFFERTE-TRAJECTEN']=[r]; state.activeNtd='OFFERTE-TRAJECTEN';
+      state.offerteAannOpen=new Set(['nr:T-IDX']);
+      startHernoem('nr:T-IDX', 1);           // B openzetten
+      state.offerteAannEditVal='B2';          // typen
+      verwijderAannemer('nr:T-IDX', 1);       // kruisje op diezelfde regel
+      // B is eerst hernoemd naar B2 en daarna weggehaald; C blijft C. De oude fout gaf 'A|0\nB2|0'.
+      return r.aannemers==='A|0\nC|0' && state.offerteAannEdit===null;
+    } finally {
+      D.ntd['OFFERTE-TRAJECTEN']=bewaardR; state.activeNtd=bewaardS;
+      state.offerteAannEdit=bE; state.offerteAannEditVal=bV; state.offerteAannOpen=bO;
+    }
+  })());
+  truthy('hernoemen: wat je typt gaat niet verloren als je iets anders aanklikt', (()=>{
+    const bewaardR=D.ntd['OFFERTE-TRAJECTEN'], bewaardS=state.activeNtd;
+    const bE=state.offerteAannEdit, bV=state.offerteAannEditVal, bO=new Set(state.offerteAannOpen);
+    try{
+      const r={taakId:'T-IDX2',code:'ZZ-IDX2',naam:'VvE Index2',aannemers:'A|0\nB|1',_row:0,
+               _sec:'OFFERTE-TRAJECTEN',offertes:'',datumAangevraagd:'1 mei 2026',opmerkingen:'',
+               behandelaar:'',deadline:''};
+      D.ntd['OFFERTE-TRAJECTEN']=[r]; state.activeNtd='OFFERTE-TRAJECTEN';
+      state.offerteAannOpen=new Set(['nr:T-IDX2']);
+      startHernoem('nr:T-IDX2', 0);
+      state.offerteAannEditVal='A-nieuw';
+      toggleAannemerBinnen('nr:T-IDX2', 1);   // ander knopje op een andere regel
+      return r.aannemers==='A-nieuw|0\nB|0' && state.offerteAannEdit===null;
+    } finally {
+      D.ntd['OFFERTE-TRAJECTEN']=bewaardR; state.activeNtd=bewaardS;
+      state.offerteAannEdit=bE; state.offerteAannEditVal=bV; state.offerteAannOpen=bO;
+    }
+  })());
+
+  // ── Groene 'Vandaag'-pil weg uit de tabelrij (v11.3) ────────────────────────
+  // Hij zat alléén op Offerte- en Subsidie-trajecten (de andere drie tabbladen hebben de
+  // Signaal-kolom) en lag als vol groen vlak boven op de opmerkingentekst. 'Weggelegd' blijft:
+  // die is gedempt en noemt een datum die nergens anders in de rij staat.
+  truthy('offerte-rij: geen groene Vandaag-pil meer, ook niet als de opvolgdatum vandaag is', (()=>{
+    const vd=_vandaagAmsterdam();
+    const dm=`${String(vd.getDate()).padStart(2,'0')}-${String(vd.getMonth()+1).padStart(2,'0')}-${vd.getFullYear()}`;
+    const bewaard=state._rowCache; state._rowCache=[];
+    try{
+      const html=rowNtd({code:'ZZ-VD',naam:'VvE Vandaag',offertes:'0/1',aannemers:'',opvolgdatum:dm,
+                         datumAangevraagd:'1 mei 2026',opmerkingen:'iets',behandelaar:'',deadline:'',
+                         _sec:'OFFERTE-TRAJECTEN',_row:9401},'OFFERTE-TRAJECTEN');
+      return !html.includes('pill-opvolg') && opvolgStatus({opvolgdatum:dm}).vandaag===true;
+    } finally { state._rowCache=bewaard; }
+  })());
+  truthy('offerte-rij: de weggelegd-pil blijft wél staan', (()=>{
+    const bewaard=state._rowCache; state._rowCache=[];
+    try{
+      const html=rowNtd({code:'ZZ-WG',naam:'VvE Weg',offertes:'0/1',aannemers:'',opvolgdatum:'31-12-2099',
+                         datumAangevraagd:'1 mei 2026',opmerkingen:'iets',behandelaar:'',deadline:'',
+                         _sec:'OFFERTE-TRAJECTEN',_row:9402},'OFFERTE-TRAJECTEN');
+      return html.includes('pill-snooze');
+    } finally { state._rowCache=bewaard; }
+  })());
+
+  // ── De opmerkingentekst liep ónder de pil door (v11.3) ──────────────────────
+  // De afkapregel stond op `.cell-note>.ct` — DIRECTE kinderen. In een pil-rij is de tekst een
+  // kleinkind van de cel, dus die regel greep er niet op en de tekst liep zichtbaar uit zijn vak.
+  truthy('pil-rij: de tekst naast een pil kapt af met …', (()=>{
+    const wrap=document.getElementById('ntd-tbl-wrap');
+    if(!wrap) return false;
+    // BINNEN #ntd-tbl-wrap, want de regel is daarop gericht. `min-width:0` op de proeftabel is
+    // nodig omdat de echte tabel daar een ondergrens van ruim 1000px heeft: zonder dat wordt de
+    // cel breder dan de tekst en meet je niets. `table-layout:fixed` maakt de 200px een echte
+    // klem, precies zoals in de echte tabel.
+    const proef=document.createElement('div');
+    proef.innerHTML='<table style="table-layout:fixed;width:200px;min-width:0"><tbody><tr>'
+      +'<td class="cell-note" style="width:200px"><div class="pil-rij">'
+      +'<span class="ct">een hele lange opmerking die er nooit in past</span>'
+      +'<span class="pill-snooze">5 sep</span></div></td></tr></tbody></table>';
+    wrap.appendChild(proef);
+    try{
+      const ct=proef.querySelector('.ct');
+      const st2=getComputedStyle(ct);
+      // Er is echt iets te kappen (scrollWidth > clientWidth) EN de cel kapt het af met een ….
+      // Zonder de fix stond hier overflow:visible en liep de tekst zichtbaar onder de pil door.
+      return st2.overflow==='hidden' && st2.textOverflow==='ellipsis' && ct.scrollWidth>ct.clientWidth;
+    } finally { proef.remove(); }
+  })());
 
   // ── offerte-aannemers: twee trajecten van DEZELFDE VvE zijn losse trajecten ──
   // Regressie (audit 2026-08-06). Het paneel werd op VvE-code gestuurd: bij twee offerte-
@@ -4315,7 +4485,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '11.2');
+  eq('versie opgehoogd', APP_VERSION, '11.3');
 
   // ── Pushmeldingen: de twee schakels die stil kapot waren (audit 2026-08-06) ──
   // Beide defecten waren onzichtbaar: de app meldde "Notificaties zijn aan!" terwijl er nooit
@@ -5500,9 +5670,12 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
            !!regelVan(vandaagHost,'Tvandaag').querySelector('.pill-opvolg'));
     truthy('bundelpaneel: een rustige subtaak krijgt géén opvolg-melding',
            !regelVan(vandaagHost,'Tb').querySelector('.pill-opvolg'));
-    // Dezelfde actie als in de tabel. Een pil met een wijzende hand die nergens op reageert is de
-    // enige variant die dit bestand niet moet krijgen; snoozePil hierboven eist die pariteit al.
-    eq('bundelpaneel: de opvolg-pil opent hetzelfde wegleg-venster als in de tabel',
+    // De pil moet iets DOEN. Een pil met een wijzende hand die nergens op reageert is de enige
+    // variant die dit bestand niet moet krijgen; snoozePil hierboven eist datzelfde.
+    // (In de tabelrij bestaat deze pil sinds v11.3 niet meer — daar is de opvolg-melding weg op
+    // verzoek van de gebruiker. Het paneel houdt hem, want dat heeft geen Signaal-kolom en geen
+    // andere plek waar 'moet vandaag' te zien is. De kleur is wel gelijkgetrokken met die kolom.)
+    eq('bundelpaneel: de opvolg-pil opent hetzelfde wegleg-venster als de weggelegd-pil',
        (regelVan(vandaagHost,'Tvandaag').querySelector('.pill-opvolg')||{}).dataset?.action,
        'taak-wegleggen');
 

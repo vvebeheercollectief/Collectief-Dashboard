@@ -9,7 +9,7 @@ import { state, D, pgs } from "./state.js";
 import { bulkWis, renderBulkUi, allesVinkjeHtml, bulkHerstel } from "./bulk.js";
 import { showToast } from "./notifications.js";
 import { renderThead, renderTbody, renderPag, bepaalStil, bouwStilIndex, _zetStilIndex, signaalDelen, deadlineCel, rowNtd, rowAf } from "./render-tabel.js";
-import { _verrijkOfferteRij, offerteAannemerPaneel, offerteAannSamenvatting } from "./render-offerte.js";
+import { _verrijkOfferteRij, offerteAannemerPaneel, offerteAannSamenvatting, herstelAannemerFocus } from "./render-offerte.js";
 import { renderAlvo, renderAlfa, toggleAlvoFlag, ALVO_ICONS, ALVO_COLS, ALVO_LABELS, flagPill, _recomputeAlvoStatus, statusIco } from "./render-alv.js";
 import { bundelWeergave, wordtGeabsorbeerd, bundelSleutel, bundelMetId, bouwBundelIndex, zichtbareKop } from "./bundel.js";
 
@@ -348,6 +348,11 @@ function renderNtd(){
   state._ntdZichtbaar=zichtbaar;
   renderPag('ntd-pag',zichtbaar.length,pgs.ntd,'ntd');
   renderNtdCrossList(state.activeNtd);
+  // Werd er een aannemersnaam aangepast, dan is dat invoerveld hierboven vervangen door een NIEUW
+  // element en is de cursor eruit gesprongen. Dit zet hem terug. Bewust hier en niet in
+  // renderTbody: de poll tekent elke acht seconden opnieuw zodra een collega iets wijzigt, en dat
+  // mag je niet merken terwijl je aan het typen bent.
+  herstelAannemerFocus();
   // De getekende lijst gaat terug naar de aanroeper: na filteren, sorteren én absorberen, dus in
   // exact de volgorde waarin de rijen op de pagina's verdeeld worden. `springNaarBundel` zoekt er
   // de pagina van de kop mee op zonder die hele pijplijn na te bouwen.

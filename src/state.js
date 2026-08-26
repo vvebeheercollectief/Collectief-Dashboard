@@ -132,6 +132,12 @@ export const state = {
                            // een koppeling wijst één bepaalde rij aan). submitTask koppelt hem ná
                            // het opslaan; clearModal wist hem, dus lees hem vóór het sluiten.
   offerteAannOpen: new Set(),   // sleutels (aannSleutel) van trajecten met uitgeklapt aannemers-paneel
+  // Welke aannemersnaam er op dit moment wordt aangepast: {sleutel, idx} of null. Op state en niet
+  // in de DOM, want renderNtd vervangt de hele tabel bij elke poll met verse data — zonder dit zou
+  // het invoerveld halverwege het typen verdwijnen. `offerteAannEditVal` bewaart wat er getypt is,
+  // zodat de hertekening het veld mét de ingetypte tekst terugzet (zie herstelAannemerFocus).
+  offerteAannEdit: null,
+  offerteAannEditVal: '',
   vveCode: null,           // VvE op de per-VvE-pagina (Fase 5)
   vveTerug: null,          // pagina waar de gebruiker vandaan kwam vóór het dossier (terug-pijltje)
   _vveAfAlles: false,      // per-VvE: alle afgeronde taken uitgeklapt

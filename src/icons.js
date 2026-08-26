@@ -46,6 +46,7 @@ const ICONS={
   plus:_s+'<path d="M12 5v14M5 12h14"/></svg>',
   chevronRechts:_s+'<path d="M9 6l6 6-6 6"/></svg>',
   chevronOnder:_s+'<path d="M6 9l6 6 6-6"/></svg>',
+  chevronBoven:_s+'<path d="M6 15l6-6 6 6"/></svg>',
   cirkelOpen:_s+'<circle cx="12" cy="12" r="8" fill="currentColor" fill-opacity="0.18"/></svg>',
   klok:_s+'<circle cx="12" cy="13" r="8" fill="currentColor" fill-opacity="0.18"/><path d="M12 9v4l2.5 2"/><path d="M4.5 5.5l3-2M19.5 5.5l-3-2"/></svg>',
   pijlOmhoog:_s+'<path d="M12 19V5.5M5.5 12L12 5.5 18.5 12"/></svg>',

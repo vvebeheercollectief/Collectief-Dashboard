@@ -22,7 +22,7 @@ import { openSnoozeModal, snoozeKies } from './snooze.js';
 import { zetInBehandeling } from './inbehandeling.js';
 import { verwijderExtraVve } from './meervve.js';
 import { openResetModal, closeResetModal, doeReset } from './alv-reset.js';
-import { addAannemer, toggleAannemerBinnen, verwijderAannemer } from './offerte-aannemers.js';
+import { addAannemer, toggleAannemerBinnen, verwijderAannemer, startHernoem, stopHernoem } from './offerte-aannemers.js';
 import { openHerhaalModal, toggleHerhaalStatus, deleteHerhaal } from './render-herhaal.js';
 import { openVvePagina, renderVve, addContactLog, terugVanDossier } from './render-vve.js';
 import { vraagChat, chatSuggestie } from './dossier-chat.js';
@@ -174,6 +174,9 @@ export const ACTIONS = {
   'offerte-aann-open':     (el) => { const s=el.dataset.aann; if(state.offerteAannOpen.has(s)) state.offerteAannOpen.delete(s); else state.offerteAannOpen.add(s); renderNtd(); },
   'offerte-aann-binnen':   (el) => toggleAannemerBinnen(el.dataset.aann, +el.dataset.idx),
   'offerte-aann-verwijder':(el) => verwijderAannemer(el.dataset.aann, +el.dataset.idx),
+  // Klik op de naam = naam aanpassen. De knop maakt plaats voor een invoerveld; opslaan gebeurt
+  // met Enter of door ergens anders te klikken (zie de toetsen- en blur-afhandeling hieronder).
+  'offerte-aann-hernoem':  (el) => startHernoem(el.dataset.aann, +el.dataset.idx),
   'offerte-aann-add':      (el) => { const inp=el.closest('.of-aann-add')?.querySelector('.of-aann-input'); if(!inp) return; const v=inp.value; inp.value=''; addAannemer(el.dataset.aann, v); },
   'herhaal-bewerken':      (el) => openHerhaalModal(+el.dataset.hid),
   'herhaal-status':        (el) => toggleHerhaalStatus(+el.dataset.hid),
@@ -244,6 +247,12 @@ export function initActions() {
       e.target.value = '';
       addAannemer(sleutel, val);
     }
+    // Offerte-aannemer HERNOEMEN: Enter bewaart, Escape laat de oude naam staan. Zelfde delegatie
+    // en dezelfde reden: het veld bestaat alleen zolang die ene naam openstaat.
+    if (e.target && e.target.classList && e.target.classList.contains('of-aann-naam-inp')) {
+      if (e.key === 'Enter')  { e.preventDefault(); stopHernoem(true); }
+      if (e.key === 'Escape') { e.preventDefault(); stopHernoem(false); }
+    }
     // Chat-agent: Enter in het vraagveld = versturen
     if (e.target && e.target.id === 'chat-input' && e.key === 'Enter') {
       e.preventDefault();
@@ -270,5 +279,36 @@ export function initActions() {
       }
     }
   });
+
+  // Wat er in het naam-veld staat, bijhouden op `state`. Zonder dit was de ingetypte tekst weg
+  // zodra de poll de tabel opnieuw tekende — het veld wordt dan als NIEUW element opgebouwd en
+  // leest zijn waarde uit `state`, niet uit het weggegooide element.
+  document.addEventListener('input', (e) => {
+    if (e.target && e.target.classList && e.target.classList.contains('of-aann-naam-inp')) {
+      state.offerteAannEditVal = e.target.value;
+    }
+  });
+
+  // Ergens anders klikken bewaart de naam. Twee dingen maken dit lastiger dan het lijkt, en beide
+  // worden hier afgevangen:
+  //   1. Een hertekening (de poll, of een eigen schrijfactie) haalt het veld weg en dat geeft óók
+  //      een blur. Zou die als 'weggeklikt' tellen, dan werd de naam halverwege het typen
+  //      opgeslagen. renderNtd zet de focus meteen terug in het nieuwe veld; de vergelijking na de
+  //      setTimeout ziet dat en doet niets.
+  //   2. Direct doorklikken naar een ándere naam. Dan staat er ná de klik een ander veld open;
+  //      `startHernoem` heeft de eerste dan al afgemaakt, dus ook hier is er niets meer te doen.
+  // De setTimeout is nodig omdat `document.activeElement` tijdens focusout nog `body` is.
+  document.addEventListener('focusout', (e) => {
+    if (!(e.target && e.target.classList && e.target.classList.contains('of-aann-naam-inp'))) return;
+    setTimeout(() => {
+      const k = state.offerteAannEdit;
+      if (!k) return;                                   // al afgerond via Enter/Escape/andere naam
+      const a = document.activeElement;
+      if (a && a.classList && a.classList.contains('of-aann-naam-inp')
+          && a.dataset.aann === k.sleutel && +a.dataset.idx === k.idx) return;   // hertekening
+      stopHernoem(true);
+    }, 0);
+  });
+
   initOpmaak();
 }

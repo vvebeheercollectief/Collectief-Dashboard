@@ -328,13 +328,18 @@ function rowNtd(r,sec){
   // SUBSIDIE-TRAJECTEN, en juist voor díe twee secties is de stil-pil onderdrukt (GEEN_STIL_PILL).
   // De regel zelf leeft door in `signaalDelen` hieronder; daar wordt hij ook echt toegepast.
   // Het kostte bovendien een volledige logboekscan per rij voor een pil die nergens verscheen.
+  // De groene 'Vandaag'-pil is hier weggehaald (v11.3, op verzoek van de gebruiker). Hij zat
+  // alléén op deze twee secties — Oppakken, Vergaderverzoeken en LOD tonen 'Vandaag opvolgen' in
+  // de Signaal-kolom, waar het een gedempte amber regel is en geen felgroen vlak midden in de
+  // opmerkingen. De vorm viel uit de toon van de rest van de tabel en het vlak lag boven op de
+  // opmerkingentekst. `opvolgStatus(r).vandaag` blijft bestaan en wordt nog gelezen door
+  // `signaalDelen` hierboven en door het bundelpaneel (render-bundel.js).
+  // 'Weggelegd' blijft hier wél staan: die pil is gedempt grijs, noemt een DATUM die nergens
+  // anders in deze rij te zien is, en hoort bij de eveneens gedempte rij (tr.snooze-row).
   const ov = opvolgStatus(r);
-  const opvolgPill = ov.vandaag
-    ? `<span class="pill-opvolg" data-action="taak-wegleggen" data-rid="${rid}" title="Opvolgen vandaag — opvolgdatum ${esc(r.opvolgdatum)}">${ico('bel',11)}Vandaag</span>`
-    : ov.weggelegd
-      ? `<span class="pill-snooze" data-action="taak-wegleggen" data-rid="${rid}" title="Weggelegd tot ${esc(r.opvolgdatum)}">${ico('pauze',11)}${esc(kortDatum(r.opvolgdatum))}</span>`
-      : '';
-  const extraPills = opvolgPill;
+  const extraPills = ov.weggelegd
+    ? `<span class="pill-snooze" data-action="taak-wegleggen" data-rid="${rid}" title="Weggelegd tot ${esc(r.opvolgdatum)}">${ico('pauze',11)}${esc(kortDatum(r.opvolgdatum))}</span>`
+    : '';
   // ── Takenbundel ──
   // state._bundelWeergave wordt door renderNtd voor déze render klaargezet (zie `bundelWeergave`):
   // de index plus `stapel`/`merk`. Via state en niet via een parameter: renderTbody geeft alleen

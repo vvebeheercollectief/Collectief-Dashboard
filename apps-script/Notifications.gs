@@ -127,6 +127,14 @@ function cd_handleNtdEdit(sheet, row, e) {
   const code = (rowData[0] || '').toString().trim();
   const naam = (rowData[1] || '').toString().trim();
   if (!code) return;
+  // Kop- en sectieregels overslaan. In kolom A van 'Nog Te Doen' staan naast VvE-codes ook de
+  // sectiekoppen ('OPPAKKEN', 'VERGADERVERZOEKEN', …) en de kolomkoprijen ('VvE Code'). Die
+  // hebben een gevulde kolom A en kwamen dus door de controle hierboven — waarna een plakactie
+  // waarvan de linkerbovenhoek op zo'n regel valt een melding '📋 Nieuwe taak' met de tekst
+  // 'OPPAKKEN' de deur uit stuurde, plus een logregel 'Aangemaakt (sheet)'.
+  var _kop = code.toUpperCase();
+  if (_kop === 'VVE CODE' || _kop === 'VVE-CODE') return;
+  if (['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN'].indexOf(_kop) !== -1) return;
 
   const behandelaarColMap = {
     'OPPAKKEN': 5,
@@ -137,7 +145,13 @@ function cd_handleNtdEdit(sheet, row, e) {
   };
   const beh = (rowData[behandelaarColMap[sec] - 1] || '').toString().trim();
 
-  const isNew = !e.oldValue && code;
+  // `e.oldValue` bestaat ALLEEN bij een bewerking van één cel. Bij plakken, doortrekken met de
+  // vulgreep of een blok-fill is hij altijd undefined, en dan telde elke zo'n actie met de
+  // linkerbovenhoek in kolom A als 'nieuwe taak'. De extra eis 'precies één cel' maakt de vlag
+  // eerlijk: bij een breder bereik weten we het simpelweg niet, en dan is zwijgen beter dan een
+  // melding die niet klopt.
+  const enkeleCel = e.range.getNumRows() === 1 && e.range.getNumColumns() === 1;
+  const isNew = enkeleCel && !e.oldValue && code;
   const colChanged = e.range.getColumn();
 
   if (isNew && colChanged === 1) {

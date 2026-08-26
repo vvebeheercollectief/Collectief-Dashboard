@@ -10,6 +10,12 @@ import { _parseAnyDate, leegBijErfenis } from "./util.js";
 // Het onderscheid is scherp te maken: een fetch die REJECTET (geen netwerk, DNS weg,
 // CORS-blokkade) gooit een TypeError zónder .status; élk antwoord van Google — ook 401, 429 en
 // 500 — heeft er wél een. Alleen het eerste is bewijs dat de verbinding weg is.
+// Deze regel wordt in de praktijk INGEBAKKEN toegepast en niet via deze functie aangeroepen:
+// `_fetchGeteld` telt `state._netwerkFouten` op in zijn catch — precies de plek waar een fetch
+// rejectet, dus waar er per definitie geen `.status` is — en zet hem op nul bij een antwoord.
+// Deze helper is de los toetsbare formulering van diezelfde regel (zie de vijf asserts in
+// tests.js). Wijzig je hier iets, dan verandert er dus NIETS aan `isOffline()`; de plek om te zijn
+// is `_fetchGeteld`.
 const _isNetwerkFout = e => !!e && e.status===undefined;
 
 // Twee netwerkfouten op rij, zodat één hapering in een tunnel of een lift het dashboard niet

@@ -428,11 +428,15 @@ function _kijktNaarLog(){
 
 // ── 'ALV's afgerond': het archief hoeft niet elke acht seconden mee ─────────
 // Gemeten op 30-07: 21 kB per ronde, na het Logboek de laatste post die de moeite waard was.
-// Dit tabblad is bijzonder omdat het dashboard er NOOIT naartoe schrijft — geen enkele schrijfweg
-// raakt het — en het verandert alleen bij de jaarlijkse ALV-reset. Verouderde gegevens kunnen hier
-// dus per definitie niets overschrijven; het enige risico is dat je een archiefregel even later
-// ziet. Daarom dezelfde regel als bij het Logboek: elke ronde meelezen zolang iemand ernaar kijkt,
-// anders hoogstens één keer per minuut. Puur, dus los testbaar.
+// Er is precies ÉÉN schrijfweg naar dit tabblad, en die zit in het dashboard zelf: `toggleAlvoFlag`
+// (render-alv.js) hangt de archiefregel eraan zodra het Notulen-vinkje aangaat. (Het commentaar
+// hier zei tot 26-08 dat 'geen enkele schrijfweg' het raakt; dat klopte niet meer sinds v11.0.)
+// Dat maakt de rem niet minder veilig: die schrijfweg APPENDT alleen, werkt met `D.alfa.unshift`
+// de lokale lijst meteen bij, en verouderde gegevens kunnen hier dus niets overschrijven — het
+// enige risico is dat je een regel van een COLLEGA even later ziet. Daarom dezelfde regel als bij
+// het Logboek: elke ronde meelezen zolang iemand ernaar kijkt, anders hoogstens één keer per
+// minuut. `_kijktNaarAlfa` telt daarom óók de ALV-overzichtpagina mee: dáár wordt hij geschreven.
+// Puur, dus los testbaar.
 const ALFA_MS=60000;
 function _alfaNodig(luid, kijkt, laatsteMs, nu){
   if(luid || !laatsteMs) return true;      // handmatige verversing of nog nooit gelezen
@@ -442,7 +446,10 @@ function _alfaNodig(luid, kijkt, laatsteMs, nu){
 // Alle plekken die D.alfa tonen: de archieflijst zelf, Analytics en het Dashboard (KPI
 // 'vergaderingen uitgeschreven') en het VvE-dossier ('laatst gehouden ALV').
 function _kijktNaarAlfa(){
-  return ['page-alfa','page-analytics','page-dash','page-vve']
+  // 'page-alvo' hoort erbij: dat is de enige pagina die naar dit tabblad SCHRIJFT (het
+  // Notulen-vinkje), en dan wil je de regel van een collega binnen acht seconden zien in plaats
+  // van na een minuut — juist daar is 'staat hij er al?' de vraag die ertoe doet.
+  return ['page-alfa','page-analytics','page-dash','page-vve','page-alvo']
     .some(id=>document.getElementById(id)?.classList.contains('active'));
 }
 
@@ -623,7 +630,7 @@ async function _loadRonde(silent){
   // deze rem juist moest voorkomen. Een LUIDE ronde vraagt hoogstens een token aan terwijl er een
   // inlogvenster openstaat; dat is een zeldzaam en zichtbaar geval, en de gebruiker heeft er zelf
   // om gevraagd.
-  if(silent && state._herinlogBezig) return;
+  if(silent && state._herinlogBezig) return false;
   state._loadInFlight=true;
   try{
     // Altijd een geldige token garanderen (ook bij Vernieuwen-knop / schrijf-resync):
@@ -637,7 +644,7 @@ async function _loadRonde(silent){
     // STILLE 8s-ronde mag dat niet: zie de toelichting bij `ensureToken`.
     if(!await ensureToken(!silent)){
       state._syncFails=(state._syncFails||0)+1;
-      if(isOffline()){ setSyncOffline(); showOfflineBanner(); return; }
+      if(isOffline()){ setSyncOffline(); showOfflineBanner(); return false; }
       if(!silent || state._syncFails>=2) setSyncErr();
       // Aparte teller voor 'de token lukt niet, maar de verbinding is er wél'. Dat is een ander
       // verhaal dan een netwerkfout: het herstelt zich NIET vanzelf bij de volgende ronde, want
@@ -651,7 +658,7 @@ async function _loadRonde(silent){
         if(state._authFails>=3) showLoadError({soort:'sessie'});
       }
       if(!silent && !(state._authFails>=3)) showLoadError();
-      return;
+      return false;
     }
     // Geslaagd → de sessie is weer in orde. Teller op nul en een staande sessiebanner weg.
     if(state._authFails){
@@ -736,7 +743,7 @@ async function _loadRonde(silent){
     // `setSaving()` en niet `setSynced()`: die laatste keert per constructie meteen terug (hij
     // begint met `if(state.pendingWrites>0) return;`), en dat is precies de voorwaarde van deze
     // tak. De balk bleef daardoor op 'Laden…' staan terwijl er in werkelijkheid opgeslagen werd.
-    if(state.pendingWrites>0){ if(!silent) setSaving(); return; }
+    if(state.pendingWrites>0){ if(!silent) setSaving(); return false; }
     // Toekennen op NAAM. Een tabblad dat niet in deze ronde zat, behoudt zijn vorige waarde in
     // plaats van door parseX(undefined) leeggeveegd te worden. Vandaag zit alles er elke ronde
     // in; de vorm is er zodat een gemiste of afwijkend gevraagde reeks nooit stil data wist.
@@ -848,7 +855,7 @@ async function _loadRonde(silent){
         state._rowCache=[]; state._ntdZichtbaar=[];
         console.error('[render]', e);
         state._renderFails=(state._renderFails||0)+1;
-        return;
+        return false;
       }
       state._renderFails=0;
       clearRenderError();
@@ -858,6 +865,12 @@ async function _loadRonde(silent){
       // sessie in plaats van 450 keer per uur.
       bewaarCache(hash);
     }
+    // Alleen HIER is de ronde echt gelopen: er staat verse data in D en het scherm is bij.
+    // Elke vroege uitgang hierboven geeft `false`, net als de catch hieronder. Zo kan een
+    // aanroeper die met `await loadAll()` op verse gegevens rekent — de undo-wegen in bulk.js en
+    // notifications.js doen dat — zien of dat ook echt zo is. (Vandaag leest nog niemand die
+    // waarde; de vorm is er zodat 'geslaagd' niet langer een aanname op papier is.)
+    return true;
   }catch(e){
     // Eén mislukte stille poll mag de indicator niet meteen op 'Fout' zetten — die
     // herstelt zich vaak vanzelf bij de volgende ronde. Pas na 2 mislukkingen op rij
@@ -872,6 +885,7 @@ async function _loadRonde(silent){
       if(!silent) showLoadError(); // alleen bij eerste/handmatige lading, niet bij zwijgende polls
     }
     console.error(e);
+    return false;
   }
   finally{
     state._loadInFlight=false;
@@ -895,7 +909,7 @@ async function _loadRonde(silent){
       // en niet meelift op een ronde die voor hem te vroeg begon.
       const klaar=state._loadAgainKlaar;
       state._loadAgainKlaar=null; state._loadAgainPromise=null;
-      _loadRonde(!loud).finally(()=>{ if(klaar) klaar(); });
+      _loadRonde(!loud).then(ok=>{ if(klaar) klaar(ok); }, ()=>{ if(klaar) klaar(false); });
     }
   }
 }

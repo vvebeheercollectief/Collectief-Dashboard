@@ -14,7 +14,7 @@ import { animateRowOut, flashRow } from "./anim.js";
 import { logEvent, logEvents, renderTaskHistory } from "./render-overig.js";
 import { backgroundWrite, loadAll, blokkeerOffline } from "./data.js";
 import { faseIndex, faseWoord, faseRijHtml, faseWijziging } from "./subsidie-fase.js";
-import { bouwBundelIndex, bundelVerwijzing, openSubtaken, bundelWaarschuwing } from "./bundel.js";
+import { bouwBundelIndex, bundelVerwijzing, openSubtaken, bundelWaarschuwing, heeftSubtaken } from "./bundel.js";
 import { koppelTaak } from "./bundel-acties.js";
 import { vraagBevestiging } from "./bevestig.js";
 import { setNtd, renderNtd, ntdPagina } from "./render-lijsten.js";
@@ -190,7 +190,7 @@ function openModal(isEdit,rowData,opts){
 
   if(isEdit&&state.editRowData){
     document.getElementById('m-code').value=state.editRowData.code||'';
-    document.getElementById('m-naam').value=state.editRowData.naam||'';
+    _zetNaamVeld(state.editRowData.code||'', state.editRowData.naam||'');
     fillModalFields(sec,state.editRowData);
     renderTaskHistory(state.editRowData.code,sec);
     zetHoortBij(state.editRowData);
@@ -202,7 +202,7 @@ function openModal(isEdit,rowData,opts){
     // net alsof de gebruiker 'm via het zoekveld had gekozen.
     if(opts&&opts.code){
       document.getElementById('m-code').value=opts.code;
-      document.getElementById('m-naam').value=opts.naam||'';
+      _zetNaamVeld(opts.code, opts.naam||'');
     }
   }
 
@@ -276,8 +276,13 @@ export function zetHoortBij(r){
   // (En dit is de aanroeper die twee momentopnames mengt: de index is vers uit `D`, terwijl `r`
   // uit state._rowCache van de laatste render komt. bundelVerwijzing staat dat toe — het is
   // precies waarom hij op taaknummer vergelijkt en niet op objectidentiteit.)
-  const verw=bundelVerwijzing(r, bouwBundelIndex(D.ntd,D.af));
-  const isKop=!!verw && verw.rol==='kop';
+  const _ix=bouwBundelIndex(D.ntd,D.af);
+  const verw=bundelVerwijzing(r, _ix);
+  // `heeftSubtaken` en niet `verw.rol==='kop'`: dat laatste is de ZICHTBARE kop (het laagste open
+  // volgnummer) en dat is een andere vraag dan 'hangt er iets onder mij?'. Zie de toelichting bij
+  // `heeftSubtaken` in bundel.js — het veld hieronder moet exact op slot staan wanneer
+  // `magKoppelen` het straks toch zou weigeren, en op geen enkel ander moment.
+  const isKop=heeftSubtaken(_ix, r);
   const isSub=!!verw && verw.rol==='sub';
   // De VOLLEDIGE verwijzing, niet alleen `taakTitel`: koppelen mag over VvE's heen, dus zonder de
   // code kan de gebruiker niet zien wélke taak dit is.
@@ -398,6 +403,34 @@ function zetOmschrijving(sec, tekst){
   return !!el;
 }
 
+// De naam ÉN de code waarvoor hij geldt. Het naamveld is readonly en wordt alleen gevuld door de
+// suggestielijst; de code ernaast is vrij te typen. Zonder deze koppeling kon er een naam in de
+// Sheet belanden die bij een héél andere VvE hoort — zie de toelichting bij `clearModal` en de
+// controle in `submitTask`.
+function _zetNaamVeld(code, naam){
+  const el=document.getElementById('m-naam'); if(!el) return;
+  el.value=naam||'';
+  if(code) el.dataset.code=code; else delete el.dataset.code;
+}
+
+// De naam die bij deze VvE-code hoort, gezocht in de gegevens die we al hebben. `D.alvo` is de
+// bron van de VvE-kiezer zelf; de takenlijsten zijn de terugval voor een VvE die (nog) niet in het
+// ALV-overzicht staat. Levert '' op als de code nergens voorkomt — dan is een lege naam eerlijker
+// dan de naam van de vorige VvE.
+function _naamBijCode(code){
+  const c=String(code||'').trim().toLowerCase();
+  if(!c) return '';
+  const uitAlvo=(D.alvo||[]).find(r=>String(r.code||'').trim().toLowerCase()===c);
+  if(uitAlvo&&uitAlvo.naam) return uitAlvo.naam;
+  for(const bron of [D.ntd, D.af]){
+    for(const sec of SKEYS){
+      const r=((bron&&bron[sec])||[]).find(x=>String(x.code||'').trim().toLowerCase()===c && x.naam);
+      if(r) return r.naam;
+    }
+  }
+  return '';
+}
+
 function clearModal(){
   document.querySelectorAll('.modal-body input,.modal-body select,.modal-body textarea').forEach(el=>{if(!el.readOnly)el.value=''});
   // 'm-naam' is het enige readonly veld in het venster en viel daardoor buiten de regel hierboven:
@@ -406,7 +439,7 @@ function clearModal(){
   // beide velden en merk je er niets van — maar tik of plak je de code met de hand (een VvE die
   // nog niet in de lijst staat), dan leest submitTask hier de náám van de vorige VvE en belandt
   // die in de Sheet.
-  ['m-naam'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=''});
+  ['m-naam'].forEach(id=>{const el=document.getElementById(id);if(el){el.value='';delete el.dataset.code;}});
   ['m-off-recv','m-off-total'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='0'});
   ['tog-ib','tog-ib-v','tog-ib-l','tog-ib-s'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('on')});
   zetModalFase('');   // terug naar Voorbereiden, anders erft een nieuwe taak de vorige fase
@@ -1126,7 +1159,13 @@ async function submitTask(){
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){alert('Inloggen mislukt. Probeer het opnieuw.');return}
   const code=document.getElementById('m-code').value.trim();
-  const naam=document.getElementById('m-naam').value.trim();
+  const _naamEl=document.getElementById('m-naam');
+  // De naam alleen overnemen als hij ook ECHT bij deze code hoort. Het naamveld is readonly en
+  // wordt gevuld door de suggestielijst; typt of plakt iemand daarna de code met de hand — bij een
+  // correctie in het bewerkscherm is dat de gewone weg — dan blijft de naam van de vórige VvE
+  // staan en belandt die zo in kolom B. Klopt de stempel niet, dan zoeken we de naam zelf op; is
+  // de code onbekend, dan liever leeg dan onwaar.
+  const naam=((_naamEl.dataset.code||'').trim()===code ? _naamEl.value.trim() : _naamBijCode(code));
   if(!code){alert('VvE Code is verplicht.');return}
 
   const sec=state.editSec||state.activeNtd;

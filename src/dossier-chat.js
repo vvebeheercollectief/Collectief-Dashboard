@@ -122,6 +122,10 @@ function _chatMessages(historie, max=10){
   return h.map(m => ({ role: m.rol==='user'?'user':'assistant', content: m.tekst }));
 }
 
+// Hoogste lengte van één vraag. De proxy (api/chat.js) klemt elk bericht op 8.000 tekens en geeft
+// daarboven een 400 terug; deze grens is dezelfde, zodat de gebruiker het hier al hoort.
+const MAX_VRAAG_TEKENS = 8000;
+
 // Voorbeeldvragen voor de lege chat (klikbaar).
 const CHAT_SUGGESTIES = ['Wat staat er nog open?', 'Wanneer is de laatste ALV afgerond?', 'Welke offertes lopen er?'];
 
@@ -189,6 +193,17 @@ async function vraagChat(){
   const vraag = (inp?.value || '').trim();
   const code = state._chatVve;
   if(!vraag || !code || state._chatBezig) return;
+  // De proxy weigert een verzoek boven zijn grenzen met een kale 400, en de melding daarbij zegt
+  // dat het DOSSIER te groot is. Dat kan het in de praktijk niet zijn (`dossierContextTekst` kapt
+  // af op 15.000 tekens en de vaste instructie is ~1.600, samen ruim onder de 20.000 die de proxy
+  // toestaat) — bij een 400 is het dus vrijwel altijd de VRAAG. Hier meteen zeggen wat er aan de
+  // hand is, in plaats van de gebruiker een onwaar antwoord te geven ná een netwerkronde.
+  if(vraag.length > MAX_VRAAG_TEKENS){
+    state._chatHistorie.push({ rol:'assistant', fout:true,
+      tekst:`Je vraag is te lang (${vraag.length} tekens, hoogstens ${MAX_VRAAG_TEKENS}). Kort hem in.` });
+    renderChat();
+    return;
+  }
   inp.value = '';
   // De VvE én het gesprek vastleggen zoals ze NU zijn. Tussen de vraag en het antwoord zitten
   // seconden, en in dat venster kan de gebruiker met 'Andere VvE kiezen…' gewoon omschakelen —

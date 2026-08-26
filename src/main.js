@@ -375,7 +375,9 @@ document.addEventListener('DOMContentLoaded',()=>{
     minTekens: 2, maxItems: 8,
     onSelect: ({code,naam}) => {
       document.getElementById('m-code').value = code;
-      document.getElementById('m-naam').value = naam;
+      const nEl = document.getElementById('m-naam');
+      nEl.value = naam;
+      nEl.dataset.code = code;   // stempel: deze naam hoort bij DEZE code (zie submitTask)
     },
   });
 

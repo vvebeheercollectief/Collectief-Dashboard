@@ -248,6 +248,15 @@ const zelfdeRij = (a, b) => {
   return a._sec === b._sec && a._row != null && a._row === b._row;
 };
 
+// Heeft deze taak zélf subtaken? Geëxporteerd zodat het BEWERKSCHERM dezelfde vraag stelt als de
+// guard in `magKoppelen`. Dat scherm toetste hem eerder op `bundelVerwijzing(...).rol === 'kop'`,
+// en dat is een ándere vraag: die rol volgt de ZICHTBARE kop (het laagste OPEN volgnummer), terwijl
+// deze op identiteit kijkt. Twee gevolgen, allebei verwarrend: het veld 'Hoort bij' stond op slot
+// bij een taak die niets onder zich had (alle subtaken afgerond → de kop is nog steeds 'kop'), en
+// het stond OPEN bij een taak die wél subtaken heeft maar zelf niet de zichtbare kop is — waarna
+// het opslaan alsnog afketste op `magKoppelen`. Eén bron voor één vraag.
+export function heeftSubtaken(index, r){ return subtakenVan(index, r).length > 0; }
+
 function subtakenVan(index, r){
   const nr = tekst(r && r.taakId);
   // Geen taaknummer = niets om naar te wijzen, dus per definitie geen subtaken. Deze regel kan het

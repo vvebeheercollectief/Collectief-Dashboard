@@ -26,7 +26,7 @@ import { ensureToken } from "./auth.js";
 import { backgroundWrite, blokkeerOffline, loadAll } from "./data.js";
 import { renderAll } from "./main.js";
 import { showToast } from "./notifications.js";
-import { getSheetIds, getInsertRow, bevestigInvoegPlek, toevoegWaarden, taakUitCache } from "./crud.js";
+import { getSheetIds, getInsertRow, bevestigInvoegPlek, toevoegWaarden } from "./crud.js";
 import { logEvent } from "./render-overig.js";
 import { vraagBevestiging } from "./bevestig.js";
 
@@ -342,11 +342,4 @@ async function verplaatsTaak(r, doelSec, nietOpgeslagen){
   return true;
 }
 
-// Ingang vanaf een rij-id (de categorie-kiezer in het bewerkscherm werkt met het rij-object zelf).
-async function verplaatsTaakVanRid(rid, doelSec, nietOpgeslagen){
-  const r = taakUitCache(rid);
-  if(!r) return false;
-  return verplaatsTaak(r, doelSec, nietOpgeslagen);
-}
-
-export { verplaatsTaak, verplaatsTaakVanRid, verplaatsWaarden, verlorenVelden, verplaatsVraagTekst, _veldLabel };
+export { verplaatsTaak, verplaatsWaarden, verlorenVelden, verplaatsVraagTekst, _veldLabel };

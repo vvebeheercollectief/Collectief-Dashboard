@@ -311,7 +311,11 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       D.logboek=[];
       await _verwerkLogboek({'Logboek':[kop, rg('t1','A'), rg('t2','B')]}, 'Logboek', true, nooit);
       eq('logboek anker: volledige ronde zet de hoogwaterstand op de laatste Sheet-rij', state._logHoogwater, 3);
-      eq('logboek anker: en het anker op kolom A van díe rij', state._logAnkerTs, 't2');
+      // Het anker is de HELE regel A..H en niet alleen kolom A: de tijdstempel is niet uniek
+      // (logEvents schrijft een blok regels met één `new Date()`), en dan zag de incrementele
+      // lezing een verschuiving niet als er precies één regel uit zo'n blok verdween.
+      eq('logboek anker: en het anker op de hele regel A..H van díe rij',
+         state._logAnkerTs, ['t2','B','OPPAKKEN','Afgerond','','','','jer'].join('\x1f'));
       eq('logboek anker: beide regels in het geheugen, nieuwste eerst', D.logboek.map(o=>o.code), ['B','A']);
 
       // 2. Staartronde. Het bereik begint óp het anker, dus de eerste teruggekomen rij is er één
@@ -4271,6 +4275,42 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       window.fetch=_fetch; state.oauthToken=tOud; state.oauthExpiry=eOud;
     }
   })();
+  // ── De VvE-naam volgt de CODE, niet het veld ernaast (doorlichting 26-08) ──
+  // `m-naam` is readonly en wordt alleen door de suggestielijst gevuld; `m-code` is vrij te typen.
+  // In het bewerkscherm staan beide gevuld met de bestaande taak. Corrigeer je daar alléén de code
+  // met de hand — de gewone weg voor een tikfout — dan bleef de naam van de vórige VvE staan en
+  // ging die zo naar kolom B van de Sheet.
+  await (async()=>{
+    const _alert=window.alert; let alerts=[]; window.alert=m=>alerts.push(m);
+    const alvoOud=D.alvo, tokOud=state.oauthToken, expOud=state.oauthExpiry, _fetch=window.fetch;
+    const secOud=state.editSec, editOud=state.editRowData, modeOud=state.editMode;
+    try{
+      D.alvo=[{code:'900001',naam:'VvE Eerste'},{code:'900002',naam:'VvE Tweede'}];
+      const naamEl=document.getElementById('m-naam'), codeEl=document.getElementById('m-code');
+      // 1) stempel klopt → de naam uit het veld wordt gebruikt
+      codeEl.value='900001'; naamEl.value='VvE Eerste'; naamEl.dataset.code='900001';
+      eq('vve-naam: stempel klopt → naam uit het veld',
+         (naamEl.dataset.code===codeEl.value.trim() ? naamEl.value.trim() : ''), 'VvE Eerste');
+      // 2) code met de hand gewijzigd → de naam hoort NIET meer bij die code
+      codeEl.value='900002';
+      truthy('vve-naam: na een handmatige codewijziging klopt de stempel niet meer',
+             naamEl.dataset.code!==codeEl.value.trim());
+      // 3) en dan wordt de naam opgezocht bij de nieuwe code
+      eq('vve-naam: de naam wordt opgezocht bij de nieuwe code',
+         (D.alvo.find(r=>r.code==='900002')||{}).naam, 'VvE Tweede');
+      // 4) onbekende code → leeg, niet de naam van de vorige VvE
+      codeEl.value='999999';
+      eq('vve-naam: een onbekende code levert geen naam van een andere VvE',
+         (D.alvo.find(r=>r.code==='999999')||{}).naam || '', '');
+    } finally {
+      window.alert=_alert; window.fetch=_fetch;
+      D.alvo=alvoOud; state.oauthToken=tokOud; state.oauthExpiry=expOud;
+      state.editSec=secOud; state.editRowData=editOud; state.editMode=modeOud;
+      const nEl=document.getElementById('m-naam'); if(nEl){ nEl.value=''; delete nEl.dataset.code; }
+      const cEl=document.getElementById('m-code'); if(cEl) cEl.value='';
+    }
+  })();
+
   // ── Dubbelklik-rem op Afhandelen: met de vlag al gezet (eerste klik onderweg) mag
   //    een tweede doCompleteTask NOOIT de schrijf-fase bereiken. We stubben fetch +
   //    token zodat de guard de énige stopper is: zonder guard zou getSheetIds fetchen.

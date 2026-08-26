@@ -552,7 +552,7 @@ function bulkVeld(rows,soort,waarde){
   // OPPAKKEN: een nieuwe deadline herberekent de opgeslagen prioriteit-kolom F mee
   // (zoals de losse bewerk-flow). Anders blijft F stale voor externe lezers.
   const oppDl = soort==='deadline';
-  const items=rows.map(r=>({r,sec:r._sec,code:r.code,oud:r[conf.veld]||'',oudPrio:r.prioriteit||''}));
+  const items=rows.map(r=>({r,sec:r._sec,code:r.code,taakId:r.taakId||'',oud:r[conf.veld]||'',oudPrio:r.prioriteit||''}));
   items.forEach(it=>{
     it.r[conf.veld]=waarde;
     if(oppDl && it.sec==='OPPAKKEN') it.r.prioriteit=berekenPrioriteit(waarde,'OPPAKKEN').prioriteit;
@@ -625,7 +625,21 @@ function bulkVeld(rows,soort,waarde){
   showUndoToast(conf.titel,items.map(i=>i.code).join(', '),async()=>{
     await state._writeChain;
     if(blokkeerOffline()) return;   // vóór het terugzetten: anders staat het scherm op 'oud' terwijl de Sheet 'nieuw' houdt
-    items.forEach(it=>{ it.r[conf.veld]=it.oud; if(oppDl && it.sec==='OPPAKKEN') it.r.prioriteit=it.oudPrio; });
+    // Her-ankeren vóór het terugzetten. `backgroundWrite` doet in zijn finally een `loadAll(true)`,
+    // en die vervangt élk rij-object in D door een vers exemplaar — ruim binnen de acht seconden
+    // dat deze knop op het scherm staat. `it.r` wees daarna nergens meer naar: de undo schreef de
+    // oude waarde netjes naar de Sheet, maar het SCHERM bleef de nieuwe waarde tonen tot de
+    // volgende ronde. Zoeken op het vaste taaknummer, met het rij-object als terugval voor rijen
+    // die er (nog) geen hebben.
+    items.forEach(it=>{
+      const lijst=D.ntd[it.sec]||[];
+      if(lijst.indexOf(it.r)<0){
+        const vers=it.taakId ? lijst.find(x=>(x.taakId||'')===it.taakId) : null;
+        if(vers) it.r=vers;
+      }
+      it.r[conf.veld]=it.oud;
+      if(oppDl && it.sec==='OPPAKKEN') it.r.prioriteit=it.oudPrio;
+    });
     renderAll();
     // De rollback stond hier op een lege functie. Mislukte het ongedaan maken, dan meldde
     // backgroundWrite 'wijziging teruggezet' terwijl er niets werd teruggezet: het scherm bleef op

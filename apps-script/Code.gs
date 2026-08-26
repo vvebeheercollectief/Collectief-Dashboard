@@ -214,22 +214,29 @@ function cd_archiveerRij(sheet, row) {
 }
 
 function setupAfgerondSheet(sheet) {
-  var headers = ["VvE-Code", "VvE", "Actiepunt", "Behandelaar", "Datum afgerond"];
+  // Het stramien dat cd_archiveerRij en afrondWaarden (src/crud.js) ÉCHT schrijven: A..H zijn de
+  // acht sectievelden, I is de afronddatum, J de toelichting, K de subcategorie en L het
+  // Herhaal-ID. De oude vijf-koloms koprij ('…Behandelaar, Datum afgerond') sloeg vanaf kolom D
+  // de plank mis en zou iemand die dit skelet ooit ziet op het verkeerde been zetten — daar staat
+  // de deadline, niet de behandelaar. Alleen de kop; de rijen eronder komen van de archiveerweg.
+  var headers = ["VvE-Code", "VvE", "Actiepunt", "Deadline", "Behandelaar", "Prioriteit",
+                 "Opmerkingen", "In behandeling", "Datum afgerond", "Toelichting",
+                 "Subcategorie", "Herhaal-ID"];
 
   sheet.getRange(1, 1).setValue("OPPAKKEN");
-  sheet.getRange(2, 1, 1, 5).setValues([headers]);
+  sheet.getRange(2, 1, 1, headers.length).setValues([headers]);
   sheet.getRange(3, 1).setValue("");
 
   sheet.getRange(4, 1).setValue("VERGADERVERZOEKEN");
-  sheet.getRange(5, 1, 1, 5).setValues([headers]);
+  sheet.getRange(5, 1, 1, headers.length).setValues([headers]);
   sheet.getRange(6, 1).setValue("");
 
   sheet.getRange(7, 1).setValue("LOD");
-  sheet.getRange(8, 1, 1, 5).setValues([headers]);
+  sheet.getRange(8, 1, 1, headers.length).setValues([headers]);
   sheet.getRange(9, 1).setValue("");
 
   sheet.getRange(10, 1).setValue("OFFERTE-TRAJECTEN");
-  sheet.getRange(11, 1, 1, 5).setValues([headers]);
+  sheet.getRange(11, 1, 1, headers.length).setValues([headers]);
   sheet.getRange(12, 1).setValue("");
 
   // Vijfde sectie (2026-07-29). Ontbrak hier, waardoor het zoeken naar de sectiekop op een vers
@@ -237,7 +244,7 @@ function setupAfgerondSheet(sheet) {
   // OFFERTE-TRAJECTEN is BEWUST anders dan SKEYS — zo staat het echt op productie, zie de
   // toelichting bovenin src/structuurcheck.js. Niet 'rechttrekken'.
   sheet.getRange(13, 1).setValue("SUBSIDIE-TRAJECTEN");
-  sheet.getRange(14, 1, 1, 5).setValues([headers]);
+  sheet.getRange(14, 1, 1, headers.length).setValues([headers]);
 }
 
 function verplaatsALV(e) {

@@ -841,9 +841,15 @@ export function initStapelSlepen(container, rijSelector, taakVanEl, magSlepen){
     if (!doelEl) return;
     const doel = s.taakVanEl(doelEl);
     // Beide rijen hangen aantoonbaar nog in de laatst getekende lijst (`losgeraakt` hierboven, en
-    // het doel komt zojuist uit het document), dus bron en doel komen uit dezelfde ronde als de
-    // index die `koppelTaak` straks bouwt — precies de voorwaarde die `magKoppelen` stelt. Alle
-    // verdere bewaking (offline, token, rij-guard, afgerond, één laag diep) staat daar.
+    // het doel komt zojuist uit het document). Dat is NIET hetzelfde als 'uit dezelfde leesronde
+    // als D.ntd': `loadAll` vervangt die rij-objecten bij elke geslaagde poll, terwijl er alleen
+    // hertekend wordt als de datahash wijzigde — na acht stille seconden wijst `state._rowCache`
+    // dus naar objecten van de vorige ronde terwijl de tabel gewoon nog staat. Hier stond ooit de
+    // aanname dat die twee samenvielen; `magKoppelen` leunde daarop en weigerde daardoor élke
+    // koppeling van een taak waarvan kolom R naar haar eigen taaknummer wees. `magKoppelen` stelt
+    // die voorwaarde sinds 26-08-2026 niet meer (zie `subtakenVan` in bundel.js), en deze plek
+    // hoeft er dus ook niet meer voor te zorgen. Alle verdere bewaking (offline, token, rij-guard,
+    // afgerond, één laag diep) staat in `koppelTaak`.
     if (doel) koppelTaak(s.r, doel);
   };
   window.addEventListener('pointerup', stop);

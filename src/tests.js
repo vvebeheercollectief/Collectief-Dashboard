@@ -4315,7 +4315,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '11.1');
+  eq('versie opgehoogd', APP_VERSION, '11.2');
 
   // ── Pushmeldingen: de twee schakels die stil kapot waren (audit 2026-08-06) ──
   // Beide defecten waren onzichtbaar: de app meldde "Notificaties zijn aan!" terwijl er nooit
@@ -4879,6 +4879,43 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const ixSleep = bouwBundelIndex({ ...leeg, OPPAKKEN:[sleepA, sleepB] }, leeg);
     eq('stapel: los op los is toegestaan', magKoppelen(sleepA, sleepB, ixSleep).mag, true);
     eq('stapel: het doel wordt de hoofdtaak', magKoppelen(sleepA, sleepB, ixSleep).bundelId, 'Tb');
+
+    // ── De guard mag niet afgaan op een taak die alleen naar ZICHZELF wijst ──────────────────
+    // De stand die op 26-08-2026 op productie stond (VvE 321009, rijen 24 en 25): het stapelen was
+    // ongedaan gemaakt, de subtaak was los, maar de hoofdtaak hield haar eigen taaknummer in kolom
+    // R. Bron en index kwamen uit VERSCHILLENDE leesrondes — `loadAll` vervangt D.ntd bij elke
+    // poll, `renderAll` en state._rowCache alleen bij een gewijzigde datahash — en toen telde de
+    // taak zichzelf als subtaak. Twee kopieën van dezelfde rij is precies wat de gebruiker in dat
+    // geval vasthoudt, dus de toets bouwt ze ook zo.
+    const restRij = (row) => ({ taakId:'Tmt9wmhqd461', bundelId:'Tmt9wmhqd461', bundelVolg:'0',
+                                _sec:'OPPAKKEN', _row:row, code:'321009' });
+    const losRij  = (row) => ({ taakId:'Tmt9wn1o5ije', bundelId:'', bundelVolg:'',
+                                _sec:'OPPAKKEN', _row:row, code:'321009' });
+    const restOud = restRij(24), restVers = restRij(24), losVers = losRij(25);
+    const ixVers = bouwBundelIndex({ ...leeg, OPPAKKEN:[restVers, losVers] }, leeg);
+    eq('koppel: een oud-hoofdtaak zonder leden mag koppelen, óók uit dezelfde ronde',
+       magKoppelen(restVers, losVers, ixVers).mag, true);
+    eq('koppel: … en óók als het rij-object uit een oudere leesronde komt',
+       magKoppelen(restOud, losVers, ixVers).mag, true);
+    eq('koppel: … zonder melding over subtaken die er niet zijn',
+       magKoppelen(restOud, losVers, ixVers).reden, '');
+    // Andersom net zo: de losse taak onder de achtergebleven kop hangen mag ook uit een oude ronde.
+    eq('koppel: en de omgekeerde richting ook', magKoppelen(losRij(25), restVers, ixVers).mag, true);
+
+    // De tegenproef, en die is het hele bestaansrecht van de rijadres-vergelijking: een ECHT
+    // dubbele rij (zelfde taaknummer, ándere regel in het blad — precies wat `checkNummers` meldt)
+    // telt nog steeds als een verwijzing, want dat is er ook een.
+    const dubbel = { taakId:'Tmt9wmhqd461', bundelId:'Tmt9wmhqd461', bundelVolg:'10',
+                     _sec:'OPPAKKEN', _row:99, code:'321009' };
+    const ixDubbel = bouwBundelIndex({ ...leeg, OPPAKKEN:[restVers, dubbel, losVers] }, leeg);
+    eq('koppel: een dubbele rij met hetzelfde nummer telt nog wél als subtaak',
+       magKoppelen(restOud, losVers, ixDubbel).mag, false);
+    // En een rij op dezelfde plek in een ANDER tabblad is een wildvreemde taak, geen 'ikzelf'.
+    const anderBlad = { taakId:'Tmt9wmhqd461', bundelId:'Tmt9wmhqd461', bundelVolg:'10',
+                        _sec:'LOD', _row:24, code:'321009' };
+    const ixAnder = bouwBundelIndex({ ...leeg, OPPAKKEN:[restVers, losVers], LOD:[anderBlad] }, leeg);
+    eq('koppel: zelfde rijnummer in een ander tabblad telt óók als subtaak',
+       magKoppelen(restOud, losVers, ixAnder).mag, false);
   })();
 
   (() => {
@@ -4907,6 +4944,17 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
        koppelKandidaten(ntd, ix, ntd.OPPAKKEN[1]).length, 0);
     eq('hoortbij: de eigen bundelgenoten vallen af',
        koppelKandidaten(ntd, ix, ntd.VERGADERVERZOEKEN[0]).map(k => k.taakId), ['Ta']);
+    // De tweede uitgang van dezelfde fout van 26-08-2026. `state.editRowData` komt uit
+    // state._rowCache van de laatste render, de index bouwt main.js vers uit D — en na een stille
+    // poll zijn dat verschillende objecten. Een taak met een achtergebleven verwijzing naar
+    // zichzelf (kolom R = kolom Q, wat een hoofdtaak overhoudt na 'Ongedaan maken') hield daardoor
+    // een LEGE kiezer over: het scherm bood geen enkele taak aan zonder te zeggen waarom.
+    const restKop = { taakId:'Trest', bundelId:'Trest', bundelVolg:'0', _sec:'OPPAKKEN', _row:24,
+                      code:'321009', naam:'Testflat', actiepunt:'Oud-hoofdtaak', deadline:'' };
+    const restNtd = { ...leeg, OPPAKKEN:[{ ...restKop }, t('Tz','','','OPPAKKEN','Losse taak')] };
+    const restIx = bouwBundelIndex(restNtd, leeg);
+    eq('hoortbij: een oud-hoofdtaak uit een oudere leesronde krijgt gewoon keuzes',
+       koppelKandidaten(restNtd, restIx, restKop).map(k => k.taakId), ['Tz']);
 
     // Het zoekfilter van datzelfde veld.
     const taken = [{ code:'311212', naam:'Testflat', actiepunt:'Dak vervangen', taakId:'Ta' },

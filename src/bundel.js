@@ -219,12 +219,35 @@ export function bundelVerwijzing(r, index){
 // `bundelVan` + `zichtbareKop` — zie de toelichting daar. Deze functie is dus geen gedeelde bron
 // meer; hij staat apart omdat `magKoppelen` een wezenlijk andere vraag stelt dan 'wie is de kop'.
 //
-// Voorwaarde aan de aanroeper: `index` en `r` komen uit dezelfde momentopname. De taak zélf valt uit
-// de lijst op object-identiteit (`m.r !== r`), want twee rijen kunnen hetzelfde taaknummer dragen
-// (een dubbele rij in de Sheet, precies wat `checkNummers` meldt) en dán is dat wél een echte
-// subtaak-achtige verwijzing. Geef je een `r` mee uit een ándere leesronde dan waaruit
-// `bouwBundelIndex` is gebouwd, dan telt de taak zichzelf als 'andere rij' en weigert `magKoppelen`
-// élke koppeling — zichtbaar als een melding over subtaken die er niet zijn.
+// Voorwaarde aan de aanroeper: GEEN — net als bij `wordtGeabsorbeerd` en `bundelVerwijzing`.
+// Hier stond ooit wél een voorwaarde ('index en r uit dezelfde momentopname'), afgedwongen door de
+// taak zélf op OBJECT-IDENTITEIT uit de lijst te filteren (`m.r !== r`). Die voorwaarde was in de
+// praktijk onhoudbaar en is op 26-08-2026 kapotgegaan op productie:
+//
+//   `loadAll` (data.js) vervangt D.ntd bij ÉLKE geslaagde poll door verse rij-objecten, maar
+//   `renderAll` — en daarmee state._rowCache en de DOM — draait alleen als de datahash wijzigde.
+//   Verandert er acht seconden lang niets, dan wijst de cache dus per definitie naar rij-objecten
+//   uit een oudere ronde dan de index die `koppelTaak` uit D.ntd bouwt. Het gevolg was dat een taak
+//   ZICHZELF als subtaak telde en `magKoppelen` élke koppeling weigerde met een melding over
+//   subtaken die niet bestaan. Zichtbaar zodra kolom R van een rij naar haar eigen taaknummer
+//   wijst — precies wat een hoofdtaak overhoudt nadat het stapelen ongedaan is gemaakt (zie de
+//   toelichting bij de undo in `koppelTaak`). Dezelfde fout maakte de kiezer van 'Hoort bij' leeg,
+//   want die loopt via `koppelKandidaten` over dezelfde guard.
+//
+// Waarom er niet gewoon op taaknummer vergeleken wordt, zoals `zelfdeTaak` elders doet: twee
+// verschillende rijen kunnen hetzelfde nummer dragen (een dubbele rij in de Sheet, precies wat
+// `checkNummers` meldt), en dán is die verwijzing wél echt. Het RIJADRES (`_sec` + `_row`) houdt de
+// twee gevallen uit elkaar: dezelfde taak uit een andere ronde staat op dezelfde plek in hetzelfde
+// blad, een dubbele rij per definitie niet.
+const zelfdeRij = (a, b) => {
+  if (a === b) return true;                                   // zelfde ronde: klaar
+  if (!a || !b) return false;
+  if (tekst(a.taakId) !== tekst(b.taakId)) return false;      // ander nummer = andere taak
+  // `_row != null` is dragend: rijen zónder rijnummer (handmatig gebouwd in een toets, of een rij
+  // die nog nergens staat) mogen niet allemaal als 'dezelfde rij' op één hoop belanden.
+  return a._sec === b._sec && a._row != null && a._row === b._row;
+};
+
 function subtakenVan(index, r){
   const nr = tekst(r && r.taakId);
   // Geen taaknummer = niets om naar te wijzen, dus per definitie geen subtaken. Deze regel kan het
@@ -235,7 +258,7 @@ function subtakenVan(index, r){
   if (!nr) return [];
   // Het `index &&` ernaast is wél dragend: een ontbrekende index is geen fout maar een vroege
   // render (zelfde afweging als in `bundelMetId`).
-  return ((index && index.get(nr)) || []).filter(m => m.r !== r);
+  return ((index && index.get(nr)) || []).filter(m => !zelfdeRij(m.r, r));
 }
 
 // Mag `bron` als subtaak onder `doel` komen te hangen?

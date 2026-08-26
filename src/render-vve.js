@@ -385,13 +385,11 @@ function renderVve(){
     }
     if(o.alfa.length){
       const l=o.alfa[0]; // nieuwste eerst (gesorteerd in vveOverzicht)
-      // 'Laatst AFGEROND' en niet 'laatst gehouden'. De datum in "ALV's afgerond" is de dag waarop
-      // het vinkje 'Notulen' is gezet (kolomkop daar: 'Datum afgerond'; `verplaatsALV` en
-      // `toggleAlvoFlag` zetten allebei de dag van het afvinken). Dat is NIET de vergaderdatum —
-      // die staat nergens in dit dashboard, want 'ALV's overzicht' heeft geen datumkolom. Op
-      // productie dragen ruim 190 archiefregels dezelfde 5-5-2026, en die vergaderingen zijn
-      // beslist niet allemaal op één dag geweest. De tekst hoort dus te zeggen wat de datum ís.
-      html+=`<div class="vve-alv-rij" style="color:var(--mut)" title="De dag waarop 'Notulen' is afgevinkt — niet per se de vergaderdatum">Laatste ALV afgerond: ${esc(l.datum||'')}</div>`;
+      // 'Laatst AFGEROND' en niet 'laatst gehouden': deze datum is de dag waarop de taak 'notulen
+      // versturen' is afgevinkt, en dat is ook wat het kantoor hier wil terugzien. De kolomkop in
+      // "ALV's afgerond" zegt hetzelfde ('Datum afgerond'). Meerdere VvE's op dezelfde dag is dus
+      // normaal — die worden in één ronde afgewerkt.
+      html+=`<div class="vve-alv-rij" style="color:var(--mut)">Laatste ALV afgerond: ${esc(l.datum||'')}</div>`;
     }
     return html||'<span style="color:var(--mut);font-size:12.5px">Geen ALV-gegevens</span>';
   };

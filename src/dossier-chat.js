@@ -54,9 +54,9 @@ function dossierContextTekst(code, data, vandaag){
       + `uitnodiging ${o.alvo.uitnodiging?'verstuurd':'nog niet'}, `
       + `notulen ${o.alvo.notulen?'ja':'nee'}, begroting ${o.alvo.begroting?'ja':'nee'}.`);
   }
-  // Zeg tegen het model WAT die datum is, anders presenteert het hem als de vergaderdatum — en
-  // dat is hij niet (zie de toelichting in render-vve.js).
-  if(o.alfa && o.alfa.length) L.push(`Laatste ALV afgerond op ${o.alfa[0].datum} (dat is de dag waarop 'Notulen verstuurd' is afgevinkt, niet per se de vergaderdatum).`);
+  // 'Afgerond op' en niet 'gehouden op': deze datum is de dag waarop de taak 'notulen versturen'
+  // is afgevinkt. Dat is precies wat het kantoor wil terugzien.
+  if(o.alfa && o.alfa.length) L.push(`Laatste ALV afgerond op ${o.alfa[0].datum}.`);
   if(o.logboek.length){
     L.push('Laatste logboek/contactmomenten (nieuwste eerst):');
     o.logboek.slice(0,15).forEach(r=>{

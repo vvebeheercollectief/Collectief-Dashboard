@@ -157,7 +157,8 @@ export const SECS = {
 // en acht sleutels, dus `cols[keys.indexOf('prioriteit')]` gaf al 'Opmerkingen'. Dat bleef
 // onzichtbaar omdat `prioriteit` een boekhoudveld is en dus nooit in de verlies-lijst komt — de
 // vijf velden die de dialoog wél kan noemen zaten toevallig allemaal vóór de eerste scheefstand.
-// Zodra er een kop bijkomt die bij geen veld hoort ('Signaal', taak 4) schuiven ook die vijf op
+// Zodra er een kop bijkomt die bij geen veld hoort (de Signaal-kolom was daar tot v12.0 het
+// voorbeeld van) schuiven ook die vijf op
 // en gaat de dialoog stil de verkeerde veldnaam tonen. Deze afbeelding is expliciet; de toetsen
 // bij 'veldlabel:' in tests.js bewaken drift in beide richtingen.
 //

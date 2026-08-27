@@ -61,13 +61,20 @@ import { renderAll } from "./main.js";
 // Eén object en geen zes losse argumenten: rijnummers, taaknummers en het bundelnummer zijn hier
 // allemaal korte waarden van dezelfde vorm — verwisseld zou geen enkele toets erop aanslaan
 // (zelfde reden als bij `toevoegWaarden` in crud.js).
+//
+// EEN LEEG TAAKNUMMER GAAT NOOIT MEE. `ontkoppelBereiken` hieronder houdt kolom Q buiten zijn
+// bereik omdat een meegeschreven lege Q een nummer zou wissen dat een collega of de backfill net
+// heeft gezet — en de rij-guard kan dat geval juist niet zien. Hier gold dezelfde belofte, maar
+// alleen doordat de aanroeper eerst een nummer maakt (zie `koppelSubtaak`). Dat is een belofte in
+// een ánder bestand; nu dwingt deze functie hem zelf af door Q weg te laten zodra het nummer leeg
+// is. Schrijven van R:S is een strikte deelverzameling, dus dit kan nooit méér stukmaken.
 export function koppelBereiken({ subRij, subNr, kopRij, kopNr, bundelId, volg, schrijfKop }){
   const uit = [];
-  if (schrijfKop)
-    uit.push({ range:`'Nog Te Doen'!Q${kopRij}:S${kopRij}`,
-               values:[_veiligeRij([kopNr||'', bundelId, '0'])] });
-  uit.push({ range:`'Nog Te Doen'!Q${subRij}:S${subRij}`,
-             values:[_veiligeRij([subNr||'', bundelId, String(volg)])] });
+  const bereik = (rij, nr, staart) => (String(nr || '').trim()
+    ? { range:`'Nog Te Doen'!Q${rij}:S${rij}`, values:[_veiligeRij([String(nr).trim(), ...staart])] }
+    : { range:`'Nog Te Doen'!R${rij}:S${rij}`, values:[_veiligeRij(staart)] });
+  if (schrijfKop) uit.push(bereik(kopRij, kopNr, [bundelId, '0']));
+  uit.push(bereik(subRij, subNr, [bundelId, String(volg)]));
   return uit;
 }
 
@@ -186,7 +193,13 @@ export async function koppelTaak(sub, doel){
   // gewijzigd'). Nodig is het daar ook niet — het bundelnummer komt dan uit check.bundelId.
   const oudSubNr = sub.taakId, oudKopNr = doel.taakId;
   if (!kopHadBundel && !(doel.taakId||'').trim()) doel.taakId = nieuwTaakId();
-  if (!(sub.taakId||'').trim())  sub.taakId  = nieuwTaakId();
+  // Deze twee worden in dezelfde milliseconde gemaakt, en dan draagt alleen het toevalsdeel het
+  // verschil. Krijgen kop en subtaak hetzelfde nummer, dan wijst de bundel naar zichzelf. De kans
+  // is klein maar de uitkomst niet te herstellen, dus hier gewoon doortellen tot ze verschillen —
+  // zelfde aanpak als `uniekTaakId` in crud.js voor 'ook voor andere VvE's'.
+  if (!(sub.taakId||'').trim()){
+    do { sub.taakId = nieuwTaakId(); } while (sub.taakId === (doel.taakId||'').trim());
+  }
   const bundelId = bundelSleutel(check.bundelId || doel.taakId);
 
   // Alle rijen met dít bundelnummer, ook als het er maar één is. Bewust rechtstreeks uit de index

@@ -799,7 +799,8 @@ function cd_createTaskRow(categorie, code, naam, actiepunt, behandelaar, deadlin
 // LET OP — SYNC: zelfde vorm als nieuwTaakId() in src/util.js. Beide kanten maken nummers voor
 // dezelfde kolom Q; wijken ze uiteen, dan is aan een nummer niet meer te zien dat het er een is.
 function cd_nieuwTaakId() {
-  return 'T' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  // Zes tekens toeval en niet drie: zie de toelichting bij nieuwTaakId() in src/util.js.
+  return 'T' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
 function test_createTask() {

@@ -1549,10 +1549,11 @@ async function submitTask(){
       // de eerste rij gezet, als één aaneengesloten blok — dat is precies wat `insertAndWriteRows`
       // straks in één keer invoegt.
       //
-      // Taaknummers binnen dit blok gegarandeerd uniek. `nieuwTaakId` is tijd + drie willekeurige
-      // tekens, en in een lus is die tijd identiek: bij twintig VvE's is de kans op een botsing
-      // klein maar niet nul, en het gevolg is stil en naar — twee rijen met hetzelfde nummer in
-      // kolom Q laten de rij-controle naar de verkéérde rij schrijven.
+      // Taaknummers binnen dit blok gegarandeerd uniek. `nieuwTaakId` is tijd + zes willekeurige
+      // tekens, en in een lus is die tijd identiek: alle bescherming zit dus in dat toevalsdeel.
+      // Sinds v12.1 zijn dat er zes in plaats van drie (2,2 miljard i.p.v. 46.656 waarden), maar
+      // deze lus blijft staan: 'klein' is niet 'nul', en het gevolg is stil en naar — twee rijen
+      // met hetzelfde nummer in kolom Q laten de rij-controle naar de verkéérde rij schrijven.
       const gebruikteIds = new Set([nieuw.taakId]);
       const uniekTaakId = () => { let id=nieuwTaakId();
                                   while(gebruikteIds.has(id)) id=nieuwTaakId();

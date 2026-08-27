@@ -1483,6 +1483,55 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     });
   })();
 
+  // ── Een leeg taaknummer gaat nooit mee in een schrijfbereik (v12.1) ──
+  // `ontkoppelBereiken` houdt kolom Q al buiten zijn bereik: een meegeschreven lege Q wist een
+  // nummer dat een collega of de backfill net heeft gezet, en juist dát geval kan de rij-guard
+  // niet zien. `koppelBereiken` hield diezelfde belofte, maar alleen doordat de aanroeper in een
+  // ánder bestand eerst een nummer maakt. Nu dwingt de functie hem zelf af.
+  (() => {
+    const metNr = koppelBereiken({ subRij:12, subNr:'T1', kopRij:10, kopNr:'T2',
+                                   bundelId:'T2', volg:10, schrijfKop:true });
+    eq('bundelbereik: mét nummers loopt het bereik vanaf Q',
+       metNr.map(b => b.range), ["'Nog Te Doen'!Q10:S10", "'Nog Te Doen'!Q12:S12"]);
+    eq('bundelbereik: en het nummer staat vooraan', metNr[0].values[0][0], 'T2');
+
+    const zonderKop = koppelBereiken({ subRij:12, subNr:'T1', kopRij:10, kopNr:'',
+                                       bundelId:'T2', volg:10, schrijfKop:true });
+    eq('bundelbereik: zonder kopnummer begint dat bereik pas bij R', zonderKop[0].range, "'Nog Te Doen'!R10:S10");
+    eq('bundelbereik: en schrijft dus geen lege Q', zonderKop[0].values[0], ['T2','0']);
+    eq('bundelbereik: de subtaak houdt zijn eigen bereik', zonderKop[1].range, "'Nog Te Doen'!Q12:S12");
+
+    const zonderSub = koppelBereiken({ subRij:12, subNr:'  ', kopRij:10, kopNr:'T2',
+                                       bundelId:'T2', volg:10, schrijfKop:false });
+    eq('bundelbereik: een nummer van alleen spaties telt als leeg', zonderSub[0].range, "'Nog Te Doen'!R12:S12");
+    eq('bundelbereik: zonder kop-vlag wordt de kop-rij niet aangeraakt', zonderSub.length, 1);
+    // Ontkoppelen deed dit al goed; hier staat het naast elkaar zodat het één regel blijft.
+    eq('bundelbereik: ontkoppelen laat Q ook met rust',
+       ontkoppelBereiken(12).map(b => b.range), ["'Nog Te Doen'!R12:S12"]);
+  })();
+
+  // ── Het taaknummer is een IDENTITEIT, geen sierletter (v12.1) ──
+  // De schrijf-guard vergelijkt hem, bundels verwijzen ermee naar hun kop en `kiesAfgerondRij`
+  // zoekt er de juiste afgeronde rij mee. Twee taken met hetzelfde nummer is dus geen
+  // schoonheidsfoutje. Het tijdsdeel is per milliseconde gelijk; alle bescherming zit in het
+  // toevalsdeel. Dat was drie tekens (46.656 waarden) en botste bij twaalf nummers ineens —
+  // precies wat de knop 'ook voor andere VvE's' doet — in 0,2% van de gevallen.
+  (() => {
+    const n = nieuwTaakId();
+    truthy('taaknummer: begint met T', /^T/.test(n));
+    // Zes tekens toeval, niet drie. Zonder deze ondergrens kan iemand hem weer terugzetten.
+    const staart = n.slice(1 + Date.now().toString(36).length);
+    truthy(`taaknummer: minstens zes tekens toeval achter de tijd (${staart.length})`, staart.length >= 6);
+    // Twaalf ineens, tweeduizend rondes: dat is de burst die 'ook voor andere VvE's' maakt.
+    let botsingen = 0;
+    for(let r = 0; r < 2000; r++){
+      const s = new Set();
+      for(let i = 0; i < 12; i++) s.add(nieuwTaakId());
+      if(s.size < 12) botsingen++;
+    }
+    eq('taaknummer: twaalf ineens botst niet, 2000 rondes lang', botsingen, 0);
+  })();
+
   // ── Alles wat klikbaar is, moet ook met het toetsenbord te bedienen zijn (v12.1) ──
   // De centrale delegatie maakt élk element met `data-action` klikbaar — óók een <span>. Die
   // kreeg daarmee een wijzende hand zonder enige manier om hem zonder muis te bereiken. Gemeten:

@@ -59,3 +59,28 @@ via het bewerkscherm te wijzigen. De toets zondert precies die ene uit en niets 
 | sectieloze logregels die meetellen | `SECTIELOOS_TELT` render-tabel.js | `CD_SECTIELOOS_TELT` Opvolging.gs | ja |
 | prioriteitsdrempels Oppakken | `PRIO_REGELS.OPPAKKEN` 7/14 | `ap_berekenPrio` 7/14 | ja |
 | omschrijvingskolom per sectie | `OMSCHRIJVING_VELD` crud.js | `CD_OMSCHRIJVING_COL` Notifications.gs | ja (C/D/G/C/C) |
+
+| 7 | **midden** | Taaknummer had maar 3 tekens toeval: 0,2% botsingskans bij 'ook voor andere VvE's' (12 ineens) | 6 tekens, beide kanten |
+| 8 | midden | `koppelBereiken` kon een LEGE kolom Q schrijven en zo een vers taaknummer wissen | dwingt het nu zelf af |
+| 9 | laag | Toelichting bij `uniekTaakId` noemde nog "drie willekeurige tekens" | bijgewerkt |
+
+## Bevinding 7+8 — het taaknummer is identiteit
+
+Kolom Q draagt de identiteit van een taak: de schrijf-guard vergelijkt hem, bundels verwijzen
+ermee naar hun kop, `kiesAfgerondRij` zoekt er de juiste afgeronde rij mee. Twee taken met
+hetzelfde nummer laten de rij-controle naar de VERKEERDE rij schrijven.
+
+Het tijdsdeel van het nummer is per milliseconde gelijk, dus alle bescherming zat in drie
+willekeurige tekens = 46.656 waarden. Gemeten over 2.000 rondes van twaalf nummers ineens —
+precies wat 'ook voor andere VvE's' doet — botste **0,2% van de rondes**. Nu zes tekens
+(2,2 miljard): 0 botsingen op dezelfde meting. Woordelijk gelijk gehouden met
+`cd_nieuwTaakId` in de backend.
+
+De bestaande uniekheids-lus in `crud.js` blijft staan ('klein' is niet 'nul'), en de twee
+nummers die `koppelSubtaak` in dezelfde adem maakt kunnen nu niet meer aan elkaar gelijk zijn.
+
+`ontkoppelBereiken` hield kolom Q al buiten zijn schrijfbereik, met een uitgeschreven reden:
+een meegeschreven lege Q wist een nummer dat een collega of de backfill net heeft gezet, en
+juist dát geval kan de rij-guard niet zien. `koppelBereiken` hield diezelfde belofte — maar
+alleen doordat de aanroeper in een ánder bestand eerst een nummer maakt. Nu laat de functie Q
+zelf weg zodra het nummer leeg is.

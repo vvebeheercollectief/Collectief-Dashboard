@@ -5219,7 +5219,37 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '11.6');
+  eq('versie opgehoogd', APP_VERSION, '11.7');
+
+  // ── Tabbladen ÍN de kaartkop (v11.7) ──
+  // De kop van de kaart zei links exact hetzelfde als het actieve tabblad — 'Oppakken' boven
+  // 'Oppakken' — en dáárónder stond nóg een balk met diezelfde tabbladen. Die dubbele regel is
+  // weg: de tabbladenrij staat nu ín de kop. Bewust STRUCTUREEL getoetst en niet op pixels: een
+  // pixelmeting zonder vastgezette vensterbreedte meet het venster van dat moment, en dat
+  // verschilt per uitvoering. Deze toetsen vallen aantoonbaar om op de oude opmaak.
+  ['ntd','af','ontw'].forEach(pg=>{
+    const tabs = document.getElementById(pg+'-tabs');
+    truthy(`${pg}: de tabbladenrij bestaat nog`, !!tabs);
+    const kop = tabs && tabs.closest('.card-hdr');
+    truthy(`${pg}: de tabbladenrij staat ín de kaartkop`, !!kop);
+    truthy(`${pg}: die kop draagt de klasse hdr-tabs`, !!kop && kop.classList.contains('hdr-tabs'));
+    const h2 = kop && kop.querySelector('h2');
+    truthy(`${pg}: de kop houdt zijn <h2> voor schermlezers`, !!h2);
+    truthy(`${pg}: en die <h2> staat niet meer in beeld`, !!h2 && h2.classList.contains('alleen-voorlezer'));
+    // Tabbladen links, filterbalk rechts. Omgekeerd zou de streep onder het actieve tabblad
+    // niet meer op de onderrand van de balk vallen maar halverwege in de lucht hangen.
+    const fb = kop && kop.querySelector('.filter-bar');
+    truthy(`${pg}: de tabbladen staan vóór de filterbalk`,
+       !!fb && !!tabs && (tabs.compareDocumentPosition(fb) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0);
+    eq(`${pg}: role=tablist blijft staan`, tabs && tabs.getAttribute('role'), 'tablist');
+  });
+  // Vangnet voor een halve terugval: één tabbalk die weer buiten de kop belandt haalt de dubbele
+  // regel terug zónder dat een van de toetsen hierboven omvalt.
+  eq('geen losse tabbalk meer buiten een kaartkop',
+     [...document.querySelectorAll('.tabs')].filter(t=>!t.closest('.card-hdr')).length, 0);
+  // De kop wordt nog stééds gevuld (render-lijsten.js zet hem); onzichtbaar is niet leeg.
+  truthy('de onzichtbare kop draagt nog een naam',
+     (document.getElementById('ntd-title').textContent||'').trim().length > 0);
 
   // ── Pushmeldingen: de twee schakels die stil kapot waren (audit 2026-08-06) ──
   // Beide defecten waren onzichtbaar: de app meldde "Notificaties zijn aan!" terwijl er nooit

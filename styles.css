@@ -247,20 +247,55 @@
     .filter-bar .btn-pri svg,.filter-bar .btn-sec svg{flex-shrink:0}
 
     /* Tabs */
-    /* Opvulling ALLEEN bovenaan (met een negatieve marge er weer af), plus een naar binnen
-       getekende focus-ring. `overflow-x:auto` maakt per spec ook de verticale as niet-visible, en
-       de globale ring (2px outline + 2px offset) viel daardoor buiten de doos — met de toets weg je
-       dan door de tabbladen zonder te zien waar je bent. Onderaan mag er GEEN ruimte bij: de
-       actieve tab hangt met `margin-bottom:-1px` precies op de onderrand van deze balk, en 4px
-       eronder zou die streep van de rand lostrekken én de scheidingslijn van de kaartkop afdekken.
-       Vandaar de ring daar naar binnen. */
-    .tabs{display:flex;gap:2px;padding:4px 26px 0;margin:-4px 0 0;border-bottom:1px solid var(--bor);background:var(--sur2);overflow-x:auto}
+    /* De tabbladenrij staat sinds v11.7 altijd ÍN een kaartkop (.hdr-tabs hieronder); wat daar
+       per plek verschilt — opvulling, marge, overloop, breedtegedrag — staat dáár en niet hier,
+       zodat elke eigenschap één plek heeft. Wat hier stond (4px opvulling bovenaan met een
+       negatieve marge eraf, een eigen achtergrond en `overflow-x:auto`) hoorde bij de losse
+       tabbalk die niet meer bestaat en werd hoe dan ook overschreven.
+       De focus-ring blijft naar BINNEN getekend: op een telefoon staat de rij nog steeds op
+       `overflow-x:auto`, en dat maakt per spec ook de verticale as niet-visible — de globale ring
+       (2px outline + 2px offset) viel daardoor buiten de doos, en dan weg je met de toets door de
+       tabbladen zonder te zien waar je bent. */
+    .tabs{display:flex;gap:2px;border-bottom:1px solid var(--bor)}
     .tab:focus-visible{outline-offset:-2px}
     .tab{padding:11px 11px;font-size:13px;font-weight:500;color:var(--mut);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color var(--tr),border-color var(--tr);display:flex;align-items:center;gap:5px;white-space:nowrap;flex-shrink:0}
     .tab:hover{color:var(--txt)}
     .tab.on{color:var(--txt);border-bottom-color:var(--ac);font-weight:600}
     .tab .cnt{min-width:auto;height:auto;padding:0;border-radius:0;font-size:12px;font-weight:500;background:none;color:var(--mut);display:inline-flex;align-items:center;justify-content:center}
     .tab.on .cnt{color:var(--mut)}
+
+    /* ── Tabbladen ÍN de kaartkop (Nog Te Doen / Afgerond / Ontwikkeling) ──
+       Tot v11.6 stonden de tabbladen in een eigen balk ONDER de kop, en zei die kop links
+       exact hetzelfde als het actieve tabblad: 'Oppakken' boven 'Oppakken'. Die dubbele regel
+       is weg. De <h2> blijft bestaan maar alleen voor schermlezers (.alleen-voorlezer): een
+       tabel zonder kop is voor een schermlezer een naamloos blok, en `#ntd-title` wordt ook
+       door de code gezet en getoetst. Gemeten op 1920 breed: 111px → 53px boven de kolomkoppen.
+
+       Drie dingen liggen hier vast en mogen niet losjes wijzigen:
+
+       1. `align-items:stretch` + `.tab{align-self:stretch}`. De streep onder het actieve
+          tabblad moet op de ONDERRAND van de balk vallen — net zoals hij eerst op de onderrand
+          van de losse tabbalk viel. Daarvoor moeten de tabbladen de volle hoogte van de balk
+          pakken; met `align-items:center` hangt die streep halverwege in de lucht.
+
+       2. `overflow:visible` en NIET `auto` (behalve op een telefoon, zie de media query
+          onderaan). `overflow-x:auto` zet de automatische minimumbreedte van een flex-item op
+          0. Dan krimpt de tabbladenrij liever dan dat de filterbalk naar een tweede regel
+          zakt, en verdwijnen er tabbladen achter een schuifbalk die niemand zoekt. Met
+          `visible` is de minimumbreedte de inhoud, dus breekt de balk netjes af.
+
+       3. `flex:1 1 auto` + de eigen onderrand + `margin-bottom:-1px`. Past alles op één regel
+          (±1850px en breder), dan groeit de tabbladenrij tot aan de filterbalk en valt haar
+          onderrand precies op die van de kaartkop — onzichtbaar, één streep. Past het niet,
+          dan zakt de filterbalk naar een tweede regel, groeit de tabbladenrij tot de volle
+          breedte en wordt diezelfde onderrand de scheidslijn tussen de twee regels. Eén set
+          regels die op elke schermbreedte klopt, zonder gegokt breekpunt. */
+    .card-hdr.hdr-tabs{padding:0 16px;gap:0 14px;align-items:stretch;position:relative}
+    .hdr-tabs .tabs{padding:0;margin:0 0 -1px;overflow:visible;flex:1 1 auto;min-height:44px}
+    .hdr-tabs .tab{align-self:stretch;padding:0 11px}
+    .hdr-tabs .filter-bar{align-self:center;padding:8px 0}
+    /* Alleen voor schermlezers. Weghalen kon niet: dan verliest de tabel haar kop. */
+    .alleen-voorlezer{position:absolute;width:1px;height:1px;padding:0;margin:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
 
     /* Table */
     .tbl-wrap{overflow-x:auto}
@@ -1342,7 +1377,17 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,.search-box inpu
 
 /* ── Mobiel: uitlijning, touch-targets en afbreek-gedrag ── */
 @media(max-width:680px){
-  .tabs{padding:4px 12px 0}   /* de opvulling bovenaan blijft: zie de basisregel (focus-ring) */
+  .card-hdr.hdr-tabs{padding:0 12px}
+  /* Hier WÉL schuiven: vijf tabbladen meten samen ±612px en dat past op geen telefoon. Ze
+     krijgen een eigen regel over de volle breedte en schuiven horizontaal, precies zoals in de
+     losse tabbalk van vroeger. De filterbalk staat eronder.
+     Zónder schuifbalk: een klassieke schuifbalk (zoals een bureaubladbrowser in telefoonstand
+     tekent) eet 6px van de 44px hoogte, en dán komt de streep onder het actieve tabblad 5px
+     boven de scheidslijn te zweven — precies wat deze hele wijziging moest rechtzetten. Op een
+     échte telefoon is de schuifbalk een zwevende laag en gebeurt dat niet; deze twee regels
+     maken het gedrag overal gelijk. Schuiven zelf blijft gewoon werken (veeg/trackpad). */
+  .hdr-tabs .tabs{flex:1 1 100%;min-width:0;overflow-x:auto;scrollbar-width:none}
+  .hdr-tabs .tabs::-webkit-scrollbar{display:none}
   .grp-kop{padding:9px 12px}
   #content{padding:14px}
   .ico-btn{width:38px;height:38px}

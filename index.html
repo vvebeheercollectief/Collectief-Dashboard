@@ -141,8 +141,16 @@
         </div>
       </div>
       <div class="card" id="ntd-card">
-        <div class="card-hdr">
-          <h2 id="ntd-title">Nog Te Doen</h2>
+        <!-- role=tablist: de knoppen erin dragen role="tab", en een tab zonder tablist eromheen is
+             ongeldige ARIA — een schermlezer negeert de rol dan of leest hem verkeerd voor. Het
+             paneel eronder is wat ze omschakelen, dus dat krijgt role=tabpanel.
+             De tabbladen staan sinds v11.7 ÍN deze kop en niet meer in een eigen balk eronder:
+             die kop zei links exact hetzelfde als het actieve tabblad. De <h2> blijft bestaan
+             voor schermlezers (en `ntd-title` wordt door render-lijsten.js gezet en getoetst),
+             maar staat niet meer in beeld — zie .hdr-tabs / .alleen-voorlezer in styles.css. -->
+        <div class="card-hdr hdr-tabs">
+          <h2 id="ntd-title" class="alleen-voorlezer">Nog Te Doen</h2>
+          <div class="tabs" id="ntd-tabs" role="tablist" aria-label="Categorie"></div>
           <div class="filter-bar">
             <div class="search-box">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
@@ -159,10 +167,6 @@
             <button class="btn btn-pri btn-sm" id="btn-add"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Toevoegen</button>
           </div>
         </div>
-        <!-- role=tablist: de knoppen erin dragen role="tab", en een tab zonder tablist eromheen is
-             ongeldige ARIA — een schermlezer negeert de rol dan of leest hem verkeerd voor. Het
-             paneel eronder is wat ze omschakelen, dus dat krijgt role=tabpanel. -->
-        <div class="tabs" id="ntd-tabs" role="tablist" aria-label="Categorie"></div>
         <div class="tbl-wrap" id="ntd-tbl-wrap" role="tabpanel" aria-label="Openstaande taken in de gekozen categorie"><table><thead id="ntd-thead"></thead><tbody id="ntd-tbody"></tbody></table></div>
         <div class="pag" id="ntd-pag"></div>
         <!-- Cross-list (bug #2): taken die via Subcategorie óók in dit scherm horen -->
@@ -173,8 +177,9 @@
     <!-- ══ AFGEROND ══ -->
     <div class="page" id="page-af">
       <div class="card">
-        <div class="card-hdr">
-          <h2>Afgerond</h2>
+        <div class="card-hdr hdr-tabs">
+          <h2 class="alleen-voorlezer">Afgerond</h2>
+          <div class="tabs" id="af-tabs" role="tablist" aria-label="Categorie"></div>
           <div class="filter-bar">
             <div class="search-box">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
@@ -189,7 +194,6 @@
             </span>
           </div>
         </div>
-        <div class="tabs" id="af-tabs" role="tablist" aria-label="Categorie"></div>
         <div class="tbl-wrap" role="tabpanel" aria-label="Afgeronde taken in de gekozen categorie"><table><thead id="af-thead"></thead><tbody id="af-tbody"></tbody></table></div>
         <div class="pag" id="af-pag"></div>
       </div>
@@ -256,8 +260,9 @@
     <!-- ══ ONTWIKKELING ══ -->
     <div class="page" id="page-ontw">
       <div class="card">
-        <div class="card-hdr" style="--sec:var(--pk);--sec-l:var(--pk-l);--sec-b:var(--pk-b)">
-          <h2 id="ontw-title">Ontwikkeling</h2>
+        <div class="card-hdr hdr-tabs" style="--sec:var(--pk);--sec-l:var(--pk-l);--sec-b:var(--pk-b)">
+          <h2 id="ontw-title" class="alleen-voorlezer">Ontwikkeling</h2>
+          <div class="tabs" id="ontw-tabs" role="tablist" aria-label="Categorie"></div>
           <div class="filter-bar">
             <div class="search-box">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
@@ -266,7 +271,6 @@
             <button class="btn btn-pri btn-sm" id="btn-add-ontw" style="background:var(--pk)">+ Nieuw item</button>
           </div>
         </div>
-        <div class="tabs" id="ontw-tabs" role="tablist" aria-label="Categorie"></div>
         <div class="tbl-wrap" role="tabpanel" aria-label="Ontwikkelitems in de gekozen categorie">
           <table><thead id="ontw-thead"></thead><tbody id="ontw-tbody"></tbody></table>
         </div>

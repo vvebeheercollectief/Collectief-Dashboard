@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="nl" data-theme="light">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Mockup — Tabbladen in de bovenste balk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="../styles.css"/>
+<style>
+/* ══════════════════════════════════════════════════════════════════
+   VOORSTEL A — onderstreepte tabbladen schuiven de bovenste balk in.
+   Zelfde tabblad-stijl als nu, alleen verhuisd. De streep onder het
+   actieve tabblad valt precies op de onderrand van de balk, dus de
+   tabbladen rekken over de volle hoogte van de balk.
+   ══════════════════════════════════════════════════════════════════ */
+.card-hdr.hdr-tabs{padding:0 16px;gap:14px;align-items:stretch;min-height:52px}
+.hdr-tabs .tabs{background:none;border-bottom:0;padding:0;margin:0;overflow:visible;flex:0 1 auto}
+.hdr-tabs .tab{align-self:stretch;padding:0 11px}
+.hdr-tabs .filter-bar{margin-left:auto;align-self:center;padding:8px 0}
+
+/* ══════════════════════════════════════════════════════════════════
+   VOORSTEL B — tabbladen als één schakelaar (pillen) in de balk.
+   Staat netjes op ooghoogte naast de zoekvelden (allemaal 36px hoog)
+   en breekt netter af op een smal scherm.
+   ══════════════════════════════════════════════════════════════════ */
+.card-hdr.hdr-pillen{padding:9px 16px;gap:14px;min-height:52px}
+.hdr-pillen .tabs{background:var(--sur2);border:1px solid var(--bor);border-radius:10px;
+  padding:3px;margin:0;gap:2px;height:36px;align-items:center;overflow:visible;flex:0 1 auto}
+.hdr-pillen .tab{border-bottom:0;margin-bottom:0;height:30px;padding:0 11px;border-radius:7px}
+.hdr-pillen .tab.on{background:var(--sur);border:1px solid var(--bor);box-shadow:0 1px 2px rgba(16,24,40,.06)}
+.hdr-pillen .filter-bar{margin-left:auto}
+
+/* ── Alleen mockup-chrome, hoort niet in de app ── */
+body{padding:26px 22px 90px;background:var(--bg)}
+.mk-h1{font-size:21px;font-weight:800;letter-spacing:-.02em;margin:0 0 4px}
+.mk-lead{font-size:13.5px;color:var(--mut);max-width:760px;margin:0 0 20px;line-height:1.6}
+.mk-bar{position:sticky;top:0;z-index:40;display:flex;flex-wrap:wrap;align-items:center;gap:8px;
+  background:var(--sur);border:1px solid var(--bor);border-radius:12px;padding:9px 12px;margin:0 0 24px;box-shadow:var(--sh)}
+.mk-bar b{font-size:12px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;margin-right:4px}
+.mk-w{border:1px solid var(--bor);background:var(--sur);border-radius:8px;padding:6px 11px;font:inherit;
+  font-size:12.5px;font-weight:700;color:var(--mut);cursor:pointer}
+.mk-w.on{background:var(--ac);border-color:var(--ac);color:#fff}
+.mk-sec{margin:0 0 30px}
+.mk-kop{display:flex;align-items:baseline;gap:10px;margin:0 0 9px}
+.mk-tag{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+  padding:3px 9px;border-radius:99px;background:var(--ac-l);color:var(--ac);border:1px solid var(--ac-b)}
+.mk-tag.nu{background:#eef0f3;color:var(--mut);border-color:var(--bor)}
+.mk-tag.b{background:var(--pu-l);color:var(--pu);border-color:var(--pu-b)}
+.mk-titel{font-size:15px;font-weight:700}
+.mk-uitleg{font-size:12.5px;color:var(--mut);margin:0 0 11px;line-height:1.6}
+.mk-veld{background:var(--bg);border:1px dashed var(--bor-input,#dfe3e8);border-radius:14px;padding:16px;overflow-x:auto}
+.mk-scherm{margin:0 auto}
+.mk-hoogte{display:inline-block;margin-top:8px;font-size:12px;font-weight:700;color:var(--mut);
+  background:var(--sur);border:1px solid var(--bor);border-radius:7px;padding:3px 9px}
+.mk-hoogte i{font-style:normal;color:var(--gn);font-weight:800}
+</style>
+</head>
+<body>
+
+<div class="mk-h1">Tabbladen naar de bovenste balk</div>
+<p class="mk-lead">Nu staat "Oppakken" twee keer boven de tabel: als kop in de bovenste balk én als
+actief tabblad in de balk daaronder. Hieronder eerst hoe het nú is, daarna twee manieren om die
+dubbele regel weg te halen. Zet de schermbreedte om te zien hoe elk voorstel meebuigt.</p>
+
+<div class="mk-bar">
+  <b>Schermbreedte</b>
+  <button class="mk-w on" data-w="1640">1920 px (jouw scherm)</button>
+  <button class="mk-w" data-w="1160">1440 px (laptop)</button>
+  <button class="mk-w" data-w="1000">1280 px</button>
+  <button class="mk-w" data-w="362">Telefoon</button>
+  <b style="margin-left:12px">Tabblad</b>
+  <button class="mk-w on" data-sec="0">Oppakken</button>
+  <button class="mk-w" data-sec="1">Vergaderverzoeken</button>
+  <button class="mk-w" data-sec="2">Offerte-trajecten</button>
+</div>
+
+<div class="mk-sec">
+  <div class="mk-kop"><span class="mk-tag nu">Nu</span><span class="mk-titel">Twee balken — de naam staat er dubbel</span></div>
+  <p class="mk-uitleg">Balk 1: kop + zoeken/filters/knoppen. Balk 2: de vijf tabbladen. De kop links
+  zegt hetzelfde als het tabblad dat aan staat.</p>
+  <div class="mk-veld"><div class="mk-scherm" id="veld-nu"></div></div>
+  <span class="mk-hoogte" id="h-nu"></span>
+</div>
+
+<div class="mk-sec">
+  <div class="mk-kop"><span class="mk-tag">Voorstel A</span><span class="mk-titel">Tabbladen schuiven de bovenste balk in — zelfde stijl</span></div>
+  <p class="mk-uitleg">De tabbladen houden precies het uiterlijk dat je gewend bent (onderstreping
+  onder het actieve tabblad), maar staan nu links in de bovenste balk. De kop vervalt: welke
+  categorie aan staat lees je aan het onderstreepte tabblad, en "Nog Te Doen" staat al bovenaan de
+  pagina. De kolomkoppen komen er direct onder.</p>
+  <div class="mk-veld"><div class="mk-scherm" id="veld-a"></div></div>
+  <span class="mk-hoogte" id="h-a"></span>
+</div>
+
+<div class="mk-sec">
+  <div class="mk-kop"><span class="mk-tag b">Voorstel B</span><span class="mk-titel">Tabbladen als één schakelaar (pillen)</span></div>
+  <p class="mk-uitleg">Zelfde plek, andere vorm: de vijf tabbladen zitten in één omlijst blokje,
+  even hoog als de zoekvelden ernaast. Op een smal scherm zakt dit blokje in zijn geheel netjes
+  naar de volgende regel — bij A kan de onderstreping dan los van de onderrand komen te staan.</p>
+  <div class="mk-veld"><div class="mk-scherm" id="veld-b"></div></div>
+  <span class="mk-hoogte" id="h-b"></span>
+</div>
+
+<script>
+const SECS=[
+ {key:'OPPAKKEN',label:'Oppakken',n:24,css:'--sec:var(--ac);--sec-l:var(--ac-l);--sec-b:var(--ac-b)',
+  cols:['VvE Code','VvE','Signaal','Actiepunt','Deadline','Wie','Opmerkingen'],
+  rijen:[['201104','VvE Fahrenheitstraat 9-11 te \'s-Gravenhage','Nog 4d','Offertes balkon onderhoud van Heijstek en HGR, delen met…','31-08-2026','J',''],
+         ['381179','VvE Drebbelstraat 40/42/44','Nog 4d','Ontvangen offertes van Heijstek en Klusbouw delen met de…','31-08-2026','J',''],
+         ['301059','VvE Kempstraat 3/5 Hobbemaplein 43','Nog 5d','Declaratie mevrouw Jiwalal opnieuw in behandeling neme…','01-09-2026','J','']]},
+ {key:'VERGADERVERZOEKEN',label:'Vergaderverzoeken',n:22,css:'--sec:var(--am);--sec-l:var(--am-l);--sec-b:var(--am-b)',
+  cols:['VvE Code','VvE','Signaal','Periode','Agendapunten','Wie','Deadline uitschr.','Opmerkingen'],
+  rijen:[['281015','VvE Noordeinde 107/107A','Nog 7d','Q3 2026','Onderhoud, begroting','J','03-09-2026',''],
+         ['301065','VvE Kaapstraat 55/57/59','','Q4 2026','Dakrenovatie','J','04-09-2026',''],
+         ['301048','VvE Kaapseplein 19 t/m 24','','Q4 2026','Schade-dossier','–','','Gabos heeft op 28 januari…']]},
+ {key:'OFFERTE-TRAJECTEN',label:'Offerte-trajecten',n:34,css:'--sec:var(--pu);--sec-l:var(--pu-l);--sec-b:var(--pu-b)',
+  cols:['VvE Code','VvE','Datum aangevr.','Ontvangen/Aangevr.','Behandelaar','Deadline','Opmerkingen'],
+  rijen:[['201065','VvE Hendrik van Deventerstraat 93/91/89','12-06-2026','2 / 3','JC','10-07-2026','Murat checken over offerte…'],
+         ['361023','VvE Troelstrakade 721 t/m 735','20-06-2026','1 / 3','J','31-07-2026',''],
+         ['381047','VvE Jan ten Brinkstraat 134 t/m 144','21-06-2026','3 / 3','JC','31-07-2026','Onderzoeksrapport binnen…']]}];
+const ALLE=[['Oppakken',24],['Vergaderverzoeken',22],['Offerte-trajecten',34],['LOD',9],['Subsidie-trajecten',7]];
+
+let breedte=1640, actief=0;
+
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+function tabsHtml(){
+  return ALLE.map((t,i)=>`<button type="button" class="tab ${i===actief?'on':''}" role="tab"
+    aria-selected="${i===actief}" ${i===actief?`style="${SECS[Math.min(actief,SECS.length-1)].css}"`:''}
+    data-tab="${i}">${t[0]}<span class="cnt">${t[1]}</span></button>`).join('');
+}
+function filterHtml(){
+  return `<div class="filter-bar">
+    <div class="search-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><input type="text" placeholder="Zoek…" aria-label="Zoek"/></div>
+    <div class="search-box" style="min-width:120px;max-width:150px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 5.523-8 13-8 13S4 15.523 4 10a8 8 0 0116 0z"/><circle cx="12" cy="10" r="3"/></svg><input type="text" placeholder="VvE Code…" aria-label="VvE-code"/></div>
+    <select class="filter-select" aria-label="Behandelaar"><option>Alle behandelaars</option></select>
+    <select class="filter-select" aria-label="Prioriteit"><option>Alle prioriteiten</option></select>
+    <button class="btn btn-sec btn-sm"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="4.5" width="15" height="15" rx="3" fill="currentColor" fill-opacity="0.18"/><path d="M8.5 12.3l2.6 2.6 4.9-5.4"/></svg> Selecteren</button>
+    <button class="btn btn-pri btn-sm"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Toevoegen</button>
+  </div>`;
+}
+function tabelHtml(){
+  const S=SECS[Math.min(actief,SECS.length-1)];
+  const th=S.cols.map(c=>`<th style="${S.css};background:var(--sec-l);color:var(--sec);border-bottom:1px solid var(--sec-b)">${esc(c)}</th>`).join('')+'<th></th>';
+  const tb=S.rijen.map(r=>`<tr>${r.map((c,i)=>`<td${i===0?' class="mono"':''}>${esc(c)}</td>`).join('')}<td></td></tr>`).join('');
+  return `<div class="tbl-wrap"><table><thead><tr>${th}</tr></thead><tbody>${tb}</tbody></table></div>`;
+}
+function kaart(variant){
+  const S=SECS[Math.min(actief,SECS.length-1)];
+  if(variant==='nu'){
+    return `<div class="card" style="${S.css}">
+      <div class="card-hdr"><h2>${S.label}</h2>${filterHtml()}</div>
+      <div class="tabs" role="tablist">${tabsHtml()}</div>
+      ${tabelHtml()}</div>`;
+  }
+  const kl = variant==='a' ? 'hdr-tabs' : 'hdr-pillen';
+  return `<div class="card" style="${S.css}">
+    <div class="card-hdr ${kl}"><div class="tabs" role="tablist">${tabsHtml()}</div>${filterHtml()}</div>
+    ${tabelHtml()}</div>`;
+}
+function meet(id,hid){
+  const el=document.getElementById(id).querySelector('.card');
+  const kop=el.querySelector('.card-hdr').getBoundingClientRect().height;
+  const tb=el.querySelector('.tabs:not(.card-hdr .tabs)');
+  const los=el.querySelector('.card > .tabs');
+  const tot=Math.round(kop+(los?los.getBoundingClientRect().height:0));
+  const s=document.getElementById(hid);
+  s.innerHTML = 'Hoogte boven de kolomkoppen: <i>'+tot+' px</i>';
+  return tot;
+}
+function teken(){
+  document.getElementById('veld-nu').innerHTML=kaart('nu');
+  document.getElementById('veld-a').innerHTML=kaart('a');
+  document.getElementById('veld-b').innerHTML=kaart('b');
+  ['veld-nu','veld-a','veld-b'].forEach(id=>document.getElementById(id).style.width=breedte+'px');
+  const nu=meet('veld-nu','h-nu'); meet('veld-a','h-a'); meet('veld-b','h-b');
+  document.getElementById('h-nu').innerHTML='Hoogte boven de kolomkoppen: <i style="color:var(--mut)">'+nu+' px</i>';
+}
+document.addEventListener('click',e=>{
+  const w=e.target.closest('[data-w]');
+  if(w){breedte=+w.dataset.w;document.querySelectorAll('[data-w]').forEach(b=>b.classList.toggle('on',b===w));teken();return}
+  const s=e.target.closest('[data-sec]');
+  if(s){actief=+s.dataset.sec;document.querySelectorAll('[data-sec]').forEach(b=>b.classList.toggle('on',b===s));teken();return}
+  const t=e.target.closest('[data-tab]');
+  if(t){actief=Math.min(+t.dataset.tab,SECS.length-1);
+    document.querySelectorAll('[data-sec]').forEach(b=>b.classList.toggle('on',+b.dataset.sec===actief));teken();}
+});
+teken();
+</script>
+</body>
+</html>

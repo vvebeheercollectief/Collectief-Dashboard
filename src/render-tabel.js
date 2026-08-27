@@ -309,7 +309,7 @@ function rowNtd(r,sec){
   // anders in deze rij te zien is, en hoort bij de eveneens gedempte rij (tr.snooze-row).
   const ov = opvolgStatus(r);
   const extraPills = ov.weggelegd
-    ? `<span class="pill-snooze" data-action="taak-wegleggen" data-rid="${rid}" title="Weggelegd tot ${esc(r.opvolgdatum)}">${ico('pauze',11)}${esc(kortDatum(r.opvolgdatum))}</span>`
+    ? `<span class="pill-snooze" role="button" tabindex="0" data-action="taak-wegleggen" data-rid="${rid}" title="Weggelegd tot ${esc(r.opvolgdatum)}">${ico('pauze',11)}${esc(kortDatum(r.opvolgdatum))}</span>`
     : '';
   // ── Takenbundel ──
   // state._bundelWeergave wordt door renderNtd voor déze render klaargezet (zie `bundelWeergave`):
@@ -348,7 +348,8 @@ function rowNtd(r,sec){
   // als de rest van de gestapelde weergave: bij een zoekterm, filter, kolomsortering of
   // bulk-selectie staat die uit en kan er niet gestapeld worden (§4.2), dus dan hoort er ook geen
   // handvat te staan dat het tegendeel belooft.
-  // Bewust dezelfde `_bw.stapel` die `initStapelSlepen` via zijn `magSlepen` leest (main.js), en
+  // Bewust dezelfde `_bw.stapel` die `initStapelSlepen` (bundel-acties.js) leest via de
+  // `magSlepen`-callback die main.js meegeeft, en
   // geen eigen afleiding ernaast: zo kunnen het zichtbare handvat en het toegestane gebaar niet uit
   // elkaar lopen.
   const bdlGreep = (_bw && _bw.stapel) ? STAPEL_GREEP : '';

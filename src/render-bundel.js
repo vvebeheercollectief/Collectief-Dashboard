@@ -129,7 +129,7 @@ function subRegel(m, i){
   // opvolgdatum aan te passen, en dat hoort hier niet anders te werken.
   const ov = opvolgStatus(r);
   const snoozePil = ov.weggelegd
-    ? `<span class="pill-snooze" data-action="taak-wegleggen" data-rid="${rid}" title="Weggelegd tot ${esc(r.opvolgdatum)}">${ico('pauze',11)}${esc(kortDatum(r.opvolgdatum))}</span>`
+    ? `<span class="pill-snooze" role="button" tabindex="0" data-action="taak-wegleggen" data-rid="${rid}" title="Weggelegd tot ${esc(r.opvolgdatum)}">${ico('pauze',11)}${esc(kortDatum(r.opvolgdatum))}</span>`
     : '';
   // 'Vandaag opvolgen' en 'stil' stonden hier ook, omdat de tabelrij ze toonde en de twee
   // hetzelfde hoorden te betekenen. Sinds v12.0 toont de tabel ze allebei NIET meer — de

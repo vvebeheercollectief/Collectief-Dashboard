@@ -1483,6 +1483,58 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     });
   })();
 
+  // ── Alles wat klikbaar is, moet ook met het toetsenbord te bedienen zijn (v12.1) ──
+  // De centrale delegatie maakt élk element met `data-action` klikbaar — óók een <span>. Die
+  // kreeg daarmee een wijzende hand zonder enige manier om hem zonder muis te bereiken. Gemeten:
+  // de VvE-code in de rij (een dossier openen kon alleen nog via Ctrl+K) en de 'Terug <datum>'-pil.
+  // Deze toets loopt élke sectie in beide standen af, zodat een nieuwe klikbare span meteen opvalt.
+  (() => {
+    const vA=state.activeNtd, vNtd=D.ntd, vPg=pgs.ntd, vBulk=state.bulkMode;
+    const NATIEF=new Set(['BUTTON','A','INPUT','SELECT','TEXTAREA','SUMMARY']);
+    try{
+      const rij=(s,i)=>({code:'30'+i,naam:'VvE Toets',actiepunt:'x',agendapunten:'y',status:'z',
+        periode:'Week 38 · 14–18 sep 2026',subsidie:'s',subsidieFase:'Verleend',
+        datumAangevraagd:'1 mei 2026',offertes:'1 / 2',deadline:'1 juni 2026',behandelaar:'Jer',
+        opmerkingen:'o',inBehandeling:i%2?'TRUE':'',opvolgdatum:i===0?'30-08-2026':'',_sec:s,_row:400+i});
+      D.ntd=Object.fromEntries(SKEYS.map(s=>[s,[0,1].map(i=>rij(s,i))]));
+      const onbereikbaar=new Map();
+      [false,true].forEach(bulk=>{ state.bulkMode=bulk;
+        SKEYS.forEach(sec=>{ pgs.ntd=1; setNtd(sec);
+          document.querySelectorAll('#ntd-tbody [data-action]').forEach(el=>{
+            if(!el.getClientRects().length) return;
+            const kan = NATIEF.has(el.tagName) || el.hasAttribute('tabindex');
+            if(!kan) onbereikbaar.set(el.dataset.action+'|'+el.tagName, el.dataset.action);
+          }); }); });
+      // De sleepgreep is de ENIGE toegestane uitzondering: slepen kán niet met een toetsenbord, en
+      // de volgorde is ook via het bewerkscherm te wijzigen. Staat hier iets anders in, dan is er
+      // een klikbaar element bijgekomen dat niemand zonder muis kan bedienen.
+      eq('toetsenbord: elk klikbaar element in de rij is te bereiken (behalve de sleepgreep)',
+         [...onbereikbaar.values()].filter(a=>a!=='stapel-greep').sort(), []);
+      // En de twee die dit blok aanleiding gaven, met naam:
+      pgs.ntd=1; setNtd('OPPAKKEN');
+      const code=document.querySelector('#ntd-tbody [data-action="vve-open"]');
+      truthy('toetsenbord: de VvE-code is te focussen', !!code && code.getAttribute('tabindex')==='0');
+      eq('toetsenbord: en meldt zich als knop', code&&code.getAttribute('role'), 'button');
+      const pil=document.querySelector('#ntd-tbody .pill-snooze');
+      truthy('toetsenbord: de terugkomdatum-pil is te focussen', !!pil && pil.getAttribute('tabindex')==='0');
+      // Enter moet dezelfde actie doen als een klik. Zonder de keydown-tak in initActions gebeurde
+      // er niets; met een NATIEVE knop mag hij juist NIET dubbel vuren.
+      let geteld=0;
+      const echt=ACTIONS['vve-open']; ACTIONS['vve-open']=()=>{geteld++;};
+      try{
+        code.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));
+        eq('toetsenbord: Enter op de VvE-code voert de actie uit', geteld, 1);
+        code.dispatchEvent(new KeyboardEvent('keydown',{key:' ',bubbles:true,cancelable:true}));
+        eq('toetsenbord: spatie ook', geteld, 2);
+        const knop=document.querySelector('#ntd-tbody button[data-action]');
+        if(knop){ const a=knop.dataset.action, oud=ACTIONS[a]; let n2=0; ACTIONS[a]=()=>{n2++;};
+          try{ knop.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));
+               eq('toetsenbord: een échte knop vuurt niet dubbel', n2, 0); }
+          finally{ ACTIONS[a]=oud; } }
+      } finally { ACTIONS['vve-open']=echt; }
+    } finally { D.ntd=vNtd; state.bulkMode=vBulk; pgs.ntd=vPg; state.activeNtd=vA; setNtd(vA); }
+  })();
+
   // ── De Signaal-kolom is weg (v12.0) ──
   (() => {
     const vA = state.activeNtd, vOpp = D.ntd['OPPAKKEN'], vLog = D.logboek, vPg = pgs.ntd;

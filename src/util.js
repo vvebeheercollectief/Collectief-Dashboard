@@ -644,7 +644,10 @@ function vveCodeSpan(code, style){
   const c=((code==null?'':code)+'').trim();
   const st=style?` style="${style}"`:'';
   if(!c||c==='—') return `<span class="code"${st}>${esc(code||'—')}</span>`;
-  return `<span class="code code-klik"${st} data-action="vve-open" data-code="${esc(c)}" title="Open VvE-dossier">${esc(c)}</span>`;
+  // `role=button` + `tabindex` en niet zomaar een <span>: dit ding heeft een wijzende hand en
+  // opent een dossier, maar was zonder muis niet te bereiken — het dossier kon alleen nog via
+  // Ctrl+K. De centrale delegatie in actions.js maakt Enter en spatie hierop werkend.
+  return `<span class="code code-klik"${st} role="button" tabindex="0" data-action="vve-open" data-code="${esc(c)}" title="Open VvE-dossier">${esc(c)}</span>`;
 }
 // De subcategorie achter de VvE-naam. Is die gelijk aan het tabblad waar je al staat ("Oppakken"
 // in de Oppakken-tab), dan zegt hij niets nieuws en gaat hij weg — dat is precies de ruis waar

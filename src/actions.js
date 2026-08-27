@@ -271,6 +271,12 @@ export function initActions() {
     // met tabindex hebben aangemeld — anders zou élke aanklikbare pil een tabstop worden en wordt
     // Tab in een lijst van 25 rijen onbruikbaar. Echte knoppen slaan we over: die doen dit zelf,
     // en meedoen zou de actie twee keer uitvoeren.
+    //
+    // TOT v12.1 STOND HIER NIETS TEGENOVER: geen enkel element droeg een tabindex, dus dit blok
+    // is nooit één keer afgegaan. De VvE-code in de rij en de 'Terug <datum>'-pil hadden wél een
+    // wijzende hand — een dossier openen kon zonder muis alleen via Ctrl+K. Die twee melden zich
+    // nu aan (util.js vveCodeSpan, en de drie plekken die de snooze-pil tekenen), en een toets in
+    // tests.js loopt élke sectie af zodat een nieuwe klikbare span meteen opvalt.
     if ((e.key === 'Enter' || e.key === ' ') && e.target instanceof Element) {
       const kb = e.target.closest('[data-action][tabindex]');
       if (kb && kb === e.target && !kb.closest('button') && kb.tagName !== 'BUTTON' && kb.tagName !== 'A') {

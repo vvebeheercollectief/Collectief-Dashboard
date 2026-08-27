@@ -11,6 +11,8 @@ oorzaak speelt.
 | 2 | midden | Weekkiezer toonde een opgeslagen week niet als die buiten 12 terug / 26 vooruit viel | gefixt, v12.1 |
 | 3 | laag | Dode CSS: `.s-soon` (producent verdween in v12.0), `.pers-jer/-cihad/-gabos` (identiek aan `.pers-default`) | opgeruimd |
 | 4 | laag | Zelftest `sync: eerste stille hapering` hing af van DOM-restanten van een eerder blok | onafhankelijk gemaakt |
+| 5 | **midden** | VvE-code en 'Terug <datum>'-pil waren klikbaar maar niet met het toetsenbord te bereiken | gefixt, v12.1 |
+| 6 | laag | Twee toelichtingen wezen naar het verkeerde bestand (PRIO_REGELS "in index.html", `magSlepen` "in main.js") | rechtgezet |
 
 ## Oorzaak achter 1, 2 en 4
 
@@ -31,3 +33,29 @@ zijn keuzelijst. Nu geldt de regel op alle vier de plekken, met toetsen die elk 
 - **Modulegraaf**: alle 47 modules laden.
 - **Contracten** (`tools/kruisverwijzing.py`): geen actie zonder afhandelaar, geen afhandelaar
   zonder knop, geen id dat nergens gezet wordt.
+
+## Bevinding 5 in detail — het mechanisme stond er al
+
+De centrale delegatie in `actions.js` maakt élk element met `data-action` klikbaar, óók een
+`<span>`. Onderaan diezelfde handler stond al een tak die Enter en spatie afhandelt voor
+"een aanklikbaar element dat GEEN knop is" — met de uitdrukkelijke voorwaarde dat het element
+zich met `tabindex` moet aanmelden.
+
+**Geen enkel element deed dat.** Die tak is dus nooit één keer afgegaan. Gevolg: de VvE-code in
+de rij (een dossier openen kon zonder muis alleen via Ctrl+K) en de 'Terug <datum>'-pil hadden
+een wijzende hand en geen toetsenbordweg. De reparatie is dus niet nieuwe code maar de twee
+elementen zich laten aanmelden — in `vveCodeSpan` (één gedeelde helper, dus overal tegelijk) en
+op de drie plekken die de snooze-pil tekenen. Ik had eerst een tweede handler toegevoegd; die
+vuurde de actie dubbel en is weer weg.
+
+De sleepgreep blijft bewust buiten: slepen kán niet met een toetsenbord, en de volgorde is ook
+via het bewerkscherm te wijzigen. De toets zondert precies die ene uit en niets anders.
+
+## SYNC-afspraken met de Apps Script-backend — met de hand nagelopen
+
+| afspraak | frontend | backend | gelijk |
+|---|---|---|---|
+| stil-escalatie (5 secties × trap1/trap2) | `STIL_ESCALATIE_REGELS` util.js | `CD_STIL_ESCALATIE_REGELS` Opvolging.gs | ja |
+| sectieloze logregels die meetellen | `SECTIELOOS_TELT` render-tabel.js | `CD_SECTIELOOS_TELT` Opvolging.gs | ja |
+| prioriteitsdrempels Oppakken | `PRIO_REGELS.OPPAKKEN` 7/14 | `ap_berekenPrio` 7/14 | ja |
+| omschrijvingskolom per sectie | `OMSCHRIJVING_VELD` crud.js | `CD_OMSCHRIJVING_COL` Notifications.gs | ja (C/D/G/C/C) |

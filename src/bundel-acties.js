@@ -150,7 +150,7 @@ function heeftRij(...rijen){
 // dan 'niet afgerond' over een taak die net gearchiveerd was. `rijIndex` vindt hem op taaknummer
 // terug, en valt bij een rij zonder nummer terug op de inhoud; bij twijfel geeft hij -1 en
 // blokkeren we niet — dezelfde kant op als voorheen, dus dit kan niet vals alarm slaan.
-function blokkeerAfgerond(...rijen){
+export function blokkeerAfgerond(...rijen){
   const uitAfgerond = r => SKEYS.some(s => rijIndex((D.af && D.af[s]) || [], r) > -1);
   if (!rijen.some(uitAfgerond)) return false;
   alert('Deze taak is al afgerond. Zet hem eerst terug voordat je de bundel wijzigt.');

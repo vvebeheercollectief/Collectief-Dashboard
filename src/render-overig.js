@@ -804,7 +804,7 @@ async function logEvents(regels) {
 
 export {
   ONTW_CATS, ONTW_CAT_COLORS, parseOntw, renderOntw, setOntw, openOntwModal, closeOntwModal,
-  submitOntwItem, deleteOntwItem, editOntwItem, parseLogboek, _logSleutel, _nogNietBevestigd, fmtLogTs, actieBadge, _LOG_AVKLEUR, avatarKleur,
+  submitOntwItem, deleteOntwItem, editOntwItem, parseLogboek, _logSleutel, _logRegelSleutel, _ontwSleutel, _nogNietBevestigd, fmtLogTs, actieBadge, _LOG_AVKLEUR, avatarKleur,
   logDayLabel, logZin, logTijd, logItemHtml, logPaginaSoort, renderLogboek, histNoteKey, renderTaskHistory, addTaskNote, logEvent, logEvents,
   _shiftRows, _shiftLogboekRows, _shiftLogEditRef, _herankerLogEdit, logEditWrite, logDeleteLabel,
   logEditForm, editLogboek, saveLogboek, cancelLogboek, setLogSoort, deleteLogboek, undoDeleteLog,

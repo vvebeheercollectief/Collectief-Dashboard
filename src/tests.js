@@ -3,7 +3,7 @@
 // ══════════════════════════════════════
 import { taakTitel, taakVerwijzing, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, stilDrempel, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, subBadge, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel, kiesAfgerondRij, filt, splitBehandelaar, korteNaam, persBadges, taakActieKnoppen, voorgesteldeDeadline, DEADLINE_VOORSTEL, DEADLINE_HINT, periodeBereik, AF_PERIODES } from "./util.js";
 import { verwerkMeldingRijen, toonMeldingen, MAX_TOAST_BURST, _whoSleutel, getCurrentWho, undoDelete } from "./notifications.js";
-import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek, logEvents, renderOntw, openOntwModal, closeOntwModal, submitOntwItem } from "./render-overig.js";
+import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek, logEvents, renderOntw, openOntwModal, closeOntwModal, submitOntwItem, _logRegelSleutel, _ontwSleutel } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM, VELD_LABELS } from "./config.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
@@ -42,7 +42,7 @@ import { bouwBundelIndex, bundelWeergave, zichtbareKop, isBundel, bundelVan, bun
 import { bundelPaneelHtml, bundelMerkje, bundelKopExtra, STAPEL_GREEP } from "./render-bundel.js";
 import { vraagBevestiging, beantwoordBevestiging, _vraagStaatOpen } from "./bevestig.js";
 import { bovensteModal, koppelFormulierLabels, benoemSchakelaars } from "./modal-a11y.js";
-import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkoppelTaak, herordenBundel, sleepDoel, paneelTaaknummers, sleepUitslag, initBundelSlepen } from "./bundel-acties.js";
+import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkoppelTaak, herordenBundel, sleepDoel, paneelTaaknummers, sleepUitslag, initBundelSlepen, blokkeerAfgerond } from "./bundel-acties.js";
 
   // De 8s-poll uitzetten zolang de suite draait: die deelt `window.fetch` en de statusbalk met de
   // toetsen hieronder, en maakte er twee wisselvallig (zie de toelichting bij de timer in main.js).
@@ -4352,6 +4352,138 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     eq('rollback: buurregel terug op 6 (oude patroon liet die op 5 staan)', arr[2]._row, 6);
     eq('rollback: rij 8 terug op 8', arr[3]._row, 8);
   })();
+  // ── De rollback van een MISLUKTE verwijdering werkt op de LEVENDE lijst ──
+  // Dit is de val die de doortest van 27-08 opdook en die het herstel-idioom hierboven NIET dekt:
+  // dat idioom rekent op één array, terwijl `loadAll` bij elke ronde `D.ntd = p.data` doet — een
+  // compleet nieuw object met nieuwe arrays. Hield de rollback de array van het klikmoment vast,
+  // dan zette hij de rij terug in een lijst waar niemand meer naar kijkt (onzichtbaar weg) terwijl
+  // `_herstelShift` de rijnummers van de LEVENDE lijst wél ophoogde — dubbel mis.
+  //
+  // Bewust een echte `deleteTaskRow` met een falende schrijfactie, en de verversing precies TIJDENS
+  // die schrijfactie: alleen dan staat de rollback voor de vraag waar hij zijn lijst vandaan haalt.
+  await (async()=>{
+    const _fetch=window.fetch, ntdOud=D.ntd, afOud=D.af, cacheOud=state._rowCache,
+          tokenOud=state.oauthToken, expiryOud=state.oauthExpiry, idsOud=state._sheetIds,
+          uitCacheOud=state._uitCache, pendingOud=state.pendingWrites;
+    try{
+      state.oauthToken='nep-token'; state.oauthExpiry=Date.now()+9e5; state._uitCache=false;
+      state._sheetIds={ 'Nog Te Doen':1, 'Afgerond':2 };
+      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const t=(row,id,act)=>({ _row:row, _sec:'OPPAKKEN', taakId:id, bundelId:'', bundelVolg:'',
+        code:'311212', naam:'Testflat', actiepunt:act, deadline:'', behandelaar:'', prioriteit:'',
+        opmerkingen:'', inBehandeling:'', subcategorie:'' });
+      const boven=t(2,'Tboven','staat erboven'), doel=t(5,'Tweg','weg-ermee'),
+            buur=t(6,'Tbuur','blijft staan'), later=t(8,'Tlater','ook blijft');
+      D.af={ ...leeg };
+      D.ntd={ ...leeg, OPPAKKEN:[boven, doel, buur, later] };
+      state._rowCache=[boven, doel, buur, later];
+      // De verse stand zoals een geslaagde leesronde hem oplevert: dezelfde taken, NIEUWE objecten,
+      // en de rijnummers zoals ze in de Sheet staan (de delete is immers niet gelukt).
+      const versLijst=[{...boven},{...doel},{...buur},{...later}];
+      let tijdensPost=null;
+      window.fetch=async(url,opt)=>{
+        const u=String(url), m=(opt||{}).method||'GET';
+        if(m==='POST' && u.includes(':batchUpdate')){
+          if(tijdensPost){ const f=tijdensPost; tijdensPost=null; f(); }
+          // 403 en geen 5xx: _isTransient zou een 5xx drie keer herkansen en dat maakt deze
+          // toets seconden traag voor precies dezelfde uitkomst.
+          return new Response(JSON.stringify({error:{message:'nep-fout voor de rollback'}}),{status:403});
+        }
+        if(u.includes('/values/')){    // de rij-guard leest de doelrij terug
+          return new Response(JSON.stringify({values:[_rijNaarCellen('Nog Te Doen', doel)]}),{status:200});
+        }
+        return new Response('{}',{status:200});
+      };
+      // Tijdens de schrijfactie landt er een verse leesronde: D.ntd wordt VERVANGEN.
+      tijdensPost=()=>{ D.ntd={ ...leeg, OPPAKKEN:versLijst }; };
+      await deleteTaskRow(doel);   // geen subtaken → geen bevestigingsvraag
+      await state._writeChain;
+      await new Promise(r=>setTimeout(r,0));
+      const levend=D.ntd.OPPAKKEN;
+      truthy('rollback-vers: de rollback schrijft in de LIJST DIE NU IN D STAAT', levend===versLijst);
+      eq('rollback-vers: de taak staat er precies één keer in',
+         levend.filter(r=>String(r.taakId||'')==='Tweg').length, 1);
+      // En de rijnummers van de buren kloppen weer met de Sheet. Dít is de helft die stil misging:
+      // `_herstelShift` draait op de levende lijst, dus als de rollback zijn rij ergens ánders
+      // terugzet, blijft de +1 wél staan en wijst élke volgende schrijfactie één rij te hoog.
+      eq('rollback-vers: en de rijnummers staan weer zoals in de Sheet',
+         levend.map(r=>r._row), [2,5,6,8]);
+    } finally {
+      window.fetch=_fetch; D.ntd=ntdOud; D.af=afOud; state._rowCache=cacheOud;
+      state.oauthToken=tokenOud; state.oauthExpiry=expiryOud; state._sheetIds=idsOud;
+      state._uitCache=uitCacheOud; state.pendingWrites=pendingOud;
+      document.querySelectorAll('.toast').forEach(el=>el.remove());
+    }
+  })();
+
+  // ── De guard 'deze taak is al afgerond' mag niet op object-identiteit leunen ──
+  // Er stond nul toetsing op deze guard, terwijl hij het enige is dat een bundelwijziging tegenhoudt
+  // op een taak die intussen gearchiveerd is. Hij vergeleek met `.includes(r)` — object-identiteit —
+  // en `loadAll` vervangt óók élk object in D.af. Vlak na een verversing zei de guard dus 'niet
+  // afgerond' over een taak die net gearchiveerd wás.
+  (()=>{
+    const afOud=D.af, _alert=window.alert, meldingen=[];
+    window.alert=m=>meldingen.push(String(m));
+    try{
+      const leegAf={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const t=(row,id,act)=>({ _row:row, _sec:'OPPAKKEN', taakId:id, bundelId:'', bundelVolg:'',
+        code:'311212', naam:'Testflat', actiepunt:act, deadline:'', behandelaar:'', prioriteit:'',
+        opmerkingen:'', inBehandeling:'', subcategorie:'' });
+      const gearchiveerd=t(4,'Tarch','al afgerond'), open=t(9,'Topen','staat nog open');
+      D.af={ ...leegAf, OPPAKKEN:[gearchiveerd] };
+      meldingen.length=0;
+      truthy('afgerond-guard: een taak die in D.af staat wordt geblokkeerd',
+             blokkeerAfgerond(gearchiveerd) === true && meldingen.length === 1);
+      // De kern: een VERVERSING heeft alle objecten vervangen. Zelfde taak, ander object.
+      D.af={ ...leegAf, OPPAKKEN:[{ ...gearchiveerd }] };
+      meldingen.length=0;
+      truthy('afgerond-guard: … óók als de verversing het object heeft vervangen (taaknummer)',
+             blokkeerAfgerond(gearchiveerd) === true && meldingen.length === 1);
+      // En zonder taaknummer — de 224 archiefrijen van vóór de backfill — via de inhoud.
+      const oudArch={ ...gearchiveerd, taakId:'' };
+      D.af={ ...leegAf, OPPAKKEN:[{ ...oudArch }] };
+      meldingen.length=0;
+      truthy('afgerond-guard: … en een archiefrij zonder taaknummer via de inhoud',
+             blokkeerAfgerond(oudArch) === true && meldingen.length === 1);
+      // Een openstaande taak mag NOOIT geblokkeerd worden — dat zou elke bundelwijziging stilleggen.
+      D.af={ ...leegAf, OPPAKKEN:[gearchiveerd] };
+      meldingen.length=0;
+      truthy('afgerond-guard: een openstaande taak wordt niet geblokkeerd',
+             blokkeerAfgerond(open) === false && meldingen.length === 0);
+      D.af={ ...leegAf };
+      truthy('afgerond-guard: leeg archief blokkeert niets', blokkeerAfgerond(gearchiveerd, open) === false);
+    } finally { D.af=afOud; window.alert=_alert; }
+  })();
+
+  // ── De rollback-sleutels van Logboek en Ontwikkeling moeten de regel ECHT uniek maken ──
+  // Vier velden was te grof: een bulk-actie op twee taken van dezelfde VvE levert logregels op die
+  // op tijdstempel, code, actie én nieuwe waarde gelijk zijn. `regelIndex` wees dan de ÁNDERE regel
+  // aan, de rollback concludeerde 'staat er nog' en zette de verwijderde regel niet terug — stil,
+  // want er komt geen melding bij een geslaagde rollback.
+  (()=>{
+    const A={ timestamp:'2026-08-27T10:00:00Z', code:'311212', sectie:'OPPAKKEN', actie:'Bewerkt',
+              veld:'behandelaar', oudeWaarde:'Jer',   nieuweWaarde:'Cihad', gebruiker:'Jer', _row:5 };
+    const B={ ...A, oudeWaarde:'Cihad', _row:6 };   // zelfde bulk-actie, andere oude waarde
+    // Zoals hij was: vier velden. Beide regels zien er identiek uit → de verwijderde regel wordt
+    // ten onrechte 'gevonden' in de ander.
+    const grof = e=>[e.timestamp,e.code,e.actie,e.nieuweWaarde].join('\x1f');
+    truthy('logsleutel: de OUDE vier-velden-sleutel kon de verkeerde regel aanwijzen',
+           regelIndex([B], A, grof) > -1);
+    // Zoals hij nu is: alle acht velden die parseLogboek leest.
+    eq('logsleutel: de volledige sleutel houdt ze uit elkaar',
+       regelIndex([B], A, _logRegelSleutel), -1);
+    truthy('logsleutel: … en vindt de regel zelf nog gewoon',
+           regelIndex([B, {...A}], A, _logRegelSleutel) === 1);
+    // Ontwikkeling: dezelfde vorm, eigen velden.
+    const O={ titel:'Zoekveld', categorie:'Verbeteringen', inhoud:'sneller maken',
+              door:'Jer', datum:'27-08-2026', status:'Open', _row:4 };
+    const O2={ ...O, inhoud:'anders bedoeld', _row:5 };
+    truthy('ontwsleutel: titel+datum alleen kon de verkeerde regel aanwijzen',
+           regelIndex([O2], O, x=>[x.titel,x.datum].join('\x1f')) > -1);
+    eq('ontwsleutel: de volledige sleutel houdt ze uit elkaar',
+       regelIndex([O2], O, _ontwSleutel), -1);
+  })();
+
   // ── Optimistische logregels (_row<=0, nog niet terug uit de Sheet) krijgen geen
   //    bewerk-/verwijderknoppen: die kunnen pas werken mét een echt rijnummer ──
   (()=>{
@@ -5087,7 +5219,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '11.5');
+  eq('versie opgehoogd', APP_VERSION, '11.6');
 
   // ── Pushmeldingen: de twee schakels die stil kapot waren (audit 2026-08-06) ──
   // Beide defecten waren onzichtbaar: de app meldde "Notificaties zijn aan!" terwijl er nooit

@@ -3,6 +3,7 @@
 // ══════════════════════════════════════
 import { IS_STAGING, ALLOWED_EMAILS, SKEYS, SECS, APP_VERSION, TEAM } from './config.js';
 import { D, pgs, state } from './state.js';
+import { verseRij } from "./rij.js";
 import { ensureToken, doOAuth } from './auth.js';
 import { startSplash } from './login-splash.js';
 import { goTo, syncKop, closeSb, applyTheme, applyDensity, cycleDensity, setupSearch } from './ui.js';
@@ -188,7 +189,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   // slepen' en 'staat de stapel aan' niet uit elkaar kunnen lopen: bij een zoekterm, filter,
   // kolomsortering of bulk-selectie staat de stapelweergave uit en betekent slepen niets (§4.2).
   initStapelSlepen(document.getElementById('ntd-tbody'), 'tr[data-row]',
-    el => state._rowCache[+el.dataset.rid] || null,
+    el => verseRij(state._rowCache[+el.dataset.rid]),
     () => !!(state._bundelWeergave && state._bundelWeergave.stapel));
   document.getElementById('f-status-alvo').onchange=()=>{pgs.alvo=1;renderAlvo()};
   document.getElementById('f-budget-alvo').onchange=()=>{pgs.alvo=1;renderAlvo()};

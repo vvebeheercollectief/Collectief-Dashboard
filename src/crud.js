@@ -5,6 +5,7 @@ import { esc, berekenPrioriteit, toISODate, toDutchDate, nieuwTaakId, taakVerwij
 import { zoekDubbels, dubbelVraagTekst } from "./dubbelcheck.js";
 import { extraVves, wisExtraVves, extraVvesHtml, extraVvesUitleg } from "./meervve.js";
 import { state, D, pgs } from "./state.js";
+import { verseRij, rijIndex } from "./rij.js";
 import { SECS, SKEYS, SID, OMSCHRIJVING_SLEUTEL, VELD_LABELS } from "./config.js";
 import { writeRange, writeRows, _shiftNtdRows, _shiftAfRows, _herstelShift, assertRowMatch, sheetsFetch, fetchSheet, _a1Bereik, _withRetry } from "./api.js";
 import { isKolomKop, isSectieKop } from "./structuurcheck.js";
@@ -778,12 +779,12 @@ async function deleteTaskRow(r, bijDoorgaan){
   // pagina, anders de taakregel op de dossierpagina. Zonder die tweede helft vond dit niets als je
   // vanuit het dossier verwijderde: de rode puls speelde onzichtbaar in een verborgen tabel en de
   // rij bleef daar ruim een seconde staan alsof er niets gebeurde.
-  const _rid=state._rowCache.indexOf(r);
+  const _rid=state._rowCache.indexOf(r);   // vorm-ok: zoekt een RID voor de puls-animatie, muteert niets
   const tr=document.querySelector(`.page.active #ntd-tbody tr[data-row="${oudeRow}"]`)
         || (_rid>=0 ? document.querySelector(`.page.active .tk[data-rid="${_rid}"]`) : null);
   // optimistisch: meteen lokaal weg + indexen meeschuiven
   const arr=D.ntd[sec]||[];
-  const pos=arr.indexOf(r);
+  const pos=rijIndex(arr, r);   // identiteit, niet object — zie src/rij.js
   if(pos>-1) arr.splice(pos,1);
   _shiftNtdRows(oudeRow,-1);
   // Ontdubbelen op het vaste TAAKNUMMER en niet op de tekst. Twee offerte-trajecten van dezelfde
@@ -822,7 +823,7 @@ async function deleteTaskRow(r, bijDoorgaan){
       // oude vaste veldketen de mist in (bij offerte en vergaderverzoek stond er iets anders).
       await logEvent(r.code, sec, 'Verwijderd', '', r[OMSCHRIJVING_SLEUTEL[sec]]||taakTitel(r,sec)||'', '');
     },
-    ()=>{ if(arr.indexOf(r)===-1){ _herstelShift(_shiftNtdRows,oudeRow); arr.splice(Math.min(pos<0?arr.length:pos,arr.length),0,r); } },
+    ()=>{ if(rijIndex(arr, r)===-1){ _herstelShift(_shiftNtdRows,oudeRow); arr.splice(Math.min(pos<0?arr.length:pos,arr.length),0,r); } },
     'Verwijderen mislukt'
   );
   // rode puls + fade op de oude rij; daarná pas hertekenen
@@ -864,13 +865,18 @@ function getAfInsertRow(sec){
 async function completeCurrentEditTask(){
   const r=_bewerkRijVers();
   if(!r) return;
-  await completeTaskRow(r, state._rowCache.indexOf(r), closeModal);
+  await completeTaskRow(r, state._rowCache.indexOf(r), closeModal);   // vorm-ok: rid voor de puls-animatie
 }
 
 // Pure (testbaar): zoek het bewaarde rij-object vers op in de huidige _rowCache.
 // Bewust op identiteit (indexOf), geen veld-vergelijking: na een verse parse zijn het
 // nieuwe objecten en is -1 het veilige antwoord — niet gokken welke rij 'dezelfde' is.
-function _verseRijIdx(row, cache){ return row ? (cache||[]).indexOf(row) : -1; }
+// LET OP — dit is een ANDERE vraag dan `rijIndex` uit src/rij.js, en ze door elkaar halen kost
+// precies de bescherming waar het om gaat. Hier: "staat dit EXACTE object er nog in?" — een
+// inhoudelijk gelijke kloon telt bewust NIET, want juist dat verschil ('D is vervangen door een
+// verse parse') is het signaal om te her-ankeren. `rijIndex` beantwoordt de vraag daarná: "en waar
+// staat die taak dan nu?", en mag wél op inhoud terugvallen.
+function _verseRijIdx(row, lijst){ return row ? (lijst||[]).indexOf(row) : -1; }   // vorm-ok: dit ÍS de strenge vraag
 
 // Pure (testbaar): her-anker een wees-rij op INHOUD nadat een verse parse alle
 // D.ntd-objecten verving (stille resync na een andere schrijfactie). Alleen bij exact
@@ -878,9 +884,7 @@ function _verseRijIdx(row, cache){ return row ? (cache||[]).indexOf(row) : -1; }
 // meerdere kandidaten liever de gebruiker opnieuw laten klikken dan gokken.
 function _herankerRij(r, ntd){
   if(!r||!SECS[r._sec]) return null;
-  const doel=serializeNtdUndo(r).join('\x1f');
-  const kandidaten=((ntd&&ntd[r._sec])||[]).filter(x=>serializeNtdUndo(x).join('\x1f')===doel);
-  return kandidaten.length===1?kandidaten[0]:null;
+  return verseRij(r, (ntd&&ntd[r._sec])||[]);
 }
 
 // De taak van het OPEN bewerkscherm, vers opgezocht op het KLIKMOMENT. Gedeelde ingang voor de drie
@@ -919,7 +923,9 @@ function _herankerRij(r, ntd){
 function _bewerkRijVers(){
   const bewaard=state.editRowData;
   if(!bewaard) return null;
-  const r=_verseRijIdx(bewaard, D.ntd[bewaard._sec])>=0 ? bewaard : _herankerRij(bewaard, D.ntd);
+  // `verseRij` doet allebei de stappen in één: staat dit object er nog, dan krijg je het terug;
+  // is D vervangen, dan het verse exemplaar met dezelfde identiteit; en anders null.
+  const r=verseRij(bewaard);
   if(!r){alert('Taak niet gevonden. De lijst is intussen ververst — probeer opnieuw.');return null}
   // Meteen vastzetten, zoals doCompleteTask dat met `state._completeRow` doet: het scherm kan open
   // blijven staan (een 'nee' op de vraag, of een afgebroken opslag), en dan hoort iedereen die er
@@ -939,10 +945,23 @@ function _bewerkRijVers(){
 // Een toast en geen alert(): de rest van het dashboard meldt fouten ook zo, en een alert legt de
 // hele pagina stil voor iets waar je niets aan hoeft te doen behalve opnieuw klikken.
 function taakUitCache(rid){
-  const r = state._rowCache[+rid];
-  if(!r) showToast('Taak niet gevonden', 'De lijst is intussen ververst. Probeer het opnieuw.',
-                   'var(--rd)', 'waarschuwing', {geenDedup:true, geenSysteemmelding:true});
-  return r || null;
+  const bewaard = state._rowCache[+rid];
+  const kwijt = () => showToast('Taak niet gevonden', 'De lijst is intussen ververst. Probeer het opnieuw.',
+                                'var(--rd)', 'waarschuwing', {geenDedup:true, geenSysteemmelding:true});
+  if(!bewaard){ kwijt(); return null; }
+  // Geen NTD-taak? Dan is er niets her-ankeren. De Ontwikkeling-lijst zet hier bewust een KOPIE
+  // neer met `_sec:'ONTW'` (render-overig.js) — die weg heeft zijn eigen identiteit (`_row` op dat
+  // tabblad) en gaat niet door D.ntd.
+  if(!SECS[bewaard._sec]) return bewaard;
+  // DE ENE PLEK waar een aangeklikte rij vers wordt gemaakt. Élke rij-actie in ACTIONS komt hier
+  // langs — bewerken, afronden, wegleggen, in behandeling, subtaak koppelen — en krijgt daarmee
+  // gratis het object dat NU in D.ntd staat. Zonder dit werkte elke actie op het object van de
+  // laatste RENDER, en die cache loopt uit de pas met D zodra `loadAll` verse objecten zet zonder
+  // dat de datahash wijzigde. Zie de kop van src/rij.js voor het volledige verhaal; dit was daar
+  // de vierde verschijningsvorm van.
+  const vers = verseRij(bewaard);
+  if(!vers){ kwijt(); return null; }
+  return vers;
 }
 
 async function completeTask(idx, bijDoorgaan){
@@ -1114,7 +1133,7 @@ async function doCompleteTask(){
     // eerste clause anders de verbórgen NTD-tabelrij matchen en de puls onzichtbaar spelen.
     const tr=document.querySelector(`.page.active #ntd-tbody tr[data-row="${r._row}"]`)||document.querySelector(`.page.active .tk[data-rid="${state._completeRid}"]`);
     const arr=D.ntd[sec]||[];
-    const pos=arr.indexOf(r);
+    const pos=rijIndex(arr, r);   // identiteit, niet object — zie src/rij.js
     if(pos>-1) arr.splice(pos,1);
     _shiftNtdRows(r._row,-1);
     closeCompleteModal();
@@ -1144,7 +1163,7 @@ async function doCompleteTask(){
         }
         await logEvent(r.code, sec, 'Afgerond', 'status', 'Nog Te Doen', 'Afgerond op ' + today + (comment ? ' — ' + comment : ''));
       },
-      ()=>{ const a=(D.ntd[sec]=D.ntd[sec]||[]); if(a.indexOf(r)===-1){ _herstelShift(_shiftNtdRows,r._row); a.splice(Math.min(pos<0?a.length:pos,a.length),0,r); } },
+      ()=>{ const a=(D.ntd[sec]=D.ntd[sec]||[]); if(rijIndex(a, r)===-1){ _herstelShift(_shiftNtdRows,r._row); a.splice(Math.min(pos<0?a.length:pos,a.length),0,r); } },
       'Afronden mislukt'
     );
     // 3) groene puls + fade op de oude rij; daarná pas hertekenen
@@ -1477,7 +1496,7 @@ async function submitTask(){
       // heeft die zijn eigen shift al gedaan en zou zijn oude nummer het anker omlaag trekken.
       const versAnker=()=>{
         const a2=D.ntd[sec]||[];
-        const levend=rijen.filter(r=>a2.indexOf(r)>-1);
+        const levend=rijen.filter(r=>rijIndex(a2, r)>-1);
         return levend.length ? Math.min(...levend.map(r=>r._row))-1 : afterRow;
       };
       let ingevoegd=false;
@@ -1511,7 +1530,7 @@ async function submitTask(){
               // schuift `_shiftNtdRows` ze ook niet meer mee. Zelfde verse afleiding als in de
               // writeFn hierboven, en om dezelfde reden.
               const ankerNu=versAnker();
-              rijen.forEach(r=>{ const p=a.indexOf(r); if(p>-1){ a.splice(p,1); weg++; } });
+              rijen.forEach(r=>{ const p=rijIndex(a, r); if(p>-1){ a.splice(p,1); weg++; } });
               // Eén keer terugschuiven, ná het verwijderen. Per rij schuiven of schuiven vóór het
               // verwijderen laat de rijnummers van de hele sectie scheef achter.
               if(weg) _shiftNtdRows(ankerNu,-weg); },

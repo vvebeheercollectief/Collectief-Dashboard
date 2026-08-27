@@ -105,7 +105,9 @@ async function saveKenmerken(){
       if(rijNu>0) rec._row=rijNu;
       // Ook de optimistische logregels terugnemen — alleen die van deze poging (op identiteit,
       // niet op inhoud), zodat een gelijkluidende regel van een andere opslag blijft staan.
-      optLog.forEach(r=>{ const i=D.logboek.indexOf(r); if(i>-1) D.logboek.splice(i,1); });
+      // vorm-ok: zelfde reden als in render-vve.js — dit zijn optimistische regels (`_row:0`) uit
+      // deze tik, en `_verwerkLogboek` tilt die op identiteit mee naar een verse lijst.
+      optLog.forEach(r=>{ const i=D.logboek.indexOf(r); if(i>-1) D.logboek.splice(i,1); });   // vorm-ok: eigen optimistische regels, zie hierboven
     },
     'Kenmerken opslaan'
   );

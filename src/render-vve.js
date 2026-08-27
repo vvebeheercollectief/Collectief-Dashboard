@@ -5,6 +5,7 @@ import { esc, displayName, persBadges, splitBehandelaar, berekenPrioriteit, opvo
 import { ico } from "./icons.js";
 import { SECS, SKEYS, PAGE_META } from "./config.js";
 import { state, D } from "./state.js";
+import { verseRij } from "./rij.js";
 import { goTo } from "./ui.js";
 import { fmtLogTs, logItemHtml, logDayLabel, logPaginaSoort, _herankerLogEdit } from "./render-overig.js";
 import { vveKenmerken, KENMERK_WAARDEN } from "./kenmerken.js";
@@ -110,7 +111,10 @@ async function addContactLog(){
   renderVve();
   backgroundWrite(
     ()=>appendRange("'Logboek'!A:H",[ts,code,'','Contact',soort,wie,tekst,who]),
-    ()=>{ const i=D.logboek.indexOf(entry); if(i>-1) D.logboek.splice(i,1); },
+    // vorm-ok: object-identiteit mag hier. Dit is een OPTIMISTISCHE regel (`_row:0`) die we in
+    // deze tik zelf hebben aangemaakt, en `_verwerkLogboek` (data.js) tilt juist díé regels op
+    // identiteit mee naar de nieuwe lijst. Het object overleeft een poll dus gegarandeerd.
+    ()=>{ const i=D.logboek.indexOf(entry); if(i>-1) D.logboek.splice(i,1); },   // vorm-ok: eigen optimistische regel, zie hierboven
     'Contactmoment vastleggen'
   );
 }
@@ -485,7 +489,7 @@ function renderVve(){
   // `afRij` hierboven). Met de bredere selector zouden ze wél als doel oplichten en bij het
   // loslaten niets doen — er is geen taak om aan te koppelen.
   initStapelSlepen(document.getElementById('vve-inhoud'), '.tk-taak',
-    el => state._rowCache[+el.dataset.rid] || null);
+    el => verseRij(state._rowCache[+el.dataset.rid]));
 }
 
 export { vveOverzicht, openVvePagina, renderVve, filterDossierLog, dossierFeed, addContactLog, afOmschrijving, terugDoel, terugVanDossier, groepeerBundels };

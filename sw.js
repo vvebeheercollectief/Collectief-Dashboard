@@ -48,6 +48,7 @@ const APP_SHELL = [
   './src/config.js',
   './allowed-emails.js',
   './src/state.js',
+  './src/rij.js',
   './src/util.js',
   './src/icons.js',
   './src/api.js',

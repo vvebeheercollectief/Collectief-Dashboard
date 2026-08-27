@@ -18,7 +18,7 @@ import { sheetsFetch, NTD_OMSCHRIJVING, _isTransient, _rowMismatch, _a1Bereik, _
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, showLoadError, clearLoadError, syncSelecteerStand, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
-import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _eindKolom, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, getAfInsertRow, OMSCHRIJVING_VELD, zetOmschrijving, _sheetBreedtes, getSheetIds, bevestigInvoegPlek, _naamBijCode, _zetNaamVeld, kiesSectie, deleteTaskRow, deleteCurrentEditTask, completeCurrentEditTask, renderExtraVves, toonMeerVve, zetDeadlineVoorstel, herzieAlsSubtaak } from "./crud.js";
+import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _eindKolom, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, getAfInsertRow, OMSCHRIJVING_VELD, zetOmschrijving, _sheetBreedtes, getSheetIds, bevestigInvoegPlek, _naamBijCode, _zetNaamVeld, taakUitCache, kiesSectie, deleteTaskRow, deleteCurrentEditTask, completeCurrentEditTask, renderExtraVves, toonMeerVve, zetDeadlineVoorstel, herzieAlsSubtaak } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages, renderChat } from "./dossier-chat.js";
 import { shouldPromptReload, maakHerlaadKern, zelfdeWorker } from "./sw-update.js";
@@ -442,6 +442,121 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('login-gate: knop heeft default- én signing-state',
     !!document.querySelector('#login-btn .lg-btn-default') && !!document.querySelector('#login-btn .lg-btn-signing'));
   truthy('login-gate: splash-laag bestaat (klik = overslaan)', !!document.querySelector('#login-gate .lg-splash'));
+  // ══════════════════════════════════════════════════════════════════════════════════════
+  //  VORMCONTROLE — de twee tripdraden die deze fout in de toekomst zelf tegenhouden
+  // ══════════════════════════════════════════════════════════════════════════════════════
+  // Waaróm dit hier staat: dezelfde fout is in dit dashboard vier keer teruggekomen in vier
+  // verschillende gedaantes (zie de kop van src/rij.js). Elke keer is de plek gerepareerd waar het
+  // symptoom zat, niet de vórm. Deze twee toetsen bewaken de vorm, zodat een nieuwe mutatieweg
+  // niet stil dezelfde fout kan maken. Ze zijn met opzet saai en letterlijk: ze lezen de bron.
+
+  // ── 1. Geen rij opzoeken op OBJECT-identiteit in een mutatieweg ──
+  // In deze bestanden hoort een rij teruggevonden te worden met `rijIndex`/`verseRij`/`regelIndex`
+  // (src/rij.js) en niet met een kale `indexOf`. Een `indexOf` op een tekst is prima, en een enkele
+  // uitzondering mag — die moet dan wél op diezelfde regel `vorm-ok:` dragen mét de reden. Zo is
+  // 'ik heb erover nagedacht' zichtbaar in de code in plaats van in iemands hoofd.
+  await (async()=>{
+    const MUTATIE_BESTANDEN = ['crud.js','bulk.js','verplaats.js','bundel-acties.js',
+                               'render-herhaal.js','render-overig.js','render-vve.js','kenmerken.js'];
+    const fout = [];
+    for(const naam of MUTATIE_BESTANDEN){
+      let bron;
+      try { bron = await (await fetch('./src/' + naam, {cache:'no-store'})).text(); }
+      catch(e){ fout.push(naam + ': niet te lezen'); continue; }
+      bron.split('\n').forEach((regel, i) => {
+        if(!regel.includes('.indexOf(')) return;
+        if(/^\s*(\/\/|\*)/.test(regel)) return;              // commentaarregel
+        if(/\.indexOf\(\s*['"`]/.test(regel)) return;          // indexOf op een TEKST — geen rij
+        if(regel.includes('vorm-ok:')) return;                 // bewuste uitzondering mét reden
+        fout.push(`${naam}:${i+1}  ${regel.trim().slice(0,70)}`);
+      });
+    }
+    eq('vormcontrole: geen kale indexOf op een rij in een mutatieweg (gebruik rijIndex/verseRij)',
+       fout.join(' | '), '');
+  })();
+
+  // ── 2. Elke rij-actie staat in het register en loopt langs de gedeelde poort ──
+  // `taakUitCache` is de ENIGE ingang waar een aangeklikte rij vers gemaakt wordt. Komt er een
+  // rij-actie bij die dat overslaat, dan werkt die op het object van de laatste render — en dat is
+  // precies de fout die we hier uitroeien. Deze toets dwingt af dat iedere actie die met een
+  // `data-rid` binnenkomt bewust in dit register staat.
+  await (async()=>{
+    const REGISTER = {
+      'taak-bewerken':      'taakUitCache → openModal',
+      'taak-afronden':      'completeTask → taakUitCache',
+      'taak-wegleggen':     'openSnoozeModal → taakUitCache',
+      'taak-inbehandeling': 'zetInBehandeling → taakUitCache',
+      'bulk-vink':          'bulkVink → verseRij',
+      'subsidie-fase':      'zetSubsidieFase → taakUitCache',
+      'ontw-bewerken':      'editOntwItem → taakUitCache (Ontwikkeling: eigen identiteit, geen NTD-rij)',
+    };
+    let bron;
+    try { bron = await (await fetch('./src/actions.js', {cache:'no-store'})).text(); }
+    catch(e){ truthy('rij-acties: actions.js te lezen ('+(e&&e.message)+')', false); return; }
+    const gevonden = new Set();
+    let huidige = null;
+    bron.split('\n').forEach(regel => {
+      const m = /^\s*'([^']+)'\s*:/.exec(regel);
+      if(m) huidige = m[1];
+      if(huidige && regel.includes('dataset.rid')) gevonden.add(huidige);
+    });
+    const nieuw = [...gevonden].filter(k => !(k in REGISTER)).sort();
+    const weg   = Object.keys(REGISTER).filter(k => !gevonden.has(k)).sort();
+    eq('rij-acties: elke actie met een data-rid staat in het register (voeg hem toe én toets hem)',
+       nieuw.join(', '), '');
+    eq('rij-acties: het register bevat geen acties die niet meer bestaan', weg.join(', '), '');
+  })();
+
+  // ── 3. En de poort doet ook echt wat hij belooft: een VEROUDERDE rij wordt vers gemaakt ──
+  (()=>{
+    const cacheOud = state._rowCache, ntdOud = D.ntd.OPPAKKEN;
+    try{
+      const echt  = { _sec:'OPPAKKEN', _row:9, taakId:'T-poort', code:'311212', naam:'VvE Poort',
+                      actiepunt:'dak nakijken', deadline:'', behandelaar:'Jer', prioriteit:'',
+                      opmerkingen:'', inBehandeling:'' };
+      const oud   = { ...echt, _row:4 };        // hetzelfde taaknummer, ander object én ander rijnummer
+      D.ntd.OPPAKKEN = [echt];
+      state._rowCache = [oud];                  // de rendercache loopt achter — het gewone geval
+      const uit = taakUitCache(0);
+      truthy('poort: een verouderde rij uit de rendercache wordt vers gemaakt', uit === echt);
+      eq('poort: en draagt dus het JUISTE rijnummer', uit && uit._row, 9);
+      // En als de taak echt weg is, gebeurt er niets — geen actie op een object dat nergens bij hoort.
+      D.ntd.OPPAKKEN = [];
+      eq('poort: een verdwenen taak levert null (geen actie op een wees-object)', taakUitCache(0), null);
+      // Zonder taaknummer valt hij terug op de inhoud; twee gelijke rijen is dubbelzinnig → null.
+      const zonderNr = { ...echt, taakId:'' };
+      D.ntd.OPPAKKEN = [{ ...zonderNr, _row:11 }];
+      state._rowCache = [zonderNr];
+      truthy('poort: zonder taaknummer her-ankert hij op inhoud', taakUitCache(0)?._row === 11);
+      D.ntd.OPPAKKEN = [{ ...zonderNr, _row:11 }, { ...zonderNr, _row:12 }];
+      eq('poort: twee inhoudelijk gelijke rijen zonder nummer → null (niet gokken)', taakUitCache(0), null);
+    } finally {
+      state._rowCache = cacheOud;
+      if(ntdOud === undefined) delete D.ntd.OPPAKKEN; else D.ntd.OPPAKKEN = ntdOud;
+      document.querySelectorAll('.toast').forEach(t=>t.remove());
+    }
+  })();
+
+  // ── 4. Apps Script: een onEdit-trigger leest het tabblad uit e.range, nooit uit het ACTIEVE ──
+  // Deze fout zat in drie functies tegelijk omdat ze van elkaar overgeschreven zijn:
+  // `e.source.getActiveSheet()` geeft het tabblad dat vooraan STAAT, terwijl de rijnummers uit
+  // `e.range` komen. Twee bronnen van waarheid voor één bewerking, en de allowlist die een back-up
+  // moet weren kan er precies door heen glippen. Eén regel bron lezen houdt dat tegen.
+  await (async()=>{
+    const fout = [];
+    for(const naam of ['Code.gs','Notifications.gs','Opvolging.gs','AutoPrioriteit.gs']){
+      let bron;
+      try { bron = await (await fetch('./apps-script/' + naam, {cache:'no-store'})).text(); }
+      catch(e){ continue; }   // niet elke omgeving serveert deze map; dan zwijgt de toets
+      bron.split('\n').forEach((regel, i) => {
+        if(/^\s*(\/\/|\*)/.test(regel)) return;
+        if(regel.includes('getActiveSheet()')) fout.push(`${naam}:${i+1}`);
+      });
+    }
+    eq('apps-script: geen enkele trigger leest het ACTIEVE tabblad (gebruik e.range.getSheet())',
+       fout.join(', '), '');
+  })();
+
   // sw.js draagt APP_VERSION mee, zodat élke uitrol de service worker verandert en de
   // 'nieuwe versie'-balk verschijnt. Zonder die regel bleef sw.js bij een uitrol die alleen src/
   // raakt byte-identiek en zag de browser geen nieuwe worker: open sessies draaiden de oude
@@ -4172,8 +4287,12 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     eq('_verseRijIdx: geen bewaarde rij → -1', _verseRijIdx(null,[rA]), -1);
     eq('_verseRijIdx: lege cache → -1', _verseRijIdx(rB,[]), -1);
     // integratie: completeTask bewaart het object zelf; closeCompleteModal ruimt op
-    const cacheOud=state._rowCache;
+    const cacheOud=state._rowCache, ntdOudCT=D.ntd.OPPAKKEN;
     state._rowCache=[rA,rB];
+    // ÓÓK in D.ntd: sinds `taakUitCache` via `verseRij` loopt (src/rij.js) is een rij die alleen in
+    // de rendercache staat per definitie een verouderde rij, en die hóórt geweigerd te worden.
+    // Deze toets gaat over iets anders — dat er een OBJECT bewaard wordt en geen index.
+    D.ntd.OPPAKKEN=[rA,rB];
     completeTask(1);
     truthy('completeTask bewaart het rij-object (geen index)', state._completeRow===rB);
     truthy('afhandel-modal is open', document.getElementById('complete-bg').classList.contains('open'));
@@ -4184,6 +4303,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     eq('closeCompleteModal wist de bewaarde rij', state._completeRow, null);
     eq('closeCompleteModal wist het bewaarde rid', state._completeRid, null);
     state._rowCache=cacheOud;
+    if(ntdOudCT===undefined) delete D.ntd.OPPAKKEN; else D.ntd.OPPAKKEN=ntdOudCT;
   })();
   // ── _herankerRij: wees-rij (verse parse verving objecten) alleen her-ankeren bij
   //    exact één inhoudelijk identieke rij — bij nul of twee kandidaten niet gokken ──

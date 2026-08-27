@@ -19,6 +19,7 @@
 // `verlorenVelden` ze op een rij en toont de vraag ze met naam en waarde — en het logboek legt ze
 // vast, zodat ze ook achteraf nog terug te lezen zijn.
 import { state, D } from "./state.js";
+import { verseRij, rijIndex } from "./rij.js";
 import { SECS, SID, OMSCHRIJVING_SLEUTEL, VELD_LABELS } from "./config.js";
 import { berekenPrioriteit, taakTitel } from "./util.js";
 import { assertRowsMatch, _shiftNtdRows, _herstelShift, sheetsFetch } from "./api.js";
@@ -206,7 +207,7 @@ async function verplaatsTaak(r, doelSec, nietOpgeslagen){
   // geheugen telt alleen dat de eindstand klopt en dit is de volgorde die niet over zichzelf
   // heen struikelt.
   const bronArr = D.ntd[bronSec] || [];
-  const pos = bronArr.indexOf(r);
+  const pos = rijIndex(bronArr, r);   // identiteit, niet object — zie src/rij.js
   if(pos > -1) bronArr.splice(pos, 1);
   _shiftNtdRows(r._row, -1);
   const naAfterRow = getInsertRow(doelSec);
@@ -322,7 +323,7 @@ async function verplaatsTaak(r, doelSec, nietOpgeslagen){
           // en het einde van het blok stond daarna één rijnummer te hoog. Normaal binnen een
           // seconde rechtgetrokken door de stille resync, maar juist de tak die deze rollback het
           // vaakst afvuurt is 'offline' — en dan komt die resync per definitie niet.
-          const dArr = D.ntd[doelSec] || []; const dp = dArr.indexOf(doelRij);
+          const dArr = D.ntd[doelSec] || []; const dp = rijIndex(dArr, doelRij);
           // Het anker VÓÓR het verwijderen aflezen, en uit het levende rij-object: `naAfterRow` is
           // het bevroren getal van het klikmoment en kan door de rollback van een eerdere
           // schrijfactie achterhaald zijn — zelfde reden als bij de invoegplek in de writeFn.

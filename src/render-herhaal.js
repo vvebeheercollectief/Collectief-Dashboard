@@ -4,6 +4,7 @@
 // ══════════════════════════════════════
 import { esc, emptyRow, vveCodeSpan, toISODate, toDutchDate, _parseAnyDate, coerceDagenVooraf } from "./util.js";
 import { state, D } from "./state.js";
+import { regelIndex } from "./rij.js";
 import { SID } from "./config.js";
 import { appendRange, writeRange, assertRowMatch, sheetsFetch } from "./api.js";
 import { ensureToken } from "./auth.js";
@@ -141,7 +142,7 @@ async function deleteHerhaal(){
   closeHerhaalModal();
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){alert('Inloggen mislukt.');return}
-  const pos=(D.herhaal||[]).indexOf(r); if(pos>-1)D.herhaal.splice(pos,1);
+  const pos=regelIndex(D.herhaal, r, x=>x.id); if(pos>-1)D.herhaal.splice(pos,1);
   (D.herhaal||[]).forEach(x=>{if(x._row>r._row)x._row--;});
   renderHerhaal();
   backgroundWrite(async()=>{
@@ -156,7 +157,10 @@ async function deleteHerhaal(){
     await logEvent(r.code,r.sectie,'Herhaalregel verwijderd','','',r.omschrijving);
     showToast('Herhaalregel verwijderd',r.omschrijving,null,'prullenbak',{geenDedup:true,geenSysteemmelding:true});
   },()=>{ // rollback: rij terugzetten + _row-indexen herstellen
-    if((D.herhaal||[]).indexOf(r)===-1){ (D.herhaal||[]).forEach(x=>{if(x._row>=r._row)x._row++;}); D.herhaal.splice(Math.min(pos<0?D.herhaal.length:pos,D.herhaal.length),0,r); }
+    // Op de ID en niet op objectidentiteit: draaide er tussen de klik en deze rollback een poll,
+    // dan staat er een VERS exemplaar van dezelfde regel in D.herhaal en zou `indexOf` -1 geven —
+    // waarna deze rollback er een tweede bij zet. Zelfde vorm als de rij-val in src/rij.js.
+    if(regelIndex(D.herhaal, r, x=>x.id)===-1){ (D.herhaal||[]).forEach(x=>{if(x._row>=r._row)x._row++;}); D.herhaal.splice(Math.min(pos<0?D.herhaal.length:pos,D.herhaal.length),0,r); }
   },'Verwijderen mislukt');
 }
 

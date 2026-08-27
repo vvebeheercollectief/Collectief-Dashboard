@@ -2,6 +2,7 @@
 //  BULK-ACTIES — selecteren + groepsacties op de NTD-lijst (Fase 5)
 // ══════════════════════════════════════
 import { state, D } from "./state.js";
+import { verseRij, rijIndex } from "./rij.js";
 import { renderNtd } from "./render-lijsten.js";
 import { toDutchDate, taakTitel, berekenPrioriteit, _parseAnyDate, _vandaagAmsterdam, _verschilInKalenderdagen, parseDt, kiesAfgerondRij } from "./util.js";
 import { SID } from "./config.js";
@@ -49,7 +50,10 @@ let _anker=null;
 // rid-nummers zou daar dwars doorheen lopen.
 function _vinkjesInTabel(){
   return [...document.querySelectorAll('#ntd-tbody [data-action="bulk-vink"]')]
-    .map(el=>state._rowCache[+el.dataset.rid])
+    // Via `verseRij`: de rendercache kan objecten van een vorige ronde bevatten (zie src/rij.js).
+    // De selectie bewaart rij-OBJECTEN, dus een verouderd exemplaar hier vult `_sel` met spoken —
+    // precies wat `bulkHerstel` er daarna weer uit moet vissen.
+    .map(el=>verseRij(state._rowCache[+el.dataset.rid]))
     .filter(Boolean);
 }
 
@@ -60,7 +64,7 @@ function _vinkjesInTabel(){
 // over de paginagrens heen is er het kopvinkje.
 function _selecteerReeks(r){
   const rijen=_vinkjesInTabel();
-  const a=rijen.indexOf(_anker), b=rijen.indexOf(r);
+  const a=rijIndex(rijen, _anker), b=rijIndex(rijen, r);
   if(a<0||b<0) return false;                      // anker staat niet meer in beeld → gewone klik
   const van=Math.min(a,b), tot=Math.max(a,b);
   for(let i=van;i<=tot;i++) _sel.add(rijen[i]);
@@ -68,7 +72,7 @@ function _selecteerReeks(r){
 }
 
 function bulkVink(rid, e){
-  const r=state._rowCache[rid]; if(!r) return;
+  const r=verseRij(state._rowCache[rid]); if(!r) return;   // zie src/rij.js
   // `e` is het klik-event uit de delegatie in actions.js (die roept `fn(el, e)` aan). Toetsenbord-
   // bediening levert hetzelfde event met shiftKey=false, dus die blijft een gewone klik.
   if(e&&e.shiftKey&&_anker&&_anker!==r&&_selecteerReeks(r)){
@@ -326,7 +330,7 @@ async function bulkAfronden(rows){
   catch(e){ alert(e.melding || e.message); loadAll(); return; }
   // optimistisch: hoog→laag lokaal verwijderen + indexen meeschuiven
   items.forEach(it=>{
-    const arr=D.ntd[it.sec]||[]; const pos=arr.indexOf(it.r);
+    const arr=D.ntd[it.sec]||[]; const pos=rijIndex(arr, it.r);   // identiteit, niet object — zie src/rij.js
     if(pos>-1) arr.splice(pos,1);
     _shiftNtdRows(it.origRow,-1);
     it.pos=pos;
@@ -376,7 +380,7 @@ async function bulkAfronden(rows){
   },()=>{ // rollback: laag→hoog terugzetten
     [...items].reverse().forEach(it=>{
       const a=(D.ntd[it.sec]=D.ntd[it.sec]||[]);
-      if(a.indexOf(it.r)===-1){ _herstelShift(_shiftNtdRows,it.origRow); a.splice(Math.min(it.pos<0?a.length:it.pos,a.length),0,it.r); }
+      if(rijIndex(a, it.r)===-1){ _herstelShift(_shiftNtdRows,it.origRow); a.splice(Math.min(it.pos<0?a.length:it.pos,a.length),0,it.r); }
     });
   },'Bulk-afronden mislukt');
 }
@@ -487,7 +491,7 @@ async function bulkVerwijderen(rows){
   // met dezelfde vaste taaknummers erbij. Zie de gelijknamige vlag in crud.js.
   const stand={gelukt:false};
   items.forEach(it=>{
-    const arr=D.ntd[it.sec]||[]; const pos=arr.indexOf(it.r);
+    const arr=D.ntd[it.sec]||[]; const pos=rijIndex(arr, it.r);   // identiteit, niet object — zie src/rij.js
     if(pos>-1) arr.splice(pos,1);
     _shiftNtdRows(it.origRow,-1);
     it.pos=pos;
@@ -512,7 +516,7 @@ async function bulkVerwijderen(rows){
   },()=>{
     [...items].reverse().forEach(it=>{
       const a=(D.ntd[it.sec]=D.ntd[it.sec]||[]);
-      if(a.indexOf(it.r)===-1){ _herstelShift(_shiftNtdRows,it.origRow); a.splice(Math.min(it.pos<0?a.length:it.pos,a.length),0,it.r); }
+      if(rijIndex(a, it.r)===-1){ _herstelShift(_shiftNtdRows,it.origRow); a.splice(Math.min(it.pos<0?a.length:it.pos,a.length),0,it.r); }
     });
   },'Bulk-verwijderen mislukt');
 }
@@ -640,11 +644,11 @@ function bulkVeld(rows,soort,waarde){
     // volgende ronde. Zoeken op het vaste taaknummer, met het rij-object als terugval voor rijen
     // die er (nog) geen hebben.
     items.forEach(it=>{
-      const lijst=D.ntd[it.sec]||[];
-      if(lijst.indexOf(it.r)<0){
-        const vers=it.taakId ? lijst.find(x=>(x.taakId||'')===it.taakId) : null;
-        if(vers) it.r=vers;
-      }
+      // Her-ankeren via de gedeelde regel (src/rij.js) in plaats van een eigen zoekactie: die
+      // kende alleen het taaknummer, terwijl `verseRij` ook de terugval op inhoud heeft voor
+      // rijen van vóór de backfill.
+      const vers=verseRij(it.r, D.ntd[it.sec]||[]);
+      if(vers) it.r=vers;
       it.r[conf.veld]=it.oud;
       if(oppDl && it.sec==='OPPAKKEN') it.r.prioriteit=it.oudPrio;
     });

@@ -5,6 +5,7 @@ import { esc, displayName, persBadges, emptyRow, _vandaagAmsterdam, vveCodeSpan 
 import { ico } from "./icons.js";
 import { PG, SID } from "./config.js";
 import { state, D, pgs } from "./state.js";
+import { regelIndex } from "./rij.js";
 import { ensureToken } from "./auth.js";
 import { writeRange, appendRange, appendRows, assertRowMatch, _herstelShift, sheetsFetch } from "./api.js";
 import { renderThead, renderPag } from "./render-lijsten.js";
@@ -181,7 +182,9 @@ async function deleteOntwItem(){
       if(!resp.ok){const e=await resp.json();const err=new Error(e.error?.message||'Verwijderfout');err.status=resp.status;throw err}
       stand.gelukt=true;
     },
-    ()=>{ if(echte&&D.ontw.indexOf(echte)===-1){ D.ontw.forEach(x=>{ if(x._row>=oudeRow) x._row++; }); D.ontw.splice(Math.min(pos<0?D.ontw.length:pos,D.ontw.length),0,echte); } },
+    // Op titel+datum en niet op objectidentiteit: een poll tussen de klik en deze rollback vervangt
+    // élk item in D.ontw, en dan zou `indexOf` -1 geven en er een tweede bij zetten.
+    ()=>{ if(echte&&regelIndex(D.ontw, echte, x=>[x.titel,x.datum].join('\x1f'))===-1){ D.ontw.forEach(x=>{ if(x._row>=oudeRow) x._row++; }); D.ontw.splice(Math.min(pos<0?D.ontw.length:pos,D.ontw.length),0,echte); } },
     'Verwijderen mislukt'
   );
   // rode puls + fade op de oude rij; daarná pas hertekenen
@@ -553,11 +556,17 @@ async function deleteLogboek(row){
         verwijderd=true;
       }
     },
-    ()=>{ if(entries.indexOf(entry)===-1){
-      _herstelShift(_shiftLogboekRows,oudeRow);
-      state.logEdit=_shiftLogEditRef(state.logEdit,oudeRow,+1);
-      entries.splice(Math.min(idx,entries.length),0,entry);
-    } },
+    // D.logboek OPNIEUW lezen en niet de `entries`-verwijzing van hierboven gebruiken.
+    // `_verwerkLogboek` (data.js) HERTOEKENT D.logboek bij een ronde die nieuwe regels vindt; die
+    // oude verwijzing wijst dan naar een array waar niemand meer naar kijkt, en de teruggezette
+    // regel kwam nooit meer in beeld. Zelfde vorm als de rij-val in src/rij.js: een verwijzing
+    // vasthouden over een await heen.
+    ()=>{ const lijst=D.logboek||[];
+      if(regelIndex(lijst, entry, e=>[e.timestamp,e.code,e.actie,e.nieuweWaarde].join('\x1f'))===-1){
+        _herstelShift(_shiftLogboekRows,oudeRow);
+        state.logEdit=_shiftLogEditRef(state.logEdit,oudeRow,+1);
+        lijst.splice(Math.min(idx,lijst.length),0,entry);
+      } },
     'Verwijderen mislukt'
   );
 }

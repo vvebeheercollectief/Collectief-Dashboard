@@ -7,8 +7,15 @@
       --shm:0 4px 16px rgba(16,22,34,.08);--shl:0 20px 60px rgba(16,22,34,.16);
       --sb:240px;--hh:60px;--tr:.17s ease;
       --bl:#1D6AA5;--bl-l:#E0EEF9;--bl-b:#B8D4EC;
-      --am:#B45309;--am-l:#fef3c7;--am-b:#FCD34D;
-      --pu:#6D5BD0;--pu-l:#EEEAFD;--pu-b:#D4CCFA;
+      /* B45309 -> AE5008 (v11.8): zelfde reden als bij --pu hieronder. Als tekst op --am-l stond
+         amber op 4,51:1 — nét boven de 4,5, te krap om op te vertrouwen. Nu 4,77. */
+      --am:#AE5008;--am-l:#fef3c7;--am-b:#FCD34D;
+      /* 6D5BD0 -> 6855C9 (v11.8): met de gekleurde kolombalk staat --pu nu ook als TEKST op
+         --pu-l, en dat haalde 4,39:1 — net onder de 4,5 die dit project aanhoudt. Drie procent
+         donkerder maakt er 4,78 van; het verschil is met het oog niet te zien en overal waar
+         --pu al stond (pillen, badges, de kaartkleur) wordt het contrast alleen beter.
+         Zelfde soort ingreep als --sig-crit hierboven. */
+      --pu:#6855C9;--pu-l:#EEEAFD;--pu-b:#D4CCFA;
       --rd:#B91C1C;--rd-l:#fee2e2;--rd-b:#fecaca;
       --gn:#047857;--gn-l:#d1fae5;--gn-b:#a7f3d0;
       --pk:#BE185D;--pk-l:#fce7f3;--pk-b:#fbcfe8;
@@ -32,6 +39,13 @@
       --tr-fast:.1s ease;--tr-slow:.3s cubic-bezier(.22,1,.36,1);--ease:cubic-bezier(.22,1,.36,1);
       /* Grotere kaart-radius (was los hardgecodeerd als 14px) */
       --r-lg:14px;
+      /* Letters. Op verzoek (v11.8) van IBM Plex naar de standaardletter van het toestel:
+         SF Pro op een Mac/iPhone, Segoe UI op Windows, Roboto op Android. Twee stapels en
+         verder nergens een letternaam in dit bestand, dus terugzetten is deze twee regels.
+         De losse letters van het inlogscherm (Hanken Grotesk / JetBrains Mono) staan bewust
+         apart onderaan: dat is een eigen, gemerkt scherm en verandert hier niet mee. */
+      --font-app:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+      --font-mono:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace;
     }
     [data-theme=dark]{
       --bg:#15181d;--sur:#1f242c;--sur2:#191d23;--bor:#2a2e36;
@@ -51,9 +65,9 @@
       --fg:#f2f4f7;--prio:#e08b82;--sig-crit:#f0a29a;
     }
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    html,body{height:100%;font-family:'IBM Plex Sans','Manrope',system-ui,sans-serif;font-size:14px;background:var(--bg);color:var(--txt);line-height:1.5;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
-    /* IBM Plex Mono — codes, datums, badges, ⌘K-hint */
-    .mono,.code,.s-normal,.s-soon,.s-telaat,.cell-sm,.ni-badge,.sb-brand span{font-family:'IBM Plex Mono','SFMono-Regular',ui-monospace,monospace}
+    html,body{height:100%;font-family:var(--font-app);font-size:14px;background:var(--bg);color:var(--txt);line-height:1.5;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+    /* Vaste-breedte letter — codes, datums, badges, ⌘K-hint (zie --font-mono) */
+    .mono,.code,.s-normal,.s-soon,.s-telaat,.cell-sm,.ni-badge,.sb-brand span{font-family:var(--font-mono)}
     button{cursor:pointer;border:none;background:none;font:inherit;color:inherit}
     input,select,textarea{font:inherit}
     ul{list-style:none}
@@ -88,7 +102,7 @@
     .ni-badge{margin-left:auto;padding:1px 7px;border-radius:5px;font-size:10px;font-weight:600;background:#3a414d;color:#cfd5df}
     .ni.on .ni-badge{background:#3a414d;color:#cfd5df}
     .sb-foot{padding:13px 18px;border-top:1px solid var(--sbedge);display:flex;align-items:center;justify-content:space-between}
-    .sync-row{display:flex;align-items:center;gap:8px;font-size:11px;color:#8b929e;font-family:'IBM Plex Mono',ui-monospace,monospace}
+    .sync-row{display:flex;align-items:center;gap:8px;font-size:11px;color:#8b929e;font-family:var(--font-mono)}
     .dot{width:6px;height:6px;border-radius:50%;background:var(--gn);flex-shrink:0}
     .dot.loading{background:var(--am);animation:pulse 1s infinite}
     .dot.err{background:var(--rd);animation:none}
@@ -300,13 +314,25 @@
     /* Table */
     .tbl-wrap{overflow-x:auto}
     table{width:100%;border-collapse:collapse;font-size:13px}
-    thead th{background:var(--sur2);padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--bor);white-space:nowrap}
+    /* `overflow:hidden;text-overflow:ellipsis` is een VANGNET, geen norm (v11.8). De koppen zijn
+       `white-space:nowrap`, en zonder dit werd een kop die niet paste OVER zijn buurkop heen
+       getekend — twee namen door elkaar, allebei onleesbaar. Nu kapt hij netjes af. De gewichten
+       in config.js zijn nog steeds zo gezet dat het bij de smalste tabel niet nodig is; dit vangt
+       alleen de selecteerstand en een toekomstige letter- of labelwijziging op. */
+    thead th{background:var(--sur2);padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--bor);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     /* Sorteerbare kolomkoppen (NTD): knop erft de th-typografie; pijl toont de richting */
+    /* De kolombalk draagt de kleur van het tabblad waar je in zit (v11.8, op verzoek).
+       De waarden komen uit SECS[...].css, dat renderThead als inline stijl op elke <th> zet —
+       die stonden er al, ze werden alleen niet gebruikt. Blauwgrijs bij Oppakken, amber bij
+       Vergaderverzoeken, paars bij Offerte-trajecten, rood bij LOD, teal bij Subsidie-trajecten
+       en roze bij Ontwikkeling. Alle zes halen ruim de 4,5:1 die dit project aanhoudt, in beide
+       thema's — nagemeten in de browser. */
+    #ntd-thead th,#af-thead th,#ontw-thead th{background:var(--sec-l);color:var(--sec);border-bottom-color:var(--sec-b)}
     .th-sort{background:none;border:0;padding:0;font:inherit;color:inherit;text-transform:inherit;letter-spacing:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
     /* --txt, niet --tx: die variabele bestaat niet, dus de hover viel stil terug op de erfkleur
        en het kopje reageerde nergens op. Ook in de terugval van .aan hieronder. */
     .th-sort:hover{color:var(--txt)}
-    .th-sort.aan{color:var(--sec,var(--txt))}
+    .th-sort.aan{color:var(--sec,var(--txt));font-weight:800}
     .th-sort:focus-visible{outline:2px solid var(--ac);outline-offset:2px;border-radius:3px}
     .th-pijl{font-size:8px;line-height:1}
     tbody tr{border-bottom:1px solid var(--row-divider);transition:background var(--tr)}
@@ -321,7 +347,7 @@
     tbody tr[data-prio=laag],tbody tr[data-prio=geen]{--prio-bar:var(--bor-input)}
     /* #69707e i.p.v. #6b7280: op een kaart haalde het 4,83:1, maar op de dossierpagina staat de
        VvE-code rechtstreeks op de paginakleur (#f4f5f7) en dan bleef er 4,43:1 over. */
-    .code{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12.5px;font-weight:500;letter-spacing:0;color:#69707e;background:none;padding:0;white-space:nowrap}
+    .code{font-family:var(--font-mono);font-size:12.5px;font-weight:500;letter-spacing:0;color:#69707e;background:none;padding:0;white-space:nowrap}
     /* Inklapbare tekstcellen — Operator: 1 regel met …; klik op de rij klapt uit.
        Clamp zit op een inline-block .ct (td blijft table-cell, zodat kolommen netjes uitlijnen). */
     .cell-name{font-weight:600;color:var(--txt)}
@@ -440,7 +466,7 @@
        uitgerekte lijn van 307px tussen vijf bolletjes — meer lijn dan informatie. Een plafond
        houdt hem compact; de kolom mag breder zijn dan de balk. */
     #ntd-tbl-wrap .fase-rij{max-width:240px}
-    #ntd-tbl-wrap thead th:last-child{position:sticky;right:0;z-index:3;background:var(--sur2)}
+    #ntd-tbl-wrap thead th:last-child{position:sticky;right:0;z-index:3;background:var(--sec-l)}
     /* De vastgezette cel moet ondoorzichtig zijn, anders schemeren de wegscrollende cellen
        erdoorheen. Een doorschijnende rijkleur kan daar dus niet: die moet ondoorzichtig
        worden ingemengd. Elders in de tabel mengt de 7%-tint van .row-telaat zichzelf met
@@ -482,7 +508,7 @@
        op diezelfde pil haalt 6,30:1 — zelfde truc als bij .staging-balk en de logboek-avatars. */
     .pill-telaat{display:inline-block;background:var(--prio);color:#fff;font-size:11px;font-weight:600;padding:2px 7px;border-radius:6px;margin-left:6px;letter-spacing:.02em}
     [data-theme=dark] .pill-telaat{color:#15181d}
-    .warn-geen-deadline{display:inline-flex;align-items:center;color:var(--am);font-size:12px;font-weight:600;font-family:'IBM Plex Mono',ui-monospace,monospace}
+    .warn-geen-deadline{display:inline-flex;align-items:center;color:var(--am);font-size:12px;font-weight:600;font-family:var(--font-mono)}
     .warn-geen-deadline::before{content:''}
     /* Deadline/status als gewone mono-tekst (geen pill) */
     .s-telaat{font-size:12.5px;font-weight:700;color:var(--rd);white-space:nowrap}
@@ -606,8 +632,8 @@
     .toast-close:hover{color:var(--txt)}
     .toast-bar{height:3px;background:var(--toast-clr,var(--ac));border-radius:0 0 2px 2px;position:absolute;bottom:0;left:0;animation:toast-bar linear forwards}
     /* ── "Nieuwe versie"-balk ── */
-    .sw-update-bar{position:fixed;left:16px;bottom:16px;z-index:98000;background:var(--sur);color:var(--txt);border:1px solid var(--bor);border-left:4px solid var(--ac);border-radius:var(--r);box-shadow:var(--shl);padding:10px 12px;display:flex;align-items:center;gap:12px;font:500 13px/1.3 'IBM Plex Sans',system-ui,sans-serif;max-width:calc(100vw - 32px);animation:toast-in .25s ease}
-    .sw-update-btn{background:var(--ac);color:#fff;border:none;border-radius:8px;padding:6px 14px;font:600 13px 'IBM Plex Sans',system-ui,sans-serif;cursor:pointer;white-space:nowrap}
+    .sw-update-bar{position:fixed;left:16px;bottom:16px;z-index:98000;background:var(--sur);color:var(--txt);border:1px solid var(--bor);border-left:4px solid var(--ac);border-radius:var(--r);box-shadow:var(--shl);padding:10px 12px;display:flex;align-items:center;gap:12px;font:500 13px/1.3 var(--font-app);max-width:calc(100vw - 32px);animation:toast-in .25s ease}
+    .sw-update-btn{background:var(--ac);color:#fff;border:none;border-radius:8px;padding:6px 14px;font:600 13px var(--font-app);cursor:pointer;white-space:nowrap}
     .sw-update-btn:hover{filter:brightness(1.05)}
     .sw-update-x{background:none;border:none;color:var(--mut);font-size:18px;line-height:1;cursor:pointer;padding:0 2px}
     .sw-update-x:hover{color:var(--txt)}
@@ -807,7 +833,7 @@
     /* Duidelijke toetsenbord-focus op de pill-toggle: een ring met offset valt beter op dan de
        2px-outline die rond de kleine 36×20px-pill (ook binnen modals) makkelijk wegvalt. */
     .tog:focus-visible{outline:none;box-shadow:0 0 0 2px var(--sur),0 0 0 4px var(--ac)}
-    code{background:var(--sur);border:1px solid var(--bor);border-radius:4px;padding:2px 5px;font-size:12px;font-family:'IBM Plex Mono','SFMono-Regular',ui-monospace,monospace}
+    code{background:var(--sur);border:1px solid var(--bor);border-radius:4px;padding:2px 5px;font-size:12px;font-family:var(--font-mono)}
 
     /* VvE autocomplete */
     .vve-wrap{position:relative}
@@ -923,7 +949,7 @@
     .ai-ctx.show{display:block}
     .ai-ctx ul{margin:5px 0 0;padding-left:17px}
     .ai-ctx li{margin:2px 0}
-    .ai-prompt{background:var(--nv-d);color:#cfd5df;border-radius:var(--rs);padding:12px 13px;font-size:11.5px;line-height:1.55;white-space:pre-wrap;font-family:'IBM Plex Mono','SF Mono',ui-monospace,monospace;max-height:240px;overflow-y:auto;border:1px solid var(--sbedge)}
+    .ai-prompt{background:var(--nv-d);color:#cfd5df;border-radius:var(--rs);padding:12px 13px;font-size:11.5px;line-height:1.55;white-space:pre-wrap;font-family:var(--font-mono);max-height:240px;overflow-y:auto;border:1px solid var(--sbedge)}
     .ai-prompt .k{color:var(--sbglow);font-weight:700}
     .ai-prompt .empty{color:#8b929e;font-style:italic}
     .ai-send{display:flex;gap:8px;margin-top:11px;flex-wrap:wrap}
@@ -1021,7 +1047,7 @@
     .tk.snooze-row{opacity:.55}
     .tk .nm{flex:1;min-width:0;overflow-wrap:anywhere}
     .tk .nm .mt{display:block;font-size:11px;color:var(--mut);margin-top:2px}
-    .tk .dl{font-family:'IBM Plex Mono','SFMono-Regular',ui-monospace,monospace;font-size:11.5px;color:var(--mut);flex-shrink:0}
+    .tk .dl{font-family:var(--font-mono);font-size:11.5px;color:var(--mut);flex-shrink:0}
     .tk .dl.af{color:var(--gn)}
     .tk .tk-af{align-self:center;flex-shrink:0}
     /* Taakrijen staan op twee regels: tekst over de volle breedte, daaronder sectie/
@@ -1498,7 +1524,7 @@ body:has(.modal-bg.open) #chat-bg{display:none}
    ene scherm en mogen de globale :root niet vervuilen. De merkkleur "leisteen"
    is elders al --nv (#2B3544); hier komt hij niet terug — de kaart is wit en de
    achtergrond de navy-radial. Fonts: Hanken Grotesk (scherm) + JetBrains Mono
-   (versielabels), alleen binnen deze scope zodat het dashboard IBM Plex houdt.
+   (versielabels), alleen binnen deze scope zodat de rest van het dashboard zijn eigen letter houdt.
    ═══════════════════════════════════════════════════════════════════════ */
 #login-gate{
   /* — login-scoped designtokens — */

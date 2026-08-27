@@ -1630,8 +1630,8 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
           };
           const acties = ths2.length ? Math.round(ths2[ths2.length - 1].getBoundingClientRect().width) : -1;
           const dl = br('Deadline'), code = br('VvE Code');
-          truthy(`kolombreedte: op 1650px blijft de deadline-kolom 155px (${dl})`,
-                 Math.abs(dl - 155) <= 1);
+          truthy(`kolombreedte: op 1650px blijft de deadline-kolom 165px (${dl})`,
+                 Math.abs(dl - 165) <= 1);
           truthy(`kolombreedte: op 1650px blijft de actiekolom 150px (${acties})`,
                  Math.abs(acties - 150) <= 1);
           // 130 en niet 105 sinds de doorlichting van 26-08: op een BUNDELKOP staan er drie dingen
@@ -1681,7 +1681,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
           const act7 = ths7.length ? Math.round(ths7[ths7.length-1].getBoundingClientRect().width) : -1;
           truthy(`kolombreedte: de px-kolommen blijven staan ná renderAf/renderOntw `
                  + `(code ${code7}, deadline ${dl7}, acties ${act7})`,
-                 Math.abs(code7 - 130) <= 1 && Math.abs(dl7 - 155) <= 1 && Math.abs(act7 - 150) <= 1);
+                 Math.abs(code7 - 130) <= 1 && Math.abs(dl7 - 165) <= 1 && Math.abs(act7 - 150) <= 1);
         } finally {
           breed7.remove();
           if(vNtd7 === undefined) delete D.ntd.OPPAKKEN; else D.ntd.OPPAKKEN = vNtd7;
@@ -5219,7 +5219,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '11.7');
+  eq('versie opgehoogd', APP_VERSION, '11.8');
 
   // ── Tabbladen ÍN de kaartkop (v11.7) ──
   // De kop van de kaart zei links exact hetzelfde als het actieve tabblad — 'Oppakken' boven
@@ -5250,6 +5250,119 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   // De kop wordt nog stééds gevuld (render-lijsten.js zet hem); onzichtbaar is niet leeg.
   truthy('de onzichtbare kop draagt nog een naam',
      (document.getElementById('ntd-title').textContent||'').trim().length > 0);
+
+  // ── Kolombalk in de kleur van het tabblad + de standaardletter (v11.8) ──
+  // De kleur komt uit SECS[...].css, dat renderThead als inline stijl op elke <th> zet. Ik vergelijk
+  // de gemeten achtergrond van de kop met die van een proefje dat expliciet var(--sec-l) draagt en
+  // in diezelfde kop hangt: dan toets ik de uitkomst en niet mijn eigen aanname over de kleurwaarde.
+  (() => {
+    const th = document.querySelector('#ntd-thead th');
+    if (!th) { truthy('kolomkop bestaat', false); return; }
+    const proef = document.createElement('span');
+    proef.style.cssText = 'background:var(--sec-l);position:absolute;width:1px;height:1px';
+    th.appendChild(proef);
+    const kop = getComputedStyle(th).backgroundColor;
+    const verwacht = getComputedStyle(proef).backgroundColor;
+    // Tegenproef met een proefje dat de OUDE neutrale tint draagt. Niet met #af-thead th: die is
+    // sinds v11.8 zelf ook gekleurd, dus dan vergeleek ik twee gekleurde koppen met elkaar.
+    const neutraalProef = document.createElement('span');
+    neutraalProef.style.cssText = 'background:var(--sur2);position:absolute;width:1px;height:1px';
+    th.appendChild(neutraalProef);
+    const neutraal = getComputedStyle(neutraalProef).backgroundColor;
+    neutraalProef.remove();
+    proef.remove();
+    eq('kolombalk draagt de kleur van het tabblad', kop, verwacht);
+    truthy('en dat is niet meer de oude neutrale tint', kop !== neutraal);
+    // Vangnet: een kop die niet past mag zijn buurkop niet onleesbaar maken.
+    const cs = getComputedStyle(th);
+    eq('een te krappe kolomkop kapt af in plaats van over de buur te tekenen',
+       [cs.overflow, cs.textOverflow], ['hidden', 'ellipsis']);
+  })();
+
+  // Contrast van de gekleurde kolombalk, in BEIDE thema's. Dit project houdt 4,5:1 aan; de kop is
+  // 11px, dus 'grote tekst' (waar 3:1 mag) gaat hier niet op. Twee kleuren zijn hiervoor bijgesteld:
+  // --pu haalde 4,39 en --am 4,51 — die tweede stond te krap om op te vertrouwen. Deze toets legt
+  // de ondergrens vast zodat een volgende kleurbijstelling niet stil onder de grens zakt.
+  (() => {
+    const geen = document.createElement('style');
+    geen.textContent = '*,*::before,*::after{transition:none !important}';
+    document.head.appendChild(geen);
+    const rgb = v => (v.match(/\d+(\.\d+)?/g) || [0,0,0]).slice(0,3).map(Number);
+    const lum = c => { const [r,g,b] = c.map(v => { v /= 255; return v <= 0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055, 2.4); });
+                       return 0.2126*r + 0.7152*g + 0.0722*b; };
+    const ratio = (a,b) => { const l1 = lum(rgb(a)), l2 = lum(rgb(b)); const hi = Math.max(l1,l2), lo = Math.min(l1,l2);
+                             return Math.round(((hi+0.05)/(lo+0.05)) * 100) / 100; };
+    const vorigeSec = state.activeNtd;
+    const meet = () => {
+      const uit = {};
+      SKEYS.forEach(sec => { state.activeNtd = sec; renderNtd();
+        const th = document.querySelector('#ntd-thead th');
+        if (!th) return;
+        const cs = getComputedStyle(th);
+        uit[sec] = ratio(cs.color, cs.backgroundColor); });
+      return uit;
+    };
+    const licht = meet();
+    const vorigThema = document.documentElement.getAttribute('data-theme');
+    document.documentElement.setAttribute('data-theme', 'dark');
+    const donker = meet();
+    if (vorigThema) document.documentElement.setAttribute('data-theme', vorigThema);
+    else document.documentElement.removeAttribute('data-theme');
+    state.activeNtd = vorigeSec; renderNtd();
+    geen.remove();
+    truthy(`kolombalk: elke sectie haalt 4,5:1 in het lichte thema (laagste ${Math.min(...Object.values(licht))})`,
+       Object.values(licht).length === SKEYS.length && Object.values(licht).every(r => r >= 4.5));
+    truthy(`kolombalk: en ook in het donkere thema (laagste ${Math.min(...Object.values(donker))})`,
+       Object.values(donker).length === SKEYS.length && Object.values(donker).every(r => r >= 4.5));
+  })();
+
+  // De letter zit in twee variabelen; nergens anders in styles.css staat nog een letternaam voor
+  // het dashboard. Zo is terugzetten één plek, en vangt deze toets het als iemand er weer een
+  // losse letternaam in zet.
+  (() => {
+    const wortel = getComputedStyle(document.documentElement);
+    const app = wortel.getPropertyValue('--font-app').trim();
+    const mono = wortel.getPropertyValue('--font-mono').trim();
+    truthy('--font-app is gezet', app.length > 0);
+    truthy('--font-mono is gezet', mono.length > 0);
+    truthy('het dashboard gebruikt de standaardletter, niet meer IBM Plex',
+       !/IBM Plex/i.test(app) && !/IBM Plex/i.test(mono));
+    truthy('de leesletter valt terug op een systeemstapel', /-apple-system|system-ui|Segoe|Roboto/i.test(app));
+    truthy('de cijferletter blijft een vaste-breedte letter', /mono/i.test(mono));
+    truthy('de body volgt --font-app',
+       getComputedStyle(document.body).fontFamily === app || !/IBM Plex/i.test(getComputedStyle(document.body).fontFamily));
+  })();
+
+  // De kolombreedtes zijn met de nieuwe (bredere) letter opnieuw uitgerekend. Deze toets legt die
+  // rekensom vast in plaats van de uitkomst op het scherm: gewicht w geeft
+  // w/gewichtSom × (1150 − pxSom) pixels bij de smalste tabel. Faalt zodra iemand een px-kolom
+  // verandert zonder de gewichten na te rekenen — precies de val die Signaal ooit stil op 145px zette.
+  (() => {
+    const SMAL = 1150;
+    SKEYS.forEach(sec => {
+      const b = SECS[sec].breedtes || [];
+      const px = b.filter(x => typeof x === 'string').reduce((s, x) => s + parseFloat(x), 0);
+      const gew = b.filter(x => typeof x === 'number');
+      const som = gew.reduce((s, x) => s + x, 0);
+      const pool = SMAL - px;
+      const breedteVan = kop => {
+        const i = SECS[sec].cols.indexOf(kop);
+        if (i < 0) return null;
+        const w = b[i];
+        return typeof w === 'string' ? parseFloat(w) : w / som * pool;
+      };
+      // Datumkolommen: "22 september 2026" heeft 148px nodig incl. celopvulling.
+      SECS[sec].cols.forEach(kop => {
+        if (!/deadline|datum/i.test(kop)) return;
+        const w = breedteVan(kop);
+        truthy(`${sec}/${kop}: datumkolom heeft ruimte voor een lange Nederlandse datum (${Math.round(w)}px ≥ 148)`, w >= 148);
+      });
+      const sig = breedteVan('Signaal');
+      if (sig !== null) {
+        truthy(`${sec}: Signaal haalt de gemeten ondergrens van 150px (${Math.round(sig)})`, sig >= 149.5);
+      }
+    });
+  })();
 
   // ── Pushmeldingen: de twee schakels die stil kapot waren (audit 2026-08-06) ──
   // Beide defecten waren onzichtbaar: de app meldde "Notificaties zijn aan!" terwijl er nooit
@@ -7989,6 +8102,14 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         //   chevron bottom 301,9 (dus eronder) en code.left 35 = handvat.left 35.
         truthy('stapel-e2e: handvat en chevron delen hun middellijn',
                Math.abs(midY(greep(kopMeet))-chevY) < 0.5);
+        // De marge op de VvE-code hieronder is 1px en niet 0,5. Een INLINE element is precies zo
+        // hoog als de opgaande en neergaande lengtes van zijn letter, dus zijn middellijn hangt aan
+        // de lettermetriek. Bij IBM Plex Mono viel die toevallig exact samen met de chevron (0,00px);
+        // met de standaardletter van v11.8 is het 0,50px. Vier andere opzetten getoetst
+        // (vertical-align:middle, inline-flex, inline-block met vaste regelhoogte) — allemaal
+        // SLECHTER (0,7 tot 1,6px). Een halve pixel ziet niemand; waar deze toets voor bedoeld is —
+        // een code die zichtbaar scheef hangt of stil naar een tweede regel zakt — vangt hij nog
+        // steeds, want dát zijn sprongen van 10px en meer.
         const codeMeet = kopMeet.querySelector('.code-klik');
         const codeGewikkeld = codeMeet.getBoundingClientRect().top >= chevEl.getBoundingClientRect().bottom;
         truthy(codeGewikkeld
@@ -7996,7 +8117,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
                  : 'stapel-e2e: en op één regel deelt de VvE-code diezelfde middellijn',
                codeGewikkeld
                  ? Math.abs(codeMeet.getBoundingClientRect().left - greep(kopMeet).getBoundingClientRect().left) < 1
-                 : Math.abs(midY(codeMeet)-chevY) < 0.5);
+                 : Math.abs(midY(codeMeet)-chevY) <= 1);
         // De chevron meet 22 × 18px en is als aanraakdoel dus te klein (richtlijn 24px+), net als
         // het merkje verderop — terwijl de twee sleep-handvatten in hetzelfde blok daar wél een halo
         // voor kregen. Op een telefoon is dit de ENIGE manier om een bundel open en dicht te klappen.

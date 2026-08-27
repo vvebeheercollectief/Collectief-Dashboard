@@ -5,7 +5,7 @@ import { ALLOWED_EMAILS } from '../allowed-emails.js';
 
 // ── Versie (zichtbaar in de UI) ────────────────────────────────────────
 // Ophogen bij ELKE wijziging: 4.1, 4.2, … 5.0 voor grote sprongen.
-export const APP_VERSION = '11.7';
+export const APP_VERSION = '11.8';
 
 // ── Omgeving (productie vs. testomgeving) ──────────────────────────────
 // Fail-safe: alleen deze exacte hosts zijn PRODUCTIE; al het andere
@@ -93,18 +93,26 @@ export const KORTE_NAMEN = {
 //                     130 en niet 105 sinds 26-08: op een BUNDELKOP staan er drie dingen in die
 //                     cel (sleepgreep 16 + 9 marge, chevron 22 + 3, code 45 = 95px) en in de
 //                     contentbox van 75px viel de code naar een tweede regel.
-//   datums    155px — "22 september 2026" is 128px.
+//   datums    165px — "22 september 2026" heeft 148px nodig incl. celopvulling. Sinds v11.8
+//                     staat het dashboard op de standaardletter van het toestel en die is
+//                     breder dan IBM Plex Mono: dezelfde datum ging van 119 naar 148px, en
+//                     op de oude 155px bleef er 7px speling over. Gemeten, niet geschat.
 //   acties    150px — vier knoppen van 28px plus de tussenruimte; op 9% viel het vinkje eraf.
 //                     Offerte-trajecten heeft er drie en houdt het op 120px.
-// De kolomKOP telt ook mee als ondergrens: hij is `white-space:nowrap` en `overflow:visible`, dus
-// een kop die niet past wordt niet afgekapt maar OVER de buurkop heen getekend. 'BEHANDELAAR' is
-// met 97px de breedste; op Offerte-trajecten en Subsidie-trajecten staan de gewichten (14,5 / 11,8)
-// daarom zo dat de kolom ook in de SELECTEERSTAND past — daar komt er een vinkjeskolom van 48px
-// bij en krimpen alle gewichtskolommen mee.
+// De kolomKOP telt ook mee als ondergrens. Hij is `white-space:nowrap`, en tot v11.8 werd een kop
+// die niet paste OVER de buurkop heen getekend. Sinds v11.8 heeft `thead th` daarom
+// `overflow:hidden;text-overflow:ellipsis` — een te krappe kop kapt nu netjes af in plaats van zijn
+// buur onleesbaar te maken. Dat is het VANGNET, niet de norm: de gewichten hieronder zijn zo gezet
+// dat elke kop bij de smalste tabel (1150px) heel blijft. 'BEHANDELAAR' is met 111px de breedste
+// (was 97px in IBM Plex Mono; de standaardletter van v11.8 is breder). In de SELECTEERSTAND komt er
+// een vinkjeskolom van 48px bij en krimpen alle gewichtskolommen mee. De gewichten zijn zo gezet
+// dat élke kop ook DAAR heel blijft — dat is wat de toets 'geen kop loopt over zijn kolom heen'
+// in beide standen afdwingt. Het kost de opmerkingenkolom op Offerte-trajecten 20px bij de smalste
+// tabel; die tekst kapt toch al af, een kolomNAAM half wegvallen is erger.
 // Alle andere kolommen dragen tekst die langer kan worden en krijgen een gewicht — óók Signaal.
 // Die stond op '150px' toen dat nog een ondergrens was; als plafond zou "Te laat (47d) Vandaag
-// opvolgen" op een breed scherm gaan afkappen terwijl er ruimte zat is. De gewichten 21,0 / 20,2 /
-// 22,3 zijn zo gekozen dat de kolom bij de smalste tabel (1150px) nog altijd 150px meet — dat was
+// opvolgen" op een breed scherm gaan afkappen terwijl er ruimte zat is. De gewichten 21,3 / 20,5 /
+// 22,6 zijn zo gekozen dat de kolom bij de smalste tabel (1150px) nog altijd 150px meet — dat was
 // de gemeten ondergrens: op 140 hielden vijf rijen een afgekapte hoofdmelding over, op 150 nul.
 // LET OP — deze drie getallen hangen aan de px-SOM van hun sectie. Toen de VvE-code van 105 naar
 // 130px ging, kwam die 25px van de gewichtskolommen af en zakte Signaal stil naar 145px. Verandert
@@ -113,19 +121,19 @@ export const KORTE_NAMEN = {
 export const SECS = {
   OPPAKKEN:{label:'Oppakken',css:'--sec:var(--ac);--sec-l:var(--ac-l);--sec-b:var(--ac-b)',color:'#0D7377',
     cols:['VvE Code','VvE','Signaal','Actiepunt','Deadline','Wie','Opmerkingen'],
-                   breedtes:['130px',23,21.0,29,'155px',7,20,'150px'],
+                   breedtes:['130px',23,21.3,29,'165px',7,19.7,'150px'],
     keys:['code','naam','actiepunt','deadline','behandelaar','prioriteit','opmerkingen','inBehandeling']},
-  VERGADERVERZOEKEN:{label:'Vergaderverzoeken',css:'--sec:var(--am);--sec-l:var(--am-l);--sec-b:var(--am-b)',color:'#B45309',
+  VERGADERVERZOEKEN:{label:'Vergaderverzoeken',css:'--sec:var(--am);--sec-l:var(--am-l);--sec-b:var(--am-b)',color:'#AE5008',
     cols:['VvE Code','VvE','Signaal','Periode','Agendapunten','Wie','Deadline uitschr.','Opmerkingen'],
-                   breedtes:['130px',21,20.2,9,18,7,'155px',21,'150px'],
+                   breedtes:['130px',21,20.5,10.7,18,7,'165px',19.0,'150px'],
     keys:['code','naam','periode','agendapunten','behandelaar','deadline','opmerkingen','inBehandeling']},
-  'OFFERTE-TRAJECTEN':{label:'Offerte-trajecten',css:'--sec:var(--pu);--sec-l:var(--pu-l);--sec-b:var(--pu-b)',color:'#6D5BD0',
+  'OFFERTE-TRAJECTEN':{label:'Offerte-trajecten',css:'--sec:var(--pu);--sec-l:var(--pu-l);--sec-b:var(--pu-b)',color:'#6855C9',
     cols:['VvE Code','VvE','Datum aangevr.','Ontvangen/Aangevr.','Behandelaar','Deadline','Opmerkingen'],
-                   breedtes:['130px',21,'165px',21.7,14.5,'155px',20.3,'120px'],
+                   breedtes:['130px',19.6,'165px',24.5,16.5,'165px',16.9,'120px'],
     keys:['code','naam','datumAangevraagd','offertes','behandelaar','deadline','opmerkingen']},
   LOD:{label:'LOD',css:'--sec:var(--rd);--sec-l:var(--rd-l);--sec-b:var(--rd-b)',color:'#B91C1C',
     cols:['VvE Code','VvE','Signaal','Actiepunt','Status','Wie','Deadline LOD','Opmerkingen'],
-                   breedtes:['130px',19,22.3,24,18,7,'155px',16,'150px'],
+                   breedtes:['130px',19,22.6,21.7,18,7,'165px',18.0,'150px'],
     keys:['code','naam','actiepunt','status','behandelaar','deadline','opmerkingen','inBehandeling']},
   // Subsidie-trajecten (2026-07-29). Zelfde kolomstramien als LOD, met 'Status'
   // vervangen door 'Fase'. Twee dingen liggen hier vast en mogen niet losjes wijzigen:
@@ -138,7 +146,7 @@ export const SECS = {
   // de gebruiker koos zes kolommen om de rij rustig te houden.
   'SUBSIDIE-TRAJECTEN':{label:'Subsidie-trajecten',css:'--sec:var(--tl);--sec-l:var(--tl-l);--sec-b:var(--tl-b)',color:'#0F766E',
     cols:['VvE Code','VvE','Subsidie','Fase','Behandelaar','Deadline'],
-                   breedtes:['130px',29,19,19,11.8,'155px','150px'],
+                   breedtes:['130px',27.5,19,19,13.3,'165px','150px'],
     keys:['code','naam','subsidie','subsidieFase','behandelaar','deadline','opmerkingen','inBehandeling']},
 };
 

@@ -603,18 +603,18 @@ const HERO_VIEWS=[
   },
   {
     key:'begroting', label:'Begroting', icon:'tabBudget',
-    color:'#6D5BD0',
+    color:'#6855C9',
     title:'Begroting doorgezet',
     sub:'Vergaderingen waar de begroting is doorgezet',
     build:()=>{
       const b=D.alvo.filter(r=>r.begroting).length;
       const t=D.alvo.length;
-      return{labels:['Doorgezet','Niet doorgezet'],data:[b,t-b],colors:['#6D5BD0',emptyDonutClr()],centerVal:`${b}/${t}`,centerLbl:'Doorgezet'};
+      return{labels:['Doorgezet','Niet doorgezet'],data:[b,t-b],colors:['#6855C9',emptyDonutClr()],centerVal:`${b}/${t}`,centerLbl:'Doorgezet'};
     }
   },
   {
     key:'taken', label:'Open Taken', icon:'tabTasks',
-    color:'#B45309',
+    color:'#AE5008',
     title:'Open taken per categorie',
     sub:'Verdeling van openstaande werkzaamheden',
     build:()=>{

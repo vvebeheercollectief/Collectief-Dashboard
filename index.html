@@ -551,7 +551,20 @@
       <!-- VERGADERVERZOEKEN -->
       <div id="fg-verg" style="display:none">
         <div class="fld-row">
-          <div class="fld"><label>Periode *</label><input type="text" id="m-per" placeholder="bv. Mei, Juni"/></div>
+          <!-- Periode = een WEEKKEUZE, geen vrije tekst meer (v11.9). `m-per` blijft bestaan als
+               verborgen veld en draagt de waarde: fillModalFields, submitTask, verschilVelden en
+               clearModal werken er alle vier op door, en hoefden dus niets te weten van de kiezer.
+               Zie src/weekkiezer.js voor de rest van de afweging. -->
+          <div class="fld"><label for="m-per-knop">Periode *</label>
+            <div class="wk-veld">
+              <input type="hidden" id="m-per"/>
+              <button type="button" class="wk-knop" id="m-per-knop" aria-expanded="false" aria-haspopup="listbox" aria-controls="m-per-paneel">
+                <span class="wk-huidig wk-leeg" id="m-per-label">Kies een week…</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              <div class="wk-paneel" id="m-per-paneel" role="listbox" aria-label="Kies een week" hidden></div>
+            </div>
+          </div>
           <div class="fld"><label>Behandelaar</label>
             <select id="m-beh-v"><option value="">Selecteer…</option><option>Jer</option><option>Cihad</option><option>Gabos</option><option>Cihad, Jer</option></select>
           </div>

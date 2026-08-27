@@ -311,6 +311,40 @@
     /* Alleen voor schermlezers. Weghalen kon niet: dan verliest de tabel haar kop. */
     .alleen-voorlezer{position:absolute;width:1px;height:1px;padding:0;margin:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
 
+    /* ── Weekkiezer ('Periode', Vergaderverzoeken) ──
+       Zelfde maat en rand als de andere velden in het bewerkscherm, zodat de rij niet
+       verspringt. Het paneel hangt absoluut onder de knop; `.wk-veld` is daarvoor het anker. */
+    .wk-veld{position:relative}
+    .wk-knop{width:100%;height:38px;display:flex;align-items:center;justify-content:space-between;gap:8px;
+      background:var(--sur);border:1px solid var(--bor-input);border-radius:var(--rs);padding:0 11px;
+      font:inherit;font-size:13px;color:var(--txt);cursor:pointer;text-align:left;
+      transition:border var(--tr),box-shadow var(--tr)}
+    .wk-knop:hover{border-color:var(--ac-b)}
+    .wk-knop[aria-expanded="true"]{border-color:var(--ac);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 14%,transparent)}
+    .wk-knop>svg{flex:none;color:var(--fnt)}
+    .wk-huidig{display:flex;align-items:baseline;gap:8px;min-width:0}
+    .wk-huidig b{font-family:var(--font-mono);font-size:12.5px;font-weight:600;flex:none}
+    .wk-huidig span{color:var(--mut);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .wk-huidig.wk-leeg{color:var(--mut);display:block}
+    .wk-oud b{font-family:inherit;font-style:italic}
+    .wk-paneel{position:absolute;z-index:50;left:0;right:0;top:calc(100% + 5px);max-height:264px;overflow-y:auto;
+      background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);box-shadow:var(--shm);padding:5px}
+    /* Maandkop bewust NIET sticky: met twee koppen vlak na elkaar blijft de bovenste plakken
+       terwijl zijn weken al weggescrold zijn, en dan lijkt die maand leeg. Elke optie noemt
+       zijn maand zelf ('ma 14 – vr 18 september'), dus de kop is een rustpunt, geen kompas. */
+    .wk-maand{padding:7px 9px 4px;font-size:10.5px;font-weight:700;
+      color:var(--mut);text-transform:uppercase;letter-spacing:.07em}
+    .wk-optie{border-radius:var(--rs);padding:6px 9px;cursor:pointer;transition:background var(--tr)}
+    .wk-optie:hover,.wk-optie.hier{background:var(--row-hover)}
+    .wk-optie.aan{background:var(--ac-l)}
+    .wk-optie .wknr{display:block;font-family:var(--font-mono);font-size:12.5px;font-weight:600;color:var(--txt)}
+    .wk-optie .wkdg{display:block;font-size:11.5px;color:var(--mut);margin-top:1px}
+    /* Weken die al voorbij zijn blijven kiesbaar (een vergadering achteraf vastleggen), maar
+       staan gedempt: ze zijn de uitzondering, niet waar je normaal naar zoekt. */
+    .wk-optie.terug .wknr{color:var(--mut);font-weight:500}
+    .wk-optie.deze .wknr::after{content:'deze week';margin-left:8px;font-family:var(--font-app);font-size:10px;
+      font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ac)}
+
     /* Table */
     .tbl-wrap{overflow-x:auto}
     table{width:100%;border-collapse:collapse;font-size:13px}
@@ -437,9 +471,20 @@
       display:block;width:max-content;max-width:100%;margin:2px 0 0;
       overflow:hidden;text-overflow:ellipsis;
     }
-    #ntd-tbl-wrap .badge-periode{
-      display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;
-    }
+    /* De periodecel (Vergaderverzoeken). Tot v11.9 stond hier een felgele pil met vetgedrukte
+       tekst omheen; die is eruit. Twee regels: weeknummer boven in de cijferletter, werkdagen
+       eronder gedempt. `overflow:hidden` op de regels apart en niet op de cel, zodat de tweede
+       regel mag afkappen zonder de eerste mee te nemen. */
+    .cell-per{vertical-align:middle}
+    .per-wk{display:block;line-height:1.25}
+    .per-wk .wk{display:block;font-family:var(--font-mono);font-size:12.5px;font-weight:600;color:var(--txt);
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .per-wk .dg{display:block;font-size:11px;color:var(--mut);margin-top:1px;
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    /* Een oude, met de hand getypte waarde ('sept/okt'): blijft staan, maar rustig — zo zie je
+       meteen welke regels nog geen week hebben zonder dat er iets in de Sheet verandert. */
+    .per-oud{display:block;font-size:12.5px;color:var(--mut);
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     /* Zelfde vangnet voor de signaal-cel: bij twee meldingen ('Te laat (45d)' + 'Vandaag opvolgen')
        is de inhoud breder dan de kolom. De ZWAARSTE melding blijft altijd heel; de tweede kapt af,
        want die is per ontwerp al de bijzaak. */

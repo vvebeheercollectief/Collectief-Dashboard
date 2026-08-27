@@ -254,6 +254,123 @@ function isoWeek(datum){
   return 1 + Math.round((don - week1Don) / (7 * 864e5));
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+//  WEEKKEUZE voor 'Periode' (Vergaderverzoeken) — v11.9
+// ══════════════════════════════════════════════════════════════════════════════
+// De periodekolom was een vrij tekstveld en dat leverde zes schrijfwijzen van
+// hetzelfde op: 'sept/okt', 'Sept/okt', 'sept/oktober', 'eind juli', '21 september …'.
+// Nu kies je een WEEK. Wat er in kolom C van de Sheet komt te staan is één regel:
+//
+//     Week 38 · 14–18 sep 2026
+//
+// Bewust leesbaar én terug te lezen: `parseWeekPeriode` haalt het weeknummer, de
+// dagen en het jaar er weer uit voor de tweeregelige cel in de tabel. Lukt dat niet,
+// dan is het een oude, met de hand getypte waarde — die blijft gewoon staan zoals hij
+// is. Er wordt NIETS in de Sheet herschreven.
+//
+// Het scheidingsteken is een MIDDENPUNT met spaties (' · ') en het datumstreepje een
+// half kastlijntje ('–'). Allebei vast: `parseWeekPeriode` en de toetsen hangen eraan,
+// en niemand typt dit veld meer met de hand, dus ze kunnen niet uiteenlopen.
+const MND_KORT = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
+const MND_LANG = ['januari','februari','maart','april','mei','juni','juli','augustus',
+                  'september','oktober','november','december'];
+
+// Maandag van de week waar `d` in valt (ma=start, zoals de Nederlandse weektelling).
+function maandagVan(d){
+  const m = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  m.setDate(m.getDate() - ((m.getDay() + 6) % 7));
+  return m;
+}
+
+// Het ISO-JAAR dat bij deze week hoort. Niet het jaar van de maandag: de week van
+// 29 december 2025 loopt door tot 2 januari 2026 en heet toch week 1 van 2026.
+// De donderdag beslist — precies zoals in `isoWeek` hierboven.
+function isoWeekJaar(d){
+  const don = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  don.setDate(don.getDate() - ((don.getDay() + 6) % 7) + 3);
+  return don.getFullYear();
+}
+
+// De werkdagen van een week als tekst.
+//
+//   kort (tabel + Sheet, zonder slotjaar — dat plakt `weekPeriodeLabel` eraan):
+//     zelfde maand   → '14–18 sep'
+//     andere maand   → '31 aug – 4 sep'          ('31–4 sep' zou onzin zijn
+//     ander JAAR     → '28 dec 2026 – 1 jan'      → slotjaar maakt er '… 1 jan 2027' van
+//   lang (keuzelijst, compleet):
+//     zelfde maand   → 'ma 14 – vr 18 september'
+//     andere maand   → 'ma 31 augustus – vr 4 september'
+//     ander jaar     → 'ma 28 december 2026 – vr 1 januari 2027'
+//
+// Dat jaar bij de MAANDAG is niet cosmetisch. Week 53 van 2026 loopt van maandag 28 december
+// 2026 tot vrijdag 1 januari 2027, en 'Week 53 · 28 dec – 1 jan 2026' leest dan alsof allebei
+// de dagen in 2026 vallen — de vrijdag valt in 2027. Eén week per jaar, maar precies de week
+// waarin de eerste vergaderronde gepland wordt.
+function weekDagen(ma, lang){
+  const vr = new Date(ma.getFullYear(), ma.getMonth(), ma.getDate() + 4);
+  const zelfdeMaand = ma.getMonth() === vr.getMonth();
+  const zelfdeJaar  = ma.getFullYear() === vr.getFullYear();
+  const nm = i => lang ? MND_LANG[i] : MND_KORT[i];
+  const jrMa = zelfdeJaar ? '' : ` ${ma.getFullYear()}`;
+  const jrVr = (zelfdeJaar || !lang) ? '' : ` ${vr.getFullYear()}`;  // kort: slotjaar komt van het label
+  if (lang) {
+    return zelfdeMaand
+      ? `ma ${ma.getDate()} – vr ${vr.getDate()} ${nm(vr.getMonth())}${jrVr}`
+      : `ma ${ma.getDate()} ${nm(ma.getMonth())}${jrMa} – vr ${vr.getDate()} ${nm(vr.getMonth())}${jrVr}`;
+  }
+  return zelfdeMaand
+    ? `${ma.getDate()}–${vr.getDate()} ${nm(vr.getMonth())}`
+    : `${ma.getDate()} ${nm(ma.getMonth())}${jrMa} – ${vr.getDate()} ${nm(vr.getMonth())}`;
+}
+
+// De regel die in de Sheet belandt. Het slotjaar is dat van de VRIJDAG — het eind van de
+// werkweek, en daarmee altijd het jaar van de laatste datum die in de regel staat. Bewust
+// niet het ISO-jaar: week 53 van 2026 eindigt op 1 januari 2027, en dan zou er '2026'
+// achter een datum uit 2027 komen te staan.
+function weekPeriodeLabel(ma){
+  const vr = new Date(ma.getFullYear(), ma.getMonth(), ma.getDate() + 4);
+  return `Week ${isoWeek(ma)} · ${weekDagen(ma, false)} ${vr.getFullYear()}`;
+}
+
+// Terug uit die regel. `null` = geen weekwaarde (oude, met de hand getypte tekst).
+// Bewust streng op de vorm: half herkennen is erger dan niet herkennen, want dan zou
+// een oude waarde als een kapotte week getekend worden.
+function parseWeekPeriode(tekst){
+  const s = String(tekst || '').trim();
+  const m = s.match(/^Week\s+(\d{1,2})\s*·\s*(.+?)\s*$/);
+  if (!m) return null;
+  const nr = +m[1];
+  if (nr < 1 || nr > 53) return null;
+  const rest = m[2];
+  const jm = rest.match(/^(.*?)\s+(\d{4})$/);
+  if (!jm) return null;
+  return { nr, dagen: jm[1].trim(), jaar: +jm[2] };
+}
+
+// De keuzelijst: `terug` weken vóór deze week en `vooruit` weken erna, deze week erbij.
+// Elke ingang draagt alles wat de kiezer nodig heeft, zodat de kiezer zelf geen datums
+// meer hoeft uit te rekenen — één producent, en los te toetsen.
+function weekOpties({ terug = 12, vooruit = 26, vandaag } = {}){
+  const start = maandagVan(vandaag || _vandaagAmsterdam());
+  const dezeMa = start.getTime();
+  const uit = [];
+  for (let i = -terug; i <= vooruit; i++) {
+    const ma = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i * 7);
+    uit.push({
+      ma: new Date(ma),
+      waarde: weekPeriodeLabel(ma),
+      nr: isoWeek(ma),
+      jaar: isoWeekJaar(ma),
+      kort: weekDagen(ma, false),
+      lang: weekDagen(ma, true),
+      maandKop: `${MND_LANG[ma.getMonth()]} ${ma.getFullYear()}`,
+      deze: ma.getTime() === dezeMa,
+      verleden: ma.getTime() < dezeMa,
+    });
+  }
+  return uit;
+}
+
 function _verschilInKalenderdagen(deadline, vandaag){
   if (!(deadline instanceof Date) || isNaN(deadline)) return null;
   const d = new Date(deadline.getFullYear(), deadline.getMonth(), deadline.getDate());
@@ -637,6 +754,7 @@ function taakVerwijzing(r, sec){
 }
 
 export {
+  maandagVan, isoWeekJaar, weekDagen, weekPeriodeLabel, parseWeekPeriode, weekOpties, MND_KORT, MND_LANG,
   taakTitel, taakVerwijzing, kortDatum, NIET_ZOEKBAAR,
   displayName, filt, splitBehandelaar, korteNaam, PRIO_REGELS, stilDrempel, STIL_ESCALATIE_REGELS,
   DEADLINE_VOORSTEL, DEADLINE_HINT, voorgesteldeDeadline, AF_PERIODES, periodeBereik,

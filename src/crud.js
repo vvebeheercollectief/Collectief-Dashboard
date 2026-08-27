@@ -28,6 +28,7 @@ const FG_PER_SECTIE = {
   LOD:'fg-lod', 'SUBSIDIE-TRAJECTEN':'fg-sub',
 };
 import { renderAll } from "./main.js";
+import { zetWeekKiezer } from './weekkiezer.js';
 
 //  MODAL — Open / Close
 // ══════════════════════════════════════
@@ -352,7 +353,7 @@ function fillModalFields(sec,r){
       setv('m-opm',r.opmerkingen);setv('m-sub-opp',r.subcategorie);
       tog('tog-ib',r.inBehandeling==='TRUE');break;
     case'VERGADERVERZOEKEN':
-      setv('m-per',r.periode);setv('m-beh-v',r.behandelaar);setv('m-agenda',r.agendapunten||r.actiepunt);
+      setv('m-per',r.periode);zetWeekKiezer();setv('m-beh-v',r.behandelaar);setv('m-agenda',r.agendapunten||r.actiepunt);
       setv('m-dl-v',toISODate(r.deadline));setv('m-opm-v',r.opmerkingen);setv('m-sub-verg',r.subcategorie);
       tog('tog-ib-v',r.inBehandeling==='TRUE');break;
     case'OFFERTE-TRAJECTEN':
@@ -472,6 +473,9 @@ function clearModal(){
   state._dlVoorgesteld = new Set();
   const chips=document.getElementById('m-extra-chips'); if(chips) chips.innerHTML='';
   const uitleg=document.getElementById('m-extra-uitleg'); if(uitleg) uitleg.textContent='';
+  // De regel bovenaan leegt óók het verborgen `m-per`; alleen de knop ernaast weet dat niet.
+  // Zonder deze regel opende een nieuw scherm met de week van de taak die je daarvóór bekeek.
+  zetWeekKiezer();
 }
 
 // ── Fase-kiezer in het bewerkscherm ──

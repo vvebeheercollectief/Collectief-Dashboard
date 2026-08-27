@@ -2,7 +2,7 @@
 //  RENDER-TABEL — generieke tabel/paginering (thead, tbody, rij-render, paginatie)
 //  Verplaatst uit render-lijsten.js (Batch D / punt 11) — zuivere refactor, geen gedragswijziging.
 // ══════════════════════════════════════
-import { esc, vveCodeSpan, persBadges, subBadge, taakActieKnoppen, offProg, emptyRow, berekenPrioriteit, opvolgStatus, taakTitel, kortDatum, _verschilInKalenderdagen, _vandaagAmsterdam, stilDrempel, aannSleutel } from "./util.js";
+import { esc, vveCodeSpan, persBadges, subBadge, taakActieKnoppen, offProg, emptyRow, berekenPrioriteit, opvolgStatus, taakTitel, kortDatum, _verschilInKalenderdagen, _vandaagAmsterdam, stilDrempel, aannSleutel, parseWeekPeriode } from "./util.js";
 import { SECS, SKEYS, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { bulkGeselecteerd } from "./bulk.js";
@@ -322,6 +322,29 @@ function deadlineCel(r, sec){
   return `<td><span class="${soon ? 's-soon' : 's-normal'}">${esc(r.deadline)}</span></td>`;
 }
 
+// De periodecel (Vergaderverzoeken). Twee regels: weeknummer boven, werkdagen eronder.
+// Tot v11.9 stond hier een felgele pil met vetgedrukte tekst om een met de hand getypte
+// periode heen; de gebruiker vond dat onprofessioneel en de waarden liepen alle kanten op.
+// Herkent de waarde als week? Dan tweeregelig. Zo niet — een oude, met de hand getypte
+// waarde zoals 'sept/okt' — dan gedempt en ongewijzigd. Er wordt niets herschreven.
+// Het JAAR staat er alleen bij als het niet het lopende jaar is: in de smalste stand is
+// deze kolom 96px en '14–18 sep 2026' past daar niet naast het weeknummer.
+function periodeCel(waarde){
+  const w = parseWeekPeriode(waarde);
+  // `title` op allebei de vormen: de tweede regel kapt af zodra de kolom krap staat — bij een week
+  // over de JAARgrens ('28 dec 2026 – 1 jan 2027') is dat onvermijdelijk, want dat is de langste
+  // tekst die dit veld kent en die kolom permanent daarop verbreden kost elders in de rij meer.
+  // Aanwijzen laat dan de hele periode zien, net als bij de andere afkappende cellen in deze tabel.
+  if(!w) return `<span class="per-oud" title="${esc(waarde)}">${esc(waarde)}</span>`;
+  const ditJaar = _vandaagAmsterdam().getFullYear();
+  // In de CEL het streepje zonder spaties ('31 aug–4 sep' i.p.v. '31 aug – 4 sep'). In de Sheet
+  // blijven de spaties staan, want daar leest een mens de regel als tekst. Het scheelt 6px, en
+  // dat is precies wat deze kolom bij de smalste tabel tekortkwam voor een week die over een
+  // maandgrens loopt — de brede stand van dezelfde kolom kost elders in de rij meer dan het waard is.
+  const dagen = (w.jaar === ditJaar ? w.dagen : `${w.dagen} ${w.jaar}`).replace(/ – /g, '–');
+  return `<span class="per-wk" title="${esc(waarde)}"><span class="wk">wk ${w.nr}</span><span class="dg">${esc(dagen)}</span></span>`;
+}
+
 function rowNtd(r,sec){
   const css=SECS[sec].css;
   const rid=state._rowCache.length; state._rowCache.push(r);
@@ -408,7 +431,7 @@ function rowNtd(r,sec){
       cells=`<td>${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
         <td class="${naamCls}"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie, sec)}${bdlNaam}</td>
         ${signaalCel(r, sec, rid)}
-        <td><span class="badge badge-periode" style="background:var(--am-l);color:var(--am)">${esc(r.periode||r.agendapunten||'')}</span></td>
+        <td class="cell-per">${periodeCel(r.periode||r.agendapunten||'')}</td>
         <td class="cell-txt"><span class="ct" title="${esc(r.agendapunten||r.actiepunt||'')}">${esc(r.agendapunten||r.actiepunt||'')}</span></td>
         <td>${persBadges(r.behandelaar, true)}</td>
         ${deadlineCel(r, 'VERGADERVERZOEKEN')}
@@ -522,4 +545,5 @@ function renderPag(id,total,cur,doel){
     </div>`;
 }
 
-export { renderThead, herzetKolomBreedtes, kolBreedtes, renderTbody, bepaalStil, bouwStilIndex, _zetStilIndex, signaalDelen, deadlineCel, rowNtd, rowAf, renderPag };
+export {
+  periodeCel, renderThead, herzetKolomBreedtes, kolBreedtes, renderTbody, bepaalStil, bouwStilIndex, _zetStilIndex, signaalDelen, deadlineCel, rowNtd, rowAf, renderPag };

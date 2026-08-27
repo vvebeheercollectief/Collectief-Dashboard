@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="nl" data-theme="light">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Periode als weekkeuze</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="../styles.css"/>
+<style>
+/* ── De tabbladenrij in de kaartkop + gekleurde kolombalk: zoals op productie ── */
+.card-hdr.hdr-tabs{padding:0 16px;gap:0 14px;align-items:stretch;position:relative}
+.hdr-tabs .tabs{padding:0;margin:0 0 -1px;overflow:visible;flex:1 1 auto;min-height:44px}
+.hdr-tabs .tab{align-self:stretch;padding:0 11px}
+.hdr-tabs .filter-bar{align-self:center;padding:8px 0}
+.mk-tabel thead th{background:var(--sec-l);color:var(--sec);border-bottom-color:var(--sec-b)}
+
+/* ══ VOORSTEL: de periodecel zonder pil ══════════════════════════════════ */
+/* A — één regel: weeknummer in de vaste-breedte letter, datums gedempt erachter. */
+.per-1{white-space:nowrap}
+.per-1 .wk{font-family:var(--font-mono);font-size:12.5px;font-weight:600;color:var(--txt)}
+.per-1 .dg{font-size:12.5px;color:var(--mut);margin-left:6px}
+/* B — twee regels: weeknummer boven, werkdagen eronder. */
+.per-2{line-height:1.25}
+.per-2 .wk{display:block;font-family:var(--font-mono);font-size:12.5px;font-weight:600;color:var(--txt)}
+.per-2 .dg{display:block;font-size:11px;color:var(--mut);margin-top:1px}
+/* Oude, met de hand getypte waarde: blijft gewoon staan, alleen rustig. */
+.per-oud{font-size:12.5px;color:var(--mut);font-style:normal}
+
+/* ══ De weekkiezer ═══════════════════════════════════════════════════════ */
+.wk-veld{position:relative}
+.wk-knop{width:100%;height:38px;display:flex;align-items:center;justify-content:space-between;gap:8px;
+  background:var(--sur);border:1px solid var(--bor-input);border-radius:var(--rs);padding:0 11px;
+  font:inherit;font-size:13px;color:var(--txt);cursor:pointer;text-align:left;transition:border var(--tr),box-shadow var(--tr)}
+.wk-knop:hover{border-color:var(--ac-b)}
+.wk-knop[aria-expanded="true"]{border-color:var(--ac);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 14%,transparent)}
+.wk-knop .leeg{color:var(--mut)}
+.wk-knop .gekozen{display:flex;align-items:baseline;gap:8px;min-width:0}
+.wk-knop .gekozen b{font-family:var(--font-mono);font-size:12.5px;font-weight:600}
+.wk-knop .gekozen span{color:var(--mut);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wk-knop svg{flex:none;color:var(--fnt)}
+.wk-paneel{position:absolute;z-index:50;left:0;right:0;top:calc(100% + 5px);max-height:280px;overflow-y:auto;
+  background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);box-shadow:var(--shm);padding:5px}
+.wk-maand{position:sticky;top:-5px;background:var(--sur);padding:7px 9px 4px;font-size:10.5px;font-weight:700;
+  color:var(--mut);text-transform:uppercase;letter-spacing:.07em}
+.wk-optie{width:100%;display:block;text-align:left;background:none;border:0;border-radius:var(--rs);
+  padding:6px 9px;cursor:pointer;font:inherit;transition:background var(--tr)}
+.wk-optie:hover{background:var(--row-hover)}
+.wk-optie.aan{background:var(--ac-l)}
+.wk-optie .wknr{display:block;font-family:var(--font-mono);font-size:12.5px;font-weight:600;color:var(--txt)}
+.wk-optie .wkdg{display:block;font-size:11.5px;color:var(--mut);margin-top:1px}
+.wk-optie.deze .wknr::after{content:'deze week';margin-left:8px;font-family:inherit;font-size:10px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.06em;color:var(--ac)}
+
+/* ── Alleen paginachrome ── */
+html,body{height:auto;min-height:100%}
+body{padding:26px 22px 120px;background:var(--bg)}
+.mk-h1{font-size:21px;font-weight:800;letter-spacing:-.02em;margin:0 0 6px}
+.mk-lead{font-size:13.5px;color:var(--mut);max-width:840px;margin:0 0 22px;line-height:1.65}
+.mk-sec{margin:0 0 28px;max-width:1180px}
+.mk-kop{display:flex;align-items:baseline;gap:10px;margin:0 0 4px}
+.mk-tag{font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:3px 9px;border-radius:99px;
+  background:var(--ac-l);color:var(--ac);border:1px solid var(--ac-b)}
+.mk-tag.nu{background:#eef0f3;color:var(--mut);border-color:var(--bor)}
+.mk-titel{font-size:15px;font-weight:700}
+.mk-uit{font-size:12.5px;color:var(--mut);margin:0 0 11px;line-height:1.6;max-width:840px}
+.mk-veld{background:var(--sur);border:1px solid var(--bor);border-radius:14px;overflow:hidden;box-shadow:var(--sh)}
+.mk-form{background:var(--sur);border:1px solid var(--bor);border-radius:14px;padding:18px;max-width:420px;box-shadow:var(--sh)}
+.mk-form label{display:block;font-size:12px;font-weight:600;color:var(--mut);margin:0 0 6px}
+</style>
+</head>
+<body>
+
+<div class="mk-h1">Periode als weekkeuze</div>
+<p class="mk-lead">De periodekolom is nu een vrij tekstveld, en daardoor staat er van alles door
+elkaar: <i>sept/okt</i>, <i>Sept/okt</i>, <i>sept/oktober</i>, <i>eind juli</i>, <i>21 september …</i>.
+Hieronder: de gele pil eruit, en in plaats van typen kies je een week.</p>
+
+<div class="mk-sec">
+  <div class="mk-kop"><span class="mk-tag nu">Nu</span><span class="mk-titel">Gele pil, vrije tekst</span></div>
+  <p class="mk-uit">Felgele pil met vetgedrukte tekst, en iedereen schrijft de periode anders op.</p>
+  <div class="mk-veld"><div id="tabel-nu"></div></div>
+</div>
+
+<div class="mk-sec">
+  <div class="mk-kop"><span class="mk-tag">Voorstel A</span><span class="mk-titel">Eén regel: weeknummer + werkdagen</span></div>
+  <p class="mk-uit">Geen vlak, geen kleur — zelfde rust als de andere kolommen. Het weeknummer in de
+  cijferletter, de datums er gedempt achter. Oude, met de hand getypte waarden blijven gewoon staan.</p>
+  <div class="mk-veld"><div id="tabel-a"></div></div>
+</div>
+
+<div class="mk-sec">
+  <div class="mk-kop"><span class="mk-tag">Voorstel B</span><span class="mk-titel">Twee regels: weeknummer boven, werkdagen eronder</span></div>
+  <p class="mk-uit">Zoals je het beschreef. Neemt minder breedte maar iets meer hoogte — en de
+  periodekolom is de smalste kolom van dit tabblad, dus dit past er makkelijker in.</p>
+  <div class="mk-veld"><div id="tabel-b"></div></div>
+</div>
+
+<div class="mk-sec">
+  <div class="mk-kop"><span class="mk-tag">Kiezen</span><span class="mk-titel">De weekkiezer in het bewerkscherm</span></div>
+  <p class="mk-uit">Klik op het veld — je kiest een week, je typt niets meer. Per maand gegroepeerd,
+  met de werkdagen onder elk weeknummer. Probeer het gerust.</p>
+  <div class="mk-form">
+    <label for="wk-knop">Periode *</label>
+    <div class="wk-veld">
+      <button type="button" class="wk-knop" id="wk-knop" aria-expanded="false" aria-haspopup="listbox">
+        <span class="leeg" id="wk-label">Kies een week…</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div class="wk-paneel" id="wk-paneel" role="listbox" aria-label="Kies een week" hidden></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Vandaag vastgezet op de dag van deze sessie, zodat de mockup dezelfde weken toont als jullie zien.
+const VANDAAG = new Date(2026, 7, 27);
+const MND = ['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december'];
+const MND_K = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
+
+function isoWeek(d){
+  const don = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  don.setDate(don.getDate() - ((don.getDay()+6)%7) + 3);
+  const w1 = new Date(don.getFullYear(), 0, 4);
+  w1.setDate(w1.getDate() - ((w1.getDay()+6)%7) + 3);
+  return 1 + Math.round((don - w1) / (7*864e5));
+}
+function maandagVan(d){ const m = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  m.setDate(m.getDate() - ((m.getDay()+6)%7)); return m; }
+
+// Werkdagen kort: "ma 14 – vr 18 sep" (of met twee maanden: "ma 31 aug – vr 4 sep")
+function werkdagen(ma){
+  const vr = new Date(ma.getFullYear(), ma.getMonth(), ma.getDate()+4);
+  return ma.getMonth() === vr.getMonth()
+    ? `ma ${ma.getDate()} – vr ${vr.getDate()} ${MND_K[vr.getMonth()]}`
+    : `ma ${ma.getDate()} ${MND_K[ma.getMonth()]} – vr ${vr.getDate()} ${MND_K[vr.getMonth()]}`;
+}
+function weken(aantal){
+  const uit = []; let ma = maandagVan(VANDAAG);
+  for(let i=0;i<aantal;i++){
+    uit.push({ nr:isoWeek(ma), ma:new Date(ma), dg:werkdagen(ma), deze:i===0,
+               maand:MND[ma.getMonth()], jaar:ma.getFullYear() });
+    ma = new Date(ma.getFullYear(), ma.getMonth(), ma.getDate()+7);
+  }
+  return uit;
+}
+const WEKEN = weken(30);
+
+// ── Tabel ────────────────────────────────────────────────────────────────
+const RIJEN = [
+  { code:'281015', naam:'VvE Noordeinde 107/107A',            wk:WEKEN[2],  agenda:'Onderhoud, begroting',   wie:'J',  dl:'3 september 2026' },
+  { code:'181003', naam:'VvE Notenplein 25/26/27',            wk:WEKEN[4],  agenda:'Balkonkast, dakrenovatie', wie:'J',  dl:'28 augustus 2026' },
+  { code:'311211', naam:'VvE Nunspeetlaan 44 - 46 - 48',      wk:WEKEN[7],  agenda:'Jaarrekening',           wie:'JC', dl:'11 september 2026' },
+  { code:'301048', naam:'VvE Kaapseplein 19 t/m 24',          oud:'sept/okt', agenda:'Schade-dossier',       wie:'–',  dl:'' },
+  { code:'091025', naam:'VvE Francois Maelsonstraat 19a t/m 19f', oud:'eind juli', agenda:'Extra vergadering', wie:'J', dl:'21 augustus 2026' },
+];
+const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const KOP = ['VvE Code','VvE','Periode','Agendapunten','Wie','Deadline uitschr.'];
+const AM = '--sec:var(--am);--sec-l:var(--am-l);--sec-b:var(--am-b)';
+
+function cel(r, vorm){
+  if(r.oud) return vorm==='nu'
+    ? `<span class="badge badge-periode" style="background:var(--am-l);color:var(--am)">${esc(r.oud)}</span>`
+    : `<span class="per-oud">${esc(r.oud)}</span>`;
+  if(vorm==='nu') return `<span class="badge badge-periode" style="background:var(--am-l);color:var(--am)">${esc(r.wk.maand.slice(0,4))}/${esc(MND_K[(r.wk.ma.getMonth()+1)%12])}</span>`;
+  if(vorm==='a')  return `<span class="per-1"><span class="wk">wk ${r.wk.nr}</span><span class="dg">${esc(r.wk.dg)}</span></span>`;
+  return `<span class="per-2"><span class="wk">wk ${r.wk.nr}</span><span class="dg">${esc(r.wk.dg)}</span></span>`;
+}
+function tabel(vorm){
+  const th = KOP.map(k=>`<th>${esc(k)}</th>`).join('')+'<th></th>';
+  const tb = RIJEN.map(r=>`<tr>
+      <td class="mono">${esc(r.code)}</td>
+      <td><span class="ct">${esc(r.naam)}</span></td>
+      <td>${cel(r,vorm)}</td>
+      <td class="cell-txt"><span class="ct">${esc(r.agenda)}</span></td>
+      <td>${esc(r.wie)}</td>
+      <td>${esc(r.dl)}</td>
+      <td></td></tr>`).join('');
+  return `<div class="mk-tabel" style="${AM}"><div class="tbl-wrap"><table><thead><tr>${th}</tr></thead><tbody>${tb}</tbody></table></div></div>`;
+}
+document.getElementById('tabel-nu').innerHTML = tabel('nu');
+document.getElementById('tabel-a').innerHTML  = tabel('a');
+document.getElementById('tabel-b').innerHTML  = tabel('b');
+
+// ── Kiezer ───────────────────────────────────────────────────────────────
+const knop = document.getElementById('wk-knop');
+const paneel = document.getElementById('wk-paneel');
+const label = document.getElementById('wk-label');
+let gekozen = null;
+
+function vulPaneel(){
+  let html = '', vorigeMaand = '';
+  WEKEN.forEach((w,i)=>{
+    const kop = `${w.maand} ${w.jaar}`;
+    if(kop !== vorigeMaand){ html += `<div class="wk-maand">${esc(kop)}</div>`; vorigeMaand = kop; }
+    html += `<button type="button" class="wk-optie${w.deze?' deze':''}${gekozen===i?' aan':''}" role="option"
+       aria-selected="${gekozen===i}" data-i="${i}">
+       <span class="wknr">Week ${w.nr}</span><span class="wkdg">${esc(w.dg)}</span></button>`;
+  });
+  paneel.innerHTML = html;
+}
+function open(aan){
+  knop.setAttribute('aria-expanded', aan ? 'true' : 'false');
+  paneel.hidden = !aan;
+  if(aan){ vulPaneel(); const a = paneel.querySelector('.wk-optie.aan') || paneel.querySelector('.wk-optie.deze'); a?.scrollIntoView({block:'center'}); }
+}
+knop.addEventListener('click', ()=> open(paneel.hidden));
+paneel.addEventListener('click', e=>{
+  const b = e.target.closest('.wk-optie'); if(!b) return;
+  gekozen = +b.dataset.i;
+  const w = WEKEN[gekozen];
+  label.outerHTML = `<span class="gekozen" id="wk-label"><b>Week ${w.nr}</b><span>${esc(w.dg)} ${w.jaar}</span></span>`;
+  open(false);
+});
+document.addEventListener('click', e=>{ if(!e.target.closest('.wk-veld')) open(false); });
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') open(false); });
+</script>
+</body>
+</html>

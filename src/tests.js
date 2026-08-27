@@ -5,6 +5,7 @@ import { taakTitel, taakVerwijzing, nieuwTaakId, berekenPrioriteit, kortDatum, _
 import { verwerkMeldingRijen, toonMeldingen, MAX_TOAST_BURST, _whoSleutel, getCurrentWho, undoDelete } from "./notifications.js";
 import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek, logEvents, renderOntw, openOntwModal, closeOntwModal, submitOntwItem, _logRegelSleutel, _ontwSleutel } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM, VELD_LABELS } from "./config.js";
+import { maandagVan, isoWeekJaar, weekDagen, weekPeriodeLabel, parseWeekPeriode, weekOpties } from "./util.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
 import { filterNtd, setNtd, renderNtd, ntdPagina, renderNtdStats, renderAf, setAf, bepaalStil, bouwStilIndex, _zetStilIndex, signaalDelen, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey, kopOpen, zetKopOpen, toggleBundel, springNaarBundel, wisNtdFilters, absorbeer, isPlatteWeergave, erIsGefilterd, rowNtd, filterAf, afFilterWaarden } from "./render-lijsten.js";
@@ -28,7 +29,7 @@ import { SPLASH_MS, _setFase } from "./login-splash.js";
 import { opmaakHtml, htmlNaarMarkers, zonderOpmaak, pasToe, opmaakBalk } from "./opmaak.js";
 import { goTo, applyTheme } from "./ui.js";
 import { checkSecties, checkRaster, checkRasters, checkNummers, checkAlles, ernstigeBevindingen, RASTER_MIN } from "./structuurcheck.js";
-import { herzetKolomBreedtes, kolBreedtes } from "./render-tabel.js";
+import { herzetKolomBreedtes, kolBreedtes, periodeCel } from "./render-tabel.js";
 import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from "./subsidie-fase.js";
 import { toggleHerhaalStatus, renderHerhaal, openHerhaalModal, deleteHerhaal } from "./render-herhaal.js";
 import { openSnoozeModal, snoozeOpslaan, closeSnoozeModal } from "./snooze.js";
@@ -5219,7 +5220,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '11.8');
+  eq('versie opgehoogd', APP_VERSION, '11.9');
 
   // ── Tabbladen ÍN de kaartkop (v11.7) ──
   // De kop van de kaart zei links exact hetzelfde als het actieve tabblad — 'Oppakken' boven
@@ -5250,6 +5251,82 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   // De kop wordt nog stééds gevuld (render-lijsten.js zet hem); onzichtbaar is niet leeg.
   truthy('de onzichtbare kop draagt nog een naam',
      (document.getElementById('ntd-title').textContent||'').trim().length > 0);
+
+  // ── Periode als weekkeuze (v11.9) ──
+  // 'Periode' was een leeg tekstvak met de hint "bv. Mei, Juni" en dat leverde zes schrijfwijzen
+  // van hetzelfde op. Nu kies je een week. Wat in kolom C belandt is één vaste regel, en die moet
+  // exact terug te lezen zijn — anders tekent de tabel een oude waarde als een kapotte week.
+  (() => {
+    // Heen en terug, op drie gevallen die echt voorkomen.
+    const gevallen = [
+      { ma: new Date(2026, 8, 14), label: 'Week 38 · 14–18 sep 2026', nr: 38, dagen: '14–18 sep', jaar: 2026 },
+      // Week over een maandgrens: dan MOETEN er twee maandnamen in, anders leest '31–4 sep' als onzin.
+      { ma: new Date(2026, 7, 31), label: 'Week 36 · 31 aug – 4 sep 2026', nr: 36, dagen: '31 aug – 4 sep', jaar: 2026 },
+      // Week 1 van 2027 begint in december 2026. Het ISO-JAAR hoort erbij te staan, niet het jaar
+      // van de maandag — dat is de klassieke val bij weeknummers rond de jaarwisseling.
+      { ma: new Date(2026, 11, 28), label: 'Week 53 · 28 dec 2026 – 1 jan 2027', nr: 53, dagen: '28 dec 2026 – 1 jan', jaar: 2027 },
+    ];
+    gevallen.forEach(g => {
+      const label = weekPeriodeLabel(g.ma);
+      eq(`weekkeuze: label voor ${g.ma.toISOString().slice(0,10)}`, label, g.label);
+      const terug = parseWeekPeriode(label);
+      eq(`weekkeuze: en dat label is exact terug te lezen (${g.nr})`,
+         [terug && terug.nr, terug && terug.dagen, terug && terug.jaar], [g.nr, g.dagen, g.jaar]);
+    });
+    // Oude, met de hand getypte waarden zijn GEEN week en mogen dat ook niet lijken.
+    ['sept/okt', 'Sept/okt', 'sept/oktober', 'eind juli', 'juni/juli', '21 september …', '', 'Week', 'Week 99 · x 2026']
+      .forEach(oud => truthy(`weekkeuze: '${oud}' wordt niet als week gelezen`, parseWeekPeriode(oud) === null));
+
+    // De keuzelijst: twaalf weken terug, deze week, zesentwintig vooruit.
+    const opties = weekOpties({ terug: 12, vooruit: 26, vandaag: new Date(2026, 7, 27) });
+    eq('weekkeuze: de lijst telt 39 weken (12 terug + deze + 26 vooruit)', opties.length, 39);
+    eq('weekkeuze: precies één week is "deze week"', opties.filter(o => o.deze).length, 1);
+    eq('weekkeuze: en dat is de week van vandaag', opties.find(o => o.deze).nr, 35);
+    eq('weekkeuze: twaalf weken staan in het verleden', opties.filter(o => o.verleden).length, 12);
+    // In KALENDERdagen en niet in milliseconden: bij de overgang naar of van de zomertijd is een
+    // week 7×24u ± 1u, en dan zou een kloppende lijst rood worden.
+    truthy('weekkeuze: elke week ligt precies zeven kalenderdagen na de vorige',
+       opties.every((o, i) => i === 0 || Math.round((o.ma - opties[i-1].ma) / 864e5) === 7));
+    truthy('weekkeuze: elke ingang is zelf weer terug te lezen',
+       opties.every(o => parseWeekPeriode(o.waarde) !== null));
+    truthy('weekkeuze: elke ingang draagt een maandkop', opties.every(o => /^[a-z]+ \d{4}$/.test(o.maandKop)));
+
+    // De cel in de tabel: twee regels, en geen pil meer.
+    const cel = periodeCel('Week 38 · 14–18 sep 2026');
+    truthy('periodecel: geen gele pil meer', !/badge/.test(cel));
+    truthy('periodecel: weeknummer op de eerste regel', /class="wk">wk 38</.test(cel));
+    truthy('periodecel: werkdagen op de tweede regel', /class="dg">14–18 sep</.test(cel));
+    // Het jaar alleen als het NIET het lopende jaar is — anders past de tweede regel niet.
+    // Op de INHOUD van de tweede regel toetsen en niet op de hele cel: de `title` draagt de
+    // volledige waarde mét jaar (voor als de regel afkapt), en die zou hier vals alarm geven.
+    const ditJaar = new Date().getFullYear();
+    const tweedeRegel = html => (html.match(/class="dg">([^<]*)</) || [,''])[1];
+    truthy('periodecel: het lopende jaar staat niet op de tweede regel',
+       !tweedeRegel(periodeCel(`Week 38 · 14–18 sep ${ditJaar}`)).includes(String(ditJaar)));
+    truthy('periodecel: een ander jaar staat er wél bij',
+       tweedeRegel(periodeCel(`Week 8 · 22–26 feb ${ditJaar+1}`)).includes(String(ditJaar+1)));
+    // En de volledige periode staat altijd in de tooltip, ook als de regel afkapt.
+    truthy('periodecel: de volledige periode zit in de tooltip',
+       periodeCel(`Week 38 · 14–18 sep ${ditJaar}`).includes(`title="Week 38 · 14–18 sep ${ditJaar}"`));
+    // Een oude waarde blijft staan zoals hij is — er wordt niets herschreven.
+    const oud = periodeCel('sept/okt');
+    truthy('periodecel: oude waarde blijft ongewijzigd staan', oud.includes('sept/okt') && /per-oud/.test(oud));
+    truthy('periodecel: en wordt niet als week getekend', !/per-wk/.test(oud));
+
+    // Het bewerkscherm: het verborgen veld draagt de waarde, de knop is wat je bedient.
+    const veld = document.getElementById('m-per');
+    const knop = document.getElementById('m-per-knop');
+    const paneel = document.getElementById('m-per-paneel');
+    truthy('weekkiezer: m-per bestaat nog en is verborgen', !!veld && veld.type === 'hidden');
+    truthy('weekkiezer: er is een knop met een paneel eraan', !!knop && !!paneel);
+    eq('weekkiezer: de knop meldt zijn paneel via ARIA',
+       [knop && knop.getAttribute('aria-haspopup'), knop && knop.getAttribute('aria-controls'), paneel && paneel.getAttribute('role')],
+       ['listbox', 'm-per-paneel', 'listbox']);
+    // Niets in het paneel mag in de tabvolgorde staan: dan loopt Tab in het bewerkscherm door
+    // negenendertig weken heen in plaats van naar het volgende veld (zelfde val als vve-zoekveld).
+    eq('weekkiezer: geen enkele optie staat in de tabvolgorde',
+       paneel ? paneel.querySelectorAll('button,a,input,[tabindex]').length : -1, 0);
+  })();
 
   // ── Kolombalk in de kleur van het tabblad + de standaardletter (v11.8) ──
   // De kleur komt uit SECS[...].css, dat renderThead als inline stijl op elke <th> zet. Ik vergelijk

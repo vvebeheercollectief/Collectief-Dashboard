@@ -23,6 +23,7 @@ import {
 import { loadAll, magPollen, schrijfActieLoopt, setSyncOffline, showOfflineBanner, clearOfflineBanner, laadUitCache } from './data.js';
 import { initActions } from './actions.js';
 import { initVveZoekveld } from './vve-zoekveld.js';
+import { initWeekKiezer } from './weekkiezer.js';
 import { voegExtraVveToe } from './meervve.js';
 import { verplaatsTaak } from './verplaats.js';
 import { renderBulkUi } from './bulk.js';
@@ -296,6 +297,10 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('ontw-modal-bg').addEventListener('mousedown',e=>{_ontwMouseDown=e.target});
   document.getElementById('ontw-modal-bg').addEventListener('click',e=>{if(e.target.id==='ontw-modal-bg'&&_ontwMouseDown?.id==='ontw-modal-bg')closeOntwModal()});
   setupSearch('s-ontw',()=>{pgs.ontw=1;renderOntw()});
+
+  // Weekkiezer voor 'Periode' (Vergaderverzoeken). Eén keer aanhaken; het paneel wordt bij
+  // elke opening opnieuw opgebouwd, zodat 'deze week' meeschuift als de dag wisselt.
+  initWeekKiezer();
 
   // Herhaalregel-modal (Fase 4)
   document.getElementById('btn-add-herhaal').onclick=()=>openHerhaalModal(null);

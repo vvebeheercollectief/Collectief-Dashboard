@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="nl" data-theme="light">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Signaal-kolom weg</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="../styles.css"/>
+<style>
+.mk-tabel thead th{background:var(--sec-l);color:var(--sec);border-bottom-color:var(--sec-b)}
+
+/* ── VOORSTEL 1: deadline op twee regels — datum blijft staan, dagen eronder ── */
+.dl-2{display:block;line-height:1.25}
+.dl-2 .dl-dat{display:block;font-family:var(--font-mono);font-size:12.5px;white-space:nowrap}
+.dl-2 .dl-bij{display:block;font-size:11px;font-weight:600;margin-top:1px;white-space:nowrap}
+.dl-2.laat .dl-dat{color:var(--sig-crit);font-weight:600}
+.dl-2.laat .dl-bij{color:var(--sig-crit)}
+.dl-2.bijna .dl-dat{color:var(--am);font-weight:600}
+.dl-2.bijna .dl-bij{color:var(--am)}
+
+/* ── Alleen paginachrome ── */
+html,body{height:auto;min-height:100%}
+body{padding:26px 22px 120px;background:var(--bg)}
+.mk-h1{font-size:21px;font-weight:800;letter-spacing:-.02em;margin:0 0 6px}
+.mk-lead{font-size:13.5px;color:var(--mut);max-width:900px;margin:0 0 20px;line-height:1.65}
+.mk-bar{position:sticky;top:0;z-index:40;display:flex;flex-wrap:wrap;align-items:center;gap:8px;
+  background:var(--sur);border:1px solid var(--bor);border-radius:12px;padding:10px 12px;margin:0 0 22px;box-shadow:var(--sh)}
+.mk-bar b{font-size:11px;font-weight:800;color:var(--mut);text-transform:uppercase;letter-spacing:.07em;margin:0 2px 0 8px}
+.mk-bar b:first-child{margin-left:0}
+.mk-k{border:1px solid var(--bor);background:var(--sur);border-radius:8px;padding:6px 11px;font:inherit;
+  font-size:12.5px;font-weight:700;color:var(--mut);cursor:pointer}
+.mk-k.on{background:var(--ac);border-color:var(--ac);color:#fff}
+.mk-sec{margin:0 0 26px}
+.mk-kop{display:flex;align-items:baseline;gap:10px;margin:0 0 4px}
+.mk-tag{font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:3px 9px;border-radius:99px;
+  background:var(--ac-l);color:var(--ac);border:1px solid var(--ac-b)}
+.mk-tag.nu{background:#eef0f3;color:var(--mut);border-color:var(--bor)}
+.mk-titel{font-size:15px;font-weight:700}
+.mk-uit{font-size:12.5px;color:var(--mut);margin:0 0 11px;line-height:1.6;max-width:900px}
+.mk-veld{background:var(--sur);border:1px solid var(--bor);border-radius:14px;overflow:hidden;box-shadow:var(--sh)}
+.mk-grp{background:var(--group-bg);font-size:11px;font-weight:800;color:var(--mut);text-transform:uppercase;
+  letter-spacing:.06em;padding:7px 14px;border-bottom:1px solid var(--bor)}
+</style>
+</head>
+<body>
+
+<div class="mk-h1">Signaal-kolom weg</div>
+<p class="mk-lead">Boven: hoe het nu is. Onder: zonder Signaal-kolom. Met de knoppen zet je de twee
+keuzes om waar je naar wilde kijken — wat er in de deadline-kolom komt te staan bij een taak die te
+laat is, en wat er gebeurt met de drie meldingen die nergens anders staan.</p>
+
+<div class="mk-bar">
+  <b>Tabblad</b>
+  <button class="mk-k on" data-z="sec" data-v="OPPAKKEN">Oppakken</button>
+  <button class="mk-k" data-z="sec" data-v="VERGADERVERZOEKEN">Vergaderverzoeken</button>
+  <button class="mk-k" data-z="sec" data-v="LOD">LOD</button>
+  <b>Te laat</b>
+  <button class="mk-k on" data-z="dl" data-v="2r">Datum + dagen eronder</button>
+  <button class="mk-k" data-z="dl" data-v="kort">Alleen "Te laat (76d)"</button>
+  <b>Meldingen</b>
+  <button class="mk-k on" data-z="mld" data-v="terug">Alleen "Terug 31 aug"</button>
+  <button class="mk-k" data-z="mld" data-v="geen">Geen</button>
+  <button class="mk-k" data-z="mld" data-v="alle">Alle drie</button>
+</div>
+
+<div class="mk-sec">
+  <div class="mk-kop"><span class="mk-tag nu">Nu</span><span class="mk-titel">Mét Signaal-kolom</span></div>
+  <p class="mk-uit">"Te laat (76d)" staat naast een deadline waar diezelfde 76 dagen uit te rekenen zijn.</p>
+  <div class="mk-veld" id="veld-nu"></div>
+</div>
+
+<div class="mk-sec">
+  <div class="mk-kop"><span class="mk-tag">Voorstel</span><span class="mk-titel">Zonder Signaal-kolom</span></div>
+  <p class="mk-uit">Eén kolom minder, en alle ruimte gaat naar het actiepunt en de opmerkingen.</p>
+  <div class="mk-veld" id="veld-nieuw"></div>
+</div>
+
+<script>
+const VANDAAG = new Date(2026, 7, 27);
+const MND_K = ['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
+const MND_L = ['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december'];
+const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const dl = (dagenTot) => { const d = new Date(VANDAAG.getFullYear(), VANDAAG.getMonth(), VANDAAG.getDate()+dagenTot);
+  return { tekst:`${d.getDate()} ${MND_L[d.getMonth()]} ${d.getFullYear()}`, dagen:dagenTot }; };
+function isoWeek(d){const o=new Date(d.getFullYear(),d.getMonth(),d.getDate());o.setDate(o.getDate()-((o.getDay()+6)%7)+3);
+  const w=new Date(o.getFullYear(),0,4);w.setDate(w.getDate()-((w.getDay()+6)%7)+3);return 1+Math.round((o-w)/(7*864e5));}
+function maandagVan(d){const m=new Date(d.getFullYear(),d.getMonth(),d.getDate());m.setDate(m.getDate()-((m.getDay()+6)%7));return m;}
+function weekCel(wkOffset){
+  const ma=maandagVan(new Date(VANDAAG.getFullYear(),VANDAAG.getMonth(),VANDAAG.getDate()+wkOffset*7));
+  const vr=new Date(ma.getFullYear(),ma.getMonth(),ma.getDate()+4);
+  const dagen = ma.getMonth()===vr.getMonth()
+    ? `ma ${ma.getDate()} – vr ${vr.getDate()} ${MND_K[vr.getMonth()]}`
+    : `ma ${ma.getDate()} ${MND_K[ma.getMonth()]} – vr ${vr.getDate()} ${MND_K[vr.getMonth()]}`;
+  return `<span class="per-wk"><span class="wk">wk ${isoWeek(ma)}</span><span class="dg">${dagen}</span></span>`;
+}
+
+// ── Rijen: elk signaal dat vandaag bestaat komt hierin voor ─────────────────
+const RIJEN = [
+  { code:'201065', naam:'VvE Hendrik van Deventerstraat 93/91/89', taak:'Uitschrijven vergadering n.a.v. CRM en offertes delen', status:'Lopend',
+    d:dl(-76), wie:'JC', opm:'Murat checken over de offerte', wk:2 },
+  { code:'361023', naam:'VvE Troelstrakade 721 t/m 735', taak:'Akkoord geven op de offerte (formulier invullen)', status:'Wacht',
+    d:dl(-27), wie:'J', opm:'', vandaag:true, wk:4 },
+  { code:'181003', naam:'VvE Notenplein 25/26/27', taak:'Indexeren offertes balkonkast en dakrenovatie', status:'Lopend',
+    d:dl(1), wie:'J', opm:'Klusbouw vragen of hij de offerte aanlevert', stil:15, wk:5 },
+  { code:'311211', naam:'VvE Nunspeetlaan 44 - 46 - 48', taak:'Eigenaresse huisnummer 44 gesproken', status:'Lopend',
+    d:dl(4), wie:'JC', opm:'', wk:7 },
+  { code:'301065', naam:'VvE Kaapstraat 55/57/59', taak:'Mail sturen naar Yigit over status onderzoek', status:'Nieuw',
+    d:dl(21), wie:'J', opm:'', wk:9 },
+  { code:'301048', naam:'VvE Kaapseplein 19 t/m 24', taak:'Schade-dossier verder oppakken', status:'Wacht',
+    d:null, wie:'–', opm:'Gabos heeft op 28 januari gemaild', wk:11 },
+];
+const WEGGELEGD = [
+  { code:'091025', naam:'VvE Francois Maelsonstraat 19a t/m 19f', taak:'Extra vergadering organiseren', status:'Wacht',
+    d:dl(-6), wie:'J', opm:'', terug:'31 aug', wk:3 },
+  { code:'91023', naam:'VvE Prins Mauritslaan 69 t/m 75B', taak:'Jaarrekening corrigeren en delen', status:'Lopend',
+    d:dl(-55), wie:'JC', opm:'Checken met Cihan', terug:'1 sep', stil:20, wk:6 },
+];
+
+const KOL = {
+  OPPAKKEN:          { css:'--sec:var(--ac);--sec-l:var(--ac-l);--sec-b:var(--ac-b)',
+                       met:['VvE Code','VvE','Signaal','Actiepunt','Deadline','Wie','Opmerkingen'],
+                       zonder:['VvE Code','VvE','Actiepunt','Deadline','Wie','Opmerkingen'] },
+  VERGADERVERZOEKEN: { css:'--sec:var(--am);--sec-l:var(--am-l);--sec-b:var(--am-b)',
+                       met:['VvE Code','VvE','Signaal','Periode','Agendapunten','Wie','Deadline uitschr.','Opmerkingen'],
+                       zonder:['VvE Code','VvE','Periode','Agendapunten','Wie','Deadline uitschr.','Opmerkingen'] },
+  LOD:               { css:'--sec:var(--rd);--sec-l:var(--rd-l);--sec-b:var(--rd-b)',
+                       met:['VvE Code','VvE','Signaal','Actiepunt','Status','Wie','Deadline LOD','Opmerkingen'],
+                       zonder:['VvE Code','VvE','Actiepunt','Status','Wie','Deadline LOD','Opmerkingen'] },
+};
+
+let sec = 'OPPAKKEN', dlVorm = '2r', mld = 'terug';
+
+function signaalCel(r){
+  const delen = [];
+  if(r.d && r.d.dagen < 0) delen.push({cls:'s-telaat', kleur:'crit', t:`Te laat (${-r.d.dagen}d)`});
+  if(r.vandaag) delen.push({cls:'pill-opvolg', kleur:'warn', t:'Vandaag opvolgen'});
+  if(r.d && r.d.dagen >= 0 && r.d.dagen <= 7) delen.push({cls:'s-soon', kleur:'warn-dof', t:`Nog ${r.d.dagen}d`});
+  if(r.stil) delen.push({cls:'pill-stil', kleur:'dof', t:`${r.stil}d stil`});
+  if(r.terug) delen.push({cls:'pill-snooze', kleur:'dof', t:`Terug ${r.terug}`});
+  if(!delen.length) return '<td class="cell-sig"></td>';
+  const [a,b] = delen;
+  return `<td class="cell-sig"><span class="sig sig-${a.kleur}"><span class="sig-dot"></span>`
+       + `<span class="sig-hoofd ${a.cls}">${esc(a.t)}</span>`
+       + (b ? `<span class="sig-bij ${b.cls}">${esc(b.t)}</span>` : '') + '</span></td>';
+}
+function deadlineCel(r, zonder){
+  if(!r.d) return '<td class="cell-sm"><span class="warn-geen-deadline geen-dl-dof">Geen deadline</span></td>';
+  if(!zonder) return `<td><span class="s-normal">${esc(r.d.tekst)}</span></td>`;
+  const laat = r.d.dagen < 0, bijna = !laat && r.d.dagen <= 7;
+  if(dlVorm === 'kort'){
+    if(laat)  return `<td><span class="s-telaat">Te laat (${-r.d.dagen}d)</span></td>`;
+    return `<td><span class="${bijna?'s-soon':'s-normal'}">${esc(r.d.tekst)}</span></td>`;
+  }
+  if(!laat && !bijna) return `<td><span class="s-normal">${esc(r.d.tekst)}</span></td>`;
+  const bij = laat ? `${-r.d.dagen}d te laat` : (r.d.dagen === 0 ? 'vandaag' : `nog ${r.d.dagen}d`);
+  return `<td><span class="dl-2 ${laat?'laat':'bijna'}"><span class="dl-dat">${esc(r.d.tekst)}</span>`
+       + `<span class="dl-bij">${esc(bij)}</span></span></td>`;
+}
+function pillen(r){
+  if(mld === 'geen') return '';
+  let uit = '';
+  if(r.terug) uit += `<span class="pill-snooze">Terug ${esc(r.terug)}</span>`;
+  if(mld === 'alle'){
+    if(r.vandaag) uit += `<span class="pill-opvolg">Vandaag opvolgen</span>`;
+    if(r.stil)    uit += `<span class="pill-stil">${r.stil}d stil</span>`;
+  }
+  return uit;
+}
+function rij(r, zonder){
+  const k = KOL[sec];
+  const cel = { 'VvE Code':`<td class="mono">${esc(r.code)}</td>`,
+    'VvE':`<td class="cell-name"><span class="ct">${esc(r.naam)}</span></td>`,
+    'Signaal':signaalCel(r),
+    'Actiepunt':`<td class="cell-txt"><span class="ct">${esc(r.taak)}</span></td>`,
+    'Periode':`<td class="cell-per">${weekCel(r.wk)}</td>`,
+    'Agendapunten':`<td class="cell-txt"><span class="ct">${esc(r.taak)}</span></td>`,
+    'Status':`<td class="cell-sm">${esc(r.status)}</td>`,
+    'Wie':`<td>${esc(r.wie)}</td>`,
+    'Deadline':deadlineCel(r, zonder), 'Deadline uitschr.':deadlineCel(r, zonder), 'Deadline LOD':deadlineCel(r, zonder),
+    'Opmerkingen':`<td class="cell-note"><div class="pil-rij"><span class="ct">${esc(r.opm)}</span>${zonder?pillen(r):''}</div></td>` };
+  return '<tr>' + (zonder?k.zonder:k.met).map(c=>cel[c]).join('') + '<td></td></tr>';
+}
+function tabel(zonder){
+  const k = KOL[sec];
+  const kop = (zonder?k.zonder:k.met).map(c=>`<th>${esc(c)}</th>`).join('') + '<th></th>';
+  const n = (zonder?k.zonder:k.met).length + 1;
+  const body = RIJEN.map(r=>rij(r,zonder)).join('')
+    + `<tr><td class="grp-kop" colspan="${n}"><div class="mk-grp" style="margin:-8px -14px;border-radius:0">Weggelegd (2) — komt terug op de opvolgdatum</div></td></tr>`
+    + WEGGELEGD.map(r=>rij(r,zonder)).join('');
+  return `<div class="mk-tabel" style="${k.css}"><div class="tbl-wrap"><table><thead><tr>${kop}</tr></thead><tbody>${body}</tbody></table></div></div>`;
+}
+function teken(){
+  document.getElementById('veld-nu').innerHTML = tabel(false);
+  document.getElementById('veld-nieuw').innerHTML = tabel(true);
+  document.querySelectorAll('.mk-bar .mk-k').forEach(b=>{
+    const v = {sec, dl:dlVorm, mld}[b.dataset.z];
+    b.classList.toggle('on', v === b.dataset.v);
+  });
+}
+document.addEventListener('click', e=>{
+  const b = e.target.closest('[data-z]'); if(!b) return;
+  if(b.dataset.z==='sec') sec = b.dataset.v;
+  if(b.dataset.z==='dl')  dlVorm = b.dataset.v;
+  if(b.dataset.z==='mld') mld = b.dataset.v;
+  teken();
+});
+teken();
+</script>
+</body>
+</html>

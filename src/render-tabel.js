@@ -2,7 +2,7 @@
 //  RENDER-TABEL — generieke tabel/paginering (thead, tbody, rij-render, paginatie)
 //  Verplaatst uit render-lijsten.js (Batch D / punt 11) — zuivere refactor, geen gedragswijziging.
 // ══════════════════════════════════════
-import { esc, vveCodeSpan, persBadges, subBadge, taakActieKnoppen, offProg, emptyRow, berekenPrioriteit, opvolgStatus, taakTitel, kortDatum, _verschilInKalenderdagen, _vandaagAmsterdam, stilDrempel, aannSleutel, parseWeekPeriode } from "./util.js";
+import { esc, vveCodeSpan, persBadges, subBadge, taakActieKnoppen, offProg, emptyRow, berekenPrioriteit, opvolgStatus, taakTitel, kortDatum, _verschilInKalenderdagen, _vandaagAmsterdam, stilDrempel, aannSleutel, parseWeekPeriode, metDagnamen } from "./util.js";
 import { SECS, SKEYS, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { bulkGeselecteerd } from "./bulk.js";
@@ -14,15 +14,13 @@ import { zichtbareKop, bundelVan, zelfdeTaak } from "./bundel.js";
 import { bundelKopExtra, bundelPaneelHtml, bundelMerkje, STAPEL_GREEP } from "./render-bundel.js";
 
 // Zie de toelichting bij het gebruik in rowNtd().
-const GEEN_STIL_PILL = ['OFFERTE-TRAJECTEN', 'SUBSIDIE-TRAJECTEN'];
 
 // De secties met een eigen Signaal-kolom. AFGELEID uit `cols` en met opzet geen eigen handlijst:
 // drie dingen moeten kloppen voor één sectie (de kop in `cols`, deze lijst, en de aanroep van
 // signaalCel in het case-blok), en een handlijst die uit de pas loopt met `cols` levert precies
 // het probleem op dat deze hele kolom oplost — de melding staat dan weer op twee plekken, of
 // nergens, en dat gaat stil. Offerte en subsidie krijgen de kop niet: daar kan 'stil' per ontwerp
-// niet voorkomen (zie GEEN_STIL_PILL) en zou de kolom vrijwel elke rij leeg blijven.
-const HEEFT_SIGNAAL_KOLOM = SKEYS.filter(s => SECS[s].cols.includes('Signaal'));
+// niet voorkomen, en zou de kolom vrijwel elke rij leeg blijven.
 
 // ══════════════════════════════════════
 //  TABLE HELPERS
@@ -134,9 +132,6 @@ function renderTbody(tbodyId,rows,sec,page,isAf,filtered){
   const leegCols=isAf?7:(SECS[sec].cols.length+1+(state.bulkMode?1:0));
   if(!sl.length){el.innerHTML=`<tr><td colspan="${leegCols}">${emptyRow(leegCols,true,filtered)}</td></tr>`;return}
   if(isAf){el.innerHTML=sl.map(r=>rowAf(r,sec)).join('');return}
-  // Eén opzoeklijst voor de hele render i.p.v. een logboekscan per rij (zie bouwStilIndex).
-  _zetStilIndex(bouwStilIndex(D.logboek, sec));
-  try{
   // Drie groepen (Fase 4): actief / in behandeling / weggelegd
   const grpOf = r => opvolgStatus(r).weggelegd ? 2 : (r.inBehandeling==='TRUE' ? 1 : 0);
   const main=sl.filter(r=>grpOf(r)===0);
@@ -155,9 +150,18 @@ function renderTbody(tbodyId,rows,sec,page,isAf,filtered){
     html+=wg.map(r=>rowNtd(r,sec)).join('');
   }
   el.innerHTML=html;
-  } finally { _zetStilIndex(null); }   // index nooit laten overleven: hij mag niet verouderen
 }
 
+// ── HET STIL-SIGNAAL STAAT SINDS v12.0 NIET MEER IN DE TABEL ──────────────────
+// De signaal-kolom is weg en daarmee ook de pil 'Xd stil'. `bouwStilIndex` en `bepaalStil`
+// hieronder worden dus niet meer aangeroepen bij het tekenen — de index wordt niet langer per
+// render opgebouwd, dat was werk voor niemand.
+// Ze blijven wél staan, en niet uit gemakzucht: dit is de SCHERMKANT van dezelfde regel waarop
+// `apps-script/Opvolging.gs` herinneringsmails verstuurt (cd_laatsteActiviteitMap,
+// CD_SECTIELOOS_TELT, CD_STIL_ESCALATIE_REGELS). Die mails gaan gewoon door. Weggooien zou de
+// enige getoetste uitwerking van die regel weghalen, en dan kan het scherm nooit meer nagaan of
+// het hetzelfde antwoord geeft als de motor. De toetsen erop blijven daarom ook staan.
+//
 // Eén pass over het logboek: VvE-code → de logregels van DEZE sectie. Voorheen scande
 // bepaalStil het hele logboek (±1.300 regels) opnieuw voor élke getoonde taakrij; op een pagina
 // van 25 rijen dus 25 keer. De index wordt per render één keer gebouwd en daarna weggegooid,
@@ -239,87 +243,26 @@ function bepaalStil(r, sec){
 // waar deze hele kolom vanaf moet.
 const BIJNA_TE_LAAT_DAGEN = 7;
 
-// De signalen van een rij, van zwaar naar licht. PUUR: leest alleen `r` en bestaande helpers,
-// raakt geen DOM en geen state. De cel toont er hoogstens twee; deze functie geeft ze allemaal,
-// zodat de derde nog in de title kan.
+// De deadline-cel draagt sinds v12.0 de urgentie zélf, op twee regels: de DATUM blijft staan en
+// eronder komt hoe ver hij afligt. Daarvoor stond dat in de signaal-kolom ernaast, die daarmee
+// tweemaal hetzelfde vertelde — 'Te laat (76d)' naast een datum waar diezelfde 76 dagen uit te
+// rekenen zijn. Die kolom is weg; dit is de ene plek geworden.
 //
-// Waarom deze volgorde: 'te laat' is de enige die zegt dat er een afspraak al gebroken is.
-// 'vandaag opvolgen' is een afspraak met jezelf voor vandaag. 'bijna te laat' kijkt vooruit.
-// 'stil' en 'weggelegd' zeggen alleen iets over de geschiedenis van de taak.
+// De datum blijft bewust staan. De oude vorm op offerte- en subsidie-trajecten VERVING de datum
+// door 'Te laat (48d)', en dan weet je wel dát het misgaat maar niet sinds wanneer.
 //
-// Drie tegelijk KAN (te laat + vandaag + stil). Weggelegd sluit vandaag uit (opvolgStatus,
-// util.js) en stil uit (bepaalStil, hierboven), dus met weggelegd blijven het er twee.
-//
-// `kleur` is het vocabulaire dat taak 4 in CSS omzet, en bestaat uit vier standen:
-//   crit     = te laat            -> --prio (baksteen; niet --rd, dat is óók de tabkleur van LOD)
-//   warn     = vandaag opvolgen   -> --am
-//   warn-dof = bijna te laat      -> gedempte amber, mag de echte waarschuwing niet overstemmen
-//   dof      = stil / weggelegd   -> --mut, want dit zegt iets over het verleden, niet over nu
-//
-// `cls` draagt de OUDE klassenaam mee. Die staat er niet voor de opmaak - binnen `.cell-sig`
-// worden ze in styles.css leeggemaakt (taak 4) - maar omdat negen bestaande toetsen op die namen
-// zoeken en omdat er zo een plek is waar staat welke klasse bij welk signaal hoort.
-function signaalDelen(r, sec){
-  const uit = [];
-  const { teLaat, dagenTot } = berekenPrioriteit(r.deadline, sec);
-  const ov = opvolgStatus(r);
-  if (teLaat)
-    uit.push({ soort:'telaat', kleur:'crit', cls:'s-telaat',
-               tekst:`Te laat (${Math.abs(dagenTot)}d)` });
-  if (ov.vandaag)
-    uit.push({ soort:'vandaag', kleur:'warn', cls:'pill-opvolg', tekst:'Vandaag opvolgen' });
-  if (!teLaat && dagenTot !== null && dagenTot <= BIJNA_TE_LAAT_DAGEN)
-    uit.push({ soort:'bijna', kleur:'warn-dof', cls:'s-soon',
-               tekst: dagenTot === 0 ? 'Deadline vandaag' : `Nog ${dagenTot}d` });
-  const stil = GEEN_STIL_PILL.includes(sec) ? null : bepaalStil(r, sec);
-  if (stil !== null)
-    uit.push({ soort:'stil', kleur:'dof', cls:'pill-stil', tekst:`${stil}d stil` });
-  if (ov.weggelegd)
-    uit.push({ soort:'weggelegd', kleur:'dof', cls:'pill-snooze',
-               tekst:`Terug ${kortDatum(r.opvolgdatum)}` });
-  return uit;
-}
-
-// Eén cel met de zwaarste melding groot en de tweede klein en gedempt erachter. Een derde
-// melding past niet en staat alleen in de title - dat is een bewuste keuze: liever één ding dat
-// opvalt dan drie die elkaar verdringen (dat was precies het probleem dat deze kolom oplost).
-//
-// `rid` komt van de aanroeper en wordt hier NIET opnieuw gemaakt: rowNtd zet één rid per rij die
-// gedeeld wordt met de knoppen, het bulk-vinkje en de fase-bolletjes. Een tweede push naar
-// state._rowCache zou de indexOf in crud.js laten verspringen.
-//
-// De hele cel draagt data-action="taak-wegleggen". Vandaag heeft 'Te laat' als enige signaal géén
-// actie, waardoor juist de rijen die het hardst een opvolgdatum nodig hebben die snelweg missen.
-// Zonder data-action zou de cel bovendien de rij-uitklapper van main.js aanspreken.
-function signaalCel(r, sec, rid){
-  const delen = signaalDelen(r, sec);
-  if(!delen.length) return `<td class="cell-sig"></td>`;
-  const eerste = delen[0];
-  const tweede = delen[1];
-  const titel = delen.map(d => d.tekst).join(' · ');
-  const bij = tweede ? `<span class="sig-bij ${tweede.cls}">${esc(tweede.tekst)}</span>` : '';
-  return `<td class="cell-sig" data-action="taak-wegleggen" data-rid="${rid}" title="${esc(titel)}">`
-       + `<span class="sig sig-${eerste.kleur}">`
-       + `<span class="sig-dot" aria-hidden="true"></span>`
-       + `<span class="sig-hoofd ${eerste.cls}">${esc(eerste.tekst)}</span>`
-       + `${bij}</span></td>`;
-}
-
-// De deadline-kolom is een DATUM, meer niet. 'Te laat' en 'bijna te laat' zijn naar de
-// signaal-kolom verhuisd; ze hier óók tonen zou de melding weer op twee plekken zetten.
-// Alleen op de secties zónder signaal-kolom (offerte, subsidie) blijft de oude kleuring staan,
-// want daar is de deadline-kolom de enige plek waar urgentie kan staan.
+// Geen tweede regel als er niets te melden valt: een rij die gewoon op tijd is hoort er niet
+// hoger door te worden.
 function deadlineCel(r, sec){
-  if (HEEFT_SIGNAAL_KOLOM.includes(sec)){
-    return r.deadline
-      ? `<td><span class="s-normal">${esc(r.deadline)}</span></td>`
-      : `<td class="cell-sm"><span class="warn-geen-deadline geen-dl-dof">Geen deadline</span></td>`;
-  }
   if (!r.deadline) return `<td class="cell-sm"><span class="warn-geen-deadline">Geen deadline</span></td>`;
   const { teLaat, dagenTot } = berekenPrioriteit(r.deadline, sec);
-  if (teLaat) return `<td><span class="s-telaat">Te laat (${Math.abs(dagenTot)}d)</span></td>`;
-  const soon = dagenTot !== null && dagenTot <= BIJNA_TE_LAAT_DAGEN;
-  return `<td><span class="${soon ? 's-soon' : 's-normal'}">${esc(r.deadline)}</span></td>`;
+  const bijna = !teLaat && dagenTot !== null && dagenTot <= BIJNA_TE_LAAT_DAGEN;
+  if (!teLaat && !bijna) return `<td><span class="s-normal">${esc(r.deadline)}</span></td>`;
+  const bij = teLaat ? `${Math.abs(dagenTot)}d te laat`
+                     : (dagenTot === 0 ? 'vandaag' : `nog ${dagenTot}d`);
+  return `<td><span class="dl-2 ${teLaat ? 'laat' : 'bijna'}">`
+       + `<span class="dl-dat">${esc(r.deadline)}</span>`
+       + `<span class="dl-bij">${esc(bij)}</span></span></td>`;
 }
 
 // De periodecel (Vergaderverzoeken). Twee regels: weeknummer boven, werkdagen eronder.
@@ -337,11 +280,10 @@ function periodeCel(waarde){
   // Aanwijzen laat dan de hele periode zien, net als bij de andere afkappende cellen in deze tabel.
   if(!w) return `<span class="per-oud" title="${esc(waarde)}">${esc(waarde)}</span>`;
   const ditJaar = _vandaagAmsterdam().getFullYear();
-  // In de CEL het streepje zonder spaties ('31 aug–4 sep' i.p.v. '31 aug – 4 sep'). In de Sheet
-  // blijven de spaties staan, want daar leest een mens de regel als tekst. Het scheelt 6px, en
-  // dat is precies wat deze kolom bij de smalste tabel tekortkwam voor een week die over een
-  // maandgrens loopt — de brede stand van dezelfde kolom kost elders in de rij meer dan het waard is.
-  const dagen = (w.jaar === ditJaar ? w.dagen : `${w.dagen} ${w.jaar}`).replace(/ – /g, '–');
+  // Mét dagnamen ('ma 14 – vr 18 sep'). Dat past sinds v12.0: de signaal-kolom ernaast is weg en
+  // die breedte is grotendeels naar deze kolom gegaan. In de Sheet blijft de korte vorm staan —
+  // daar is 'Week 38 · 14–18 sep 2026' één leesbare regel en zeggen 'ma' en 'vr' niets extra's.
+  const dagen = metDagnamen(w.dagen) + (w.jaar === ditJaar ? '' : ` ${w.jaar}`);
   return `<span class="per-wk" title="${esc(waarde)}"><span class="wk">wk ${w.nr}</span><span class="dg">${esc(dagen)}</span></span>`;
 }
 
@@ -357,18 +299,12 @@ function rowNtd(r,sec){
   const ibStand = heeftInBehandeling(sec) ? (r.inBehandeling==='TRUE'?'TRUE':'FALSE') : null;
   const editBtn=`<div class="acts">${taakActieKnoppen(rid, ibStand)}</div>`;
   let cells='';
-  // GEEN stil-pil meer hier. Sinds de Signaal-kolom (v10.41) draagt die kolom het stil-signaal
-  // voor Oppakken, Vergaderverzoeken en LOD. Wat hier stond kón per definitie nooit op het scherm
-  // komen: `extraPills` wordt alleen gebruikt in de case-blokken van OFFERTE-TRAJECTEN en
-  // SUBSIDIE-TRAJECTEN, en juist voor díe twee secties is de stil-pil onderdrukt (GEEN_STIL_PILL).
-  // De regel zelf leeft door in `signaalDelen` hieronder; daar wordt hij ook echt toegepast.
-  // Het kostte bovendien een volledige logboekscan per rij voor een pil die nergens verscheen.
-  // De groene 'Vandaag'-pil is hier weggehaald (v11.3, op verzoek van de gebruiker). Hij zat
-  // alléén op deze twee secties — Oppakken, Vergaderverzoeken en LOD tonen 'Vandaag opvolgen' in
-  // de Signaal-kolom, waar het een gedempte amber regel is en geen felgroen vlak midden in de
-  // opmerkingen. De vorm viel uit de toon van de rest van de tabel en het vlak lag boven op de
-  // opmerkingentekst. `opvolgStatus(r).vandaag` blijft bestaan en wordt nog gelezen door
-  // `signaalDelen` hierboven en door het bundelpaneel (render-bundel.js).
+  // Sinds v12.0 draagt élke sectie deze pil: de signaal-kolom is weg, en 'Terug <datum>' was het
+  // enige dat daarin stond zonder andere plek. Bij een weggelegde taak is dit de enige regel op
+  // het scherm die zegt wannéér hij terugkomt — de groepskop zegt alleen dát het gebeurt.
+  // 'Vandaag opvolgen' staat sinds v12.0 nergens meer in de tabel: hij zat alleen in de
+  // signaal-kolom en die is weg. `opvolgStatus(r).vandaag` blijft wel bestaan — het bundelpaneel
+  // (render-bundel.js) leest hem nog.
   // 'Weggelegd' blijft hier wél staan: die pil is gedempt grijs, noemt een DATUM die nergens
   // anders in deze rij te zien is, en hoort bij de eveneens gedempte rij (tr.snooze-row).
   const ov = opvolgStatus(r);
@@ -420,22 +356,20 @@ function rowNtd(r,sec){
     case'OPPAKKEN':
       cells=`<td>${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
         <td class="${naamCls}"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie, sec)}${bdlNaam}</td>
-        ${signaalCel(r, sec, rid)}
         <td class="cell-txt"><span class="ct" title="${esc(r.actiepunt)}">${esc(r.actiepunt)}</span></td>
         ${deadlineCel(r, 'OPPAKKEN')}
         <td>${persBadges(r.behandelaar, true)}</td>
-        <td class="cell-note"><span class="ct" title="${esc(r.opmerkingen||'')}">${esc(r.opmerkingen||'')}</span></td>
+        <td class="cell-note"><div class="pil-rij"><span class="ct" title="${esc(r.opmerkingen||'')}">${esc(r.opmerkingen||'')}</span>${extraPills}</div></td>
         <td>${editBtn}</td>`;
       break;
     case'VERGADERVERZOEKEN':
       cells=`<td>${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
         <td class="${naamCls}"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie, sec)}${bdlNaam}</td>
-        ${signaalCel(r, sec, rid)}
         <td class="cell-per">${periodeCel(r.periode||r.agendapunten||'')}</td>
         <td class="cell-txt"><span class="ct" title="${esc(r.agendapunten||r.actiepunt||'')}">${esc(r.agendapunten||r.actiepunt||'')}</span></td>
         <td>${persBadges(r.behandelaar, true)}</td>
         ${deadlineCel(r, 'VERGADERVERZOEKEN')}
-        <td class="cell-note"><span class="ct" title="${esc(r.opmerkingen||'')}">${esc(r.opmerkingen||'')}</span></td>
+        <td class="cell-note"><div class="pil-rij"><span class="ct" title="${esc(r.opmerkingen||'')}">${esc(r.opmerkingen||'')}</span>${extraPills}</div></td>
         <td>${editBtn}</td>`;
       break;
     case'OFFERTE-TRAJECTEN':
@@ -451,12 +385,11 @@ function rowNtd(r,sec){
     case'LOD':
       cells=`<td>${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
         <td class="${naamCls}"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie, sec)}${bdlNaam}</td>
-        ${signaalCel(r, sec, rid)}
         <td class="cell-txt"><span class="ct" title="${esc(r.actiepunt||'')}">${esc(r.actiepunt||'')}</span></td>
         <td class="cell-txt" style="font-style:italic"><span class="ct" title="${esc(r.status||'')}">${esc(r.status||'')}</span></td>
         <td>${persBadges(r.behandelaar, true)}</td>
         ${deadlineCel(r, 'LOD')}
-        <td class="cell-note"><span class="ct" title="${esc(r.opmerkingen||'')}">${esc(r.opmerkingen||'')}</span></td>
+        <td class="cell-note"><div class="pil-rij"><span class="ct" title="${esc(r.opmerkingen||'')}">${esc(r.opmerkingen||'')}</span>${extraPills}</div></td>
         <td>${editBtn}</td>`;
       break;
     // Zes kolommen, niet zeven: Opmerkingen bestaat wel als veld (kolom G) maar staat
@@ -546,4 +479,4 @@ function renderPag(id,total,cur,doel){
 }
 
 export {
-  periodeCel, renderThead, herzetKolomBreedtes, kolBreedtes, renderTbody, bepaalStil, bouwStilIndex, _zetStilIndex, signaalDelen, deadlineCel, rowNtd, rowAf, renderPag };
+  periodeCel, renderThead, herzetKolomBreedtes, kolBreedtes, renderTbody, bepaalStil, bouwStilIndex, _zetStilIndex, deadlineCel, rowNtd, rowAf, renderPag };

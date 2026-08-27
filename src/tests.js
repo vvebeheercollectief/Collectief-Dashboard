@@ -8,7 +8,7 @@ import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM, VELD_LABELS } from "./c
 import { maandagVan, isoWeekJaar, weekDagen, weekPeriodeLabel, parseWeekPeriode, weekOpties } from "./util.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
-import { filterNtd, setNtd, renderNtd, ntdPagina, renderNtdStats, renderAf, setAf, bepaalStil, bouwStilIndex, _zetStilIndex, signaalDelen, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey, kopOpen, zetKopOpen, toggleBundel, springNaarBundel, wisNtdFilters, absorbeer, isPlatteWeergave, erIsGefilterd, rowNtd, filterAf, afFilterWaarden } from "./render-lijsten.js";
+import { filterNtd, setNtd, renderNtd, ntdPagina, renderNtdStats, renderAf, setAf, bepaalStil, bouwStilIndex, _zetStilIndex, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey, kopOpen, zetKopOpen, toggleBundel, springNaarBundel, wisNtdFilters, absorbeer, isPlatteWeergave, erIsGefilterd, rowNtd, filterAf, afFilterWaarden } from "./render-lijsten.js";
 import { HERO_VIEWS } from "./render-analytics.js";
 import { state, D, pgs } from "./state.js";
 import { verseRij, rijIndex, regelIndex } from "./rij.js";
@@ -29,7 +29,7 @@ import { SPLASH_MS, _setFase } from "./login-splash.js";
 import { opmaakHtml, htmlNaarMarkers, zonderOpmaak, pasToe, opmaakBalk } from "./opmaak.js";
 import { goTo, applyTheme } from "./ui.js";
 import { checkSecties, checkRaster, checkRasters, checkNummers, checkAlles, ernstigeBevindingen, RASTER_MIN } from "./structuurcheck.js";
-import { herzetKolomBreedtes, kolBreedtes, periodeCel } from "./render-tabel.js";
+import { herzetKolomBreedtes, kolBreedtes, periodeCel, deadlineCel } from "./render-tabel.js";
 import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from "./subsidie-fase.js";
 import { toggleHerhaalStatus, renderHerhaal, openHerhaalModal, deleteHerhaal } from "./render-herhaal.js";
 import { openSnoozeModal, snoozeOpslaan, closeSnoozeModal } from "./snooze.js";
@@ -1305,23 +1305,24 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       return zichtbaar && html.includes('OPEN-1');
     }catch(e){ console.error('offerte-tabel-open-test:',e); return false; }
   })());
-  // Het stil-label is bewust alleen op de offerte-tab weg; de andere secties houden 'm.
-  truthy('stil-label: weg bij offerte, blijft bij LOD', (()=>{
+  // Het stil-label stond tot v12.0 in de signaal-kolom (en nooit op de offerte-tab). Die kolom is
+  // weg, dus het label hoort nu op GEEN ENKELE tab meer te staan. De drempel zelf blijft bestaan —
+  // die stuurt de herinneringsmail — en wordt hieronder nog gewoon getoetst.
+  truthy('stil-label: staat op geen enkel tabblad meer in de tabel', (()=>{
     try{
-      const vA=state.activeNtd, vOff=D.ntd['OFFERTE-TRAJECTEN'], vLod=D.ntd['LOD'], vLog=D.logboek;
-      const oud=new Date(Date.now()-45*864e5).toISOString(); // ruim over elke stil-drempel (LOD staat op 30)
-      D.logboek=[
-        {code:'STIL-O',sectie:'OFFERTE-TRAJECTEN',timestamp:oud},
-        {code:'STIL-L',sectie:'LOD',timestamp:oud},
-      ];
-      D.ntd['OFFERTE-TRAJECTEN']=[{code:'STIL-O',naam:'VvE Stil Off',offertes:'0/1',aannemers:'',fase:'',datumAangevraagd:'1 mei 2026',opmerkingen:'',behandelaar:'',deadline:'',inBehandeling:'TRUE',_sec:'OFFERTE-TRAJECTEN',_row:9601}];
-      D.ntd['LOD']=[{code:'STIL-L',naam:'VvE Stil Lod',actiepunt:'x',status:'',opmerkingen:'',behandelaar:'',deadline:'',inBehandeling:'TRUE',_sec:'LOD',_row:9602}];
-      setNtd('OFFERTE-TRAJECTEN');
-      const offHtml=document.getElementById('ntd-tbody').innerHTML;
-      setNtd('LOD');
-      const lodHtml=document.getElementById('ntd-tbody').innerHTML;
-      D.ntd['OFFERTE-TRAJECTEN']=vOff; D.ntd['LOD']=vLod; D.logboek=vLog; setNtd(vA);
-      return !offHtml.includes('pill-stil') && lodHtml.includes('pill-stil');
+      const vA=state.activeNtd, vLog=D.logboek, bewaard={};
+      const oud=new Date(Date.now()-45*864e5).toISOString(); // ruim over elke stil-drempel
+      D.logboek=SKEYS.map(s=>({code:'STIL-'+s, sectie:s, timestamp:oud}));
+      const basis={naam:'VvE Stil',actiepunt:'x',status:'',periode:'',agendapunten:'',subsidie:'',
+                   offertes:'0/1',aannemers:'',fase:'',datumAangevraagd:'1 mei 2026',
+                   opmerkingen:'',behandelaar:'',deadline:'',inBehandeling:'TRUE'};
+      SKEYS.forEach((s,i)=>{ bewaard[s]=D.ntd[s];
+        D.ntd[s]=[{...basis, code:'STIL-'+s, _sec:s, _row:9601+i}]; });
+      const gevonden=SKEYS.filter(s=>{ setNtd(s);
+        return document.getElementById('ntd-tbody').innerHTML.includes('pill-stil'); });
+      SKEYS.forEach(s=>{ if(bewaard[s]===undefined) delete D.ntd[s]; else D.ntd[s]=bewaard[s]; });
+      D.logboek=vLog; setNtd(vA);
+      return gevonden.length===0;
     }catch(e){ console.error('stil-pill-test:',e); return false; }
   })());
 
@@ -1332,77 +1333,49 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
      [7, 14, 21, 30, 21]);
   eq('stil-drempel: een onbekende sectie valt terug op 7', stilDrempel('BESTAAT-NIET'), 7);
 
-  // ── Signaal-rangorde ──
+  // ── De deadline-cel draagt de urgentie (v12.0) ──
+  // Dit blok toetste tot v12.0 `signaalDelen`, de motor achter de signaal-kolom. Die kolom is weg:
+  // hij stond naast de deadline en rekende daar zijn eigen 'Te laat (76d)' uit — dezelfde dagen die
+  // uit de datum ernaast te halen zijn. De beslissingen die hier vastlagen (waar ligt de grens van
+  // 'bijna', wat leest de gebruiker) horen nu bij `deadlineCel`, dus zijn de toetsen meeverhuisd in
+  // plaats van weggegooid.
   (() => {
-    const vLog = D.logboek;
     const vandaag = _vandaagAmsterdam();
     const dat = n => { const d = new Date(vandaag.getFullYear(), vandaag.getMonth(), vandaag.getDate() + n);
                        return `${d.getDate()}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`; };
-    const iso = n => new Date(Date.now() + n*864e5).toISOString();
-    try{
-      // 30 dagen en niet 20: de offerte-toets verderop moet bewijzen dat GEEN_STIL_PILL het
-      // stil-signaal onderdrukt. Met 20 dagen haalde die rij de offerte-drempel (21) sowieso niet
-      // en bleef de toets groen mét én zónder guard — hij bewees dus niets. Bij 30 wordt hij rood
-      // zodra de guard verdwijnt. Toets 2 kijkt alleen naar `soort`, dus die merkt het verschil niet.
-      D.logboek = [{ code:'SIG-1', sectie:'OPPAKKEN', timestamp: iso(-30) }];
-      _zetStilIndex(bouwStilIndex(D.logboek, 'OPPAKKEN'));
+    const cel = n => deadlineCel({ deadline: n === null ? '' : dat(n) }, 'OPPAKKEN');
+    const tekst = html => html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    const tweedeRegel = html => (html.match(/class="dl-bij">([^<]*)</) || [,''])[1];
 
-      const soorten = r => signaalDelen(r, 'OPPAKKEN').map(d => d.soort);
+    eq('deadline: zonder deadline staat er "Geen deadline"', tekst(cel(null)), 'Geen deadline');
 
-      // 1. Niets aan de hand -> lege lijst.
-      eq('signaal: geen deadline en geen opvolgdatum geeft niets',
-         soorten({ code:'SIG-0', deadline:'', opvolgdatum:'', inBehandeling:'' }), []);
+    // Ruim op tijd: één regel, alleen de datum. Een rustige rij hoort niet hoger te worden.
+    truthy('deadline: ruim op tijd is eenregelig', !/dl-2/.test(cel(30)));
+    eq('deadline: en toont gewoon de datum', tekst(cel(30)), dat(30));
 
-      // 2. Te laat wint van alles.
-      eq('signaal: te laat staat vooraan',
-         soorten({ code:'SIG-1', deadline:dat(-45), opvolgdatum:dat(0), inBehandeling:'TRUE' }),
-         ['telaat','vandaag','stil']);
+    // De grens van 'bijna' ligt op zeven dagen. Zonder deze twee kon dat getal stil op 3 of 14
+    // gezet worden en bleef alles groen.
+    truthy('deadline: op de grens van zeven dagen kleurt hij amber', /dl-2 bijna/.test(cel(7)));
+    eq('deadline: en de tweede regel telt af', tweedeRegel(cel(7)), 'nog 7d');
+    truthy('deadline: één dag verder is hij weer rustig', !/dl-2/.test(cel(8)));
+    eq('deadline: op de dag zelf staat er "vandaag"', tweedeRegel(cel(0)), 'vandaag');
 
-      // 3. Bijna te laat telt alleen als hij NIET te laat is.
-      eq('signaal: bijna te laat bij een deadline binnen zeven dagen',
-         soorten({ code:'SIG-0', deadline:dat(3), opvolgdatum:'', inBehandeling:'' }), ['bijna']);
-      eq('signaal: bij te laat komt bijna-te-laat er niet ook nog bij',
-         soorten({ code:'SIG-0', deadline:dat(-1), opvolgdatum:'', inBehandeling:'' }), ['telaat']);
-      eq('signaal: een deadline over dertig dagen geeft niets',
-         soorten({ code:'SIG-0', deadline:dat(30), opvolgdatum:'', inBehandeling:'' }), []);
-      // Pin de drempel zelf vast, precies op de grens. Zonder deze twee kon BIJNA_TE_LAAT_DAGEN
-      // op 3 of op 14 gezet worden en bleef alles groen — terwijl dat getal gelijk moet lopen met
-      // de amber van deadlineCel. Nu is elke andere waarde meteen rood.
-      eq('signaal: op de grens van zeven dagen gaat bijna-te-laat nog aan',
-         soorten({ code:'SIG-0', deadline:dat(7), opvolgdatum:'', inBehandeling:'' }), ['bijna']);
-      eq('signaal: één dag verder is het stil',
-         soorten({ code:'SIG-0', deadline:dat(8), opvolgdatum:'', inBehandeling:'' }), []);
-      eq('signaal: op de dag zelf leest hij als een datum, niet als een aftelling',
-         signaalDelen({ code:'SIG-0', deadline:dat(0), opvolgdatum:'', inBehandeling:'' },
-                      'OPPAKKEN')[0].tekst, 'Deadline vandaag');
-      // 'vandaag opvolgen' en 'bijna te laat' komen in geen enkele andere toets samen voor, dus
-      // hun onderlinge volgorde lag nergens vast.
-      eq('signaal: vandaag opvolgen weegt zwaarder dan bijna te laat',
-         soorten({ code:'SIG-0', deadline:dat(2), opvolgdatum:dat(0), inBehandeling:'' }),
-         ['vandaag','bijna']);
+    // Te laat: rood, mét het aantal dagen — en de DATUM blijft staan. Dat laatste is het verschil
+    // met de oude vorm op offerte-trajecten, die de datum verving door 'Te laat (48d)': dan weet je
+    // wel dát het misgaat maar niet sinds wanneer.
+    truthy('deadline: te laat kleurt rood', /dl-2 laat/.test(cel(-12)));
+    eq('deadline: de tweede regel noemt het aantal dagen', tweedeRegel(cel(-12)), '12d te laat');
+    truthy('deadline: en de datum blijft staan', tekst(cel(-12)).startsWith(dat(-12)));
 
-      // 4. Weggelegd sluit vandaag EN stil uit (bestaand gedrag van opvolgStatus/bepaalStil).
-      eq('signaal: weggelegd sluit vandaag en stil uit',
-         soorten({ code:'SIG-1', deadline:dat(-2), opvolgdatum:dat(9), inBehandeling:'TRUE' }),
-         ['telaat','weggelegd']);
-
-      // 5. Stil kan alleen als de taak is opgepakt.
-      eq('signaal: stil vereist in behandeling',
-         soorten({ code:'SIG-1', deadline:'', opvolgdatum:'', inBehandeling:'' }), []);
-
-      // 6. Op offerte en subsidie bestaat stil niet, ook niet via deze motor.
-      eq('signaal: offerte krijgt nooit een stil-signaal',
-         signaalDelen({ code:'SIG-1', deadline:'', opvolgdatum:'', inBehandeling:'TRUE' },
-                      'OFFERTE-TRAJECTEN').map(d => d.soort), []);
-
-      // 7. De tekst van de zwaarste melding is de tekst die de gebruiker leest.
-      eq('signaal: de te-laat-tekst noemt het aantal dagen',
-         signaalDelen({ code:'SIG-0', deadline:dat(-12), opvolgdatum:'', inBehandeling:'' },
-                      'OPPAKKEN')[0].tekst, 'Te laat (12d)');
-    } finally { _zetStilIndex(null); D.logboek = vLog; }
+    // Alle vijf de secties doen hetzelfde: de uitzondering voor offerte/subsidie is vervallen.
+    SKEYS.forEach(sec => {
+      const h = deadlineCel({ deadline: dat(-3) }, sec);
+      truthy(`deadline: ${sec} toont de datum én hoe ver hij afligt`,
+         /dl-2 laat/.test(h) && tekst(h).includes(dat(-3)) && tweedeRegel(h) === '3d te laat');
+    });
   })();
 
-  // ── Signaal-kolom in de tabel ──
+  // ── De Signaal-kolom is weg (v12.0) ──
   (() => {
     const vA = state.activeNtd, vOpp = D.ntd['OPPAKKEN'], vLog = D.logboek, vPg = pgs.ntd;
     const vandaag = _vandaagAmsterdam();
@@ -1422,72 +1395,74 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
 
       const rij1 = document.querySelector('#ntd-tbody tr[data-row="9701"]');
       const rij2 = document.querySelector('#ntd-tbody tr[data-row="9702"]');
-      const sig1 = rij1 && rij1.querySelector('.cell-sig');
+      truthy('geen signaalkolom: de rijen worden getekend', !!rij1 && !!rij2);
 
-      truthy('signaalkolom: de rij wordt getekend', !!rij1 && !!rij2);
-      truthy('signaalkolom: er is een signaal-cel', !!sig1);
-      eq('signaalkolom: de zwaarste melding staat groot',
-         sig1 ? (sig1.querySelector('.sig-hoofd')||{}).textContent : null, 'Te laat (45d)');
-      eq('signaalkolom: de tweede melding staat klein erachter',
-         sig1 ? (sig1.querySelector('.sig-bij')||{}).textContent : null, 'Vandaag opvolgen');
-      truthy('signaalkolom: de derde melding staat in de title',
-             !!sig1 && sig1.getAttribute('title').includes('20d stil'));
-      eq('signaalkolom: de cel is een snelkoppeling naar wegleggen',
-         sig1 ? sig1.dataset.action : null, 'taak-wegleggen');
-      eq('signaalkolom: het rid van de cel wijst naar dezelfde taak als de rij',
-         sig1 ? sig1.dataset.rid : null, rij1 ? rij1.dataset.rid : undefined);
-      eq('signaalkolom: een rustige rij heeft een lege signaal-cel',
-         rij2 ? rij2.querySelector('.cell-sig').textContent.trim() : null, '');
+      // De kolom bestaat nergens meer — niet in de koppen, niet in de cellen, op geen enkel tabblad.
+      eq('geen signaalkolom: er staat geen enkele signaal-cel meer in de tabel',
+         document.querySelectorAll('#ntd-tbody .cell-sig').length, 0);
+      truthy('geen signaalkolom: en geen enkele sectie noemt hem nog in zijn koppen',
+         SKEYS.every(s => !SECS[s].cols.includes('Signaal')));
 
-      // Elke rij zet precies EEN ingang in _rowCache; signaalCel mag er geen tweede bij pushen.
-      // Math.abs omdat de twee rijen in verschillende groepen vallen (rij2 is 'actief', rij1
-      // staat onder 'In behandeling') en dus in die volgorde getekend worden.
-      eq('signaalkolom: één rid per rij, niet twee',
-         Math.abs(Number(rij2.dataset.rid) - Number(rij1.dataset.rid)), 1);
-
-      // Koppen en cellen moeten gelijk lopen.
-      eq('signaalkolom: evenveel koppen als cellen',
+      // Zeven kolommen: VvE Code, VvE, Actiepunt, Deadline, Wie, Opmerkingen + de actiekolom.
+      eq('geen signaalkolom: Oppakken houdt evenveel koppen als cellen',
          [document.querySelectorAll('#ntd-thead th').length,
-          rij1.querySelectorAll('td').length], [8, 8]);
-      eq('signaalkolom: Signaal staat op de derde plek',
+          rij1.querySelectorAll('td').length], [7, 7]);
+      eq('geen signaalkolom: het actiepunt staat nu op de derde plek',
          [...document.querySelectorAll('#ntd-thead th')]
-           .map(t => t.textContent.trim().replace(/[▲▼]$/, ''))[2], 'Signaal');
-      // En de CEL moet daar ook echt staan. Zonder deze regel kon de signaal-cel met de
-      // actiepunt-cel worden omgewisseld — signaal onder de kop 'Actiepunt' en andersom — en
-      // bleef de hele suite groen: de koppen werden wel geteld, de celvolgorde niet.
-      eq('signaalkolom: de signaal-cel staat op dezelfde plek als zijn kop',
-         [...rij1.querySelectorAll('td')].indexOf(sig1), 2);
-      // De opmaak moet de rangorde ook echt tónen. De zware melding was even groot en even zwaar
-      // als de lichte, doordat het reset-blok (0,2,0) van .sig-hoofd (0,1,0) won. Meet ze allebei
-      // en eis dat ze verschillen; overgangen staan hier niet aan, dus dit is een vaste waarde.
+           .map(t2 => t2.textContent.trim().replace(/[▲▼]$/, ''))[2], 'Actiepunt');
+
+      // De urgentie staat in de deadline-cel, mét de datum erbij.
+      const dlCel = rij1.querySelectorAll('td')[3];
+      truthy('geen signaalkolom: de deadline-cel draagt de te-laat-melding',
+             !!dlCel && !!dlCel.querySelector('.dl-2.laat'));
+      eq('geen signaalkolom: die melding noemt het aantal dagen',
+         dlCel ? (dlCel.querySelector('.dl-bij')||{}).textContent : null, '45d te laat');
+      eq('geen signaalkolom: en de datum staat er nog steeds boven',
+         dlCel ? (dlCel.querySelector('.dl-dat')||{}).textContent : null, dat(-45));
+      truthy('geen signaalkolom: een rustige rij krijgt geen tweede regel',
+             !rij2.querySelectorAll('td')[3].querySelector('.dl-2'));
+
+      // De opmaak moet de rangorde ook echt tónen: de datum zwaarder dan de bijregel.
       (() => {
-        const h = getComputedStyle(sig1.querySelector('.sig-hoofd'));
-        const b = getComputedStyle(sig1.querySelector('.sig-bij'));
-        truthy('signaalkolom: de zwaarste melding is zwaarder gezet dan de tweede',
-               parseInt(h.fontWeight,10) > parseInt(b.fontWeight,10));
-        truthy('signaalkolom: en groter', parseFloat(h.fontSize) > parseFloat(b.fontSize));
-        truthy('signaalkolom: de twee meldingen hebben niet dezelfde kleur', h.color !== b.color);
+        const d = getComputedStyle(dlCel.querySelector('.dl-dat'));
+        const b = getComputedStyle(dlCel.querySelector('.dl-bij'));
+        truthy('geen signaalkolom: de datum is groter gezet dan de bijregel',
+               parseFloat(d.fontSize) > parseFloat(b.fontSize));
+        eq('geen signaalkolom: en ze delen dezelfde rode kleur', d.color, b.color);
       })();
 
-      // De deadline-kolom is neutraal geworden: geen 'Te laat' meer, alleen een datum.
-      const dlCel = rij1.querySelectorAll('td')[4];
-      truthy('signaalkolom: de deadline-kolom noemt geen "Te laat" meer',
-             !!dlCel && !dlCel.textContent.includes('Te laat'));
-      eq('signaalkolom: de deadline-kolom is nog wel een datum',
-         !!dlCel && dlCel.textContent.trim() === dat(-45), true);
+      // Eén rid per rij; de weggevallen cel mag er geen tweede meer bij pushen.
+      eq('geen signaalkolom: één rid per rij, niet twee',
+         Math.abs(Number(rij2.dataset.rid) - Number(rij1.dataset.rid)), 1);
 
       // Het rode waas over te late rijen blijft: op een telefoon is dat het enige teken.
-      truthy('signaalkolom: het rode waas over te late rijen blijft staan',
+      truthy('geen signaalkolom: het rode waas over te late rijen blijft staan',
              rij1.classList.contains('row-telaat'));
 
-      // De oude klassenamen blijven bestaan als betekenisdrager.
-      truthy('signaalkolom: de oude klassenamen staan nog in de cel',
-             !!sig1.querySelector('.s-telaat') && !!sig1.querySelector('.pill-opvolg'));
+      // 'Terug <datum>' was het enige uit de signaal-kolom zonder andere plek. Die staat nu als
+      // gedempt label in de opmerkingen-cel, precies zoals Offerte-trajecten dat al deed. Bij een
+      // weggelegde taak is dat de enige regel die zegt wannéér hij terugkomt.
+      (() => {
+        const bewaard = D.ntd['OPPAKKEN'];
+        try{
+          D.ntd['OPPAKKEN'] = [{ code:'SIGT-4', naam:'VvE Weggelegd', actiepunt:'x', deadline:dat(-6),
+                                 opvolgdatum:dat(9), behandelaar:'Jer', opmerkingen:'let op',
+                                 inBehandeling:'', _sec:'OPPAKKEN', _row:9704 }];
+          pgs.ntd = 1; setNtd('OPPAKKEN');
+          const tr = document.querySelector('#ntd-tbody tr[data-row="9704"]');
+          const pil = tr && tr.querySelector('.cell-note .pill-snooze');
+          truthy('geen signaalkolom: een weggelegde taak houdt zijn terugkomdatum', !!pil);
+          truthy('geen signaalkolom: en die staat in de opmerkingen-cel naast de tekst',
+                 !!tr && tr.querySelector('.cell-note .ct').textContent.includes('let op'));
+          truthy('geen signaalkolom: de pil blijft leesbaar op een gedempte rij',
+                 !!pil && getComputedStyle(pil).opacity === '1');
+        } finally { D.ntd['OPPAKKEN'] = bewaard; }
+      })();
 
-      // Vergaderverzoeken en LOD kregen exact dezelfde ingreep op drie plekken, maar niets in de
-      // suite tekende ze. Eén rij per tabblad is genoeg om een scheve kolom te betrappen.
-      [['VERGADERVERZOEKEN', 9, { periode:'sept/okt', agendapunten:'z' }],
-       ['LOD',               9, { actiepunt:'z', status:'' }]].forEach(([sec, kolommen, extra]) => {
+      // Vergaderverzoeken en LOD kregen exact dezelfde ingreep. Eén rij per tabblad is genoeg om
+      // een scheve kolom te betrappen.
+      [['VERGADERVERZOEKEN', 8, { periode:'sept/okt', agendapunten:'z' }],
+       ['LOD',               8, { actiepunt:'z', status:'' }]].forEach(([sec, kolommen, extra]) => {
         const bewaard = D.ntd[sec];
         try{
           D.ntd[sec] = [{ code:'SIGT-3', naam:'VvE Signaal Drie', deadline:dat(-5),
@@ -1495,20 +1470,20 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
                           _sec:sec, _row:9703, ...extra }];
           pgs.ntd = 1; setNtd(sec);
           const tr = document.querySelector('#ntd-tbody tr[data-row="9703"]');
-          const cel = tr && tr.querySelector('.cell-sig');
-          eq(`signaalkolom: ${sec} heeft evenveel koppen als cellen`,
+          eq(`geen signaalkolom: ${sec} heeft evenveel koppen als cellen`,
              [document.querySelectorAll('#ntd-thead th').length,
               tr ? tr.querySelectorAll('td').length : 0], [kolommen, kolommen]);
-          eq(`signaalkolom: ${sec} zet de signaal-cel op de derde plek`,
-             tr ? [...tr.querySelectorAll('td')].indexOf(cel) : -1, 2);
-          eq(`signaalkolom: ${sec} toont de te-laat-melding in die cel`,
-             cel ? (cel.querySelector('.sig-hoofd')||{}).textContent : null, 'Te laat (5d)');
+          truthy(`geen signaalkolom: ${sec} heeft geen signaal-cel meer`,
+             !!tr && !tr.querySelector('.cell-sig'));
+          truthy(`geen signaalkolom: ${sec} toont de te-laat-melding bij de deadline`,
+             !!tr && !!tr.querySelector('.dl-2.laat') &&
+             tr.querySelector('.dl-bij').textContent === '5d te laat');
         } finally { if(bewaard === undefined) delete D.ntd[sec]; else D.ntd[sec] = bewaard; }
       });
 
-      // Offerte en subsidie blijven zoals ze waren.
+      // Offerte en subsidie hadden hem al niet; die blijven zoals ze waren.
       setNtd('SUBSIDIE-TRAJECTEN');
-      eq('signaalkolom: subsidie houdt zes koppen en krijgt er géén',
+      eq('geen signaalkolom: subsidie houdt zijn zes koppen plus de actiekolom',
          [...document.querySelectorAll('#ntd-thead th')].length, 7);
       // ── Kolomverdeling ──
       // De tabel deelde de ruimte zelf uit en de tekst had een klem in vaste pixels. Gemeten op
@@ -1643,11 +1618,12 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
                  Math.abs(code - 130) <= 1);
           // ... en de ruimte die dat oplevert gaat naar de tekstkolommen. Zonder deze tegenproef
           // zou een tabel die per ongeluk smaller wordt dan 1650 ook groen zijn.
-          const act = br('Actiepunt'), opm = br('Opmerkingen'), sig = br('Signaal');
+          const act = br('Actiepunt'), opm = br('Opmerkingen');
+          // Sinds v12.0 is er geen Signaal-kolom meer en gaat die breedte naar deze twee, dus de
+          // ondergrenzen liggen hoger dan voorheen (300 / 200).
           truthy(`kolombreedte: op 1650px krijgt het actiepunt de vrijgekomen ruimte (${act})`,
-                 act >= 300);
-          truthy(`kolombreedte: op 1650px groeien ook opmerkingen en signaal mee `
-                 + `(${opm} / ${sig})`, opm >= 200 && sig >= 200);
+                 act >= 380);
+          truthy(`kolombreedte: op 1650px groeien ook de opmerkingen mee (${opm})`, opm >= 280);
         } finally {
           breed.remove();
           if(vNtd4 === undefined) delete D.ntd.OPPAKKEN; else D.ntd.OPPAKKEN = vNtd4;
@@ -1891,10 +1867,9 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       })();
       setNtd('SUBSIDIE-TRAJECTEN');
 
-      // En de sectielijst wordt afgeleid uit `cols`, dus die kan niet uit de pas lopen.
-      eq('signaalkolom: precies drie tabbladen dragen de kop',
-         SKEYS.filter(s => SECS[s].cols.includes('Signaal')),
-         ['OPPAKKEN','VERGADERVERZOEKEN','LOD']);
+      // De kop mag op geen enkel tabblad terugkomen — dat is de hele wijziging van v12.0.
+      eq('geen signaalkolom: geen enkel tabblad draagt de kop nog',
+         SKEYS.filter(s => SECS[s].cols.includes('Signaal')), []);
     } finally {
       if (vOpp === undefined) delete D.ntd['OPPAKKEN']; else D.ntd['OPPAKKEN'] = vOpp;
       D.logboek = vLog; state.activeNtd = vA; pgs.ntd = vPg; setNtd(vA);
@@ -5220,7 +5195,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '11.9');
+  eq('versie opgehoogd', APP_VERSION, '12.0');
 
   // ── Tabbladen ÍN de kaartkop (v11.7) ──
   // De kop van de kaart zei links exact hetzelfde als het actieve tabblad — 'Oppakken' boven
@@ -5295,7 +5270,8 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const cel = periodeCel('Week 38 · 14–18 sep 2026');
     truthy('periodecel: geen gele pil meer', !/badge/.test(cel));
     truthy('periodecel: weeknummer op de eerste regel', /class="wk">wk 38</.test(cel));
-    truthy('periodecel: werkdagen op de tweede regel', /class="dg">14–18 sep</.test(cel));
+    truthy('periodecel: werkdagen op de tweede regel, mét dagnamen',
+       /class="dg">ma 14 – vr 18 sep</.test(cel));
     // Het jaar alleen als het NIET het lopende jaar is — anders past de tweede regel niet.
     // Op de INHOUD van de tweede regel toetsen en niet op de hele cel: de `title` draagt de
     // volledige waarde mét jaar (voor als de regel afkapt), en die zou hier vals alarm geven.
@@ -6618,29 +6594,19 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     vandaagSub.opvolgdatum = `${String(_vdBdl.getDate()).padStart(2,'0')}-`
                            + `${String(_vdBdl.getMonth()+1).padStart(2,'0')}-${_vdBdl.getFullYear()}`;
     const vandaagHost = paneelMet(vandaagSub);
-    // Het paneel hoort hetzelfde te zeggen als de rij erboven. 'Vandaag opvolgen' en 'stil'
-    // ontbraken; een subtaak die vandaag moet, stond er precies zo bij als een die kan wachten.
-    truthy('bundelpaneel: een subtaak die vandaag opgevolgd moet worden zegt dat ook',
-           !!regelVan(vandaagHost,'Tvandaag').querySelector('.pill-opvolg'));
-    truthy('bundelpaneel: een rustige subtaak krijgt géén opvolg-melding',
+    // Het paneel hoort hetzelfde te zeggen als de rij erboven. Tot v12.0 betekende dat: 'Vandaag
+    // opvolgen' en 'stil' óók hier tonen, want de tabelrij had er een Signaal-kolom voor. Die kolom
+    // is weg en die twee meldingen staan nergens meer — dus horen ze hier ook niet meer te staan.
+    // Deze toetsen bewaken nu die kant op: verschijnen ze tóch weer, dan lopen paneel en rij weer
+    // uit de pas. Het stil-signaal zelf blijft bestaan en verstuurt herinneringsmails.
+    truthy('bundelpaneel: geen opvolg-melding meer, net als in de tabelrij',
+           !regelVan(vandaagHost,'Tvandaag').querySelector('.pill-opvolg'));
+    truthy('bundelpaneel: een rustige subtaak krijgt er evenmin een',
            !regelVan(vandaagHost,'Tb').querySelector('.pill-opvolg'));
-    // De pil moet iets DOEN. Een pil met een wijzende hand die nergens op reageert is de enige
-    // variant die dit bestand niet moet krijgen; snoozePil hierboven eist datzelfde.
-    // (In de tabelrij bestaat deze pil sinds v11.3 niet meer — daar is de opvolg-melding weg op
-    // verzoek van de gebruiker. Het paneel houdt hem, want dat heeft geen Signaal-kolom en geen
-    // andere plek waar 'moet vandaag' te zien is. De kleur is wel gelijkgetrokken met die kolom.)
-    eq('bundelpaneel: de opvolg-pil opent hetzelfde wegleg-venster als de weggelegd-pil',
-       (regelVan(vandaagHost,'Tvandaag').querySelector('.pill-opvolg')||{}).dataset?.action,
-       'taak-wegleggen');
 
-    // 3c-ter. STIL. Zonder deze toetsen overleefde de hele 'stil'-tak elke mutatie: haal hem uit
-    //     het filter en er viel geen enkele regel om, terwijl 'stil' in de taaktitel staat.
-    //     Twee dingen worden hier vastgelegd die allebei apart mis kunnen gaan:
-    //       1. dat 'stil' überhaupt in het paneel verschijnt;
-    //       2. dat hij dat ook doet als de bundel twee SECTIES overspant. De opzoeklijst wordt
-    //          gebouwd voor de sectie van de TABEL, dus een subtaak uit Oppakken onder een kop uit
-    //          Vergaderverzoeken viel er stil uit en kreeg nooit een pil. Gemeten vóór de fix:
-    //          index voor VERGADERVERZOEKEN gaf niets, index voor OPPAKKEN gaf '20d stil'.
+    // STIL. Ook hier: niet meer tonen, en dat geldt óók als de bundel twee secties overspant —
+    // dat was vroeger juist het geval waarin hij stil wegviel, dus die opzet blijft staan als
+    // tegenproef.
     (() => {
       const vLog = D.logboek;
       try{
@@ -6648,29 +6614,18 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         stilSub.inBehandeling = 'TRUE';
         D.logboek = [{ code: stilSub.code, sectie:'OPPAKKEN',
                        timestamp: new Date(Date.now() - 20*864e5).toISOString() }];
-        // a. Zonder index (losse render): het gewone pad.
         _zetStilIndex(null);
-        const losHost = paneelMet(stilSub);
-        truthy('bundelpaneel: een subtaak die stil ligt zegt dat ook',
-               !!regelVan(losHost,'Tstil').querySelector('.pill-stil'));
-        eq('bundelpaneel: … en opent hetzelfde bewerkscherm als in de tabel',
-           (regelVan(losHost,'Tstil').querySelector('.pill-stil')||{}).dataset?.action,
-           'taak-bewerken');
-        truthy('bundelpaneel: een subtaak zonder logboekregels ligt niet stil',
-               !regelVan(losHost,'Tb').querySelector('.pill-stil'));
-        // b. Mét een index die voor een ÁNDERE sectie gebouwd is — de echte renderpad van een
-        //    bundel die twee tabbladen overspant. Die mag het signaal niet laten verdwijnen.
+        truthy('bundelpaneel: een subtaak die stil ligt krijgt geen stil-pil meer',
+               !regelVan(paneelMet(stilSub),'Tstil').querySelector('.pill-stil'));
         _zetStilIndex(bouwStilIndex(D.logboek, 'VERGADERVERZOEKEN'));
-        const kruisHost = paneelMet(stilSub);
-        truthy('bundelpaneel: stil blijft staan als de bundel twee tabbladen overspant',
-               !!regelVan(kruisHost,'Tstil').querySelector('.pill-stil'));
+        truthy('bundelpaneel: ook niet als de bundel twee tabbladen overspant',
+               !regelVan(paneelMet(stilSub),'Tstil').querySelector('.pill-stil'));
       } finally { _zetStilIndex(null); D.logboek = vLog; }
     })();
 
-    // 3c-quater. Het FILTER zelf. Zonder hem zet paneelSignalen 'Te laat (Nd)' een tweede keer
-    //     neer, naast de meta-regel die hem al toont — en bij een weggelegde subtaak drie datums
-    //     achter elkaar. Beide bestaande toetsen bleven daarbij groen, want querySelector pakt de
-    //     eerste treffer en die had toevallig dezelfde tekst.
+    // 3c-quater. 'Te laat' hoort precies ÉÉN keer in de regel te staan. Vroeger zette een tweede
+    //     bron hem er nog eens naast; die bron is weg, maar de eis blijft — de meta-regel is de
+    //     enige plek waar hij hoort te staan.
     (() => {
       const laatSub2 = t('Tdubbel','Tkop','30','OPPAKKEN','Al lang te laat');
       laatSub2.deadline = '1-1-2020';

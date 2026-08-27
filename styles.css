@@ -397,7 +397,7 @@
        uitsluitend door rowNtd geschreven, dus élke .ct staat binnen #ntd-tbl-wrap en werd daar al
        overschreven. `rowAf` en de dossierlijsten zetten géén .ct — die regels raakten dus niets
        meer. De klem die telt staat bij de kolomverdeling hieronder. */
-    tr.expanded .cell-name,tr.expanded .cell-txt,tr.expanded .cell-note,tr.expanded .cell-sig{white-space:normal}
+    tr.expanded .cell-name,tr.expanded .cell-txt,tr.expanded .cell-note{white-space:normal}
     tr.expanded .cell-name>.ct,tr.expanded .cell-txt>.ct,tr.expanded .cell-note>.ct{display:inline;max-width:none;white-space:normal;overflow:visible;text-overflow:clip}
     .cell-sm{font-size:12.5px;color:#48505c;white-space:nowrap}
     /* Actiekolom blijft in beeld (v8.9). De takentabel is breder dan het venster, waardoor
@@ -441,13 +441,16 @@
        zichtbaar uit en schoof hij ónder de pil door (gemeten: 256px tekst in 82px ruimte). Dat is
        wat je op Offerte- en Subsidie-trajecten zag. `display:block` erbij, want een inline-block
        binnen een flexrij kapt niet betrouwbaar af. */
-    #ntd-tbl-wrap .pil-rij>.ct{flex:1;min-width:0;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    /* `flex:0 1 auto` en niet `flex:1` (v12.0): met flex-GROW duwde een korte opmerking de pil
+       naar de rechterrand van de kolom, los van de tekst waar hij bij hoort. Nu staat hij er
+       direct achter. Krimpen mag hij nog steeds, dus een lange opmerking kapt af en de pil
+       blijft staan — dat was de reden dat hier ooit een flexrij kwam. */
+    #ntd-tbl-wrap .pil-rij>.ct{flex:0 1 auto;min-width:0;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     /* Uitgeklapte rij: de tekst mag over meerdere regels, net als in een cel zonder pil-rij. Zonder
        deze regel bleef de opmerking op Offerte- en Subsidie-trajecten één afgekapte regel, ook na
        een klik op de rij — precies het gedrag dat het uitklappen moet opheffen. */
     #ntd-tbl-wrap tr.expanded .pil-rij{align-items:flex-start}
     #ntd-tbl-wrap tr.expanded .pil-rij>.ct{overflow:visible;text-overflow:clip;white-space:normal}
-    #ntd-tbl-wrap .pil-rij>.pill-stil,#ntd-tbl-wrap .pil-rij>.pill-opvolg,
     #ntd-tbl-wrap .pil-rij>.pill-snooze{flex:none;margin-left:0}
     /* De naamcel krijgt NADRUKKELIJK GEEN flexrij. Het bundel-merkje hoort daar op een EIGEN
        REGEL onder de naam te staan: naast elkaar vraagt de cel de SOM van beide breedtes in
@@ -475,6 +478,17 @@
        tekst omheen; die is eruit. Twee regels: weeknummer boven in de cijferletter, werkdagen
        eronder gedempt. `overflow:hidden` op de regels apart en niet op de cel, zodat de tweede
        regel mag afkappen zonder de eerste mee te nemen. */
+    /* Deadline op twee regels (v12.0): datum boven, hoe ver hij afligt eronder. Zelfde vorm als de
+       periodecel hiernaast, zodat de twee kolommen elkaars ritme volgen. Alleen als er iets te
+       melden valt — een rij die gewoon op tijd is blijft eenregelig. --sig-crit i.p.v. --prio voor
+       de TEKST: --prio haalt 4,42:1 en dit project houdt 4,5 aan. */
+    .dl-2{display:block;line-height:1.25}
+    .dl-2 .dl-dat{display:block;font-family:var(--font-mono);font-size:12.5px;font-weight:600;white-space:nowrap;
+      overflow:hidden;text-overflow:ellipsis}
+    .dl-2 .dl-bij{display:block;font-size:11px;font-weight:600;margin-top:1px;white-space:nowrap;
+      overflow:hidden;text-overflow:ellipsis}
+    .dl-2.laat .dl-dat,.dl-2.laat .dl-bij{color:var(--sig-crit)}
+    .dl-2.bijna .dl-dat,.dl-2.bijna .dl-bij{color:var(--am)}
     .cell-per{vertical-align:middle}
     .per-wk{display:block;line-height:1.25}
     .per-wk .wk{display:block;font-family:var(--font-mono);font-size:12.5px;font-weight:600;color:var(--txt);
@@ -485,16 +499,6 @@
        meteen welke regels nog geen week hebben zonder dat er iets in de Sheet verandert. */
     .per-oud{display:block;font-size:12.5px;color:var(--mut);
       overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    /* Zelfde vangnet voor de signaal-cel: bij twee meldingen ('Te laat (45d)' + 'Vandaag opvolgen')
-       is de inhoud breder dan de kolom. De ZWAARSTE melding blijft altijd heel; de tweede kapt af,
-       want die is per ontwerp al de bijzaak. */
-    #ntd-tbl-wrap .cell-sig .sig{max-width:100%}
-    /* Volgorde van inkrimpen: eerst de tweede melding, daarna pas de zwaarste. flex-shrink 100
-       tegen 1 maakt dat verschil groot genoeg dat de bijzaak volledig verdwijnt vóór de
-       hoofdmelding ook maar één letter inlevert. De hoofdmelding kán afkappen — dat is beter dan
-       over de buurkolom heen lopen — maar met de ondergrens van 140px komt het daar niet van. */
-    #ntd-tbl-wrap .cell-sig .sig-hoofd{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
-    #ntd-tbl-wrap .cell-sig .sig-bij{flex:0 100 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
     /* De tekst loopt tot de celrand, niet tot een vast getal. */
     #ntd-tbl-wrap .cell-name>.ct,#ntd-tbl-wrap .cell-txt>.ct,#ntd-tbl-wrap .cell-note>.ct{max-width:100%}
     /* De offerte-cel zette de voortgangsbalk en 'Aannemers toevoegen' ónder elkaar, waardoor élke
@@ -559,7 +563,6 @@
     .s-telaat{font-size:12.5px;font-weight:700;color:var(--rd);white-space:nowrap}
     .s-soon{font-size:12.5px;font-weight:600;color:var(--am);white-space:nowrap}
     .s-normal{font-size:12.5px;font-weight:500;color:#48505c;white-space:nowrap}
-    .pill-stil{display:inline-flex;align-items:center;gap:3px;background:rgba(107,114,128,0.15);color:#4b5563;font-size:11px;font-weight:600;padding:1px 6px;border-radius:10px;margin-left:5px;cursor:pointer;vertical-align:middle}
     /* Fase 4 — opvolging & herhaling */
     /* Was een VOL GROEN vlak met witte tekst (#00872e). Dat was de enige felle kleurvlek in de
        tabel en trok daardoor meer aandacht dan 'te laat', terwijl het lichter weegt. Nu hetzelfde
@@ -568,55 +571,12 @@
        --am op --am-l haalt 4,53:1 in licht en 7,5:1 in donker; de contrasttoets in tests.js
        meet dit paar en houdt het zo. Nog in gebruik in het bundelpaneel (render-bundel.js); in
        de tabelrij is de pil helemaal weg (zie rowNtd). */
-    .pill-opvolg{display:inline-flex;align-items:center;gap:3px;background:var(--am-l);color:var(--am);font-size:11px;font-weight:700;padding:1px 6px;border-radius:10px;margin-left:5px;cursor:pointer;vertical-align:middle}
     .pill-snooze{display:inline-flex;align-items:center;gap:3px;background:rgba(107,114,128,0.15);color:#4b5563;font-size:11px;font-weight:600;padding:1px 6px;border-radius:10px;margin-left:5px;cursor:pointer;white-space:nowrap;vertical-align:middle}
-    /* .pill-stil en .pill-snooze delen hun kleuren; de donkere variant was alleen voor de tweede
-       gezet. De eerste bleef daardoor op #4b5563 staan: 1,76:1 op de donkere achtergrond. */
-    [data-theme=dark] .pill-stil,[data-theme=dark] .pill-snooze{color:#9ca3af}
+    [data-theme=dark] .pill-snooze{color:#9ca3af}
     tr.snooze-row td{opacity:.55}
-    /* ── Signaal-kolom ──────────────────────────────────────────────────────
-       Eén cel per rij met de zwaarste melding. De kleur zit op de wikkel `.sig-*`, zodat
-       bolletje en tekst niet los van elkaar kunnen gaan lopen. */
-    .cell-sig{white-space:nowrap;vertical-align:middle}
-    /* Alleen een gevulde cel is klikbaar. Een lege cel met een wijzende hand belooft een actie
-       die er niet is — daar valt de klik terug op het uitklappen van de rij. */
-    .cell-sig[data-action]{cursor:pointer}
-    .sig{display:inline-flex;align-items:baseline;gap:7px}
-    .sig-dot{width:7px;height:7px;border-radius:50%;flex:none;align-self:center}
-    /* --sig-crit is een tint donkerder dan --prio: dit is de zwaarste tekst in de rij en moest
-       4,5:1 halen. --prio zelf bleef op 4,42:1 steken en blijft wél de kleur van het bolletje en
-       van het staafje links, zodat de rij één familie blijft. */
-    .sig-crit{color:var(--sig-crit)} .sig-crit .sig-dot{background:var(--prio)}
-    .sig-warn{color:var(--am)}       .sig-warn .sig-dot{background:var(--am)}
-    /* 'Bijna te laat' krijgt DEZELFDE amber als 'vandaag opvolgen', alleen lichter van gewicht
-       (zie .cell-sig .sig-warn-dof verderop). Een eigen kleur zou een vijfde betekenis
-       suggereren terwijl het dezelfde soort waarschuwing is, alleen minder dringend. Eerder
-       stond hier --mut met een --am-b bolletje: dat was niet te onderscheiden van 'stil'
-       (zelfde tekstkleur) en het bolletje haalde 1,44:1 — praktisch onzichtbaar. */
-    .sig-warn-dof{color:var(--am)}   .sig-warn-dof .sig-dot{background:var(--am)}
-    .sig-dof{color:var(--mut)}       .sig-dof .sig-dot{background:var(--mut)}
-    /* Binnen de signaal-cel dragen de oude klassenamen alleen nog BETEKENIS, geen opmaak: negen
-       toetsen zoeken op die namen, en zo staat op één plek welke klasse bij welk signaal hoort.
-       Zonder deze regel zouden ze hier als pil mét vlak terugkomen - precies wat we weghalen.
-       Dit hele blok staat bewust ná `[data-theme=dark] .pill-stil,.pill-snooze` hierboven: die
-       heeft precies dezelfde specificiteit (0,2,0), dus bij gelijke stand wint de laatste. Stond
-       het blok ervóór, dan hield een 'stil'- of 'weggelegd'-signaal in de donkere modus alsnog
-       zijn eigen pil-kleur en liep die uit de pas met het bolletje ernaast. */
-    .cell-sig .pill-stil,.cell-sig .pill-opvolg,.cell-sig .pill-snooze,
-    .cell-sig .s-telaat,.cell-sig .s-soon{
-      background:none;color:inherit;padding:0;margin:0;border-radius:0;
-      font-size:inherit;font-weight:inherit;font-family:inherit;
-    }
-    /* En NÁ het reset-blok de hiërarchie terugzetten. Dit moet met dezelfde specificiteit (0,2,0)
-       en dus lager in het bestand: `.sig-hoofd` alleen is (0,1,0) en verloor van de reset
-       hierboven, waardoor de zware en de lichte melding er exact hetzelfde uitzagen — precies het
-       probleem dat deze kolom oplost, en de hoofdmelding was zelfs zwakker dan de oude pil. */
-    .cell-sig .sig-hoofd{font-size:12.5px;font-weight:700}
-    .cell-sig .sig-warn-dof .sig-hoofd{font-weight:500}
-    .cell-sig .sig-bij{font-size:11px;font-weight:500;color:var(--mut)}
-    /* tr.snooze-row td{opacity:.55} dempt élke cel; het signaal is juist de reden dat de rij daar
-       staat en moet leesbaar blijven. Hogere specificiteit, dus deze wint. */
-    tr.snooze-row .cell-sig{opacity:1}
+    /* tr.snooze-row td{opacity:.55} dempt élke cel; de 'Terug <datum>'-pil is juist de reden dat
+       de rij daar staat en moet leesbaar blijven. Hogere specificiteit, dus deze wint. */
+    tr.snooze-row .pill-snooze{opacity:1}
     /* En om precies dezelfde reden de VASTGEZETTE actiekolom. Gescoped op `#ntd-tbl-wrap`, net als
        de sticky-regel die hij compenseert: de Herhaalregels-tabel heeft geen vastgezette kolom en
        hoort daar dus niets van te merken. Die staat op `position:sticky` met
@@ -1551,7 +1511,7 @@ body:has(.modal-bg.open) #chat-bg{display:none}
 .pal-ico svg{width:15px;height:15px}
 .bb-knop svg{width:13px;height:13px;vertical-align:-2px;margin-right:3px}
 .bb-knop svg.caret{width:10px;height:10px;margin:0 0 0 1px;vertical-align:-1px;opacity:.75}
-.pill-stil svg,.pill-opvolg svg,.pill-snooze svg{width:11px;height:11px;flex-shrink:0}
+.pill-snooze svg{width:11px;height:11px;flex-shrink:0}
 .badge svg{width:12px;height:12px;vertical-align:-2px}
 .ai-rhead svg,.ai-card-hd svg{width:15px;height:15px;flex:none}
 .load-err svg{width:15px;height:15px;flex:none}

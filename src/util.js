@@ -323,6 +323,21 @@ function weekDagen(ma, lang){
     : `${ma.getDate()} ${nm(ma.getMonth())}${jrMa} – ${vr.getDate()} ${nm(vr.getMonth())}`;
 }
 
+// De dagen-tekst uit een opgeslagen periode omzetten naar de vorm mét dagnamen, voor in de tabel:
+//   '14–18 sep'          -> 'ma 14 – vr 18 sep'
+//   '31 aug – 4 sep'     -> 'ma 31 aug – vr 4 sep'
+//   '28 dec 2026 – 1 jan'-> 'ma 28 dec 2026 – vr 1 jan'
+// Bewust op de tekst en niet op de datum: `parseWeekPeriode` geeft de dagen al goed terug, en de
+// maandag terugrekenen uit alleen een weeknummer + jaar is rond de jaarwisseling dubbelzinnig
+// (week 53 van 2026 begint in december 2026 maar eindigt in 2027).
+function metDagnamen(dagen){
+  const s = String(dagen || '').trim();
+  if (!s) return '';
+  const i = s.indexOf('–');
+  if (i < 0) return `ma ${s}`;
+  return `ma ${s.slice(0, i).trim()} – vr ${s.slice(i + 1).trim()}`;
+}
+
 // De regel die in de Sheet belandt. Het slotjaar is dat van de VRIJDAG — het eind van de
 // werkweek, en daarmee altijd het jaar van de laatste datum die in de regel staat. Bewust
 // niet het ISO-jaar: week 53 van 2026 eindigt op 1 januari 2027, en dan zou er '2026'
@@ -754,7 +769,7 @@ function taakVerwijzing(r, sec){
 }
 
 export {
-  maandagVan, isoWeekJaar, weekDagen, weekPeriodeLabel, parseWeekPeriode, weekOpties, MND_KORT, MND_LANG,
+  maandagVan, isoWeekJaar, weekDagen, weekPeriodeLabel, parseWeekPeriode, weekOpties, metDagnamen, MND_KORT, MND_LANG,
   taakTitel, taakVerwijzing, kortDatum, NIET_ZOEKBAAR,
   displayName, filt, splitBehandelaar, korteNaam, PRIO_REGELS, stilDrempel, STIL_ESCALATIE_REGELS,
   DEADLINE_VOORSTEL, DEADLINE_HINT, voorgesteldeDeadline, AF_PERIODES, periodeBereik,

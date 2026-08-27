@@ -22,9 +22,8 @@ import { wordtGeabsorbeerd, bundelSleutel, bundelStand, bundelVerwijzing } from 
 // LET OP — dit is een KRINGETJE: render-tabel.js importeert hierboven al uit render-bundel.js.
 // ES-modules kunnen dat aan. Let op WAAROM: een functie-DECLARATIE is bij het koppelen al
 // klaargezet, dus zelfs een aanroep op modulehoogte zou werken. Het gevaar zit in de omgekeerde
-// richting: zodra `signaalDelen` een `const` wordt, of render-tabel.js iets van hier op
+// richting: zodra render-tabel.js iets van hier op
 // modulehoogte gaat gebruiken, klapt de kringloop om. Houd beide dus binnen functielichamen.
-import { signaalDelen } from "./render-tabel.js";
 import { ico } from "./icons.js";
 import { state } from "./state.js";
 
@@ -132,32 +131,14 @@ function subRegel(m, i){
   const snoozePil = ov.weggelegd
     ? `<span class="pill-snooze" data-action="taak-wegleggen" data-rid="${rid}" title="Weggelegd tot ${esc(r.opvolgdatum)}">${ico('pauze',11)}${esc(kortDatum(r.opvolgdatum))}</span>`
     : '';
-  // 'Vandaag opvolgen' en 'stil' ontbraken hier terwijl de tabelrij ze wél toont. Uit dezelfde
-  // bron als de rij (signaalDelen), zodat 'vandaag' en 'stil' hier en daar hetzelfde betekenen.
-  // De deadline en 'weggelegd' worden hieronder al door dlTekst en snoozePil getekend; die twee
-  // slaan we hier over om ze niet dubbel te zetten.
-  // Alleen 'vandaag opvolgen' en 'stil': de deadline en 'te laat' staan hieronder al in dlTekst en
-  // 'weggelegd' in snoozePil. Zonder dit filter komt 'Te laat (Nd)' twee keer in dezelfde regel te
-  // staan — met de datum ernaast, en bij een weggelegde subtaak drie datums achter elkaar.
-  //
-  // 'Bijna te laat' laten we hier bewust weg: de meta-regel toont de datum al voluit ("Oppakken ·
-  // 28 aug"), dus een aftelling erbij zegt niets nieuws. Dat is het ENE verschil met de tabelrij,
-  // waar de datum juist neutraal is en de aftelling het signaal draagt.
-  //
-  // Dezelfde data-action als in de tabel (render-tabel.js): een pil met een wijzende hand die
-  // nergens op reageert is de vierde variant die dit bestand niet moet krijgen — snoozePil hier
-  // draagt zijn actie wél, en styles.css legt bij .cell-sig uit waarom een hand zonder actie fout is.
-  const PANEEL_ACTIE = { vandaag:'taak-wegleggen', stil:'taak-bewerken' };
-  const paneelSignalen = signaalDelen(r, r._sec)
-    .filter(d => PANEEL_ACTIE[d.soort])
-    .map(d => `<span class="${d.cls}" data-action="${PANEEL_ACTIE[d.soort]}" data-rid="${rid}"`
-             + ` title="${esc(d.tekst)}">${esc(d.tekst)}</span>`)
-    .join('');
-  // LET OP — de gelijkloop met de tabel is inhoudelijk hersteld, maar de PLAATS verschilt bewust.
-  // De tabelrij heeft sinds de Signaal-kolom één signaal-cel en houdt in de deadline-kolom een
-  // kale datum over; het paneel heeft die kolommen niet, dus 'Te laat' blijft hier in de meta-regel
-  // staan (hieronder, via dlTekst) en 'vandaag opvolgen'/'stil' staan hierboven bij de pillen.
-  // Wat de gebruiker LEEST is daarmee op beide plekken hetzelfde; alleen de vorm is anders.
+  // 'Vandaag opvolgen' en 'stil' stonden hier ook, omdat de tabelrij ze toonde en de twee
+  // hetzelfde hoorden te betekenen. Sinds v12.0 toont de tabel ze allebei NIET meer — de
+  // signaal-kolom is weg — dus zijn ze hier meeverdwenen. Dat houdt de belofte overeind waar dit
+  // blok ooit voor gemaakt is: wat de gebruiker leest is op beide plekken hetzelfde.
+  // Het stil-signaal zelf bestaat gewoon nog en verstuurt herinneringsmails (Opvolging.gs).
+  // De tabelrij draagt 'Te laat' sinds v12.0 in de deadline-cel; het paneel heeft die kolom niet
+  // en houdt het in zijn meta-regel (hieronder, via dlTekst). Wat de gebruiker LEEST is op beide
+  // plekken hetzelfde; alleen de vorm verschilt.
   // Wie hier iets verplaatst: dlTekst en snoozePil zijn met opzet onaangeroerd gebleven — zes
   // toetsen in src/tests.js hangen aan precies deze markup.
   //
@@ -178,7 +159,7 @@ function subRegel(m, i){
        + `<span class="bdl-num">${i+1}</span>`
        + `<span class="bdl-dot" style="background:${kleur}"></span>`
        + `<button type="button" class="bdl-txt" data-action="taak-bewerken" data-rid="${rid}" title="Bewerken">${esc(taakTitel(r))}</button>`
-       + ibPil + snoozePil + paneelSignalen
+       + ibPil + snoozePil
        + `<span class="bdl-meta">${esc(label)} · ${dlTekst}</span>`
        // Exact dezelfde drie knoppen als op een tabelrij, uit één helper: ze staan op hetzelfde
        // scherm pal onder elkaar, dus een eigen variant hier zou meteen als verschil opvallen.

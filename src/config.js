@@ -5,7 +5,7 @@ import { ALLOWED_EMAILS } from '../allowed-emails.js';
 
 // ── Versie (zichtbaar in de UI) ────────────────────────────────────────
 // Ophogen bij ELKE wijziging: 4.1, 4.2, … 5.0 voor grote sprongen.
-export const APP_VERSION = '11.9';
+export const APP_VERSION = '12.0';
 
 // ── Omgeving (productie vs. testomgeving) ──────────────────────────────
 // Fail-safe: alleen deze exacte hosts zijn PRODUCTIE; al het andere
@@ -109,31 +109,32 @@ export const KORTE_NAMEN = {
 // dat élke kop ook DAAR heel blijft — dat is wat de toets 'geen kop loopt over zijn kolom heen'
 // in beide standen afdwingt. Het kost de opmerkingenkolom op Offerte-trajecten 20px bij de smalste
 // tabel; die tekst kapt toch al af, een kolomNAAM half wegvallen is erger.
-// Alle andere kolommen dragen tekst die langer kan worden en krijgen een gewicht — óók Signaal.
-// Die stond op '150px' toen dat nog een ondergrens was; als plafond zou "Te laat (47d) Vandaag
-// opvolgen" op een breed scherm gaan afkappen terwijl er ruimte zat is. De gewichten 21,3 / 20,5 /
-// 22,6 zijn zo gekozen dat de kolom bij de smalste tabel (1150px) nog altijd 150px meet — dat was
-// de gemeten ondergrens: op 140 hielden vijf rijen een afgekapte hoofdmelding over, op 150 nul.
-// LET OP — deze drie getallen hangen aan de px-SOM van hun sectie. Toen de VvE-code van 105 naar
-// 130px ging, kwam die 25px van de gewichtskolommen af en zakte Signaal stil naar 145px. Verandert
-// er ooit weer een px-kolom, reken deze drie dan opnieuw uit: gewicht w geeft
-// w/(gewichtSom) × (100 − pxSom/1150 × 100) procent van 1150.
+// Alle andere kolommen dragen tekst die langer kan worden en krijgen een gewicht.
+//
+// DE SIGNAAL-KOLOM IS WEG (v12.0). Hij stond naast de deadline en rekende daar zijn eigen
+// "Te laat (76d)" uit — dezelfde dagen die uit de datum ernaast te halen zijn. Die melding staat nu
+// ónder de datum in de deadline-kolom zelf, dus op één plek. Wat er verder in stond: 'Terug 31 aug'
+// is een gedempt label in de opmerkingen-cel geworden (zoals Offerte-trajecten dat al deed), en
+// 'Vandaag opvolgen' en 'Xd stil' zijn vervallen — het stil-signaal blijft wél bestaan als
+// herinneringsmail (STIL_ESCALATIE_REGELS in util.js / Opvolging.gs), het staat alleen niet meer
+// in de tabel. De vrijgekomen breedte (21,3 / 20,5 / 22,6) is verdeeld over de tekstkolommen, en bij
+// Vergaderverzoeken vooral naar Periode: die cel toont sinds v12.0 'ma 7 – vr 11 sep' voluit.
 export const SECS = {
   OPPAKKEN:{label:'Oppakken',css:'--sec:var(--ac);--sec-l:var(--ac-l);--sec-b:var(--ac-b)',color:'#0D7377',
-    cols:['VvE Code','VvE','Signaal','Actiepunt','Deadline','Wie','Opmerkingen'],
-                   breedtes:['130px',23,21.3,29,'165px',7,19.7,'150px'],
+    cols:['VvE Code','VvE','Actiepunt','Deadline','Wie','Opmerkingen'],
+                   breedtes:['130px',27.3,38,'165px',7,27.7,'150px'],
     keys:['code','naam','actiepunt','deadline','behandelaar','prioriteit','opmerkingen','inBehandeling']},
   VERGADERVERZOEKEN:{label:'Vergaderverzoeken',css:'--sec:var(--am);--sec-l:var(--am-l);--sec-b:var(--am-b)',color:'#AE5008',
-    cols:['VvE Code','VvE','Signaal','Periode','Agendapunten','Wie','Deadline uitschr.','Opmerkingen'],
-                   breedtes:['130px',21,20.5,13.4,18,7,'165px',16.3,'150px'],
+    cols:['VvE Code','VvE','Periode','Agendapunten','Wie','Deadline uitschr.','Opmerkingen'],
+                   breedtes:['130px',26,19.1,23,7,'165px',21.1,'150px'],
     keys:['code','naam','periode','agendapunten','behandelaar','deadline','opmerkingen','inBehandeling']},
   'OFFERTE-TRAJECTEN':{label:'Offerte-trajecten',css:'--sec:var(--pu);--sec-l:var(--pu-l);--sec-b:var(--pu-b)',color:'#6855C9',
     cols:['VvE Code','VvE','Datum aangevr.','Ontvangen/Aangevr.','Behandelaar','Deadline','Opmerkingen'],
                    breedtes:['130px',19.6,'165px',24.5,16.5,'165px',16.9,'120px'],
     keys:['code','naam','datumAangevraagd','offertes','behandelaar','deadline','opmerkingen']},
   LOD:{label:'LOD',css:'--sec:var(--rd);--sec-l:var(--rd-l);--sec-b:var(--rd-b)',color:'#B91C1C',
-    cols:['VvE Code','VvE','Signaal','Actiepunt','Status','Wie','Deadline LOD','Opmerkingen'],
-                   breedtes:['130px',19,22.6,21.7,18,7,'165px',18.0,'150px'],
+    cols:['VvE Code','VvE','Actiepunt','Status','Wie','Deadline LOD','Opmerkingen'],
+                   breedtes:['130px',24,29.7,20,7,'165px',25.6,'150px'],
     keys:['code','naam','actiepunt','status','behandelaar','deadline','opmerkingen','inBehandeling']},
   // Subsidie-trajecten (2026-07-29). Zelfde kolomstramien als LOD, met 'Status'
   // vervangen door 'Fase'. Twee dingen liggen hier vast en mogen niet losjes wijzigen:

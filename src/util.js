@@ -474,8 +474,9 @@ function korteNaam(naam){
   return bezet.has(letter.toLowerCase()) ? n : letter;
 }
 
-// `kort` alleen aanzetten waar breedte echt knelt: de drie tabbladen met een Signaal-kolom
-// (Oppakken, Vergaderverzoeken, LOD). Alle andere plekken houden de volle naam — dus óók
+// `kort` alleen aanzetten waar breedte echt knelt: Oppakken, Vergaderverzoeken en LOD. (Dat waren
+// tot v12.0 'de drie tabbladen met een Signaal-kolom'; die kolom bestaat niet meer, de drie
+// tabbladen wel.) Alle andere plekken houden de volle naam — dus óók
 // Offerte-trajecten en Subsidie-trajecten, die in dezelfde takentabel staan maar buiten dit
 // ontwerp vielen, plus het VvE-dossier, de Afgerond-lijst, Analytics en de Ontwikkeling-pagina — daar is ruimte
 // genoeg en leest een code alleen maar als een raadsel. De volle naam blijft in de title staan,

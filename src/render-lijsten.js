@@ -341,8 +341,7 @@ function renderNtd(){
   // geabsorbeerde subtaak is niet verdwenen, alleen anders getekend, en moet dus meetellen.
   const zichtbaar=absorbeer(sorteerNtd(filterNtd(D.ntd[state.activeNtd]||[],q,fCode,fBeh,fPrio,state.activeNtd,state.ntdStatus),state.ntdSort),state.activeNtd,bw);
   // De bulk-kolom krijgt een px-ONDERGRENS en geen gewicht, precies zoals elke andere kolom met een
-  // bekende minimuminhoud (VvE-code 130, datums 155, acties 150/120 — zie config.js; Signaal is
-  // daar bewust GEEN px-kolom maar een gewicht, zie de toelichting erboven).
+  // bekende minimuminhoud (VvE-code 130, datums 165, acties 150/120 — zie config.js).
   // Met een gewicht van 3 deelde hij mee in de ruimte die ná de px-kolommen overblijft, en bij de
   // smalste stand (min-width 1150) werd dat smaller dan het vinkje zelf plus zijn celopvulling —
   // dan valt het vinkje van de rij af. 48px: 20 opvulling links + 14 vinkje + 14 rechts, waarbij

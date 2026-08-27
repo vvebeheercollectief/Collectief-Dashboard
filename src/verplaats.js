@@ -52,7 +52,8 @@ function verlorenVelden(r, bronSec, doelSec){
 
 // De kolomkop zoals de gebruiker hem in de tabel ziet, zodat de vraag niet met interne veldnamen
 // spreekt. Uit VELD_LABELS (config.js) en nadrukkelijk NIET uit `cols` op index: die twee lopen
-// niet gelijk op, en zodra er een kop 'Signaal' bij komt die bij geen veld hoort al helemaal niet.
+// niet gelijk op, en zodra er een kop bij komt die bij geen veld hoort al helemaal niet (de
+// Signaal-kolom was daar tot v12.0 het voorbeeld van).
 // Kent VELD_LABELS het veld niet, dan valt hij terug op de sleutel zelf.
 function _veldLabel(sec, sleutel){
   const kaart = VELD_LABELS[sec];

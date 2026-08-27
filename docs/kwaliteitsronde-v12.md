@@ -84,3 +84,26 @@ een meegeschreven lege Q wist een nummer dat een collega of de backfill net heef
 juist dát geval kan de rij-guard niet zien. `koppelBereiken` hield diezelfde belofte — maar
 alleen doordat de aanroeper in een ánder bestand eerst een nummer maakt. Nu laat de functie Q
 zelf weg zodra het nummer leeg is.
+
+| 10 | laag | Weescommentaren van verwijderde constanten (`GEEN_STIL_PILL`, `HEEFT_SIGNAAL_KOLOM`) | opgeruimd |
+| 11 | laag | Vijf toelichtingen noemden nog de Signaal-kolom of een datumbreedte van 155px (is 165 sinds v11.8) | bijgewerkt |
+
+## Nog machinaal nagelopen (0 bevindingen)
+
+- **Ontsnapping**: élk veld van élke sectie gevuld met `"><img src=x onerror=…>`, daarna alle
+  vijf de tabbladen, Afgerond, ALV, Logboek, Ontwikkeling, het VvE-dossier, het bewerkscherm en
+  het commandopalet getekend. Geen uitvoering, geen ingeslopen element, geen enkele weergave die
+  struikelt. Vastgelegd als blijvende toets.
+- **Datumverwerking**: zestien randgevallen (31 februari, 29-02 in een niet-schrikkeljaar,
+  2-cijferig jaar, spaties, ISO met losse cijfers, US-volgorde). Alle onmogelijke datums geweigerd.
+- **Filteren en sorteren**: zoekterm, VvE-code, behandelaar, prioriteit, statuspillen, en sorteren
+  op code en deadline in beide richtingen — allemaal correct, inclusief de groepsvolgorde
+  (actief / in behandeling / weggelegd). De prioriteitsfilter kijkt bewust naar de BEREKENDE
+  prioriteit, niet naar de opgeslagen kolom; dat staat uitgeschreven en is getoetst.
+- **Prestaties**: 11–35 ms per hertekening bij de echte omvang (96 taken, 1.300 logregels).
+  Schaalt sublineair (4× rijen → 2× tijd), dus geen verborgen kwadratisch gedrag. De omvang van
+  het logboek doet er sinds v12.0 niets meer toe (5.000 regels even snel als 1.300): de stil-index
+  wordt niet meer per hertekening opgebouwd.
+- **Eindsweep** op 378, 1440 en 1920 px, vijf secties × twee standen: cellen = koppen, elke actie
+  heeft een afhandelaar, elk klikbaar element is te focussen (behalve de sleepgreep), elke `rid`
+  wijst naar de juiste rij, geen zijwaartse schuif.

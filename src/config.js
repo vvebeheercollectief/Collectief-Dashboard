@@ -5,7 +5,7 @@ import { ALLOWED_EMAILS } from '../allowed-emails.js';
 
 // ── Versie (zichtbaar in de UI) ────────────────────────────────────────
 // Ophogen bij ELKE wijziging: 4.1, 4.2, … 5.0 voor grote sprongen.
-export const APP_VERSION = '12.1';
+export const APP_VERSION = '12.2';
 
 // ── Omgeving (productie vs. testomgeving) ──────────────────────────────
 // Fail-safe: alleen deze exacte hosts zijn PRODUCTIE; al het andere
@@ -62,7 +62,7 @@ export const KORTE_NAMEN = {
 
 // `breedtes` is de kolomverdeling, als GEWICHTEN — één meer dan `cols`, want de actiekolom
 // rechts telt mee. Een GETAL is een gewicht (wordt een percentage en groeit mee met het venster),
-// een STRING als '155px' is een vaste breedte. Gewichten hoeven niet op 100 uit te komen — ze
+// een STRING als '165px' is een vaste breedte. Gewichten hoeven niet op 100 uit te komen — ze
 // delen wat er na de vaste kolommen overblijft — en een extra kolom (het bulk-vinkje) schuift er
 // vanzelf tussen.
 //
@@ -77,7 +77,7 @@ export const KORTE_NAMEN = {
 // 128px in IBM Plex Mono, en `.s-normal` is `white-space:nowrap` in een cel met `overflow:visible`
 // — de datum werd dus niet afgekapt maar óver de buurkolom heen getekend. Sheets levert lange
 // Nederlandse datums (zie _parseAnyDate), dus dat is de normale vorm en niet de uitzondering.
-// Elke datumkolom heeft daarom een VASTE breedte in pixels ('155px') in plaats van een gewicht dat
+// Elke datumkolom heeft daarom een VASTE breedte in pixels ('165px' sinds v11.8) in plaats van een gewicht dat
 // bij elke bijstelling opnieuw moest kloppen.
 //
 // EEN PX-BREEDTE IS EEN PLAFOND, GEEN ONDERGRENS (sinds v11.1). kolBreedtes() rekent de

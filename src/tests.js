@@ -1483,6 +1483,45 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     });
   })();
 
+  // ── Inhoud uit de Sheet komt nooit als HTML op het scherm (v12.1) ──
+  // De rijen komen uit een Google Sheet waar mensen vrij in typen. Belandt zo'n waarde zonder
+  // `esc()` in een sjabloonstring die als innerHTML wordt gezet, dan voert een cel met
+  // `<img onerror=…>` code uit. De weergavefuncties gaan bijna allemaal via hulpfuncties
+  // (vveCodeSpan, persBadges, subBadge, offProg, periodeCel, faseRijHtml, flagPill) en die
+  // ontsnappen zelf — maar dat is een belofte per functie. Deze toets controleert de UITKOMST:
+  // élk veld van élke sectie gevuld met een uitbraakpoging, en dan mag er niets afgaan.
+  await (async () => {
+    const vNtd=D.ntd, vAf=D.af, vSec=state.activeNtd, vPg=pgs.ntd, vOntw=D.ontw, vLog=D.logboek;
+    const teller = { n: 0 };
+    window.__xssToets = () => { teller.n++; };
+    const GIF = '"><img src=x onerror="window.__xssToets&&window.__xssToets()"><b data-x="';
+    try{
+      const velden = ['code','naam','actiepunt','deadline','behandelaar','prioriteit','opmerkingen',
+        'inBehandeling','periode','agendapunten','status','datumAangevraagd','offertes','subsidie',
+        'subsidieFase','subcategorie','opvolgdatum','aannemers','taakId','bundelId','opmerking',
+        'taak','afgerondOp','titel','categorie','inhoud','door','datum'];
+      const vuil = Object.fromEntries(velden.map(v => [v, GIF]));
+      D.ntd = Object.fromEntries(SKEYS.map(s => [s, [{ ...vuil, _sec:s, _row:500 }]]));
+      D.af  = Object.fromEntries(SKEYS.map(s => [s, [{ ...vuil, _sec:s, _row:501 }]]));
+      D.ontw = [{ ...vuil, status:'Open', _row:502 }];
+      D.logboek = [{ ...vuil, actie:'Notitie', timestamp:new Date().toISOString(), _row:503 }];
+      const fouten = [];
+      SKEYS.forEach(s => { pgs.ntd=1; try{ setNtd(s); }catch(e){ fouten.push(s+': '+e.message); } });
+      try{ renderAf(); }catch(e){ fouten.push('afgerond: '+e.message); }
+      try{ renderOntw(); }catch(e){ fouten.push('ontwikkeling: '+e.message); }
+      await new Promise(r => setTimeout(r, 60));
+      eq('ontsnapping: geen enkele weergave struikelt over vijandige inhoud', fouten, []);
+      eq('ontsnapping: er wordt geen code uitgevoerd', teller.n, 0);
+      // De harde vorm: er hoort geen enkel <img> in de tabellen te staan. Zou een veld ontsnappen,
+      // dan is dát het eerste wat je ziet — ook als de onerror om een andere reden niet afgaat.
+      eq('ontsnapping: en er verschijnt geen ingeslopen element',
+         document.querySelectorAll('#ntd-tbody img, #af-tbody img, #ontw-tbody img').length, 0);
+    } finally {
+      delete window.__xssToets;
+      D.ntd=vNtd; D.af=vAf; D.ontw=vOntw; D.logboek=vLog; state.activeNtd=vSec; pgs.ntd=vPg; setNtd(vSec);
+    }
+  })();
+
   // ── Een leeg taaknummer gaat nooit mee in een schrijfbereik (v12.1) ──
   // `ontkoppelBereiken` houdt kolom Q al buiten zijn bereik: een meegeschreven lege Q wist een
   // nummer dat een collega of de backfill net heeft gezet, en juist dát geval kan de rij-guard
@@ -5409,7 +5448,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '12.1');
+  eq('versie opgehoogd', APP_VERSION, '12.2');
 
   // ── Tabbladen ÍN de kaartkop (v11.7) ──
   // De kop van de kaart zei links exact hetzelfde als het actieve tabblad — 'Oppakken' boven

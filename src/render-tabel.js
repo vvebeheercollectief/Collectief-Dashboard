@@ -13,14 +13,8 @@ import { heeftInBehandeling } from "./inbehandeling.js";
 import { zichtbareKop, bundelVan, zelfdeTaak } from "./bundel.js";
 import { bundelKopExtra, bundelPaneelHtml, bundelMerkje, STAPEL_GREEP } from "./render-bundel.js";
 
-// Zie de toelichting bij het gebruik in rowNtd().
-
-// De secties met een eigen Signaal-kolom. AFGELEID uit `cols` en met opzet geen eigen handlijst:
-// drie dingen moeten kloppen voor één sectie (de kop in `cols`, deze lijst, en de aanroep van
-// signaalCel in het case-blok), en een handlijst die uit de pas loopt met `cols` levert precies
-// het probleem op dat deze hele kolom oplost — de melding staat dan weer op twee plekken, of
-// nergens, en dat gaat stil. Offerte en subsidie krijgen de kop niet: daar kan 'stil' per ontwerp
-// niet voorkomen, en zou de kolom vrijwel elke rij leeg blijven.
+// (Hier stonden GEEN_STIL_PILL en HEEFT_SIGNAAL_KOLOM. Allebei weg met de Signaal-kolom in v12.0;
+//  de urgentie zit sindsdien in de deadline-cel — zie `deadlineCel` verderop.)
 
 // ══════════════════════════════════════
 //  TABLE HELPERS
@@ -29,7 +23,7 @@ import { bundelKopExtra, bundelPaneelHtml, bundelMerkje, STAPEL_GREEP } from "./
 // Sorteerbare koppen worden een echte knop (toetsenbord-bedienbaar) met pijl + aria-sort op de th.
 // De breedte die elke kolom in de <colgroup> krijgt, als CSS-waarde.
 //
-// Een getal is een GEWICHT en wordt een percentage. Een string als '155px' is een VASTE breedte:
+// Een getal is een GEWICHT en wordt een percentage. Een string als '165px' is een VASTE breedte:
 // die kolom is altijd precies zo breed. Dat is nodig voor de datumkolommen, want
 // "22 september 2026" is 128px en moet er altijd in passen.
 //

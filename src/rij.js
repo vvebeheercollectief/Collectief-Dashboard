@@ -18,9 +18,13 @@
 // DE REGEL: identiteit boven positie. Een taak is zijn vaste TAAKNUMMER (kolom Q), niet zijn plek
 // in een array en niet het object dat je toevallig nog vasthoudt.
 //
-// Alle mutatiewegen horen hier doorheen te gaan. Er staat een toets op (zie 'verouderde rij' in
-// tests.js) die élke rij-actie met een verouderd object voert en nagaat dat hij de JUISTE rij
-// raakt — en die weigert groen te worden zodra er een rij-actie bij komt die er niet in staat.
+// Alle mutatiewegen horen hier doorheen te gaan. Daar staan drie toetsen op (zie 'vormcontrole',
+// 'rij-acties' en 'poort' in tests.js): de eerste leest de broncode van élk bestand dat naar de
+// Sheet schrijft en slaat alarm bij een rij die op object-identiteit wordt opgezocht; de tweede
+// volgt iedere actie met een `data-rid` naar de functie erachter en eist dat díe de poort
+// aanroept; de derde voert de poort een verouderde rij en kijkt of hij het verse exemplaar
+// teruggeeft. De eerste twee lezen hun bestandenlijst uit de modulegraaf, niet uit een handlijst —
+// juist die handlijst is de manier waarop deze fout steeds terugkwam.
 //
 // Bewust alleen `state` en `config` als import: zo kan iedere module dit gebruiken zonder een
 // kringverwijzing te maken.
@@ -32,8 +36,18 @@ const tekst = v => (v == null ? '' : String(v)).trim();
 // De inhoudelijke vingerafdruk van een taakrij. ALLEEN als terugval voor rijen zonder taaknummer:
 // van vóór de backfill, of aangemaakt door een oude client. De acht sectievelden plus de kolommen
 // die twee taken van dezelfde VvE uit elkaar houden.
-// LET OP — SYNC: deze velden komen uit `SECS[sec].keys` (config.js) plus de staartkolommen die
-// `parseSections` (data.js) leest. Komt daar een kolom bij, dan hoort hij hier ook bij.
+//
+// Dit is exact de veldenlijst van `serializeNtdUndo` (crud.js) — de vingerafdruk waarop het
+// her-ankeren vóór deze verbouwing al liep — min het taaknummer zelf, dat hier per definitie leeg
+// is. Bewust NIET erbij: kolom I (datum), J (opmerking) en N (esc). Die staan in serializeNtdUndo
+// ook als lege string, want ze worden langs een andere weg geschreven en zouden een undo anders
+// stilletjes wissen.
+//
+// LET OP — SYNC: komt er een sectieveld of staartkolom bij, dan hoort hij in ALLEBEI. Wat de ene
+// wel heeft en de andere niet is geen ramp maar wél verwarrend, want de richting is veilig:
+// een veld WEGLATEN maakt de sleutel grover, en grover betekent hooguit dat twee rijen op elkaar
+// gaan lijken — en dat telt in `rijIndex` als dubbelzinnig, dus als 'niet gevonden'. Een veld
+// weglaten kan nooit de VERKEERDE rij opleveren; alleen géén rij.
 function _inhoudSleutel(r){
   const keys = (SECS[r && r._sec] || {}).keys || [];
   return keys.map(k => tekst(r[k]))
@@ -57,7 +71,7 @@ export function rijIndex(lijst, r){
   const nr = tekst(r.taakId);
   if (nr) {
     const treffers = [];
-    for (let i = 0; i < arr.length; i++) if (tekst(arr[i].taakId) === nr) treffers.push(i);
+    for (let i = 0; i < arr.length; i++) if (arr[i] && tekst(arr[i].taakId) === nr) treffers.push(i);
     return treffers.length === 1 ? treffers[0] : -1;
   }
   const sleutel = _inhoudSleutel(r);

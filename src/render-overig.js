@@ -33,6 +33,15 @@ function parseOntw(rows){
   }).filter(Boolean);
 }
 
+// De volledige vingerafdruk van een Ontwikkeling-item, zoals `parseOntw` hierboven hem oplevert.
+// Alle velden, want dit antwoordt op 'staat deze regel er nog?' in een rollback: een sleutel die te
+// grof is wijst een ÁNDERE regel aan, en dan denkt de rollback ten onrechte dat er niets terug
+// hoeft. Blijft er dan toch twijfel (twee regels die op alles gelijk zijn), dan geeft `regelIndex`
+// -1 en zetten we terug — dat is de veilige kant: hooguit één regel dubbel, die de eerstvolgende
+// verversing weer opruimt. `_row` hoort er NIET in: dat schuift bij het verwijderen juist mee.
+// LET OP — SYNC: verandert `parseOntw`, dan verandert dit mee.
+const _ontwSleutel = x => [x.titel,x.categorie,x.inhoud,x.door,x.datum,x.status].join('\x1f');
+
 function renderOntw(){
   const q=(document.getElementById('s-ontw')?.value||'').toLowerCase().trim();
   const cats=['Alles',...ONTW_CATS,'Afgerond'];
@@ -184,7 +193,7 @@ async function deleteOntwItem(){
     },
     // Op titel+datum en niet op objectidentiteit: een poll tussen de klik en deze rollback vervangt
     // élk item in D.ontw, en dan zou `indexOf` -1 geven en er een tweede bij zetten.
-    ()=>{ if(echte&&regelIndex(D.ontw, echte, x=>[x.titel,x.datum].join('\x1f'))===-1){ D.ontw.forEach(x=>{ if(x._row>=oudeRow) x._row++; }); D.ontw.splice(Math.min(pos<0?D.ontw.length:pos,D.ontw.length),0,echte); } },
+    ()=>{ if(echte&&regelIndex(D.ontw, echte, _ontwSleutel)===-1){ D.ontw.forEach(x=>{ if(x._row>=oudeRow) x._row++; }); D.ontw.splice(Math.min(pos<0?D.ontw.length:pos,D.ontw.length),0,echte); } },
     'Verwijderen mislukt'
   );
   // rode puls + fade op de oude rij; daarná pas hertekenen
@@ -562,7 +571,7 @@ async function deleteLogboek(row){
     // regel kwam nooit meer in beeld. Zelfde vorm als de rij-val in src/rij.js: een verwijzing
     // vasthouden over een await heen.
     ()=>{ const lijst=D.logboek||[];
-      if(regelIndex(lijst, entry, e=>[e.timestamp,e.code,e.actie,e.nieuweWaarde].join('\x1f'))===-1){
+      if(regelIndex(lijst, entry, _logRegelSleutel)===-1){
         _herstelShift(_shiftLogboekRows,oudeRow);
         state.logEdit=_shiftLogEditRef(state.logEdit,oudeRow,+1);
         lijst.splice(Math.min(idx,lijst.length),0,entry);
@@ -618,6 +627,15 @@ function _herankerLogEdit(){
   showToast('De lijst is ververst','De regel die je bewerkte bestaat niet meer — het formulier is gesloten.',
             'var(--am)','label',{geenDedup:true,geenSysteemmelding:true});
 }
+
+// Idem voor een logregel: alle acht velden die `parseLogboek` leest. Vier velden was te grof —
+// een bulk-actie op twee taken van dezelfde VvE levert regels op die op timestamp, code, actie en
+// nieuwe waarde gelijk zijn, en dan hield de rollback een verwijderde regel voor 'staat er nog'.
+// Bewust NIET `_logSleutel` hierboven: die laat de tijdstempel en de oude waarde juist weg, omdat
+// hij een optimistische regel moet herkennen in wat de server terugstuurt. Voor die vraag is grof
+// goed; voor deze vraag is grof gevaarlijk.
+// LET OP — SYNC: verandert `parseLogboek`, dan verandert dit mee.
+const _logRegelSleutel = e => [e.timestamp,e.code,e.sectie,e.actie,e.veld,e.oudeWaarde,e.nieuweWaarde,e.gebruiker].join('\x1f');
 
 function renderLogboek(){
   // Bescherm half-getypte bewerktekst tegen de 8s-poll (analoog aan de VvE-composer).

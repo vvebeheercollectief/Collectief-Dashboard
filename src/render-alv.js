@@ -57,7 +57,7 @@ function renderAlvo(){
   const sl=rows.slice((pgs.alvo-1)*PG,pgs.alvo*PG);
   document.getElementById('alvo-tbody').innerHTML=sl.length
     ?sl.map(r=>{
-      const idx=D.alvo.indexOf(r);
+      const idx=D.alvo.indexOf(r);   // vorm-ok: de index is een HINT op de knop; toggleAlvoFlag toetst hem op de VvE-code en zoekt anders alsnog op code
       return`<tr>
         <td>${vveCodeSpan(r.code, '--sec:var(--ac);--sec-l:var(--ac-l)')}</td>
         <td class="cell-name">${esc(r.naam)}${r.budget?' <span class="badge budget-tag" title="Budgetpakket — vergadert zelf">Budget</span>':''}</td>

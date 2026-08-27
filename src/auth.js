@@ -266,7 +266,7 @@ function logout(reden){
   // inlogkaart staan — met de dossiergegevens van een VvE er nog in.
   try{ document.getElementById('chat-bg')?.classList.remove('open'); }catch(_){}
   state._chatHistorie=null; state._chatVve=null; state._chatBezig=false;
-  state.editMode=false; state.editRowData=null; state.editSec=null;
+  state.editMode=false; state.editRowData=null; state.editFoto=null; state.editSec=null;
   state._completeRow=null; state._completeRid=null;
   // Het inlogscherm is een `position:fixed`-overlay: hij dekt het dashboard alleen VISUEEL af.
   // Zonder `inert` bleven alle knoppen erachter met Tab bereikbaar én klikbaar via het

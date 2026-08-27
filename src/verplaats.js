@@ -324,10 +324,13 @@ async function verplaatsTaak(r, doelSec, nietOpgeslagen){
           // seconde rechtgetrokken door de stille resync, maar juist de tak die deze rollback het
           // vaakst afvuurt is 'offline' — en dan komt die resync per definitie niet.
           const dArr = D.ntd[doelSec] || []; const dp = rijIndex(dArr, doelRij);
+          const versDoel = dp > -1 ? dArr[dp] : null;
           // Het anker VÓÓR het verwijderen aflezen, en uit het levende rij-object: `naAfterRow` is
           // het bevroren getal van het klikmoment en kan door de rollback van een eerdere
           // schrijfactie achterhaald zijn — zelfde reden als bij de invoegplek in de writeFn.
-          const naNu2 = (dp > -1 ? doelRij._row : naAfterRow + 1) - 1;
+          // Uit het VERSE object, niet uit `doelRij`: `rijIndex` vindt de rij ook op taaknummer
+          // terug, en dan is het aangeklikte object nog steeds het bevroren exemplaar.
+          const naNu2 = (versDoel ? versDoel._row : naAfterRow + 1) - 1;
           if(dp > -1) dArr.splice(dp, 1);
           _shiftNtdRows(naNu2, -1);      // de invoeging terugdraaien
           _herstelShift(_shiftNtdRows, r._row);   // en de verwijdering — via het huisidioom, want de

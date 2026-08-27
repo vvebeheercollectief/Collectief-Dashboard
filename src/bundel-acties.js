@@ -26,6 +26,7 @@
 // Eén lezing, geen extra verzoek.
 import { SID, SKEYS } from "./config.js";
 import { state, D } from "./state.js";
+import { rijIndex } from "./rij.js";
 import { _veiligeRij, assertRowsMatch, fetchSheet, sheetsFetch } from "./api.js";
 import { backgroundWrite, blokkeerOffline } from "./data.js";
 import { ensureToken } from "./auth.js";
@@ -144,10 +145,13 @@ function heeftRij(...rijen){
 // aanroeper die er straks bij komt: die krijgt een melding in plaats van een stille schrijfactie in
 // een wildvreemde rij. Niet op de rij-guard vertrouwen: die vangt het meestal (de vingerafdruk van
 // een andere taak matcht niet), maar dat is toeval en geen ontwerp.
-// Vergelijkt op OBJECT-identiteit: D.af bevat exact de rij-objecten die uit 'Afgerond' geparst
-// zijn, dus een openstaande taak kan hier niet vals op aanslaan.
+// Via `rijIndex` en niet via `.includes(r)`: dat laatste is objectidentiteit, en die is precies wat
+// een tussentijdse verversing wegneemt — `loadAll` vervangt óók elk object in D.af. De guard zei
+// dan 'niet afgerond' over een taak die net gearchiveerd was. `rijIndex` vindt hem op taaknummer
+// terug, en valt bij een rij zonder nummer terug op de inhoud; bij twijfel geeft hij -1 en
+// blokkeren we niet — dezelfde kant op als voorheen, dus dit kan niet vals alarm slaan.
 function blokkeerAfgerond(...rijen){
-  const uitAfgerond = r => SKEYS.some(s => ((D.af && D.af[s]) || []).includes(r));
+  const uitAfgerond = r => SKEYS.some(s => rijIndex((D.af && D.af[s]) || [], r) > -1);
   if (!rijen.some(uitAfgerond)) return false;
   alert('Deze taak is al afgerond. Zet hem eerst terug voordat je de bundel wijzigt.');
   return true;

@@ -43,7 +43,7 @@ export const state = {
   _gsiErrorCb: null,       // per-aanvraag gebonden GIS error_callback (popup gesloten/geblokkeerd)
   // taak-bewerkmodus
   editMode: false,
-  editRowData: null,
+  editFoto:null, editRowData: null,
   editSec: null,
   // analytics
   anaPeriod: 'maand',     // 'dag' | 'week' | 'maand' | 'kwartaal'

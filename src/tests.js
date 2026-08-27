@@ -10,6 +10,7 @@ import { filterVves } from "./vve-zoekveld.js";
 import { filterNtd, setNtd, renderNtd, ntdPagina, renderNtdStats, renderAf, setAf, bepaalStil, bouwStilIndex, _zetStilIndex, signaalDelen, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey, kopOpen, zetKopOpen, toggleBundel, springNaarBundel, wisNtdFilters, absorbeer, isPlatteWeergave, erIsGefilterd, rowNtd, filterAf, afFilterWaarden } from "./render-lijsten.js";
 import { HERO_VIEWS } from "./render-analytics.js";
 import { state, D, pgs } from "./state.js";
+import { verseRij, rijIndex, regelIndex } from "./rij.js";
 import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel, renderVve, groepeerBundels } from "./render-vve.js";
 import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN, saveKenmerken } from "./kenmerken.js";
 import { zoekAlles, openPalette, closePalette, palOpen } from "./palette.js";
@@ -450,61 +451,163 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   // symptoom zat, niet de vórm. Deze twee toetsen bewaken de vorm, zodat een nieuwe mutatieweg
   // niet stil dezelfde fout kan maken. Ze zijn met opzet saai en letterlijk: ze lezen de bron.
 
-  // ── 1. Geen rij opzoeken op OBJECT-identiteit in een mutatieweg ──
-  // In deze bestanden hoort een rij teruggevonden te worden met `rijIndex`/`verseRij`/`regelIndex`
-  // (src/rij.js) en niet met een kale `indexOf`. Een `indexOf` op een tekst is prima, en een enkele
-  // uitzondering mag — die moet dan wél op diezelfde regel `vorm-ok:` dragen mét de reden. Zo is
-  // 'ik heb erover nagedacht' zichtbaar in de code in plaats van in iemands hoofd.
-  await (async()=>{
-    const MUTATIE_BESTANDEN = ['crud.js','bulk.js','verplaats.js','bundel-acties.js',
-                               'render-herhaal.js','render-overig.js','render-vve.js','kenmerken.js'];
-    const fout = [];
-    for(const naam of MUTATIE_BESTANDEN){
-      let bron;
-      try { bron = await (await fetch('./src/' + naam, {cache:'no-store'})).text(); }
-      catch(e){ fout.push(naam + ': niet te lezen'); continue; }
-      bron.split('\n').forEach((regel, i) => {
-        if(!regel.includes('.indexOf(')) return;
-        if(/^\s*(\/\/|\*)/.test(regel)) return;              // commentaarregel
-        if(/\.indexOf\(\s*['"`]/.test(regel)) return;          // indexOf op een TEKST — geen rij
-        if(regel.includes('vorm-ok:')) return;                 // bewuste uitzondering mét reden
-        fout.push(`${naam}:${i+1}  ${regel.trim().slice(0,70)}`);
-      });
-    }
-    eq('vormcontrole: geen kale indexOf op een rij in een mutatieweg (gebruik rijIndex/verseRij)',
-       fout.join(' | '), '');
+  // ── 0. De kern zelf: verseRij / rijIndex / regelIndex op hun randen ──
+  // Alles hierboven leunt hierop, dus dit is de plek waar de regel hard vastligt. Let vooral op de
+  // twee weiger-gevallen: dubbelzinnig is geen 'kies er maar een', dat is 'doe niets'.
+  (()=>{
+    const b = (o) => Object.assign({_sec:'OPPAKKEN', code:'311212', naam:'VvE', actiepunt:'werk',
+      deadline:'', behandelaar:'Jer', prioriteit:'', opmerkingen:'', inBehandeling:''}, o);
+    const oud  = b({taakId:'T1', _row:4, actiepunt:'oude tekst'});
+    const vers = b({taakId:'T1', _row:9, actiepunt:'inhoud is intussen gewijzigd'});
+    truthy('rij: het TAAKNUMMER wint van de inhoud', verseRij(oud, [b({taakId:'T2',_row:8}), vers]) === vers);
+    const zonder = b({taakId:'', _row:4}), metNr = b({taakId:'T9', _row:7});
+    truthy('rij: zonder nummer valt hij terug op de inhoud', verseRij(zonder, [metNr]) === metNr);
+    eq('rij: twee inhoudelijk gelijke rijen zonder nummer → niets doen',
+       verseRij(zonder, [b({taakId:'',_row:7}), b({taakId:'',_row:8})]), null);
+    eq('rij: twee rijen met hetzelfde nummer → niets doen (mag niet bestaan)',
+       verseRij(oud, [b({taakId:'T1',_row:7}), b({taakId:'T1',_row:8})]), null);
+    eq('rij: onbekende sectie → null', verseRij({_sec:'BESTAAT-NIET', taakId:'T1'}), null);
+    eq('rij: lege lijst → null', verseRij(oud, []), null);
+    eq('rij: geen rij → null', verseRij(null), null);
+    eq('rij: rijIndex zonder rij → -1', rijIndex([], null), -1);
+    // regelIndex: dezelfde vraag voor de tabbladen met een eigen sleutel.
+    const h1 = {id:'H1', _row:2}, h2 = {id:'H2', _row:3};
+    eq('rij: regelIndex vindt op de meegegeven sleutel', regelIndex([h2, {id:'H1',_row:9}], h1, x=>x.id), 1);
+    eq('rij: regelIndex zonder sleutel doet alleen object-identiteit', regelIndex([{...h1}], h1), -1);
+    eq('rij: regelIndex weigert bij twee gelijke sleutels', regelIndex([{id:'H1'},{id:'H1'}], h1, x=>x.id), -1);
   })();
 
-  // ── 2. Elke rij-actie staat in het register en loopt langs de gedeelde poort ──
-  // `taakUitCache` is de ENIGE ingang waar een aangeklikte rij vers gemaakt wordt. Komt er een
-  // rij-actie bij die dat overslaat, dan werkt die op het object van de laatste render — en dat is
-  // precies de fout die we hier uitroeien. Deze toets dwingt af dat iedere actie die met een
-  // `data-rid` binnenkomt bewust in dit register staat.
+  // ── Gedeelde bronlezer voor de tripdraden hieronder ──
+  // Een fetch GOOIT NIET bij een 404: je krijgt netjes de 404-pagina terug. Twee van de drie
+  // tripdraden hieronder lazen daardoor op productie HTML in plaats van broncode, vonden daar de
+  // verboden vorm niet, en stonden groen zonder ook maar één regel code gezien te hebben. Deze
+  // lezer eist een geslaagde respons ÉN een anker dat alleen in echte broncode voorkomt, en gooit
+  // anders — zodat een onleesbare bron een RODE toets is en geen stilte.
+  const _leesBron = async (pad, anker) => {
+    const res = await fetch(new URL(pad, document.baseURI), {cache:'no-store'});
+    if(!res.ok) throw new Error(pad + ': HTTP ' + res.status);
+    const t = await res.text();
+    if(anker && !t.includes(anker)) throw new Error(pad + ': geen broncode (anker ontbreekt)');
+    return t;
+  };
+  // De modulegraaf vanaf main.js, als naam → bron. Bewust de graaf en geen handlijst: een handlijst
+  // vergeet precies het bestand dat er later bij komt, en dat is de manier waarop deze fout steeds
+  // terugkwam.
+  const _graaf = await (async()=>{
+    const uit = new Map(), tedoen = ['main.js'];
+    while(tedoen.length){
+      const naam = tedoen.pop();
+      if(uit.has(naam) || naam === 'tests.js') continue;
+      const bron = await _leesBron('src/' + naam, 'export ');
+      uit.set(naam, bron);
+      for(const m of bron.matchAll(/from\s*["']\.\/([\w.-]+\.js)["']/g)) tedoen.push(m[1]);
+      for(const m of bron.matchAll(/import\(\s*["']\.\/([\w.-]+\.js)["']\s*\)/g)) tedoen.push(m[1]);
+    }
+    return uit;
+  })();
+
+  // ── 1. Geen rij opzoeken op OBJECT-identiteit in een mutatieweg ──
+  // In elk bestand dat naar de Sheet schrijft hoort een rij teruggevonden te worden met
+  // `rijIndex`/`verseRij`/`regelIndex` (src/rij.js) en niet op object-identiteit. `loadAll` vervangt
+  // élk rij-object bij elke ronde, dus identiteit is een aanname die een halve seconde meegaat.
+  //
+  // De toets kijkt niet naar de NAAM van de lijst maar naar wat er gezocht wordt: is de meegegeven
+  // variabele elders in dat bestand als rij gebruikt (`x._row`, `x._sec`, `x.taakId`), dan is dit een
+  // rij-zoekactie. Zo blijven `.includes(q)` op een zoekterm en `.indexOf(sleutel)` op een tekst
+  // buiten schot — nagemeten: nul valse treffers op de huidige code, en alle zestien plekken van
+  // vóór deze verbouwing werden gevonden, inclusief de twee (`.includes(r)` in bundel-acties.js en
+  // `D.alvo.indexOf(r)`) die de eerdere, bredere versie van deze toets niet zag.
+  //
+  // Een bewuste uitzondering mag, maar draagt dan `vorm-ok:` op diezelfde regel mét de reden.
+  await (async()=>{
+    try{
+      const SCHRIJFT = /backgroundWrite\(|writeRange\(|writeRows\(|appendRange\(|sheetsFetch\(/;
+      const bestanden = [...(_graaf.keys())].filter(n => SCHRIJFT.test(_graaf.get(n))).sort();
+      // Tegenproef: zonder deze assert zou een kapotte afleiding een lege lijst opleveren en zou de
+      // toets voor altijd groen staan zonder iets te lezen.
+      truthy('vormcontrole: de mutatiebestanden komen uit de modulegraaf (' + bestanden.length + ')',
+             bestanden.length >= 12);
+      const ZOEK = /\.(indexOf|lastIndexOf|includes)\(\s*([A-Za-z_$][\w$]*)\s*\)/g;
+      const CB   = /\.(findIndex|findLastIndex|find|some|filter)\(\s*\(?\s*([A-Za-z_$][\w$]*)\s*\)?\s*=>\s*(?:\2\s*===\s*([A-Za-z_$][\w$]*)|([A-Za-z_$][\w$]*)\s*===\s*\2)\s*\)/g;
+      const fout = [];
+      for(const naam of bestanden){
+        const bron = _graaf.get(naam);
+        const isRij = v => new RegExp('\\b' + v + '\\s*\\.\\s*(_row|_sec|taakId)\\b').test(bron);
+        bron.split('\n').forEach((regel, i) => {
+          if(/^\s*(\/\/|\*)/.test(regel)) return;          // commentaarregel
+          if(regel.includes('vorm-ok:')) return;           // bewuste uitzondering mét reden
+          ZOEK.lastIndex = 0; CB.lastIndex = 0;
+          let m, raak = null;
+          while((m = ZOEK.exec(regel))) if(isRij(m[2])){ raak = m[0]; break; }
+          if(!raak) while((m = CB.exec(regel))){ const a = m[3] || m[4]; if(a && isRij(a)){ raak = m[0]; break; } }
+          if(raak) fout.push(`${naam}:${i+1} ${raak}`);
+        });
+      }
+      eq('vormcontrole: geen rij op OBJECT-identiteit opgezocht in een mutatieweg (gebruik rijIndex/verseRij)',
+         fout.join(' | '), '');
+    }catch(e){ truthy('vormcontrole: bron leesbaar (' + (e && e.message) + ')', false); }
+  })();
+
+  // ── 2. Elke rij-actie loopt aantoonbaar langs de gedeelde poort ──
+  // `taakUitCache` (crud.js) is de enige ingang waar een aangeklikte rij vers gemaakt wordt. De
+  // eerste versie van deze toets vergeleek alleen NAMEN met een register — en de route die ernaast
+  // stond ('completeTask → taakUitCache') was vrije tekst die door niets werd nagerekend. Nu volgt
+  // de toets de route echt: van de actie naar de functie die het rij-nummer ontvangt, en dan of
+  // díe functie de poort aanroept. Het register is daarmee een bewering die faalt als hij niet klopt.
   await (async()=>{
     const REGISTER = {
-      'taak-bewerken':      'taakUitCache → openModal',
-      'taak-afronden':      'completeTask → taakUitCache',
-      'taak-wegleggen':     'openSnoozeModal → taakUitCache',
-      'taak-inbehandeling': 'zetInBehandeling → taakUitCache',
-      'bulk-vink':          'bulkVink → verseRij',
-      'subsidie-fase':      'zetSubsidieFase → taakUitCache',
-      'ontw-bewerken':      'editOntwItem → taakUitCache (Ontwikkeling: eigen identiteit, geen NTD-rij)',
+      'taak-bewerken':      'taakUitCache',
+      'taak-afronden':      'taakUitCache',
+      'taak-wegleggen':     'taakUitCache',
+      'taak-inbehandeling': 'taakUitCache',
+      'bulk-vink':          'verseRij',
+      'subsidie-fase':      'taakUitCache',
+      'ontw-bewerken':      'taakUitCache',
     };
-    let bron;
-    try { bron = await (await fetch('./src/actions.js', {cache:'no-store'})).text(); }
-    catch(e){ truthy('rij-acties: actions.js te lezen ('+(e&&e.message)+')', false); return; }
-    const gevonden = new Set();
-    let huidige = null;
-    bron.split('\n').forEach(regel => {
-      const m = /^\s*'([^']+)'\s*:/.exec(regel);
-      if(m) huidige = m[1];
-      if(huidige && regel.includes('dataset.rid')) gevonden.add(huidige);
-    });
-    const nieuw = [...gevonden].filter(k => !(k in REGISTER)).sort();
-    const weg   = Object.keys(REGISTER).filter(k => !gevonden.has(k)).sort();
-    eq('rij-acties: elke actie met een data-rid staat in het register (voeg hem toe én toets hem)',
-       nieuw.join(', '), '');
-    eq('rij-acties: het register bevat geen acties die niet meer bestaan', weg.join(', '), '');
+    try{
+      const acties = _graaf.get('actions.js') || await _leesBron('src/actions.js', 'export ');
+      const regels = acties.split('\n');
+      // Alleen het ACTIONS-object zelf: de eerste `};` op kolom 0 sluit het. Zonder die grens liep
+      // de sleutelherkenning door tot het einde van het bestand en kreeg de laatste actie de
+      // regels van `initActions` erbij.
+      const eind = regels.findIndex(r => r === '};');
+      truthy('rij-acties: het ACTIONS-object is af te bakenen', eind > 0);
+      const blok = {};
+      let huidige = null;
+      regels.slice(0, eind > 0 ? eind : regels.length).forEach(r => {
+        const m = /^\s{2}['"]([^'"]+)['"]\s*:/.exec(r);   // beide soorten aanhalingstekens
+        if(m){ huidige = m[1]; blok[huidige] = []; }
+        if(huidige) blok[huidige].push(r);
+      });
+      const zoekFunctie = (naam) => {
+        for(const [bestand, bron] of _graaf){
+          const m = new RegExp('(?:export\\s+)?(?:async\\s+)?function\\s+' + naam + '\\s*\\(').exec(bron)
+                 || new RegExp('(?:export\\s+)?const\\s+' + naam + '\\s*=').exec(bron);
+          if(m){ const rest = bron.slice(m.index); const e = rest.search(/\n\}/); return {bestand, body: e > -1 ? rest.slice(0, e) : rest}; }
+        }
+        return null;
+      };
+      const gevonden = new Set(), fout = [];
+      for(const [naam, rs] of Object.entries(blok)){
+        const tekst = rs.join('\n');
+        if(!/dataset\.rid|data-rid/.test(tekst)) continue;
+        gevonden.add(naam);
+        const verwacht = REGISTER[naam];
+        if(!verwacht) continue;                      // wordt hieronder als 'nieuw' gemeld
+        if(tekst.includes(verwacht + '(')) continue; // de poort staat in de actie zelf
+        const doel = /([\w$]+)\(\s*\+?\s*el\.dataset\.rid/.exec(tekst);
+        if(!doel){ fout.push(naam + ': geen doelfunctie te vinden'); continue; }
+        const fn = zoekFunctie(doel[1]);
+        if(!fn){ fout.push(`${naam}: ${doel[1]} nergens gedefinieerd`); continue; }
+        if(!fn.body.includes(verwacht + '(')) fout.push(`${naam}: ${doel[1]} (${fn.bestand}) roept ${verwacht} NIET aan`);
+      }
+      const nieuw = [...gevonden].filter(k => !(k in REGISTER)).sort();
+      const weg   = Object.keys(REGISTER).filter(k => !gevonden.has(k)).sort();
+      eq('rij-acties: elke actie met een data-rid staat in het register', nieuw.join(', '), '');
+      eq('rij-acties: het register bevat geen acties die niet meer bestaan', weg.join(', '), '');
+      eq('rij-acties: en de route in het register klopt ook echt', fout.join(' | '), '');
+      truthy('rij-acties: er zijn rij-acties gevonden (' + gevonden.size + ')', gevonden.size >= 6);
+    }catch(e){ truthy('rij-acties: bron leesbaar (' + (e && e.message) + ')', false); }
   })();
 
   // ── 3. En de poort doet ook echt wat hij belooft: een VEROUDERDE rij wordt vers gemaakt ──
@@ -541,18 +644,29 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   // Deze fout zat in drie functies tegelijk omdat ze van elkaar overgeschreven zijn:
   // `e.source.getActiveSheet()` geeft het tabblad dat vooraan STAAT, terwijl de rijnummers uit
   // `e.range` komen. Twee bronnen van waarheid voor één bewerking, en de allowlist die een back-up
-  // moet weren kan er precies door heen glippen. Eén regel bron lezen houdt dat tegen.
+  // moet weren kan er precies doorheen glippen.
+  //
+  // LET OP: `apps-script` staat in de exclude-lijst van _config.yml, dus op de gepubliceerde site
+  // bestaat die map niet. De vorige versie deed daar `catch → continue` en meldde groen zonder één
+  // regel gelezen te hebben. Nu zegt de toets hardop dát hij hier niets kon lezen; de echte
+  // controle op de echte bestanden zit in tools/syntaxcheck.js, dat lokaal vóór elke uitrol draait.
   await (async()=>{
-    const fout = [];
+    const fout = [], gelezen = [];
     for(const naam of ['Code.gs','Notifications.gs','Opvolging.gs','AutoPrioriteit.gs']){
       let bron;
-      try { bron = await (await fetch('./apps-script/' + naam, {cache:'no-store'})).text(); }
-      catch(e){ continue; }   // niet elke omgeving serveert deze map; dan zwijgt de toets
+      try { bron = await _leesBron('./apps-script/' + naam, 'function '); }
+      catch(e){ continue; }
+      gelezen.push(naam);
       bron.split('\n').forEach((regel, i) => {
         if(/^\s*(\/\/|\*)/.test(regel)) return;
         if(regel.includes('getActiveSheet()')) fout.push(`${naam}:${i+1}`);
       });
     }
+    if(!gelezen.length){
+      truthy('apps-script: NIET hier getoetst — map staat niet op deze host; tools/syntaxcheck.js doet het lokaal', true);
+      return;
+    }
+    eq('apps-script: alle vier de bronbestanden gelezen', gelezen.length, 4);
     eq('apps-script: geen enkele trigger leest het ACTIEVE tabblad (gebruik e.range.getSheet())',
        fout.join(', '), '');
   })();
@@ -4973,7 +5087,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '11.4');
+  eq('versie opgehoogd', APP_VERSION, '11.5');
 
   // ── Pushmeldingen: de twee schakels die stil kapot waren (audit 2026-08-06) ──
   // Beide defecten waren onzichtbaar: de app meldde "Notificaties zijn aan!" terwijl er nooit

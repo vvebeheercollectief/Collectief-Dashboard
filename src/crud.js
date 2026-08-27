@@ -179,10 +179,21 @@ function herzieAlsSubtaak(sec){
   if(hintEl) hintEl.textContent = '';
 }
 
+// De inhoud van de taak op het moment dat het bewerkscherm openging. Alleen de velden die DIT
+// scherm zelf schrijft: de laatste drie kolommen blijven erbuiten, want Q is het taaknummer (dat is
+// identiteit, geen inhoud) en R/S zijn de bundelkolommen — die wijzigen door 'Hoort bij' terwijl
+// dit scherm openstaat, en dat is de gebruiker zelf.
+function _inhoudsFoto(r){
+  if(!r||!SECS[r._sec]) return null;
+  const v=serializeNtdUndo(r);
+  return v.slice(0, v.length-3).join('\x1f');
+}
+
 function openModal(isEdit,rowData,opts){
   state.editMode=!!isEdit;
   const sec=isEdit?rowData._sec:((opts&&opts.sec)||state.activeNtd);
   state.editRowData=rowData||null;
+  state.editFoto=isEdit?_inhoudsFoto(rowData):null;
   toonSectie(sec,isEdit);
 
   document.getElementById('m-submit-lbl').textContent=isEdit?'Opslaan':'Toevoegen';
@@ -823,7 +834,15 @@ async function deleteTaskRow(r, bijDoorgaan){
       // oude vaste veldketen de mist in (bij offerte en vergaderverzoek stond er iets anders).
       await logEvent(r.code, sec, 'Verwijderd', '', r[OMSCHRIJVING_SLEUTEL[sec]]||taakTitel(r,sec)||'', '');
     },
-    ()=>{ if(rijIndex(arr, r)===-1){ _herstelShift(_shiftNtdRows,oudeRow); arr.splice(Math.min(pos<0?arr.length:pos,arr.length),0,r); } },
+    // De lijst hier OPNIEUW uit D lezen en niet de `arr`-verwijzing van hierboven gebruiken.
+    // `loadAll` zet `D.ntd=p.data` — een compleet nieuw object met nieuwe arrays — en een
+    // geslaagde schrijfactie start die verversing zonder erop te wachten. Deze rollback draait
+    // seconden later; `arr` kan dan een array zijn waar niemand meer naar kijkt. Het terugzetten
+    // gebeurde dan onzichtbaar, terwijl `_herstelShift` de rijnummers van de LEVENDE lijst wél
+    // ophoogde. Zelfde vorm als de rij-val in src/rij.js: een verwijzing vasthouden over een
+    // await heen. Zo doen doCompleteTask en bulk.js het ook.
+    ()=>{ const a=(D.ntd[sec]=D.ntd[sec]||[]);
+          if(rijIndex(a, r)===-1){ _herstelShift(_shiftNtdRows,oudeRow); a.splice(Math.min(pos<0?a.length:pos,a.length),0,r); } },
     'Verwijderen mislukt'
   );
   // rode puls + fade op de oude rij; daarná pas hertekenen
@@ -927,6 +946,18 @@ function _bewerkRijVers(){
   // is D vervangen, dan het verse exemplaar met dezelfde identiteit; en anders null.
   const r=verseRij(bewaard);
   if(!r){alert('Taak niet gevonden. De lijst is intussen ververst — probeer opnieuw.');return null}
+  // Wél de juiste rij, maar met andere INHOUD dan toen dit scherm openging. Dat betekent dat een
+  // collega (of een eigen handeling in een ander scherm) de taak intussen heeft aangepast. Vóór
+  // `verseRij` bestond deze bescherming per ongeluk: her-ankeren lukte alleen bij een letterlijk
+  // identieke rij, dus een gewijzigde taak gaf 'niet gevonden'. `verseRij` vindt hem nu wél — op
+  // taaknummer — en dan zou Opslaan de wijziging van die ander overschrijven zonder dat iemand
+  // het merkt (`assertRowMatch` vergelijkt met de rij die we meesturen, en die is dan al vers).
+  // Daarom hier expliciet, met een melding die zegt wat er aan de hand is. Het scherm blijft open
+  // staan, dus getypte tekst gaat niet verloren.
+  if(state.editFoto && _inhoudsFoto(r)!==state.editFoto){
+    alert('Deze taak is intussen gewijzigd — door een collega of vanuit een ander scherm.\n\nSluit dit scherm en open de taak opnieuw, dan zie je de nieuwe stand. Wat je hier getypt hebt blijft tot die tijd staan.');
+    return null;
+  }
   // Meteen vastzetten, zoals doCompleteTask dat met `state._completeRow` doet: het scherm kan open
   // blijven staan (een 'nee' op de vraag, of een afgebroken opslag), en dan hoort iedereen die er
   // dáárna uit leest — de volgende knop, of de 'Hoort bij'-kiezer die `state.editRowData` bij elke
@@ -1495,8 +1526,12 @@ async function submitTask(){
       // Alleen rijen die er NOG staan tellen mee: is er intussen één afgerond of verwijderd, dan
       // heeft die zijn eigen shift al gedaan en zou zijn oude nummer het anker omlaag trekken.
       const versAnker=()=>{
+        // Het VERSE exemplaar pakken dat `rijIndex` aanwijst, en niet het aangeklikte object:
+        // sinds die op taaknummer terugvalt slaagt de lidmaatschapstoets óók voor een verouderd
+        // object — en juist dát object wordt door `_shiftNtdRows` niet meer meegecorrigeerd, dus
+        // zijn `_row` is precies het bevroren getal waar dit anker vanaf wilde.
         const a2=D.ntd[sec]||[];
-        const levend=rijen.filter(r=>rijIndex(a2, r)>-1);
+        const levend=rijen.map(r=>{ const i=rijIndex(a2, r); return i>-1 ? a2[i] : null; }).filter(Boolean);
         return levend.length ? Math.min(...levend.map(r=>r._row))-1 : afterRow;
       };
       let ingevoegd=false;

@@ -95,7 +95,10 @@ function zetOpen(aan){
   if(!aan){ knop.removeAttribute('aria-activedescendant'); _actief = -1; return; }
   // De lijst wordt bij élke opening opnieuw opgebouwd: 'deze week' schuift op zodra de
   // dag wisselt, en het dashboard blijft dagen achtereen openstaan.
-  _opties = weekOpties({ terug:TERUG, vooruit:VOORUIT });
+  // `bevat`: de al opgeslagen week hoort er altijd in te staan, ook als hij verder dan twaalf
+  // weken terug of zesentwintig vooruit ligt. Zonder dat kon je bij een oud vergaderverzoek je
+  // eigen keuze niet meer zien — en verving één klik hem ongemerkt.
+  _opties = weekOpties({ terug:TERUG, vooruit:VOORUIT, bevat: el(ID.veld)?.value || '' });
   paneel.innerHTML = paneelHtml();
   const gekozenEl = paneel.querySelector('.wk-optie.aan');
   const dezeEl = paneel.querySelector('.wk-optie.deze');

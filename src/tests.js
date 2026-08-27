@@ -5,7 +5,7 @@ import { taakTitel, taakVerwijzing, nieuwTaakId, berekenPrioriteit, kortDatum, _
 import { verwerkMeldingRijen, toonMeldingen, MAX_TOAST_BURST, _whoSleutel, getCurrentWho, undoDelete } from "./notifications.js";
 import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek, logEvents, renderOntw, openOntwModal, closeOntwModal, submitOntwItem, _logRegelSleutel, _ontwSleutel } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM, VELD_LABELS } from "./config.js";
-import { maandagVan, isoWeekJaar, weekDagen, weekPeriodeLabel, parseWeekPeriode, weekOpties } from "./util.js";
+import { maandagVan, isoWeekJaar, weekDagen, weekPeriodeLabel, parseWeekPeriode, weekOpties, weekAfstand } from "./util.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
 import { filterNtd, setNtd, renderNtd, ntdPagina, renderNtdStats, renderAf, setAf, bepaalStil, bouwStilIndex, _zetStilIndex, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey, kopOpen, zetKopOpen, toggleBundel, springNaarBundel, wisNtdFilters, absorbeer, isPlatteWeergave, erIsGefilterd, rowNtd, filterAf, afFilterWaarden } from "./render-lijsten.js";
@@ -1332,6 +1332,114 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
      ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN'].map(stilDrempel),
      [7, 14, 21, 30, 21]);
   eq('stil-drempel: een onbekende sectie valt terug op 7', stilDrempel('BESTAAT-NIET'), 7);
+
+  // ── Een waarde die het scherm niet kan tonen, mag niet verdampen (v12.1) ──
+  // Dezelfde regel die `setv` al voor een <select> hanteerde ("een waarde die er al is mag nooit
+  // verdampen omdat een lijstje hem niet kent"), doorgetrokken naar de velden waar hij niet met een
+  // extra optie op te lossen is: een <input type=date> kent alleen echte datums, de fase-ladder
+  // vijf woorden, de offerte-teller 'n/m'.
+  // Gemeten vóór de reparatie: een taak met deadline 'eind juni' openen en opslaan schreef een LEGE
+  // deadline weg — zonder melding, en zonder dat het in de wijzigingssamenvatting stond. Dit team
+  // typt zulke tekst ook echt ('eind juli' stond in de periodekolom).
+  await (async () => {
+    const _fetch=window.fetch, tokenOud=state.oauthToken, expiryOud=state.oauthExpiry;
+    const idsOud=state._sheetIds, cacheOud=state._uitCache;
+    const bewaardNtd=D.ntd, bewaardSec=state.activeNtd, bewaardPg=pgs.ntd, bewaardDub=state._dubbelcheckUit;
+    const failsOud=state._syncFails;   // de 403-lezingen hieronder mogen de statusbol niet besmetten
+    const dotOud=document.getElementById('dot')?.className;
+    const geschreven=[];
+    let _guardRij=null;                // welke rij de rij-guard hoort terug te lezen
+    try{
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
+      state._sheetIds={'Nog Te Doen':0}; state._uitCache=false; state._dubbelcheckUit=true;
+      window.fetch=async (url, opt) => {
+        const methode=(opt&&opt.method)||'GET';
+        if(methode==='PUT'){
+          geschreven.push({ bereik: decodeURIComponent(String(url)).split('/values/')[1].split('?')[0],
+                            rij: JSON.parse(opt.body).values[0] });
+          return new Response('{}',{status:200});
+        }
+        if(methode==='POST') return new Response(JSON.stringify({replies:[{}]}),{status:200});
+        // Een BEWERKING gaat langs de rij-guard, en die LEEST de rij terug om te controleren dat
+        // hij nog dezelfde is. Zonder antwoord blokkeert hij en wordt er niets geschreven — dan
+        // toetst dit blok niets. `_rijNaarCellen` bouwt precies de cellen die de guard verwacht.
+        // LET OP — een KOPIE van vóór de bewerking. submitTask werkt het rij-object meteen bij
+        // (optimistisch) en de vingerafdruk kijkt naar de deadline- en omschrijvingskolom; gaf de
+        // stub het levende object terug, dan las de guard de NIEUWE waarden terug, zag hij een
+        // verschil en rolde hij de bewerking terug. Kostte een half uur: het leek alsof alléén een
+        // deadline wijzigen niet opsloeg, terwijl de toets zichzelf in de weg zat.
+        if(_guardRij && /\/values\//.test(String(url)) && !/batchGet/.test(String(url))){
+          return new Response(JSON.stringify({ values:[ _rijNaarCellen('Nog Te Doen', _guardRij) ] }),{status:200});
+        }
+        return new Response(JSON.stringify({error:{message:'geen leesronde in deze test'}}),{status:403});
+      };
+      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+
+      // 1. DEADLINE die geen datum is.
+      const rij={ _row:70, _sec:'OPPAKKEN', code:'311212', naam:'Testflat', actiepunt:'Werk',
+                  deadline:'eind juni', behandelaar:'Jer', opmerkingen:'', inBehandeling:'' };
+      D.ntd={ ...leeg, OPPAKKEN:[rij] }; state.activeNtd='OPPAKKEN'; pgs.ntd=1; _guardRij={...rij};
+      openModal(true, rij);
+      eq('onvertaalbaar: het datumveld blijft leeg, want dit is geen datum',
+         document.getElementById('m-dl').value, '');
+      truthy('onvertaalbaar: en de gebruiker ziet waaróm',
+         (document.getElementById('dl-hint').textContent||'').includes('eind juni'));
+      document.getElementById('m-opm').value='iets anders';   // een échte wijziging
+      await submitTask(); await state._writeChain;
+      const r1=(geschreven[0]||{rij:[]}).rij;
+      eq('onvertaalbaar: de oorspronkelijke tekst staat nog in de deadline-kolom', r1[3], 'eind juni');
+      truthy('onvertaalbaar: en de rest van de rij is wél bijgewerkt', r1[6]==='iets anders');
+
+      // 2. Tegenproef: kiest de gebruiker WEL een datum, dan wint die.
+      geschreven.length=0;
+      D.ntd={ ...leeg, OPPAKKEN:[rij] }; state.activeNtd='OPPAKKEN'; pgs.ntd=1; _guardRij={...rij};
+      openModal(true, rij);
+      document.getElementById('m-dl').value='2026-09-14';
+      await submitTask(); await state._writeChain;
+      eq('onvertaalbaar: een gekozen datum vervangt de oude tekst',
+         (geschreven[0]||{rij:[]}).rij[3], '14-09-2026');
+
+      // 3. FASE die niet in de ladder staat.
+      geschreven.length=0;
+      const sub={ _row:71, _sec:'SUBSIDIE-TRAJECTEN', code:'311212', naam:'Testflat',
+                  subsidie:'SVVE', subsidieFase:'Toegekend', behandelaar:'Jer', deadline:'', opmerkingen:'', inBehandeling:'' };
+      D.ntd={ ...leeg, 'SUBSIDIE-TRAJECTEN':[sub] }; state.activeNtd='SUBSIDIE-TRAJECTEN'; pgs.ntd=1; _guardRij={...sub};
+      openModal(true, sub);
+      document.getElementById('m-opm-s').value='gewijzigd';
+      await submitTask(); await state._writeChain;
+      eq('onvertaalbaar: een onbekende fase blijft staan i.p.v. terug te vallen op Voorbereiden',
+         (geschreven[0]||{rij:[]}).rij[3], 'Toegekend');
+
+      // 4. Tegenproef: klikt de gebruiker een fase aan, dan wint die.
+      geschreven.length=0;
+      D.ntd={ ...leeg, 'SUBSIDIE-TRAJECTEN':[sub] }; state.activeNtd='SUBSIDIE-TRAJECTEN'; pgs.ntd=1; _guardRij={...sub};
+      openModal(true, sub);
+      kiesModalFase(4);
+      await submitTask(); await state._writeChain;
+      eq('onvertaalbaar: een aangeklikte fase vervangt de onbekende waarde',
+         (geschreven[0]||{rij:[]}).rij[3], 'Verleend');
+
+      // 5. OFFERTE-TELLER die geen 'n/m' is.
+      geschreven.length=0;
+      const off={ _row:72, _sec:'OFFERTE-TRAJECTEN', code:'311212', naam:'Testflat',
+                  datumAangevraagd:'', offertes:'twee van drie', behandelaar:'Jer', deadline:'', opmerkingen:'' };
+      D.ntd={ ...leeg, 'OFFERTE-TRAJECTEN':[off] }; state.activeNtd='OFFERTE-TRAJECTEN'; pgs.ntd=1; _guardRij={...off};
+      openModal(true, off);
+      document.getElementById('m-opm-o').value='gewijzigd';
+      await submitTask(); await state._writeChain;
+      eq('onvertaalbaar: een onleesbare offerte-teller blijft staan i.p.v. leeg te worden',
+         (geschreven[0]||{rij:[]}).rij[3], 'twee van drie');
+
+      for(let i=0;i<100 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,5));
+    } finally {
+      window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
+      state._sheetIds=idsOud; state._uitCache=cacheOud; state._dubbelcheckUit=bewaardDub;
+      state._syncFails=failsOud;
+      if(dotOud!==undefined){ const d=document.getElementById('dot'); if(d) d.className=dotOud; }
+      D.ntd=bewaardNtd; state.activeNtd=bewaardSec; pgs.ntd=bewaardPg;
+      closeModal(); clearModal(); setNtd(bewaardSec);
+    }
+  })();
 
   // ── De deadline-cel draagt de urgentie (v12.0) ──
   // Dit blok toetste tot v12.0 `signaalDelen`, de motor achter de signaal-kolom. Die kolom is weg:
@@ -2696,6 +2804,11 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       }}}};
       state._gsiTokenClient=null; state.oauthToken=null; state.oauthExpiry=0;
       state.currentUserEmail='info@vvebeheercollectief.nl'; state._syncFails=0;
+      // De statusbol óók op een bekende stand zetten. Deze toets leest de DOM, en een eerder blok
+      // dat met een gestubde fetch werkt kan 'err' hebben laten staan — dan is 'toont nog geen
+      // Fout' rood zonder dat er iets stuk is. Een toets hoort niet af te hangen van wat een
+      // ander blok toevallig achterliet.
+      { const d=document.getElementById('dot'); if(d) d.className='dot'; }
       const isFout=()=>document.getElementById('dot').className.includes('err');
       // Eerst wachten tot een eventuele lopende ronde klaar is: staat _loadInFlight nog op true,
       // dan keert loadAll meteen terug zónder de tokenvernieuwing te proberen en telt _syncFails
@@ -5195,7 +5308,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '12.0');
+  eq('versie opgehoogd', APP_VERSION, '12.1');
 
   // ── Tabbladen ÍN de kaartkop (v11.7) ──
   // De kop van de kaart zei links exact hetzelfde als het actieve tabblad — 'Oppakken' boven
@@ -5265,6 +5378,31 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     truthy('weekkeuze: elke ingang is zelf weer terug te lezen',
        opties.every(o => parseWeekPeriode(o.waarde) !== null));
     truthy('weekkeuze: elke ingang draagt een maandkop', opties.every(o => /^[a-z]+ \d{4}$/.test(o.maandKop)));
+
+    // Een al opgeslagen week hoort ALTIJD in de lijst te staan, ook buiten het standaardbereik.
+    // Zelfde regel als bij `setv`: een waarde die er al is mag niet verdampen omdat een lijstje hem
+    // niet kent. Een vergaderverzoek van vier maanden geleden viel anders buiten de twaalf weken
+    // terug — de knop toonde de week wél, de lijst niet, en één klik verving hem ongemerkt.
+    (() => {
+      const vandaag = new Date(2026, 7, 27);
+      const ver = weekPeriodeLabel(maandagVan(new Date(2026, 7, 27 + 40 * 7)));   // 40 weken vooruit
+      const oud = weekPeriodeLabel(maandagVan(new Date(2026, 7, 27 - 30 * 7)));   // 30 weken terug
+      const zonder = weekOpties({ terug:12, vooruit:26, vandaag });
+      truthy('weekkeuze: zo ver vooruit staat er normaal niet in', !zonder.some(o => o.waarde === ver));
+      [ver, oud].forEach(w => {
+        const met = weekOpties({ terug:12, vooruit:26, vandaag, bevat:w });
+        truthy(`weekkeuze: met bevat staat '${w}' er wél in`, met.some(o => o.waarde === w));
+        truthy('weekkeuze: en deze week blijft er ook in staan', met.filter(o => o.deze).length === 1);
+        truthy('weekkeuze: de lijst blijft aaneengesloten',
+           met.every((o, i) => i === 0 || Math.round((o.ma - met[i-1].ma) / 864e5) === 7));
+      });
+      // Een oude, met de hand getypte waarde is geen week en mag de lijst niet oprekken.
+      eq('weekkeuze: een niet-week laat het bereik ongemoeid',
+         weekOpties({ terug:12, vooruit:26, vandaag, bevat:'sept/okt' }).length, 39);
+      eq('weekkeuze: afstand van een niet-week is niet te bepalen', weekAfstand('sept/okt', vandaag), null);
+      eq('weekkeuze: afstand van deze week is nul',
+         weekAfstand(weekPeriodeLabel(maandagVan(vandaag)), vandaag), 0);
+    })();
 
     // De cel in de tabel: twee regels, en geen pil meer.
     const cel = periodeCel('Week 38 · 14–18 sep 2026');

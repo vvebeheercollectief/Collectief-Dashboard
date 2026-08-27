@@ -14,7 +14,7 @@ import { showToast, showUndoToast, fireNotifEvent, undoComplete, undoDelete } fr
 import { animateRowOut, flashRow } from "./anim.js";
 import { logEvent, logEvents, renderTaskHistory } from "./render-overig.js";
 import { backgroundWrite, loadAll, blokkeerOffline } from "./data.js";
-import { faseIndex, faseWoord, faseRijHtml, faseWijziging } from "./subsidie-fase.js";
+import { faseIndex, faseWoord, faseRijHtml, faseWijziging, SUBSIDIE_FASES } from "./subsidie-fase.js";
 import { bouwBundelIndex, bundelVerwijzing, openSubtaken, bundelWaarschuwing, heeftSubtaken } from "./bundel.js";
 import { koppelTaak } from "./bundel-acties.js";
 import { vraagBevestiging } from "./bevestig.js";
@@ -223,6 +223,7 @@ function openModal(isEdit,rowData,opts){
   // een <select>, die daarmee op 'geen selectie' zou blijven staan.
   zetSectieKiezer(sec,isEdit);
   zetDeadlineVoorstel(sec,isEdit);
+  toonOnvertaalbaar(sec);   // ná het voorstel: dat maakt élk hint-zinnetje eerst leeg
   toonMeerVve(isEdit);
 
   document.getElementById('modal-bg').classList.add('open');
@@ -349,33 +350,43 @@ function fillModalFields(sec,r){
   const tog=(id,on)=>{const e=document.getElementById(id);if(e){e.classList.toggle('on',!!on);e.setAttribute('aria-checked',!!on);}};
   switch(sec){
     case'OPPAKKEN':
-      setv('m-actie',r.actiepunt);setv('m-dl',toISODate(r.deadline));setv('m-beh',r.behandelaar);
+      setv('m-actie',r.actiepunt);zetDatumVeld('m-dl',r.deadline);setv('m-beh',r.behandelaar);
       setv('m-opm',r.opmerkingen);setv('m-sub-opp',r.subcategorie);
       tog('tog-ib',r.inBehandeling==='TRUE');break;
     case'VERGADERVERZOEKEN':
       setv('m-per',r.periode);zetWeekKiezer();setv('m-beh-v',r.behandelaar);setv('m-agenda',r.agendapunten||r.actiepunt);
-      setv('m-dl-v',toISODate(r.deadline));setv('m-opm-v',r.opmerkingen);setv('m-sub-verg',r.subcategorie);
+      zetDatumVeld('m-dl-v',r.deadline);setv('m-opm-v',r.opmerkingen);setv('m-sub-verg',r.subcategorie);
       tog('tog-ib-v',r.inBehandeling==='TRUE');break;
     case'OFFERTE-TRAJECTEN':
-      setv('m-daang',toISODate(r.datumAangevraagd));setv('m-beh-o',r.behandelaar);
+      zetDatumVeld('m-daang',r.datumAangevraagd);setv('m-beh-o',r.behandelaar);
       // `_offertesManual` vóór `offertes`: dat eerste IS kolom D, het tweede is wat het scherm
       // ervan maakt. `_verrijkOfferteRij` tilt de teller in het geheugen op tot het aantal
       // aangevinkte aannemers (kolom D telt daarbij als ondergrens) en schrijft dat in `offertes`.
       // Las dit veld die afgeleide waarde, dan zette één keer opslaan hem alsnog in kolom D — en
       // omdat de ondergrens met Math.max werkt, kwam je daar nooit meer onder: een vinkje weghalen
       // veranderde de teller daarna niet meer. Gemeten: kolom D '0/3' met twee vinkjes toonde '2/3'.
-      {const[ontv,totaal]=((r._offertesManual!==undefined?r._offertesManual:r.offertes)||'').split('/').map(s=>parseInt(s)||0);
-      setv('m-off-recv',ontv||0);setv('m-off-total',totaal||0);}
-      setv('m-dl-o',toISODate(r.deadline));setv('m-opm-o',r.opmerkingen);setv('m-sub-off',r.subcategorie);break;
+      {const ruwOff=((r._offertesManual!==undefined?r._offertesManual:r.offertes)||'');
+      const[ontv,totaal]=ruwOff.split('/').map(s=>parseInt(s)||0);
+      setv('m-off-recv',ontv||0);setv('m-off-total',totaal||0);
+      // Twee tellers kunnen alleen 'n/m' weergeven. Staat er iets anders in kolom D, dan blijft
+      // dat staan in plaats van als lege teller te worden weggeschreven.
+      onthoudOnvertaalbaar('m-off', ruwOff, /^\s*\d+\s*\/\s*\d+\s*$/.test(ruwOff) ? ruwOff : '');}
+      zetDatumVeld('m-dl-o',r.deadline);setv('m-opm-o',r.opmerkingen);setv('m-sub-off',r.subcategorie);break;
     case'LOD':
       setv('m-actie-l',r.actiepunt);setv('m-stat-l',r.status);setv('m-beh-l',r.behandelaar);
-      setv('m-dl-l',toISODate(r.deadline));setv('m-opm-l',r.opmerkingen);setv('m-sub-lod',r.subcategorie);
+      zetDatumVeld('m-dl-l',r.deadline);setv('m-opm-l',r.opmerkingen);setv('m-sub-lod',r.subcategorie);
       tog('tog-ib-l',r.inBehandeling==='TRUE');break;
     case'SUBSIDIE-TRAJECTEN':
       setv('m-subsidie',r.subsidie);setv('m-beh-s',r.behandelaar);
-      setv('m-dl-s',toISODate(r.deadline));setv('m-opm-s',r.opmerkingen);setv('m-sub-sub',r.subcategorie);
+      zetDatumVeld('m-dl-s',r.deadline);setv('m-opm-s',r.opmerkingen);setv('m-sub-sub',r.subcategorie);
       tog('tog-ib-s',r.inBehandeling==='TRUE');
-      zetModalFase(r.subsidieFase);break;
+      zetModalFase(r.subsidieFase);
+      // De ladder kent vijf woorden; alles daarbuiten toonde 'Voorbereiden' en werd zo ook
+      // weggeschreven. `faseIndex` geeft voor élke onbekende waarde 1, dus 'herkend' betekent:
+      // het is leeg, óf het is letterlijk een van de vijf.
+      onthoudOnvertaalbaar('m-fase', r.subsidieFase,
+        SUBSIDIE_FASES.some(f=>f.toLowerCase()===String(r.subsidieFase||'').trim().toLowerCase()) ? r.subsidieFase : '');
+      break;
   }
 }
 // Zet een waarde in een veld. Bij een <select> geldt een extra regel: staat de opgeslagen waarde
@@ -395,6 +406,54 @@ function setv(id,v){
     el.appendChild(opt);
   }
   el.value=w;
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  WAARDEN DIE HET SCHERM NIET KAN TONEN
+// ══════════════════════════════════════════════════════════════════════════════
+// Dit is dezelfde regel als hierboven bij `setv`, doorgetrokken naar de velden waar hij niet met
+// een extra <option> op te lossen is:
+//
+//     een waarde die er al is mag nooit verdampen omdat het scherm hem niet kan tonen.
+//
+// Een `<input type=date>` kent alleen echte datums, de fase-ladder kent vijf woorden en de
+// offerte-teller kent 'n/m'. Staat er in de Sheet iets anders — en dat gebeurt, dit team typte
+// 'eind juli' in een periodeveld en 'eind juni' komt net zo goed in een deadline — dan toont het
+// scherm leeg, of de eerste fase, of 0/0. Tot v12.1 schreef Opslaan die leegte vervolgens terug:
+// één keer een taak openen om de behandelaar te wijzigen was genoeg om 'eind juni' te wissen,
+// zonder dat het in de wijzigingssamenvatting stond.
+//
+// Wat hier onthouden wordt, wordt bij Opslaan ONGEWIJZIGD teruggeschreven — tenzij de gebruiker
+// het veld zelf invult. Dat laatste is aan de vorm te zien en hoeft niet apart bijgehouden te
+// worden: er wordt alléén onthouden als het veld leeg bleef, dus staat er iets, dan is dat van de
+// gebruiker. De fase is de uitzondering (die is nooit leeg) en heeft daarom een eigen vlag.
+let _onvertaalbaar = {};
+let _faseGekozen = false;
+
+// `getoond` = wat het veld ervan wist te maken. Leeg terwijl er wél iets stond = niet te tonen.
+function onthoudOnvertaalbaar(id, ruw, getoond){
+  const r = (ruw == null ? '' : String(ruw)).trim();
+  if (r && !getoond) _onvertaalbaar[id] = r; else delete _onvertaalbaar[id];
+}
+// Wat er weggeschreven moet worden. Heeft de gebruiker het veld gevuld, dan wint dat.
+function uitVeld(id, omgezet){
+  return omgezet ? omgezet : (_onvertaalbaar[id] || '');
+}
+// Zet een datumveld én onthoud de oorspronkelijke tekst als het geen datum bleek.
+function zetDatumVeld(id, ruw){
+  const iso = toISODate(ruw);
+  setv(id, iso);
+  onthoudOnvertaalbaar(id, ruw, iso);
+}
+// Eén regel onder het datumveld, zodat de gebruiker het ook ZIET. Het hint-element is in de
+// bewerkstand altijd leeg (zetDeadlineVoorstel maakt hem leeg en vult hem alleen bij een nieuwe
+// taak), dus we lenen hem hier. Moet ná zetDeadlineVoorstel draaien — zie openModal.
+function toonOnvertaalbaar(sec){
+  const hintEl = document.getElementById(DEADLINE_HINT_VELD[sec]);
+  const dlId = DEADLINE_VELD[sec];
+  if(!hintEl || !dlId) return;
+  const ruw = _onvertaalbaar[dlId];
+  if(ruw) hintEl.textContent = `In de Sheet staat "${ruw}" — dat is geen datum. Dat blijft zo staan; kies een datum om het te vervangen.`;
 }
 
 // Waar de OMSCHRIJVING van een taak thuishoort, per sectie. Eén bron, want deze koppeling stond op
@@ -473,6 +532,8 @@ function clearModal(){
   state._dlVoorgesteld = new Set();
   const chips=document.getElementById('m-extra-chips'); if(chips) chips.innerHTML='';
   const uitleg=document.getElementById('m-extra-uitleg'); if(uitleg) uitleg.textContent='';
+  // Een leeg scherm draagt geen onvertaalbare waarden van de vorige taak mee.
+  _onvertaalbaar = {}; _faseGekozen = false;
   // De regel bovenaan leegt óók het verborgen `m-per`; alleen de knop ernaast weet dat niet.
   // Zonder deze regel opende een nieuw scherm met de week van de taak die je daarvóór bekeek.
   zetWeekKiezer();
@@ -485,13 +546,16 @@ function clearModal(){
 let _modalFase = 1;
 function zetModalFase(woord){
   _modalFase = faseIndex(woord);
+  _faseGekozen = false;   // dit is de stand ZOALS OPGESLAGEN, niet een keuze van de gebruiker
   const host = document.getElementById('m-fase');
   if(!host) return;
   host.innerHTML = faseRijHtml(faseWoord(_modalFase), -1, 'fase-rij-modal');
   // In de modal mag een klik niet meteen naar de Sheet schrijven — pas bij Opslaan.
   host.querySelectorAll('.fase-bol').forEach(b=>{ b.dataset.action='subsidie-fase-modal'; });
 }
-function kiesModalFase(n){ zetModalFase(faseWoord(n)); }
+// Ná zetModalFase, want die zet de vlag juist terug: dít is wél een keuze van de gebruiker,
+// en vanaf nu mag een onbekende opgeslagen waarde overschreven worden.
+function kiesModalFase(n){ zetModalFase(faseWoord(n)); _faseGekozen = true; delete _onvertaalbaar['m-fase']; }
 function _modalFaseWoord(){ return faseWoord(_modalFase); }
 
 // ══════════════════════════════════════
@@ -1247,22 +1311,23 @@ async function submitTask(){
     // Apps Script-backend. Daarom twee lege kolommen (I + J) vóór `sub`.
     switch(sec){
       case'OPPAKKEN':{
-        const _berekend = berekenPrioriteit(toDutchDate(gv('m-dl')), 'OPPAKKEN').prioriteit;
-        values=[code,naam,gv('m-actie'),toDutchDate(gv('m-dl')),gv('m-beh'),_berekend,gv('m-opm'),
+        const _dlOpp = uitVeld('m-dl', toDutchDate(gv('m-dl')));
+        const _berekend = berekenPrioriteit(_dlOpp, 'OPPAKKEN').prioriteit;
+        values=[code,naam,gv('m-actie'),_dlOpp,gv('m-beh'),_berekend,gv('m-opm'),
           document.getElementById('tog-ib').classList.contains('on'),'','',sub];break;}
       case'VERGADERVERZOEKEN':
-        values=[code,naam,gv('m-per'),gv('m-agenda'),gv('m-beh-v'),toDutchDate(gv('m-dl-v')),gv('m-opm-v'),
+        values=[code,naam,gv('m-per'),gv('m-agenda'),gv('m-beh-v'),uitVeld('m-dl-v',toDutchDate(gv('m-dl-v'))),gv('m-opm-v'),
           document.getElementById('tog-ib-v').classList.contains('on'),'','',sub];break;
       case'OFFERTE-TRAJECTEN':{
         const recv=parseInt(gv('m-off-recv'))||0;
         const total=parseInt(gv('m-off-total'))||0;
         const offStr=total>0?`${recv}/${total}`:'';
-        values=[code,naam,toDutchDate(gv('m-daang')),offStr,gv('m-beh-o'),toDutchDate(gv('m-dl-o')),gv('m-opm-o'),'','','',sub];break;}
+        values=[code,naam,uitVeld('m-daang',toDutchDate(gv('m-daang'))),uitVeld('m-off',offStr),gv('m-beh-o'),uitVeld('m-dl-o',toDutchDate(gv('m-dl-o'))),gv('m-opm-o'),'','','',sub];break;}
       case'LOD':
-        values=[code,naam,gv('m-actie-l'),gv('m-stat-l'),gv('m-beh-l'),toDutchDate(gv('m-dl-l')),gv('m-opm-l'),
+        values=[code,naam,gv('m-actie-l'),gv('m-stat-l'),gv('m-beh-l'),uitVeld('m-dl-l',toDutchDate(gv('m-dl-l'))),gv('m-opm-l'),
           document.getElementById('tog-ib-l').classList.contains('on'),'','',sub];break;
       case'SUBSIDIE-TRAJECTEN':
-        values=[code,naam,gv('m-subsidie'),faseWoord(_modalFase),gv('m-beh-s'),toDutchDate(gv('m-dl-s')),gv('m-opm-s'),
+        values=[code,naam,gv('m-subsidie'),(!_faseGekozen && _onvertaalbaar['m-fase']) ? _onvertaalbaar['m-fase'] : faseWoord(_modalFase),gv('m-beh-s'),uitVeld('m-dl-s',toDutchDate(gv('m-dl-s'))),gv('m-opm-s'),
           document.getElementById('tog-ib-s').classList.contains('on'),'','',sub];break;
     }
 

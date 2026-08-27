@@ -365,7 +365,35 @@ function parseWeekPeriode(tekst){
 // De keuzelijst: `terug` weken vóór deze week en `vooruit` weken erna, deze week erbij.
 // Elke ingang draagt alles wat de kiezer nodig heeft, zodat de kiezer zelf geen datums
 // meer hoeft uit te rekenen — één producent, en los te toetsen.
-function weekOpties({ terug = 12, vooruit = 26, vandaag } = {}){
+// Hoeveel weken ligt `waarde` van deze week af? `null` als het geen weekwaarde is of als hij
+// verder dan vijf jaar weg ligt. Bewust zoekend en niet rekenend: het weeknummer alléén is rond
+// de jaarwisseling dubbelzinnig (week 53 van 2026 begint in december 2026 en eindigt in 2027),
+// en het label is de enige plek waar beide kanten samenkomen. 520 goedkope vergelijkingen, en
+// alleen als de waarde niet gewoon in de lijst staat.
+function weekAfstand(waarde, vandaag){
+  if(!parseWeekPeriode(waarde)) return null;
+  const start = maandagVan(vandaag || _vandaagAmsterdam());
+  for(let i = 0; i <= 260; i++){
+    for(const n of (i === 0 ? [0] : [i, -i])){
+      const ma = new Date(start.getFullYear(), start.getMonth(), start.getDate() + n * 7);
+      if(weekPeriodeLabel(ma) === waarde) return n;
+    }
+  }
+  return null;
+}
+
+// `bevat`: een opgeslagen weekwaarde die HOE DAN OOK in de lijst moet staan. Zelfde regel als bij
+// `setv` in crud.js — een waarde die er al is mag nooit verdampen omdat een lijstje hem niet kent.
+// Een vergaderverzoek van vier maanden geleden viel anders buiten de twaalf weken terug: de knop
+// toonde de week wél, de lijst niet, en één klik verving hem ongemerkt door iets anders.
+function weekOpties({ terug = 12, vooruit = 26, vandaag, bevat } = {}){
+  if(bevat){
+    const n = weekAfstand(bevat, vandaag);
+    if(n !== null){
+      if(n < 0) terug = Math.max(terug, -n);
+      if(n > 0) vooruit = Math.max(vooruit, n);
+    }
+  }
   const start = maandagVan(vandaag || _vandaagAmsterdam());
   const dezeMa = start.getTime();
   const uit = [];
@@ -769,7 +797,7 @@ function taakVerwijzing(r, sec){
 }
 
 export {
-  maandagVan, isoWeekJaar, weekDagen, weekPeriodeLabel, parseWeekPeriode, weekOpties, metDagnamen, MND_KORT, MND_LANG,
+  maandagVan, isoWeekJaar, weekDagen, weekPeriodeLabel, parseWeekPeriode, weekOpties, weekAfstand, metDagnamen, MND_KORT, MND_LANG,
   taakTitel, taakVerwijzing, kortDatum, NIET_ZOEKBAAR,
   displayName, filt, splitBehandelaar, korteNaam, PRIO_REGELS, stilDrempel, STIL_ESCALATIE_REGELS,
   DEADLINE_VOORSTEL, DEADLINE_HINT, voorgesteldeDeadline, AF_PERIODES, periodeBereik,

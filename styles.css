@@ -67,7 +67,7 @@
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     html,body{height:100%;font-family:var(--font-app);font-size:14px;background:var(--bg);color:var(--txt);line-height:1.5;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
     /* Vaste-breedte letter — codes, datums, badges, ⌘K-hint (zie --font-mono) */
-    .mono,.code,.s-normal,.s-soon,.s-telaat,.cell-sm,.ni-badge,.sb-brand span{font-family:var(--font-mono)}
+    .mono,.code,.s-normal,.s-telaat,.cell-sm,.ni-badge,.sb-brand span{font-family:var(--font-mono)}
     button{cursor:pointer;border:none;background:none;font:inherit;color:inherit}
     input,select,textarea{font:inherit}
     ul{list-style:none}
@@ -419,7 +419,7 @@
        bredere kolom: hij loopt óver de buurkolom heen, want de cel is `overflow:visible` en deze
        spans zijn `white-space:nowrap`. De kolombreedtes zijn zo gekozen dat een lange datum past,
        maar een onverwacht lange waarde hoort af te kappen in plaats van de buur te overschrijven. */
-    #ntd-tbl-wrap .s-normal,#ntd-tbl-wrap .s-telaat,#ntd-tbl-wrap .s-soon,
+    #ntd-tbl-wrap .s-normal,#ntd-tbl-wrap .s-telaat,
     #ntd-tbl-wrap .warn-geen-deadline{
       display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;
     }
@@ -561,7 +561,6 @@
     .warn-geen-deadline::before{content:''}
     /* Deadline/status als gewone mono-tekst (geen pill) */
     .s-telaat{font-size:12.5px;font-weight:700;color:var(--rd);white-space:nowrap}
-    .s-soon{font-size:12.5px;font-weight:600;color:var(--am);white-space:nowrap}
     .s-normal{font-size:12.5px;font-weight:500;color:#48505c;white-space:nowrap}
     /* Fase 4 — opvolging & herhaling */
     /* Was een VOL GROEN vlak met witte tekst (#00872e). Dat was de enige felle kleurvlek in de
@@ -606,7 +605,11 @@
        chip. Vaste maten, want een rondje met tekstbreedte is een ei. 21px is dezelfde hoogte als
        de chip ernaast, zodat een gemengde rij (JC naast Gerrit) niet gaat springen. */
     .pers.pers-rond{width:21px;height:21px;padding:0;border-radius:50%;justify-content:center;font-size:10px;font-weight:700;letter-spacing:-.02em}
-    .pers-jer,.pers-cihad,.pers-gabos,.pers-default{background:#eef1f4;color:#5b6675}
+    /* Eén klasse: `persBadges` zet altijd `pers-default`. De drie naam-klassen die hier stonden
+       hadden exact dezelfde waarden, werden nergens meer gezet en liepen achter op TEAM (Cihan
+       ontbrak). Ze bleven staan 'voor oude opgeslagen HTML' — maar dit dashboard bewaart nergens
+       HTML, dus die reden bestond niet. Wil je ooit kleur per persoon: leid hem af uit TEAM. */
+    .pers-default{background:#eef1f4;color:#5b6675}
 
     /* Aanvinkbare ALV-flag pills — zelfde vormtaal als .badge/.btn-afr: 6px, 11px/600, vlakke hover.
        Kleur per kolom via --flag, gestuurd door het data-field dat render-alv.js al meegeeft.
@@ -1254,7 +1257,7 @@
     [data-theme=dark] .prio-hoog{color:#e08b82}
     [data-theme=dark] .prio-mid{color:#d4b06a}
     [data-theme=dark] .prio-laag{color:#8b929e}
-    [data-theme=dark] .pers,[data-theme=dark] .pers-jer,[data-theme=dark] .pers-cihad,[data-theme=dark] .pers-gabos,[data-theme=dark] .pers-default{background:#2a2f38;color:#cfd5df}
+    [data-theme=dark] .pers,[data-theme=dark] .pers-default{background:#2a2f38;color:#cfd5df}
     [data-theme=dark] .act-bw{background:var(--sur);border-color:var(--bor-input);color:var(--mut)}
     [data-theme=dark] .act-ib{background:var(--sur);border-color:var(--bor-input);color:var(--mut)}
     [data-theme=dark] .act-af{background:#12302a;border-color:#1f4a3c;color:#34d39a}

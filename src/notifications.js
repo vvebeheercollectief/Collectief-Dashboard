@@ -379,7 +379,12 @@ function verwerkMeldingRijen(koppen, rijen, watermerk, who, prefs) {
     // typt; ' jer' of 'JER' liet de melding stil verdwijnen bij precies de persoon voor wie hij
     // bedoeld was. 'allen' blijft de vaste sleutel.
     .filter(n => { const v = String(n.voor || '').trim().toLowerCase();
-                   return !(v && v !== 'allen' && v !== String(who || '').trim().toLowerCase()); })
+                   if (!v || v === 'allen') return true;
+                   // Per NAAM vergelijken, met dezelfde splitser als de rest van de app: 'voor'
+                   // draagt bij een duo-taak 'Jer; Cihad', en de ongesplitste vergelijking liet
+                   // de melding dan bij állebei stil verdwijnen (naloop 2026-08-28).
+                   const ik = String(who || '').trim().toLowerCase();
+                   return splitBehandelaar(v).some(naam => naam.toLowerCase() === ik); })
     .filter(n => { const k = TYPE_NAAR_PREFS[n.type]; return !(k && prefs[k] === false); })
     .sort((a, b) => a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0);   // nieuwste bovenaan
 

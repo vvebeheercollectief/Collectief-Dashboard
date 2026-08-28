@@ -14056,6 +14056,33 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     eq('datum: 4-cijferig blijft gewoon werken', _parseAnyDate('15-09-2026'), {y:2026,m:9,d:15});
   })();
 
+  // ── Duo-behandelaar: meldingen bereiken beide namen ──
+  // 'voor' draagt bij een duo-taak 'Jer; Cihad'. De ongesplitste vergelijking liet zo'n melding
+  // bij állebei stil verdwijnen; de backend-splitser (cd_splitBehandelaar) kende bovendien de
+  // puntkomma niet die de frontend al sinds 2026-08-20 splitst.
+  await (async () => {
+    console.log('%c[TESTS] Duo-behandelaar in meldingen', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const KOP = ['Timestamp','Type','Titel','Inhoud','Voor'];
+    const rr = (ts,type,titel,inhoud,voor)=>[ts,type,titel,inhoud,voor];
+    const prefsAan = { newtask:true, assigned:true, deadline:true, alv:true, daily:true };
+    const uit = verwerkMeldingRijen(KOP, [
+      rr('2026-08-29T09:00:00.000Z','n_assigned','Voor het duo','x','Jer; Cihad'),
+      rr('2026-08-29T09:00:01.000Z','n_assigned','Voor een ander','x','Gabos'),
+    ], '2026-08-29T08:00:00.000Z', 'Cihad', prefsAan);
+    eq('meldingen: een duo-melding bereikt élk van de twee namen',
+       uit.toon.map(n=>n.title), ['Voor het duo']);
+    // En de backend-splitser is woordelijk gelijkgetrokken — dezelfde leesweg (en dezelfde
+    // stilte op de gepubliceerde site) als de getActiveSheet-toets hierboven.
+    let bron = null;
+    try { bron = await _leesBron('./apps-script/Notifications.gs', 'function '); } catch(e){}
+    if (bron === null) {
+      truthy('meldingen: backend-splitser NIET hier getoetst — map staat niet op deze host', true);
+    } else {
+      truthy('meldingen: cd_splitBehandelaar splitst op komma, puntkomma én schuine streep',
+             /function cd_splitBehandelaar[\s\S]{0,400}split\(\/\[,;\\\/\]\//.test(bron));
+    }
+  })();
+
   // ══════════════════════════════════════════════════════════════════════════
   //  STRUCTUURCHECK — wat verdient een melding op het scherm?
   // ══════════════════════════════════════════════════════════════════════════

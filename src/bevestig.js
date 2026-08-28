@@ -24,12 +24,15 @@
 // aanroeper over de `await` heen vasthoudt (`rows` in bulk.js, `state._snoozeRow`,
 // `state.herhaalEditRow`) zitten daar niet meer in. Het gevolg bij 'ja' verschilt per weg — alle
 // drie nagelopen, want één symptoom voor alle drie opschrijven zou hier onwaar zijn:
-//   - `bulkVerwijderen` (bulk.js): `arr.indexOf(it.r)` geeft -1, de rij verdwijnt dus niet uit het
-//     scherm, én `_shiftNtdRows(it.origRow,-1)` schuift verse objecten op een verouderd rijnummer.
-//   - `deleteHerhaal` (render-herhaal.js): ook een `indexOf`, maar op `D.herhaal` en met een eigen
-//     `x._row--`-lus; `_shiftNtdRows` komt daar niet aan te pas.
-//   - `schrijfOpvolgdatum` (snooze.js): geen van beide. Daar wordt `r.opvolgdatum` op het
-//     losgeraakte object gezet, waarna `renderAll()` het simpelweg niet toont.
+//   - `bulkVerwijderen` (bulk.js): zoekt sinds de rij.js-poort op IDENTITEIT (`rijIndex`), dus de
+//     rij verdwijnt gewoon uit het scherm; alleen `_shiftNtdRows(it.origRow,-1)` rekent nog met
+//     het rijnummer van de momentopname.
+//   - `deleteHerhaal` (render-herhaal.js): zoekt óók op identiteit (`regelIndex` op de ID); zijn
+//     eigen `x._row--`-lus rekent, net als hierboven, met het onthouden rijnummer.
+//   - `schrijfOpvolgdatum` (snooze.js): daar wordt `r.opvolgdatum` op het losgeraakte object
+//     gezet, waarna `renderAll()` het simpelweg niet toont.
+// (Inventaris herijkt bij de naloop van 2026-08-28 — de twee indexOf-routes die hier eerst
+// stonden bestaan niet meer.)
 //
 // Niet gerepareerd, wel bewust. De Sheet zelf is gedekt: élke schrijfweg hierachter draait eerst
 // `assertRowMatch`/`assertRowsMatch`, en die vergelijkt de doelrij vóór het schrijven en geeft

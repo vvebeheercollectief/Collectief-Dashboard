@@ -80,11 +80,38 @@ function verplaatsAfgerond(e) {
     if (vinkjes[rr - eersteRij][0] !== true) continue;   // de per-rij-guard in cd_archiveerRij blijft
     cd_archiveerRij(sheet, rr);
   }
+ }, () => {
+  // Lock 2x niet gekregen: de afvink-actie is NIET uitgevoerd en het vinkje staat er nog. Dat
+  // zichtbaar melden op de VvE zelf — een stil weggevallen archivering was voorheen alleen aan
+  // het achtergebleven vinkje te zien, en niemand wist waarom (naloop 2026-08-28).
+  var s = e.range.getSheet();
+  if (s.getName().trim().toLowerCase() !== NTD_SHEET.toLowerCase()) return;
+  var code = (s.getRange(e.range.getRow(), 1).getValue() + '').trim();
+  cd_schrijfLogboek(code, '', 'Fout', 'Afvinken', '',
+    'Het archiveren van deze afvink-actie kon niet starten (een andere bewerking hield het ' +
+    'systeem bezet). Het vinkje staat er nog: haal het weg en zet het opnieuw.', 'systeem');
  });
 }
 
 // Eén afgevinkte rij naar 'Afgerond'. Los van de trigger zodat een bereik van meerdere rijen er
 // rij voor rij langs kan; elke `return` hierin slaat alleen díé rij over.
+// SYNC — spiegel van reconcileOffertes + parseOff + parseAannemers (src/util.js), voor de
+// afvink-in-de-Sheet-weg hierboven: X/N uit kolom D is een handmatige ONDERGRENS; het aantal
+// aangevinkte (|1) aannemers in kolom P en de lijstlengte tillen hem op. Geen lijst → D rauw.
+function cd_reconcileOffertes(rauwD, aannemersCel) {
+  var lijst = ((aannemersCel == null ? '' : aannemersCel) + '').split('\n')
+    .map(function (l) { return l.trim(); }).filter(function (l) { return l; });
+  if (!lijst.length) return (rauwD == null ? '' : rauwD) + '';
+  var binnen = 0;
+  for (var i = 0; i < lijst.length; i++) {
+    var p = lijst[i].lastIndexOf('|');
+    if (p >= 0 && lijst[i].slice(p + 1).trim() === '1') binnen++;
+  }
+  var delen = ((rauwD == null ? '' : rauwD) + '').split('/');
+  var mRecv = parseInt(delen[0], 10) || 0, mReq = parseInt(delen[1], 10) || 0;
+  return Math.max(mRecv, binnen) + '/' + Math.max(mReq, lijst.length);
+}
+
 function cd_archiveerRij(sheet, row) {
   var vinkKolom = 9;   // kolom I — het afvink-hokje (heette hier `lastCol` toen A:I álles was)
   // Lees t/m S en niet t/m I. De kolommen Q (taakId), R (bundelId) en S (bundelVolg) moeten mee
@@ -136,6 +163,13 @@ function cd_archiveerRij(sheet, row) {
   // A..H kan letterlijk mee: dat is in beide tabbladen exact SECS[sec].keys, in dezelfde volgorde.
   var archief = rowData.slice(0, 8);
   while (archief.length < 8) archief.push("");
+  // Offerte-trajecten: kolom D eerst optillen tot wat de aannemerslijst (kolom P) al weet —
+  // exact wat de afrondweg in het dashboard doet (reconcileOffertes in src/crud.js:
+  // "de afgeleide teller is het enige wat er van die lijst overblijft"). Deze Sheet-afvinkweg
+  // archiveerde de rauwe ondergrens ('0/3' terwijl er twee van drie binnen waren) en de lijst
+  // zelf gaat hieronder bewust niet mee (M..P leeg) — de echte stand was dus definitief weg
+  // (naloop 2026-08-28).
+  if (sectie === "OFFERTE-TRAJECTEN") archief[3] = cd_reconcileOffertes(rowData[3], rowData[15]);
   archief.push(datumAfgerond);              // I = afgerond op
   archief.push("");                         // J = toelichting (bij afvinken in de Sheet is die er niet)
   archief.push(cd_f4val(rowData[10]));      // K = subcategorie (K in de bron)
@@ -310,7 +344,11 @@ function verplaatsALV(e) {
   var vinkjes = sheet.getRange(eersteRij, 4, aantal, 1).getValues();
   var teDoen = [];
   for (var i = 0; i < aantal; i++) {
-    if (vinkjes[i][0] === true && (eersteRij + i) > 1) teDoen.push(eersteRij + i);
+    // > 2 en niet > 1: de data van 'ALV's overzicht' begint op rij 3 (twee koprijen — dezelfde
+    // grens als parseAlvo in src/data.js en cd_handleAlvoEdit hieronder). Een blok-plak dat D2
+    // op TRUE zette liet de KOLOMKOPRIJ als ALV archiveren: de koptekst verscheen als VvE-code
+    // in het archief en telde mee in de KPI's (naloop 2026-08-28).
+    if (vinkjes[i][0] === true && (eersteRij + i) > 2) teDoen.push(eersteRij + i);
   }
   if (!teDoen.length) return;
   // Zelfde vangrail als bij verplaatsAfgerond, en om een verwante reden: bij een bereik lezen we de
@@ -329,6 +367,14 @@ function verplaatsALV(e) {
     return;
   }
   cd_archiveerALVs(sheet, teDoen, teDoen.length > 1);
+ }, () => {
+  // Zelfde geen-lock-melding als verplaatsAfgerond hierboven, om dezelfde reden.
+  var s = e.range.getSheet();
+  if (s.getName().trim().toLowerCase() !== ALVO_SHEET.toLowerCase()) return;
+  var code = (s.getRange(e.range.getRow(), 1).getValue() + '').trim();
+  cd_schrijfLogboek(code, 'ALVS', 'Fout', 'Notulen', '',
+    'Het archiveren van dit Notulen-vinkje kon niet starten (een andere bewerking hield het ' +
+    'systeem bezet). Het vinkje staat er nog: haal het weg en zet het opnieuw.', 'systeem');
  });
 }
 
@@ -439,18 +485,18 @@ function cd_archiveerALVs(sheet, rijen, blok) {
     nieuw.push([vveCode, vveNaam, datumAfgerond]);
   }
   if (!nieuw.length) return;
-  // Nooit buiten het raster schrijven: getRange gooit dan een fout en legt de hele trigger stil
-  // (zelfde vangnet als de leesbreedte-klem in cd_archiveerRij). Het blad groeit niet vanzelf mee
-  // bij setValues; appendRow doet dat wel, maar dat zou weer één schrijfactie per regel zijn.
-  var tekort = (lastRow + nieuw.length) - targetSheet.getMaxRows();
-  if (tekort > 0) targetSheet.insertRowsAfter(targetSheet.getMaxRows(), tekort);
-  // Ook de BREEDTE klemmen, net als de leesbreedte in cd_archiveerRij. Het tabblad wordt met de
-  // hand beheerd (er is op 26-08 nog met de hand bijgevuld); is het ooit smaller dan drie kolommen,
-  // dan gooit getRange een fout en ligt de hele trigger stil in plaats van alleen deze regel.
+  // De BREEDTE klemmen, net als de leesbreedte in cd_archiveerRij. Het tabblad wordt met de
+  // hand beheerd (er is op 26-08 nog met de hand bijgevuld); is het ooit smaller dan drie
+  // kolommen, dan gooit de schrijf een fout en ligt de hele trigger stil in plaats van alleen
+  // deze regel.
   var br = Math.min(3, targetSheet.getMaxColumns());
-  var uit = [];
-  for (var w = 0; w < nieuw.length; w++) uit.push(nieuw[w].slice(0, br));
-  targetSheet.getRange(lastRow + 1, 1, uit.length, br).setValues(uit);
+  // appendRow per regel en NIET setValues op het vooraf gelezen `lastRow`: tussen die lezing en
+  // dit punt zitten meerdere round-trips, en het dashboard archiveert via values:append — dat
+  // loopt volledig búiten de document-lock. Landde zo'n append in dat venster, dan overschreef
+  // setValues die regel zonder enige controle en was hij stil weg (naloop 2026-08-28).
+  // appendRow bepaalt het tabel-einde per aanroep zelf en groeit het raster vanzelf mee; het
+  // aantal regels is door MAX_AFVINK_PER_KEER begrensd, dus de extra schrijfacties zijn beperkt.
+  for (var w = 0; w < nieuw.length; w++) targetSheet.appendRow(nieuw[w].slice(0, br));
 }
 function sorteerOfferteTrajecten(e) {
   // Serialiseer t.o.v. de andere mutatie-triggers (verplaatsAfgerond/-ALV, opvolg-motor,

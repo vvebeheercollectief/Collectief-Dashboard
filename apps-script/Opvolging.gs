@@ -145,8 +145,26 @@ function cd_hr_zetTakenKlaar() {
       const oms  = (rows[i][1] || '').toString().trim();
       const type = (rows[i][6] || '').toString().trim().toLowerCase();
       const dlStr = cd_ddmmyyyy(new Date(dl.getFullYear(), dl.getMonth(), dl.getDate()));
+      // Verse identiteitscontrole VÓÓR het klaarzetten — zelfde patroon als
+      // cd_hr_verwerkAfrondingen en cd_escaleerStilleDossiers: `rows` is één momentopname, en
+      // vóór deze rij zaten mogelijk al taak-aanmaken (seconden) en pushes van eerdere regels,
+      // terwijl het dashboard Herhaalregels-rijen búiten deze lock om verwijdert
+      // (deleteDimension via de REST-API). Op rij i+1 kan dus inmiddels een ándere regel staan
+      // (naloop 2026-08-28).
+      if (((hr.getRange(i + 1, 1).getValue() || '') + '').trim() !== id) {
+        Logger.log('cd_hr_zetTakenKlaar: rij ' + (i + 1) + ' is verschoven — overgeslagen');
+        continue;
+      }
       cd_createTaskRow(sectie, code, naam, oms, beh, dlStr, id);
       const nieuwVolgende = (type === 'na-afronden') ? '' : cd_volgendeDeadlineStr(dl, type, rows[i][7]);
+      // En nóg eens vlak vóór de schrijf: cd_createTaskRow zelf kost seconden (insertRowBefore
+      // plus meerdere writes) en is dus een eigen venster. Slaat deze controle aan, dan staat de
+      // taak er al maar schuift J niet door — dat kan morgen een dubbele taak geven, en dat is
+      // de mindere van twee kwaden: een deadline die bij de VERKEERDE regel landt is onzichtbaar.
+      if (((hr.getRange(i + 1, 1).getValue() || '') + '').trim() !== id) {
+        Logger.log('cd_hr_zetTakenKlaar: rij ' + (i + 1) + ' verschoof tijdens het klaarzetten — J/L niet bijgewerkt');
+        continue;
+      }
       hr.getRange(i + 1, 10).setValue(nieuwVolgende);                            // J doorschuiven
       hr.getRange(i + 1, 12).setValue(new Date().toISOString() + ' → ' + dlStr); // L = LaatstKlaargezet
       cd_schrijfLogboek(code, sectie, 'Terugkerende taak klaargezet', '', '', oms, 'systeem');
@@ -177,6 +195,13 @@ function cd_hr_verwerkAfrondingen() {
   const afData = af.getDataRange().getValues();
   const hrData = hr.getDataRange().getValues();
   for (let i = 0; i < afData.length; i++) {
+    // Sectiekoppen en kolomkoprijen overslaan — dezelfde herkenning als élke andere scanner in
+    // dit bestand. Zonder deze twee regels gold de kop 'Herhaal-ID' in kolom L van een
+    // kolomkoprij als echt ID, en wiste de onvoorwaardelijke setValue('') onderaan die cel —
+    // geluidloos, elke ochtend opnieuw zodra iemand hem terugzette (naloop 2026-08-28).
+    const eerste = (afData[i][0] || '').toString().trim();
+    if (CD_OPV_SKEYS.indexOf(eerste.toUpperCase()) !== -1) continue;
+    if (['VvE Code', 'VvE-Code'].indexOf(eerste) !== -1) continue;
     const herhaalId = cd_f4val(afData[i][11]);   // L in 'Afgerond'
     if (!herhaalId) continue;
     // VERS CONTROLEREN VÓÓR het herplannen, niet erna. `afData` is één momentopname van vóór de
@@ -198,6 +223,13 @@ function cd_hr_verwerkAfrondingen() {
         const type = (hrData[j][6] || '').toString().trim().toLowerCase();
         const status = (hrData[j][10] || '').toString().trim().toUpperCase();
         if (type === 'na-afronden' && status === 'ACTIEF') {
+          // De verse controle op regel 188 dekt alleen de Afgerond-kant; `hrData` is óók een
+          // momentopname en het dashboard verwijdert Herhaalregels-rijen buiten deze lock om.
+          // Zonder deze regel kreeg een verschoven buurregel de nieuwe deadline (naloop 2026-08-28).
+          if (((hr.getRange(j + 1, 1).getValue() || '') + '').trim() !== herhaalId) {
+            Logger.log('cd_hr_verwerkAfrondingen: Herhaalregels-rij ' + (j + 1) + ' is verschoven — niet herplant');
+            break;
+          }
           const afgerondOp = cd_parseDate(afData[i][8]) || new Date(); // I = afgerond op
           hr.getRange(j + 1, 10).setValue(cd_volgendeDeadlineStr(afgerondOp, 'na-afronden', hrData[j][7]));
         }

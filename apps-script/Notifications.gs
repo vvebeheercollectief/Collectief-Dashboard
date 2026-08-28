@@ -53,10 +53,22 @@ function cd_withLock(fn) {
   }
 }
 // Lock + foutopvang: voor mutaties waarbij een fout niet de uitvoering mag laten klappen.
-function cd_lockedRun(label, fn) {
+// Twee pogingen i.p.v. één: de opvolgmotor houdt de lock realistisch langer dan 10 s vast (er
+// zitten pushes van 0,5-2 s per stuk bínnen de lock), en een afvink-actie die dan stil wegviel
+// liet het vinkje staan zonder archiefregel, zonder logboekregel en zonder melding — herstel
+// vergde uit- en weer aanvinken, en niemand wist het. `bijGeenLock` laat de aanroeper dat
+// zichtbaar maken op een plek waar hij zijn eigen context (VvE-code) nog kent (naloop 2026-08-28).
+function cd_lockedRun(label, fn, bijGeenLock) {
   const lock = LockService.getDocumentLock();
   try {
-    if (!lock.tryLock(10000)) { Logger.log(label + ': lock niet verkregen — overgeslagen'); return; }
+    if (!lock.tryLock(10000)) {
+      Utilities.sleep(2000);
+      if (!lock.tryLock(10000)) {
+        Logger.log(label + ': lock niet verkregen (2x) — overgeslagen');
+        if (bijGeenLock) { try { bijGeenLock(); } catch (e2) { Logger.log(label + ' geen-lock-melding fout: ' + e2); } }
+        return;
+      }
+    }
     return fn();
   } catch (e) {
     Logger.log(label + ' fout: ' + e);
@@ -394,8 +406,13 @@ function cd_findSection(sheet, row) {
   return null;
 }
 
+// SYNC — woordelijk gelijk aan splitBehandelaar in src/util.js. De frontend splitst sinds de
+// naloop van 2026-08-20 óók op ';' ('Jer; Cihad' is écht voorgekomen data); deze kant bleef op
+// komma en schuine streep staan. Gevolg: het dashboard toonde twee persoonsbadges terwijl de
+// push-toewijzing op de LETTERLIJKE tekst 'Jer; Cihad' filterde — nul toestellen, stil, want
+// geen enkele HTTP-fout (naloop 2026-08-28).
 function cd_splitBehandelaar(s) {
-  return (s || '').split(/[,\/]/).map(p => p.trim()).filter(Boolean);
+  return (s || '').split(/[,;\/]/).map(p => p.trim()).filter(Boolean);
 }
 
 // Maandnamen-tabel — gelijk aan _MAANDEN in src/util.js. Google Sheets geeft
@@ -789,7 +806,7 @@ function cd_createTaskRow(categorie, code, naam, actiepunt, behandelaar, deadlin
   // herhaalregels) zonder identiteit in de lijst kwam. Gevolg: de schrijf-bescherming van het
   // dashboard valt voor zo'n rij terug op de vingerafdruk van de inhoud in plaats van op het
   // nummer, en bouwBundelIndex kan hem nooit als bundellid herkennen. Zelfde vorm als
-  // nieuwTaakId() in src/util.js — tijdstempel in base36 plus drie toevalstekens.
+  // nieuwTaakId() in src/util.js — tijdstempel in base36 plus zes toevalstekens.
   // Nooit buiten het raster schrijven: dat mislukt in Apps Script met een fout die de hele
   // trigger stillegt. Beide bladen zijn breed genoeg (gemeten), de klem is het vangnet.
   if (sheet.getMaxColumns() >= 17) sheet.getRange(insertRow, 17).setValue(cd_nieuwTaakId());

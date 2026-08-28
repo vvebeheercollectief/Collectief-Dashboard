@@ -101,6 +101,11 @@ async function addContactLog(){
   const code=state.vveCode;
   if(!code) return;
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
+  // Zelfde dubbelklik-rem als addTaskNote (render-overig.js): het await-gat van ensureToken was
+  // hier genoeg voor twee identieke contactregels (naloop 2026-08-28).
+  if(state._notitieBezig) return;
+  state._notitieBezig=true;
+  try{
   if(!await ensureToken()){ alert('Inloggen mislukt.'); return; }
   const soort=state._contactSoort||'Telefoon';
   const wie=document.getElementById('dos-wie')?.value||'Overig';
@@ -117,6 +122,7 @@ async function addContactLog(){
     ()=>{ const i=D.logboek.indexOf(entry); if(i>-1) D.logboek.splice(i,1); },   // vorm-ok: eigen optimistische regel, zie hierboven
     'Contactmoment vastleggen'
   );
+  } finally { state._notitieBezig=false; }
 }
 
 // Kenmerken-kaart: weergave- of bewerkmodus (Beheerderskenmerken)

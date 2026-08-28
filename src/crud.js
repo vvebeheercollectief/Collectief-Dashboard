@@ -336,7 +336,7 @@ export function nietOpgeslagenVelden(r){
   const spec=_MODAL_VELDEN[r&&r._sec];
   if(!spec) return [];
   const labels=VELD_LABELS[r._sec]||{};
-  return spec.filter(([id,sleutel,soort])=>{
+  const uit=spec.filter(([id,sleutel,soort])=>{
     const el=document.getElementById(id);
     if(!el) return false;
     if(soort===2) return el.classList.contains('on') !== (r[sleutel]==='TRUE');
@@ -344,6 +344,25 @@ export function nietOpgeslagenVelden(r){
     const opgeslagen=soort===1 ? toISODate(r[sleutel]||'') : String(r[sleutel]==null?'':r[sleutel]).trim();
     return opScherm!==opgeslagen;
   }).map(([,sleutel])=>labels[sleutel]||_MODAL_EXTRA_LABEL[sleutel]||sleutel);
+  // Twee schermwaarden leven niet in een gewoon invoerveld en vielen daardoor buiten de
+  // opsomming hierboven — terwijl de vraagtekst als een VOLLEDIGE opsomming leest en
+  // `verplaatsWaarden` ze uit het rij-object neemt: de wijziging verdween dan zonder één woord
+  // (naloop 2026-08-28).
+  //  · De offerte-teller: twee losse nummerveldjes, vergeleken tegen de RAUWE kolom D
+  //    (`_offertesManual`), precies zoals fillModalFields hem vult.
+  if(r._sec==='OFFERTE-TRAJECTEN' && document.getElementById('m-off-recv')){
+    const ruw=((r._offertesManual!==undefined?r._offertesManual:r.offertes)||'');
+    const [o,t]=ruw.split('/').map(s=>parseInt(s)||0);
+    if((parseInt(gv('m-off-recv'))||0)!==(o||0) || (parseInt(gv('m-off-total'))||0)!==(t||0))
+      uit.push(labels.offertes||'Ontvangen/Aangevr.');
+  }
+  //  · De fase-kiezer: modulestand (_modalFase), geen DOM-veld. Alleen een échte klik van de
+  //    gebruiker telt (_faseGekozen) — de genormaliseerde weergave van een rommelwaarde niet.
+  if(r._sec==='SUBSIDIE-TRAJECTEN' && _faseGekozen
+     && _modalFaseWoord()!==faseWoord(faseIndex(r.subsidieFase||''))){
+    uit.push(labels.subsidieFase||'Fase');
+  }
+  return uit;
 }
 
 function fillModalFields(sec,r){

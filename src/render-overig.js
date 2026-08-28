@@ -146,7 +146,10 @@ async function submitOntwItem(){
     // een lopende undo of bulk heen schrijven (naloop 2026-08-28).
     await serieleWrite(()=>metWriteMarkering(async()=>{
       if(state.ontwEditMode&&state.ontwEditRow?._row){
-        await assertRowMatch(state.ontwEditRow._row, state.ontwEditRow.titel, 'Ontwikkeling'); // bescherming: rij nog hetzelfde item vóór overschrijven
+        // Het HELE rij-object en niet alleen de titel: die is niet uniek, en na een verschuiving
+        // keurde de kolom-A-controle het gelijknamige buur-item goed (naloop 2026-08-28).
+        // `ontwEditRow` is de kloon van VÓÓR de bewerking — precies wat er nu in de Sheet hoort.
+        await assertRowMatch(state.ontwEditRow._row, state.ontwEditRow, 'Ontwikkeling');
         await writeRange(`'Ontwikkeling'!A${state.ontwEditRow._row}:F${state.ontwEditRow._row}`,values);
       } else {
         await appendRange("'Ontwikkeling'!A:F",values);
@@ -170,7 +173,10 @@ async function deleteOntwItem(){
   const pos=D.ontw.findIndex(x=>x._row===oudeRow);
   const echte=pos>-1?D.ontw[pos]:null;
   if(pos>-1) D.ontw.splice(pos,1);
-  D.ontw.forEach(x=>{ if(x._row>oudeRow) x._row--; });
+  // Alleen meeschuiven als het item lokaal ook echt weg is: was het al verdwenen (pos -1, een
+  // poll verving de lijst), dan verschoof deze regel de nummers van rijen die níet verschoven
+  // zijn — en wees elk volgend rijnummer één mis (naloop 2026-08-28).
+  if(pos>-1) D.ontw.forEach(x=>{ if(x._row>oudeRow) x._row--; });
   closeOntwModal();
   // De melding met 'ongedaan maken' verschijnt meteen, maar de verwijdering in de Sheet loopt nog.
   // Mislukt die, dan draait de rollback hieronder het item lokaal terug — en stáát de rij dus nog
@@ -184,7 +190,7 @@ async function deleteOntwItem(){
       const ids=await getSheetIds();
       const sheetId=ids['Ontwikkeling'];
       if(sheetId==null) throw new Error('Sheet "Ontwikkeling" niet gevonden');
-      await assertRowMatch(oudeRow, r.titel, 'Ontwikkeling'); // bescherming: rij nog hetzelfde item vóór verwijderen
+      await assertRowMatch(oudeRow, r, 'Ontwikkeling'); // hele rij, niet alleen de (niet-unieke) titel — zie submitOntwItem
       const resp=await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
         method:'POST',
         headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
@@ -551,7 +557,10 @@ async function deleteLogboek(row){
   // undoDeleteLog zéker weet of de delete doorging — géén timestamp-heuristiek,
   // want bulk-acties schrijven meerdere logregels met exact dezelfde milliseconde.
   let verwijderd=false;
-  showUndoToast('Logregel verwijderd', logDeleteLabel(entry), ()=>undoDeleteLog(vals, oudeRow, ()=>verwijderd), 'prullenbak');
+  // geenDedup: twee gelijkluidende logregels (bulk-regels van dezelfde VvE, of tweemaal
+  // 'Aangevinkt') kort na elkaar verwijderen gaf voor de tweede geen toast — en die toast is de
+  // enige weg terug. Elke klik is hier een eigen handeling met een eigen undo (naloop 2026-08-28).
+  showUndoToast('Logregel verwijderd', logDeleteLabel(entry), ()=>undoDeleteLog(vals, oudeRow, ()=>verwijderd), 'prullenbak', { geenDedup:true });
   backgroundWrite(
     async ()=>{
       const ids=await getSheetIds();
@@ -761,18 +770,24 @@ async function addTaskNote(){
   const note=(document.getElementById('hist-note').value||'').trim();
   if(!note){alert('Typ eerst een opmerking.');return}
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
-  if(!await ensureToken()){alert('Inloggen mislukt.');return}
-  const container=document.getElementById('fg-history');
-  const code=container.dataset.code;
-  const sec=container.dataset.sec;
-  if(!code)return;
-  // Eerst écht wegschrijven; pas bij succes optimistisch tonen + veld legen. Zo "verdwijnt"
-  // een opmerking nooit stil bij een schrijffout — de tekst blijft staan om te herproberen.
-  const ok=await logEvent(code,sec,'Opmerking','','',note);
-  if(!ok){ alert('Opmerking kon niet worden opgeslagen. Controleer je verbinding en probeer het opnieuw.'); return; }
-  document.getElementById('hist-note').value='';
-  D.logboek.unshift({_row:0,timestamp:new Date().toISOString(),code,sectie:sec,actie:'Opmerking',veld:'',oudeWaarde:'',nieuweWaarde:note,gebruiker:getCurrentWho()||'?'});
-  renderTaskHistory(code,sec);
+  // Dubbelklik-rem over het async-gat hieronder (ensureToken + logEvent): twee snelle klikken
+  // lazen allebei hetzelfde veld en schreven dezelfde opmerking twee keer (naloop 2026-08-28).
+  if(state._notitieBezig) return;
+  state._notitieBezig=true;
+  try{
+    if(!await ensureToken()){alert('Inloggen mislukt.');return}
+    const container=document.getElementById('fg-history');
+    const code=container.dataset.code;
+    const sec=container.dataset.sec;
+    if(!code)return;
+    // Eerst écht wegschrijven; pas bij succes optimistisch tonen + veld legen. Zo "verdwijnt"
+    // een opmerking nooit stil bij een schrijffout — de tekst blijft staan om te herproberen.
+    const ok=await logEvent(code,sec,'Opmerking','','',note);
+    if(!ok){ alert('Opmerking kon niet worden opgeslagen. Controleer je verbinding en probeer het opnieuw.'); return; }
+    document.getElementById('hist-note').value='';
+    D.logboek.unshift({_row:0,timestamp:new Date().toISOString(),code,sectie:sec,actie:'Opmerking',veld:'',oudeWaarde:'',nieuweWaarde:note,gebruiker:getCurrentWho()||'?'});
+    renderTaskHistory(code,sec);
+  } finally { state._notitieBezig=false; }
 }
 
 // Geeft true terug bij succes, false bij falen (geen token of schrijffout). Fire-and-forget-

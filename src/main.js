@@ -174,7 +174,10 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('ntd-tbody').addEventListener('click',e=>{
     if(e.target.closest('button,a,input,select,textarea,[data-action],.code-klik,.of-aann-tbl-tog')) return;
     const tr=e.target.closest('tr[data-row]'); if(!tr) return;
-    const id=tr.getAttribute('data-row');
+    // De sleutel is de taak-IDENTITEIT (rijSleutel, rij.js), niet het rijnummer: na een
+    // verwijdering of afronding erboven schuiven de nummers en bleef anders stil de verkeerde
+    // rij uitgeklapt staan (naloop 2026-08-28).
+    const id=tr.getAttribute('data-uitklap');
     if(state.expandedRows.has(id)){state.expandedRows.delete(id);tr.classList.remove('expanded');}
     else{state.expandedRows.add(id);tr.classList.add('expanded');}
   });

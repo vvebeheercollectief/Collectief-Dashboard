@@ -120,6 +120,10 @@ export const state = {
   _completeRow: null,      // rij-OBJECT waarvoor de afhandel-modal open staat (identiteit, geen index)
   _completeRid: null,      // geklikte data-rid, alléén voor de groene puls op de juiste DOM-rij
   _completeBusy: false,    // afhandelen loopt (dubbelklik-rem over het async-gat)
+  _notitieBezig: false,    // dubbelklik-rem op 'Opmerking toevoegen' (bewerkscherm) én het
+                           // contactmoment-vastleggen (dossier): beide lezen het veld pas ná een
+                           // await (ensureToken/logEvent), dus twee snelle klikken schreven
+                           // dezelfde tekst twee keer naar het Logboek (naloop 2026-08-28)
   _alvoFlagBezig: null,    // Set van 'idx:veld' met lopende ALV-vinkjes (dubbelklik-rem)
   _snoozeRow: null,        // taak waarvoor de wegleggen-modal open staat (Fase 4)
   _nieuwBundel: null,      // {bundelId, volg} voor een taak die via '+ Voeg een subtaak toe' wordt
@@ -142,7 +146,7 @@ export const state = {
   vveTerug: null,          // pagina waar de gebruiker vandaan kwam vóór het dossier (terug-pijltje)
   _vveAfAlles: false,      // per-VvE: alle afgeronde taken uitgeklapt
   bulkMode: false,         // bulk-selecteerstand op de NTD-lijst (Fase 5)
-  expandedRows: new Set(), // _row-id's van NTD-rijen die de gebruiker uitklapte (Operator: 1-regel → volledige tekst)
+  expandedRows: new Set(), // rijSleutel()-waarden (taaknummer!) van uitgeklapte NTD-rijen — zelfde principe als bundelOpen hieronder
   bundelOpen: new Set(),   // bundelId's van opengeklapte bundels. BEWUST op bundelId en niet op
                            // _row: rijnummers schuiven bij elke insert/delete, waardoor een op
                            // rijnummer bewaarde stand na een poll de verkeerde rij openzet.

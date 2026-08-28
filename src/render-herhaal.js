@@ -98,8 +98,26 @@ async function submitHerhaal(){
       interval:type==='na-afronden'?interval:'',dagenVooraf:vooraf,volgendeDeadline:volgende});
     renderHerhaal();
     backgroundWrite(async()=>{
-      await assertRowMatch(r._row, r.id, 'Herhaalregels'); // bescherming: rij nog dezelfde regel vóór overschrijven
+      // De guard (kolom A = het regel-ID) geeft de zojuist gelezen cellen terug, en J/K/L komen
+      // dááruit — niet uit het geheugen. Het venster heeft namelijk geen veld voor K (status) en
+      // L (laatst klaargezet), en de motor (Opvolging.gs) schrijft J en L zelf; het rij-object is
+      // bevroren op het moment van openen. Terugschrijven uit het geheugen zette een intussen
+      // gepauzeerde regel stil weer op ACTIEF, en een teruggedraaide J/L liet de motor dezelfde
+      // taak nógmaals aanmaken (naloop 2026-08-28).
+      const vers=await assertRowMatch(r._row, r.id, 'Herhaalregels');
+      const cel=vers.get(r._row)||[];
+      const versJ=(cel[9]??'')+'', versK=(cel[10]??'')+'', versL=(cel[11]??'')+'';
+      // J: staat het deadlineveld in beeld, dan telt de invoer. Verborgen (na-afronden) → de
+      // VERSE Sheet-waarde behouden: daar kan een door de motor geplande deadline staan
+      // (Opvolging.gs plant J ná een afronding) en die werd hier voorheen stil gewist. Alleen
+      // wie het type juist nú naar na-afronden omzet begint leeg — de oude, zichtbare deadline
+      // hoort dan niet stiekem door te tikken.
+      values[9]  = type!=='na-afronden' ? volgende : (oud.type==='na-afronden' ? versJ : '');
+      values[10] = versK||'ACTIEF';
+      values[11] = versL;
       await writeRange(`'Herhaalregels'!A${r._row}:L${r._row}`,values);
+      // Het scherm meteen eerlijk houden (de resync trekt het zo dadelijk toch recht).
+      Object.assign(r,{volgendeDeadline:values[9], status:values[10], laatstKlaargezet:values[11]});
       await logEvent(code,sectie,'Herhaalregel bewerkt','','',oms);
       showToast('Herhaalregel opgeslagen',oms,null,'opslaan',{geenDedup:true,geenSysteemmelding:true});
     },()=>{Object.assign(r,oud);},'Opslaan mislukt');

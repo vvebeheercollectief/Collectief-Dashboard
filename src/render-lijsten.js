@@ -4,6 +4,7 @@
 //  Batch D / punt 11: offerte/ALV/tabel-render zijn naar eigen modules verplaatst.
 // ══════════════════════════════════════
 import { esc, filt, NIET_ZOEKBAAR, berekenPrioriteit, parseDt, opvolgStatus, _vandaagAmsterdam, toISODate, isoWeek, vveCodeSpan, splitBehandelaar, periodeBereik, AF_PERIODES } from "./util.js";
+import { rijSleutel } from "./rij.js";
 import { SECS, SKEYS, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { bulkWis, renderBulkUi, allesVinkjeHtml, bulkHerstel } from "./bulk.js";
@@ -318,11 +319,12 @@ function renderNtd(){
   // hieronder, anders verdwijnt een rij hier terwijl hij daar geen stapel krijgt.
   state._bundelWeergave=bw;
 
-  // Snoei de uitklap-Set tot rij-id's die nog bestaan: na verwijderen/afronden schuiven de
-  // _row-nummers mee, dus verdwenen id's mogen niet blijven hangen (anders staat een verkeerde
-  // rij uitgeklapt tot de gebruiker er zelf op klikt).
+  // Snoei de uitklap-Set tot sleutels die nog bestaan. De sleutel is sinds de naloop van
+  // 2026-08-28 de taak-identiteit (rijSleutel: taaknummer, met het rijnummer als terugval), dus
+  // een verschuiving van rijnummers kan de stand niet meer naar een ándere taak dragen; deze
+  // snoei ruimt alleen nog op wat écht verdwenen is (afgerond, verwijderd).
   if(state.expandedRows.size){
-    state.expandedRows=new Set([...state.expandedRows].filter(id=>SKEYS.some(s=>(D.ntd[s]||[]).some(r=>''+r._row===id))));
+    state.expandedRows=new Set([...state.expandedRows].filter(id=>SKEYS.some(s=>(D.ntd[s]||[]).some(r=>rijSleutel(r)===id))));
   }
 
   // Tabs

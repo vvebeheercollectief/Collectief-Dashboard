@@ -96,6 +96,13 @@ export function verseRij(r, lijst){
 // positievraag, terwijl het antwoord over identiteit gaat.
 export function rijBestaatNog(r, lijst){ return rijIndex(lijst || (r && D.ntd[r._sec]) || [], r) > -1; }
 
+// Sleutel voor per-rij-UI-toestand (zoals de uitklapstand van een taakrij): het vaste taaknummer
+// als dat er is, anders het rijnummer als terugval voor rijen van vóór de backfill. DE REGEL van
+// dit bestand geldt ook voor onthouden toestand: een Set op `_row` wijst na een verwijdering
+// erboven stil naar een ándere taak — `bundelOpen` (state.js) maakte die keuze al goed op
+// bundelId, `expandedRows` liep er tot de naloop van 2026-08-28 nog in.
+export function rijSleutel(r){ return r && r.taakId ? 'T' + r.taakId : 'R' + (r && r._row); }
+
 // Dezelfde vraag voor de tabbladen die NIET uit D.ntd komen: Herhaalregels, Ontwikkeling, Logboek.
 // Die hebben hun eigen sleutel, dus die geef je hier mee. De vorm van de fout is identiek — een
 // rollback die seconden later draait houdt een object vast dat `loadAll` intussen vervangen heeft,

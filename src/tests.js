@@ -3,7 +3,7 @@
 // ══════════════════════════════════════
 import { taakTitel, taakVerwijzing, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, stilDrempel, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, subBadge, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel, kiesAfgerondRij, filt, splitBehandelaar, korteNaam, persBadges, taakActieKnoppen, voorgesteldeDeadline, DEADLINE_VOORSTEL, DEADLINE_HINT, periodeBereik, AF_PERIODES, duurUitCel, duurNaarCel } from "./util.js";
 import { verwerkMeldingRijen, toonMeldingen, MAX_TOAST_BURST, _whoSleutel, getCurrentWho, undoDelete } from "./notifications.js";
-import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek, logEvents, renderOntw, openOntwModal, closeOntwModal, submitOntwItem, _logRegelSleutel, _ontwSleutel } from "./render-overig.js";
+import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek, logEvents, renderOntw, openOntwModal, closeOntwModal, submitOntwItem, _logRegelSleutel, _ontwSleutel, addTaskNote } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM, VELD_LABELS } from "./config.js";
 import { maandagVan, isoWeekJaar, weekDagen, weekPeriodeLabel, parseWeekPeriode, weekOpties, weekAfstand } from "./util.js";
 import { ACTIONS } from "./actions.js";
@@ -11,8 +11,8 @@ import { filterVves } from "./vve-zoekveld.js";
 import { filterNtd, setNtd, renderNtd, ntdPagina, renderNtdStats, renderAf, setAf, bepaalStil, bouwStilIndex, _zetStilIndex, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey, kopOpen, zetKopOpen, toggleBundel, springNaarBundel, wisNtdFilters, absorbeer, isPlatteWeergave, erIsGefilterd, rowNtd, filterAf, afFilterWaarden } from "./render-lijsten.js";
 import { HERO_VIEWS } from "./render-analytics.js";
 import { state, D, pgs } from "./state.js";
-import { verseRij, rijIndex, regelIndex } from "./rij.js";
-import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel, renderVve, groepeerBundels } from "./render-vve.js";
+import { verseRij, rijIndex, regelIndex, rijSleutel } from "./rij.js";
+import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel, renderVve, groepeerBundels, addContactLog } from "./render-vve.js";
 import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN, saveKenmerken } from "./kenmerken.js";
 import { zoekAlles, openPalette, closePalette, palOpen } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen, bulkSelectie, bulkWis, renderBulkUi, bulkDoe, bulkVink, bulkVeld, bulkAlles, allesVinkjeHtml, allesVinkjeStand } from "./bulk.js";
@@ -20,18 +20,18 @@ import { sheetsFetch, NTD_OMSCHRIJVING, _isTransient, _rowMismatch, _a1Bereik, _
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, serieleWrite, POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, showLoadError, clearLoadError, syncSelecteerStand, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
-import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _eindKolom, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, getAfInsertRow, OMSCHRIJVING_VELD, zetOmschrijving, _sheetBreedtes, getSheetIds, bevestigInvoegPlek, _naamBijCode, _zetNaamVeld, taakUitCache, kiesSectie, deleteTaskRow, deleteCurrentEditTask, completeCurrentEditTask, renderExtraVves, toonMeerVve, zetDeadlineVoorstel, herzieAlsSubtaak, kiesDuur, gekozenDuur, wisDuurKeuze } from "./crud.js";
+import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _eindKolom, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, getAfInsertRow, OMSCHRIJVING_VELD, zetOmschrijving, _sheetBreedtes, getSheetIds, bevestigInvoegPlek, _naamBijCode, _zetNaamVeld, taakUitCache, kiesSectie, deleteTaskRow, deleteCurrentEditTask, completeCurrentEditTask, renderExtraVves, toonMeerVve, zetDeadlineVoorstel, herzieAlsSubtaak, kiesDuur, gekozenDuur, wisDuurKeuze, nietOpgeslagenVelden } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages, renderChat } from "./dossier-chat.js";
 import { shouldPromptReload, maakHerlaadKern, zelfdeWorker } from "./sw-update.js";
-import { doOAuth, ensureToken } from "./auth.js";
+import { doOAuth, ensureToken, logout } from "./auth.js";
 import { SPLASH_MS, _setFase } from "./login-splash.js";
 import { opmaakHtml, htmlNaarMarkers, zonderOpmaak, pasToe, opmaakBalk } from "./opmaak.js";
 import { goTo, applyTheme } from "./ui.js";
 import { checkSecties, checkRaster, checkRasters, checkNummers, checkAlles, ernstigeBevindingen, RASTER_MIN } from "./structuurcheck.js";
 import { herzetKolomBreedtes, kolBreedtes, periodeCel, deadlineCel } from "./render-tabel.js";
 import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from "./subsidie-fase.js";
-import { toggleHerhaalStatus, renderHerhaal, openHerhaalModal, deleteHerhaal } from "./render-herhaal.js";
+import { toggleHerhaalStatus, renderHerhaal, openHerhaalModal, deleteHerhaal, submitHerhaal } from "./render-herhaal.js";
 import { openSnoozeModal, snoozeOpslaan, closeSnoozeModal } from "./snooze.js";
 import { zetInBehandeling, inBehandelingKolom, heeftInBehandeling, volgendeStand } from "./inbehandeling.js";
 import { zoekDubbels, gelijkenis, zitErinVervat, lijktOp, woorden, dubbelVraagTekst, DUBBEL_DREMPEL } from "./dubbelcheck.js";
@@ -11373,7 +11373,10 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         const u = decodeURIComponent(String(url));
         if (opt && opt.method === 'PUT') { geschreven.push({ u, v: JSON.parse(opt.body).values[0] }); return new Response('{}', { status: 200 }); }
         if (opt && opt.method === 'POST' && /:append/.test(u)) { geschreven.push({ u, v: JSON.parse(opt.body).values[0] }); return new Response('{}', { status: 200 }); }
-        if (/'Ontwikkeling'!/.test(u)) return new Response(JSON.stringify({ values: [['Bestaand idee']] }), { status: 200 });
+        // De guard vergelijkt sinds de naloop van 2026-08-28 de HELE regel (de titel is niet
+        // uniek), dus de stub moet de volledige rij van vóór de bewerking teruggeven — precies
+        // wat er op dat moment in de Sheet staat.
+        if (/'Ontwikkeling'!/.test(u)) return new Response(JSON.stringify({ values: [['Bestaand idee','Idee','oud','Jer','03-06-2026','Open']] }), { status: 200 });
         return new Response(JSON.stringify(_batchGetStub(url, 'Ontwikkeling', [])), { status: 200 });
       };
       const rij = { titel: 'Bestaand idee', categorie: 'Idee', inhoud: 'oud', door: 'Jer',
@@ -13818,6 +13821,200 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       document.querySelectorAll('.toast').forEach(x=>x.remove());
       document.querySelectorAll('.load-err').forEach(b=>b.remove());
     }
+  })();
+
+  // ── logout beantwoordt een openstaande ja/nee-vraag met 'nee' ──
+  // De kale class-verwijdering liet `_openVraag` (de dubbelklik-rem in bevestig.js) staan:
+  // elke volgende vraag — ook na een nieuwe inlog in ditzelfde tabblad — kreeg dan stil 'nee'.
+  await (async () => {
+    console.log('%c[TESTS] logout beantwoordt de open vraag', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const tokenOud=state.oauthToken, expOud=state.oauthExpiry, mailOud=state.currentUserEmail;
+    try{
+      let antwoord=null;
+      const p=vraagBevestiging({titel:'Openstaande vraag',tekst:'x'}).then(a=>{antwoord=a;});
+      truthy('logout: de vraag staat echt open', _vraagStaatOpen());
+      logout();
+      await p;
+      eq('logout: de openstaande vraag is met NEE beantwoord', antwoord, false);
+      truthy('logout: de rem is losgelaten — een volgende vraag kan gewoon gesteld worden', !_vraagStaatOpen());
+      const p2=vraagBevestiging({titel:'Nieuwe vraag',tekst:'y'});
+      truthy('logout: … en die volgende vraag staat dan ook echt open', _vraagStaatOpen());
+      beantwoordBevestiging(false); await p2;
+    } finally {
+      state.oauthToken=tokenOud; state.oauthExpiry=expOud; state.currentUserEmail=mailOud;
+      state._uitCache=false;   // logout() zet de schrijf-rem aan; latere blokken verwachten hem uit
+      document.getElementById('app')?.removeAttribute('inert');
+      document.querySelectorAll('.toast').forEach(x=>x.remove());
+    }
+  })();
+
+  // ── De uitklapstand volgt de TAAK, niet het rijnummer ──
+  (() => {
+    console.log('%c[TESTS] Uitklapstand op identiteit', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const ntdOud=D.ntd, infoOud=D.ntdSecInfo, openOud=state.expandedRows, actOud=state.activeNtd;
+    try{
+      const A={_sec:'OPPAKKEN',_row:5,code:'311001',naam:'VvE A',actiepunt:'Taak A',deadline:'',behandelaar:'Jer',inBehandeling:'FALSE',opmerkingen:'',taakId:'AAAAAA'};
+      const B={_sec:'OPPAKKEN',_row:6,code:'311002',naam:'VvE B',actiepunt:'Taak B',deadline:'',behandelaar:'Jer',inBehandeling:'FALSE',opmerkingen:'',taakId:'BBBBBB'};
+      D.ntd={OPPAKKEN:[A,B],VERGADERVERZOEKEN:[],'OFFERTE-TRAJECTEN':[],LOD:[],'SUBSIDIE-TRAJECTEN':[]};
+      D.ntdSecInfo={OPPAKKEN:{colHeaderRow:2}};
+      state.activeNtd='OPPAKKEN'; state.expandedRows=new Set();
+      renderNtd();
+      // Klik op de naamcel van A (niet op een knop — die slaat de uitklap juist over).
+      document.querySelector('#ntd-tbody tr[data-uitklap="TAAAAAA"] .cell-name')?.click();
+      truthy('uitklap: de stand hangt aan het taaknummer', state.expandedRows.has('TAAAAAA'));
+      // A wordt afgerond; B schuift een rij omhoog en draagt nu het OUDE rijnummer van A.
+      D.ntd.OPPAKKEN=[Object.assign(B,{_row:5})];
+      renderNtd();
+      truthy('uitklap: de taak die naar het oude rijnummer schuift klapt NIET open',
+             !document.querySelector('#ntd-tbody tr[data-uitklap="TBBBBBB"]')?.classList.contains('expanded'));
+      truthy('uitklap: de stand van de verdwenen taak is opgeruimd', !state.expandedRows.has('TAAAAAA'));
+      // En andersom: een uitgeklapte taak die verschuift blijft uitgeklapt.
+      document.querySelector('#ntd-tbody tr[data-uitklap="TBBBBBB"] .cell-name')?.click();
+      D.ntd.OPPAKKEN=[Object.assign(B,{_row:3})];
+      renderNtd();
+      truthy('uitklap: een verschoven taak houdt zijn uitklapstand',
+             document.querySelector('#ntd-tbody tr[data-uitklap="TBBBBBB"]')?.classList.contains('expanded'));
+    } finally {
+      D.ntd=ntdOud; D.ntdSecInfo=infoOud; state.expandedRows=openOud; state.activeNtd=actOud;
+    }
+  })();
+
+  // ── Dubbelklik-rem op de twee notitie-wegen ──
+  await (async () => {
+    console.log('%c[TESTS] Dubbelklik schrijft één notitie', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const fetchOud=window.fetch, tokenOud=state.oauthToken, expOud=state.oauthExpiry;
+    const logOud=D.logboek, alertOud=window.alert;
+    try{
+      window.alert=()=>{};
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
+      D.logboek=[];
+      let appends=0;
+      window.fetch=async(url,opt)=>{
+        const u=decodeURIComponent(String(url));
+        if(u.includes('values:batchGet')) return new Response(JSON.stringify({error:{message:'x'}}),{status:403});
+        if(opt&&opt.method==='POST'&&/:append/.test(u)){ appends++; return new Response('{}',{status:200}); }
+        return new Response('{}',{status:200});
+      };
+      const cont=document.getElementById('fg-history');
+      cont.dataset.code='311001'; cont.dataset.sec='OPPAKKEN';
+      document.getElementById('hist-note').value='Twee keer geklikt, één keer geschreven';
+      const q1=addTaskNote(), q2=addTaskNote();
+      await q1; await q2;
+      eq('notitie: twee snelle klikken schrijven precies één logregel', appends, 1);
+      eq('notitie: … en er staat er ook maar één in het geheugen', D.logboek.length, 1);
+    } finally {
+      window.fetch=fetchOud; window.alert=alertOud;
+      state.oauthToken=tokenOud; state.oauthExpiry=expOud; D.logboek=logOud;
+      const n=document.getElementById('hist-note'); if(n) n.value='';
+      state._notitieBezig=false;
+    }
+  })();
+
+  // ── nietOpgeslagenVelden kent nu ook de offerte-teller en de fase-kiezer ──
+  (() => {
+    console.log('%c[TESTS] Verplaats-waarschuwing: teller en fase tellen mee', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const zet=(id,v)=>{const e=document.getElementById(id); if(e){e.value=v==null?'':v;}};
+    // Offerte: alle gewone velden gelijk aan de rij; alleen de teller wijkt af.
+    const off={_sec:'OFFERTE-TRAJECTEN',code:'311001',naam:'V',datumAangevraagd:'',behandelaar:'',
+               deadline:'',opmerkingen:'',subcategorie:'',offertes:'2/3',_offertesManual:'2/3'};
+    ['m-daang','m-beh-o','m-dl-o','m-opm-o','m-sub-off'].forEach(id=>zet(id,''));
+    zet('m-off-recv','2'); zet('m-off-total','3');
+    eq('verplaats: gelijke teller → geen waarschuwing', nietOpgeslagenVelden(off), []);
+    zet('m-off-recv','3');
+    truthy('verplaats: gewijzigde offerte-teller wordt genoemd',
+           nietOpgeslagenVelden(off).some(l=>/Ontvangen/.test(l)));
+    zet('m-off-recv','2');
+    // Subsidie: een klik op een fase-bolletje telt als niet-opgeslagen wijziging.
+    const sub={_sec:'SUBSIDIE-TRAJECTEN',code:'311001',naam:'V',subsidie:'',behandelaar:'',
+               deadline:'',opmerkingen:'',subcategorie:'',subsidieFase:'Aangevraagd',inBehandeling:'FALSE'};
+    ['m-subsidie','m-beh-s','m-dl-s','m-opm-s','m-sub-sub'].forEach(id=>zet(id,''));
+    document.getElementById('tog-ib-s')?.classList.remove('on');
+    kiesModalFase(2);   // = 'Aangevraagd', gelijk aan opgeslagen
+    eq('verplaats: fase gelijk aan opgeslagen → geen waarschuwing', nietOpgeslagenVelden(sub), []);
+    kiesModalFase(3);   // = 'In behandeling', wél een wijziging
+    truthy('verplaats: een aangeklikte fase wordt genoemd',
+           nietOpgeslagenVelden(sub).some(l=>/Fase/.test(l)));
+    clearModal();
+  })();
+
+  // ── Herhaalregel bewerken laat J/K/L van de motor met rust ──
+  // Het venster heeft geen veld voor K (status) en L (laatst klaargezet), en bij 'na afronden'
+  // is ook het deadlineveld (J) verborgen. Die drie kwamen tóch uit het bevroren geheugen mee in
+  // de A:L-schrijf: een gepauzeerde regel ging stil weer op ACTIEF, en een door de motor geplande
+  // deadline werd gewist (waarna de motor de regel oversloeg tot de volgende afronding).
+  await (async () => {
+    console.log('%c[TESTS] Herhaalregel: J/K/L uit de verse lezing', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const fetchOud=window.fetch, tokenOud=state.oauthToken, expOud=state.oauthExpiry;
+    const hhOud=D.herhaal, editOud=state.herhaalEditRow, uitCacheOud=state._uitCache;
+    const wachtKlaar=async()=>{ await state._writeChain;
+      for(let i=0;i<200&&(state._loadInFlight||state.pendingWrites>0);i++) await new Promise(r=>setTimeout(r,5)); };
+    try{
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3; state._uitCache=false;
+      const r={_row:7,id:'HR-X',omschrijving:'Proefregel',sectie:'OPPAKKEN',code:'311001',naam:'VvE P',
+               behandelaar:'Jer',type:'na-afronden',interval:'6',dagenVooraf:14,
+               volgendeDeadline:'',status:'ACTIEF',laatstKlaargezet:''};
+      D.herhaal=[r]; state.herhaalEditRow=r;
+      const zet=(id,v)=>setv(id,v);
+      zet('hh-omschrijving','Proefregel'); zet('hh-code','311001'); zet('hh-naam','VvE P');
+      zet('hh-sectie','OPPAKKEN'); zet('hh-beh','Jer'); zet('hh-type','na-afronden');
+      zet('hh-interval','6'); zet('hh-vooraf','14'); zet('hh-deadline','');
+      // In de Sheet is intussen méér gebeurd dan het geheugen weet: de motor plande J, een
+      // collega pauzeerde de regel (K) en L is gestempeld.
+      const verseRijCellen=['HR-X','Proefregel','OPPAKKEN','311001','VvE P','Jer','na-afronden','6','14',
+                           '15-09-2026','GEPAUZEERD','2026-08-20'];
+      let geschreven=null;
+      window.fetch=async(url,opt)=>{
+        const u=decodeURIComponent(String(url)), methode=(opt&&opt.method)||'GET';
+        if(u.includes('values:batchGet')) return new Response(JSON.stringify({error:{message:'x'}}),{status:403});
+        if(methode==='GET') return new Response(JSON.stringify({values:[verseRijCellen]}),{status:200});
+        if(methode==='PUT'){ geschreven=JSON.parse(opt.body).values[0]; return new Response('{}',{status:200}); }
+        return new Response('{}',{status:200});
+      };
+      await submitHerhaal();
+      await wachtKlaar();
+      truthy('herhaal: er is echt geschreven', !!geschreven);
+      eq('herhaal: J (geplande deadline) komt uit de verse lezing, niet leeg',
+         geschreven && geschreven[9], '15-09-2026');
+      eq('herhaal: K (status) blijft de verse stand — GEPAUZEERD gaat niet stil weer aan',
+         geschreven && geschreven[10], 'GEPAUZEERD');
+      eq('herhaal: L (laatst klaargezet) reist niet uit het geheugen mee',
+         geschreven && geschreven[11], '2026-08-20');
+    } finally {
+      window.fetch=fetchOud; state.oauthToken=tokenOud; state.oauthExpiry=expOud;
+      D.herhaal=hhOud; state.herhaalEditRow=editOud; state._uitCache=uitCacheOud;
+      document.querySelectorAll('.toast').forEach(x=>x.remove());
+      document.querySelectorAll('.load-err').forEach(b=>b.remove());
+    }
+  })();
+
+  // ── De Ontwikkeling-guard vergelijkt de hele regel, niet alleen de titel ──
+  await (async () => {
+    console.log('%c[TESTS] Ontwikkeling-guard op de hele regel', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const fetchOud=window.fetch, tokenOud=state.oauthToken, expOud=state.oauthExpiry;
+    try{
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
+      const item={_row:9,titel:'Bug in filter',categorie:'Opmerkingen',inhoud:'De lijst blijft leeg',
+                  door:'Jer',datum:'28-08-2026',status:'Open'};
+      let sheetRij=['Bug in filter','Opmerkingen','De lijst blijft leeg','Jer','28-08-2026','Open'];
+      window.fetch=async()=>new Response(JSON.stringify({values:[sheetRij]}),{status:200});
+      let fout=null;
+      try{ await assertRowMatch(9, item, 'Ontwikkeling'); }catch(e){ fout=e; }
+      eq('ontw-guard: identieke regel passeert', fout, null);
+      // Het gelijknamige buur-item (zelfde titel, andere inhoud) — dat keurde de oude
+      // kolom-A-controle goed en dan werd de verkeerde regel overschreven of verwijderd.
+      sheetRij=['Bug in filter','Opmerkingen','Iets heel anders','Cihad','20-08-2026','Open']; fout=null;
+      try{ await assertRowMatch(9, item, 'Ontwikkeling'); }catch(e){ fout=e; }
+      truthy('ontw-guard: gelijknamig buur-item wordt geweigerd', !!(fout && fout.rowMismatch));
+    } finally {
+      window.fetch=fetchOud; state.oauthToken=tokenOud; state.oauthExpiry=expOud;
+    }
+  })();
+
+  // ── SYNC: de logregel-verwijder-toast blijft per klik zijn eigen undo houden ──
+  (async () => {
+    const bron=await (await fetch('/src/render-overig.js')).text();
+    truthy('sync: de logregel-verwijder-toast draait zonder ontdubbeling (geenDedup)',
+           /showUndoToast\('Logregel verwijderd'[\s\S]{0,200}geenDedup:true/.test(bron));
   })();
 
   // ══════════════════════════════════════════════════════════════════════════

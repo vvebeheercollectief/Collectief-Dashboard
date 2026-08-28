@@ -7,6 +7,7 @@ import { loadAll, laadUitCache, wisCache } from "./data.js";
 import { toonKaart } from "./login-splash.js";
 import { refreshNotifUI, herstelNotifKoppeling } from "./notifications.js";
 import { fetchMetKlok } from "./api.js";
+import { beantwoordBevestiging } from "./bevestig.js";
 
 // Hoe lang een tokenaanvraag zonder antwoord de bezig-teller mag bezetten. Eindig — zie het
 // vangnet in doOAuth. Tests kunnen dit verlagen via state._authTimeoutMs.
@@ -259,6 +260,11 @@ function logout(reden){
   // steeds weer in — het toetsenbord komt niet meer bij de inlogknop. `MODAL_SLUITERS` niet
   // gebruiken: dat zou een kringverwijzing naar main.js opleveren, en de vensters hoeven hier
   // alleen dícht. De bijbehorende toestand wordt hieronder toch al leeggemaakt.
+  // Een openstaande ja/nee-vraag éérst BEANTWOORDEN (met 'nee') in plaats van alleen het venster
+  // te sluiten. De kale class-verwijdering hieronder liet `_openVraag` in bevestig.js staan, en
+  // die is tegelijk de dubbelklik-rem: elke volgende vraag — ook na een nieuwe inlog in ditzelfde
+  // tabblad — kreeg dan meteen stil 'nee' terug, tot een herlaad (naloop 2026-08-28).
+  try{ beantwoordBevestiging(false); }catch(_){}
   try{ document.querySelectorAll('.modal-bg.open').forEach(bg=>bg.classList.remove('open')); }catch(_){}
   // Het chatpaneel draagt geen `.modal-bg` (het is bewust NIET-modaal, zie dossier-chat.js) en
   // valt dus buiten de query hierboven. Het staat wél buiten #app, dus `inert` raakt het ook niet:

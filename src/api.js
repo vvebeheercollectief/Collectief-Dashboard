@@ -309,12 +309,19 @@ const FP_KOLOMMEN = {
   // niets van Apps Script in dit tabblad, dus er is geen kolom die vanzelf verandert en vals
   // alarm zou geven.
   'Logboek':     { tekst:[0,1,2,3,4,5,6,7], datum:null },
+  // Ontwikkeling: de HELE regel, want de titel is NIET afgedwongen uniek — twee items 'Bug in
+  // filter' bestonden gewoon, en dan keurde de kolom-A-controle na een rijverschuiving stil het
+  // gelijknamige buur-item goed (naloop 2026-08-28). De datumkolom als datum vergelijken: de
+  // regel wordt met USER_ENTERED geschreven, dus Sheets kan '28-08-2026' als échte datum opslaan
+  // en in een andere schrijfwijze terugformatteren.
+  'Ontwikkeling': { tekst:[0,1,2,3,5], datum:[4] },
 };
 // Veldnamen per kolom voor tabbladen die NIET uit parseSections komen. De vingerafdruk moet
 // beide kanten via dezelfde weg bouwen (rij-object → cellen), en buiten Nog Te Doen/Afgerond
 // bestaat SECS[r._sec] niet.
 const OBJ_KOLOMMEN = {
   'Logboek': ['timestamp','code','sectie','actie','veld','oudeWaarde','nieuweWaarde','gebruiker'],
+  'Ontwikkeling': ['titel','categorie','inhoud','door','datum','status'],   // zie parseOntw
 };
 // Welke kolom de deadline draagt verschilt per sectie van 'Nog Te Doen' (zie SECS.keys):
 // OPPAKKEN D(3) · VERGADERVERZOEKEN F(5) · OFFERTE-TRAJECTEN C(2)+F(5) · LOD F(5)

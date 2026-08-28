@@ -3,6 +3,7 @@
 //  Verplaatst uit render-lijsten.js (Batch D / punt 11) — zuivere refactor, geen gedragswijziging.
 // ══════════════════════════════════════
 import { esc, vveCodeSpan, persBadges, subBadge, taakActieKnoppen, offProg, emptyRow, berekenPrioriteit, opvolgStatus, taakTitel, kortDatum, _verschilInKalenderdagen, _vandaagAmsterdam, stilDrempel, aannSleutel, parseWeekPeriode, metDagnamen } from "./util.js";
+import { rijSleutel } from "./rij.js";
 import { SECS, SKEYS, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { bulkGeselecteerd } from "./bulk.js";
@@ -406,7 +407,7 @@ function rowNtd(r,sec){
     r.inBehandeling === 'TRUE' ? 'ib-row' : '',
     rowTeLaat ? 'row-telaat' : '',
     ov.weggelegd ? 'snooze-row' : '',
-    state.expandedRows.has(''+r._row) ? 'expanded' : ''
+    state.expandedRows.has(rijSleutel(r)) ? 'expanded' : ''
   ].filter(Boolean).join(' ');
   const aannRow = (sec==='OFFERTE-TRAJECTEN' && state.offerteAannOpen.has(aannSleutel(r)))
     ? `<tr class="of-aann-tr"><td colspan="${(state.bulkMode?1:0)+SECS[sec].cols.length+1}">${offerteAannemerPaneel(r)}</td></tr>`
@@ -430,7 +431,7 @@ function rowNtd(r,sec){
   // komen. `rid` is een directe index in state._rowCache — precies het mechanisme waarmee elke
   // andere rij-actie (bewerken, wegleggen, afronden, bulk) hier al werkt. Op `_row` zoeken zou
   // een scan door alle vijf de secties van D.ntd worden voor iets wat hier al bij de hand is.
-  return `<tr class="${rowCls}" data-row="${r._row}" data-rid="${rid}"${prioAttr}>${bulkCel}${cells}</tr>${aannRow}${bdlNa}`;
+  return `<tr class="${rowCls}" data-row="${r._row}" data-rid="${rid}" data-uitklap="${esc(rijSleutel(r))}"${prioAttr}>${bulkCel}${cells}</tr>${aannRow}${bdlNa}`;
 }
 
 function rowAf(r,sec){

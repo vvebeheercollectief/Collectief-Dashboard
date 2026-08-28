@@ -18,7 +18,7 @@ import {
   subscribeNotifs, unsubscribeNotifs, sendTestNotif, getCurrentWho, initMeldingen,
 } from './notifications.js';
 import {
-  openModal, closeModal, submitTask, doCompleteTask, closeCompleteModal, kiesSectie, renderExtraVves, _bewerkRijVers, nietOpgeslagenVelden,
+  openModal, closeModal, submitTask, doCompleteTask, closeCompleteModal, kiesSectie, renderExtraVves, _bewerkRijVers, nietOpgeslagenVelden, kiesDuur,
 } from './crud.js';
 import { loadAll, magPollen, schrijfActieLoopt, setSyncOffline, showOfflineBanner, clearOfflineBanner, laadUitCache } from './data.js';
 import { initActions } from './actions.js';
@@ -370,6 +370,11 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('complete-close').onclick=closeCompleteModal;
   document.getElementById('complete-cancel').onclick=closeCompleteModal;
   document.getElementById('complete-confirm').onclick=doCompleteTask;
+  // Eén listener op het rooster in plaats van vijf op de knoppen: dan hoeft er niets opnieuw
+  // aangesloten te worden als de knoppen ooit veranderen.
+  document.getElementById('complete-duur').addEventListener('click', e=>{
+    kiesDuur(e.target.closest('.duur-knop'));
+  });
   let _compMouseDown=null;
   document.getElementById('complete-bg').addEventListener('mousedown',e=>{_compMouseDown=e.target});
   document.getElementById('complete-bg').addEventListener('click',e=>{if(e.target.id==='complete-bg'&&_compMouseDown?.id==='complete-bg')closeCompleteModal()});

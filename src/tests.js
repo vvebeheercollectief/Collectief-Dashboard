@@ -6045,6 +6045,117 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     eq('duurknop: wissen zonder rooster klapt niet', stand(), '-,-,-,-,-');
   })();
 
+  // ── Taak 6: de duurkeuze écht aangesloten — klikken (main.js), wissen bij openen
+  //    (completeTaskRow) en meeschrijven (doCompleteTask → afrondWaarden) ──
+  // De vorige toets bewees dat kiesDuur/gekozenDuur/wisDuurKeuze zelf goed werken, op een
+  // losstaand roostertje. Dat zegt niets over de DRIE VERBINDINGEN die taak 6 toevoegt: staat er
+  // een listener op #complete-duur, roept completeTaskRow wisDuurKeuze() écht aan, en geeft
+  // doCompleteTask de keuze écht door aan afrondWaarden. Zelfde stub-idioom als het
+  // bulk-afronden-blok verderop (afMWaarden): een nagebootst tabblad langs _rijNaarCellen, zodat
+  // bevestigInvoegPlek/assertRowMatch daadwerkelijk slagen en de schrijfactie NIET terugrolt —
+  // met een falende stub zet de rollback de optimistische wijziging terug en meet de assert de
+  // teruggedraaide stand in plaats van wat er echt naar de Sheet ging.
+  await (async () => {
+    const _fetch=window.fetch, _alert=window.alert;
+    const tokenOud=state.oauthToken, expiryOud=state.oauthExpiry;
+    const ntdOud=D.ntd, afOud=D.af, afSecInfoOud=D.afSecInfo, sheetIdsOud=state._sheetIds;
+    const rowCacheOud=state._rowCache, uitCacheOud=state._uitCache;
+    const completeRowOud=state._completeRow, completeRidOud=state._completeRid;
+    let posts=[], blad={}, alerts=[];
+    // Verse lege secties per aanroep, niet gedeeld: `{...leeg}` zou D.af en D.ntd dezelfde
+    // ARRAY-VERWIJZING voor OPPAKKEN geven (zie de toelichting bij het bulk-afronden-blok
+    // hieronder), en dan telt _shiftNtdRows/_shiftAfRows rijen mee die het niet aangaan.
+    const versLeeg=()=>({ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] });
+    const taak=(row)=>({ _sec:'OPPAKKEN', _row:row, code:'DUUR-1', naam:'VvE Duurtoets',
+      actiepunt:'Duurtoets', deadline:'', behandelaar:'', prioriteit:'', opmerkingen:'',
+      inBehandeling:'', subcategorie:'', opvolgdatum:'', taakId:'TD-'+row, bundelId:'', bundelVolg:'' });
+    // Het nagebootste tabblad langs dezelfde bron als assertRowMatch zelf (_rijNaarCellen): met
+    // een handgeschreven cel-array zou deze toets omvallen zodra de kolomvolgorde wijzigt.
+    const zetBlad=r=>{ blad={ [r._row]: _rijNaarCellen('Nog Te Doen', r).map(v=>String(v ?? '')) }; };
+    // Kolom M (index 12) van de ECHTE updateCells-aanroep naar 'Afgerond' — wat afrondWaarden zou
+    // doen bij handmatige argumenten zegt niets over wat doCompleteTask hem intern meegeeft.
+    const afMWaarde=()=>{
+      const p=posts.find(p=>p.body&&p.body.requests);
+      return p ? p.body.requests.find(x=>x.updateCells).updateCells.rows[0].values[12].userEnteredValue.stringValue : undefined;
+    };
+    const aantalAan=()=>document.querySelectorAll('#complete-duur .duur-knop[aria-pressed="true"]').length;
+    const tik=()=>new Promise(r=>{const k=new MessageChannel();k.port1.onmessage=()=>r();k.port2.postMessage(0);});
+    const wachtTot=async(klaar)=>{ for(let i=0;i<200 && !klaar();i++) await tik(); };
+    // Wachtrij én stille resync laten leeglopen (dezelfde reden als het bulk-afronden-blok): de
+    // `finally` van backgroundWrite start `loadAll(true)` zodra pendingWrites op 0 komt, en die
+    // moet met de stub nog actief zijn tegen de tijd dat hij loopt.
+    const leeglopen=async()=>{ await state._writeChain; await wachtTot(()=>!state._loadInFlight); };
+    try{
+      window.alert=m=>{ alerts.push(m); };
+      state.oauthToken='stub'; state.oauthExpiry=Date.now()+3600e3;
+      state._uitCache=false;                 // de cache-rem in blokkeerOffline mag hier niet dichtstaan
+      state._sheetIds={ 'Nog Te Doen':0, 'Afgerond':1, 'Logboek':2 };   // scheelt een fetch in getSheetIds
+      D.afSecInfo={ OPPAKKEN:{colHeaderRow:2}, VERGADERVERZOEKEN:{colHeaderRow:20},
+                    'OFFERTE-TRAJECTEN':{colHeaderRow:40}, LOD:{colHeaderRow:60}, 'SUBSIDIE-TRAJECTEN':{colHeaderRow:80} };
+      window.fetch=async(url, opt)=>{
+        const u=decodeURIComponent(String(url)), methode=(opt&&opt.method)||'GET';
+        // De leesronde blijft dicht — zie de toelichting bij `leeglopen` hierboven.
+        if(u.includes('values:batchGet'))
+          return new Response(JSON.stringify({error:{message:'geen leesronde in deze test'}}),{status:403});
+        if(methode==='GET'){
+          const m=/!A(\d+):S(\d+)/.exec(u)||[];
+          const opAfgerond=/afgerond/i.test(u.split('!')[0]||'');
+          const rijen=[];
+          for(let r=+m[1]; r<=+m[2]; r++) rijen.push(opAfgerond ? (r===2?['VvE Code']:[]) : (blad[r]||[]));
+          return new Response(JSON.stringify({values:rijen}),{status:200});
+        }
+        posts.push({ url:u, methode, body:(opt&&opt.body)?JSON.parse(opt.body):null });
+        return new Response('{}',{status:200});
+      };
+
+      // ── 1. De keuze reist mee: een ECHTE klik op de 30m-knop (toetst main.js's listener,
+      //    niet alleen kiesDuur zelf) belandt in kolom M van de archiefrij. ──
+      let r=taak(5);
+      D.af=versLeeg(); D.ntd={ ...versLeeg(), OPPAKKEN:[r] };
+      state._rowCache=[r]; zetBlad(r); posts=[]; alerts=[];
+      await completeTask(0);                 // opent het venster
+      const knop30=document.querySelector('#complete-duur .duur-knop[data-min="30"]');
+      knop30.click();                        // echte klik, geen kiesDuur(...) uit de hand
+      eq('duur-meeschrijven: een klik op de 30m-knop zet hem echt aan', knop30.getAttribute('aria-pressed'), 'true');
+      document.getElementById('complete-date').value='2026-08-14';
+      await doCompleteTask();
+      await leeglopen();
+      eq('duur-meeschrijven: geen onverwachte melding', alerts, []);
+      eq('duur-meeschrijven: kolom M van de archiefrij krijgt de gekozen duur', afMWaarde(), '30');
+
+      // ── 2. Zonder gekozen duur blijft kolom M leeg. ──
+      r=taak(6);
+      D.af=versLeeg(); D.ntd={ ...versLeeg(), OPPAKKEN:[r] };
+      state._rowCache=[r]; zetBlad(r); posts=[]; alerts=[];
+      await completeTask(0);                 // nieuw venster, niets aangeklikt
+      eq('duur-meeschrijven: bij het openen staat er geen knop aan', aantalAan(), 0);
+      document.getElementById('complete-date').value='2026-08-14';
+      await doCompleteTask();
+      await leeglopen();
+      eq('duur-meeschrijven: geen onverwachte melding (2)', alerts, []);
+      eq('duur-meeschrijven: zonder keuze blijft kolom M leeg', afMWaarde(), '');
+
+      // ── 3. Het OPENEN wist een eerder gekozen duur — niet het sluiten. ──
+      let r3=taak(7);
+      D.ntd={ ...versLeeg(), OPPAKKEN:[r3] }; state._rowCache=[r3];
+      await completeTask(0);
+      document.querySelector('#complete-duur .duur-knop[data-min="15"]').click();
+      eq('duur-wissen: eerst staat er precies één knop aan', aantalAan(), 1);
+      const r4=taak(8);
+      D.ntd={ ...versLeeg(), OPPAKKEN:[r4] }; state._rowCache=[r4];
+      await completeTask(0);                 // een ANDERE taak openen — géén doCompleteTask ertussen
+      eq('duur-wissen: het openen van een andere taak wist de vorige keuze', aantalAan(), 0);
+    } finally {
+      window.fetch=_fetch; window.alert=_alert;
+      state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
+      D.ntd=ntdOud; D.af=afOud; D.afSecInfo=afSecInfoOud; state._sheetIds=sheetIdsOud;
+      state._rowCache=rowCacheOud; state._uitCache=uitCacheOud;
+      state._completeRow=completeRowOud; state._completeRid=completeRidOud;
+      document.getElementById('complete-bg').classList.remove('open');
+      document.querySelectorAll('#complete-duur .duur-knop').forEach(b=>b.removeAttribute('aria-pressed'));
+    }
+  })();
+
   (() => {
     // A..H per sectie. Bewust met de hand uitgeschreven en NIET afgeleid uit SECS.keys: de code
     // leest die lijst zelf, dus een test die hem óók leest beweegt netjes mee met een fout erin.

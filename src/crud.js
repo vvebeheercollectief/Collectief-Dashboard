@@ -1096,6 +1096,9 @@ async function completeTaskRow(r, rid, bijDoorgaan){
   const d=new Date();
   document.getElementById('complete-date').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   document.getElementById('complete-comment').value='';
+  // Wissen bij het OPENEN. Sluit iemand af met het kruisje en opent hij daarna een andere taak,
+  // dan zou een bewaarde keuze stil op die verkeerde taak belanden.
+  wisDuurKeuze();
   // Zelfde bron als de meldingen: bij een offerte-traject of vergaderverzoek stond hier anders
   // alleen de VvE-code (resp. de periode), en dan is op dit scherm niet te zien wélke taak je
   // afrondt als een VvE er twee heeft.
@@ -1182,7 +1185,7 @@ async function doCompleteTask(){
   state._completeBusy=true;
   try{
     const sec=r._sec;
-    const values = afrondWaarden(r, sec, today, comment);
+    const values = afrondWaarden(r, sec, today, comment, gekozenDuur());
     const ids=await getSheetIds();
     const afSheetId=ids['Afgerond'];
     const ntdSheetId=ids['Nog Te Doen'];

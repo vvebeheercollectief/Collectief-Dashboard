@@ -841,6 +841,11 @@
     .duur-knop:hover{border-color:var(--ac-b);color:var(--txt);background:var(--sur)}
     /* Groen, net als de Afhandelen-knop eronder: dit venster heeft --sec:var(--gn). */
     .duur-knop[aria-pressed=true]{background:var(--gn);border-color:var(--gn);color:#fff}
+    /* In donkere modus is --gn een lichte mint (#34D39A); witte tekst haalt daar 1,92:1.
+       Donkere tekst op datzelfde vlak haalt ruim de 4,5 die dit project aanhoudt. De knop
+       eronder ('Afhandelen') heeft dat probleem óók, maar dat is een bestaande fout en geen
+       reden om er hier een tweede bij te maken. */
+    [data-theme=dark] .duur-knop[aria-pressed=true]{color:#0d1f19}
     .fld-row{display:grid;grid-template-columns:1fr 1fr;gap:11px}
     @media(max-width:480px){.fld-row{grid-template-columns:1fr}}
     .toggle-row{display:flex;align-items:center;gap:10px;padding:7px 0}

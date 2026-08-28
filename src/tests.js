@@ -5955,6 +5955,53 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   })();
 
   (() => {
+    // Een archiefrij is 19 kolommen breed. Hier bouwen we er twee met de hand, want de test moet
+    // de VASTE posities vastleggen en niet meebewegen met een fout in de code.
+    const kop = ['OPPAKKEN'];
+    const kolomkop = ['VvE-Code','Naam','Actiepunt','Deadline','Behandelaar','Prioriteit',
+                      'Opmerkingen','In behandeling','Datum','Toelichting','Sub','Herhaal',
+                      'Duur (min)','','','','Taak','Bundel','Volg'];
+    const rij = (duur) => ['311212','Testflat','Iets doen','','Jer','','','',
+                           '14 aug 2026','Klaar','','', duur, '','','', 'T1','','' ];
+
+    // LET OP twee dingen aan deze aanroep: het tweede argument is de TABBLADNAAM (een tekst,
+    // `parseSections` leidt `isArchief` daaruit af), en de functie levert `{data, secInfo}` —
+    // dus `.data` en niet direct de secties.
+    const uitArchief = (duur) =>
+      parseSections([kop, kolomkop, rij(duur)], 'Afgerond').data.OPPAKKEN[0];
+
+    eq('lees duur: 30 uit kolom M', uitArchief('30').duurMin, 30);
+    eq('lees duur: lege cel is null', uitArchief('').duurMin, null);
+    eq('lees duur: tekst is null', uitArchief('lang').duurMin, null);
+    eq('lees duur: 0 is null en niet 0', uitArchief('0').duurMin, null);
+    eq('lees duur: negatief is null', uitArchief('-5').duurMin, null);
+    // Kolom M mag het herhaalId in L niet opeten.
+    eq('lees duur: herhaalId in L blijft heel', uitArchief('30').herhaalId, '');
+
+    // Een legacy-rij van vijf kolommen heeft geen M en levert dus null — geen fout.
+    const oud = parseSections([kop, kolomkop,
+      ['311212','Testflat','Iets doen','Jer','14 aug 2026']], 'Afgerond').data.OPPAKKEN[0];
+    eq('lees duur: legacy-rij van 5 kolommen geeft null', oud.duurMin, null);
+
+    // In 'Nog Te Doen' is kolom M het herhaalId. Daar mag duurMin niet uit gelezen worden,
+    // anders telt elk herhaal-ID straks als een duur.
+    const ntd = parseSections([kop, kolomkop,
+      ['311212','Testflat','Iets doen','','Jer','','','','','','','','H7']],
+      'Nog Te Doen').data.OPPAKKEN[0];
+    eq('lees duur: buiten het archief altijd null', ntd.duurMin, null);
+    eq('lees duur: M blijft daar het herhaalId', ntd.herhaalId, 'H7');
+
+    // 'H7' is tekst en zou toch al null geven, met of zonder de isArchief-controle — die assert
+    // bewaakt dus niks. Met een CIJFERIG herhaalId zou duurUitCel het wél als duur inlezen als de
+    // isArchief-controle ontbreekt. Dit is het geval dat de valkuil van deze taak echt vangt.
+    const ntdCijfer = parseSections([kop, kolomkop,
+      ['311212','Testflat','Iets doen','','Jer','','','','','','','','45']],
+      'Nog Te Doen').data.OPPAKKEN[0];
+    eq('lees duur: cijferig herhaalId in Nog Te Doen wordt geen duur', ntdCijfer.duurMin, null);
+    eq('lees duur: cijferig herhaalId blijft zelf wel heel', ntdCijfer.herhaalId, '45');
+  })();
+
+  (() => {
     // A..H per sectie. Bewust met de hand uitgeschreven en NIET afgeleid uit SECS.keys: de code
     // leest die lijst zelf, dus een test die hem óók leest beweegt netjes mee met een fout erin.
     // Elk veld krijgt een eigen waarde, zodat een verwisseling (bv. deadline ↔ behandelaar)

@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  DATA — laden, parsen, achtergrond-schrijven, sync-indicator
 // ══════════════════════════════════════
-import { parseDt, _parseAnyDate, coerceDagenVooraf, leegBijErfenis } from "./util.js";
+import { parseDt, _parseAnyDate, coerceDagenVooraf, leegBijErfenis, duurUitCel } from "./util.js";
 import { state, D } from "./state.js";
 import { SKEYS, SECS, APP_VERSION, ALLOWED_EMAILS } from "./config.js";
 import { fetchSheet, fetchSheets, _withRetry, isOffline } from "./api.js";
@@ -963,6 +963,10 @@ function parseSections(rows, tabblad){
     // L en M wisselen van betekenis per tabblad — zie de kop van deze functie.
     entry.opvolgdatum=isArchief ? '' : _f4v(row[11]);           // L (alleen 'Nog Te Doen')
     entry.herhaalId  =isArchief ? _f4v(row[11]) : _f4v(row[12]); // L in 'Afgerond', M in 'Nog Te Doen'
+    // M — hoe lang de taak kostte, in minuten. ALLEEN in het archief: in 'Nog Te Doen' is deze
+    // kolom het herhaalId (zie de regel hierboven), en dat zou hier anders als duur gaan tellen.
+    // Leeg, tekst, 0 en negatief worden allemaal null en niet 0 — zie duurUitCel voor waarom.
+    entry.duurMin    =isArchief ? duurUitCel(row[12]) : null;
     entry.esc        =_f4v(row[13]);  // N (alleen door Apps Script geschreven)
     entry.fase       =_f4v(row[14]);  // O — offerte-fase (offerte-motor)
     entry.aannemers  =_f4v(row[15]);  // P — aannemerslijst (naam|0/1 per regel)

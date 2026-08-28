@@ -20,7 +20,7 @@ import { sheetsFetch, NTD_OMSCHRIJVING, _isTransient, _rowMismatch, _a1Bereik, _
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, showLoadError, clearLoadError, syncSelecteerStand, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
-import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _eindKolom, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, getAfInsertRow, OMSCHRIJVING_VELD, zetOmschrijving, _sheetBreedtes, getSheetIds, bevestigInvoegPlek, _naamBijCode, _zetNaamVeld, taakUitCache, kiesSectie, deleteTaskRow, deleteCurrentEditTask, completeCurrentEditTask, renderExtraVves, toonMeerVve, zetDeadlineVoorstel, herzieAlsSubtaak } from "./crud.js";
+import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _eindKolom, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, getAfInsertRow, OMSCHRIJVING_VELD, zetOmschrijving, _sheetBreedtes, getSheetIds, bevestigInvoegPlek, _naamBijCode, _zetNaamVeld, taakUitCache, kiesSectie, deleteTaskRow, deleteCurrentEditTask, completeCurrentEditTask, renderExtraVves, toonMeerVve, zetDeadlineVoorstel, herzieAlsSubtaak, kiesDuur, gekozenDuur, wisDuurKeuze } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages, renderChat } from "./dossier-chat.js";
 import { shouldPromptReload, maakHerlaadKern, zelfdeWorker } from "./sw-update.js";
@@ -5999,6 +5999,37 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       'Nog Te Doen').data.OPPAKKEN[0];
     eq('lees duur: cijferig herhaalId in Nog Te Doen wordt geen duur', ntdCijfer.duurMin, null);
     eq('lees duur: cijferig herhaalId blijft zelf wel heel', ntdCijfer.herhaalId, '45');
+  })();
+
+  (() => {
+    // Het venster ÍS de bron: er is bewust geen aparte state naast, net als bij de datum en de
+    // opmerking. Deze toetsen bouwen daarom een echt rooster in de DOM.
+    const houder = document.createElement('div');
+    houder.innerHTML = [5,15,30,60,120]
+      .map(m => `<button type="button" class="duur-knop" data-min="${m}"></button>`).join('');
+    const knoppen = [...houder.querySelectorAll('.duur-knop')];
+    const stand = () => knoppen.map(b => b.getAttribute('aria-pressed') || '-').join(',');
+
+    eq('duurknop: begint zonder keuze', stand(), '-,-,-,-,-');
+
+    kiesDuur(knoppen[2]);                       // 30m
+    eq('duurknop: klik zet er één aan', stand(), '-,-,true,-,-');
+
+    kiesDuur(knoppen[4]);                       // 2u+
+    eq('duurknop: tweede keuze vervangt de eerste', stand(), '-,-,-,-,true');
+
+    kiesDuur(knoppen[4]);                       // nogmaals dezelfde
+    eq('duurknop: nogmaals klikken trekt de keuze in', stand(), '-,-,-,-,-');
+
+    // gekozenDuur leest uit een meegegeven wortel, zodat de toets niet aan #complete-duur zit.
+    kiesDuur(knoppen[3]);                       // 1u
+    eq('duurknop: gekozenDuur leest 60', gekozenDuur(houder), 60);
+    kiesDuur(knoppen[3]);
+    eq('duurknop: niets gekozen levert null', gekozenDuur(houder), null);
+
+    kiesDuur(knoppen[0]);
+    wisDuurKeuze(houder);
+    eq('duurknop: wissen maakt alles leeg', stand(), '-,-,-,-,-');
   })();
 
   (() => {

@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  CRUD — taak-modals, sheet-helpers, toevoegen/afronden/verwijderen
 // ══════════════════════════════════════
-import { esc, berekenPrioriteit, toISODate, toDutchDate, nieuwTaakId, taakVerwijzing, voorgesteldeDeadline, DEADLINE_HINT, taakTitel, reconcileOffertes, parseAannemers, duurNaarCel } from "./util.js";
+import { esc, berekenPrioriteit, toISODate, toDutchDate, nieuwTaakId, taakVerwijzing, voorgesteldeDeadline, DEADLINE_HINT, taakTitel, reconcileOffertes, parseAannemers, duurNaarCel, duurUitCel } from "./util.js";
 import { zoekDubbels, dubbelVraagTekst } from "./dubbelcheck.js";
 import { extraVves, wisExtraVves, extraVvesHtml, extraVvesUitleg } from "./meervve.js";
 import { state, D, pgs } from "./state.js";
@@ -1272,6 +1272,38 @@ async function doCompleteTask(){
     animateRowOut(tr,'rij-puls-groen',renderAll);
   }catch(e){alert('Fout bij afhandelen: '+e.message)}
   finally{ state._completeBusy=false; }
+}
+
+// ── De duurkeuze in het afrondvenster ────────────────────────────────────────────────────────
+// Er is bewust GEEN aparte state voor de gekozen duur. Het venster is de bron, net als bij de
+// datum en de opmerking eronder: `doCompleteTask` leest die twee ook rechtstreeks uit de DOM.
+// Een schaduwvariabele zou uit de pas kunnen lopen met wat de gebruiker ziet — precies het soort
+// fout dat `_rowCache` versus `D` in dit project al eerder heeft opgeleverd.
+
+// Toggle, geen radiogroep: nogmaals klikken op dezelfde knop trekt de keuze weer in. Zonder dat
+// kun je een per ongeluk aangeklikte duur niet meer weghalen zonder het venster te sluiten, en
+// dan wordt er een verkeerde meting opgeslagen omdat annuleren te veel gedoe is.
+export function kiesDuur(knop){
+  if(!knop) return;
+  const aan = knop.getAttribute('aria-pressed')==='true';
+  knop.parentElement.querySelectorAll('.duur-knop').forEach(b=>b.removeAttribute('aria-pressed'));
+  if(!aan) knop.setAttribute('aria-pressed','true');
+}
+
+// De gekozen duur in minuten, of null als er niets aanstaat. `wortel` is er voor de zelftest;
+// in de app leest hij gewoon het echte venster.
+export function gekozenDuur(wortel){
+  const bron = wortel || document.getElementById('complete-duur');
+  const el = bron && bron.querySelector('.duur-knop[aria-pressed="true"]');
+  return el ? duurUitCel(el.dataset.min) : null;
+}
+
+// Bij het ÓPENEN van het venster wissen, niet bij het sluiten: sluit iemand af met een kruisje
+// en opent hij daarna een andere taak, dan zou een bewaarde keuze stil op de verkeerde taak
+// belanden.
+export function wisDuurKeuze(wortel){
+  const bron = wortel || document.getElementById('complete-duur');
+  if(bron) bron.querySelectorAll('.duur-knop').forEach(b=>b.removeAttribute('aria-pressed'));
 }
 
 function closeCompleteModal(){document.getElementById('complete-bg').classList.remove('open');state._completeRow=null;state._completeRid=null}

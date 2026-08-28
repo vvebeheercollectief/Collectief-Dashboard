@@ -5934,12 +5934,15 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   })();
 
   (() => {
-    const taak = { code:'311212', naam:'Testflat 1', actiepunt:'Iets doen',
+    const taak = { code:'311212', naam:'Testflat 1', actiepunt:'Iets doen', herhaalId:'H7',
                    taakId:'Tsub', bundelId:'Tkop', bundelVolg:'10' };
     const met = afrondWaarden(taak, 'OPPAKKEN', '2026-08-14', 'Klaar', 30);
     eq('afrond+duur: 30 op index 12 (kolom M)', met[12], '30');
     eq('afrond+duur: N t/m P blijven leeg', [met[13],met[14],met[15]], ['','','']);
     eq('afrond+duur: rij blijft 19 lang', met.length, 19);
+    // L is de kolom die Opvolging.gs r.119 leest. Zonder deze assert blijft de suite groen als
+    // de duur hem opeet, en verliest een herhalende taak stil zijn Herhaal-ID.
+    eq('afrond+duur: herhaalId in L blijft heel naast een duur', met[11], 'H7');
     // Q/R/S mogen NIET opschuiven — Opvolging.gs en parseSections lezen op vaste index.
     eq('afrond+duur: Q/R/S liggen nog op 16/17/18',
        [met[16],met[17],met[18]], ['Tsub','Tkop','10']);
@@ -10541,6 +10544,14 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       .flatMap(p=>((p.body&&p.body.data)||[]).map(d=>d.range));
     const wisRijen=()=>posts.filter(p=>p.body&&p.body.requests)
       .flatMap(p=>p.body.requests.filter(r=>r.deleteDimension).map(r=>r.deleteDimension.range.startIndex+1));
+    // Kolom M (index 12) van elke rij die bulkAfronden ECHT naar 'Afgerond' schreef — via
+    // updateCells, niet via values:batchUpdate, dus schrijfRanges hierboven ziet deze niet.
+    // Kijkt naar wat er in de request zit, niet naar wat afrondWaarden zou doen als je hem
+    // zelf vier argumenten geeft: bulkAfronden roept die functie intern aan, en dít vangt het
+    // als die aanroep ooit een vijfde argument zou meekrijgen.
+    const afMWaarden=()=>posts.filter(p=>p.body&&p.body.requests)
+      .flatMap(p=>p.body.requests.filter(r=>r.updateCells))
+      .map(r=>r.updateCells.rows[0].values[12].userEnteredValue.stringValue);
     // Het losse wegleggen schrijft ÉÉN cel en gaat daarom via `writeRange` — een PUT op
     // /values/<bereik>, niet via values:batchUpdate. `schrijfRanges` hierboven ziet die dus niet.
     // Filteren op de methode en niet op de URL, omdat de logboek-append (POST) langs dezelfde
@@ -10879,6 +10890,10 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       await leeglopen();
       eq('bulk-afronden: bij twee taken wordt er niets gevraagd en gaat het gewoon door',
          [vragen.length, D.ntd.OPPAKKEN.length], [0, 0]);
+      // Bulk is opruimwerk en hoort niet in de meting: kolom M moet leeg de Sheet in. Deze assert
+      // kijkt naar wat er ECHT geschreven wordt, niet naar wat afrondWaarden zou doen als je hem
+      // vier argumenten geeft.
+      eq('bulk-afronden: kolom M blijft leeg', afMWaarden(), ['','']);
 
       // Vanaf drie: wél een vraag, met het aantal in de titel.
       rijen=kiesN(3);

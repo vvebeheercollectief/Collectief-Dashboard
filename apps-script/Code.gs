@@ -140,7 +140,8 @@ function cd_archiveerRij(sheet, row) {
   archief.push("");                         // J = toelichting (bij afvinken in de Sheet is die er niet)
   archief.push(cd_f4val(rowData[10]));      // K = subcategorie (K in de bron)
   archief.push(cd_f4val(rowData[12]));      // L = Herhaal-ID (M in de bron)
-  archief.push("", "", "", "");             // M..P blijven leeg, net als bij afrondWaarden
+  archief.push("", "", "", "");             // M = duur in minuten, blijft hier leeg: afvinken in
+                                             // de Sheet zelf kent geen duur. N..P blijven ook leeg.
   archief.push(rowData[16] || "", rowData[17] || "", rowData[18] || "");  // Q/R/S: taaknummer + bundel
 
   // Via `sheet.getParent()` en niet via het onEdit-event: deze functie staat sinds de opsplitsing

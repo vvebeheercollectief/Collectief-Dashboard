@@ -304,7 +304,8 @@ async function bulkAfronden(rows){
     // Zelfde bron als de losse afrond-modal (crud.js), zodat bulk en modal niet uiteen kunnen
     // lopen — vroeger stond dezelfde kolomvolgorde hier een tweede keer uitgeschreven. Bulk
     // kent geen toelichtingveld, vandaar de lege J. De oude `default`-tak was letterlijk de
-    // LOD-opbouw; die staat nu als eigen case in afrondWaarden.
+    // LOD-opbouw; die staat nu als eigen case in afrondWaarden. Ook geen vijfde argument, dus
+    // kolom M (duur) blijft leeg: bulk is opruimwerk en hoort niet in de meting.
     const values=afrondWaarden(r, r._sec, vandaag, '');
     return { r, sec:r._sec, origRow:r._row, afValues:values, ntdValues:_ntdValues(r), code:r.code };
   });

@@ -705,6 +705,18 @@
     <div class="modal-body">
       <div class="fld"><label>Afgerond op</label><input type="date" id="complete-date"/></div>
       <div class="fld"><label>Opmerking</label><textarea id="complete-comment" rows="3" placeholder="Optioneel — wat is er gedaan?"></textarea></div>
+      <!-- Duur: bewust GEEN voorgeselecteerde knop. Een voorselectie die meegeschreven wordt
+           geeft elke taak een verzonnen half uur, en dan meet je je eigen aanname. -->
+      <div class="fld">
+        <label id="complete-duur-lbl">Hoe lang duurde dit?<span class="fld-opt">optioneel</span></label>
+        <div class="duur-keuze" id="complete-duur" role="group" aria-labelledby="complete-duur-lbl">
+          <button type="button" class="duur-knop" data-min="5">5m</button>
+          <button type="button" class="duur-knop" data-min="15">15m</button>
+          <button type="button" class="duur-knop" data-min="30">30m</button>
+          <button type="button" class="duur-knop" data-min="60">1u</button>
+          <button type="button" class="duur-knop" data-min="120">2u+</button>
+        </div>
+      </div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-sec" id="complete-cancel">Annuleren</button>

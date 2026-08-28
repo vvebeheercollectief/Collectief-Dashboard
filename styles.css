@@ -831,6 +831,16 @@
     .fld input,.fld select,.fld textarea{width:100%;background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rs);padding:8px 11px;color:var(--txt);font-size:13px;outline:none;transition:border var(--tr)}
     .fld input:focus,.fld select:focus,.fld textarea:focus{border-color:var(--modal-sec,var(--ac));box-shadow:0 0 0 3px color-mix(in srgb,var(--modal-sec,var(--ac)) 16%,transparent)}
     .fld textarea{resize:vertical;min-height:68px}
+    .fld-opt{font-weight:600;color:var(--fnt);letter-spacing:0;text-transform:none;margin-left:6px}
+    /* Vast raster van vijf. Met flex-wrap viel '2u+' bij 440px vensterbreedte om naar een tweede
+       regel; een raster kan dat niet. */
+    .duur-keuze{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+    .duur-knop{padding:8px 4px;text-align:center;border:1px solid var(--bor-input);border-radius:var(--rs);
+      font-size:12px;font-weight:600;color:var(--mut);background:var(--sur2);cursor:pointer;
+      font-variant-numeric:tabular-nums;transition:background var(--tr),border-color var(--tr),color var(--tr)}
+    .duur-knop:hover{border-color:var(--ac-b);color:var(--txt);background:var(--sur)}
+    /* Groen, net als de Afhandelen-knop eronder: dit venster heeft --sec:var(--gn). */
+    .duur-knop[aria-pressed=true]{background:var(--gn);border-color:var(--gn);color:#fff}
     .fld-row{display:grid;grid-template-columns:1fr 1fr;gap:11px}
     @media(max-width:480px){.fld-row{grid-template-columns:1fr}}
     .toggle-row{display:flex;align-items:center;gap:10px;padding:7px 0}

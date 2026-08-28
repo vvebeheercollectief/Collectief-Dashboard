@@ -5940,7 +5940,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     eq('afrond+duur: 30 op index 12 (kolom M)', met[12], '30');
     eq('afrond+duur: N t/m P blijven leeg', [met[13],met[14],met[15]], ['','','']);
     eq('afrond+duur: rij blijft 19 lang', met.length, 19);
-    // L is de kolom die Opvolging.gs r.119 leest. Zonder deze assert blijft de suite groen als
+    // L is de kolom die cd_hr_verwerkAfrondingen (Opvolging.gs) leest. Zonder deze assert blijft de suite groen als
     // de duur hem opeet, en verliest een herhalende taak stil zijn Herhaal-ID.
     eq('afrond+duur: herhaalId in L blijft heel naast een duur', met[11], 'H7');
     // Q/R/S mogen NIET opschuiven — Opvolging.gs en parseSections lezen op vaste index.

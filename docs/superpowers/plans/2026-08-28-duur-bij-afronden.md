@@ -29,7 +29,7 @@ index  0..7   → A..H   sectievelden (per sectie anders, zie SECS.keys)
 index  8      → I      afronddatum
 index  9      → J      toelichting
 index 10      → K      subcategorie
-index 11      → L      herhaalId          ← Opvolging.gs:119 leest afData[i][11], NIET verplaatsen
+index 11      → L      herhaalId          ← cd_hr_verwerkAfrondingen (Opvolging.gs) leest afData[i][11], NIET verplaatsen
 index 12      → M      LEEG               ← hier komt de duur
 index 13..15  → N,O,P  leeg
 index 16..18  → Q,R,S  taakId, bundelId, bundelVolg

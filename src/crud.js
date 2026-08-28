@@ -1106,7 +1106,7 @@ async function completeTaskRow(r, rid, bijDoorgaan){
 // Rijwaarden voor een afgeronde taak. Puur, dus los testbaar — en één bron voor zowel de
 // modal-flow (doCompleteTask) als bulk-afronden, zodat die twee niet uiteen kunnen lopen.
 // Vaste kolomposities: A..H sectievelden, I afronddatum, J toelichting, K subcategorie,
-// L herhaalId (Opvolging.gs:119 leest afData[i][11] — NIET verplaatsen), M duur in minuten,
+// L herhaalId (cd_hr_verwerkAfrondingen in Opvolging.gs leest afData[i][11] — NIET verplaatsen), M duur in minuten,
 // N..P leeg, Q taakId, R bundelId, S bundelVolg. Q/R/S liggen op dezelfde index als in
 // 'Nog Te Doen', omdat parseSections beide tabbladen met dezelfde vaste posities leest.
 //

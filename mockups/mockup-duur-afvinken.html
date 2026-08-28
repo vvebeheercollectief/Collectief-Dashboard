@@ -1,0 +1,281 @@
+<title>Het Afvinkmoment</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+/* ══════════════════════════════════════════════════════════════════
+   De duurvraag op de plek waar hij hoort: in het bestaande venster
+   "Taak afhandelen" (index.html r.699). Alle onderdelen — .modal,
+   .fld, .btn — komen uit styles.css van de app.
+   ══════════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#f4f5f7;--sur:#ffffff;--sur2:#fbfcfd;--bor:#ebedf0;
+  --txt:#1b1e24;--mut:#5b6675;--fnt:#9aa1ad;
+  --bor-input:#e4e7ec;--row-divider:#f1f3f5;--row-hover:#f7f9fb;
+  --r:10px;--rs:7px;--sh:0 1px 2px rgba(16,22,34,.05);
+  --shm:0 4px 16px rgba(16,22,34,.08);--shl:0 20px 60px rgba(16,22,34,.16);
+  --hh:60px;--tr:.17s ease;
+  --gn:#047857;--gn-l:#d1fae5;--gn-b:#a7f3d0;
+  --ac:#4a5b7a;--ac-l:#eef1f6;--ac-b:#d6deea;--ac-900:#3a4a66;
+  --sbbg:#1b1e24;--sbedge:#2a2e36;--sig-crit:#9e463e;--am:#AE5008;--am-l:#fef3c7;
+  --cell-txt:#48505c;--pers-bg:#eef1f4;--pers-fg:#5b6675;
+  --font-app:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  --font-mono:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){
+  --bg:#15181d;--sur:#1f242c;--sur2:#191d23;--bor:#2a2e36;
+  --bor-input:#343a44;--row-divider:#23272f;--row-hover:#22272f;
+  --txt:#f2f4f7;--mut:#9aa1ad;--fnt:#6b7280;
+  --sh:0 1px 3px rgba(0,0,0,.45);--shm:0 6px 20px rgba(0,0,0,.5);--shl:0 24px 64px rgba(0,0,0,.65);
+  --gn:#34D39A;--gn-l:#103129;--gn-b:#1F4A3C;
+  --ac:#8b9dc4;--ac-l:#262b35;--ac-b:#3a4256;--ac-900:#a8b8d8;
+  --sig-crit:#f0a29a;--am:#F0B44C;--am-l:#382912;
+  --cell-txt:#c2c8d0;--pers-bg:#2a2f38;--pers-fg:#cfd5df;
+}}
+:root[data-theme=dark]{
+  --bg:#15181d;--sur:#1f242c;--sur2:#191d23;--bor:#2a2e36;
+  --bor-input:#343a44;--row-divider:#23272f;--row-hover:#22272f;
+  --txt:#f2f4f7;--mut:#9aa1ad;--fnt:#6b7280;
+  --sh:0 1px 3px rgba(0,0,0,.45);--shm:0 6px 20px rgba(0,0,0,.5);--shl:0 24px 64px rgba(0,0,0,.65);
+  --gn:#34D39A;--gn-l:#103129;--gn-b:#1F4A3C;
+  --ac:#8b9dc4;--ac-l:#262b35;--ac-b:#3a4256;--ac-900:#a8b8d8;
+  --sig-crit:#f0a29a;--am:#F0B44C;--am-l:#382912;
+  --cell-txt:#c2c8d0;--pers-bg:#2a2f38;--pers-fg:#cfd5df;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none!important}
+body{font-family:var(--font-app);font-size:14px;line-height:1.5;background:var(--bg);color:var(--txt);
+  -webkit-font-smoothing:antialiased}
+button{cursor:pointer;border:none;background:none;font:inherit;color:inherit}
+input,textarea{font:inherit;color:inherit}
+table{border-collapse:collapse;width:100%}
+:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+.kiezer{background:var(--sbbg);border-bottom:1px solid var(--sbedge);padding:11px 20px;
+  color:#8b929e;font-size:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.kiezer b{color:#e7eaef;font-size:11px;letter-spacing:.11em;text-transform:uppercase}
+
+/* ── App-schil ── */
+.schil{position:relative;max-width:1120px;margin:0 auto;background:var(--bg);
+  border-left:1px solid var(--bor);border-right:1px solid var(--bor);min-height:560px;overflow:hidden}
+.hdr{height:var(--hh);background:var(--sur);border-bottom:1px solid var(--bor);display:flex;
+  align-items:center;padding:0 26px}
+.hdr h1{font-size:16px;font-weight:600;letter-spacing:-.01em}
+.hdr p{font-size:12px;color:var(--mut);margin-top:1px}
+.blad{padding:20px 26px 34px}
+.card{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden}
+.card-hdr{padding:13px 16px;border-bottom:1px solid var(--bor);display:flex;align-items:center;min-height:52px}
+.card-hdr h2{font-size:14px;font-weight:700}
+thead th{background:var(--sur2);padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:var(--mut);
+  text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--bor);white-space:nowrap}
+tbody tr{border-bottom:1px solid var(--row-divider)}
+tbody tr:last-child{border-bottom:none}
+tbody td{padding:9px 10px;vertical-align:middle}
+.cell-name{font-weight:600}
+.cell-txt{color:var(--cell-txt);font-size:12.5px;margin-top:1px}
+.cell-sm{font-size:12.5px;color:var(--cell-txt);white-space:nowrap}
+.vve-code{font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--ac)}
+.pers{padding:2px 7px;border-radius:5px;font-size:11.5px;font-weight:600;display:inline-flex;
+  background:var(--pers-bg);color:var(--pers-fg)}
+.telaat{color:var(--sig-crit);font-weight:600}
+.btn-afr{padding:4px 10px;border-radius:6px;border:1px solid var(--gn-b);background:var(--gn-l);color:var(--gn);
+  font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:5px}
+.btn-afr svg{width:12px;height:12px}
+.btn-afr.aan{background:var(--gn);border-color:var(--gn);color:#fff}
+
+/* ── Venster, exact zoals in de app ── */
+.mod-bg{position:absolute;inset:0;background:rgba(0,0,0,.45);z-index:5;display:flex;
+  align-items:flex-start;justify-content:center;padding:40px 16px}
+.modal{background:var(--sur);border-radius:var(--r);width:100%;max-width:440px;box-shadow:var(--shl);
+  overflow:hidden;align-self:flex-start}
+.modal-hdr{padding:16px 20px;border-bottom:1px solid var(--bor);display:flex;align-items:center;
+  justify-content:space-between;gap:10px}
+.modal-hdr h2{font-size:15px;font-weight:700}
+.modal-close{font-size:20px;color:var(--mut);width:30px;height:30px;display:grid;place-items:center;
+  border-radius:6px;line-height:1;flex-shrink:0}
+.modal-close:hover{background:var(--sur2)}
+.modal-body{padding:18px 20px}
+.modal-foot{padding:13px 20px;border-top:1px solid var(--bor);display:flex;justify-content:flex-end;gap:8px}
+.fld{margin-bottom:13px}
+.fld:last-child{margin-bottom:0}
+.fld label{display:block;font-size:11.5px;font-weight:700;color:var(--mut);margin-bottom:5px;
+  text-transform:uppercase;letter-spacing:.04em}
+.fld label .opt{font-weight:600;color:var(--fnt);letter-spacing:0;text-transform:none;margin-left:6px}
+.fld input,.fld textarea{width:100%;background:var(--sur2);border:1px solid var(--bor);
+  border-radius:var(--rs);padding:8px 11px;font-size:13px;outline:none}
+.fld textarea{resize:vertical;min-height:68px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--rs);
+  font-size:13px;font-weight:600}
+.btn svg{width:13px;height:13px}
+.btn-sec{background:var(--sur);color:var(--mut);border:1px solid var(--bor)}
+.btn-sec:hover{background:var(--sur2);color:var(--txt)}
+.btn-gn{background:var(--gn);color:#fff}
+.btn-gn:hover{filter:brightness(1.1)}
+
+/* ── De duurvraag ── */
+.duur-knoppen{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+.dk{padding:8px 4px;text-align:center;border:1px solid var(--bor-input);border-radius:var(--rs);
+  font-size:12px;font-weight:600;color:var(--mut);background:var(--sur2);
+  font-variant-numeric:tabular-nums;transition:all var(--tr)}
+.dk:hover{border-color:var(--ac-b);color:var(--txt);background:var(--sur)}
+.dk[aria-pressed=true]{background:var(--gn);border-color:var(--gn);color:#fff}
+
+/* ── Nu / straks ── */
+.verg{max-width:1120px;margin:0 auto;padding:26px 26px 8px;border-left:1px solid var(--bor);
+  border-right:1px solid var(--bor);background:var(--sur2)}
+.verg h2{font-size:11px;letter-spacing:.11em;text-transform:uppercase;color:var(--mut);font-weight:700;margin-bottom:16px}
+.verg-rij{display:flex;gap:30px;flex-wrap:wrap;align-items:flex-start}
+.verg-kolom{flex:1;min-width:300px;max-width:440px}
+.verg-kolom h3{font-size:12px;font-weight:700;color:var(--mut);margin-bottom:10px}
+.verg-kolom .modal{box-shadow:var(--shm);border:1px solid var(--bor)}
+.verg-kolom .maat{font-size:11px;color:var(--fnt);margin-top:9px;font-variant-numeric:tabular-nums}
+
+.uitleg{max-width:1120px;margin:0 auto;padding:22px 26px 42px;border-left:1px solid var(--bor);
+  border-right:1px solid var(--bor);background:var(--sur2)}
+.uitleg h2{font-size:11px;letter-spacing:.11em;text-transform:uppercase;color:var(--mut);font-weight:700;margin-bottom:12px}
+.uitleg ul{list-style:none;display:grid;gap:8px;max-width:76ch}
+.uitleg li{position:relative;padding-left:16px;font-size:13.5px}
+.uitleg li::before{content:'';position:absolute;left:0;top:9px;width:7px;height:1px;background:var(--mut)}
+.uitleg li b{font-weight:700}
+.vraag-blok{margin-top:16px;padding:12px 14px;border-left:3px solid var(--am);background:var(--am-l);
+  border-radius:0 var(--rs) var(--rs) 0;font-size:13px;max-width:76ch;color:var(--txt)}
+</style>
+
+<div class="kiezer"><b>Correctie</b> Afronden opent al een venster. De duurvraag hoort dáárin, niet in een melding erna.</div>
+
+<div class="schil">
+  <header class="hdr"><div><h1>Nog Te Doen</h1><p>Openstaande taken en actiepunten</p></div></header>
+  <div class="blad">
+    <div class="card">
+      <div class="card-hdr"><h2>Oppakken</h2></div>
+      <table>
+        <thead><tr><th style="width:84px">VvE</th><th>Actiepunt</th><th style="width:112px">Deadline</th>
+          <th style="width:104px">Behandelaar</th><th style="width:108px"></th></tr></thead>
+        <tbody>
+          <tr>
+            <td><span class="vve-code">310884</span></td>
+            <td><div class="cell-name">Lekkage berging blok B nabellen bij aannemer</div>
+              <div class="cell-txt">Herenstraat 9 &amp; 9a</div></td>
+            <td class="cell-sm">28 aug 2026</td><td><span class="pers">Gabos</span></td>
+            <td><button class="btn-afr aan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m5 12 5 5L20 7"/></svg>Afronden</button></td>
+          </tr>
+          <tr>
+            <td><span class="vve-code">311212</span></td>
+            <td><div class="cell-name">Uitnodiging ALV opstellen en versturen</div>
+              <div class="cell-txt">De La Reyweg 131 t/m 141</div></td>
+            <td class="cell-sm">10 sep 2026</td><td><span class="pers">Jer</span></td>
+            <td><button class="btn-afr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m5 12 5 5L20 7"/></svg>Afronden</button></td>
+          </tr>
+          <tr>
+            <td><span class="vve-code">311047</span></td>
+            <td><div class="cell-name">Sleutelplan navragen bij het bestuur</div>
+              <div class="cell-txt">Van Ostadelaan 2 t/m 44</div></td>
+            <td class="cell-sm telaat">3 sep 2026</td><td><span class="pers">Cihan</span></td>
+            <td><button class="btn-afr"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m5 12 5 5L20 7"/></svg>Afronden</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="mod-bg">
+    <div class="modal">
+      <div class="modal-hdr">
+        <h2>Taak afhandelen — Lekkage berging blok B nabellen</h2>
+        <button class="modal-close" aria-label="Sluiten">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="fld"><label for="d1">Afgerond op</label><input id="d1" type="text" value="28-08-2026"></div>
+        <div class="fld"><label for="o1">Opmerking</label>
+          <textarea id="o1" placeholder="Optioneel — wat is er gedaan?"></textarea></div>
+        <div class="fld">
+          <label>Hoe lang duurde dit?<span class="opt">optioneel</span></label>
+          <div class="duur-knoppen">
+            <button class="dk">5m</button><button class="dk">15m</button>
+            <button class="dk">30m</button><button class="dk">1u</button><button class="dk">2u+</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-sec">Annuleren</button>
+        <button class="btn btn-gn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 13l5 5L19.5 6.5"/></svg>Afhandelen</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="verg">
+  <h2>Wat je erbij krijgt</h2>
+  <div class="verg-rij">
+    <div class="verg-kolom">
+      <h3>Zoals het venster nu is</h3>
+      <div class="modal">
+        <div class="modal-hdr"><h2>Taak afhandelen</h2><button class="modal-close">×</button></div>
+        <div class="modal-body">
+          <div class="fld"><label for="d2">Afgerond op</label><input id="d2" type="text" value="28-08-2026"></div>
+          <div class="fld"><label for="o2">Opmerking</label>
+            <textarea id="o2" placeholder="Optioneel — wat is er gedaan?"></textarea></div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn btn-sec">Annuleren</button>
+          <button class="btn btn-gn">Afhandelen</button>
+        </div>
+      </div>
+      <div class="maat" id="m-nu">–</div>
+    </div>
+    <div class="verg-kolom">
+      <h3>Zoals het zou worden</h3>
+      <div class="modal">
+        <div class="modal-hdr"><h2>Taak afhandelen</h2><button class="modal-close">×</button></div>
+        <div class="modal-body">
+          <div class="fld"><label for="d3">Afgerond op</label><input id="d3" type="text" value="28-08-2026"></div>
+          <div class="fld"><label for="o3">Opmerking</label>
+            <textarea id="o3" placeholder="Optioneel — wat is er gedaan?"></textarea></div>
+          <div class="fld">
+            <label>Hoe lang duurde dit?<span class="opt">optioneel</span></label>
+            <div class="duur-knoppen">
+              <button class="dk">5m</button><button class="dk">15m</button>
+              <button class="dk">30m</button><button class="dk">1u</button><button class="dk">2u+</button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn btn-sec">Annuleren</button>
+          <button class="btn btn-gn">Afhandelen</button>
+        </div>
+      </div>
+      <div class="maat" id="m-straks">–</div>
+    </div>
+  </div>
+</div>
+
+<div class="uitleg">
+  <h2>Waarom dit beter is dan de melding</h2>
+  <ul>
+    <li><b>Geen extra moment.</b> Dit venster open je toch al om af te ronden. De vraag staat onder de twee velden die er al zijn, in dezelfde opmaak.</li>
+    <li><b>Geen tweede schrijfactie.</b> De duur gaat mee in dezelfde regel die toch al naar het tabblad Afgerond wordt geschreven. Bij de melding-variant moest de app achteraf terugkomen op een regel die al weg was — meer code, meer dat stuk kan.</li>
+    <li><b>Niets kan de vraag inhalen.</b> De melding verdwijnt na een paar seconden; wie net te traag klikte, was zijn antwoord kwijt. Hier is dat onmogelijk.</li>
+    <li><b>Niets aangeklikt is leeg.</b> Er staat bewust géén knop voorgeselecteerd. Anders zou elke taak een verzonnen half uur krijgen, en dan meet je je eigen aanname in plaats van je werk.</li>
+    <li>Bij <b>bulk-afronden</b> komt de vraag niet — dat is opruimwerk, en twaalf keer "30m" vervuilt de meting.</li>
+  </ul>
+  <div class="vraag-blok"><b>Wat ik hiermee terugneem:</b> in de vorige mockup stond dat 30 minuten voorgeselecteerd zou zijn én dat overslaan mocht. Dat kan niet allebei. Jij zei dat overslaan moet kunnen, dus die wint: niets aangeklikt betekent niets gemeten. Reken op zestig tot tachtig procent gevulde taken.</div>
+</div>
+
+<script>
+(function(){
+  document.querySelectorAll('.duur-knoppen').forEach(function(g){
+    g.querySelectorAll('.dk').forEach(function(b){
+      b.addEventListener('click', function(){
+        var aan = b.getAttribute('aria-pressed') === 'true';
+        g.querySelectorAll('.dk').forEach(function(x){ x.removeAttribute('aria-pressed'); });
+        if(!aan) b.setAttribute('aria-pressed','true');   // nogmaals klikken = keuze weer intrekken
+      });
+    });
+  });
+  // Hoogtes echt meten in plaats van ze op te schrijven.
+  var k = document.querySelectorAll('.verg-kolom .modal');
+  var nu = Math.round(k[0].getBoundingClientRect().height);
+  var st = Math.round(k[1].getBoundingClientRect().height);
+  document.getElementById('m-nu').textContent = nu + ' pixels hoog';
+  document.getElementById('m-straks').textContent = st + ' pixels hoog · ' + (st - nu) + ' erbij';
+})();
+</script>

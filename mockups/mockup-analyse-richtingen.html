@@ -1,0 +1,613 @@
+<title>Twee Richtingen Analyse</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+/* ══════════════════════════════════════════════════════════════════
+   TWEE RICHTINGEN voor het samengevoegde Analyse-scherm.
+   Dezelfde gegevens, twee verschillende behandelingen.
+   A — STAAT     : documenttaal. Geen tegels, geen kaarten, geen kleur
+                   als versiering. Haarlijnen, strakke cijferkolommen.
+   B — WERKBANK  : hoge dichtheid. Donkere cijferbalk uit de zijbalk,
+                   daaronder compacte regels. Kleur alleen als status.
+   ══════════════════════════════════════════════════════════════════ */
+:root{
+  --pap:#ffffff;--grond:#f1f2f4;--inkt:#14171c;--dof:#6b7480;--flauw:#98a0ab;
+  --lijn:#e4e7ea;--lijn-zwaar:#c9ced5;--vlak:#f7f8f9;
+  --ac:#3a4a66;--ac-l:#eef1f6;--ac-b:#d6deea;
+  --alarm:#9e463e;--goed:#046b4e;
+  --bl:#1D6AA5;--am:#AE5008;--pu:#6855C9;--rd:#B91C1C;--tl:#0F766E;
+  --sbbg:#1b1e24;--sbedge:#2a2e36;
+  --font-app:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  --font-mono:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){
+  --pap:#1c2027;--grond:#131519;--inkt:#eef0f3;--dof:#98a0ab;--flauw:#6b7480;
+  --lijn:#272c34;--lijn-zwaar:#3a414b;--vlak:#191d23;
+  --ac:#9fb0d4;--ac-l:#232833;--ac-b:#39414f;
+  --alarm:#e79a92;--goed:#3fbf94;
+  --bl:#5FA8E0;--am:#F0B44C;--pu:#A896F0;--rd:#F0746F;--tl:#5EC8BC;
+}}
+:root[data-theme=dark]{
+  --pap:#1c2027;--grond:#131519;--inkt:#eef0f3;--dof:#98a0ab;--flauw:#6b7480;
+  --lijn:#272c34;--lijn-zwaar:#3a414b;--vlak:#191d23;
+  --ac:#9fb0d4;--ac-l:#232833;--ac-b:#39414f;
+  --alarm:#e79a92;--goed:#3fbf94;
+  --bl:#5FA8E0;--am:#F0B44C;--pu:#A896F0;--rd:#F0746F;--tl:#5EC8BC;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none!important}
+body{font-family:var(--font-app);font-size:14px;line-height:1.5;background:var(--grond);color:var(--inkt);
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+button{cursor:pointer;border:none;background:none;font:inherit;color:inherit}
+ul{list-style:none}
+table{border-collapse:collapse;width:100%}
+:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+.tnum{font-variant-numeric:tabular-nums}
+
+/* ── Kiezer ── */
+.kiezer{position:sticky;top:0;z-index:60;background:var(--sbbg);border-bottom:1px solid var(--sbedge);
+  padding:10px 20px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.kiezer-lbl{color:#6b7280;font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;margin-right:6px}
+.kiezer button{color:#a8aeb9;padding:6px 14px;border-radius:6px;font-size:12.5px;font-weight:600;transition:all .15s ease}
+.kiezer button:hover{background:#262a32;color:#e7eaef}
+.kiezer button[aria-pressed=true]{background:#e7eaef;color:#1b1e24}
+
+/* ── Schil ── */
+.schil{display:flex;max-width:1440px;margin:0 auto;background:var(--grond);
+  border-left:1px solid var(--lijn);border-right:1px solid var(--lijn);min-height:880px}
+.sb{width:240px;flex-shrink:0;background:var(--sbbg);border-right:1px solid var(--sbedge);color:#8b929e;padding-bottom:16px}
+.sb-logo{padding:20px;border-bottom:1px solid var(--sbedge);display:flex;align-items:center;gap:11px}
+.sb-mark{width:32px;height:32px;border-radius:7px;background:#2B3544;color:#fff;display:grid;place-items:center;font-weight:800;font-size:12px}
+.sb-brand{font-size:13px;font-weight:600;color:#e7eaef;line-height:1.3}
+.sb-brand span{display:block;font-family:var(--font-mono);font-size:10px;font-weight:400;color:#6b7280}
+.sb-lbl{padding:16px 20px 6px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#5b626e;font-weight:700}
+.ni{display:flex;align-items:center;gap:11px;width:100%;padding:9px 20px;font-size:13.5px;text-align:left;color:#a8aeb9}
+.ni svg{width:17px;height:17px;opacity:.8;flex-shrink:0}
+.ni:hover{background:#22262e;color:#e7eaef}
+.ni[aria-current=page]{background:#262c38;color:#fff;box-shadow:inset 2px 0 0 #9fb0d4}
+.ni-badge{margin-left:auto;font-family:var(--font-mono);font-size:11px;color:#7d8595;background:#22262e;padding:1px 6px;border-radius:20px}
+.ni.vervalt{opacity:.4}.ni.vervalt .lbl{text-decoration:line-through}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+
+/* ── Toelichting ── */
+.uitleg{max-width:1440px;margin:0 auto;padding:22px 26px 40px;border-left:1px solid var(--lijn);
+  border-right:1px solid var(--lijn);background:var(--vlak)}
+.uitleg h2{font-size:11px;letter-spacing:.11em;text-transform:uppercase;color:var(--dof);font-weight:700;margin-bottom:12px}
+.uitleg ul{display:grid;gap:8px;max-width:76ch}
+.uitleg li{position:relative;padding-left:16px;font-size:13.5px}
+.uitleg li::before{content:'';position:absolute;left:0;top:9px;width:7px;height:1px;background:var(--dof)}
+.uitleg li b{font-weight:700}
+
+/* ══════════════════════════════════════════════
+   RICHTING A — STAAT
+   ══════════════════════════════════════════════ */
+.A .blad{background:var(--pap);flex:1;padding:0}
+.A .kop{padding:30px 44px 22px;border-bottom:1px solid var(--lijn-zwaar);display:flex;
+  align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap}
+.A .kop h1{font-size:23px;font-weight:600;letter-spacing:-.022em;line-height:1.15}
+.A .kop .dat{font-size:12px;color:var(--dof);margin-top:6px;font-variant-numeric:tabular-nums}
+.A .periode{display:flex;gap:0;border:1px solid var(--lijn-zwaar);border-radius:3px;overflow:hidden}
+.A .periode button{padding:6px 15px;font-size:12px;font-weight:600;color:var(--dof);border-right:1px solid var(--lijn)}
+.A .periode button:last-child{border-right:none}
+.A .periode button:hover{background:var(--vlak);color:var(--inkt)}
+.A .periode button[aria-pressed=true]{background:var(--inkt);color:var(--pap)}
+
+.A .sectie{padding:0 44px}
+.A .sectie-kop{display:flex;align-items:baseline;gap:14px;padding:34px 0 0}
+.A .sectie-kop h2{font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--inkt)}
+.A .sectie-kop .toel{font-size:12px;color:var(--flauw)}
+.A .sectie-kop::after{content:'';flex:1;height:1px;background:var(--lijn)}
+
+/* Cijferregel: geen kaartjes, alleen kolommen met scheidingslijnen */
+.A .staat{display:grid;grid-template-columns:repeat(4,1fr);margin-top:20px;border-top:1px solid var(--lijn)}
+.A .post{padding:20px 26px 20px 0;border-right:1px solid var(--lijn);text-align:left;width:100%;
+  display:block;transition:background .15s ease}
+.A .post:last-child{border-right:none}
+.A .post:not(:first-child){padding-left:26px}
+.A .post:hover{background:var(--vlak)}
+.A .post .lbl{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--dof);font-weight:700}
+.A .post .n{font-size:46px;font-weight:250;letter-spacing:-.045em;line-height:1;margin:12px 0 0;
+  font-variant-numeric:tabular-nums;color:var(--inkt)}
+.A .post .n.let{color:var(--alarm);font-weight:300}
+.A .post .toel{font-size:12px;color:var(--dof);margin-top:9px}
+.A .post .ga{font-size:11.5px;color:var(--ac);font-weight:600;margin-top:12px;display:inline-block;
+  border-bottom:1px solid var(--ac-b);padding-bottom:1px}
+.A .post:hover .ga{border-bottom-color:var(--ac)}
+
+/* Grafiek: dunne lijn, geen vulling, geen bolletje */
+.A .verloop{display:grid;grid-template-columns:1fr 300px;gap:44px;margin-top:22px;align-items:start}
+.A .grafiek h3,.A .seizoen h3{font-size:13px;font-weight:600;margin-bottom:2px}
+.A .grafiek .bij,.A .seizoen .bij{font-size:12px;color:var(--dof);margin-bottom:16px}
+.A .chart{width:100%;height:auto;display:block}
+.A .as{font-size:10px;fill:var(--flauw);font-weight:600}
+.A .grid-l{stroke:var(--lijn);stroke-width:1}
+
+/* Seizoen als staafjes-staat i.p.v. donut */
+.A .balken{display:grid;gap:0;border-top:1px solid var(--lijn)}
+.A .balk-rij{display:grid;grid-template-columns:1fr 34px;gap:12px;align-items:center;padding:11px 0;
+  border-bottom:1px solid var(--lijn)}
+.A .balk-lbl{font-size:12.5px}
+.A .balk-spoor{height:2px;background:var(--lijn);margin-top:7px;position:relative}
+.A .balk-spoor i{position:absolute;left:0;top:-1px;height:4px;background:var(--inkt)}
+.A .balk-rij .n{text-align:right;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums}
+
+/* Tabellen in richting A */
+.A table{font-size:13px;margin-top:18px}
+.A thead th{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--dof);font-weight:700;
+  padding:0 14px 9px 0;text-align:left;border-bottom:1px solid var(--lijn-zwaar);white-space:nowrap}
+.A thead th.r{text-align:right;padding-right:0}
+.A tbody td{padding:13px 14px 13px 0;border-bottom:1px solid var(--lijn);vertical-align:baseline}
+.A tbody td.r{text-align:right;padding-right:0;font-variant-numeric:tabular-nums}
+.A tbody tr:hover{background:var(--vlak)}
+.A .nm{font-weight:600}
+.A .zw{font-weight:600;font-variant-numeric:tabular-nums}
+.A .let{color:var(--alarm);font-weight:600}
+.A .nul{color:var(--flauw)}
+.A .verschil{font-size:12px;color:var(--dof);font-variant-numeric:tabular-nums}
+.A .verschil.op::before{content:'+';}
+.A .cat{font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--dof);white-space:nowrap}
+.A .cat i{display:inline-block;width:6px;height:6px;margin-right:7px;vertical-align:1px}
+.A .code{font-family:var(--font-mono);font-size:12px;color:var(--ac);font-weight:600;cursor:pointer}
+.A .code:hover{text-decoration:underline}
+.A .sub{font-size:12px;color:var(--dof);margin-top:2px}
+.A .voet{padding:26px 44px 40px;color:var(--flauw);font-size:11.5px}
+
+/* ══════════════════════════════════════════════
+   RICHTING B — WERKBANK
+   ══════════════════════════════════════════════ */
+.B .werk{flex:1;background:var(--grond);display:flex;flex-direction:column;min-width:0}
+.B .band{background:var(--sbbg);color:#e7eaef;padding:0 24px;display:flex;align-items:stretch;
+  border-bottom:1px solid var(--sbedge);flex-wrap:wrap}
+.B .band-titel{padding:16px 26px 16px 0;border-right:1px solid #2f343d;display:flex;flex-direction:column;justify-content:center}
+.B .band-titel h1{font-size:15px;font-weight:600;color:#fff;letter-spacing:-.01em}
+.B .band-titel span{font-size:11px;color:#8b929e;font-family:var(--font-mono);margin-top:3px}
+.B .meet{padding:16px 26px;border-right:1px solid #2f343d;display:flex;flex-direction:column;
+  justify-content:center;text-align:left;min-width:132px;transition:background .15s ease}
+.B .meet:hover{background:#22262e}
+.B .meet .lbl{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:#8b929e;font-weight:700}
+.B .meet .n{font-family:var(--font-mono);font-size:26px;font-weight:500;letter-spacing:-.03em;line-height:1.1;
+  margin-top:5px;color:#fff;font-variant-numeric:tabular-nums}
+.B .meet .n.let{color:#e79a92}
+.B .meet .toel{font-size:10.5px;color:#767d89;margin-top:3px;font-family:var(--font-mono)}
+.B .band-eind{margin-left:auto;display:flex;align-items:center;gap:6px;padding:16px 0 16px 26px}
+.B .pbtn{padding:5px 12px;border-radius:5px;font-size:11.5px;font-weight:600;color:#a8aeb9;border:1px solid #343a44}
+.B .pbtn:hover{background:#262a32;color:#e7eaef}
+.B .pbtn[aria-pressed=true]{background:#e7eaef;color:#1b1e24;border-color:#e7eaef}
+
+.B .romp{padding:18px 24px 40px;display:grid;grid-template-columns:1fr 330px;gap:18px;align-items:start}
+.B .paneel{background:var(--pap);border:1px solid var(--lijn)}
+.B .paneel+.paneel{margin-top:18px}
+.B .p-kop{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--lijn);
+  background:var(--vlak)}
+.B .p-kop h2{font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--inkt)}
+.B .p-kop .bij{font-size:11px;color:var(--flauw);font-family:var(--font-mono);margin-left:auto}
+.B .p-body{padding:14px}
+.B .chart{width:100%;height:auto;display:block}
+.B .as{font-size:9.5px;fill:var(--flauw);font-weight:600;font-family:var(--font-mono)}
+.B .grid-l{stroke:var(--lijn);stroke-width:1}
+
+.B table{font-size:12.5px}
+.B thead th{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--dof);font-weight:700;
+  padding:8px 12px;text-align:left;background:var(--vlak);border-bottom:1px solid var(--lijn);white-space:nowrap}
+.B thead th.r{text-align:right}
+.B tbody td{padding:8px 12px;border-bottom:1px solid var(--lijn);vertical-align:middle}
+.B tbody tr:last-child td{border-bottom:none}
+.B tbody tr:hover{background:var(--vlak)}
+.B td.r{text-align:right;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.B .nm{font-weight:600}
+.B .sub{font-size:11px;color:var(--dof);margin-top:1px}
+.B .code{font-family:var(--font-mono);font-size:11.5px;color:var(--ac);font-weight:600;cursor:pointer}
+.B .code:hover{text-decoration:underline}
+.B .stip{display:inline-block;width:7px;height:7px;margin-right:8px;vertical-align:0}
+.B .cat{font-size:10px;letter-spacing:.07em;text-transform:uppercase;font-weight:700;color:var(--dof);white-space:nowrap}
+.B .let{color:var(--alarm);font-weight:700}
+.B .nul{color:var(--flauw)}
+.B .dlt{font-family:var(--font-mono);font-size:11.5px;color:var(--dof)}
+.B .dlt.op{color:var(--goed)}.B .dlt.neer{color:var(--alarm)}
+.B .naam{font-family:var(--font-mono);font-size:11px;color:var(--dof);background:var(--vlak);
+  border:1px solid var(--lijn);padding:1px 6px;border-radius:3px}
+
+/* Seizoen als gestapelde balk */
+.B .stapel{height:10px;display:flex;overflow:hidden;border-radius:2px;margin-bottom:14px}
+.B .stapel i{display:block;height:100%}
+.B .sz-rij{display:grid;grid-template-columns:9px 1fr auto auto;gap:10px;align-items:center;
+  padding:7px 0;border-bottom:1px solid var(--lijn);font-size:12px}
+.B .sz-rij:last-child{border-bottom:none}
+.B .sz-rij i{width:9px;height:9px}
+.B .sz-rij .n{font-family:var(--font-mono);font-weight:600;font-variant-numeric:tabular-nums}
+.B .sz-rij .p{font-family:var(--font-mono);font-size:11px;color:var(--flauw);width:32px;text-align:right}
+
+@media (max-width:1080px){
+  .sb{display:none}
+  .A .verloop,.B .romp{grid-template-columns:1fr}
+  .A .staat{grid-template-columns:repeat(2,1fr)}
+  .A .post{border-bottom:1px solid var(--lijn)}
+  .A .kop,.A .sectie,.A .voet{padding-left:22px;padding-right:22px}
+}
+</style>
+
+<div class="kiezer">
+  <span class="kiezer-lbl">Richting</span>
+  <button data-s="A" aria-pressed="true">A — Staat</button>
+  <button data-s="B" aria-pressed="false">B — Werkbank</button>
+</div>
+
+<!-- ══════════════════ A — STAAT ══════════════════ -->
+<section id="s-A">
+<div class="schil A">
+  <aside class="sb">
+    <div class="sb-logo"><div class="sb-mark">VBC</div>
+      <div class="sb-brand">VvE Beheer<span>Collectief Dashboard 12.3</span></div></div>
+    <nav>
+      <div class="sb-lbl">Taken</div>
+      <button class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg><span class="lbl">Nog Te Doen</span><span class="ni-badge">81</span></button>
+      <button class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg><span class="lbl">Afgerond</span></button>
+      <div class="sb-lbl">ALV's</div>
+      <button class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg><span class="lbl">ALV's Overzicht</span></button>
+      <button class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span class="lbl">ALV's Afgerond</span></button>
+      <div class="sb-lbl">Intern</div>
+      <button class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span class="lbl">Logboek</span></button>
+      <button class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg><span class="lbl">Herhaalregels</span></button>
+      <div class="sb-lbl">Analyse</div>
+      <button class="ni" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v15a1 1 0 001 1h15"/><path d="M7 15l3.5-3.5 3 3L20 7"/><path d="M20 11V7h-4"/></svg><span class="lbl">Analyse</span></button>
+      <button class="ni vervalt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span class="lbl">Dashboard</span></button>
+    </nav>
+  </aside>
+
+  <div class="main"><div class="blad">
+
+    <div class="kop">
+      <div>
+        <h1>Analyse</h1>
+        <div class="dat">Stand op vrijdag 28 augustus 2026, 09:14</div>
+      </div>
+      <div class="periode">
+        <button>Week</button><button aria-pressed="true">Maand</button><button>Kwartaal</button><button>Jaar</button>
+      </div>
+    </div>
+
+    <div class="sectie">
+      <div class="sectie-kop"><h2>Werkvoorraad</h2><span class="toel">stand van nu</span></div>
+      <div class="staat">
+        <button class="post">
+          <div class="lbl">Open taken</div>
+          <div class="n tnum">81</div>
+          <div class="toel">over vijf categorieën</div>
+          <span class="ga">Naar de lijst</span>
+        </button>
+        <button class="post">
+          <div class="lbl">Deadline verstreken</div>
+          <div class="n let tnum">14</div>
+          <div class="toel">langst open 76 dagen</div>
+          <span class="ga">Toon alleen deze</span>
+        </button>
+        <button class="post">
+          <div class="lbl">Vergaderingen open</div>
+          <div class="n tnum">19</div>
+          <div class="toel">van 63 dit seizoen</div>
+          <span class="ga">Naar ALV's Overzicht</span>
+        </button>
+        <button class="post">
+          <div class="lbl">Stil in behandeling</div>
+          <div class="n tnum">7</div>
+          <div class="toel">vier dagen of langer</div>
+          <span class="ga">Toon alleen deze</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="sectie">
+      <div class="sectie-kop"><h2>Verloop</h2><span class="toel">twaalf maanden</span></div>
+      <div class="verloop">
+        <div class="grafiek">
+          <h3>Taken afgerond per maand</h3>
+          <div class="bij">Gemiddeld 18. Augustus is met 28 de hoogste maand sinds de meting begon.</div>
+          <svg class="chart" viewBox="0 0 620 196" role="img" aria-label="Afgeronde taken per maand, van 9 in september 2025 naar 28 in augustus 2026">
+            <line class="grid-l" x1="26" y1="160" x2="614" y2="160"/>
+            <line class="grid-l" x1="26" y1="112" x2="614" y2="112" stroke-dasharray="1 5"/>
+            <line class="grid-l" x1="26" y1="63"  x2="614" y2="63"  stroke-dasharray="1 5"/>
+            <line class="grid-l" x1="26" y1="14"  x2="614" y2="14"  stroke-dasharray="1 5"/>
+            <text class="as" x="18" y="164" text-anchor="end">0</text>
+            <text class="as" x="18" y="116" text-anchor="end">10</text>
+            <text class="as" x="18" y="67"  text-anchor="end">20</text>
+            <text class="as" x="18" y="18"  text-anchor="end">30</text>
+            <path d="M26,116.1 L79.5,91.6 L133,106.3 L186.5,76.9 L240,101.4 L293.5,67.1 L347,47.5 L400.5,81.8 L454,57.3 L507.5,32.8 L561,52.4 L614,23.0"
+                  fill="none" stroke="var(--inkt)" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round"/>
+            <text class="as" x="26"  y="184" text-anchor="middle">sep</text>
+            <text class="as" x="133" y="184" text-anchor="middle">nov</text>
+            <text class="as" x="240" y="184" text-anchor="middle">jan</text>
+            <text class="as" x="347" y="184" text-anchor="middle">mrt</text>
+            <text class="as" x="454" y="184" text-anchor="middle">mei</text>
+            <text class="as" x="561" y="184" text-anchor="middle">jul</text>
+          </svg>
+        </div>
+        <div class="seizoen">
+          <h3>Vergaderseizoen</h3>
+          <div class="bij">63 VvE's, 49 procent afgerond.</div>
+          <div class="balken">
+            <div class="balk-rij">
+              <div><div class="balk-lbl">Notulen verstuurd</div><div class="balk-spoor"><i style="width:49%"></i></div></div>
+              <div class="n">31</div>
+            </div>
+            <div class="balk-rij">
+              <div><div class="balk-lbl">Uitnodiging verstuurd</div><div class="balk-spoor"><i style="width:19%"></i></div></div>
+              <div class="n">12</div>
+            </div>
+            <div class="balk-rij">
+              <div><div class="balk-lbl">Klaargezet</div><div class="balk-spoor"><i style="width:11%"></i></div></div>
+              <div class="n">7</div>
+            </div>
+            <div class="balk-rij">
+              <div><div class="balk-lbl">Nog niets gedaan</div><div class="balk-spoor"><i style="width:21%"></i></div></div>
+              <div class="n">13</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sectie">
+      <div class="sectie-kop"><h2>Per behandelaar</h2><span class="toel">augustus 2026</span></div>
+      <table>
+        <thead><tr>
+          <th>Behandelaar</th><th class="r">Afgerond</th><th class="r">Vorige maand</th>
+          <th class="r">Verschil</th><th class="r">Nu open</th><th class="r">Te laat</th>
+        </tr></thead>
+        <tbody>
+          <tr><td class="nm">Jer</td><td class="r zw">11</td><td class="r">8</td>
+            <td class="r verschil op">3</td><td class="r">23</td><td class="r let">4</td></tr>
+          <tr><td class="nm">Cihad</td><td class="r zw">9</td><td class="r">10</td>
+            <td class="r verschil">−1</td><td class="r">19</td><td class="r let">6</td></tr>
+          <tr><td class="nm">Gabos</td><td class="r zw">7</td><td class="r">7</td>
+            <td class="r verschil nul">0</td><td class="r">25</td><td class="r let">3</td></tr>
+          <tr><td class="nm">Cihan</td><td class="r zw">5</td><td class="r">3</td>
+            <td class="r verschil op">2</td><td class="r">14</td><td class="r nul">–</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="sectie">
+      <div class="sectie-kop"><h2>Laatst afgerond</h2><span class="toel">tien meest recente</span></div>
+      <table>
+        <thead><tr><th style="width:150px">Categorie</th><th style="width:90px">VvE</th><th>Actiepunt</th>
+          <th style="width:110px">Behandelaar</th><th class="r" style="width:110px">Datum</th></tr></thead>
+        <tbody>
+          <tr><td><span class="cat"><i style="background:var(--am)"></i>Vergadering</span></td>
+            <td><span class="code">311212</span></td>
+            <td><div>Notulen jaarvergadering rondgestuurd</div><div class="sub">De La Reyweg 131 t/m 141</div></td>
+            <td>Jer</td><td class="r">27 aug 2026</td></tr>
+          <tr><td><span class="cat"><i style="background:var(--pu)"></i>Offerte</span></td>
+            <td><span class="code">310884</span></td>
+            <td><div>Gunning schilderwerk doorgegeven</div><div class="sub">Herenstraat 9 &amp; 9a</div></td>
+            <td>Gabos</td><td class="r">27 aug 2026</td></tr>
+          <tr><td><span class="cat"><i style="background:var(--bl)"></i>Oppakken</span></td>
+            <td><span class="code">311047</span></td>
+            <td><div>Lekkage berging verholpen</div><div class="sub">Van Ostadelaan 2 t/m 44</div></td>
+            <td>Cihan</td><td class="r">26 aug 2026</td></tr>
+          <tr><td><span class="cat"><i style="background:var(--rd)"></i>LOD</span></td>
+            <td><span class="code">311301</span></td>
+            <td><div>Herstelplan voegwerk ingediend bij gemeente</div><div class="sub">Zuidhoornseweg 14 t/m 30</div></td>
+            <td>Cihad</td><td class="r">25 aug 2026</td></tr>
+          <tr><td><span class="cat"><i style="background:var(--tl)"></i>Subsidie</span></td>
+            <td><span class="code">310915</span></td>
+            <td><div>Aanvraag isolatiesubsidie ingediend</div><div class="sub">Kerklaan 88 t/m 96</div></td>
+            <td>Jer</td><td class="r">25 aug 2026</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="voet">Analyse · Collectief Dashboard · gegevens ververst 09:14</div>
+  </div></div>
+</div>
+<div class="uitleg">
+  <h2>Richting A — Staat</h2>
+  <ul>
+    <li><b>Geen tegels en geen kaarten.</b> De vier cijfers staan als posten naast elkaar, gescheiden door haarlijnen. Dat is de taal van een jaarrekening, niet van een app-startscherm.</li>
+    <li><b>Kleur draagt geen versiering.</b> Alles is inkt op papier. Alleen "14 te laat" is rood, want dat betekent iets. De categorieën in de onderste tabel krijgen een vierkantje van 6 pixels — verder niets.</li>
+    <li><b>Grote cijfers, licht gezet.</b> 46 pixels op gewicht 250. Dat leest volwassen; hetzelfde cijfer op gewicht 800 in kleur leest als een spelletje.</li>
+    <li>De grafiek is <b>één dunne lijn</b>, zonder vulling en zonder bolletje aan het eind. De zin eronder zegt wat je moet weten.</li>
+    <li>De donut is vervangen door <b>vier regels met een dun streepje</b> — je kunt de aantallen zo aflezen, wat bij een donut nooit lukt.</li>
+    <li>Sluit aan op de <b>bestuursrapportage</b> die je goed vond: dezelfde documenttaal.</li>
+  </ul>
+</div>
+</section>
+
+<!-- ══════════════════ B — WERKBANK ══════════════════ -->
+<section id="s-B" hidden>
+<div class="schil B">
+  <aside class="sb">
+    <div class="sb-logo"><div class="sb-mark">VBC</div>
+      <div class="sb-brand">VvE Beheer<span>Collectief Dashboard 12.3</span></div></div>
+    <nav>
+      <div class="sb-lbl">Taken</div>
+      <button class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg><span class="lbl">Nog Te Doen</span><span class="ni-badge">81</span></button>
+      <button class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg><span class="lbl">Afgerond</span></button>
+      <div class="sb-lbl">ALV's</div>
+      <button class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg><span class="lbl">ALV's Overzicht</span></button>
+      <button class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span class="lbl">ALV's Afgerond</span></button>
+      <div class="sb-lbl">Intern</div>
+      <button class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span class="lbl">Logboek</span></button>
+      <button class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg><span class="lbl">Herhaalregels</span></button>
+      <div class="sb-lbl">Analyse</div>
+      <button class="ni" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v15a1 1 0 001 1h15"/><path d="M7 15l3.5-3.5 3 3L20 7"/><path d="M20 11V7h-4"/></svg><span class="lbl">Analyse</span></button>
+      <button class="ni vervalt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span class="lbl">Dashboard</span></button>
+    </nav>
+  </aside>
+
+  <div class="werk">
+    <div class="band">
+      <div class="band-titel"><h1>Analyse</h1><span>28-08-2026 09:14</span></div>
+      <button class="meet"><span class="lbl">Open</span><span class="n">81</span><span class="toel">5 categorieën</span></button>
+      <button class="meet"><span class="lbl">Te laat</span><span class="n let">14</span><span class="toel">max 76 dagen</span></button>
+      <button class="meet"><span class="lbl">ALV open</span><span class="n">19</span><span class="toel">van 63</span></button>
+      <button class="meet"><span class="lbl">Stil</span><span class="n">7</span><span class="toel">≥ 4 dagen</span></button>
+      <div class="band-eind">
+        <button class="pbtn">W</button><button class="pbtn" aria-pressed="true">M</button>
+        <button class="pbtn">K</button><button class="pbtn">J</button>
+      </div>
+    </div>
+
+    <div class="romp">
+      <div>
+        <div class="paneel">
+          <div class="p-kop"><h2>Afgerond per maand</h2><span class="bij">gem. 18 · piek 28</span></div>
+          <div class="p-body">
+            <svg class="chart" viewBox="0 0 600 176" role="img" aria-label="Afgeronde taken per maand als staafjes, van 9 in september 2025 naar 28 in augustus 2026">
+              <line class="grid-l" x1="24" y1="146" x2="596" y2="146"/>
+              <line class="grid-l" x1="24" y1="102" x2="596" y2="102" stroke-dasharray="1 5"/>
+              <line class="grid-l" x1="24" y1="58"  x2="596" y2="58"  stroke-dasharray="1 5"/>
+              <line class="grid-l" x1="24" y1="14"  x2="596" y2="14"  stroke-dasharray="1 5"/>
+              <text class="as" x="18" y="150" text-anchor="end">0</text>
+              <text class="as" x="18" y="106" text-anchor="end">10</text>
+              <text class="as" x="18" y="62"  text-anchor="end">20</text>
+              <text class="as" x="18" y="18"  text-anchor="end">30</text>
+              <g fill="var(--ac)">
+                <rect x="30"  y="106.4" width="30" height="39.6"/>
+                <rect x="77"  y="84.4"  width="30" height="61.6"/>
+                <rect x="124" y="97.6"  width="30" height="48.4"/>
+                <rect x="171" y="71.2"  width="30" height="74.8"/>
+                <rect x="218" y="93.2"  width="30" height="52.8"/>
+                <rect x="265" y="62.4"  width="30" height="83.6"/>
+                <rect x="312" y="44.8"  width="30" height="101.2"/>
+                <rect x="359" y="75.6"  width="30" height="70.4"/>
+                <rect x="406" y="53.6"  width="30" height="92.4"/>
+                <rect x="453" y="31.6"  width="30" height="114.4"/>
+                <rect x="500" y="49.2"  width="30" height="96.8"/>
+                <rect x="547" y="22.8"  width="30" height="123.2" fill="var(--inkt)"/>
+              </g>
+              <text class="as" x="45"  y="166" text-anchor="middle">sep</text>
+              <text class="as" x="139" y="166" text-anchor="middle">nov</text>
+              <text class="as" x="233" y="166" text-anchor="middle">jan</text>
+              <text class="as" x="327" y="166" text-anchor="middle">mrt</text>
+              <text class="as" x="421" y="166" text-anchor="middle">mei</text>
+              <text class="as" x="515" y="166" text-anchor="middle">jul</text>
+            </svg>
+          </div>
+        </div>
+
+        <div class="paneel">
+          <div class="p-kop"><h2>Per behandelaar</h2><span class="bij">augustus 2026</span></div>
+          <div class="tbl">
+            <table>
+              <thead><tr><th>Behandelaar</th><th class="r">Af</th><th class="r">Vorige</th><th class="r">Δ</th>
+                <th class="r">Open</th><th class="r">Te laat</th></tr></thead>
+              <tbody>
+                <tr><td class="nm">Jer</td><td class="r">11</td><td class="r">8</td>
+                  <td class="r"><span class="dlt op">+3</span></td><td class="r">23</td><td class="r let">4</td></tr>
+                <tr><td class="nm">Cihad</td><td class="r">9</td><td class="r">10</td>
+                  <td class="r"><span class="dlt neer">−1</span></td><td class="r">19</td><td class="r let">6</td></tr>
+                <tr><td class="nm">Gabos</td><td class="r">7</td><td class="r">7</td>
+                  <td class="r"><span class="dlt">0</span></td><td class="r">25</td><td class="r let">3</td></tr>
+                <tr><td class="nm">Cihan</td><td class="r">5</td><td class="r">3</td>
+                  <td class="r"><span class="dlt op">+2</span></td><td class="r">14</td><td class="r nul">–</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="paneel">
+          <div class="p-kop"><h2>Laatst afgerond</h2><span class="bij">10 recentste</span></div>
+          <div class="tbl">
+            <table>
+              <thead><tr><th style="width:132px">Categorie</th><th style="width:82px">VvE</th><th>Actiepunt</th>
+                <th style="width:96px">Wie</th><th class="r" style="width:104px">Datum</th></tr></thead>
+              <tbody>
+                <tr><td><span class="cat"><i class="stip" style="background:var(--am)"></i>Vergadering</span></td>
+                  <td><span class="code">311212</span></td>
+                  <td><div class="nm">Notulen jaarvergadering rondgestuurd</div><div class="sub">De La Reyweg 131 t/m 141</div></td>
+                  <td><span class="naam">Jer</span></td><td class="r">27-08</td></tr>
+                <tr><td><span class="cat"><i class="stip" style="background:var(--pu)"></i>Offerte</span></td>
+                  <td><span class="code">310884</span></td>
+                  <td><div class="nm">Gunning schilderwerk doorgegeven</div><div class="sub">Herenstraat 9 &amp; 9a</div></td>
+                  <td><span class="naam">Gabos</span></td><td class="r">27-08</td></tr>
+                <tr><td><span class="cat"><i class="stip" style="background:var(--bl)"></i>Oppakken</span></td>
+                  <td><span class="code">311047</span></td>
+                  <td><div class="nm">Lekkage berging verholpen</div><div class="sub">Van Ostadelaan 2 t/m 44</div></td>
+                  <td><span class="naam">Cihan</span></td><td class="r">26-08</td></tr>
+                <tr><td><span class="cat"><i class="stip" style="background:var(--rd)"></i>LOD</span></td>
+                  <td><span class="code">311301</span></td>
+                  <td><div class="nm">Herstelplan voegwerk ingediend</div><div class="sub">Zuidhoornseweg 14 t/m 30</div></td>
+                  <td><span class="naam">Cihad</span></td><td class="r">25-08</td></tr>
+                <tr><td><span class="cat"><i class="stip" style="background:var(--tl)"></i>Subsidie</span></td>
+                  <td><span class="code">310915</span></td>
+                  <td><div class="nm">Aanvraag isolatiesubsidie ingediend</div><div class="sub">Kerklaan 88 t/m 96</div></td>
+                  <td><span class="naam">Jer</span></td><td class="r">25-08</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="paneel">
+          <div class="p-kop"><h2>Vergaderseizoen</h2><span class="bij">63 VvE's</span></div>
+          <div class="p-body">
+            <div class="stapel">
+              <i style="width:49.2%;background:var(--goed)"></i>
+              <i style="width:19.0%;background:var(--bl)"></i>
+              <i style="width:11.1%;background:var(--am)"></i>
+              <i style="width:20.7%;background:var(--lijn-zwaar)"></i>
+            </div>
+            <div class="sz-rij"><i style="background:var(--goed)"></i><span>Notulen verstuurd</span><span class="n">31</span><span class="p">49%</span></div>
+            <div class="sz-rij"><i style="background:var(--bl)"></i><span>Uitnodiging weg</span><span class="n">12</span><span class="p">19%</span></div>
+            <div class="sz-rij"><i style="background:var(--am)"></i><span>Klaargezet</span><span class="n">7</span><span class="p">11%</span></div>
+            <div class="sz-rij"><i style="background:var(--lijn-zwaar)"></i><span>Nog niets</span><span class="n">13</span><span class="p">21%</span></div>
+          </div>
+        </div>
+
+        <div class="paneel">
+          <div class="p-kop"><h2>Werkvoorraad per categorie</h2></div>
+          <div class="tbl">
+            <table>
+              <thead><tr><th>Categorie</th><th class="r">Open</th><th class="r">Te laat</th></tr></thead>
+              <tbody>
+                <tr><td><span class="cat"><i class="stip" style="background:var(--bl)"></i>Oppakken</span></td><td class="r">34</td><td class="r let">6</td></tr>
+                <tr><td><span class="cat"><i class="stip" style="background:var(--am)"></i>Vergaderverzoeken</span></td><td class="r">19</td><td class="r let">3</td></tr>
+                <tr><td><span class="cat"><i class="stip" style="background:var(--pu)"></i>Offerte-trajecten</span></td><td class="r">17</td><td class="r let">4</td></tr>
+                <tr><td><span class="cat"><i class="stip" style="background:var(--rd)"></i>LOD</span></td><td class="r">6</td><td class="r let">1</td></tr>
+                <tr><td><span class="cat"><i class="stip" style="background:var(--tl)"></i>Subsidie</span></td><td class="r">5</td><td class="r nul">–</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="uitleg">
+  <h2>Richting B — Werkbank</h2>
+  <ul>
+    <li><b>De cijfers zitten in een donkere balk</b> die doorloopt uit de zijbalk. Ze horen bij het kader van het scherm, niet bij de inhoud — dus ze concurreren niet meer met je tabellen.</li>
+    <li><b>Vaste-breedte cijfers overal.</b> Kolommen lijnen daardoor echt uit; je kunt twee getallen onder elkaar vergelijken zonder te tellen.</li>
+    <li><b>Hoge dichtheid.</b> Panelen met een rand van één pixel, geen schaduwen, geen ronde hoeken. Er past twee keer zoveel op het scherm.</li>
+    <li><b>Kleur is uitsluitend status</b> — een vierkantje van 7 pixels per categorie, rood voor te laat, verder niets.</li>
+    <li>De grafiek is een <b>staafdiagram</b> met de huidige maand in het donker. Bij twaalf losse maanden lees je staven nauwkeuriger af dan een lijn.</li>
+    <li>Er is ruimte over, dus rechts staat er iets bij wat je nu nergens ziet: <b>werkvoorraad per categorie</b>.</li>
+  </ul>
+</div>
+</section>
+
+<script>
+(function(){
+  var knoppen = document.querySelectorAll('.kiezer button');
+  knoppen.forEach(function(k){
+    k.addEventListener('click', function(){
+      knoppen.forEach(function(b){ b.setAttribute('aria-pressed', String(b === k)); });
+      document.getElementById('s-A').hidden = k.dataset.s !== 'A';
+      document.getElementById('s-B').hidden = k.dataset.s !== 'B';
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    });
+  });
+  ['.A .periode','.B .band-eind'].forEach(function(sel){
+    document.querySelectorAll(sel).forEach(function(g){
+      g.querySelectorAll('button').forEach(function(b){
+        b.addEventListener('click', function(){
+          g.querySelectorAll('button').forEach(function(x){
+            if(x === b) x.setAttribute('aria-pressed','true'); else x.removeAttribute('aria-pressed');
+          });
+        });
+      });
+    });
+  });
+})();
+</script>

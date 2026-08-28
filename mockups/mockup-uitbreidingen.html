@@ -1,0 +1,766 @@
+<title>Analyse en Rapportage</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+/* ══════════════════════════════════════════════════════════════════
+   MOCKUP — Analytics + Dashboard samengevoegd.
+   Alle onderdelen zijn OVERGENOMEN uit styles.css van de app:
+   .kpi / .prod-hdr / .period-bar / .metric-toggle / .hero-donut-card /
+   .leaderboard / .card / .badge / .pers / .btn / .fld / .stat-*.
+   Waarden (radius 10px, gewicht 800-900, letter-spacing) zijn 1-op-1
+   gekopieerd, niet opnieuw verzonnen.
+   ══════════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#f4f5f7;--sur:#ffffff;--sur2:#fbfcfd;--bor:#ebedf0;
+  --txt:#1b1e24;--mut:#5b6675;--fnt:#9aa1ad;
+  --bor-input:#e4e7ec;--row-divider:#f1f3f5;--row-hover:#f7f9fb;--group-bg:#f5f7f9;
+  --r:10px;--rs:7px;--sh:0 1px 2px rgba(16,22,34,.05);
+  --shm:0 4px 16px rgba(16,22,34,.08);--shl:0 20px 60px rgba(16,22,34,.16);
+  --hh:60px;--tr:.17s ease;--tr-fast:.1s ease;
+  --bl:#1D6AA5;--bl-l:#E0EEF9;--bl-b:#B8D4EC;
+  --am:#AE5008;--am-l:#fef3c7;--am-b:#FCD34D;
+  --pu:#6855C9;--pu-l:#EEEAFD;--pu-b:#D4CCFA;
+  --rd:#B91C1C;--rd-l:#fee2e2;--rd-b:#fecaca;
+  --gn:#047857;--gn-l:#d1fae5;--gn-b:#a7f3d0;
+  --tl:#0F766E;--tl-l:#e3f2f0;--tl-b:#b3ddd7;
+  --ac:#4a5b7a;--ac-l:#eef1f6;--ac-b:#d6deea;--ac-900:#3a4a66;--ac-500:#6f81a3;
+  --nv:#2B3544;--sbbg:#1b1e24;--sbedge:#2a2e36;--fg:#1b1e24;
+  --prio:#b5544b;--sig-crit:#9e463e;
+  /* Waarden die in de app hardgecodeerd staan met een aparte donkere regel */
+  --cell-txt:#48505c;--pers-bg:#eef1f4;--pers-fg:#5b6675;
+  --gold:#bd5b00;--silver:#64748B;--bronze:#B45309;
+  --font-app:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  --font-mono:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){
+  --bg:#15181d;--sur:#1f242c;--sur2:#191d23;--bor:#2a2e36;
+  --bor-input:#343a44;--row-divider:#23272f;--row-hover:#22272f;--group-bg:#1c2026;
+  --txt:#f2f4f7;--mut:#9aa1ad;--fnt:#6b7280;
+  --sh:0 1px 3px rgba(0,0,0,.45),0 1px 2px rgba(0,0,0,.35);
+  --shm:0 6px 20px rgba(0,0,0,.5);--shl:0 24px 64px rgba(0,0,0,.65);
+  --bl:#5FA8E0;--bl-l:#15293D;--bl-b:#244159;
+  --am:#F0B44C;--am-l:#382912;--am-b:#5A451F;
+  --pu:#A896F0;--pu-l:#241C44;--pu-b:#392C62;
+  --rd:#F0746F;--rd-l:#371A1B;--rd-b:#582A2A;
+  --gn:#34D39A;--gn-l:#103129;--gn-b:#1F4A3C;
+  --tl:#5EC8BC;--tl-l:#10302E;--tl-b:#1F5049;
+  --ac:#8b9dc4;--ac-l:#262b35;--ac-b:#3a4256;--ac-900:#a8b8d8;--ac-500:#9fb0d4;
+  --nv:#c3ccdb;--fg:#f2f4f7;--prio:#e08b82;--sig-crit:#f0a29a;
+  --cell-txt:#c2c8d0;--pers-bg:#2a2f38;--pers-fg:#cfd5df;
+  --gold:#D97706;--silver:#7c8ca3;--bronze:#d27127;
+}}
+:root[data-theme=dark]{
+  --bg:#15181d;--sur:#1f242c;--sur2:#191d23;--bor:#2a2e36;
+  --bor-input:#343a44;--row-divider:#23272f;--row-hover:#22272f;--group-bg:#1c2026;
+  --txt:#f2f4f7;--mut:#9aa1ad;--fnt:#6b7280;
+  --sh:0 1px 3px rgba(0,0,0,.45),0 1px 2px rgba(0,0,0,.35);
+  --shm:0 6px 20px rgba(0,0,0,.5);--shl:0 24px 64px rgba(0,0,0,.65);
+  --bl:#5FA8E0;--bl-l:#15293D;--bl-b:#244159;
+  --am:#F0B44C;--am-l:#382912;--am-b:#5A451F;
+  --pu:#A896F0;--pu-l:#241C44;--pu-b:#392C62;
+  --rd:#F0746F;--rd-l:#371A1B;--rd-b:#582A2A;
+  --gn:#34D39A;--gn-l:#103129;--gn-b:#1F4A3C;
+  --tl:#5EC8BC;--tl-l:#10302E;--tl-b:#1F5049;
+  --ac:#8b9dc4;--ac-l:#262b35;--ac-b:#3a4256;--ac-900:#a8b8d8;--ac-500:#9fb0d4;
+  --nv:#c3ccdb;--fg:#f2f4f7;--prio:#e08b82;--sig-crit:#f0a29a;
+  --cell-txt:#c2c8d0;--pers-bg:#2a2f38;--pers-fg:#cfd5df;
+  --gold:#D97706;--silver:#7c8ca3;--bronze:#d27127;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+/* Moet vóór alles staan: een reset die `display` op elementen zet, wint anders van het
+   hidden-attribuut en dan nemen de verborgen schermen gewoon ruimte in. */
+[hidden]{display:none!important}
+body{font-family:var(--font-app);font-size:14px;line-height:1.5;background:var(--bg);color:var(--txt);
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+button{cursor:pointer;border:none;background:none;font:inherit;color:inherit}
+input,select,textarea{font:inherit}
+ul{list-style:none}
+:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ── Kiezer: hoort NIET bij de app, alleen om te bladeren ── */
+.kiezer{position:sticky;top:0;z-index:60;background:var(--sbbg);border-bottom:1px solid var(--sbedge);
+  padding:9px 16px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.kiezer-lbl{color:#6b7280;font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;margin-right:8px}
+.kiezer button{color:#a8aeb9;padding:5px 12px;border-radius:var(--rs);font-size:12.5px;font-weight:600;transition:all var(--tr)}
+.kiezer button:hover{background:#262a32;color:#e7eaef}
+.kiezer button[aria-pressed=true]{background:var(--ac);color:#fff}
+
+/* ── App-schil (#sb / #hdr / .page uit styles.css) ── */
+.schil{display:flex;min-height:900px;max-width:1440px;margin:0 auto;background:var(--bg);
+  border-left:1px solid var(--bor);border-right:1px solid var(--bor);overflow:hidden;position:relative}
+.sb{width:240px;flex-shrink:0;background:var(--sbbg);border-right:1px solid var(--sbedge);
+  color:#8b929e;display:flex;flex-direction:column;padding-bottom:14px}
+.sb-logo{padding:20px 20px 18px;border-bottom:1px solid var(--sbedge);display:flex;align-items:center;gap:11px}
+.sb-mark{width:32px;height:32px;border-radius:7px;background:#2B3544;color:#fff;display:grid;place-items:center;
+  font-weight:800;font-size:12px;flex-shrink:0}
+.sb-brand{font-size:13px;font-weight:600;color:#e7eaef;line-height:1.3}
+.sb-brand span{display:block;font-family:var(--font-mono);font-size:10px;font-weight:400;color:#6b7280}
+.sb-lbl{padding:16px 20px 6px;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#5b626e;font-weight:700}
+.ni{display:flex;align-items:center;gap:11px;width:100%;padding:9px 20px;font-size:13.5px;text-align:left;color:#a8aeb9;transition:all var(--tr)}
+.ni svg{width:17px;height:17px;flex-shrink:0;opacity:.8}
+.ni:hover{background:#22262e;color:#e7eaef}
+.ni[aria-current=page]{background:#262c38;color:#fff;box-shadow:inset 2px 0 0 var(--ac-500)}
+.ni-badge{margin-left:auto;font-family:var(--font-mono);font-size:11px;color:#7d8595;background:#22262e;padding:1px 6px;border-radius:20px}
+.ni-vlag{margin-left:auto;font-size:9px;letter-spacing:.06em;text-transform:uppercase;font-weight:800;
+  color:var(--sbbg);background:#c9d6ea;padding:2px 6px;border-radius:4px}
+.ni-vlag.weg{color:#8b929e;background:none;border:1px dashed #4a5058;font-weight:700}
+.ni.vervalt{opacity:.4}
+.ni.vervalt .lbl{text-decoration:line-through}
+
+.main{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg)}
+.hdr{height:var(--hh);flex-shrink:0;background:var(--sur);border-bottom:1px solid var(--bor);
+  display:flex;align-items:center;padding:0 26px;gap:8px}
+.hdr h1{font-size:16px;font-weight:600;line-height:1.2;letter-spacing:-.01em}
+.hdr p{font-size:12px;color:var(--mut);margin-top:1px}
+.hdr-rechts{margin-left:auto;display:flex;gap:8px;align-items:center}
+.ico-btn{width:34px;height:34px;border-radius:var(--rs);display:grid;place-items:center;color:var(--mut);
+  border:1px solid var(--bor);background:var(--sur);transition:all var(--tr)}
+.ico-btn svg{width:16px;height:16px}
+.ico-btn:hover{background:var(--sur2);color:var(--txt)}
+/* In de app scrollt .page binnen een schil van 100vh. In deze mockup laten we de schil
+   met de inhoud meegroeien, anders is alles onder de grafiek onbereikbaar. */
+.page{padding:22px 26px 44px}
+
+/* ── Knoppen (.btn) ── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--rs);
+  font-size:13px;font-weight:600;white-space:nowrap;transition:all var(--tr)}
+.btn svg{width:15px;height:15px}
+.btn-pri{background:var(--ac);color:#fff}.btn-pri:hover{filter:brightness(1.1)}
+.btn-sec{background:var(--sur);color:var(--mut);border:1px solid var(--bor)}
+.btn-sec:hover{background:var(--sur2);color:var(--txt)}
+.btn-sm{padding:5px 10px;font-size:12px}
+
+/* ── Kaart (.card) ── */
+.card{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);box-shadow:var(--sh);
+  overflow:hidden;margin-bottom:18px}
+.card-hdr{padding:13px 16px;border-bottom:1px solid var(--bor);display:flex;align-items:center;gap:10px;
+  flex-wrap:wrap;min-height:52px}
+.card-hdr h2{font-size:14px;font-weight:700;flex:1;min-width:0}
+.card-hdr .rechts{margin-left:auto;display:flex;gap:8px;align-items:center}
+
+/* ── Sectiekop (.prod-hdr) ── */
+.prod-hdr{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.prod-hdr h2{font-size:18px;font-weight:800;letter-spacing:-.02em;display:flex;align-items:center;gap:9px}
+.prod-hdr h2 svg{color:var(--ac);width:22px;height:22px;flex-shrink:0}
+.prod-hdr .toel{font-size:12px;color:var(--mut);font-weight:500;margin-left:2px}
+.period-bar{display:inline-flex;background:var(--sur);border:1px solid var(--bor);border-radius:10px;
+  padding:4px;gap:2px;box-shadow:var(--sh)}
+.period-btn{padding:6px 14px;border-radius:7px;font-size:12px;font-weight:600;color:var(--mut);transition:all var(--tr)}
+.period-btn:hover{color:var(--txt)}
+.period-btn.on{background:var(--ac);color:#fff;box-shadow:0 1px 3px color-mix(in srgb,var(--ac) 30%,transparent)}
+
+/* ── KPI-tegels (.kpi) ── */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-bottom:26px}
+.kpi{position:relative;background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);
+  padding:18px 20px 14px;box-shadow:var(--sh),0 4px 12px color-mix(in srgb,var(--sec,var(--ac)) 10%,transparent);
+  overflow:hidden;transition:transform var(--tr),box-shadow var(--tr);text-align:left;display:block;width:100%}
+.kpi:hover{transform:translateY(-2px);box-shadow:var(--shm),0 8px 20px color-mix(in srgb,var(--sec,var(--ac)) 18%,transparent)}
+.kpi::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--sec,var(--ac))}
+.kpi-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px}
+.kpi-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--mut)}
+.kpi-ico{width:34px;height:34px;border-radius:9px;background:var(--sec-l,var(--ac-l));display:grid;place-items:center;
+  color:var(--sec,var(--ac));flex-shrink:0}
+.kpi-ico svg{width:20px;height:20px}
+.kpi-num{font-size:34px;font-weight:800;line-height:1;letter-spacing:-.04em;color:var(--sec,var(--ac));
+  margin-bottom:4px;font-variant-numeric:tabular-nums}
+.kpi-sub{font-size:11px;color:var(--mut);margin-bottom:8px;min-height:14px}
+.kpi-ga{font-size:11.5px;font-weight:700;color:var(--ac);display:inline-flex;align-items:center;gap:4px}
+.kpi-ga svg{width:12px;height:12px}
+.kpi:hover .kpi-ga{gap:7px}
+.kpi-persons{display:flex;flex-direction:column;gap:7px;margin-top:2px}
+.kpi-person-row{display:grid;grid-template-columns:48px 1fr 28px;align-items:center;gap:8px;font-size:12px}
+.kpi-person-name{font-weight:600;color:var(--txt)}
+.kpi-person-bar{height:7px;background:var(--sur2);border-radius:4px;overflow:hidden}
+.kpi-person-fill{height:100%;background:var(--sec,var(--ac));border-radius:4px}
+.kpi-person-num{font-weight:800;color:var(--sec,var(--ac));text-align:right;font-variant-numeric:tabular-nums}
+
+/* ── Hoofdgrafiek (.hero-chart) ── */
+.ana-rij{display:grid;grid-template-columns:1.7fr 1fr;gap:18px;align-items:start;margin-bottom:18px}
+.ana-rij>.card,.ana-rij>.hero-donut-card{margin-bottom:0}
+.hero-chart{padding:18px 20px}
+.hero-chart-hdr{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.hero-chart-hdr h3{font-size:14px;font-weight:700}
+.hero-chart-hdr h3 .sub{font-size:11px;font-weight:500;color:var(--mut);margin-left:6px}
+.metric-toggle{display:inline-flex;background:var(--sur2);border-radius:8px;padding:3px;gap:2px}
+.metric-btn{padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;color:var(--mut);transition:all var(--tr)}
+.metric-btn:hover{color:var(--txt)}
+.metric-btn.on{background:var(--sur);color:var(--ac);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.chart-svg{width:100%;height:auto;display:block}
+.as{font-size:10px;fill:var(--fnt);font-weight:600}
+.grid-l{stroke:var(--bor);stroke-width:1}
+
+/* ── Donut (.hero-donut-card) ── */
+.hero-donut-card{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);padding:18px 20px;
+  box-shadow:var(--sh);position:relative;overflow:hidden}
+.hero-donut-card::before{content:"";position:absolute;inset:0;
+  background:radial-gradient(circle at 0% 0%,color-mix(in srgb,var(--hero-color,var(--ac)) 7%,transparent),transparent 55%);
+  pointer-events:none}
+.hero-donut-hdr{position:relative;margin-bottom:14px}
+.hero-donut-hdr h3{font-size:14px;font-weight:700;color:var(--fg)}
+.hero-donut-sub{font-size:12px;color:var(--mut);margin-top:3px;font-weight:500}
+.donut-body{position:relative;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.donut-wrap{position:relative;width:150px;height:150px;flex-shrink:0}
+.donut-mid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.donut-mid .n{font-size:28px;font-weight:800;letter-spacing:-.04em;line-height:1;color:var(--fg)}
+.donut-mid .l{font-size:11px;color:var(--mut);text-align:center;line-height:1.3;margin-top:4px;font-weight:600}
+.donut-leg{flex:1;min-width:150px;display:flex;flex-direction:column;gap:9px}
+.donut-leg div{display:flex;align-items:center;gap:9px;font-size:12.5px}
+.donut-leg i{width:9px;height:9px;border-radius:2px;flex-shrink:0}
+.donut-leg .n{margin-left:auto;font-weight:800;font-variant-numeric:tabular-nums}
+.donut-leg .p{color:var(--fnt);font-size:11px;font-weight:600;width:32px;text-align:right}
+
+/* ── Tabellen ── */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{background:var(--sur2);padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:var(--mut);
+  text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--bor);white-space:nowrap}
+tbody tr{border-bottom:1px solid var(--row-divider);transition:background var(--tr)}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:var(--row-hover)}
+tbody td{padding:9px 10px;vertical-align:middle}
+.cell-name{font-weight:600;color:var(--txt)}
+.cell-txt{color:var(--cell-txt);font-size:12.5px}
+.cell-sm{font-size:12.5px;color:var(--cell-txt);white-space:nowrap}
+.rechts{text-align:right}
+.badge{display:inline-flex;align-items:center;gap:3px;padding:2px 9px;border-radius:6px;font-size:11px;
+  font-weight:600;white-space:nowrap}
+.b-bl{background:var(--bl-l);color:var(--bl)}.b-am{background:var(--am-l);color:var(--am)}
+.b-pu{background:var(--pu-l);color:var(--pu)}.b-rd{background:var(--rd-l);color:var(--rd)}
+.b-tl{background:var(--tl-l);color:var(--tl)}.b-gn{background:var(--gn-l);color:var(--gn)}
+.pers{padding:2px 7px;border-radius:5px;font-size:11.5px;font-weight:600;display:inline-flex;
+  background:var(--pers-bg);color:var(--pers-fg)}
+.vve-code{font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--ac);cursor:pointer}
+.vve-code:hover{text-decoration:underline}
+
+/* ── Leaderboard (.leaderboard) ── */
+.leaderboard{padding:0}
+.leaderboard thead th{padding:11px 16px;font-weight:700;letter-spacing:.05em}
+.leaderboard tbody td{padding:13px 16px;border-bottom:1px solid var(--bor);font-size:13px}
+.leaderboard tbody tr:last-child td{border-bottom:none}
+.leaderboard tbody tr:hover{background:var(--sur2)}
+.lb-rank{font-weight:800;color:var(--mut);width:30px;font-variant-numeric:tabular-nums}
+.lb-rank.gold{color:var(--gold)}.lb-rank.silver{color:var(--silver)}.lb-rank.bronze{color:var(--bronze)}
+.lb-name{font-weight:700;color:var(--txt)}
+.lb-now{font-weight:800;color:var(--ac);font-variant-numeric:tabular-nums}
+.lb-prev{color:var(--mut);font-variant-numeric:tabular-nums}
+.lb-open{font-weight:700;font-variant-numeric:tabular-nums}
+.lb-laat{font-weight:800;color:var(--sig-crit);font-variant-numeric:tabular-nums}
+.lb-laat.nul{color:var(--fnt);font-weight:600}
+.kpi-trend{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;padding:3px 8px;
+  border-radius:20px;line-height:1}
+.kpi-trend.up{background:var(--gn-l);color:var(--gn)}
+.kpi-trend.down{background:var(--rd-l);color:var(--rd)}
+.kpi-trend.flat{background:var(--sur2);color:var(--mut)}
+
+/* ── Toelichting (hoort niet bij de app) ── */
+.uitleg{max-width:1440px;margin:0 auto;padding:20px 26px 38px;border-left:1px solid var(--bor);
+  border-right:1px solid var(--bor);background:var(--sur2)}
+.uitleg h2{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--mut);font-weight:700;margin-bottom:11px}
+.uitleg ul{display:grid;gap:8px;max-width:76ch}
+.uitleg li{position:relative;padding-left:17px;font-size:13.5px;color:var(--txt)}
+.uitleg li::before{content:'';position:absolute;left:2px;top:8px;width:5px;height:5px;border-radius:50%;background:var(--ac)}
+.uitleg li b{font-weight:700}
+.vraag{margin-top:15px;padding:11px 14px;border-left:3px solid var(--am);background:var(--am-l);
+  border-radius:0 var(--rs) var(--rs) 0;font-size:13px;max-width:76ch;color:var(--txt)}
+
+/* ══ RAPPORTAGE ══ */
+.rap-split{display:grid;grid-template-columns:290px 1fr;gap:18px;align-items:start}
+.rap-opties{padding:18px 20px}
+.rap-opties .card{margin:0}
+.rap-groep+.rap-groep{margin-top:18px}
+.rap-groep h3{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--mut);font-weight:700;margin-bottom:9px}
+.keuze{display:flex;align-items:center;gap:9px;padding:5px 0;font-size:13px}
+.keuze input{width:15px;height:15px;accent-color:var(--ac);flex-shrink:0}
+.blad{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);box-shadow:var(--shm);
+  padding:36px 40px 32px;font-size:13px;line-height:1.62}
+.blad-kop{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;
+  padding-bottom:16px;border-bottom:2px solid var(--nv);margin-bottom:20px}
+.blad-kop h2{font-size:19px;font-weight:800;letter-spacing:-.02em;line-height:1.28}
+.blad-kop .meta{font-size:12px;color:var(--mut);margin-top:5px;font-weight:500}
+.blad-merk{text-align:right;font-size:11px;color:var(--mut);line-height:1.5;flex-shrink:0}
+.blad-merk b{display:block;font-size:12.5px;color:var(--txt);font-weight:700}
+.blad h3{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);font-weight:700;margin:24px 0 10px}
+.cijferrij{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.cijfer{border:1px solid var(--bor);border-radius:var(--rs);padding:12px 14px;background:var(--sur2)}
+.cijfer .n{font-size:24px;font-weight:800;letter-spacing:-.04em;line-height:1;font-variant-numeric:tabular-nums}
+.cijfer .l{font-size:11px;color:var(--mut);margin-top:4px;font-weight:600}
+.blad ul.acties li{display:grid;grid-template-columns:92px 1fr;gap:14px;padding:8px 0;
+  border-bottom:1px solid var(--row-divider);align-items:baseline}
+.blad ul.acties li:last-child{border-bottom:none}
+.blad ul.acties .d{font-family:var(--font-mono);font-size:11.5px;color:var(--mut)}
+.blad .lopend{display:grid;gap:9px}
+.blad .lopend div{display:flex;gap:10px;align-items:baseline}
+.blad-voet{margin-top:28px;padding-top:14px;border-top:1px solid var(--bor);font-size:11px;color:var(--fnt)}
+
+/* ══ MODAL (.modal) ══ */
+.mod-vervaag{position:absolute;inset:0;background:rgba(0,0,0,.45);z-index:5}
+.mod{position:absolute;left:50%;top:32px;transform:translateX(-50%);width:600px;max-width:94%;z-index:6;
+  background:var(--sur);border-radius:var(--r);box-shadow:var(--shl);overflow:hidden}
+.mod-hdr{padding:16px 20px;border-bottom:1px solid var(--bor);display:flex;align-items:center;justify-content:space-between}
+.mod-hdr h2{font-size:15px;font-weight:700}
+.mod-close{font-size:20px;color:var(--mut);width:30px;height:30px;display:grid;place-items:center;border-radius:6px;line-height:1}
+.mod-close:hover{background:var(--sur2)}
+.mod-body{padding:18px 20px}
+.mod-foot{padding:13px 20px;border-top:1px solid var(--bor);display:flex;justify-content:flex-end;gap:8px}
+.fld{margin-bottom:13px;position:relative}
+.fld label{display:block;font-size:11.5px;font-weight:700;color:var(--mut);margin-bottom:5px;
+  text-transform:uppercase;letter-spacing:.04em}
+.fld input,.fld select,.fld textarea{width:100%;background:var(--sur2);border:1px solid var(--bor);
+  border-radius:var(--rs);padding:8px 11px;color:var(--txt);font-size:13px;outline:none}
+.fld textarea{resize:vertical;min-height:68px}
+.fld-row{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.fld input.actief{border-color:var(--ac);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 16%,transparent)}
+/* Alleen in deze mockup: ruimte zodat de open suggestielijst niets bedekt.
+   In de app klapt die lijst dicht zodra je kiest. */
+.fld-row.ruimte{margin-bottom:96px}
+.sug{position:absolute;top:100%;left:0;right:0;margin-top:4px;background:var(--sur);border:1px solid var(--bor);
+  border-radius:var(--rs);box-shadow:var(--shm);z-index:3;overflow:hidden}
+.sug-leeg{padding:11px 12px;font-size:12.5px;color:var(--mut)}
+.sug-nieuw{display:flex;align-items:center;gap:9px;padding:10px 12px;border-top:1px solid var(--bor);
+  background:var(--ac-l);width:100%;text-align:left;font-size:13px;font-weight:700;color:var(--ac)}
+.sug-nieuw svg{width:16px;height:16px;flex-shrink:0}
+.sug-nieuw:hover{background:var(--ac-b)}
+.nieuw-blok{border:1px solid var(--ac-b);background:var(--ac-l);border-radius:var(--rs);padding:15px 16px 3px;margin-bottom:13px}
+.nieuw-blok h3{font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--ac);font-weight:700;
+  display:flex;align-items:center;gap:7px;margin-bottom:12px}
+.nieuw-blok h3 svg{width:14px;height:14px}
+.nieuw-blok .fld input,.nieuw-blok .fld select{background:var(--sur)}
+
+@media (max-width:980px){
+  .sb{display:none}
+  .ana-rij,.rap-split{grid-template-columns:1fr}
+  .blad{padding:24px 22px}
+  .cijferrij{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+
+<div class="kiezer">
+  <span class="kiezer-lbl">Mockup</span>
+  <button data-s="ana" aria-pressed="true">Analyse</button>
+  <button data-s="rap" aria-pressed="false">Bestuursrapportage</button>
+  <button data-s="vve" aria-pressed="false">Nieuwe VvE</button>
+</div>
+
+<!-- ══════════════════ ANALYSE ══════════════════ -->
+<section id="s-ana">
+<div class="schil">
+  <aside class="sb">
+    <div class="sb-logo"><div class="sb-mark">VBC</div>
+      <div class="sb-brand">VvE Beheer<span>Collectief Dashboard 12.3</span></div></div>
+    <nav>
+      <div class="sb-lbl">Taken</div>
+      <button class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg><span class="lbl">Nog Te Doen</span><span class="ni-badge">81</span></button>
+      <button class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg><span class="lbl">Afgerond</span></button>
+      <div class="sb-lbl">ALV's</div>
+      <button class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg><span class="lbl">ALV's Overzicht</span></button>
+      <button class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span class="lbl">ALV's Afgerond</span></button>
+      <div class="sb-lbl">Intern</div>
+      <button class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span class="lbl">Ontwikkeling</span></button>
+      <button class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg><span class="lbl">Logboek</span></button>
+      <button class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg><span class="lbl">Herhaalregels</span></button>
+      <div class="sb-lbl">Analyse</div>
+      <button class="ni" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v15a1 1 0 001 1h15"/><path d="M7 15l3.5-3.5 3 3L20 7"/><path d="M20 11V7h-4"/></svg><span class="lbl">Analyse</span></button>
+      <button class="ni vervalt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span class="lbl">Dashboard</span><span class="ni-vlag weg">vervalt</span></button>
+    </nav>
+  </aside>
+
+  <div class="main">
+    <header class="hdr">
+      <div><h1>Analyse</h1><p>Werkvoorraad en productiviteit</p></div>
+      <div class="hdr-rechts">
+        <button class="ico-btn" title="Vernieuwen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0115-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 01-15 6.7L3 16"/></svg></button>
+      </div>
+    </header>
+
+    <div class="page">
+
+      <!-- ── WERKVOORRAAD ── -->
+      <div class="prod-hdr">
+        <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v13a1 1 0 01-1 1H4a1 1 0 01-1-1z" fill="currentColor" fill-opacity=".18"/><path d="M3 7l2-3h14l2 3"/><path d="M9 11h6"/></svg>Werkvoorraad<span class="toel">Stand van nu — los van de gekozen periode</span></h2>
+      </div>
+      <div class="kpi-grid">
+        <button class="kpi" style="--sec:var(--bl);--sec-l:var(--bl-l)">
+          <div class="kpi-top"><div class="kpi-lbl">Open taken</div>
+            <div class="kpi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2" fill="currentColor" fill-opacity=".18"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></div></div>
+          <div class="kpi-num">81</div>
+          <div class="kpi-sub">verdeeld over 5 categorieën</div>
+          <span class="kpi-ga">Naar de lijst <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="m9 18 6-6-6-6"/></svg></span>
+        </button>
+        <button class="kpi" style="--sec:var(--prio);--sec-l:var(--rd-l)">
+          <div class="kpi-top"><div class="kpi-lbl">Deadline verstreken</div>
+            <div class="kpi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" fill="currentColor" fill-opacity=".18"/><path d="M12 7v5.5l3.5 2"/></svg></div></div>
+          <div class="kpi-num">14</div>
+          <div class="kpi-sub">langst open: 76 dagen</div>
+          <span class="kpi-ga">Toon alleen deze <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="m9 18 6-6-6-6"/></svg></span>
+        </button>
+        <button class="kpi" style="--sec:var(--am);--sec-l:var(--am-l)">
+          <div class="kpi-top"><div class="kpi-lbl">Vergaderingen open</div>
+            <div class="kpi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2" fill="currentColor" fill-opacity=".18"/><path d="M8 3v4M16 3v4M3 11h18"/></svg></div></div>
+          <div class="kpi-num">19</div>
+          <div class="kpi-sub">van 63 VvE's dit seizoen</div>
+          <span class="kpi-ga">Naar ALV's Overzicht <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="m9 18 6-6-6-6"/></svg></span>
+        </button>
+        <button class="kpi" style="--sec:var(--pu);--sec-l:var(--pu-l)">
+          <div class="kpi-top"><div class="kpi-lbl">Stil in behandeling</div>
+            <div class="kpi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11a2 2 0 01-2 2H9l-5 4z" fill="currentColor" fill-opacity=".18"/><path d="M9 10h.01M13 10h.01"/></svg></div></div>
+          <div class="kpi-num">7</div>
+          <div class="kpi-sub">4 dagen of langer geen activiteit</div>
+          <span class="kpi-ga">Toon alleen deze <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="m9 18 6-6-6-6"/></svg></span>
+        </button>
+      </div>
+
+      <!-- ── PRODUCTIVITEIT ── -->
+      <div class="prod-hdr">
+        <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 15l3.5-3.5 3 3L20 7v8H7z" fill="currentColor" fill-opacity="0.18" stroke="none"/><path d="M4 4v15a1 1 0 001 1h15"/><path d="M7 15l3.5-3.5 3 3L20 7"/><path d="M20 11V7h-4"/></svg>Productiviteit</h2>
+        <div class="period-bar">
+          <button class="period-btn">Week</button>
+          <button class="period-btn on">Maand</button>
+          <button class="period-btn">Kwartaal</button>
+          <button class="period-btn">Jaar</button>
+        </div>
+      </div>
+
+      <div class="ana-rij">
+        <div class="card hero-chart">
+          <div class="hero-chart-hdr">
+            <h3>Taken afgerond<span class="sub">gemiddeld 18 per maand</span></h3>
+            <div class="metric-toggle">
+              <button class="metric-btn on">Taken</button>
+              <button class="metric-btn">Vergaderingen</button>
+            </div>
+          </div>
+          <svg class="chart-svg" viewBox="0 0 620 210" role="img" aria-label="Afgeronde taken per maand, van 9 in september 2025 naar 28 in augustus 2026">
+            <defs><linearGradient id="vul" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="var(--ac)" stop-opacity=".22"/>
+              <stop offset="100%" stop-color="var(--ac)" stop-opacity="0"/></linearGradient></defs>
+            <line class="grid-l" x1="30" y1="172" x2="612" y2="172"/>
+            <line class="grid-l" x1="30" y1="119" x2="612" y2="119" stroke-dasharray="2 4"/>
+            <line class="grid-l" x1="30" y1="66"  x2="612" y2="66"  stroke-dasharray="2 4"/>
+            <line class="grid-l" x1="30" y1="14"  x2="612" y2="14"  stroke-dasharray="2 4"/>
+            <text class="as" x="22" y="176" text-anchor="end">0</text>
+            <text class="as" x="22" y="123" text-anchor="end">10</text>
+            <text class="as" x="22" y="70"  text-anchor="end">20</text>
+            <text class="as" x="22" y="18"  text-anchor="end">30</text>
+            <path d="M30,124.4 L82.9,98.0 L135.8,113.9 L188.7,82.1 L241.6,108.6 L294.5,71.5 L347.5,50.3 L400.4,87.4 L453.3,61.0 L506.2,34.6 L559.1,55.9 L612,24.0 L612,172 L30,172 Z" fill="url(#vul)"/>
+            <path d="M30,124.4 L82.9,98.0 L135.8,113.9 L188.7,82.1 L241.6,108.6 L294.5,71.5 L347.5,50.3 L400.4,87.4 L453.3,61.0 L506.2,34.6 L559.1,55.9 L612,24.0"
+                  fill="none" stroke="var(--ac)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>
+            <circle cx="612" cy="24" r="8" fill="var(--ac)" opacity=".18"/>
+            <circle cx="612" cy="24" r="4.4" fill="var(--ac)"/>
+            <text class="as" x="30"  y="196" text-anchor="middle">sep</text>
+            <text class="as" x="136" y="196" text-anchor="middle">nov</text>
+            <text class="as" x="242" y="196" text-anchor="middle">jan</text>
+            <text class="as" x="347" y="196" text-anchor="middle">mrt</text>
+            <text class="as" x="453" y="196" text-anchor="middle">mei</text>
+            <text class="as" x="559" y="196" text-anchor="middle">jul</text>
+          </svg>
+        </div>
+
+        <div class="hero-donut-card" style="--hero-color:var(--gn)">
+          <div class="hero-donut-hdr">
+            <h3>Vergaderseizoen</h3>
+            <div class="hero-donut-sub">63 VvE's, stand op 28 augustus</div>
+          </div>
+          <div class="donut-body">
+            <div class="donut-wrap">
+              <svg viewBox="0 0 150 150" width="150" height="150" role="img" aria-label="31 notulen verstuurd, 12 uitnodiging verstuurd, 7 klaargezet, 13 nog niets">
+                <g transform="rotate(-90 75 75)" fill="none" stroke-width="16">
+                  <circle cx="75" cy="75" r="52" stroke="var(--gn)" stroke-dasharray="160.8 326.7" stroke-dashoffset="0"/>
+                  <circle cx="75" cy="75" r="52" stroke="var(--bl)" stroke-dasharray="62.2 326.7" stroke-dashoffset="-160.8"/>
+                  <circle cx="75" cy="75" r="52" stroke="var(--am)" stroke-dasharray="36.3 326.7" stroke-dashoffset="-223.0"/>
+                  <circle cx="75" cy="75" r="52" stroke="var(--bor)" stroke-dasharray="67.4 326.7" stroke-dashoffset="-259.3"/>
+                </g>
+              </svg>
+              <div class="donut-mid"><span class="n">49%</span><span class="l">seizoen<br>afgerond</span></div>
+            </div>
+            <div class="donut-leg">
+              <div><i style="background:var(--gn)"></i>Notulen verstuurd<span class="n">31</span><span class="p">49%</span></div>
+              <div><i style="background:var(--bl)"></i>Uitnodiging weg<span class="n">12</span><span class="p">19%</span></div>
+              <div><i style="background:var(--am)"></i>Klaargezet<span class="n">7</span><span class="p">11%</span></div>
+              <div><i style="background:var(--bor)"></i>Nog niets<span class="n">13</span><span class="p">21%</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── LEADERBOARD ── -->
+      <div class="card leaderboard">
+        <div class="card-hdr"><h2>Per behandelaar — augustus 2026</h2></div>
+        <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th style="width:44px">#</th><th>Behandelaar</th>
+            <th class="rechts" style="width:110px">Afgerond</th>
+            <th class="rechts" style="width:110px">Vorige maand</th>
+            <th style="width:104px">Trend</th>
+            <th class="rechts" style="width:96px">Nu open</th>
+            <th class="rechts" style="width:88px">Te laat</th>
+          </tr></thead>
+          <tbody>
+            <tr><td class="lb-rank gold">1</td><td class="lb-name">Jer</td>
+              <td class="rechts lb-now">11</td><td class="rechts lb-prev">8</td>
+              <td><span class="kpi-trend up">▲ 38%</span></td>
+              <td class="rechts lb-open">23</td><td class="rechts lb-laat">4</td></tr>
+            <tr><td class="lb-rank silver">2</td><td class="lb-name">Cihad</td>
+              <td class="rechts lb-now">9</td><td class="rechts lb-prev">10</td>
+              <td><span class="kpi-trend down">▼ 10%</span></td>
+              <td class="rechts lb-open">19</td><td class="rechts lb-laat">6</td></tr>
+            <tr><td class="lb-rank bronze">3</td><td class="lb-name">Gabos</td>
+              <td class="rechts lb-now">7</td><td class="rechts lb-prev">7</td>
+              <td><span class="kpi-trend flat">gelijk</span></td>
+              <td class="rechts lb-open">25</td><td class="rechts lb-laat">3</td></tr>
+            <tr><td class="lb-rank">4</td><td class="lb-name">Cihan</td>
+              <td class="rechts lb-now">5</td><td class="rechts lb-prev">3</td>
+              <td><span class="kpi-trend up">▲ 67%</span></td>
+              <td class="rechts lb-open">14</td><td class="rechts lb-laat nul">–</td></tr>
+          </tbody>
+        </table>
+        </div>
+      </div>
+
+      <!-- ── RECENT ── -->
+      <div class="card">
+        <div class="card-hdr"><h2>Recentelijk afgerond</h2>
+          <div class="rechts"><button class="btn btn-sec btn-sm">Naar Afgerond</button></div></div>
+        <div class="tbl-wrap">
+        <table>
+          <thead><tr><th style="width:104px">Categorie</th><th style="width:88px">VvE</th><th>Actiepunt</th>
+            <th style="width:110px">Behandelaar</th><th style="width:112px">Datum</th></tr></thead>
+          <tbody>
+            <tr><td><span class="badge b-am">Vergadering</span></td><td><span class="vve-code">311212</span></td>
+              <td><div class="cell-name">Notulen jaarvergadering rondgestuurd</div><div class="cell-txt">De La Reyweg 131 t/m 141</div></td>
+              <td><span class="pers">Jer</span></td><td class="cell-sm">27 aug 2026</td></tr>
+            <tr><td><span class="badge b-pu">Offerte</span></td><td><span class="vve-code">310884</span></td>
+              <td><div class="cell-name">Gunning schilderwerk doorgegeven</div><div class="cell-txt">Herenstraat 9 &amp; 9a</div></td>
+              <td><span class="pers">Gabos</span></td><td class="cell-sm">27 aug 2026</td></tr>
+            <tr><td><span class="badge b-bl">Oppakken</span></td><td><span class="vve-code">311047</span></td>
+              <td><div class="cell-name">Lekkage berging verholpen</div><div class="cell-txt">Van Ostadelaan 2 t/m 44</div></td>
+              <td><span class="pers">Cihan</span></td><td class="cell-sm">26 aug 2026</td></tr>
+            <tr><td><span class="badge b-rd">LOD</span></td><td><span class="vve-code">311301</span></td>
+              <td><div class="cell-name">Herstelplan voegwerk ingediend bij gemeente</div><div class="cell-txt">Zuidhoornseweg 14 t/m 30</div></td>
+              <td><span class="pers">Cihad</span></td><td class="cell-sm">25 aug 2026</td></tr>
+            <tr><td><span class="badge b-tl">Subsidie</span></td><td><span class="vve-code">310915</span></td>
+              <td><div class="cell-name">Aanvraag isolatiesubsidie ingediend</div><div class="cell-txt">Kerklaan 88 t/m 96</div></td>
+              <td><span class="pers">Jer</span></td><td class="cell-sm">25 aug 2026</td></tr>
+          </tbody>
+        </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+<div class="uitleg">
+  <h2>Wat er verandert</h2>
+  <ul>
+    <li><b>Opgebouwd uit onderdelen die de app al heeft</b> — dezelfde KPI-tegels met gekleurde rand en icoon, dezelfde periodebalk, dezelfde leaderboard-tabel, dezelfde badges en naambadges. Er is niets nieuws bedacht qua vormgeving.</li>
+    <li><b>Twee pagina's worden één.</b> Analytics en Dashboard toonden allebei "Taken afgerond", met verschillende getallen eronder.</li>
+    <li>De pagina valt in <b>twee blokken met een eigen kop</b>: <i>Werkvoorraad</i> (stand van nu) en <i>Productiviteit</i> (over de gekozen periode). De periodebalk staat bij het blok waar hij bij hoort — op de oude pagina stond hij bovenaan en leek hij overal op te slaan.</li>
+    <li>De vier tegels zijn <b>klikbaar</b> en brengen je naar de gefilterde lijst.</li>
+    <li>Twee cijfers zijn nieuw: <b>Deadline verstreken</b> en <b>Stil in behandeling</b>. Die vertellen je meer over vandaag dan een leaderboard.</li>
+    <li>De leaderboard krijgt er <b>Nu open</b> en <b>Te laat</b> bij. Gabos die er 7 afrondt met 25 open is een ander verhaal dan Cihan met 5 en 14 open.</li>
+    <li>De losse tegel "Taken per behandelaar" vervalt — die stond met dezelfde cijfers in de leaderboard eronder.</li>
+    <li>De donut gaat niet meer over categorieën maar over het <b>vergaderseizoen</b> in vier stappen.</li>
+  </ul>
+  <div class="vraag"><b>Nog te beslissen:</b> de knop in de balk heet nu "Analyse". Past die naam, of houd je liever "Dashboard"?</div>
+</div>
+</section>
+
+<!-- ══════════════════ BESTUURSRAPPORTAGE ══════════════════ -->
+<section id="s-rap" hidden>
+<div class="schil">
+  <aside class="sb">
+    <div class="sb-logo"><div class="sb-mark">VBC</div>
+      <div class="sb-brand">VvE Beheer<span>Collectief Dashboard 12.3</span></div></div>
+    <nav>
+      <div class="sb-lbl">Taken</div>
+      <button class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg><span class="lbl">Nog Te Doen</span><span class="ni-badge">81</span></button>
+      <button class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg><span class="lbl">Afgerond</span></button>
+      <div class="sb-lbl">ALV's</div>
+      <button class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg><span class="lbl">ALV's Overzicht</span></button>
+      <div class="sb-lbl">Analyse</div>
+      <button class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4v15a1 1 0 001 1h15"/><path d="M7 15l3.5-3.5 3 3L20 7"/><path d="M20 11V7h-4"/></svg><span class="lbl">Analyse</span></button>
+    </nav>
+  </aside>
+  <div class="main">
+    <header class="hdr">
+      <button class="ico-btn" title="Terug naar dossier"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 18-6-6 6-6"/></svg></button>
+      <div><h1>Bestuursrapportage</h1><p>311212 — De La Reyweg 131 t/m 141</p></div>
+      <div class="hdr-rechts">
+        <button class="btn btn-sec">Kopieer als e-mail</button>
+        <button class="btn btn-pri"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Afdrukken / PDF</button>
+      </div>
+    </header>
+    <div class="page">
+      <div class="rap-split">
+        <div class="card rap-opties">
+          <div class="rap-groep">
+            <h3>Periode</h3>
+            <label class="keuze"><input type="radio" name="per" checked> 2e kwartaal 2026</label>
+            <label class="keuze"><input type="radio" name="per"> Heel 2026</label>
+            <label class="keuze"><input type="radio" name="per"> Sinds vorige ALV</label>
+            <label class="keuze"><input type="radio" name="per"> Zelf kiezen…</label>
+          </div>
+          <div class="rap-groep">
+            <h3>Meenemen</h3>
+            <label class="keuze"><input type="checkbox" checked> Afgeronde acties</label>
+            <label class="keuze"><input type="checkbox" checked> Lopende zaken</label>
+            <label class="keuze"><input type="checkbox" checked> Vergaderstatus</label>
+            <label class="keuze"><input type="checkbox"> Notities uit het logboek</label>
+            <label class="keuze"><input type="checkbox"> Offerte-trajecten met bedragen</label>
+          </div>
+          <div class="rap-groep">
+            <h3>Toon</h3>
+            <label class="keuze"><input type="radio" name="toon" checked> Zakelijk</label>
+            <label class="keuze"><input type="radio" name="toon"> Uitgebreid</label>
+          </div>
+        </div>
+
+        <div class="blad">
+          <div class="blad-kop">
+            <div>
+              <h2>Beheerrapportage<br>De La Reyweg 131 t/m 141</h2>
+              <div class="meta">VvE 311212 · 2e kwartaal 2026 (1 april – 30 juni)</div>
+            </div>
+            <div class="blad-merk"><b>VvE Beheer Collectief</b>Wateringen<br>info@vvebeheercollectief.nl<br>KvK 51721139</div>
+          </div>
+          <div class="cijferrij">
+            <div class="cijfer"><div class="n">17</div><div class="l">acties afgerond</div></div>
+            <div class="cijfer"><div class="n">4</div><div class="l">lopende zaken</div></div>
+            <div class="cijfer"><div class="n">1</div><div class="l">vergadering gehouden</div></div>
+            <div class="cijfer"><div class="n">2</div><div class="l">offertetrajecten</div></div>
+          </div>
+          <h3>Afgeronde acties</h3>
+          <ul class="acties">
+            <li><span class="d">08-04-2026</span><span>Jaarstukken 2025 opgesteld en ter goedkeuring aan het bestuur voorgelegd</span></li>
+            <li><span class="d">17-04-2026</span><span>Lekkage berging blok B verholpen — aannemer Van Dijk, kosten binnen onderhoudsbudget</span></li>
+            <li><span class="d">02-05-2026</span><span>Uitnodiging en agenda algemene ledenvergadering verstuurd aan alle eigenaars</span></li>
+            <li><span class="d">12-05-2026</span><span>Algemene ledenvergadering gehouden; notulen binnen twee weken rondgestuurd</span></li>
+            <li><span class="d">28-05-2026</span><span>Drie offertes opgevraagd voor het schilderwerk buitengevel</span></li>
+            <li><span class="d">19-06-2026</span><span>Opstalverzekering herbeoordeeld; premie met 8% verlaagd bij gelijke dekking</span></li>
+          </ul>
+          <h3>Lopende zaken</h3>
+          <div class="lopend">
+            <div><span class="badge b-pu">Offerte</span><span>Schilderwerk buitengevel — offertes vergeleken, besluit staat op de agenda van de najaarsvergadering.</span></div>
+            <div><span class="badge b-rd">LOD</span><span>Aanschrijving gemeente over het voegwerk; hersteltermijn loopt tot 23 september 2026.</span></div>
+            <div><span class="badge b-bl">Oppakken</span><span>Vervanging van de verlichting in het trappenhuis, ingepland voor oktober.</span></div>
+            <div><span class="badge b-tl">Subsidie</span><span>Aanvraag isolatiesubsidie in voorbereiding.</span></div>
+          </div>
+          <h3>Vergaderingen</h3>
+          <p>De jaarvergadering is gehouden op 12 mei 2026. De notulen zijn op 22 mei verstuurd en de begroting is vastgesteld. De volgende vergadering staat gepland op 14 september 2026.</p>
+          <div class="blad-voet">Opgesteld op 28 augustus 2026 door VvE Beheer Collectief · administratief, financieel en technisch beheer</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="uitleg">
+  <h2>Ongewijzigd — dit vond je goed</h2>
+  <ul>
+    <li>Blijft een <b>knop op het VvE-dossier</b>, los van de Analyse-pagina. Analyse gaat over jullie kantoor, dit gaat over één VvE.</li>
+    <li>De tekst komt <b>letterlijk uit je afgeronde taken en het logboek</b>. Niets wordt verzonnen.</li>
+    <li>"Afdrukken / PDF" gebruikt de printfunctie van de browser — geen extra dienst, geen kosten.</li>
+  </ul>
+  <div class="vraag"><b>Nog te beslissen:</b> je taakomschrijvingen zijn intern geschreven ("Cihad nabellen"). Wil je (a) de tekst met de hand kunnen bijwerken in het voorbeeld, of (b) de AI-assistent er een nette zin van laten maken?</div>
+</div>
+</section>
+
+<!-- ══════════════════ NIEUWE VVE ══════════════════ -->
+<section id="s-vve" hidden>
+<div class="schil">
+  <aside class="sb">
+    <div class="sb-logo"><div class="sb-mark">VBC</div>
+      <div class="sb-brand">VvE Beheer<span>Collectief Dashboard 12.3</span></div></div>
+    <nav>
+      <div class="sb-lbl">Taken</div>
+      <button class="ni" aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg><span class="lbl">Nog Te Doen</span><span class="ni-badge">81</span></button>
+      <button class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg><span class="lbl">Afgerond</span></button>
+      <div class="sb-lbl">ALV's</div>
+      <button class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg><span class="lbl">ALV's Overzicht</span></button>
+    </nav>
+  </aside>
+  <div class="main">
+    <header class="hdr"><div><h1>Nog Te Doen</h1><p>Openstaande taken en actiepunten</p></div></header>
+    <div class="page"></div>
+  </div>
+  <div class="mod-vervaag"></div>
+  <div class="mod">
+    <div class="mod-hdr"><h2>Taak toevoegen</h2><button class="mod-close" aria-label="Sluiten">×</button></div>
+    <div class="mod-body">
+      <div class="fld-row ruimte">
+        <div class="fld">
+          <label for="nv-code">VvE Code *</label>
+          <input id="nv-code" class="actief" value="311455" autocomplete="off">
+          <div class="sug">
+            <div class="sug-leeg">Geen VvE gevonden met code of naam “311455”.</div>
+            <button class="sug-nieuw">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>
+              Nieuwe VvE aanmaken: 311455
+            </button>
+          </div>
+        </div>
+        <div class="fld">
+          <label for="nv-naam">VvE Naam</label>
+          <input id="nv-naam" value="" placeholder="Automatisch ingevuld">
+        </div>
+      </div>
+
+      <div class="nieuw-blok">
+        <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 5v14M5 12h14"/></svg>Nieuwe VvE</h3>
+        <div class="fld"><label for="nv-vnaam">Naam *</label><input id="nv-vnaam" value="Bomenbuurt 12 t/m 26"></div>
+        <div class="fld-row">
+          <div class="fld"><label for="nv-plaats">Plaats</label><input id="nv-plaats" value="Wateringen"></div>
+          <div class="fld"><label for="nv-kenmerk">Kenmerk</label>
+            <select id="nv-kenmerk"><option>Gemeenschappelijk</option><option>Individueel</option><option>Budgetpakket</option></select></div>
+        </div>
+        <div class="fld"><label for="nv-beh">Vaste beheerder</label>
+          <select id="nv-beh"><option>— nog niet bekend —</option><option>Jer</option><option>Cihad</option><option>Gabos</option><option>Cihan</option></select></div>
+      </div>
+
+      <div class="fld"><label for="nv-actie">Actiepunt *</label><textarea id="nv-actie">Eerste kennismaking bestuur inplannen</textarea></div>
+      <div class="fld-row">
+        <div class="fld"><label for="nv-dl">Deadline</label><input id="nv-dl" value="11-09-2026"></div>
+        <div class="fld"><label for="nv-beh2">Behandelaar</label>
+          <select id="nv-beh2"><option>Jer</option><option>Cihad</option><option>Gabos</option><option>Cihan</option></select></div>
+      </div>
+    </div>
+    <div class="mod-foot">
+      <button class="btn btn-sec">Annuleren</button>
+      <button class="btn btn-pri">VvE aanmaken en taak opslaan</button>
+    </div>
+  </div>
+</div>
+<div class="uitleg">
+  <h2>Wat dit doet</h2>
+  <ul>
+    <li>Typ je in <b>VvE Code</b> iets dat nog niet bestaat, dan zegt de app dat en biedt meteen aan hem aan te maken. Je hoeft je taak niet te onderbreken.</li>
+    <li>Er klapt een <b>klein blok</b> open met alleen wat nodig is: naam, plaats, kenmerk, beheerder.</li>
+    <li>Eén knop onderaan doet allebei: <b>VvE aanmaken én de taak opslaan</b>. De nieuwe VvE staat daarna overal in de app.</li>
+  </ul>
+  <div class="vraag"><b>Nog te beslissen:</b> waar komt de nieuwe VvE terecht — onderaan "ALV's Overzicht" (dan staat hij meteen in het vergaderseizoen), of op een eigen plek zodat dat overzicht zuiver blijft?</div>
+</div>
+</section>
+
+<script>
+(function(){
+  var knoppen = document.querySelectorAll('.kiezer button');
+  var secties = { ana:'s-ana', rap:'s-rap', vve:'s-vve' };
+  knoppen.forEach(function(k){
+    k.addEventListener('click', function(){
+      knoppen.forEach(function(b){ b.setAttribute('aria-pressed', String(b === k)); });
+      Object.keys(secties).forEach(function(s){
+        document.getElementById(secties[s]).hidden = (s !== k.dataset.s);
+      });
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    });
+  });
+  ['.period-bar','.metric-toggle'].forEach(function(sel){
+    document.querySelectorAll(sel).forEach(function(g){
+      g.querySelectorAll('button').forEach(function(b){
+        b.addEventListener('click', function(){
+          g.querySelectorAll('button').forEach(function(x){ x.classList.toggle('on', x === b); });
+        });
+      });
+    });
+  });
+})();
+</script>

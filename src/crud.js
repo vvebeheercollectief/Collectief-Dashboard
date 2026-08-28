@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  CRUD — taak-modals, sheet-helpers, toevoegen/afronden/verwijderen
 // ══════════════════════════════════════
-import { esc, berekenPrioriteit, toISODate, toDutchDate, nieuwTaakId, taakVerwijzing, voorgesteldeDeadline, DEADLINE_HINT, taakTitel, reconcileOffertes, parseAannemers } from "./util.js";
+import { esc, berekenPrioriteit, toISODate, toDutchDate, nieuwTaakId, taakVerwijzing, voorgesteldeDeadline, DEADLINE_HINT, taakTitel, reconcileOffertes, parseAannemers, duurNaarCel } from "./util.js";
 import { zoekDubbels, dubbelVraagTekst } from "./dubbelcheck.js";
 import { extraVves, wisExtraVves, extraVvesHtml, extraVvesUitleg } from "./meervve.js";
 import { state, D, pgs } from "./state.js";
@@ -1106,15 +1106,15 @@ async function completeTaskRow(r, rid, bijDoorgaan){
 // Rijwaarden voor een afgeronde taak. Puur, dus los testbaar — en één bron voor zowel de
 // modal-flow (doCompleteTask) als bulk-afronden, zodat die twee niet uiteen kunnen lopen.
 // Vaste kolomposities: A..H sectievelden, I afronddatum, J toelichting, K subcategorie,
-// L herhaalId (Opvolging.gs:119 leest afData[i][11] — NIET verplaatsen), M..P leeg,
-// Q taakId, R bundelId, S bundelVolg. Q/R/S liggen op dezelfde index als in 'Nog Te Doen',
-// omdat parseSections beide tabbladen met dezelfde vaste posities leest.
+// L herhaalId (Opvolging.gs:119 leest afData[i][11] — NIET verplaatsen), M duur in minuten,
+// N..P leeg, Q taakId, R bundelId, S bundelVolg. Q/R/S liggen op dezelfde index als in
+// 'Nog Te Doen', omdat parseSections beide tabbladen met dezelfde vaste posities leest.
 //
 // A..H komt uit SECS.keys en niet uit een eigen lijstje per sectie: die kolomvolgorde is NIET
 // de volgorde waarin de velden in het rij-object staan ('actiepunt' is kolom C, niet index 1),
 // en parseSections leest hem met precies dezelfde bron terug. Een handgeschreven kopie zou
 // stilletjes uiteen kunnen lopen — dezelfde afweging als in serializeNtdUndo en _rijNaarCellen.
-export function afrondWaarden(r, sec, datum, toelichting){
+export function afrondWaarden(r, sec, datum, toelichting, duurMin){
   // Harde fout i.p.v. terugvallen op een 'default'-sectie: een taak die in het verkeerde
   // kolomstramien in 'Afgerond' belandt is duurder dan een mislukte afronding.
   if(!SECS[sec]) throw new Error('Onbekende sectie: '+sec);
@@ -1141,7 +1141,10 @@ export function afrondWaarden(r, sec, datum, toelichting){
   return v.concat([
     datum, toelichting, r.subcategorie||'',   // I, J, K
     r.herhaalId||'',                          // L
-    '', '', '', '',                           // M, N, O, P
+    // M — hoe lang de taak kostte, in minuten. Leeg als er niets is aangeklikt: overslaan mag,
+    // en een lege cel telt nergens in mee. `bulkAfronden` roept deze functie met vier argumenten
+    // aan en laat M dus altijd leeg — bulk is opruimwerk en hoort niet in de meting.
+    duurNaarCel(duurMin), '', '', '',         // M, N, O, P
     r.taakId||'', r.bundelId||'', nulVeilig(r.bundelVolg),  // Q, R, S
   ]);
 }

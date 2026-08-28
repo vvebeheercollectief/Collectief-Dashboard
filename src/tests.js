@@ -5921,7 +5921,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     eq('afrond: toelichting op index 9', v[9], 'Klaar');
     eq('afrond: subcategorie op index 10', v[10], 'Dak');
     eq('afrond: herhaalId blijft op index 11', v[11], 'H7');   // L — Opvolging.gs leest deze
-    eq('afrond: M t/m P blijven leeg', [v[12],v[13],v[14],v[15]], ['','','','']);
+    eq('afrond: zonder duur blijft M t/m P leeg', [v[12],v[13],v[14],v[15]], ['','','','']);
     eq('afrond: taakId op index 16', v[16], 'Tsub');
     eq('afrond: bundelId op index 17', v[17], 'Tkop');
     eq('afrond: bundelVolg op index 18', v[18], '10');
@@ -5931,6 +5931,24 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
                                subcategorie:'', herhaalId:'', taakId:'Tk', bundelId:'Tk', bundelVolg:'0' },
                              'VERGADERVERZOEKEN', '2026-08-14', '');
     eq('afrond: staart ligt gelijk voor elke sectie', [vv.length, vv[16], vv[17], vv[18]], [19,'Tk','Tk','0']);
+  })();
+
+  (() => {
+    const taak = { code:'311212', naam:'Testflat 1', actiepunt:'Iets doen',
+                   taakId:'Tsub', bundelId:'Tkop', bundelVolg:'10' };
+    const met = afrondWaarden(taak, 'OPPAKKEN', '2026-08-14', 'Klaar', 30);
+    eq('afrond+duur: 30 op index 12 (kolom M)', met[12], '30');
+    eq('afrond+duur: N t/m P blijven leeg', [met[13],met[14],met[15]], ['','','']);
+    eq('afrond+duur: rij blijft 19 lang', met.length, 19);
+    // Q/R/S mogen NIET opschuiven — Opvolging.gs en parseSections lezen op vaste index.
+    eq('afrond+duur: Q/R/S liggen nog op 16/17/18',
+       [met[16],met[17],met[18]], ['Tsub','Tkop','10']);
+    // Overslaan is de standaard: vier argumenten (zoals bulkAfronden doet) laat M leeg.
+    const zonder = afrondWaarden(taak, 'OPPAKKEN', '2026-08-14', '');
+    eq('afrond+duur: vier argumenten laat M leeg', zonder[12], '');
+    // 0 is geen meting maar een overgeslagen taak.
+    const nul = afrondWaarden(taak, 'OPPAKKEN', '2026-08-14', '', 0);
+    eq('afrond+duur: 0 wordt een lege cel', nul[12], '');
   })();
 
   (() => {

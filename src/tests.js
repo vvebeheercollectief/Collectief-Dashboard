@@ -14026,8 +14026,10 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   })();
 
   // ── SYNC: de logregel-verwijder-toast blijft per klik zijn eigen undo houden ──
-  (async () => {
-    const bron=await (await fetch('/src/render-overig.js')).text();
+  await (async () => {
+    // RELATIEF pad ('./src/…'), net als _leesBron bij de andere brontoetsen: de productie-site
+    // draait onder /Collectief-Dashboard/ en een absoluut '/src/…' haalt daar de 404-pagina op.
+    const bron=await (await fetch('./src/render-overig.js', {cache:'no-store'})).text();
     truthy('sync: de logregel-verwijder-toast draait zonder ontdubbeling (geenDedup)',
            /showUndoToast\('Logregel verwijderd'[\s\S]{0,200}geenDedup:true/.test(bron));
   })();

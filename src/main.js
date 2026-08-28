@@ -372,7 +372,12 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('complete-confirm').onclick=doCompleteTask;
   // Eén listener op het rooster in plaats van vijf op de knoppen: dan hoeft er niets opnieuw
   // aangesloten te worden als de knoppen ooit veranderen.
-  document.getElementById('complete-duur').addEventListener('click', e=>{
+  // `?.` en niet kaal, anders dan de drie regels hierboven: #complete-duur is NIEUWE html, en deze
+  // handler loopt zonder try/catch door tot `goTo('ntd')` op het eind. Serveert de service worker
+  // één keer een index.html van vóór deze tak naast verse JS, dan gooit een kale aanroep hier en
+  // wordt alles erna overgeslagen — de app start dan niet meer op. De regels hierboven verwijzen
+  // naar elementen die al releases bestaan en overleven zo'n scheve cache wél.
+  document.getElementById('complete-duur')?.addEventListener('click', e=>{
     kiesDuur(e.target.closest('.duur-knop'));
   });
   let _compMouseDown=null;

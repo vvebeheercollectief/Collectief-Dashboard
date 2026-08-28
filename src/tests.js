@@ -5448,7 +5448,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '12.2');
+  eq('versie opgehoogd', APP_VERSION, '12.3');
 
   // ── Tabbladen ÍN de kaartkop (v11.7) ──
   // De kop van de kaart zei links exact hetzelfde als het actieve tabblad — 'Oppakken' boven
@@ -12028,6 +12028,69 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         });
         eq('a11y: elke pil en de icoonknop in de taakrij halen de norm in beide thema\'s', gezakt, []);
       } finally { applyTheme(themaOud); rem.remove(); proef.remove(); }
+    })();
+
+    // Dezelfde meting, maar dan op de ZWEEF-standen. Die zijn met het oog bijna niet te
+    // controleren — je ziet ze alleen zolang de muis stilstaat — en precies daar zaten drie
+    // gevulde knoppen nog op wit terwijl hun vulling in de donkere modus juist licht is:
+    // .btn-del:hover 2,83, .act-ib.aan:hover 1,85 en .mv-x:hover 2,72. Twee lessen zitten in
+    // deze toets verwerkt:
+    //  1. Een :hover is niet na te bootsen met een eigen kopie van de regel — dan toets je je
+    //     kopie. We schrijven de selector van de ECHTE regel om naar `.zweefX` en zetten hem
+    //     daarna terug, zodat de meting door de echte cascade loopt.
+    //  2. `r.cssRules` bestaat sinds CSS-nesting op ELKE stijlregel (als lege lijst, en dus
+    //     truthy). Recursief afdalen op `if (r.cssRules)` slaat daardoor iedere gewone regel
+    //     over en je meet stilletjes de rusttoestand. Vandaar de eis `.length`.
+    (() => {
+      const proef = document.createElement('div');
+      proef.style.cssText = 'position:fixed;left:-4000px;top:0;width:900px';
+      proef.innerHTML = '<button class="btn btn-del zweefX">Verwijder</button>'
+        + '<button class="act-ib act-ico aan zweefX">I</button>'
+        + '<span class="mv-chip"><button class="mv-x zweefX">x</button></span>'
+        + '<button class="btn btn-afr zweefX">Afronden</button>'
+        + '<button class="act-af act-ico zweefX">A</button>'
+        + '<button class="toast-undo">Ongedaan maken</button>'
+        + '<div style="background:var(--nv)"><button class="bb-knop bb-groen">Klaar</button></div>';
+      document.body.appendChild(proef);
+      const rem = document.createElement('style');
+      rem.textContent = '*,*::before,*::after{transition:none !important;animation:none !important}';
+      document.head.appendChild(rem);
+      const themaOud = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+      const terug = [];
+      const omzetten = rs => { for (let i = 0; i < rs.length; i++) { const r = rs[i];
+        if (r.cssRules && r.cssRules.length) omzetten(r.cssRules);     // zie les 2 hierboven
+        if (r.selectorText && r.selectorText.indexOf(':hover') >= 0) {
+          try { const o = r.selectorText; r.selectorText = o.replace(/:hover/g, '.zweefX'); terug.push([r, o]); } catch (e) {} } } };
+      for (const ss of document.styleSheets) { try { omzetten(ss.cssRules); } catch (e) {} }
+      const _p = s => { const m = String(s).match(/rgba?\(([^)]+)\)/); if (!m) return null;
+        const q = m[1].split(/[,\s\/]+/).filter(Boolean).map(Number);
+        return { r: q[0], g: q[1], b: q[2], a: q.length > 3 ? q[3] : 1 }; };
+      const _op = (fg, bg) => [0,1,2].map(i => [fg.r,fg.g,fg.b][i]*fg.a + bg[i]*(1-fg.a));
+      const _bg = el => { const st = []; let n = el;
+        while (n && n !== document.documentElement) { const c = _p(getComputedStyle(n).backgroundColor);
+          if (c && c.a > 0) { st.push(c); if (c.a === 1) break; } n = n.parentElement; }
+        const h = _p(getComputedStyle(document.documentElement).backgroundColor) || { r:255, g:255, b:255, a:1 };
+        let b = [h.r, h.g, h.b];
+        for (let i = st.length - 1; i >= 0; i--) b = _op(st[i], b);
+        return b; };
+      // Pictogram-knoppen mogen op 3:1, tekstknoppen moeten 4,5:1 halen — zelfde weging als bij
+      // de taakrij hierboven.
+      const eis = el => el.classList.contains('act-ico') || el.classList.contains('mv-x') ? 3 : 4.5;
+      const meet = () => { const uit = [];
+        proef.querySelectorAll('button').forEach(el => { const fg = _p(getComputedStyle(el).color);
+          const bg = _bg(el); uit.push([el.className.replace(/\s*zweefX\s*/, ' ').trim(), _cr(_op(fg, bg), bg), eis(el)]); });
+        return uit; };
+      try {
+        applyTheme('light'); const licht = meet();
+        applyTheme('dark');  const donker = meet();
+        const gezakt = [];
+        licht.forEach(([k, v, e], i) => {
+          if (v < e) gezakt.push(`${k} licht ${v.toFixed(2)} (<${e})`);
+          const d = donker[i]; if (d[1] < d[2]) gezakt.push(`${d[0]} donker ${d[1].toFixed(2)} (<${d[2]})`);
+        });
+        eq('a11y: elke gevulde zweefstand haalt de norm in beide thema\'s', gezakt, []);
+      } finally { applyTheme(themaOud); terug.forEach(([r, s]) => { try { r.selectorText = s; } catch (e) {} });
+        rem.remove(); proef.remove(); }
     })();
 
     // 10. De chat-knop hoort in de bovenbalk en mag NIET zweven. Als zwevend knopje rechtsonder lag

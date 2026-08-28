@@ -1514,6 +1514,19 @@ body:has(.modal-bg.open) #chat-bg{display:none}
 [data-theme=dark] .toast-undo,
 [data-theme=dark] .bb-groen,
 [data-theme=dark] .btn-afr:hover{color:#15181d}
+/* Dezelfde omkering, maar dan voor de drie ZWEEF-standen die ook aan beide blokken hierboven
+   ontsnapt zijn. Ze vullen zich met --rd / --am / --ac, en die drie zijn in de donkere modus net
+   zo licht als --gn. Gemeten met getComputedStyle op de echte knoppen in donkere modus, met de
+   overgangen uit:
+     .btn-del:hover      wit op --rd (#F0746F)  2,83:1  →  6,30:1
+     .act-ib.aan:hover   wit op --am (#F0B44C)  1,85:1  →  9,61:1
+     .mv-x:hover         wit op --ac (#8b9dc4)  2,72:1  →  6,54:1
+   .btn-del is niet alleen 'Verwijder' in het bewerkscherm, maar via bevestig.js ook de ja-knop
+   van élke gevaarlijke bevestiging — precies de knop die je moet kunnen lezen vóór je hem indrukt.
+   De andere twee zijn pictogrammen (de norm is daar 3:1) en zaten daar allebei onder. */
+[data-theme=dark] .btn-del:hover,
+[data-theme=dark] .act-ib.aan:hover,
+[data-theme=dark] .mv-x:hover{color:#15181d}
 
 .load-err{position:fixed;top:72px;left:50%;transform:translateX(-50%);z-index:750;background:var(--sur);border:1px solid var(--rd-b);border-left:4px solid var(--rd);border-radius:var(--r);box-shadow:var(--shl);padding:12px 16px;display:flex;align-items:center;gap:14px;font-size:13px;font-weight:500;color:var(--txt);max-width:calc(100vw - 32px)}
 

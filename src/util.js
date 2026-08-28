@@ -812,6 +812,25 @@ function taakVerwijzing(r, sec){
   return [[soort, vve].filter(Boolean).join(' · '), echteOms].filter(Boolean).join(' — ');
 }
 
+// ── Duur van een afgeronde taak (kolom M van 'Afgerond') ─────────────────────────────────────
+// Leeg en 0 zijn hier NIET hetzelfde, en dat is de hele reden dat dit een functie is en geen
+// `Number(x)||0` op de plek van gebruik. Leeg betekent 'niemand heeft het ingevuld' en moet
+// overal buiten de telling vallen; 0 zou als échte meting meedoen en elk gemiddelde omlaag
+// trekken met taken die alleen maar zijn overgeslagen. Alles wat geen positief getal is —
+// lege cel, tekst, 0, negatief — wordt daarom null.
+// De Sheet kan een Nederlands decimaalteken teruggeven, vandaar de komma-vervanging.
+function duurUitCel(v){
+  const n = Number(String(v ?? '').trim().replace(',', '.'));
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+}
+
+// Dezelfde regel, de andere kant op: wat er in de cel terechtkomt. Bewust via `duurUitCel`,
+// zodat lezen en schrijven niet uit elkaar kunnen lopen.
+function duurNaarCel(v){
+  const n = duurUitCel(v);
+  return n === null ? '' : String(n);
+}
+
 export {
   maandagVan, isoWeekJaar, weekDagen, weekPeriodeLabel, parseWeekPeriode, weekOpties, weekAfstand, metDagnamen, MND_KORT, MND_LANG,
   taakTitel, taakVerwijzing, kortDatum, NIET_ZOEKBAAR,
@@ -824,4 +843,5 @@ export {
   parseOff, offerteFase,
   parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, aannSleutel,
   meldSleutel, _zonderLeidendSymbool, kiesAfgerondRij,
+  duurUitCel, duurNaarCel,
 };

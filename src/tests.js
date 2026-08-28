@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { taakTitel, taakVerwijzing, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, stilDrempel, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, subBadge, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel, kiesAfgerondRij, filt, splitBehandelaar, korteNaam, persBadges, taakActieKnoppen, voorgesteldeDeadline, DEADLINE_VOORSTEL, DEADLINE_HINT, periodeBereik, AF_PERIODES } from "./util.js";
+import { taakTitel, taakVerwijzing, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, stilDrempel, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, subBadge, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel, kiesAfgerondRij, filt, splitBehandelaar, korteNaam, persBadges, taakActieKnoppen, voorgesteldeDeadline, DEADLINE_VOORSTEL, DEADLINE_HINT, periodeBereik, AF_PERIODES, duurUitCel, duurNaarCel } from "./util.js";
 import { verwerkMeldingRijen, toonMeldingen, MAX_TOAST_BURST, _whoSleutel, getCurrentWho, undoDelete } from "./notifications.js";
 import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek, logEvents, renderOntw, openOntwModal, closeOntwModal, submitOntwItem, _logRegelSleutel, _ontwSleutel } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM, VELD_LABELS } from "./config.js";
@@ -5880,6 +5880,26 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     eq('undo: bundelVolg op index 18', v[18], '0');
     eq('undo: opvolgdatum blijft op index 11 (L)', v[11], '1 jul 2026');
     eq('undo: herhaalId blijft op index 12 (M)', v[12], 'H7');
+  })();
+
+  (() => {
+    // Kolom M van 'Afgerond'. De hele reden dat dit een eigen functie is: leeg en 0 mogen niet
+    // op één hoop. 'Niet gemeten' telt nergens in mee; 0 zou als meting meedoen en elk
+    // gemiddelde omlaag trekken met taken die niemand heeft ingevuld.
+    eq('duur: getal blijft getal', duurUitCel('30'), 30);
+    eq('duur: spaties eromheen', duurUitCel('  60  '), 60);
+    eq('duur: komma telt als punt', duurUitCel('7,5'), 8);
+    eq('duur: lege cel is null', duurUitCel(''), null);
+    eq('duur: undefined is null', duurUitCel(undefined), null);
+    eq('duur: tekst is null', duurUitCel('ongeveer een uur'), null);
+    eq('duur: nul is null en NIET 0', duurUitCel('0'), null);
+    eq('duur: negatief is null', duurUitCel('-15'), null);
+    eq('duur: het getal 0 is ook null', duurUitCel(0), null);
+    // Andere kant op — wat er in de cel belandt.
+    eq('duur naar cel: 30 wordt "30"', duurNaarCel(30), '30');
+    eq('duur naar cel: niets wordt lege string', duurNaarCel(null), '');
+    eq('duur naar cel: tekst wordt lege string', duurNaarCel('nvt'), '');
+    eq('duur naar cel: 0 wordt lege string', duurNaarCel(0), '');
   })();
 
   (() => {

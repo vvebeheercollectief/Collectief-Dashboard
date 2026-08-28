@@ -831,7 +831,13 @@
     .fld input,.fld select,.fld textarea{width:100%;background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rs);padding:8px 11px;color:var(--txt);font-size:13px;outline:none;transition:border var(--tr)}
     .fld input:focus,.fld select:focus,.fld textarea:focus{border-color:var(--modal-sec,var(--ac));box-shadow:0 0 0 3px color-mix(in srgb,var(--modal-sec,var(--ac)) 16%,transparent)}
     .fld textarea{resize:vertical;min-height:68px}
-    .fld-opt{font-weight:600;color:var(--fnt);letter-spacing:0;text-transform:none;margin-left:6px}
+    /* --mut en niet --fnt. Op --fnt haalde dit woordje 2,60:1 (licht) en 3,22:1 (donker) bij
+       11,5px — dezelfde meting en dezelfde variabele als bij de foutbanner (zie r.589), en dit
+       project dwingt 4,5:1 af. Juist hier telt het: wie 'optioneel' niet leest denkt dat een duur
+       verplicht is en klikt maar wat aan, en dan meet je een verzonnen waarde — precies wat het
+       weglaten van een voorselectie moest voorkomen. Blijft van het label onderscheiden door
+       gewicht 600 tegen 700 en text-transform:none. */
+    .fld-opt{font-weight:600;color:var(--mut);letter-spacing:0;text-transform:none;margin-left:6px}
     /* Vast raster van vijf. Met flex-wrap viel '2u+' bij 440px vensterbreedte om naar een tweede
        regel; een raster kan dat niet. */
     .duur-keuze{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}

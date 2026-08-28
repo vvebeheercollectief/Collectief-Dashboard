@@ -820,8 +820,8 @@ function taakVerwijzing(r, sec){
 // lege cel, tekst, 0, negatief — wordt daarom null.
 // De Sheet kan een Nederlands decimaalteken teruggeven, vandaar de komma-vervanging.
 function duurUitCel(v){
-  const n = Number(String(v ?? '').trim().replace(',', '.'));
-  return Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+  const n = Math.round(Number(String(v ?? '').trim().replace(',', '.')));
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 // Dezelfde regel, de andere kant op: wat er in de cel terechtkomt. Bewust via `duurUitCel`,

@@ -5883,9 +5883,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   })();
 
   (() => {
-    // Kolom M van 'Afgerond'. De hele reden dat dit een eigen functie is: leeg en 0 mogen niet
-    // op één hoop. 'Niet gemeten' telt nergens in mee; 0 zou als meting meedoen en elk
-    // gemiddelde omlaag trekken met taken die niemand heeft ingevuld.
+    // Kolom M van 'Afgerond'. Waarom leeg en 0 niet op één hoop mogen: zie duurUitCel in util.js.
     eq('duur: getal blijft getal', duurUitCel('30'), 30);
     eq('duur: spaties eromheen', duurUitCel('  60  '), 60);
     eq('duur: komma telt als punt', duurUitCel('7,5'), 8);
@@ -5900,6 +5898,16 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     eq('duur naar cel: niets wordt lege string', duurNaarCel(null), '');
     eq('duur naar cel: tekst wordt lege string', duurNaarCel('nvt'), '');
     eq('duur naar cel: 0 wordt lege string', duurNaarCel(0), '');
+    // Onder de minuut: het gat waar de afrondvolgorde in misging. Alles onder een halve minuut
+    // glipte door de `> 0`-poort en werd daarna alsnog 0.
+    eq('duur: een kwartier in uren genoteerd is geen meting', duurUitCel('0,25'), null);
+    // De rondgang. Zonder deze assert staat de belofte 'lezen en schrijven lopen niet uiteen'
+    // alleen in een commentaarregel, en die was aantoonbaar onwaar.
+    eq('duur: rondgang schrijven-lezen is sluitend',
+       duurUitCel(duurNaarCel('0,4')), duurUitCel('0,4'));
+    // Kolom M is een nieuwe, lege kolom naast L. Overgeërfde validatie heeft in dit project
+    // eerder TRUE/FALSE in lege cellen achtergelaten — zie leegBijErfenis (util.js r.602).
+    eq('duur: een overgeërfde TRUE is geen meting', duurUitCel('TRUE'), null);
   })();
 
   (() => {

@@ -8,7 +8,7 @@ import { ensureToken } from "./auth.js";
 import { fetchSheet, appendRange, assertRowMatch, sheetsFetch } from "./api.js";
 import { logEvent } from "./render-overig.js";
 import { getSheetIds, insertAndWriteRow, getInsertRow, bevestigInvoegPlek } from "./crud.js";
-import { loadAll, parseSections, metWriteMarkering, blokkeerOffline } from "./data.js";
+import { loadAll, parseSections, metWriteMarkering, serieleWrite, blokkeerOffline } from "./data.js";
 import { flashRow } from "./anim.js";
 import { ico } from "./icons.js";
 
@@ -206,77 +206,86 @@ async function undoComplete(undoData) {
   const { sec, ntdValues, ntdRow } = undoData;
   state._undoInFlight = true; // pauzeer de 8s-poll; deze undo doet z'n eigen loadAll
   try {
-    await state._writeChain; // de afronding-write moet eerst klaar zijn vóór we de rij zoeken
-    // Is de afronding zélf mislukt (rij-guard, 401, 5xx), dan staat de taak er gewoon nog en zou
-    // deze undo hem een TWEEDE keer invoegen — met hetzelfde vaste taaknummer. De toast blijft na
-    // een mislukking namelijk nog seconden staan mét een werkende knop. Zelfde weigering als
-    // `undoDeleteLog` in render-overig.js.
-    if (!undoData.gelukt) {
-      // De tekst zegt bewust NIET 'hij staat er nog'. `gelukt` is alleen true na een OK-antwoord,
-      // en géén antwoord (een afgebroken verzoek na 20 s) bewijst niet dat de Sheet niets deed —
-      // de schrijfactie kán geland zijn. Terugzetten mag daarom niet, maar het als feit
-      // presenteren evenmin. De lijst wordt opnieuw geladen zodat de gebruiker het zelf ziet.
-      showToast('Niet ongedaan gemaakt',
-                'We konden niet bevestigen dát de taak is afgerond, dus er is niets teruggezet. De lijst wordt opnieuw geladen — kijk of de taak er nog staat.',
-                'var(--am)', 'label', { geenDedup:true, geenSysteemmelding:true });
-      await loadAll();
-      return;
-    }
-    // De invoegplek in 'Nog Te Doen' vers narekenen, net als bij het aanmaken van een taak.
-    // BEWUST vóór metWriteMarkering: daarbinnen staat pendingWrites al op >0 en keert
-    // bevestigInvoegPlek meteen terug zonder iets te bewaken.
-    const insertRowVooraf = getInsertRow(sec);
-    try { await bevestigInvoegPlek(sec, insertRowVooraf); }
-    catch(e){ alert(e.melding || e.message); await loadAll(); return; }
-    // Alleen het schrijvende deel onder de teller — de loadAll hieronder moet zijn verse data
-    // WÉL kunnen gebruiken (zie de waarschuwing bij metWriteMarkering).
-    await metWriteMarkering(async () => {
-      const ids = await getSheetIds();
-      const afId = ids['Afgerond'];
-      // Verse Afgerond-data en de ZOJUIST afgeronde rij zoeken (nieuwste datum eerst, zelfde
-      // sortering als D.af). D.af kan nog verouderd zijn.
-      // De keuze zelf staat in `kiesAfgerondRij` (util.js), gedeeld met de bulk-undo: die matcht
-      // eerst op het vaste taaknummer uit `ntdValues[16]` en valt alleen daarna terug op de code.
-      // Zoeken op code + datum is namelijk een GOK zodra er twee afrondingen van dezelfde VvE op
-      // dezelfde dag in dezelfde sectie staan — zie de toelichting daar.
-      const afData = (parseSections(await fetchSheet('Afgerond'), 'Afgerond').data[sec] || [])
-        .slice().sort((a, b) => parseDt(b.datum) - parseDt(a.datum));
-      const doelAf = kiesAfgerondRij(afData, (ntdValues || [])[16], undoData.code);
-      // EERST terugzetten, DAN pas weghalen. Breekt de verbinding ertussen, dan staat de taak
-      // dubbel (zichtbaar, herstelbaar) in plaats van nergens (onzichtbaar, verloren).
-      await insertAndWriteRow('Nog Te Doen', insertRowVooraf, ntdValues);
-      if (doelAf) {
-        // Guard op 'Afgerond': deze deleteDimension leunt op een rijnummer uit een verse lezing,
-        // maar tussen die lezing en dit verzoek kan de Sheet alsnog verschoven zijn. Klopt de rij
-        // niet meer, dan zou hier stil een ándere afronding verdwijnen.
-        await assertRowMatch(doelAf._row, doelAf, 'Afgerond');
-        const resp = await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${state.oauthToken}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ requests: [{ deleteDimension: { range: { sheetId: afId, dimension: 'ROWS', startIndex: doelAf._row - 1, endIndex: doelAf._row } } }] })
-        });
-        // Dit antwoord bleef als ENIGE in de app ongecontroleerd. Gevolg: 'Ongedaan gemaakt' op
-        // het scherm terwijl de afronding nog in 'Afgerond' staat — de taak staat dan dubbel
-        // zonder dat iemand het weet, en er werd bovendien een logregel 'Teruggezet' bij
-        // geschreven die beweert dat het rond is. bulk.js doet bij precies dezelfde delete al
-        // wél deze controle. Het foutlichaam met .catch uitlezen om de reden uit api.js: een
-        // HTML-antwoord van een tussenliggende proxy geeft anders een SyntaxError zónder
-        // .status, die dan als NETWERKfout telt en het dashboard onterecht offline zet.
-        if(!resp.ok){
-          const e = await resp.json().catch(()=>({}));
-          if(resp.status===401){ state.oauthToken=null; state.oauthExpiry=0; }
-          const err = new Error(e.error?.message
-            || 'De taak staat terug in Nog Te Doen, maar de regel in Afgerond kon niet worden weggehaald — hij staat nu dubbel.');
-          err.status = resp.status;
-          throw err;
-        }
+    // Eén beurt in de seriële schrijfwachtrij (serieleWrite, data.js): de afronding-write is dan
+    // per definitie klaar vóór we de rij zoeken, én er kan geen andere schrijfactie (een tweede
+    // undo, een nieuwe taak) meer tussen het narekenen van de invoegplek en de invoeging zelf
+    // schieten. Het oude `await state._writeChain` hier wachtte wel op de rij, maar maakte deze
+    // undo geen onderdeel ervan — twee snelle undo's berekenden dan allebei hetzelfde anker en
+    // schreven om beurten over elkaars invoeging heen (naloop 2026-08-28).
+    await serieleWrite(async () => {
+      // Is de afronding zélf mislukt (rij-guard, 401, 5xx), dan staat de taak er gewoon nog en zou
+      // deze undo hem een TWEEDE keer invoegen — met hetzelfde vaste taaknummer. De toast blijft na
+      // een mislukking namelijk nog seconden staan mét een werkende knop. Zelfde weigering als
+      // `undoDeleteLog` in render-overig.js.
+      if (!undoData.gelukt) {
+        // De tekst zegt bewust NIET 'hij staat er nog'. `gelukt` is alleen true na een OK-antwoord,
+        // en géén antwoord (een afgebroken verzoek na 20 s) bewijst niet dat de Sheet niets deed —
+        // de schrijfactie kán geland zijn. Terugzetten mag daarom niet, maar het als feit
+        // presenteren evenmin. De lijst wordt opnieuw geladen zodat de gebruiker het zelf ziet.
+        showToast('Niet ongedaan gemaakt',
+                  'We konden niet bevestigen dát de taak is afgerond, dus er is niets teruggezet. De lijst wordt opnieuw geladen — kijk of de taak er nog staat.',
+                  'var(--am)', 'label', { geenDedup:true, geenSysteemmelding:true });
+        await loadAll();
+        return;
       }
-      await logEvent(undoData.code, sec, 'Teruggezet', 'status', 'Afgerond', 'Nog Te Doen');
+      // De invoegplek in 'Nog Te Doen' vers narekenen, net als bij het aanmaken van een taak.
+      // BEWUST vóór metWriteMarkering: daarbinnen staat pendingWrites al op >0 en keert
+      // bevestigInvoegPlek meteen terug zonder iets te bewaken.
+      const insertRowVooraf = getInsertRow(sec);
+      try { await bevestigInvoegPlek(sec, insertRowVooraf); }
+      catch(e){ alert(e.melding || e.message); await loadAll(); return; }
+      // Alleen het schrijvende deel onder de teller — de loadAll hieronder moet zijn verse data
+      // WÉL kunnen gebruiken (zie de waarschuwing bij metWriteMarkering).
+      await metWriteMarkering(async () => {
+        const ids = await getSheetIds();
+        const afId = ids['Afgerond'];
+        // Verse Afgerond-data en de ZOJUIST afgeronde rij zoeken (nieuwste datum eerst, zelfde
+        // sortering als D.af). D.af kan nog verouderd zijn.
+        // De keuze zelf staat in `kiesAfgerondRij` (util.js), gedeeld met de bulk-undo: die matcht
+        // eerst op het vaste taaknummer uit `ntdValues[16]` en valt alleen daarna terug op de code.
+        // Zoeken op code + datum is namelijk een GOK zodra er twee afrondingen van dezelfde VvE op
+        // dezelfde dag in dezelfde sectie staan — zie de toelichting daar.
+        const afData = (parseSections(await fetchSheet('Afgerond'), 'Afgerond').data[sec] || [])
+          .slice().sort((a, b) => parseDt(b.datum) - parseDt(a.datum));
+        const doelAf = kiesAfgerondRij(afData, (ntdValues || [])[16], undoData.code);
+        // EERST terugzetten, DAN pas weghalen. Breekt de verbinding ertussen, dan staat de taak
+        // dubbel (zichtbaar, herstelbaar) in plaats van nergens (onzichtbaar, verloren).
+        await insertAndWriteRow('Nog Te Doen', insertRowVooraf, ntdValues);
+        if (doelAf) {
+          // Guard op 'Afgerond': deze deleteDimension leunt op een rijnummer uit een verse lezing,
+          // maar tussen die lezing en dit verzoek kan de Sheet alsnog verschoven zijn. Klopt de rij
+          // niet meer, dan zou hier stil een ándere afronding verdwijnen.
+          await assertRowMatch(doelAf._row, doelAf, 'Afgerond');
+          const resp = await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${state.oauthToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ requests: [{ deleteDimension: { range: { sheetId: afId, dimension: 'ROWS', startIndex: doelAf._row - 1, endIndex: doelAf._row } } }] })
+          });
+          // Dit antwoord bleef als ENIGE in de app ongecontroleerd. Gevolg: 'Ongedaan gemaakt' op
+          // het scherm terwijl de afronding nog in 'Afgerond' staat — de taak staat dan dubbel
+          // zonder dat iemand het weet, en er werd bovendien een logregel 'Teruggezet' bij
+          // geschreven die beweert dat het rond is. bulk.js doet bij precies dezelfde delete al
+          // wél deze controle. Het foutlichaam met .catch uitlezen om de reden uit api.js: een
+          // HTML-antwoord van een tussenliggende proxy geeft anders een SyntaxError zónder
+          // .status, die dan als NETWERKfout telt en het dashboard onterecht offline zet.
+          if(!resp.ok){
+            const e = await resp.json().catch(()=>({}));
+            if(resp.status===401){ state.oauthToken=null; state.oauthExpiry=0; }
+            const err = new Error(e.error?.message
+              || 'De taak staat terug in Nog Te Doen, maar de regel in Afgerond kon niet worden weggehaald — hij staat nu dubbel.');
+            err.status = resp.status;
+            throw err;
+          }
+        }
+        await logEvent(undoData.code, sec, 'Teruggezet', 'status', 'Afgerond', 'Nog Te Doen');
+      });
+      // De loadAll hoort nog bínnen de beurt: zo staat D weer vers vóórdat een wachtende
+      // schrijfactie (bijvoorbeeld een tweede undo) zijn eigen anker uit D berekent.
+      showToast('Ongedaan gemaakt', `${undoData.code} terug in Nog Te Doen`, 'var(--am)', 'ongedaan');
+      await loadAll();
+      const terug=(D.ntd[sec]||[]).filter(x=>x.code===undoData.code).pop();
+      if(terug) flashRow('ntd-tbody', terug._row, 'rij-flits-amber');
     });
-    showToast('Ongedaan gemaakt', `${undoData.code} terug in Nog Te Doen`, 'var(--am)', 'ongedaan');
-    await loadAll();
-    const terug=(D.ntd[sec]||[]).filter(x=>x.code===undoData.code).pop();
-    if(terug) flashRow('ntd-tbody', terug._row, 'rij-flits-amber');
   } catch(e) { alert('Undo fout: ' + e.message); }
   finally { state._undoInFlight = false; }
 }
@@ -286,29 +295,33 @@ async function undoDelete(undoData) {
   if (!await ensureToken()) { alert('Inloggen mislukt.'); return; }
   state._undoInFlight = true; // pauzeer de 8s-poll; deze undo doet z'n eigen loadAll
   try {
-    await state._writeChain;            // delete-write gegarandeerd vóór de re-insert
-    const { sec, ntdValues } = undoData;
-    // Is er niets verwijderd (rij-guard, 401, 5xx), dan staat de taak er nog en zou deze undo een
-    // duplicaat met hetzelfde taaknummer maken. Zie de toelichting bij undoComplete.
-    if (!undoData.gelukt) {
-      // Zie de toelichting bij undoComplete: 'geen antwoord' is geen bewijs van 'niets gebeurd'.
-      showToast('Niet ongedaan gemaakt',
-                'We konden niet bevestigen dát de taak is verwijderd, dus er is niets teruggezet. De lijst wordt opnieuw geladen — kijk of de taak er nog staat.',
-                'var(--am)', 'label', { geenDedup:true, geenSysteemmelding:true });
+    // Zelfde beurt-constructie als undoComplete hierboven: de delete-write is klaar vóór de
+    // re-insert, en niets anders schrijft meer tussen het narekenen van de invoegplek en de
+    // invoeging zelf (naloop 2026-08-28).
+    await serieleWrite(async () => {
+      const { sec, ntdValues } = undoData;
+      // Is er niets verwijderd (rij-guard, 401, 5xx), dan staat de taak er nog en zou deze undo een
+      // duplicaat met hetzelfde taaknummer maken. Zie de toelichting bij undoComplete.
+      if (!undoData.gelukt) {
+        // Zie de toelichting bij undoComplete: 'geen antwoord' is geen bewijs van 'niets gebeurd'.
+        showToast('Niet ongedaan gemaakt',
+                  'We konden niet bevestigen dát de taak is verwijderd, dus er is niets teruggezet. De lijst wordt opnieuw geladen — kijk of de taak er nog staat.',
+                  'var(--am)', 'label', { geenDedup:true, geenSysteemmelding:true });
+        await loadAll();
+        return;
+      }
+      const insertRow = getInsertRow(sec);
+      try { await bevestigInvoegPlek(sec, insertRow); }
+      catch(e){ alert(e.melding || e.message); await loadAll(); return; }
+      await metWriteMarkering(async () => {
+        await insertAndWriteRow('Nog Te Doen', insertRow, ntdValues);
+        await logEvent(undoData.code, sec, 'Teruggezet', 'status', 'Verwijderd', 'Nog Te Doen');
+      });
+      showToast('Ongedaan gemaakt', `${undoData.code} terug in Nog Te Doen`, 'var(--am)', 'ongedaan');
       await loadAll();
-      return;
-    }
-    const insertRow = getInsertRow(sec);
-    try { await bevestigInvoegPlek(sec, insertRow); }
-    catch(e){ alert(e.melding || e.message); await loadAll(); return; }
-    await metWriteMarkering(async () => {
-      await insertAndWriteRow('Nog Te Doen', insertRow, ntdValues);
-      await logEvent(undoData.code, sec, 'Teruggezet', 'status', 'Verwijderd', 'Nog Te Doen');
+      const terug=(D.ntd[sec]||[]).filter(x=>x.code===undoData.code).pop();
+      if(terug) flashRow('ntd-tbody', terug._row, 'rij-flits-amber');
     });
-    showToast('Ongedaan gemaakt', `${undoData.code} terug in Nog Te Doen`, 'var(--am)', 'ongedaan');
-    await loadAll();
-    const terug=(D.ntd[sec]||[]).filter(x=>x.code===undoData.code).pop();
-    if(terug) flashRow('ntd-tbody', terug._row, 'rij-flits-amber');
   } catch(e) { alert('Undo fout: ' + e.message); }
   finally { state._undoInFlight = false; }
 }

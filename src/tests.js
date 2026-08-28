@@ -17,7 +17,7 @@ import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN, saveKenmerken } from "./
 import { zoekAlles, openPalette, closePalette, palOpen } from "./palette.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen, bulkSelectie, bulkWis, renderBulkUi, bulkDoe, bulkVink, bulkVeld, bulkAlles, allesVinkjeHtml, allesVinkjeStand } from "./bulk.js";
 import { sheetsFetch, NTD_OMSCHRIJVING, _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, _shiftNtdRows, _shiftAfRows, veiligeCel, _veiligeRij, fetchSheet, fetchSheets, vingerafdruk, rijVingerafdruk, _normCel, _rijNaarCellen, assertRowMatch, NTD_DATUM, _isOffline, _isNetwerkFout, appendRange, appendRows } from "./api.js";
-import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, showLoadError, clearLoadError, syncSelecteerStand, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
+import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, serieleWrite, POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, showLoadError, clearLoadError, syncSelecteerStand, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
 import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _eindKolom, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, getAfInsertRow, OMSCHRIJVING_VELD, zetOmschrijving, _sheetBreedtes, getSheetIds, bevestigInvoegPlek, _naamBijCode, _zetNaamVeld, taakUitCache, kiesSectie, deleteTaskRow, deleteCurrentEditTask, completeCurrentEditTask, renderExtraVves, toonMeerVve, zetDeadlineVoorstel, herzieAlsSubtaak, kiesDuur, gekozenDuur, wisDuurKeuze } from "./crud.js";
@@ -13664,6 +13664,158 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       state._undoInFlight=false;
       document.querySelectorAll('.toast').forEach(t=>t.remove());
       // De weigertak doet een `loadAll()`, en die kan met de 403-stub een foutbanner achterlaten.
+      document.querySelectorAll('.load-err').forEach(b=>b.remove());
+    }
+  })();
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  NALOOP 2026-08-28 — undo-schrijfwegen zijn échte beurten in de wachtrij
+  // ══════════════════════════════════════════════════════════════════════════
+  // De undo's schreven via metWriteMarkering BUITEN de seriële keten: hun `await state._writeChain`
+  // wachtte op wat er al in de rij stond, maar maakte de eigen schrijfactie geen onderdeel ervan.
+  // Twee snelle undo's berekenden dan allebei hetzelfde invoeganker en voerden hun positionele
+  // inserts/deletes door elkaar uit — de tweede kon de eerste overschrijven en er bleef een lege
+  // rij achter. Sinds serieleWrite (data.js) is elke undo één beurt: hij begint pas als alles
+  // vóór hem klaar is, en niets anders begint zolang hij loopt.
+  await (async () => {
+    console.log('%c[TESTS] Serialisatie van undo-schrijfwegen', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const fetchOud=window.fetch, alertOud=window.alert;
+    const tokenOud=state.oauthToken, expOud=state.oauthExpiry, idsOud=state._sheetIds;
+    const ntdOud=D.ntd, infoOud=D.ntdSecInfo, cacheOud=state._uitCache, nfOud=state._netwerkFouten;
+    const meldingen=[], events=[];
+    let insertTeller=0, laatInsert1=null;
+    const poort=new Promise(res=>{ laatInsert1=res; });
+    try{
+      window.alert=m=>meldingen.push(String(m));
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
+      state._uitCache=false; state._netwerkFouten=0;
+      state._sheetIds={'Nog Te Doen':0,'Afgerond':1,'Logboek':2};
+      const taak={_sec:'OPPAKKEN',_row:10,code:'311162',naam:'VvE Test',actiepunt:'Lekkage dak',
+                  deadline:'',behandelaar:'Jer',prioriteit:'',opmerkingen:'',taakId:'T-77'};
+      D.ntd={OPPAKKEN:[taak],VERGADERVERZOEKEN:[],'OFFERTE-TRAJECTEN':[],LOD:[],'SUBSIDIE-TRAJECTEN':[]};
+      D.ntdSecInfo={OPPAKKEN:{colHeaderRow:2}};
+      const ntdValues=serializeNtdUndo(taak);
+      const ankerRij=(()=>{ const c=_rijNaarCellen('Nog Te Doen',taak); c[16]=taak.taakId; return c; })();
+      window.fetch=async(url,opt)=>{
+        const u=decodeURIComponent(String(url)), methode=(opt&&opt.method)||'GET';
+        if(u.includes('values:batchGet'))
+          return new Response(JSON.stringify({error:{message:'geen leesronde in deze test'}}),{status:403});
+        if(methode==='GET'){ events.push('lees-anker'); return new Response(JSON.stringify({values:[ankerRij]}),{status:200}); }
+        if(methode==='POST' && opt && opt.body && String(opt.body).includes('insertDimension')){
+          insertTeller++; events.push('insert-'+insertTeller);
+          // Undo 1 blijft in zijn schrijfactie hangen tot de toets de poort opent. Precies het
+          // venster waarin de oude code undo 2 er dwars doorheen liet lopen.
+          if(insertTeller===1) await poort;
+          return new Response('{}',{status:200});
+        }
+        events.push('schrijf');
+        return new Response('{}',{status:200});
+      };
+      const p1=undoDelete({sec:'OPPAKKEN',code:'311162',ntdValues,gelukt:true});
+      await new Promise(r=>setTimeout(r,30));
+      const p2=undoDelete({sec:'OPPAKKEN',code:'311162',ntdValues,gelukt:true});
+      await new Promise(r=>setTimeout(r,60));
+      // Het hart van de toets: zolang undo 1 midden in zijn insert hangt, heeft undo 2 nog NIETS
+      // gedaan — geen ankerlezing, geen insert. Vóór de reparatie stonden hier al twee lezingen.
+      eq('serialisatie: undo 2 doet niets zolang undo 1 nog schrijft',
+         events.filter(e=>e==='lees-anker').length, 1);
+      eq('serialisatie: er is dan ook nog maar één insert onderweg', insertTeller, 1);
+      laatInsert1();
+      await p1; await p2;
+      eq('serialisatie: daarna landen beide undo\'s alsnog', insertTeller, 2);
+      eq('serialisatie: zonder foutmelding', meldingen, []);
+      // En de keten mag nooit breken op een fout: de volgende beurt start gewoon.
+      let tweedeLiep=false;
+      await serieleWrite(async()=>{ throw new Error('expres'); }).catch(()=>{});
+      await serieleWrite(async()=>{ tweedeLiep=true; });
+      truthy('serialisatie: een fout in de ene beurt laat de volgende gewoon starten', tweedeLiep);
+    } finally {
+      window.fetch=fetchOud; window.alert=alertOud;
+      state.oauthToken=tokenOud; state.oauthExpiry=expOud; state._sheetIds=idsOud;
+      D.ntd=ntdOud; D.ntdSecInfo=infoOud; state._uitCache=cacheOud; state._netwerkFouten=nfOud;
+      state._undoInFlight=false;
+      document.querySelectorAll('.toast').forEach(t=>t.remove());
+      document.querySelectorAll('.load-err').forEach(b=>b.remove());
+    }
+  })();
+
+  // ── De rij-guard op 'Afgerond' kent sinds deze naloop óók het taaknummer ──
+  // Bulk-afgeronde tweelingrijen zijn daar inhoudelijk identiek (zelfde code, tekst en datum);
+  // alleen kolom Q onderscheidt ze. De undo-delete keurde de verkeerde tweeling goed als het
+  // archief net verschoven was.
+  await (async () => {
+    console.log('%c[TESTS] Rij-guard Afgerond kent het taaknummer', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const fetchOud=window.fetch, tokenOud=state.oauthToken, expOud=state.oauthExpiry;
+    try{
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
+      const afRij={_sec:'OPPAKKEN',_row:5,code:'311162',naam:'VvE Test',actiepunt:'Sleutel bijmaken',
+                   deadline:'',behandelaar:'Jer',prioriteit:'',opmerkingen:'',inBehandeling:'',
+                   datum:'27-08-2026',taakId:'QQ1AAA'};
+      let sheetQ='QQ1AAA';
+      window.fetch=async(url)=>{
+        const c=_rijNaarCellen('Afgerond', afRij); c[16]=sheetQ;
+        return new Response(JSON.stringify({values:[c]}),{status:200});
+      };
+      let fout=null;
+      try{ await assertRowMatch(5, afRij, 'Afgerond'); }catch(e){ fout=e; }
+      eq('guard Afgerond: zelfde inhoud én zelfde nummer passeert', fout, null);
+      // De tweelingrij: identieke inhoud, ander taaknummer → weigeren.
+      sheetQ='ZZ9BBB'; fout=null;
+      try{ await assertRowMatch(5, afRij, 'Afgerond'); }catch(e){ fout=e; }
+      truthy('guard Afgerond: identieke inhoud met een ÁNDER taaknummer wordt geweigerd',
+             !!(fout && fout.rowMismatch));
+      // Een rij van vóór de backfill (geen nummer in het geheugen) blijft op inhoud vergelijken —
+      // het nummer in de Sheet mag dan geen vals alarm geven.
+      const zonderNr={...afRij}; delete zonderNr.taakId; fout=null;
+      try{ await assertRowMatch(5, zonderNr, 'Afgerond'); }catch(e){ fout=e; }
+      eq('guard Afgerond: zonder eigen nummer telt alleen de inhoud', fout, null);
+    } finally {
+      window.fetch=fetchOud; state.oauthToken=tokenOud; state.oauthExpiry=expOud;
+    }
+  })();
+
+  // ── bulkVeld: de undo-knop weigert na een mislukte heenweg ──
+  // Voor 'geven' en 'wegleggen' zit de kolom niet in de vingerafdruk: de terugschrijf zou na een
+  // mislukte heenweg gewoon passeren en per taak een logregel schrijven voor een wijziging die
+  // nooit heeft plaatsgevonden — en die valse regels resetten de opvolg-/escalatieklok.
+  await (async () => {
+    console.log('%c[TESTS] bulkVeld-undo weigert na mislukte heenweg', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const fetchOud=window.fetch, tokenOud=state.oauthToken, expOud=state.oauthExpiry;
+    const ntdOud=D.ntd, uitCacheOud=state._uitCache;
+    const wachtKlaar=async()=>{ await state._writeChain;
+      for(let i=0;i<200&&(state._loadInFlight||state.pendingWrites>0);i++) await new Promise(r=>setTimeout(r,5)); };
+    try{
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3; state._uitCache=false;
+      const rij={code:'BK-90',naam:'Hof',behandelaar:'Jer',_row:5,_sec:'OPPAKKEN',taakId:'BK90AA'};
+      D.ntd={OPPAKKEN:[rij],VERGADERVERZOEKEN:[],'OFFERTE-TRAJECTEN':[],LOD:[],'SUBSIDIE-TRAJECTEN':[]};
+      const appends=[];
+      // De guard-lezing slaagt, maar de schrijf zelf faalt HARD (400 = niet-transient, dus géén
+      // herkansingen van _withRetry die deze toets seconden zouden kosten): `gelukt` blijft false.
+      window.fetch=async(url,opt)=>{
+        const u=decodeURIComponent(String(url));
+        if(u.includes('values:batchGet')) return new Response(JSON.stringify({error:{message:'x'}}),{status:403});
+        if(opt&&opt.method==='POST'&&/:append/.test(u)){ appends.push(1); return new Response('{}',{status:200}); }
+        if(!opt||!opt.method||opt.method==='GET'){
+          const c=_rijNaarCellen('Nog Te Doen', rij); c[16]=rij.taakId;
+          return new Response(JSON.stringify({values:[c]}),{status:200});
+        }
+        return new Response(JSON.stringify({error:{message:'kapotte aanvraag'}}),{status:400});
+      };
+      document.querySelectorAll('.toast').forEach(x=>x.remove());
+      bulkVeld([rij],'geven','Cihad');
+      await wachtKlaar();
+      // De heenweg is mislukt; nu op 'Ongedaan maken' drukken.
+      const knop=[...document.querySelectorAll('.toast button')].find(b=>/Ongedaan/.test(b.textContent));
+      truthy('bulkVeld: de undo-toast staat er (dat was al zo)', !!knop);
+      appends.length=0;
+      if(knop){ knop.click(); await wachtKlaar(); }
+      eq('bulkVeld: de undo schrijft dan NIETS (geen valse logregels)', appends.length, 0);
+      truthy('bulkVeld: … en zegt waarom, in dezelfde bewoording als de zusters',
+             [...document.querySelectorAll('.toast')].some(x=>/Niets ongedaan te maken/.test(x.textContent)));
+    } finally {
+      window.fetch=fetchOud; state.oauthToken=tokenOud; state.oauthExpiry=expOud;
+      D.ntd=ntdOud; state._uitCache=uitCacheOud;
+      document.querySelectorAll('.toast').forEach(x=>x.remove());
       document.querySelectorAll('.load-err').forEach(b=>b.remove());
     }
   })();

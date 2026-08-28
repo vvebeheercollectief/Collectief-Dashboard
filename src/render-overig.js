@@ -10,7 +10,7 @@ import { ensureToken } from "./auth.js";
 import { writeRange, appendRange, appendRows, assertRowMatch, _herstelShift, sheetsFetch } from "./api.js";
 import { renderThead, renderPag } from "./render-lijsten.js";
 import { getSheetIds, setv, gv, insertAndWriteRow, taakUitCache } from "./crud.js";
-import { loadAll, backgroundWrite, metWriteMarkering, blokkeerOffline } from "./data.js";
+import { loadAll, backgroundWrite, metWriteMarkering, serieleWrite, blokkeerOffline } from "./data.js";
 import { getCurrentWho, showToast, showUndoToast } from "./notifications.js";
 import { animateRowOut } from "./anim.js";
 import { renderVve } from "./render-vve.js";
@@ -142,14 +142,16 @@ async function submitOntwItem(){
   const datum = bewerken ? ((state.ontwEditRow.datum || '').trim() || today) : today;
   const values=[titel,cat,inhoud,door,datum,status];
   try{
-    await metWriteMarkering(async()=>{
+    // Eén beurt in de seriële schrijfwachtrij (serieleWrite): dit pad kon tot nu toe dwars door
+    // een lopende undo of bulk heen schrijven (naloop 2026-08-28).
+    await serieleWrite(()=>metWriteMarkering(async()=>{
       if(state.ontwEditMode&&state.ontwEditRow?._row){
         await assertRowMatch(state.ontwEditRow._row, state.ontwEditRow.titel, 'Ontwikkeling'); // bescherming: rij nog hetzelfde item vóór overschrijven
         await writeRange(`'Ontwikkeling'!A${state.ontwEditRow._row}:F${state.ontwEditRow._row}`,values);
       } else {
         await appendRange("'Ontwikkeling'!A:F",values);
       }
-    });
+    }));
     closeOntwModal();
     await loadAll();
   }catch(e){alert('Fout: '+e.message)}
@@ -204,18 +206,19 @@ async function undoOntwDelete(values, titel, stand){
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){alert('Inloggen mislukt.');return}
   try{
-    await state._writeChain;
-    // Pas ná de schrijfketen is bekend of de verwijdering ècht doorging. Ging hij níet door, dan
-    // heeft de rollback het item al teruggezet en stáát de rij nog in de Sheet — dan zou dit er een
-    // tweede van maken. Niets doen is hier het goede antwoord, mét een woord van uitleg.
-    if(stand && !stand.gelukt){
-      showToast('Niets terug te zetten', 'De verwijdering is niet doorgegaan; het item staat er nog.',
-                'var(--am)', 'waarschuwing', {geenDedup:true, geenSysteemmelding:true});
-      return;
-    }
-    await metWriteMarkering(()=>appendRange("'Ontwikkeling'!A:F", values));
-    showToast('Ongedaan gemaakt', `"${titel||''}" teruggezet`, 'var(--am)', 'ongedaan');
-    await loadAll();
+    // Eén beurt in de seriële schrijfwachtrij; pas dán is ook bekend of de verwijdering ècht
+    // doorging. Ging hij níet door, dan heeft de rollback het item al teruggezet en stáát de rij
+    // nog in de Sheet — dan zou dit er een tweede van maken (naloop 2026-08-28).
+    await serieleWrite(async()=>{
+      if(stand && !stand.gelukt){
+        showToast('Niets terug te zetten', 'De verwijdering is niet doorgegaan; het item staat er nog.',
+                  'var(--am)', 'waarschuwing', {geenDedup:true, geenSysteemmelding:true});
+        return;
+      }
+      await metWriteMarkering(()=>appendRange("'Ontwikkeling'!A:F", values));
+      showToast('Ongedaan gemaakt', `"${titel||''}" teruggezet`, 'var(--am)', 'ongedaan');
+      await loadAll();
+    });
   }catch(e){alert('Undo fout: '+e.message)}
 }
 
@@ -587,20 +590,24 @@ async function undoDeleteLog(vals, oudeRow, wasVerwijderd){
   if(!await ensureToken()){ alert('Inloggen mislukt.'); return; }
   state._undoInFlight=true; // pauzeer de 8s-poll; deze undo doet z'n eigen loadAll
   try{
-    await state._writeChain;                         // delete (of z'n rollback) gegarandeerd afgerond
-    // Was de delete mislukt, dan heeft de rollback de regel lokaal al teruggezet en is
-    // er in de Sheet niets verwijderd: een insert zou een duplicaatregel maken en een
-    // tweede logEdit-verschuiving zou het open formulier één regel te ver zetten.
-    if(wasVerwijderd && !wasVerwijderd()){
-      showToast('Niets te herstellen','De regel staat er nog — verwijderen was niet gelukt.','var(--am)','ongedaan');
-      return;
-    }
-    await metWriteMarkering(()=>insertAndWriteRow('Logboek', oudeRow-1, vals));
-    // Open bewerkformulier op een regel die bij de delete omhoog schoof: terug omlaag,
-    // zodat het ná de verse loadAll (echte _row-nummers) weer bij dezelfde regel hoort.
-    state.logEdit=_shiftLogEditRef(state.logEdit,oudeRow,+1);
-    showToast('Ongedaan gemaakt','Logregel teruggezet','var(--am)','ongedaan');
-    await loadAll();                                 // _row-indexen vers uit de Sheet
+    // Eén beurt in de seriële schrijfwachtrij: de delete (of z'n rollback) is dan gegarandeerd
+    // afgerond, en deze positionele insert kan niet meer verweven raken met een andere
+    // schrijfactie (naloop 2026-08-28).
+    await serieleWrite(async()=>{
+      // Was de delete mislukt, dan heeft de rollback de regel lokaal al teruggezet en is
+      // er in de Sheet niets verwijderd: een insert zou een duplicaatregel maken en een
+      // tweede logEdit-verschuiving zou het open formulier één regel te ver zetten.
+      if(wasVerwijderd && !wasVerwijderd()){
+        showToast('Niets te herstellen','De regel staat er nog — verwijderen was niet gelukt.','var(--am)','ongedaan');
+        return;
+      }
+      await metWriteMarkering(()=>insertAndWriteRow('Logboek', oudeRow-1, vals));
+      // Open bewerkformulier op een regel die bij de delete omhoog schoof: terug omlaag,
+      // zodat het ná de verse loadAll (echte _row-nummers) weer bij dezelfde regel hoort.
+      state.logEdit=_shiftLogEditRef(state.logEdit,oudeRow,+1);
+      showToast('Ongedaan gemaakt','Logregel teruggezet','var(--am)','ongedaan');
+      await loadAll();                               // _row-indexen vers uit de Sheet
+    });
   }catch(e){ alert('Undo fout: '+e.message); }
   finally{ state._undoInFlight=false; }
 }

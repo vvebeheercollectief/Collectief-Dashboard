@@ -12,7 +12,7 @@ import { showToast, fireNotifEvent } from "./notifications.js";
 import { ensureToken } from "./auth.js";
 import { renderPag } from "./render-tabel.js";
 import { renderNtdDonut } from "./render-lijsten.js";
-import { metWriteMarkering, blokkeerOffline } from "./data.js";
+import { metWriteMarkering, serieleWrite, blokkeerOffline } from "./data.js";
 import { ico } from "./icons.js";
 
 // ══════════════════════════════════════
@@ -142,7 +142,9 @@ async function toggleAlvoFlag(idx,field,code){
     // balk na afloop op 'Opslaan…' laten hangen.
     // De optimistische render hierboven staat er bewust vóór: daar zit geen await tussen, dus
     // de poll kan er niet tussendoor glippen.
-    await metWriteMarkering(async()=>{
+    // Bovendien één beurt in de seriële wachtrij zelf (serieleWrite): tot nu toe kon dit pad
+    // dwars door een lopende undo of bulk heen schrijven (naloop 2026-08-28).
+    await serieleWrite(()=>metWriteMarkering(async()=>{
       const ids=await getSheetIds();
       const sheetId=ids["ALV's overzicht"]??ids["ALV's Overzicht"]??ids["ALV's overzicht "];
       if(sheetId==null) throw new Error("Sheet 'ALV's overzicht' niet gevonden");
@@ -229,7 +231,7 @@ async function toggleAlvoFlag(idx,field,code){
       // geenDedup: hetzelfde vinkje binnen 15 s uit- en weer aanzetten geeft twee keer dezelfde
       // titel+tekst; zonder deze vlag slikt de ontdubbeling de tweede bevestiging in.
       showToast(`${ALVO_LABELS[field]} ${newVal?'aan':'uit'}`,`${r.code} – ${r.naam}`,newVal?'var(--gn)':'var(--mut)',newVal?'vink':'cirkelOpen',{geenDedup:true,geenSysteemmelding:true});
-    });
+    }));
   }catch(e){
     // Revert
     r[field]=oldVal;

@@ -400,7 +400,11 @@ function _rijNaarCellen(sheetName, r){
   const uit=keys.map(k=>r[k] ?? '');
   while(uit.length<8) uit.push('');            // OFFERTE heeft 7 velden → vul tot H
   if(sheetName==='Afgerond') uit[8]=r.datum ?? '';   // I = datum afgerond
-  if(sheetName==='Nog Te Doen' && r.taakId) uit[16]=r.taakId;   // Q = vast taaknummer
+  // Q = vast taaknummer, op BEIDE tabbladen die het dragen. 'Afgerond' stond hier niet bij, en
+  // juist dáár zijn bulk-afgeronde tweelingrijen inhoudelijk identiek (zelfde code, tekst en
+  // datum) — alleen kolom Q onderscheidt ze nog. De undo-delete keurde dan de verkeerde tweeling
+  // goed als het archief net verschoven was (naloop 2026-08-28).
+  if((sheetName==='Nog Te Doen'||sheetName==='Afgerond') && r.taakId) uit[16]=r.taakId;
   return uit;
 }
 // Vingerafdruk rechtstreeks uit een rij-object.
@@ -451,7 +455,9 @@ async function assertRowsMatch(checks, sheetName='Nog Te Doen'){
     if(c.r && FP_KOLOMMEN[sheetName]){
       // heeftNr: kent de verwachte kant een taaknummer? Zo niet, dan mag de teruggelezen kant
       // het zijne ook niet gebruiken — anders blokkeert de guard op 'ik weet het niet'.
-      const heeftNr=!!(sheetName==='Nog Te Doen' && c.r.taakId);
+      // Ook op 'Afgerond': archiefrijen dragen sinds fase 4 hetzelfde nummer in Q, en rijen van
+      // vóór de backfill vallen via deze zelfde voorwaarde vanzelf terug op inhoud-alleen.
+      const heeftNr=!!((sheetName==='Nog Te Doen'||sheetName==='Afgerond') && c.r.taakId);
       return { row:c.row, fp:true, sec:c.r._sec, heeftNr, code:rijVingerafdruk(sheetName, c.r) };
     }
     // Rij-object op een tabblad zónder spec: val terug op de sleutel in kolom A i.p.v. te

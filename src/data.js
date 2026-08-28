@@ -104,6 +104,27 @@ async function metWriteMarkering(fn){
   }
 }
 
+// Eén beurt in de seriële schrijfwachtrij, voor de paden die NIET via backgroundWrite lopen
+// (undo's, ALV-reset, Ontwikkeling, Logboek-herstel). Die deden tot nu toe alleen een
+// `await state._writeChain` vooraf — dat wacht op wat er al in de rij stond, maar het maakt de
+// eigen schrijfactie geen onderdeel van de rij. Twee undo's (of een undo naast een gewone
+// schrijfactie) liepen daardoor echt door elkaar, en dat zijn juist de paden die op RIJNUMMERS
+// invoegen en verwijderen: interleaving betekent daar een lege of overschreven rij.
+//
+// De fout gaat ONGEMOEID naar de aanroeper (die heeft zijn eigen afhandeling), maar de keten
+// zelf mag er nooit door breken — anders zou élke volgende schrijfactie blijven hangen.
+//
+// Voor de aanroeper gelden twee regels:
+//   · nooit bínnen `taak` nog eens op `state._writeChain` wachten (dat is deze beurt zelf);
+//   · `loadAll` mag wél, maar alleen búiten een metWriteMarkering-blok (zie hierboven).
+// De prep (verse lezing, invoegplek narekenen) hoort mét de schrijfactie in dezelfde beurt:
+// dat is precies het punt — tussen narekenen en schrijven mag niets anders meer schrijven.
+function serieleWrite(taak){
+  const beurt = state._writeChain.then(taak);
+  state._writeChain = beurt.then(()=>{}, ()=>{});
+  return beurt;
+}
+
 // ── Leescache ──────────────────────────────────────────────────────────────
 // Comfort bij het openen: meteen de laatst bekende stand in beeld in plaats van een leeg scherm.
 // Uitdrukkelijk GEEN offline-vermogen — bij een koude start is inloggen netwerkafhankelijk.
@@ -1044,7 +1065,7 @@ function parseAlfa(rows){
 // ══════════════════════════════════════
 
 export {
-  backgroundWrite, schrijfActieLoopt, metWriteMarkering, setSyncing, setSaving, setSynced, setSyncErr, dot, loadAll, magPollen, parseSections, parseAlvo, parseAlfa, parseHerhaal,
+  backgroundWrite, schrijfActieLoopt, metWriteMarkering, serieleWrite, setSyncing, setSaving, setSynced, setSyncErr, dot, loadAll, magPollen, parseSections, parseAlvo, parseAlfa, parseHerhaal,
   POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _zetLogAnker, _verwerkLogboek, _logVolledigNodig, _alfaNodig,
   MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen,
   blokkeerOffline, showOfflineBanner, clearOfflineBanner, setSyncOffline, syncSelecteerStand, showLoadError, clearLoadError,

@@ -7,7 +7,7 @@
 import { state, D } from "./state.js";
 import { SID } from "./config.js";
 import { ensureToken } from "./auth.js";
-import { loadAll, metWriteMarkering, blokkeerOffline } from "./data.js";
+import { loadAll, metWriteMarkering, serieleWrite, blokkeerOffline } from "./data.js";
 import { assertRowsMatch, sheetsFetch } from "./api.js";
 import { showToast } from "./notifications.js";
 import { logEvent } from "./render-overig.js";
@@ -103,7 +103,9 @@ async function doeReset(){
     // Alleen het schrijvende deel onder de schrijfteller (statusbalk/sluit-waarschuwing/poll-rem).
     // De loadAll hierboven en hieronder blijven er bewust buiten: bínnen de markering gooit
     // loadAll zijn verse data weg (pendingWrites>0) en verviel juist de verse-stand-controle.
-    const naam=await metWriteMarkering(async()=>{
+    // Plus één beurt in de seriële wachtrij (serieleWrite): een reset die dwars door een
+    // lopende undo of taak-schrijfactie heen loopt is precies wat hier niet mag (naloop 2026-08-28).
+    const naam=await serieleWrite(()=>metWriteMarkering(async()=>{
       // Rij-identiteit vóór een bulkschrijfactie: één GET over het hele bereik, gooit bij
       // de eerste rij die niet meer bij de verwachte VvE-code hoort. Niets geschreven.
       await assertRowsMatch(D.alvo.map(r=>({row:r._row,code:r.code})), ALVO_TAB);
@@ -151,7 +153,7 @@ async function doeReset(){
 
       await logEvent('','ALVS','Nieuwe ronde gestart',`${bereik.aantal} VvE's gereset, archief '${archiefNaam}'`,'','');
       return archiefNaam;
-    });
+    }));
     closeResetModal();
     await loadAll(true);                     // loadAll hertekent zelf zodra de data wijzigt
     showToast('Nieuwe ronde gestart',`${bereik.aantal} VvE's op Open, archief '${naam}'`,'var(--gn)','herhaal');

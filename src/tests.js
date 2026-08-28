@@ -6030,6 +6030,19 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     kiesDuur(knoppen[0]);
     wisDuurKeuze(houder);
     eq('duurknop: wissen maakt alles leeg', stand(), '-,-,-,-,-');
+
+    // Taak 6 hangt één listener op de hele groep en geeft `e.target.closest('.duur-knop')` door.
+    // Bij een klik in de 4px tussenruimte is dat null. Zonder deze assert blijft de suite groen
+    // als iemand die guard later als overbodig wegpoetst.
+    kiesDuur(null);
+    eq('duurknop: een klik naast een knop doet niets', stand(), '-,-,-,-,-');
+
+    // Idem voor de wortel die er niet is: taak 6 roept wisDuurKeuze() zonder argument aan bij het
+    // openen van het venster, en #complete-duur kan ontbreken als er een oude index.html uit de
+    // service-worker-cache wordt geserveerd naast verse JS.
+    wisDuurKeuze(null);
+    wisDuurKeuze();
+    eq('duurknop: wissen zonder rooster klapt niet', stand(), '-,-,-,-,-');
   })();
 
   (() => {

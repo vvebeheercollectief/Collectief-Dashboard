@@ -22,9 +22,13 @@ function displayName(s){
 // 'Algemene ledenvergadering' is 'al' en van 'Servicekosten' is 'se' — allebei een deelstring
 // van 'false'. Prioriteit staat sinds v8.9 niet meer in beeld; op 'hoog' zoeken vond dan taken
 // waar dat woord nergens te lezen is.
+// duurMin hoort hier ook: die staat nergens op het scherm, maar is wél een GETAL, en dat maakt
+// hem gevaarlijker dan de rest van deze lijst. Zoeken op huisnummer '30' gaf anders elke taak
+// terug die toevallig een half uur duurde, en '2u+' (120 minuten) matchte op '0', '12', '20' én
+// '120' tegelijk.
 const NIET_ZOEKBAAR = new Set(['_row','_sec','_offertesManual','_aannemers',
                                'taakId','bundelId','bundelVolg','herhaalId','esc','fase',
-                               'inBehandeling','prioriteit']);
+                               'inBehandeling','prioriteit','duurMin']);
 function filt(rows,q){
   if(!q)return rows;
   return rows.filter(r=>Object.entries(r).some(([k,v])=>

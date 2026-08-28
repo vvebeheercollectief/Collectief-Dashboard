@@ -11607,10 +11607,14 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const rij = { _row: 12, _sec: 'OPPAKKEN', code: '340580', naam: 'VvE Weimarstraat',
                   actiepunt: 'Schilderwerk', behandelaar: 'Jer', datum: '1 aug 2026', opmerking: '',
                   taakId: 'T7', bundelId: 'T3', bundelVolg: '20', herhaalId: 'HR-9',
-                  esc: '2026-08-01', fase: 'gegund', aannemers: 'Jansen|1' };
+                  esc: '2026-08-01', fase: 'gegund', aannemers: 'Jansen|1', duurMin: 120 };
     const R = [rij];
+    // '12' en '120' staan er bewust bij: duurMin is een GETAL, dus een zoekterm als een huisnummer
+    // of een VvE-code kan er zomaar in vallen — 120 minuten matcht als deelstring op allebei.
+    // '20' staat er NIET bij: dat zit legitiem in de datum '1 aug 2026' en hoort wél te vinden.
     eq('zoeken: boekhouding levert geen treffer',
-       ['12', 'oppakken', 't7', 'hr-9', 'gegund', 't3'].map(q => filt(R, q).length), [0, 0, 0, 0, 0, 0]);
+       ['12', 'oppakken', 't7', 'hr-9', 'gegund', 't3', '120'].map(q => filt(R, q).length),
+       [0, 0, 0, 0, 0, 0, 0]);
     eq('zoeken: wat wél op het scherm staat levert wél een treffer',
        ['weimar', 'schilder', 'jer', '340580', 'aug', 'jansen'].map(q => filt(R, q).length), [1, 1, 1, 1, 1, 1]);
     eq('zoeken: zonder zoekterm blijft alles staan', filt(R, '').length, 1);

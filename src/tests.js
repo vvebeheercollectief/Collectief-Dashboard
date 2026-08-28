@@ -9468,6 +9468,14 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       toets('Escape');
       eq('hoortbij: en Escape sluit de lijst weer',
          [sugLijst.style.display, veld.getAttribute('aria-expanded')], ['none','false']);
+      // Eén toets sluit ÉÉN ding — zelfde regel als de weekkiezer en het palet. Escape op een
+      // open lijst sloot voorheen in dezelfde aanslag óók het hele bewerkscherm, met alle nog
+      // niet opgeslagen invoer erin (naloop 2026-08-28).
+      truthy('hoortbij: … maar het bewerkscherm eronder blijft gewoon staan',
+             document.getElementById('modal-bg').classList.contains('open'));
+      toets('Escape');
+      truthy('hoortbij: een tweede Escape — de lijst is al dicht — sluit dan pas het venster',
+             !document.getElementById('modal-bg').classList.contains('open'));
 
       // 3. En dan de hele keten: opslaan met een gekozen doeltaak. De bewerking zelf schrijft A..K
       //    (Q, R en S liggen daarbuiten — anders veegt elke gewone bewerking het taaknummer en de
@@ -11610,7 +11618,11 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const rij = { _row: 12, _sec: 'OPPAKKEN', code: '340580', naam: 'VvE Weimarstraat',
                   actiepunt: 'Schilderwerk', behandelaar: 'Jer', datum: '1 aug 2026', opmerking: '',
                   taakId: 'T7', bundelId: 'T3', bundelVolg: '20', herhaalId: 'HR-9',
-                  esc: '2026-08-01', fase: 'gegund', aannemers: 'Jansen|1', duurMin: 120 };
+                  esc: '2026-08-01', fase: 'gegund', aannemers: 'Jansen|1', duurMin: 120,
+                  // Vier velden die het archief wél draagt maar de pagina nérgens toont — een
+                  // treffer daarop is voor de gebruiker niet uit te leggen (naloop 2026-08-28).
+                  deadline: '17 juni 2026', datumAangevraagd: '3 mei 2026',
+                  opmerkingen: 'interne notitie', toelichting: 'keurig afgerond' };
     const R = [rij];
     // '12' en '120' staan er bewust bij: duurMin is een GETAL, dus een zoekterm als een huisnummer
     // of een VvE-code kan er zomaar in vallen — 120 minuten matcht als deelstring op allebei.
@@ -11618,8 +11630,11 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     eq('zoeken: boekhouding levert geen treffer',
        ['12', 'oppakken', 't7', 'hr-9', 'gegund', 't3', '120'].map(q => filt(R, q).length),
        [0, 0, 0, 0, 0, 0, 0]);
+    eq('zoeken: onzichtbare velden (oude deadline, aanvraagdatum, kolom G) evenmin',
+       ['17 juni', '3 mei', 'interne notitie'].map(q => filt(R, q).length), [0, 0, 0]);
     eq('zoeken: wat wél op het scherm staat levert wél een treffer',
-       ['weimar', 'schilder', 'jer', '340580', 'aug', 'jansen'].map(q => filt(R, q).length), [1, 1, 1, 1, 1, 1]);
+       ['weimar', 'schilder', 'jer', '340580', 'aug', 'jansen', 'keurig'].map(q => filt(R, q).length),
+       [1, 1, 1, 1, 1, 1, 1]);
     eq('zoeken: zonder zoekterm blijft alles staan', filt(R, '').length, 1);
   })();
 
@@ -14015,6 +14030,30 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const bron=await (await fetch('/src/render-overig.js')).text();
     truthy('sync: de logregel-verwijder-toast draait zonder ontdubbeling (geenDedup)',
            /showUndoToast\('Logregel verwijderd'[\s\S]{0,200}geenDedup:true/.test(bron));
+  })();
+
+  // ── NTD-zoek dekt óók wat buiten SECS.keys om getoond wordt ──
+  (() => {
+    console.log('%c[TESTS] NTD-zoek: subcategorie, Terug-pil en aannemersnamen', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const off={_sec:'OFFERTE-TRAJECTEN',code:'311001',naam:'VvE Q',datumAangevraagd:'',offertes:'0/3',
+               behandelaar:'Jer',deadline:'',opmerkingen:'',subcategorie:'Dakwerk',
+               opvolgdatum:'15-09-2026',aannemers:'Jansen BV|0\nBakker|1'};
+    const zoek=q=>filterNtd([off],q,'','','', 'OFFERTE-TRAJECTEN','').length;
+    eq('ntd-zoek: een aannemersnaam uit het uitklap-paneel vindt de rij', zoek('jansen'), 1);
+    eq('ntd-zoek: de subcategorie-badge telt mee', zoek('dakwerk'), 1);
+    eq('ntd-zoek: de Terug-datum telt mee', zoek('15-09'), 1);
+    // De |0/|1-markering is boekhouding en géén schermtekst; '|0' matcht dus niet.
+    eq('ntd-zoek: de binnen/uit-markering van de aannemerslijst niet', zoek('|0'), 0);
+  })();
+
+  // ── Een tikfout-jaartal is een tekst, geen datum in jaar 202 ──
+  (() => {
+    console.log('%c[TESTS] Drie-cijferig jaartal wordt geweigerd', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    eq('datum: 15-09-202 is onleesbaar en blijft tekst', _parseAnyDate('15-09-202'), null);
+    eq('datum: 15 sep 202 evenzo', _parseAnyDate('15 sep 202'), null);
+    eq('datum: een 4-cijferig jaar met voorloopnul evenzo', _parseAnyDate('15-09-0202'), null);
+    eq('datum: 2-cijferig blijft gewoon 20xx', _parseAnyDate('15-09-26'), {y:2026,m:9,d:15});
+    eq('datum: 4-cijferig blijft gewoon werken', _parseAnyDate('15-09-2026'), {y:2026,m:9,d:15});
   })();
 
   // ══════════════════════════════════════════════════════════════════════════

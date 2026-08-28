@@ -29,10 +29,18 @@ function displayName(s){
 const NIET_ZOEKBAAR = new Set(['_row','_sec','_offertesManual','_aannemers',
                                'taakId','bundelId','bundelVolg','herhaalId','esc','fase',
                                'inBehandeling','prioriteit','duurMin']);
+// Zoeken op de Afgerond-pagina dekt precies wat `rowAf` (render-tabel.js) TOONT: code, naam, de
+// taakomschrijving zoals hij op het scherm staat (taakTitel, inclusief zijn terugvalketen),
+// subcategorie, behandelaar, afronddatum en toelichting — plus de aannemersnamen (util.js-regel
+// hierboven: die horen doorzoekbaar te zijn). Een WITTE lijst en geen zwarte: de zwarte lijst
+// moest bij elk nieuw veld op het rij-object worden bijgehouden (duurMin was de laatste), en wat
+// vergeten werd lekte stil de zoek in — een treffer op een onzichtbare oude deadline is voor de
+// gebruiker niet uit te leggen (naloop 2026-08-28). NIET_ZOEKBAAR blijft bestaan voor filterNtd.
+const _afZoekvelden = r => [r.code, r.naam, taakTitel(r, r._sec), r.subcategorie, r.behandelaar,
+                            r.datum, r.toelichting, ...parseAannemers(r.aannemers).map(a=>a.naam)];
 function filt(rows,q){
   if(!q)return rows;
-  return rows.filter(r=>Object.entries(r).some(([k,v])=>
-    !NIET_ZOEKBAAR.has(k) && !k.startsWith('_') && String(v??'').toLowerCase().includes(q)));
+  return rows.filter(r=>_afZoekvelden(r).some(v=>String(v??'').toLowerCase().includes(q)));
 }
 
 // Sleutel voor het ontdubbelen van toasts, ongevoelig voor een leidend symbool.
@@ -621,11 +629,15 @@ function _parseAnyDate(s){
   // yyyy-mm-dd of yyyy-mm-ddT... (ISO, met of zonder tijdgedeelte)
   let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(T.*)?$/);
   if(m)return _valDate(+m[1],+m[2],+m[3]);
-  // dd-mm-yyyy / dd/mm/yyyy / dd-mm-yy (2-cijferig jaar → 20xx)
-  m=s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})$/);
+  // dd-mm-yyyy / dd/mm/yyyy / dd-mm-yy (2-cijferig jaar → 20xx). Precies twee óf vier cijfers:
+  // \d{2,4} liet '15-09-202' door als het letterlijke jaar 202, en dat werd dan '666185d te
+  // laat', prioriteit Hoog en de uiterste plek bij het sorteren. Een tikfout hoort — net als elke
+  // andere onleesbare datum — gewoon als tekst te blijven staan. Apps Script (cd_parseDate) eiste
+  // al \d{4}; nu zeggen beide kanten hetzelfde (naloop 2026-08-28).
+  m=s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2}|[1-9]\d{3})$/);
   if(m){let y=+m[3];if(y<100)y+=2000;return _valDate(y,+m[2],+m[1]);}
-  // "21 mei 2026" / "3 jan. 2025" / "21 mei '26"
-  m=s.match(/^(\d{1,2})\s+([a-zA-Z]+)\.?\s+'?(\d{2,4})$/);
+  // "21 mei 2026" / "3 jan. 2025" / "21 mei '26" — zelfde jaarregel als hierboven
+  m=s.match(/^(\d{1,2})\s+([a-zA-Z]+)\.?\s+'?(\d{2}|[1-9]\d{3})$/);
   if(m){const mn=_MAANDEN[m[2].toLowerCase()];if(mn){let y=+m[3];if(y<100)y+=2000;return _valDate(y,mn,+m[1]);}}
   return null;
 }

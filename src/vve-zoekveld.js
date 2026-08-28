@@ -111,7 +111,15 @@ function initVveZoekveld({input, lijstEl, minTekens=0, maxItems=null, onSelect,
   input.addEventListener('input', toon);
   input.addEventListener('focus', toon);
   input.addEventListener('keydown', e=>{
-    if(e.key==='Escape'){ sluit(); return; }
+    if(e.key==='Escape'){
+      // Eén toets sluit één ding — hetzelfde patroon als de weekkiezer en het palet. Staat de
+      // lijst open, dan sluit Escape alléén de lijst en blijft hij hier (stopPropagation): de
+      // centrale Escape-afhandeling in main.js sloot anders in dezelfde toetsaanslag ook het
+      // hele bewerkscherm, inclusief alle nog niet opgeslagen invoer (naloop 2026-08-28).
+      // Staat de lijst dicht, dan bubbelt de toets gewoon door en doet hij wat hij overal doet.
+      if(lijstEl.style.display==='block'){ e.stopPropagation(); sluit(); }
+      return;
+    }
     if(e.key==='ArrowDown' || e.key==='ArrowUp'){
       // Dicht en je drukt op een pijltje: eerst openen. Zo is de lijst ook terug te halen nadat hij
       // met Escape of een blur is weggegaan, zonder opnieuw te hoeven typen.

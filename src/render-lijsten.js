@@ -3,7 +3,7 @@
 //  + re-export van render-offerte / render-alv / render-tabel (publieke interface stabiel).
 //  Batch D / punt 11: offerte/ALV/tabel-render zijn naar eigen modules verplaatst.
 // ══════════════════════════════════════
-import { esc, filt, NIET_ZOEKBAAR, berekenPrioriteit, parseDt, opvolgStatus, _vandaagAmsterdam, toISODate, isoWeek, vveCodeSpan, splitBehandelaar, periodeBereik, AF_PERIODES } from "./util.js";
+import { esc, filt, NIET_ZOEKBAAR, berekenPrioriteit, parseDt, opvolgStatus, _vandaagAmsterdam, toISODate, isoWeek, vveCodeSpan, splitBehandelaar, periodeBereik, AF_PERIODES, parseAannemers } from "./util.js";
 import { rijSleutel } from "./rij.js";
 import { SECS, SKEYS, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
@@ -447,12 +447,20 @@ function ntdPagina(zichtbaar, r){
 
 function filterNtd(rows,q,fCode,beh,prio,sec,status){
   const out=rows.filter(r=>{
-    // Dezelfde uitsluitlijst als `filt` (util.js). Twee velden vallen daarmee buiten de zoekterm:
+    // Dezelfde uitsluitlijst als NIET_ZOEKBAAR (util.js). Twee velden vallen daarmee buiten de zoekterm:
     //  · `inBehandeling` draagt letterlijk 'TRUE'/'FALSE', dus elke term die in die twee woorden zit
     //    ('al', 'se', 'fa', 'ru') gaf de hele lijst terug;
     //  · `prioriteit` staat sinds v8.9 niet meer in beeld — op 'hoog' zoeken vond taken waar dat
     //    woord nergens te lezen is. Bewust, en niet stil: zie de toets hieronder.
-    if(q&&!SECS[sec].keys.some(k=>!NIET_ZOEKBAAR.has(k)&&(r[k]||'').toLowerCase().includes(q))) return false;
+    // En wat de rij WÉL toont maar niet in SECS.keys staat, telt sinds de naloop van 2026-08-28
+    // óók mee: de subcategorie-badge, de 'Terug'-pil (opvolgdatum) en de aannemersnamen uit het
+    // uitklap-paneel — zoeken op 'Jansen' filterde het traject mét Jansen juist wég. Alleen de
+    // NAMEN, niet de rauwe cel: de |0/|1-markering hoort niet te matchen.
+    if(q){
+      const extra=[r.subcategorie, r.opvolgdatum, ...parseAannemers(r.aannemers).map(a=>a.naam)];
+      if(!SECS[sec].keys.some(k=>!NIET_ZOEKBAAR.has(k)&&(r[k]||'').toLowerCase().includes(q))
+         && !extra.some(v=>String(v??'').toLowerCase().includes(q))) return false;
+    }
     if(fCode&&!(r.code||'').toLowerCase().includes(fCode)) return false;
     if(beh&&!(r.behandelaar||'').toLowerCase().includes(beh.toLowerCase())) return false;
     if(prio){

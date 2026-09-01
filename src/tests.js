@@ -1031,15 +1031,17 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
 
   // ── offerte: 'Datum aangevraagd' vult het opvolgdatum-voorstel (+3 weken) ──
   (() => {
-    const secOud=state.editSec, vlagOud=state._offAangevraagdBijOpen;
+    const secOud=state.editSec;
     try{
       state.editSec='OFFERTE-TRAJECTEN'; state._offAangevraagdBijOpen=false;
       const zet=(id,v)=>{const e=document.getElementById(id); if(e) e.value=v;};
+      const hintTekst=()=>document.getElementById('dl-hint-o').textContent;
       zet('m-daang','2026-09-01'); zet('m-dl-o','');
       offerteAanvraagGewijzigd();
       eq('aanvraag gevuld → opvolgdatum-voorstel = +21 dagen', waardeVan('m-dl-o'), '2026-09-22');
       eq('aanvraag gevuld → label wisselt naar Opvolgdatum',
          document.getElementById('m-dl-o-label').textContent, 'Opvolgdatum');
+      truthy('eerste voorstel vult de hintzin', hintTekst().includes('Aanvraag uitgezet'));
       zet('m-dl-o','2026-10-01'); state._offAangevraagdBijOpen=true;
       offerteAanvraagGewijzigd();
       eq('al aangevraagd bij openen → bestaande opvolgdatum blijft staan', waardeVan('m-dl-o'), '2026-10-01');
@@ -1047,7 +1049,33 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       offerteAanvraagGewijzigd();
       eq('aanvraag weer leeg → label terug naar Deadline',
          document.getElementById('m-dl-o-label').textContent, 'Deadline');
-    } finally { state.editSec=secOud; state._offAangevraagdBijOpen=vlagOud; clearModal(); }
+      // De voorstel-rem: een handmatige opvolgdatum overleeft een correctie van de aanvraagdatum.
+      zet('m-dl-o',''); zet('m-daang','2026-09-01');
+      offerteAanvraagGewijzigd();                              // voorstel: 2026-09-22
+      zet('m-dl-o','2026-10-05');                              // handmatige keuze
+      zet('m-daang','2026-09-08');
+      offerteAanvraagGewijzigd();
+      eq('handmatige opvolgdatum overleeft een daang-correctie', waardeVan('m-dl-o'), '2026-10-05');
+      zet('m-daang','');
+      offerteAanvraagGewijzigd();
+      eq('handmatige keuze blijft ook staan als de aanvraag weer leeg gaat', waardeVan('m-dl-o'), '2026-10-05');
+      // De terugweg: aanvraag wissen zet de oorspronkelijke F-waarde terug — gevuld én leeg.
+      zet('m-dl-o','2026-06-19');
+      zet('m-daang','2026-09-01');
+      offerteAanvraagGewijzigd();
+      eq('eerste vulling stelt óók over een bestaande deadline voor', waardeVan('m-dl-o'), '2026-09-22');
+      zet('m-daang','');
+      offerteAanvraagGewijzigd();
+      eq('aanvraag gewist → de oude deadline komt terug', waardeVan('m-dl-o'), '2026-06-19');
+      truthy('aanvraag gewist → de aanvraag-hint is weg', !hintTekst().includes('Aanvraag uitgezet'));
+      zet('m-dl-o',''); zet('m-daang','2026-09-01');
+      offerteAanvraagGewijzigd();
+      zet('m-daang','');
+      offerteAanvraagGewijzigd();
+      eq('aanvraag gewist bij lege oorspronkelijke F → veld weer leeg', waardeVan('m-dl-o'), '');
+    // clearModal wist de vlag én de voorstel-rem; een aparte terugzetting erná zou hem juist
+    // weer vullen (opruimvolgorde-les uit de review van dit blok).
+    } finally { state.editSec=secOud; clearModal(); }
   })();
 
   truthy('verrijking leidt X/N af uit aannemerslijst (leeg handmatig)', (()=>{

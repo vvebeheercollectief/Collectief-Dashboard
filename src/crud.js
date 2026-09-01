@@ -144,18 +144,47 @@ function zetOffLabel(aangevraagd){
   const lbl=document.getElementById('m-dl-o-label');
   if(lbl) lbl.textContent = aangevraagd ? 'Opvolgdatum' : 'Deadline';
 }
+// Wat het voorstel zelf in m-dl-o schreef, en wat er vóór de éérste overschrijving stond.
+// Zelfde gemeten bugklasse als de rem in zetDeadlineVoorstel (_dlVoorgesteld): zonder deze twee
+// kwam het voorstel bij élke aanslag in 'Datum aangevraagd' terug en verving het stil een
+// opvolgdatum die de gebruiker al met de hand had gekozen. Modaal-lokaal en bewust vluchtig:
+// clearModal, closeModal én het openen van een bewerkscherm (fillModalFields) wissen ze allebei.
+let _offVoorstel=null;
+let _offVorigeF=null;
 function offerteAanvraagGewijzigd(){
   if(state.editSec!=='OFFERTE-TRAJECTEN') return;
+  const veld=document.getElementById('m-dl-o');
+  const hint=document.getElementById('dl-hint-o');
   const daang=gv('m-daang');
-  if(!daang){ zetOffLabel(false); return; }
+  if(!daang){
+    // De terugweg: aanvraagdatum weer leeg = geen aanvraag. Label terug, en staat ons eigen
+    // voorstel nog onaangeroerd in het veld, dan komt de oorspronkelijke waarde terug (kan ''
+    // zijn) — anders bleef er in een bewerkscherm een wees-voorsteldatum in kolom F staan bij
+    // een lege kolom C, en was de oorspronkelijke deadline onherstelbaar weg. De aanvraag-hint
+    // gaat weg; een eventuele onvertaalbaar-melding ('eind juni') hoort daarna weer te zien te zijn.
+    zetOffLabel(false);
+    if(veld && _offVoorstel!==null && veld.value===_offVoorstel) veld.value=_offVorigeF;
+    if(hint) hint.textContent='';
+    toonOnvertaalbaar(state.editSec);
+    _offVoorstel=null; _offVorigeF=null;
+    return;
+  }
   zetOffLabel(true);
   if(state._offAangevraagdBijOpen) return;
-  const p=_parseAnyDate(toDutchDate(daang));
-  if(!p) return;
+  const p=_parseAnyDate(daang);
+  if(!p || !veld) return;
+  // De rem: de ÉÉRSTE vulling van 'Datum aangevraagd' springt bewust over wat er staat heen —
+  // het veld wórdt op dat moment een opvolgdatum. Dat geldt ook als er een onvertaalbaar-melding
+  // ('eind juni') onder het lege veld staat: het voorstel vervangt die melding zichtbaar, de
+  // gebruiker kan het wissen en de terugweg hierboven zet de melding dan terug — bewust zo.
+  // Elke LATERE correctie van de aanvraagdatum mag het veld alleen nog verzetten zolang er leeg
+  // óf exact ons eigen voorstel staat: een handmatige keuze wordt nooit stil vervangen.
+  if(_offVoorstel!==null && veld.value!=='' && veld.value!==_offVoorstel) return;
+  if(_offVoorstel===null) _offVorigeF=veld.value;
   const d=new Date(p.y, p.m-1, p.d + 21);
-  const veld=document.getElementById('m-dl-o');
-  if(veld) veld.value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  const hint=document.getElementById('dl-hint-o');
+  const iso=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  veld.value=iso;
+  _offVoorstel=iso;
   if(hint) hint.textContent='Aanvraag uitgezet — de deadline is nu een opvolgdatum. Voorstel: +3 weken. Aanpassen mag.';
 }
 
@@ -270,9 +299,11 @@ function closeModal(){
   // submitTask nooit buiten een geopend venster om draait. Die aanname is hier niet nodig.
   state._hbDoel=null;
   // Zelfde regel voor de offerte-openstand: die hoort bij het scherm dat hem zette. Het label
-  // gaat mee terug, zodat een gesloten venster niet met 'Opvolgdatum' blijft staan.
+  // gaat mee terug, zodat een gesloten venster niet met 'Opvolgdatum' blijft staan — en de
+  // voorstel-rem gaat mee, want ook die hoorde bij dit ene scherm.
   state._offAangevraagdBijOpen=false;
   zetOffLabel(false);
+  _offVoorstel=null; _offVorigeF=null;
   // En het NTD-tabblad terug naar waar de gebruiker vandaan kwam. `prefillNieuweTaak` (ai.js)
   // verzet `state.activeNtd` al bij het openen — vóór enige bevestiging — en dit venster kan op
   // vier manieren weg zonder dat er iets is aangemaakt. `submitTask` wist de vlag zodra de taak
@@ -416,8 +447,10 @@ function fillModalFields(sec,r){
       zetDatumVeld('m-dl-o',r.deadline);setv('m-opm-o',r.opmerkingen);setv('m-sub-off',r.subcategorie);
       // De stand bij het OPENEN bepaalt of 'Datum aangevraagd' invullen nog een opvolgdatum-
       // voorstel mag doen (zie offerteAanvraagGewijzigd); het label toont meteen de juiste naam.
+      // De voorstel-rem hoort bij het scherm, dus een vers bewerkscherm begint met een verse rem.
       state._offAangevraagdBijOpen = offerteAangevraagd(r);
       zetOffLabel(state._offAangevraagdBijOpen);
+      _offVoorstel=null; _offVorigeF=null;
       break;
     case'LOD':
       setv('m-actie-l',r.actiepunt);setv('m-stat-l',r.status);setv('m-beh-l',r.behandelaar);
@@ -571,9 +604,11 @@ function clearModal(){
   // scherm waarin hij is aangewezen. submitTask leest hem daarom vóór het sluiten uit (zie daar).
   state._hbDoel=null;
   // Een leeg scherm is nog niet aangevraagd: het F-veld heet weer 'Deadline' en het volgende
-  // offerte-scherm mag weer een opvolgdatum-voorstel doen (zie offerteAanvraagGewijzigd).
+  // offerte-scherm mag weer een opvolgdatum-voorstel doen (zie offerteAanvraagGewijzigd) —
+  // dus ook de voorstel-rem en de onthouden oude veldwaarde gaan mee schoon.
   state._offAangevraagdBijOpen=false;
   zetOffLabel(false);
+  _offVoorstel=null; _offVorigeF=null;
   // Om precies dezelfde reden de extra VvE's: een leeg formulier hoort bij één VvE. Zonder deze
   // regel zou het volgende toevoegscherm de twaalf VvE's van de vorige ronde meedragen en er bij
   // één klik op Toevoegen twaalf taken bij maken.

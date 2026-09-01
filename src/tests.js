@@ -37,7 +37,7 @@ import { zetInBehandeling, inBehandelingKolom, heeftInBehandeling, volgendeStand
 import { zoekDubbels, gelijkenis, zitErinVervat, lijktOp, woorden, dubbelVraagTekst, DUBBEL_DREMPEL } from "./dubbelcheck.js";
 import { extraVves, wisExtraVves, voegExtraVveToe, verwijderExtraVve, extraVvesHtml, extraVvesUitleg } from "./meervve.js";
 import { verplaatsTaak, verplaatsWaarden, verlorenVelden, verplaatsVraagTekst, _veldLabel } from "./verplaats.js";
-import { addAannemer, verwijderAannemer, toggleAannemerBinnen, hernoemAannemer, startHernoem, stopHernoem } from "./offerte-aannemers.js";
+import { addAannemer, verwijderAannemer, toggleAannemerBinnen, hernoemAannemer, startHernoem, stopHernoem, opgevolgd } from "./offerte-aannemers.js";
 import { zetModalAannemers, modalAannemersCel, modalAannemerBinnen } from "./modal-aannemers.js";
 import { _verrijkOfferteRij, herstelAannemerFocus } from "./render-offerte.js";
 import { bouwBundelIndex, bundelWeergave, zichtbareKop, isBundel, bundelVan, bundelMetId, hernummerLeden, volgendeVolg, magKoppelen, wordtGeabsorbeerd, koppelKandidaten, taakFilter, openSubtaken, bundelWaarschuwing, bundelVerwijzing, bundelStand, zelfdeTaak } from "./bundel.js";
@@ -1601,6 +1601,84 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       if(dotOud!==undefined){ const d=document.getElementById('dot'); if(d) d.className=dotOud; }
       D.ntd=bewaardNtd; state.activeNtd=bewaardSec; pgs.ntd=bewaardPg;
       closeModal(); clearModal(); setNtd(bewaardSec);
+    }
+  })();
+
+  // ── 'Opgevolgd · +2 wk': de schrijfweg zelf (offerte-stappen taak 5, naloop) ──
+  // Zelfde harnas als de P-write-toets hierboven: gemockte fetch, geen Google-verkeer. Drie
+  // dingen liggen hier vast. (1) De F-write draagt vandaag + 14 dagen als dd-mm-jjjj. (2) De
+  // rij-guard vergelijkt tegen de OUDE deadline: de stub geeft de oude Sheet-rij terug en de
+  // deadline-kolom zit in de vingerafdruk — droeg de momentopname de nieuwe waarde, dan werd
+  // de write hier geblokkeerd en teruggerold, dus dat de write dóórgaat ís het bewijs. (3) De
+  // logboekregel draagt actie, veld en beide datums. Plus de idempotentie-rem: een tweede klik
+  // op dezelfde dag schrijft niet nóg een keer.
+  await (async () => {
+    console.log('%c[TESTS] Opgevolgd: de schrijfweg zelf', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const _fetch=window.fetch, tokenOud=state.oauthToken, expiryOud=state.oauthExpiry;
+    const idsOud=state._sheetIds, cacheOud=state._uitCache;
+    const bewaardNtd=D.ntd, bewaardSec=state.activeNtd, bewaardPg=pgs.ntd, bewaardDub=state._dubbelcheckUit;
+    const failsOud=state._syncFails;
+    const dotOud=document.getElementById('dot')?.className;
+    const geschreven=[], gelogd=[];
+    let _guardRij=null;
+    try{
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
+      state._sheetIds={'Nog Te Doen':0}; state._uitCache=false; state._dubbelcheckUit=true;
+      window.fetch=async (url, opt) => {
+        const methode=(opt&&opt.method)||'GET';
+        if(methode==='PUT'){
+          geschreven.push({ bereik: decodeURIComponent(String(url)).split('/values/')[1].split('?')[0],
+                            rij: JSON.parse(opt.body).values[0] });
+          return new Response('{}',{status:200});
+        }
+        if(methode==='POST'){
+          // logEvent gaat als append naar het Logboek — vangen om de regel-inhoud te toetsen.
+          if(String(url).includes(':append')) gelogd.push(JSON.parse(opt.body).values[0]);
+          return new Response(JSON.stringify({replies:[{}]}),{status:200});
+        }
+        // De rij-guard leest de OUDE Sheet-stand terug (kopie van vóór de klik), om dezelfde
+        // reden als in de blokken hierboven: het levende object is dan al gemuteerd.
+        if(_guardRij && /\/values\//.test(String(url)) && !/batchGet/.test(String(url))){
+          return new Response(JSON.stringify({ values:[ _rijNaarCellen('Nog Te Doen', _guardRij) ] }),{status:200});
+        }
+        return new Response(JSON.stringify({error:{message:'geen leesronde in deze test'}}),{status:403});
+      };
+      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const rij={ _row:74, _sec:'OFFERTE-TRAJECTEN', code:'311212', naam:'Testflat', taakId:'9901',
+                  datumAangevraagd:'20 aug 2026', offertes:'1/3', behandelaar:'Jer',
+                  deadline:'25-08-2026', opmerkingen:'Dakrenovatie', aannemers:'' };
+      D.ntd={ ...leeg, 'OFFERTE-TRAJECTEN':[rij] }; state.activeNtd='OFFERTE-TRAJECTEN'; pgs.ntd=1;
+      _guardRij={...rij};
+      const d=new Date(); d.setDate(d.getDate()+14);
+      const verwacht=`${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;
+
+      opgevolgd('nr:9901');
+      await state._writeChain;
+      for(let i=0;i<200 && !geschreven.some(g=>/!F74$/.test(g.bereik));i++) await new Promise(r=>setTimeout(r,5));
+      await state._writeChain;
+      const fIdx=geschreven.findIndex(g=>/!F74$/.test(g.bereik));
+      truthy('opgevolgd: precies één write, en die gaat naar kolom F van de eigen rij',
+             fIdx!==-1 && geschreven.length===1);
+      eq('opgevolgd: … met vandaag + 14 dagen als dd-mm-jjjj', (geschreven[fIdx]||{rij:[]}).rij[0], verwacht);
+      eq('opgevolgd: het rij-object draagt de nieuwe datum (optimistisch)', rij.deadline, verwacht);
+      eq('opgevolgd: de logboekregel draagt actie, veld en beide datums',
+         (gelogd[0]||[]).slice(1,7), ['311212','OFFERTE-TRAJECTEN','Opgevolgd','opvolgdatum','25-08-2026',verwacht]);
+
+      // Idempotentie-rem: de datum staat al op vandaag + 2 weken → geen tweede write of logregel.
+      opgevolgd('nr:9901');
+      for(let i=0;i<20;i++) await new Promise(r=>setTimeout(r,5));
+      await state._writeChain;
+      eq('opgevolgd: een tweede klik op dezelfde dag schrijft niet nóg een keer',
+         geschreven.filter(g=>/!F74$/.test(g.bereik)).length, 1);
+      eq('opgevolgd: … en logt ook niet nóg een keer', gelogd.length, 1);
+
+      for(let i=0;i<100 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,5));
+    } finally {
+      window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
+      state._sheetIds=idsOud; state._uitCache=cacheOud; state._dubbelcheckUit=bewaardDub;
+      state._syncFails=failsOud;
+      if(dotOud!==undefined){ const d=document.getElementById('dot'); if(d) d.className=dotOud; }
+      D.ntd=bewaardNtd; state.activeNtd=bewaardSec; pgs.ntd=bewaardPg; setNtd(bewaardSec);
     }
   })();
 

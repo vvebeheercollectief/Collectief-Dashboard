@@ -5,13 +5,16 @@
 //  Optimistisch schrijven met rollback (backgroundWrite).
 // ══════════════════════════════════════
 import { state, D } from "./state.js";
-import { parseAannemers, serializeAannemers, aannSleutel } from "./util.js";
+import { parseAannemers, serializeAannemers, aannSleutel, toDutchDate, taakTitel } from "./util.js";
 import { writeRange, assertRowMatch } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { backgroundWrite, blokkeerOffline } from "./data.js";
 import { showToast, showUndoToast } from "./notifications.js";
 import { renderNtd } from "./render-lijsten.js";
 import { herstelAannemerFocus } from "./render-offerte.js";
+import { verseRij } from "./rij.js";
+// (kringverwijzing offerte-aannemers ⇄ render-overig, via crud: logEvent wordt pas op runtime
+//  aangeroepen — live binding, veilig; zelfde patroon als data ⇄ main in data.js)
 import { logEvent } from "./render-overig.js";
 
 // Zoek het traject op zijn eigen sleutel (vast taaknummer, zie aannSleutel) en NIET op de
@@ -45,8 +48,15 @@ async function _bewaar(r, vorige){
     return;
   }
   let gedaan=false;
+  // Vingerafdruk-momentopname op INSCHRIJF-moment, niet pas wanneer de writeFn aan de beurt is.
+  // De wachtrij is serieel, dus wat hier staat is per definitie wat de Sheet bevat als deze beurt
+  // start. Las de writeFn het levende `r` pas bij de start, dan zag hij ook de optimistische
+  // mutaties van beurten die ná deze zijn ingeschreven (bv. een Opgevolgd-klik die de deadline —
+  // een vingerafdrukkolom — alvast verzet heeft) en sloeg de guard vals alarm: niet geschreven,
+  // en de aannemerslijst onterecht teruggerold.
+  const snap={...r};
   backgroundWrite(
-    async()=>{ if(!gedaan){ await assertRowMatch(r._row, r); await writeRange(`'Nog Te Doen'!P${r._row}`,[r.aannemers]); gedaan=true; } },
+    async()=>{ if(!gedaan){ await assertRowMatch(r._row, snap); await writeRange(`'Nog Te Doen'!P${r._row}`,[r.aannemers]); gedaan=true; } },
     ()=>{ r.aannemers=vorige; },
     'Aannemers opslaan'
   );
@@ -188,32 +198,76 @@ function opgevolgd(sleutel){
   if(blokkeerOffline()) return;
   const d=new Date(); d.setDate(d.getDate()+OPVOLG_TERMIJN_DAGEN);
   const nieuw=`${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;
-  _schrijfOpvolg(r, nieuw, r.deadline||'', 'Opgevolgd');
+  // Idempotentie-rem: staat de opvolgdatum al op vandaag + 2 weken, dan valt er niets te
+  // verzetten — een tweede klik op dezelfde dag schreef anders opnieuw (write + logregel +
+  // undo-toast). Via toDutchDate en niet als kale stringvergelijking: na een resync draagt
+  // r.deadline de lange Nederlandse datumvorm van de Sheet ('15 september 2026'), en dan
+  // matchte de tekst nooit met het hier gebouwde dd-mm-jjjj.
+  if(toDutchDate(r.deadline||'')===nieuw) return;
+  _schrijfOpvolg(r, nieuw, r.deadline||'', 'Opgevolgd', true);
 }
-async function _schrijfOpvolg(r, nieuw, oud, actie){
+// `metUndo` is een expliciete parameter en wordt niet uit de actienaam afgeleid: de terugweg
+// van de undo is dezélfde functie en hoort geen tweede undo-toast op te leveren — en dat
+// verschil mag niet stil omvallen wanneer iemand ooit de actietekst herformuleert.
+async function _schrijfOpvolg(r, nieuw, oud, actie, metUndo){
   if(!await ensureToken()){
-    showToast('Niet opgeslagen','Inloggen mislukt — de opvolgdatum staat nog zoals hij was',
+    // Richtingneutraal geformuleerd ('niet gewijzigd'): deze functie is ook de terugweg van de
+    // undo, en dáár is 'staat nog zoals hij was' precies de waarde die NIET bereikt is.
+    showToast('Niet opgeslagen','Inloggen mislukt — de opvolgdatum is niet gewijzigd',
               'var(--rd)',null,{geenDedup:true});
     return;
   }
   r.deadline=nieuw; renderNtd();
   const heenweg={gelukt:false};
   let geschreven=false;
+  // Vingerafdruk-momentopname op INSCHRIJF-moment, niet pas wanneer de writeFn aan de beurt is:
+  // de wachtrij is serieel, dus wat hier staat (mét de oude deadline — die kolom zit in de
+  // vingerafdruk) is per definitie wat de Sheet bevat als deze beurt start. Las de writeFn het
+  // levende `r` pas bij de start, dan zag hij ook mutaties van later ingeschreven beurten en
+  // sloeg de guard vals alarm.
+  const snap={...r, deadline:oud};
   backgroundWrite(
     async()=>{ if(!geschreven){
-        await assertRowMatch(r._row, {...r, deadline:oud});
+        await assertRowMatch(r._row, snap);
         await writeRange(`'Nog Te Doen'!F${r._row}`,[nieuw]);
         geschreven=true; heenweg.gelukt=true; }
       await logEvent(r.code,'OFFERTE-TRAJECTEN',actie,'opvolgdatum',oud,nieuw); },
     ()=>{ r.deadline=oud; },
     'Opvolgdatum opslaan'
   );
-  if(actie==='Opgevolgd') showUndoToast('Opgevolgd',`${r.code} — opvolgen ${nieuw}`,()=>{
-    // Undo pas als de heenweg echt in de Sheet staat (zelfde afspraak als herordenBundel);
-    // de terugweg is dezelfde schrijfweg met de waarden omgedraaid.
-    if(!heenweg.gelukt) return;
-    _schrijfOpvolg(r, oud, nieuw, 'Opvolgdatum teruggezet');
-  },'pauze',{sleutel:`opvolg|${r.taakId||r._row}`});
+  // geenDedup: de ontdubbelsleutel van showUndoToast blijft 30 s staan terwijl de toast na 8 s
+  // weg is — wie opvolgt, ongedaan maakt en opnieuw opvolgt, verloor anders stil precies de
+  // undo-knop (gedocumenteerde val, zie de 'Gestapeld'-toast in bundel-acties.js).
+  // De titel via taakTitel en niet alleen de VvE-code: één VvE kan meerdere offerte-trajecten
+  // tegelijk hebben, en dan zegt de code niet wélk traject er net verzet is (zelfde keuze als
+  // de wegleg-bevestiging in snooze.js).
+  if(metUndo) showUndoToast('Opgevolgd',
+    `${r.code} — ${taakTitel(r,'OFFERTE-TRAJECTEN')||r.naam||''} · opvolgen ${nieuw}`,
+    async()=>{
+      // Eerst de lopende schrijfactie afwachten en dán pas de gelukt-check. De vlag gaat pas ná
+      // de write om; een klik in de eerste seconden las hem anders altijd als false en de knop
+      // deed stil niets (zelfde volgorde-eis als bij de bulk-undo en herordenBundel).
+      await state._writeChain;
+      if(!heenweg.gelukt){
+        // Niets terug te draaien, wél iets zeggen — stilte na een klik leest als een kapotte
+        // knop, en de foutmelding van de heenweg kan intussen weggetikt zijn.
+        showToast('Niets ongedaan te maken','Het opvolgen is niet opgeslagen — er is niets gewijzigd.',
+                  'var(--am)','label',{geenDedup:true,geenSysteemmelding:true});
+        return;
+      }
+      if(blokkeerOffline()) return;   // de heenweg had zijn poort in `opgevolgd`; de undo verdient dezelfde
+      // Her-ankeren vóór het terugzetten: de finally van backgroundWrite draait loadAll(true) en
+      // die vervangt élk rij-object — ruim binnen de acht seconden dat deze knop staat. `r` wees
+      // daarna nergens meer naar: de Sheet kreeg de oude datum netjes terug, maar het scherm
+      // bleef de nieuwe tonen tot de volgende poll (zelfde reparatie als bij de bulk-undo).
+      const vers=verseRij(r, D.ntd['OFFERTE-TRAJECTEN']||[]);
+      if(!vers){
+        showToast('Niets ongedaan te maken','Het traject is niet meer terug te vinden in de lijst.',
+                  'var(--am)','label',{geenDedup:true,geenSysteemmelding:true});
+        return;
+      }
+      _schrijfOpvolg(vers, oud, nieuw, 'Opvolgdatum teruggezet', false);
+    },'pauze',{geenDedup:true});
 }
 
 export { addAannemer, toggleAannemerBinnen, verwijderAannemer,

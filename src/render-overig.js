@@ -290,6 +290,10 @@ function actieBadge(actie){
     'Contact':['--sec:var(--ac);--sec-l:var(--ac-l)',ico('telefoon')],
     'Kenmerk':['--sec:var(--pu);--sec-l:var(--pu-l)',ico('klembord')],
     'Fase gewijzigd':['--sec:var(--tl);--sec-l:var(--tl-l)',ico('chevronRechts')],
+    // Zelfde paars/pauze als de Opgevolgd-knop en zijn toast; teruggezet in het amber/ongedaan
+    // van de andere terugzet-acties.
+    'Opgevolgd':['--sec:var(--pu);--sec-l:var(--pu-l)',ico('pauze')],
+    'Opvolgdatum teruggezet':['--sec:var(--am);--sec-l:var(--am-l)',ico('ongedaan')],
   };
   const[css,badgeIco]=map[actie]||['',''];
   return css?`<span class="badge" style="background:var(--sec-l);color:var(--sec);${css}">${badgeIco} ${esc(actie)}</span>`:`<span class="badge">${esc(actie)}</span>`;
@@ -314,7 +318,7 @@ function logDayLabel(iso){
 
 // Eén kleurbron per logboek-actie: het werkwoord in de zin én de stip van de dunne
 // regel gebruiken dezelfde kleur, zodat ze elkaar nooit tegenspreken.
-const LOG_KLEUR={Afgerond:'var(--gn)',Aangevinkt:'var(--gn)',Uitgevinkt:'var(--am)',Teruggezet:'var(--am)',Opmerking:'var(--am)',Verwijderd:'var(--rd)','Behandelaar gewijzigd':'var(--ac)',Contact:'var(--ac)',Aangemaakt:'var(--pu)','Aangemaakt (sheet)':'var(--pu)',Kenmerk:'var(--pu)',Weggelegd:'var(--am)','Opvolgdatum gewist':'var(--am)','Auto-prioriteit':'var(--mut)'};
+const LOG_KLEUR={Afgerond:'var(--gn)',Aangevinkt:'var(--gn)',Uitgevinkt:'var(--am)',Teruggezet:'var(--am)',Opmerking:'var(--am)',Verwijderd:'var(--rd)','Behandelaar gewijzigd':'var(--ac)',Contact:'var(--ac)',Aangemaakt:'var(--pu)','Aangemaakt (sheet)':'var(--pu)',Kenmerk:'var(--pu)',Weggelegd:'var(--am)','Opvolgdatum gewist':'var(--am)','Auto-prioriteit':'var(--mut)',Opgevolgd:'var(--pu)','Opvolgdatum teruggezet':'var(--am)'};
 const logKleur=a=>LOG_KLEUR[a]||'var(--pu)';
 
 // Eén zinnengenerator voor alle logregels (gedeeld door Logboek-pagina en VvE-dossier).
@@ -345,6 +349,10 @@ function logZin(r, opts){
     case'Kenmerk':             return A('wijzigde')+`kenmerk <b>${esc(r.veld||'')}</b>`+bij+(r.nieuweWaarde?` <span style="color:var(--mut)">→ ${esc(r.nieuweWaarde)}</span>`:'');
     case'Weggelegd':           return A('legde')+(zonderCode?'een taak':chip)+' weg'+(r.nieuweWaarde?` tot <b>${esc(r.nieuweWaarde)}</b>`:'');
     case'Opvolgdatum gewist':  return A('haalde')+(zonderCode?'een taak':chip)+' terug uit weggelegd';
+    // De Opgevolgd-knop (offerte-paneel): zonder eigen zin vielen deze twee in de default-tak
+    // en stond de nieuwe opvolgdatum nergens — precies het gegeven waar de regel om draait.
+    case'Opgevolgd':           return A('volgde')+(zonderCode?'een offerte-traject':chip)+' op'+(r.nieuweWaarde?` → volgende check <b>${esc(r.nieuweWaarde)}</b>`:'');
+    case'Opvolgdatum teruggezet':return A('zette')+'de opvolgdatum'+bij+' terug'+(r.nieuweWaarde?` naar <b>${esc(r.nieuweWaarde)}</b>`:'');
     case'Fase gewijzigd':      return A('zette')+(zonderCode?'het subsidietraject':chip)+` op <b>${esc(r.nieuweWaarde||'—')}</b>`+(r.oudeWaarde?` <span style="color:var(--mut)">(was ${esc(r.oudeWaarde)})</span>`:'');
     case'Auto-prioriteit':     return A('paste')+'de prioriteit automatisch aan'+(r.nieuweWaarde?` <span style="color:var(--mut)">· ${esc(r.nieuweWaarde)}</span>`:'');
     default:                   return `<b>${naam}</b> — ${esc(r.actie||'')}`+staart;

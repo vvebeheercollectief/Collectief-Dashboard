@@ -12,7 +12,7 @@ import {
   setOntw, renderOntw, editOntwItem, addTaskNote, renderLogboek,
   editLogboek, saveLogboek, cancelLogboek, setLogSoort, deleteLogboek,
 } from './render-overig.js';
-import { openModal, completeTask, completeCurrentEditTask, deleteCurrentEditTask, zetSubsidieFase, kiesModalFase, zetHoortBij, taakUitCache, renderExtraVves, herzieAlsSubtaak, _bewerkRijVers } from './crud.js';
+import { openModal, completeTask, completeCurrentEditTask, deleteCurrentEditTask, zetSubsidieFase, kiesModalFase, zetHoortBij, taakUitCache, renderExtraVves, herzieAlsSubtaak, _bewerkRijVers, offerteAanvraagGewijzigd } from './crud.js';
 import { ontkoppelTaak } from './bundel-acties.js';
 import { modalAannemerAdd, modalAannemerBinnen, modalAannemerWeg } from './modal-aannemers.js';
 import { copyAiPrompt, aiOvernemen, aiActieTaak, aiKopieerConcept, prefillNieuweTaak } from './ai.js';
@@ -304,6 +304,9 @@ export function initActions() {
     if (e.target && e.target.classList && e.target.classList.contains('of-aann-naam-inp')) {
       state.offerteAannEditVal = e.target.value;
     }
+    // 'Datum aangevraagd' in het offerte-scherm: label en opvolgdatum-voorstel meteen laten
+    // meebewegen terwijl de gebruiker typt of kiest (zie offerteAanvraagGewijzigd in crud.js).
+    if (e.target && e.target.id === 'm-daang') offerteAanvraagGewijzigd();
   });
 
   // Ergens anders klikken bewaart de naam. Twee dingen maken dit lastiger dan het lijkt, en beide

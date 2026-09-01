@@ -20,7 +20,7 @@ import { sheetsFetch, NTD_OMSCHRIJVING, _isTransient, _rowMismatch, _a1Bereik, _
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, serieleWrite, POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, showLoadError, clearLoadError, syncSelecteerStand, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
-import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _eindKolom, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, getAfInsertRow, OMSCHRIJVING_VELD, zetOmschrijving, _sheetBreedtes, getSheetIds, bevestigInvoegPlek, _naamBijCode, _zetNaamVeld, taakUitCache, kiesSectie, deleteTaskRow, deleteCurrentEditTask, completeCurrentEditTask, renderExtraVves, toonMeerVve, zetDeadlineVoorstel, herzieAlsSubtaak, kiesDuur, gekozenDuur, wisDuurKeuze, nietOpgeslagenVelden } from "./crud.js";
+import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _eindKolom, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, getAfInsertRow, OMSCHRIJVING_VELD, zetOmschrijving, _sheetBreedtes, getSheetIds, bevestigInvoegPlek, _naamBijCode, _zetNaamVeld, taakUitCache, kiesSectie, deleteTaskRow, deleteCurrentEditTask, completeCurrentEditTask, renderExtraVves, toonMeerVve, zetDeadlineVoorstel, herzieAlsSubtaak, kiesDuur, gekozenDuur, wisDuurKeuze, nietOpgeslagenVelden, offerteAanvraagGewijzigd } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages, renderChat } from "./dossier-chat.js";
 import { shouldPromptReload, maakHerlaadKern, zelfdeWorker } from "./sw-update.js";
@@ -1028,6 +1028,27 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
      return h.includes('opvolgen') && h.includes('bijna') && !h.includes('te laat'); })());
   truthy('deadlineCel: niet-aangevraagd traject houdt de gewone te-laat-vorm',
      deadlineCel({datumAangevraagd:'', deadline:'19 juni 2020'},'OFFERTE-TRAJECTEN').includes('te laat'));
+
+  // ── offerte: 'Datum aangevraagd' vult het opvolgdatum-voorstel (+3 weken) ──
+  (() => {
+    const secOud=state.editSec, vlagOud=state._offAangevraagdBijOpen;
+    try{
+      state.editSec='OFFERTE-TRAJECTEN'; state._offAangevraagdBijOpen=false;
+      const zet=(id,v)=>{const e=document.getElementById(id); if(e) e.value=v;};
+      zet('m-daang','2026-09-01'); zet('m-dl-o','');
+      offerteAanvraagGewijzigd();
+      eq('aanvraag gevuld → opvolgdatum-voorstel = +21 dagen', waardeVan('m-dl-o'), '2026-09-22');
+      eq('aanvraag gevuld → label wisselt naar Opvolgdatum',
+         document.getElementById('m-dl-o-label').textContent, 'Opvolgdatum');
+      zet('m-dl-o','2026-10-01'); state._offAangevraagdBijOpen=true;
+      offerteAanvraagGewijzigd();
+      eq('al aangevraagd bij openen → bestaande opvolgdatum blijft staan', waardeVan('m-dl-o'), '2026-10-01');
+      state._offAangevraagdBijOpen=false; zet('m-daang','');
+      offerteAanvraagGewijzigd();
+      eq('aanvraag weer leeg → label terug naar Deadline',
+         document.getElementById('m-dl-o-label').textContent, 'Deadline');
+    } finally { state.editSec=secOud; state._offAangevraagdBijOpen=vlagOud; clearModal(); }
+  })();
 
   truthy('verrijking leidt X/N af uit aannemerslijst (leeg handmatig)', (()=>{
     const row={code:'ZZ-TEST',naam:'Test',offertes:'',aannemers:'A|1\nB|0',_row:9999};

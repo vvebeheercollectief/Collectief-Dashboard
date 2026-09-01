@@ -135,6 +135,10 @@ export const state = {
   _hbDoel: null,           // in 'Hoort bij' aangewezen hoofdtaak (het rij-OBJECT, niet zijn code:
                            // een koppeling wijst één bepaalde rij aan). submitTask koppelt hem ná
                            // het opslaan; clearModal wist hem, dus lees hem vóór het sluiten.
+  _offAangevraagdBijOpen: false, // stond het offerte-traject bij het openen van het bewerkscherm al
+                           // op 'aangevraagd'? Dan blijft de bestaande opvolgdatum met rust en doet
+                           // 'Datum aangevraagd' invullen géén +3-wekenvoorstel (offerteAanvraagGewijzigd).
+                           // Bewust vluchtig: clearModal én closeModal wissen hem, net als _nieuwBundel.
   offerteAannOpen: new Set(),   // sleutels (aannSleutel) van trajecten met uitgeklapt aannemers-paneel
   // Welke aannemersnaam er op dit moment wordt aangepast: {sleutel, idx} of null. Op state en niet
   // in de DOM, want renderNtd vervangt de hele tabel bij elke poll met verse data — zonder dit zou

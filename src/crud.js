@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  CRUD — taak-modals, sheet-helpers, toevoegen/afronden/verwijderen
 // ══════════════════════════════════════
-import { esc, berekenPrioriteit, toISODate, toDutchDate, nieuwTaakId, taakVerwijzing, voorgesteldeDeadline, DEADLINE_HINT, taakTitel, reconcileOffertes, parseAannemers, duurNaarCel, duurUitCel } from "./util.js";
+import { esc, berekenPrioriteit, toISODate, toDutchDate, nieuwTaakId, taakVerwijzing, voorgesteldeDeadline, DEADLINE_HINT, taakTitel, reconcileOffertes, parseAannemers, duurNaarCel, duurUitCel, _parseAnyDate, offerteAangevraagd } from "./util.js";
 import { zoekDubbels, dubbelVraagTekst } from "./dubbelcheck.js";
 import { extraVves, wisExtraVves, extraVvesHtml, extraVvesUitleg } from "./meervve.js";
 import { state, D, pgs } from "./state.js";
@@ -134,6 +134,31 @@ function zetDeadlineVoorstel(sec, isEdit){
   if(!veldEl.value) veldEl.value = iso;
 }
 
+// ── Offerte: deadline ↔ opvolgdatum in het scherm (v12.5) ──
+// Zodra 'Datum aangevraagd' voor het eerst gevuld wordt is de aanvraag uitgezet: het F-veld
+// wordt een OPVOLGDATUM — label wisselt en het veld krijgt een voorstel van +3 weken na de
+// aanvraagdatum (ontwerpbesluit 2026-09-01; daarna verlengt de paneel-knop telkens +2 weken).
+// `state._offAangevraagdBijOpen` onthoudt de stand bij het openen: wie een al-aangevraagd
+// traject opent krijgt géén nieuw voorstel over zijn bestaande opvolgdatum heen.
+function zetOffLabel(aangevraagd){
+  const lbl=document.getElementById('m-dl-o-label');
+  if(lbl) lbl.textContent = aangevraagd ? 'Opvolgdatum' : 'Deadline';
+}
+function offerteAanvraagGewijzigd(){
+  if(state.editSec!=='OFFERTE-TRAJECTEN') return;
+  const daang=gv('m-daang');
+  if(!daang){ zetOffLabel(false); return; }
+  zetOffLabel(true);
+  if(state._offAangevraagdBijOpen) return;
+  const p=_parseAnyDate(toDutchDate(daang));
+  if(!p) return;
+  const d=new Date(p.y, p.m-1, p.d + 21);
+  const veld=document.getElementById('m-dl-o');
+  if(veld) veld.value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const hint=document.getElementById('dl-hint-o');
+  if(hint) hint.textContent='Aanvraag uitgezet — de deadline is nu een opvolgdatum. Voorstel: +3 weken. Aanpassen mag.';
+}
+
 // De merkjes en het uitlegregeltje van 'ook voor andere VvE's' opnieuw tekenen. Eén functie, zodat
 // toevoegen, weghalen en het openen van het scherm allemaal langs dezelfde weg lopen.
 function renderExtraVves(){
@@ -244,6 +269,10 @@ function closeModal(){
   // hangt de belofte 'een keuze hoort bij het scherm waarin hij is gemaakt' aan de aanname dat
   // submitTask nooit buiten een geopend venster om draait. Die aanname is hier niet nodig.
   state._hbDoel=null;
+  // Zelfde regel voor de offerte-openstand: die hoort bij het scherm dat hem zette. Het label
+  // gaat mee terug, zodat een gesloten venster niet met 'Opvolgdatum' blijft staan.
+  state._offAangevraagdBijOpen=false;
+  zetOffLabel(false);
   // En het NTD-tabblad terug naar waar de gebruiker vandaan kwam. `prefillNieuweTaak` (ai.js)
   // verzet `state.activeNtd` al bij het openen — vóór enige bevestiging — en dit venster kan op
   // vier manieren weg zonder dat er iets is aangemaakt. `submitTask` wist de vlag zodra de taak
@@ -384,7 +413,12 @@ function fillModalFields(sec,r){
       // terug de Sheet in — rijen van vóór de aannemerslijst houden zo hun oude getal.
       // `_offertesManual` vóór `offertes`: dat eerste IS kolom D (zie _verrijkOfferteRij).
       onthoudOnvertaalbaar('m-off', ((r._offertesManual!==undefined?r._offertesManual:r.offertes)||''), '');
-      zetDatumVeld('m-dl-o',r.deadline);setv('m-opm-o',r.opmerkingen);setv('m-sub-off',r.subcategorie);break;
+      zetDatumVeld('m-dl-o',r.deadline);setv('m-opm-o',r.opmerkingen);setv('m-sub-off',r.subcategorie);
+      // De stand bij het OPENEN bepaalt of 'Datum aangevraagd' invullen nog een opvolgdatum-
+      // voorstel mag doen (zie offerteAanvraagGewijzigd); het label toont meteen de juiste naam.
+      state._offAangevraagdBijOpen = offerteAangevraagd(r);
+      zetOffLabel(state._offAangevraagdBijOpen);
+      break;
     case'LOD':
       setv('m-actie-l',r.actiepunt);setv('m-stat-l',r.status);setv('m-beh-l',r.behandelaar);
       zetDatumVeld('m-dl-l',r.deadline);setv('m-opm-l',r.opmerkingen);setv('m-sub-lod',r.subcategorie);
@@ -536,6 +570,10 @@ function clearModal(){
   // En de andere kant van dezelfde belofte: een in 'Hoort bij' aangewezen doeltaak hoort bij het
   // scherm waarin hij is aangewezen. submitTask leest hem daarom vóór het sluiten uit (zie daar).
   state._hbDoel=null;
+  // Een leeg scherm is nog niet aangevraagd: het F-veld heet weer 'Deadline' en het volgende
+  // offerte-scherm mag weer een opvolgdatum-voorstel doen (zie offerteAanvraagGewijzigd).
+  state._offAangevraagdBijOpen=false;
+  zetOffLabel(false);
   // Om precies dezelfde reden de extra VvE's: een leeg formulier hoort bij één VvE. Zonder deze
   // regel zou het volgende toevoegscherm de twaalf VvE's van de vorige ronde meedragen en er bij
   // één klik op Toevoegen twaalf taken bij maken.
@@ -1752,5 +1790,6 @@ export {
   OMSCHRIJVING_VELD, zetOmschrijving, taakUitCache,
   _verseRijIdx, _herankerRij, zetSubsidieFase, kiesModalFase, _modalFaseWoord,
   zetDeadlineVoorstel, DEADLINE_VELD, DEADLINE_HINT_VELD, renderExtraVves, toonMeerVve, herzieAlsSubtaak,
+  offerteAanvraagGewijzigd,
   _bewerkRijVers,
 };

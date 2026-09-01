@@ -1580,10 +1580,13 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const vA=state.activeNtd, vNtd=D.ntd, vPg=pgs.ntd, vBulk=state.bulkMode;
     const NATIEF=new Set(['BUTTON','A','INPUT','SELECT','TEXTAREA','SUMMARY']);
     try{
+      // De terugkomdatum moet in de toekomst liggen, anders is de rij niet 'weggelegd' en rendert de pil niet.
+      const terug=(()=>{const d=new Date();d.setDate(d.getDate()+30);
+        return `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;})();
       const rij=(s,i)=>({code:'30'+i,naam:'VvE Toets',actiepunt:'x',agendapunten:'y',status:'z',
         periode:'Week 38 · 14–18 sep 2026',subsidie:'s',subsidieFase:'Verleend',
         datumAangevraagd:'1 mei 2026',offertes:'1 / 2',deadline:'1 juni 2026',behandelaar:'Jer',
-        opmerkingen:'o',inBehandeling:i%2?'TRUE':'',opvolgdatum:i===0?'30-08-2026':'',_sec:s,_row:400+i});
+        opmerkingen:'o',inBehandeling:i%2?'TRUE':'',opvolgdatum:i===0?terug:'',_sec:s,_row:400+i});
       D.ntd=Object.fromEntries(SKEYS.map(s=>[s,[0,1].map(i=>rij(s,i))]));
       const onbereikbaar=new Map();
       [false,true].forEach(bulk=>{ state.bulkMode=bulk;

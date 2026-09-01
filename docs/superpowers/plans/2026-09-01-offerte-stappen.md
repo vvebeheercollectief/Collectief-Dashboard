@@ -751,7 +751,7 @@ git commit -m "Offerte-stappen 5/8: Opgevolgd-knop zet de opvolgdatum +2 weken, 
 
 - [ ] **Stap 6.2: run** — faalt (module bestaat niet).
 
-- [ ] **Stap 6.3: nieuwe module `src/offerte-stappen.js`** — volledige inhoud:
+- [ ] **Stap 6.3: nieuwe module `src/offerte-stappen.js`** — volledige inhoud (LET OP: nieuwe module ook toevoegen aan APP_SHELL in sw.js — de modulegraaf-tripdraad in de tests eist dat):
 
 ```js
 // ══════════════════════════════════════
@@ -871,7 +871,7 @@ git commit -m "Offerte-stappen 6/8: elk nieuw traject krijgt automatisch de subt
 - Create: `src/migratie-offerte.js`
 - Modify: `src/main.js` (window-haak)
 
-- [ ] **Stap 7.1: nieuwe module `src/migratie-offerte.js`** — volledige inhoud (lees vooraf de exacte signatuur van `serieleWrite` in data.js:122 — die krijgt één async taak en geeft de beurt-promise terug):
+- [ ] **Stap 7.1: nieuwe module `src/migratie-offerte.js`** — volledige inhoud (ook aan APP_SHELL in sw.js toevoegen, zie taak 6) (lees vooraf de exacte signatuur van `serieleWrite` in data.js:122 — die krijgt één async taak en geeft de beurt-promise terug):
 
 ```js
 // ══════════════════════════════════════

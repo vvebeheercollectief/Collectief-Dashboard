@@ -38,6 +38,7 @@ import { zoekDubbels, gelijkenis, zitErinVervat, lijktOp, woorden, dubbelVraagTe
 import { extraVves, wisExtraVves, voegExtraVveToe, verwijderExtraVve, extraVvesHtml, extraVvesUitleg } from "./meervve.js";
 import { verplaatsTaak, verplaatsWaarden, verlorenVelden, verplaatsVraagTekst, _veldLabel } from "./verplaats.js";
 import { addAannemer, verwijderAannemer, toggleAannemerBinnen, hernoemAannemer, startHernoem, stopHernoem } from "./offerte-aannemers.js";
+import { zetModalAannemers, modalAannemersCel, modalAannemerBinnen } from "./modal-aannemers.js";
 import { _verrijkOfferteRij, herstelAannemerFocus } from "./render-offerte.js";
 import { bouwBundelIndex, bundelWeergave, zichtbareKop, isBundel, bundelVan, bundelMetId, hernummerLeden, volgendeVolg, magKoppelen, wordtGeabsorbeerd, koppelKandidaten, taakFilter, openSubtaken, bundelWaarschuwing, bundelVerwijzing, bundelStand, zelfdeTaak } from "./bundel.js";
 import { bundelPaneelHtml, bundelMerkje, bundelKopExtra, STAPEL_GREEP } from "./render-bundel.js";
@@ -423,7 +424,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   eq('filterVves deelstring',     filterVves('vve',_vves).length, 3);
 
   // ── actions-registry ── (dekkings-test: elke verwachte data-action bestaat)
-  const VERWACHTE_ACTIES = ['toggle','notif-toggle','off','notitie-toevoegen','taak-verwijder-modal','ai-kopieer','login','ntd-sectie','af-sectie','alvo-flag','taak-bewerken','taak-afronden','pagineer','ai-overnemen','ai-actie-taak','ai-kopieer-concept','ontw-cat','ontw-bewerken','toast-sluiten','taak-wegleggen','snooze-kies','herhaal-bewerken','herhaal-status','herhaal-verwijderen',
+  const VERWACHTE_ACTIES = ['toggle','notif-toggle','maann-binnen','maann-weg','maann-add','notitie-toevoegen','taak-verwijder-modal','ai-kopieer','login','ntd-sectie','af-sectie','alvo-flag','taak-bewerken','taak-afronden','pagineer','ai-overnemen','ai-actie-taak','ai-kopieer-concept','ontw-cat','ontw-bewerken','toast-sluiten','taak-wegleggen','snooze-kies','herhaal-bewerken','herhaal-status','herhaal-verwijderen',
 'vve-open','vve-terug','vve-af-alles','pal-kies','bulk-toggle','bulk-vink','bulk-menu','bulk-doe','taak-afronden-modal',
 'kenmerken-bewerken','kenmerken-opslaan','kenmerken-annuleren',
 'contact-soort','contact-vastleggen','vve-log-filter','vve-log-alles','ntd-sorteer'];
@@ -2275,8 +2276,8 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
 
   // #19 setv toont 0 i.p.v. een leeg veld
   truthy('setv: 0 blijft "0"', (()=>{
-    const el=document.getElementById('m-off-recv'); if(!el) return true; // alleen als veld bestaat
-    const v=el.value; setv('m-off-recv',0); const got=el.value; el.value=v;
+    const el=document.createElement('input'); el.id='tst-setv-nul'; document.body.appendChild(el);
+    setv('tst-setv-nul',0); const got=el.value; el.remove();
     return got==='0';
   })());
 
@@ -7525,6 +7526,11 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     // Zelfde reden als bij serializeNtdUndo: 0 is een echt volgnummer, geen lege cel.
     eq('nieuw: volgnummer 0 wordt geen lege cel',
        toevoegWaarden(velden(), { taakId:'T7', bundelId:'Tkop', bundelVolg:0 })[18], '0');
+    eq('toevoegWaarden: aannemerslijst landt op kolom P (index 15)',
+       toevoegWaarden(velden(), { taakId:'T7', aannemers:'MoTec|1\nVan der Herp|0' })[15],
+       'MoTec|1\nVan der Herp|0');
+    eq('toevoegWaarden: zonder aannemers blijft P leeg',
+       toevoegWaarden(velden(), { taakId:'T7' })[15], '');
 
     // En de vlag, via een ECHTE klik op de knop in het paneel. Rechtstreeks ACTIONS aanroepen zou
     // groen blijven als `data-bundel` op de knop ontbreekt of anders heet — de knop doet dan in de
@@ -11638,34 +11644,26 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   })();
 
   // ══════════════════════════════════════════════════════════════════════════
-  //  OFFERTE-TELLER — het bewerkscherm toont kolom D, niet de afgeleide stand
+  //  OFFERTE-AANNEMERS — het bewerkscherm werkt op een werkkopie van kolom P
   // ══════════════════════════════════════════════════════════════════════════
-  // `_verrijkOfferteRij` tilt de X/N-teller in het GEHEUGEN op tot het aantal aangevinkte
-  // aannemers; kolom D blijft de handmatige ondergrens. Het bewerkscherm las die opgetilde waarde,
-  // dus één keer openen en opslaan zette hem alsnog in kolom D. En omdat de ondergrens met
-  // Math.max werkt, kom je daar nooit meer onder: een vinkje weghalen deed daarna niets meer.
   (() => {
-    console.log('%c[TESTS] Offerte-teller in het bewerkscherm', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    console.log('%c[TESTS] Offerte-aannemers in het bewerkscherm', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
     const editOud = state.editRowData;
     try {
-      const r = { code: '311212', naam: 'X', datumAangevraagd: '1 aug 2026', offertes: '0/3',
-                  behandelaar: 'Jer', deadline: '', opmerkingen: '',
-                  aannemers: 'Jansen|1\nPietersen|1\nDe Vries|0', _row: 9, _sec: 'OFFERTE-TRAJECTEN' };
+      const r = { code:'311212', naam:'X', datumAangevraagd:'1 aug 2026', offertes:'0/3',
+                  behandelaar:'Jer', deadline:'', opmerkingen:'',
+                  aannemers:'Jansen|1\nPietersen|1\nDe Vries|0', _row:9, _sec:'OFFERTE-TRAJECTEN' };
       _verrijkOfferteRij(r);
-      eq('offerte: het scherm toont de afgeleide stand, kolom D blijft de handmatige',
+      eq('offerte: de lijst ís de teller, kolom D blijft apart bewaard',
          [r._offertesManual, r.offertes], ['0/3', '2/3']);
       openModal(true, r);
-      eq('offerte: het bewerkscherm vult de teller met kolom D en niet met de afgeleide stand',
-         [waardeVan('m-off-recv'), waardeVan('m-off-total')], ['0', '3']);
+      eq('offerte: het bewerkscherm laadt de aannemerslijst als werkkopie',
+         modalAannemersCel(), 'Jansen|1\nPietersen|1\nDe Vries|0');
+      modalAannemerBinnen(2);
+      eq('offerte: vinkje in het scherm muteert alleen de werkkopie',
+         [modalAannemersCel().split('\n')[2], r.aannemers.split('\n')[2]], ['De Vries|1', 'De Vries|0']);
       closeModal();
-      // Tegenproef: een rij die nooit verrijkt is (geen aannemerslijst) heeft geen _offertesManual
-      // en moet gewoon zijn eigen waarde tonen.
-      openModal(true, { code: '311213', naam: 'Y', datumAangevraagd: '', offertes: '1/2',
-                        behandelaar: '', deadline: '', opmerkingen: '', _row: 10, _sec: 'OFFERTE-TRAJECTEN' });
-      eq('offerte: zonder aannemerslijst blijft de eigen waarde staan',
-         [waardeVan('m-off-recv'), waardeVan('m-off-total')], ['1', '2']);
-      closeModal();
-    } finally { state.editRowData = editOud; closeModal(); }
+    } finally { state.editRowData = editOud; closeModal(); clearModal(); }
   })();
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -13924,20 +13922,20 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     }
   })();
 
-  // ── nietOpgeslagenVelden kent nu ook de offerte-teller en de fase-kiezer ──
+  // ── nietOpgeslagenVelden kent nu ook de aannemerslijst en de fase-kiezer ──
   (() => {
-    console.log('%c[TESTS] Verplaats-waarschuwing: teller en fase tellen mee', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    console.log('%c[TESTS] Verplaats-waarschuwing: aannemerslijst en fase tellen mee', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
     const zet=(id,v)=>{const e=document.getElementById(id); if(e){e.value=v==null?'':v;}};
-    // Offerte: alle gewone velden gelijk aan de rij; alleen de teller wijkt af.
+    // Offerte: alle gewone velden gelijk aan de rij; alleen de aannemerslijst wijkt straks af.
     const off={_sec:'OFFERTE-TRAJECTEN',code:'311001',naam:'V',datumAangevraagd:'',behandelaar:'',
-               deadline:'',opmerkingen:'',subcategorie:'',offertes:'2/3',_offertesManual:'2/3'};
+               deadline:'',opmerkingen:'',subcategorie:'',aannemers:'MoTec|1'};
     ['m-daang','m-beh-o','m-dl-o','m-opm-o','m-sub-off'].forEach(id=>zet(id,''));
-    zet('m-off-recv','2'); zet('m-off-total','3');
-    eq('verplaats: gelijke teller → geen waarschuwing', nietOpgeslagenVelden(off), []);
-    zet('m-off-recv','3');
-    truthy('verplaats: gewijzigde offerte-teller wordt genoemd',
-           nietOpgeslagenVelden(off).some(l=>/Ontvangen/.test(l)));
-    zet('m-off-recv','2');
+    zetModalAannemers('MoTec|1');
+    eq('verplaats: gelijke aannemerslijst → geen waarschuwing', nietOpgeslagenVelden(off), []);
+    zetModalAannemers('MoTec|1\nVan der Herp|0');
+    truthy('verplaats: gewijzigde aannemerslijst wordt genoemd',
+           nietOpgeslagenVelden(off).some(l=>/Aangevraagd bij/.test(l)));
+    zetModalAannemers('');
     // Subsidie: een klik op een fase-bolletje telt als niet-opgeslagen wijziging.
     const sub={_sec:'SUBSIDIE-TRAJECTEN',code:'311001',naam:'V',subsidie:'',behandelaar:'',
                deadline:'',opmerkingen:'',subcategorie:'',subsidieFase:'Aangevraagd',inBehandeling:'FALSE'};

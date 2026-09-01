@@ -100,8 +100,8 @@ function _verrijkOfferteRij(r){
   // aannemers zijn. Kolom D in de Sheet blijft ongewijzigd.
   if(r._offertesManual===undefined) r._offertesManual=r.offertes;
   r._aannemers=parseAannemers(r.aannemers);
-  // Handmatige D-waarde = ondergrens, aannemer-vinkjes kunnen 'm alleen ophogen (reconcileOffertes).
-  // Voorheen overschreef de aannemerslijst de D-waarde blind → een handmatig "1/3" werd "0/3".
+  // Sinds v12.5: staat er een aannemerslijst, dan ís die de teller (reconcileOffertes) — de
+  // handmatige D-waarde blijft alleen staan voor rijen ZONDER lijst (van vóór de aannemerslijst).
   r.offertes=reconcileOffertes(r._offertesManual, r._aannemers);
   return r;
 }

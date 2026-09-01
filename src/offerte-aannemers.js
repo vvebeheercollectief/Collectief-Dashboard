@@ -164,5 +164,15 @@ function verwijderAannemer(sleutel, idx){
   _bewaar(r, vorige);
 }
 
+// Vanuit het BEWERKSCHERM: de complete werkkopie in één keer wegschrijven (kolom P). Zelfde
+// schrijfweg als de paneel-mutaties (_bewaar), zodat guard en rollback niet uit elkaar lopen.
+// Komt in de seriële wachtrij ná de A..K-write van submitTask — zelfde plek als koppelTaak.
+function schrijfAannemers(r, nieuweCel){
+  if(blokkeerOffline()) return;
+  const vorige=r.aannemers;
+  r.aannemers=nieuweCel;
+  _bewaar(r, vorige);
+}
+
 export { addAannemer, toggleAannemerBinnen, verwijderAannemer,
-         hernoemAannemer, startHernoem, stopHernoem };
+         hernoemAannemer, startHernoem, stopHernoem, schrijfAannemers };

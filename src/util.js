@@ -511,12 +511,6 @@ function persBadges(v, kort){
 }
 
 
-function adjOff(id,delta){
-  const el=document.getElementById(id);
-  if(!el)return;
-  el.value=Math.max(0,(parseInt(el.value)||0)+delta);
-}
-
 // "X/N" → [ontvangen, aangevraagd]
 function parseOff(v){
   const [recv, req] = ((v||'')+'').split('/').map(s => parseInt(s)||0);
@@ -557,8 +551,8 @@ function serializeAannemers(lijst){
   return (lijst||[]).map(a=>`${(a.naam||'').replace(/[|\n]/g,' ').trim()}|${a.binnen?1:0}`).join('\n');
 }
 // Afgeleide "X/N binnen": N = aantal aannemers, X = aantal met offerte binnen. Leeg → ''.
-// NIET IN GEBRUIK door de app: `reconcileOffertes` hieronder heeft hem vervangen, want die neemt
-// de handmatig ingevulde kolom-D-waarde als ONDERGRENS mee. Alleen de zelftest roept hem nog aan.
+// NIET IN GEBRUIK door de app: `reconcileOffertes` hieronder heeft hem vervangen, want die kent
+// ook het geval ZONDER lijst (dan blijft kolom D staan). Alleen de zelftest roept hem nog aan.
 function deriveOffertes(lijst){
   if(!lijst||!lijst.length) return '';
   return `${lijst.filter(a=>a.binnen).length}/${lijst.length}`;
@@ -852,7 +846,7 @@ export {
   DEADLINE_VOORSTEL, DEADLINE_HINT, voorgesteldeDeadline, AF_PERIODES, periodeBereik,
   opvolgStatus, volgendeDeadline, HERHAAL_MAANDEN, _vandaagAmsterdam, isoWeek,
   _verschilInKalenderdagen, berekenPrioriteit, prioBadge, persBadges,
-  adjOff, offProg, _MAANDEN, _parseAnyDate, parseDt, toISODate, toDutchDate, leegBijErfenis, nieuwTaakId,
+  offProg, _MAANDEN, _parseAnyDate, parseDt, toISODate, toDutchDate, leegBijErfenis, nieuwTaakId,
   emptyRow, esc, vveCodeSpan, subBadge, taakActieKnoppen, coerceDagenVooraf,
   parseOff, offerteFase,
   parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, aannSleutel,

@@ -14,7 +14,7 @@ import {
 } from './render-overig.js';
 import { openModal, completeTask, completeCurrentEditTask, deleteCurrentEditTask, zetSubsidieFase, kiesModalFase, zetHoortBij, taakUitCache, renderExtraVves, herzieAlsSubtaak, _bewerkRijVers } from './crud.js';
 import { ontkoppelTaak } from './bundel-acties.js';
-import { adjOff } from './util.js';
+import { modalAannemerAdd, modalAannemerBinnen, modalAannemerWeg } from './modal-aannemers.js';
 import { copyAiPrompt, aiOvernemen, aiActieTaak, aiKopieerConcept, prefillNieuweTaak } from './ai.js';
 import { dismissToast, saveNotifPrefs, showToast } from './notifications.js';
 import { doLogin } from './auth.js';
@@ -36,7 +36,6 @@ const PAG_RENDER = { ntd:renderNtd, af:renderAf, alvo:renderAlvo, alfa:renderAlf
 export const ACTIONS = {
   'toggle':                (el) => { el.setAttribute('aria-checked', el.classList.toggle('on')); },
   'notif-toggle':          (el) => { el.setAttribute('aria-checked', el.classList.toggle('on')); saveNotifPrefs(); },
-  'off':                   (el) => adjOff(el.dataset.off, +el.dataset.delta),
   // Fase-bolletje in een tabelrij: schrijft meteen weg naar kolom D.
   'subsidie-fase':         (el) => zetSubsidieFase(+el.dataset.rid, +el.dataset.fase),
   // Hetzelfde bolletje in het bewerkscherm: zet alleen de lokale stand; pas bij
@@ -178,6 +177,11 @@ export const ACTIONS = {
   // met Enter of door ergens anders te klikken (zie de toetsen- en blur-afhandeling hieronder).
   'offerte-aann-hernoem':  (el) => startHernoem(el.dataset.aann, +el.dataset.idx),
   'offerte-aann-add':      (el) => { const inp=el.closest('.of-aann-add')?.querySelector('.of-aann-input'); if(!inp) return; const v=inp.value; inp.value=''; addAannemer(el.dataset.aann, v); },
+  // Zelfde lijst, maar dan in het aanmaak-/bewerkscherm: mutaties op de WERKKOPIE
+  // (modal-aannemers.js), er wordt pas bij Opslaan geschreven.
+  'maann-binnen':          (el) => modalAannemerBinnen(+el.dataset.idx),
+  'maann-weg':             (el) => modalAannemerWeg(+el.dataset.idx),
+  'maann-add':             ()   => { const inp=document.getElementById('m-aann-input'); if(!inp) return; const v=inp.value; inp.value=''; modalAannemerAdd(v); },
   'herhaal-bewerken':      (el) => openHerhaalModal(+el.dataset.hid),
   'herhaal-status':        (el) => toggleHerhaalStatus(+el.dataset.hid),
   'herhaal-verwijderen':   ()   => deleteHerhaal(),
@@ -239,6 +243,13 @@ export function initActions() {
   document.addEventListener('keydown', (e) => {
     if (e.target && e.target.id === 'dos-tekst' && (e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault(); addContactLog();
+    }
+    // Aannemer toevoegen in het BEWERKSCHERM: Enter in het modal-invoerveld (werkkopie).
+    if (e.target && e.target.id === 'm-aann-input' && e.key === 'Enter') {
+      e.preventDefault();
+      const v = e.target.value; e.target.value = '';
+      modalAannemerAdd(v);
+      return;
     }
     // Offerte-aannemer toevoegen: Enter in het inline invoerveld (delegatie: veld leeft kort)
     if (e.target && e.target.classList && e.target.classList.contains('of-aann-input') && e.key === 'Enter') {

@@ -84,6 +84,7 @@ const APP_SHELL = [
   './src/render-overig.js',
   './src/render-analytics.js',
   './src/offerte-aannemers.js',
+  './src/modal-aannemers.js',
   './src/vve-zoekveld.js',
   './src/weekkiezer.js',
   './src/opmaak.js',

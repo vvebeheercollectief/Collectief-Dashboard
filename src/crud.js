@@ -17,6 +17,8 @@ import { backgroundWrite, loadAll, blokkeerOffline } from "./data.js";
 import { faseIndex, faseWoord, faseRijHtml, faseWijziging, SUBSIDIE_FASES } from "./subsidie-fase.js";
 import { bouwBundelIndex, bundelVerwijzing, openSubtaken, bundelWaarschuwing, heeftSubtaken } from "./bundel.js";
 import { koppelTaak } from "./bundel-acties.js";
+import { zetModalAannemers, modalAannemersCel } from "./modal-aannemers.js";
+import { schrijfAannemers } from "./offerte-aannemers.js";
 import { vraagBevestiging } from "./bevestig.js";
 import { setNtd, renderNtd, ntdPagina } from "./render-lijsten.js";
 
@@ -348,13 +350,9 @@ export function nietOpgeslagenVelden(r){
   // opsomming hierboven — terwijl de vraagtekst als een VOLLEDIGE opsomming leest en
   // `verplaatsWaarden` ze uit het rij-object neemt: de wijziging verdween dan zonder één woord
   // (naloop 2026-08-28).
-  //  · De offerte-teller: twee losse nummerveldjes, vergeleken tegen de RAUWE kolom D
-  //    (`_offertesManual`), precies zoals fillModalFields hem vult.
-  if(r._sec==='OFFERTE-TRAJECTEN' && document.getElementById('m-off-recv')){
-    const ruw=((r._offertesManual!==undefined?r._offertesManual:r.offertes)||'');
-    const [o,t]=ruw.split('/').map(s=>parseInt(s)||0);
-    if((parseInt(gv('m-off-recv'))||0)!==(o||0) || (parseInt(gv('m-off-total'))||0)!==(t||0))
-      uit.push(labels.offertes||'Ontvangen/Aangevr.');
+  //  · De aannemerslijst: werkkopie in modal-aannemers.js, geen gewoon invoerveld.
+  if(r._sec==='OFFERTE-TRAJECTEN' && document.getElementById('m-aann')){
+    if(modalAannemersCel()!==(r.aannemers||'')) uit.push('Aangevraagd bij');
   }
   //  · De fase-kiezer: modulestand (_modalFase), geen DOM-veld. Alleen een échte klik van de
   //    gebruiker telt (_faseGekozen) — de genormaliseerde weergave van een rommelwaarde niet.
@@ -378,18 +376,14 @@ function fillModalFields(sec,r){
       tog('tog-ib-v',r.inBehandeling==='TRUE');break;
     case'OFFERTE-TRAJECTEN':
       zetDatumVeld('m-daang',r.datumAangevraagd);setv('m-beh-o',r.behandelaar);
-      // `_offertesManual` vóór `offertes`: dat eerste IS kolom D, het tweede is wat het scherm
-      // ervan maakt. `_verrijkOfferteRij` tilt de teller in het geheugen op tot het aantal
-      // aangevinkte aannemers (kolom D telt daarbij als ondergrens) en schrijft dat in `offertes`.
-      // Las dit veld die afgeleide waarde, dan zette één keer opslaan hem alsnog in kolom D — en
-      // omdat de ondergrens met Math.max werkt, kwam je daar nooit meer onder: een vinkje weghalen
-      // veranderde de teller daarna niet meer. Gemeten: kolom D '0/3' met twee vinkjes toonde '2/3'.
-      {const ruwOff=((r._offertesManual!==undefined?r._offertesManual:r.offertes)||'');
-      const[ontv,totaal]=ruwOff.split('/').map(s=>parseInt(s)||0);
-      setv('m-off-recv',ontv||0);setv('m-off-total',totaal||0);
-      // Twee tellers kunnen alleen 'n/m' weergeven. Staat er iets anders in kolom D, dan blijft
-      // dat staan in plaats van als lege teller te worden weggeschreven.
-      onthoudOnvertaalbaar('m-off', ruwOff, /^\s*\d+\s*\/\s*\d+\s*$/.test(ruwOff) ? ruwOff : '');}
+      // De aannemerslijst (kolom P) ís sinds v12.5 de teller. Het scherm werkt op een
+      // werkkopie; submitTask schrijft hem bij Opslaan weg (zie modal-aannemers.js).
+      zetModalAannemers(r.aannemers||'');
+      // Kolom D (de oude X/N-teller) heeft geen invoerveld meer. Alles wat erin staat is dus
+      // per definitie 'niet te tonen' en gaat via het onvertaalbaar-mechanisme ONGEWIJZIGD
+      // terug de Sheet in — rijen van vóór de aannemerslijst houden zo hun oude getal.
+      // `_offertesManual` vóór `offertes`: dat eerste IS kolom D (zie _verrijkOfferteRij).
+      onthoudOnvertaalbaar('m-off', ((r._offertesManual!==undefined?r._offertesManual:r.offertes)||''), '');
       zetDatumVeld('m-dl-o',r.deadline);setv('m-opm-o',r.opmerkingen);setv('m-sub-off',r.subcategorie);break;
     case'LOD':
       setv('m-actie-l',r.actiepunt);setv('m-stat-l',r.status);setv('m-beh-l',r.behandelaar);
@@ -531,7 +525,7 @@ function clearModal(){
   // nog niet in de lijst staat), dan leest submitTask hier de náám van de vorige VvE en belandt
   // die in de Sheet.
   ['m-naam'].forEach(id=>{const el=document.getElementById(id);if(el){el.value='';delete el.dataset.code;}});
-  ['m-off-recv','m-off-total'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='0'});
+  zetModalAannemers('');
   ['tog-ib','tog-ib-v','tog-ib-l','tog-ib-s'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('on')});
   zetModalFase('');   // terug naar Voorbereiden, anders erft een nieuwe taak de vorige fase
   // Hetzelfde voor de bundel: een leeg formulier hoort bij géén bundel. openModal roept clearModal
@@ -707,10 +701,10 @@ const nulVeilig = v => (v === 0 || v) ? String(v) : '';
 // De RAUWE celwaarde van een veld — dus wat er in de Sheet hoort te staan, niet wat het scherm
 // toont. Er is precies één veld waar die twee verschillen: `offertes` (kolom D). Bij elke render
 // vervangt `_verrijkOfferteRij` (render-offerte.js) dat veld door de gereconcilieerde teller
-// (kolom D als ONDERGRENS, opgehoogd met de aangevinkte aannemers uit kolom P) en bewaart de
-// echte D-waarde in `_offertesManual`. Schrijf je die afgeleide waarde terug, dan wordt hij de
-// nieuwe ondergrens en kan de teller nooit meer omlaag: een vinkje weghalen bij een aannemer
-// verandert er dan niets meer aan, en dat is met de hand in de Sheet te herstellen.
+// (lijst in kolom P aanwezig → de lijst wint; zonder lijst blijft kolom D) en bewaart de echte
+// D-waarde in `_offertesManual`. Schrijf je die afgeleide waarde terug, dan belandt er een
+// teller in kolom D die daar nooit is ingevuld — en rijen van vóór de aannemerslijst horen hun
+// oude getal juist ongemoeid te houden.
 // `fillModalFields` deed dit al goed; de undo-serialisatie en de archiefrij niet. Eén helper,
 // zodat een vierde plek er niet opnieuw langs kan lopen.
 export const celWaarde = (r, k) =>
@@ -734,9 +728,9 @@ export function serializeNtdUndo(r){
   return v;
 }
 
-// Kolommen L..S achter de sectievelden van een NIEUWE taakrij. `values` loopt tot en met K, L t/m P
-// blijven leeg, en Q/R/S krijgen taaknummer, bundelnummer en volgnummer — dezelfde vaste posities
-// als serializeNtdUndo en afrondWaarden hierboven.
+// Kolommen L..S achter de sectievelden van een NIEUWE taakrij. `values` loopt tot en met K,
+// L..O blijven leeg, P = aannemerslijst, en Q/R/S krijgen taaknummer, bundelnummer en volgnummer
+// — dezelfde vaste posities als serializeNtdUndo en afrondWaarden hierboven.
 // Apart en puur om dezelfde reden als die twee: zo is te toetsen dat de bundel op R en S landt
 // zonder in te loggen. Eén lege string te weinig schuift het bundelnummer een kolom op en de rij
 // wordt gewoon geschreven — geen fout, alleen een taak die stil uit zijn bundel valt.
@@ -744,7 +738,7 @@ export function serializeNtdUndo(r){
 // tekst: verwisseld zou geen enkele toets erop aanslaan.
 export function toevoegWaarden(values, r){
   return values.concat([
-    '', '', '', '', '',                                      // L..P
+    '', '', '', '', r.aannemers||'',                         // L..O leeg, P = aannemerslijst
     r.taakId||'', r.bundelId||'', nulVeilig(r.bundelVolg),   // Q, R, S
   ]);
 }
@@ -1153,10 +1147,9 @@ export function afrondWaarden(r, sec, datum, toelichting, duurMin){
     // ging mis zodra de rij nog niet door een render was gegaan: `_verrijkOfferteRij` draait
     // alleen binnen `filterNtd`, en `renderAll` slaat over zolang de datahash gelijk blijft.
     // Dan stond er de RAUWE kolom D in — '0/3' terwijl er drie offertes binnen waren, en na
-    // het archiveren nergens meer terug te halen. `reconcileOffertes` geeft voor een verrijkte
-    // rij exact dezelfde uitkomst: `reconcileOffertes` neemt per kant het MAXIMUM, en de al
-    // verrijkte `r.offertes` is per definitie al ≥ de telling uit kolom P. Dit verandert dus niets
-    // aan het geval dat vandaag goed ging en repareert alleen het geval zonder render ervoor.
+    // het archiveren nergens meer terug te halen. `reconcileOffertes` geeft verrijkt of
+    // onverrijkt dezelfde uitkomst: lijst aanwezig → de lijst wint (wat er ook als eerste
+    // parameter staat); zonder lijst blijft de meegegeven kolom-D-waarde staan.
     k==='offertes' ? reconcileOffertes(r.offertes||'', parseAannemers(r.aannemers)) : (r[k]||'')
   );
   while(v.length<8) v.push('');               // OFFERTE heeft 7 velden → vul tot H
@@ -1375,11 +1368,10 @@ async function submitTask(){
       case'VERGADERVERZOEKEN':
         values=[code,naam,gv('m-per'),gv('m-agenda'),gv('m-beh-v'),uitVeld('m-dl-v',toDutchDate(gv('m-dl-v'))),gv('m-opm-v'),
           document.getElementById('tog-ib-v').classList.contains('on'),'','',sub];break;
-      case'OFFERTE-TRAJECTEN':{
-        const recv=parseInt(gv('m-off-recv'))||0;
-        const total=parseInt(gv('m-off-total'))||0;
-        const offStr=total>0?`${recv}/${total}`:'';
-        values=[code,naam,uitVeld('m-daang',toDutchDate(gv('m-daang'))),uitVeld('m-off',offStr),gv('m-beh-o'),uitVeld('m-dl-o',toDutchDate(gv('m-dl-o'))),gv('m-opm-o'),'','','',sub];break;}
+      case'OFFERTE-TRAJECTEN':
+        // Kolom D wordt niet meer bewerkt: het onvertaalbaar-mechanisme geeft de bestaande
+        // waarde ongewijzigd door (nieuwe taak: leeg — de aannemerslijst ís de teller).
+        values=[code,naam,uitVeld('m-daang',toDutchDate(gv('m-daang'))),uitVeld('m-off',''),gv('m-beh-o'),uitVeld('m-dl-o',toDutchDate(gv('m-dl-o'))),gv('m-opm-o'),'','','',sub];break;
       case'LOD':
         values=[code,naam,gv('m-actie-l'),gv('m-stat-l'),gv('m-beh-l'),uitVeld('m-dl-l',toDutchDate(gv('m-dl-l'))),gv('m-opm-l'),
           document.getElementById('tog-ib-l').classList.contains('on'),'','',sub];break;
@@ -1441,6 +1433,8 @@ async function submitTask(){
       // De in 'Hoort bij' aangewezen doeltaak NU vastpakken: het closeModal/clearModal hieronder
       // wist die keuze (een leeg formulier hoort bij geen bundel), en dan is hij weg.
       const hbDoel=state._hbDoel;
+      // De aannemerslijst NU uitlezen, om dezelfde reden als hbDoel: clearModal wist de werkkopie.
+      const aannCel = sec==='OFFERTE-TRAJECTEN' ? modalAannemersCel() : null;
       keys.forEach((k,i)=>{ doelRow[k]=norm(values[i]); });
       doelRow.subcategorie=values[values.length-1];
       // Offerte: gooi de gecachete handmatige X/N weg zodat de net-bewerkte kolom-D-waarde
@@ -1499,6 +1493,9 @@ async function submitTask(){
       // niet naar vóór de backgroundWrite hierboven: het gaat daar vandaag ook goed, maar dan
       // hangt de volgorde aan die ene await in koppelTaak in plaats van aan de plek in de wachtrij.
       if(hbDoel) koppelTaak(doelRow, hbDoel);
+      // De aannemerslijst is net als de bundelkoppeling een APARTE schrijfweg (kolom P): de
+      // hoofd-write blijft strikt A..K. Zelfde plek in de wachtrij, om dezelfde reden.
+      if(aannCel!==null && aannCel!==(oudeWaarden.aannemers||'')) schrijfAannemers(doelRow, aannCel);
     } else {
       // ── Toevoegen: rij meteen lokaal tonen, dan op de achtergrond opslaan ──
       const afterRow=getInsertRow(sec);
@@ -1523,6 +1520,9 @@ async function submitTask(){
       const bdl=state._nieuwBundel;
       nieuw.bundelId  = bdl ? bdl.bundelId : '';
       nieuw.bundelVolg= bdl ? bdl.volg     : '';
+      // De aannemerslijst gaat bij een nieuwe taak mee in de rij zelf (kolom P) — één
+      // atomaire A..S-write, geen tweede actie.
+      nieuw.aannemers = sec==='OFFERTE-TRAJECTEN' ? modalAannemersCel() : '';
       // De vlag wordt hier bewust NIET gewist. Het `closeModal` een paar regels verderop doet dat
       // al — net als élke andere sluitweg — en tussen dit punt en dat closeModal staat `renderAll()`.
       // Gooit die, dan blijft dit venster open via de catch onderaan submitTask, en met een al
@@ -1625,6 +1625,7 @@ async function submitTask(){
         extraRij.subcategorie = vals[vals.length-1];
         extraRij.taakId = uniekTaakId();
         extraRij.bundelId = ''; extraRij.bundelVolg = '';
+        extraRij.aannemers = nieuw.aannemers;   // zelfde aanvraag, zelfde aannemers per VvE
         blokValues.push(toevoegWaarden(vals, extraRij));
         rijen.push(extraRij);
       });

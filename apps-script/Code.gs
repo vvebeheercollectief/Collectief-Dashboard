@@ -95,9 +95,11 @@ function verplaatsAfgerond(e) {
 
 // Eén afgevinkte rij naar 'Afgerond'. Los van de trigger zodat een bereik van meerdere rijen er
 // rij voor rij langs kan; elke `return` hierin slaat alleen díé rij over.
-// SYNC — spiegel van reconcileOffertes + parseOff + parseAannemers (src/util.js), voor de
-// afvink-in-de-Sheet-weg hierboven: X/N uit kolom D is een handmatige ONDERGRENS; het aantal
-// aangevinkte (|1) aannemers in kolom P en de lijstlengte tillen hem op. Geen lijst → D rauw.
+// SYNC — spiegel van reconcileOffertes + parseAannemers (src/util.js), voor de
+// afvink-in-de-Sheet-weg hierboven: staat er een aannemerslijst in kolom P, dan telt alléén
+// de lijst (X = aantal |1, N = lijstlengte). Geen lijst → kolom D rauw (rijen van vóór de
+// aannemerslijst). Sinds v12.5 — de oude ondergrens (Math.max per kant) is weg, gelijk met
+// de frontend; anders archiveerden Sheet-afvinken en dashboard-afronden verschillende tellers.
 function cd_reconcileOffertes(rauwD, aannemersCel) {
   var lijst = ((aannemersCel == null ? '' : aannemersCel) + '').split('\n')
     .map(function (l) { return l.trim(); }).filter(function (l) { return l; });
@@ -107,9 +109,7 @@ function cd_reconcileOffertes(rauwD, aannemersCel) {
     var p = lijst[i].lastIndexOf('|');
     if (p >= 0 && lijst[i].slice(p + 1).trim() === '1') binnen++;
   }
-  var delen = ((rauwD == null ? '' : rauwD) + '').split('/');
-  var mRecv = parseInt(delen[0], 10) || 0, mReq = parseInt(delen[1], 10) || 0;
-  return Math.max(mRecv, binnen) + '/' + Math.max(mReq, lijst.length);
+  return binnen + '/' + lijst.length;
 }
 
 function cd_archiveerRij(sheet, row) {
@@ -163,12 +163,12 @@ function cd_archiveerRij(sheet, row) {
   // A..H kan letterlijk mee: dat is in beide tabbladen exact SECS[sec].keys, in dezelfde volgorde.
   var archief = rowData.slice(0, 8);
   while (archief.length < 8) archief.push("");
-  // Offerte-trajecten: kolom D eerst optillen tot wat de aannemerslijst (kolom P) al weet —
-  // exact wat de afrondweg in het dashboard doet (reconcileOffertes in src/crud.js:
-  // "de afgeleide teller is het enige wat er van die lijst overblijft"). Deze Sheet-afvinkweg
-  // archiveerde de rauwe ondergrens ('0/3' terwijl er twee van drie binnen waren) en de lijst
-  // zelf gaat hieronder bewust niet mee (M..P leeg) — de echte stand was dus definitief weg
-  // (naloop 2026-08-28).
+  // Offerte-trajecten: kolom D eerst afleiden uit de aannemerslijst (kolom P) — lijst
+  // aanwezig → lijst wint; zonder lijst blijft kolom D. Exact wat de afrondweg in het
+  // dashboard doet (reconcileOffertes). De lijst zelf gaat hieronder bewust niet mee
+  // (M..P leeg), dus de afgeleide teller is het enige wat er van die lijst overblijft;
+  // deze Sheet-afvinkweg archiveerde eerder de rauwe kolom D ('0/3' terwijl er twee van
+  // drie binnen waren) en dan was de echte stand definitief weg (naloop 2026-08-28).
   if (sectie === "OFFERTE-TRAJECTEN") archief[3] = cd_reconcileOffertes(rowData[3], rowData[15]);
   archief.push(datumAfgerond);              // I = afgerond op
   archief.push("");                         // J = toelichting (bij afvinken in de Sheet is die er niet)

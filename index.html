@@ -586,27 +586,11 @@
             <select id="m-beh-o"><option value="">Selecteer…</option><option>Jer</option><option>Cihad</option><option>Gabos</option><option>Cihad, Jer</option></select>
           </div>
         </div>
-        <div class="fld-row">
-          <div class="fld">
-            <label>Offertes ontvangen / aangevraagd</label>
-            <div class="off-counter">
-              <span class="off-lbl">Ontvangen</span>
-              <div class="off-spin">
-                <button type="button" class="off-btn" data-action="off" data-off="m-off-recv" data-delta="-1">−</button>
-                <input type="number" id="m-off-recv" min="0" value="0" class="off-inp">
-                <button type="button" class="off-btn" data-action="off" data-off="m-off-recv" data-delta="1">+</button>
-              </div>
-              <span class="off-sep">/</span>
-              <span class="off-lbl">Aangevraagd</span>
-              <div class="off-spin">
-                <button type="button" class="off-btn" data-action="off" data-off="m-off-total" data-delta="-1">−</button>
-                <input type="number" id="m-off-total" min="0" value="0" class="off-inp">
-                <button type="button" class="off-btn" data-action="off" data-off="m-off-total" data-delta="1">+</button>
-              </div>
-            </div>
-          </div>
-          <div class="fld"><label>Deadline</label><input type="date" id="m-dl-o" aria-describedby="dl-hint-o"/><small class="dl-hint" id="dl-hint-o"></small></div>
+        <div class="fld">
+          <label>Aangevraagd bij</label>
+          <div id="m-aann"></div>
         </div>
+        <div class="fld"><label id="m-dl-o-label">Deadline</label><input type="date" id="m-dl-o" aria-describedby="dl-hint-o"/><small class="dl-hint" id="dl-hint-o"></small></div>
         <div class="fld"><label>Opmerkingen</label><textarea id="m-opm-o"></textarea></div>
         <div class="fld"><label>Subcategorie</label><select id="m-sub-off"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option><option>Subsidie-trajecten</option></select></div>
       </div>

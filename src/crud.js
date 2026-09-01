@@ -1669,7 +1669,10 @@ async function submitTask(){
         const pg = ntdPagina(getekend, nieuw);
         if(pg && pg!==pgs.ntd){ pgs.ntd = pg; renderNtd(); }
       }
-      flashRow('ntd-tbody', nieuw._row, 'rij-flits-groen');
+      // De groene flits komt pas ná maakVoorlegSubtaken verderop: die hertekent de lijst nog in
+      // dezelfde synchrone beurt (en schuift nieuw._row op), en elke hertekening veegt de
+      // flits-class stil van de rij. Hier flitsen was dus onzichtbaar bij elk offerte-traject —
+      // en bij extra VvE's ook, want ook díe weg hertekent hieronder nog een keer.
       // De extra VvE's NU uitlezen: het `clearModal` hieronder wist ze, net als de bundelkeuze en
       // de 'Hoort bij'-doeltaak. Dezelfde afweging, dezelfde plek.
       // De extra's nog één keer langs de HOOFD-VvE halen. `voegExtraVveToe` vergelijkt op het moment
@@ -1744,6 +1747,10 @@ async function submitTask(){
       // De voorleg-subtaken EERST in de wachtrij — zie maakVoorlegSubtaken over de
       // ankervolgorde (OPPAKKEN ligt boven het offerteblok).
       if(autoVoorleg) maakVoorlegSubtaken(rijen, gebruikteIds);
+      // Pas ná ALLE renders van deze beurt flitsen (zie het comment bij de oude plek hierboven):
+      // nieuw._row draagt hier de subtaak-verschuiving al, en de getekende <tr> blijft nu staan
+      // tot de animatie klaar is.
+      flashRow('ntd-tbody', nieuw._row, 'rij-flits-groen');
       let ingevoegd=false;
       backgroundWrite(
         async ()=>{

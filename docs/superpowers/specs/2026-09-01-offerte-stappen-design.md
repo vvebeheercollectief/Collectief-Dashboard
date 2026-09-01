@@ -131,7 +131,11 @@ Drie klachten over het tabblad Offerte-trajecten, in één samenhangend ontwerp:
   géén bundel (isBundel eist ≥2, src/bundel.js:118) en rendert als normale rij — onschadelijk,
   bestaande fouttoast meldt het.
 - De subtaak verschijnt door de bestaande bundel-rendering vanzelf in het uitklappaneel
-  onder het traject (absorptie uit de vlakke lijst werkt al sectie-overstijgend).
+  onder het traject: bouwBundelIndex kijkt sectie-overstijgend. Absorptie uit de vlakke
+  lijst (wordtGeabsorbeerd, src/bundel.js:178-184) werkt daarentegen alléén binnen
+  hetzelfde tabblad — de kop staat in Offerte-trajecten, dus de subtaak blijft in
+  Oppakken gewoon als rij staan, mét bundel-merkje, én verschijnt in het paneel onder
+  het traject. Dat is precies de bedoeling: in Oppakken is hij afvinkbaar werk.
 - **Niet** aanmaken wanneer de nieuwe taak zelf al een subtaak is (state._nieuwBundel gezet)
   — structuur blijft één laag diep (magKoppelen-regel). Bij "Ook voor andere VvE's" krijgt
   **elk** aangemaakt traject zijn eigen subtaak.

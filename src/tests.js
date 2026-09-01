@@ -39,7 +39,7 @@ import { extraVves, wisExtraVves, voegExtraVveToe, verwijderExtraVve, extraVvesH
 import { verplaatsTaak, verplaatsWaarden, verlorenVelden, verplaatsVraagTekst, _veldLabel } from "./verplaats.js";
 import { addAannemer, verwijderAannemer, toggleAannemerBinnen, hernoemAannemer, startHernoem, stopHernoem, opgevolgd } from "./offerte-aannemers.js";
 import { zetModalAannemers, modalAannemersCel, modalAannemerBinnen } from "./modal-aannemers.js";
-import { voorlegValues, VOORLEG_ACTIE } from "./offerte-stappen.js";
+import { voorlegValues, VOORLEG_ACTIE, maakVoorlegSubtaken } from "./offerte-stappen.js";
 import { _verrijkOfferteRij, herstelAannemerFocus } from "./render-offerte.js";
 import { bouwBundelIndex, bundelWeergave, zichtbareKop, isBundel, bundelVan, bundelMetId, hernummerLeden, volgendeVolg, magKoppelen, wordtGeabsorbeerd, koppelKandidaten, taakFilter, openSubtaken, bundelWaarschuwing, bundelVerwijzing, bundelStand, zelfdeTaak } from "./bundel.js";
 import { bundelPaneelHtml, bundelMerkje, bundelKopExtra, STAPEL_GREEP } from "./render-bundel.js";
@@ -7802,6 +7802,39 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
        toevoegWaarden(voorlegValues('411006','X',''), {taakId:'T9', bundelId:'Tkop', bundelVolg:'10'}).slice(16),
        ['T9','Tkop','10']);
 
+    // ── De anker-vangrails: een mislukt subtaak-anker mag de traject-opslag nooit meetrekken ──
+    // maakVoorlegSubtaken staat bínnen submitTask's try; zou getInsertRow('OPPAKKEN') hier hard
+    // doorgooien, dan verviel de hele traject-write terwijl het traject al optimistisch op het
+    // scherm staat — "taak weg, opslaan leek te lukken". Beide vangrails keren terug VÓÓR enige
+    // mutatie, dus er valt hier ook niets terug te rollen.
+    (() => {
+      const bewaardNtd=D.ntd, bewaardInfo=D.ntdSecInfo;
+      try{
+        // 1) Geen OPPAKKEN-blok: getInsertRow gooit bewust hard — de vangrail slikt dat op.
+        D.ntd={ OPPAKKEN:[], 'OFFERTE-TRAJECTEN':[{ _row:9, _sec:'OFFERTE-TRAJECTEN', taakId:'Tx',
+                bundelId:'Tx', bundelVolg:'0', code:'311212', naam:'Testflat', behandelaar:'' }] };
+        D.ntdSecInfo={};
+        let gooit=false;
+        try{ maakVoorlegSubtaken(D.ntd['OFFERTE-TRAJECTEN'].slice(), new Set()); }
+        catch(_){ gooit=true; }
+        eq('voorleg-vangrail: zonder OPPAKKEN-blok geen throw en geen subtaak',
+           [gooit, D.ntd.OPPAKKEN.length], [false, 0]);
+        document.querySelectorAll('.toast').forEach(el => el.remove());
+        // 2) Blokvolgorde andersom: het OPPAKKEN-anker ligt niet bóven het traject. De dwingende
+        //    wachtrij-volgorde leunt op die ligging; klopt hij niet, dan liever géén subtaak dan
+        //    eentje n rijen te laag (parseSections gooit een rij pal onder een sectiekop stil weg).
+        D.ntd={ OPPAKKEN:[{ _row:50, _sec:'OPPAKKEN', taakId:'To', bundelId:'', bundelVolg:'',
+                            code:'311212', naam:'Testflat', actiepunt:'x', deadline:'' }],
+                'OFFERTE-TRAJECTEN':[{ _row:20, _sec:'OFFERTE-TRAJECTEN', taakId:'Ty', bundelId:'Ty',
+                            bundelVolg:'0', code:'311212', naam:'Testflat', behandelaar:'' }] };
+        let gooit2=false;
+        try{ maakVoorlegSubtaken(D.ntd['OFFERTE-TRAJECTEN'].slice(), new Set()); }
+        catch(_){ gooit2=true; }
+        eq('voorleg-vangrail: anker niet boven het offerteblok → overgeslagen zonder throw',
+           [gooit2, D.ntd.OPPAKKEN.length], [false, 1]);
+      } finally { D.ntd=bewaardNtd; D.ntdSecInfo=bewaardInfo; }
+    })();
+
     // En de vlag, via een ECHTE klik op de knop in het paneel. Rechtstreeks ACTIONS aanroepen zou
     // groen blijven als `data-bundel` op de knop ontbreekt of anders heet — de knop doet dan in de
     // app niets. Bovendien loopt alleen langs deze weg de volgorde mee die hier dwingend is:
@@ -10166,6 +10199,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const fStatus=state.ntdStatus, fSort=state.ntdSort, fBulk=state.bulkMode;
     const paginaVoor=(document.querySelector('.page.active')?.id || 'page-ntd').replace('page-','');
     const geschreven=[], ingevoegd=[];
+    let faalOppakken=false;   // deel 2: laat de subtaken-insert (anker 61) met een 500 falen
     const tik=() => new Promise(r => { const k=new MessageChannel(); k.port1.onmessage=()=>r(); k.port2.postMessage(0); });
     try {
       state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
@@ -10180,7 +10214,13 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         if(methode==='POST'){
           // Alleen de rij-invoegingen vastleggen; logEvents/append gaan hier ook langs.
           const ins=(JSON.parse(opt.body||'{}').requests||[]).find(r=>r.insertDimension);
-          if(ins) ingevoegd.push([ins.insertDimension.range.startIndex, ins.insertDimension.range.endIndex]);
+          if(ins){
+            ingevoegd.push([ins.insertDimension.range.startIndex, ins.insertDimension.range.endIndex]);
+            // Op ANKER en niet op volgorde: _withRetry probeert een 500 nog twee keer opnieuw, en
+            // elke poging moet falen — anders slaagt de herkansing en valt er niets terug te rollen.
+            if(faalOppakken && ins.insertDimension.range.startIndex===61)
+              return new Response(JSON.stringify({error:{message:'Internal error'}}),{status:500});
+          }
           return new Response(JSON.stringify({replies:[{}]}),{status:200});
         }
         return new Response(JSON.stringify({error:{message:'geen leesverkeer in deze test'}}),{status:403});
@@ -10198,7 +10238,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
                 bundelVolg:'', code:'311999', naam:'Ander', deadline:'' } ] };
       state.activeNtd='OFFERTE-TRAJECTEN'; pgs.ntd=1; state.bundelOpen=new Set();
       state._nieuwBundel=null; state._ntdVoorModal=null;
-      renderNtd();
+      goTo('ntd'); renderNtd();
       openModal(false);
       const kiezer=document.getElementById('m-sec');
       kiezer.value='OFFERTE-TRAJECTEN';
@@ -10208,6 +10248,14 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       document.getElementById('m-opm-o').value='Dakofferte aanvragen';
       voegExtraVveToe('311888','VvE Twee','311777');
       await submitTask();
+      // De groene flits, gemeten VÓÓR de writes draaien (daarna kan een render hem terecht
+      // opruimen): de flashRow moet ná de subtaak-render komen, anders veegt die hem in dezelfde
+      // synchrone beurt weg — en het rijnummer moet de subtaak-verschuiving al dragen. Bij
+      // 'verminder beweging' flitst er bewust niets (motionOk), dan zwijgt deze toets.
+      const motionAan=window.matchMedia('(prefers-reduced-motion: no-preference)').matches;
+      truthy('voorleg-e2e: de groene flits overleeft de subtaak-render op het verschoven rijnummer',
+             !motionAan || !!document.querySelector(
+               `#ntd-tbody tr[data-row="${D.ntd['OFFERTE-TRAJECTEN'].slice(-2)[0]._row}"].rij-flits-groen`));
       await state._writeChain;
 
       const trajecten=D.ntd['OFFERTE-TRAJECTEN'].slice(-2), subs=D.ntd.OPPAKKEN.slice(-2);
@@ -10233,6 +10281,36 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
          trajecten.map(t=>[...voorlegValues(t.code, t.naam, 'Cihad'), t.taakId, '10']));
       eq('voorleg-e2e: de trajectrijen dragen hun eigen nummer als bundelkop',
          ((geschreven[1]||{}).rijen||[]).map(r=>[r[16]===r[17], r[18]]), [[true,'0'],[true,'0']]);
+      for(let i=0;i<200 && state._loadInFlight;i++) await tik();
+
+      // ── Deel 2: de subtaken-write faalt, de trajecten-write mag NIET op het al-verschoven
+      // anker blijven rekenen. De rollback van de subtaken draait zijn +2 er weer af (offerteblok
+      // 92→90), dus de trajecten-insert hoort op het pre-shift-anker te landen: [90,92] — twee
+      // rijen, ná offerte-rij 90 — en niet op [92,94]. Dit is precies waarvoor versAnker ín de
+      // writeFn leest in plaats van bij de klik.
+      geschreven.length=0; ingevoegd.length=0; faalOppakken=true;
+      D.ntd={ ...leeg, OPPAKKEN:[ opp(60), opp(61) ],
+              'OFFERTE-TRAJECTEN':[ { _row:90, _sec:'OFFERTE-TRAJECTEN', taakId:'Toff', bundelId:'',
+                bundelVolg:'', code:'311999', naam:'Ander', deadline:'' } ] };
+      state.activeNtd='OFFERTE-TRAJECTEN'; pgs.ntd=1; renderNtd();
+      openModal(false);
+      kiezer.value='OFFERTE-TRAJECTEN';
+      kiezer.dispatchEvent(new Event('change', { bubbles:true }));
+      document.getElementById('m-code').value='311777';
+      document.getElementById('m-beh-o').value='Cihad';
+      document.getElementById('m-opm-o').value='Dakofferte aanvragen';
+      voegExtraVveToe('311888','VvE Twee','311777');
+      await submitTask();
+      await state._writeChain;
+      eq('voorleg-e2e: na een gefaalde subtaken-write landen de trajecten op het teruggerolde anker',
+         [ingevoegd[0], ingevoegd[ingevoegd.length-1]], [[61,63],[90,92]]);
+      truthy('voorleg-e2e: … en nergens op het nog-verschoven anker 92',
+             !ingevoegd.some(p=>p[0]===92));
+      eq('voorleg-e2e: … in één PUT op datzelfde anker',
+         ((geschreven[0]||{}).bereik), "'Nog Te Doen'!A91:S92");
+      eq('voorleg-e2e: en de subtaken zijn lokaal netjes weggerold',
+         D.ntd.OPPAKKEN.length, 2);
+      document.querySelectorAll('.toast').forEach(el => el.remove());
       for(let i=0;i<200 && state._loadInFlight;i++) await tik();
     } finally {
       window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;

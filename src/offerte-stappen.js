@@ -4,6 +4,15 @@
 //  OPPAKKEN een gebundelde subtaak. Zie docs/superpowers/specs/2026-09-01-offerte-stappen-design.md.
 //  Import-cyclus met crud.js is bewust en onschadelijk: alle over-en-weer-gebruik zit in
 //  functie-lichamen, niet op moduleniveau (zelfde situatie als crud ↔ main).
+//
+//  FAALPADEN, EERLIJK. (1) Mislukt de subtaken-write maar slaagt de trajecten-write, dan blijft
+//  een gewoon traject over: één lid met een bundelnummer is géén bundel (isBundel eist ≥2) en
+//  rendert als normale rij — onschadelijk. (2) Andersom — subtaken-write slaagt, trajecten-write
+//  faalt — blijft er een ÉCHTE voorleg-rij in Oppakken achter met een bundelId dat nergens meer
+//  naar wijst: die rendert als gewone rij en telt gewoon mee, terwijl de toast 'Toevoegen
+//  mislukt — wijziging teruggezet' zegt. Die rij wordt bewust NIET automatisch opgeruimd: dat
+//  zou een extra delete-write zijn met eigen faalkansen (bij een netwerkstoring faalt juist die
+//  óók), terwijl de achtergebleven rij zichtbaar is en met de hand te verwijderen.
 // ══════════════════════════════════════
 import { D } from "./state.js";
 import { nieuwTaakId } from "./util.js";
@@ -13,6 +22,7 @@ import { backgroundWrite } from "./data.js";
 import { getInsertRow, insertAndWriteRows, toevoegWaarden } from "./crud.js";
 import { logEvents } from "./render-overig.js";
 import { renderNtd } from "./render-lijsten.js";
+import { showToast } from "./notifications.js";
 
 export const VOORLEG_ACTIE = 'Offertes voorleggen aan eigenaren';
 
@@ -39,7 +49,31 @@ export function maakVoorlegSubtaken(trajecten, gebruikt){
   const lijst=(trajecten||[]).filter(t=>t && t.taakId && t.bundelId);
   if(!lijst.length) return;
   const uniek=()=>{ let id=nieuwTaakId(); while(gebruikt.has(id)) id=nieuwTaakId(); gebruikt.add(id); return id; };
-  const afterRow=getInsertRow('OPPAKKEN');
+  // Het anker mag de TRAJECT-opslag nooit meetrekken: deze aanroep staat bínnen submitTask's try,
+  // en getInsertRow gooit bewust hard als het OPPAKKEN-blok ontbreekt. Zonder deze vangrail
+  // verviel dan de hele traject-write terwijl het traject al optimistisch op het scherm staat en
+  // de modal dicht is — 'taak weg, opslaan leek te lukken'. Lukt het anker niet: GEEN subtaak en
+  // gewoon door (faalpad 1 hierboven); wél melden, anders zoekt niemand hem ooit.
+  //
+  // Dit anker passeert bewust geen bevestigInvoegPlek (die guard draait in submitTask alleen op
+  // het anker van de traject-sectie zelf): elke verschuiving die dít anker raakt ligt bóven het
+  // offerteblok en breekt dus óók die offerte-guard. De dekking is indirect, maar echt — en de
+  // volgorde-vangrail hieronder vangt de rest.
+  let afterRow;
+  try{ afterRow=getInsertRow('OPPAKKEN'); }
+  catch(e){
+    console.warn('[voorleg] OPPAKKEN-anker niet te bepalen, subtaak overgeslagen:', e && e.message);
+    showToast('Subtaak niet aangemaakt', 'Het offerte-traject zelf is wél opgeslagen. Maak "'+VOORLEG_ACTIE+'" zo nodig met de hand aan in Oppakken.', 'var(--rd)');
+    return;
+  }
+  // Vangrail op de blokVOLGORDE: de dwingende wachtrij-volgorde hieronder leunt erop dat het
+  // OPPAKKEN-blok bóven het offerteblok ligt. Ligt het anker NIET boven het verse traject-anker,
+  // dan klopt die aanname niet meer — en dan liever géén subtaak dan eentje n rijen te laag
+  // (parseSections gooit een rij pal onder een sectiekop stil weg).
+  if(afterRow >= Math.min(...lijst.map(t=>t._row))){
+    console.warn('[voorleg] OPPAKKEN-anker ('+afterRow+') ligt niet boven het offerteblok, subtaak overgeslagen');
+    return;
+  }
   const subs=[], blok=[];
   lijst.forEach((t,i)=>{
     const vals=voorlegValues(t.code, t.naam, t.behandelaar);

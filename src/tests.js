@@ -39,6 +39,7 @@ import { extraVves, wisExtraVves, voegExtraVveToe, verwijderExtraVve, extraVvesH
 import { verplaatsTaak, verplaatsWaarden, verlorenVelden, verplaatsVraagTekst, _veldLabel } from "./verplaats.js";
 import { addAannemer, verwijderAannemer, toggleAannemerBinnen, hernoemAannemer, startHernoem, stopHernoem, opgevolgd } from "./offerte-aannemers.js";
 import { zetModalAannemers, modalAannemersCel, modalAannemerBinnen } from "./modal-aannemers.js";
+import { voorlegValues, VOORLEG_ACTIE } from "./offerte-stappen.js";
 import { _verrijkOfferteRij, herstelAannemerFocus } from "./render-offerte.js";
 import { bouwBundelIndex, bundelWeergave, zichtbareKop, isBundel, bundelVan, bundelMetId, hernummerLeden, volgendeVolg, magKoppelen, wordtGeabsorbeerd, koppelKandidaten, taakFilter, openSubtaken, bundelWaarschuwing, bundelVerwijzing, bundelStand, zelfdeTaak } from "./bundel.js";
 import { bundelPaneelHtml, bundelMerkje, bundelKopExtra, STAPEL_GREEP } from "./render-bundel.js";
@@ -7793,6 +7794,14 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     eq('toevoegWaarden: zonder aannemers blijft P leeg',
        toevoegWaarden(velden(), { taakId:'T7' })[15], '');
 
+    // ── offerte: automatische subtaak 'voorleggen aan eigenaren' (v12.5) ──
+    eq('voorlegValues volgt het OPPAKKEN-stramien A..K',
+       voorlegValues('411006','VvE Herenstraat 9-9a','Cihad'),
+       ['411006','VvE Herenstraat 9-9a','Offertes voorleggen aan eigenaren','','Cihad','','','FALSE','','','']);
+    eq('voorleg-subtaak draagt de bundel van zijn traject',
+       toevoegWaarden(voorlegValues('411006','X',''), {taakId:'T9', bundelId:'Tkop', bundelVolg:'10'}).slice(16),
+       ['T9','Tkop','10']);
+
     // En de vlag, via een ECHTE klik op de knop in het paneel. Rechtstreeks ACTIONS aanroepen zou
     // groen blijven als `data-bundel` op de knop ontbreekt of anders heet — de knop doet dan in de
     // app niets. Bovendien loopt alleen langs deze weg de volgorde mee die hier dwingend is:
@@ -10133,6 +10142,104 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       D.ntd=bewaardNtd; D.af=bewaardAf; pgs.ntd=bewaardPg;
       state.bundelOpen=new Set(); state._nieuwBundel=null;
       closeModal(); clearModal();
+      state.activeNtd=bewaardSec; state._ntdVoorModal=null;
+      document.querySelectorAll('.toast').forEach(el => el.remove());
+      filterVelden.forEach((id, i) => document.getElementById(id).value = fWaarden[i]);
+      state.ntdStatus=fStatus; state.ntdSort=fSort; state.bulkMode=fBulk;
+      renderNtd(); renderNtdStats(); goTo(paginaVoor);
+    }
+  })();
+
+  // ── Nieuw offerte-traject = bundelkop + automatische voorleg-subtaak, tot in de Sheet ──
+  // De hele keten uit offerte-stappen.js met een gestubde fetch, mét 'Ook voor andere VvE's':
+  // twee trajecten, dus twee subtaken. Wat hier vastligt en nergens anders: de VOLGORDE in de
+  // wachtrij (subtaken-write éérst — OPPAKKEN ligt bóven het offerteblok, dus de trajecten-write
+  // moet zijn anker uit al-verschoven rij-objecten lezen) en de ankers van beide blokken. Gaat de
+  // volgorde ooit om, dan landt een traject pal onder een sectiekop en gooit parseSections hem
+  // stil weg — geen foutmelding, alleen een verdwenen taak.
+  await (async () => {
+    const _fetch=window.fetch, tokenOud=state.oauthToken, expiryOud=state.oauthExpiry;
+    const idsOud=state._sheetIds, cacheOud=state._uitCache, failsOud=state._syncFails;
+    const bewaardNtd=D.ntd, bewaardAf=D.af, bewaardSec=state.activeNtd, bewaardPg=pgs.ntd;
+    const filterVelden=['s-ntd','f-code-ntd','f-beh-ntd','f-prio-ntd'];
+    const fWaarden=filterVelden.map(id => document.getElementById(id).value);
+    const fStatus=state.ntdStatus, fSort=state.ntdSort, fBulk=state.bulkMode;
+    const paginaVoor=(document.querySelector('.page.active')?.id || 'page-ntd').replace('page-','');
+    const geschreven=[], ingevoegd=[];
+    const tik=() => new Promise(r => { const k=new MessageChannel(); k.port1.onmessage=()=>r(); k.port2.postMessage(0); });
+    try {
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
+      state._sheetIds={'Nog Te Doen':0}; state._uitCache=false;
+      window.fetch=async (url, opt) => {
+        const methode=(opt&&opt.method)||'GET';
+        if(methode==='PUT'){
+          geschreven.push({ bereik: decodeURIComponent(String(url)).split('/values/')[1].split('?')[0],
+                            rijen: JSON.parse(opt.body).values });
+          return new Response('{}',{status:200});
+        }
+        if(methode==='POST'){
+          // Alleen de rij-invoegingen vastleggen; logEvents/append gaan hier ook langs.
+          const ins=(JSON.parse(opt.body||'{}').requests||[]).find(r=>r.insertDimension);
+          if(ins) ingevoegd.push([ins.insertDimension.range.startIndex, ins.insertDimension.range.endIndex]);
+          return new Response(JSON.stringify({replies:[{}]}),{status:200});
+        }
+        return new Response(JSON.stringify({error:{message:'geen leesverkeer in deze test'}}),{status:403});
+      };
+      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const opp=(row) => ({ _row:row, _sec:'OPPAKKEN', taakId:'T'+row, bundelId:'', bundelVolg:'',
+        code:'311212', naam:'Testflat', actiepunt:'Bestaand werk '+row, deadline:'' });
+      filterVelden.forEach(id => document.getElementById(id).value = '');
+      state.ntdStatus=''; state.ntdSort={ key:null, asc:true }; state.bulkMode=false;
+      D.af={ ...leeg };
+      // OPPAKKEN bóven het offerteblok, zoals in de echte Sheet — de rijnummers hieronder
+      // bewijzen dan écht dat de subtaken-write het offerteblok mee omlaag schuift.
+      D.ntd={ ...leeg, OPPAKKEN:[ opp(60), opp(61) ],
+              'OFFERTE-TRAJECTEN':[ { _row:90, _sec:'OFFERTE-TRAJECTEN', taakId:'Toff', bundelId:'',
+                bundelVolg:'', code:'311999', naam:'Ander', deadline:'' } ] };
+      state.activeNtd='OFFERTE-TRAJECTEN'; pgs.ntd=1; state.bundelOpen=new Set();
+      state._nieuwBundel=null; state._ntdVoorModal=null;
+      renderNtd();
+      openModal(false);
+      const kiezer=document.getElementById('m-sec');
+      kiezer.value='OFFERTE-TRAJECTEN';
+      kiezer.dispatchEvent(new Event('change', { bubbles:true }));
+      document.getElementById('m-code').value='311777';
+      document.getElementById('m-beh-o').value='Cihad';
+      document.getElementById('m-opm-o').value='Dakofferte aanvragen';
+      voegExtraVveToe('311888','VvE Twee','311777');
+      await submitTask();
+      await state._writeChain;
+
+      const trajecten=D.ntd['OFFERTE-TRAJECTEN'].slice(-2), subs=D.ntd.OPPAKKEN.slice(-2);
+      eq('voorleg-e2e: elk traject is meteen zijn eigen bundelkop (R=eigen nummer, S=0)',
+         trajecten.map(t=>[t.bundelId===t.taakId, t.bundelVolg]), [[true,'0'],[true,'0']]);
+      eq('voorleg-e2e: elk traject krijgt zijn eigen subtaak in Oppakken',
+         subs.map(s=>[s.actiepunt, s.bundelId, s.bundelVolg, s.behandelaar]),
+         [[VOORLEG_ACTIE, trajecten[0].taakId, '10', 'Cihad'],
+          [VOORLEG_ACTIE, trajecten[1].taakId, '10', 'Cihad']]);
+      eq('voorleg-e2e: vier taken, vier verschillende taaknummers',
+         new Set([...trajecten,...subs].map(r=>r.taakId)).size, 4);
+      // De wachtrij: subtaken éérst (ná Oppakken-rij 61), de trajecten erna — op een anker dat de
+      // verschuiving van +2 al draagt (offerteblok 90→92, trajecten 91/92→93/94).
+      eq('voorleg-e2e: twee invoegingen, subtaken eerst en op de juiste ankers',
+         ingevoegd, [[61,63],[92,94]]);
+      eq('voorleg-e2e: de subtaakrijen landen als blok onder Oppakken',
+         (geschreven[0]||{}).bereik, "'Nog Te Doen'!A62:S63");
+      eq('voorleg-e2e: en de trajectrijen als blok onder het (verschoven) offerteblok',
+         (geschreven[1]||{}).bereik, "'Nog Te Doen'!A93:S94");
+      const subRijen=(geschreven[0]||{}).rijen||[[],[]];
+      eq('voorleg-e2e: de subtaakrij volgt het OPPAKKEN-stramien en draagt de bundel van zijn traject',
+         subRijen.map(r=>[...r.slice(0,11), r[17], r[18]]),
+         trajecten.map(t=>[...voorlegValues(t.code, t.naam, 'Cihad'), t.taakId, '10']));
+      eq('voorleg-e2e: de trajectrijen dragen hun eigen nummer als bundelkop',
+         ((geschreven[1]||{}).rijen||[]).map(r=>[r[16]===r[17], r[18]]), [[true,'0'],[true,'0']]);
+      for(let i=0;i<200 && state._loadInFlight;i++) await tik();
+    } finally {
+      window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
+      state._sheetIds=idsOud; state._uitCache=cacheOud; state._syncFails=failsOud;
+      D.ntd=bewaardNtd; D.af=bewaardAf; pgs.ntd=bewaardPg;
+      state.bundelOpen=new Set(); state._nieuwBundel=null;
+      wisExtraVves(); closeModal(); clearModal();
       state.activeNtd=bewaardSec; state._ntdVoorModal=null;
       document.querySelectorAll('.toast').forEach(el => el.remove());
       filterVelden.forEach((id, i) => document.getElementById(id).value = fWaarden[i]);

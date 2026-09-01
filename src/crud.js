@@ -18,6 +18,7 @@ import { faseIndex, faseWoord, faseRijHtml, faseWijziging, SUBSIDIE_FASES } from
 import { bouwBundelIndex, bundelVerwijzing, openSubtaken, bundelWaarschuwing, heeftSubtaken } from "./bundel.js";
 import { koppelTaak } from "./bundel-acties.js";
 import { zetModalAannemers, modalAannemersCel } from "./modal-aannemers.js";
+import { maakVoorlegSubtaken } from "./offerte-stappen.js";
 import { schrijfAannemers } from "./offerte-aannemers.js";
 import { vraagBevestiging } from "./bevestig.js";
 import { setNtd, renderNtd, ntdPagina } from "./render-lijsten.js";
@@ -1596,6 +1597,10 @@ async function submitTask(){
       // De aannemerslijst gaat bij een nieuwe taak mee in de rij zelf (kolom P) — één
       // atomaire A..S-write, geen tweede actie.
       nieuw.aannemers = sec==='OFFERTE-TRAJECTEN' ? modalAannemersCel() : '';
+      // Een nieuw offerte-traject wordt meteen bundelkop: R = eigen taaknummer, S = '0'.
+      // Niet wanneer dit zélf een subtaak is (state._nieuwBundel) — bundels blijven één laag diep.
+      const autoVoorleg = sec==='OFFERTE-TRAJECTEN' && !bdl;
+      if(autoVoorleg){ nieuw.bundelId=nieuw.taakId; nieuw.bundelVolg='0'; }
       // De vlag wordt hier bewust NIET gewist. Het `closeModal` een paar regels verderop doet dat
       // al — net als élke andere sluitweg — en tussen dit punt en dat closeModal staat `renderAll()`.
       // Gooit die, dan blijft dit venster open via de catch onderaan submitTask, en met een al
@@ -1697,7 +1702,8 @@ async function submitTask(){
         keys.forEach((k,j)=>{ extraRij[k]=norm(vals[j]); });
         extraRij.subcategorie = vals[vals.length-1];
         extraRij.taakId = uniekTaakId();
-        extraRij.bundelId = ''; extraRij.bundelVolg = '';
+        extraRij.bundelId  = autoVoorleg ? extraRij.taakId : '';   // elk traject zijn eigen bundel
+        extraRij.bundelVolg= autoVoorleg ? '0' : '';
         extraRij.aannemers = nieuw.aannemers;   // zelfde aanvraag, zelfde aannemers per VvE
         blokValues.push(toevoegWaarden(vals, extraRij));
         rijen.push(extraRij);
@@ -1735,6 +1741,9 @@ async function submitTask(){
         const levend=rijen.map(r=>{ const i=rijIndex(a2, r); return i>-1 ? a2[i] : null; }).filter(Boolean);
         return levend.length ? Math.min(...levend.map(r=>r._row))-1 : afterRow;
       };
+      // De voorleg-subtaken EERST in de wachtrij — zie maakVoorlegSubtaken over de
+      // ankervolgorde (OPPAKKEN ligt boven het offerteblok).
+      if(autoVoorleg) maakVoorlegSubtaken(rijen, gebruikteIds);
       let ingevoegd=false;
       backgroundWrite(
         async ()=>{

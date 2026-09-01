@@ -16,7 +16,7 @@
 // niet, terwijl elke bundel-toggle, sortering, paginawissel en toetsaanslag in het zoekveld een
 // renderNtd is. Dat kost geheugen, geen correctheid; behandel `state._rowCache` daarom niet als
 // een eindige of volledige lijst van wat er nú op het scherm staat.
-import { esc, taakTitel, taakVerwijzing, kortDatum, taakActieKnoppen, opvolgStatus, berekenPrioriteit } from "./util.js";
+import { esc, taakTitel, taakVerwijzing, kortDatum, taakActieKnoppen, opvolgStatus, berekenPrioriteit, offerteAangevraagd } from "./util.js";
 import { SECS } from "./config.js";
 import { wordtGeabsorbeerd, bundelSleutel, bundelStand, bundelVerwijzing } from "./bundel.js";
 // LET OP — dit is een KRINGETJE: render-tabel.js importeert hierboven al uit render-bundel.js.
@@ -147,10 +147,12 @@ function subRegel(m, i){
   // werk dat nog ruim op tijd is: de kop-pil zei 'N te laat' terwijl er in de hele lijst geen enkele
   // rij te zien was die dat liet zien. Eén bron voor 'wat is te laat', dus alleen opmaak hier.
   const prio = berekenPrioriteit(r.deadline, r._sec);
+  const _opvolg = r._sec==='OFFERTE-TRAJECTEN' && offerteAangevraagd(r);
   const dlTekst = !r.deadline
     ? `<span class="warn-geen-deadline geen-dl-dof">Geen deadline</span>`
-    : (prio.teLaat ? `<span class="s-telaat">Te laat (${Math.abs(prio.dagenTot)}d)</span>`
-                   : esc(kortDatum(r.deadline)));
+    : (prio.teLaat && _opvolg) ? `<span class="pill-opvolg">Opvolgen (${Math.abs(prio.dagenTot)}d)</span>`
+    : prio.teLaat ? `<span class="s-telaat">Te laat (${Math.abs(prio.dagenTot)}d)</span>`
+    : esc(kortDatum(r.deadline));
   // Het handvat is voor een schermlezer verborgen: het draagt geen eigen actie, alleen een
   // muisgebaar. Herordenen met het toetsenbord kan dus (nog) niet — die weg hoort bij het slepen
   // zelf en moet daar bewust gekozen worden, niet stil overgeslagen.

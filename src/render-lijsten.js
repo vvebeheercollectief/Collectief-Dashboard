@@ -3,7 +3,7 @@
 //  + re-export van render-offerte / render-alv / render-tabel (publieke interface stabiel).
 //  Batch D / punt 11: offerte/ALV/tabel-render zijn naar eigen modules verplaatst.
 // ══════════════════════════════════════
-import { esc, filt, NIET_ZOEKBAAR, berekenPrioriteit, parseDt, opvolgStatus, _vandaagAmsterdam, toISODate, isoWeek, vveCodeSpan, splitBehandelaar, periodeBereik, AF_PERIODES, parseAannemers } from "./util.js";
+import { esc, filt, NIET_ZOEKBAAR, berekenPrioriteit, teLaatVoorTelling, parseDt, opvolgStatus, _vandaagAmsterdam, toISODate, isoWeek, vveCodeSpan, splitBehandelaar, periodeBereik, AF_PERIODES, parseAannemers } from "./util.js";
 import { rijSleutel } from "./rij.js";
 import { SECS, SKEYS, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
@@ -29,7 +29,7 @@ function renderNtdStats(){
   SKEYS.forEach(s=>{
     (D.ntd[s]||[]).forEach(r=>{
       open++;
-      if(berekenPrioriteit(r.deadline,s).teLaat) telaat++;
+      if(teLaatVoorTelling(r,s)) telaat++;
       if(opvolgStatus(r).weggelegd) weg++;
     });
   });
@@ -397,7 +397,7 @@ function renderNtdCrossList(sec){
         if(fCode && !((r.code||'').toLowerCase().includes(fCode))) return;
         if(fBeh && !((r.behandelaar||'').toLowerCase().includes(fBeh))) return;
         if(fPrio && berekenPrioriteit(r.deadline,s).prioriteit!==fPrio) return;
-        if(state.ntdStatus==='telaat'    && !berekenPrioriteit(r.deadline,s).teLaat) return;
+        if(state.ntdStatus==='telaat'    && !teLaatVoorTelling(r,s)) return;
         if(state.ntdStatus==='weggelegd' && !opvolgStatus(r).weggelegd) return;
         treffers.push(r);
       });
@@ -469,7 +469,7 @@ function filterNtd(rows,q,fCode,beh,prio,sec,status){
     }
     // Statusfilter uit de kop-pillen. Onbekende waarden filteren niets weg, zodat een
     // oude/rare state nooit een lege lijst oplevert.
-    if(status==='telaat'    && !berekenPrioriteit(r.deadline, sec).teLaat) return false;
+    if(status==='telaat'    && !teLaatVoorTelling(r, sec)) return false;
     if(status==='weggelegd' && !opvolgStatus(r).weggelegd) return false;
     return true;
   });

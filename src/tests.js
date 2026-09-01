@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { taakTitel, taakVerwijzing, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, stilDrempel, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, subBadge, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel, kiesAfgerondRij, filt, splitBehandelaar, korteNaam, persBadges, taakActieKnoppen, voorgesteldeDeadline, DEADLINE_VOORSTEL, DEADLINE_HINT, periodeBereik, AF_PERIODES, duurUitCel, duurNaarCel } from "./util.js";
+import { taakTitel, taakVerwijzing, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, stilDrempel, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, subBadge, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel, kiesAfgerondRij, filt, splitBehandelaar, korteNaam, persBadges, taakActieKnoppen, voorgesteldeDeadline, DEADLINE_VOORSTEL, DEADLINE_HINT, periodeBereik, AF_PERIODES, duurUitCel, duurNaarCel, offerteAangevraagd, teLaatVoorTelling } from "./util.js";
 import { verwerkMeldingRijen, toonMeldingen, MAX_TOAST_BURST, _whoSleutel, getCurrentWho, undoDelete } from "./notifications.js";
 import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek, logEvents, renderOntw, openOntwModal, closeOntwModal, submitOntwItem, _logRegelSleutel, _ontwSleutel, addTaskNote } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM, VELD_LABELS } from "./config.js";
@@ -1008,6 +1008,27 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     filterNtd([row],'','','','','OFFERTE-TRAJECTEN');
     return row.offertes==='0/3' && offerteFase(row)==='aangevraagd';
   })());
+
+  // ── offerte: na 'aangevraagd' is kolom F een opvolgdatum, geen deadline (v12.5) ──
+  console.log('%c[TESTS] Offerte-opvolgdatum', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+  const T3 = new Date(2026, 8, 1); // 1 sep 2026
+  eq('offerteAangevraagd: leeg', offerteAangevraagd({datumAangevraagd:''}), false);
+  eq('offerteAangevraagd: vrije tekst telt niet', offerteAangevraagd({datumAangevraagd:'z.s.m.'}), false);
+  eq('offerteAangevraagd: datum telt', offerteAangevraagd({datumAangevraagd:'20 mei 2026'}), true);
+  eq('teLaatVoorTelling: aangevraagd offerte-traject telt nooit als te laat',
+     teLaatVoorTelling({datumAangevraagd:'20 mei 2026', deadline:'19 juni 2026'},'OFFERTE-TRAJECTEN',T3), false);
+  eq('teLaatVoorTelling: niet-aangevraagd traject wél',
+     teLaatVoorTelling({datumAangevraagd:'', deadline:'19 juni 2026'},'OFFERTE-TRAJECTEN',T3), true);
+  eq('teLaatVoorTelling: andere secties ongemoeid',
+     teLaatVoorTelling({deadline:'19 juni 2026'},'OPPAKKEN',T3), true);
+  truthy('deadlineCel: aangevraagd → opvolgen (toekomst, rustig)',
+     deadlineCel({datumAangevraagd:'20 mei 2026', deadline:'15 september 2099'},'OFFERTE-TRAJECTEN').includes('opvolgen · nog'));
+  truthy('deadlineCel: aangevraagd + verstreken → amber opvolgen, nooit rood te laat', (()=>{
+     const h=deadlineCel({datumAangevraagd:'20 mei 2026', deadline:'19 juni 2020'},'OFFERTE-TRAJECTEN');
+     return h.includes('opvolgen') && h.includes('bijna') && !h.includes('te laat'); })());
+  truthy('deadlineCel: niet-aangevraagd traject houdt de gewone te-laat-vorm',
+     deadlineCel({datumAangevraagd:'', deadline:'19 juni 2020'},'OFFERTE-TRAJECTEN').includes('te laat'));
+
   truthy('verrijking leidt X/N af uit aannemerslijst (leeg handmatig)', (()=>{
     const row={code:'ZZ-TEST',naam:'Test',offertes:'',aannemers:'A|1\nB|0',_row:9999};
     filterNtd([row],'','','','','OFFERTE-TRAJECTEN');

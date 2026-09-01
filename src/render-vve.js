@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  PER-VVE-PAGINA — alles van één VvE op één scherm (Fase 5)
 // ══════════════════════════════════════
-import { esc, displayName, persBadges, splitBehandelaar, berekenPrioriteit, opvolgStatus, parseDt, taakTitel, taakVerwijzing, _vandaagAmsterdam, _verschilInKalenderdagen } from "./util.js";
+import { esc, displayName, persBadges, splitBehandelaar, berekenPrioriteit, teLaatVoorTelling, offerteAangevraagd, opvolgStatus, parseDt, taakTitel, taakVerwijzing, _vandaagAmsterdam, _verschilInKalenderdagen } from "./util.js";
 import { ico } from "./icons.js";
 import { SECS, SKEYS, PAGE_META } from "./config.js";
 import { state, D } from "./state.js";
@@ -40,7 +40,7 @@ function vveOverzicht(code, data, vandaag){
   const afgerond=[];
   SKEYS.forEach(s=>(data.af[s]||[]).forEach(r=>{ if(r.code===code) afgerond.push(r); }));
   afgerond.sort((a,b)=>parseDt(b.datum)-parseDt(a.datum));
-  const teLaat=open.filter(r=>berekenPrioriteit(r.deadline,r._sec,vandaag).teLaat).length;
+  const teLaat=open.filter(r=>teLaatVoorTelling(r,r._sec,vandaag)).length;
   const logboek=(data.logboek||[]).filter(e=>e.code===code)
     .slice().sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
   let laatsteDagen=null;
@@ -336,7 +336,7 @@ function renderVve(){
     const dl=weg
       ? `<span class="pill-snooze" role="button" tabindex="0" data-action="taak-wegleggen" data-rid="${rid}">terug op ${esc(r.opvolgdatum)}</span>`
       : r.deadline
-        ? `${esc(r.deadline)}${p.teLaat?` <span class="pill-telaat">Te laat (${Math.abs(p.dagenTot)}d)</span>`:''}`
+        ? `${esc(r.deadline)}${teLaatVoorTelling(r,r._sec)?` <span class="pill-telaat">Te laat (${Math.abs(p.dagenTot)}d)</span>`:''}${(r._sec==='OFFERTE-TRAJECTEN'&&offerteAangevraagd(r)&&p.teLaat)?` <span class="pill-opvolg">Opvolgen</span>`:''}`
         : '<span class="warn-geen-deadline">Geen deadline</span>';
     // Wat deze rij binnen haar bundel is. Dezelfde bron als het merkje in de takentabel, dus
     // beide schermen kunnen niet iets anders beweren.

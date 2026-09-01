@@ -227,6 +227,23 @@ function opvolgStatus(r, vandaag){
   return { weggelegd: diff > 0, vandaag: diff <= 0 };
 }
 
+// Is dit offerte-traject al aangevraagd? Bepaald door 'Datum aangevraagd' (kolom C): gevuld en
+// als datum leesbaar. Vanaf dat moment is kolom F geen aanvraag-deadline meer maar een
+// OPVOLGDATUM (zie deadlineCel in render-tabel.js) en telt de rij niet meer als 'te laat'.
+function offerteAangevraagd(r){
+  return !!_parseAnyDate((((r && r.datumAangevraagd) || '') + ''));
+}
+// 'Te laat' zoals de TELLING en de rode markering hem hanteren: een aangevraagd
+// offerte-traject is nooit 'te laat' — zijn verstreken datum betekent 'opvolgen' en dat
+// signaal draagt de deadline-cel zelf (amber). Eén helper, zodat de kop-pil, het
+// statusfilter, de rij-klasse, het dossier en Ctrl+K dezelfde uitzondering hanteren.
+// De SORTERING blijft bewust op de rauwe teLaat: een traject dat op opvolgen wacht hoort
+// net zo goed bovenaan.
+function teLaatVoorTelling(r, sec, vandaag){
+  if (sec === 'OFFERTE-TRAJECTEN' && offerteAangevraagd(r)) return false;
+  return berekenPrioriteit(r.deadline, sec, vandaag).teLaat;
+}
+
 // Volgende deadline voor een herhaalregel. Types: week|maand|kwartaal|halfjaar|jaar|na-afronden.
 // LET OP — SYNC: zelfde logica als cd_volgendeDeadlineStr in apps-script/Opvolging.gs
 const HERHAAL_MAANDEN = { maand:1, kwartaal:3, halfjaar:6, jaar:12 };
@@ -845,6 +862,7 @@ export {
   displayName, filt, splitBehandelaar, korteNaam, PRIO_REGELS, stilDrempel, STIL_ESCALATIE_REGELS,
   DEADLINE_VOORSTEL, DEADLINE_HINT, voorgesteldeDeadline, AF_PERIODES, periodeBereik,
   opvolgStatus, volgendeDeadline, HERHAAL_MAANDEN, _vandaagAmsterdam, isoWeek,
+  offerteAangevraagd, teLaatVoorTelling,
   _verschilInKalenderdagen, berekenPrioriteit, prioBadge, persBadges,
   offProg, _MAANDEN, _parseAnyDate, parseDt, toISODate, toDutchDate, leegBijErfenis, nieuwTaakId,
   emptyRow, esc, vveCodeSpan, subBadge, taakActieKnoppen, coerceDagenVooraf,

@@ -4,7 +4,7 @@
 // `taakTitel` en niet een eigen veldenketen: een offerte-traject heeft geen van die
 // velden (zijn omschrijving staat in `opmerkingen`), dus zulke treffers kwamen met een
 // LEGE vetgedrukte regel in de lijst — terwijl zoekAlles ze wél vindt.
-import { esc, displayName, berekenPrioriteit, parseDt, taakTitel } from "./util.js";
+import { esc, displayName, berekenPrioriteit, teLaatVoorTelling, offerteAangevraagd, parseDt, taakTitel } from "./util.js";
 import { SECS, SKEYS } from "./config.js";
 import { state, D } from "./state.js";
 import { goTo } from "./ui.js";
@@ -115,7 +115,11 @@ function renderPal(q){
     }).join(''));
     html+=_groep('Open taken',res.taken.map(r=>{
       const p=berekenPrioriteit(r.deadline,r._sec);
-      const pill=p.teLaat?`<span class="pill-telaat">Te laat (${Math.abs(p.dagenTot)}d)</span>`:esc(r.deadline||'');
+      const laat=teLaatVoorTelling(r,r._sec);
+      const opv=r._sec==='OFFERTE-TRAJECTEN' && offerteAangevraagd(r) && p.teLaat;
+      const pill=laat?`<span class="pill-telaat">Te laat (${Math.abs(p.dagenTot)}d)</span>`
+               : opv ?`<span class="pill-opvolg">Opvolgen (${Math.abs(p.dagenTot)}d)</span>`
+               : esc(r.deadline||'');
       return _item(`<span class="pal-ico pal-ico-taak">${ico('cirkelOpen')}</span><div class="pal-tekst"><b>${esc(taakTitel(r, r._sec))}</b><span>${esc(r.code)} ${esc(r.naam||'')} · ${esc(SECS[r._sec].label)} · ${esc(r.behandelaar||'—')}</span></div><span class="pal-hint">${pill}</span>`,
         ()=>{ closePalette(); openModal(true,r); });
     }).join(''));

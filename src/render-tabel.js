@@ -2,7 +2,7 @@
 //  RENDER-TABEL — generieke tabel/paginering (thead, tbody, rij-render, paginatie)
 //  Verplaatst uit render-lijsten.js (Batch D / punt 11) — zuivere refactor, geen gedragswijziging.
 // ══════════════════════════════════════
-import { esc, vveCodeSpan, persBadges, subBadge, taakActieKnoppen, offProg, emptyRow, berekenPrioriteit, opvolgStatus, taakTitel, kortDatum, _verschilInKalenderdagen, _vandaagAmsterdam, stilDrempel, aannSleutel, parseWeekPeriode, metDagnamen } from "./util.js";
+import { esc, vveCodeSpan, persBadges, subBadge, taakActieKnoppen, offProg, emptyRow, berekenPrioriteit, opvolgStatus, taakTitel, kortDatum, _verschilInKalenderdagen, _vandaagAmsterdam, stilDrempel, aannSleutel, parseWeekPeriode, metDagnamen, offerteAangevraagd, teLaatVoorTelling } from "./util.js";
 import { rijSleutel } from "./rij.js";
 import { SECS, SKEYS, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
@@ -249,6 +249,19 @@ const BIJNA_TE_LAAT_DAGEN = 7;
 // Geen tweede regel als er niets te melden valt: een rij die gewoon op tijd is hoort er niet
 // hoger door te worden.
 function deadlineCel(r, sec){
+  // Aangevraagd offerte-traject: kolom F is dan een OPVOLGDATUM (ontwerp 2026-09-01). Altijd
+  // tweeregelig — het woord 'opvolgen' is precies wat deze cel van een deadline onderscheidt.
+  // Verstreken of vandaag = amber ('check of ze binnen zijn'), nooit rood 'te laat'.
+  if (sec === 'OFFERTE-TRAJECTEN' && offerteAangevraagd(r)){
+    if (!r.deadline) return `<td class="cell-sm"><span class="warn-geen-deadline">Geen opvolgdatum</span></td>`;
+    const { teLaat, dagenTot } = berekenPrioriteit(r.deadline, sec);
+    const kleur = (teLaat || dagenTot === 0) ? 'bijna' : 'opvolg';
+    const bij = teLaat ? `opvolgen · ${Math.abs(dagenTot)}d over`
+              : dagenTot === 0 ? 'opvolgen · vandaag'
+              : dagenTot === null ? 'opvolgen'
+              : `opvolgen · nog ${dagenTot}d`;
+    return `<td><span class="dl-2 ${kleur}"><span class="dl-dat">${esc(r.deadline)}</span><span class="dl-bij">${esc(bij)}</span></span></td>`;
+  }
   if (!r.deadline) return `<td class="cell-sm"><span class="warn-geen-deadline">Geen deadline</span></td>`;
   const { teLaat, dagenTot } = berekenPrioriteit(r.deadline, sec);
   const bijna = !teLaat && dagenTot !== null && dagenTot <= BIJNA_TE_LAAT_DAGEN;
@@ -401,7 +414,8 @@ function rowNtd(r,sec){
         <td>${editBtn}</td>`;
       break;
   }
-  const { teLaat: rowTeLaat, prioriteit: rowPrio } = berekenPrioriteit(r.deadline, sec);
+  const rowPrio  = berekenPrioriteit(r.deadline, sec).prioriteit;
+  const rowTeLaat = teLaatVoorTelling(r, sec);
   const prioAttr = ` data-prio="${(rowPrio||'geen').toLowerCase()}"`;
   const rowCls = [
     r.inBehandeling === 'TRUE' ? 'ib-row' : '',

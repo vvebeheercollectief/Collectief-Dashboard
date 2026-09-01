@@ -100,7 +100,7 @@ git commit -m "Offerte-stappen 1/8: aannemerslijst wint volledig van kolom D"
 
 **Files:**
 - Create: `src/modal-aannemers.js`
-- Modify: `index.html:589-609`, `styles.css` (bij de `.of-aann-*`-regels, ±r.1246), `src/crud.js` (fillModalFields, clearModal, nietOpgeslagenVelden, submitTask, toevoegWaarden), `src/actions.js`, `src/offerte-aannemers.js`
+- Modify: `index.html:589-609`, `styles.css` (bij de `.of-aann-*`-regels, ±r.1246), `src/crud.js` (fillModalFields, clearModal, nietOpgeslagenVelden, submitTask, toevoegWaarden), `src/actions.js`, `src/offerte-aannemers.js`, `apps-script/Code.gs:95-113` (SYNC-spiegel)
 - Test: `src/tests.js` (blokken 2279, 7520, 11645, 13936, 426)
 
 - [ ] **Stap 2.1: nieuwe module `src/modal-aannemers.js`** — volledige inhoud:
@@ -301,6 +301,31 @@ function schrijfAannemers(r, nieuweCel){
 ```
 
 en voeg `schrijfAannemers` toe aan het export-blok onderaan.
+
+- [ ] **Stap 2.6b: Apps Script-spiegel gelijktrekken** — `apps-script/Code.gs` heeft een SYNC-kopie van reconcileOffertes voor de afvink-in-de-Sheet-weg (kwaliteitsreview Taak 1). Vervang het commentaar (r.97-99) én de functie `cd_reconcileOffertes` (r.100-113) door:
+
+```js
+// SYNC — spiegel van reconcileOffertes + parseAannemers (src/util.js), voor de
+// afvink-in-de-Sheet-weg hierboven: staat er een aannemerslijst in kolom P, dan telt alléén
+// de lijst (X = aantal |1, N = lijstlengte). Geen lijst → kolom D rauw (rijen van vóór de
+// aannemerslijst). Sinds v12.5 — de oude ondergrens (Math.max per kant) is weg, gelijk met
+// de frontend; anders archiveerden Sheet-afvinken en dashboard-afronden verschillende tellers.
+function cd_reconcileOffertes(rauwD, aannemersCel) {
+  var lijst = ((aannemersCel == null ? '' : aannemersCel) + '').split('\n')
+    .map(function (l) { return l.trim(); }).filter(function (l) { return l; });
+  if (!lijst.length) return (rauwD == null ? '' : rauwD) + '';
+  var binnen = 0;
+  for (var i = 0; i < lijst.length; i++) {
+    var p = lijst[i].lastIndexOf('|');
+    if (p >= 0 && lijst[i].slice(p + 1).trim() === '1') binnen++;
+  }
+  return binnen + '/' + lijst.length;
+}
+```
+
+(Apps Script deployt automatisch via de CI-Action bij push naar staging/main — geen handwerk.)
+
+- [ ] **Stap 2.6c: verouderde commentaren rechttrekken** (gemeld door de Taak-1-reviews; alleen tekst, geen gedrag): `src/util.js:560-561` (deriveOffertes-commentaar noemt nog de ondergrens), `src/render-offerte.js:103-104` (idem), `src/crud.js:1143-1159` (afrondWaarden-motivering: de conclusie blijft, de Math.max-redenering klopt niet meer — herschrijf naar "lijst aanwezig → lijst wint; de archiefrij houdt alleen de afgeleide teller over"). De blokken die stap 2.4/2.7 toch al vervangen hoeven hier niet apart.
 
 - [ ] **Stap 2.7: toetsen bijwerken** in `src/tests.js`:
 
@@ -959,4 +984,4 @@ git commit -m "Offerte-stappen 8/8: versie 12.5 / cd-v152"
 ## Zelf-review checklist (na het schrijven uitgevoerd)
 
 - Spec-dekking: Deel 1 → Taken 1, 2 · Deel 2 → Taken 3, 4, 5 en migratie-A (7) · Deel 3 → Taak 6 en migratie-B (7) · stijl-eis → alle UI hergebruikt bestaande klassen · "wat niet verandert" → geen taak raakt snooze/herhaal/ALV.
-- Bekende open eindjes, bewust: exacte tekst "opvolgen · Xd over" mag bij de bouw nog bijgesteld; `.pill-opvolg`-properties worden van `.pill-telaat` gekloond op het moment zelf; Apps Script (Notifications.gs/Opvolging.gs) leest kolom D alleen — in Taak 8 kort verifiëren met `grep -n "\[3\]\|kolom D" apps-script/*.gs`.
+- Bekende open eindjes, bewust: exacte tekst "opvolgen · Xd over" mag bij de bouw nog bijgesteld; `.pill-opvolg`-properties worden van `.pill-telaat` gekloond op het moment zelf. Apps Script: Code.gs SCHRIJFT de teller wél (cd_reconcileOffertes bij afvinken-in-de-Sheet) — gelijkgetrokken in stap 2.6b; Notifications.gs/Opvolging.gs alleen-lezen, in Taak 8 kort naverifiëren.

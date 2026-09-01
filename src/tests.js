@@ -986,27 +986,26 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   eq('deriveOffertes 1 van 3',
      deriveOffertes([{naam:'a',binnen:true},{naam:'b',binnen:false},{naam:'c',binnen:false}]), '1/3');
 
-  // ── offerte: reconcileOffertes — handmatige D-waarde is ondergrens, vinkjes hogen op ──
+  // ── offerte: reconcileOffertes — de aannemerslijst wint volledig (v12.5). Kolom D telt
+  //    alleen nog voor rijen ZONDER lijst (van vóór de aannemerslijst).
   eq('reconcile lege lijst → handmatig blijft', reconcileOffertes('2/4', []), '2/4');
   eq('reconcile lege lijst + leeg handmatig → leeg', reconcileOffertes('', []), '');
-  eq('reconcile leeg handmatig → afgeleid uit lijst',
+  eq('reconcile lijst zonder handmatig',
      reconcileOffertes('', [{naam:'a',binnen:true},{naam:'b',binnen:false}]), '1/2');
-  // De bug-regressie: gebruiker gaf handmatig "1/3" op, alle aannemers nog op "nog niet".
-  // Vroeger werd dat "0/3"; nu blijft de handmatige ondergrens staan → "1/3".
-  eq('reconcile handmatig wint als vinkjes lager staan (bug-regressie)',
-     reconcileOffertes('1/3', [{naam:'De Lange',binnen:false},{naam:'Zegwaard',binnen:false},{naam:'Rioolservice West',binnen:false}]), '1/3');
-  eq('reconcile vinkje hoogt handmatig op',
+  eq('reconcile lijst overschrijft handmatig omhoog',
      reconcileOffertes('0/3', [{naam:'a',binnen:true},{naam:'b',binnen:false},{naam:'c',binnen:false}]), '1/3');
-  eq('reconcile total = max(handmatig, aantal aannemers)',
-     reconcileOffertes('1/5', [{naam:'a',binnen:true},{naam:'b',binnen:false}]), '1/5');
+  eq('reconcile lijst overschrijft handmatig omlaag (vinkje weg telt weer mee)',
+     reconcileOffertes('1/3', [{naam:'De Lange',binnen:false},{naam:'Zegwaard',binnen:false},{naam:'Rioolservice West',binnen:false}]), '0/3');
+  eq('reconcile korte lijst wint van hoge handmatige',
+     reconcileOffertes('1/5', [{naam:'a',binnen:true},{naam:'b',binnen:false}]), '1/2');
 
   // ── offerte: aannemerslijst stuurt de X/N-teller (via filterNtd-verrijking) ──
-  // Exacte live-bug 381109: kolom D "1/3", 3 aannemers allen "nog niet" → moet "1/3" tonen
-  // (en recv>0 → fase 'ontvangen'), niet "0/3".
-  truthy('381109-regressie: handmatige 1/3 blijft staan bij nog-niet-aannemers', (()=>{
+  // Sinds v12.5 wint de lijst volledig: kolom D "1/3" met 3 aannemers allen "nog niet"
+  // toont "0/3" (en fase 'aangevraagd') — het vinkje is de enige waarheid geworden.
+  truthy('381109 onder v12.5: de lijst wint — 0/3 bij nog-niet-aannemers', (()=>{
     const row={code:'ZZ-381109',naam:'Test',offertes:'1/3',aannemers:'De Lange|0\nZegwaard|0\nRioolservice West|0',_row:9996};
     filterNtd([row],'','','','','OFFERTE-TRAJECTEN');
-    return row.offertes==='1/3' && offerteFase(row)==='ontvangen';
+    return row.offertes==='0/3' && offerteFase(row)==='aangevraagd';
   })());
   truthy('verrijking leidt X/N af uit aannemerslijst (leeg handmatig)', (()=>{
     const row={code:'ZZ-TEST',naam:'Test',offertes:'',aannemers:'A|1\nB|0',_row:9999};

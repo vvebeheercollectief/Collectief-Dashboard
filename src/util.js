@@ -563,16 +563,14 @@ function deriveOffertes(lijst){
   if(!lijst||!lijst.length) return '';
   return `${lijst.filter(a=>a.binnen).length}/${lijst.length}`;
 }
-// Effectieve "X/N": de handmatige kolom-D-waarde is de ondergrens; de aannemer-vinkjes
-// (kolom P) kunnen 'm alleen óphogen. Zo overschrijft een nog-niet-aangevinkte
-// aannemerslijst nooit een handmatig ingevuld aantal — de bug "ik gaf 1 ontvangen op
-// maar de teller bleef op 0" kan hierdoor niet meer voorkomen. Lege lijst → handmatig blijft.
+// Effectieve "X/N": staat er een aannemerslijst (kolom P), dan telt alléén de lijst —
+// X = aantal binnen, N = lijstlengte. Zonder lijst blijft de handmatige kolom-D-waarde staan
+// (rijen van vóór de aannemerslijst). Tot v12.5 was D een ONDERGRENS (Math.max per kant);
+// sinds de lijst in het bewerkscherm staat is die dubbele boekhouding weg — een vinkje
+// weghalen moet de teller ook weer omlaag brengen.
 function reconcileOffertes(manual, lijst){
   if(!lijst||!lijst.length) return manual||'';
-  const [mRecv,mReq]=parseOff(manual);
-  const recv=Math.max(mRecv, lijst.filter(a=>a.binnen).length);
-  const req =Math.max(mReq,  lijst.length);
-  return `${recv}/${req}`;
+  return `${lijst.filter(a=>a.binnen).length}/${lijst.length}`;
 }
 
 function offProg(v){

@@ -9,9 +9,10 @@ import { parseAannemers, serializeAannemers, aannSleutel } from "./util.js";
 import { writeRange, assertRowMatch } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { backgroundWrite, blokkeerOffline } from "./data.js";
-import { showToast } from "./notifications.js";
+import { showToast, showUndoToast } from "./notifications.js";
 import { renderNtd } from "./render-lijsten.js";
 import { herstelAannemerFocus } from "./render-offerte.js";
+import { logEvent } from "./render-overig.js";
 
 // Zoek het traject op zijn eigen sleutel (vast taaknummer, zie aannSleutel) en NIET op de
 // VvE-code: een VvE kan meerdere offerte-trajecten tegelijk hebben, en .find op de code pakte
@@ -176,5 +177,44 @@ function schrijfAannemers(r, nieuweCel){
   _bewaar(r, vorige);
 }
 
+// 'Opgevolgd · +2 wk' (paneel): herinnering gestuurd/nagebeld → volgende opvolgdatum in
+// kolom F (de deadline-kolom, die bij een aangevraagd traject de opvolgdatum draagt).
+// LET OP: de deadline zit in de rij-vingerafdruk, dus de guard krijgt de OUDE waarde mee
+// (zelfde vorm als zetSubsidieFase in crud.js). Mét logboekregel en undo.
+const OPVOLG_TERMIJN_DAGEN = 14;
+function opgevolgd(sleutel){
+  _rondNaamwijzigingAf();
+  const r=_vindRij(sleutel); if(!r || !r._row) return;
+  if(blokkeerOffline()) return;
+  const d=new Date(); d.setDate(d.getDate()+OPVOLG_TERMIJN_DAGEN);
+  const nieuw=`${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;
+  _schrijfOpvolg(r, nieuw, r.deadline||'', 'Opgevolgd');
+}
+async function _schrijfOpvolg(r, nieuw, oud, actie){
+  if(!await ensureToken()){
+    showToast('Niet opgeslagen','Inloggen mislukt — de opvolgdatum staat nog zoals hij was',
+              'var(--rd)',null,{geenDedup:true});
+    return;
+  }
+  r.deadline=nieuw; renderNtd();
+  const heenweg={gelukt:false};
+  let geschreven=false;
+  backgroundWrite(
+    async()=>{ if(!geschreven){
+        await assertRowMatch(r._row, {...r, deadline:oud});
+        await writeRange(`'Nog Te Doen'!F${r._row}`,[nieuw]);
+        geschreven=true; heenweg.gelukt=true; }
+      await logEvent(r.code,'OFFERTE-TRAJECTEN',actie,'opvolgdatum',oud,nieuw); },
+    ()=>{ r.deadline=oud; },
+    'Opvolgdatum opslaan'
+  );
+  if(actie==='Opgevolgd') showUndoToast('Opgevolgd',`${r.code} — opvolgen ${nieuw}`,()=>{
+    // Undo pas als de heenweg echt in de Sheet staat (zelfde afspraak als herordenBundel);
+    // de terugweg is dezelfde schrijfweg met de waarden omgedraaid.
+    if(!heenweg.gelukt) return;
+    _schrijfOpvolg(r, oud, nieuw, 'Opvolgdatum teruggezet');
+  },'pauze',{sleutel:`opvolg|${r.taakId||r._row}`});
+}
+
 export { addAannemer, toggleAannemerBinnen, verwijderAannemer,
-         hernoemAannemer, startHernoem, stopHernoem, schrijfAannemers };
+         hernoemAannemer, startHernoem, stopHernoem, schrijfAannemers, opgevolgd };

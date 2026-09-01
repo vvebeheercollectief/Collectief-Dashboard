@@ -4,7 +4,7 @@
 //  (v6.2): de offerte-tab is weer een platte tabel zoals Oppakken/LOD. Wat rest is de
 //  aannemerslijst achter de X/N-teller — de enige offerte-specifieke UI die overblijft.
 // ══════════════════════════════════════
-import { esc, parseAannemers, reconcileOffertes, aannSleutel } from "./util.js";
+import { esc, parseAannemers, reconcileOffertes, aannSleutel, offerteAangevraagd } from "./util.js";
 import { state } from "./state.js";
 import { ico } from "./icons.js";
 
@@ -67,11 +67,17 @@ function offerteAannemerPaneel(r){
   // ruimte in het overzicht in, en een kopregel erbij zou dat probleem groter maken in plaats van
   // kleiner. Dezelfde actie en dezelfde sleutel als de samenvatting in de rij, dus open en dicht
   // lopen langs precies één weg.
+  //
+  // 'Opgevolgd · +2 wk' alleen bij een AANGEVRAAGD traject: pas dan draagt kolom F een
+  // opvolgdatum (zie offerteAangevraagd in util.js) die je 2 weken verder kunt zetten.
+  const opvolgKnop = offerteAangevraagd(r)
+    ? `<button type="button" class="of-aann-opvolg" data-action="offerte-opgevolgd" data-aann="${sl}" title="Herinnering gestuurd — zet de opvolgdatum 2 weken verder">Opgevolgd · +2 wk</button>`
+    : '';
   return `<div class="of-aann-paneel">${rijen}
     <div class="of-aann-add">
       <input class="of-aann-input" data-aann="${sl}" placeholder="Aannemer toevoegen…" autocomplete="off" aria-label="Aannemer toevoegen">
       <button class="of-aann-toevoeg" data-action="offerte-aann-add" data-aann="${sl}">+ Toevoegen</button>
-      <button type="button" class="of-aann-dicht" data-action="offerte-aann-open" data-aann="${sl}" title="Aannemerslijst inklappen">${ico('chevronBoven',12)}Inklappen</button>
+      ${opvolgKnop}<button type="button" class="of-aann-dicht" data-action="offerte-aann-open" data-aann="${sl}" title="Aannemerslijst inklappen">${ico('chevronBoven',12)}Inklappen</button>
     </div>
   </div>`;
 }

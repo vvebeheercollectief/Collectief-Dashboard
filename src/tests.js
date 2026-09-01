@@ -427,7 +427,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   const VERWACHTE_ACTIES = ['toggle','notif-toggle','maann-binnen','maann-weg','maann-add','notitie-toevoegen','taak-verwijder-modal','ai-kopieer','login','ntd-sectie','af-sectie','alvo-flag','taak-bewerken','taak-afronden','pagineer','ai-overnemen','ai-actie-taak','ai-kopieer-concept','ontw-cat','ontw-bewerken','toast-sluiten','taak-wegleggen','snooze-kies','herhaal-bewerken','herhaal-status','herhaal-verwijderen',
 'vve-open','vve-terug','vve-af-alles','pal-kies','bulk-toggle','bulk-vink','bulk-menu','bulk-doe','taak-afronden-modal',
 'kenmerken-bewerken','kenmerken-opslaan','kenmerken-annuleren',
-'contact-soort','contact-vastleggen','vve-log-filter','vve-log-alles','ntd-sorteer'];
+'contact-soort','contact-vastleggen','vve-log-filter','vve-log-alles','ntd-sorteer','offerte-opgevolgd'];
   VERWACHTE_ACTIES.forEach(a => truthy(`actie '${a}' bestaat`, typeof ACTIONS[a] === 'function'));
 
   // ── login-beginscherm ── (redesign jul-2026: splash → kaart)
@@ -1161,6 +1161,14 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       return !!inp && inp.value==='Half getypt' && +inp.dataset.idx===1 && knoppen.length===1;
     } finally { state.offerteAannEdit=bE; state.offerteAannEditVal=bV; }
   })());
+
+  // ── 'Opgevolgd · +2 wk' (offerte-stappen taak 5) ────────────────────────────
+  // De knop hoort alleen in het paneel van een AANGEVRAAGD traject: pas dan draagt
+  // kolom F een opvolgdatum die je 2 weken verder kunt zetten.
+  truthy('paneel: Opgevolgd-knop alleen bij een aangevraagd traject',
+     offerteAannemerPaneel({taakId:'T1',datumAangevraagd:'20 mei 2026',_aannemers:[]}).includes('offerte-opgevolgd'));
+  truthy('paneel: geen Opgevolgd-knop vóór de aanvraag',
+     !offerteAannemerPaneel({taakId:'T1',datumAangevraagd:'',_aannemers:[]}).includes('offerte-opgevolgd'));
 
   // De schrijfweg zelf. `_row:0` = geen schrijfdoel, dus `_bewaar` blijft lokaal en er is geen
   // Google-login nodig; wat we hier meten is precies de tekst die naar kolom P zou gaan.

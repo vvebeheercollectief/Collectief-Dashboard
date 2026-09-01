@@ -1260,6 +1260,8 @@
        In de toevoeg-regel en niet op een eigen kopbalk: het paneel neemt al ruimte in. */
     .of-aann-dicht{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;font-family:inherit;font-size:12px;font-weight:700;color:var(--mut);background:none;border:1px solid var(--bor);border-radius:7px;padding:0 10px;height:30px;cursor:pointer;white-space:nowrap}
     .of-aann-dicht:hover{color:var(--txt);background:var(--sur);border-color:var(--bor-input)}
+    .of-aann-opvolg{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;font-family:inherit;font-size:12px;font-weight:700;color:var(--pu);background:none;border:1px solid var(--pu);border-radius:7px;padding:0 10px;height:30px;cursor:pointer;white-space:nowrap}
+    .of-aann-opvolg:hover{background:var(--pu-l)}
     /* Aannemerslijst in het bewerkscherm (v12.5): zelfde onderdelen als het tabelpaneel,
        alleen de naam is hier stilstaande tekst — hernoemen kan in het paneel. */
     #m-aann{border:1px solid var(--bor);border-radius:8px;background:var(--sur)}

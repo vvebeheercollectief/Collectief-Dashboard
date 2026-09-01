@@ -22,7 +22,7 @@ import { openSnoozeModal, snoozeKies } from './snooze.js';
 import { zetInBehandeling } from './inbehandeling.js';
 import { verwijderExtraVve } from './meervve.js';
 import { openResetModal, closeResetModal, doeReset } from './alv-reset.js';
-import { addAannemer, toggleAannemerBinnen, verwijderAannemer, startHernoem, stopHernoem } from './offerte-aannemers.js';
+import { addAannemer, toggleAannemerBinnen, verwijderAannemer, startHernoem, stopHernoem, opgevolgd } from './offerte-aannemers.js';
 import { openHerhaalModal, toggleHerhaalStatus, deleteHerhaal } from './render-herhaal.js';
 import { openVvePagina, renderVve, addContactLog, terugVanDossier } from './render-vve.js';
 import { vraagChat, chatSuggestie } from './dossier-chat.js';
@@ -177,6 +177,8 @@ export const ACTIONS = {
   // met Enter of door ergens anders te klikken (zie de toetsen- en blur-afhandeling hieronder).
   'offerte-aann-hernoem':  (el) => startHernoem(el.dataset.aann, +el.dataset.idx),
   'offerte-aann-add':      (el) => { const inp=el.closest('.of-aann-add')?.querySelector('.of-aann-input'); if(!inp) return; const v=inp.value; inp.value=''; addAannemer(el.dataset.aann, v); },
+  // 'Opgevolgd · +2 wk' (paneel van een aangevraagd traject): opvolgdatum in kolom F 2 weken verder.
+  'offerte-opgevolgd':     (el) => opgevolgd(el.dataset.aann),
   // Zelfde lijst, maar dan in het aanmaak-/bewerkscherm: mutaties op de WERKKOPIE
   // (modal-aannemers.js), er wordt pas bij Opslaan geschreven.
   'maann-binnen':          (el) => modalAannemerBinnen(+el.dataset.idx),

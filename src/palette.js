@@ -118,7 +118,7 @@ function renderPal(q){
       const laat=teLaatVoorTelling(r,r._sec);
       const opv=r._sec==='OFFERTE-TRAJECTEN' && offerteAangevraagd(r) && p.teLaat;
       const pill=laat?`<span class="pill-telaat">Te laat (${Math.abs(p.dagenTot)}d)</span>`
-               : opv ?`<span class="pill-opvolg">Opvolgen (${Math.abs(p.dagenTot)}d)</span>`
+               : opv ?`<span class="pill-opvolgen">Opvolgen (${Math.abs(p.dagenTot)}d)</span>`
                : esc(r.deadline||'');
       return _item(`<span class="pal-ico pal-ico-taak">${ico('cirkelOpen')}</span><div class="pal-tekst"><b>${esc(taakTitel(r, r._sec))}</b><span>${esc(r.code)} ${esc(r.naam||'')} · ${esc(SECS[r._sec].label)} · ${esc(r.behandelaar||'—')}</span></div><span class="pal-hint">${pill}</span>`,
         ()=>{ closePalette(); openModal(true,r); });

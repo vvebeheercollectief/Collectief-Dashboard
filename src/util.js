@@ -230,6 +230,8 @@ function opvolgStatus(r, vandaag){
 // Is dit offerte-traject al aangevraagd? Bepaald door 'Datum aangevraagd' (kolom C): gevuld en
 // als datum leesbaar. Vanaf dat moment is kolom F geen aanvraag-deadline meer maar een
 // OPVOLGDATUM (zie deadlineCel in render-tabel.js) en telt de rij niet meer als 'te laat'.
+// LET OP: er bestaan twee LOSSE dingen die allebei 'opvolgen' heten — kolom L (wegleggen,
+// `opvolgStatus` hierboven) en kolom F-als-opvolgdatum (dit). Niet samenvoegen.
 function offerteAangevraagd(r){
   return !!_parseAnyDate((((r && r.datumAangevraagd) || '') + ''));
 }

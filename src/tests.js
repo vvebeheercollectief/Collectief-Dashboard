@@ -1192,6 +1192,8 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       const html=rowNtd({code:'ZZ-VD',naam:'VvE Vandaag',offertes:'0/1',aannemers:'',opvolgdatum:dm,
                          datumAangevraagd:'1 mei 2026',opmerkingen:'iets',behandelaar:'',deadline:'',
                          _sec:'OFFERTE-TRAJECTEN',_row:9401},'OFFERTE-TRAJECTEN');
+      // NB: dit bewaakt het oude `pill-opvolg` (groene Vandaag-pil, weg sinds v12.0); de nieuwe
+      // amber pil van v12.5 heet bewust `pill-opvolgen` en staat nooit in een tabelrij.
       return !html.includes('pill-opvolg') && opvolgStatus({opvolgdatum:dm}).vandaag===true;
     } finally { state._rowCache=bewaard; }
   })());
@@ -5223,6 +5225,15 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     eq('statusfilter onbekend → alles',    codes('bestaatniet').length, 4);
     eq('statusfilter combineert met zoek',
        filterNtd(rijen,'te laat','','','','OPPAKKEN','telaat').map(r=>r.code), ['A1']);
+    // Een aangevraagd offerte-traject met verstreken kolom F is geen 'te laat' maar 'opvolgen'
+    // (v12.5, teLaatVoorTelling): het telaat-filter hoort hem NIET te tonen; een traject dat nog
+    // niet is aangevraagd wél.
+    const offRijen = [
+      {code:'O1', naam:'Aangevraagd',      datumAangevraagd:_dag(-30), deadline:_dag(-3), opvolgdatum:'', offertes:'', aannemers:'', behandelaar:'', _row:9301},
+      {code:'O2', naam:'Niet aangevraagd', datumAangevraagd:'',        deadline:_dag(-3), opvolgdatum:'', offertes:'', aannemers:'', behandelaar:'', _row:9302},
+    ];
+    eq('statusfilter telaat toont een aangevraagd offerte-traject niet',
+       filterNtd(offRijen,'','','','','OFFERTE-TRAJECTEN','telaat').map(r=>r.code), ['O2']);
   })();
 
   // ── Kop-pillen: vier tellers, twee ervan zijn knoppen ──
@@ -5236,7 +5247,11 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       D.ntd = {OPPAKKEN:[
         {code:'P1', naam:'Laat', deadline:_dag(-1), opvolgdatum:'', _row:3},
         {code:'P2', naam:'Weg',  deadline:_dag(9),  opvolgdatum:_dag(4), _row:4},
-      ], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[]};
+      ], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[
+        // Aangevraagd + verstreken kolom F: dat is 'opvolgen', geen 'te laat' (v12.5) — de rode
+        // pil hieronder hoort op 1 te blijven staan (alleen P1).
+        {code:'P3', naam:'Opvolgen', datumAangevraagd:_dag(-30), deadline:_dag(-5), opvolgdatum:'', offertes:'', aannemers:'', _row:5},
+      ], LOD:[]};
       D.af = {OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[]};
       state.ntdStatus = '';
       renderNtdStats();
@@ -5250,6 +5265,8 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       truthy('pil te laat bestaat',    !!pil('telaat'));
       truthy('pil weggelegd bestaat',  !!pil('weggelegd'));
       truthy('pil te laat telt 1',     pil('telaat').textContent.includes('1'));
+      truthy('pil te laat telt het aangevraagde offerte-traject NIET mee',
+             !pil('telaat').textContent.includes('2'));
       truthy('pil weggelegd telt 1',   pil('weggelegd').textContent.includes('1'));
       eq('pil te laat niet aangedrukt', pil('telaat').getAttribute('aria-pressed'), 'false');
 
@@ -7235,6 +7252,8 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     // is weg en die twee meldingen staan nergens meer — dus horen ze hier ook niet meer te staan.
     // Deze toetsen bewaken nu die kant op: verschijnen ze tóch weer, dan lopen paneel en rij weer
     // uit de pas. Het stil-signaal zelf blijft bestaan en verstuurt herinneringsmails.
+    // NB: `.pill-opvolg` = de oude groene Vandaag-pil (weg sinds v12.0). De amber offerte-pil
+    // van v12.5 heet bewust `pill-opvolgen` en triggert deze selector dus niet.
     truthy('bundelpaneel: geen opvolg-melding meer, net als in de tabelrij',
            !regelVan(vandaagHost,'Tvandaag').querySelector('.pill-opvolg'));
     truthy('bundelpaneel: een rustige subtaak krijgt er evenmin een',
@@ -12223,7 +12242,9 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       const proef = document.createElement('div');
       proef.innerHTML = '<table><tbody><tr class="row-telaat" style="--prio:var(--rd)"><td class="cell-txt">'
         + '<span class="pill-telaat">Te laat</span><span class="pill-stil">Stil</span>'
-        + '<span class="pill-opvolg">Vandaag</span><span class="pill-snooze">Weggelegd</span>'
+        // `pill-opvolgen` = de amber opvolg-pil van een aangevraagd offerte-traject (v12.5).
+        // Niet te verwarren met het oude `pill-opvolg` (groene Vandaag-pil, weg sinds v12.0).
+        + '<span class="pill-opvolgen">Opvolgen (3d)</span><span class="pill-snooze">Weggelegd</span>'
         + '<span class="code">311200</span>'
         + '</td><td><div class="acts"><button class="act-bw act-ico">B</button>'
         + '<button class="act-ib act-ico">I</button><button class="act-ib act-ico aan">A</button></div></td></tr>'

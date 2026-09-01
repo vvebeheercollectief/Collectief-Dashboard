@@ -139,7 +139,8 @@ function subRegel(m, i){
   // De tabelrij draagt 'Te laat' sinds v12.0 in de deadline-cel; het paneel heeft die kolom niet
   // en houdt het in zijn meta-regel (hieronder, via dlTekst). Wat de gebruiker LEEST is op beide
   // plekken hetzelfde; alleen de vorm verschilt.
-  // Wie hier iets verplaatst: dlTekst en snoozePil zijn met opzet onaangeroerd gebleven — zes
+  // Wie hier iets verplaatst: snoozePil is met opzet onaangeroerd gebleven, en dlTekst kreeg in
+  // v12.5 alleen een opvolg-tak erbij (aangevraagd offerte-traject → amber 'Opvolgen'-pil) — zes
   // toetsen in src/tests.js hangen aan precies deze markup.
   //
   // De deadline via dezelfde berekening als de tabel (`berekenPrioriteit`), en niet
@@ -150,7 +151,7 @@ function subRegel(m, i){
   const _opvolg = r._sec==='OFFERTE-TRAJECTEN' && offerteAangevraagd(r);
   const dlTekst = !r.deadline
     ? `<span class="warn-geen-deadline geen-dl-dof">Geen deadline</span>`
-    : (prio.teLaat && _opvolg) ? `<span class="pill-opvolg">Opvolgen (${Math.abs(prio.dagenTot)}d)</span>`
+    : (prio.teLaat && _opvolg) ? `<span class="pill-opvolgen">Opvolgen (${Math.abs(prio.dagenTot)}d)</span>`
     : prio.teLaat ? `<span class="s-telaat">Te laat (${Math.abs(prio.dagenTot)}d)</span>`
     : esc(kortDatum(r.deadline));
   // Het handvat is voor een schermlezer verborgen: het draagt geen eigen actie, alleen een

@@ -488,7 +488,8 @@ function filterNtd(rows,q,fCode,beh,prio,sec,status){
     }
     const pa = berekenPrioriteit(a.deadline, sec);
     const pb = berekenPrioriteit(b.deadline, sec);
-    // 1. Te laat altijd bovenaan
+    // 1. Te laat altijd bovenaan — bewust de rauwe teLaat en niet teLaatVoorTelling (util.js):
+    //    een aangevraagd offerte-traject waarvan de opvolgdatum over is hoort óók bovenaan.
     if (pa.teLaat !== pb.teLaat) return pa.teLaat ? -1 : 1;
     // 2. Opvolgen-vandaag direct daarna (Fase 4)
     const ovA = opvolgStatus(a).vandaag ? 0 : 1, ovB = opvolgStatus(b).vandaag ? 0 : 1;

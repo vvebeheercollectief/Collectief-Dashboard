@@ -30,7 +30,8 @@ function vveOverzicht(code, data, vandaag){
     if(r.code!==code) return;
     if(opvolgStatus(r, vandaag).weggelegd) weggelegd.push(r); else open.push(r);
   }));
-  // open: te laat eerst, dan vroegste deadline
+  // open: te laat eerst, dan vroegste deadline — bewust de rauwe teLaat en niet
+  // teLaatVoorTelling (util.js): opvolgen-over hoort in de sortering óók bovenaan.
   open.sort((a,b)=>{
     const pa=berekenPrioriteit(a.deadline,a._sec,vandaag), pb=berekenPrioriteit(b.deadline,b._sec,vandaag);
     if(pa.teLaat!==pb.teLaat) return pa.teLaat?-1:1;
@@ -336,7 +337,7 @@ function renderVve(){
     const dl=weg
       ? `<span class="pill-snooze" role="button" tabindex="0" data-action="taak-wegleggen" data-rid="${rid}">terug op ${esc(r.opvolgdatum)}</span>`
       : r.deadline
-        ? `${esc(r.deadline)}${teLaatVoorTelling(r,r._sec)?` <span class="pill-telaat">Te laat (${Math.abs(p.dagenTot)}d)</span>`:''}${(r._sec==='OFFERTE-TRAJECTEN'&&offerteAangevraagd(r)&&p.teLaat)?` <span class="pill-opvolg">Opvolgen</span>`:''}`
+        ? `${esc(r.deadline)}${teLaatVoorTelling(r,r._sec)?` <span class="pill-telaat">Te laat (${Math.abs(p.dagenTot)}d)</span>`:''}${(r._sec==='OFFERTE-TRAJECTEN'&&offerteAangevraagd(r)&&p.teLaat)?` <span class="pill-opvolgen">Opvolgen</span>`:''}`
         : '<span class="warn-geen-deadline">Geen deadline</span>';
     // Wat deze rij binnen haar bundel is. Dezelfde bron als het merkje in de takentabel, dus
     // beide schermen kunnen niet iets anders beweren.

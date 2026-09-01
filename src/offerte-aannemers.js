@@ -167,6 +167,8 @@ function verwijderAannemer(sleutel, idx){
 // Vanuit het BEWERKSCHERM: de complete werkkopie in één keer wegschrijven (kolom P). Zelfde
 // schrijfweg als de paneel-mutaties (_bewaar), zodat guard en rollback niet uit elkaar lopen.
 // Komt in de seriële wachtrij ná de A..K-write van submitTask — zelfde plek als koppelTaak.
+// Leunt erop dat kolom P buiten de vingerafdruk valt (zie de O,P-regel bij FP_KOLOMMEN,
+// api.js): r.aannemers draagt hier al de nieuwe waarde wanneer assertRowMatch draait.
 function schrijfAannemers(r, nieuweCel){
   if(blokkeerOffline()) return;
   const vorige=r.aannemers;

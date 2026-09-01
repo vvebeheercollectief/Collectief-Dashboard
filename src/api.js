@@ -290,7 +290,12 @@ async function askChat(system, messages){
 //   F  prioriteit  — cd_recalcPrioriteiten herschrijft die dagelijks (alleen OPPAKKEN)
 //   L  opvolgdatum — door de opvolgmotor geschreven
 //   I,J            — afvink-selectievakje / ongebruikt; dragen TRUE/FALSE-erfenis
-//   O,P            — buiten de gewone bewerkweg om geschreven; voegen niets toe aan identiteit
+//   O,P            — offerte-fase en aannemerslijst; voegen niets toe aan identiteit. P's
+//                    uitsluiting is bovendien DRAGEND: elke aannemers-schrijfweg (de paneel-
+//                    mutaties én schrijfAannemers vanuit het bewerkscherm, offerte-aannemers.js)
+//                    muteert r.aannemers optimistisch VÓÓR assertRowMatch draait. Zou P ooit in
+//                    de vingerafdruk komen, dan vergelijkt die guard de oude Sheet-waarde met de
+//                    al-gemuteerde rij en slaat élke lijstwijziging vals alarm.
 // De VvE-naam doet niet mee: dezelfde code betekent per definitie dezelfde naam.
 // Alleen de twee tabbladen waar kolom A NIET onderscheidend genoeg is. Op Herhaalregels,
 // Ontwikkeling, Logboek, Kenmerken en ALV's overzicht is de sleutel in kolom A al uniek genoeg

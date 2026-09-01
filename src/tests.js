@@ -1441,6 +1441,89 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     }
   })();
 
+  // ── Opslaan in het bewerkscherm: de aannemerslijst gaat als APARTE P-write mee (v12.5) ──
+  // De hoofd-write van een bewerking blijft strikt A..K; de lijst reist via schrijfAannemers
+  // (offerte-aannemers.js) als tweede write in dezelfde wachtrij. Twee dingen moeten hier
+  // vastliggen, want beide breken stil: de gate `aannCel!==(oudeWaarden.aannemers||'')` (zonder
+  // die gate schreef élke opslag kolom P opnieuw, ook als er niets wijzigde) en de volgorde
+  // (P ná A..K, zodat de rij-controle van de P-write de zojuist opgeslagen rij terugleest).
+  await (async () => {
+    console.log('%c[TESTS] Bewerkscherm: aparte P-write voor de aannemerslijst', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const _fetch=window.fetch, tokenOud=state.oauthToken, expiryOud=state.oauthExpiry;
+    const idsOud=state._sheetIds, cacheOud=state._uitCache;
+    const bewaardNtd=D.ntd, bewaardSec=state.activeNtd, bewaardPg=pgs.ntd, bewaardDub=state._dubbelcheckUit;
+    const failsOud=state._syncFails;
+    const dotOud=document.getElementById('dot')?.className;
+    const geschreven=[];
+    let _guardRij=null;
+    try{
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
+      state._sheetIds={'Nog Te Doen':0}; state._uitCache=false; state._dubbelcheckUit=true;
+      window.fetch=async (url, opt) => {
+        const methode=(opt&&opt.method)||'GET';
+        if(methode==='PUT'){
+          geschreven.push({ bereik: decodeURIComponent(String(url)).split('/values/')[1].split('?')[0],
+                            rij: JSON.parse(opt.body).values[0] });
+          return new Response('{}',{status:200});
+        }
+        if(methode==='POST') return new Response(JSON.stringify({replies:[{}]}),{status:200});
+        // Kopie van vóór de bewerking, om dezelfde reden als in het onvertaalbaar-blok hierboven:
+        // de rij-guard moet de OUDE Sheet-stand teruglezen, niet het al-gemuteerde object.
+        if(_guardRij && /\/values\//.test(String(url)) && !/batchGet/.test(String(url))){
+          return new Response(JSON.stringify({ values:[ _rijNaarCellen('Nog Te Doen', _guardRij) ] }),{status:200});
+        }
+        return new Response(JSON.stringify({error:{message:'geen leesronde in deze test'}}),{status:403});
+      };
+      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const maakRij=()=>({ _row:73, _sec:'OFFERTE-TRAJECTEN', code:'311212', naam:'Testflat',
+                           datumAangevraagd:'', offertes:'0/3', behandelaar:'Jer', deadline:'',
+                           opmerkingen:'', subcategorie:'', aannemers:'MoTec|1\nVan der Herp|0' });
+
+      // 1. GEWIJZIGDE lijst → A..K-write mét kolom D onaangeroerd, daarna een P-write.
+      const rij=maakRij();
+      D.ntd={ ...leeg, 'OFFERTE-TRAJECTEN':[rij] }; state.activeNtd='OFFERTE-TRAJECTEN'; pgs.ntd=1; _guardRij={...rij};
+      openModal(true, rij);
+      zetModalAannemers('MoTec|1\nVan der Herp|1');   // het vinkje dat de gebruiker in het scherm zette
+      await submitTask(); await state._writeChain;
+      // schrijfAannemers hangt zijn write pas ná een await (ensureToken) aan de wachtrij; even
+      // doorwachten tot hij er is, anders toetst dit blok een race in plaats van de code.
+      for(let i=0;i<200 && !geschreven.some(g=>/!P\d/.test(g.bereik));i++) await new Promise(r=>setTimeout(r,5));
+      await state._writeChain;
+      const hoofdIdx=geschreven.findIndex(g=>/!A73:K73$/.test(g.bereik));
+      const pIdx=geschreven.findIndex(g=>/!P73$/.test(g.bereik));
+      truthy('P-write: de hoofd-write blijft strikt A..K', hoofdIdx!==-1);
+      eq('P-write: kolom D gaat via het onvertaalbaar-mechanisme ongewijzigd mee',
+         (geschreven[hoofdIdx]||{rij:[]}).rij[3], '0/3');
+      truthy('P-write: een gewijzigde lijst levert een aparte write naar kolom P', pIdx!==-1);
+      eq('P-write: … met de complete nieuwe cel', (geschreven[pIdx]||{rij:[]}).rij[0], 'MoTec|1\nVan der Herp|1');
+      truthy('P-write: en hij komt ná de A..K-write in de wachtrij', hoofdIdx!==-1 && pIdx>hoofdIdx);
+      eq('P-write: het rij-object draagt de nieuwe lijst (optimistisch)', rij.aannemers, 'MoTec|1\nVan der Herp|1');
+
+      // 2. ONgewijzigde lijst → wél de A..K-write, géén P-write (de gate).
+      geschreven.length=0;
+      const rij2=maakRij();
+      D.ntd={ ...leeg, 'OFFERTE-TRAJECTEN':[rij2] }; state.activeNtd='OFFERTE-TRAJECTEN'; pgs.ntd=1; _guardRij={...rij2};
+      openModal(true, rij2);
+      document.getElementById('m-opm-o').value='iets anders';   // een échte wijziging elders
+      await submitTask(); await state._writeChain;
+      for(let i=0;i<20;i++) await new Promise(r=>setTimeout(r,5));   // tijd voor een write die er NIET hoort te zijn
+      await state._writeChain;
+      truthy('P-write: opslaan zonder lijstwijziging schrijft gewoon A..K',
+             geschreven.some(g=>/!A73:K73$/.test(g.bereik)));
+      eq('P-write: … maar raakt kolom P niet aan',
+         geschreven.filter(g=>/!P\d/.test(g.bereik)).map(g=>g.bereik), []);
+
+      for(let i=0;i<100 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,5));
+    } finally {
+      window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
+      state._sheetIds=idsOud; state._uitCache=cacheOud; state._dubbelcheckUit=bewaardDub;
+      state._syncFails=failsOud;
+      if(dotOud!==undefined){ const d=document.getElementById('dot'); if(d) d.className=dotOud; }
+      D.ntd=bewaardNtd; state.activeNtd=bewaardSec; pgs.ntd=bewaardPg;
+      closeModal(); clearModal(); setNtd(bewaardSec);
+    }
+  })();
+
   // ── De deadline-cel draagt de urgentie (v12.0) ──
   // Dit blok toetste tot v12.0 `signaalDelen`, de motor achter de signaal-kolom. Die kolom is weg:
   // hij stond naast de deadline en rekende daar zijn eigen 'Te laat (76d)' uit — dezelfde dagen die

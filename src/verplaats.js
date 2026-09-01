@@ -120,12 +120,12 @@ function verplaatsWaarden(r, bronSec, doelSec, nieuwRow){
   // En L..S via dezelfde helper als een nieuwe taak, zodat taaknummer (Q) en bundel (R/S) op
   // precies dezelfde plek belanden. Dát is de kern van dit hele bestand: de identiteit verhuist mee.
   const rij = toevoegWaarden(values.slice(0, 11), doel);
-  // L = opvolgdatum, M = herhaal-id. `toevoegWaarden` laat L..P leeg (dat klopt voor een NIEUWE
-  // taak), maar een verhuizende taak neemt zijn opvolgdatum en herhaalregel gewoon mee.
+  // L = opvolgdatum, M = herhaal-id. `toevoegWaarden` laat L..O leeg (dat klopt voor een NIEUWE
+  // taak) en vult P (aannemerslijst) al uit het rij-object; een verhuizende taak neemt daarbovenop
+  // zijn opvolgdatum, herhaalregel en offerte-fase gewoon mee.
   rij[11] = doel.opvolgdatum || '';
   rij[12] = doel.herhaalId || '';
   rij[14] = doel.fase || '';
-  rij[15] = doel.aannemers || '';
   return { rij, doelRij: doel };
 }
 

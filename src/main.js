@@ -507,6 +507,11 @@ document.addEventListener('DOMContentLoaded',()=>{
     loadAll(true);
   });
 
+  // Eenmalige migratie v12.5 (offerte-stappen) — handmatig vanuit de console; zie migratie-offerte.js.
+  // Lazy import: de module weegt zo niets mee in de normale start, en de kringverwijzing met main.js
+  // (hij heeft renderAll nodig) knelt niet omdat hij pas ná main.js geladen wordt.
+  import('./migratie-offerte.js').then(m=>{ window.migreerOfferteStappen=m.migreerOfferteStappen; });
+
   // Live updates — auto-refresh elke 8 seconden (smart diff voorkomt onnodige re-renders)
   // Id bewaard voor diagnose — logout() stopt hem BEWUST niet: dan zou een tweede inlog in
   // hetzelfde tabblad stil bevriezen. De poll ligt na een uitlog vanzelf stil (magPollen eist

@@ -40,6 +40,7 @@ import { verplaatsTaak, verplaatsWaarden, verlorenVelden, verplaatsVraagTekst, _
 import { addAannemer, verwijderAannemer, toggleAannemerBinnen, hernoemAannemer, startHernoem, stopHernoem, opgevolgd } from "./offerte-aannemers.js";
 import { zetModalAannemers, modalAannemersCel, modalAannemerBinnen } from "./modal-aannemers.js";
 import { voorlegValues, VOORLEG_ACTIE, maakVoorlegSubtaken } from "./offerte-stappen.js";
+import { migratieSelectie } from "./migratie-offerte.js";
 import { _verrijkOfferteRij, herstelAannemerFocus } from "./render-offerte.js";
 import { bouwBundelIndex, bundelWeergave, zichtbareKop, isBundel, bundelVan, bundelMetId, hernummerLeden, volgendeVolg, magKoppelen, wordtGeabsorbeerd, koppelKandidaten, taakFilter, openSubtaken, bundelWaarschuwing, bundelVerwijzing, bundelStand, zelfdeTaak } from "./bundel.js";
 import { bundelPaneelHtml, bundelMerkje, bundelKopExtra, STAPEL_GREEP } from "./render-bundel.js";
@@ -7289,8 +7290,13 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     // §3.3/§4.1 — de kop staat bij Vergaderverzoeken, één subtaak bij Oppakken en één afgeronde
     // subtaak bij Offerte-trajecten — want daar hangt alles aan: wat de pill telt, wat er in het
     // paneel komt en wanneer een subtaak een merkje krijgt.
+    // De standaard-deadline moet in de TOEKOMST liggen: verderop toetst §3d dat een subtaak die
+    // nog op tijd is géén 'te laat'-markering krijgt. Een vaste datum rot om — die toets viel om
+    // zodra de dag gepasseerd was (zelfde val als de terugkomdatum-toets, r.1583).
+    const _opTijd = (() => { const d = new Date(); d.setDate(d.getDate() + 30);
+      return `${d.getDate()}-${d.getMonth() + 1}-${d.getFullYear()}`; })();
     const t = (taakId, bundelId, volg, sec, tekst) => ({ taakId, bundelId, bundelVolg:volg, _sec:sec,
-      code:'311212', naam:'Testflat', actiepunt:tekst, deadline:'1-9-2026' });
+      code:'311212', naam:'Testflat', actiepunt:tekst, deadline:_opTijd });
     const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
     const kop = t('Tkop','Tkop','0','VERGADERVERZOEKEN','ALV');
     const s1  = t('Tb','Tkop','10','OPPAKKEN','Aannemer bellen');
@@ -7801,6 +7807,55 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     eq('voorleg-subtaak draagt de bundel van zijn traject',
        toevoegWaarden(voorlegValues('411006','X',''), {taakId:'T9', bundelId:'Tkop', bundelVolg:'10'}).slice(16),
        ['T9','Tkop','10']);
+
+    // ── De eenmalige migratie (v12.5): alleen de SELECTIE, want daar hangt de idempotentie aan.
+    // De schrijfweg zelf draait handmatig en wordt op de TEST-Sheet echt gedaan.
+    (() => {
+      const T = new Date(2026, 8, 15);                       // 15-09-2026
+      const tr = (taakId, extra) => ({ taakId, bundelId:'', bundelVolg:'', _row:10,
+        _sec:'OFFERTE-TRAJECTEN', code:'311212', naam:'Testflat', deadline:'', datumAangevraagd:'',
+        ...extra });
+      const ixVan = leden => new Map(leden ? [['Tkop', leden]] : []);
+
+      // A — alleen een AANGEVRAAGD traject met een verstreken datum verhuist naar een opvolgdatum.
+      const verstreken = tr('T1', { datumAangevraagd:'1-8-2026', deadline:'1-9-2026' });
+      const toekomst   = tr('T2', { datumAangevraagd:'1-8-2026', deadline:'1-10-2026' });
+      const nietAangev = tr('T3', { deadline:'1-9-2026' });
+      eq('migratie A: alleen het aangevraagde traject met verstreken datum',
+         migratieSelectie([verstreken, toekomst, nietAangev], ixVan(null), T)
+           .naarOpvolg.map(r => r.taakId), ['T1']);
+      // De idempotentie van A, expliciet: na de run staat F in de toekomst en valt de rij eruit.
+      eq('migratie A: een tweede run pakt de al verzette rij niet nog eens',
+         migratieSelectie([{ ...verstreken, deadline:'29-9-2026' }], ixVan(null), T)
+           .naarOpvolg.length, 0);
+
+      // B — een traject telt als 'gedaan' zodra er een OPEN voorleg-subtaak in zijn bundel zit.
+      const kop = tr('Tkop', { bundelId:'Tkop', bundelVolg:'0' });
+      const sub = (af, actie) => ({ af, r:{ taakId:'Ts', bundelId:'Tkop', actiepunt:actie } });
+      eq('migratie B: zonder bundel hoort het traject erbij',
+         migratieSelectie([tr('T4')], ixVan(null), T).zonderSub.map(r => r.taakId), ['T4']);
+      eq('migratie B: met een open voorleg-subtaak niet meer',
+         migratieSelectie([kop], ixVan([{ af:false, r:kop }, sub(false, VOORLEG_ACTIE)]), T)
+           .zonderSub.length, 0);
+      // Bewust: een AFGERONDE voorleg-subtaak telt niet mee — anders zou de migratie werk
+      // teruggeven dat al gedaan is. Zie de kop van migratie-offerte.js.
+      eq('migratie B: een afgeronde voorleg-subtaak telt niet als dekking',
+         migratieSelectie([kop], ixVan([{ af:false, r:kop }, sub(true, VOORLEG_ACTIE)]), T)
+           .zonderSub.map(r => r.taakId), ['Tkop']);
+      eq('migratie B: een andere subtaak in dezelfde bundel dekt het traject niet af',
+         migratieSelectie([kop], ixVan([{ af:false, r:kop }, sub(false, 'Iets anders')]), T)
+           .zonderSub.map(r => r.taakId), ['Tkop']);
+
+      // Een rij zonder rijnummer zou 'Nog Te Doen'!Qundefined worden — die schrijft de API
+      // klakkeloos ergens weg. Hij hoort dus in geen van beide lijsten te staan.
+      const zonderRij = { ...tr('T5', { datumAangevraagd:'1-8-2026', deadline:'1-9-2026' }), _row:0 };
+      eq('migratie: een rij zonder rijnummer valt overal buiten',
+         [migratieSelectie([zonderRij], ixVan(null), T).naarOpvolg.length,
+          migratieSelectie([zonderRij], ixVan(null), T).zonderSub.length], [0, 0]);
+      eq('migratie: een lege lijst geeft twee lege uitkomsten',
+         [migratieSelectie(null, ixVan(null), T).naarOpvolg.length,
+          migratieSelectie(undefined, ixVan(null), T).zonderSub.length], [0, 0]);
+    })();
 
     // ── De anker-vangrails: een mislukt subtaak-anker mag de traject-opslag nooit meetrekken ──
     // maakVoorlegSubtaken staat bínnen submitTask's try; zou getInsertRow('OPPAKKEN') hier hard

@@ -95,6 +95,10 @@ const APP_SHELL = [
   './src/bundel.js',
   './src/bundel-acties.js',
   './src/render-bundel.js',
+  // Eenmalige migratie v12.5. Wordt lazy geïmporteerd door main.js, maar de wachtpost in tests.js
+  // volgt óók dynamische imports — en terecht: een dynamische import is net zo goed een verzoek
+  // dat bij 'eerste bezoek en meteen offline' niet uit de cache te beantwoorden valt.
+  './src/migratie-offerte.js',
 ];
 
 self.addEventListener('install', e => {

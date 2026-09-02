@@ -510,7 +510,12 @@ document.addEventListener('DOMContentLoaded',()=>{
   // Eenmalige migratie v12.5 (offerte-stappen) — handmatig vanuit de console; zie migratie-offerte.js.
   // Lazy import: de module weegt zo niets mee in de normale start, en de kringverwijzing met main.js
   // (hij heeft renderAll nodig) knelt niet omdat hij pas ná main.js geladen wordt.
-  import('./migratie-offerte.js').then(m=>{ window.migreerOfferteStappen=m.migreerOfferteStappen; });
+  import('./migratie-offerte.js')
+    .then(m=>{ window.migreerOfferteStappen=m.migreerOfferteStappen; })
+    // Zonder deze vangst mislukt de import stil (bv. een bestand dat bij het laden nog niet
+    // uitgerold was) en staat er in de console alleen 'undefined is not a function' — zonder
+    // enige aanwijzing waaróm. Gebeurd bij de uitrol van 12.5 op 02-09-2026.
+    .catch(e=>console.warn('[migratie] module niet geladen:', e && e.message));
 
   // Live updates — auto-refresh elke 8 seconden (smart diff voorkomt onnodige re-renders)
   // Id bewaard voor diagnose — logout() stopt hem BEWUST niet: dan zou een tweede inlog in

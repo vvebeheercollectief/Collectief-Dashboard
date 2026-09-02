@@ -5709,7 +5709,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '12.6');
+  eq('versie opgehoogd', APP_VERSION, '12.7');
 
   // ── Tabbladen ÍN de kaartkop (v11.7) ──
   // De kop van de kaart zei links exact hetzelfde als het actieve tabblad — 'Oppakken' boven
@@ -7988,6 +7988,43 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       state.ntdStatus = fStatus; state.ntdSort = fSort; state.bulkMode = fBulk;
       renderNtd(); renderNtdStats(); goTo(paginaVoor);
     }
+  })();
+
+  // ── …maar in het zoekvenster (Ctrl+K) moet hij juist ALTIJD te vinden zijn (v12.7) ──
+  // Op verzoek van de gebruiker. Hij stond eerst in dezelfde groep 'Open taken' met een cap van
+  // vijf, en omdat hij per definitie geen deadline heeft sorteerde hij daar altijd achteraan: bij
+  // een VvE met vijf of meer open taken viel hij weg. Nu een eigen groep met een eigen cap.
+  (() => {
+    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const traj = { taakId:'Toff', bundelId:'Toff', bundelVolg:'0', _sec:'OFFERTE-TRAJECTEN', _row:90,
+      code:'311212', naam:'Testflat', opmerkingen:'Dakofferte', deadline:'', datumAangevraagd:'' };
+    const stapR = { taakId:'Tstap', bundelId:'Toff', bundelVolg:'10', _sec:'OPPAKKEN', _row:60,
+      code:'311212', naam:'Testflat', actiepunt:VOORLEG_ACTIE, deadline:'', behandelaar:'Jer' };
+    // Zes gewone taken MÉT deadline: genoeg om de cap van vijf helemaal te vullen.
+    const druk = Array.from({length:6}, (_,i)=>({ taakId:'Tdruk'+i, bundelId:'', bundelVolg:'',
+      _sec:'OPPAKKEN', _row:70+i, code:'311212', naam:'Testflat', actiepunt:'Werk '+i,
+      deadline:'1-1-2026', behandelaar:'Jer' }));
+    const data={ ntd:{ ...leeg, 'OFFERTE-TRAJECTEN':[traj], OPPAKKEN:[stapR, ...druk] }, af:{ ...leeg },
+                 alvo:[], logboek:[] };
+
+    const res=zoekAlles('311212', data);
+    eq('palet: de automatische stap staat niet tussen de gewone taken',
+       res.taken.some(r=>r.taakId==='Tstap'), false);
+    eq('palet: … maar in zijn eigen groep, ook als de takenlijst vol is',
+       res.stappen.map(r=>r.taakId), ['Tstap']);
+    eq('palet: en de gewone taken houden hun eigen vijf plekken', res.taken.length, 5);
+    // De tegenproef op de oude fout: zónder eigen groep viel hij weg. Zes taken met deadline
+    // vullen de cap, en de stap (geen deadline → achteraan) haalde de lijst nooit.
+    eq('palet: de zes taken met deadline drukken hem in de takengroep inderdaad weg',
+       res.taken.some(r=>r.taakId==='Tstap'), false);
+    // Een zelfgemaakte subtaak onder hetzelfde traject blijft een gewone taak.
+    const eigenSub={ ...stapR, taakId:'Teigen', actiepunt:'Aannemer bellen', _row:61 };
+    const res2=zoekAlles('aannemer', { ...data, ntd:{ ...data.ntd, OPPAKKEN:[stapR, eigenSub] } });
+    eq('palet: een zelfgemaakte subtaak hoort gewoon bij de taken',
+       [res2.taken.map(r=>r.taakId), res2.stappen.length], [['Teigen'], 0]);
+    // En zoeken op de tekst van de stap zelf levert hem ook op.
+    eq('palet: zoeken op de tekst van de stap vindt hem',
+       zoekAlles('voorleggen', data).stappen.map(r=>r.taakId), ['Tstap']);
   })();
 
   // ── De automatische offerte-stap hoort niet in de vlakke Oppakken-lijst (v12.6) ──

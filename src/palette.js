@@ -6,6 +6,7 @@
 // LEGE vetgedrukte regel in de lijst — terwijl zoekAlles ze wél vindt.
 import { esc, displayName, berekenPrioriteit, teLaatVoorTelling, offerteAangevraagd, parseDt, taakTitel } from "./util.js";
 import { SECS, SKEYS } from "./config.js";
+import { bouwBundelIndex, isAutoOfferteStap, bundelVerwijzing } from "./bundel.js";
 import { state, D } from "./state.js";
 import { goTo } from "./ui.js";
 import { openModal, zetOmschrijving } from "./crud.js";
@@ -14,22 +15,30 @@ import { logZin } from "./render-overig.js";
 import { toggleBulkMode } from "./bulk.js";
 import { ico } from "./icons.js";
 
-const PAL_MAX = { vves:3, taken:5, afgerond:3, logboek:3 };
+// `stappen` staat los van `taken` en niet erin: de automatische offerte-stap staat sinds v12.6
+// niet meer in de takenlijst, dus het palet is voor hém de snelle weg terug — en in de gedeelde
+// cap van vijf verloor hij het altijd. Hij heeft namelijk per definitie geen deadline, en de
+// sortering hieronder zet 'geen deadline' achteraan. Een eigen groep met een eigen cap kan niet
+// leeggedrukt worden door gewone taken, en andersom kosten 23 stappen geen enkele takenplek.
+const PAL_MAX = { vves:3, taken:5, stappen:5, afgerond:3, logboek:3 };
 
 // Pure zoekfunctie (testbaar): doorzoekt VvE's, open taken, afgerond en logboek.
 function zoekAlles(q, data, max){
   max = max || PAL_MAX;
   const z=(q||'').trim().toLowerCase();
-  const res={vves:[],taken:[],afgerond:[],logboek:[]};
+  const res={vves:[],taken:[],stappen:[],afgerond:[],logboek:[]};
   if(!z) return res;
   const hit=(...velden)=>velden.some(v=>String(v||'').toLowerCase().includes(z));
   res.vves=(data.alvo||[]).filter(r=>hit(r.code,r.naam)).slice(0,max.vves);
   // Eerst alle taak-treffers over álle secties verzamelen, dán cappen op relevantie. Anders vult
   // de cap zich met OPPAKKEN/VERGADER (eerste secties) en komen sterk-matchende LOD/offerte-taken
   // er nooit bij. Relevantie: exacte code-match eerst, daarna op urgentie (te laat = meest negatief).
-  const alleTaken=[];
+  const alleTaken=[], alleStappen=[];
+  // De index één keer, niet per rij: `bouwBundelIndex` loopt over vijf secties van twee bladen.
+  const _ix=bouwBundelIndex(data.ntd||{}, data.af||{});
   SKEYS.forEach(s=>(data.ntd[s]||[]).forEach(r=>{
-    if(hit(r.code,r.naam,r.actiepunt,r.periode,r.agendapunten,r.status,r.subsidie,r.opmerkingen)) alleTaken.push(r);
+    if(!hit(r.code,r.naam,r.actiepunt,r.periode,r.agendapunten,r.status,r.subsidie,r.opmerkingen)) return;
+    (isAutoOfferteStap(r,_ix) ? alleStappen : alleTaken).push(r);
   }));
   const _dt=r=>{const p=berekenPrioriteit(r.deadline,r._sec).dagenTot; return p==null?Infinity:p;};
   alleTaken.sort((a,b)=>{
@@ -38,6 +47,14 @@ function zoekAlles(q, data, max){
     return _dt(a)-_dt(b);
   });
   res.taken=alleTaken.slice(0,max.taken);
+  // Stappen op VvE-code, met een exacte code-treffer vooraan — op urgentie sorteren heeft hier
+  // geen betekenis, want ze dragen geen van alle een deadline.
+  alleStappen.sort((a,b)=>{
+    const ax=(a.code||'').toLowerCase()===z?0:1, bx=(b.code||'').toLowerCase()===z?0:1;
+    if(ax!==bx) return ax-bx;
+    return (a.code||'').localeCompare(b.code||'');
+  });
+  res.stappen=alleStappen.slice(0,max.stappen);
   // Zelfde behandeling als de open taken hierboven, en om dezelfde reden: eerst álles verzamelen,
   // dán cappen. Hier stond de cap nog IN de lus, dus hij vulde zich met OPPAKKEN (de eerste sectie)
   // en een sterk matchende afgeronde LOD- of offerte-taak kwam er nooit bij.
@@ -121,6 +138,17 @@ function renderPal(q){
                : opv ?`<span class="pill-opvolgen">Opvolgen (${Math.abs(p.dagenTot)}d)</span>`
                : esc(r.deadline||'');
       return _item(`<span class="pal-ico pal-ico-taak">${ico('cirkelOpen')}</span><div class="pal-tekst"><b>${esc(taakTitel(r, r._sec))}</b><span>${esc(r.code)} ${esc(r.naam||'')} · ${esc(SECS[r._sec].label)} · ${esc(r.behandelaar||'—')}</span></div><span class="pal-hint">${pill}</span>`,
+        ()=>{ closePalette(); openModal(true,r); });
+    }).join(''));
+    // Eigen groep, met de taak waar de stap bij hoort in de onderregel: los van zijn traject zegt
+    // 'Offertes voorleggen aan eigenaren' bij elke VvE hetzelfde, en dan is de lijst niet te lezen.
+    // De index één keer buiten de lus: hij loopt over vijf secties van twee bladen.
+    const _palIx=res.stappen.length ? bouwBundelIndex(D.ntd||{}, D.af||{}) : null;
+    html+=_groep('Stap in een traject',res.stappen.map(r=>{
+      const vw=bundelVerwijzing(r, _palIx);
+      const kop=vw && vw.rol==='sub' ? vw.kopRij : null;
+      const bij=kop ? `stap in: ${taakTitel(kop, kop._sec)||SECS[kop._sec].label}` : SECS[r._sec].label;
+      return _item(`<span class="pal-ico pal-ico-taak">${ico('cirkelOpen')}</span><div class="pal-tekst"><b>${esc(taakTitel(r, r._sec))}</b><span>${esc(r.code)} ${esc(r.naam||'')} · ${esc(bij)}</span></div><span class="pal-hint">Enter → bewerken</span>`,
         ()=>{ closePalette(); openModal(true,r); });
     }).join(''));
     html+=_groep('Afgerond',res.afgerond.map(r=>

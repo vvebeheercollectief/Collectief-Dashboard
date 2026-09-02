@@ -40,7 +40,7 @@ import { verplaatsTaak, verplaatsWaarden, verlorenVelden, verplaatsVraagTekst, _
 import { addAannemer, verwijderAannemer, toggleAannemerBinnen, hernoemAannemer, startHernoem, stopHernoem, opgevolgd } from "./offerte-aannemers.js";
 import { zetModalAannemers, modalAannemersCel, modalAannemerBinnen } from "./modal-aannemers.js";
 import { voorlegValues, VOORLEG_ACTIE, maakVoorlegSubtaken } from "./offerte-stappen.js";
-import { migratieSelectie } from "./migratie-offerte.js";
+import { migratieSelectie, migreerOfferteStappen } from "./migratie-offerte.js";
 import { _verrijkOfferteRij, herstelAannemerFocus } from "./render-offerte.js";
 import { bouwBundelIndex, bundelWeergave, zichtbareKop, isBundel, bundelVan, bundelMetId, hernummerLeden, volgendeVolg, magKoppelen, wordtGeabsorbeerd, koppelKandidaten, taakFilter, openSubtaken, bundelWaarschuwing, bundelVerwijzing, bundelStand, zelfdeTaak } from "./bundel.js";
 import { bundelPaneelHtml, bundelMerkje, bundelKopExtra, STAPEL_GREEP } from "./render-bundel.js";
@@ -7845,6 +7845,24 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       eq('migratie B: een andere subtaak in dezelfde bundel dekt het traject niet af',
          migratieSelectie([kop], ixVan([{ af:false, r:kop }, sub(false, 'Iets anders')]), T)
            .zonderSub.map(r => r.taakId), ['Tkop']);
+      // Een traject dat zélf subtaak is in andermans bundel (R ≠ eigen nummer) krijgt géén eigen
+      // voorleg-subtaak — zelfde regel als submitTask, bundels blijven één laag diep. Zonder deze
+      // uitzondering ging de subtaak met de vreemde bundelId mee en stond hij als broer/zus naast
+      // het traject in die andere bundel (tegenlezing 2026-09-02).
+      const inVreemde = tr('T6', { bundelId:'Talv', bundelVolg:'10' });
+      const uitVreemde = migratieSelectie([inVreemde], ixVan(null), T);
+      eq('migratie B: een traject dat zelf in andermans bundel zit wordt overgeslagen en apart geteld',
+         [uitVreemde.zonderSub.length, uitVreemde.inAndereBundel.map(r => r.taakId)], [0, ['T6']]);
+      // …en die uitzondering wint óók als de vreemde bundel toevallig al een open voorleg-rij heeft:
+      // hij hoort in geen van beide lijsten, want hij is niet 'gedekt' — hij is uitgesloten.
+      const vreemdeIx = new Map([['Talv', [{ af:false, r:{ taakId:'Talv', bundelId:'Talv', actiepunt:'ALV' } },
+                                          { af:false, r:inVreemde }, sub(false, VOORLEG_ACTIE)]]]);
+      eq('migratie B: … ongeacht wat er in die andere bundel staat',
+         [migratieSelectie([inVreemde], vreemdeIx, T).zonderSub.length,
+          migratieSelectie([inVreemde], vreemdeIx, T).inAndereBundel.length], [0, 1]);
+      // Een echte kop (R = eigen nummer) valt hier niet onder; die gaat gewoon de B-selectie in.
+      eq('migratie B: een eigen kop telt niet als "andere bundel"',
+         migratieSelectie([kop], ixVan([{ af:false, r:kop }]), T).inAndereBundel.length, 0);
 
       // Een rij zonder rijnummer zou 'Nog Te Doen'!Qundefined worden — die schrijft de API
       // klakkeloos ergens weg. Hij hoort dus in geen van beide lijsten te staan.
@@ -7971,6 +7989,102 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       renderNtd(); renderNtdStats(); goTo(paginaVoor);
     }
   })();
+
+  // ── De migratie-schrijfweg zelf, met gestubde fetch: guard VÓÓR de batch, terugweg bij een
+  // verschoven blad, en run 2 leeg. Dit is de toets die rood wordt zodra iemand de rij-guard
+  // weer uit de beurt haalt — de routine gaat één keer op ~31 productie-rijen draaien, zonder
+  // rollback; 'de idempotente selectie is het vangnet' vangt géén rij die n te hoog geschreven is.
+  await (async () => {
+    const _fetch=window.fetch, tokenOud=state.oauthToken, expiryOud=state.oauthExpiry;
+    const idsOud=state._sheetIds, cacheOud=state._uitCache, failsOud=state._syncFails;
+    const bewaardNtd=D.ntd, bewaardAf=D.af, bewaardSec=state.activeNtd, bewaardPg=pgs.ntd;
+    const tik=() => new Promise(r => { const k=new MessageChannel(); k.port1.onmessage=()=>r(); k.port2.postMessage(0); });
+    const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const opp=(row) => ({ _row:row, _sec:'OPPAKKEN', taakId:'To'+row, bundelId:'', bundelVolg:'',
+      code:'311212', naam:'Testflat', actiepunt:'Iets', deadline:'', behandelaar:'', inBehandeling:'' });
+    const traject=() => ({ _row:90, _sec:'OFFERTE-TRAJECTEN', taakId:'Toff', bundelId:'', bundelVolg:'',
+      code:'311999', naam:'Ander', datumAangevraagd:'1 mei 2026', offertes:'0 / 3', behandelaar:'Cihad',
+      deadline:'1-8-2026', opmerkingen:'Dakofferte' });
+    // Wat de "Sheet" teruggeeft op de guard-lezing van rij 90, per scenario instelbaar.
+    let sheetRij=null; const verkeer=[];
+    try {
+      await state._writeChain;
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
+      state._sheetIds={'Nog Te Doen':0}; state._uitCache=false;
+      window.fetch=async (url, opt) => {
+        const methode=(opt&&opt.method)||'GET', u=decodeURIComponent(String(url));
+        if(methode==='GET' && u.includes('/values/') && !u.includes('batchGet')){
+          verkeer.push({ soort:'guard', bereik:u.split('/values/')[1].split('?')[0] });
+          return new Response(JSON.stringify({ values:[sheetRij||[]] }),{status:200});
+        }
+        if(methode==='POST' && u.includes('values:batchUpdate')){
+          verkeer.push({ soort:'batch', data:JSON.parse(opt.body).data });
+          return new Response('{}',{status:200});
+        }
+        if(methode==='PUT'){ verkeer.push({ soort:'put', bereik:u.split('/values/')[1].split('?')[0] }); return new Response('{}',{status:200}); }
+        if(methode==='POST'){ verkeer.push({ soort:'post' }); return new Response(JSON.stringify({replies:[{}]}),{status:200}); }
+        return new Response(JSON.stringify({error:{message:'geen leesverkeer in deze test'}}),{status:403});
+      };
+
+      // 1) Verschoven blad: rij 90 draagt intussen een ándere taak → guard gaat af, niets geschreven,
+      //    optimistische stand terug, geen subtaak.
+      D.ntd={ ...leeg, OPPAKKEN:[ opp(60), opp(61) ], 'OFFERTE-TRAJECTEN':[ traject() ] }; D.af={ ...leeg };
+      state.activeNtd='OFFERTE-TRAJECTEN'; pgs.ntd=1;
+      sheetRij=_rijNaarCellen('Nog Te Doen', { ...traject(), code:'999999', taakId:'Tvreemd' });
+      const uit1=await migreerOfferteStappen();
+      await state._writeChain;
+      const t1=D.ntd['OFFERTE-TRAJECTEN'][0];
+      truthy('migratie-e2e: bij een verschoven blad meldt de uitslag "niet geschreven"', /^niet geschreven/.test(uit1));
+      eq('migratie-e2e: … en er is dan alleen gelezen, niets geschreven',
+         verkeer.map(v => v.soort), ['guard']);
+      eq('migratie-e2e: … de guard las precies de doelrij',
+         verkeer[0].bereik, "'Nog Te Doen'!A90:S90");
+      eq('migratie-e2e: … en de optimistische stand is terug naar hoe hij was',
+         [t1.deadline, t1.bundelId, t1.bundelVolg, D.ntd.OPPAKKEN.length], ['1-8-2026', '', '', 2]);
+      eq('migratie-e2e: … zonder een schrijfactie open te laten staan', state.pendingWrites, 0);
+      for(let i=0;i<200 && state._loadInFlight;i++) await tik();
+
+      // 2) Blad klopt: guard eerst, dán de batch (Q:S én F op rij 90), dán de subtaak-insert.
+      verkeer.length=0;
+      D.ntd={ ...leeg, OPPAKKEN:[ opp(60), opp(61) ], 'OFFERTE-TRAJECTEN':[ traject() ] }; D.af={ ...leeg };
+      sheetRij=_rijNaarCellen('Nog Te Doen', traject());
+      const uit2=await migreerOfferteStappen();
+      await state._writeChain;
+      const t2=D.ntd['OFFERTE-TRAJECTEN'][0], sub=D.ntd.OPPAKKEN.slice(-1)[0]||{};
+      truthy('migratie-e2e: de uitslag telt 1 opvolgdatum en 1 subtaak',
+             /: 1 trajecten · nieuwe subtaken: 1$/.test(uit2));
+      eq('migratie-e2e: de guard-lezing gaat VÓÓR de batch, en de batch vóór de subtaak-insert',
+         verkeer.map(v => v.soort), ['guard', 'batch', 'post', 'put', 'post']);
+      const batch=(verkeer[1]||{}).data||[];
+      eq('migratie-e2e: de batch zet Q/R/S én F op de rij van het traject',
+         batch.map(b => [b.range, b.values[0]]),
+         [["'Nog Te Doen'!Q90:S90", ['Toff','Toff','0']], ["'Nog Te Doen'!F90", [t2.deadline]]]);
+      truthy('migratie-e2e: de nieuwe opvolgdatum ligt in de toekomst (dd-mm-jjjj)',
+             /^\d{2}-\d{2}-\d{4}$/.test(t2.deadline) && !berekenPrioriteit(t2.deadline,'OFFERTE-TRAJECTEN').teLaat);
+      eq('migratie-e2e: het traject is nu zijn eigen bundelkop', [t2.bundelId, t2.bundelVolg], ['Toff','0']);
+      eq('migratie-e2e: de subtaak hangt onder het traject, in Oppakken',
+         [sub.actiepunt, sub.bundelId, sub.bundelVolg, sub._sec], [VOORLEG_ACTIE, 'Toff', '10', 'OPPAKKEN']);
+      eq('migratie-e2e: … en de subtaakrij landt onder het Oppakken-blok',
+         (verkeer[3]||{}).bereik, "'Nog Te Doen'!A62:S62");
+      for(let i=0;i<200 && state._loadInFlight;i++) await tik();
+
+      // 3) Run 2 direct erna, zónder herlaad: de index uit D.ntd ziet de open voorleg-subtaak en
+      //    de verzette F — er valt niets meer te doen en er wordt ook niets gelezen of geschreven.
+      verkeer.length=0;
+      const uit3=await migreerOfferteStappen();
+      await state._writeChain;
+      truthy('migratie-e2e: run 2 meldt 0 · 0', /: 0 trajecten · nieuwe subtaken: 0$/.test(uit3));
+      eq('migratie-e2e: … en raakt de Sheet niet aan', verkeer.length, 0);
+      for(let i=0;i<200 && state._loadInFlight;i++) await tik();
+    } finally {
+      window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
+      state._sheetIds=idsOud; state._uitCache=cacheOud; state._syncFails=failsOud;
+      D.ntd=bewaardNtd; D.af=bewaardAf; pgs.ntd=bewaardPg; state.activeNtd=bewaardSec;
+      document.querySelectorAll('.toast').forEach(el => el.remove());
+      renderNtd(); renderNtdStats();
+    }
+  })();
+
 
   // ── En de schakel ertussen: van de knop naar de rij die écht wordt weggeschreven ──
   // De twee helften hierboven raken submitTask niet, en juist dáár zit de stilste breuk van deze

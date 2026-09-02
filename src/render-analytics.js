@@ -4,6 +4,7 @@
 import { esc, displayName, persBadges, emptyRow, parseDt, _parseAnyDate, vveCodeSpan, taakTitel, splitBehandelaar } from "./util.js";
 import { SECS, SKEYS, TEAM } from "./config.js";
 import { state, D } from "./state.js";
+import { telbaar } from "./bundel.js";
 import { ico } from "./icons.js";
 
 // Leiblauwe accentkleur uitlezen op render-moment (Chart.js kan geen CSS-var-strings
@@ -242,7 +243,11 @@ function renderKpiPersonTile(period){
   // Verzamel alle taken in laatste bucket (huidige periode)
   const keys=lastBucketKeys(period,1);
   const curKey=keys[0];
-  const allTaken=SKEYS.flatMap(s=>D.af[s]||[]);
+  // Zelfde populatie als de tegels: een automatische offerte-stap telt nergens als eigen taak.
+  // `telbaar` buiten de flatMap: hij bouwt intern de hele bundelindex, en in de lus zou dat er
+  // vijf per aanroep zijn.
+  const telKpi=telbaar(D.ntd, D.af);
+  const allTaken=SKEYS.flatMap(s=>telKpi.af[s]||[]);
   const tally={};
   TEAM.forEach(n=>tally[n]=0);
   allTaken.forEach(r=>{
@@ -311,7 +316,10 @@ function renderHeroChart(metric,period){
 
 // Leaderboard — taken per behandelaar deze vs vorige periode
 function renderLeaderboard(period){
-  const rows=SKEYS.flatMap(s=>D.af[s]||[]);
+  // Zelfde populatie als de tegels (zie `telbaar` in bundel.js); buiten de flatMap om dezelfde
+  // reden als hierboven.
+  const telLb=telbaar(D.ntd, D.af);
+  const rows=SKEYS.flatMap(s=>telLb.af[s]||[]);
   const series=seriesPerPersonByPeriod(rows,'datum','behandelaar',period,2);
   // Vast team + iedereen die in de data afgeronde taken heeft (zo valt een collega/stagiair
   // buiten EMAIL_NAMES niet stil uit het leaderboard).
@@ -618,7 +626,10 @@ const HERO_VIEWS=[
     title:'Open taken per categorie',
     sub:'Verdeling van openstaande werkzaamheden',
     build:()=>{
-      const data=SKEYS.map(s=>D.ntd[s]?.length||0);
+      // Zonder de automatische offerte-stappen — zelfde telling als de takenpagina en de tegel
+      // hieronder, anders zegt de donut een ander totaal dan de kop van 'Nog Te Doen'.
+      const tel=telbaar(D.ntd, D.af);
+      const data=SKEYS.map(s=>tel.ntd[s]?.length||0);
       const tot=data.reduce((a,b)=>a+b,0);
       return{labels:SKEYS.map(s=>SECS[s].label),data,colors:SKEYS.map(s=>s==='OPPAKKEN'?acColor():SECS[s].color),centerVal:`${tot}`,centerLbl:'Open Taken'};
     }
@@ -660,8 +671,14 @@ function buildDash(){
   _wisGrafiekFout('page-dash');
   const uitnD=D.alvo.filter(r=>r.uitnodiging).length;
   const notulenD=D.alvo.filter(r=>r.notulen).length;
-  const ntdTotal=SKEYS.reduce((s,k)=>s+(D.ntd[k]?.length||0),0);
-  const afTotal=SKEYS.reduce((s,k)=>s+(D.af[k]?.length||0),0);
+  // Eén keer opbouwen en dan pas optellen: `telbaar` bouwt intern de volledige bundelindex, en
+  // deze functie draait bij élke geslaagde poll zolang de Cijfers-pagina open staat. In de reduce
+  // gezet betekende dat vijf indexopbouwen per acht seconden voor één getal.
+  // Beide tegels uit dezelfde bron, anders telt 'Taken afgerond' werk mee dat bij 'Open taken'
+  // nooit heeft meegeteld — zie de toelichting bij `telbaar` in bundel.js.
+  const telAn=telbaar(D.ntd, D.af);
+  const ntdTotal=SKEYS.reduce((s,k)=>s+(telAn.ntd[k]?.length||0),0);
+  const afTotal=SKEYS.reduce((s,k)=>s+(telAn.af[k]?.length||0),0);
 
   const dItem=(val,cls,cap,hint)=>`<div class="stat-item"><span class="stat-val ${cls}">${val}</span><div class="stat-meta"><span class="stat-cap">${cap}</span>${hint?`<span class="stat-hint">${hint}</span>`:''}</div></div>`;
   document.getElementById('dash-stats').innerHTML=

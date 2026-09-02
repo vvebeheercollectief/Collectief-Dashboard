@@ -12,7 +12,7 @@ import { showToast } from "./notifications.js";
 import { renderThead, renderTbody, renderPag, bepaalStil, bouwStilIndex, _zetStilIndex, deadlineCel, rowNtd, rowAf } from "./render-tabel.js";
 import { _verrijkOfferteRij, offerteAannemerPaneel, offerteAannSamenvatting, herstelAannemerFocus } from "./render-offerte.js";
 import { renderAlvo, renderAlfa, toggleAlvoFlag, ALVO_ICONS, ALVO_COLS, ALVO_LABELS, flagPill, _recomputeAlvoStatus, statusIco } from "./render-alv.js";
-import { bundelWeergave, wordtGeabsorbeerd, bundelSleutel, bundelMetId, bouwBundelIndex, zichtbareKop } from "./bundel.js";
+import { bundelWeergave, wordtGeabsorbeerd, bundelSleutel, bundelMetId, bouwBundelIndex, zichtbareKop, isAutoOfferteStap, telbaar } from "./bundel.js";
 
 // ══════════════════════════════════════
 //  NTD STATS
@@ -26,8 +26,13 @@ const CHEV_SVG = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" st
 
 function renderNtdStats(){
   let open=0, telaat=0, weg=0;
+  // Over `telbaar` en niet over de rauwe D.ntd/D.af: de automatische offerte-stappen staan niet in
+  // de lijst eronder en mogen dus ook niet in deze pillen meetellen — anders zegt de kop '123 open'
+  // boven een lijst die er 100 toont. Beide kanten uit dezelfde bron, zodat 'af' niet omhoog kan
+  // gaan voor een stap die in 'open' nooit heeft meegeteld. Zie isAutoOfferteStap (bundel.js).
+  const tel=telbaar(D.ntd, D.af);
   SKEYS.forEach(s=>{
-    (D.ntd[s]||[]).forEach(r=>{
+    (tel.ntd[s]||[]).forEach(r=>{
       open++;
       if(teLaatVoorTelling(r,s)) telaat++;
       if(opvolgStatus(r).weggelegd) weg++;
@@ -36,7 +41,7 @@ function renderNtdStats(){
   const tv=_vandaagAmsterdam();
   const todayISO=`${tv.getFullYear()}-${String(tv.getMonth()+1).padStart(2,'0')}-${String(tv.getDate()).padStart(2,'0')}`;
   let afVandaag=0;
-  SKEYS.forEach(s=>{(D.af?.[s]||[]).forEach(r=>{ if(toISODate(r.datum||'')===todayISO) afVandaag++; })});
+  SKEYS.forEach(s=>{(tel.af?.[s]||[]).forEach(r=>{ if(toISODate(r.datum||'')===todayISO) afVandaag++; })});
 
   const host=document.getElementById('ntd-kop-pillen');
   if(!host) return;
@@ -294,6 +299,12 @@ function springNaarBundel(bundelId){
                           null,'label',{ geenSysteemmelding:true, geenDedup:true });
 }
 
+// De automatische offerte-stap hoort niet in de vlakke lijst van Oppakken en telt daar ook niet
+// mee — zie `isAutoOfferteStap` (bundel.js) voor het waarom en de randgevallen. Eén helper voor de
+// twee plekken die de rijen van een tabblad opleveren (de tabteller en de lijst zelf), zodat het
+// getal op de tab niet stil kan afwijken van wat eronder staat.
+const zonderAutoStap = (rows, bw) => (rows||[]).filter(r => !isAutoOfferteStap(r, bw && bw.ix));
+
 function renderNtd(){
   // Eerst de selectie ontdoen van rij-objecten die na een verversing niet meer bestaan; anders
   // tekent de tabel lege vinkjes terwijl de balk nog een aantal noemt (zie bulkHerstel).
@@ -329,7 +340,7 @@ function renderNtd(){
 
   // Tabs
   document.getElementById('ntd-tabs').innerHTML=SKEYS.map(s=>{
-    const rows=filterNtd(D.ntd[s]||[],q,fCode,fBeh,fPrio,s,state.ntdStatus);
+    const rows=zonderAutoStap(filterNtd(D.ntd[s]||[],q,fCode,fBeh,fPrio,s,state.ntdStatus), bw);
     return`<button type="button" class="tab ${s===state.activeNtd?'on':''}" role="tab" aria-selected="${s===state.activeNtd}" style="${s===state.activeNtd?SECS[s].css:''}" data-action="ntd-sectie" data-sec="${s}">${SECS[s].label}<span class="cnt">${rows.length}</span></button>`;
   }).join('');
 
@@ -341,7 +352,25 @@ function renderNtd(){
   // Absorptie als laatste stap, ná filteren en sorteren: alleen de lijst die getekend wordt
   // krimpt. De tab-tellers hierboven blijven bewust op de ONgeabsorbeerde lijst staan — een
   // geabsorbeerde subtaak is niet verdwenen, alleen anders getekend, en moet dus meetellen.
-  const zichtbaar=absorbeer(sorteerNtd(filterNtd(D.ntd[state.activeNtd]||[],q,fCode,fBeh,fPrio,state.activeNtd,state.ntdStatus),state.ntdSort),state.activeNtd,bw);
+  //
+  // `zonderAutoStap` staat daar bewust NAAST en niet ín: absorptie geldt alleen in de gestapelde
+  // weergave (bundelWeergave zet `stapel` uit zodra er gezocht, gefilterd, gesorteerd of in bulk
+  // gewerkt wordt), en dan kwamen de automatische stappen terug zodra iemand één letter in het
+  // zoekveld typt. Ze horen ALTIJD weg uit deze lijst én uit de tabteller.
+  //
+  // DE TERUGWEG, eerlijk opgeschreven — een rij die uit de lijst verdwijnt moet ergens anders
+  // volledig bereikbaar blijven:
+  //   · altijd: het uitklappaneel van het traject op het tabblad Offerte-trajecten, en de
+  //     VvE-dossierpagina (groepeerBundels, render-vve.js — daar verdwijnt per ontwerp geen rij).
+  //     Afvinken, bewerken, verwijderen en wegleggen kunnen daar allemaal.
+  //   · meestal: Ctrl+K, dat rechtstreeks het bewerkscherm opent (palette.js:124). Let op dat dat
+  //     GEEN garantie is: het palet toont hooguit vijf open taken en sorteert op urgentie, en deze
+  //     stap heeft geen deadline en staat dus achteraan. Bij een VvE met vijf of meer open taken
+  //     valt hij buiten de lijst. Noem Ctrl+K dus nooit als enige terugweg.
+  //   · NIET in de selecteerstand (bulk): daar staat `stapel` én `merk` uit, dus het traject toont
+  //     geen chevron en geen merkje en is de stap onbereikbaar. Bewuste keuze — bulk is een stand
+  //     waar de gebruiker zelf in en uit stapt, en een bulk-actie op deze stappen heeft geen zin.
+  const zichtbaar=absorbeer(sorteerNtd(zonderAutoStap(filterNtd(D.ntd[state.activeNtd]||[],q,fCode,fBeh,fPrio,state.activeNtd,state.ntdStatus), bw),state.ntdSort),state.activeNtd,bw);
   // De bulk-kolom krijgt een px-ONDERGRENS en geen gewicht, precies zoals elke andere kolom met een
   // bekende minimuminhoud (VvE-code 130, datums 165, acties 150/120 — zie config.js).
   // Met een gewicht van 3 deelde hij mee in de ruimte die ná de px-kolommen overblijft, en bij de

@@ -42,7 +42,7 @@ import { zetModalAannemers, modalAannemersCel, modalAannemerBinnen } from "./mod
 import { voorlegValues, VOORLEG_ACTIE, maakVoorlegSubtaken } from "./offerte-stappen.js";
 import { migratieSelectie, migreerOfferteStappen } from "./migratie-offerte.js";
 import { _verrijkOfferteRij, herstelAannemerFocus } from "./render-offerte.js";
-import { bouwBundelIndex, bundelWeergave, zichtbareKop, isBundel, bundelVan, bundelMetId, hernummerLeden, volgendeVolg, magKoppelen, wordtGeabsorbeerd, koppelKandidaten, taakFilter, openSubtaken, bundelWaarschuwing, bundelVerwijzing, bundelStand, zelfdeTaak } from "./bundel.js";
+import { bouwBundelIndex, bundelWeergave, zichtbareKop, isBundel, bundelVan, bundelMetId, hernummerLeden, volgendeVolg, magKoppelen, wordtGeabsorbeerd, koppelKandidaten, taakFilter, openSubtaken, bundelWaarschuwing, bundelVerwijzing, bundelStand, zelfdeTaak, isAutoOfferteStap, telbaar } from "./bundel.js";
 import { bundelPaneelHtml, bundelMerkje, bundelKopExtra, STAPEL_GREEP } from "./render-bundel.js";
 import { vraagBevestiging, beantwoordBevestiging, _vraagStaatOpen } from "./bevestig.js";
 import { bovensteModal, koppelFormulierLabels, benoemSchakelaars } from "./modal-a11y.js";
@@ -5709,7 +5709,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '12.5');
+  eq('versie opgehoogd', APP_VERSION, '12.6');
 
   // ── Tabbladen ÍN de kaartkop (v11.7) ──
   // De kop van de kaart zei links exact hetzelfde als het actieve tabblad — 'Oppakken' boven
@@ -7988,6 +7988,110 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       state.ntdStatus = fStatus; state.ntdSort = fSort; state.bulkMode = fBulk;
       renderNtd(); renderNtdStats(); goTo(paginaVoor);
     }
+  })();
+
+  // ── De automatische offerte-stap hoort niet in de vlakke Oppakken-lijst (v12.6) ──
+  // Gemeld door de gebruiker vlak na de migratie: 23 regels 'Offertes voorleggen aan eigenaren'
+  // vervuilden het tabblad Oppakken. De stap moet alleen als stap ín zijn offerte-traject staan.
+  // Uitdrukkelijk WEL blijven staan: subtaken die de gebruiker zelf onder een traject hangt.
+  (() => {
+    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const traj = (taakId, extra) => ({ taakId, bundelId:taakId, bundelVolg:'0', _sec:'OFFERTE-TRAJECTEN',
+      _row:90, code:'311212', naam:'Testflat', opmerkingen:'Dakofferte', deadline:'', ...extra });
+    const stap = (taakId, bundelId, extra) => ({ taakId, bundelId, bundelVolg:'10', _sec:'OPPAKKEN',
+      _row:60, code:'311212', naam:'Testflat', actiepunt:VOORLEG_ACTIE, deadline:'', ...extra });
+    const ixVan = ntd => bouwBundelIndex(ntd, leeg);
+
+    // 1. De gewone stand: traject op Offerte-trajecten, stap in Oppakken → verbergen.
+    const t1=traj('Toff'), s1=stap('Tstap','Toff');
+    const ntd1={ ...leeg, 'OFFERTE-TRAJECTEN':[t1], OPPAKKEN:[s1] };
+    eq('autostap: de automatische stap onder een offerte-traject wordt verborgen',
+       isAutoOfferteStap(s1, ixVan(ntd1)), true);
+    eq('autostap: het traject zelf natuurlijk niet', isAutoOfferteStap(t1, ixVan(ntd1)), false);
+
+    // 2. Zelfgemaakte subtaak onder hetzelfde traject: blijft staan. Dat is de eis van de
+    //    gebruiker — alleen wat hij zelf aanmaakt hoort op het tabblad Oppakken.
+    const eigen=stap('Teigen','Toff',{ actiepunt:'Aannemer bellen', _row:61 });
+    eq('autostap: een zelfgemaakte subtaak onder hetzelfde traject blijft staan',
+       isAutoOfferteStap(eigen, ixVan({ ...ntd1, OPPAKKEN:[s1, eigen] })), false);
+
+    // 3. Losse taak met exact dezelfde tekst, zonder bundel: blijft staan. De tekst alleen is
+    //    nooit genoeg — anders verdween een handmatig aangemaakte taak stil uit de lijst.
+    const los=stap('Tlos','',{ bundelVolg:'', _row:62 });
+    eq('autostap: dezelfde tekst zonder bundel blijft gewoon staan',
+       isAutoOfferteStap(los, ixVan({ ...leeg, OPPAKKEN:[los] })), false);
+
+    // 4. De stap onder een ANDERE kop gehangen (Hoort bij → vergaderverzoek): blijft staan; de
+    //    gebruiker heeft er dan zelf iets mee gedaan.
+    const verg={ taakId:'Tverg', bundelId:'Tverg', bundelVolg:'0', _sec:'VERGADERVERZOEKEN', _row:70,
+                 code:'311212', naam:'Testflat', agendapunten:'ALV', deadline:'' };
+    const onderVerg=stap('Tstap2','Tverg',{ _row:63 });
+    eq('autostap: onder een vergaderverzoek gehangen blijft hij staan',
+       isAutoOfferteStap(onderVerg, ixVan({ ...leeg, VERGADERVERZOEKEN:[verg], OPPAKKEN:[onderVerg] })), false);
+
+    // 5. Traject afgerond/verwijderd → de stap is zelf de zichtbare kop. Er is dan geen traject
+    //    meer dat hem toont, dus hij hoort juist WÉL in de lijst — anders is het werk nergens.
+    eq('autostap: zonder levend traject wordt de stap weer zichtbaar',
+       isAutoOfferteStap(s1, bouwBundelIndex({ ...leeg, OPPAKKEN:[s1] },
+                                             { ...leeg, 'OFFERTE-TRAJECTEN':[t1] })), false);
+
+    // 6. telbaar: de gedeelde bron voor de tellingen die niet langs filterNtd lopen.
+    const tel=telbaar(ntd1, leeg);
+    eq('autostap: telbaar laat de stap weg maar raakt de rest niet aan',
+       [tel.ntd.OPPAKKEN.length, tel.ntd['OFFERTE-TRAJECTEN'].length], [0, 1]);
+    eq('autostap: telbaar houdt de zelfgemaakte subtaak wél',
+       telbaar({ ...ntd1, OPPAKKEN:[s1, eigen] }, leeg).ntd.OPPAKKEN.map(r=>r.taakId), ['Teigen']);
+    // De AFGERONDE kant telt hem net zo min mee: anders gaat de pil 'N af' omhoog voor een stap
+    // die in 'N open' nooit heeft meegeteld — twee getallen naast elkaar die elkaar tegenspreken.
+    const afStap={ ...s1, datum:'2-9-2026' };
+    const telAf=telbaar({ ...leeg, 'OFFERTE-TRAJECTEN':[t1] }, { ...leeg, OPPAKKEN:[afStap] });
+    eq('autostap: een afgeronde automatische stap telt ook aan de af-kant niet mee',
+       telAf.af.OPPAKKEN.length, 0);
+    eq('autostap: een gewone afgeronde taak blijft aan de af-kant gewoon staan',
+       telbaar({ ...leeg, 'OFFERTE-TRAJECTEN':[t1] },
+               { ...leeg, OPPAKKEN:[{ ...eigen, datum:'2-9-2026' }] }).af.OPPAKKEN.length, 1);
+    // De index blijft over de VOLLEDIGE D.ntd lopen: valt de stap daaruit weg, dan verliezen het
+    // bundelpaneel, het VvE-dossier en de idempotentie van de migratie hem tegelijk.
+    eq('autostap: de bundel zelf houdt al zijn leden (paneel/dossier/migratie leunen erop)',
+       (ixVan(ntd1).get('Toff')||[]).map(m=>m.r.taakId), ['Toff','Tstap']);
+
+    // 7. En hetzelfde tot op het SCHERM: de regel weg uit de lijst, de tabteller mee omlaag, en
+    //    de kop-pil 'N open' ook. Zonder deze toets blijft het predikaat groen terwijl iemand de
+    //    aanroep in renderNtd weghaalt — precies de klacht van de gebruiker die dan terugkomt.
+    //    Ook getoetst mét een zoekterm: de gestapelde weergave gaat dan uit (bundelWeergave zet
+    //    `stapel` op false) en dát is de stand waarin absorptie níets doet.
+    (() => {
+      const vNtd=D.ntd, vAf=D.af, vSec=state.activeNtd, vPg=pgs.ntd, vOpen=state.bundelOpen;
+      const vZoek=document.getElementById('s-ntd').value, vStatus=state.ntdStatus, vSort=state.ntdSort;
+      try{
+        D.af={ ...leeg };
+        D.ntd={ ...leeg, 'OFFERTE-TRAJECTEN':[t1], OPPAKKEN:[s1, eigen] };
+        state.activeNtd='OPPAKKEN'; pgs.ntd=1; state.bundelOpen=new Set();
+        state.ntdStatus=''; state.ntdSort={ key:null, asc:true };
+        document.getElementById('s-ntd').value='';
+        renderNtd();
+        const taken = () => [...document.querySelectorAll('#ntd-tbody tr[data-row]')].map(tr=>tr.dataset.row);
+        const tabTeller = sec => {
+          const el=[...document.querySelectorAll('#ntd-tabs .tab')].find(t=>t.dataset.sec===sec);
+          return el ? el.querySelector('.cnt').textContent : null;
+        };
+        eq('autostap-scherm: alleen de zelfgemaakte subtaak staat in de lijst', taken(), ['61']);
+        eq('autostap-scherm: de tabteller van Oppakken telt de automatische stap niet mee',
+           tabTeller('OPPAKKEN'), '1');
+        eq('autostap-scherm: het offerte-tabblad houdt zijn traject', tabTeller('OFFERTE-TRAJECTEN'), '1');
+        renderNtdStats();
+        eq('autostap-scherm: de kop-pil telt twee open taken, niet drie',
+           (document.querySelector('#ntd-kop-pillen')||{}).textContent.includes('2 open'), true);
+        // Met een zoekterm die op álle drie past: de stap blijft weg, ook nu absorptie uit staat.
+        document.getElementById('s-ntd').value='311212';
+        renderNtd();
+        eq('autostap-scherm: ook bij zoeken blijft de automatische stap weg', taken(), ['61']);
+      } finally {
+        document.getElementById('s-ntd').value=vZoek; state.ntdStatus=vStatus; state.ntdSort=vSort;
+        D.ntd=vNtd; D.af=vAf; state.activeNtd=vSec; pgs.ntd=vPg; state.bundelOpen=vOpen;
+        renderNtd(); renderNtdStats();
+      }
+    })();
   })();
 
   // ── De migratie-schrijfweg zelf, met gestubde fetch: guard VÓÓR de batch, terugweg bij een

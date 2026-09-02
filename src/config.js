@@ -5,7 +5,7 @@ import { ALLOWED_EMAILS } from '../allowed-emails.js';
 
 // ── Versie (zichtbaar in de UI) ────────────────────────────────────────
 // Ophogen bij ELKE wijziging: 4.1, 4.2, … 5.0 voor grote sprongen.
-export const APP_VERSION = '12.5';
+export const APP_VERSION = '12.6';
 
 // ── Omgeving (productie vs. testomgeving) ──────────────────────────────
 // Fail-safe: alleen deze exacte hosts zijn PRODUCTIE; al het andere
@@ -193,6 +193,12 @@ export const VELD_LABELS = {
 };
 
 export const SKEYS = Object.keys(SECS);
+
+// Het actiepunt van de AUTOMATISCHE stap bij een offerte-traject (v12.5). Woont hier en niet in
+// offerte-stappen.js omdat de bundel-laag hem moet kennen om die stap uit de vlakke lijst te
+// houden — en bundel.js mag onmogelijk offerte-stappen.js importeren (die hangt via crud.js aan
+// de halve app). offerte-stappen.js exporteert hem door, zodat bestaande imports blijven werken.
+export const VOORLEG_ACTIE = 'Offertes voorleggen aan eigenaren';
 
 // Waar staat de OMSCHRIJVING van een taak, per categorie — als VELDNAAM (niet als DOM-id).
 // Dit is dezelfde afspraak als OMSCHRIJVING_VELD in crud.js (dat de invoervelden aanwijst) en als

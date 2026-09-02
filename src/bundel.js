@@ -16,7 +16,7 @@
 // testbaar. Let op: dat maakt hem onschadelijk, maar niet vanzelf zijn uitvoer — `hernummerLeden`
 // deelt schrijfopdrachten uit die een aanroeper straks omzet in een cel-bereik, en die lijst moet
 // dus zelf al veilig zijn (zie daar).
-import { SKEYS } from "./config.js";
+import { SKEYS, VOORLEG_ACTIE } from "./config.js";
 
 // De sleutel waaronder een bundel bekend staat: `bundelId`, en het taaknummer waar dat naar
 // verwijst. Die twee leven in dezelfde ruimte — het bundelnummer ís het taaknummer van de
@@ -181,6 +181,61 @@ export function wordtGeabsorbeerd(r, index, sec){
   const kop = zichtbareKop(leden);
   if (!kop || zelfdeTaak(kop.r, r)) return false;  // geen open lid meer, of zelf de kop → blijft staan
   return kop.r._sec === sec;                       // kop in hetzelfde tabblad → het paneel tekent hem
+}
+
+// Is deze rij de AUTOMATISCHE stap die bij een offerte-traject hoort (v12.5)?
+//
+// Waarom dit bestaat: die stap wordt als rij in het OPPAKKEN-blok weggeschreven, maar zijn kop
+// staat op OFFERTE-TRAJECTEN. `wordtGeabsorbeerd` hieronder laat zo'n rij bewust staan — voor een
+// zelfgemaakte subtaak is dat precies goed, want anders was het werk nergens meer te zien. Voor
+// déze stap niet: de gebruiker heeft hem niet aangemaakt en wil hem alleen als stap ín het traject
+// zien. Vandaar een APARTE regel en niet een verruiming van `wordtGeabsorbeerd`: die twee zeggen
+// iets verschillends en moeten uit elkaar te houden blijven.
+//
+// De regel is bewust een EN-toets, geen kale tekstvergelijking:
+//   · `zelfdeTaak(kop, r)` → is de stap zélf de zichtbare kop geworden (traject afgerond of
+//     verwijderd), dan is er geen traject meer dat hem toont en hoort hij juist wél in de lijst;
+//   · de kop moet op OFFERTE-TRAJECTEN staan. Hangt de gebruiker de stap met 'Hoort bij' onder
+//     een andere taak, dan valt de regel om en staat hij weer gewoon in Oppakken — bewust: hij
+//     heeft er dan zelf iets mee gedaan.
+// Wat de tekstvergelijking NIET kan: iemand die de omschrijving overtypt haalt de stap terug in
+// de lijst, en iemand die met de hand een taak met exact deze zin onder een offerte-traject hangt
+// verbergt hem. Allebei zijn het randgevallen die precies dezelfde uitkomst geven als wat de
+// gebruiker dan bedoelt, en een duurzame markering zou een twintigste kolom in de Sheet kosten
+// (met een sorteerbereik in Apps Script erachteraan — zie de kolom-R/S-les). Bewust niet gedaan.
+export function isAutoOfferteStap(r, index){
+  if (!r || r.actiepunt !== VOORLEG_ACTIE) return false;
+  const leden = bundelVan(index, r);
+  if (!leden) return false;
+  const kop = zichtbareKop(leden);
+  if (!kop || zelfdeTaak(kop.r, r)) return false;
+  return kop.r._sec === 'OFFERTE-TRAJECTEN';
+}
+
+// De rijen die MEETELLEN in de cijfers: alles behalve de automatische offerte-stappen. Eén bron
+// voor de tellingen die buiten `filterNtd` om over de rauwe D.ntd/D.af liepen — de pil 'N open' en
+// 'N af', het cijfer in de zijbalk, en op Cijfers de twee tegels, de donut en het leaderboard.
+// Dat waren losse rekensommen met hetzelfde antwoord; nu kan er niet één achterblijven.
+//
+// BEIDE kanten, en dat is de kern: telde alleen de open kant hem niet mee, dan ging de pil 'N af'
+// omhoog zodra iemand de stap afvinkt terwijl 'N open' nooit was gedaald — twee getallen naast
+// elkaar die elkaar tegenspreken. De regel is dus één zin: de automatische stap is een stap ín een
+// traject, geen eigen taak, en telt daarom nergens in de cijfers mee.
+//
+// Eén index voor allebei: `bouwBundelIndex` loopt over vijf secties van twee bladen en sorteert
+// elke bundel — die twee keer opbouwen voor één getal is puur weggegooid werk.
+//
+// Let op: dit is puur een TEL-/WEERGAVE-hulp. `bouwBundelIndex` zelf blijft over de volledige
+// D.ntd lopen — valt de stap daaruit weg, dan verliezen het bundelpaneel, het VvE-dossier, de
+// waarschuwing bij afronden én de idempotentie van de migratie hem allemaal tegelijk.
+export function telbaar(ntd, af){
+  const ix = bouwBundelIndex(ntd || {}, af || {});
+  const zeef = bron => {
+    const uit = {};
+    for (const k of Object.keys(bron || {})) uit[k] = (bron[k] || []).filter(r => !isAutoOfferteStap(r, ix));
+    return uit;
+  };
+  return { ntd: zeef(ntd), af: zeef(af) };
 }
 
 // Wat is deze rij binnen haar bundel? Eén antwoord voor de drie plekken die dat tonen: het platte

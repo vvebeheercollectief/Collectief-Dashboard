@@ -15,6 +15,7 @@
 //  óók), terwijl de achtergebleven rij zichtbaar is en met de hand te verwijderen.
 // ══════════════════════════════════════
 import { D } from "./state.js";
+import { VOORLEG_ACTIE } from "./config.js";
 import { nieuwTaakId } from "./util.js";
 import { rijIndex } from "./rij.js";
 import { _shiftNtdRows } from "./api.js";
@@ -24,7 +25,9 @@ import { logEvents } from "./render-overig.js";
 import { renderNtd } from "./render-lijsten.js";
 import { showToast } from "./notifications.js";
 
-export const VOORLEG_ACTIE = 'Offertes voorleggen aan eigenaren';
+// De tekst zelf woont in config.js (zie daar waarom); hier doorgegeven zodat elke bestaande
+// import uit dit bestand blijft werken.
+export { VOORLEG_ACTIE };
 
 // Kolomwaarden A..K van de subtaak, in het OPPAKKEN-stramien (code, naam, actiepunt, deadline,
 // wie, prioriteit, opmerkingen, in behandeling, I, J, subcategorie). Geen deadline: een subtaak

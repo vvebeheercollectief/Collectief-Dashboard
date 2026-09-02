@@ -28,7 +28,7 @@ import { voegExtraVveToe } from './meervve.js';
 import { verplaatsTaak } from './verplaats.js';
 import { renderBulkUi } from './bulk.js';
 import { vulPeriodeKeuze } from './render-lijsten.js';
-import { bouwBundelIndex, koppelKandidaten, taakFilter } from './bundel.js';
+import { bouwBundelIndex, koppelKandidaten, taakFilter, telbaar } from './bundel.js';
 import { initBundelSlepen, initStapelSlepen } from './bundel-acties.js';
 import { esc, taakTitel, taakVerwijzing } from './util.js';
 import { isOffline } from './api.js';
@@ -601,7 +601,10 @@ document.addEventListener('DOMContentLoaded',()=>{
 // doen; hier iets nabouwen zou een tweede kopie van die filter/sorteer-pijplijn opleveren.
 export function renderAll(){
   state._rowCache=[];
-  const ntdTotal=SKEYS.reduce((s,k)=>s+(D.ntd[k]?.length||0),0);
+  // Zelfde telling als de kop-pil 'N open' en de tegel op Cijfers: zonder de automatische
+  // offerte-stappen, die niet in een lijst staan (zie isAutoOfferteStap in bundel.js).
+  const tel=telbaar(D.ntd, D.af);
+  const ntdTotal=SKEYS.reduce((s,k)=>s+(tel.ntd[k]?.length||0),0);
   document.getElementById('b-ntd').textContent=ntdTotal;
   renderNtdStats();
   syncKop();

@@ -26,7 +26,7 @@ import { initVveZoekveld } from './vve-zoekveld.js';
 import { initWeekKiezer } from './weekkiezer.js';
 import { voegExtraVveToe } from './meervve.js';
 import { verplaatsTaak } from './verplaats.js';
-import { renderBulkUi } from './bulk.js';
+import { renderBulkUi, beantwoordBulkAfronden } from './bulk.js';
 import { vulPeriodeKeuze } from './render-lijsten.js';
 import { bouwBundelIndex, koppelKandidaten, taakFilter, telbaar } from './bundel.js';
 import { initBundelSlepen, initStapelSlepen } from './bundel-acties.js';
@@ -58,6 +58,10 @@ const MODAL_SLUITERS = {
   // Escape op de bevestigingsvraag is 'nee'. Alleen de .open-class weghalen zou de wachtende
   // aanroeper eeuwig laten hangen — die staat op een Promise die alleen hierlangs afloopt.
   'bevestig-bg': () => beantwoordBevestiging(false),
+  // Zelfde reden als hierboven: bulkAfronden wacht op een Promise die alleen via deze weg
+  // afloopt. Alleen de .open-class weghalen zou de bulk-actie eeuwig laten hangen én
+  // `state._bulkBezig` op true laten staan, waarna elke volgende bulkactie stil terugkeert.
+  'bulkaf-bg': () => beantwoordBulkAfronden(null),
 };
 
 // ── Clickjacking-bescherming (frame-buster) ────────────────────────────

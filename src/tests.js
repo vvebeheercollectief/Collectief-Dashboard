@@ -11641,14 +11641,27 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const tik=()=>new Promise(r=>{const k=new MessageChannel();k.port1.onmessage=()=>r();k.port2.postMessage(0);});
     const wachtTot=async(klaar)=>{ for(let i=0;i<200 && !klaar();i++) await tik(); };
     const hooguit=(p)=>Promise.race([p, new Promise(r=>setTimeout(r,400))]);
+    // Beantwoordt ÓF het gewone bevestigingsvenster ÓF het bulk-afrondvenster, wat er ook opengaat.
+    // Zonder die tweede tak antwoordt niemand op #bulkaf-bg, loopt `wachtTot` leeg, blijft
+    // `state._bulkBezig` op true staan en keren álle latere bulkDoe-aanroepen in dit blok stil
+    // terug — het blok meet dan een dode bulkbalk en blijft grotendeels gróén.
+    const afBg=document.getElementById('bulkaf-bg');
+    const leesAfVraag=()=>[document.getElementById('bulkaf-title').textContent,
+                           document.getElementById('bulkaf-uitleg').textContent,
+                           document.getElementById('bulkaf-confirm').textContent].join(' | ');
     const vraag=async(start)=>{
       let af=false;
       const klaar=Promise.resolve(start()).then(()=>{af=true;});
-      await wachtTot(()=>af || bevBg.classList.contains('open'));
+      await wachtTot(()=>af || bevBg.classList.contains('open') || afBg.classList.contains('open'));
       if(bevBg.classList.contains('open')){
         vragen.push(leesVraag());
         knopKleur=document.getElementById('bevestig-ja').className;
         document.getElementById(antwoord?'bevestig-ja':'bevestig-nee').click();
+      } else if(afBg.classList.contains('open')){
+        vragen.push(leesAfVraag());
+        knopKleur=document.getElementById('bulkaf-confirm').className;
+        if(antwoord) document.getElementById('bulkaf-comment').value='Opgeruimd';
+        document.getElementById(antwoord?'bulkaf-confirm':'bulkaf-cancel').click();
       }
       await hooguit(klaar);
     };
@@ -11694,6 +11707,11 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const afMWaarden=()=>posts.filter(p=>p.body&&p.body.requests)
       .flatMap(p=>p.body.requests.filter(r=>r.updateCells))
       .map(r=>r.updateCells.rows[0].values[12].userEnteredValue.stringValue);
+    // Kolom J: de gedeelde afrondopmerking. Zelfde vorm, andere index — index 9 is de toelichting
+    // die vóór v12.8 bij bulk altijd leeg bleef.
+    const afJWaarden=()=>posts.filter(p=>p.body&&p.body.requests)
+      .flatMap(p=>p.body.requests.filter(r=>r.updateCells))
+      .map(r=>r.updateCells.rows[0].values[9].userEnteredValue.stringValue);
     // Het losse wegleggen schrijft ÉÉN cel en gaat daarom via `writeRange` — een PUT op
     // /values/<bereik>, niet via values:batchUpdate. `schrijfRanges` hierboven ziet die dus niet.
     // Filteren op de methode en niet op de URL, omdat de logboek-append (POST) langs dezelfde
@@ -12027,27 +12045,37 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       // vraag die je twintig keer per dag wegklikt, lees je op de eenentwintigste keer ook niet.
       let rijen=kiesN(2);
       eq('bulk-afronden: er staan twee taken geselecteerd', bulkSelectie().length, 2);
-      antwoord=false; vragen=[];
+      // 'ja' i.p.v. 'nee': sinds v12.8 komt het venster óók onder de drempel (de opmerking is
+      // verplicht), en dit doorloopje moet de afronding juist wél afmaken om kolom J en M te
+      // kunnen meten.
+      antwoord=true; vragen=[];
       await vraag(()=>bulkDoe(bulkKnop));
       await leeglopen();
-      eq('bulk-afronden: bij twee taken wordt er niets gevraagd en gaat het gewoon door',
-         [vragen.length, D.ntd.OPPAKKEN.length], [0, 0]);
+      // Sinds v12.8 komt het venster ALTIJD — de opmerking is verplicht. Onder de drempel blijft
+      // de waarschuwende zin over de omvang wél weg: die is er voor een selectie die je niet
+      // helemaal in beeld hebt gehad, en dat speelt bij twee taken niet.
+      eq('bulk-afronden: bij twee taken komt het venster zonder de waarschuwende zin',
+         [vragen.length, D.ntd.OPPAKKEN.length], [1, 0]);
+      truthy('bulk-afronden: … dus zonder de ongedaan-maken-zin',
+         !(vragen[0]||'').includes('ongedaan maken'));
       // Bulk is opruimwerk en hoort niet in de meting: kolom M moet leeg de Sheet in. Deze assert
       // kijkt naar wat er ECHT geschreven wordt, niet naar wat afrondWaarden zou doen als je hem
       // vier argumenten geeft.
       eq('bulk-afronden: kolom M blijft leeg', afMWaarden(), ['','']);
+      // De gedeelde opmerking landt op kolom J van ELKE rij van de selectie.
+      eq('bulk-afronden: de gedeelde opmerking staat op kolom J van beide rijen', afJWaarden(), ['Opgeruimd','Opgeruimd']);
 
       // Vanaf drie: wél een vraag, met het aantal in de titel.
       rijen=kiesN(3);
       pendingVoor=state.pendingWrites;
       antwoord=false; vragen=[];
       await vraag(()=>bulkDoe(bulkKnop));
-      eq('bulk-afronden: vanaf drie taken komt er een vraag, met het aantal in de titel', vragen,
-         [`3 taken afronden? | Deze taken verhuizen naar 'Afgerond'. `+
+      eq('bulk-afronden: vanaf drie taken staat de waarschuwing in het venster, met het aantal in de titel', vragen,
+         [`3 taken afronden | Deze taken verhuizen naar 'Afgerond'. `+
           `Meteen daarna kun je dit nog ongedaan maken met de knop in de melding. | Afronden`]);
       // Niet de rode knop: rood hangt in deze app aan de drie verwijdervragen, en afronden is
       // geen verwijderen.
-      eq('bulk-afronden: … met de gewone (niet-rode) bevestigknop', knopKleur, 'btn btn-pri');
+      truthy('bulk-afronden: … met de gewone (niet-rode) bevestigknop', knopKleur.includes('btn-pri'));
       eq('bulk-afronden: nee laat alles staan — taken, selectie én bulk-modus',
          [D.ntd.OPPAKKEN.length, bulkSelectie().length, state.bulkMode,
           state.pendingWrites-pendingVoor, posts.length],
@@ -12086,7 +12114,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       antwoord=false; vragen=[];
       await vraag(()=>bulkDoe(bulkKnop));
       truthy('bulk-afronden: één taak met een achterblijvende subtaak vraagt tóch, in enkelvoud',
-             (vragen[0]||'').startsWith('1 taak afronden?') &&
+             (vragen[0]||'').startsWith('1 taak afronden') &&
              (vragen[0]||'').includes('subtaak die niet in deze selectie zit'));
 
       // En de `await` in `bulkDoe`. Zonder die await liep de optimistische verhuizing door terwijl
@@ -12096,11 +12124,19 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       vragen=[];
       let afrondAf=false;
       const lopendAf=bulkDoe(bulkKnop).then(()=>{ afrondAf=true; });
-      await wachtTot(()=>bevBg.classList.contains('open'));
+      await wachtTot(()=>afBg.classList.contains('open'));
       await tik(); await tik();
-      eq('bulk-afronden: bulkDoe blijft lopen zolang de vraag onbeantwoord openstaat',
-         [bevBg.classList.contains('open'), afrondAf, D.ntd.OPPAKKEN.length], [true, false, 3]);
-      document.getElementById('bevestig-ja').click();
+      eq('bulk-afronden: bulkDoe blijft lopen zolang het venster onbeantwoord openstaat',
+         [afBg.classList.contains('open'), afrondAf, D.ntd.OPPAKKEN.length], [true, false, 3]);
+      // Eerst zonder tekst: dat mag niets doen, precies zoals in het losse afrondvenster.
+      document.getElementById('bulkaf-confirm').click();
+      await tik(); await tik();
+      eq('bulk-afronden: zonder opmerking blijft het venster staan en gebeurt er niets',
+         [afBg.classList.contains('open'), D.ntd.OPPAKKEN.length], [true, 3]);
+      eq('bulk-afronden: het veld is als fout gemarkeerd',
+         document.getElementById('bulkaf-comment').getAttribute('aria-invalid'), 'true');
+      document.getElementById('bulkaf-comment').value='Opgeruimd';
+      document.getElementById('bulkaf-confirm').click();
       await lopendAf;
       eq('bulk-afronden: ja rondt de drie taken af en sluit de bulk-modus af',
          [D.ntd.OPPAKKEN.length, bulkSelectie().length, state.bulkMode], [0, 0, false]);

@@ -4,11 +4,11 @@
 import { state, D } from "./state.js";
 import { verseRij, rijIndex } from "./rij.js";
 import { renderNtd } from "./render-lijsten.js";
-import { toDutchDate, taakTitel, berekenPrioriteit, _parseAnyDate, _vandaagAmsterdam, _verschilInKalenderdagen, parseDt, kiesAfgerondRij } from "./util.js";
-import { SID } from "./config.js";
+import { toDutchDate, taakTitel, berekenPrioriteit, _parseAnyDate, _vandaagAmsterdam, _verschilInKalenderdagen, parseDt, kiesAfgerondRij, esc } from "./util.js";
+import { SID, AFROND_SNELKEUZES, BULK_AFROND_SNELKEUZE } from "./config.js";
 import { ensureToken } from "./auth.js";
 import { _shiftNtdRows, _shiftAfRows, _herstelShift, assertRowsMatch, _veiligeRij, sheetsFetch } from "./api.js";
-import { getSheetIds, getAfInsertRow, getInsertRow, insertAndWriteRow, serializeNtdUndo, afrondWaarden, bevestigInvoegPlek } from "./crud.js";
+import { getSheetIds, getAfInsertRow, getInsertRow, insertAndWriteRow, serializeNtdUndo, afrondWaarden, afrondLogRegel, afrondInvoerOk, bevestigInvoegPlek } from "./crud.js";
 import { backgroundWrite, loadAll, metWriteMarkering, serieleWrite, blokkeerOffline, syncSelecteerStand } from "./data.js";
 import { showToast, showUndoToast, fireNotifEvent } from "./notifications.js";
 import { vraagBevestiging } from "./bevestig.js";
@@ -270,6 +270,63 @@ async function _bulkDoeKern(el, wat, rows){
 // vraag die je twintig keer per dag wegklikt, lees je op de eenentwintigste keer ook niet.
 const BULK_AFROND_VRAAG_VANAF = 3;
 
+// Eén venster voor de hele selectie: de waarschuwing én de gedeelde opmerking. Geeft de tekst
+// terug, of null bij annuleren. Zelfde vorm als vraagBevestiging (bevestig.js), inclusief de
+// dubbelklik-rem: een tweede vraag terwijl er al één openstaat krijgt meteen 'nee'.
+let _bulkAfOpen = false, _bulkAfAntwoord = null;
+
+// De centrale Escape-sluiting (MODAL_SLUITERS in main.js) roept dit aan. Alleen de .open-class
+// weghalen zou de wachtende aanroeper eeuwig laten hangen — die staat op een Promise die alleen
+// hierlangs afloopt. Exact dezelfde reden als bij `beantwoordBevestiging`.
+export function beantwoordBulkAfronden(waarde){ if(_bulkAfAntwoord) _bulkAfAntwoord(waarde); }
+export function vraagBulkAfronden({ aantal, toonWaarschuwing, subZin }){
+  if(_bulkAfOpen) return Promise.resolve(null);
+  const bg=document.getElementById('bulkaf-bg');
+  if(!bg) return Promise.resolve(null);        // venster ontbreekt in de DOM → antwoord is 'nee'
+  _bulkAfOpen = true;
+  document.getElementById('bulkaf-title').textContent =
+    `${aantal} ${aantal===1?'taak':'taken'} afronden`;
+  document.getElementById('bulkaf-uitleg').textContent = toonWaarschuwing
+    ? `${aantal===1?'Deze taak verhuist':'Deze taken verhuizen'} naar 'Afgerond'. `+
+      `Meteen daarna kun je dit nog ongedaan maken met de knop in de melding.`+(subZin||'')
+    : `${aantal===1?'Deze taak verhuist':'Deze taken verhuizen'} naar 'Afgerond'.`;
+  const veld=document.getElementById('bulkaf-comment');
+  const fout=document.getElementById('bulkaf-comment-fout');
+  veld.value=''; veld.setAttribute('aria-invalid','false'); fout.hidden=true;
+  const host=document.getElementById('bulkaf-snel');
+  if(host) host.innerHTML=[...AFROND_SNELKEUZES, BULK_AFROND_SNELKEUZE].map(t=>
+    `<button type="button" class="snel-knop" data-action="afrond-snelkeuze" data-tekst="${esc(t)}">${esc(t)}</button>`
+  ).join('');
+  bg.classList.add('open');
+  const ja=document.getElementById('bulkaf-confirm');
+  const nee=document.getElementById('bulkaf-cancel');
+  const kruis=document.getElementById('bulkaf-close');
+  return new Promise(klaar=>{
+    const opruimen=()=>{
+      ja.removeEventListener('click',opJa); nee.removeEventListener('click',opNee);
+      kruis.removeEventListener('click',opNee);
+    };
+    const sluit=(waarde)=>{ bg.classList.remove('open'); _bulkAfOpen=false; _bulkAfAntwoord=null; opruimen(); klaar(waarde); };
+    _bulkAfAntwoord=sluit;
+    // Zelfde keuze als in het losse afrondvenster: de knop blijft klikbaar en de terugkoppeling
+    // zit in het veld. Een `disabled` knop ziet er identiek uit (geen .btn:disabled-opmaak) en
+    // valt uit de focusval van modal-a11y.
+    const opJa=()=>{
+      const t=veld.value;
+      if(!afrondInvoerOk(t)){
+        fout.hidden=false; veld.setAttribute('aria-invalid','true');
+        try{ veld.focus(); }catch(_){}
+        return;
+      }
+      sluit(t.trim());
+    };
+    const opNee=()=>sluit(null);
+    ja.addEventListener('click',opJa); nee.addEventListener('click',opNee);
+    kruis.addEventListener('click',opNee);
+    try{ veld.focus(); }catch(_){}
+  });
+}
+
 async function bulkAfronden(rows){
   // Afronden was de ENIGE bulk-weg zonder poort. Verwijderen vraagt het al (met de subtaak-zin) en
   // één taak afronden waarschuwt via `bundelWaarschuwing` (crud.js). Sinds het kopvinkje de HELE
@@ -280,24 +337,35 @@ async function bulkAfronden(rows){
   const ixAf = bouwBundelIndex(D.ntd, D.af);
   const gekozenAf = new Set(rows);
   const metSubAf = rows.reduce((n,r)=> n + (openSubtaken(ixAf, r, gekozenAf) > 0 ? 1 : 0), 0);
-  if(rows.length >= BULK_AFROND_VRAAG_VANAF || metSubAf > 0){
-    const subTotaalAf = rows.reduce((n,r)=> n + openSubtaken(ixAf, r, gekozenAf), 0);
-    const subZin = metSubAf
-      ? ` Let op: bij ${metSubAf===1?(rows.length===1?'deze taak':'één van deze taken'):`${metSubAf} van deze taken`} `+
-        `${subTotaalAf===1?'hangt nog een subtaak die':`hangen nog ${subTotaalAf} subtaken die`} niet in deze selectie ${subTotaalAf===1?'zit':'zitten'}. `+
-        `${subTotaalAf===1?'Die blijft':'Die blijven'} staan.`
-      : '';
-    // Enkelvoud in titel én tekst: onder de drempel wordt er alleen gevraagd als er een subtaak
-    // achterblijft, en dan kan het om één taak gaan. Zelfde vorm als bij bulk-verwijderen.
-    // Niet 'gevaarlijk' (de rode knop): rood hangt in deze app aan de drie verwijdervragen, en
-    // afronden is geen verwijderen. Wel dezelfde plek in de volgorde als daar: ná ensureToken en
-    // blokkeerOffline, waar `confirm()` vroeger ook stond.
-    if(!await vraagBevestiging({
-        titel:`${rows.length} ${rows.length===1?'taak':'taken'} afronden?`,
-        tekst:`${rows.length===1?'Deze taak verhuist':'Deze taken verhuizen'} naar 'Afgerond'. `+
-              `Meteen daarna kun je dit nog ongedaan maken met de knop in de melding.`+subZin,
-        bevestigTekst:'Afronden' })) return;
+  const subTotaalAf = rows.reduce((n,r)=> n + openSubtaken(ixAf, r, gekozenAf), 0);
+  const subZin = metSubAf
+    ? ` Let op: bij ${metSubAf===1?(rows.length===1?'deze taak':'één van deze taken'):`${metSubAf} van deze taken`} `+
+      `${subTotaalAf===1?'hangt nog een subtaak die':`hangen nog ${subTotaalAf} subtaken die`} niet in deze selectie ${subTotaalAf===1?'zit':'zitten'}. `+
+      `${subTotaalAf===1?'Die blijft':'Die blijven'} staan.`
+    : '';
+  // De één-sectie-eis en de archiefplek-controle staan VÓÓR het venster. Faalt een van beide
+  // erna, dan is de zojuist getypte opmerking weg — terwijl de losse weg zijn venster in precies
+  // die situatie bewust openhoudt (crud.js). Twee wegen met tegengesteld gedrag op het enige pad
+  // waar verplichte tekst zonder toedoen van de gebruiker verdampt.
+  if(new Set(rows.map(r=>r._sec)).size!==1){
+    alert('Afronden kan alleen binnen één categorie tegelijk. Maak de selectie leeg en probeer opnieuw.');
+    return;
   }
+  let afAnker;
+  try{ afAnker=getAfInsertRow(rows[0]._sec); }
+  catch(e){ alert(e.message || String(e)); return; }
+  try{ await bevestigInvoegPlek(rows[0]._sec, afAnker, 'Afgerond'); }
+  catch(e){ alert(e.melding || e.message); loadAll(); return; }
+
+  // ÉÉN venster sinds v12.8: de waarschuwing én de gedeelde opmerking. Het venster komt er
+  // altijd, ook onder de drempel — die drempel bepaalde vroeger of er gevráágd werd, maar de
+  // opmerking is nu verplicht en dus is er hoe dan ook een venster. BULK_AFROND_VRAAG_VANAF
+  // bepaalt nog wél of de waarschuwende zin over de omvang erbij komt.
+  const opmerking = await vraagBulkAfronden({
+    aantal: rows.length,
+    toonWaarschuwing: rows.length >= BULK_AFROND_VRAAG_VANAF || metSubAf > 0,
+    subZin });
+  if(opmerking===null) return;
   const d=new Date();
   const vandaag=`${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;
   const items=rows.map(r=>{
@@ -305,8 +373,9 @@ async function bulkAfronden(rows){
     // lopen — vroeger stond dezelfde kolomvolgorde hier een tweede keer uitgeschreven. Bulk
     // kent geen toelichtingveld, vandaar de lege J. De oude `default`-tak was letterlijk de
     // LOD-opbouw; die staat nu als eigen case in afrondWaarden. Ook geen vijfde argument, dus
-    // kolom M (duur) blijft leeg: bulk is opruimwerk en hoort niet in de meting.
-    const values=afrondWaarden(r, r._sec, vandaag, '');
+    // kolom M (duur) blijft leeg: bulk is opruimwerk en hoort niet in de meting. De TOELICHTING
+    // is sinds v12.8 wél gevuld — één gedeelde zin voor de hele selectie, in kolom J van elke rij.
+    const values=afrondWaarden(r, r._sec, vandaag, opmerking);
     return { r, sec:r._sec, origRow:r._row, afValues:values, ntdValues:_ntdValues(r), code:r.code };
   });
   // Archiefplek vers narekenen — dezelfde controle die `submitTask` op 'Nog Te Doen' doet en die
@@ -317,18 +386,7 @@ async function bulkAfronden(rows){
   // één `_shiftAfRows` gelden alleen als álle items in hetzelfde blok van 'Afgerond' landen. Dat
   // klopt vandaag omdat `setNtd` de selectie bij een tabbladwissel wist, maar dat is een gedrag
   // elders — verdwijnt het ooit, dan zou dit stil naar het verkeerde blok schrijven.
-  if(new Set(items.map(i=>i.sec)).size!==1){
-    alert('Afronden kan alleen binnen één categorie tegelijk. Maak de selectie leeg en probeer opnieuw.');
-    return;
-  }
   const standAf={gelukt:false};
-  // `getAfInsertRow` GOOIT als het sectieblok niet in 'Afgerond' staat. Deze functie wordt door de
-  // klik-delegatie niet gecatcht, dus zonder deze try zou de knop zichtbaar niets doen.
-  let afAnker;
-  try{ afAnker=getAfInsertRow(items[0].sec); }
-  catch(e){ alert(e.message || String(e)); return; }
-  try{ await bevestigInvoegPlek(items[0].sec, afAnker, 'Afgerond'); }
-  catch(e){ alert(e.melding || e.message); loadAll(); return; }
   // optimistisch: hoog→laag lokaal verwijderen + indexen meeschuiven
   items.forEach(it=>{
     const arr=D.ntd[it.sec]||[]; const pos=rijIndex(arr, it.r);   // identiteit, niet object — zie src/rij.js
@@ -377,7 +435,10 @@ async function bulkAfronden(rows){
     // for…of i.p.v. forEach: in een forEach-callback kun je niet awaiten, en zonder await valt
     // de schrijfteller naar 0 terwijl de logboek-appends nog lopen (resync te vroeg, regel weg).
     // Eén append voor de hele bulk i.p.v. één per taak: 20 taken kostten zo 20 schrijfverzoeken.
-    await logEvents(items.map(it=>({code:it.code,sec:it.sec,actie:'Afgerond',veld:'status',oudeWaarde:'Nog Te Doen',nieuweWaarde:'Afgerond op '+vandaag+' (bulk)'})));
+    // Zelfde bouwer als de losse weg. Het merkje '(bulk)' verhuist mee naar kolom F: `logTijd`
+    // toont alleen uu:mm, dus zonder dat merkje zijn twee losse afrondingen in dezelfde minuut
+    // niet van een bulk van twee te onderscheiden.
+    await logEvents(items.map(it=>afrondLogRegel(it.code, it.sec, vandaag+' (bulk)', opmerking)));
   },()=>{ // rollback: laag→hoog terugzetten
     [...items].reverse().forEach(it=>{
       const a=(D.ntd[it.sec]=D.ntd[it.sec]||[]);

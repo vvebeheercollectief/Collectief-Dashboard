@@ -719,6 +719,33 @@
   </div>
 </div>
 
+<!-- ═══════ BULK-AFRONDEN — één gedeelde opmerking (v12.8) ═══════
+     Eén venster in plaats van twee: de waarschuwing (vanaf drie taken, en over achterblijvende
+     subtaken) staat ÍN dit venster. Twee vensters achter elkaar voor één handeling is precies de
+     wrijving die de bulkknop onbruikbaar maakt. -->
+<div class="modal-bg" id="bulkaf-bg">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-hdr" style="--sec:var(--gn)">
+      <h2 id="bulkaf-title">Taken afronden</h2>
+      <button class="modal-close" id="bulkaf-close">×</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-uitleg" id="bulkaf-uitleg"></p>
+      <div class="fld">
+        <label for="bulkaf-comment">Hoe staat het er nu voor? <span class="fld-req">verplicht</span></label>
+        <div class="snelkeuze" id="bulkaf-snel"></div>
+        <textarea id="bulkaf-comment" rows="3" aria-describedby="bulkaf-comment-fout"
+                  placeholder="Deze zin komt bij elke taak in deze selectie te staan"></textarea>
+        <p class="veld-fout" id="bulkaf-comment-fout" hidden>Vul eerst kort in hoe het er nu voor staat.</p>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-sec" id="bulkaf-cancel" data-autofocus>Annuleren</button>
+      <button class="btn btn-pri" id="bulkaf-confirm" style="background:var(--gn)">Afronden</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════ HERHAALREGEL MODAL — Fase 4 ═══════ -->
 <div class="modal-bg" id="hh-bg">
   <div class="modal" style="max-width:520px">

@@ -457,7 +457,7 @@ function rowAf(r,sec){
     <td class="cell-sm">${esc(r.subcategorie||'')}</td>
     <td>${persBadges(r.behandelaar)}</td>
     <td class="cell-sm">${esc(r.datum||'')}</td>
-    <td class="cell-txt">${r.opmerking?`<span style="font-size:12px">${esc(r.opmerking)}</span>`:''}</td>
+    <td class="cell-note">${r.opmerking?`<span class="ct" title="${esc(r.opmerking)}">${esc(r.opmerking)}</span>`:''}</td>
   </tr>`;
 }
 

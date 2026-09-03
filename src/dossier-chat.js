@@ -5,7 +5,7 @@ import { esc, displayName, taakTitel } from "./util.js";
 import { SECS } from "./config.js";
 import { state, D } from "./state.js";
 import { vveOverzicht } from "./render-vve.js";
-import { fmtLogTs } from "./render-overig.js";
+import { fmtLogTs, logPaginaSoort, logZinPlat, afrondOpmerking } from "./render-overig.js";
 import { askChat } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { zonderOpmaak } from "./opmaak.js";
@@ -17,6 +17,45 @@ import { zonderOpmaak } from "./opmaak.js";
 const CONTEXT_MAX = 15000;
 const LOGREGEL_MAX = 400;
 const _kapLog = t => (t.length > LOGREGEL_MAX ? t.slice(0, LOGREGEL_MAX) + '…' : t);
+// Verkorte vorm voor het tweede logboekblok: dat zijn korte, feitelijke regels ('zette de
+// behandelaar op Cihad'), geen geplakte mails.
+const HANDELING_MAX = 160;
+const _kapKort = t => (t.length > HANDELING_MAX ? t.slice(0, HANDELING_MAX) + '…' : t);
+// Eigen budget per blok. Vóór v12.8 stond hier één `slice(0,15)` over de hele lijst, en bij een
+// VvE met veel bulk-afrondingen waren dat vijftien informatieloze regels — het model zag dan geen
+// enkele notitie. Het probleem was niet dat er te véél in zat, maar dat de willekeurige greep de
+// belangrijke regels eruit duwde. Met een eigen budget kan het ene blok het andere niet meer
+// verdringen, en ziet het model méér dan vroeger (tot 26 regels in plaats van 15).
+const AI_LOG_INHOUD = 14, AI_LOG_OVERIG = 12;
+
+// Het logboekdeel van de dossier-context, als twee blokken. Puur, dus los te toetsen.
+//
+// Het schermfilter is een SCHERMfilter: de assistent heeft geen last van ruis zoals een mens dat
+// heeft, hij heeft last van een te kleine greep. Alles blijft dus in de context — alleen de
+// inhoudelijke regels staan vooraan en voluit, en de rest verkort eronder.
+export function dossierLogTekst(logboek){
+  const alles = logboek || [];
+  const inhoud = alles.filter(r => logPaginaSoort(r)).slice(0, AI_LOG_INHOUD);
+  const overig = alles.filter(r => !logPaginaSoort(r)).slice(0, AI_LOG_OVERIG);
+  const L = [];
+  if(inhoud.length){
+    L.push('Notities, contactmomenten en afrondingen (nieuwste eerst):');
+    inhoud.forEach(r=>{
+      const wie = displayName(r.gebruiker) || r.gebruiker || '?';
+      const wat = r.actie === 'Contact'
+        ? `${r.veld || 'Contact'} met ${r.oudeWaarde || '?'}: ${zonderOpmaak(r.nieuweWaarde)}`
+        : r.actie === 'Afgerond'
+          ? `Afgerond: ${zonderOpmaak(afrondOpmerking(r))}`
+          : `${r.actie}${r.nieuweWaarde ? ': ' + zonderOpmaak(r.nieuweWaarde) : ''}`;
+      L.push(`- ${fmtLogTs(r.timestamp)} ${_kapLog(`(${wie}) ${wat}`)}`);
+    });
+  }
+  if(overig.length){
+    L.push('Overige handelingen (nieuwste eerst, verkort):');
+    overig.forEach(r=>L.push(`- ${fmtLogTs(r.timestamp)} ${_kapKort(zonderOpmaak(logZinPlat(r)))}`));
+  }
+  return L;
+}
 
 // Pure helper (testbaar): compacte, feitelijke context-tekst over één VvE.
 function dossierContextTekst(code, data, vandaag){
@@ -57,16 +96,9 @@ function dossierContextTekst(code, data, vandaag){
   // 'Afgerond op' en niet 'gehouden op': deze datum is de dag waarop de taak 'notulen versturen'
   // is afgevinkt. Dat is precies wat het kantoor wil terugzien.
   if(o.alfa && o.alfa.length) L.push(`Laatste ALV afgerond op ${o.alfa[0].datum}.`);
-  if(o.logboek.length){
-    L.push('Laatste logboek/contactmomenten (nieuwste eerst):');
-    o.logboek.slice(0,15).forEach(r=>{
-      const wie = displayName(r.gebruiker) || r.gebruiker || '?';
-      const wat = r.actie === 'Contact'
-        ? `${r.veld || 'Contact'} met ${r.oudeWaarde || '?'}: ${zonderOpmaak(r.nieuweWaarde)}`
-        : `${r.actie}${r.nieuweWaarde ? ': ' + zonderOpmaak(r.nieuweWaarde) : ''}`;
-      L.push(`- ${fmtLogTs(r.timestamp)} ${_kapLog(`(${wie}) ${wat}`)}`);
-    });
-  }
+  // De leegtoets blijft op de ONgefilterde lijst staan: een VvE met alleen automatische regels
+  // hoort geen kop met nul regels eronder te krijgen.
+  if(o.logboek.length) L.push(...dossierLogTekst(o.logboek));
   // Prompt-injectie-hardening (deel 1 van 2): de dossier-context is onvertrouwde data en wordt
   // straks tussen """ … """ in de system-prompt geplakt. Een notitie die zélf """ bevat zou dat
   // afbakeningsblok kunnen sluiten; door elke reeks van 3+ dubbele aanhalingstekens te verkorten

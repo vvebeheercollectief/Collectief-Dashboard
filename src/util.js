@@ -36,8 +36,12 @@ const NIET_ZOEKBAAR = new Set(['_row','_sec','_offertesManual','_aannemers',
 // moest bij elk nieuw veld op het rij-object worden bijgehouden (duurMin was de laatste), en wat
 // vergeten werd lekte stil de zoek in — een treffer op een onzichtbare oude deadline is voor de
 // gebruiker niet uit te leggen (naloop 2026-08-28). NIET_ZOEKBAAR blijft bestaan voor filterNtd.
-const _afZoekvelden = r => [r.code, r.naam, taakTitel(r, r._sec), r.subcategorie, r.behandelaar,
-                            r.datum, r.toelichting, ...parseAannemers(r.aannemers).map(a=>a.naam)];
+export const _afZoekvelden = r => [r.code, r.naam, taakTitel(r, r._sec), r.subcategorie, r.behandelaar,
+                            // `opmerking` en NIET `toelichting`: parseSections (data.js) schrijft kolom J van
+                            // 'Afgerond' als `entry.opmerking`. Met de oude naam zocht deze balk in een veld dat
+                            // niet bestaat — onopvallend zolang kolom J bijna altijd leeg was, maar sinds de
+                            // opmerking bij afronden verplicht is, is dit hét veld dat je wilt terugvinden.
+                            r.datum, r.opmerking, ...parseAannemers(r.aannemers).map(a=>a.naam)];
 function filt(rows,q){
   if(!q)return rows;
   return rows.filter(r=>_afZoekvelden(r).some(v=>String(v??'').toLowerCase().includes(q)));

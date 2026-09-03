@@ -392,7 +392,7 @@ function renderVve(){
   const afRij=r=>{
     const om=afOmschrijving(r);
     return `<div class="tk">
-      <span class="nm${om.leeg?' geen-oms':''}">${esc(om.tekst)}${r.opmerking?`<span class="mt">${esc(r.opmerking)}</span>`:''}</span>
+      <span class="nm${om.leeg?' geen-oms':''}">${esc(om.tekst)}${r.opmerking?`<span class="mt" title="${esc(r.opmerking)}">${esc(r.opmerking)}</span>`:''}</span>
       <span class="dl af">${esc(r.datum||'')}</span></div>`;
   };
   const meerKnop=(!state._vveAfAlles&&o.afgerond.length>5)

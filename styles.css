@@ -1082,7 +1082,12 @@
     .tk:has(+ .vve-voet){border-bottom:none} /* geen dubbele lijn boven de paneelvoet */
     .tk.snooze-row{opacity:.55}
     .tk .nm{flex:1;min-width:0;overflow-wrap:anywhere}
-    .tk .nm .mt{display:block;font-size:11px;color:var(--mut);margin-top:2px}
+    /* Afkappen sinds v12.8: de afrondopmerking is verplicht geworden, dus ELKE afgeronde taak in
+       het dossier heeft deze tweede regel. Zonder afkapping werd het paneel 'Laatst afgerond'
+       ongeveer twee keer zo hoog en sneuvelde de belofte 'drie panelen zonder paginascroll'.
+       De volle tekst staat in de zweeftekst. */
+    .tk .nm .mt{display:block;font-size:11px;color:var(--mut);margin-top:2px;
+                overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
     .tk .dl{font-family:var(--font-mono);font-size:11.5px;color:var(--mut);flex-shrink:0}
     .tk .dl.af{color:var(--gn)}
     .tk .tk-af{align-self:center;flex-shrink:0}

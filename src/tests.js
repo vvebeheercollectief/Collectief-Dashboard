@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { taakTitel, taakVerwijzing, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, stilDrempel, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, subBadge, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel, kiesAfgerondRij, filt, splitBehandelaar, korteNaam, persBadges, taakActieKnoppen, voorgesteldeDeadline, DEADLINE_VOORSTEL, DEADLINE_HINT, periodeBereik, AF_PERIODES, duurUitCel, duurNaarCel, offerteAangevraagd, teLaatVoorTelling } from "./util.js";
+import { taakTitel, taakVerwijzing, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, stilDrempel, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, subBadge, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel, kiesAfgerondRij, filt, splitBehandelaar, korteNaam, persBadges, taakActieKnoppen, voorgesteldeDeadline, DEADLINE_VOORSTEL, DEADLINE_HINT, periodeBereik, AF_PERIODES, duurUitCel, duurNaarCel, offerteAangevraagd, teLaatVoorTelling, _afZoekvelden } from "./util.js";
 import { verwerkMeldingRijen, toonMeldingen, MAX_TOAST_BURST, _whoSleutel, getCurrentWho, undoDelete } from "./notifications.js";
 import { logZin, logZinPlat, logPaginaSoort, afrondOpmerking, logBewerkbaar, logRegelZichtbaar, logZoekTekst, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek, logEvents, renderOntw, openOntwModal, closeOntwModal, submitOntwItem, _logRegelSleutel, _ontwSleutel, addTaskNote } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM, VELD_LABELS, AFROND_SNELKEUZES, BULK_AFROND_SNELKEUZE } from "./config.js";
@@ -22,14 +22,14 @@ import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFla
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
 import { setv, serializeNtdUndo, afrondWaarden, afrondLogRegel, afrondInvoerOk, toevoegWaarden, _eindKolom, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, getAfInsertRow, OMSCHRIJVING_VELD, zetOmschrijving, _sheetBreedtes, getSheetIds, bevestigInvoegPlek, _naamBijCode, _zetNaamVeld, taakUitCache, kiesSectie, deleteTaskRow, deleteCurrentEditTask, completeCurrentEditTask, renderExtraVves, toonMeerVve, zetDeadlineVoorstel, herzieAlsSubtaak, kiesDuur, gekozenDuur, wisDuurKeuze, nietOpgeslagenVelden, offerteAanvraagGewijzigd } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
-import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages, renderChat } from "./dossier-chat.js";
+import { dossierContextTekst, dossierLogTekst, buildChatSysteemPrompt, _chatMessages, renderChat } from "./dossier-chat.js";
 import { shouldPromptReload, maakHerlaadKern, zelfdeWorker } from "./sw-update.js";
 import { doOAuth, ensureToken, logout } from "./auth.js";
 import { SPLASH_MS, _setFase } from "./login-splash.js";
 import { opmaakHtml, htmlNaarMarkers, zonderOpmaak, pasToe, opmaakBalk } from "./opmaak.js";
 import { goTo, applyTheme } from "./ui.js";
 import { checkSecties, checkRaster, checkRasters, checkNummers, checkAlles, ernstigeBevindingen, RASTER_MIN } from "./structuurcheck.js";
-import { herzetKolomBreedtes, kolBreedtes, periodeCel, deadlineCel } from "./render-tabel.js";
+import { herzetKolomBreedtes, kolBreedtes, periodeCel, deadlineCel, rowAf, renderTbody } from "./render-tabel.js";
 import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from "./subsidie-fase.js";
 import { toggleHerhaalStatus, renderHerhaal, openHerhaalModal, deleteHerhaal, submitHerhaal } from "./render-herhaal.js";
 import { openSnoozeModal, snoozeOpslaan, closeSnoozeModal } from "./snooze.js";
@@ -998,6 +998,41 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     truthy('doCompleteTask: de logregel staat BINNEN de idempotentie-vlag (backgroundWrite draait de writeFn tot drie keer)',
        vlag > -1 && log > vlag && log < eind);
   })();
+
+  // ── Kolom J wordt nu ALTIJD gevuld; drie plekken moeten daar tegen kunnen ──
+  truthy('_afZoekvelden zoekt in opmerking (parseSections schrijft kolom J als `opmerking`)',
+     _afZoekvelden({code:'X',naam:'VvE X',opmerking:'dak hersteld',_sec:'OPPAKKEN'}).includes('dak hersteld'));
+  eq('_afZoekvelden zoekt niet meer in het niet-bestaande `toelichting`',
+     _afZoekvelden({code:'X',naam:'VvE X',toelichting:'oud veld',_sec:'OPPAKKEN'}).includes('oud veld'), false);
+  (() => {
+    const rij={code:'X', naam:'VvE X', actiepunt:'iets', datum:'03-09-2026',
+               opmerking:'een hele lange afrondtoelichting die anders de kolom uitrekt', _sec:'OPPAKKEN'};
+    const h=rowAf(rij,'OPPAKKEN');
+    truthy('rowAf kapt de opmerking af met een .ct-wikkel', h.includes('class="ct"'));
+    truthy('rowAf zet de volle tekst in de zweeftekst', h.includes('title="een hele lange'));
+  })();
+
+  // ── AI-context: twee blokken met een eigen budget ──
+  (() => {
+    const veel=[];
+    for(let i=0;i<20;i++) veel.push({timestamp:'2026-09-0'+(i%9+1)+'T10:00:00Z', code:'311129',
+      actie:'Afgerond', veld:'', oudeWaarde:'Afgerond op 0'+(i%9+1)+'-09-2026', nieuweWaarde:'',
+      gebruiker:'info@vvebeheercollectief.nl'});
+    veel.push({timestamp:'2026-08-01T10:00:00Z', code:'311129', actie:'Opmerking', veld:'',
+      oudeWaarde:'', nieuweWaarde:'Bestuur wil eerst de MJOP zien', gebruiker:'info@vvebeheercollectief.nl'});
+    const t=dossierLogTekst(veel).join('\n');
+    truthy('AI-context: de ene notitie overleeft twintig afrondingen', t.includes('MJOP'));
+    truthy('AI-context: er is een tweede blok met overige handelingen', t.includes('Overige handelingen'));
+  })();
+  (() => {
+    const alleenAuto=[{timestamp:'2026-09-01T10:00:00Z', code:'311129', actie:'Weggelegd',
+      veld:'opvolgdatum', oudeWaarde:'', nieuweWaarde:'15-09-2026', gebruiker:'info@vvebeheercollectief.nl'}];
+    const t=dossierLogTekst(alleenAuto).join('\n');
+    truthy('AI-context: automatische regels blijven zichtbaar voor het model', t.includes('Overige handelingen'));
+    truthy('AI-context: de weggelegd-datum staat erin', t.includes('15-09-2026'));
+    truthy('AI-context: en zonder HTML', !/[<>]/.test(t));
+  })();
+  eq('AI-context: een leeg logboek geeft geen koppen', dossierLogTekst([]).length, 0);
 
   // ── De chips op de Logboek-pagina ──
   (() => {
@@ -12590,7 +12625,12 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
                   // Vier velden die het archief wél draagt maar de pagina nérgens toont — een
                   // treffer daarop is voor de gebruiker niet uit te leggen (naloop 2026-08-28).
                   deadline: '17 juni 2026', datumAangevraagd: '3 mei 2026',
-                  opmerkingen: 'interne notitie', toelichting: 'keurig afgerond' };
+                  opmerkingen: 'interne notitie',
+                  // `opmerking` (kolom J), niet `toelichting`. Die fixture-naam hield tot v12.8 een
+                  // fout in _afZoekvelden overeind: de zoekbalk keek in een veld dat parseSections
+                  // nooit schrijft. Onopvallend zolang kolom J bijna altijd leeg was — maar sinds de
+                  // afrondopmerking verplicht is, is dit hét veld dat je wilt terugvinden.
+                  opmerking: 'keurig afgerond' };
     const R = [rij];
     // '12' en '120' staan er bewust bij: duurMin is een GETAL, dus een zoekterm als een huisnummer
     // of een VvE-code kan er zomaar in vallen — 120 minuten matcht als deelstring op allebei.

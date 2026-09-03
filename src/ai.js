@@ -7,7 +7,7 @@ import { SECS, SKEYS } from "./config.js";
 import { goTo } from "./ui.js";
 import { openModal, zetOmschrijving } from "./crud.js";
 import { showToast } from "./notifications.js";
-import { fmtLogTs } from "./render-overig.js";
+import { fmtLogTs, logPaginaSoort } from "./render-overig.js";
 import { ico } from "./icons.js";
 import { zonderOpmaak } from "./opmaak.js";
 
@@ -47,9 +47,17 @@ function aiVveContext(code){
     });
   });
   if(!naam){ const a=(D.alvo||[]).find(x=>String(x.code||'').toLowerCase()===c); if(a)naam=a.naam||''; }
-  const laatste=(D.logboek||[]).filter(r=>String(r.code||'').toLowerCase()===c).slice(0,3)
+  // Inhoudelijke regels (notities, contact, afrondingen mét opmerking) eerst, de rest erachter.
+  // Vroeger stond hier een kale `slice(0,3)`, en bij een VvE met drie recente afrondingen zag het
+  // model geen enkele notitie.
+  const _alleLog=(D.logboek||[]).filter(r=>String(r.code||'').toLowerCase()===c);
+  const _geordend=[..._alleLog.filter(r=>logPaginaSoort(r)), ..._alleLog.filter(r=>!logPaginaSoort(r))];
+  const laatste=_geordend.slice(0,6)
     .map(r=>`${fmtLogTs(r.timestamp)} — ${displayName(r.gebruiker)}: ${r.actie}${r.nieuweWaarde?' ('+zonderOpmaak(r.nieuweWaarde)+')':''}`);
-  if(!naam && !behs.size && !open.length && !laatste.length) return null;
+  // De leegtoets op de ONgefilterde lijst. Zou hij op een gefilterde lijst staan, dan geeft
+  // aiVveContext null bij een VvE met alleen automatische regels en verdwijnt het complete
+  // 'Live context'-kader — inclusief de behandelaar en de open taken die er wél waren.
+  if(!naam && !behs.size && !open.length && !_alleLog.length) return null;
   return {code, naam, beh:[...behs].join(', '), open, laatste};
 }
 

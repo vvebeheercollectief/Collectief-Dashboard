@@ -4,32 +4,37 @@
 //  (v6.2): de offerte-tab is weer een platte tabel zoals Oppakken/LOD. Wat rest is de
 //  aannemerslijst achter de X/N-teller — de enige offerte-specifieke UI die overblijft.
 // ══════════════════════════════════════
-import { esc, parseAannemers, reconcileOffertes, aannSleutel, offerteAangevraagd } from "./util.js";
+import { esc, parseAannemers, reconcileOffertes, aannSleutel, offerteAangevraagd, offProg } from "./util.js";
 import { state } from "./state.js";
 import { ico } from "./icons.js";
 
-// Klikbare samenvatting die het aannemers-paneel open/dicht klapt (staat in de teller-cel).
+// De klikbare cel van een offerte-traject: chevron + teller + balkje, alles ÍN de knop.
+//
+// HET ZICHTBARE LABEL IS ERUIT (v12.8, op verzoek). Bij een gevulde lijst zei 'Aannemers · 1 van
+// 2 binnen' letterlijk hetzelfde als de teller ernaast, en bij een lege lijst kostte de zin
+// 'Aannemers toevoegen' ruimte op élke rij, altijd. De volle zin blijft in `aria-label` en
+// `title`.
+//
+// LET OP — DE KLIKZONE. Alléén de tekst weghalen zou een knop van een paar pixels overhouden:
+// `.of-aann-tbl-tog` is `flex:1` en dus precies wat er ná de teller overblijft. Daarom omvat de
+// knop nu de HELE celinhoud. Dat is geen achteruitgang maar een verbetering op v11.3, die de
+// klikzone van 46% naar 100% van de RESTruimte bracht; nu is het 100% van de cel.
+//
+// Bewust nog steeds géén <button>: deze span staat in een tabelcel en een knop zou daar zijn
+// eigen opmaak meebrengen. De Enter/spatie-afhandeling zit centraal in actions.js.
 function offerteAannSamenvatting(r){
   const lijst=r._aannemers||[];
   // data-aann draagt de TRAJECT-sleutel, niet de VvE-code (zie aannSleutel in util.js). Een
   // eigen attribuutnaam, want data-code betekent elders in de app 'open het VvE-dossier'.
   const sl=aannSleutel(r);
   const open=state.offerteAannOpen.has(sl);
-  const lbl=lijst.length
+  const zin=lijst.length
     ? `Aannemers · ${lijst.filter(a=>a.binnen).length} van ${lijst.length} binnen`
     : 'Aannemers toevoegen';
-  // tabindex + role: dit is een echte bediening (het paneel eronder open/dicht) en was met alleen
-  // een <span> uitsluitend met de muis te bereiken. Eén tabstop per offerte-rij; de Enter/spatie-
-  // afhandeling zit centraal in actions.js. Geen <button>: deze span staat in een cel naast andere
-  // tekst en een knop zou daar zijn eigen opmaak meebrengen.
-  //
-  // De tekst zit in een eigen `.of-aann-lbl` en de span is een flexrij die de VOLLE cel vult
-  // (zie styles.css). Daarvoor was de span precies zo breed als zijn tekst en 16px hoog in een rij
-  // van 47: klikte je een paar pixels ernaast, dan gebeurde er niets - de wikkel eromheen staat in
-  // de uitzonderingslijst van de rij-uitklapper (main.js) en heeft zelf geen actie. Het paneel
-  // leek daardoor niet in te klappen. Het label kapt nu ook netjes af in plaats van uit de wikkel
-  // te lopen; die had `overflow:hidden`, dus bij een smalle kolom werd de klikzone nog kleiner.
-  return `<span class="of-aann-tog" role="button" tabindex="0" aria-expanded="${open}" data-action="offerte-aann-open" data-aann="${esc(sl)}" title="${open?'Aannemerslijst inklappen':'Aannemerslijst uitklappen'}">${open?ico('chevronOnder',12):ico('chevronRechts',12)}<span class="of-aann-lbl">${lbl}</span></span>`;
+  // `offProg('')` geeft een lege string terug (util.js): een traject zónder aannemerslijst én
+  // zónder waarde in kolom D zou dan uit één chevron van 12px bestaan. Vandaar de plaatshouder.
+  const teller=offProg(r.offertes)||'<span class="of-aann-leeg">–</span>';
+  return `<span class="of-aann-tog" role="button" tabindex="0" aria-expanded="${open}" data-action="offerte-aann-open" data-aann="${esc(sl)}" aria-label="${esc(zin)} — klik om de lijst te ${open?'sluiten':'openen'}" title="${esc(zin)}">${open?ico('chevronOnder',12):ico('chevronRechts',12)}${teller}</span>`;
 }
 
 // Staat de naam op regel `i` van dit traject op dit moment in de bewerkstand?

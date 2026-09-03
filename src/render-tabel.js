@@ -105,9 +105,15 @@ function renderThead(id,cols,css,sort,breedtes){
       if(_kolObs){ _kolObs.disconnect(); _kolObs.observe(tbl); }
     }
   }
+  // Uitleg per kolomkop (SECS[sec].kopUitleg). Alleen SORTEERBARE koppen kregen een title, en
+  // daardoor verloor 'Offertes' de uitleg die 'Ontvangen/Aangevr.' letterlijk in zijn naam gaf.
+  const uitlegVan = (sort && sort.kopUitleg) || {};
   document.getElementById(id).innerHTML=`<tr>${cols.map(c=>{
     const key=kf?kf(c):null;
-    if(!key) return `<th style="${css}">${c}</th>`;
+    if(!key){
+      const u=uitlegVan[c];
+      return `<th style="${css}"${u?` title="${u}"`:''}>${c}</th>`;
+    }
     const aan=!!(sort.active&&sort.active.key===key);
     const richting=aan?(sort.active.asc?'ascending':'descending'):'none';
     const uitleg=aan?(sort.active.asc?'nu oplopend — klik voor aflopend':'nu aflopend — klik voor standaardvolgorde'):'klik om te sorteren';
@@ -260,7 +266,10 @@ function deadlineCel(r, sec){
               : dagenTot === 0 ? 'opvolgen · vandaag'
               : dagenTot === null ? 'opvolgen'
               : `opvolgen · nog ${dagenTot}d`;
-    return `<td><span class="dl-2 ${kleur}"><span class="dl-dat">${esc(r.deadline)}</span><span class="dl-bij">${esc(bij)}</span></span></td>`;
+    // KORTE datum, alleen op dit tabblad (v12.8): '16 sep' i.p.v. '16 september 2026', met het
+    // jaar erbij zodra hij buiten het lopende jaar valt (kortDatum, util.js). Dat is wat de
+    // kolom van 165 naar 148px laat: de tweede regel ('opvolgen · nog 14d') is hier de breedste.
+    return `<td><span class="dl-2 ${kleur}"><span class="dl-dat">${esc(kortDatum(r.deadline))}</span><span class="dl-bij">${esc(bij)}</span></span></td>`;
   }
   if (!r.deadline) return `<td class="cell-sm"><span class="warn-geen-deadline">Geen deadline</span></td>`;
   const { teLaat, dagenTot } = berekenPrioriteit(r.deadline, sec);
@@ -384,8 +393,8 @@ function rowNtd(r,sec){
     case'OFFERTE-TRAJECTEN':
       cells=`<td>${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
         <td class="${naamCls}"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}${bdlNaam}</td>
-        <td class="cell-sm">${esc(r.datumAangevraagd||'')}</td>
-        <td class="cell-of"><div class="of-rij">${offProg(r.offertes)}<div class="of-aann-tbl-tog">${offerteAannSamenvatting(r)}</div></div></td>
+        <td class="cell-sm">${esc(kortDatum(r.datumAangevraagd||''))}</td>
+        <td class="cell-of"><div class="of-aann-tbl-tog">${offerteAannSamenvatting(r)}</div></td>
         <td>${persBadges(r.behandelaar)}</td>
         ${deadlineCel(r, 'OFFERTE-TRAJECTEN')}
         <td class="cell-note"><div class="pil-rij"><span class="ct" title="${esc(r.opmerkingen||'')}">${esc(r.opmerkingen||'')}</span>${extraPills}</div></td>

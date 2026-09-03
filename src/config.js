@@ -136,8 +136,21 @@ export const SECS = {
                    breedtes:['130px',26,19.1,23,7,'165px',21.1,'150px'],
     keys:['code','naam','periode','agendapunten','behandelaar','deadline','opmerkingen','inBehandeling']},
   'OFFERTE-TRAJECTEN':{label:'Offerte-trajecten',css:'--sec:var(--pu);--sec-l:var(--pu-l);--sec-b:var(--pu-b)',color:'#6855C9',
-    cols:['VvE Code','VvE','Datum aangevr.','Ontvangen/Aangevr.','Behandelaar','Deadline','Opmerkingen'],
-                   breedtes:['130px',19.6,'165px',24.5,16.5,'165px',16.9,'120px'],
+    // Koppen korter sinds v12.8. 'Aangevraagd' en niet 'Aangevr.': dat laatste is een deelstring
+    // van de oude kop van de buurkolom ('Ontvangen/Aangevr.'), en wie de oude tabel kent mapt hem
+    // dan op de verkeerde plek. 'Wie' i.p.v. 'Behandelaar' maakt alle vijf de tabbladen gelijk.
+    cols:['VvE Code','VvE','Aangevraagd','Offertes','Wie','Deadline','Opmerkingen'],
+    // GEWICHTEN voor 'Offertes' en 'Wie', geen vaste px. Een vaste kolom groeit niet mee, en de
+    // klikzone van de aannemers-uitklapper is precies wat er ná de teller en het balkje overblijft:
+    // bij een vaste 150px zakt die op een venster van 1920 van ~221 naar ~33px — exact de fout die
+    // v11.3 heeft gerepareerd. 'Aangevraagd' en 'Deadline' mogen wél vast, want die tonen sinds
+    // v12.8 de KORTE datum ('14 jul' i.p.v. '14 juli 2026').
+    // Gemeten bij 1440: VvE 244 · Aangevraagd 130 · Offertes 167 · Wie 141 · Deadline 148 ·
+    // Opmerkingen 360 (was 188). Bij 1150 houdt Opmerkingen er nog 245 over (was 124).
+                   breedtes:['130px',19,'130px',13,11,'148px',28,'120px'],
+    // 'Offertes' verliest de uitleg die 'Ontvangen/Aangevr.' letterlijk gaf; die staat nu in de
+    // zweeftekst van de kop (renderThead gaf die alleen aan sorteerbare koppen).
+    kopUitleg:{'Offertes':'Ontvangen van aangevraagd'},
     keys:['code','naam','datumAangevraagd','offertes','behandelaar','deadline','opmerkingen']},
   LOD:{label:'LOD',css:'--sec:var(--rd);--sec-l:var(--rd-l);--sec-b:var(--rd-b)',color:'#B91C1C',
     cols:['VvE Code','VvE','Actiepunt','Status','Wie','Deadline LOD','Opmerkingen'],
@@ -153,7 +166,8 @@ export const SECS = {
   // Opmerkingen (kolom G) bestaat wel als veld maar staat bewust niet in `cols`:
   // de gebruiker koos zes kolommen om de rij rustig te houden.
   'SUBSIDIE-TRAJECTEN':{label:'Subsidie-trajecten',css:'--sec:var(--tl);--sec-l:var(--tl-l);--sec-b:var(--tl-b)',color:'#0F766E',
-    cols:['VvE Code','VvE','Subsidie','Fase','Behandelaar','Deadline'],
+    // 'Wie' i.p.v. 'Behandelaar' (v12.8): alle vijf de tabbladen dragen nu dezelfde kop.
+    cols:['VvE Code','VvE','Subsidie','Fase','Wie','Deadline'],
                    breedtes:['130px',27.5,19,19,13.3,'165px','150px'],
     keys:['code','naam','subsidie','subsidieFase','behandelaar','deadline','opmerkingen','inBehandeling']},
 };
@@ -183,8 +197,8 @@ export const VELD_LABELS = {
     inBehandeling:'In behandeling',
   },
   'OFFERTE-TRAJECTEN': {
-    code:'VvE Code', naam:'VvE', datumAangevraagd:'Datum aangevr.',
-    offertes:'Ontvangen/Aangevr.', behandelaar:'Behandelaar', deadline:'Deadline',
+    code:'VvE Code', naam:'VvE', datumAangevraagd:'Aangevraagd',
+    offertes:'Offertes', behandelaar:'Wie', deadline:'Deadline',
     opmerkingen:'Opmerkingen',
   },
   'LOD': {
@@ -194,7 +208,7 @@ export const VELD_LABELS = {
   },
   'SUBSIDIE-TRAJECTEN': {
     code:'VvE Code', naam:'VvE', subsidie:'Subsidie', subsidieFase:'Fase',
-    behandelaar:'Behandelaar', deadline:'Deadline', opmerkingen:'Opmerkingen',
+    behandelaar:'Wie', deadline:'Deadline', opmerkingen:'Opmerkingen',
     inBehandeling:'In behandeling',
   },
 };

@@ -379,7 +379,7 @@ function renderNtd(){
   // die 14 de RUIMSTE stand van --row-px is (de dichtheidsknop zet hem op 10 of 14). Rekenen met
   // de standaardstand gaf een kolom die in 'Ruim' vier pixels te smal was.
   renderThead('ntd-thead',[...(state.bulkMode?[allesVinkjeHtml(zichtbaar)]:[]),...SECS[state.activeNtd].cols,''],SECS[state.activeNtd].css,
-    {active:state.ntdSort, keyFor:ntdSorteerKey},
+    {active:state.ntdSort, keyFor:ntdSorteerKey, kopUitleg:SECS[state.activeNtd].kopUitleg},
     [...(state.bulkMode?['48px']:[]),...(SECS[state.activeNtd].breedtes||[])]);
   renderTbody('ntd-tbody',zichtbaar,state.activeNtd,pgs.ntd,false,erIsGefilterd(filters));
   // Dezelfde lijst die hierboven over de pagina's verdeeld is, ook op state — daar leest

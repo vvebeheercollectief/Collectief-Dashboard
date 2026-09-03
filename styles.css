@@ -510,9 +510,12 @@
        haalt hem uit de tabelopmaak — de browser maakt er dan een anonieme cel omheen, en de
        rijstreep tekende zich dwars onder de inhoud door. Zichtbaar als een dunne lijn onder elke
        offerte-cel; met een wikkel blijft de td gewoon een tabelcel. */
-    #ntd-tbl-wrap td.cell-of .of-rij{display:flex;align-items:center;gap:12px;white-space:nowrap}
+    /* Sinds v12.8 zit de teller ÍN de knop en is de wikkel dus geen flexrij meer maar gewoon de
+       celinhoud. Daarmee is de klikzone de volle cel op elk schermformaat, in plaats van wat er
+       ná de teller overbleef. `overflow:hidden` blijft nodig zodat een lange teller de buurkolom
+       niet overschrijft — en juist dáárom staat de focusring op de td (zie hieronder). */
+    #ntd-tbl-wrap td.cell-of .of-aann-tbl-tog{display:block;min-width:0;margin-top:0;overflow:hidden}
     #ntd-tbl-wrap td.cell-of .prog-wrap{flex:none}
-    #ntd-tbl-wrap td.cell-of .of-aann-tbl-tog{flex:1;min-width:0;margin-top:0;overflow:hidden;text-overflow:ellipsis}
     /* De fase-balk is een flex die de hele cel vulde. Met een vaste kolomindeling werd dat een
        uitgerekte lijn van 307px tussen vijf bolletjes — meer lijn dan informatie. Een plafond
        houdt hem compact; de kolom mag breder zijn dan de balk. */
@@ -1220,12 +1223,19 @@
        in te klappen. Nu vult de knop de hele cel — vol breed en vol hoog — zodat élke klik in dat
        vak het paneel open of dicht doet. `gap` in plaats van de spatie die hier in de markup stond;
        die spatie verdween met de flexbox toch. */
-    .of-aann-tog{display:flex;align-items:center;gap:4px;width:100%;min-width:0;padding:6px 0;font-size:11.5px;font-weight:700;color:var(--ac);cursor:pointer}
+    .of-aann-tog{display:flex;align-items:center;gap:9px;width:100%;min-width:0;padding:6px 0;font-size:11.5px;font-weight:700;color:var(--ac);cursor:pointer}
     .of-aann-tog>svg{flex:none}
-    /* De tekst kapt binnen de knop af. Deed hij dat niet, dan liep de knop uit de wikkel
-       (`overflow:hidden`) en werd de klikbare zone bij een smalle kolom juist kleiner. */
-    .of-aann-lbl{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .of-aann-tog:hover .of-aann-lbl{text-decoration:underline}
+    /* Plaatshouder voor een traject zonder teller én zonder aannemers: zonder deze regel zou die
+       cel uit één chevron van 12px bestaan. */
+    .of-aann-leeg{color:var(--fnt);font-weight:600}
+    /* De terugkoppeling zat in een onderstreping op de tekst, en die tekst is er niet meer. Nu de
+       hele cel, want dat is ook de klikzone. In het donker getoetst: `var(--ac-l)` is daar bijna
+       niet van de celkleur te onderscheiden, `--row-hover` wel. */
+    #ntd-tbl-wrap td.cell-of:hover{background:var(--row-hover)}
+    /* De focusring op de TD en niet op de knop: `.of-aann-tbl-tog` heeft `overflow:hidden`, en dat
+       knipt zowel een outline als een box-shadow af — het chevron staat op x=0 van een knop die de
+       volle breedte vult, dus de ring zou er links altijd afvallen. */
+    #ntd-tbl-wrap td.cell-of:has(.of-aann-tog:focus-visible){outline:2px solid var(--ac);outline-offset:-2px;border-radius:6px}
     .of-aann-tog:focus-visible{outline:2px solid var(--ac);outline-offset:2px;border-radius:6px}
     .of-aann-paneel{margin:2px 0 10px;border:1px solid var(--bor);border-radius:9px;background:var(--sur2);overflow:hidden}
     .of-aann-rij{display:flex;align-items:center;gap:10px;padding:8px 12px;border-top:1px solid var(--bor)}

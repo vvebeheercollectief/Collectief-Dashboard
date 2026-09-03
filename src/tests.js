@@ -1012,6 +1012,37 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     truthy('rowAf zet de volle tekst in de zweeftekst', h.includes('title="een hele lange'));
   })();
 
+  // ── Offerte-kolommen (v12.8) ──
+  eq('offerte-breedtes: acht elementen', SECS['OFFERTE-TRAJECTEN'].breedtes.length, 8);
+  eq('offerte-breedtes: gewichtsom 71',
+     SECS['OFFERTE-TRAJECTEN'].breedtes.filter(w=>typeof w==='number').reduce((a,b)=>a+b,0), 71);
+  eq('offerte-koppen', SECS['OFFERTE-TRAJECTEN'].cols,
+     ['VvE Code','VvE','Aangevraagd','Offertes','Wie','Deadline','Opmerkingen']);
+  // Alle vijf tabbladen dezelfde kop — daar vroeg de gebruiker expliciet om.
+  eq('alle tabbladen gebruiken "Wie" en niet meer "Behandelaar"',
+     SKEYS.filter(s=>SECS[s].cols.includes('Behandelaar')), []);
+  truthy('offerte: "Offertes" houdt zijn uitleg in een zweeftekst',
+     (SECS['OFFERTE-TRAJECTEN'].kopUitleg||{})['Offertes']);
+  // De echte pixels bij drie vensterbreedtes. kolBreedtes verdeelt de gewichten over wat er ná de
+  // px-kolommen overblijft, dus dit is de enige plek waar die verdeling vastligt.
+  (() => {
+    const b=SECS['OFFERTE-TRAJECTEN'].breedtes;
+    const bij=(t)=>kolBreedtes(b,t).map(w=>String(w).endsWith('%')?Math.round(parseFloat(w)/100*t):parseFloat(w));
+    const w1440=bij(1440), w1150=bij(1150), w1920=bij(1920);
+    truthy(`offerte @1440: Opmerkingen ~360px (${w1440[6]})`, Math.abs(w1440[6]-360)<=3);
+    truthy(`offerte @1440: Wie ~141px (${w1440[4]})`, Math.abs(w1440[4]-141)<=3);
+    truthy(`offerte @1150: Opmerkingen ruimer dan de 124 van vroeger (${w1150[6]})`, w1150[6]>200);
+    // De klikzone van de aannemers-uitklapper hangt aan deze kolom: als hij niet meegroeit, is
+    // hij op een breed scherm ineens smaller dan op een smal. Dat is de v11.3-regressie.
+    truthy(`offerte @1920: de offertecel groeit mee (${w1920[3]})`, w1920[3]>180);
+    truthy('offerte: de offertecel is breder op 1920 dan op 1150', w1920[3]>w1150[3]);
+  })();
+  // Korte datum ALLEEN op dit tabblad.
+  truthy('offerte-deadline gebruikt de korte datum',
+     deadlineCel({deadline:'16 september 2026', datumAangevraagd:'14 juli 2026'},'OFFERTE-TRAJECTEN').includes('16 sep'));
+  truthy('oppakken-deadline houdt de volle datum',
+     deadlineCel({deadline:'16 september 2026'},'OPPAKKEN').includes('16 september 2026'));
+
   // ── AI-context: twee blokken met een eigen budget ──
   (() => {
     const veel=[];
@@ -1294,8 +1325,26 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   // Deze twee toetsen leggen vast dat de knop de cel VULT en dat zijn tekst binnen de knop afkapt
   // (zonder dat laatste loopt hij uit de wikkel, die `overflow:hidden` heeft, en wordt de klikzone
   // bij een smalle kolom juist weer kleiner).
-  truthy('aannemer-samenvatting: het label zit in een eigen span die kan afkappen',
-    offerteAannSamenvatting({code:'Q',_aannemers:[]}).includes('of-aann-lbl'));
+  // Sinds v12.8 is het zichtbare label eruit en zit de TELLER in de knop. De klikzone is daarmee
+  // de volle cel op elk schermformaat, in plaats van wat er ná de teller overbleef — de
+  // v11.3-reparatie is dus niet teruggedraaid maar verder doorgevoerd.
+  (() => {
+    const leeg=offerteAannSamenvatting({code:'Q',offertes:'0/3',_aannemers:[]});
+    const vol =offerteAannSamenvatting({code:'R',offertes:'1/2',
+                 _aannemers:[{naam:'Klusbouw',binnen:true},{naam:'HGR',binnen:false}]});
+    eq('aannemer-samenvatting: geen zichtbaar label meer', leeg.includes('of-aann-lbl'), false);
+    eq('aannemer-samenvatting: en ook de zin staat niet meer in beeld',
+       leeg.replace(/aria-label="[^"]*"/,'').replace(/title="[^"]*"/,'').includes('Aannemers'), false);
+    truthy('aannemer-samenvatting: de volle zin blijft in aria-label', leeg.includes('aria-label="Aannemers toevoegen'));
+    truthy('aannemer-samenvatting: gevuld zegt hoeveel er binnen zijn', vol.includes('1 van 2 binnen'));
+    truthy('aannemer-samenvatting: en in de zweeftekst', vol.includes('title="Aannemers'));
+    truthy('aannemer-samenvatting: nog steeds een knop', vol.includes('role="button"'));
+    truthy('aannemer-samenvatting: de teller zit ÍN de knop (dus is de klikzone de hele cel)',
+       vol.indexOf('prog-wrap') > vol.indexOf('of-aann-tog'));
+    // Een traject zonder teller én zonder aannemers mag geen kale 12px-pijl worden.
+    truthy('aannemer-samenvatting: plaatshouder bij een lege teller',
+       offerteAannSamenvatting({code:'S',offertes:'',_aannemers:[]}).includes('of-aann-leeg'));
+  })();
   truthy('aannemer-samenvatting: de knop vult de hele cel', (()=>{
     const proef=document.createElement('div');
     proef.innerHTML=`<div style="width:198px"><div class="of-aann-tbl-tog">${offerteAannSamenvatting({code:'Q',_aannemers:[]})}</div></div>`;
@@ -2459,6 +2508,14 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       (() => {
         const vNtd = {}, secs = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN'];
         const vA3 = state.activeNtd, vPg3 = pgs.ntd;
+        // TIJDBOM WEG. Hier stond de harde datum '22 september 2026'. Zodra die verstreken is
+        // valt élke sectie in de tweeregelige `.dl-2`-tak en meet dit blok iets anders dan het
+        // denkt — drie weken na een uitrol, precies wanneer de vangrail nodig is. Nu wordt hij
+        // relatief aan de testdatum berekend, in de LANGE Nederlandse vorm die Sheets levert.
+        const _MND_LANG = ['januari','februari','maart','april','mei','juni','juli','augustus',
+                           'september','oktober','november','december'];
+        const _lgD = new Date(T.getFullYear(), T.getMonth(), T.getDate() + 112);
+        const _lgDatum = `${_lgD.getDate()} ${_MND_LANG[_lgD.getMonth()]} ${_lgD.getFullYear()}`;
         const klem = document.createElement('style');
         klem.textContent = '#ntd-tbl-wrap{width:1150px !important}';
         document.head.appendChild(klem);
@@ -2467,7 +2524,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
             vNtd[sec] = D.ntd[sec];
             D.ntd[sec] = [{ code:'DLB-1', naam:'VvE Datum Breedte', actiepunt:'x', agendapunten:'x',
                             subsidie:'x', status:'', periode:'juni', offertes:'0/1', aannemers:'',
-                            datumAangevraagd:'22 september 2026', deadline:'22 september 2026',
+                            datumAangevraagd:_lgDatum, deadline:_lgDatum,
                             opvolgdatum:'', behandelaar:'Jer', opmerkingen:'', inBehandeling:'',
                             _sec:sec, _row:9901 }];
             pgs.ntd = 1; setNtd(sec);
@@ -2482,11 +2539,24 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
             let gemeten = 0;
             ths.forEach((th, i) => {
               const kop = th.textContent.trim().replace(/[▲▼]$/, '');
-              if(!(kop.startsWith('Deadline') || kop.startsWith('Datum'))) return;
+              // 'Aangevraagd' hoort erbij sinds v12.8: zonder deze regel slaat de lus de
+              // offerte-datumkolom over en verdampen die asserts zónder één rode regel.
+              if(!(kop.startsWith('Deadline') || kop.startsWith('Datum') || kop === 'Aangevraagd')) return;
               gemeten++;
               const td = tr && tr.children[i];
-              // 'Datum aangevr.' op Offerte is KALE tekst zonder span; meet dan de cel zelf.
-              const el = (td && td.querySelector('span')) || td;
+              // De tweeregelige deadline-cel is een `.dl-2`-BLOK met `display:block`; die kan per
+              // definitie nooit overlopen en `scrollWidth <= clientWidth` is er altijd waar. Meet
+              // dus de echte tekstregels eronder. 'Aangevraagd' op Offerte is kale tekst zonder
+              // span; meet dan de cel zelf.
+              const el = (td && (td.querySelector('.dl-dat') || td.querySelector('span'))) || td;
+              const bij = td && td.querySelector('.dl-bij');
+              if(bij){
+                const overBij = bij.getBoundingClientRect().right - td.getBoundingClientRect().right;
+                truthy(`datumbreedte: ${sec} — "${kop}" tweede regel blijft binnen zijn kolom `
+                       + `(${Math.round(overBij)}px over de rand)`, overBij <= 1);
+                truthy(`datumbreedte: ${sec} — "${kop}" tweede regel kapt niet af `
+                       + `(${bij.scrollWidth} in ${bij.clientWidth})`, bij.scrollWidth <= bij.clientWidth + 1);
+              }
               truthy(`datumbreedte: ${sec} — "${kop}" heeft een datum om te meten`,
                      !!el && el.textContent.trim().length > 0);
               if(!el) return;
@@ -2521,14 +2591,21 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
             deadline:'', _sec:'OFFERTE-TRAJECTEN', _row:9801 }];
           pgs.ntd = 1; setNtd('OFFERTE-TRAJECTEN');
           const ofTd = document.querySelector('#ntd-tbody td.cell-of');
-          const of   = document.querySelector('#ntd-tbody td.cell-of .of-rij');
-          truthy('kolombreedte: de offerte-rij heeft een cel met een wikkel', !!ofTd && !!of);
-          eq('kolombreedte: de offerte-cel zet balk en link naast elkaar',
+          const of   = document.querySelector('#ntd-tbody td.cell-of .of-aann-tog');
+          truthy('kolombreedte: de offerte-rij heeft een cel met een knop erin', !!ofTd && !!of);
+          eq('kolombreedte: de knop zet pijl en balk naast elkaar',
              of ? getComputedStyle(of).display : null, 'flex');
-          // De flex hoort op de WIKKEL te zitten. Op de <td> zelf haalt hij de cel uit de
+          // De flex hoort op de KNOP te zitten. Op de <td> zelf haalt hij de cel uit de
           // tabelopmaak en tekende de rijstreep zich dwars onder de inhoud door.
           eq('kolombreedte: en de cel zelf blijft een gewone tabelcel',
              ofTd ? getComputedStyle(ofTd).display : null, 'table-cell');
+          // De klikzone vult de cel. Dit is de v11.3-reparatie, nu gemeten in de echte tabel en
+          // niet alleen op een losse proefwikkel.
+          truthy('kolombreedte: de klikzone vult de hele cel', (()=>{
+            if(!ofTd||!of) return false;
+            const c=ofTd.getBoundingClientRect(), k=of.getBoundingClientRect();
+            return k.width >= c.width - 40 && k.height >= 24;   // 40 = celopvulling links+rechts
+          })());
         } finally {
           if(vOff === undefined) delete D.ntd['OFFERTE-TRAJECTEN']; else D.ntd['OFFERTE-TRAJECTEN'] = vOff;
           state.activeNtd = vA2; pgs.ntd = vPg2;
@@ -6293,7 +6370,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       // De kolomkoppen moeten de gekozen zes zijn, in volgorde.
       eq('kolomkoppen in de juiste volgorde',
          [...document.querySelectorAll('#ntd-thead th')].slice(0, 6).map(t => t.textContent.trim().replace(/[▲▼]$/, '')),
-         ['VvE Code','VvE','Subsidie','Fase','Behandelaar','Deadline']);
+         ['VvE Code','VvE','Subsidie','Fase','Wie','Deadline']);
     } finally {
       if (_bewaardNtd === undefined) delete D.ntd['SUBSIDIE-TRAJECTEN'];
       else D.ntd['SUBSIDIE-TRAJECTEN'] = _bewaardNtd;

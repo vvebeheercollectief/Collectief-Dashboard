@@ -160,7 +160,7 @@ export const state = {
   ntdStatus: '',                 // statusfilter uit de kop-pillen: '' | 'telaat' | 'weggelegd'
   // VvE-dossier (logboek + kenmerken)
   kenmerkenEdit: false,    // kenmerken-paneel in bewerkmodus
-  vveLogFilter: 'alles',   // 'alles' | 'contact'
+  vveLogFilter: 'notities',   // 'notities' (standaard) | 'contact' | 'alles'
   _vveLogAlles: false,     // dossier-feed volledig uitgeklapt
   dosComposerOpen: false,  // composer uitgeklapt (blijft open tot een ander dossier opent)
   _contactSoort: 'Telefoon',

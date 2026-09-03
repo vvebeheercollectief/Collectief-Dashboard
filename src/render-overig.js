@@ -365,18 +365,78 @@ function logTijd(iso){
   return d.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
 }
 
-// Bepaalt of een logregel op de Logboek-pagina thuishoort, en zo ja hoe prominent.
-// 'normaal' = onze eigen notities/contacten (volwaardig), 'subtiel' = automatische
-// afgerond/aangemaakt (dunne regel), null = ruis (alleen in taak-geschiedenis/VvE-dossier).
-// 'normaal' wordt óók gebruikt als eigen/bewerkbaar-criterium in dossierFeed.
-function logPaginaSoort(actie){
-  const a=(actie||'').trim();
-  if(a==='Opmerking'||a==='Contact') return 'normaal';
-  // Fasewijzigingen horen op de logboekpagina thuis — het verloop van een
-  // subsidietraject is juist wat je later wilt terugzien. Gedempt, want de app
-  // schrijft ze zelf, net als 'Afgerond' en 'Aangemaakt'.
-  if(a==='Afgerond'||a==='Fase gewijzigd'||a.indexOf('Aangemaakt')===0) return 'subtiel';
+// Dezelfde zin als logZin, maar als PLATTE TEKST. logZin bouwt HTML (chips, <b>, kleuren) en
+// die hoort niet in een AI-prompt: het model leest dan opmaak in plaats van inhoud.
+export function logZinPlat(r){
+  return logZin(r, {zonderCode:true}).replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim();
+}
+
+// De opmerking uit een 'Afgerond'-logregel, of '' als er geen is.
+//
+// TWEE VORMEN, want er wordt niets gemigreerd:
+//   nieuw (v12.8+): F = 'Afgerond op <datum>'   G = alleen de opmerking
+//   oud            : F = 'Nog Te Doen'          G = 'Afgerond op <datum>[ — opmerking]'
+// Bewust GEEN datum-regex om de oude vorm te strippen: 'Afgerond op 14-08-2026 (bulk)' en
+// 'Afgerond op 1 juli' zouden daar allebei doorheen glippen en als notitie op het scherm komen.
+// De ' — '-splitsing is precies wat crud.js tot v12.7 schreef, dus die is exact.
+export function afrondOpmerking(r){
+  if(!r || (r.actie||'').trim()!=='Afgerond') return '';
+  if(/^Afgerond op\b/.test((r.oudeWaarde||'').trim())) return (r.nieuweWaarde||'').trim();
+  const t=(r.nieuweWaarde||'').trim(), i=t.indexOf(' — ');
+  return i<0 ? '' : t.slice(i+3).trim();
+}
+
+// Mag deze logregel BEWERKT worden? Losgekoppeld van 'is hij zichtbaar', want een
+// 'Afgerond'-regel met opmerking wordt sinds v12.8 wél volwaardig getoond maar mag GEEN potlood
+// krijgen: `logEditWrite` schrijft voor niet-Contact alleen kolom G, terwijl diezelfde tekst
+// óók in kolom J van 'Afgerond' staat (afrondWaarden, crud.js). Bewerken van alleen de logregel
+// laat die twee stil uit de pas lopen, en bij een oude regel zou het de datum uit de tekst wissen.
+export function logBewerkbaar(r){
+  const a=((r&&r.actie)||'').trim();
+  return a==='Opmerking'||a==='Contact';
+}
+
+// Bepaalt of een logregel op het scherm thuishoort (Logboek-pagina én VvE-dossier), en zo ja
+// hoe prominent. ALLOWLIST, geen denylist: Apps Script schrijft ook 'Terugkerende taak
+// klaargezet' (Opvolging.gs), 'Aangemaakt via mail-intake' (Notifications.gs) en
+// 'Auto-prioriteit' (AutoPrioriteit.gs), en met een denylist glipt elk nieuw actietype er stil
+// doorheen.
+//
+// Neemt de hele REGEL, niet alleen de actienaam: "een afronding is zichtbaar als er een
+// opmerking bij staat" is niet uit de naam af te leiden — daar is kolom F/G voor nodig. De
+// string-tak blijft bestaan als vangnet: zonder die tak zou een gemiste aanroeper '' zien, null
+// teruggeven, en de regel zonder foutmelding van het scherm laten verdwijnen.
+//
+// 'Teruggezet' hoort in de lijst. Undo van een afronding verwijdert de 'Afgerond'-regel NIET
+// (notifications.js, bulk.js). Zonder deze regel beweert de tijdlijn prominent "Jer rondde
+// 311199 af — dak hersteld" voor een taak die weer gewoon open staat, en is de intrekking
+// onzichtbaar.
+//
+// 'subtiel' komt in productie niet meer voor, maar blijft in het contract: beide renderers
+// berekenen `subtiel = logPaginaSoort(r) !== 'normaal'`, zodat een regel die er onverhoopt tóch
+// doorheen komt als dunne regel binnenkomt en niet als volle regel met avatar.
+export function logPaginaSoort(r){
+  const a=(typeof r==='string' ? r : ((r&&r.actie)||'')).trim();
+  if(a==='Opmerking'||a==='Contact'||a==='Teruggezet') return 'normaal';
+  if(a==='Afgerond' && afrondOpmerking(r)) return 'normaal';
   return null;
+}
+
+// Eén bron voor de zoekstring van een logregel, gedeeld door de poort hieronder en het filter in
+// renderLogboek — anders zoekt de poort over andere velden dan het filter.
+export function logZoekTekst(r){
+  return `${r.timestamp} ${r.code} ${r.sectie} ${r.actie} ${r.veld} ${r.oudeWaarde} ${r.nieuweWaarde} ${r.gebruiker} ${displayName(r.gebruiker)}`.toLowerCase();
+}
+
+// Mag deze regel op de Logboek-PAGINA staan? Puur, dus los te toetsen.
+//
+// De zoekterm hoort HIER en niet erna. De zoekbalk belooft "Zoek op VvE, woord of naam…" over
+// het hele logboek; filtert de poort vóór de zoekterm, dan geeft zoeken op een taaknaam uit een
+// 'Aangemaakt'-regel nul treffers zonder uitleg. Zoeken is een expliciete daad, en opruimen mag
+// het resultaat daarvan niet stiekem inperken.
+export function logRegelZichtbaar(r, zoekterm){
+  if(logPaginaSoort(r)) return true;
+  return !!(zoekterm && logZoekTekst(r).includes(zoekterm));
 }
 
 // Eén logregel als HTML (gedeeld door Logboek-pagina en VvE-dossier).
@@ -387,6 +447,9 @@ function logItemHtml(r,subtiel,acties,opts){
   // geen echt rijnummer — bewerk-/verwijderknoppen zouden niets (of het verkeerde) doen.
   // Na de stille resync krijgt de regel z'n echte _row en verschijnen de knoppen alsnog.
   const magActies=!!acties&&r._row>0;
+  // Zichtbaar ≠ bewerkbaar: een afronding mét opmerking is nu een volle regel, maar zijn tekst
+  // staat óók in kolom J van 'Afgerond' en logEditWrite raakt alleen kolom G.
+  const magBewerken=magActies&&logBewerkbaar(r);
   if(subtiel){
     const kleur=logKleur(r.actie);
     const acts=magActies?`<span class="log-acts"><button class="log-act-btn del" data-action="log-verwijderen" data-row="${r._row}" title="Verwijderen" aria-label="Regel verwijderen">${ico('prullenbak')}</button></span>`:'';
@@ -397,17 +460,24 @@ function logItemHtml(r,subtiel,acties,opts){
       ${acts}
     </div>`;
   }
-  if(magActies && state.logEdit===r._row) return logEditForm(r);
+  if(magBewerken && state.logEdit===r._row) return logEditForm(r);
   let extra='';
   if((r.actie==='Behandelaar gewijzigd'||r.actie==='Kenmerk') && r.veld && (r.oudeWaarde||r.nieuweWaarde)){
     extra=`<div class="log-change"><span class="old">${esc(r.oudeWaarde||'—')}</span><span class="arr">→</span><span class="new">${esc(r.nieuweWaarde||'—')}</span></div>`;
   }
   if((r.actie==='Opmerking'||r.actie==='Contact') && r.nieuweWaarde){
     extra=`<div class="log-note">${opmaakHtml(r.nieuweWaarde)}</div>`;
+  } else {
+    // De afrondopmerking komt uit een KALE textarea zonder opmaakbalk (#complete-comment). Door
+    // `opmaakHtml` zou 'kosten *inclusief* btw' zijn sterretjes verliezen en zou 'dak hersteld
+    // \n- factuur door' een opsomming worden — terwijl dezelfde cel op de VvE-dossierpagina
+    // letterlijk blijft staan. Dus esc() + pre-wrap.
+    const afr=afrondOpmerking(r);
+    if(afr) extra=`<div class="log-note">${esc(afr)}</div>`;
   }
   const init=(displayName(r.gebruiker)||'?').charAt(0).toUpperCase();
   const acts=magActies?`<span class="log-acts">
-    <button class="log-act-btn" data-action="log-bewerken" data-row="${r._row}" title="Bewerken" aria-label="Regel bewerken">${ico('potlood')}</button>
+    ${magBewerken?`<button class="log-act-btn" data-action="log-bewerken" data-row="${r._row}" title="Bewerken" aria-label="Regel bewerken">${ico('potlood')}</button>`:''}
     <button class="log-act-btn del" data-action="log-verwijderen" data-row="${r._row}" title="Verwijderen" aria-label="Regel verwijderen">${ico('prullenbak')}</button>
   </span>`:'';
   return `<div class="log-item">
@@ -690,14 +760,20 @@ function renderLogboek(){
     return { klasse, start:_actLog.selectionStart ?? null, eind:_actLog.selectionEnd ?? null };
   })();
   const q=(document.getElementById('s-logboek')?.value||'').toLowerCase().trim();
+  // Staat er een bewerkformulier open op een regel die niet meer bewerkbaar is? Dan wissen.
+  // `_herankerLogEdit` doet bij meerdere ankertreffers bewust niets en houdt het kale rijnummer
+  // vast; `_shiftLogEditRef` kan dat daarna naar een ándere regel schuiven. Zonder deze guard
+  // opent er een formulier op een regel die de gebruiker nooit heeft aangeklikt, en schrijft
+  // Opslaan kolom G van die vreemde regel.
+  if(state.logEdit){
+    const bezig=D.logboek.find(r=>r._row===state.logEdit);
+    if(bezig && !logBewerkbaar(bezig)){ state.logEdit=null; state.logEditTs=null; }
+  }
   const rows=D.logboek.filter(r=>{
-    if(!logPaginaSoort(r.actie)) return false;   // ruis weren — alleen notities/contact + afgerond/aangemaakt
+    if(!logRegelZichtbaar(r,q)) return false;   // ruis weren, maar zoeken doorbreekt de poort
     if(state.logWho && displayName(r.gebruiker)!==state.logWho) return false;
-    if(state.logAct){
-      const m = r.actie===state.logAct || (state.logAct==='Aangemaakt' && (r.actie||'').indexOf('Aangemaakt')===0);
-      if(!m) return false;
-    }
-    if(q&&!`${r.timestamp} ${r.code} ${r.sectie} ${r.actie} ${r.veld} ${r.oudeWaarde} ${r.nieuweWaarde} ${r.gebruiker} ${displayName(r.gebruiker)}`.toLowerCase().includes(q)) return false;
+    if(state.logAct && r.actie!==state.logAct) return false;
+    if(q && !logZoekTekst(r).includes(q)) return false;
     return true;
   });
 
@@ -721,7 +797,7 @@ function renderLogboek(){
     sl.forEach(r=>{
       const dag=logDayLabel(r.timestamp);
       if(dag!==lastDay){ html+=`<div class="log-day">${dag}</div>`; lastDay=dag; }
-      html+=logItemHtml(r,logPaginaSoort(r.actie)==='subtiel',true);
+      html+=logItemHtml(r,logPaginaSoort(r)!=='normaal',true);
     });
     el.innerHTML=html;
   }
@@ -835,7 +911,7 @@ async function logEvents(regels) {
 export {
   ONTW_CATS, ONTW_CAT_COLORS, parseOntw, renderOntw, setOntw, openOntwModal, closeOntwModal,
   submitOntwItem, deleteOntwItem, editOntwItem, parseLogboek, _logSleutel, _logRegelSleutel, _ontwSleutel, _nogNietBevestigd, fmtLogTs, actieBadge, _LOG_AVKLEUR, avatarKleur,
-  logDayLabel, logZin, logTijd, logItemHtml, logPaginaSoort, renderLogboek, histNoteKey, renderTaskHistory, addTaskNote, logEvent, logEvents,
+  logDayLabel, logZin, logTijd, logItemHtml, renderLogboek, histNoteKey, renderTaskHistory, addTaskNote, logEvent, logEvents,
   _shiftRows, _shiftLogboekRows, _shiftLogEditRef, _herankerLogEdit, logEditWrite, logDeleteLabel,
   logEditForm, editLogboek, saveLogboek, cancelLogboek, setLogSoort, deleteLogboek, undoDeleteLog,
 };

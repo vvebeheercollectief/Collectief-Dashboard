@@ -3,7 +3,7 @@
 // ══════════════════════════════════════
 import { taakTitel, taakVerwijzing, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, stilDrempel, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, subBadge, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel, kiesAfgerondRij, filt, splitBehandelaar, korteNaam, persBadges, taakActieKnoppen, voorgesteldeDeadline, DEADLINE_VOORSTEL, DEADLINE_HINT, periodeBereik, AF_PERIODES, duurUitCel, duurNaarCel, offerteAangevraagd, teLaatVoorTelling } from "./util.js";
 import { verwerkMeldingRijen, toonMeldingen, MAX_TOAST_BURST, _whoSleutel, getCurrentWho, undoDelete } from "./notifications.js";
-import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek, logEvents, renderOntw, openOntwModal, closeOntwModal, submitOntwItem, _logRegelSleutel, _ontwSleutel, addTaskNote } from "./render-overig.js";
+import { logZin, logZinPlat, logPaginaSoort, afrondOpmerking, logBewerkbaar, logRegelZichtbaar, logZoekTekst, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek, logEvents, renderOntw, openOntwModal, closeOntwModal, submitOntwItem, _logRegelSleutel, _ontwSleutel, addTaskNote } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM, VELD_LABELS } from "./config.js";
 import { maandagVan, isoWeekJaar, weekDagen, weekPeriodeLabel, parseWeekPeriode, weekOpties, weekAfstand } from "./util.js";
 import { ACTIONS } from "./actions.js";
@@ -237,12 +237,67 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('logItemHtml stip Verwijderd is rood', logItemHtml({actie:'Verwijderd', code:'TEST01', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, false).includes('background:var(--rd)'));
 
   // ── logPaginaSoort ── (welke logregels horen op de Logboek-pagina: notities/contact=normaal, afgerond/aangemaakt=subtiel, rest=ruis)
-  eq('logPaginaSoort Opmerking → normaal', logPaginaSoort('Opmerking'), 'normaal');
-  eq('logPaginaSoort Contact → normaal',   logPaginaSoort('Contact'),   'normaal');
-  eq('logPaginaSoort Afgerond → subtiel',  logPaginaSoort('Afgerond'),  'subtiel');
-  eq('logPaginaSoort Aangemaakt → subtiel', logPaginaSoort('Aangemaakt'), 'subtiel');
-  eq('logPaginaSoort "Aangemaakt (sheet)" → subtiel', logPaginaSoort('Aangemaakt (sheet)'), 'subtiel');
-  eq('logPaginaSoort Bewerkt → ruis (null)',   logPaginaSoort('Bewerkt'),   null);
+  // ── afrondOpmerking ── (twee vormen naast elkaar, want er wordt niet gemigreerd)
+  const _afrNieuw     = {actie:'Afgerond', veld:'', oudeWaarde:'Afgerond op 03-09-2026', nieuweWaarde:'Dak hersteld'};
+  const _afrNieuwLeeg = {actie:'Afgerond', veld:'', oudeWaarde:'Afgerond op 03-09-2026', nieuweWaarde:''};
+  const _afrOud       = {actie:'Afgerond', veld:'status', oudeWaarde:'Nog Te Doen', nieuweWaarde:'Afgerond op 03-09-2026 — gebeld met bestuur'};
+  const _afrOudKaal   = {actie:'Afgerond', veld:'status', oudeWaarde:'Nog Te Doen', nieuweWaarde:'Afgerond op 03-09-2026'};
+  const _afrBulk      = {actie:'Afgerond', veld:'status', oudeWaarde:'Nog Te Doen', nieuweWaarde:'Afgerond op 14-08-2026 (bulk)'};
+  const _afrJuli      = {actie:'Afgerond', veld:'status', oudeWaarde:'Nog Te Doen', nieuweWaarde:'Afgerond op 1 juli'};
+  eq('afrondOpmerking nieuwe vorm leest kolom G', afrondOpmerking(_afrNieuw), 'Dak hersteld');
+  eq('afrondOpmerking nieuwe vorm zonder tekst is leeg', afrondOpmerking(_afrNieuwLeeg), '');
+  eq('afrondOpmerking oude vorm splitst op de gedachtestreep', afrondOpmerking(_afrOud), 'gebeld met bestuur');
+  eq('afrondOpmerking oude vorm zonder toelichting is leeg', afrondOpmerking(_afrOudKaal), '');
+  eq('afrondOpmerking oude bulkregel geeft niet "(bulk)"', afrondOpmerking(_afrBulk), '');
+  eq('afrondOpmerking "Afgerond op 1 juli" geeft niets', afrondOpmerking(_afrJuli), '');
+  eq('afrondOpmerking op een andere actie is leeg', afrondOpmerking({actie:'Opmerking', nieuweWaarde:'x'}), '');
+  eq('afrondOpmerking op niets is leeg', afrondOpmerking(null), '');
+
+  // ── logBewerkbaar ── (zichtbaar ≠ bewerkbaar: kolom J van 'Afgerond' draagt dezelfde tekst,
+  //    en logEditWrite schrijft alleen kolom G — die twee zouden stil uit de pas gaan lopen)
+  truthy('logBewerkbaar Opmerking', logBewerkbaar({actie:'Opmerking'}));
+  truthy('logBewerkbaar Contact', logBewerkbaar({actie:'Contact'}));
+  eq('logBewerkbaar Afgerond-met-opmerking is onwaar', logBewerkbaar(_afrNieuw), false);
+  eq('logBewerkbaar Teruggezet is onwaar', logBewerkbaar({actie:'Teruggezet'}), false);
+
+  // ── logPaginaSoort ── (ALLOWLIST: alleen wat een MENS geschreven heeft komt op het scherm.
+  //    'Afgerond' telt alleen mee mét opmerking; 'Teruggezet' hoort erbij omdat anders een
+  //    ingetrokken afronding prominent blijft staan zonder dat de intrekking te zien is.)
+  eq('logPaginaSoort Opmerking → normaal', logPaginaSoort({actie:'Opmerking'}), 'normaal');
+  eq('logPaginaSoort Contact → normaal',   logPaginaSoort({actie:'Contact'}),   'normaal');
+  eq('logPaginaSoort Teruggezet → normaal', logPaginaSoort({actie:'Teruggezet'}), 'normaal');
+  eq('logPaginaSoort Afgerond MÉT opmerking → normaal', logPaginaSoort(_afrNieuw), 'normaal');
+  eq('logPaginaSoort Afgerond ZONDER opmerking → null', logPaginaSoort(_afrNieuwLeeg), null);
+  eq('logPaginaSoort Aangemaakt → null', logPaginaSoort({actie:'Aangemaakt'}), null);
+  eq('logPaginaSoort "Aangemaakt (sheet)" → null', logPaginaSoort({actie:'Aangemaakt (sheet)'}), null);
+  eq('logPaginaSoort "Fase gewijzigd" → null', logPaginaSoort({actie:'Fase gewijzigd'}), null);
+  eq('logPaginaSoort Bewerkt → null', logPaginaSoort({actie:'Bewerkt'}), null);
+  eq('logPaginaSoort Verwijderd → null', logPaginaSoort({actie:'Verwijderd'}), null);
+  eq('logPaginaSoort Aangevinkt → null', logPaginaSoort({actie:'Aangevinkt'}), null);
+  eq('logPaginaSoort Weggelegd → null', logPaginaSoort({actie:'Weggelegd'}), null);
+  // TERUGVALTAK. De signatuurwissel (actienaam → hele regel) zou anders STIL falen: een gemiste
+  // aanroeper met een kale string ziet '' en geeft null — die regel verdwijnt dan zonder
+  // foutmelding van het scherm.
+  eq('logPaginaSoort accepteert nog steeds een string', logPaginaSoort('Opmerking'), 'normaal');
+  eq('logPaginaSoort string Afgerond → null (geen regel om in te kijken)', logPaginaSoort('Afgerond'), null);
+
+  // ── logRegelZichtbaar ── (zoeken doorbreekt de poort: de zoekbalk belooft het hele logboek)
+  eq('logRegelZichtbaar zonder zoekterm weert een Aangemaakt-regel',
+     logRegelZichtbaar({actie:'Aangemaakt', nieuweWaarde:'Dakgoot'}, ''), false);
+  truthy('logRegelZichtbaar mét zoekterm laat hem door',
+     logRegelZichtbaar({actie:'Aangemaakt', nieuweWaarde:'Dakgoot'}, 'dakgoot'));
+  eq('logRegelZichtbaar mét zoekterm die niet matcht blijft onwaar',
+     logRegelZichtbaar({actie:'Aangemaakt', nieuweWaarde:'Dakgoot'}, 'kozijn'), false);
+  truthy('logRegelZichtbaar laat een notitie zonder zoekterm door',
+     logRegelZichtbaar({actie:'Opmerking', nieuweWaarde:'x'}, ''));
+
+  // ── logZinPlat ── (de AI-context krijgt tekst, geen HTML: anders leest het model opmaak)
+  truthy('logZinPlat bevat geen HTML',
+     !/[<>]/.test(logZinPlat({actie:'Weggelegd', code:'311129', nieuweWaarde:'15-09-2026',
+                              gebruiker:'info@vvebeheercollectief.nl', timestamp:'2026-09-01T10:00:00Z'})));
+  truthy('logZinPlat houdt de inhoud',
+     logZinPlat({actie:'Weggelegd', code:'311129', nieuweWaarde:'15-09-2026',
+                 gebruiker:'info@vvebeheercollectief.nl', timestamp:'2026-09-01T10:00:00Z'}).includes('15-09-2026'));
 
   // ── parseLogboek ── ('Bewerkt' was 1 op de 3 logregels en is pure ruis: elke taak-opslag
   //    schreef er één. Sinds v6.3 loggen we ze niet meer én filteren we ze bij het inlezen weg.
@@ -383,11 +438,10 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   ]);
   eq('stil: rekent vanaf de notitie, Bewerkt is weggefilterd',
      dagenStil({code:'381158', inBehandeling:'TRUE', deadline:''}, 'OPPAKKEN', _stilLogB, _stilLogT), 5);
-  eq('logPaginaSoort Teruggezet → ruis',       logPaginaSoort('Teruggezet'), null);
-  eq('logPaginaSoort Behandelaar gewijzigd → ruis', logPaginaSoort('Behandelaar gewijzigd'), null);
-  eq('logPaginaSoort Kenmerk → ruis',          logPaginaSoort('Kenmerk'),   null);
-  eq('logPaginaSoort Herhaalregel → ruis',     logPaginaSoort('Herhaalregel bewerkt'), null);
-  eq('logPaginaSoort leeg → ruis',             logPaginaSoort(''),          null);
+  eq('logPaginaSoort Behandelaar gewijzigd → ruis', logPaginaSoort({actie:'Behandelaar gewijzigd'}), null);
+  eq('logPaginaSoort Kenmerk → ruis',          logPaginaSoort({actie:'Kenmerk'}),   null);
+  eq('logPaginaSoort Herhaalregel → ruis',     logPaginaSoort({actie:'Herhaalregel bewerkt'}), null);
+  eq('logPaginaSoort leeg → ruis',             logPaginaSoort({actie:''}),          null);
 
   // ── Logboek bewerken/verwijderen (pure helpers) ──
   (()=>{
@@ -866,9 +920,39 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
      subBadge('Oppakken').includes('Oppakken'));
 
   // ── filterDossierLog ── (dossier-feed: 'contact' toont alleen handmatige contactmomenten)
-  const _dosLog=[{actie:'Contact'},{actie:'Afgerond'},{actie:'Contact'},{actie:'Kenmerk'}];
-  eq('dossierfilter alles',   filterDossierLog(_dosLog,'alles').length, 4);
+  //    Drie standen sinds v12.8: 'notities' (standaard, alleen wat een mens schreef), 'contact'
+  //    en 'alles'. Die laatste blijft bestaan omdat het dossier het ENIGE scherm is waar een
+  //    foute logregel te verwijderen is, en de enige plek waar het ALV-afvinkspoor te lezen is.
+  const _dosLog=[
+    {actie:'Contact', oudeWaarde:'Bestuur', nieuweWaarde:'gebeld'},
+    {actie:'Afgerond', veld:'', oudeWaarde:'Afgerond op 03-09-2026', nieuweWaarde:'dak hersteld'},
+    {actie:'Contact', oudeWaarde:'Bewoner', nieuweWaarde:'mail'},
+    {actie:'Kenmerk', veld:'Dak', nieuweWaarde:'Gemeenschappelijk'},
+    {actie:'Aangevinkt', veld:'In behandeling'},
+  ];
+  eq('dossierfilter alles toont ook de systeemregels', filterDossierLog(_dosLog,'alles').length, 5);
   eq('dossierfilter contact', filterDossierLog(_dosLog,'contact').length, 2);
+  eq('dossierfilter notities: contact + afronding-met-opmerking', filterDossierLog(_dosLog,'notities').length, 3);
+  eq('dossierfilter standaardstand is notities', filterDossierLog(_dosLog).length, 3);
+  eq('dossierfilter notities weert een afronding zonder opmerking',
+     filterDossierLog([{actie:'Afgerond', veld:'', oudeWaarde:'Afgerond op 03-09-2026', nieuweWaarde:''}],'notities').length, 0);
+  // De prullenbak op automatische regels moet in de 'alles'-stand blijven bestaan: dit is het
+  // ENIGE scherm waar een foute 'Kenmerk'- of 'Fout'-regel weggehaald kan worden.
+  truthy('dossierFeed houdt de verwijderknop op een systeemregel',
+     dossierFeed([{actie:'Kenmerk', veld:'Dak', code:'X', timestamp:'2026-09-03T10:00:00Z',
+                   gebruiker:'info@vvebeheercollectief.nl', _row:9}])
+       .includes('data-action="log-verwijderen"'));
+
+  // ── De chips op de Logboek-pagina ──
+  (() => {
+    const chips=[...document.querySelectorAll('#logboek-act .lchip')].map(b=>b.dataset.act);
+    eq('logboek-chips: vier stuks', chips.length, 4);
+    eq('logboek-chips: geen Aangemaakt meer (die zou altijd nul geven)', chips.includes('Aangemaakt'), false);
+    eq('logboek-chips: Afgerond blijft de filterwaarde', chips.includes('Afgerond'), true);
+    const afr=document.querySelector('#logboek-act .lchip[data-act="Afgerond"]');
+    truthy('logboek-chip Afgerond heet Afrondnotities — hij toont alleen afrondingen mét notitie',
+       (afr?.textContent||'').includes('Afrondnotities'));
+  })();
 
   // ── dossierFeed: bewerk-/verwijderknoppen ── (potlood alleen bij eigen notities/contactmomenten;
   //    prullenbak overal — ook de gedempte dunne automatische regels blijven individueel
@@ -5649,8 +5733,11 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('geen lege was-tussenzin', !_lz2.includes('(was )'));
   truthy('nieuwe fase staat er nog steeds', _lz2.includes('In behandeling'));
   // De Logboek-pagina filterde de regel volledig weg.
-  eq('fasewijziging is zichtbaar op de logboekpagina',
-     logPaginaSoort('Fase gewijzigd'), 'subtiel');
+  // Sinds v12.8 niet meer: de logboekpagina toont alleen nog wat een mens geschreven heeft.
+  // Het faseverloop blijft leesbaar in het VvE-dossier (stand 'Alles') en in de fase-bolletjes
+  // op het tabblad zelf.
+  eq('fasewijziging staat niet meer op de logboekpagina',
+     logPaginaSoort({actie:'Fase gewijzigd'}), null);
   truthy('badge krijgt een eigen kleur', actieBadge('Fase gewijzigd').includes('--sec:'));
 
   // ── Omschrijving: overal waar een taak een titel krijgt ──

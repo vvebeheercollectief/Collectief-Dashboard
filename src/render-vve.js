@@ -76,8 +76,19 @@ function afOmschrijving(r){
 const CONTACT_SOORTEN=[['Telefoon',ico('telefoon')],['E-mail',ico('envelop')],['Gesprek',ico('gesprek')],['Notitie',ico('potlood')]];
 
 // Pure helper (testbaar): 'contact' = alleen handmatige contactmomenten
+// Drie standen sinds v12.8. 'notities' is de standaard en toont alleen wat een mens geschreven
+// heeft; 'alles' blijft bestaan en dat is GEEN half werk maar noodzaak:
+//   · dit is het enige scherm waar een foute logregel te verwijderen is (de prullenbak in
+//     logItemHtml) — anders kan dat alleen nog met de hand in de Sheet;
+//   · het afvinkspoor van een ALV-ronde ('Aangevinkt' op sectie ALVS) heeft geen bewerkscherm en
+//     is nergens anders te lezen;
+//   · kenmerkwijzigingen worden hier optimistisch getoond als bevestiging van het opslaan;
+//   · de kerncijfers tellen ONgefilterd door, dus zonder deze knop kan er 'laatste activiteit:
+//     1 d' boven 'Geschiedenis 0' staan — twee uitspraken op één scherm die elkaar tegenspreken.
 function filterDossierLog(entries, modus){
-  return modus==='contact' ? entries.filter(e=>e.actie==='Contact') : entries;
+  if(modus==='alles') return entries;
+  if(modus==='contact') return entries.filter(e=>e.actie==='Contact');
+  return entries.filter(e=>logPaginaSoort(e));
 }
 
 function dossierFeed(entries){
@@ -89,7 +100,7 @@ function dossierFeed(entries){
     // Eigen notities/contactmomenten blijven volwaardig en bewerkbaar. Alles wat de app
     // zelf logt wordt een gedempte dunne regel — wel per stuk verwijderbaar, want ze
     // samenvatten zou dat onmogelijk maken.
-    const eigen=logPaginaSoort(r.actie)==='normaal';
+    const eigen=logPaginaSoort(r)==='normaal';
     html+=logItemHtml(r, !eigen, true, {zonderCode:true});
   });
   return html;
@@ -179,7 +190,7 @@ function openVvePagina(code){
   state.vveCode=code;
   state._vveAfAlles=false;
   state.kenmerkenEdit=false;
-  state.vveLogFilter='alles';
+  state.vveLogFilter='notities';
   state._vveLogAlles=false;
   state.dosComposerOpen=false;
   state.logEdit=null;          // open bewerkformulier hoort bij het vórige dossier/scherm
@@ -406,6 +417,11 @@ function renderVve(){
   };
 
   const dosEntries=filterDossierLog(o.logboek,state.vveLogFilter);
+  // 'N van M' zodra er iets verborgen is. Een tijdlijn die leeg oogt terwijl er 180 regels in het
+  // blad staan leest als een storing; dit getal is de aanwijzing dat er meer achter de
+  // Alles-knop zit.
+  const dosTeller=dosEntries.length<o.logboek.length
+    ? `${dosEntries.length} van ${o.logboek.length}` : String(dosEntries.length);
   const dosLimiet=state._vveLogAlles?dosEntries.length:30;
   const dosMeer=(!state._vveLogAlles&&dosEntries.length>30)
     ?`<button class="btn btn-sec btn-sm" data-action="vve-log-alles" style="margin:10px auto 2px;display:block">Alle ${dosEntries.length} tonen</button>`:'';
@@ -451,10 +467,11 @@ function renderVve(){
         <!-- De teller telt wat je ziet (dosEntries), niet het hele logboek. Met het filter
              'Alleen contactmomenten' aan stond hier het totaal van álles, terwijl de knop eronder
              'Alle 3 tonen' zei en er drie regels stonden: drie getallen die elkaar tegenspreken. -->
-        <div class="vve-sectie">Geschiedenis <span class="n">${dosEntries.length}</span>
+        <div class="vve-sectie">Geschiedenis <span class="n">${dosTeller}</span>
           <span class="dos-filters">
-            <button class="dos-filter${state.vveLogFilter!=='contact'?' aan':''}" aria-pressed="${state.vveLogFilter!=='contact'}" data-action="vve-log-filter" data-modus="alles">Alles</button>
-            <button class="dos-filter${state.vveLogFilter==='contact'?' aan':''}" aria-pressed="${state.vveLogFilter==='contact'}" data-action="vve-log-filter" data-modus="contact">Alleen contactmomenten</button>
+            <button class="dos-filter${state.vveLogFilter==='notities'?' aan':''}" aria-pressed="${state.vveLogFilter==='notities'}" data-action="vve-log-filter" data-modus="notities">Notities &amp; contact</button>
+            <button class="dos-filter${state.vveLogFilter==='contact'?' aan':''}" aria-pressed="${state.vveLogFilter==='contact'}" data-action="vve-log-filter" data-modus="contact">Contact</button>
+            <button class="dos-filter${state.vveLogFilter==='alles'?' aan':''}" aria-pressed="${state.vveLogFilter==='alles'}" data-action="vve-log-filter" data-modus="alles" title="Ook de handelingen die de app zelf logt — hier haal je een foute regel weg">Alles</button>
           </span>
         </div>
         ${composerHtml(o.code)}

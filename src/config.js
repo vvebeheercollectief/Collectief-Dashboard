@@ -129,19 +129,26 @@ export const KORTE_NAMEN = {
 export const SECS = {
   OPPAKKEN:{label:'Oppakken',css:'--sec:var(--ac);--sec-l:var(--ac-l);--sec-b:var(--ac-b)',color:'#0D7377',
     cols:['VvE Code','VvE','Actiepunt','Deadline','Wie','Opmerkingen'],
+    // De VvE-naamkolom is een gewicht MET een plafond: {w:26, max:260}. Gemeten op de echte
+    // namen in 'Nog Te Doen' is de mediaan 29-32 tekens (216-236px) en het 90e percentiel 39-51.
+    // Als kaal gewicht werd die kolom bij tabel 1637 zo'n 316-325px en liet de helft van de rijen
+    // er 80-100px leeg. Vastzetten in px kon niet: bij de smalste tabel (1150) zou 260 juist méér
+    // pakken dan het gewicht daar geeft (192). Met een plafond klopt het aan beide kanten, en de
+    // vrijgekomen ruimte gaat naar de kolom die WÉL afkapt.
+    //
     // v12.9 — herverdeeld op GEMETEN inhoud. Eén regel: de kolom die AFKAPT krijgt de ruimte, de
     // kolom die vaak leeg of kort is levert in. Bij tabel 1637: Actiepunt 453 -> 535 (kapte af,
     // en dat IS de taak), Opmerkingen 330 -> 267 (leeg in 45 van de 54 rijen). 'Wie' wordt VAST:
     // op 83px wikkelden twee ronde naamplaatjes naar een tweede regel; 76 = 46 badge + 30
     // opvulling in de ruime stand.
-                   breedtes:['135px',26,44,'158px','76px',22,'150px'],
+                   breedtes:['135px',{w:26,max:260},44,'158px','76px',22,'150px'],
     keys:['code','naam','actiepunt','deadline','behandelaar','prioriteit','opmerkingen','inBehandeling']},
   VERGADERVERZOEKEN:{label:'Vergaderverzoeken',css:'--sec:var(--am);--sec-l:var(--am-l);--sec-b:var(--am-b)',color:'#AE5008',
     cols:['VvE Code','VvE','Periode','Agendapunten','Wie','Deadline uitschr.','Opmerkingen'],
     // 'Periode' wordt VAST op 135px: de weekvorm ('wk 36' boven 'ma 31 aug – vr 4 sep') vraagt er
     // 127, en verder groeien levert alleen wit op naast een waarde als 'Juni'. Gemeten bij tabel
     // 1637: 237 -> 135, en die 102px gaan naar Agendapunten (285 -> 369), dat afkapte.
-                   breedtes:['135px',26,'135px',30,'76px','158px',24,'150px'],
+                   breedtes:['135px',{w:26,max:260},'135px',30,'76px','158px',24,'150px'],
     keys:['code','naam','periode','agendapunten','behandelaar','deadline','opmerkingen','inBehandeling']},
   'OFFERTE-TRAJECTEN':{label:'Offerte-trajecten',css:'--sec:var(--pu);--sec-l:var(--pu-l);--sec-b:var(--pu-b)',color:'#6855C9',
     // Koppen korter sinds v12.8. 'Aangevraagd' en niet 'Aangevr.': dat laatste is een deelstring
@@ -160,14 +167,14 @@ export const SECS = {
     // meer aan wat er ná de teller overblijft. Vast is hij 145px op ELKE vensterbreedte, tegen
     // 114 bij het smalste venster. 'Wie' krijgt 111px: dit tabblad toont de VOLLE naam
     // ('Cihad, Jer' = 83px), niet de ronde initialen van Oppakken/Vergaderverzoeken/LOD.
-                   breedtes:['135px',24,'118px','145px','111px','158px',36,'120px'],
+                   breedtes:['135px',{w:24,max:260},'118px','145px','111px','158px',36,'120px'],
     // 'Offertes' verliest de uitleg die 'Ontvangen/Aangevr.' letterlijk gaf; die staat nu in de
     // zweeftekst van de kop (renderThead gaf die alleen aan sorteerbare koppen).
     kopUitleg:{'Offertes':'Ontvangen van aangevraagd'},
     keys:['code','naam','datumAangevraagd','offertes','behandelaar','deadline','opmerkingen']},
   LOD:{label:'LOD',css:'--sec:var(--rd);--sec-l:var(--rd-l);--sec-b:var(--rd-b)',color:'#B91C1C',
     cols:['VvE Code','VvE','Actiepunt','Status','Wie','Deadline LOD','Opmerkingen'],
-                   breedtes:['135px',24,34,22,'76px','158px',26,'150px'],
+                   breedtes:['135px',{w:24,max:260},34,22,'76px','158px',26,'150px'],
     keys:['code','naam','actiepunt','status','behandelaar','deadline','opmerkingen','inBehandeling']},
   // Subsidie-trajecten (2026-07-29). Zelfde kolomstramien als LOD, met 'Status'
   // vervangen door 'Fase'. Twee dingen liggen hier vast en mogen niet losjes wijzigen:
@@ -185,7 +192,7 @@ export const SECS = {
     // (kolom G) en werd alleen niet getoond. 'Fase' wordt vast op 187px: de bolletjesbalk heeft
     // een min-width van 158 en liep bij 172 al 6px zijn eigen cel uit.
     cols:['VvE Code','VvE','Subsidie','Fase','Wie','Deadline','Opmerkingen'],
-                   breedtes:['135px',26,24,'187px','111px','158px',30,'150px'],
+                   breedtes:['135px',{w:26,max:260},24,'187px','111px','158px',30,'150px'],
     keys:['code','naam','subsidie','subsidieFase','behandelaar','deadline','opmerkingen','inBehandeling']},
 };
 

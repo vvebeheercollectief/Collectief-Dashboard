@@ -41,14 +41,46 @@ import { bundelKopExtra, bundelPaneelHtml, bundelMerkje, STAPEL_GREEP } from "./
 // hem netjes over, maar in een vaste kolomindeling behandelt hij zo'n kolom als `auto` — gemeten:
 // alle vijf de gewichtskolommen kwamen op exact dezelfde 248px uit. Vandaar het narekenen in JS.
 const TABEL_MIN = 1150;   // gelijk houden aan `min-width` van #ntd-tbl-wrap table in styles.css
+// EEN DERDE SOORT: een gewicht MET een plafond, geschreven als {w:26, max:260}.
+//
+// Waarom dat er moest komen. De VvE-naamkolom was een kaal gewicht en groeide dus mee met het
+// venster. Gemeten op de echte namen in 'Nog Te Doen': de mediaan is 29-32 tekens (216-236px),
+// het 90e percentiel 39-51. Bij een tabel van 1637 werd de kolom 316-325px, en de helft van de
+// rijen liet daar 80 tot 100px leeg — precies het vlak dat de gebruiker drie keer heeft
+// aangewezen. Vastzetten in px loste het niet op: bij de smalste tabel (1150) zou een vaste
+// 260px juist MEER pakken dan het gewicht daar geeft (192px), en dan gaat het ten koste van het
+// actiepunt op precies het scherm waar de ruimte al krap is.
+//
+// Met een plafond klopt het aan beide kanten: smal venster = gewoon zijn aandeel, breed venster
+// = tot 260px en geen pixel meer, en wat overblijft gaat naar de kolommen die WÉL afkappen.
+//
+// De verdeling loopt in rondes: pin elke kolom die boven zijn plafond uitkomt vast en verdeel de
+// rest opnieuw over de overgeblevenen, tot er niets meer omvalt. Zonder die herhaling zou het
+// vrijgekomen deel van de ene kolom een andere over zijn plafond kunnen duwen.
 function kolBreedtes(breedtes, tabelBreedte){
   const isPx = w => typeof w === 'string';
+  const gew  = w => (w && typeof w === 'object') ? w.w : w;
+  const plaf = w => (w && typeof w === 'object') ? w.max : Infinity;
   const breedte = Math.max(TABEL_MIN, tabelBreedte || 0);
-  const pxTotaal = breedtes.filter(isPx).reduce((a,w) => a + (parseFloat(w) || 0), 0);
-  const restAandeel = Math.max(0, 100 - (pxTotaal / breedte * 100));
-  const gewichtSom = breedtes.filter(w => !isPx(w)).reduce((a,b) => a + b, 0);
-  return breedtes.map(w => isPx(w) ? w
-    : (gewichtSom > 0 ? (w / gewichtSom * restAandeel).toFixed(3) + '%' : 'auto'));
+  const pxTotaal = breedtes.reduce((a,w) => a + (isPx(w) ? (parseFloat(w) || 0) : 0), 0);
+
+  const vast = new Map();                       // index -> pixels, voor gepinde plafondkolommen
+  let rest = Math.max(0, breedte - pxTotaal);
+  for(let ronde = 0; ronde < 8; ronde++){
+    const open = breedtes.map((w,i)=>({w,i})).filter(o => !isPx(o.w) && !vast.has(o.i));
+    const som = open.reduce((a,o) => a + gew(o.w), 0);
+    if(!som) break;
+    const teVeel = open.filter(o => gew(o.w) / som * rest > plaf(o.w));
+    if(!teVeel.length) break;
+    teVeel.forEach(o => { vast.set(o.i, plaf(o.w)); rest -= plaf(o.w); });
+  }
+  const open = breedtes.map((w,i)=>({w,i})).filter(o => !isPx(o.w) && !vast.has(o.i));
+  const som = open.reduce((a,o) => a + gew(o.w), 0);
+  return breedtes.map((w,i) => {
+    if(isPx(w)) return w;
+    if(vast.has(i)) return vast.get(i) + 'px';
+    return som > 0 ? (gew(w) / som * Math.max(0,rest) / breedte * 100).toFixed(3) + '%' : 'auto';
+  });
 }
 
 // De percentages hangen aan de gemeten tabelbreedte, dus ze moeten opnieuw gezet worden zodra die

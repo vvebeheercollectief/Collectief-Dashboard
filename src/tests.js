@@ -1266,8 +1266,12 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
 
   // ── Offerte-kolommen (v12.8) ──
   eq('offerte-breedtes: acht elementen', SECS['OFFERTE-TRAJECTEN'].breedtes.length, 8);
+  // De VvE-kolom is sinds v12.9 een gewicht MET plafond ({w:24,max:260}) en telt dus als object,
+  // niet als getal. Tel beide vormen mee, anders meet deze regel stil iets anders dan hij zegt.
   eq('offerte-breedtes: gewichtsom 60',
-     SECS['OFFERTE-TRAJECTEN'].breedtes.filter(w=>typeof w==='number').reduce((a,b)=>a+b,0), 60);
+     SECS['OFFERTE-TRAJECTEN'].breedtes
+       .filter(w=>typeof w==='number' || (w&&typeof w==='object'))
+       .reduce((a,w)=>a+(typeof w==='number'?w:w.w),0), 60);
   eq('offerte-koppen', SECS['OFFERTE-TRAJECTEN'].cols,
      ['VvE Code','VvE','Aangevraagd','Offertes','Wie','Deadline','Opmerkingen']);
   // Alle vijf tabbladen dezelfde kop — daar vroeg de gebruiker expliciet om.
@@ -1292,6 +1296,23 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
        w1150[3]===145 && w1440[3]===145 && w1920[3]===145);
     truthy('offerte: en dat is ruimer dan de 114px die het smalste venster vroeger gaf', 145>114);
   })();
+  // ── Het plafond op de VvE-naamkolom (v12.9) ──
+  // Gemeten op de echte namen: mediaan 29-32 tekens (216-236px), p90 39-51. Als kaal gewicht werd
+  // die kolom bij tabel 1637 zo'n 325px en liet de helft van de rijen er 80-100px leeg. Vastzetten
+  // in px kon niet: bij 1150 pakt 260 juist méér dan het gewicht daar geeft (192).
+  (() => {
+    const b=SECS['OPPAKKEN'].breedtes;
+    const bij=t=>kolBreedtes(b,t).map(w=>String(w).endsWith('%')?Math.round(parseFloat(w)/100*t):parseFloat(w));
+    const w1150=bij(1150), w1440=bij(1440), w1637=bij(1637);
+    truthy(`plafond: bij 1150 blijft de VvE-kolom ONDER het plafond (${w1150[1]})`, w1150[1]<260);
+    eq(`plafond: bij 1440 raakt hij het plafond (${w1440[1]})`, w1440[1], 260);
+    eq(`plafond: bij 1637 blijft hij op het plafond (${w1637[1]})`, w1637[1], 260);
+    // En de vrijgekomen ruimte gaat naar het actiepunt, niet naar de lucht.
+    truthy(`plafond: het actiepunt krijgt de rest (1637: ${w1637[2]})`, w1637[2]>540);
+    truthy('plafond: de som blijft precies de tabel vullen',
+       Math.abs(w1637.reduce((a,x)=>a+x,0)-1637)<=2 && Math.abs(w1150.reduce((a,x)=>a+x,0)-1150)<=2);
+  })();
+
   // Korte datum ALLEEN op dit tabblad.
   truthy('offerte-deadline gebruikt de korte datum',
      deadlineCel({deadline:'16 september 2026', datumAangevraagd:'14 juli 2026'},'OFFERTE-TRAJECTEN').includes('16 sep'));
@@ -2467,9 +2488,15 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN'].forEach(sec => {
         eq(`kolombreedte: ${sec} heeft één breedte per kolom plus de actiekolom`,
            (SECS[sec].breedtes || []).length, SECS[sec].cols.length + 1);
+        // Drie geldige vormen sinds v12.9: een GEWICHT (getal), een VASTE breedte ('135px'), en
+        // een gewicht MÉT plafond ({w:26,max:260}) — die laatste groeit mee tot een grens en
+        // laat de rest naar de kolommen gaan die wél afkappen.
         truthy(`kolombreedte: ${sec} heeft alleen geldige breedtes`,
                (SECS[sec].breedtes || []).every(w =>
-                 (Number.isFinite(w) && w > 0) || (typeof w === 'string' && /^\d+px$/.test(w))));
+                 (Number.isFinite(w) && w > 0)
+                 || (typeof w === 'string' && /^\d+px$/.test(w))
+                 || (w && typeof w === 'object' && Number.isFinite(w.w) && w.w > 0
+                     && Number.isFinite(w.max) && w.max > 0)));
         // Drie soorten kolommen hebben een VASTE breedte in pixels: de VvE-code (kan een kenmerk
         // dragen), de datum(s), en de actiekolom (vier knoppen van 28px). Offerte heeft twee
         // datums, dus daar zijn het er vier in plaats van drie. Zonder deze toets kan zo'n

@@ -158,6 +158,10 @@ export const state = {
                            // leest hem bij élke bundelkop, en een crash daar neemt de takenlijst mee.
   ntdSort: {key:null, asc:true}, // kolomkop-sortering NTD: key 'code'|'deadline'|null (null = standaardvolgorde)
   ntdStatus: '',                 // statusfilter uit de kop-pillen: '' | 'telaat' | 'weggelegd'
+  // Groeperen per VvE (v12.8). App-breed en niet per tabblad: het is een manier van kijken, geen
+  // eigenschap van één lijst. Wordt bij het opstarten uit localStorage gelezen, net als de
+  // dichtheidsknop.
+  ntdPerVve: false,
   // VvE-dossier (logboek + kenmerken)
   kenmerkenEdit: false,    // kenmerken-paneel in bewerkmodus
   vveLogFilter: 'notities',   // 'notities' (standaard) | 'contact' | 'alles'

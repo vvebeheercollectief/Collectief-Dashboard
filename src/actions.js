@@ -6,7 +6,7 @@ import { pgs, state, D } from './state.js';
 import { bouwBundelIndex, zichtbareKop, volgendeVolg, bundelSleutel } from './bundel.js';
 import {
   setNtd, renderNtd, renderNtdStats, setAf, renderAf, renderAlvo, toggleAlvoFlag, renderAlfa,
-  kopOpen, zetKopOpen, toggleBundel, springNaarBundel,
+  kopOpen, zetKopOpen, toggleBundel, springNaarBundel, zetPerVveKnop,
 } from './render-lijsten.js';
 import {
   setOntw, renderOntw, editOntwItem, addTaskNote, renderLogboek,
@@ -35,6 +35,13 @@ const PAG_RENDER = { ntd:renderNtd, af:renderAf, alvo:renderAlvo, alfa:renderAlf
 
 export const ACTIONS = {
   'toggle':                (el) => { el.setAttribute('aria-checked', el.classList.toggle('on')); },
+  // Groeperen per VvE aan/uit. Puur weergave: er wordt niets geschreven, dus geen poorten.
+  'pervve-toggle':         () => {
+    state.ntdPerVve = !state.ntdPerVve;
+    try{ localStorage.setItem('ntdPerVve', state.ntdPerVve?'1':'0'); }catch(_){}
+    zetPerVveKnop();
+    renderNtd();
+  },
   // Snelkeuze in het afrondvenster: vult het veld en laat het bewerkbaar. Eén actie voor beide
   // vensters — welk veld hij vult volgt uit waar de knop staat, niet uit een tweede actienaam.
   'afrond-snelkeuze':      (el) => {

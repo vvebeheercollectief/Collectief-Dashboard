@@ -862,9 +862,83 @@ function duurNaarCel(v){
   return n === null ? '' : String(n);
 }
 
+// ══════════════════════════════════════
+//  GROEPEREN PER VvE (v12.8)
+// ══════════════════════════════════════
+// Zet taken van dezelfde VvE bij elkaar, zonder de volgorde van filterNtd op zijn kop te zetten.
+//
+// DE REGEL: een VvE met TWEE OF MEER zichtbare taken vormt een groep, en die groep komt op de
+// plek van zijn URGENTSTE lid te staan. Een VvE met één zichtbare taak blijft precies staan waar
+// hij stond. Er wordt dus alleen naar voren gehaald, nooit naar achteren geduwd.
+//
+// WAAROM GEEN RESTBAK. De eerste opzet zette alle VvE's met één taak in een blok 'Losse taken'
+// onderaan. Daarmee zakt een enkele taak die te laat is onder álle groepen, bij PG=25 desnoods
+// naar pagina 2 — en dat breekt precies de urgentiebelofte waar deze lijst op gebouwd is.
+//
+// `koppen` is gesleuteld op de INDEX in `rijen`, niet op `rijSleutel(r)`. Dat is geen smaak:
+// `rijSleutel` botst zodra twee rijen in dezelfde lijst hetzelfde taaknummer dragen — een geval
+// dat dit project gedocumenteerd kent (`checkNummers` meldt het aan de gebruiker) — en geeft
+// 'Rundefined' voor elke rij zonder taakId én zonder _row. Met een Map op sleutel zou de kop van
+// een groep stil wegvallen en zou één taak onder de kop van een ÁNDERE VvE komen te staan.
+//
+// De code wordt getrimd en kleingeschreven vergeleken, zoals crud.js, dubbelcheck.js,
+// render-alv.js, palette.js en vve-zoekveld.js dat allemaal al doen. Zonder dat splitst één
+// spatie in kolom A een VvE in twee groepen die allebei dezelfde zichtbare code tonen.
+function groepeerPerVve(rows){
+  const lijst = rows || [];
+  const sleutel = r => String((r && r.code) || '').trim().toLowerCase();
+  const tel = new Map();
+  lijst.forEach(r => { const k = sleutel(r); tel.set(k, (tel.get(k) || 0) + 1); });
+
+  // `hoort[i]` = de kop waar rij i onder valt, of null. Nodig om boven aan een volgende pagina
+  // een vervolgkop te kunnen zetten: een groep kan over een paginagrens vallen, en dan staat de
+  // helft eronder zonder enige aanduiding van bij welke VvE hij hoort.
+  const rijen = [], koppen = new Map(), hoort = [], gedaan = new Set();
+  lijst.forEach(r => {
+    const k = sleutel(r);
+    if (gedaan.has(k)) return;                                        // deze groep staat er al
+    if ((tel.get(k) || 0) < 2) { rijen.push(r); hoort.push(null); return; }   // losse taak
+    gedaan.add(k);
+    const leden = lijst.filter(x => sleutel(x) === k);
+    koppen.set(rijen.length, {
+      // Terugval voor rijen zonder VvE-code: die horen visueel wél bij elkaar, maar een lege
+      // kop leest als een storing.
+      code:   (r.code || '').trim() || 'Zonder code',
+      naam:   r.naam || '',
+      aantal: leden.length,
+      teLaat: leden.filter(x => teLaatVoorTelling(x, x._sec)).length,
+    });
+    const kop = koppen.get(rijen.length);
+    leden.forEach(x => { rijen.push(x); hoort.push(kop); });
+  });
+  return { rijen, koppen, hoort };
+}
+
+// Dezelfde groepering, maar BINNEN de drie blokken van de takenlijst (actief / in behandeling /
+// weggelegd). Over de blokken heen zou een weggelegde taak tussen de actieve komen te staan; die
+// blokken zijn de bovenliggende indeling en blijven dat.
+//
+// Draait vóór het pagineren, niet erna. Groepeerde je pas binnen één pagina, dan zouden twee
+// taken van dezelfde VvE die toevallig op pagina 1 en pagina 2 staan elkaar nooit vinden — en
+// dat is juist het geval waar deze hele schakelaar voor bestaat.
+export function groepeerPerBlok(rows, blokVan){
+  const lijst = rows || [];
+  const rijen = [], koppen = new Map(), hoort = [];
+  [0,1,2].forEach(b => {
+    const deel = lijst.filter(r => blokVan(r) === b);
+    if(!deel.length) return;
+    const g = groepeerPerVve(deel);
+    const offset = rijen.length;
+    g.rijen.forEach((r,i) => { rijen.push(r); hoort.push(g.hoort[i]); });
+    g.koppen.forEach((k,i) => koppen.set(offset + i, k));
+  });
+  return { rijen, koppen, hoort };
+}
+
+
 export {
   maandagVan, isoWeekJaar, weekDagen, weekPeriodeLabel, parseWeekPeriode, weekOpties, weekAfstand, metDagnamen, MND_KORT, MND_LANG,
-  taakTitel, taakVerwijzing, kortDatum, NIET_ZOEKBAAR,
+  taakTitel, taakVerwijzing, kortDatum, NIET_ZOEKBAAR, groepeerPerVve,
   displayName, filt, splitBehandelaar, korteNaam, PRIO_REGELS, stilDrempel, STIL_ESCALATIE_REGELS,
   DEADLINE_VOORSTEL, DEADLINE_HINT, voorgesteldeDeadline, AF_PERIODES, periodeBereik,
   opvolgStatus, volgendeDeadline, HERHAAL_MAANDEN, _vandaagAmsterdam, isoWeek,

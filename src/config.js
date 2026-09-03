@@ -5,7 +5,7 @@ import { ALLOWED_EMAILS } from '../allowed-emails.js';
 
 // ── Versie (zichtbaar in de UI) ────────────────────────────────────────
 // Ophogen bij ELKE wijziging: 4.1, 4.2, … 5.0 voor grote sprongen.
-export const APP_VERSION = '12.7';
+export const APP_VERSION = '12.8';
 
 // Snelkeuzes in het afrondvenster. Sinds v12.8 is de opmerking verplicht, en zonder deze
 // knoppen zou dat betekenen dat je bij elke afronding een zin moet typen. Hier en niet in de

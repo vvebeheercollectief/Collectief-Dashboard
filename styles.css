@@ -2026,3 +2026,22 @@ td>.stapel-h{margin-right:9px}
     .snel-knop:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
     .veld-fout{margin:5px 0 0;font-size:12px;font-weight:600;color:var(--rd)}
     textarea[aria-invalid="true"]{border-color:var(--rd);box-shadow:0 0 0 3px var(--rd-l)}
+
+    /* ── Groeperen per VvE (v12.8) ──────────────────────────────────────────────────────────
+       De koppen volgen de dichtheidsknop. `.grp-kop` stond op vaste padding en luisterde niet
+       naar --row-py/--row-px; bij tien groepen kost dat in de compacte stand ~300px die de
+       compacte gebruiker juist niet wilde. */
+    .grp-kop{padding:var(--row-py,9px) var(--row-px,26px)}
+    /* Border-top en géén cursor:pointer: `.bdl-paneel` gebruikt dezelfde --group-bg en ÍS
+       uitklapbaar. Zonder onderscheid nodigt deze kop uit tot een klik die niets doet. */
+    .grp-vve td{border-top:1px solid var(--bor)}
+    /* De flex op de WIKKEL, niet op de td — zie de toelichting bij vveGroepKop. */
+    .grp-in{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .grp-cd{font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--ac)}
+    .grp-nm{font-size:12.5px;font-weight:700;color:var(--txt);text-transform:none;letter-spacing:0}
+    .grp-ct{font-size:11px;font-weight:600;color:var(--mut);text-transform:none;letter-spacing:0}
+    .grp-w{font-size:10.5px;font-weight:700;color:var(--sig-crit);background:var(--rd-l);border:1px solid var(--rd-b);padding:1px 6px;border-radius:999px;text-transform:none;letter-spacing:0}
+    /* Aan-stand van de knop in de filterbalk, en de gedempte stand als kolomkop-sortering hem
+       tijdelijk overneemt. */
+    #pervve-btn.on{border-color:var(--ac);color:var(--ac);background:var(--ac-l)}
+    #pervve-btn.gedempt{opacity:.55}

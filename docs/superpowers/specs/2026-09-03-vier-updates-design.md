@@ -215,22 +215,54 @@ werk maar noodzaak** — vier dingen hangen eraan:
 De teller boven de tijdlijn (render-vve.js:424) telt de **zichtbare** regels en krijgt de tekst
 "N van M" zodra er iets verborgen is, zodat een leeg ogende tijdlijn niet als storing leest.
 
-### 1.8 De AI-context
+### 1.8 De AI-context wordt beter, niet slechter
 
-- **`dossier-chat.js`:60-62** — de kop "Laatste logboek/contactmomenten" wordt nu getoetst op de
-  ongefilterde lijst en gevuld met de eerste 15 regels, wat bij een VvE met veel bulk-afrondingen
-  vijftien kale `Afgerond`-regels zijn. Nieuw: filter eerst, dán de leegtoets, dan `slice(0,15)`.
-  Zo ziet het model notities en afrondopmerkingen in plaats van ruis.
-- **`ai.js`:50-52** — hier moet het filter **ná** de leegtoets op :52
-  (`if(!naam && !behs.size && !open.length && !laatste.length) return null`). Anders valt
-  `laatste` leeg bij een VvE met alleen automatische regels, geeft `aiVveContext` null terug en
-  verdwijnt het complete 'Live context'-kader (ai.js:76) inclusief behandelaar en open taken.
+**Uitgangspunt (gebruiker, 03-09):** het schermfilter is een *schermfilter*. De chatassistent moet
+de hele geschiedenis blijven zien — hij heeft geen last van ruis zoals een mens dat heeft, hij
+heeft alleen last van een te kleine greep.
 
-**Eerlijk over de prijs:** op "wie heeft dit opgepakt?" en "wanneer is dit weggelegd?" antwoordt
-de chat straks vaker "dat staat niet in het dossier", omdat `Behandelaar gewijzigd` en
-`Weggelegd` uit zijn context vallen. Dat is een echte achteruitgang. Ze staan wél nog in de
-`alles`-stand van het dossier en in Ctrl+K. Als dit gaat knellen is de volgende stap om de
-chat-context apart te voeden — bewust niet in deze ronde.
+Vandaag pakt `dossier-chat.js`:62 domweg `o.logboek.slice(0,15)` — vijftien regels vanaf de
+nieuwste. Bij een VvE met veel bulk-afrondingen zijn dat vijftien kale `Afgerond`-regels en ziet
+het model geen enkele notitie. Het probleem is dus niet dat er te véél in zit, maar dat de
+willekeurige greep de belangrijke regels eruit duwt.
+
+**Nieuwe opzet — twee blokken in plaats van één lijst**, met een eigen budget per blok, zodat het
+ene het andere niet meer kan verdringen:
+
+```
+Notities, contactmomenten en afrondingen (nieuwste eerst):
+  … tot 14 regels die logPaginaSoort() doorlaat, volledig uitgeschreven …
+
+Overige handelingen (nieuwste eerst, verkort):
+  03-09  Jer zette de behandelaar op Cihad
+  02-09  Jer legde de taak weg tot 15-09
+  01-09  Cihad maakte een nieuwe taak aan: Dakgoot vervangen
+  … tot 12 regels, één regel per stuk …
+```
+
+Het tweede blok komt uit precies de regels die `logPaginaSoort` op `null` zet en gebruikt
+`logZin(r)` — dezelfde zin die de Logboek-pagina zou tonen — met `_kapLog` op 160 tekens in
+plaats van 400. Daarmee ziet het model **meer** dan vandaag (tot 26 regels in plaats van 15) en
+staat de inhoudelijke informatie vooraan.
+
+Vragen als "wie heeft dit opgepakt?" en "wanneer is dit weggelegd?" worden daarmee beter
+beantwoord dan nu, niet slechter — vandaag vallen die regels weg zodra er vijftien afrondingen
+boven staan.
+
+Twee bedradingsdetails die niet mogen verschuiven:
+
+- **`dossier-chat.js`:60** — `if(o.logboek.length)` toetst de ongefilterde lijst. Die toets blijft
+  op de ongefilterde lijst staan; alleen de opbouw eronder verandert. Anders krijgt een VvE met
+  alleen automatische regels een kop met nul regels eronder.
+- **`ai.js`:50-52** — de leegtoets op :52
+  (`if(!naam && !behs.size && !open.length && !laatste.length) return null`) blijft op de
+  **ongefilterde** `laatste` staan. Zou hij op een gefilterde lijst staan, dan geeft
+  `aiVveContext` null terug bij een VvE met alleen automatische regels en verdwijnt het complete
+  'Live context'-kader (ai.js:76) inclusief behandelaar en open taken. De AI-helper krijgt
+  dezelfde tweedeling, met een kleiner budget (3 inhoudelijke + 3 overige).
+
+De token-kosten zijn verwaarloosbaar: de verkorte regels zijn ~60 tekens en er komen er hooguit
+twaalf bij.
 
 ---
 
@@ -653,6 +685,9 @@ Draai `tools/syntaxcheck.js` vóór elke testronde. Baseline meten op de live UR
    de ingevoerde tekst terug. Idem voor de bulkweg via `logEvents`.
 8. `filterDossierLog` met de drie standen.
 9. Een zoekterm op de Logboek-pagina toont ook een verborgen regel.
+9a. `dossierContextTekst` bevat twee blokken; een VvE met 20 afrondingen en 1 notitie toont die
+    notitie nog steeds, en de overige handelingen staan verkort in het tweede blok.
+9b. `aiVveContext` geeft géén null bij een VvE met uitsluitend automatische logregels.
 10. `renderLogboek` wist een bewerkstand op een regel die niet meer bewerkbaar is.
 11. De `.log-note` van een afrondregel gaat door `esc`, niet door `opmaakHtml`
     (`**vet**` blijft letterlijk staan).
@@ -721,7 +756,7 @@ Geen Sheet-verbouwing nodig: er komt geen kolom bij en er verandert niets aan ee
 |---|---|
 | **Aanname** | Een verplichte opmerking levert bruikbare zinnen op en niet vier keer "ok". De snelkeuzes zijn daarvoor bedoeld; na een paar weken de inhoud van kolom J bekijken en zo nodig de teksten bijstellen. |
 | **Risico** | Een typo in de nu verplichte opmerking heeft geen correctieweg: kolom J is nergens bewerkbaar en de logregel mag niet bewerkt worden (§1.3). Bewust geaccepteerd in deze ronde; een bewerkweg op kolom J is een los, klein vervolg. |
-| **Risico** | De chatassistent wordt slechter in vragen over behandelaarswissels en wegleggen (§1.8). Zichtbaar gemaakt, niet verborgen. |
+| **Aanname** | De tweedeling in de chat-context (§1.8) maakt de assistent beter, niet slechter. Te toetsen door na de uitrol een paar vragen te stellen die vandaag misgaan ("wie heeft dit opgepakt?" bij een VvE met veel afrondingen). |
 | **Risico** | De vaste px-som van de offerte-tabel gaat van 580 naar 528 — lager dan nu, dus de flexibele kolommen krijgen juist méér. Elke px-kolom die er later bij komt gaat wél rechtstreeks van de VvE-naam en de opmerking af. |
 | **Beperking** | Groeperen per VvE laat rijen verspringen bij andermans wijzigingen (§4.9). Daarom een schakelaar. |
 | **Openstaand** | Variant C (handmatige groepen over VvE's heen) is bewust uitgesteld: dat vraagt kolom T en dus een Sheet-verbouwing op twee tabbladen. |

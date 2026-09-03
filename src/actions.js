@@ -35,6 +35,16 @@ const PAG_RENDER = { ntd:renderNtd, af:renderAf, alvo:renderAlvo, alfa:renderAlf
 
 export const ACTIONS = {
   'toggle':                (el) => { el.setAttribute('aria-checked', el.classList.toggle('on')); },
+  // Snelkeuze in het afrondvenster: vult het veld en laat het bewerkbaar. Eén actie voor beide
+  // vensters — welk veld hij vult volgt uit waar de knop staat, niet uit een tweede actienaam.
+  'afrond-snelkeuze':      (el) => {
+    const doel = el.closest('#bulkaf-bg') ? 'bulkaf-comment' : 'complete-comment';
+    const v = document.getElementById(doel); if(!v) return;
+    v.value = el.dataset.tekst || '';
+    try{ v.focus(); v.setSelectionRange(v.value.length, v.value.length); }catch(_){}
+    const fout = document.getElementById(doel+'-fout'); if(fout) fout.hidden = true;
+    v.setAttribute('aria-invalid','false');
+  },
   'notif-toggle':          (el) => { el.setAttribute('aria-checked', el.classList.toggle('on')); saveNotifPrefs(); },
   // Fase-bolletje in een tabelrij: schrijft meteen weg naar kolom D.
   'subsidie-fase':         (el) => zetSubsidieFase(+el.dataset.rid, +el.dataset.fase),

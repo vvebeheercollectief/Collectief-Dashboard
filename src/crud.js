@@ -6,7 +6,7 @@ import { zoekDubbels, dubbelVraagTekst } from "./dubbelcheck.js";
 import { extraVves, wisExtraVves, extraVvesHtml, extraVvesUitleg } from "./meervve.js";
 import { state, D, pgs } from "./state.js";
 import { verseRij, rijIndex } from "./rij.js";
-import { SECS, SKEYS, SID, OMSCHRIJVING_SLEUTEL, VELD_LABELS } from "./config.js";
+import { SECS, SKEYS, SID, OMSCHRIJVING_SLEUTEL, VELD_LABELS, AFROND_SNELKEUZES } from "./config.js";
 import { writeRange, writeRows, _shiftNtdRows, _shiftAfRows, _herstelShift, assertRowMatch, sheetsFetch, fetchSheet, _a1Bereik, _withRetry } from "./api.js";
 import { isKolomKop, isSectieKop } from "./structuurcheck.js";
 import { ensureToken } from "./auth.js";
@@ -1185,6 +1185,8 @@ async function completeTaskRow(r, rid, bijDoorgaan){
   const d=new Date();
   document.getElementById('complete-date').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   document.getElementById('complete-comment').value='';
+  vulSnelkeuzes('complete-snel');
+  toonAfrondFout(false);
   // Wissen bij het OPENEN. Sluit iemand af met het kruisje en opent hij daarna een andere taak,
   // dan zou een bewaarde keuze stil op die verkeerde taak belanden.
   wisDuurKeuze();
@@ -1194,6 +1196,45 @@ async function completeTaskRow(r, rid, bijDoorgaan){
   document.getElementById('complete-title').textContent=`Taak afhandelen — ${taakTitel(r, r._sec)||r.code||''}`;
   document.getElementById('complete-bg').classList.add('open');
 }
+
+// De snelkeuzeknoppen bouwen. Bewust géén `.soort-chip`: die heeft elders een blijvende
+// `.aan`-stand (contact-composer, logEditForm) en wie die kent klikt hier twee keer omdat er
+// niets aan blijft staan. Dit is een invoeg-actie, geen keuze.
+export function vulSnelkeuzes(hostId, extra){
+  const host=document.getElementById(hostId); if(!host) return;
+  const lijst=extra?[...AFROND_SNELKEUZES,extra]:AFROND_SNELKEUZES;
+  host.innerHTML=lijst.map(t=>
+    `<button type="button" class="snel-knop" data-action="afrond-snelkeuze" data-tekst="${esc(t)}">${esc(t)}</button>`
+  ).join('');
+}
+
+// De foutmelding aan- of uitzetten. Zichtbaar én hoorbaar: `aria-invalid` op het veld zorgt dat
+// een schermlezer het meldt, en `aria-describedby` (in de HTML) koppelt de zin eraan.
+export function toonAfrondFout(aan, veldId, foutId){
+  const v=document.getElementById(veldId||'complete-comment');
+  const f=document.getElementById(foutId||'complete-comment-fout');
+  if(f) f.hidden=!aan;
+  if(v){ v.setAttribute('aria-invalid', aan?'true':'false'); if(aan){ try{ v.focus(); }catch(_){} } }
+}
+
+// De logregel van een afronding, als één bron voor de losse weg (doCompleteTask) én bulk.
+// Vorm sinds v12.8:
+//   veld (E)         = ''                      ← leeg, want renderTaskHistory tekent zijn
+//                                                'oud → nieuw'-regel alleen bij een gevuld veld,
+//                                                en 'status: Nog Te Doen → Afgerond op …' is een
+//                                                pijl tussen twee dingen die geen voor en na zijn
+//   oudeWaarde (F)   = 'Afgerond op <datum>'   ← machineleesbaar; hier hangt afrondOpmerking aan
+//   nieuweWaarde (G) = de opmerking            ← puur mensentekst, zodat hij als .log-note kan
+// Daarvóór stonden machinetekst en mensentekst door elkaar in kolom G, en dat is precies wat
+// die cel onbruikbaar maakte als notitie op het scherm.
+export function afrondLogRegel(code, sec, datum, opmerking){
+  return { code, sec, actie:'Afgerond', veld:'',
+           oudeWaarde:'Afgerond op '+datum, nieuweWaarde:(opmerking||'').trim() };
+}
+
+// Is er iets ingevuld bij 'Hoe staat het er nu voor?' Puur, want dit is de regel waar het hele
+// venster om draait en de bulkweg gebruikt hem ook.
+export const afrondInvoerOk = tekst => !!String(tekst||'').trim();
 
 // Rijwaarden voor een afgeronde taak. Puur, dus los testbaar — en één bron voor zowel de
 // modal-flow (doCompleteTask) als bulk-afronden, zodat die twee niet uiteen kunnen lopen.
@@ -1269,6 +1310,10 @@ async function doCompleteTask(){
   // zou afronden. Bewust niet vóór ensureToken: een hangende/geblokkeerde OAuth-popup
   // zou de vlag dan eeuwig op true laten staan; een tweede klik is daar juist een
   // legitieme herkansing.
+  // Ná blokkeerOffline en ensureToken, en dat is de vaste poortvolgorde van dit project (zie
+  // bulk.js en submitTask). Andersom typ je eerst een zin en hoor je pás daarna dat er niets
+  // weggeschreven kan worden.
+  if(!afrondInvoerOk(comment)){ toonAfrondFout(true); return; }
   if(state._completeBusy) return;
   state._completeBusy=true;
   try{
@@ -1353,8 +1398,13 @@ async function doCompleteTask(){
           // vólgende schrijfactie in de wachtrij op het juiste anker uitkomt. Bij een mislukking
           // gebeurt er niets en hoeft de rollback dus ook niets terug te draaien.
           _shiftAfRows(afRij,+1);
+          // BINNEN de vlag, niet eronder: `backgroundWrite` draait deze writeFn via `_withRetry`
+          // tot drie keer bij een 429/5xx. Eronder zou elke herkansing een tweede logregel
+          // schrijven — vroeger was dat ruis, maar sinds die regel de zichtbare mensentekst
+          // draagt is het een dubbele afrondnotitie in de tijdlijn én in de dossierteller.
+          const lg = afrondLogRegel(r.code, sec, today, comment);
+          await logEvent(lg.code, lg.sec, lg.actie, lg.veld, lg.oudeWaarde, lg.nieuweWaarde);
         }
-        await logEvent(r.code, sec, 'Afgerond', 'status', 'Nog Te Doen', 'Afgerond op ' + today + (comment ? ' — ' + comment : ''));
       },
       ()=>{ const a=(D.ntd[sec]=D.ntd[sec]||[]); if(rijIndex(a, r)===-1){ _herstelShift(_shiftNtdRows,r._row); a.splice(Math.min(pos<0?a.length:pos,a.length),0,r); } },
       'Afronden mislukt'

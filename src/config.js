@@ -7,6 +7,13 @@ import { ALLOWED_EMAILS } from '../allowed-emails.js';
 // Ophogen bij ELKE wijziging: 4.1, 4.2, … 5.0 voor grote sprongen.
 export const APP_VERSION = '12.7';
 
+// Snelkeuzes in het afrondvenster. Sinds v12.8 is de opmerking verplicht, en zonder deze
+// knoppen zou dat betekenen dat je bij elke afronding een zin moet typen. Hier en niet in de
+// HTML: het bulk-venster gebruikt dezelfde lijst plus BULK_AFROND_SNELKEUZE, en twee
+// handgeschreven kopieën lopen uiteen.
+export const AFROND_SNELKEUZES = ['Uitgevoerd en akkoord','Doorgezet naar aannemer','Vervallen','Bestuur geïnformeerd'];
+export const BULK_AFROND_SNELKEUZE = 'Opgeruimd';
+
 // ── Omgeving (productie vs. testomgeving) ──────────────────────────────
 // Fail-safe: alleen deze exacte hosts zijn PRODUCTIE; al het andere
 // (staging-branch, andere previews, localhost) draait op de TEST-data.

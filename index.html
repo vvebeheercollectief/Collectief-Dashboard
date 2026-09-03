@@ -687,7 +687,18 @@
     </div>
     <div class="modal-body">
       <div class="fld"><label>Afgerond op</label><input type="date" id="complete-date"/></div>
-      <div class="fld"><label>Opmerking</label><textarea id="complete-comment" rows="3" placeholder="Optioneel — wat is er gedaan?"></textarea></div>
+      <!-- Verplicht sinds v12.8. De knop 'Afhandelen' blijft bewust klikbaar: er bestaat geen
+           .btn:disabled-opmaak (een uitgeschakelde knop ziet er identiek uit en zwijgt bij een
+           klik), en modal-a11y.js filtert `button:not([disabled])` — een disabled knop valt dus
+           volledig uit de focusval van het venster. In plaats daarvan springt de cursor in het
+           veld met een zichtbare én hoorbare melding. -->
+      <div class="fld">
+        <label for="complete-comment">Hoe staat het er nu voor? <span class="fld-req">verplicht</span></label>
+        <div class="snelkeuze" id="complete-snel"></div>
+        <textarea id="complete-comment" rows="3" aria-describedby="complete-comment-fout"
+                  placeholder="Bijvoorbeeld: dakgoot vervangen, factuur akkoord bestuur"></textarea>
+        <p class="veld-fout" id="complete-comment-fout" hidden>Vul eerst kort in hoe het er nu voor staat.</p>
+      </div>
       <!-- Duur: bewust GEEN voorgeselecteerde knop. Een voorselectie die meegeschreven wordt
            geeft elke taak een verzonnen half uur, en dan meet je je eigen aanname. -->
       <div class="fld">

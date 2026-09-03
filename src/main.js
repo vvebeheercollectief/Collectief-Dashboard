@@ -18,7 +18,7 @@ import {
   subscribeNotifs, unsubscribeNotifs, sendTestNotif, getCurrentWho, initMeldingen,
 } from './notifications.js';
 import {
-  openModal, closeModal, submitTask, doCompleteTask, closeCompleteModal, kiesSectie, renderExtraVves, _bewerkRijVers, nietOpgeslagenVelden, kiesDuur,
+  openModal, closeModal, submitTask, doCompleteTask, closeCompleteModal, kiesSectie, renderExtraVves, _bewerkRijVers, nietOpgeslagenVelden, kiesDuur, afrondInvoerOk,
 } from './crud.js';
 import { loadAll, magPollen, schrijfActieLoopt, setSyncOffline, showOfflineBanner, clearOfflineBanner, laadUitCache } from './data.js';
 import { initActions } from './actions.js';
@@ -385,7 +385,18 @@ document.addEventListener('DOMContentLoaded',()=>{
   });
   let _compMouseDown=null;
   document.getElementById('complete-bg').addEventListener('mousedown',e=>{_compMouseDown=e.target});
-  document.getElementById('complete-bg').addEventListener('click',e=>{if(e.target.id==='complete-bg'&&_compMouseDown?.id==='complete-bg')closeCompleteModal()});
+  document.getElementById('complete-bg').addEventListener('click',e=>{
+    if(e.target.id!=='complete-bg'||_compMouseDown?.id!=='complete-bg') return;
+    // Niet sluiten als er tekst staat. Sinds de opmerking verplicht is, is dit de enige
+    // TOEVALLIGE weg naar tekstverlies; het kruisje, Annuleren en Escape blijven wél sluiten,
+    // want dat zijn expliciete daden.
+    // Bewust GEEN concept-bewaring als alternatief: elke sleutel daarvoor botst. `code` is de
+    // VvE-code en niet uniek, en `_row` schuift mee met `_shiftNtdRows` terwijl een bewaarde
+    // sleutel bevroren is — twee taken van dezelfde VvE met één afronding ertussen zouden dan
+    // elkaars concept krijgen.
+    if(afrondInvoerOk(document.getElementById('complete-comment')?.value)) return;
+    closeCompleteModal();
+  });
 
   // VvE autocomplete (gedeeld component; gedrag identiek: ≥2 tekens, max 8)
   initVveZoekveld({

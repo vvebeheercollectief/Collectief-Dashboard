@@ -4,7 +4,7 @@
 import { taakTitel, taakVerwijzing, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, stilDrempel, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, subBadge, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel, kiesAfgerondRij, filt, splitBehandelaar, korteNaam, persBadges, taakActieKnoppen, voorgesteldeDeadline, DEADLINE_VOORSTEL, DEADLINE_HINT, periodeBereik, AF_PERIODES, duurUitCel, duurNaarCel, offerteAangevraagd, teLaatVoorTelling } from "./util.js";
 import { verwerkMeldingRijen, toonMeldingen, MAX_TOAST_BURST, _whoSleutel, getCurrentWho, undoDelete } from "./notifications.js";
 import { logZin, logZinPlat, logPaginaSoort, afrondOpmerking, logBewerkbaar, logRegelZichtbaar, logZoekTekst, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek, logEvents, renderOntw, openOntwModal, closeOntwModal, submitOntwItem, _logRegelSleutel, _ontwSleutel, addTaskNote } from "./render-overig.js";
-import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM, VELD_LABELS } from "./config.js";
+import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM, VELD_LABELS, AFROND_SNELKEUZES, BULK_AFROND_SNELKEUZE } from "./config.js";
 import { maandagVan, isoWeekJaar, weekDagen, weekPeriodeLabel, parseWeekPeriode, weekOpties, weekAfstand } from "./util.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
@@ -20,7 +20,7 @@ import { sheetsFetch, NTD_OMSCHRIJVING, _isTransient, _rowMismatch, _a1Bereik, _
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, serieleWrite, POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, showLoadError, clearLoadError, syncSelecteerStand, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
-import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _eindKolom, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, getAfInsertRow, OMSCHRIJVING_VELD, zetOmschrijving, _sheetBreedtes, getSheetIds, bevestigInvoegPlek, _naamBijCode, _zetNaamVeld, taakUitCache, kiesSectie, deleteTaskRow, deleteCurrentEditTask, completeCurrentEditTask, renderExtraVves, toonMeerVve, zetDeadlineVoorstel, herzieAlsSubtaak, kiesDuur, gekozenDuur, wisDuurKeuze, nietOpgeslagenVelden, offerteAanvraagGewijzigd } from "./crud.js";
+import { setv, serializeNtdUndo, afrondWaarden, afrondLogRegel, afrondInvoerOk, toevoegWaarden, _eindKolom, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, getAfInsertRow, OMSCHRIJVING_VELD, zetOmschrijving, _sheetBreedtes, getSheetIds, bevestigInvoegPlek, _naamBijCode, _zetNaamVeld, taakUitCache, kiesSectie, deleteTaskRow, deleteCurrentEditTask, completeCurrentEditTask, renderExtraVves, toonMeerVve, zetDeadlineVoorstel, herzieAlsSubtaak, kiesDuur, gekozenDuur, wisDuurKeuze, nietOpgeslagenVelden, offerteAanvraagGewijzigd } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages, renderChat } from "./dossier-chat.js";
 import { shouldPromptReload, maakHerlaadKern, zelfdeWorker } from "./sw-update.js";
@@ -942,6 +942,62 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
      dossierFeed([{actie:'Kenmerk', veld:'Dak', code:'X', timestamp:'2026-09-03T10:00:00Z',
                    gebruiker:'info@vvebeheercollectief.nl', _row:9}])
        .includes('data-action="log-verwijderen"'));
+
+  // ── afrondLogRegel ── (één bron voor de losse weg én bulk, zodat de vorm niet op twee plekken
+  //    met de hand staat en afrondOpmerking beide altijd terugvindt)
+  const _alr=afrondLogRegel('311129','OPPAKKEN','03-09-2026','Dak hersteld');
+  eq('afrondLogRegel: veld leeg (anders tekent renderTaskHistory een zinloze pijl)', _alr.veld, '');
+  eq('afrondLogRegel: datum in oudeWaarde', _alr.oudeWaarde, 'Afgerond op 03-09-2026');
+  eq('afrondLogRegel: alleen de opmerking in nieuweWaarde', _alr.nieuweWaarde, 'Dak hersteld');
+  eq('afrondLogRegel: actie', _alr.actie, 'Afgerond');
+  eq('afrondLogRegel: trimt de opmerking', afrondLogRegel('X','OPPAKKEN','03-09-2026','  x  ').nieuweWaarde, 'x');
+  eq('afrondLogRegel: zonder opmerking leeg', afrondLogRegel('X','OPPAKKEN','03-09-2026').nieuweWaarde, '');
+  eq('rondgang afrondLogRegel → afrondOpmerking', afrondOpmerking(_alr), 'Dak hersteld');
+  // Het bulk-merkje verhuist naar kolom F, zodat een bulk herkenbaar blijft: logTijd toont alleen
+  // uu:mm, dus twee losse afrondingen in dezelfde minuut zijn er anders niet van te onderscheiden.
+  const _alrBulk=afrondLogRegel('X','OPPAKKEN','03-09-2026 (bulk)','Opgeruimd');
+  eq('afrondLogRegel bulk: merkje in kolom F', _alrBulk.oudeWaarde, 'Afgerond op 03-09-2026 (bulk)');
+  eq('afrondLogRegel bulk: alleen de opmerking in kolom G', _alrBulk.nieuweWaarde, 'Opgeruimd');
+  eq('rondgang bulk-logregel', afrondOpmerking(_alrBulk), 'Opgeruimd');
+
+  // ── Verplichte afrond-opmerking ──
+  eq('afrondInvoerOk weigert leeg', afrondInvoerOk(''), false);
+  eq('afrondInvoerOk weigert spaties', afrondInvoerOk('   '), false);
+  eq('afrondInvoerOk weigert niets', afrondInvoerOk(null), false);
+  truthy('afrondInvoerOk laat tekst door', afrondInvoerOk('Dak hersteld'));
+  eq('AFROND_SNELKEUZES: vier stuks', AFROND_SNELKEUZES.length, 4);
+  truthy('AFROND_SNELKEUZES bevat "Uitgevoerd en akkoord"', AFROND_SNELKEUZES.includes('Uitgevoerd en akkoord'));
+  eq('BULK_AFROND_SNELKEUZE', BULK_AFROND_SNELKEUZE, 'Opgeruimd');
+  (() => {
+    const bg=document.getElementById('complete-bg');
+    truthy('afrondvenster: het opmerkingveld heet "Hoe staat het er nu voor?"',
+       bg.innerHTML.includes('Hoe staat het er nu voor?'));
+    eq('afrondvenster: het woord optioneel staat niet meer bij de opmerking',
+       (document.getElementById('complete-comment').closest('.fld').textContent||'').includes('optioneel'), false);
+    // De knop mag NIET disabled zijn: er bestaat geen .btn:disabled-opmaak (hij zou er identiek
+    // uitzien, en een klik zou zwijgend niets doen) en modal-a11y.js filtert
+    // `button:not([disabled])`, waardoor hij uit de focusval van het venster valt.
+    eq('afrondvenster: Afhandelen is niet uitgeschakeld',
+       document.getElementById('complete-confirm').hasAttribute('disabled'), false);
+    truthy('afrondvenster: het veld verwijst naar zijn foutmelding',
+       document.getElementById('complete-comment').getAttribute('aria-describedby'));
+    truthy('afrondvenster: er is een plek voor de snelkeuzes', !!document.getElementById('complete-snel'));
+  })();
+  // BRONCODE-TOETSEN op doCompleteTask. Twee volgordes die er echt toe doen en die je niet aan
+  // een DOM-meting kunt afleiden.
+  (async () => {
+    const bron = await (await fetch('./src/crud.js', {cache:'no-store'})).text();
+    const i = bron.indexOf('async function doCompleteTask');
+    const o = bron.indexOf('blokkeerOffline()', i);
+    const v = bron.indexOf('afrondInvoerOk(', i);
+    truthy('doCompleteTask: de opmerking-controle staat ná blokkeerOffline (anders typ je eerst een zin en hoor je daarna pas dat je offline bent)',
+       o > -1 && v > o);
+    const vlag = bron.indexOf('if(!afgerond){', i);
+    const log  = bron.indexOf('afrondLogRegel(', vlag);
+    const eind = bron.indexOf("'Afronden mislukt'", vlag);
+    truthy('doCompleteTask: de logregel staat BINNEN de idempotentie-vlag (backgroundWrite draait de writeFn tot drie keer)',
+       vlag > -1 && log > vlag && log < eind);
+  })();
 
   // ── De chips op de Logboek-pagina ──
   (() => {
@@ -6466,6 +6522,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       knop30.click();                        // echte klik, geen kiesDuur(...) uit de hand
       eq('duur-meeschrijven: een klik op de 30m-knop zet hem echt aan', knop30.getAttribute('aria-pressed'), 'true');
       document.getElementById('complete-date').value='2026-08-14';
+      document.getElementById('complete-comment').value='Uitgevoerd en akkoord';   // verplicht sinds v12.8
       await doCompleteTask();
       await leeglopen();
       eq('duur-meeschrijven: geen onverwachte melding', alerts, []);
@@ -6478,10 +6535,37 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       await completeTask(0);                 // nieuw venster, niets aangeklikt
       eq('duur-meeschrijven: bij het openen staat er geen knop aan', aantalAan(), 0);
       document.getElementById('complete-date').value='2026-08-14';
+      document.getElementById('complete-comment').value='Uitgevoerd en akkoord';   // verplicht sinds v12.8
       await doCompleteTask();
       await leeglopen();
       eq('duur-meeschrijven: geen onverwachte melding (2)', alerts, []);
       eq('duur-meeschrijven: zonder keuze blijft kolom M leeg', afMWaarde(), '');
+
+      // ── 3. Zonder opmerking gebeurt er NIETS: geen batch, venster blijft open, veld gemarkeerd. ──
+      r=taak(7);
+      D.af=versLeeg(); D.ntd={ ...versLeeg(), OPPAKKEN:[r] };
+      state._rowCache=[r]; zetBlad(r); posts=[]; alerts=[];
+      await completeTask(0);
+      document.getElementById('complete-date').value='2026-08-14';
+      document.getElementById('complete-comment').value='   ';      // alleen spaties
+      await doCompleteTask();
+      eq('verplichte opmerking: er wordt niets weggeschreven', posts.length, 0);
+      truthy('verplichte opmerking: het venster blijft open',
+         document.getElementById('complete-bg').classList.contains('open'));
+      eq('verplichte opmerking: het veld is als fout gemarkeerd',
+         document.getElementById('complete-comment').getAttribute('aria-invalid'), 'true');
+      eq('verplichte opmerking: de melding staat in beeld',
+         document.getElementById('complete-comment-fout').hidden, false);
+      eq('verplichte opmerking: geen alert() — de melding staat bij het veld', alerts, []);
+      // En daarna mét tekst: dan gaat het gewoon door.
+      document.getElementById('complete-comment').value='Vervallen';
+      await doCompleteTask();
+      await leeglopen();
+      truthy('verplichte opmerking: mét tekst wordt er wél geschreven', posts.length > 0);
+      eq('verplichte opmerking: de tekst staat op kolom J van de archiefrij',
+         (posts.find(p=>p.url.includes('batchUpdate'))?.body?.requests?.find(x=>x.updateCells)
+            ?.updateCells.rows[0].values[9].userEnteredValue.stringValue), 'Vervallen');
+      document.getElementById('complete-comment').value='';
 
       // ── 3. Het OPENEN wist een eerder gekozen duur — niet het sluiten. ──
       let r3=taak(7);

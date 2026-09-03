@@ -1996,3 +1996,18 @@ td>.stapel-h{margin-right:9px}
    rowNtd tekent chevron én handvat op dezelfde `_bw.stapel`-vlag, en op de dossierpagina bestaat de
    chevron niet. */
 .stapel-h+.bdl-chev{margin-left:0}
+
+    /* ── Verplichte afrond-opmerking (v12.8) ────────────────────────────────────────────────
+       De knop 'Afhandelen' wordt bewust niet `disabled`: er is geen .btn:disabled-opmaak (hij
+       zou er identiek uitzien en bij een klik zwijgen) en modal-a11y.js filtert
+       `button:not([disabled])`, waardoor een uitgeschakelde knop volledig uit de focusval van
+       het venster valt. De terugkoppeling zit daarom in het veld zelf. */
+    .fld-req{margin-left:7px;font-family:var(--font-mono);font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--rd);background:var(--rd-l);border:1px solid var(--rd-b);padding:1px 5px;border-radius:3px;vertical-align:1px}
+    .snelkeuze{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:7px}
+    /* Streepjesrand en geen `.soort-chip`: die heeft elders een blijvende `.aan`-stand, en wie
+       die kent klikt hier twee keer omdat er niets aan blijft staan. Dit is een invoeg-actie. */
+    .snel-knop{font-size:11.5px;font-weight:600;padding:4px 9px;border-radius:999px;border:1px dashed var(--bor-input);background:var(--sur);color:var(--mut);cursor:pointer;transition:var(--tr)}
+    .snel-knop:hover{border-style:solid;border-color:var(--ac);color:var(--ac);background:var(--ac-l)}
+    .snel-knop:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+    .veld-fout{margin:5px 0 0;font-size:12px;font-weight:600;color:var(--rd)}
+    textarea[aria-invalid="true"]{border-color:var(--rd);box-shadow:0 0 0 3px var(--rd-l)}

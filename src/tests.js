@@ -1187,9 +1187,35 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   })();
 
   // ── De schakelaar ──
-  truthy('schakelaar Per VvE staat in de filterbalk', !!document.getElementById('pervve-btn'));
-  eq('schakelaar heeft aria-pressed',
-     document.getElementById('pervve-btn').hasAttribute('aria-pressed'), true);
+  // Hij staat in de KOP-PILLENRIJ en NIET in de filterbalk. Gemeten op 1920: die balk houdt naast
+  // de tabbladen 42px over en de knop kostte er 103, waardoor de kop naar twee regels brak —
+  // precies de dubbele regel die v11.7/v11.8 heeft weggehaald.
+  (() => {
+    const was=state.ntdPerVve;
+    state.ntdPerVve=true; renderNtdStats();
+    const pil=document.querySelector('#ntd-kop-pillen [data-action="pervve-toggle"]');
+    truthy('schakelaar Per VvE staat in de kop-pillenrij', !!pil);
+    eq('schakelaar staat NIET in de filterbalk',
+       !!document.querySelector('.filter-bar [data-action="pervve-toggle"]'), false);
+    eq('schakelaar heeft aria-pressed', pil && pil.getAttribute('aria-pressed'), 'true');
+    truthy('schakelaar toont zijn aan-stand', pil && pil.classList.contains('aan'));
+    state.ntdPerVve=false; renderNtdStats();
+    const uit=document.querySelector('#ntd-kop-pillen [data-action="pervve-toggle"]');
+    eq('schakelaar uit', uit && uit.getAttribute('aria-pressed'), 'false');
+    state.ntdPerVve=was; renderNtdStats();
+  })();
+  // GEOMETRIE-TOETS. Een toets die alleen kijkt óf de knop bestaat had deze regressie niet
+  // gevangen: de knop was er, hij duwde alleen de halve balk naar een tweede regel. Dit meet de
+  // echte hoogte van de kaartkop, en die hoort de hoogte van één rij te zijn.
+  (() => {
+    const hdr=document.querySelector('#ntd-card .hdr-tabs');
+    const tabs=hdr && hdr.querySelector('.tabs');
+    const bar=hdr && hdr.querySelector('.filter-bar');
+    if(!hdr||!tabs||!bar){ truthy('kopbalk: elementen aanwezig', false); return; }
+    const t=tabs.getBoundingClientRect(), b=bar.getBoundingClientRect();
+    truthy(`kopbalk: tabbladen en filters staan op ÉÉN regel (tabs top ${Math.round(t.top)}, filters top ${Math.round(b.top)})`,
+       Math.abs(t.top-b.top) < 12);
+  })();
   (() => {
     const wasP=state.ntdPerVve, wasS=state.ntdSort;
     state.ntdPerVve=true; state.ntdSort={key:null,asc:true};
@@ -5845,8 +5871,12 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
 
       const host = document.getElementById('ntd-kop-pillen');
       truthy('kop-pillen container bestaat', !!host);
-      eq('vier pillen in de kop', host.querySelectorAll('.kop-pil').length, 4);
-      eq('twee pillen zijn knoppen', host.querySelectorAll('button.kop-pil').length, 2);
+      // Vijf sinds v12.8: open · te laat · weggelegd · af · Per VvE. Die laatste kwam hierheen
+      // omdat de filterbalk naast de tabbladen nog maar 42px over had (gemeten op 1920) en de
+      // knop er 103 kostte — de kaartkop brak daardoor naar twee regels.
+      eq('vijf pillen in de kop', host.querySelectorAll('.kop-pil').length, 5);
+      eq('drie pillen zijn knoppen', host.querySelectorAll('button.kop-pil').length, 3);
+      truthy('de Per VvE-pil hoort erbij', !!host.querySelector('[data-action="pervve-toggle"]'));
 
       const pil = s => host.querySelector(`[data-action="ntd-stat"][data-status="${s}"]`);
       truthy('pil te laat bestaat',    !!pil('telaat'));

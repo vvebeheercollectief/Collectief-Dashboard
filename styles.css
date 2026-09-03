@@ -2041,7 +2041,9 @@ td>.stapel-h{margin-right:9px}
     .grp-nm{font-size:12.5px;font-weight:700;color:var(--txt);text-transform:none;letter-spacing:0}
     .grp-ct{font-size:11px;font-weight:600;color:var(--mut);text-transform:none;letter-spacing:0}
     .grp-w{font-size:10.5px;font-weight:700;color:var(--sig-crit);background:var(--rd-l);border:1px solid var(--rd-b);padding:1px 6px;border-radius:999px;text-transform:none;letter-spacing:0}
-    /* Aan-stand van de knop in de filterbalk, en de gedempte stand als kolomkop-sortering hem
-       tijdelijk overneemt. */
-    #pervve-btn.on{border-color:var(--ac);color:var(--ac);background:var(--ac-l)}
-    #pervve-btn.gedempt{opacity:.55}
+    /* 'Per VvE' als pil in de kop, naast 'te laat' en 'weggelegd'. Leiblauw i.p.v. rood/amber:
+       die twee zijn signalen, dit is een manier van kijken. Gedempt zodra kolomkop-sortering de
+       groepering tijdelijk overneemt — anders lijkt de pil stuk. */
+    .kop-pil-klik.pil-vve{border-color:var(--ac-b)}
+    .kop-pil-klik.aan.pil-vve{background:var(--ac);border-color:var(--ac);color:#fff}
+    .kop-pil-klik.pil-vve.gedempt{opacity:.5}

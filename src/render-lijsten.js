@@ -57,11 +57,23 @@ function renderNtdStats(){
   const paneelOpen=kopOpen();
   const chev=`<button type="button" class="kop-chev" data-action="ntd-kop-toggle" aria-expanded="${paneelOpen}" aria-controls="ntd-top-row" aria-label="${paneelOpen?'Details verbergen':'Week en vergaderingen tonen'}" title="${paneelOpen?'Details verbergen':'Week en vergaderingen tonen'}">${CHEV_SVG}</button>`;
 
+  // 'Per VvE' staat HIER en niet in de filterbalk. Gemeten op een venster van 1920: die balk
+  // houdt naast de tabbladen nog 42px over, en de knop kostte er 103 — de kop brak daardoor naar
+  // twee regels, precies de dubbele regel die v11.7/v11.8 heeft weggehaald. Ook een knop met
+  // alleen een pictogram (±48px) past daar niet meer. Deze rij heeft ruimte zat, en 'te laat' en
+  // 'weggelegd' staan er al als aan/uit-knop: dit hoort in datzelfde rijtje.
+  const pv=!!state.ntdPerVve, pvActief=perVveActief();
+  const pervve=`<button type="button" class="kop-pil kop-pil-klik pil-vve${pv?' aan':''}${pv&&!pvActief?' gedempt':''}" `+
+    `data-action="pervve-toggle" aria-pressed="${pv}" `+
+    `title="${pv&&!pvActief?'Staat uit zolang er op een kolomkop gesorteerd wordt'
+              :pv?'Groepering uitzetten':'Taken van dezelfde VvE bij elkaar zetten'}">Per VvE</button>`;
+
   host.innerHTML=
     plat(open,'open')+
     knop(telaat,'te laat','pil-rd','telaat')+
     knop(weg,'weggelegd','pil-am','weggelegd')+
     plat(afVandaag,'af','pil-dof')+
+    pervve+
     chev;
 
   renderNtdWeek();
@@ -389,9 +401,6 @@ function renderNtd(){
     ? groepeerPerBlok(zichtbaar, r => opvolgStatus(r).weggelegd ? 2 : (r.inBehandeling==='TRUE' ? 1 : 0))
     : { rijen: zichtbaar, koppen: new Map(), hoort: [] };
   renderTbody('ntd-tbody',grp.rijen,state.activeNtd,pgs.ntd,false,erIsGefilterd(filters),grp);
-  // De knop dempt zodra kolomkop-sortering de groepering overneemt; die stand hangt dus aan
-  // elke hertekening en niet alleen aan de klik op de knop zelf.
-  zetPerVveKnop();
   // Dezelfde lijst die hierboven over de pagina's verdeeld is, ook op state — daar leest
   // 'alles selecteren' hem. Bewust hier en niet in `renderTbody`: die krijgt alleen de rijen van
   // ÉÉN pagina, en 'alles' moet juist over de paginagrens heen gaan.
@@ -557,23 +566,6 @@ function perVveActief(){
   return !!state.ntdPerVve && !(state.ntdSort && state.ntdSort.key);
 }
 
-// De stand van de knop 'Per VvE' op het scherm zetten. Apart van de actie, want main.js roept
-// hem bij het opstarten ook aan (de stand komt uit localStorage) — zelfde patroon als
-// `applyDensity` in ui.js.
-//
-// De knop wordt GEDEMPT zodra er op een kolomkop gesorteerd wordt: de stand blijft dan aan, maar
-// de groepering staat uit (zie perVveActief). Zonder die aanwijzing lijkt de knop stuk.
-function zetPerVveKnop(){
-  const b=document.getElementById('pervve-btn'); if(!b) return;
-  const aan=!!state.ntdPerVve, actief=perVveActief();
-  b.setAttribute('aria-pressed', aan?'true':'false');
-  b.classList.toggle('on', aan);
-  b.classList.toggle('gedempt', aan && !actief);
-  b.title = aan && !actief
-    ? 'Staat uit zolang er op een kolomkop gesorteerd wordt'
-    : 'Taken van dezelfde VvE bij elkaar zetten';
-}
-
 // Welke kolomkoppen zijn sorteerbaar? 'VvE Code' → code; elke 'Deadline…'-kop → deadline.
 function ntdSorteerKey(lbl){
   return lbl==='VvE Code' ? 'code' : (String(lbl).startsWith('Deadline') ? 'deadline' : null);
@@ -694,7 +686,7 @@ export {
   renderNtdStats, renderNtdDonut, renderNtd, setNtd, ntdPagina, filterNtd, sorteerNtd, ntdSorteerKey, renderAf, setAf,
   filterAf, afFilterWaarden, vulPeriodeKeuze,
   kopOpen, zetKopOpen, toggleBundel, springNaarBundel, wisNtdFilters, absorbeer, isPlatteWeergave, erIsGefilterd,
-  perVveActief, zetPerVveKnop,
+  perVveActief,
   offerteAannemerPaneel, offerteAannSamenvatting,
   ALVO_ICONS, renderAlvo, ALVO_COLS, ALVO_LABELS, flagPill, _recomputeAlvoStatus, toggleAlvoFlag, statusIco, renderAlfa,
   renderThead, renderTbody, bepaalStil, bouwStilIndex, _zetStilIndex, deadlineCel, rowNtd, rowAf, renderPag,

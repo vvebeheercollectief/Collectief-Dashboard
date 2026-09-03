@@ -7,7 +7,7 @@ import { verseRij } from "./rij.js";
 import { ensureToken, doOAuth } from './auth.js';
 import { startSplash } from './login-splash.js';
 import { goTo, syncKop, closeSb, applyTheme, applyDensity, cycleDensity, setupSearch } from './ui.js';
-import { renderNtd, renderAf, renderAlvo, renderAlfa, renderNtdStats, zetKopOpen, kopOpen, zetPerVveKnop } from './render-lijsten.js';
+import { renderNtd, renderAf, renderAlvo, renderAlfa, renderNtdStats, zetKopOpen, kopOpen } from './render-lijsten.js';
 import {
   renderOntw, renderLogboek, openOntwModal, closeOntwModal,
   submitOntwItem, deleteOntwItem, histNoteKey,
@@ -129,7 +129,6 @@ document.addEventListener('DOMContentLoaded',()=>{
   // afgeschermde context (privé-venster met geblokkeerde opslag) gooit localStorage; dan blijft
   // hij gewoon uit staan.
   try{ state.ntdPerVve = localStorage.getItem('ntdPerVve')==='1'; }catch(_){}
-  zetPerVveKnop();
 
   // Zichtbaar versienummer overal gelijk zetten (één bron: APP_VERSION)
   document.querySelectorAll('#app-version, #app-version-login, #app-version-splash').forEach(el => el.textContent = APP_VERSION);

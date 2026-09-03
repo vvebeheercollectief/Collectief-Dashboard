@@ -6,7 +6,7 @@ import { pgs, state, D } from './state.js';
 import { bouwBundelIndex, zichtbareKop, volgendeVolg, bundelSleutel } from './bundel.js';
 import {
   setNtd, renderNtd, renderNtdStats, setAf, renderAf, renderAlvo, toggleAlvoFlag, renderAlfa,
-  kopOpen, zetKopOpen, toggleBundel, springNaarBundel, zetPerVveKnop,
+  kopOpen, zetKopOpen, toggleBundel, springNaarBundel,
 } from './render-lijsten.js';
 import {
   setOntw, renderOntw, editOntwItem, addTaskNote, renderLogboek,
@@ -39,7 +39,9 @@ export const ACTIONS = {
   'pervve-toggle':         () => {
     state.ntdPerVve = !state.ntdPerVve;
     try{ localStorage.setItem('ntdPerVve', state.ntdPerVve?'1':'0'); }catch(_){}
-    zetPerVveKnop();
+    // Ook de statregel opnieuw: de pil ZIT daarin, dus zonder dit blijft hij op zijn oude stand
+    // staan terwijl de lijst al gegroepeerd is.
+    renderNtdStats();
     renderNtd();
   },
   // Snelkeuze in het afrondvenster: vult het veld en laat het bewerkbaar. Eén actie voor beide

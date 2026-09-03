@@ -30,6 +30,7 @@ def hoofd():
     p.add_argument('--breed', type=int, default=1440)
     p.add_argument('--hoog', type=int, default=900)
     p.add_argument('--wacht', type=float, default=3.0, help='Seconden laten laden vóór de meting.')
+    p.add_argument('--schermafdruk', help='Sla een PNG van de pagina op onder dit pad (ná de JS).')
     args = p.parse_args()
 
     uitdrukking = args.js
@@ -80,6 +81,16 @@ def hoofd():
             return 1
         waarde = r.get('result', {}).get('value')
         print(json.dumps(waarde, indent=2, ensure_ascii=False) if not isinstance(waarde, str) else waarde)
+        if args.schermafdruk:
+            # Ná de JS: die zet de pagina eerst in de stand die je wilt zien (login-gate weg,
+            # rijen erin). Een screenshot dwingt bovendien een echte tekening af — zonder dat
+            # blijven getransitioneerde eigenschappen in headless op hun oude waarde staan.
+            import base64 as _b64, time as _t
+            _t.sleep(0.6)
+            beeld = ws.roep('Page.captureScreenshot', {'format': 'png', 'captureBeyondViewport': True})
+            with open(args.schermafdruk, 'wb') as f:
+                f.write(_b64.b64decode(beeld['data']))
+            print('schermafdruk: ' + args.schermafdruk, file=sys.stderr)
         return 0
     finally:
         if ws: ws.sluit()

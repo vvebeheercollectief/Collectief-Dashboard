@@ -485,11 +485,14 @@ function logItemHtml(r,subtiel,acties,opts){
     const tekst=(r.actie==='Opmerking'||r.actie==='Contact') ? opmaakHtml(eigen) : esc(eigen);
     inhoud=`${chip}${met}${tekst}`;
   } else {
-    // Geen eigen tekst (een teruggezette taak, of in het dossier de stand 'Alles'): dan is de zin
-    // zelf de inhoud, gedempt. Zonder naam — die staat rechts.
-    inhoud=logZin(r,{...(opts||{}),zonderNaam:true});
+    // Geen eigen tekst (een teruggezette taak, of in het dossier de stand 'Alles'): dan is de ZIN
+    // de inhoud, gedempt. Hier houdt de zin zijn onderwerp — 'zette 311059 terug' zonder naam
+    // leest krom — en rechts blijft alleen de tijd staan, anders staat de naam er twee keer.
+    inhoud=logZin(r,opts);
     dof=true;
   }
+  const rechts=dof ? esc(logTijd(r.timestamp))
+                   : `${esc(displayName(r.gebruiker)||'?')} · ${esc(logTijd(r.timestamp))}`;
   const acts=magActies?`<span class="log-acts">
     ${magBewerken?`<button class="log-act-btn" data-action="log-bewerken" data-row="${r._row}" title="Bewerken" aria-label="Regel bewerken">${ico('potlood')}</button>`:''}
     <button class="log-act-btn del" data-action="log-verwijderen" data-row="${r._row}" title="Verwijderen" aria-label="Regel verwijderen">${ico('prullenbak')}</button>
@@ -497,7 +500,7 @@ function logItemHtml(r,subtiel,acties,opts){
   return `<div class="log-r${dof?' dof':''}">
     <span class="log-ic" style="color:${logKleur(r.actie)}" aria-hidden="true">${ico(logIcoon(r),13)}</span>
     <div class="log-tx">${inhoud}</div>
-    <span class="log-wie">${esc(displayName(r.gebruiker)||'?')} · ${esc(logTijd(r.timestamp))}</span>
+    <span class="log-wie">${rechts}</span>
     ${acts}
   </div>`;
 }

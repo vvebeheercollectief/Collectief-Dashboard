@@ -460,6 +460,7 @@ function rowNtd(r,sec){
         <td>${faseRijHtml(r.subsidieFase, rid)}</td>
         <td>${persBadges(r.behandelaar)}</td>
         ${deadlineCel(r, 'SUBSIDIE-TRAJECTEN')}
+        <td class="cell-note"><span class="ct" title="${esc(r.opmerkingen||'')}">${esc(r.opmerkingen||'')}</span></td>
         <td>${editBtn}</td>`;
       break;
   }

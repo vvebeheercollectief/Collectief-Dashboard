@@ -2047,3 +2047,31 @@ td>.stapel-h{margin-right:9px}
     .kop-pil-klik.pil-vve{border-color:var(--ac-b)}
     .kop-pil-klik.aan.pil-vve{background:var(--ac);border-color:var(--ac);color:#fff}
     .kop-pil-klik.pil-vve.gedempt{opacity:.5}
+
+    /* ── Compacte logregel (v12.9) ──────────────────────────────────────────────────────────
+       Vervangt .log-item (avatar 32px + zin + notitie eronder, ~64px) en .log-mini. De regel die
+       de gebruiker als vervuiling aanwees — 'Jer rondde 311199 af' — was er nog steeds, alleen
+       groter geworden. Nu is de OPMERKING de inhoud, zegt het pictogram wat er gebeurde en staat
+       wie het deed rechts op dezelfde regel. Gemeten: ~30px in plaats van ~64. */
+    .log-r{display:flex;gap:10px;align-items:baseline;padding:6px 10px;border-radius:8px;
+           transition:background var(--tr);position:relative}
+    .log-r:hover{background:var(--sur2)}
+    .log-ic{flex:none;width:16px;display:inline-flex;align-items:center;justify-content:center;
+            position:relative;top:2px}
+    .log-ic svg{display:block}
+    .log-tx{flex:1;min-width:0;font-size:13px;line-height:1.5;color:var(--txt);
+            white-space:pre-wrap;word-break:break-word}
+    /* De code-chip en het 'met wie' van een contactmoment lopen mee in de tekstregel. */
+    .log-tx>.code{margin-right:6px;vertical-align:1px}
+    .log-met{color:var(--mut);margin-right:6px}
+    .log-met::after{content:'·';margin-left:6px;color:var(--fnt)}
+    /* Gedempt: een regel zónder eigen tekst (een teruggezette taak, of in het dossier de stand
+       'Alles'). Die hoort er te staan, maar niet te schreeuwen. */
+    .log-r.dof .log-tx{color:var(--mut);font-size:12.5px}
+    .log-wie{flex:none;font-size:11.5px;color:var(--mut);white-space:nowrap;font-variant-numeric:tabular-nums}
+    .log-r .log-acts{align-items:center}
+    .log-r:hover .log-acts{opacity:1}
+    /* Het geschiedenisblok in het bewerkscherm gebruikt dezelfde regel; alleen wat compacter. */
+    #hist-body .log-r{padding:4px 6px}
+    #hist-body .log-tx{font-size:12.5px}
+    .hist-veld{display:block;font-size:11px;color:var(--mut);margin-bottom:1px}

@@ -5,7 +5,7 @@ import { ALLOWED_EMAILS } from '../allowed-emails.js';
 
 // ── Versie (zichtbaar in de UI) ────────────────────────────────────────
 // Ophogen bij ELKE wijziging: 4.1, 4.2, … 5.0 voor grote sprongen.
-export const APP_VERSION = '12.8';
+export const APP_VERSION = '12.9';
 
 // Snelkeuzes in het afrondvenster. Sinds v12.8 is de opmerking verplicht, en zonder deze
 // knoppen zou dat betekenen dat je bij elke afronding een zin moet typen. Hier en niet in de
@@ -129,11 +129,19 @@ export const KORTE_NAMEN = {
 export const SECS = {
   OPPAKKEN:{label:'Oppakken',css:'--sec:var(--ac);--sec-l:var(--ac-l);--sec-b:var(--ac-b)',color:'#0D7377',
     cols:['VvE Code','VvE','Actiepunt','Deadline','Wie','Opmerkingen'],
-                   breedtes:['130px',27.3,38,'165px',7,27.7,'150px'],
+    // v12.9 — herverdeeld op GEMETEN inhoud. Eén regel: de kolom die AFKAPT krijgt de ruimte, de
+    // kolom die vaak leeg of kort is levert in. Bij tabel 1637: Actiepunt 453 -> 535 (kapte af,
+    // en dat IS de taak), Opmerkingen 330 -> 267 (leeg in 45 van de 54 rijen). 'Wie' wordt VAST:
+    // op 83px wikkelden twee ronde naamplaatjes naar een tweede regel; 76 = 46 badge + 30
+    // opvulling in de ruime stand.
+                   breedtes:['135px',26,44,'158px','76px',22,'150px'],
     keys:['code','naam','actiepunt','deadline','behandelaar','prioriteit','opmerkingen','inBehandeling']},
   VERGADERVERZOEKEN:{label:'Vergaderverzoeken',css:'--sec:var(--am);--sec-l:var(--am-l);--sec-b:var(--am-b)',color:'#AE5008',
     cols:['VvE Code','VvE','Periode','Agendapunten','Wie','Deadline uitschr.','Opmerkingen'],
-                   breedtes:['130px',26,19.1,23,7,'165px',21.1,'150px'],
+    // 'Periode' wordt VAST op 135px: de weekvorm ('wk 36' boven 'ma 31 aug – vr 4 sep') vraagt er
+    // 127, en verder groeien levert alleen wit op naast een waarde als 'Juni'. Gemeten bij tabel
+    // 1637: 237 -> 135, en die 102px gaan naar Agendapunten (285 -> 369), dat afkapte.
+                   breedtes:['135px',26,'135px',30,'76px','158px',24,'150px'],
     keys:['code','naam','periode','agendapunten','behandelaar','deadline','opmerkingen','inBehandeling']},
   'OFFERTE-TRAJECTEN':{label:'Offerte-trajecten',css:'--sec:var(--pu);--sec-l:var(--pu-l);--sec-b:var(--pu-b)',color:'#6855C9',
     // Koppen korter sinds v12.8. 'Aangevraagd' en niet 'Aangevr.': dat laatste is een deelstring
@@ -147,14 +155,19 @@ export const SECS = {
     // v12.8 de KORTE datum ('14 jul' i.p.v. '14 juli 2026').
     // Gemeten bij 1440: VvE 244 · Aangevraagd 130 · Offertes 167 · Wie 141 · Deadline 148 ·
     // Opmerkingen 360 (was 188). Bij 1150 houdt Opmerkingen er nog 245 over (was 124).
-                   breedtes:['130px',19,'130px',13,11,'148px',28,'120px'],
+    // v12.9: 'Offertes' en 'Wie' worden VAST. Het klikzone-argument hierboven is door v12.8 zelf
+    // achterhaald — sinds de hele cel de knop is (.of-aann-tog{width:100%}) hangt die zone niet
+    // meer aan wat er ná de teller overblijft. Vast is hij 145px op ELKE vensterbreedte, tegen
+    // 114 bij het smalste venster. 'Wie' krijgt 111px: dit tabblad toont de VOLLE naam
+    // ('Cihad, Jer' = 83px), niet de ronde initialen van Oppakken/Vergaderverzoeken/LOD.
+                   breedtes:['135px',24,'118px','145px','111px','158px',36,'120px'],
     // 'Offertes' verliest de uitleg die 'Ontvangen/Aangevr.' letterlijk gaf; die staat nu in de
     // zweeftekst van de kop (renderThead gaf die alleen aan sorteerbare koppen).
     kopUitleg:{'Offertes':'Ontvangen van aangevraagd'},
     keys:['code','naam','datumAangevraagd','offertes','behandelaar','deadline','opmerkingen']},
   LOD:{label:'LOD',css:'--sec:var(--rd);--sec-l:var(--rd-l);--sec-b:var(--rd-b)',color:'#B91C1C',
     cols:['VvE Code','VvE','Actiepunt','Status','Wie','Deadline LOD','Opmerkingen'],
-                   breedtes:['130px',24,29.7,20,7,'165px',25.6,'150px'],
+                   breedtes:['135px',24,34,22,'76px','158px',26,'150px'],
     keys:['code','naam','actiepunt','status','behandelaar','deadline','opmerkingen','inBehandeling']},
   // Subsidie-trajecten (2026-07-29). Zelfde kolomstramien als LOD, met 'Status'
   // vervangen door 'Fase'. Twee dingen liggen hier vast en mogen niet losjes wijzigen:
@@ -167,8 +180,12 @@ export const SECS = {
   // de gebruiker koos zes kolommen om de rij rustig te houden.
   'SUBSIDIE-TRAJECTEN':{label:'Subsidie-trajecten',css:'--sec:var(--tl);--sec-l:var(--tl-l);--sec-b:var(--tl-b)',color:'#0F766E',
     // 'Wie' i.p.v. 'Behandelaar' (v12.8): alle vijf de tabbladen dragen nu dezelfde kop.
-    cols:['VvE Code','VvE','Subsidie','Fase','Wie','Deadline'],
-                   breedtes:['130px',27.5,19,19,13.3,'165px','150px'],
+    // 'Opmerkingen' staat er sinds v12.9 WÉL bij. Met zes kolommen bleef er op een breed scherm
+    // ruimte over die nergens goed heen kon — twee lege vlakken in de rij. Het veld bestond al
+    // (kolom G) en werd alleen niet getoond. 'Fase' wordt vast op 187px: de bolletjesbalk heeft
+    // een min-width van 158 en liep bij 172 al 6px zijn eigen cel uit.
+    cols:['VvE Code','VvE','Subsidie','Fase','Wie','Deadline','Opmerkingen'],
+                   breedtes:['135px',26,24,'187px','111px','158px',30,'150px'],
     keys:['code','naam','subsidie','subsidieFase','behandelaar','deadline','opmerkingen','inBehandeling']},
 };
 

@@ -230,11 +230,24 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   // ── logItemHtml: de dunne (subtiele) regel gebruikt dezelfde zinnengenerator als de volle regel ──
   truthy('logItemHtml subtiel Aangevinkt geeft nette zin', logItemHtml({actie:'Aangevinkt', code:'TEST01', veld:'Notulen', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, false).includes('vinkte'));
   truthy('logItemHtml subtiel Aangevinkt is geen "maakte aan"', !logItemHtml({actie:'Aangevinkt', code:'TEST01', veld:'Notulen', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, false).includes('maakte'));
-  truthy('logItemHtml subtiel gebruikt log-mini', logItemHtml({actie:'Afgerond', code:'TEST01', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, false).includes('log-mini'));
+  truthy('logItemHtml gedempt gebruikt log-r.dof', logItemHtml({actie:'Afgerond', code:'TEST01', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, false).includes('log-r dof'));
   truthy('logItemHtml subtiel Afgerond zegt nog "rondde"', logItemHtml({actie:'Afgerond', code:'TEST01', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, false).includes('rondde'));
   truthy('logItemHtml subtiel met acties heeft verwijderknop', logItemHtml({actie:'Afgerond', code:'TEST01', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, true).includes('log-verwijderen'));
-  truthy('logItemHtml stip volgt werkwoordkleur (Uitgevinkt=amber)', logItemHtml({actie:'Uitgevinkt', code:'TEST01', veld:'Notulen', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, false).includes('background:var(--am)'));
-  truthy('logItemHtml stip Verwijderd is rood', logItemHtml({actie:'Verwijderd', code:'TEST01', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, false).includes('background:var(--rd)'));
+  // Sinds v12.9 draagt het PICTOGRAM de kleur (er is geen stip en geen avatar meer); de kleur
+  // komt nog steeds uit dezelfde LOG_KLEUR-tabel, zodat werkwoord en teken elkaar niet kunnen
+  // tegenspreken.
+  truthy('logItemHtml pictogram volgt werkwoordkleur (Uitgevinkt=amber)', logItemHtml({actie:'Uitgevinkt', code:'TEST01', veld:'Notulen', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, false).includes('color:var(--am)'));
+  truthy('logItemHtml pictogram Verwijderd is rood', logItemHtml({actie:'Verwijderd', code:'TEST01', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, false).includes('color:var(--rd)'));
+  // De compacte regel zet WIE het deed rechts, niet in de zin — anders staat de naam er twee keer.
+  (() => {
+    const h=logItemHtml({actie:'Afgerond', code:'TEST01', veld:'', oudeWaarde:'Afgerond op 03-09-2026',
+      nieuweWaarde:'Dak hersteld', timestamp:'2026-07-15T12:41:00Z',
+      gebruiker:'info@vvebeheercollectief.nl', _row:5}, false, false);
+    truthy('compacte regel: de opmerking is de inhoud', h.includes('Dak hersteld'));
+    truthy('compacte regel: wie het deed staat apart', h.includes('log-wie'));
+    eq('compacte regel: geen avatar meer', h.includes('log-av'), false);
+    eq('compacte regel: en niet de zin "rondde … af"', h.includes('rondde'), false);
+  })();
 
   // ── logPaginaSoort ── (welke logregels horen op de Logboek-pagina: notities/contact=normaal, afgerond/aangemaakt=subtiel, rest=ruis)
   // ── afrondOpmerking ── (twee vormen naast elkaar, want er wordt niet gemigreerd)
@@ -1205,16 +1218,31 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     state.ntdPerVve=was; renderNtdStats();
   })();
   // GEOMETRIE-TOETS. Een toets die alleen kijkt óf de knop bestaat had deze regressie niet
-  // gevangen: de knop was er, hij duwde alleen de halve balk naar een tweede regel. Dit meet de
-  // echte hoogte van de kaartkop, en die hoort de hoogte van één rij te zijn.
+  // gevangen: de knop wás er, hij duwde alleen de halve balk naar een tweede regel.
+  //
+  // LET OP de breedte-voorwaarde. Onder ±1850px zakt de filterbalk BEWUST naar een tweede regel —
+  // dat staat zo beschreven bij .hdr-tabs in styles.css en is het ontwerp, geen fout. Een toets
+  // die onvoorwaardelijk één regel eist is daarom zelf kapot; hij was hier eerst wél zo
+  // geschreven en viel om zodra de suite op 1440 draaide.
   (() => {
     const hdr=document.querySelector('#ntd-card .hdr-tabs');
     const tabs=hdr && hdr.querySelector('.tabs');
     const bar=hdr && hdr.querySelector('.filter-bar');
     if(!hdr||!tabs||!bar){ truthy('kopbalk: elementen aanwezig', false); return; }
     const t=tabs.getBoundingClientRect(), b=bar.getBoundingClientRect();
-    truthy(`kopbalk: tabbladen en filters staan op ÉÉN regel (tabs top ${Math.round(t.top)}, filters top ${Math.round(b.top)})`,
-       Math.abs(t.top-b.top) < 12);
+    if(window.innerWidth>=1850){
+      truthy(`kopbalk: op een breed venster één regel (tabs top ${Math.round(t.top)}, filters top ${Math.round(b.top)})`,
+         Math.abs(t.top-b.top) < 12);
+    }
+    // DE EIGENLIJKE VANGRAIL, en die is breedte-ONafhankelijk: een budget op de filterbalk.
+    // Op een smal venster wikkelt die balk sowieso — dat deed hij vóór v12.8 ook en is geen fout.
+    // Wat wél een fout is, is dat er iets bijkomt: gemeten op 1920 vroegen de zes onderdelen
+    // samen 927px terwijl er naast de tabbladen 969 beschikbaar was. Elke toevoeging boven dat
+    // budget duwt de kop naar twee regels op ELK scherm dat vandaag nog één regel toont.
+    const kinderen=[...bar.children].filter(el=>el.getBoundingClientRect().width>0);
+    const nodig=kinderen.reduce((a,el)=>a+el.getBoundingClientRect().width+8,0)-8;
+    truthy(`kopbalk: de filterbalk blijft binnen zijn budget (${Math.round(nodig)}px van 960, ${kinderen.length} onderdelen)`,
+       nodig<=960);
   })();
   (() => {
     const wasP=state.ntdPerVve, wasS=state.ntdSort;
@@ -1238,8 +1266,8 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
 
   // ── Offerte-kolommen (v12.8) ──
   eq('offerte-breedtes: acht elementen', SECS['OFFERTE-TRAJECTEN'].breedtes.length, 8);
-  eq('offerte-breedtes: gewichtsom 71',
-     SECS['OFFERTE-TRAJECTEN'].breedtes.filter(w=>typeof w==='number').reduce((a,b)=>a+b,0), 71);
+  eq('offerte-breedtes: gewichtsom 60',
+     SECS['OFFERTE-TRAJECTEN'].breedtes.filter(w=>typeof w==='number').reduce((a,b)=>a+b,0), 60);
   eq('offerte-koppen', SECS['OFFERTE-TRAJECTEN'].cols,
      ['VvE Code','VvE','Aangevraagd','Offertes','Wie','Deadline','Opmerkingen']);
   // Alle vijf tabbladen dezelfde kop — daar vroeg de gebruiker expliciet om.
@@ -1253,13 +1281,16 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const b=SECS['OFFERTE-TRAJECTEN'].breedtes;
     const bij=(t)=>kolBreedtes(b,t).map(w=>String(w).endsWith('%')?Math.round(parseFloat(w)/100*t):parseFloat(w));
     const w1440=bij(1440), w1150=bij(1150), w1920=bij(1920);
-    truthy(`offerte @1440: Opmerkingen ~360px (${w1440[6]})`, Math.abs(w1440[6]-360)<=3);
-    truthy(`offerte @1440: Wie ~141px (${w1440[4]})`, Math.abs(w1440[4]-141)<=3);
+    truthy(`offerte @1440: Opmerkingen ~392px (${w1440[6]})`, Math.abs(w1440[6]-392)<=3);
+    truthy(`offerte @1440: Wie vast op 111px (${w1440[4]})`, w1440[4]===111);
     truthy(`offerte @1150: Opmerkingen ruimer dan de 124 van vroeger (${w1150[6]})`, w1150[6]>200);
-    // De klikzone van de aannemers-uitklapper hangt aan deze kolom: als hij niet meegroeit, is
-    // hij op een breed scherm ineens smaller dan op een smal. Dat is de v11.3-regressie.
-    truthy(`offerte @1920: de offertecel groeit mee (${w1920[3]})`, w1920[3]>180);
-    truthy('offerte: de offertecel is breder op 1920 dan op 1150', w1920[3]>w1150[3]);
+    // De klikzone van de aannemers-uitklapper is sinds v12.9 een VASTE 145px. Hij hing eerst aan
+    // wat er ná de teller overbleef, en dat was de v11.3-regressie; sinds v12.8 is de hele cel de
+    // knop, dus een vaste breedte is nu juist de sterkste vorm — 145 op élk venster, tegen 114
+    // bij het smalste. Deze toets bewaakt de ONDERGRENS, niet dat hij meegroeit.
+    truthy(`offerte: de offertecel is overal 145px (1150=${w1150[3]}, 1440=${w1440[3]}, 1920=${w1920[3]})`,
+       w1150[3]===145 && w1440[3]===145 && w1920[3]===145);
+    truthy('offerte: en dat is ruimer dan de 114px die het smalste venster vroeger gaf', 145>114);
   })();
   // Korte datum ALLEEN op dit tabblad.
   truthy('offerte-deadline gebruikt de korte datum',
@@ -1320,8 +1351,8 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     {actie:'Contact', code:'TST', veld:'Telefoon', oudeWaarde:'Bestuur', nieuweWaarde:'Gebeld over de ALV', timestamp:'2026-07-15T10:24:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:2},
     {actie:'Aangevinkt', code:'TST', veld:'Notulen', timestamp:'2026-07-15T09:00:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:3},
   ];
-  truthy('dossierFeed: contact is een volle regel', dossierFeed(_dosMix).includes('log-item'));
-  truthy('dossierFeed: aangevinkt is een dunne regel', dossierFeed(_dosMix).includes('log-mini'));
+  truthy('dossierFeed: contact is een volwaardige regel', /class="log-r"/.test(dossierFeed(_dosMix)));
+  truthy('dossierFeed: aangevinkt is een gedempte regel', /class="log-r dof"/.test(dossierFeed(_dosMix)));
   truthy('dossierFeed: aangevinkt toont nette zin', dossierFeed(_dosMix).includes('vinkte'));
   truthy('dossierFeed: code-chip is weg in het dossier', !dossierFeed(_dosMix).includes('data-action="vve-open"'));
   truthy('dossierFeed: dunne regel behoudt verwijderknop', dossierFeed(_dosMix).includes('log-verwijderen'));
@@ -2425,8 +2456,10 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
 
       // Offerte en subsidie hadden hem al niet; die blijven zoals ze waren.
       setNtd('SUBSIDIE-TRAJECTEN');
-      eq('geen signaalkolom: subsidie houdt zijn zes koppen plus de actiekolom',
-         [...document.querySelectorAll('#ntd-thead th')].length, 7);
+      // Zeven sinds v12.9: 'Opmerkingen' staat er wél bij. Met zes kolommen bleef er op een breed
+      // scherm ruimte over die nergens goed heen kon.
+      eq('subsidie heeft zeven koppen plus de actiekolom',
+         [...document.querySelectorAll('#ntd-thead th')].length, 8);
       // ── Kolomverdeling ──
       // De tabel deelde de ruimte zelf uit en de tekst had een klem in vaste pixels. Gemeten op
       // productie-achtige data: 'Datum aangevr.' 351px voor één datum, terwijl de VvE-naam en de
@@ -2444,9 +2477,14 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         // wat er bij een venster van 1440 gebeurde: het vinkje viel van de rij af.
         // En andersom: Signaal hoort GEEN px te zijn. Sinds de breedtes met calc() worden gezet is
         // px een plafond, en dan kapt "Te laat (47d) Vandaag opvolgen" op een breed scherm af.
+        // Sinds v12.9 staan er méér kolommen vast: 'Wie' (de naamplaatjes wikkelden bij 83px
+        // naar een tweede regel), 'Periode' (de weekvorm vraagt 127 en verder groeien levert
+        // alleen wit op), 'Fase' (de bolletjesbalk liep zijn cel uit) en 'Offertes' (de klikzone
+        // hangt sinds v12.8 niet meer aan de restruimte). Per sectie geteld, niet met één getal —
+        // ze verschillen echt.
         eq(`kolombreedte: ${sec} houdt zijn krappe kolommen op een vaste breedte`,
            (SECS[sec].breedtes || []).filter(w => typeof w === 'string').length,
-           sec === 'OFFERTE-TRAJECTEN' ? 4 : 3);
+           ({OPPAKKEN:4, VERGADERVERZOEKEN:5, 'OFFERTE-TRAJECTEN':6, LOD:4, 'SUBSIDIE-TRAJECTEN':5})[sec]);
         // De eerste kolom (VvE Code) en de laatste (acties) moeten allebei zo'n ondergrens hebben.
         const _b = SECS[sec].breedtes || [];
         truthy(`kolombreedte: ${sec} — code- en actiekolom staan allebei vast`,
@@ -2548,16 +2586,16 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
           };
           const acties = ths2.length ? Math.round(ths2[ths2.length - 1].getBoundingClientRect().width) : -1;
           const dl = br('Deadline'), code = br('VvE Code');
-          truthy(`kolombreedte: op 1650px blijft de deadline-kolom 165px (${dl})`,
-                 Math.abs(dl - 165) <= 1);
+          truthy(`kolombreedte: op 1650px blijft de deadline-kolom 158px (${dl})`,
+                 Math.abs(dl - 158) <= 1);
           truthy(`kolombreedte: op 1650px blijft de actiekolom 150px (${acties})`,
                  Math.abs(acties - 150) <= 1);
           // 130 en niet 105 sinds de doorlichting van 26-08: op een BUNDELKOP staan er drie dingen
           // in deze cel (sleepgreep 16 + 9 marge, chevron 22 + 3, code 45 = 95px) en in een
           // contentbox van 75px viel de code naar een tweede regel. 130 - 20 - 10 = 100, dus
           // dezelfde 5px speling die een gewone rij (70px inhoud in 75) altijd al had.
-          truthy(`kolombreedte: op 1650px blijft de codekolom 130px (${code})`,
-                 Math.abs(code - 130) <= 1);
+          truthy(`kolombreedte: op 1650px blijft de codekolom 135px (${code})`,
+                 Math.abs(code - 135) <= 1);
           // ... en de ruimte die dat oplevert gaat naar de tekstkolommen. Zonder deze tegenproef
           // zou een tabel die per ongeluk smaller wordt dan 1650 ook groen zijn.
           const act = br('Actiepunt'), opm = br('Opmerkingen');
@@ -2565,7 +2603,10 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
           // ondergrenzen liggen hoger dan voorheen (300 / 200).
           truthy(`kolombreedte: op 1650px krijgt het actiepunt de vrijgekomen ruimte (${act})`,
                  act >= 380);
-          truthy(`kolombreedte: op 1650px groeien ook de opmerkingen mee (${opm})`, opm >= 280);
+          // v12.9 draait dit bewust om: de opmerkingen zijn op Oppakken in 45 van de 54 rijen
+          // leeg en leveren in, het ACTIEPUNT kapte af en krijgt de ruimte.
+          truthy(`kolombreedte: op 1650px krijgt het actiepunt duidelijk meer dan de opmerkingen (${act} vs ${opm})`,
+                 act > opm + 200);
         } finally {
           breed.remove();
           if(vNtd4 === undefined) delete D.ntd.OPPAKKEN; else D.ntd.OPPAKKEN = vNtd4;
@@ -2600,7 +2641,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
           const act7 = ths7.length ? Math.round(ths7[ths7.length-1].getBoundingClientRect().width) : -1;
           truthy(`kolombreedte: de px-kolommen blijven staan ná renderAf/renderOntw `
                  + `(code ${code7}, deadline ${dl7}, acties ${act7})`,
-                 Math.abs(code7 - 130) <= 1 && Math.abs(dl7 - 165) <= 1 && Math.abs(act7 - 150) <= 1);
+                 Math.abs(code7 - 135) <= 1 && Math.abs(dl7 - 158) <= 1 && Math.abs(act7 - 150) <= 1);
         } finally {
           breed7.remove();
           if(vNtd7 === undefined) delete D.ntd.OPPAKKEN; else D.ntd.OPPAKKEN = vNtd7;
@@ -6036,7 +6077,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   eq('SECS heeft vijf secties', Object.keys(SECS).length, 5);
   eq('subsidie is de laatste sectie', Object.keys(SECS)[4], 'SUBSIDIE-TRAJECTEN');
   eq('subsidie-label', SECS['SUBSIDIE-TRAJECTEN'].label, 'Subsidie-trajecten');
-  eq('subsidie heeft 6 kolomkoppen', SECS['SUBSIDIE-TRAJECTEN'].cols.length, 6);
+  eq('subsidie heeft 7 kolomkoppen', SECS['SUBSIDIE-TRAJECTEN'].cols.length, 7);
   eq('subsidie heeft 8 sleutels', SECS['SUBSIDIE-TRAJECTEN'].keys.length, 8);
   // parseSections overschrijft entry.fase met kolom O (de offerte-fase); een sleutel
   // die 'fase' heet zou dus stil worden weggegooid.
@@ -6192,7 +6233,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '12.8');
+  eq('versie opgehoogd', APP_VERSION, '12.9');
 
   // ── Tabbladen ÍN de kaartkop (v11.7) ──
   // De kop van de kaart zei links exact hetzelfde als het actieve tabblad — 'Oppakken' boven
@@ -6577,7 +6618,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       D.ntd['SUBSIDIE-TRAJECTEN'] = [{
         _row: 99, _sec: 'SUBSIDIE-TRAJECTEN', code: '311028', naam: 'VvE Naarderstraat',
         subsidie: 'SVVE isolatie', subsidieFase: 'Verleend', behandelaar: 'Cihad',
-        deadline: '28 augustus 2026', opmerkingen: 'DIT-MAG-NIET-IN-DE-TABEL',
+        deadline: '28 augustus 2026', opmerkingen: 'DIT-STAAT-NU-WEL-IN-DE-TABEL',
         inBehandeling: 'TRUE',
       }];
       state.activeNtd = 'SUBSIDIE-TRAJECTEN'; pgs.ntd = 1;
@@ -6585,20 +6626,22 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       const _tr = document.querySelector('#ntd-tbody tr[data-row="99"]');
       truthy('subsidierij wordt getekend', !!_tr);
       // Zonder eigen case in de switch komt er een <tr> zonder enkele <td> uit rowNtd.
-      eq('zes kolommen plus de actiekolom', _tr ? _tr.querySelectorAll('td').length : 0, 7);
+      eq('zeven kolommen plus de actiekolom', _tr ? _tr.querySelectorAll('td').length : 0, 8);
       eq('evenveel kolomkoppen als cellen',
-         document.querySelectorAll('#ntd-thead th').length, 7);
+         document.querySelectorAll('#ntd-thead th').length, 8);
       truthy('subsidie-omschrijving staat in de rij', !!_tr && _tr.textContent.includes('SVVE isolatie'));
       truthy('fasewoord staat in de rij', !!_tr && _tr.textContent.includes('Verleend'));
-      truthy('opmerkingen staan NIET in de tabel',
-         !!_tr && !_tr.textContent.includes('DIT-MAG-NIET-IN-DE-TABEL'));
+      // Sinds v12.9 staan ze er WÉL. Met zes kolommen bleef er op een breed scherm ruimte over
+      // die nergens goed heen kon; het veld bestond al (kolom G) en werd alleen niet getoond.
+      truthy('opmerkingen staan nu WEL in de tabel',
+         !!_tr && _tr.textContent.includes('DIT-STAAT-NU-WEL-IN-DE-TABEL'));
       eq('vijf fase-knoppen in de rij', _tr ? _tr.querySelectorAll('.fase-bol').length : 0, 5);
       // Wachten is hier de normale toestand, dus geen stil-klokje.
       eq('geen stil-pill op dit tabblad', _tr ? _tr.querySelectorAll('.pill-stil').length : 0, 0);
       // De kolomkoppen moeten de gekozen zes zijn, in volgorde.
       eq('kolomkoppen in de juiste volgorde',
-         [...document.querySelectorAll('#ntd-thead th')].slice(0, 6).map(t => t.textContent.trim().replace(/[▲▼]$/, '')),
-         ['VvE Code','VvE','Subsidie','Fase','Wie','Deadline']);
+         [...document.querySelectorAll('#ntd-thead th')].slice(0, 7).map(t => t.textContent.trim().replace(/[▲▼]$/, '')),
+         ['VvE Code','VvE','Subsidie','Fase','Wie','Deadline','Opmerkingen']);
     } finally {
       if (_bewaardNtd === undefined) delete D.ntd['SUBSIDIE-TRAJECTEN'];
       else D.ntd['SUBSIDIE-TRAJECTEN'] = _bewaardNtd;

@@ -1304,9 +1304,9 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const b=SECS['OPPAKKEN'].breedtes;
     const bij=t=>kolBreedtes(b,t).map(w=>String(w).endsWith('%')?Math.round(parseFloat(w)/100*t):parseFloat(w));
     const w1150=bij(1150), w1440=bij(1440), w1637=bij(1637);
-    truthy(`plafond: bij 1150 blijft de VvE-kolom ONDER het plafond (${w1150[1]})`, w1150[1]<260);
-    eq(`plafond: bij 1440 raakt hij het plafond (${w1440[1]})`, w1440[1], 260);
-    eq(`plafond: bij 1637 blijft hij op het plafond (${w1637[1]})`, w1637[1], 260);
+    truthy(`plafond: bij 1150 blijft de VvE-kolom ONDER het plafond (${w1150[1]})`, w1150[1]<265);
+    eq(`plafond: bij 1440 raakt hij het plafond (${w1440[1]})`, w1440[1], 265);
+    eq(`plafond: bij 1637 blijft hij op het plafond (${w1637[1]})`, w1637[1], 265);
     // En de vrijgekomen ruimte gaat naar het actiepunt, niet naar de lucht.
     truthy(`plafond: het actiepunt krijgt de rest (1637: ${w1637[2]})`, w1637[2]>540);
     truthy('plafond: de som blijft precies de tabel vullen',

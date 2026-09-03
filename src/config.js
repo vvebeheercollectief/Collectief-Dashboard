@@ -141,14 +141,22 @@ export const SECS = {
     // en dat IS de taak), Opmerkingen 330 -> 267 (leeg in 45 van de 54 rijen). 'Wie' wordt VAST:
     // op 83px wikkelden twee ronde naamplaatjes naar een tweede regel; 76 = 46 badge + 30
     // opvulling in de ruime stand.
-                   breedtes:['135px',{w:26,max:260},44,'158px','76px',22,'150px'],
+                   breedtes:['135px',{w:26,max:265},46,'158px','76px',{w:18,max:300},'150px'],
+    // De winnaar op DIT tabblad is het ACTIEPUNT. Gemeten over de zichtbare rijen: p75 548px
+    // tekst, en het is de taak zelf. Opmerkingen is hier in 68% van de rijen leeg en krijgt
+    // daarom een plafond van 300 — bij 1920 gaat alle overige ruimte naar het actiepunt (836px).
+    // Dát is het verschil per tabblad: hieronder wint telkens een andere kolom.
     keys:['code','naam','actiepunt','deadline','behandelaar','prioriteit','opmerkingen','inBehandeling']},
   VERGADERVERZOEKEN:{label:'Vergaderverzoeken',css:'--sec:var(--am);--sec-l:var(--am-l);--sec-b:var(--am-b)',color:'#AE5008',
     cols:['VvE Code','VvE','Periode','Agendapunten','Wie','Deadline uitschr.','Opmerkingen'],
     // 'Periode' wordt VAST op 135px: de weekvorm ('wk 36' boven 'ma 31 aug – vr 4 sep') vraagt er
     // 127, en verder groeien levert alleen wit op naast een waarde als 'Juni'. Gemeten bij tabel
     // 1637: 237 -> 135, en die 102px gaan naar Agendapunten (285 -> 369), dat afkapte.
-                   breedtes:['135px',{w:26,max:260},'135px',30,'76px','158px',24,'150px'],
+                   breedtes:['135px',{w:26,max:265},'135px',34,'76px','168px',{w:22,max:290},'150px'],
+    // Hier winnen de AGENDAPUNTEN (p75 447px tekst, max 2455). Opmerkingen is in 59% van de
+    // rijen leeg en krijgt een plafond van 290. 'Deadline uitschr.' staat op 168 en niet op 158:
+    // die kop is in de ACTIEVE sorteerstand 160-170px breed (vet 800 plus een pijl) en kapte op
+    // 158 dus af zodra je op die kolom sorteerde. Twee onafhankelijke metingen kwamen daarop uit.
     keys:['code','naam','periode','agendapunten','behandelaar','deadline','opmerkingen','inBehandeling']},
   'OFFERTE-TRAJECTEN':{label:'Offerte-trajecten',css:'--sec:var(--pu);--sec-l:var(--pu-l);--sec-b:var(--pu-b)',color:'#6855C9',
     // Koppen korter sinds v12.8. 'Aangevraagd' en niet 'Aangevr.': dat laatste is een deelstring
@@ -174,7 +182,12 @@ export const SECS = {
     keys:['code','naam','datumAangevraagd','offertes','behandelaar','deadline','opmerkingen']},
   LOD:{label:'LOD',css:'--sec:var(--rd);--sec-l:var(--rd-l);--sec-b:var(--rd-b)',color:'#B91C1C',
     cols:['VvE Code','VvE','Actiepunt','Status','Wie','Deadline LOD','Opmerkingen'],
-                   breedtes:['135px',{w:24,max:260},34,22,'76px','158px',26,'150px'],
+                   breedtes:['135px',{w:26,max:265},38,{w:16,max:205},'76px','158px',{w:20,max:190},'150px'],
+    // Hier wint het ACTIEPUNT (p75 462px). Status en Opmerkingen zijn allebei in ongeveer een
+    // derde van de rijen leeg en krijgen een plafond (205 / 190). De naamkolom houdt hier
+    // hetzelfde plafond als elders: LOD heeft weliswaar de langste namen (p75 297px), maar hem
+    // ruimer maken zou juist op dit tabblad de meeste dode ruimte achterlaten — en dat is de
+    // klacht die deze hele ronde stuurt.
     keys:['code','naam','actiepunt','status','behandelaar','deadline','opmerkingen','inBehandeling']},
   // Subsidie-trajecten (2026-07-29). Zelfde kolomstramien als LOD, met 'Status'
   // vervangen door 'Fase'. Twee dingen liggen hier vast en mogen niet losjes wijzigen:
@@ -192,7 +205,10 @@ export const SECS = {
     // (kolom G) en werd alleen niet getoond. 'Fase' wordt vast op 187px: de bolletjesbalk heeft
     // een min-width van 158 en liep bij 172 al 6px zijn eigen cel uit.
     cols:['VvE Code','VvE','Subsidie','Fase','Wie','Deadline','Opmerkingen'],
-                   breedtes:['135px',{w:26,max:260},24,'187px','111px','158px',30,'150px'],
+                   breedtes:['135px',{w:26,max:265},{w:18,max:195},'187px','111px','158px',32,'150px'],
+    // Hier winnen de OPMERKINGEN (p75 483px). De Subsidie-kolom is in 6 van de 8 rijen letterlijk
+    // hetzelfde woord ('Subsidieaanvraag', 104px) en krijgt daarom een plafond — 195 en niet 175,
+    // want op DIT tabblad staat de 'weggelegd'-pil in díé cel en die eet er 72px van op.
     keys:['code','naam','subsidie','subsidieFase','behandelaar','deadline','opmerkingen','inBehandeling']},
 };
 

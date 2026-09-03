@@ -3,7 +3,7 @@
 // ══════════════════════════════════════
 import { taakTitel, taakVerwijzing, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, stilDrempel, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, subBadge, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel, kiesAfgerondRij, filt, splitBehandelaar, korteNaam, persBadges, taakActieKnoppen, voorgesteldeDeadline, DEADLINE_VOORSTEL, DEADLINE_HINT, periodeBereik, AF_PERIODES, duurUitCel, duurNaarCel, offerteAangevraagd, teLaatVoorTelling, _afZoekvelden, groepeerPerVve, groepeerPerBlok } from "./util.js";
 import { verwerkMeldingRijen, toonMeldingen, MAX_TOAST_BURST, _whoSleutel, getCurrentWho, undoDelete } from "./notifications.js";
-import { logZin, logZinPlat, logPaginaSoort, afrondOpmerking, logBewerkbaar, logRegelZichtbaar, logZoekTekst, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek, logEvents, renderOntw, openOntwModal, closeOntwModal, submitOntwItem, _logRegelSleutel, _ontwSleutel, addTaskNote } from "./render-overig.js";
+import { logZin, logZinPlat, logPaginaSoort, afrondOpmerking, logBewerkbaar, logRegelZichtbaar, logZoekTekst, afrondHistHtml, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek, logEvents, renderOntw, openOntwModal, closeOntwModal, submitOntwItem, _logRegelSleutel, _ontwSleutel, addTaskNote } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM, VELD_LABELS, AFROND_SNELKEUZES, BULK_AFROND_SNELKEUZE } from "./config.js";
 import { maandagVan, isoWeekJaar, weekDagen, weekPeriodeLabel, parseWeekPeriode, weekOpties, weekAfstand } from "./util.js";
 import { ACTIONS } from "./actions.js";
@@ -290,6 +290,16 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
      logRegelZichtbaar({actie:'Aangemaakt', nieuweWaarde:'Dakgoot'}, 'kozijn'), false);
   truthy('logRegelZichtbaar laat een notitie zonder zoekterm door',
      logRegelZichtbaar({actie:'Opmerking', nieuweWaarde:'x'}, ''));
+
+  // ── afrondHistHtml ── (de per-taak-tijdlijn in het bewerkscherm)
+  // Bij de nieuwe vorm is kolom E leeg, dus de `hist-change`-regel tekent niets; zonder deze
+  // helper zou de afrondopmerking juist in het scherm waar je hem zoekt onzichtbaar zijn.
+  truthy('afrondHistHtml: nieuwe vorm toont de opmerking', afrondHistHtml(_afrNieuw).includes('Dak hersteld'));
+  truthy('afrondHistHtml: nieuwe vorm toont ook de afronddatum', afrondHistHtml(_afrNieuw).includes('Afgerond op 03-09-2026'));
+  truthy('afrondHistHtml: nieuwe vorm zonder opmerking toont alleen de datum',
+     afrondHistHtml(_afrNieuwLeeg).includes('Afgerond op') && !afrondHistHtml(_afrNieuwLeeg).includes('log-note'));
+  eq('afrondHistHtml: oude vorm laat de bestaande hist-change zijn werk doen', afrondHistHtml(_afrOud), '');
+  eq('afrondHistHtml: op een andere actie niets', afrondHistHtml({actie:'Opmerking',nieuweWaarde:'x'}), '');
 
   // ── logZinPlat ── (de AI-context krijgt tekst, geen HTML: anders leest het model opmaak)
   truthy('logZinPlat bevat geen HTML',

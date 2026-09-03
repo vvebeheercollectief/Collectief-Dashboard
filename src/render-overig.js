@@ -822,6 +822,21 @@ function histNoteKey(e){
   if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault();addTaskNote();}
 }
 
+// De afrondregel in de per-taak-tijdlijn (bewerkscherm).
+//
+// Bij de OUDE vorm draagt `veld` nog 'status' en tekent de `hist-change` hieronder de hele zin
+// al ('status: Nog Te Doen → Afgerond op 1 juli — gebeld'). Bij de NIEUWE vorm is `veld` met
+// opzet leeg — een pijl tussen 'Nog Te Doen' en een datum is geen voor-en-na — en dan zou de
+// afrondopmerking hier hélemaal niet te zien zijn. Juist dit scherm is waar je 'm zoekt als je
+// wilt weten hoe een taak is afgelopen.
+function afrondHistHtml(r){
+  if((r.actie||'').trim()!=='Afgerond') return '';
+  if(!/^Afgerond op\b/.test((r.oudeWaarde||'').trim())) return '';   // oude vorm: hist-change doet het al
+  const opm=afrondOpmerking(r);
+  return `<div class="hist-change">${esc(r.oudeWaarde)}</div>`
+       + (opm?`<div class="log-note">${esc(opm)}</div>`:'');
+}
+
 function renderTaskHistory(code,sec){
   const container=document.getElementById('fg-history');
   const body=document.getElementById('hist-body');
@@ -845,6 +860,7 @@ function renderTaskHistory(code,sec){
         <span style="margin-left:6px;color:var(--mut)">${esc(displayName(r.gebruiker))}</span>
         ${r.veld?`<div class="hist-change">${esc(r.veld)}: ${esc(r.oudeWaarde)} → ${esc(r.nieuweWaarde)}</div>`:''}
         ${r.actie==='Opmerking'&&r.nieuweWaarde?`<div class="log-note">${opmaakHtml(r.nieuweWaarde)}</div>`:''}
+        ${afrondHistHtml(r)}
       </div>
     </div>`).join('');
   }
@@ -911,7 +927,7 @@ async function logEvents(regels) {
 export {
   ONTW_CATS, ONTW_CAT_COLORS, parseOntw, renderOntw, setOntw, openOntwModal, closeOntwModal,
   submitOntwItem, deleteOntwItem, editOntwItem, parseLogboek, _logSleutel, _logRegelSleutel, _ontwSleutel, _nogNietBevestigd, fmtLogTs, actieBadge, _LOG_AVKLEUR, avatarKleur,
-  logDayLabel, logZin, logTijd, logItemHtml, renderLogboek, histNoteKey, renderTaskHistory, addTaskNote, logEvent, logEvents,
+  logDayLabel, logZin, logTijd, logItemHtml, afrondHistHtml, renderLogboek, histNoteKey, renderTaskHistory, addTaskNote, logEvent, logEvents,
   _shiftRows, _shiftLogboekRows, _shiftLogEditRef, _herankerLogEdit, logEditWrite, logDeleteLabel,
   logEditForm, editLogboek, saveLogboek, cancelLogboek, setLogSoort, deleteLogboek, undoDeleteLog,
 };

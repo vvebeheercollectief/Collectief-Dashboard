@@ -58,6 +58,9 @@ Logo: twee handen die elkaar vasthouden onder een dak.
 | `og-image-1200x630.png` | 1200x630 | WhatsApp, Facebook, LinkedIn (wit) |
 | `og-image-donker-1200x630.png` | 1200x630 | Idem, donkere variant |
 
+### Socials-pakket
+Profielfoto's, banners en postformaten per kanaal (Instagram, Facebook, LinkedIn, X, Snapchat, YouTube, TikTok, WhatsApp Business, Google Bedrijfsprofiel) staan in `socials/`. Zie `socials/README.md` en `socials/overzicht.html`. Opnieuw genereren: `python3 tools/socials-pakket.py`.
+
 ### Platform-specifiek
 | Bestand | Formaat | Gebruik |
 |---------|---------|--------|

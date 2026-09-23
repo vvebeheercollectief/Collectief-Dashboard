@@ -100,6 +100,10 @@ const PRIO_REGELS = {
   // Met de Oppakken-drempels zou vrijwel elke rij Hoog worden en verliest de kleur
   // z'n betekenis.
   'SUBSIDIE-TRAJECTEN': { hoog: 14, midden: 45 },
+  // CRM: de reactietermijn is kort (5 werkdagen, ±7 kalenderdagen). Hoog als er nog 2 dagen of
+  // minder over zijn, midden tot 5. Zonder regel kreeg elke vraag prioriteit '' en matchte het
+  // prioriteitsfilter nooit — dezelfde valkuil die bij Subsidie in het ontwerp staat.
+  'CRM':               { hoog:  2, midden:   5 },
 };
 
 // ══════════════════════════════════════
@@ -128,6 +132,9 @@ const DEADLINE_VOORSTEL = {
   'OFFERTE-TRAJECTEN': 14,
   'LOD':               null,
   'SUBSIDIE-TRAJECTEN':null,
+  // CRM rekent in WERKDAGEN vanaf de ontvangstdatum, niet in kalenderdagen vanaf vandaag — zie
+  // voorgesteldeDeadline. Bron: afgesproken met de gebruiker bij het CRM-ontwerp (2026-09-23).
+  'CRM':               { werkdagen: 5 },
 };
 const DEADLINE_HINT = {
   'OPPAKKEN':           'Voorstel: over 7 dagen. Aanpassen of leegmaken mag.',
@@ -135,17 +142,52 @@ const DEADLINE_HINT = {
   'OFFERTE-TRAJECTEN':  'Voorstel: over 14 dagen. Aanpassen of leegmaken mag.',
   'LOD':                'Neem de hersteltermijn uit de brief over — die vullen we niet zelf in.',
   'SUBSIDIE-TRAJECTEN': 'Geen vaste termijn; vul in wat de regeling voorschrijft.',
+  'CRM':                'Automatisch: 5 werkdagen na ontvangst. Aanpassen mag.',
 };
 
 // De voorgestelde deadline als ISO-datum (yyyy-mm-dd, de vorm die een <input type="date"> wil),
 // of '' als deze sectie geen voorstel kent. `vandaag` is injecteerbaar zodat dit los te toetsen is
 // zonder van de kalender af te hangen.
 function voorgesteldeDeadline(sec, vandaag){
-  const dagen = DEADLINE_VOORSTEL[sec];
-  if(!Number.isFinite(dagen)) return '';
+  const regel = DEADLINE_VOORSTEL[sec];
   const basis = vandaag || _vandaagAmsterdam();
-  const d = new Date(basis.getFullYear(), basis.getMonth(), basis.getDate() + dagen);
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  // CRM: `vandaag` is hier de ONTVANGSTdatum (standaard vandaag) en er wordt in werkdagen geteld.
+  if(regel && Number.isFinite(regel.werkdagen)) return _isoDatum(werkdagenNa(basis, regel.werkdagen));
+  if(!Number.isFinite(regel)) return '';
+  const d = new Date(basis.getFullYear(), basis.getMonth(), basis.getDate() + regel);
+  return _isoDatum(d);
+}
+const _isoDatum = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
+// N werkdagen na `datum`: zaterdag en zondag tellen niet. Feestdagen wel (nog), zie het ontwerp.
+// Een vraag die in het weekend binnenkomt begint op maandag te tellen: za + 5 = vr, zo + 5 = vr.
+// Puur; geeft een nieuwe Date op middernacht lokale tijd.
+function werkdagenNa(datum, n){
+  const d = new Date(datum.getFullYear(), datum.getMonth(), datum.getDate());
+  let over = n | 0;
+  while(over > 0){
+    d.setDate(d.getDate() + 1);
+    const dag = d.getDay();
+    if(dag !== 0 && dag !== 6) over--;
+  }
+  return d;
+}
+
+// Hoe lang wacht deze eigenaar al, en hoe staat dat tegenover de deadline? Voor de Wacht-kolom
+// van CRM. null als er geen (leesbare) ontvangstdatum is — de cel valt dan terug op de gewone
+// deadlinecel. `vandaag` is injecteerbaar voor de toetsen.
+//   dagen    — kalenderdagen sinds ontvangst (0 = vandaag binnengekomen)
+//   dagenTot — dagen tot de deadline (negatief = te laat), null zonder deadline
+function crmWacht(r, vandaag){
+  const alsDatum = p => p ? new Date(p.y, p.m - 1, p.d) : null;   // _parseAnyDate geeft {y,m,d}
+  const ontv = alsDatum(_parseAnyDate((r && r.ontvangen) || ''));
+  if(!ontv) return null;
+  const nu = vandaag || _vandaagAmsterdam();
+  // _verschilInKalenderdagen(a, b) = a − b in dagen.
+  const dagen = Math.max(0, _verschilInKalenderdagen(nu, ontv));
+  const dl = alsDatum(_parseAnyDate((r && r.deadline) || ''));
+  const dagenTot = dl ? _verschilInKalenderdagen(dl, nu) : null;
+  return { dagen, dagenTot };
 }
 
 // ══════════════════════════════════════
@@ -158,6 +200,9 @@ const STIL_ESCALATIE_REGELS = {
   'OFFERTE-TRAJECTEN': { trap1: 21, trap2: 35 },
   'LOD':               { trap1: 30, trap2: 60 },
   'SUBSIDIE-TRAJECTEN': { trap1: 21, trap2: 42 },
+  // CRM: een eigenaar merkt stilte sneller dan een aannemer. Na 3 dagen de behandelaar, na 7 ook
+  // Jer — afgesproken bij het CRM-ontwerp (2026-09-23).
+  'CRM':               { trap1:  3, trap2:  7 },
 };
 
 // Vanaf hoeveel stille KALENDERDAGEN het signaal aangaat, per sectie. Bewust dezelfde getallen als
@@ -801,7 +846,8 @@ function taakTitel(r, sec){
   // r.subsidie hoort erbij: een subsidietraject heeft geen actiepunt/periode/status,
   // dus zonder deze terugval toont het dossier letterlijk "Subsidie-trajecten —
   // geen omschrijving" (zie afOmschrijving in render-vve.js).
-  const eigen = schoon(r.actiepunt) || schoon(r.agendapunten) || schoon(r.periode) || schoon(r.status) || schoon(r.subsidie);
+  // r.onderwerp om dezelfde reden: de omschrijving van een CRM-vraag.
+  const eigen = schoon(r.actiepunt) || schoon(r.agendapunten) || schoon(r.periode) || schoon(r.status) || schoon(r.subsidie) || schoon(r.onderwerp);
   return _kort(eigen || (SECS[sec] && SECS[sec].label) || '');
 }
 
@@ -812,7 +858,7 @@ function taakTitel(r, sec){
 // houdt in plaats van een regel die met ' · ' begint.
 const SOORT_ENKELVOUD = {
   OPPAKKEN:'Taak', VERGADERVERZOEKEN:'Vergaderverzoek', 'OFFERTE-TRAJECTEN':'Offerte-traject',
-  LOD:'LOD', 'SUBSIDIE-TRAJECTEN':'Subsidie-traject',
+  LOD:'LOD', 'SUBSIDIE-TRAJECTEN':'Subsidie-traject', CRM:'CRM-vraag',
 };
 
 // De volledige verwijzing naar ÉÉN taak: soort · VvE — omschrijving.
@@ -940,7 +986,7 @@ export {
   maandagVan, isoWeekJaar, weekDagen, weekPeriodeLabel, parseWeekPeriode, weekOpties, weekAfstand, metDagnamen, MND_KORT, MND_LANG,
   taakTitel, taakVerwijzing, kortDatum, NIET_ZOEKBAAR, groepeerPerVve,
   displayName, filt, splitBehandelaar, korteNaam, PRIO_REGELS, stilDrempel, STIL_ESCALATIE_REGELS,
-  DEADLINE_VOORSTEL, DEADLINE_HINT, voorgesteldeDeadline, AF_PERIODES, periodeBereik,
+  DEADLINE_VOORSTEL, DEADLINE_HINT, voorgesteldeDeadline, werkdagenNa, crmWacht, AF_PERIODES, periodeBereik,
   opvolgStatus, volgendeDeadline, HERHAAL_MAANDEN, _vandaagAmsterdam, isoWeek,
   offerteAangevraagd, teLaatVoorTelling,
   _verschilInKalenderdagen, berekenPrioriteit, prioBadge, persBadges,

@@ -332,7 +332,8 @@ const OBJ_KOLOMMEN = {
 // OPPAKKEN D(3) · VERGADERVERZOEKEN F(5) · OFFERTE-TRAJECTEN C(2)+F(5) · LOD F(5)
 // · SUBSIDIE-TRAJECTEN F(5). Let op: bij subsidie is D de FASE, geen datum — daar
 // mag dus geen datumopmaak op.
-const NTD_DATUM = { OPPAKKEN:[3], VERGADERVERZOEKEN:[5], 'OFFERTE-TRAJECTEN':[2,5], LOD:[5], 'SUBSIDIE-TRAJECTEN':[5] };
+// · CRM F(5); ook daar is D de fase.
+const NTD_DATUM = { OPPAKKEN:[3], VERGADERVERZOEKEN:[5], 'OFFERTE-TRAJECTEN':[2,5], LOD:[5], 'SUBSIDIE-TRAJECTEN':[5], CRM:[5] };
 
 // Welke kolom de OMSCHRIJVING draagt, per sectie — afgeleid uit OMSCHRIJVING_SLEUTEL (config.js)
 // en de kolomvolgorde in SECS.keys, zodat er geen vierde plek ontstaat waar dezelfde afspraak

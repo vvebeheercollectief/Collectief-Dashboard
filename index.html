@@ -543,7 +543,7 @@
         <div class="fld-row">
           <div class="fld" style="flex:1"><label>Opmerkingen</label><input type="text" id="m-opm"/></div>
         </div>
-        <div class="fld"><label>Subcategorie</label><select id="m-sub-opp"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option><option>Subsidie-trajecten</option></select></div>
+        <div class="fld"><label>Subcategorie</label><select id="m-sub-opp"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option><option>Subsidie-trajecten</option><option>CRM</option></select></div>
         <div class="toggle-row"><button type="button" class="tog" role="switch" aria-checked="false" id="tog-ib" data-action="toggle"></button><span>In behandeling</span></div>
       </div>
 
@@ -573,7 +573,7 @@
           <div class="fld"><label>Deadline uitschrijven</label><input type="date" id="m-dl-v" aria-describedby="dl-hint-v"/><small class="dl-hint" id="dl-hint-v"></small></div>
           <div class="fld"><label>Opmerkingen</label><input type="text" id="m-opm-v"/></div>
         </div>
-        <div class="fld"><label>Subcategorie</label><select id="m-sub-verg"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option><option>Subsidie-trajecten</option></select></div>
+        <div class="fld"><label>Subcategorie</label><select id="m-sub-verg"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option><option>Subsidie-trajecten</option><option>CRM</option></select></div>
         <div class="toggle-row"><button type="button" class="tog" role="switch" aria-checked="false" id="tog-ib-v" data-action="toggle"></button><span>In behandeling</span></div>
       </div>
 
@@ -591,7 +591,7 @@
         </div>
         <div class="fld"><label id="m-dl-o-label">Deadline</label><input type="date" id="m-dl-o" aria-describedby="dl-hint-o"/><small class="dl-hint" id="dl-hint-o"></small></div>
         <div class="fld"><label>Opmerkingen</label><textarea id="m-opm-o"></textarea></div>
-        <div class="fld"><label>Subcategorie</label><select id="m-sub-off"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option><option>Subsidie-trajecten</option></select></div>
+        <div class="fld"><label>Subcategorie</label><select id="m-sub-off"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option><option>Subsidie-trajecten</option><option>CRM</option></select></div>
       </div>
 
       <!-- LOD -->
@@ -607,7 +607,7 @@
           <div class="fld"><label>Deadline LOD</label><input type="date" id="m-dl-l" aria-describedby="dl-hint-l"/><small class="dl-hint" id="dl-hint-l"></small></div>
           <div class="fld"><label>Opmerkingen</label><input type="text" id="m-opm-l"/></div>
         </div>
-        <div class="fld"><label>Subcategorie</label><select id="m-sub-lod"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option><option>Subsidie-trajecten</option></select></div>
+        <div class="fld"><label>Subcategorie</label><select id="m-sub-lod"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option><option>Subsidie-trajecten</option><option>CRM</option></select></div>
         <div class="toggle-row"><button type="button" class="tog" role="switch" aria-checked="false" id="tog-ib-l" data-action="toggle"></button><span>In behandeling</span></div>
       </div>
       <!-- SUBSIDIE-TRAJECTEN -->
@@ -624,8 +624,40 @@
           </div>
         </div>
         <div class="fld"><label>Opmerkingen</label><input type="text" id="m-opm-s"/></div>
-        <div class="fld"><label>Subcategorie</label><select id="m-sub-sub"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option><option>Subsidie-trajecten</option></select></div>
+        <div class="fld"><label>Subcategorie</label><select id="m-sub-sub"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option><option>Subsidie-trajecten</option><option>CRM</option></select></div>
         <div class="toggle-row"><button type="button" class="tog" role="switch" aria-checked="false" id="tog-ib-s" data-action="toggle"></button><span>In behandeling</span></div>
+      </div>
+      <!-- CRM (v13.0) — een vraag van een eigenaar. Volgorde zoals in de mockup: eerst wat voor
+           vraag en van wie, dan het korte onderwerp (dat is wat de tabel toont), dan de mail zelf.
+           De deadline rekent zichzelf uit: 'Ontvangen op' + 5 werkdagen (crmOntvangenGewijzigd). -->
+      <div id="fg-crm" style="display:none">
+        <div class="fld"><label id="m-soort-lbl">Soort vraag</label>
+          <div class="crm-keuzes" id="m-soort" role="group" aria-labelledby="m-soort-lbl">
+            <button type="button" class="crm-keus aan" data-action="crm-soort" data-soort="Vraag" aria-pressed="true">Vraag</button>
+            <button type="button" class="crm-keus" data-action="crm-soort" data-soort="Klacht" aria-pressed="false">Klacht</button>
+            <button type="button" class="crm-keus" data-action="crm-soort" data-soort="Schade" aria-pressed="false">Schade</button>
+            <button type="button" class="crm-keus" data-action="crm-soort" data-soort="Financieel" aria-pressed="false">Financieel</button>
+          </div>
+        </div>
+        <div class="fld-row">
+          <div class="fld"><label for="m-van">Van</label><input type="text" id="m-van" placeholder="bv. Dhr. Visser, nr. 53"/></div>
+          <div class="fld"><label for="m-ontv">Ontvangen op</label><input type="date" id="m-ontv"/></div>
+        </div>
+        <div class="fld"><label for="m-onderwerp">Onderwerp *</label><input type="text" id="m-onderwerp" placeholder="Eén korte regel: waar gaat de vraag over?"/></div>
+        <div class="fld"><label for="m-mail">Mail van de eigenaar</label><textarea id="m-mail" placeholder="Plak hier de mail. Je leest hem terug door de rij open te klikken."></textarea></div>
+        <div class="fld">
+          <label>Fase</label>
+          <div id="m-fase-c"></div>
+        </div>
+        <div class="fld-row">
+          <div class="fld"><label for="m-dl-c">Reactie uiterlijk</label><input type="date" id="m-dl-c" aria-describedby="dl-hint-c"/><small class="dl-hint" id="dl-hint-c"></small></div>
+          <div class="fld"><label for="m-beh-c">Behandelaar</label>
+            <select id="m-beh-c"><option value="">Selecteer…</option><option>Jer</option><option>Cihad</option><option>Gabos</option><option>Cihad, Jer</option><option>Jer, Gabos</option><option>Cihad, Gabos</option></select>
+          </div>
+        </div>
+        <div class="fld"><label for="m-opm-c">Opmerkingen</label><input type="text" id="m-opm-c" placeholder="Interne notitie, bijvoorbeeld op wie je wacht"/></div>
+        <div class="fld"><label>Subcategorie</label><select id="m-sub-crm"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option><option>Subsidie-trajecten</option><option>CRM</option></select></div>
+        <div class="toggle-row"><button type="button" class="tog" role="switch" aria-checked="false" id="tog-ib-c" data-action="toggle"></button><span>In behandeling</span></div>
       </div>
       <!-- Hoort bij (Takenbundel) — staat buiten de secties, want elk tabblad kan een subtaak zijn.
            Alleen zichtbaar bij BEWERKEN: koppelen schrijft naar de RIJ van een bestaande taak, en

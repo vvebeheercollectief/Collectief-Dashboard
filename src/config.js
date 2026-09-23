@@ -5,7 +5,7 @@ import { ALLOWED_EMAILS } from '../allowed-emails.js';
 
 // ── Versie (zichtbaar in de UI) ────────────────────────────────────────
 // Ophogen bij ELKE wijziging: 4.1, 4.2, … 5.0 voor grote sprongen.
-export const APP_VERSION = '12.9';
+export const APP_VERSION = '13.0';
 
 // Snelkeuzes in het afrondvenster. Sinds v12.8 is de opmerking verplicht, en zonder deze
 // knoppen zou dat betekenen dat je bij elke afronding een zin moet typen. Hier en niet in de
@@ -210,7 +210,28 @@ export const SECS = {
     // hetzelfde woord ('Subsidieaanvraag', 104px) en krijgt daarom een plafond — 195 en niet 175,
     // want op DIT tabblad staat de 'weggelegd'-pil in díé cel en die eet er 72px van op.
     keys:['code','naam','subsidie','subsidieFase','behandelaar','deadline','opmerkingen','inBehandeling']},
+  // CRM (v13.0, 2026-09-23): vragen, klachten en meldingen van eigenaren die op antwoord wachten.
+  // Volledig los van Subsidie-trajecten — eigen fases (crm-fase.js), eigen kleur, eigen blok.
+  //   - de sleutel heet `crmFase`, NIET `fase` (zelfde reden als `subsidieFase`).
+  //   - `color` is de letterlijke hex van --pk (roze): groen betekent 'afgerond', teal is Subsidie.
+  //   - Van/Ontvangen/Soort/Mail staan NIET in `keys` (dat mag er maar 8 hebben, zie afOff in
+  //     parseSections) maar in de vaste kolommen T..W, net als taaknummer en bundel op Q..S.
+  //   - 'Van' en 'Wacht' zijn kolommen zonder eigen sleutel: Van toont `afzender`, Wacht rekent
+  //     uit `ontvangen` en `deadline`. Opmerkingen staat in het uitklappaneel, niet als kolom.
+  // Breedtes: 'Van' vast op 150 (naam + huisnummer eronder), 'Fase' op 176 (vier bolletjes met
+  // 'Wacht op reactie' eronder), 'Wacht' op 112 ('33 dagen' / '26d te laat'), 'Wie' vast op 76
+  // (twee ronde naamplaatjes; als gewicht werd dat bij de smalste tabel 42px en brak de kop af).
+  CRM:{label:'CRM',css:'--sec:var(--pk);--sec-l:var(--pk-l);--sec-b:var(--pk-b)',color:'#BE185D',
+    cols:['VvE Code','VvE','Vraag','Van','Fase','Wacht','Wie'],
+                   breedtes:['130px',24,40,'150px','176px','112px','76px','150px'],
+    keys:['code','naam','onderwerp','crmFase','behandelaar','deadline','opmerkingen','inBehandeling']},
 };
+
+// CRM: de vier soorten vraag (één klik in het bewerkscherm) en de reactietermijn in werkdagen.
+// De termijn bepaalt de automatische deadline (ontvangen + 5 werkdagen) en daarmee wanneer de
+// wachtcel amber of rood wordt. Weekenden tellen niet mee; feestdagen (nog) wel.
+export const CRM_SOORTEN = ['Vraag', 'Klacht', 'Schade', 'Financieel'];
+export const CRM_TERMIJN_WERKDAGEN = 5;
 
 // De kolomkop zoals de gebruiker hem ziet, per VELDNAAM in plaats van per kolompositie.
 //
@@ -251,6 +272,12 @@ export const VELD_LABELS = {
     behandelaar:'Wie', deadline:'Deadline', opmerkingen:'Opmerkingen',
     inBehandeling:'In behandeling',
   },
+  'CRM': {
+    code:'VvE Code', naam:'VvE', onderwerp:'Vraag', crmFase:'Fase',
+    behandelaar:'Wie', deadline:'Deadline', opmerkingen:'Opmerkingen',
+    inBehandeling:'In behandeling',
+    afzender:'Van',   // kolom T, geen sleutel in SECS.keys maar wél een kolom in de tabel
+  },
 };
 
 export const SKEYS = Object.keys(SECS);
@@ -272,6 +299,7 @@ export const OMSCHRIJVING_SLEUTEL = {
   'OFFERTE-TRAJECTEN':  'opmerkingen',
   'LOD':                'actiepunt',
   'SUBSIDIE-TRAJECTEN': 'subsidie',
+  'CRM':                'onderwerp',
 };
 
 // Fase van een offerte-traject (kolom O). Het dashboard schrijft deze kolom sinds v6.2 niet

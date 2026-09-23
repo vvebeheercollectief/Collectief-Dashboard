@@ -437,7 +437,7 @@ export function koppelKandidaten(ntd, index, bron){
 // LOD-taak een status, een offerte-traject leunt op zijn opmerkingen. Ze staan hier daarom
 // allemaal — zoekt het filter maar in één kolom, dan is de halve lijst met geen mogelijkheid te
 // vinden en lijkt de kiezer stuk.
-const TAAK_ZOEKVELDEN = ['actiepunt', 'agendapunten', 'periode', 'status', 'subsidie', 'opmerkingen'];
+const TAAK_ZOEKVELDEN = ['actiepunt', 'agendapunten', 'periode', 'status', 'subsidie', 'onderwerp', 'afzender', 'opmerkingen'];
 
 // Zoekfilter voor de taakkiezer: VvE-code, VvE-naam en de omschrijving. Lege zoekterm → alles,
 // zelfde vorm als `filterVves` (vve-zoekveld.js), want de component wisselt ze om.

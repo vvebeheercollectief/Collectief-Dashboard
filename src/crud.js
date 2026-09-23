@@ -6,7 +6,7 @@ import { zoekDubbels, dubbelVraagTekst } from "./dubbelcheck.js";
 import { extraVves, wisExtraVves, extraVvesHtml, extraVvesUitleg } from "./meervve.js";
 import { state, D, pgs } from "./state.js";
 import { verseRij, rijIndex } from "./rij.js";
-import { SECS, SKEYS, SID, OMSCHRIJVING_SLEUTEL, VELD_LABELS, AFROND_SNELKEUZES } from "./config.js";
+import { SECS, SKEYS, SID, OMSCHRIJVING_SLEUTEL, VELD_LABELS, AFROND_SNELKEUZES, CRM_SOORTEN } from "./config.js";
 import { writeRange, writeRows, _shiftNtdRows, _shiftAfRows, _herstelShift, assertRowMatch, sheetsFetch, fetchSheet, _a1Bereik, _withRetry } from "./api.js";
 import { isKolomKop, isSectieKop } from "./structuurcheck.js";
 import { ensureToken } from "./auth.js";
@@ -15,6 +15,7 @@ import { animateRowOut, flashRow } from "./anim.js";
 import { logEvent, logEvents, renderTaskHistory } from "./render-overig.js";
 import { backgroundWrite, loadAll, blokkeerOffline } from "./data.js";
 import { faseIndex, faseWoord, faseRijHtml, faseWijziging, SUBSIDIE_FASES } from "./subsidie-fase.js";
+import { CRM_FASES, crmFaseIndex, crmFaseWoord, crmFaseWijziging, crmFaseRijHtml } from "./crm-fase.js";
 import { bouwBundelIndex, bundelVerwijzing, openSubtaken, bundelWaarschuwing, heeftSubtaken } from "./bundel.js";
 import { koppelTaak } from "./bundel-acties.js";
 import { zetModalAannemers, modalAannemersCel } from "./modal-aannemers.js";
@@ -28,7 +29,7 @@ import { setNtd, renderNtd, ntdPagina } from "./render-lijsten.js";
 // straks maar één plek in plaats van vijf losse regels.
 const FG_PER_SECTIE = {
   OPPAKKEN:'fg-opp', VERGADERVERZOEKEN:'fg-verg', 'OFFERTE-TRAJECTEN':'fg-off',
-  LOD:'fg-lod', 'SUBSIDIE-TRAJECTEN':'fg-sub',
+  LOD:'fg-lod', 'SUBSIDIE-TRAJECTEN':'fg-sub', CRM:'fg-crm',
 };
 import { renderAll } from "./main.js";
 import { zetWeekKiezer } from './weekkiezer.js';
@@ -99,9 +100,9 @@ function kiesSectie(sec){
 // Sectie → het deadline-invoerveld en het zinnetje eronder. Dezelfde ids die `fillModalFields` en
 // `submitTask` gebruiken; op één plek, zodat een nieuw scherm niet op drie plekken bijgewerkt hoeft.
 const DEADLINE_VELD = { OPPAKKEN:'m-dl', VERGADERVERZOEKEN:'m-dl-v', 'OFFERTE-TRAJECTEN':'m-dl-o',
-                        LOD:'m-dl-l', 'SUBSIDIE-TRAJECTEN':'m-dl-s' };
+                        LOD:'m-dl-l', 'SUBSIDIE-TRAJECTEN':'m-dl-s', CRM:'m-dl-c' };
 const DEADLINE_HINT_VELD = { OPPAKKEN:'dl-hint', VERGADERVERZOEKEN:'dl-hint-v', 'OFFERTE-TRAJECTEN':'dl-hint-o',
-                             LOD:'dl-hint-l', 'SUBSIDIE-TRAJECTEN':'dl-hint-s' };
+                             LOD:'dl-hint-l', 'SUBSIDIE-TRAJECTEN':'dl-hint-s', CRM:'dl-hint-c' };
 
 // Het deadline-voorstel bij een NIEUWE taak. Alleen daar: bij bewerken staat er een echte datum en
 // zou een voorstel die overschrijven — dat is geen hulp maar gegevensverlies.
@@ -121,8 +122,17 @@ function zetDeadlineVoorstel(sec, isEdit){
   // mee in de te-laat-pil en krijgt een prioriteit. Zelfde grens als bij 'ook voor andere VvE's'.
   if(state._nieuwBundel) return;
   hintEl.textContent = DEADLINE_HINT[sec] || '';
-  const iso = voorgesteldeDeadline(sec);
+  // CRM: 'Ontvangen op' staat bij een nieuwe vraag op vandaag. De meeste mails worden ingevoerd op
+  // de dag dat ze binnenkomen; is hij ouder, dan past de gebruiker de datum aan en schuift de
+  // deadline mee (crmOntvangenGewijzigd).
+  if(sec==='CRM'){
+    const o=document.getElementById('m-ontv');
+    if(o && !o.value){ const d=new Date(); o.value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+  }
+  // CRM telt vanaf de ONTVANGSTdatum (standaard vandaag), niet vanaf vandaag — zie crmOntvangenGewijzigd.
+  const iso = voorgesteldeDeadline(sec, sec==='CRM' ? _crmOntvangenDatum() : undefined);
   if(!iso) return;
+  if(sec==='CRM') state._crmDlAuto = iso;
   // MAAR ÉÉN KEER PER SCHERM per categorie. Zonder deze rem kwam een bewust weggehaalde datum
   // terug zodra de gebruiker in de categorie-kiezer heen en weer ging: het veld was leeg, dus de
   // regel hieronder vulde hem opnieuw. Het zinnetje eronder belooft woordelijk 'Aanpassen of
@@ -133,6 +143,26 @@ function zetDeadlineVoorstel(sec, isEdit){
   if(state._dlVoorgesteld.has(sec)) return;
   state._dlVoorgesteld.add(sec);
   if(!veldEl.value) veldEl.value = iso;
+}
+
+// ── CRM: de deadline beweegt mee met 'Ontvangen op' (v13.0) ──
+// De deadline is ontvangen + 5 werkdagen. Wie de ontvangstdatum aanpast (een mail van gisteren die
+// je vandaag pas invoert) krijgt een nieuwe deadline, MAAR alleen zolang het deadlineveld nog de
+// automatisch berekende waarde draagt. Heeft de gebruiker de deadline zelf gewijzigd, dan blijft
+// die staan: een automatiek die een bewuste keuze overschrijft is geen hulp.
+// `state._crmDlAuto` onthoudt de laatst automatisch gezette waarde (ISO), per scherm.
+function _crmOntvangenDatum(){
+  const iso=gv('m-ontv');
+  const p=iso ? _parseAnyDate(iso) : null;
+  if(p) return new Date(p.y, p.m-1, p.d);
+  return undefined;   // voorgesteldeDeadline valt dan terug op vandaag
+}
+function crmOntvangenGewijzigd(){
+  const dl=document.getElementById('m-dl-c');
+  if(!dl) return;
+  const nieuw=voorgesteldeDeadline('CRM', _crmOntvangenDatum());
+  if(!nieuw) return;
+  if(!dl.value || dl.value===state._crmDlAuto){ dl.value=nieuw; state._crmDlAuto=nieuw; }
 }
 
 // ── Offerte: deadline ↔ opvolgdatum in het scherm (v12.5) ──
@@ -393,8 +423,12 @@ const _MODAL_VELDEN = {
   'OFFERTE-TRAJECTEN':  [['m-daang','datumAangevraagd',1],['m-beh-o','behandelaar'],['m-dl-o','deadline',1],['m-opm-o','opmerkingen'],['m-sub-off','subcategorie']],
   'LOD':                [['m-actie-l','actiepunt'],['m-stat-l','status'],['m-beh-l','behandelaar'],['m-dl-l','deadline',1],['m-opm-l','opmerkingen'],['m-sub-lod','subcategorie'],['tog-ib-l','inBehandeling',2]],
   'SUBSIDIE-TRAJECTEN': [['m-subsidie','subsidie'],['m-beh-s','behandelaar'],['m-dl-s','deadline',1],['m-opm-s','opmerkingen'],['m-sub-sub','subcategorie'],['tog-ib-s','inBehandeling',2]],
+  'CRM':                [['m-onderwerp','onderwerp'],['m-van','afzender'],['m-ontv','ontvangen',1],['m-mail','mail'],['m-beh-c','behandelaar'],['m-dl-c','deadline',1],['m-opm-c','opmerkingen'],['m-sub-crm','subcategorie'],['tog-ib-c','inBehandeling',2]],
 };
-const _MODAL_EXTRA_LABEL = { subcategorie:'Subcategorie', inBehandeling:'In behandeling' };
+// Velden die geen eigen sleutel in SECS hebben (subcategorie, schakelaar) of die bij CRM in T..W
+// staan en dus niet in VELD_LABELS voorkomen.
+const _MODAL_EXTRA_LABEL = { subcategorie:'Subcategorie', inBehandeling:'In behandeling',
+                             afzender:'Van', ontvangen:'Ontvangen op', mail:'Mail', soort:'Soort vraag' };
 export function nietOpgeslagenVelden(r){
   const spec=_MODAL_VELDEN[r&&r._sec];
   if(!spec) return [];
@@ -420,6 +454,14 @@ export function nietOpgeslagenVelden(r){
   if(r._sec==='SUBSIDIE-TRAJECTEN' && _faseGekozen
      && _modalFaseWoord()!==faseWoord(faseIndex(r.subsidieFase||''))){
     uit.push(labels.subsidieFase||'Fase');
+  }
+  //  · CRM: fase-kiezer en soort-knoppen, allebei modulestand. Zelfde regel: alleen een échte klik.
+  if(r._sec==='CRM' && _crmFaseGekozen
+     && crmFaseWoord(_modalCrmFase)!==crmFaseWoord(crmFaseIndex(r.crmFase||''))){
+    uit.push(labels.crmFase||'Fase');
+  }
+  if(r._sec==='CRM' && _crmSoortGekozen && _modalSoort()!==(r.soort||'')){
+    uit.push(_MODAL_EXTRA_LABEL.soort);
   }
   return uit;
 }
@@ -467,6 +509,21 @@ function fillModalFields(sec,r){
       // het is leeg, óf het is letterlijk een van de vijf.
       onthoudOnvertaalbaar('m-fase', r.subsidieFase,
         SUBSIDIE_FASES.some(f=>f.toLowerCase()===String(r.subsidieFase||'').trim().toLowerCase()) ? r.subsidieFase : '');
+      break;
+    case'CRM':
+      setv('m-onderwerp',r.onderwerp);setv('m-van',r.afzender);zetDatumVeld('m-ontv',r.ontvangen);
+      setv('m-mail',r.mail);setv('m-beh-c',r.behandelaar);zetDatumVeld('m-dl-c',r.deadline);
+      setv('m-opm-c',r.opmerkingen);setv('m-sub-crm',r.subcategorie);
+      tog('tog-ib-c',r.inBehandeling==='TRUE');
+      zetModalCrmFase(r.crmFase);
+      onthoudOnvertaalbaar('m-fase-c', r.crmFase,
+        CRM_FASES.some(f=>f.toLowerCase()===String(r.crmFase||'').trim().toLowerCase()) ? r.crmFase : '');
+      zetModalSoort(r.soort);
+      // Een soort die niet in de vier knoppen staat (met de hand in de Sheet gezet) blijft bij
+      // Opslaan ongewijzigd staan — zelfde regel als het onvertaalbaar-mechanisme hieronder.
+      onthoudOnvertaalbaar('m-soort', r.soort, CRM_SOORTEN.includes(String(r.soort||'').trim()) ? r.soort : '');
+      // Draagt de deadline nog de berekende waarde, dan mag hij meebewegen met 'Ontvangen op'.
+      state._crmDlAuto = voorgesteldeDeadline('CRM', _crmOntvangenDatum()) || null;
       break;
   }
 }
@@ -549,6 +606,7 @@ const OMSCHRIJVING_VELD = {
   'OFFERTE-TRAJECTEN':  'm-opm-o',
   'LOD':                'm-actie-l',
   'SUBSIDIE-TRAJECTEN': 'm-subsidie',
+  'CRM':                'm-onderwerp',
 };
 function zetOmschrijving(sec, tekst){
   const el = document.getElementById(OMSCHRIJVING_VELD[sec] || '');
@@ -594,8 +652,11 @@ function clearModal(){
   // die in de Sheet.
   ['m-naam'].forEach(id=>{const el=document.getElementById(id);if(el){el.value='';delete el.dataset.code;}});
   zetModalAannemers('');
-  ['tog-ib','tog-ib-v','tog-ib-l','tog-ib-s'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('on')});
+  ['tog-ib','tog-ib-v','tog-ib-l','tog-ib-s','tog-ib-c'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('on')});
   zetModalFase('');   // terug naar Voorbereiden, anders erft een nieuwe taak de vorige fase
+  zetModalCrmFase('');   // CRM: terug naar Ontvangen
+  zetModalSoort('');     // CRM: terug naar Vraag
+  state._crmDlAuto=null;
   // Hetzelfde voor de bundel: een leeg formulier hoort bij géén bundel. openModal roept clearModal
   // aan vóór het tonen van een NIEUWE taak, dus dit is de garantie dat een gewoon toevoegscherm
   // schoon begint. Die volgorde is dwingend voor de actie 'bundel-nieuw' (actions.js): die zet zijn
@@ -620,7 +681,7 @@ function clearModal(){
   const chips=document.getElementById('m-extra-chips'); if(chips) chips.innerHTML='';
   const uitleg=document.getElementById('m-extra-uitleg'); if(uitleg) uitleg.textContent='';
   // Een leeg scherm draagt geen onvertaalbare waarden van de vorige taak mee.
-  _onvertaalbaar = {}; _faseGekozen = false;
+  _onvertaalbaar = {}; _faseGekozen = false; _crmFaseGekozen = false; _crmSoortGekozen = false;
   // De regel bovenaan leegt óók het verborgen `m-per`; alleen de knop ernaast weet dat niet.
   // Zonder deze regel opende een nieuw scherm met de week van de taak die je daarvóór bekeek.
   zetWeekKiezer();
@@ -644,6 +705,39 @@ function zetModalFase(woord){
 // en vanaf nu mag een onbekende opgeslagen waarde overschreven worden.
 function kiesModalFase(n){ zetModalFase(faseWoord(n)); _faseGekozen = true; delete _onvertaalbaar['m-fase']; }
 function _modalFaseWoord(){ return faseWoord(_modalFase); }
+
+// ── CRM: fase-kiezer en soort-knoppen in het bewerkscherm (v13.0) ──
+// Eigen stand, eigen host (#m-fase-c) en eigen klikactie: CRM en Subsidie delen alleen de tekening
+// van de balk, niets van de inhoud.
+let _modalCrmFase = 1;
+let _crmFaseGekozen = false;
+function zetModalCrmFase(woord){
+  _modalCrmFase = crmFaseIndex(woord);
+  _crmFaseGekozen = false;
+  const host = document.getElementById('m-fase-c');
+  if(!host) return;
+  host.innerHTML = crmFaseRijHtml(crmFaseWoord(_modalCrmFase), -1, 'fase-rij-modal');
+  host.querySelectorAll('.fase-bol').forEach(b=>{ b.dataset.action='crm-fase-modal'; });
+}
+function kiesModalCrmFase(n){ zetModalCrmFase(crmFaseWoord(n)); _crmFaseGekozen = true; delete _onvertaalbaar['m-fase-c']; }
+function _modalCrmFaseWoord(){ return crmFaseWoord(_modalCrmFase); }
+
+// De soort staat als ingedrukte knop in #m-soort. Leeg of onbekend toont 'Vraag'.
+let _crmSoortGekozen = false;
+function zetModalSoort(woord){
+  const w = CRM_SOORTEN.includes(String(woord||'').trim()) ? String(woord).trim() : CRM_SOORTEN[0];
+  _crmSoortGekozen = false;
+  document.querySelectorAll('#m-soort .crm-keus').forEach(b=>{
+    const aan = b.dataset.soort===w;
+    b.classList.toggle('aan', aan);
+    b.setAttribute('aria-pressed', String(aan));
+  });
+}
+function kiesModalSoort(woord){ zetModalSoort(woord); _crmSoortGekozen = true; delete _onvertaalbaar['m-soort']; }
+function _modalSoort(){
+  const aan = document.querySelector('#m-soort .crm-keus.aan');
+  return aan ? aan.dataset.soort : CRM_SOORTEN[0];
+}
 
 // ══════════════════════════════════════
 //  SHEET HELPERS (insert / delete rows)
@@ -801,7 +895,17 @@ export function serializeNtdUndo(r){
   v.push(r.bundelId||''); // R — om dezelfde reden: zonder dit valt de taak na een undo uit zijn bundel.
   v.push(nulVeilig(r.bundelVolg)); // S — via nulVeilig, want 0 is een echt volgnummer (zo begint
                                    // een verse bundel), geen lege cel
+  if(r._sec==='CRM') v.push(...crmVelden(r));   // T..W — alleen CRM, zie crmVelden
   return v;
+}
+
+// T..W van een CRM-rij: van wie, wanneer ontvangen, welke soort, en de mail. ALLEEN CRM-rijen
+// schrijven voorbij kolom S. Zo raakt geen schrijfactie van de andere vijf tabbladen deze kolommen —
+// ook niet op een blad dat (nog) maar 19 kolommen breed is, waar een bredere schrijfactie stil zou
+// mislukken. Eén bron voor toevoegen, ongedaan maken en afronden, zodat de volgorde niet op drie
+// plekken uit elkaar kan lopen.
+export function crmVelden(r){
+  return [r.afzender||'', r.ontvangen||'', r.soort||'', r.mail||''];
 }
 
 // Kolommen L..S achter de sectievelden van een NIEUWE taakrij. `values` loopt tot en met K,
@@ -816,7 +920,7 @@ export function toevoegWaarden(values, r){
   return values.concat([
     '', '', '', '', r.aannemers||'',                         // L..O leeg, P = aannemerslijst
     r.taakId||'', r.bundelId||'', nulVeilig(r.bundelVolg),   // Q, R, S
-  ]);
+  ], r._sec==='CRM' ? crmVelden(r) : []);                     // T..W — alleen CRM
 }
 
 // De laatste kolomletter van het bereik dat `insertAndWriteRow` beschrijft. Puur en geëxporteerd,
@@ -1278,7 +1382,7 @@ export function afrondWaarden(r, sec, datum, toelichting, duurMin){
     // aan en laat M dus altijd leeg — bulk is opruimwerk en hoort niet in de meting.
     duurNaarCel(duurMin), '', '', '',         // M, N, O, P
     r.taakId||'', r.bundelId||'', nulVeilig(r.bundelVolg),  // Q, R, S
-  ]);
+  ], sec==='CRM' ? crmVelden(r) : []);        // T..W — de mail gaat mee naar het archief
 }
 
 async function doCompleteTask(){
@@ -1480,7 +1584,7 @@ async function submitTask(){
   state._submitBezig=true;
 
   try{
-    const subId={OPPAKKEN:'m-sub-opp',VERGADERVERZOEKEN:'m-sub-verg','OFFERTE-TRAJECTEN':'m-sub-off',LOD:'m-sub-lod','SUBSIDIE-TRAJECTEN':'m-sub-sub'}[sec];
+    const subId={OPPAKKEN:'m-sub-opp',VERGADERVERZOEKEN:'m-sub-verg','OFFERTE-TRAJECTEN':'m-sub-off',LOD:'m-sub-lod','SUBSIDIE-TRAJECTEN':'m-sub-sub',CRM:'m-sub-crm'}[sec];
     const sub=gv(subId);
     // Kolomvolgorde 'Nog Te Doen': … H=InBeh, I=Afgerond, J=(leeg), K=Subcategorie, L=Opvolg, …
     // De subcategorie moet dus op kolom K (index 10) staan — gelijk aan parseSections en de
@@ -1504,12 +1608,23 @@ async function submitTask(){
       case'SUBSIDIE-TRAJECTEN':
         values=[code,naam,gv('m-subsidie'),(!_faseGekozen && _onvertaalbaar['m-fase']) ? _onvertaalbaar['m-fase'] : faseWoord(_modalFase),gv('m-beh-s'),uitVeld('m-dl-s',toDutchDate(gv('m-dl-s'))),gv('m-opm-s'),
           document.getElementById('tog-ib-s').classList.contains('on'),'','',sub];break;
+      case'CRM':
+        values=[code,naam,gv('m-onderwerp'),(!_crmFaseGekozen && _onvertaalbaar['m-fase-c']) ? _onvertaalbaar['m-fase-c'] : _modalCrmFaseWoord(),gv('m-beh-c'),uitVeld('m-dl-c',toDutchDate(gv('m-dl-c'))),gv('m-opm-c'),
+          document.getElementById('tog-ib-c').classList.contains('on'),'','',sub];break;
     }
+    // CRM: T..W apart, want ze staan niet in SECS.keys. Een soort die niet in de vier knoppen past
+    // en niet is aangeklikt, gaat ongewijzigd terug (zie fillModalFields).
+    const crmExtra = sec==='CRM'
+      ? { afzender:gv('m-van'), ontvangen:uitVeld('m-ontv',toDutchDate(gv('m-ontv'))),
+          soort:(!_crmSoortGekozen && _onvertaalbaar['m-soort']) ? _onvertaalbaar['m-soort'] : _modalSoort(),
+          mail:gv('m-mail') }
+      : null;
+    if(sec==='CRM' && !gv('m-onderwerp')){ alert('Onderwerp is verplicht: één korte regel waar de vraag over gaat.'); return; }
 
     const endCol=String.fromCharCode(64+Math.max(values.length,9));
     const keys=SECS[sec].keys;
     const norm=v=>v===true?'TRUE':v===false?'FALSE':v; // boolean → Sheets-stringvorm
-    const newBeh=(sec==='OPPAKKEN'?gv('m-beh'):sec==='VERGADERVERZOEKEN'?gv('m-beh-v'):sec==='OFFERTE-TRAJECTEN'?gv('m-beh-o'):sec==='SUBSIDIE-TRAJECTEN'?gv('m-beh-s'):gv('m-beh-l'));
+    const newBeh=(sec==='OPPAKKEN'?gv('m-beh'):sec==='VERGADERVERZOEKEN'?gv('m-beh-v'):sec==='OFFERTE-TRAJECTEN'?gv('m-beh-o'):sec==='SUBSIDIE-TRAJECTEN'?gv('m-beh-s'):sec==='CRM'?gv('m-beh-c'):gv('m-beh-l'));
 
     // ── Lijkt deze nieuwe taak al te bestaan? ──
     // Alleen bij TOEVOEGEN, en alleen als vraag: twee taken die op elkaar lijken zijn soms écht
@@ -1563,6 +1678,7 @@ async function submitTask(){
       const aannCel = sec==='OFFERTE-TRAJECTEN' ? modalAannemersCel() : null;
       keys.forEach((k,i)=>{ doelRow[k]=norm(values[i]); });
       doelRow.subcategorie=values[values.length-1];
+      if(crmExtra) Object.assign(doelRow, crmExtra);
       // Offerte: gooi de gecachete handmatige X/N weg zodat de net-bewerkte kolom-D-waarde
       // meteen wordt herkend (anders pas zichtbaar ná de stille resync). Harmloos elders.
       delete doelRow._offertesManual;
@@ -1575,7 +1691,7 @@ async function submitTask(){
       // nog met de oude vergelijkt. Dat gaf een valse 'Iemand heeft deze taak net gewijzigd',
       // een teruggerolde bewerking op het scherm — en de schuld bij een collega die niets deed.
       // De logregels dragen om dezelfde reden hun eigen vlag: een append is niet idempotent.
-      let geschreven=false, behGelogd=false, faseGelogd=false;
+      let geschreven=false, behGelogd=false, faseGelogd=false, crmGeschreven=false;
       backgroundWrite(
         async ()=>{
           if(!geschreven){
@@ -1584,6 +1700,12 @@ async function submitTask(){
             // er op dit moment nog in de Sheet hoort te staan.
             await writeRange(`'Nog Te Doen'!A${doelRow._row}:${endCol}${doelRow._row}`,values);
             geschreven=true;
+          }
+          // CRM: T..W als tweede schrijfactie in DEZELFDE beurt — na de rij-controle hierboven, dus
+          // op dezelfde, gecontroleerde rij. Eigen vlag, want bij een herkansing is de eerste al gedaan.
+          if(crmExtra && !crmGeschreven){
+            await writeRange(`'Nog Te Doen'!T${doelRow._row}:W${doelRow._row}`,crmVelden(crmExtra));
+            crmGeschreven=true;
           }
           if(newBeh && newBeh!==(oudeWaarden.behandelaar||'') && !behGelogd){
             fireNotifEvent('assigned',{sec,code,naam,behandelaar:newBeh});
@@ -1599,13 +1721,19 @@ async function submitTask(){
             if(w) await logEvent(code,sec,'Fase gewijzigd','fase',w.van,w.naar);
             faseGelogd=true;
           }
+          if(sec==='CRM' && !faseGelogd){
+            const w=crmFaseWijziging(oudeWaarden.crmFase, doelRow.crmFase);
+            if(w) await logEvent(code,sec,'Fase gewijzigd','fase',w.van,w.naar);
+            faseGelogd=true;
+          }
           // Bevestiging pas hier: vóór de write was 'Opgeslagen' een belofte, geen feit.
           // Helemaal onderaan de writeFn, zodat een _withRetry-herkansing er geen tweede
           // kan opleveren. geenDedup: twee keer dezelfde taak opslaan binnen 15 s moet
           // twee bevestigingen geven, anders leest de tweede als 'mislukt'.
           showToast('Opgeslagen',`${code} — ${naam||''}`,null,'opslaan',{geenDedup:true,geenSysteemmelding:true});
         },
-        ()=>{ keys.forEach(k=>{ doelRow[k]=oudeWaarden[k]; }); doelRow.subcategorie=oudeWaarden.subcategorie; delete doelRow._offertesManual; },
+        ()=>{ keys.forEach(k=>{ doelRow[k]=oudeWaarden[k]; }); doelRow.subcategorie=oudeWaarden.subcategorie; delete doelRow._offertesManual;
+              if(crmExtra) ['afzender','ontvangen','soort','mail'].forEach(k=>{ doelRow[k]=oudeWaarden[k]; }); },
         'Opslaan mislukt'
       );
       // De bundelkoppeling is een APARTE schrijfweg (kolom Q, R en S) en loopt bewust niet mee in
@@ -1649,6 +1777,8 @@ async function submitTask(){
       // De aannemerslijst gaat bij een nieuwe taak mee in de rij zelf (kolom P) — één
       // atomaire A..S-write, geen tweede actie.
       nieuw.aannemers = sec==='OFFERTE-TRAJECTEN' ? modalAannemersCel() : '';
+      // CRM: T..W zitten in dezelfde atomaire write (toevoegWaarden), geen tweede actie.
+      if(crmExtra) Object.assign(nieuw, crmExtra);
       // Een nieuw offerte-traject wordt meteen bundelkop: R = eigen taaknummer, S = '0'.
       // Niet wanneer dit zélf een subtaak is (state._nieuwBundel) — bundels blijven één laag diep.
       const autoVoorleg = sec==='OFFERTE-TRAJECTEN' && !bdl;
@@ -1760,6 +1890,7 @@ async function submitTask(){
         extraRij.bundelId  = autoVoorleg ? extraRij.taakId : '';   // elk traject zijn eigen bundel
         extraRij.bundelVolg= autoVoorleg ? '0' : '';
         extraRij.aannemers = nieuw.aannemers;   // zelfde aanvraag, zelfde aannemers per VvE
+        if(crmExtra) Object.assign(extraRij, crmExtra);   // CRM: zelfde vraag, zelfde afzender
         blokValues.push(toevoegWaarden(vals, extraRij));
         rijen.push(extraRij);
       });
@@ -1885,6 +2016,30 @@ async function zetSubsidieFase(rid, stap){
   );
 }
 
+// Hetzelfde voor een CRM-vraag: fase naar kolom D van het CRM-blok. Eigen functie en eigen
+// klikactie ('crm-fase'), zodat een bolletje in de ene sectie nooit het veld van de andere raakt.
+async function zetCrmFase(rid, stap){
+  const r = taakUitCache(rid);
+  if(!r || r._sec !== 'CRM') return;
+  const nieuw = crmFaseWoord(stap), oud = r.crmFase || '';
+  if(nieuw === oud) return;
+  if(blokkeerOffline()) return;
+  if(!await ensureToken()){alert('Inloggen mislukt. Probeer het opnieuw.');return}
+  r.crmFase = nieuw;
+  renderAll();
+  backgroundWrite(
+    async ()=>{
+      await assertRowMatch(r._row, {...r, crmFase: oud});
+      await writeRange(`'Nog Te Doen'!D${r._row}`, [nieuw]);
+      const w=crmFaseWijziging(oud, nieuw);
+      if(w) await logEvent(r.code, 'CRM', 'Fase gewijzigd', 'fase', w.van, w.naar);
+      showToast('Fase bijgewerkt', `${r.code} — ${nieuw}`, null, 'opslaan', {geenSysteemmelding:true});
+    },
+    ()=>{ r.crmFase = oud; },
+    'Fase opslaan mislukt'
+  );
+}
+
 export {
   openModal, editRow, closeModal, fillModalFields, setv, clearModal, kiesSectie,
   getSheetIds, _sheetBreedtes, getInsertRow, bevestigInvoegPlek, insertAndWriteRow, insertAndWriteRows, deleteCurrentEditTask, deleteTaskRow,
@@ -1892,6 +2047,7 @@ export {
   getAfInsertRow, completeTask, completeCurrentEditTask, doCompleteTask, closeCompleteModal, submitTask, gv,
   OMSCHRIJVING_VELD, zetOmschrijving, taakUitCache,
   _verseRijIdx, _herankerRij, zetSubsidieFase, kiesModalFase, _modalFaseWoord,
+  zetCrmFase, kiesModalCrmFase, _modalCrmFaseWoord, kiesModalSoort, _modalSoort, crmOntvangenGewijzigd,
   zetDeadlineVoorstel, DEADLINE_VELD, DEADLINE_HINT_VELD, renderExtraVves, toonMeerVve, herzieAlsSubtaak,
   offerteAanvraagGewijzigd,
   _bewerkRijVers,

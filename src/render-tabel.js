@@ -2,7 +2,7 @@
 //  RENDER-TABEL — generieke tabel/paginering (thead, tbody, rij-render, paginatie)
 //  Verplaatst uit render-lijsten.js (Batch D / punt 11) — zuivere refactor, geen gedragswijziging.
 // ══════════════════════════════════════
-import { esc, vveCodeSpan, persBadges, subBadge, taakActieKnoppen, offProg, emptyRow, berekenPrioriteit, opvolgStatus, taakTitel, kortDatum, _verschilInKalenderdagen, _vandaagAmsterdam, stilDrempel, aannSleutel, parseWeekPeriode, metDagnamen, offerteAangevraagd, teLaatVoorTelling } from "./util.js";
+import { esc, vveCodeSpan, persBadges, subBadge, taakActieKnoppen, offProg, emptyRow, berekenPrioriteit, opvolgStatus, taakTitel, kortDatum, _verschilInKalenderdagen, _vandaagAmsterdam, stilDrempel, aannSleutel, parseWeekPeriode, metDagnamen, offerteAangevraagd, teLaatVoorTelling, crmWacht } from "./util.js";
 import { rijSleutel } from "./rij.js";
 import { SECS, SKEYS, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
@@ -10,6 +10,7 @@ import { bulkGeselecteerd } from "./bulk.js";
 import { offerteAannSamenvatting, offerteAannemerPaneel } from "./render-offerte.js";
 import { ico } from "./icons.js";
 import { faseRijHtml } from "./subsidie-fase.js";
+import { crmFaseRijHtml } from "./crm-fase.js";
 import { heeftInBehandeling } from "./inbehandeling.js";
 import { zichtbareKop, bundelVan, zelfdeTaak } from "./bundel.js";
 import { bundelKopExtra, bundelPaneelHtml, bundelMerkje, STAPEL_GREEP } from "./render-bundel.js";
@@ -495,6 +496,19 @@ function rowNtd(r,sec){
         <td class="cell-note"><span class="ct" title="${esc(r.opmerkingen||'')}">${esc(r.opmerkingen||'')}</span></td>
         <td>${editBtn}</td>`;
       break;
+    // CRM (v13.0). Zeven kolommen: Vraag = soortlabel + kort onderwerp, Van = afzender, Fase = vier
+    // bolletjes, Wacht = dagen sinds ontvangst. Opmerkingen staan in het uitklappaneel eronder
+    // (crmMailRij). Houd dit gelijk aan SECS.CRM.cols.
+    case'CRM':
+      cells=`<td>${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
+        <td class="${naamCls}"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie, sec)}${bdlNaam}</td>
+        <td class="cell-txt"><div class="pil-rij"><div class="crm-vraag">${r.soort?`<span class="crm-soort">${esc(r.soort)}</span>`:''}<span class="ct" title="${esc(r.onderwerp||'')}">${esc(r.onderwerp||'')}</span></div>${extraPills}</div></td>
+        ${crmVanCel(r.afzender)}
+        <td>${crmFaseRijHtml(r.crmFase, rid)}</td>
+        ${crmWachtCel(r)}
+        <td>${persBadges(r.behandelaar, true)}</td>
+        <td>${editBtn}</td>`;
+      break;
   }
   const rowPrio  = berekenPrioriteit(r.deadline, sec).prioriteit;
   const rowTeLaat = teLaatVoorTelling(r, sec);
@@ -527,7 +541,51 @@ function rowNtd(r,sec){
   // komen. `rid` is een directe index in state._rowCache — precies het mechanisme waarmee elke
   // andere rij-actie (bewerken, wegleggen, afronden, bulk) hier al werkt. Op `_row` zoeken zou
   // een scan door alle vijf de secties van D.ntd worden voor iets wat hier al bij de hand is.
-  return `<tr class="${rowCls}" data-row="${r._row}" data-rid="${rid}" data-uitklap="${esc(rijSleutel(r))}"${prioAttr}>${bulkCel}${cells}</tr>${aannRow}${bdlNa}`;
+  const crmRij = sec==='CRM' ? crmMailRij(r, (state.bulkMode?1:0)+SECS[sec].cols.length+1) : '';
+  return `<tr class="${rowCls}" data-row="${r._row}" data-rid="${rid}" data-uitklap="${esc(rijSleutel(r))}"${prioAttr}>${bulkCel}${cells}</tr>${crmRij}${aannRow}${bdlNa}`;
+}
+
+// ── CRM-cellen ──
+// Van: de afzender, en wat er na de eerste komma staat (meestal het huisnummer) gedempt eronder.
+function crmVanCel(afzender){
+  const a = String(afzender||'').trim();
+  const k = a.indexOf(',');
+  const naam = k > -1 ? a.slice(0, k).trim() : a;
+  const nr   = k > -1 ? a.slice(k + 1).trim() : '';
+  return `<td class="crm-van"><span class="ct" title="${esc(a)}">${esc(naam)}</span>${nr?`<span class="crm-nr">${esc(nr)}</span>`:''}</td>`;
+}
+// Amber vanaf 2 dagen vóór de deadline, niet vanaf 7 (BIJNA_TE_LAAT_DAGEN): de hele termijn is maar
+// 5 werkdagen, dus met 7 zou elke vraag al amber zijn op de dag dat hij binnenkomt. Zelfde grens als
+// 'hoog' in PRIO_REGELS.CRM.
+const CRM_BIJNA_DAGEN = 2;
+// Wacht: dagen sinds ontvangst, met eronder hoe dat zich tot de deadline verhoudt — dezelfde
+// .dl-2-vorm en kleuren als de deadlinecel, zodat 'te laat' er overal hetzelfde uitziet. Zonder
+// ontvangstdatum (een taak die vanuit Oppakken hierheen verhuisde) valt hij terug op de gewone
+// deadlinecel: dan is er niets om te tellen, maar de deadline blijft zichtbaar.
+function crmWachtCel(r){
+  const w = crmWacht(r);
+  if(!w) return deadlineCel(r, 'CRM');
+  const woord = w.dagen === 1 ? '1 dag' : `${w.dagen} dagen`;
+  const titel = `Ontvangen ${r.ontvangen}` + (r.deadline ? ` · reactie uiterlijk ${r.deadline}` : '');
+  if(w.dagenTot !== null && w.dagenTot < 0)
+    return `<td title="${esc(titel)}"><span class="dl-2 laat"><span class="dl-dat">${woord}</span><span class="dl-bij">${-w.dagenTot}d te laat</span></span></td>`;
+  if(w.dagenTot !== null && w.dagenTot <= CRM_BIJNA_DAGEN)
+    return `<td title="${esc(titel)}"><span class="dl-2 bijna"><span class="dl-dat">${woord}</span><span class="dl-bij">${w.dagenTot===0?'vandaag':`nog ${w.dagenTot}d`}</span></span></td>`;
+  return `<td title="${esc(titel)}"><span class="s-normal">${woord}</span></td>`;
+}
+// Het uitklappaneel: ALTIJD getekend, en via CSS alleen zichtbaar als de rij erboven openstaat
+// (`tr.expanded + .crm-mail-tr`). Het openklikken in main.js zet alleen een klasse en tekent niet
+// opnieuw; zo werkt het paneel mee zonder dat daar iets aan verandert.
+function crmMailRij(r, kolommen){
+  const van = String(r.afzender||'').trim();
+  const meta = [r.ontvangen ? `ontvangen ${r.ontvangen}` : '', r.soort||''].filter(Boolean).join(' · ');
+  const mail = String(r.mail||'').trim();
+  const notitie = String(r.opmerkingen||'').trim();
+  return `<tr class="crm-mail-tr"><td colspan="${kolommen}"><div class="crm-mail">`
+       + `<div class="crm-mail-kop"><span>${van ? `Mail van <b>${esc(van)}</b>` : 'Mail van de eigenaar'}</span>${meta?`<span class="crm-mail-meta">${esc(meta)}</span>`:''}</div>`
+       + (mail ? `<div class="crm-mail-tekst">${esc(mail)}</div>` : `<div class="crm-mail-leeg">Geen mail bewaard. Plak hem in het bewerkscherm.</div>`)
+       + (notitie ? `<div class="crm-notitie"><span class="crm-notitie-lbl">Interne notitie</span>${esc(notitie)}</div>` : '')
+       + `</div></td></tr>`;
 }
 
 function rowAf(r,sec){

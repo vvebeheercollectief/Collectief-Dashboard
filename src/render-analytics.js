@@ -701,6 +701,7 @@ function buildDash(){
     'OFFERTE-TRAJECTEN':`<span style="background:var(--pu-l);color:var(--pu)" class="badge">Offerte</span>`,
     LOD:`<span style="background:var(--rd-l);color:var(--rd)" class="badge">LOD</span>`,
     'SUBSIDIE-TRAJECTEN':`<span style="background:var(--tl-l);color:var(--tl)" class="badge">Subsidie</span>`,
+    'CRM':`<span style="background:var(--pk-l);color:var(--pk)" class="badge">CRM</span>`,
   };
   const all=SKEYS.flatMap(s=>(D.af[s]||[]).map(r=>({...r,_sec:s})));
   all.sort((a,b)=>parseDt(b.datum)-parseDt(a.datum));

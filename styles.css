@@ -1412,6 +1412,50 @@
   .fase-rij:not(.fase-rij-modal) .fase-bol::before{content:'';position:absolute;inset:-11px -3px}
 }
 
+/* ══ CRM (v13.0) ══
+   Alles hieronder hangt aan een CRM-klasse of aan #fg-crm, zodat de andere vijf tabbladen niets
+   merken. Kleur via --pk (roze), in beide thema's al gedefinieerd in :root en [data-theme=dark]. */
+
+/* Fase-bolletjes: zelfde balk als Subsidie, maar roze en met vier stappen. */
+.fase-rij.crm-fase{min-width:140px}
+.fase-rij.crm-fase .fase-bol.af{background:var(--pk);border-color:var(--pk)}
+.fase-rij.crm-fase .fase-bol.nu{background:var(--sur);border-color:var(--pk)}
+.fase-rij.crm-fase .fase-bol:focus-visible{outline-color:var(--pk)}
+.fase-rij.crm-fase .fase-lijn.af{background:var(--pk)}
+.fase-rij.crm-fase.fase-rij-modal{min-width:0;max-width:220px}
+
+/* Vraag-kolom: soortlabel + kort onderwerp op één regel. Het label krimpt nooit; het onderwerp
+   kapt af met … zoals elke tekstcel (klik de rij open voor de rest). */
+.crm-vraag{display:flex;align-items:baseline;gap:8px;min-width:0}
+.crm-vraag .ct{min-width:0}
+.crm-soort{flex:none;font-size:11px;font-weight:600;padding:1px 7px;border-radius:5px;background:#eef1f4;color:#5b6675}
+[data-theme=dark] .crm-soort{background:#2a2f38;color:#cfd5df}
+
+/* Van-kolom: naam, met het huisnummer (of wat er na de komma staat) gedempt eronder. */
+.crm-van .ct{font-weight:600}
+.crm-nr{display:block;font-size:11px;color:var(--mut);font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Uitklappaneel onder een opengeklikte CRM-rij: de mail en de interne notitie. */
+.crm-mail-tr td{padding:0 16px 14px;background:var(--sur)}
+.crm-mail{border-left:2px solid var(--pk);background:var(--bg);border-radius:0 8px 8px 0;padding:12px 16px;display:grid;gap:10px;max-width:980px}
+.crm-mail-kop{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 16px;font-size:12.5px;color:var(--txt)}
+.crm-mail-meta{color:var(--mut);font-family:var(--font-mono);font-size:11.5px}
+.crm-mail-tekst{font-size:13px;line-height:1.65;max-width:72ch;color:var(--txt);white-space:pre-wrap;overflow-wrap:anywhere}
+.crm-mail-leeg{font-size:12.5px;color:var(--mut);font-style:italic}
+.crm-notitie{font-size:12.5px;color:var(--mut);border-top:1px solid var(--bor);padding-top:8px;display:flex;gap:10px;flex-wrap:wrap;white-space:pre-wrap}
+.crm-notitie-lbl{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--mut)}
+
+/* Soort-knoppen in het bewerkscherm. */
+.crm-keuzes{display:flex;flex-wrap:wrap;gap:6px}
+.crm-keus{border:1px solid var(--bor-input,var(--bor));background:var(--sur);border-radius:8px;padding:7px 13px;font:inherit;font-size:13px;font-weight:600;color:var(--mut);cursor:pointer}
+.crm-keus.aan{background:var(--pk-l);border-color:var(--pk);color:var(--pk)}
+.crm-keus:focus-visible{outline:2px solid var(--pk);outline-offset:2px}
+
+/* Het zoekveld van Nog Te Doen: 203 → 140px. Met zes tabbladen paste de kopbalk bij 1920px anders
+   niet meer op één regel (gemeten: 8px speelruimte, de CRM-tab kost 66). 12+14+8+92+12+2 = 140.
+   Alleen dit veld; het zoekveld van Afgerond houdt zijn breedte. */
+#s-ntd{width:92px}
+
 /* ── Chat-velden: zelfde afwerking als de overige invoervelden ── */
 .chat-invoer input,.chat-vve-wrap input{border:1px solid var(--bor);border-radius:9px;padding:8px 11px;background:var(--sur2);color:var(--txt);outline:none;height:36px;transition:border var(--tr),box-shadow var(--tr)}
 .chat-invoer input:focus,.chat-vve-wrap input:focus{border-color:var(--ac);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 14%,transparent)}
@@ -2075,3 +2119,9 @@ td>.stapel-h{margin-right:9px}
     #hist-body .log-r{padding:4px 6px}
     #hist-body .log-tx{font-size:12.5px}
     .hist-veld{display:block;font-size:11px;color:var(--mut);margin-bottom:1px}
+
+/* CRM-uitklappaneel: standaard dicht, open zodra de rij erboven .expanded is (main.js zet alleen
+   die klasse, zonder opnieuw te tekenen). */
+.crm-mail-tr{display:none}
+tr.expanded + .crm-mail-tr{display:table-row}
+#ntd-tbody tr[data-row] + .crm-mail-tr td{border-top:none}

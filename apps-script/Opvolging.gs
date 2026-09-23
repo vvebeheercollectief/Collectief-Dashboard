@@ -11,9 +11,11 @@ const CD_STIL_ESCALATIE_REGELS = {
   'OFFERTE-TRAJECTEN': { trap1: 21, trap2: 35 },
   'LOD':               { trap1: 30, trap2: 60 },
   'SUBSIDIE-TRAJECTEN': { trap1: 21, trap2: 42 },
+  // CRM (v13.0): na 3 dagen zonder activiteit de behandelaar, na 7 dagen ook Jer.
+  'CRM':               { trap1:  3, trap2:  7 },
 };
 const HR_SHEET = 'Herhaalregels';
-const CD_OPV_SKEYS = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN'];
+const CD_OPV_SKEYS = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN','CRM'];
 
 function cd_opvolgingMotor() {
   cd_lockedRun('cd_opvolgingMotor', function () {
@@ -278,6 +280,8 @@ function cd_opvolgWakker() {
 // ── 4. Stille dossiers: twee-traps escalatie met stempel in kolom N ──
 // Scope = zelfde als de 'Stil'-pil: in behandeling; OFFERTE-TRAJECTEN (geen
 // in-behandeling-veld) telt als geheel mee. Weggelegde taken slaan we over.
+// CRM telt ook als geheel mee (v13.0): een vraag van een eigenaar waar nog niemand aan zit is
+// precies de vraag die niet stil mag blijven liggen.
 function cd_escaleerStilleDossiers() {
   const sheet = SpreadsheetApp.getActive().getSheetByName(NTD_SHEET);
   if (!sheet) return;
@@ -297,7 +301,7 @@ function cd_escaleerStilleDossiers() {
       const naam = (data[i][1] || '').toString().trim();
       const beh  = (data[i][4] || '').toString().trim();
       const ib   = ((data[i][7] || '') + '').toString().toUpperCase() === 'TRUE';
-      if (!ib && curSec !== 'OFFERTE-TRAJECTEN') continue;
+      if (!ib && curSec !== 'OFFERTE-TRAJECTEN' && curSec !== 'CRM') continue;
       const opvolg = cd_parseDate(data[i][11]);
       if (opvolg && opvolg.getTime() > today.getTime()) continue; // weggelegd = bewust geparkeerd
       const laatst = cd_laatsteActiviteit(stilMap, code, curSec);

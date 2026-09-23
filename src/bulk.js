@@ -180,7 +180,7 @@ function _sluitMenus(){ document.querySelectorAll('.bb-menu').forEach(m=>m.class
 // Kolomletters in 'Nog Te Doen': behandelaar is overal E (keys-index 4);
 // deadline is D bij OPPAKKEN (index 3) en F bij de andere vier (index 5).
 const BULK_BEH_KOLOM='E';
-const BULK_DEADLINE_KOLOM={OPPAKKEN:'D',VERGADERVERZOEKEN:'F','OFFERTE-TRAJECTEN':'F',LOD:'F','SUBSIDIE-TRAJECTEN':'F'};
+const BULK_DEADLINE_KOLOM={OPPAKKEN:'D',VERGADERVERZOEKEN:'F','OFFERTE-TRAJECTEN':'F',LOD:'F','SUBSIDIE-TRAJECTEN':'F',CRM:'F'};
 const OPVOLG_KOLOM='L';
 
 // Serialiseer een taakrij naar de NTD-kolomwaarden — gedeelde bron in crud.js

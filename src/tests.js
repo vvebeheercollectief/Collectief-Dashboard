@@ -643,6 +643,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       'taak-inbehandeling': 'taakUitCache',
       'bulk-vink':          'verseRij',
       'subsidie-fase':      'taakUitCache',
+      'crm-fase':           'taakUitCache',
       'ontw-bewerken':      'taakUitCache',
     };
     try{
@@ -1955,7 +1956,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         }
         return new Response(JSON.stringify({error:{message:'geen leesronde in deze test'}}),{status:403});
       };
-      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
 
       // 1. DEADLINE die geen datum is.
       const rij={ _row:70, _sec:'OPPAKKEN', code:'311212', naam:'Testflat', actiepunt:'Werk',
@@ -2056,7 +2057,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         }
         return new Response(JSON.stringify({error:{message:'geen leesronde in deze test'}}),{status:403});
       };
-      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
       const maakRij=()=>({ _row:73, _sec:'OFFERTE-TRAJECTEN', code:'311212', naam:'Testflat',
                            datumAangevraagd:'', offertes:'0/3', behandelaar:'Jer', deadline:'',
                            opmerkingen:'', subcategorie:'', aannemers:'MoTec|1\nVan der Herp|0' });
@@ -2145,7 +2146,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         }
         return new Response(JSON.stringify({error:{message:'geen leesronde in deze test'}}),{status:403});
       };
-      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
       const rij={ _row:74, _sec:'OFFERTE-TRAJECTEN', code:'311212', naam:'Testflat', taakId:'9901',
                   datumAangevraagd:'20 aug 2026', offertes:'1/3', behandelaar:'Jer',
                   deadline:'25-08-2026', opmerkingen:'Dakrenovatie', aannemers:'' };
@@ -2699,7 +2700,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         klem5.textContent = '#ntd-tbl-wrap{width:1150px !important}';
         document.head.appendChild(klem5);
         try{
-          const leeg5 = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+          const leeg5 = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
           const t5 = (taakId, volg) => ({ _row: 20 + (+volg||0)/10, taakId, bundelId:'Tkop', bundelVolg:volg,
             _sec:'OPPAKKEN', code:'311212', naam:'Vereniging Parkzicht Noord', actiepunt:'Werk',
             deadline:'', behandelaar:'Jer', opmerkingen:'', inBehandeling:'' });
@@ -2762,7 +2763,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         document.head.appendChild(klem6);
         try{
           const secs6 = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN'];
-          const leeg6 = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+          const leeg6 = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
           // MET ÉN ZONDER selecteerstand. In die stand komt er een vinkjeskolom van 48px bij en
           // krimpen alle gewichtskolommen mee — daar liep 'BEHANDELAAR' nog over 'DEADLINE' heen
           // terwijl de gewone weergave al klopte.
@@ -5387,7 +5388,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     try{
       state.oauthToken='nep-token'; state.oauthExpiry=Date.now()+9e5; state._uitCache=false;
       state._sheetIds={ 'Nog Te Doen':1, 'Afgerond':2 };
-      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
       const t=(row,id,act)=>({ _row:row, _sec:'OPPAKKEN', taakId:id, bundelId:'', bundelVolg:'',
         code:'311212', naam:'Testflat', actiepunt:act, deadline:'', behandelaar:'', prioriteit:'',
         opmerkingen:'', inBehandeling:'', subcategorie:'' });
@@ -5444,7 +5445,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const afOud=D.af, _alert=window.alert, meldingen=[];
     window.alert=m=>meldingen.push(String(m));
     try{
-      const leegAf={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const leegAf={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
       const t=(row,id,act)=>({ _row:row, _sec:'OPPAKKEN', taakId:id, bundelId:'', bundelVolg:'',
         code:'311212', naam:'Testflat', actiepunt:act, deadline:'', behandelaar:'', prioriteit:'',
         opmerkingen:'', inBehandeling:'', subcategorie:'' });
@@ -5708,7 +5709,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     try{
       D.alvo=[{code:'900001',naam:'VvE Eerste'},{code:'900002',naam:'VvE Tweede'}];
       D.ntd={OPPAKKEN:[{_sec:'OPPAKKEN',_row:5,code:'900003',naam:'VvE Derde uit de takenlijst'}],
-             VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[]};
+             VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[],CRM:[]};
       // _zetNaamVeld stempelt de code waarvoor de naam geldt
       _zetNaamVeld('900001','VvE Eerste');
       eq('vve-naam: het veld draagt de code waarvoor de naam geldt',
@@ -6101,7 +6102,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   console.log('%c[TESTS] Subsidie-trajecten', 'background:#0F766E;color:white;padding:2px 6px;border-radius:3px');
 
   // ── Sectiedefinitie ──
-  eq('SECS heeft vijf secties', Object.keys(SECS).length, 5);
+  eq('SECS heeft zes secties (sinds CRM, v13.0)', Object.keys(SECS).length, 6);
   eq('subsidie is de laatste sectie', Object.keys(SECS)[4], 'SUBSIDIE-TRAJECTEN');
   eq('subsidie-label', SECS['SUBSIDIE-TRAJECTEN'].label, 'Subsidie-trajecten');
   eq('subsidie heeft 7 kolomkoppen', SECS['SUBSIDIE-TRAJECTEN'].cols.length, 7);
@@ -6217,7 +6218,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   // in ntd én af, plus alvo/alfa/logboek.
   const _Dsub = {
     ntd: { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[_sr] },
-    af:  { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] },
+    af:  { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] },
     alvo: [{ code:'311028', naam:'VvE Naarderstraat' }], alfa: [], logboek: [],
   };
   truthy('dossier-context noemt de omschrijving',
@@ -6260,7 +6261,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '12.9');
+  eq('versie opgehoogd', APP_VERSION, '13.0');
 
   // ── Tabbladen ÍN de kaartkop (v11.7) ──
   // De kop van de kaart zei links exact hetzelfde als het actieve tabblad — 'Oppakken' boven
@@ -6602,10 +6603,11 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('vijfde formuliergroep bestaat', !!document.getElementById('fg-sub'));
   ['m-subsidie','m-beh-s','m-dl-s','m-opm-s','m-sub-sub','tog-ib-s','m-fase']
     .forEach(id => truthy(`veld ${id} bestaat`, !!document.getElementById(id)));
-  ['m-sub-opp','m-sub-verg','m-sub-off','m-sub-lod','m-sub-sub'].forEach(id => {
+  ['m-sub-opp','m-sub-verg','m-sub-off','m-sub-lod','m-sub-sub','m-sub-crm'].forEach(id => {
     const opts = [...document.getElementById(id).options].map(o => o.text);
     truthy(`${id} biedt Subsidie-trajecten`, opts.includes('Subsidie-trajecten'));
-    eq(`${id} heeft Geen + vijf secties`, opts.length, 6);
+    truthy(`${id} biedt CRM`, opts.includes('CRM'));
+    eq(`${id} heeft Geen + zes secties`, opts.length, 7);
   });
 
   // ── Schrijfwegen ──
@@ -6879,7 +6881,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     // Verse lege secties per aanroep, niet gedeeld: `{...leeg}` zou D.af en D.ntd dezelfde
     // ARRAY-VERWIJZING voor OPPAKKEN geven (zie de toelichting bij het bulk-afronden-blok
     // hieronder), en dan telt _shiftNtdRows/_shiftAfRows rijen mee die het niet aangaan.
-    const versLeeg=()=>({ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] });
+    const versLeeg=()=>({ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] });
     const taak=(row)=>({ _sec:'OPPAKKEN', _row:row, code:'DUUR-1', naam:'VvE Duurtoets',
       actiepunt:'Duurtoets', deadline:'', behandelaar:'', prioriteit:'', opmerkingen:'',
       inBehandeling:'', subcategorie:'', opvolgdatum:'', taakId:'TD-'+row, bundelId:'', bundelVolg:'' });
@@ -7047,7 +7049,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       OPPAKKEN: [ t('Tb','Tkop','10','OPPAKKEN'), t('Tlos','','','OPPAKKEN') ],
       LOD: [], 'SUBSIDIE-TRAJECTEN': [],
     };
-    const af = { OPPAKKEN: [], VERGADERVERZOEKEN: [], 'OFFERTE-TRAJECTEN': [], LOD: [], 'SUBSIDIE-TRAJECTEN': [] };
+    const af = { OPPAKKEN: [], VERGADERVERZOEKEN: [], 'OFFERTE-TRAJECTEN': [], LOD: [], 'SUBSIDIE-TRAJECTEN': [], CRM: [] };
     const ix = bouwBundelIndex(ntd, af);
     eq('index: één bundel gevonden', ix.size, 1);
     eq('index: leden op volgnummer gesorteerd',
@@ -7065,7 +7067,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     eq('kop: afgerond lid is als afgerond gemarkeerd', ix2.get('Tkop')[0].af, true);
 
     // Alles afgerond → geen zichtbare kop meer.
-    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
     const alAf = { ...leeg, OPPAKKEN:[ t('Tb','Tkop','10','OPPAKKEN') ] };
     const ix3 = bouwBundelIndex(leeg, alAf);
     eq('kop: geen kop als alles afgerond is', zichtbareKop(ix3.get('Tkop')), null);
@@ -7258,8 +7260,8 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     // bundelVan: elke ingang afgevangen. Een ontbrekende index hoort bij een vroege render.
     const ntdB = { OPPAKKEN:[ { taakId:'Tkop', bundelId:'Tkop', bundelVolg:'0', _sec:'OPPAKKEN' },
                               { taakId:'Ta', bundelId:'Tkop', bundelVolg:'10', _sec:'OPPAKKEN' } ],
-                   VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
-    const legeAf = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+                   VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
+    const legeAf = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
     const ixB = bouwBundelIndex(ntdB, legeAf);
     eq('bundelVan: vindt de bundel van een lid',
        (bundelVan(ixB, ntdB.OPPAKKEN[1]) || []).map(m => m.r.taakId), ['Tkop','Ta']);
@@ -7283,7 +7285,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     // keuzes vast die anders stil kunnen omdraaien — vallen op een subtaak voegt je toe aan DIE
     // bundel, en een taak met eigen subtaken kan nergens onder.
     const t = (taakId, bundelId, volg) => ({ taakId, bundelId, bundelVolg:volg, _sec:'OPPAKKEN', code:'311212' });
-    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
     const kop = t('Tkop','Tkop','0'), sub = t('Tb','Tkop','10'), los = t('Tlos','',''), los2 = t('Tl2','','');
     const ix = bouwBundelIndex({ ...leeg, OPPAKKEN:[kop, sub, los, los2] }, leeg);
 
@@ -7396,7 +7398,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     // of erger, hij verbergt keuzes die wél mogen.
     const t = (taakId, bundelId, volg, sec, tekst) => ({ taakId, bundelId, bundelVolg:volg, _sec:sec,
       code:'311212', naam:'Testflat', actiepunt:tekst, deadline:'' });
-    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
     const ntd = { ...leeg,
       OPPAKKEN:[ t('Ta','','','OPPAKKEN','Losse taak'), t('Tb','Tb','0','OPPAKKEN','Kop met sub') ],
       VERGADERVERZOEKEN:[ t('Tc','Tb','10','VERGADERVERZOEKEN','Subtaak') ] };
@@ -7457,7 +7459,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     // wijst niemand meer naar de zichtbare kop en bleef de waarschuwing stil weg. Zie het blok
     // 'kop doorgeschoven' onderaan — dat is het geval dat live op de testomgeving misging.
     const t = (taakId, bundelId, volg, sec) => ({ taakId, bundelId, bundelVolg:volg, _sec:sec, code:'311212' });
-    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
     const kop = t('Tkop','Tkop','0','VERGADERVERZOEKEN');
     const subB = t('Tb','Tkop','10','OPPAKKEN'), subC = t('Tc','Tkop','20','OPPAKKEN');
     const ix = bouwBundelIndex({ ...leeg, VERGADERVERZOEKEN:[kop], OPPAKKEN:[subB, subC] }, leeg);
@@ -7578,7 +7580,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   (() => {
     const t = (taakId, bundelId, volg, sec, over) => ({ taakId, bundelId, bundelVolg:volg,
       _sec:sec, code:'381005', naam:'VvE Oudemansstraat', periode:'sept/okt', deadline:'', ...over });
-    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
     const kop  = t('Tkop','Tkop','0','VERGADERVERZOEKEN');
     const sub  = t('Tsub','Tkop','10','OFFERTE-TRAJECTEN', { opmerkingen:'Agenderen' });
     const los  = t('Tlos','','','OPPAKKEN');
@@ -7622,7 +7624,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   (() => {
     const t = (taakId, bundelId, volg, sec, over) => ({ taakId, bundelId, bundelVolg:volg,
       _sec:sec, code:'381005', naam:'VvE Oudemansstraat', deadline:'', ...over });
-    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
     const kop  = t('Tkop','Tkop','0','VERGADERVERZOEKEN', { periode:'sept/okt' });
     const s2   = t('Ts2','Tkop','20','OFFERTE-TRAJECTEN',  { opmerkingen:'Offertes' });
     const s1   = t('Ts1','Tkop','10','OPPAKKEN',           { actiepunt:'Agenderen' });
@@ -7680,7 +7682,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   (() => {
     const vC=state.vveCode, vN=D.ntd, vA=D.af;
     try{
-      const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
       const t = (o) => ({ code:'DOS1', naam:'VvE Dossierhof', deadline:'', behandelaar:'',
                           inBehandeling:'FALSE', opvolgdatum:'', taakId:'', bundelId:'',
                           bundelVolg:'', ...o });
@@ -7714,7 +7716,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   (() => {
     const t = (taakId, bundelId, volg, sec) => ({ taakId, bundelId, bundelVolg:volg, _sec:sec,
                                                   code:'311212', naam:'Testflat', actiepunt:'X', deadline:'' });
-    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
     const kop = t('Tkop','Tkop','0','OPPAKKEN');
     const subZelfde = t('Tb','Tkop','10','OPPAKKEN');       // zelfde tabblad → wordt geabsorbeerd
     const subAnder  = t('Ta','Tkop','20','OFFERTE-TRAJECTEN'); // ander tabblad → blijft staan
@@ -7878,7 +7880,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       return `${d.getDate()}-${d.getMonth() + 1}-${d.getFullYear()}`; })();
     const t = (taakId, bundelId, volg, sec, tekst) => ({ taakId, bundelId, bundelVolg:volg, _sec:sec,
       code:'311212', naam:'Testflat', actiepunt:tekst, deadline:_opTijd });
-    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
     const kop = t('Tkop','Tkop','0','VERGADERVERZOEKEN','ALV');
     const s1  = t('Tb','Tkop','10','OPPAKKEN','Aannemer bellen');
     const bronNtd = { ...leeg, VERGADERVERZOEKEN:[kop], OPPAKKEN:[s1] };
@@ -8108,7 +8110,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     try {
       const t = (taakId, bundelId, volg, sec) => ({ _row: 10 + (+volg||0)/10, taakId, bundelId,
         bundelVolg:volg, _sec:sec, code:'311212', naam:'Testflat', actiepunt:'Werk', deadline:'' });
-      const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
       D.af = { ...leeg };
       SKEYS.forEach(sec => {
         D.ntd = { ...leeg, [sec]: [ t('Tkop','Tkop','0',sec), t('Tb','Tkop','10',sec) ] };
@@ -8189,7 +8191,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     try {
       const t = (taakId, volg) => ({ _row: 30 + (+volg||0)/10, taakId, bundelId:'Tkop',
         bundelVolg:volg, _sec:'OPPAKKEN', code:'311212', naam:'Testflat', actiepunt:'Dakwerk', deadline:'' });
-      const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
       D.af = { ...leeg };
       D.ntd = { ...leeg, OPPAKKEN: [ t('Tkop','0'), t('Tb','10') ] };
       state.activeNtd = 'OPPAKKEN'; pgs.ntd = 1; state.bundelOpen = new Set();
@@ -8277,7 +8279,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     try {
       const t = (taakId, volg) => ({ _row: 10 + (+volg||0)/10, taakId, bundelId:'Tkop',
         bundelVolg:volg, _sec:'OPPAKKEN', code:'311212', naam:'Testflat', actiepunt:'Werk', deadline:'' });
-      const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
       D.af = { ...leeg };
       D.ntd = { ...leeg, OPPAKKEN: [ t('Tkop','0'), t('Tb','10') ] };
       state.activeNtd = 'OPPAKKEN'; pgs.ntd = 1; state.bundelOpen = new Set();
@@ -8503,7 +8505,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     try {
       const t = (taakId, volg) => ({ _row: 60 + (+volg||0)/10, taakId, bundelId:'Tkop',
         bundelVolg:volg, _sec:'OPPAKKEN', code:'311212', naam:'Testflat', actiepunt:'Werk', deadline:'' });
-      const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
       // Het paneel wordt alleen getekend als de lijst NIET plat is; een filter uit een eerder
       // testblok zou de knop laten verdwijnen en deze asserts om de verkeerde reden rood maken.
       filterVelden.forEach(id => document.getElementById(id).value = '');
@@ -8576,7 +8578,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   // vijf, en omdat hij per definitie geen deadline heeft sorteerde hij daar altijd achteraan: bij
   // een VvE met vijf of meer open taken viel hij weg. Nu een eigen groep met een eigen cap.
   (() => {
-    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
     const traj = { taakId:'Toff', bundelId:'Toff', bundelVolg:'0', _sec:'OFFERTE-TRAJECTEN', _row:90,
       code:'311212', naam:'Testflat', opmerkingen:'Dakofferte', deadline:'', datumAangevraagd:'' };
     const stapR = { taakId:'Tstap', bundelId:'Toff', bundelVolg:'10', _sec:'OPPAKKEN', _row:60,
@@ -8613,7 +8615,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   // vervuilden het tabblad Oppakken. De stap moet alleen als stap ín zijn offerte-traject staan.
   // Uitdrukkelijk WEL blijven staan: subtaken die de gebruiker zelf onder een traject hangt.
   (() => {
-    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
     const traj = (taakId, extra) => ({ taakId, bundelId:taakId, bundelVolg:'0', _sec:'OFFERTE-TRAJECTEN',
       _row:90, code:'311212', naam:'Testflat', opmerkingen:'Dakofferte', deadline:'', ...extra });
     const stap = (taakId, bundelId, extra) => ({ taakId, bundelId, bundelVolg:'10', _sec:'OPPAKKEN',
@@ -8721,7 +8723,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const idsOud=state._sheetIds, cacheOud=state._uitCache, failsOud=state._syncFails;
     const bewaardNtd=D.ntd, bewaardAf=D.af, bewaardSec=state.activeNtd, bewaardPg=pgs.ntd;
     const tik=() => new Promise(r => { const k=new MessageChannel(); k.port1.onmessage=()=>r(); k.port2.postMessage(0); });
-    const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
     const opp=(row) => ({ _row:row, _sec:'OPPAKKEN', taakId:'To'+row, bundelId:'', bundelVolg:'',
       code:'311212', naam:'Testflat', actiepunt:'Iets', deadline:'', behandelaar:'', inBehandeling:'' });
     const traject=() => ({ _row:90, _sec:'OFFERTE-TRAJECTEN', taakId:'Toff', bundelId:'', bundelVolg:'',
@@ -8845,7 +8847,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
 
       const t=(taakId, volg) => ({ _row: 60 + (+volg||0)/10, taakId, bundelId:'Tkop',
         bundelVolg:volg, _sec:'OPPAKKEN', code:'311212', naam:'Testflat', actiepunt:'Werk', deadline:'' });
-      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
       filterVelden.forEach(id => document.getElementById(id).value = '');
       state.ntdStatus=''; state.ntdSort={ key:null, asc:true }; state.bulkMode=false;
       D.af={ ...leeg };
@@ -9082,7 +9084,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
           : new Response('{}',{status:200});
       };
 
-      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
       const t=(row, taakId, actie) => ({ _row:row, _sec:'OPPAKKEN', taakId, bundelId:'', bundelVolg:'',
         code:'311212', naam:'Testflat', actiepunt:actie, deadline:'', behandelaar:'', prioriteit:'',
         opmerkingen:'', inBehandeling:'' });
@@ -10549,7 +10551,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         return new Response('{}',{status:200});
       };
 
-      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
       const t=(row, taakId, actie) => ({ _row:row, _sec:'OPPAKKEN', taakId, bundelId:'', bundelVolg:'',
         code:'311212', naam:'Testflat', actiepunt:actie, deadline:'', behandelaar:'', prioriteit:'',
         opmerkingen:'', inBehandeling:'', subcategorie:'' });
@@ -10886,7 +10888,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       const t=(taakId, volg) => ({ _row: 70 + (+volg||0)/10, taakId, bundelId:'Tkop', bundelVolg:volg,
         _sec:'VERGADERVERZOEKEN', code:'311212', naam:'Testflat', periode:'mei', agendapunten:'ALV',
         deadline:'' });
-      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
       filterVelden.forEach(id => document.getElementById(id).value = '');
       state.ntdStatus=''; state.ntdSort={ key:null, asc:true }; state.bulkMode=false;
       D.af={ ...leeg };
@@ -11019,7 +11021,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         return new Response(JSON.stringify({error:{message:'geen leesverkeer in deze test'}}),{status:403});
       };
 
-      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
       const verg=(taakId, volg) => ({ _row: 70 + (+volg||0)/10, taakId, bundelId:'Tkop', bundelVolg:volg,
         _sec:'VERGADERVERZOEKEN', code:'311212', naam:'Testflat', periode:'mei', agendapunten:'ALV', deadline:'' });
       filterVelden.forEach(id => document.getElementById(id).value = '');
@@ -11116,7 +11118,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         }
         return new Response(JSON.stringify({error:{message:'geen leesverkeer in deze test'}}),{status:403});
       };
-      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
       const opp=(row) => ({ _row:row, _sec:'OPPAKKEN', taakId:'T'+row, bundelId:'', bundelVolg:'',
         code:'311212', naam:'Testflat', actiepunt:'Bestaand werk '+row, deadline:'' });
       filterVelden.forEach(id => document.getElementById(id).value = '');
@@ -11256,7 +11258,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         if(methode==='POST') return new Response(JSON.stringify({replies:[{}]}),{status:200});
         return new Response(JSON.stringify({error:{message:'geen leesverkeer in deze test'}}),{status:403});
       };
-      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
       const rij=(sec, row, actie) => ({ _row:row, _sec:sec, taakId:'T'+row, bundelId:'', bundelVolg:'',
         code:'311212', naam:'Testflat', actiepunt:actie, status:'', deadline:'' });
       // Beide lijsten ruim over één pagina (PG=25) heen: anders klemt `renderPag` de teller sowieso
@@ -11395,7 +11397,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         if(methode==='POST') return new Response(JSON.stringify({replies:[{}]}),{status:200});
         return new Response(JSON.stringify({error:{message:'geen leesverkeer in deze test'}}),{status:403});
       };
-      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
       D.af={ ...leeg };
       D.ntd={ ...leeg, OPPAKKEN:[ { _row:40, _sec:'OPPAKKEN', taakId:'Tkop', bundelId:'Tkop',
         bundelVolg:'0', code:'311212', naam:'Testflat', actiepunt:'Hoofdtaak', deadline:'' } ] };
@@ -11441,7 +11443,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const bewaardNtd=D.ntd, bewaardAf=D.af, bewaardSec=state.activeNtd, bewaardPg=pgs.ntd;
     const zoek=document.getElementById('s-ntd'), zoekOud=zoek.value;
     try {
-      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
       D.af={ ...leeg };
       D.ntd={ ...leeg, OPPAKKEN:[ { _row:50, _sec:'OPPAKKEN', taakId:'Tx', bundelId:'', bundelVolg:'',
         code:'311212', naam:'Testflat', actiepunt:'Dakwerk', deadline:'' } ] };
@@ -11475,7 +11477,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       const t=(taakId, volg, sec) => ({ _row: 60 + (+volg||0)/10, taakId, bundelId:'Tkop',
         bundelVolg:volg, _sec:sec, code:'311212', naam:'Testflat', actiepunt:'Werk',
         periode:'mei', agendapunten:'ALV', deadline:'' });
-      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
       const tel=(titel) => [...document.querySelectorAll('#toast-container .toast-title')]
                              .filter(el => el.textContent === titel).length;
       D.af={ ...leeg };
@@ -11522,7 +11524,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     try {
       const t=(taakId, volg) => ({ _row: 80 + (+volg||0)/10, taakId, bundelId:'Tkop', bundelVolg:volg,
         _sec:'OPPAKKEN', code:'311212', naam:'Testflat', actiepunt:'Werk', deadline:'' });
-      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
       const kop=t('Tkop','0'), sub=t('Tb','10');
       // De index uit een ándere leesronde: dezelfde taken, andere objecten. Zo ziet elke poll eruit.
       const uitOudereRonde={ ...leeg, OPPAKKEN:[ { ...kop }, { ...sub } ] };
@@ -11600,7 +11602,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       // Anders zou `closeModal` (dat hieronder aan de twee knoppen hangt) de NTD-lijst met de
       // neptaken hertekenen en `state._rowCache` onder de test vandaan herbouwen.
       state._ntdVoorModal=null;
-      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
       const kop={ _sec:'OPPAKKEN', _row:5, code:'BW-1', naam:'VvE BW', actiepunt:'hoofdtaak',
                   deadline:'', taakId:'Tw1', bundelId:'Tw1', bundelVolg:'0' };
       const sub={ _sec:'OPPAKKEN', _row:6, code:'BW-1', naam:'VvE BW', actiepunt:'subtaak',
@@ -12086,7 +12088,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
     const nlOver =n=>{const d=new Date();d.setDate(d.getDate()+n);
       return `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;};
-    const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
     const taak=(row,actie,deadline)=>({ _sec:'OPPAKKEN', _row:row, code:'311212', naam:'Testflat',
       actiepunt:actie, deadline:deadline||'', behandelaar:'', prioriteit:'', opmerkingen:'',
       inBehandeling:'', subcategorie:'', opvolgdatum:'', taakId:'T'+row, bundelId:'', bundelVolg:'' });
@@ -12430,7 +12432,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       // niet aangaan. Gemeten: de rijnummers van deze taken schoven van 5/6/7 naar 21/22/23 en de
       // rij-guard sloeg terecht alarm. Bij de oudere blokken hierboven valt dat niet op omdat die
       // alleen naar OPPAKKEN kijken; hier wel, want afronden raakt Afgerond én Nog Te Doen.
-      const versLeeg=()=>({ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] });
+      const versLeeg=()=>({ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] });
       // Afronden raakt het tabblad 'Afgerond', en `getAfInsertRow` GOOIT als het blok daar niet
       // bekend is — dan zou dit blok stilte meten in plaats van een afronding. De andere bulk-wegen
       // hierboven komen nooit bij Afgerond en hadden dit daarom niet nodig.
@@ -12699,7 +12701,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       state.oauthToken = 'nep'; state.oauthExpiry = Date.now() + 3600e3; state._uitCache = false;
       const taak = { code: 'HK-01', naam: 'Herkanshof', actiepunt: 'oude tekst', deadline: '', behandelaar: 'Jer',
                      opmerkingen: '', inBehandeling: 'FALSE', subcategorie: '', _row: 5, _sec: 'OPPAKKEN' };
-      D.ntd = { OPPAKKEN: [taak], VERGADERVERZOEKEN: [], 'OFFERTE-TRAJECTEN': [], LOD: [], 'SUBSIDIE-TRAJECTEN': [] };
+      D.ntd = { OPPAKKEN: [taak], VERGADERVERZOEKEN: [], 'OFFERTE-TRAJECTEN': [], LOD: [], 'SUBSIDIE-TRAJECTEN': [], CRM: [] };
       state._rowCache = [taak];
       // Vastgelegde kopie: submitTask muteert `taak` optimistisch nog vóór de schrijffunctie
       // draait, dus zonder deze bevriezing zou de nagebootste Sheet de nieuwe tekst al bevatten
@@ -12850,7 +12852,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         { code: 'BK-03', naam: 'Driehof', behandelaar: 'Jer', _row: 7, _sec: 'OPPAKKEN' },
         { code: 'BK-04', naam: 'Vierhof', behandelaar: 'Jer', _row: 8, _sec: 'OPPAKKEN' },
       ];
-      D.ntd = { OPPAKKEN: rijen, VERGADERVERZOEKEN: [], 'OFFERTE-TRAJECTEN': [], LOD: [], 'SUBSIDIE-TRAJECTEN': [] };
+      D.ntd = { OPPAKKEN: rijen, VERGADERVERZOEKEN: [], 'OFFERTE-TRAJECTEN': [], LOD: [], 'SUBSIDIE-TRAJECTEN': [], CRM: [] };
       // Alles slaagt; we vangen op wat er naar de Notif-wachtrij gaat.
       const wachtrij = [];
       window.fetch = async (url, opt) => {
@@ -12918,11 +12920,11 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       // Gemeten: C=3 voor Oppakken/LOD/Subsidie, D=4 voor Vergaderverzoeken, G=7 voor Offertes.
       const VELD_NAAR_SLEUTEL = { 'm-actie':'actiepunt', 'm-agenda':'agendapunten',
                                   'm-opm-o':'opmerkingen', 'm-actie-l':'actiepunt',
-                                  'm-subsidie':'subsidie' };
+                                  'm-subsidie':'subsidie', 'm-onderwerp':'onderwerp' };
       const kolomVan = sec => SECS[sec].keys.indexOf(VELD_NAAR_SLEUTEL[OMSCHRIJVING_VELD[sec]]) + 1;
       eq('omschrijving: de kolom per sectie is dezelfde als die de backend gebruikt (CD_OMSCHRIJVING_COL)',
          SKEYS.map(kolomVan),
-         [3, 4, 7, 3, 3]);
+         [3, 4, 7, 3, 3, 3]);   // CRM: onderwerp op C, gelijk aan CD_OMSCHRIJVING_COL.CRM
       // De echte weg: open een toevoegscherm per sectie en zet er tekst in.
       SKEYS.forEach(sec => {
         state.activeNtd = sec;
@@ -12950,25 +12952,25 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   (() => {
     console.log('%c[TESTS] Rijnummers en sectieblokken', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
     const ntdOud = D.ntd, secOud = D.ntdSecInfo, afOud = D.af, afSecOud = D.afSecInfo;
-    const leeg = () => ({ OPPAKKEN: [], VERGADERVERZOEKEN: [], 'OFFERTE-TRAJECTEN': [], LOD: [], 'SUBSIDIE-TRAJECTEN': [] });
+    const leeg = () => ({ OPPAKKEN: [], VERGADERVERZOEKEN: [], 'OFFERTE-TRAJECTEN': [], LOD: [], 'SUBSIDIE-TRAJECTEN': [], CRM: [] });
     try {
       D.ntd = leeg();
       D.ntd.OPPAKKEN = [{ code: 'A', _row: 10, _sec: 'OPPAKKEN' }];
       D.ntdSecInfo = { OPPAKKEN: { colHeaderRow: 2 }, VERGADERVERZOEKEN: { colHeaderRow: 40 },
                        'OFFERTE-TRAJECTEN': { colHeaderRow: 60 }, LOD: { colHeaderRow: 80 },
-                       'SUBSIDIE-TRAJECTEN': { colHeaderRow: 100 } };
+                       'SUBSIDIE-TRAJECTEN': { colHeaderRow: 100 }, CRM: { colHeaderRow: 120 } };
       // Een taak op rij 5 verdwijnt (afgerond): alles eronder schuift één omhoog.
       _shiftNtdRows(5, -1);
       eq('rijnummers: de taak schuift mee', D.ntd.OPPAKKEN[0]._row, 9);
       eq('rijnummers: de koprijen onder de wijziging schuiven óók mee',
-         SKEYS.map(s => D.ntdSecInfo[s].colHeaderRow), [2, 39, 59, 79, 99]);
+         SKEYS.map(s => D.ntdSecInfo[s].colHeaderRow), [2, 39, 59, 79, 99, 119]);
       // En de lege sectie krijgt daarmee het juiste invoegpunt.
       eq('rijnummers: een lege sectie wijst na de verschuiving de goede rij aan',
          getInsertRow('SUBSIDIE-TRAJECTEN'), 99);
       // De kop bóven de wijziging blijft staan — anders zou de eerste sectie mee gaan lopen.
       _shiftNtdRows(1000, -1);
       eq('rijnummers: een wijziging onder alles raakt niets',
-         SKEYS.map(s => D.ntdSecInfo[s].colHeaderRow), [2, 39, 59, 79, 99]);
+         SKEYS.map(s => D.ntdSecInfo[s].colHeaderRow), [2, 39, 59, 79, 99, 119]);
 
       // Afgerond: een ontbrekend blok is een harde fout, geen stille terugval naar een ander blok.
       D.af = leeg();
@@ -13108,7 +13110,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const ntdOud = D.ntd, afOud = D.af, alvoOud = D.alvo, kmkOud = D.kenmerken;
     const codeOud = state.vveCode, editOud = state.kenmerkenEdit;
     const paginaOud = (document.querySelector('.page.active') || {}).id;
-    const leeg = { OPPAKKEN: [], VERGADERVERZOEKEN: [], 'OFFERTE-TRAJECTEN': [], LOD: [], 'SUBSIDIE-TRAJECTEN': [] };
+    const leeg = { OPPAKKEN: [], VERGADERVERZOEKEN: [], 'OFFERTE-TRAJECTEN': [], LOD: [], 'SUBSIDIE-TRAJECTEN': [], CRM: [] };
     try {
       D.ntd = { ...leeg }; D.af = { ...leeg }; D.kenmerken = [];
       D.alvo = [{ code: 'KM-01', naam: 'Kenmerkhof', datum: '', status: '', opmerkingen: '', _row: 2 },
@@ -13326,8 +13328,8 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       { code: 'ZK-' + i, naam: 'Zoekhof', actiepunt: 'iets', datum: '1 aug 2026', _sec: sec, _row: 10 + i }, extra || {});
     const veelOppakken = Array.from({ length: 12 }, (_, i) => afRij('OPPAKKEN', i, { actiepunt: 'dakgoot nakijken' }));
     const dataAf = {
-      alvo: [], logboek: [], ntd: { OPPAKKEN: [], VERGADERVERZOEKEN: [], 'OFFERTE-TRAJECTEN': [], LOD: [], 'SUBSIDIE-TRAJECTEN': [] },
-      af: { OPPAKKEN: veelOppakken, VERGADERVERZOEKEN: [], 'OFFERTE-TRAJECTEN': [], LOD: [afRij('LOD', 99, { actiepunt: 'dakgoot nakijken', datum: '5 aug 2026' })], 'SUBSIDIE-TRAJECTEN': [] },
+      alvo: [], logboek: [], ntd: { OPPAKKEN: [], VERGADERVERZOEKEN: [], 'OFFERTE-TRAJECTEN': [], LOD: [], 'SUBSIDIE-TRAJECTEN': [], CRM: [] },
+      af: { OPPAKKEN: veelOppakken, VERGADERVERZOEKEN: [], 'OFFERTE-TRAJECTEN': [], LOD: [afRij('LOD', 99, { actiepunt: 'dakgoot nakijken', datum: '5 aug 2026' })], 'SUBSIDIE-TRAJECTEN': [], CRM: [] },
     };
     const gevonden = zoekAlles('dakgoot', dataAf, { vves: 5, taken: 5, afgerond: 3, logboek: 3 });
     eq('archiefzoeken: er komen er precies drie terug', gevonden.afgerond.length, 3);
@@ -13637,7 +13639,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   // toetst dus wat de gebruiker doet.
   (function(){
     const paginaVoorBulk = (document.querySelector('.page.active')?.id || 'page-ntd').replace('page-','');
-    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
     const ntdOud = D.ntd, afOud = D.af, bulkOud = state.bulkMode, secOud = state.activeNtd;
     const pagOud = pgs.ntd, cacheOud = state._rowCache, zichtOud = state._ntdZichtbaar;
     const veldIds = ['s-ntd','f-code-ntd','f-beh-ntd','f-prio-ntd'];
@@ -13833,7 +13835,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const fetchOud = window.fetch, tokenOud = state.oauthToken, expOud = state.oauthExpiry;
     const ntdOud = D.ntd, afOud = D.af, cacheOud = state._rowCache, idsOud = state._sheetIds;
     const uitCacheOud = state._uitCache, alertOud = window.alert;
-    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
     let blad = {}, posts = [], faalPut = false;
     const mk = () => ({ _sec:'OPPAKKEN', _row:7, code:'311212', naam:'Testflat', actiepunt:'Dakgoot',
                         deadline:'', behandelaar:'', prioriteit:'', opmerkingen:'', inBehandeling:'',
@@ -14117,7 +14119,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const velden = ['s-af','f-beh-af','f-per-af','f-van-af','f-tot-af'];
     const veldOud = velden.map(id => { const el=document.getElementById(id); return el?el.value:''; });
     try {
-      const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
       D.af = { ...leeg, OPPAKKEN: lijst };
       state.activeAf = 'OPPAKKEN'; pgs.af = 1;
       velden.forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
@@ -14268,7 +14270,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const uitCacheOud = state._uitCache, alertOud = window.alert, fetchOud = window.fetch;
     const tokenOud = state.oauthToken, expOud = state.oauthExpiry, idsOud = state._sheetIds;
     const infoOud = D.ntdSecInfo;
-    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
     let vragen = [];
     const hooguit = p => Promise.race([p, new Promise(r=>setTimeout(r,400))]);
     // Het venster gaat pas ópen ná de `await`s bovenin `submitTask` (offline-rem, token). Direct
@@ -14468,7 +14470,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const fetchOud = window.fetch, tokenOud = state.oauthToken, expOud = state.oauthExpiry;
     const ntdOud = D.ntd, afOud = D.af, idsOud = state._sheetIds, secOud = state.activeNtd;
     const infoOud = D.ntdSecInfo, alertOud = window.alert, uitCacheOud = state._uitCache;
-    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
     let posts = [];
     try {
       window.alert = ()=>{};
@@ -14606,7 +14608,8 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     // staan. 'Signaal' hoort bij geen enkel veld en is daarom de enige uitzondering.
     eq('veldlabel: geen enkele kolomkop is uit VELD_LABELS weggelopen',
        SKEYS.flatMap(s =>
-         SECS[s].cols.filter(c => c !== 'Signaal' &&
+         // 'Wacht' (CRM) is net als 'Signaal' een BEREKENDE kolom: dagen sinds ontvangst, geen veld.
+         SECS[s].cols.filter(c => c !== 'Signaal' && !(s === 'CRM' && c === 'Wacht') &&
            !Object.values(VELD_LABELS[s] || {}).includes(c)).map(c => `${s}:${c}`)),
        []);
     // Kant 2: elk veld moet een label hebben. Zonder deze toets valt een nieuw veld stil terug op
@@ -14661,7 +14664,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const ntdOud = D.ntd, afOud = D.af, idsOud = state._sheetIds, infoOud = D.ntdSecInfo;
     const alertOud = window.alert, uitCacheOud = state._uitCache;
     const bevBg = document.getElementById('bevestig-bg');
-    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
     let posts = [], vragen = [];
     const hooguit = p => Promise.race([p, new Promise(r=>setTimeout(r,400))]);
     // Zie de toelichting bij `wachtOpVenster` in het dubbelcheck-blok: het venster gaat pas open
@@ -14810,7 +14813,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
            vingerafdruk('Nog Te Doen', opp, 'OPPAKKEN') !== vingerafdruk('Nog Te Doen', oppPlus, 'OPPAKKEN'));
     // De afgeleide tabel zelf, zodat een wijziging in SECS of OMSCHRIJVING_SLEUTEL hier opvalt.
     eq('guard: de omschrijvingskolom per sectie', NTD_OMSCHRIJVING,
-       { OPPAKKEN:[2], VERGADERVERZOEKEN:[3], 'OFFERTE-TRAJECTEN':[6], LOD:[2], 'SUBSIDIE-TRAJECTEN':[2] });
+       { OPPAKKEN:[2], VERGADERVERZOEKEN:[3], 'OFFERTE-TRAJECTEN':[6], LOD:[2], 'SUBSIDIE-TRAJECTEN':[2], CRM:[2] });
   })();
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -14828,7 +14831,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       state.oauthToken = 'nep'; state.oauthExpiry = Date.now() + 3600e3;
       const taak = { _sec:'OPPAKKEN', _row:10, code:'311162', naam:'VvE Test', actiepunt:'Lekkage dak',
                      deadline:'', behandelaar:'Jer', prioriteit:'', opmerkingen:'', taakId:'T-77' };
-      D.ntd = { OPPAKKEN:[taak], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      D.ntd = { OPPAKKEN:[taak], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
       D.ntdSecInfo = { OPPAKKEN:{colHeaderRow:2}, VERGADERVERZOEKEN:{colHeaderRow:20},
                        'OFFERTE-TRAJECTEN':{colHeaderRow:40}, LOD:{colHeaderRow:60}, 'SUBSIDIE-TRAJECTEN':{colHeaderRow:80} };
       // De rij die de guard terugleest, in de vorm die values.get teruggeeft (A..S).
@@ -14924,7 +14927,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       // anker van vóór de eerste invoeging, en landde de archiefregel op de kolomkoprij van het
       // volgende blok — waar parseSections hem altijd weggooit.
       const a1={_row:10,code:'A'}, a2={_row:11,code:'B'}, a3={_row:40,code:'C'};
-      D.af={OPPAKKEN:[a1,a2],VERGADERVERZOEKEN:[],'OFFERTE-TRAJECTEN':[],LOD:[a3],'SUBSIDIE-TRAJECTEN':[]};
+      D.af={OPPAKKEN:[a1,a2],VERGADERVERZOEKEN:[],'OFFERTE-TRAJECTEN':[],LOD:[a3],'SUBSIDIE-TRAJECTEN':[],CRM:[]};
       D.afSecInfo={OPPAKKEN:{colHeaderRow:2},VERGADERVERZOEKEN:{colHeaderRow:20},
                    'OFFERTE-TRAJECTEN':{colHeaderRow:30},LOD:{colHeaderRow:39},'SUBSIDIE-TRAJECTEN':{colHeaderRow:80}};
       _shiftAfRows(10, +1);
@@ -14998,7 +15001,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const fetchOud=window.fetch, alertOud=window.alert;
     const tokenOud=state.oauthToken, expOud=state.oauthExpiry, idsOud=state._sheetIds;
     const ntdOud=D.ntd, infoOud=D.ntdSecInfo, cacheOud=state._uitCache, nfOud=state._netwerkFouten;
-    const leeg=()=>({OPPAKKEN:[],VERGADERVERZOEKEN:[],'OFFERTE-TRAJECTEN':[],LOD:[],'SUBSIDIE-TRAJECTEN':[]});
+    const leeg=()=>({OPPAKKEN:[],VERGADERVERZOEKEN:[],'OFFERTE-TRAJECTEN':[],LOD:[],'SUBSIDIE-TRAJECTEN':[],CRM:[]});
     let meldingen=[], inserts=[], ankerRij=null;
     try{
       window.alert=m=>meldingen.push(String(m));
@@ -15087,7 +15090,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       state._sheetIds={'Nog Te Doen':0,'Afgerond':1,'Logboek':2};
       const taak={_sec:'OPPAKKEN',_row:10,code:'311162',naam:'VvE Test',actiepunt:'Lekkage dak',
                   deadline:'',behandelaar:'Jer',prioriteit:'',opmerkingen:'',taakId:'T-77'};
-      D.ntd={OPPAKKEN:[taak],VERGADERVERZOEKEN:[],'OFFERTE-TRAJECTEN':[],LOD:[],'SUBSIDIE-TRAJECTEN':[]};
+      D.ntd={OPPAKKEN:[taak],VERGADERVERZOEKEN:[],'OFFERTE-TRAJECTEN':[],LOD:[],'SUBSIDIE-TRAJECTEN':[],CRM:[]};
       D.ntdSecInfo={OPPAKKEN:{colHeaderRow:2}};
       const ntdValues=serializeNtdUndo(taak);
       const ankerRij=(()=>{ const c=_rijNaarCellen('Nog Te Doen',taak); c[16]=taak.taakId; return c; })();
@@ -15182,7 +15185,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     try{
       state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3; state._uitCache=false;
       const rij={code:'BK-90',naam:'Hof',behandelaar:'Jer',_row:5,_sec:'OPPAKKEN',taakId:'BK90AA'};
-      D.ntd={OPPAKKEN:[rij],VERGADERVERZOEKEN:[],'OFFERTE-TRAJECTEN':[],LOD:[],'SUBSIDIE-TRAJECTEN':[]};
+      D.ntd={OPPAKKEN:[rij],VERGADERVERZOEKEN:[],'OFFERTE-TRAJECTEN':[],LOD:[],'SUBSIDIE-TRAJECTEN':[],CRM:[]};
       const appends=[];
       // De guard-lezing slaagt, maar de schrijf zelf faalt HARD (400 = niet-transient, dus géén
       // herkansingen van _withRetry die deze toets seconden zouden kosten): `gelukt` blijft false.
@@ -15247,7 +15250,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     try{
       const A={_sec:'OPPAKKEN',_row:5,code:'311001',naam:'VvE A',actiepunt:'Taak A',deadline:'',behandelaar:'Jer',inBehandeling:'FALSE',opmerkingen:'',taakId:'AAAAAA'};
       const B={_sec:'OPPAKKEN',_row:6,code:'311002',naam:'VvE B',actiepunt:'Taak B',deadline:'',behandelaar:'Jer',inBehandeling:'FALSE',opmerkingen:'',taakId:'BBBBBB'};
-      D.ntd={OPPAKKEN:[A,B],VERGADERVERZOEKEN:[],'OFFERTE-TRAJECTEN':[],LOD:[],'SUBSIDIE-TRAJECTEN':[]};
+      D.ntd={OPPAKKEN:[A,B],VERGADERVERZOEKEN:[],'OFFERTE-TRAJECTEN':[],LOD:[],'SUBSIDIE-TRAJECTEN':[],CRM:[]};
       D.ntdSecInfo={OPPAKKEN:{colHeaderRow:2}};
       state.activeNtd='OPPAKKEN'; state.expandedRows=new Set();
       renderNtd();
@@ -15545,7 +15548,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     console.log('%c[TESTS] Vergeten selecteerstand', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
     const bulkOud = state.bulkMode, ntdOud = D.ntd;
     try {
-      D.ntd = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      D.ntd = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
       goTo('ntd');
       state.bulkMode = true; bulkWis();
       goTo('logboek');
@@ -15680,7 +15683,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       state._sheetIds = null;                    // dwingt getSheetIds het net op
       const taak = { _sec:'OPPAKKEN', _row:10, code:'311212', naam:'Testflat', actiepunt:'Lekkage',
                      deadline:'', behandelaar:'', prioriteit:'', opmerkingen:'', taakId:'T-10' };
-      D.ntd = { OPPAKKEN:[taak], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      D.ntd = { OPPAKKEN:[taak], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
       D.ntdSecInfo = { OPPAKKEN:{colHeaderRow:2}, VERGADERVERZOEKEN:{colHeaderRow:20},
                        'OFFERTE-TRAJECTEN':{colHeaderRow:40}, LOD:{colHeaderRow:60}, 'SUBSIDIE-TRAJECTEN':{colHeaderRow:80} };
       // Een quotumfout op de spreadsheets-GET die getSheetIds doet. 403: niet-tijdelijk, dus
@@ -15769,7 +15772,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const tokenOud=state.oauthToken, expOud=state.oauthExpiry, idsOud=state._sheetIds;
     const ntdOud=D.ntd, afOud=D.af, infoOud=D.ntdSecInfo, cacheOud=state._uitCache;
     const dcOud=state._dubbelcheckUit, secOud=state.activeNtd, editOud=state.editMode;
-    const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+    const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
     let inserts=0;
     try{
       window.alert=()=>{};
@@ -15828,7 +15831,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
       const taak={ _sec:'OPPAKKEN', _row:10, code:'311162', naam:'VvE Test', actiepunt:'Lekkage',
                    deadline:'', behandelaar:'', prioriteit:'', opmerkingen:'', taakId:'T-77' };
-      D.ntd={ OPPAKKEN:[taak], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
+      D.ntd={ OPPAKKEN:[taak], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
       D.ntdSecInfo={ OPPAKKEN:{colHeaderRow:2} };
       let gelezen=0;
       // Zou hij tóch lezen, dan geeft deze stub een ANDERE taak terug en sloeg de guard alarm —
@@ -15893,13 +15896,212 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     console.log('%c[TESTS] Achterblijvende subtaken tellen', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
     const kop={ _sec:'OPPAKKEN', _row:5, code:'311212', naam:'F', actiepunt:'Kop',  taakId:'TK', bundelId:'B1', bundelVolg:'0'  };
     const sub={ _sec:'OPPAKKEN', _row:6, code:'311212', naam:'F', actiepunt:'Sub',  taakId:'TS', bundelId:'B1', bundelVolg:'10' };
-    const leeg={ OPPAKKEN:[kop,sub], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] };
-    const ix=bouwBundelIndex(leeg, { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[] });
+    const leeg={ OPPAKKEN:[kop,sub], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
+    const ix=bouwBundelIndex(leeg, { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] });
     eq('subtaken: zonder negeer-lijst telt de subtaak gewoon mee', openSubtaken(ix, kop), 1);
     eq('subtaken: zit de subtaak in dezelfde handeling, dan blijft er niets achter',
        openSubtaken(ix, kop, new Set([kop, sub])), 0);
     eq('subtaken: een negeer-lijst zonder die subtaak verandert niets',
        openSubtaken(ix, kop, new Set([kop])), 1);
+  })();
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  CRM (v13.0) — zesde tabblad, volledig los van Subsidie
+  // ══════════════════════════════════════════════════════════════════════════
+  // Ontwerp: docs/superpowers/specs/2026-09-23-crm-tab-design.md. Wat hier bewaakt wordt:
+  // de sleutels (max 8, geen verboden namen), de eigen fases, de werkdagentelling voor de deadline,
+  // de wachtcel, T..W die ALLEEN bij CRM-rijen geschreven worden, en de getekende rij met zijn
+  // uitklappaneel. Plus de ene wijziging buiten het tabblad: het smallere zoekveld.
+  await (async () => {
+    console.log('%c[TESTS] CRM', 'background:#BE185D;color:white;padding:2px 6px;border-radius:3px');
+    const CF  = await import('./crm-fase.js');
+    const U   = await import('./util.js');
+    const CR  = await import('./crud.js');
+    const CFG = await import('./config.js');
+
+    // ── Configuratie ──
+    const k = SECS.CRM.keys;
+    eq('crm: precies acht sleutels (afOff)', k.length, 8);
+    eq('crm: de fase heet crmFase, niet fase', [k.includes('crmFase'), k.includes('fase')], [true, false]);
+    eq('crm: geen verboden sleutelnaam',
+       k.filter(x => ['datum','opmerking','subcategorie','opvolgdatum','herhaalId','esc','fase','aannemers','taakId',
+                      'afzender','ontvangen','soort','mail','bundelId','bundelVolg'].includes(x)), []);
+    eq('crm: breedtes = kolommen + actiekolom', SECS.CRM.breedtes.length, SECS.CRM.cols.length + 1);
+    eq('crm: omschrijving is het onderwerp', CFG.OMSCHRIJVING_SLEUTEL.CRM, 'onderwerp');
+    eq('crm: vier soorten, Vraag voorop', CFG.CRM_SOORTEN, ['Vraag','Klacht','Schade','Financieel']);
+    eq('crm: laatste tabblad, na Subsidie', SKEYS.slice(-2), ['SUBSIDIE-TRAJECTEN','CRM']);
+
+    // ── Fases: eigen reeks, en Subsidie teken voor teken ongewijzigd ──
+    eq('crm-fase: vier fases', CF.CRM_FASES, ['Ontvangen','Opgepakt','Wacht op reactie','Beantwoord']);
+    eq('crm-fase: leeg, onzin en hoofdletters',
+       [CF.crmFaseIndex(''), CF.crmFaseIndex('onzin'), CF.crmFaseIndex('wacht OP reactie'), CF.crmFaseIndex(null)], [1, 1, 3, 1]);
+    eq('crm-fase: buiten bereik = Ontvangen', [CF.crmFaseWoord(9), CF.crmFaseWoord(0), CF.crmFaseWoord(4)], ['Ontvangen','Ontvangen','Beantwoord']);
+    eq('crm-fase: wijziging vanaf leeg telt als vanaf Ontvangen', CF.crmFaseWijziging('', 'Opgepakt'), { van:'Ontvangen', naar:'Opgepakt' });
+    eq('crm-fase: geen wijziging = null', [CF.crmFaseWijziging('Opgepakt','Opgepakt'), CF.crmFaseWijziging('Opgepakt','')], [null, null]);
+    const crmBalk = CF.crmFaseRijHtml('Wacht op reactie', 7);
+    eq('crm-fase: vier knoppen met de eigen klikactie',
+       [(crmBalk.match(/<button/g)||[]).length, (crmBalk.match(/data-action="crm-fase"/g)||[]).length], [4, 4]);
+    truthy('crm-fase: de balk draagt de CRM-klasse en het label', /class="fase-rij crm-fase/.test(crmBalk) && /Fase van deze vraag/.test(crmBalk));
+    truthy('crm-fase: stap 3 is de huidige', /data-fase="3" aria-pressed="true"/.test(crmBalk));
+    // De oude implementatie van faseRijHtml, letterlijk, als referentie.
+    const oudeSubsidieBalk = (huidig, rid, extraClass) => {
+      const n = faseIndex(huidig); let rail = '';
+      for (let i = 1; i <= 5; i++) {
+        const cls = i < n ? 'af' : i === n ? 'nu' : '';
+        rail += `<button type="button" class="fase-bol ${cls}" data-action="subsidie-fase"`
+              + ` data-rid="${rid}" data-fase="${i}" aria-pressed="${i === n}"`
+              + ` title="Zet op ${SUBSIDIE_FASES[i - 1]}"`
+              + ` aria-label="Zet op ${SUBSIDIE_FASES[i - 1]}"></button>`;
+        if (i < 5) rail += `<span class="fase-lijn ${i < n ? 'af' : ''}"></span>`;
+      }
+      return `<div class="fase-rij ${extraClass || ''}" role="group" aria-label="Fase van dit subsidietraject">`
+           + `<div class="fase-rail">${rail}</div>`
+           + `<div class="fase-lbl">${faseWoord(n)}</div></div>`;
+    };
+    eq('subsidie-fase: de balk is na de splitsing teken voor teken gelijk',
+       ['', 'Aangevraagd', 'In behandeling', 'Afgerond', 'rommel'].map(w => faseRijHtml(w, 3) === oudeSubsidieBalk(w, 3)),
+       [true, true, true, true, true]);
+    eq('subsidie-fase: ook de modalvariant', faseRijHtml('Verleend', -1, 'fase-rij-modal'), oudeSubsidieBalk('Verleend', -1, 'fase-rij-modal'));
+
+    // ── Werkdagen en de automatische deadline ──
+    const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    eq('werkdagen: woensdag + 5 = woensdag erna', iso(U.werkdagenNa(new Date(2026,8,23), 5)), '2026-09-30');
+    eq('werkdagen: vrijdag + 5 = vrijdag erna', iso(U.werkdagenNa(new Date(2026,8,25), 5)), '2026-10-02');
+    eq('werkdagen: zaterdag en zondag + 5 = vrijdag', [iso(U.werkdagenNa(new Date(2026,8,26), 5)), iso(U.werkdagenNa(new Date(2026,8,27), 5))], ['2026-10-02','2026-10-02']);
+    eq('werkdagen: 0 = dezelfde dag', iso(U.werkdagenNa(new Date(2026,8,23), 0)), '2026-09-23');
+    eq('deadline-voorstel: CRM telt werkdagen vanaf ontvangst', U.voorgesteldeDeadline('CRM', new Date(2026,8,25)), '2026-10-02');
+    eq('deadline-voorstel: de andere secties ongewijzigd',
+       [U.voorgesteldeDeadline('OPPAKKEN', new Date(2026,8,25)), U.voorgesteldeDeadline('LOD', new Date(2026,8,25)), U.voorgesteldeDeadline('SUBSIDIE-TRAJECTEN', new Date(2026,8,25))],
+       ['2026-10-02', '', '']);
+
+    // ── Wachttijd en prioriteit ──
+    const nu = new Date(2026,8,23);
+    eq('wacht: 33 dagen, 26 dagen over de deadline', U.crmWacht({ ontvangen:'21-08-2026', deadline:'28-08-2026' }, nu), { dagen:33, dagenTot:-26 });
+    eq('wacht: vandaag binnen = 0 dagen', U.crmWacht({ ontvangen:'23 september 2026', deadline:'30-09-2026' }, nu), { dagen:0, dagenTot:7 });
+    eq('wacht: zonder deadline alleen de dagen', U.crmWacht({ ontvangen:'22-09-2026' }, nu), { dagen:1, dagenTot:null });
+    eq('wacht: zonder (leesbare) ontvangstdatum = null', [U.crmWacht({ deadline:'30-09-2026' }, nu), U.crmWacht({ ontvangen:'eind sept' }, nu)], [null, null]);
+    eq('prio: CRM-grenzen 2 en 5',
+       ['25-09-2026','26-09-2026','28-09-2026','29-09-2026'].map(d => berekenPrioriteit(d, 'CRM', nu).prioriteit),
+       ['Hoog','Midden','Midden','Laag']);
+    eq('stil: CRM na 3 en 7 dagen', STIL_ESCALATIE_REGELS.CRM, { trap1:3, trap2:7 });
+    eq('sorteren: Wacht sorteert op de deadline', ntdSorteerKey('Wacht'), 'deadline');
+    eq('bulk: de deadline van CRM staat op F', BULK_DEADLINE_KOLOM.CRM, 'F');
+
+    // ── Inlezen: T..W en de fase uit D, zonder botsing met de offerte-fase uit O ──
+    const leegRij = n => Array(n).fill('');
+    const crmCellen = ['381057','VvE Jan ten Brinkstraat 69/73','Wie betaalt het onderzoek?','Wacht op reactie','Jer','17-09-2026','Bestuur gemaild','FALSE',
+                       '','','','','','','','','TCRM1','','', 'Mw. Jansen, nr. 71','10-09-2026','Vraag','Beste beheerder,\nWie betaalt dit?'];
+    const blad = [['SUBSIDIE-TRAJECTEN'], ['VvE Code'], ['311059','VvE S','Subsidieaanvraag','Aangevraagd','Jer','29-10-2026'],
+                  ['CRM'], ['VvE Code','VvE','Onderwerp','Fase'], crmCellen];
+    const p = parseSections(blad, 'Nog Te Doen');
+    const c = p.data.CRM[0];
+    eq('lezen: de CRM-rij landt in CRM, de subsidierij blijft in Subsidie', [p.data.CRM.length, p.data['SUBSIDIE-TRAJECTEN'].length], [1, 1]);
+    eq('lezen: sleutels A..H', [c.onderwerp, c.crmFase, c.behandelaar, c.deadline, c.opmerkingen], ['Wie betaalt het onderzoek?','Wacht op reactie','Jer','17-09-2026','Bestuur gemaild']);
+    eq('lezen: T..W', [c.afzender, c.ontvangen, c.soort, c.mail], ['Mw. Jansen, nr. 71','10-09-2026','Vraag','Beste beheerder,\nWie betaalt dit?']);
+    eq('lezen: de offerte-fase (O) blijft leeg', c.fase, '');
+    eq('lezen: taaknummer uit Q', c.taakId, 'TCRM1');
+    eq('lezen: de koprij van CRM is geregistreerd', p.secInfo.CRM.colHeaderRow, 5);
+    eq('lezen: een gewone rij krijgt lege T..W', [p.data['SUBSIDIE-TRAJECTEN'][0].afzender, p.data['SUBSIDIE-TRAJECTEN'][0].mail], ['', '']);
+
+    // ── Schrijven: T..W alleen bij CRM ──
+    const vals11 = ['381057','VvE J','Onderwerp','Opgepakt','Jer','17-09-2026','','FALSE','','',''];
+    const crmObj = { ...c, _sec:'CRM', _row:40 };
+    const oppObj = { _sec:'OPPAKKEN', _row:10, code:'1', naam:'N', actiepunt:'A', deadline:'', behandelaar:'Jer', prioriteit:'', opmerkingen:'', inBehandeling:'FALSE',
+                     afzender:'NIET SCHRIJVEN', ontvangen:'x', soort:'x', mail:'x' };
+    eq('toevoegen: CRM loopt tot W', CR.toevoegWaarden(vals11, crmObj).length, 23);
+    eq('toevoegen: T..W in de juiste volgorde', CR.toevoegWaarden(vals11, crmObj).slice(19), ['Mw. Jansen, nr. 71','10-09-2026','Vraag','Beste beheerder,\nWie betaalt dit?']);
+    eq('toevoegen: een andere sectie blijft tot S, ook met velden op het object', CR.toevoegWaarden(vals11, oppObj).length, 19);
+    eq('undo: CRM loopt tot W, Oppakken tot S', [serializeNtdUndo(crmObj).length, serializeNtdUndo(oppObj).length], [23, 19]);
+    eq('undo: het taaknummer blijft op Q', serializeNtdUndo(crmObj)[16], 'TCRM1');
+    eq('afronden: CRM loopt tot W en de mail gaat mee', [afrondWaarden(crmObj,'CRM','23-09-2026','Beantwoord').length, afrondWaarden(crmObj,'CRM','23-09-2026','x')[22]], [23, 'Beste beheerder,\nWie betaalt dit?']);
+    eq('afronden: Oppakken blijft tot S', afrondWaarden(oppObj,'OPPAKKEN','23-09-2026','x').length, 19);
+    eq('crmVelden: vaste volgorde, leeg als niets', CR.crmVelden({}), ['','','','']);
+
+    // ── Verplaatsen ──
+    const weg = verlorenVelden(crmObj, 'CRM', 'OPPAKKEN').map(v => v.label);
+    truthy('verplaatsen uit CRM: Van, Ontvangen op, Soort vraag en Mail staan in de vraag',
+           ['Van','Ontvangen op','Soort vraag','Mail'].every(l => weg.includes(l)));
+    eq('verplaatsen uit CRM: de fase ook', weg.includes('Fase'), true);
+    eq('verplaatsen naar CRM: niets van T..W in de vraag', verlorenVelden(oppObj, 'OPPAKKEN', 'CRM').map(v => v.label).filter(l => ['Van','Mail'].includes(l)), []);
+    const naarOpp = verplaatsWaarden(crmObj, 'CRM', 'OPPAKKEN', 12);
+    eq('verplaatsen uit CRM: de rij wordt 19 breed, onderwerp wordt actiepunt', [naarOpp.rij.length, naarOpp.rij[2]], [19, 'Wie betaalt het onderzoek?']);
+    const naarCrm = verplaatsWaarden({ ...oppObj, afzender:'', ontvangen:'', soort:'', mail:'', actiepunt:'CRM Zie ingekomen berichten' }, 'OPPAKKEN', 'CRM', 50);
+    eq('verplaatsen naar CRM: de rij wordt 23 breed, actiepunt wordt onderwerp', [naarCrm.rij.length, naarCrm.rij[2]], [23, 'CRM Zie ingekomen berichten']);
+
+    // ── De getekende rij ──
+    const bewaard = { ntd:D.ntd, sec:state.activeNtd, pg:pgs.ntd, exp:state.expandedRows };
+    try {
+      const dag = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`; };
+      const rij = { ...crmObj, _row:60, taakId:'TCRMR', afzender:'Dhr. Van Wijk, nr. 151', soort:'Klacht',
+                    ontvangen:dag(-33), deadline:dag(-26), crmFase:'Opgepakt', opmerkingen:'Planning opvragen' };
+      const rij2 = { ...crmObj, _row:61, taakId:'TCRMS', afzender:'', soort:'', ontvangen:'', deadline:dag(3), crmFase:'', mail:'' };
+      D.ntd = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[rij, rij2] };
+      state.expandedRows = new Set();
+      pgs.ntd = 1; setNtd('CRM');
+      const tabs = [...document.querySelectorAll('#ntd-tabs .tab')].map(t => t.dataset.sec);
+      eq('rij: zes tabbladen, CRM als laatste', [tabs.length, tabs[5]], [6, 'CRM']);
+      const tr = document.querySelector('#ntd-tbody tr[data-row="60"]');
+      truthy('rij: de CRM-rij staat in de tabel', !!tr);
+      eq('rij: zeven cellen + acties', tr ? tr.children.length : 0, 8);
+      eq('rij: vier bolletjes, stap 2 actief',
+         [tr.querySelectorAll('.fase-bol').length, tr.querySelector('.fase-bol[aria-pressed="true"]')?.dataset.fase], [4, '2']);
+      eq('rij: soort en onderwerp', [tr.querySelector('.crm-soort')?.textContent, tr.querySelector('.crm-vraag .ct')?.textContent], ['Klacht', 'Wie betaalt het onderzoek?']);
+      eq('rij: Van splitst naam en huisnummer', [tr.querySelector('.crm-van .ct')?.textContent, tr.querySelector('.crm-nr')?.textContent], ['Dhr. Van Wijk', 'nr. 151']);
+      eq('rij: wacht 33 dagen, 26 te laat',
+         [tr.querySelector('.dl-2.laat .dl-dat')?.textContent, tr.querySelector('.dl-2.laat .dl-bij')?.textContent], ['33 dagen', '26d te laat']);
+      const paneel = tr.nextElementSibling;
+      truthy('paneel: direct onder de rij', !!paneel && paneel.classList.contains('crm-mail-tr'));
+      eq('paneel: dicht zolang de rij dicht is', getComputedStyle(paneel).display, 'none');
+      tr.classList.add('expanded');
+      eq('paneel: open zodra de rij open is', getComputedStyle(paneel).display, 'table-row');
+      truthy('paneel: toont de mail en de notitie',
+             /Wie betaalt dit\?/.test(paneel.textContent) && /Planning opvragen/.test(paneel.textContent) && /Dhr\. Van Wijk/.test(paneel.textContent));
+      eq('paneel: overspant de hele rij', paneel.firstElementChild.colSpan, 8);
+      const tr2 = document.querySelector('#ntd-tbody tr[data-row="61"]');
+      truthy('rij zonder ontvangstdatum: valt terug op de deadlinecel', !!tr2 && !/dagen|dag</.test(tr2.children[5].innerHTML) && /nog 3d|\d{2}-\d{2}-\d{4}/.test(tr2.children[5].textContent));
+      truthy('rij zonder mail: het paneel zegt dat eerlijk', /Geen mail bewaard/.test(tr2.nextElementSibling?.textContent || ''));
+      eq('rij zonder soort: geen leeg label', tr2.querySelectorAll('.crm-soort').length, 0);
+    } finally {
+      D.ntd = bewaard.ntd; state.expandedRows = bewaard.exp; pgs.ntd = bewaard.pg; state.activeNtd = bewaard.sec;
+    }
+
+    // ── Het invulvenster ──
+    const vandaagIso = iso(new Date());
+    try {
+      openModal(false, null, { sec:'CRM' });
+      eq('venster: het CRM-blok is zichtbaar, Subsidie niet',
+         [document.getElementById('fg-crm').style.display, document.getElementById('fg-sub').style.display], ['', 'none']);
+      eq('venster: vier bolletjes, op Ontvangen', [document.querySelectorAll('#m-fase-c .fase-bol').length, CR._modalCrmFaseWoord()], [4, 'Ontvangen']);
+      eq('venster: soort staat op Vraag', CR._modalSoort(), 'Vraag');
+      eq('venster: ontvangen staat op vandaag', document.getElementById('m-ontv').value, vandaagIso);
+      eq('venster: de deadline is vandaag + 5 werkdagen', document.getElementById('m-dl-c').value, U.voorgesteldeDeadline('CRM', new Date()));
+      document.getElementById('m-ontv').value = '2026-09-25';
+      CR.crmOntvangenGewijzigd();
+      eq('venster: een andere ontvangstdatum verzet de automatische deadline', document.getElementById('m-dl-c').value, '2026-10-02');
+      document.getElementById('m-dl-c').value = '2026-10-09';
+      document.getElementById('m-ontv').value = '2026-09-28';
+      CR.crmOntvangenGewijzigd();
+      eq('venster: een zelf gekozen deadline blijft staan', document.getElementById('m-dl-c').value, '2026-10-09');
+      CR.kiesModalSoort('Schade');
+      eq('venster: soort kiezen', [CR._modalSoort(), document.querySelector('#m-soort .crm-keus.aan')?.dataset.soort], ['Schade', 'Schade']);
+      CR.kiesModalCrmFase(3);
+      eq('venster: fase kiezen', CR._modalCrmFaseWoord(), 'Wacht op reactie');
+      closeModal(); clearModal();
+      eq('venster: een nieuw scherm begint weer op Vraag en Ontvangen', [CR._modalSoort(), CR._modalCrmFaseWoord()], ['Vraag', 'Ontvangen']);
+      // Bewerken: de velden uit T..W komen terug, en een soort buiten de vier gaat ongewijzigd terug.
+      openModal(true, { ...crmObj, soort:'Overig' });
+      eq('bewerken: T..W in de velden',
+         ['m-van','m-ontv','m-mail','m-onderwerp'].map(id => document.getElementById(id).value),
+         ['Mw. Jansen, nr. 71', '2026-09-10', 'Beste beheerder,\nWie betaalt dit?', 'Wie betaalt het onderzoek?']);
+      eq('bewerken: de fase uit D', CR._modalCrmFaseWoord(), 'Wacht op reactie');
+    } finally { closeModal(); clearModal(); }
+    void vandaagIso;
+
+    // ── Klikacties en het zoekveld ──
+    eq('acties: drie CRM-acties geregistreerd',
+       ['crm-fase','crm-fase-modal','crm-soort'].map(a => typeof ACTIONS[a]), ['function','function','function']);
+    eq('zoekveld: het zoekvak van Nog Te Doen is 92px, dat van Afgerond ongewijzigd',
+       [getComputedStyle(document.getElementById('s-ntd')).width, getComputedStyle(document.getElementById('s-af')).width], ['92px', '155px']);
   })();
 
   console.log = _origLog;         // het voortgangsspoor weer los

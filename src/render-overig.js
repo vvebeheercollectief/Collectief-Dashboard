@@ -353,7 +353,7 @@ function logZin(r, opts){
     // en stond de nieuwe opvolgdatum nergens — precies het gegeven waar de regel om draait.
     case'Opgevolgd':           return A('volgde')+(zonderCode?'een offerte-traject':chip)+' op'+(r.nieuweWaarde?` → volgende check <b>${esc(r.nieuweWaarde)}</b>`:'');
     case'Opvolgdatum teruggezet':return A('zette')+'de opvolgdatum'+bij+' terug'+(r.nieuweWaarde?` naar <b>${esc(r.nieuweWaarde)}</b>`:'');
-    case'Fase gewijzigd':      return A('zette')+(zonderCode?'het subsidietraject':chip)+` op <b>${esc(r.nieuweWaarde||'—')}</b>`+(r.oudeWaarde?` <span style="color:var(--mut)">(was ${esc(r.oudeWaarde)})</span>`:'');
+    case'Fase gewijzigd':      return A('zette')+(zonderCode?(r.sectie==='CRM'?'de vraag':'het subsidietraject'):chip)+` op <b>${esc(r.nieuweWaarde||'—')}</b>`+(r.oudeWaarde?` <span style="color:var(--mut)">(was ${esc(r.oudeWaarde)})</span>`:'');
     case'Auto-prioriteit':     return A('paste')+'de prioriteit automatisch aan'+(r.nieuweWaarde?` <span style="color:var(--mut)">· ${esc(r.nieuweWaarde)}</span>`:'');
     default:                   return `<b>${naam}</b> — ${esc(r.actie||'')}`+staart;
   }

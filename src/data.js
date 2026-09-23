@@ -1000,6 +1000,15 @@ function parseSections(rows, tabblad){
                                       // '0' (hoofdtaak) en 10/20/30, maar slepen hernummert álle
                                       // open leden vanaf 10 — ook de hoofdtaak. Welk lid de kop is
                                       // volgt dus uit het laagste OPEN nummer, niet uit de 0.
+    // T..W — alleen gevuld bij CRM-rijen (v13.0): wie de vraag stelde, wanneer hij binnenkwam, wat
+    // voor soort vraag het is, en de mail zelf. Voor elke rij gelezen (leeg bij de andere secties),
+    // zodat een taak die naar CRM verhuist of terugkomt uit Afgerond dezelfde vorm houdt. Alleen
+    // CRM-rijen SCHRIJVEN hier: zie crmVelden in crud.js.
+    entry.afzender   =_f4v(row[19]);  // T
+    entry.ontvangen  =_f4v(row[20]);  // U
+    entry.soort      =_f4v(row[21]);  // V
+    entry.mail       =(row[22]==null?'':String(row[22])).trim();  // W — bewust niet via _f4v: een
+                                      // mail hoort nooit stil leeg te worden.
     // Legacy 'Afgerond'-rijen (oude onEdit-vinkjes, vóór juni): 5-koloms vorm
     // [code,naam,actiepunt,behandelaar,datum] met de afronddatum op kolom E i.p.v. I.
     // Herken ze — geen datum op I, maar kolom E (in entry.behandelaar) is wél een datum —

@@ -53,17 +53,27 @@ export function faseWijziging(oud, nieuw){
 // de toegankelijkheidsronde aanhoudt. Het fasewoord staat er als tekst onder, want
 // kleur alleen is geen informatiedrager.
 export function faseRijHtml(huidig, rid, extraClass) {
-  const n = faseIndex(huidig);
+  return bouwFaseRij(SUBSIDIE_FASES, faseIndex(huidig), rid, extraClass,
+                     'subsidie-fase', 'Fase van dit subsidietraject');
+}
+
+// De bolletjesbalk zelf, los van WELKE fases het zijn. Sinds het CRM-tabblad (v13.0) zijn er twee
+// reeksen — deze vijf en de vier van CRM (crm-fase.js) — en die blijven inhoudelijk volledig
+// gescheiden: eigen woorden, eigen klikactie, eigen kolom. Alleen de tekening is gedeeld, zodat een
+// verbetering aan de balk (raakvlak, toegankelijkheid) niet in twee kopieën uit elkaar gaat lopen.
+// De uitvoer voor Subsidie is teken-voor-teken dezelfde als vóór deze splitsing.
+export function bouwFaseRij(fases, n, rid, extraClass, actie, groepLabel) {
+  const aantal = fases.length;
   let rail = '';
-  for (let i = 1; i <= 5; i++) {
+  for (let i = 1; i <= aantal; i++) {
     const cls = i < n ? 'af' : i === n ? 'nu' : '';
-    rail += `<button type="button" class="fase-bol ${cls}" data-action="subsidie-fase"`
+    rail += `<button type="button" class="fase-bol ${cls}" data-action="${actie}"`
           + ` data-rid="${rid}" data-fase="${i}" aria-pressed="${i === n}"`
-          + ` title="Zet op ${esc(SUBSIDIE_FASES[i - 1])}"`
-          + ` aria-label="Zet op ${esc(SUBSIDIE_FASES[i - 1])}"></button>`;
-    if (i < 5) rail += `<span class="fase-lijn ${i < n ? 'af' : ''}"></span>`;
+          + ` title="Zet op ${esc(fases[i - 1])}"`
+          + ` aria-label="Zet op ${esc(fases[i - 1])}"></button>`;
+    if (i < aantal) rail += `<span class="fase-lijn ${i < n ? 'af' : ''}"></span>`;
   }
-  return `<div class="fase-rij ${extraClass || ''}" role="group" aria-label="Fase van dit subsidietraject">`
+  return `<div class="fase-rij ${extraClass || ''}" role="group" aria-label="${esc(groepLabel)}">`
        + `<div class="fase-rail">${rail}</div>`
-       + `<div class="fase-lbl">${esc(faseWoord(n))}</div></div>`;
+       + `<div class="fase-lbl">${esc(fases[n - 1] || fases[0])}</div></div>`;
 }

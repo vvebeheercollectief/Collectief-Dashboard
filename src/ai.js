@@ -42,7 +42,7 @@ function aiVveContext(code){
       // `taakTitel` als terugval en niet het sectielabel: bij een Offerte-traject staat de
       // omschrijving in `opmerkingen` en die stond niet in deze keten, dus elke offerte-regel werd
       // letterlijk 'Offerte-trajecten: Offerte-trajecten' in de context van de chat-agent.
-      const titel=r.actiepunt||r.agendapunten||r.periode||r.status||r.subsidie||taakTitel(r,s)||SECS[s].label;
+      const titel=r.actiepunt||r.agendapunten||r.periode||r.status||r.subsidie||r.onderwerp||taakTitel(r,s)||SECS[s].label;
       open.push(`${SECS[s].label}: ${titel}`.trim());
     });
   });
@@ -55,7 +55,7 @@ function aiVveContext(code){
 
 const AI_WANT_TEKST={
   samenvatting:'Een korte samenvatting in 2-3 zinnen.',
-  categorie:'In welke categorie dit valt (Oppakken / Vergaderverzoeken / Offerte-trajecten / LOD / Subsidie-trajecten) en om welke VvE het gaat, met een prioriteit-inschatting (Hoog/Midden/Laag).',
+  categorie:'In welke categorie dit valt (Oppakken / Vergaderverzoeken / Offerte-trajecten / LOD / Subsidie-trajecten / CRM) en om welke VvE het gaat, met een prioriteit-inschatting (Hoog/Midden/Laag).',
   acties:'De concrete actiepunten als bulletlijst (begin elke regel met "- ").',
   antwoord:'Een vriendelijk, professioneel concept-antwoord namens VvE Beheer Collectief.'
 };
@@ -156,6 +156,7 @@ function parseAiAnswer(){
 function aiGisCategorie(txt){
   const t=(txt||'').toLowerCase();
   if(t.includes('vergader')) return 'VERGADERVERZOEKEN';
+  if(/\bcrm\b/.test(t)) return 'CRM';
   if(t.includes('subsidie')) return 'SUBSIDIE-TRAJECTEN';
   if(t.includes('offerte')) return 'OFFERTE-TRAJECTEN';
   if(/\blod\b/.test(t)) return 'LOD';

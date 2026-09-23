@@ -538,7 +538,9 @@ function filterNtd(rows,q,fCode,beh,prio,sec,status){
 
 // Welke kolomkoppen zijn sorteerbaar? 'VvE Code' → code; elke 'Deadline…'-kop → deadline.
 function ntdSorteerKey(lbl){
-  return lbl==='VvE Code' ? 'code' : (String(lbl).startsWith('Deadline') ? 'deadline' : null);
+  // 'Wacht' (CRM) sorteert op de deadline: die is ontvangen + 5 werkdagen, dus dezelfde volgorde als
+  // 'langst wachtend eerst', en hij bestaat ook voor een vraag zonder ontvangstdatum.
+  return lbl==='VvE Code' ? 'code' : ((String(lbl).startsWith('Deadline') || lbl==='Wacht') ? 'deadline' : null);
 }
 
 // Kolomkop-sortering (klikcyclus ▲/▼/uit). key:null = standaardvolgorde uit filterNtd.

@@ -37,7 +37,7 @@ function zoekAlles(q, data, max){
   // De index één keer, niet per rij: `bouwBundelIndex` loopt over vijf secties van twee bladen.
   const _ix=bouwBundelIndex(data.ntd||{}, data.af||{});
   SKEYS.forEach(s=>(data.ntd[s]||[]).forEach(r=>{
-    if(!hit(r.code,r.naam,r.actiepunt,r.periode,r.agendapunten,r.status,r.subsidie,r.opmerkingen)) return;
+    if(!hit(r.code,r.naam,r.actiepunt,r.periode,r.agendapunten,r.status,r.subsidie,r.onderwerp,r.afzender,r.opmerkingen)) return;
     (isAutoOfferteStap(r,_ix) ? alleStappen : alleTaken).push(r);
   }));
   const _dt=r=>{const p=berekenPrioriteit(r.deadline,r._sec).dagenTot; return p==null?Infinity:p;};
@@ -64,7 +64,7 @@ function zoekAlles(q, data, max){
   // nadat hij was afgerond. Beide velden tellen nu mee.
   const alleAf=[];
   SKEYS.forEach(s=>(data.af[s]||[]).forEach(r=>{
-    if(hit(r.code,r.naam,r.actiepunt,r.periode,r.agendapunten,r.status,r.subsidie,r.opmerkingen,r.opmerking)) alleAf.push(r);
+    if(hit(r.code,r.naam,r.actiepunt,r.periode,r.agendapunten,r.status,r.subsidie,r.onderwerp,r.afzender,r.opmerkingen,r.opmerking)) alleAf.push(r);
   }));
   alleAf.sort((a,b)=>{
     const ax=(a.code||'').toLowerCase()===z?0:1, bx=(b.code||'').toLowerCase()===z?0:1;

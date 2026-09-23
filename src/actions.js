@@ -12,7 +12,7 @@ import {
   setOntw, renderOntw, editOntwItem, addTaskNote, renderLogboek,
   editLogboek, saveLogboek, cancelLogboek, setLogSoort, deleteLogboek,
 } from './render-overig.js';
-import { openModal, completeTask, completeCurrentEditTask, deleteCurrentEditTask, zetSubsidieFase, kiesModalFase, zetHoortBij, taakUitCache, renderExtraVves, herzieAlsSubtaak, _bewerkRijVers, offerteAanvraagGewijzigd } from './crud.js';
+import { openModal, completeTask, completeCurrentEditTask, deleteCurrentEditTask, zetSubsidieFase, kiesModalFase, zetHoortBij, taakUitCache, renderExtraVves, herzieAlsSubtaak, _bewerkRijVers, offerteAanvraagGewijzigd, zetCrmFase, kiesModalCrmFase, kiesModalSoort, crmOntvangenGewijzigd } from './crud.js';
 import { ontkoppelTaak } from './bundel-acties.js';
 import { modalAannemerAdd, modalAannemerBinnen, modalAannemerWeg } from './modal-aannemers.js';
 import { copyAiPrompt, aiOvernemen, aiActieTaak, aiKopieerConcept, prefillNieuweTaak } from './ai.js';
@@ -41,6 +41,10 @@ export const ACTIONS = {
   // Hetzelfde bolletje in het bewerkscherm: zet alleen de lokale stand; pas bij
   // Opslaan gaat het naar de Sheet.
   'subsidie-fase-modal':   (el) => kiesModalFase(+el.dataset.fase),
+  // CRM (v13.0): eigen acties, zodat een bolletje in de ene sectie nooit het veld van de andere raakt.
+  'crm-fase':              (el) => zetCrmFase(+el.dataset.rid, +el.dataset.fase),
+  'crm-fase-modal':        (el) => kiesModalCrmFase(+el.dataset.fase),
+  'crm-soort':             (el) => kiesModalSoort(el.dataset.soort),
   'notitie-toevoegen':     ()   => addTaskNote(),
   'taak-verwijder-modal':  ()   => deleteCurrentEditTask(),
   'taak-afronden-modal':   ()   => completeCurrentEditTask(),
@@ -309,6 +313,8 @@ export function initActions() {
     // 'Datum aangevraagd' in het offerte-scherm: label en opvolgdatum-voorstel meteen laten
     // meebewegen terwijl de gebruiker typt of kiest (zie offerteAanvraagGewijzigd in crud.js).
     if (e.target && e.target.id === 'm-daang') offerteAanvraagGewijzigd();
+    // CRM: 'Ontvangen op' verzet de automatische deadline (ontvangen + 5 werkdagen).
+    if (e.target && e.target.id === 'm-ontv') crmOntvangenGewijzigd();
   });
 
   // Ergens anders klikken bewaart de naam. Twee dingen maken dit lastiger dan het lijkt, en beide

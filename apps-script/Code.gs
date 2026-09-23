@@ -121,7 +121,8 @@ function cd_archiveerRij(sheet, row) {
   // in plaats van doorgestreept bovenin het paneel te blijven staan — en bij een bundel van twee
   // bleef er geen bundel over. Achteraf niet meer te herstellen: de archiefrij had geen identiteit.
   // Nooit breder lezen dan het blad is; getRange gooit anders een fout en legt de hele trigger stil.
-  var leesBreedte = Math.min(19, sheet.getMaxColumns());
+  // 23 = A..W: sinds CRM (v13.0) dragen CRM-rijen afzender/ontvangen/soort/mail in T..W.
+  var leesBreedte = Math.min(23, sheet.getMaxColumns());
   var rowData = sheet.getRange(row, 1, 1, leesBreedte).getValues()[0];
 
   // Herverifieer binnen de lock dat de afvink-checkbox (kolom 9) op rij `row` NOG aan staat.
@@ -142,7 +143,7 @@ function cd_archiveerRij(sheet, row) {
   var sectie = "";
   for (var i = row - 1; i >= 1; i--) {
     var cellValue = kolomABron[i - 1][0].toString().trim().toUpperCase();
-    if (cellValue === "OPPAKKEN" || cellValue === "VERGADERVERZOEKEN" || cellValue === "LOD" || cellValue === "OFFERTE-TRAJECTEN" || cellValue === "SUBSIDIE-TRAJECTEN") {
+    if (cellValue === "OPPAKKEN" || cellValue === "VERGADERVERZOEKEN" || cellValue === "LOD" || cellValue === "OFFERTE-TRAJECTEN" || cellValue === "SUBSIDIE-TRAJECTEN" || cellValue === "CRM") {
       sectie = cellValue;
       break;
     }
@@ -177,6 +178,8 @@ function cd_archiveerRij(sheet, row) {
   archief.push("", "", "", "");             // M = duur in minuten, blijft hier leeg: afvinken in
                                              // de Sheet zelf kent geen duur. N..P blijven ook leeg.
   archief.push(rowData[16] || "", rowData[17] || "", rowData[18] || "");  // Q/R/S: taaknummer + bundel
+  // T..W alleen bij CRM, net als afrondWaarden in src/crud.js: de mail gaat mee naar het archief.
+  if (sectie === "CRM") archief.push(rowData[19] || "", rowData[20] || "", rowData[21] || "", rowData[22] || "");
 
   // Via `sheet.getParent()` en niet via het onEdit-event: deze functie staat sinds de opsplitsing
   // LOS van de trigger (een bereik van meerdere rijen loopt er rij voor rij langs), dus `e` bestaat
@@ -230,7 +233,7 @@ function cd_archiveerRij(sheet, row) {
   var insertRow = sectieRow + 2;
   while (insertRow <= lastRowTarget) {
     var checkVal = kopA(insertRow);
-    if (checkVal === "OPPAKKEN" || checkVal === "VERGADERVERZOEKEN" || checkVal === "LOD" || checkVal === "OFFERTE-TRAJECTEN" || checkVal === "SUBSIDIE-TRAJECTEN") {
+    if (checkVal === "OPPAKKEN" || checkVal === "VERGADERVERZOEKEN" || checkVal === "LOD" || checkVal === "OFFERTE-TRAJECTEN" || checkVal === "SUBSIDIE-TRAJECTEN" || checkVal === "CRM") {
       break;
     }
     if (celA(insertRow) === "") {
@@ -301,11 +304,12 @@ function setupAfgerondSheet(sheet) {
     'VERGADERVERZOEKEN':   ["VvE-Code","VvE","Periode","Agendapunten","Behandelaar","Deadline","Opmerkingen","In behandeling"],
     'LOD':                 ["VvE-Code","VvE","Actiepunt","Status","Behandelaar","Deadline","Opmerkingen","In behandeling"],
     'OFFERTE-TRAJECTEN':   ["VvE-Code","VvE","Datum aangevraagd","Ontvangen/Aangevraagd","Behandelaar","Deadline","Opmerkingen",""],
-    'SUBSIDIE-TRAJECTEN':  ["VvE-Code","VvE","Subsidie","Fase","Behandelaar","Deadline","Opmerkingen","In behandeling"]
+    'SUBSIDIE-TRAJECTEN':  ["VvE-Code","VvE","Subsidie","Fase","Behandelaar","Deadline","Opmerkingen","In behandeling"],
+    'CRM':                 ["VvE-Code","VvE","Onderwerp","Fase","Behandelaar","Deadline","Opmerkingen","In behandeling"]
   };
   // De volgorde LOD vóór OFFERTE-TRAJECTEN is BEWUST anders dan SKEYS — zo staat het echt op
   // productie, zie de toelichting bovenin src/structuurcheck.js. Niet 'rechttrekken'.
-  var BLOKKEN = ['OPPAKKEN', 'VERGADERVERZOEKEN', 'LOD', 'OFFERTE-TRAJECTEN', 'SUBSIDIE-TRAJECTEN'];
+  var BLOKKEN = ['OPPAKKEN', 'VERGADERVERZOEKEN', 'LOD', 'OFFERTE-TRAJECTEN', 'SUBSIDIE-TRAJECTEN', 'CRM'];
 
   for (var i = 0; i < BLOKKEN.length; i++) {
     var sec = BLOKKEN[i];
@@ -514,7 +518,10 @@ function sorteerOfferteTrajecten(e) {
 // liggen terwijl A..Q wél herschikten — dan draagt taak X het bundelnummer van taak Y, zonder
 // enige melding. Dit getal hoort dus gelijk te lopen met RASTER_MIN['Nog Te Doen'] in
 // src/structuurcheck.js (ook 19); dát getal volgt de breedste schrijfactie van de app.
-const NTD_SORT_KOLOMMEN = 19;   // A t/m S
+// Op 2026-09-23 van 19 naar 23 voor CRM (v13.0): T..W dragen afzender, ontvangen, soort en mail.
+// De sortering hieronder klemt op sheet.getMaxColumns(), dus op een blad dat nog niet verbreed is
+// (PROD tussen de code-uitrol en cd_setupCrm) sorteert hij gewoon A..S, zonder fout.
+const NTD_SORT_KOLOMMEN = 23;   // A t/m W
 function _sorteerOfferteTrajectenImpl(e) {
   var ss = e ? e.source : SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName("Nog Te Doen");
@@ -543,6 +550,7 @@ function _sorteerOfferteTrajectenImpl(e) {
   var offerteHeader = -1;
   var lodHeader = -1;
   var subsidieHeader = -1;
+  var crmHeader = -1;
 
   for (var i = 0; i < allValues.length; i++) {
     var val = allValues[i][0].toString().trim().toUpperCase();
@@ -551,6 +559,7 @@ function _sorteerOfferteTrajectenImpl(e) {
     if (val === "OFFERTE-TRAJECTEN") offerteHeader = i + 1;
     if (val === "LOD") lodHeader = i + 1;
     if (val === "SUBSIDIE-TRAJECTEN") subsidieHeader = i + 1;
+    if (val === "CRM") crmHeader = i + 1;
   }
 
   // Nooit breder sorteren dan het blad is: getRange gooit een fout zodra numColumns het
@@ -568,7 +577,10 @@ function _sorteerOfferteTrajectenImpl(e) {
   // "alles onder de LOD-kop": anders sorteert een bewerking in het subsidieblok
   // de LOD-rijen mee (en andersom).
   var inLOD = sortAll || (editedRow > lodHeader && (subsidieHeader < 0 || editedRow < subsidieHeader));
-  var inSubsidie = sortAll || (subsidieHeader > 0 && editedRow > subsidieHeader);
+  // Subsidie is sinds CRM (v13.0) niet meer het laatste blok: begrensd op de CRM-kop, anders sorteert
+  // een bewerking in het subsidieblok de CRM-rijen mee (dezelfde fout die LOD had, zie hierboven).
+  var inSubsidie = sortAll || (subsidieHeader > 0 && editedRow > subsidieHeader && (crmHeader < 0 || editedRow < crmHeader));
+  var inCrm = sortAll || (crmHeader > 0 && editedRow > crmHeader);
 
   // Sorteer OPPAKKEN op kolom H (8) = het vinkje 'In behandeling'. Bij VERGADERVERZOEKEN idem.
   //
@@ -646,7 +658,7 @@ function _sorteerOfferteTrajectenImpl(e) {
     var subEnd = subStart - 1;
     for (var m = subStart; m <= lastRow; m++) {
       var mv = allValues[m - 1][0].toString().trim().toUpperCase();
-      if (mv === "") break;
+      if (mv === "" || mv === "CRM") break;
       subEnd = m;
     }
     var subRows = subEnd - subStart + 1;
@@ -654,4 +666,89 @@ function _sorteerOfferteTrajectenImpl(e) {
       sheet.getRange(subStart, 1, subRows, sortBreedte).sort({column: 6, ascending: true});
     }
   }
+
+  // Sorteer CRM op kolom F (6) — de deadline (ontvangen + 5 werkdagen), dus de langst wachtende
+  // vraag bovenaan. NIET kolom D: daar staat de fase.
+  if (inCrm && crmHeader > 0) {
+    var crmStart = crmHeader + 2;
+    var crmEnd = crmStart - 1;
+    for (var c = crmStart; c <= lastRow; c++) {
+      var crv = allValues[c - 1][0].toString().trim().toUpperCase();
+      if (crv === "") break;
+      crmEnd = c;
+    }
+    var crmRows = crmEnd - crmStart + 1;
+    if (crmRows > 1) {
+      sheet.getRange(crmStart, 1, crmRows, sortBreedte).sort({column: 6, ascending: true});
+    }
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+//  CRM (v13.0) — het blok en de vier extra kolommen klaarzetten
+// ════════════════════════════════════════════════════════════
+// Idempotent: nog een keer draaien doet niets wat er al staat. Per tabblad ('Nog Te Doen' en
+// 'Afgerond'):
+//   1. het raster minstens 23 kolommen breed maken (A..W), anders mislukken de CRM-schrijfacties
+//      naar T..W zonder melding;
+//   2. als er nog geen CRM-kop is: onderaan, direct na de laatste regel, de kop 'CRM' en de
+//      kolomkoprij zetten, met de opmaak van het Subsidie-blok;
+//   3. genoeg lege rijen eronder laten staan om in te groeien.
+// Volgorde bij de uitrol is dwingend: EERST de code live, DAN dit. Andersom leest de oude code de
+// CRM-regels als Subsidie-rijen. Zie docs/superpowers/specs/2026-09-23-crm-tab-design.md.
+var CD_CRM_KOLOMKOPPEN = ["VvE Code","VvE","Onderwerp","Fase","Behandelaar","Deadline","Opmerkingen","In behandeling"];
+var CD_CRM_EXTRA_KOPPEN = ["Van","Ontvangen","Soort","Mail"];   // T..W
+var CD_CRM_BREEDTE = 23;
+
+function cd_setupCrm() {
+  var verslag = [];
+  cd_lockedRun('cd_setupCrm', function () {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    ['Nog Te Doen', 'Afgerond'].forEach(function (naam) {
+      var sh = ss.getSheetByName(naam);
+      if (!sh) { verslag.push(naam + ': tabblad ontbreekt, niets gedaan'); return; }
+      // 1. Raster verbreden. 'kolom rechts invoegen' erft de opmaak van links; dat is hier goed.
+      var tekort = CD_CRM_BREEDTE - sh.getMaxColumns();
+      if (tekort > 0) { sh.insertColumnsAfter(sh.getMaxColumns(), tekort); verslag.push(naam + ': ' + tekort + ' kolommen toegevoegd'); }
+      // 2. Bestaat het blok al?
+      var laatste = sh.getLastRow();
+      var kolomA = sh.getRange(1, 1, Math.max(laatste, 1), 1).getValues();
+      var subKop = -1;
+      for (var i = 0; i < kolomA.length; i++) {
+        var v = (kolomA[i][0] || '').toString().trim().toUpperCase();
+        if (v === 'CRM') { verslag.push(naam + ': CRM-blok bestond al op rij ' + (i + 1)); return; }
+        if (v === 'SUBSIDIE-TRAJECTEN') subKop = i + 1;
+      }
+      // 3. Ruimte: kop + kolomkoprij + 60 rijen om in te groeien.
+      var start = laatste + 1;
+      var nodigRijen = start + 1 + 60;
+      if (sh.getMaxRows() < nodigRijen) sh.insertRowsAfter(sh.getMaxRows(), nodigRijen - sh.getMaxRows());
+      var breed = Math.min(CD_CRM_BREEDTE, sh.getMaxColumns());
+      // Opmaak eerst (van de Subsidie-kop en zijn kolomkoprij), dan de waarden, zodat de opmaak ze
+      // niet overschrijft. Zonder Subsidie-blok blijft het bij de waarden.
+      if (subKop > 0) {
+        sh.getRange(subKop, 1, 2, breed).copyTo(sh.getRange(start, 1, 2, breed),
+          SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
+      }
+      sh.getRange(start, 1, 2, breed).clearContent();
+      sh.getRange(start, 1).setValue('CRM');
+      sh.getRange(start + 1, 1, 1, CD_CRM_KOLOMKOPPEN.length).setValues([CD_CRM_KOLOMKOPPEN]);
+      if (breed >= 23) sh.getRange(start + 1, 20, 1, 4).setValues([CD_CRM_EXTRA_KOPPEN]);
+      verslag.push(naam + ': CRM-blok gezet op rij ' + start + ' (kolomkoppen op ' + (start + 1) + ')');
+    });
+    PropertiesService.getScriptProperties().setProperty('CD_CRM_SETUP', new Date().toISOString());
+  });
+  Logger.log('cd_setupCrm:\n' + verslag.join('\n'));
+  return verslag;
+}
+
+// Alleen op het TEST-blad: één keer vanzelf, vanuit de 5-minuten-sweep, zodat de testomgeving na
+// een push naar staging zonder handwerk klaarstaat. Op PROD nooit vanzelf — daar draait
+// cd_setupCrm met de hand, ná de code-uitrol en een harde verversing (zie het ontwerp).
+var CD_TEST_SHEET_ID = '1-6Q36CrwB0szX2DS2eLjPwfiY-jAw8lK9JOPDSlljm4';
+function cd_crmSetupOpTest() {
+  if (PropertiesService.getScriptProperties().getProperty('CD_CRM_SETUP')) return;
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss || ss.getId() !== CD_TEST_SHEET_ID) return;
+  cd_setupCrm();
 }

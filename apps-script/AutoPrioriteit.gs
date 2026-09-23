@@ -36,7 +36,7 @@ function cd_recalcPrioriteiten() {
     let inOppakken = false, updates = 0, overgeslagen = 0;
     for (let i = 0; i < data.length; i++) {
       const first = (data[i][0] || '').toString().trim().toUpperCase();
-      if (['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN'].indexOf(first) !== -1) {
+      if (['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN','CRM'].indexOf(first) !== -1) {
         inOppakken = (first === 'OPPAKKEN'); continue;
       }
       if (!inOppakken || !data[i][0]) continue;

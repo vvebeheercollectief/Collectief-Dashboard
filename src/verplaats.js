@@ -42,13 +42,20 @@ const BOEKHOUD_SLEUTELS = new Set(['code','naam','behandelaar','deadline','opmer
 function verlorenVelden(r, bronSec, doelSec){
   const doelKeys = new Set(SECS[doelSec] ? SECS[doelSec].keys : []);
   const bronOmschrijving = OMSCHRIJVING_SLEUTEL[bronSec];
-  return (SECS[bronSec] ? SECS[bronSec].keys : [])
+  const uitSleutels = (SECS[bronSec] ? SECS[bronSec].keys : [])
     .filter(k => !doelKeys.has(k))
     .filter(k => k !== bronOmschrijving)      // de omschrijving verhuist altijd mee, zie hieronder
     .filter(k => !BOEKHOUD_SLEUTELS.has(k))
-    .map(k => ({ sleutel:k, label:_veldLabel(bronSec, k), waarde:String(r[k] == null ? '' : r[k]).trim() }))
-    .filter(v => v.waarde !== '');
+    .map(k => ({ sleutel:k, label:_veldLabel(bronSec, k), waarde:String(r[k] == null ? '' : r[k]).trim() }));
+  // CRM draagt vier velden BUITEN zijn sleutels, in kolom T..W. Die kent geen andere categorie, dus
+  // bij een verhuizing uit CRM vervallen ze — en dat hoort in de vraag te staan, niet stil te gebeuren.
+  const crmUit = (bronSec === 'CRM' && doelSec !== 'CRM')
+    ? CRM_EXTRA.map(([k, label]) => ({ sleutel:k, label, waarde:String(r[k] == null ? '' : r[k]).trim() }))
+    : [];
+  return uitSleutels.concat(crmUit).filter(v => v.waarde !== '');
 }
+// De CRM-velden in T..W, met het label zoals het bewerkscherm ze toont.
+const CRM_EXTRA = [['afzender','Van'], ['ontvangen','Ontvangen op'], ['soort','Soort vraag'], ['mail','Mail']];
 
 // De kolomkop zoals de gebruiker hem in de tabel ziet, zodat de vraag niet met interne veldnamen
 // spreekt. Uit VELD_LABELS (config.js) en nadrukkelijk NIET uit `cols` op index: die twee lopen
@@ -74,7 +81,8 @@ function verplaatsWaarden(r, bronSec, doelSec, nieuwRow){
   Object.keys(r).forEach(k => {
     if(k.startsWith('_')) return;
     if(!doelSpec.keys.includes(k) && !['subcategorie','opvolgdatum','herhaalId','fase','aannemers',
-                                       'taakId','bundelId','bundelVolg'].includes(k)) delete doel[k];
+                                       'taakId','bundelId','bundelVolg'].includes(k)
+       && !(doelSec === 'CRM' && CRM_EXTRA.some(([c]) => c === k))) delete doel[k];
   });
   // De omschrijving heet in elke categorie anders, en dát is de enige tekst die per se mee MOET:
   // `verlorenVelden` sluit hem uit van de 'dit vervalt'-lijst met de belofte dat hij altijd

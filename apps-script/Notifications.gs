@@ -146,7 +146,7 @@ function cd_handleNtdEdit(sheet, row, e) {
   // 'OPPAKKEN' de deur uit stuurde, plus een logregel 'Aangemaakt (sheet)'.
   var _kop = code.toUpperCase();
   if (_kop === 'VVE CODE' || _kop === 'VVE-CODE') return;
-  if (['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN'].indexOf(_kop) !== -1) return;
+  if (['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN','CRM'].indexOf(_kop) !== -1) return;
 
   const behandelaarColMap = {
     'OPPAKKEN': 5,
@@ -154,6 +154,7 @@ function cd_handleNtdEdit(sheet, row, e) {
     'OFFERTE-TRAJECTEN': 5,
     'LOD': 5,
     'SUBSIDIE-TRAJECTEN': 5,
+    'CRM': 5,
   };
   const beh = (rowData[behandelaarColMap[sec] - 1] || '').toString().trim();
 
@@ -250,10 +251,10 @@ function cd_checkDeadlines() {
     const data = sheet.getDataRange().getValues();
     const now = new Date();
     let curSec = null;
-    const SKEYS = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN'];
+    const SKEYS = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN','CRM'];
 
-    const DEADLINE_COL = { 'OPPAKKEN': 3, 'VERGADERVERZOEKEN': 5, 'OFFERTE-TRAJECTEN': 5, 'LOD': 5, 'SUBSIDIE-TRAJECTEN': 5 };
-    const BEH_COL      = { 'OPPAKKEN': 4, 'VERGADERVERZOEKEN': 4, 'OFFERTE-TRAJECTEN': 4, 'LOD': 4, 'SUBSIDIE-TRAJECTEN': 4 };
+    const DEADLINE_COL = { 'OPPAKKEN': 3, 'VERGADERVERZOEKEN': 5, 'OFFERTE-TRAJECTEN': 5, 'LOD': 5, 'SUBSIDIE-TRAJECTEN': 5, 'CRM': 5 };
+    const BEH_COL      = { 'OPPAKKEN': 4, 'VERGADERVERZOEKEN': 4, 'OFFERTE-TRAJECTEN': 4, 'LOD': 4, 'SUBSIDIE-TRAJECTEN': 4, 'CRM': 4 };
 
     for (let i = 0; i < data.length; i++) {
       const first = (data[i][0] || '').toString().trim().toUpperCase();
@@ -331,9 +332,9 @@ function cd_dailySummary() {
     if (!sheet) return;
     const data = sheet.getDataRange().getValues();
     let curSec = null;
-    const SKEYS = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN'];
-    const BEH_COL = { 'OPPAKKEN': 4, 'VERGADERVERZOEKEN': 4, 'OFFERTE-TRAJECTEN': 4, 'LOD': 4, 'SUBSIDIE-TRAJECTEN': 4 };
-    const DEADLINE_COL = { 'OPPAKKEN': 3, 'VERGADERVERZOEKEN': 5, 'OFFERTE-TRAJECTEN': 5, 'LOD': 5, 'SUBSIDIE-TRAJECTEN': 5 };
+    const SKEYS = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN','CRM'];
+    const BEH_COL = { 'OPPAKKEN': 4, 'VERGADERVERZOEKEN': 4, 'OFFERTE-TRAJECTEN': 4, 'LOD': 4, 'SUBSIDIE-TRAJECTEN': 4, 'CRM': 4 };
+    const DEADLINE_COL = { 'OPPAKKEN': 3, 'VERGADERVERZOEKEN': 5, 'OFFERTE-TRAJECTEN': 5, 'LOD': 5, 'SUBSIDIE-TRAJECTEN': 5, 'CRM': 5 };
     const today = new Date(); today.setHours(0,0,0,0);
     const stilMap = cd_laatsteActiviteitMap(); // Opvolging.gs (Fase 4)
 
@@ -359,7 +360,8 @@ function cd_dailySummary() {
         if (!weggelegd && dl && dl.getTime() < today.getTime()) p.telaat++;
         if (opvolg && opvolg.getTime() <= today.getTime()) p.opvolgen++;
         const regels = CD_STIL_ESCALATIE_REGELS[sec];
-        if (!weggelegd && regels && (ib || sec === 'OFFERTE-TRAJECTEN')) {
+        // CRM telt ook zonder 'In behandeling': een vraag waar niemand aan zit is juist de stille.
+        if (!weggelegd && regels && (ib || sec === 'OFFERTE-TRAJECTEN' || sec === 'CRM')) {
           const laatst = cd_laatsteActiviteit(stilMap, code, sec);
           if (laatst) {
             const dagen = cd_dagenSinds(laatst, today);   // zelfde afronding als het scherm
@@ -382,6 +384,7 @@ function cd_dailySummary() {
         if (p.secs['OFFERTE-TRAJECTEN']) parts.push(p.secs['OFFERTE-TRAJECTEN'] + ' offerte-traject' + (p.secs['OFFERTE-TRAJECTEN']>1?'en':''));
         if (p.secs['LOD']) parts.push(p.secs['LOD'] + ' LOD');
         if (p.secs['SUBSIDIE-TRAJECTEN']) parts.push(p.secs['SUBSIDIE-TRAJECTEN'] + ' subsidie-traject' + (p.secs['SUBSIDIE-TRAJECTEN']>1?'en':''));
+        if (p.secs['CRM']) parts.push(p.secs['CRM'] + ' CRM-vra' + (p.secs['CRM']>1?'gen':'ag'));
 
         cd_notifyByExternalId(name, 'n_daily', '1', {
           title: '☀️ Goedemorgen — ' + total + ' open ' + (total===1?'taak':'taken'),
@@ -397,7 +400,7 @@ function cd_dailySummary() {
 //  HELPERS
 // ════════════════════════════════════════════════════════════
 function cd_findSection(sheet, row) {
-  const SKEYS = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN'];
+  const SKEYS = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN','CRM'];
   const colA = sheet.getRange(1, 1, row, 1).getValues();
   for (let i = row - 1; i >= 0; i--) {
     const v = (colA[i][0] || '').toString().trim().toUpperCase();
@@ -678,7 +681,12 @@ function cd_setupNotifQueue() {
 function cd_onNotifQueueChange(e) { cd_drainNotifQueue(); }
 
 // Vangnet: pakt rijen op die een gemiste onChange anders zou laten liggen.
-function cd_sweepNotifQueue() { cd_drainNotifQueue(); }
+function cd_sweepNotifQueue() {
+  cd_drainNotifQueue();
+  // CRM (v13.0): zet op het TEST-blad één keer het CRM-blok klaar. Doet op PROD niets, en daarna
+  // ook op TEST niets meer (Script Property CD_CRM_SETUP). Zie cd_crmSetupOpTest in Code.gs.
+  cd_safeRun('cd_crmSetupOpTest', cd_crmSetupOpTest);
+}
 
 // Alleen push-only events mogen via de (semi-vertrouwde, OAuth-append) Notif-wachtrij. Privileged
 // schrijf-events — create_task (maakt een echte taak aan) en logboek (schrijft logregels) — moeten
@@ -722,7 +730,7 @@ function cd_drainNotifQueue() {
 //  Kolommen "Nog Te Doen" (1-geteld): A=code B=naam C=actiepunt
 //  D=deadline E=behandelaar F=prioriteit. Data start op kop+2.
 // ════════════════════════════════════════════════════════════
-const CD_NTD_SECTIES = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN'];
+const CD_NTD_SECTIES = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN','CRM'];
 
 // Formule-injectie-rem: waarden uit een onvertrouwde bron (mail-intake) die met = + - @ (of een
 // stuur-teken) beginnen, zou Sheets als formule uitvoeren. Een apostrof-prefix forceert platte tekst.
@@ -746,13 +754,14 @@ function cd_sha256Hex(s) {
 // In welke kolom staat de OMSCHRIJVING van een taak, per categorie?
 // LET OP — SYNC: dit is de kolomvertaling van OMSCHRIJVING_VELD in src/crud.js:
 //   OPPAKKEN → m-actie (C) · VERGADERVERZOEKEN → m-agenda (D) · OFFERTE-TRAJECTEN → m-opm-o (G)
-//   LOD → m-actie-l (C) · SUBSIDIE-TRAJECTEN → m-subsidie (C)
+//   LOD → m-actie-l (C) · SUBSIDIE-TRAJECTEN → m-subsidie (C) · CRM → m-onderwerp (C)
 var CD_OMSCHRIJVING_COL = {
   'OPPAKKEN': 3,
   'VERGADERVERZOEKEN': 4,
   'OFFERTE-TRAJECTEN': 7,
   'LOD': 3,
-  'SUBSIDIE-TRAJECTEN': 3
+  'SUBSIDIE-TRAJECTEN': 3,
+  'CRM': 3
 };
 
 function cd_createTaskRow(categorie, code, naam, actiepunt, behandelaar, deadline, herhaalId) {

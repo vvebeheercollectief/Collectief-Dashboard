@@ -29,7 +29,7 @@ function dossierContextTekst(code, data, vandaag){
   // gewoon 'Dakrenovatie — 2 van 3 binnen' toont. taakTitel levert dat onderwerp én de teller.
   // Bewust ná de eigen velden en niet ervóór: die worden hier onverkort meegegeven, terwijl
   // taakTitel op de eerste regel snijdt en op lengte afkapt.
-  const t = r => (r.actiepunt || r.agendapunten || r.status || r.periode || r.subsidie || '').trim()
+  const t = r => (r.actiepunt || r.agendapunten || r.status || r.periode || r.subsidie || r.onderwerp || '').trim()
               || taakTitel(r, r._sec);
   const L = [];
   L.push(`VvE: ${o.code}${o.naam ? ' — ' + o.naam : ''}`);

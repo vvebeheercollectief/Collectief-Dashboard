@@ -287,7 +287,9 @@ const _zetStilIndex = ix => { _stilIndex = ix || null; };
 
 function bepaalStil(r, sec){
   if (opvolgStatus(r).weggelegd) return null; // weggelegd = bewust geparkeerd, niet stil (Fase 4)
-  if (r.inBehandeling !== 'TRUE') return null;
+  // CRM telt ook zonder 'In behandeling' (v13.0): een vraag waar niemand aan zit is juist de stille.
+  // LET OP — SYNC met cd_escaleerStilleDossiers (Opvolging.gs) en cd_dailySummary (Notifications.gs).
+  if (r.inBehandeling !== 'TRUE' && (sec || r._sec) !== 'CRM') return null;
   // De index alleen gebruiken als hij VOOR DEZE SECTIE gebouwd is. Anders terugvallen op de
   // volledige scan: langzamer, maar een lege trefferlijst uit de verkeerde index zou stil
   // 'geen activiteit' betekenen, en dat is precies het signaal dat we niet mogen missen.

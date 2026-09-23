@@ -160,9 +160,13 @@ function _crmOntvangenDatum(){
 function crmOntvangenGewijzigd(){
   const dl=document.getElementById('m-dl-c');
   if(!dl) return;
+  // Een subtaak krijgt geen deadline-voorstel (zie zetDeadlineVoorstel), dus ook geen meebewegende.
+  if(state._nieuwBundel) return;
   const nieuw=voorgesteldeDeadline('CRM', _crmOntvangenDatum());
   if(!nieuw) return;
-  if(!dl.value || dl.value===state._crmDlAuto){ dl.value=nieuw; state._crmDlAuto=nieuw; }
+  // Alleen als het veld nog precies de automatisch gezette waarde draagt. Een zelf gekozen OF bewust
+  // leeggemaakte deadline blijft staan — 'leegmaken mag' is een belofte (zie zetDeadlineVoorstel).
+  if(state._crmDlAuto && dl.value===state._crmDlAuto){ dl.value=nieuw; state._crmDlAuto=nieuw; }
 }
 
 // ── Offerte: deadline ↔ opvolgdatum in het scherm (v12.5) ──
@@ -268,13 +272,17 @@ function herzieAlsSubtaak(sec){
 }
 
 // De inhoud van de taak op het moment dat het bewerkscherm openging. Alleen de velden die DIT
-// scherm zelf schrijft: de laatste drie kolommen blijven erbuiten, want Q is het taaknummer (dat is
-// identiteit, geen inhoud) en R/S zijn de bundelkolommen — die wijzigen door 'Hoort bij' terwijl
-// dit scherm openstaat, en dat is de gebruiker zelf.
+// scherm zelf schrijft: Q/R/S blijven erbuiten, want Q is het taaknummer (dat is identiteit, geen
+// inhoud) en R/S zijn de bundelkolommen — die wijzigen door 'Hoort bij' terwijl dit scherm
+// openstaat, en dat is de gebruiker zelf.
+// Op POSITIE en niet als 'alles behalve de laatste drie': sinds CRM (v13.0) staan er bij een
+// CRM-rij nog vier kolommen ACHTER S (T..W: van, ontvangen, soort, mail). Met 'de laatste drie'
+// telden Q/R/S/T mee en ontvangen/soort/mail niet — een ontkoppelde subtaak blokkeerde dan Opslaan
+// met 'intussen gewijzigd', en een wijziging van een collega aan de mail bleef onopgemerkt.
 function _inhoudsFoto(r){
   if(!r||!SECS[r._sec]) return null;
   const v=serializeNtdUndo(r);
-  return v.slice(0, v.length-3).join('\x1f');
+  return v.slice(0, 16).concat(v.slice(19)).join('\x1f');   // A..P (+ T..W bij CRM)
 }
 
 function openModal(isEdit,rowData,opts){
@@ -1695,17 +1703,19 @@ async function submitTask(){
       backgroundWrite(
         async ()=>{
           if(!geschreven){
-            await assertRowMatch(doelRow._row, oudeWaarden); // bescherming: rij nog dezelfde TAAK vóór overschrijven
+            if(!crmGeschreven) await assertRowMatch(doelRow._row, oudeWaarden); // bescherming: rij nog dezelfde TAAK vóór overschrijven
             // oudeWaarden is de snapshot VÓÓR de optimistische mutatie van doelRow — precies wat
             // er op dit moment nog in de Sheet hoort te staan.
+            // CRM: T..W EERST, dan A..K — in dezelfde beurt, na dezelfde rij-controle. Deze volgorde
+            // omdat T..W de schrijfactie is die op een (nog) niet verbreed blad mislukt: dan staat er
+            // niets half opgeslagen, en klopt de rollback hieronder (alles terug) ook met de Sheet.
+            // Eigen vlag, want bij een herkansing is die al gedaan.
+            if(crmExtra && !crmGeschreven){
+              await writeRange(`'Nog Te Doen'!T${doelRow._row}:W${doelRow._row}`,crmVelden(crmExtra));
+              crmGeschreven=true;
+            }
             await writeRange(`'Nog Te Doen'!A${doelRow._row}:${endCol}${doelRow._row}`,values);
             geschreven=true;
-          }
-          // CRM: T..W als tweede schrijfactie in DEZELFDE beurt — na de rij-controle hierboven, dus
-          // op dezelfde, gecontroleerde rij. Eigen vlag, want bij een herkansing is de eerste al gedaan.
-          if(crmExtra && !crmGeschreven){
-            await writeRange(`'Nog Te Doen'!T${doelRow._row}:W${doelRow._row}`,crmVelden(crmExtra));
-            crmGeschreven=true;
           }
           if(newBeh && newBeh!==(oudeWaarden.behandelaar||'') && !behGelogd){
             fireNotifEvent('assigned',{sec,code,naam,behandelaar:newBeh});
@@ -2047,7 +2057,7 @@ export {
   getAfInsertRow, completeTask, completeCurrentEditTask, doCompleteTask, closeCompleteModal, submitTask, gv,
   OMSCHRIJVING_VELD, zetOmschrijving, taakUitCache,
   _verseRijIdx, _herankerRij, zetSubsidieFase, kiesModalFase, _modalFaseWoord,
-  zetCrmFase, kiesModalCrmFase, _modalCrmFaseWoord, kiesModalSoort, _modalSoort, crmOntvangenGewijzigd,
+  zetCrmFase, kiesModalCrmFase, _modalCrmFaseWoord, kiesModalSoort, _modalSoort, crmOntvangenGewijzigd, _inhoudsFoto,
   zetDeadlineVoorstel, DEADLINE_VELD, DEADLINE_HINT_VELD, renderExtraVves, toonMeerVve, herzieAlsSubtaak,
   offerteAanvraagGewijzigd,
   _bewerkRijVers,

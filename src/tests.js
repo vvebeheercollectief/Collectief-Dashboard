@@ -16097,6 +16097,40 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     } finally { closeModal(); clearModal(); }
     void vandaagIso;
 
+    // ── Uit de review (2026-09-23) ──
+    // 1. De inhoudsfoto telt T..W wél en Q/R/S níet — ook bij CRM, waar er vier kolommen achter S staan.
+    const foto = CR._inhoudsFoto(crmObj);
+    eq('review: ontkoppelen (bundel) verandert de foto niet',
+       CR._inhoudsFoto({ ...crmObj, bundelId:'B9', bundelVolg:'20', taakId:'TANDERS' }), foto);
+    eq('review: een andere mail, soort of ontvangstdatum wél',
+       ['mail','soort','ontvangen','afzender'].map(v => CR._inhoudsFoto({ ...crmObj, [v]:'anders' }) !== foto), [true, true, true, true]);
+    eq('review: bij Oppakken is de foto ongewijzigd A..P',
+       CR._inhoudsFoto(oppObj), serializeNtdUndo(oppObj).slice(0, 16).join('\x1f'));
+    // 4. Het stil-signaal op het scherm telt CRM ook zonder 'In behandeling', gelijk aan de motor.
+    const stilOud = D.logboek;
+    try {
+      const lang = new Date(); lang.setDate(lang.getDate() - 10);
+      D.logboek = [{ code:'381057', sectie:'CRM', actie:'Aangemaakt', gebruiker:'jer', timestamp:lang.toISOString() }];
+      _zetStilIndex(null);
+      eq('review: CRM zonder In behandeling is na 10 dagen stil', bepaalStil({ ...crmObj, inBehandeling:'FALSE', opvolgdatum:'' }, 'CRM'), 10);
+      D.logboek = [{ code:'1', sectie:'OPPAKKEN', actie:'Aangemaakt', gebruiker:'jer', timestamp:lang.toISOString() }];
+      eq('review: Oppakken zonder In behandeling blijft niet-stil', bepaalStil({ ...oppObj, code:'1', inBehandeling:'FALSE', opvolgdatum:'' }, 'OPPAKKEN'), null);
+    } finally { D.logboek = stilOud; }
+    // 5. Een leeggemaakte deadline komt niet terug, en een subtaak krijgt geen meebewegende deadline.
+    try {
+      openModal(false, null, { sec:'CRM' });
+      document.getElementById('m-dl-c').value = '';
+      document.getElementById('m-ontv').value = '2026-09-25';
+      CR.crmOntvangenGewijzigd();
+      eq('review: een bewust leeggemaakte deadline blijft leeg', document.getElementById('m-dl-c').value, '');
+      closeModal(); clearModal();
+      openModal(false, null, { sec:'CRM' });
+      document.getElementById('m-dl-c').value = ''; state._crmDlAuto = null; state._nieuwBundel = { bundelId:'B1', volg:'10' };
+      document.getElementById('m-ontv').value = '2026-09-25';
+      CR.crmOntvangenGewijzigd();
+      eq('review: een subtaak krijgt geen deadline via Ontvangen op', document.getElementById('m-dl-c').value, '');
+    } finally { state._nieuwBundel = null; closeModal(); clearModal(); }
+
     // ── Klikacties en het zoekveld ──
     eq('acties: drie CRM-acties geregistreerd',
        ['crm-fase','crm-fase-modal','crm-soort'].map(a => typeof ACTIONS[a]), ['function','function','function']);

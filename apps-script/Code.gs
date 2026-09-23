@@ -576,7 +576,9 @@ function _sorteerOfferteTrajectenImpl(e) {
   // LOD is sinds de vijfde sectie niet meer het laatste blok, dus niet langer
   // "alles onder de LOD-kop": anders sorteert een bewerking in het subsidieblok
   // de LOD-rijen mee (en andersom).
-  var inLOD = sortAll || (editedRow > lodHeader && (subsidieHeader < 0 || editedRow < subsidieHeader));
+  // En begrensd op de CRM-kop (v13.0): ontbreekt het Subsidie-blok, dan ligt CRM direct onder LOD.
+  var lodEindKop = subsidieHeader > 0 ? subsidieHeader : crmHeader;
+  var inLOD = sortAll || (editedRow > lodHeader && (lodEindKop < 0 || editedRow < lodEindKop));
   // Subsidie is sinds CRM (v13.0) niet meer het laatste blok: begrensd op de CRM-kop, anders sorteert
   // een bewerking in het subsidieblok de CRM-rijen mee (dezelfde fout die LOD had, zie hierboven).
   var inSubsidie = sortAll || (subsidieHeader > 0 && editedRow > subsidieHeader && (crmHeader < 0 || editedRow < crmHeader));
@@ -642,7 +644,7 @@ function _sorteerOfferteTrajectenImpl(e) {
       var kv = allValues[k - 1][0].toString().trim().toUpperCase();
       // Ook stoppen op een volgende sectiekop: alleen op een lege regel breken zou het
       // LOD-blok laten doorlopen tot in SUBSIDIE-TRAJECTEN als daar geen lege rij tussen zit.
-      if (kv === "" || kv === "SUBSIDIE-TRAJECTEN") break;
+      if (kv === "" || kv === "SUBSIDIE-TRAJECTEN" || kv === "CRM") break;
       lodEnd = k;
     }
     var lodRows = lodEnd - lodStart + 1;

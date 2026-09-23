@@ -683,9 +683,9 @@ function cd_onNotifQueueChange(e) { cd_drainNotifQueue(); }
 // Vangnet: pakt rijen op die een gemiste onChange anders zou laten liggen.
 function cd_sweepNotifQueue() {
   cd_drainNotifQueue();
-  // CRM (v13.0): zet op het TEST-blad één keer het CRM-blok klaar. Doet op PROD niets, en daarna
-  // ook op TEST niets meer (Script Property CD_CRM_SETUP). Zie cd_crmSetupOpTest in Code.gs.
-  cd_safeRun('cd_crmSetupOpTest', cd_crmSetupOpTest);
+  // CRM (v13.0): zet één keer het CRM-blok klaar — op TEST meteen, op PROD pas als de nieuwe code
+  // al een kwartier live staat. Daarna nooit meer (Script Property CD_CRM_SETUP). Zie Code.gs.
+  cd_safeRun('cd_crmSetupAutomatisch', cd_crmSetupAutomatisch);
 }
 
 // Alleen push-only events mogen via de (semi-vertrouwde, OAuth-append) Notif-wachtrij. Privileged

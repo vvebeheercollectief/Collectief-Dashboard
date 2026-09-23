@@ -744,13 +744,32 @@ function cd_setupCrm() {
   return verslag;
 }
 
-// Alleen op het TEST-blad: één keer vanzelf, vanuit de 5-minuten-sweep, zodat de testomgeving na
-// een push naar staging zonder handwerk klaarstaat. Op PROD nooit vanzelf — daar draait
-// cd_setupCrm met de hand, ná de code-uitrol en een harde verversing (zie het ontwerp).
+// Eén keer vanzelf, vanuit de 5-minuten-sweep, zodat er geen handwerk in de editor nodig is.
+//   TEST: meteen.
+//   PROD: pas als (1) de CRM-code aantoonbaar op het LIVE dashboard staat — het script haalt
+//         src/crm-fase.js op van GitHub Pages — en (2) dat al minstens een kwartier zo is. Zo blijft
+//         de dwingende volgorde 'eerst de code, dan het blok' gegarandeerd, ook als de Pages-uitrol
+//         mislukt of achterloopt op de Apps Script-uitrol, en hebben open dashboards de tijd gehad om
+//         de nieuwe versie binnen te halen (sw-update). Andersom zou een oude versie de kopregel 'CRM'
+//         als een Subsidie-rij lezen.
+// Daarna nooit meer: Script Property CD_CRM_SETUP. Handmatig kan altijd nog met cd_setupCrm().
 var CD_TEST_SHEET_ID = '1-6Q36CrwB0szX2DS2eLjPwfiY-jAw8lK9JOPDSlljm4';
-function cd_crmSetupOpTest() {
-  if (PropertiesService.getScriptProperties().getProperty('CD_CRM_SETUP')) return;
+var CD_PROD_SHEET_ID = '1fnUsbwb4nDMNttWym9FWBw1CMMMAVTuZ3v88b35isUw';
+var CD_CRM_FRONTEND_URL = 'https://vvebeheercollectief.github.io/Collectief-Dashboard/src/crm-fase.js';
+var CD_CRM_WACHT_MS = 15 * 60 * 1000;
+function cd_crmSetupAutomatisch() {
+  var props = PropertiesService.getScriptProperties();
+  if (props.getProperty('CD_CRM_SETUP')) return;
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  if (!ss || ss.getId() !== CD_TEST_SHEET_ID) return;
+  if (!ss) return;
+  var id = ss.getId();
+  if (id === CD_TEST_SHEET_ID) { cd_setupCrm(); return; }
+  if (id !== CD_PROD_SHEET_ID) return;
+  var resp = UrlFetchApp.fetch(CD_CRM_FRONTEND_URL + '?t=' + Date.now(), { muteHttpExceptions: true, followRedirects: true });
+  var live = resp.getResponseCode() === 200 && resp.getContentText().indexOf('CRM_FASES') !== -1;
+  if (!live) { props.deleteProperty('CD_CRM_FRONTEND_GEZIEN'); return; }
+  var gezien = Number(props.getProperty('CD_CRM_FRONTEND_GEZIEN') || 0);
+  if (!gezien) { props.setProperty('CD_CRM_FRONTEND_GEZIEN', String(Date.now())); return; }
+  if (Date.now() - gezien < CD_CRM_WACHT_MS) return;
   cd_setupCrm();
 }

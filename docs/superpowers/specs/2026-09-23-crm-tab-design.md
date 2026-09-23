@@ -101,8 +101,10 @@ NTD_SORT_KOLOMMEN mee). "Afgerond" is al 26 breed.
 - `cd_setupCrm()`: idempotent. Verbreedt "Nog Te Doen" tot 23 kolommen, zet het CRM-blok
   (kop + kolomkoppen incl. T..W) onderaan "Nog Te Doen" en "Afgerond", met de opmaak en de
   vinkje-validatie van het Subsidie-blok.
-- Op **TEST** draait `cd_setupCrm` één keer vanzelf vanuit de bestaande 5-minuten-sweep, alleen
-  als het blad het TEST-blad is. Op **PROD** alleen met de hand, bij de uitrol.
+- `cd_setupCrm` draait één keer vanzelf vanuit de bestaande 5-minuten-sweep: op **TEST** meteen, op
+  **PROD** pas als `src/crm-fase.js` aantoonbaar op GitHub Pages staat én dat al 15 minuten zo is
+  (bijgesteld bij de uitrol op 2026-09-23, met toestemming van de gebruiker: zo is er geen handwerk
+  in de editor nodig en blijft 'eerst de code, dan het blok' gegarandeerd).
 
 ## Uitrolvolgorde (dwingend)
 
@@ -111,7 +113,7 @@ NTD_SORT_KOLOMMEN mee). "Afgerond" is al 26 breed.
 3. Gebruiker test ingelogd op de staging-URL.
 4. Na akkoord: **`feat/crm-tab` → `main`** (niet `staging` → `main`: staging bevat ook v12.9,
    waar de gebruiker later op terugkomt).
-5. Harde verversing, dán `cd_setupCrm()` op PROD.
+5. `cd_setupCrm()` draait vanzelf op PROD, 15 minuten nadat de nieuwe code live staat.
 6. De vijf CRM-taken uit Oppakken verhuizen, via de verplaatsfunctie in het dashboard, en
    Van/Onderwerp invullen.
 

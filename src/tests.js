@@ -5270,9 +5270,38 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     eq('veiligeCel: = middenin blijft ongemoeid', veiligeCel('a=b'), 'a=b');
     eq('veiligeCel: boolean blijft boolean (checkbox)', veiligeCel(true), true);
     eq('veiligeCel: getal blijft getal', veiligeCel(5), 5);
+    eq('veiligeCel: VvE-code met voorloopnul blijft tekst', veiligeCel('021002'), "'021002");
+    eq('veiligeCel: telefoon 06… houdt zijn nul', veiligeCel('0612345678'), "'0612345678");
+    eq('veiligeCel: code met achtervoegsel blijft ongemoeid', veiligeCel('051006 - G'), '051006 - G');
+    eq('veiligeCel: code zonder voorloopnul blijft ongemoeid', veiligeCel('301134'), '301134');
+    eq('veiligeCel: losse 0 (bundelkop) blijft', veiligeCel('0'), '0');
+    eq('veiligeCel: datum met voorloopnul blijft datum', veiligeCel('01-09-2026'), '01-09-2026');
     eq('_veiligeRij: alleen de riskante cel geprefixt', _veiligeRij(['=x','21-07-2026',true,5,'']), ["'=x",'21-07-2026',true,5,'']);
     eq('_veiligeRij: null-invoer geeft lege rij', _veiligeRij(null), []);
     eq('bulk-batchUpdate: formule wordt tekst', _veiligeRij(['=SOM(A1:A9)','gewoon']), ["'=SOM(A1:A9)",'gewoon']);
+  })();
+  // ── VvE-codes (v13.2): de backend-kant van dezelfde rem, en de eenmalige herstelregel ──
+  //    Zelfde leesweg als de getActiveSheet-toets: op de gepubliceerde site staat apps-script/ niet.
+  await (async()=>{
+    let code=null, notif=null;
+    try { code = await _leesBron('./apps-script/Code.gs', 'function '); } catch(e){}
+    try { notif = await _leesBron('./apps-script/Notifications.gs', 'function '); } catch(e){}
+    if(code===null || notif===null){
+      truthy('vve-codes: backend NIET hier getoetst — map staat niet op deze host', true);
+      return;
+    }
+    const safe = notif.match(/function cd_safeCell\(s\) \{[\s\S]*?\n\}/);
+    const hern = code.match(/var CD_CODES_HERNOEM = [^;]+;/);
+    const herst = code.match(/function cd_vveCodeHersteld\(v\) \{[\s\S]*?\n\}/);
+    truthy('vve-codes: cd_safeCell, CD_CODES_HERNOEM en cd_vveCodeHersteld gevonden', !!(safe&&hern&&herst));
+    if(!(safe&&hern&&herst)) return;
+    // Uitvoeren kan hier niet: de CSP van het dashboard verbiedt new Function (terecht). Dus de
+    // bron lezen. Het gedrag is bij het bouwen los nagerekend in JavaScriptCore.
+    truthy('vve-codes: cd_safeCell kent de voorloopnul-regel van veiligeCel', safe[0].includes('/^0\\d+$/'));
+    truthy('vve-codes: herstelregel vult vijf cijfers aan tot zes', herst[0].includes("/^\\d{5}$/.test(s)) return '0' + s"));
+    truthy("vve-codes: 801003 wordt 301134 (TwinQ)", /'801003'\s*:\s*'301134'/.test(hern[0]));
+    truthy('vve-codes: archief- en ALV-kopie gaan via cd_safeCell',
+           code.includes('archief[0] = cd_safeCell(archief[0])') && code.includes('nieuw.push([cd_safeCell(vveCode)'));
   })();
   // ── Logregels van één bulk-actie gaan in ÉÉN append ──
   // Was: één schrijfverzoek per taak. Bij 20 taken dus 20 verzoeken (~4,7 s 'Opslaan…'), en
@@ -5876,7 +5905,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '13.1');
+  eq('versie opgehoogd', APP_VERSION, '13.2');
 
   // ── Tabbladen ÍN de kaartkop (v11.7) ──
   // De kop van de kaart zei links exact hetzelfde als het actieve tabblad — 'Oppakken' boven

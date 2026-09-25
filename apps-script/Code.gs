@@ -246,6 +246,8 @@ function cd_archiveerRij(sheet, row) {
   // Eén schrijfactie over A..S. Nooit breder dan het blad: schrijven buiten het raster mislukt in
   // Apps Script met een fout die de hele trigger stillegt. 'Afgerond' is 26 kolommen breed
   // (gemeten), dus in de praktijk gaan alle 19 mee; de klem is het vangnet voor een smaller blad.
+  // De code als tekst: een code met voorloopnul (021002) werd anders een getal zonder nul.
+  archief[0] = cd_safeCell(archief[0]);
   var schrijfBreedte = Math.min(archief.length, targetSheet.getMaxColumns());
   targetSheet.getRange(insertRow, 1, 1, schrijfBreedte)
              .setValues([archief.slice(0, schrijfBreedte)]);
@@ -486,7 +488,7 @@ function cd_archiveerALVs(sheet, rijen, blok) {
     if (bestaand[sleutel]) continue;      // staat er al — niets doen
     if (blok && recent[(vveCode + '').trim()]) continue;   // blok-bewerking: zie ALFA_RECENT_DAGEN
     bestaand[sleutel] = true;             // ook binnen dit bereik niet dubbel
-    nieuw.push([vveCode, vveNaam, datumAfgerond]);
+    nieuw.push([cd_safeCell(vveCode), vveNaam, datumAfgerond]);   // tekst: houdt de voorloopnul
   }
   if (!nieuw.length) return;
   // De BREEDTE klemmen, net als de leesbreedte in cd_archiveerRij. Het tabblad wordt met de
@@ -772,4 +774,138 @@ function cd_crmSetupAutomatisch() {
   if (!gezien) { props.setProperty('CD_CRM_FRONTEND_GEZIEN', String(Date.now())); return; }
   if (Date.now() - gezien < CD_CRM_WACHT_MS) return;
   cd_setupCrm();
+}
+
+// ════════════════════════════════════════════════════════════
+//  VvE-CODES RECHTZETTEN (25-09-2026, eenmalig)
+// ════════════════════════════════════════════════════════════
+// Een VvE-code heeft zes cijfers. Begint hij met een 0 (021002), dan maakte Sheets er via
+// USER_ENTERED een getal van en viel de nul weg: 21002. Dat gebeurde overal waar een code staat.
+// Daarnaast stond Kaapstraat 159 & Majubastraat 1/3 als 801003 in het register, terwijl TwinQ hem
+// als 301134 kent, en ontbrak de nieuwe VvE 211026. Bron: TwinQ-uitdraai 'Gegevens alle VvE's met
+// actuele beheerder' van 25-09-2026, aangeleverd door Jer.
+//
+// De schrijfwegen zijn in dezelfde uitrol dichtgezet (veiligeCel / cd_safeCell), dus dit hoeft
+// maar één keer. Volgorde op PROD als bij het CRM-blok: eerst moet de nieuwe dashboardcode een
+// kwartier live staan, anders schrijft een oude versie bij de eerstvolgende bewerking 21002 terug.
+var CD_CODES_FRONTEND_URL = 'https://vvebeheercollectief.github.io/Collectief-Dashboard/src/api.js';
+var CD_CODES_FRONTEND_MERK = '/^0\\d+$/';
+// [tabblad, kolom (1 = A), eerste rij die gegevens kan bevatten]. Kopregels en sectiekoppen zijn
+// tekst en voldoen nooit aan het patroon, dus die mogen gewoon in het bereik vallen.
+var CD_CODES_KOLOMMEN = [
+  ['Nog Te Doen', 1, 1], ['Afgerond', 1, 1], ["ALV's overzicht", 1, 3], ["ALV's afgerond", 1, 2],
+  ['Kenmerken', 1, 2], ['Herhaalregels', 4, 2], ['Logboek', 2, 2]
+];
+var CD_CODES_HERNOEM = { '801003': '301134' };
+var CD_CODES_KAAPSTRAAT = { code: '301134', naamOud: 'Kaapstraat 159 & Majubastraat 1/3',
+                            naam: 'VvE Kaapstraat 159  & Majubastraat 1/3', naVolgt: '301133' };
+var CD_CODES_NIEUW = { code: '211026', naam: 'VvE Waldeck Pyrmontkade 941 t/m 942A', naVolgt: '211025' };
+var CD_CODES_MAX_MS = 4.5 * 60 * 1000;   // ruim binnen de 6 minuten van één uitvoering
+
+// De juiste code voor een cel, of null als de cel goed is. Puur, zodat hij los te toetsen is.
+function cd_vveCodeHersteld(v) {
+  var s = (v === null || v === undefined) ? '' : String(v).trim();
+  if (CD_CODES_HERNOEM[s]) return CD_CODES_HERNOEM[s];
+  if (/^\d{5}$/.test(s)) return '0' + s;
+  return null;
+}
+
+function cd_vveCodesAutomatisch() {
+  var props = PropertiesService.getScriptProperties();
+  if (props.getProperty('CD_VVECODES_V1')) return;
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) return;
+  var id = ss.getId();
+  if (id !== CD_TEST_SHEET_ID) {
+    if (id !== CD_PROD_SHEET_ID) return;
+    var resp = UrlFetchApp.fetch(CD_CODES_FRONTEND_URL + '?t=' + Date.now(), { muteHttpExceptions: true, followRedirects: true });
+    var live = resp.getResponseCode() === 200 && resp.getContentText().indexOf(CD_CODES_FRONTEND_MERK) !== -1;
+    if (!live) { props.deleteProperty('CD_CODES_FRONTEND_GEZIEN'); return; }
+    var gezien = Number(props.getProperty('CD_CODES_FRONTEND_GEZIEN') || 0);
+    if (!gezien) { props.setProperty('CD_CODES_FRONTEND_GEZIEN', String(Date.now())); return; }
+    if (Date.now() - gezien < CD_CRM_WACHT_MS) return;
+  }
+  var klaar = cd_withLock(function () { return cd_vveCodesHerstel(ss); });
+  // Pas als ALLES gedaan is de vlag zetten. Liep de tijd op, of was de lock bezet, dan pakt de
+  // volgende veegbeurt het op; het werk is herhaalbaar (wat al klopt, wordt overgeslagen).
+  if (klaar) props.setProperty('CD_VVECODES_V1', new Date().toISOString());
+}
+
+// Geeft true als alles rond is. Handmatig te draaien vanuit de editor (binnen een lock).
+function cd_vveCodesHerstel(ss) {
+  ss = ss || SpreadsheetApp.getActiveSpreadsheet();
+  var start = Date.now();
+  var teller = {};
+  for (var k = 0; k < CD_CODES_KOLOMMEN.length; k++) {
+    var tab = CD_CODES_KOLOMMEN[k][0], kol = CD_CODES_KOLOMMEN[k][1], vanaf = CD_CODES_KOLOMMEN[k][2];
+    var sh = ss.getSheetByName(tab);
+    if (!sh) continue;
+    var laatste = sh.getLastRow();
+    if (laatste < vanaf) continue;
+    var waarden = sh.getRange(vanaf, kol, laatste - vanaf + 1, 1).getValues();
+    var n = 0;
+    for (var i = 0; i < waarden.length; i++) {
+      var nieuw = cd_vveCodeHersteld(waarden[i][0]);
+      if (nieuw === null) continue;
+      if (Date.now() - start > CD_CODES_MAX_MS) { Logger.log('VvE-codes: tijd op, volgende ronde verder. ' + JSON.stringify(teller)); return false; }
+      // Vlak vóór het schrijven opnieuw kijken. Het dashboard schrijft buiten deze lock om en kan
+      // intussen een rij hebben verwijderd of ingevoegd; dan staat er op dit rijnummer een andere
+      // taak en blijft die cel onaangeroerd. De volgende ronde ziet hem dan op zijn nieuwe plek.
+      var cel = sh.getRange(vanaf + i, kol);
+      var nu = cel.getValue();
+      if (String(nu).trim() !== String(waarden[i][0]).trim()) continue;
+      cel.setValue(/^0/.test(nieuw) ? "'" + nieuw : nieuw);
+      n++;
+    }
+    teller[tab] = n;
+  }
+  var alv = ss.getSheetByName("ALV's overzicht");
+  if (alv) {
+    teller.kaapstraat = cd_vveCodesKaapstraat(alv);
+    teller.nieuw = cd_vveCodesNieuw(alv);
+  }
+  SpreadsheetApp.flush();
+  Logger.log('VvE-codes hersteld: ' + JSON.stringify(teller));
+  return true;
+}
+
+// Rijnummer van een code in kolom A van het register (vanaf rij 3), of 0.
+function cd_vveCodesRij(alv, code) {
+  var laatste = alv.getLastRow();
+  if (laatste < 3) return 0;
+  var a = alv.getRange(3, 1, laatste - 2, 1).getValues();
+  for (var i = 0; i < a.length; i++) if (String(a[i][0]).trim() === code) return i + 3;
+  return 0;
+}
+
+// Kaapstraat: de code is hierboven al 301134 geworden. Hier de naam gelijk aan TwinQ, en de rij naar
+// zijn gesorteerde plek (het ALV-overzicht toont de volgorde van de Sheet).
+function cd_vveCodesKaapstraat(alv) {
+  var c = CD_CODES_KAAPSTRAAT;
+  var rij = cd_vveCodesRij(alv, c.code);
+  if (!rij) return 'niet gevonden';
+  var naamCel = alv.getRange(rij, 2);
+  if (String(naamCel.getValue()).trim() === c.naamOud) naamCel.setValue(c.naam);
+  var voor = cd_vveCodesRij(alv, c.naVolgt);
+  if (!voor || rij === voor + 1) return 'naam';
+  // moveRows telt de bestemming in de nummering van vóór het verplaatsen: 'vóór deze rij'.
+  alv.moveRows(alv.getRange(rij + ':' + rij), voor + 1);
+  return 'naam + verplaatst';
+}
+
+// 211026 invoegen na 211025, met dezelfde opmaak en selectievakjes als die rij.
+function cd_vveCodesNieuw(alv) {
+  var c = CD_CODES_NIEUW;
+  if (cd_vveCodesRij(alv, c.code)) return 'stond er al';
+  var voor = cd_vveCodesRij(alv, c.naVolgt);
+  if (!voor) return 'buurrij niet gevonden';
+  alv.insertRowAfter(voor);
+  var breed = Math.min(7, alv.getMaxColumns());
+  var bron = alv.getRange(voor, 1, 1, breed), doel = alv.getRange(voor + 1, 1, 1, breed);
+  bron.copyTo(doel, SpreadsheetApp.CopyPasteType.PASTE_FORMAT, false);
+  bron.copyTo(doel, SpreadsheetApp.CopyPasteType.PASTE_DATA_VALIDATION, false);
+  // A code, B naam, C uitnodiging, D notulen, E begroting, F opmerkingen, G klaargezet.
+  var rij = ["'" + c.code, c.naam, false, false, false, '', false];
+  doel.setValues([rij.slice(0, breed)]);
+  return 'ingevoegd op rij ' + (voor + 1);
 }

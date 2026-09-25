@@ -703,6 +703,9 @@ function cd_sweepNotifQueue() {
   // CRM (v13.0): zet één keer het CRM-blok klaar — op TEST meteen, op PROD pas als de nieuwe code
   // al een kwartier live staat. Daarna nooit meer (Script Property CD_CRM_SETUP). Zie Code.gs.
   cd_safeRun('cd_crmSetupAutomatisch', cd_crmSetupAutomatisch);
+  // VvE-codes (v13.2): zet één keer de codes recht (voorloopnul, 801003 → 301134, VvE 211026 erbij).
+  // Op PROD pas als de nieuwe code een kwartier live staat. Zie cd_vveCodesAutomatisch in Code.gs.
+  cd_safeRun('cd_vveCodesAutomatisch', cd_vveCodesAutomatisch);
 }
 
 // Alleen push-only events mogen via de (semi-vertrouwde, OAuth-append) Notif-wachtrij. Privileged
@@ -753,7 +756,9 @@ const CD_NTD_SECTIES = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD'
 // stuur-teken) beginnen, zou Sheets als formule uitvoeren. Een apostrof-prefix forceert platte tekst.
 function cd_safeCell(s) {
   s = (s == null ? '' : s).toString();
-  return /^[=+\-@\t\r]/.test(s) ? "'" + s : s;
+  // Tweede geval: alleen cijfers, beginnend met een 0 (VvE-code 021002, telefoon 06…). Sheets maakt
+  // daar anders een getal van en gooit de nul weg. Spiegel van veiligeCel in src/api.js.
+  return (/^[=+\-@\t\r]/.test(s) || /^0\d+$/.test(s)) ? "'" + s : s;
 }
 
 // SHA-256 → lowercase hex. Gebruikt om het oude gelekte webhook-secret te herkennen

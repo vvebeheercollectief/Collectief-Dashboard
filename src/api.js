@@ -150,7 +150,11 @@ async function fetchSheets(names){
 // Alleen STRINGS worden geraakt: datums ('21-07-2026'), TRUE/FALSE-strings,
 // booleans en getallen blijven exact zoals ze waren, zodat USER_ENTERED ze blijft
 // parsen zoals altijd (de datumles van v6.0 blijft intact).
-const veiligeCel=v=>(typeof v==='string'&&/^[=+\-@\t\r]/.test(v))?"'"+v:v;
+// Tweede geval: een reeks CIJFERS die met een 0 begint. USER_ENTERED maakt daar een getal van en
+// gooit de nul weg — VvE-code 021002 stond zo als 21002 in de Sheet, en telefoonnummers 06…
+// verloren hun 0 op dezelfde manier. De apostrof houdt de cel tekst. Een losse '0' (volgnummer
+// van een bundelkop) blijft een getal: dat patroon vraagt minstens twee cijfers.
+const veiligeCel=v=>(typeof v==='string'&&(/^[=+\-@\t\r]/.test(v)||/^0\d+$/.test(v)))?"'"+v:v;
 const _veiligeRij=values=>(values||[]).map(veiligeCel);
 
 async function writeRange(range,values,method='PUT'){

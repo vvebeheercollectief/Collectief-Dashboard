@@ -398,7 +398,9 @@
        overschreven. `rowAf` en de dossierlijsten zetten géén .ct — die regels raakten dus niets
        meer. De klem die telt staat bij de kolomverdeling hieronder. */
     tr.expanded .cell-name,tr.expanded .cell-txt,tr.expanded .cell-note{white-space:normal}
-    tr.expanded .cell-name>.ct,tr.expanded .cell-txt>.ct,tr.expanded .cell-note>.ct{display:inline;max-width:none;white-space:normal;overflow:visible;text-overflow:clip}
+    /* overflow-wrap:anywhere: uitgeklapt mag de tekst wikkelen, maar een URL of een lang samengesteld
+       woord ('gevelrenovatiewerkzaamheden') heeft geen breekpunt en liep dan over de buurkolom (naloop 25-09). */
+    tr.expanded .cell-name>.ct,tr.expanded .cell-txt>.ct,tr.expanded .cell-note>.ct{display:inline;max-width:none;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
     .cell-sm{font-size:12.5px;color:#48505c;white-space:nowrap}
     /* Actiekolom blijft in beeld (v8.9). De takentabel is breder dan het venster, waardoor
        de bewerk-/wegleg-/afvinkknoppen erbuiten vielen en je eerst zijwaarts moest scrollen
@@ -450,7 +452,7 @@
        deze regel bleef de opmerking op Offerte- en Subsidie-trajecten één afgekapte regel, ook na
        een klik op de rij — precies het gedrag dat het uitklappen moet opheffen. */
     #ntd-tbl-wrap tr.expanded .pil-rij{align-items:flex-start}
-    #ntd-tbl-wrap tr.expanded .pil-rij>.ct{overflow:visible;text-overflow:clip;white-space:normal}
+    #ntd-tbl-wrap tr.expanded .pil-rij>.ct{overflow:visible;text-overflow:clip;white-space:normal;overflow-wrap:anywhere}
     #ntd-tbl-wrap .pil-rij>.pill-snooze{flex:none;margin-left:0}
     /* De naamcel krijgt NADRUKKELIJK GEEN flexrij. Het bundel-merkje hoort daar op een EIGEN
        REGEL onder de naam te staan: naast elkaar vraagt de cel de SOM van beide breedtes in
@@ -470,6 +472,13 @@
        De rij wordt hierdoor één regel hoger — precies wat de kop-merkjes in de platte lijst al
        doen, en in lijn met 'rijen rekken mee met hun inhoud'. */
     #ntd-tbl-wrap .cell-name.met-telpil>.ct{max-width:100%}
+    /* Het grijze subcategorie-label (subBadge) óók op een eigen regel onder de naam, om dezelfde
+       reden als de telpil: naast een naam die de volle kolom al pakt, tekende het label tot 101px
+       over de buurkolom heen (naloop 25-09). margin-left !important tegen de inline 4px. */
+    #ntd-tbl-wrap .cell-name>.badge{
+      display:block;width:max-content;max-width:100%;margin:2px 0 0 !important;
+      overflow:hidden;text-overflow:ellipsis;
+    }
     #ntd-tbl-wrap .cell-name.met-telpil>.bdl-pill{
       display:block;width:max-content;max-width:100%;margin:2px 0 0;
       overflow:hidden;text-overflow:ellipsis;
@@ -1416,7 +1425,7 @@
    .crm-vraag, en liep dus ongehinderd over Van, Fase en Wacht heen (naloop 25-09). */
 .crm-vraag .ct{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #ntd-tbl-wrap tr.expanded .crm-vraag{align-items:flex-start}
-#ntd-tbl-wrap tr.expanded .crm-vraag .ct{overflow:visible;text-overflow:clip;white-space:normal}
+#ntd-tbl-wrap tr.expanded .crm-vraag .ct{overflow:visible;text-overflow:clip;white-space:normal;overflow-wrap:anywhere}
 .crm-soort{flex:none;font-size:11px;font-weight:600;padding:1px 7px;border-radius:5px;background:#eef1f4;color:#5b6675}
 [data-theme=dark] .crm-soort{background:#2a2f38;color:#cfd5df}
 

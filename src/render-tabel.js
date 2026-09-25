@@ -253,7 +253,8 @@ const BIJNA_TE_LAAT_DAGEN = 7;
 //
 // Geen tweede regel als er niets te melden valt: een rij die gewoon op tijd is hoort er niet
 // hoger door te worden.
-function deadlineCel(r, sec, bijnaDagen = BIJNA_TE_LAAT_DAGEN){
+// `toon` maakt de getoonde datum op (standaard ongewijzigd); CRM geeft kortDatum mee, zie crmWachtCel.
+function deadlineCel(r, sec, bijnaDagen = BIJNA_TE_LAAT_DAGEN, toon = d => d){
   // Aangevraagd offerte-traject: kolom F is dan een OPVOLGDATUM (ontwerp 2026-09-01). Altijd
   // tweeregelig — het woord 'opvolgen' is precies wat deze cel van een deadline onderscheidt.
   // Verstreken of vandaag = amber ('check of ze binnen zijn'), nooit rood 'te laat'.
@@ -270,11 +271,12 @@ function deadlineCel(r, sec, bijnaDagen = BIJNA_TE_LAAT_DAGEN){
   if (!r.deadline) return `<td class="cell-sm"><span class="warn-geen-deadline">Geen deadline</span></td>`;
   const { teLaat, dagenTot } = berekenPrioriteit(r.deadline, sec);
   const bijna = !teLaat && dagenTot !== null && dagenTot <= bijnaDagen;
-  if (!teLaat && !bijna) return `<td><span class="s-normal">${esc(r.deadline)}</span></td>`;
+  const tt = toon(r.deadline) !== r.deadline ? ` title="${esc(r.deadline)}"` : '';
+  if (!teLaat && !bijna) return `<td${tt}><span class="s-normal">${esc(toon(r.deadline))}</span></td>`;
   const bij = teLaat ? `${Math.abs(dagenTot)}d te laat`
                      : (dagenTot === 0 ? 'vandaag' : `nog ${dagenTot}d`);
-  return `<td><span class="dl-2 ${teLaat ? 'laat' : 'bijna'}">`
-       + `<span class="dl-dat">${esc(r.deadline)}</span>`
+  return `<td${tt}><span class="dl-2 ${teLaat ? 'laat' : 'bijna'}">`
+       + `<span class="dl-dat">${esc(toon(r.deadline))}</span>`
        + `<span class="dl-bij">${esc(bij)}</span></span></td>`;
 }
 
@@ -489,11 +491,13 @@ function crmWachtCel(r){
   // Reactie al gegeven: geen 'te laat' of amber meer, alleen hoe lang de vraag al loopt (of de
   // deadline, als er geen ontvangstdatum is). Besluit 25-09, zie crmReactieGegeven (util.js).
   if(crmReactieGegeven(r)){
-    const tekst = w ? (w.dagen === 1 ? '1 dag' : `${w.dagen} dagen`) : (r.deadline || '');
+    const tekst = w ? (w.dagen === 1 ? '1 dag' : `${w.dagen} dagen`) : kortDatum(r.deadline || '');
     return `<td${w ? ` title="${esc(`Ontvangen ${r.ontvangen}`)}"` : ''}><span class="s-normal">${esc(tekst)}</span></td>`;
   }
   // Met de CRM-grens voor amber: anders kleurde dezelfde tab op twee manieren (7 hier, 2 hieronder).
-  if(!w) return deadlineCel(r, 'CRM', CRM_BIJNA_DAGEN);
+  // Korte datum ('22 sep'): de Wacht-kolom is smal omdat hij normaal '33 dagen' toont, en een lange
+  // datum werd hier '22 septembe…' (naloop 25-09). De kop is 'WACHT', dus hier wint korter wél.
+  if(!w) return deadlineCel(r, 'CRM', CRM_BIJNA_DAGEN, kortDatum);
   const woord = w.dagen === 1 ? '1 dag' : `${w.dagen} dagen`;
   const titel = `Ontvangen ${r.ontvangen}` + (r.deadline ? ` · reactie uiterlijk ${r.deadline}` : '');
   if(w.dagenTot !== null && w.dagenTot < 0)

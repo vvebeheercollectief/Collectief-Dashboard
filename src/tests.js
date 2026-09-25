@@ -2348,7 +2348,9 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
               gemeten++;
               const td = tr && tr.children[i];
               // 'Datum aangevr.' op Offerte is KALE tekst zonder span; meet dan de cel zelf.
-              const el = (td && td.querySelector('span')) || td;
+              // De BINNENSTE datumregel (.dl-dat) als die er is: de buitenste .dl-2 is een blok dat
+              // zelf niet afkapt, dus die meting zag een afgekapte datum binnenin nooit (naloop 25-09).
+              const el = (td && (td.querySelector('.dl-dat') || td.querySelector('span'))) || td;
               truthy(`datumbreedte: ${sec} — "${kop}" heeft een datum om te meten`,
                      !!el && el.textContent.trim().length > 0);
               if(!el) return;
@@ -2382,10 +2384,16 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         document.head.appendChild(klem7);
         const lang = 'Wachten op herstel riool vanuit gemeente, daarna gaat Mo langs om liggend riool te herstellen en de vloer te bekijken';
         const leeg7 = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
+        const bulkOud7 = state.bulkMode, openOud7 = state.expandedRows;
         try{
+          // Drie standen: gewoon, selecteerstand (vinkjeskolom erbij, alles krimpt) en opengeklikt
+          // (tekst mag wikkelen; een URL of lang samengesteld woord mag dan niet over de rand).
+          [['gewoon',false,false],['selecteren',true,false],['open',false,true]].forEach(([stand,bulk,open]) => {
           Object.keys(leeg7).forEach(sec => {
             // Twee rijen: één met soortlabel en afzender, één zonder (zo stond hij op productie).
+            const url = 'Zie https://www.twinq.nl/vve/311212/documenten/offerte-dakgoot-gevelrenovatiewerkzaamheden-2026.pdf';
             const basis = { code:'171001', naam:'VvE Kokosnootstraat 21/23/25 en de rest van het complex', actiepunt:lang,
+              subcategorie:'Vergaderverzoeken',
               agendapunten:lang, periode:lang, subsidie:lang, status:lang, opmerkingen:lang, onderwerp:lang,
               offertes:'1/3', datumAangevraagd:'22 september 2026', deadline:'23 september 2026',
               behandelaar:'Jer, Cihad', inBehandeling:'', crmFase:'1', subsidieFase:'2', _sec:sec };
@@ -2393,8 +2401,10 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
               { ...basis, _row:9911, soort:'Klacht', afzender:'Mevrouw A.B.C. van der Wielen-Boekhorst, nr. 151 tweede etage', ontvangen:'1 september 2026' },
               { ...basis, _row:9912, soort:'', afzender:'', ontvangen:'' },
               // Een afzender zonder spaties (zo komt een mailadres binnen) kan niet afbreken.
-              { ...basis, _row:9913, soort:'Vraag', afzender:'fred.en.hetty.vanderwielen5861@gmail.com', ontvangen:'1-9-2026' } ] };
-            state.activeNtd = sec; pgs.ntd = 1;
+              { ...basis, _row:9913, soort:'Vraag', afzender:'fred.en.hetty.vanderwielen5861@gmail.com', ontvangen:'1-9-2026' },
+              { ...basis, _row:9914, naam:'VvE Appartementencomplexvereniging', actiepunt:url, opmerkingen:url, onderwerp:url, subsidie:url, agendapunten:url, status:url } ] };
+            state.activeNtd = sec; pgs.ntd = 1; state.bulkMode = bulk;
+            state.expandedRows = open ? new Set(D.ntd[sec].map(r => rijSleutel(r))) : new Set();
             renderNtd(); herzetKolomBreedtes();
             const over = [];
             document.querySelectorAll('#ntd-tbody tr[data-row] > td').forEach(td => {
@@ -2414,10 +2424,11 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
                 over.push(`${td.cellIndex}:${el.className||el.tagName} +${Math.round(r.right - tdR)}px`);
               });
             });
-            eq(`celinhoud (${sec}): niets tekent over de buurkolom heen`, over.join(', '), '');
+            eq(`celinhoud (${sec}, ${stand}): niets tekent over de buurkolom heen`, over.join(', '), '');
+          });
           });
         } finally {
-          klem7.remove();
+          klem7.remove(); state.bulkMode = bulkOud7; state.expandedRows = openOud7;
           D.ntd = vNtd7; state.activeNtd = vSec7; pgs.ntd = vPg7; renderNtd();
         }
       })();
@@ -15590,7 +15601,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
              /Wie betaalt dit\?/.test(paneel.textContent) && /Planning opvragen/.test(paneel.textContent) && /Dhr\. Van Wijk/.test(paneel.textContent));
       eq('paneel: overspant de hele rij', paneel.firstElementChild.colSpan, 8);
       const tr2 = document.querySelector('#ntd-tbody tr[data-row="61"]');
-      truthy('rij zonder ontvangstdatum: valt terug op de deadlinecel', !!tr2 && !/dagen|dag</.test(tr2.children[5].innerHTML) && /nog 3d|\d{2}-\d{2}-\d{4}/.test(tr2.children[5].textContent));
+      truthy('rij zonder ontvangstdatum: valt terug op de deadlinecel', !!tr2 && !/dagen|dag</.test(tr2.children[5].innerHTML) && /nog 3d|\d{1,2} [a-z]{3}/.test(tr2.children[5].textContent));   // korte datum sinds 25-09
       truthy('rij zonder mail: het paneel zegt dat eerlijk', /Geen mail bewaard/.test(tr2.nextElementSibling?.textContent || ''));
       eq('rij zonder soort: geen leeg label', tr2.querySelectorAll('.crm-soort').length, 0);
     } finally {

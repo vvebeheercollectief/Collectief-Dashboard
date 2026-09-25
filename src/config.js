@@ -158,11 +158,11 @@ export const SECS = {
   //   - 'Van' en 'Wacht' zijn kolommen zonder eigen sleutel: Van toont `afzender`, Wacht rekent
   //     uit `ontvangen` en `deadline`. Opmerkingen staat in het uitklappaneel, niet als kolom.
   // Breedtes: 'Van' vast op 150 (naam + huisnummer eronder), 'Fase' op 176 (vier bolletjes met
-  // 'Wacht op reactie' eronder), 'Wacht' op 112 ('33 dagen' / '26d te laat'), 'Wie' vast op 76
+  // 'Wacht op reactie' eronder), 'Wacht' op 120 ('33 dagen' / '26d te laat', en 'Geen deadline' = 94px), 'Wie' vast op 76
   // (twee ronde naamplaatjes; als gewicht werd dat bij de smalste tabel 42px en brak de kop af).
   CRM:{label:'CRM',css:'--sec:var(--pk);--sec-l:var(--pk-l);--sec-b:var(--pk-b)',color:'#BE185D',
     cols:['VvE Code','VvE','Vraag','Van','Fase','Wacht','Wie'],
-                   breedtes:['130px',24,40,'150px','176px','112px','76px','150px'],
+                   breedtes:['130px',24,40,'150px','176px','120px','76px','150px'],
     keys:['code','naam','onderwerp','crmFase','behandelaar','deadline','opmerkingen','inBehandeling']},
 };
 

@@ -706,6 +706,8 @@ function cd_sweepNotifQueue() {
   // VvE-codes (v13.2): zet één keer de codes recht (voorloopnul, 801003 → 301134, VvE 211026 erbij).
   // Op PROD pas als de nieuwe code een kwartier live staat. Zie cd_vveCodesAutomatisch in Code.gs.
   cd_safeRun('cd_vveCodesAutomatisch', cd_vveCodesAutomatisch);
+  // Vier VvE's uit beheer (25-09-2026) één keer uit het register. Zie Code.gs.
+  cd_safeRun('cd_vveCodesUitBeheerAutomatisch', cd_vveCodesUitBeheerAutomatisch);
 }
 
 // Alleen push-only events mogen via de (semi-vertrouwde, OAuth-append) Notif-wachtrij. Privileged

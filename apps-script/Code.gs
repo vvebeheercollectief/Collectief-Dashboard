@@ -869,6 +869,30 @@ function cd_vveCodesHerstel(ss) {
   return true;
 }
 
+// Uit beheer (25-09-2026, Jer): staan niet meer in TwinQ en gaan uit het register. Alleen het
+// register; afgeronde taken, logboek en ALV-archief blijven als geschiedenis staan. Geen open taken,
+// herhaalregels of kenmerken meer voor deze vier (nagekeken voor het verwijderen).
+var CD_CODES_UIT_BEHEER = ['201090', '201137', '311162', '411003'];
+function cd_vveCodesUitBeheerAutomatisch() {
+  var props = PropertiesService.getScriptProperties();
+  if (props.getProperty('CD_VVECODES_V2')) return;
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss || (ss.getId() !== CD_PROD_SHEET_ID && ss.getId() !== CD_TEST_SHEET_ID)) return;
+  var klaar = cd_withLock(function () {
+    var alv = ss.getSheetByName("ALV's overzicht");
+    if (!alv) return false;
+    var weg = [];
+    for (var i = 0; i < CD_CODES_UIT_BEHEER.length; i++) {
+      // Elke keer opnieuw zoeken: na een verwijdering schuift alles eronder één rij op.
+      var rij = cd_vveCodesRij(alv, CD_CODES_UIT_BEHEER[i]);
+      if (rij) { alv.deleteRow(rij); weg.push(CD_CODES_UIT_BEHEER[i] + '@' + rij); }
+    }
+    Logger.log('Uit beheer verwijderd: ' + weg.join(', '));
+    return true;
+  });
+  if (klaar) props.setProperty('CD_VVECODES_V2', new Date().toISOString());
+}
+
 // Rijnummer van een code in kolom A van het register (vanaf rij 3), of 0.
 function cd_vveCodesRij(alv, code) {
   var laatste = alv.getLastRow();

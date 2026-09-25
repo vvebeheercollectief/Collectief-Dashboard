@@ -4199,6 +4199,44 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     }
   })();
 
+  // ── Naloop 25-09: een leesronde van vóór een (al afgeronde) schrijfactie wordt weggegooid ──
+  // De enige rem was `pendingWrites>0` op het moment dat de lezing terugkwam. Begon én eindigde een
+  // schrijfactie tijdens het lezen, dan stond de teller weer op 0 en kwamen de OUDE gegevens in D:
+  // een net afgeronde taak stond terug en klikken liepen op oude rijnummers.
+  await (async()=>{
+    const _fetch=window.fetch;
+    const tokenOud=state.oauthToken, expiryOud=state.oauthExpiry, failsOud=state._syncFails, hashOud=state._lastDHash;
+    const alfaMsOud=state._alfaMs, hwOud=state._logHoogwater, ankOud=state._logAnkerTs;
+    const dOud={}; Object.keys(D).forEach(k=>dOud[k]=D[k]);
+    try{
+      for(let i=0;i<200 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,10));
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3; state._syncFails=0; state._lastDHash=null;
+      const merk={ OPPAKKEN:[{code:'GEN-1', naam:'Blijft staan'}] };
+      D.ntd=merk;
+      window.fetch=async(url)=>{
+        // Tijdens het lezen: een schrijfactie begint én is klaar (generatie +1, teller terug op 0).
+        state._schrijfGen=(state._schrijfGen||0)+1;
+        const d=decodeURIComponent(String(url));
+        if(d.includes('values:batchGet')){
+          const leeg=[...d.matchAll(/ranges=([^&]*)/g)].map(()=>({values:[]}));
+          return new Response(JSON.stringify({valueRanges:leeg}),{status:200});
+        }
+        return new Response(JSON.stringify({values:[]}),{status:200});
+      };
+      const uit=await loadAll(true);
+      window.fetch=_fetch;
+      eq('generatie: de oude lezing wordt niet toegepast', [uit, D.ntd===merk], [false, true]);
+      for(let i=0;i<200 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,10));
+    } finally {
+      window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
+      state._syncFails=failsOud; state._lastDHash=hashOud; state._loadAgain=false;
+      state._alfaMs=alfaMsOud; state._logHoogwater=hwOud; state._logAnkerTs=ankOud;
+      Object.keys(dOud).forEach(k=>{ D[k]=dOud[k]; });
+      document.getElementById('dot').className='dot';
+      document.getElementById('load-err-banner')?.remove();
+    }
+  })();
+
   // ── De rasterbewaking loopt écht mee in de leesronde ──
   // Een pure test op checkAlles bewijst alleen dat die functie klopt; checkRaster klopte al jaren
   // en werd door niets aangeroepen. Deze ronde toetst de schakel zelf: loadAll moet de controle

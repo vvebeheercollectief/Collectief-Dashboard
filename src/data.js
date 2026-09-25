@@ -31,6 +31,7 @@ import { renderAll } from "./main.js";
 // wijziging terug en verschijnt een foutmelding.
 function backgroundWrite(writeFn, rollback, foutTitel){
   state.pendingWrites++;
+  state._schrijfGen=(state._schrijfGen||0)+1;   // zie de generatiecontrole in _loadRonde
   setSaving();
   state._writeChain=state._writeChain.then(async()=>{
     state._writeStart=Date.now();   // pas hier begint deze write écht (de wachtrij is serieel)
@@ -93,6 +94,7 @@ function schrijfActieLoopt(nu){
 // afgeronde rijen in bèide lijsten zou achterlaten.
 async function metWriteMarkering(fn){
   state.pendingWrites++;
+  state._schrijfGen=(state._schrijfGen||0)+1;   // zie de generatiecontrole in _loadRonde
   setSaving();
   const eerder=state._writeStart;
   state._writeStart=Date.now();
@@ -653,6 +655,8 @@ async function _loadRonde(silent){
   // om gevraagd.
   if(silent && state._herinlogBezig) return false;
   state._loadInFlight=true;
+  // Welke schrijfgeneratie zag deze ronde bij de start? Zie de controle ná het lezen.
+  const genBijStart=state._schrijfGen||0;
   try{
     // Altijd een geldige token garanderen (ook bij Vernieuwen-knop / schrijf-resync):
     // een verlopen-maar-niet-null token gaf anders een 401 → onnodige 'Fout'.
@@ -770,6 +774,11 @@ async function _loadRonde(silent){
     // begint met `if(state.pendingWrites>0) return;`), en dat is precies de voorwaarde van deze
     // tak. De balk bleef daardoor op 'Laden…' staan terwijl er in werkelijkheid opgeslagen werd.
     if(state.pendingWrites>0){ if(!silent) setSaving(); return false; }
+    // En een schrijfactie die tijdens het lezen BEGON ÉN AL KLAAR is? Dan staat pendingWrites weer
+    // op 0, maar is wat hier binnenkwam ouder dan die schrijfactie: toepassen zette de afgeronde
+    // taak terug in D en oude rijnummers onder het scherm, tot de volgende ronde (naloop 25-09).
+    // Weggooien en een verse ronde inplannen — de resync van die schrijfactie staat meestal al klaar.
+    if((state._schrijfGen||0)!==genBijStart){ state._loadAgain=true; return false; }
     // Toekennen op NAAM. Een tabblad dat niet in deze ronde zat, behoudt zijn vorige waarde in
     // plaats van door parseX(undefined) leeggeveegd te worden. Vandaag zit alles er elke ronde
     // in; de vorm is er zodat een gemiste of afwijkend gevraagde reeks nooit stil data wist.

@@ -235,7 +235,9 @@
     .search-box{display:flex;align-items:center;gap:8px;height:36px;background:var(--sur);border:1px solid var(--bor);border-radius:9px;padding:0 12px;transition:border var(--tr),box-shadow var(--tr)}
     .search-box:focus-within{border-color:var(--ac);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 14%,transparent)}
     .search-box svg{width:14px;height:14px;color:var(--fnt);flex-shrink:0}
-    .search-box input{background:none;border:none;outline:none;color:var(--txt);font-size:13px;font-weight:500;width:155px}
+    .search-box input{background:none;border:none;outline:none;color:var(--txt);font-size:13px;font-weight:500;width:155px;min-width:0;flex:1 1 auto}
+    /* min-width:0 + flex: het VvE-codeveld zit in een vak van max. 150px, maar de invoer bleef 155px
+       en getypte codes liepen over de rand tot in de behandelaarkeuze (naloop 25-09). */
     .search-box input::placeholder{color:var(--mut)} /* leesbare instructietekst → --mut (WCAG AA), niet de te-lichte --fnt */
     .filter-select{height:36px;background:var(--sur);border:1px solid var(--bor);border-radius:9px;padding:0 34px 0 12px;color:var(--txt);font-size:13px;font-weight:600;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;transition:border var(--tr),box-shadow var(--tr)}
     .filter-select:hover{border-color:var(--ac-b)}
@@ -388,6 +390,11 @@
     .cell-txt{color:#48505c;font-size:calc(var(--row-fs,13px) - .5px)}
     .cell-note{color:var(--mut);font-size:12px}
     .cell-name,.cell-txt,.cell-note{line-height:var(--row-lh,1.4);cursor:pointer;white-space:nowrap}
+    /* De nowrap hierboven is voor de takentabel (vaste kolommen + afkapping met …). De andere tabellen
+       (Afgerond, Recentelijk afgerond, Ontwikkeling, Herhaalregels, ALV's) hebben geen afkapping en
+       verdelen de ruimte naar inhoud: daar schoven lange teksten Behandelaar, Datum en Opmerking
+       buiten beeld (Afgerond: 528px zijwaarts op 1440). Daar mag de rij meegroeien (naloop 25-09). */
+    .tbl-wrap:not(#ntd-tbl-wrap) :is(.cell-name,.cell-txt,.cell-note){white-space:normal;overflow-wrap:anywhere}
     .cell-name>.ct,.cell-txt>.ct,.cell-note>.ct{display:inline-block;vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     /* Breedteverdeling (v8.9). Het actiepunt is de kolom die je écht leest, dus die krijgt
        de meeste ruimte; VvE-naam en opmerkingen leveren in. De som is zo gekozen dat de
@@ -471,6 +478,9 @@
        `table-layout:fixed` met een vaste colgroup, dus celinhoud verzet geen kolombreedte.
        De rij wordt hierdoor één regel hoger — precies wat de kop-merkjes in de platte lijst al
        doen, en in lijn met 'rijen rekken mee met hun inhoud'. */
+    /* Codecel op één regel: het sleephandvat + een code als '121034 - G' pasten niet naast elkaar,
+       de code wikkelde naar een tweede regel en stond lager dan de naam (naloop 25-09). */
+    #ntd-tbl-wrap td.cell-code{white-space:nowrap}
     #ntd-tbl-wrap .cell-name.met-telpil>.ct{max-width:100%}
     /* Het grijze subcategorie-label (subBadge) óók op een eigen regel onder de naam, om dezelfde
        reden als de telpil: naast een naam die de volle kolom al pakt, tekende het label tot 101px
@@ -525,7 +535,10 @@
     /* De fase-balk is een flex die de hele cel vulde. Met een vaste kolomindeling werd dat een
        uitgerekte lijn van 307px tussen vijf bolletjes — meer lijn dan informatie. Een plafond
        houdt hem compact; de kolom mag breder zijn dan de balk. */
-    #ntd-tbl-wrap .fase-rij{max-width:240px}
+    /* min-width:0 in de tabel: de 158px ondergrens (.fase-rij, voor het bewerkscherm) is breder dan
+       de Fase-kolom zodra de selecteerstand er een vinkjeskolom bijzet — het laatste bolletje stak
+       dan 10px de Behandelaar-kolom in (naloop 25-09). Bolletjes en lijnen passen in ±91px. */
+    #ntd-tbl-wrap .fase-rij{max-width:240px;min-width:0}
     #ntd-tbl-wrap thead th:last-child{position:sticky;right:0;z-index:3;background:var(--sec-l)}
     /* De vastgezette cel moet ondoorzichtig zijn, anders schemeren de wegscrollende cellen
        erdoorheen. Een doorschijnende rijkleur kan daar dus niet: die moet ondoorzichtig
@@ -651,7 +664,7 @@
     .toast-ico{font-size:18px;flex-shrink:0;line-height:1.3}
     .toast-body{flex:1;min-width:0}
     .toast-title{font-size:13px;font-weight:600;line-height:1.3}
-    .toast-msg{font-size:12px;color:var(--mut);margin-top:3px;line-height:1.4}
+    .toast-msg{font-size:12px;color:var(--mut);margin-top:3px;line-height:1.4;overflow-wrap:anywhere} /* een foutmelding met een lange JSON/URL liep onder het kruisje door */
     .toast-close{background:none;border:none;font-size:17px;color:var(--mut);cursor:pointer;padding:0;line-height:1;flex-shrink:0;transition:color var(--tr)}
     .toast-close:hover{color:var(--txt)}
     .toast-bar{height:3px;background:var(--toast-clr,var(--ac));border-radius:0 0 2px 2px;position:absolute;bottom:0;left:0;animation:toast-bar linear forwards}
@@ -821,7 +834,7 @@
        taken als lijstje toont: een waarschuwing zonder het gevonden werk erbij is niet te
        beoordelen en wordt weggeklikt. Alleen dít element; overal elders blijft tekst gewoon
        doorlopen. */
-    #bevestig-tekst{white-space:pre-line}
+    #bevestig-tekst{white-space:pre-line;overflow-wrap:anywhere}
 
     /* Form */
     .fld{margin-bottom:13px}
@@ -1083,7 +1096,9 @@
       .tl-scroll{overflow:visible}
     }
     @media(max-width:900px){.vve-grid{grid-template-columns:1fr}}
-    .vve-sectie{font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:18px 0 8px;display:flex;align-items:center;gap:8px}
+    .vve-sectie{font-size:11.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:18px 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    /* flex-wrap: 'BEHEERDERSKENMERKEN' + de knop Bewerken waren samen 6px breder dan het paneel
+       (1440/1920); de knop stak dan over de rand. Nu schuift hij zo nodig naar de volgende regel. */
     .vve-sectie:first-child{margin-top:0}
     .vve-sectie .n{background:var(--sur2);border:1px solid var(--bor);border-radius:20px;padding:0 8px;font-size:11px;color:var(--txt)}
     /* Taak-/afgerond-rijen in de panelen (platte divs, geen tabel meer) */

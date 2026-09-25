@@ -3,7 +3,7 @@
 //  + re-export van render-offerte / render-alv / render-tabel (publieke interface stabiel).
 //  Batch D / punt 11: offerte/ALV/tabel-render zijn naar eigen modules verplaatst.
 // ══════════════════════════════════════
-import { esc, filt, NIET_ZOEKBAAR, berekenPrioriteit, teLaatVoorTelling, parseDt, opvolgStatus, _vandaagAmsterdam, toISODate, isoWeek, vveCodeSpan, splitBehandelaar, periodeBereik, AF_PERIODES, parseAannemers } from "./util.js";
+import { esc, filt, NIET_ZOEKBAAR, berekenPrioriteit, teLaatVoorTelling, crmReactieGegeven, parseDt, opvolgStatus, _vandaagAmsterdam, toISODate, isoWeek, vveCodeSpan, splitBehandelaar, periodeBereik, AF_PERIODES, parseAannemers } from "./util.js";
 import { rijSleutel } from "./rij.js";
 import { SECS, SKEYS, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
@@ -523,7 +523,10 @@ function filterNtd(rows,q,fCode,beh,prio,sec,status){
     const pb = berekenPrioriteit(b.deadline, sec);
     // 1. Te laat altijd bovenaan — bewust de rauwe teLaat en niet teLaatVoorTelling (util.js):
     //    een aangevraagd offerte-traject waarvan de opvolgdatum over is hoort óók bovenaan.
-    if (pa.teLaat !== pb.teLaat) return pa.teLaat ? -1 : 1;
+    //    Uitzondering: een CRM-vraag waarop al gereageerd is (crmReactieGegeven) telt niet als te laat.
+    const laatA = pa.teLaat && !(sec === 'CRM' && crmReactieGegeven(a));
+    const laatB = pb.teLaat && !(sec === 'CRM' && crmReactieGegeven(b));
+    if (laatA !== laatB) return laatA ? -1 : 1;
     // 2. Opvolgen-vandaag direct daarna (Fase 4)
     const ovA = opvolgStatus(a).vandaag ? 0 : 1, ovB = opvolgStatus(b).vandaag ? 0 : 1;
     if (ovA !== ovB) return ovA - ovB;

@@ -370,7 +370,7 @@ function rowNtd(r,sec){
   const bdlGreep = (_bw && _bw.stapel) ? STAPEL_GREEP : '';
   switch(sec){
     case'OPPAKKEN':
-      cells=`<td>${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
+      cells=`<td class="cell-code">${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
         <td class="${naamCls}"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie, sec)}${bdlNaam}</td>
         <td class="cell-txt"><span class="ct" title="${esc(r.actiepunt)}">${esc(r.actiepunt)}</span></td>
         ${deadlineCel(r, 'OPPAKKEN')}
@@ -379,7 +379,7 @@ function rowNtd(r,sec){
         <td>${editBtn}</td>`;
       break;
     case'VERGADERVERZOEKEN':
-      cells=`<td>${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
+      cells=`<td class="cell-code">${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
         <td class="${naamCls}"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie, sec)}${bdlNaam}</td>
         <td class="cell-per">${periodeCel(r.periode||r.agendapunten||'')}</td>
         <td class="cell-txt"><span class="ct" title="${esc(r.agendapunten||r.actiepunt||'')}">${esc(r.agendapunten||r.actiepunt||'')}</span></td>
@@ -389,7 +389,7 @@ function rowNtd(r,sec){
         <td>${editBtn}</td>`;
       break;
     case'OFFERTE-TRAJECTEN':
-      cells=`<td>${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
+      cells=`<td class="cell-code">${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
         <td class="${naamCls}"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}${bdlNaam}</td>
         <td class="cell-sm">${esc(r.datumAangevraagd||'')}</td>
         <td class="cell-of"><div class="of-rij">${offProg(r.offertes)}<div class="of-aann-tbl-tog">${offerteAannSamenvatting(r)}</div></div></td>
@@ -399,7 +399,7 @@ function rowNtd(r,sec){
         <td>${editBtn}</td>`;
       break;
     case'LOD':
-      cells=`<td>${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
+      cells=`<td class="cell-code">${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
         <td class="${naamCls}"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie, sec)}${bdlNaam}</td>
         <td class="cell-txt"><span class="ct" title="${esc(r.actiepunt||'')}">${esc(r.actiepunt||'')}</span></td>
         <td class="cell-txt" style="font-style:italic"><span class="ct" title="${esc(r.status||'')}">${esc(r.status||'')}</span></td>
@@ -412,7 +412,7 @@ function rowNtd(r,sec){
     // bewust niet in de tabel — de fase-bolletjes hebben die ruimte nodig en de rij
     // moet rustig blijven. Houd dit gelijk aan SECS['SUBSIDIE-TRAJECTEN'].cols.
     case'SUBSIDIE-TRAJECTEN':
-      cells=`<td>${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
+      cells=`<td class="cell-code">${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
         <td class="${naamCls}"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie)}${bdlNaam}</td>
         <td class="cell-txt"><div class="pil-rij"><span class="ct" title="${esc(r.subsidie||'')}">${esc(r.subsidie||'')}</span>${extraPills}</div></td>
         <td>${faseRijHtml(r.subsidieFase, rid)}</td>
@@ -424,7 +424,7 @@ function rowNtd(r,sec){
     // bolletjes, Wacht = dagen sinds ontvangst. Opmerkingen staan in het uitklappaneel eronder
     // (crmMailRij). Houd dit gelijk aan SECS.CRM.cols.
     case'CRM':
-      cells=`<td>${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
+      cells=`<td class="cell-code">${bdlGreep}${bdlChev}${vveCodeSpan(r.code, css)}</td>
         <td class="${naamCls}"><span class="ct" title="${esc(r.naam)}">${esc(r.naam)}</span>${subBadge(r.subcategorie, sec)}${bdlNaam}</td>
         <td class="cell-txt"><div class="pil-rij"><div class="crm-vraag">${r.soort?`<span class="crm-soort">${esc(r.soort)}</span>`:''}<span class="ct" title="${esc(r.onderwerp||'')}">${esc(r.onderwerp||'')}</span></div>${extraPills}</div></td>
         ${crmVanCel(r.afzender)}

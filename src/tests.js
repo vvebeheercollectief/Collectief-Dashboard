@@ -1760,6 +1760,8 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
        (h => !/dl-2 laat|row-telaat/.test(h) && h.includes('10 dagen'))(rowNtd(laatCrm('Beantwoord'),'CRM')));
     truthy('crm te laat: Opgepakt blijft rood', /dl-2 laat/.test(rowNtd(laatCrm('Opgepakt'),'CRM')));
     eq('crm stil: Beantwoord is nooit stil', bepaalStil(laatCrm('Beantwoord'),'CRM'), null);
+    eq('crm sortering: een te late open vraag gaat vóór een eerder verlopen beantwoorde',
+       filterNtd([{ ...laatCrm('Beantwoord'), code:'B', deadline:dat(-9) }, { ...laatCrm('Opgepakt'), code:'O', _row:9933 }], '', '', '', '', 'CRM').map(r=>r.code), ['O','B']);
   })();
 
   // ── Inhoud uit de Sheet komt nooit als HTML op het scherm (v12.1) ──
@@ -2401,7 +2403,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
               { ...basis, _row:9911, soort:'Klacht', afzender:'Mevrouw A.B.C. van der Wielen-Boekhorst, nr. 151 tweede etage', ontvangen:'1 september 2026' },
               { ...basis, _row:9912, soort:'', afzender:'', ontvangen:'' },
               // Een afzender zonder spaties (zo komt een mailadres binnen) kan niet afbreken.
-              { ...basis, _row:9913, soort:'Vraag', afzender:'fred.en.hetty.vanderwielen5861@gmail.com', ontvangen:'1-9-2026' },
+              { ...basis, _row:9913, code:'121034 - G', subcategorie:'', soort:'Vraag', afzender:'fred.en.hetty.vanderwielen5861@gmail.com', ontvangen:'1-9-2026' },
               { ...basis, _row:9914, naam:'VvE Appartementencomplexvereniging', actiepunt:url, opmerkingen:url, onderwerp:url, subsidie:url, agendapunten:url, status:url } ] };
             state.activeNtd = sec; pgs.ntd = 1; state.bulkMode = bulk;
             state.expandedRows = open ? new Set(D.ntd[sec].map(r => rijSleutel(r))) : new Set();
@@ -2423,8 +2425,21 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
                 }
                 over.push(`${td.cellIndex}:${el.className||el.tagName} +${Math.round(r.right - tdR)}px`);
               });
+              // De fasebalk heeft geen tekstbladeren (de bolletjes zijn lege knoppen): apart meten.
+              td.querySelectorAll('.fase-rij').forEach(f => {
+                const r = f.getBoundingClientRect();
+                if(r.right > tdR + 1) over.push(`${td.cellIndex}:fase-rij +${Math.round(r.right - tdR)}px`);
+              });
             });
             eq(`celinhoud (${sec}, ${stand}): niets tekent over de buurkolom heen`, over.join(', '), '');
+            // Een code met '- G' wikkelde naast het sleephandvat naar een tweede regel en stond dan
+            // lager dan de naam ernaast (zichtbaar op CRM en Oppakken). Code en naam op één hoogte.
+            if(stand === 'gewoon'){
+              const tr = document.querySelector('#ntd-tbody tr[data-row="9913"]');
+              const code = tr && tr.querySelector('.code'), naam = tr && tr.querySelector('.cell-name .ct');
+              const dy = (code && naam) ? Math.abs(code.getBoundingClientRect().top - naam.getBoundingClientRect().top) : 99;
+              truthy(`celinhoud (${sec}): code '121034 - G' staat op de hoogte van de naam (${Math.round(dy)}px verschil)`, dy <= 4);
+            }
           });
           });
         } finally {
@@ -5857,7 +5872,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '13.0');
+  eq('versie opgehoogd', APP_VERSION, '13.1');
 
   // ── Tabbladen ÍN de kaartkop (v11.7) ──
   // De kop van de kaart zei links exact hetzelfde als het actieve tabblad — 'Oppakken' boven

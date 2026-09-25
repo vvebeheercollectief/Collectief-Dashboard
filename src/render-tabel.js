@@ -2,7 +2,7 @@
 //  RENDER-TABEL — generieke tabel/paginering (thead, tbody, rij-render, paginatie)
 //  Verplaatst uit render-lijsten.js (Batch D / punt 11) — zuivere refactor, geen gedragswijziging.
 // ══════════════════════════════════════
-import { esc, vveCodeSpan, persBadges, subBadge, taakActieKnoppen, offProg, emptyRow, berekenPrioriteit, opvolgStatus, taakTitel, kortDatum, _verschilInKalenderdagen, _vandaagAmsterdam, stilDrempel, aannSleutel, parseWeekPeriode, metDagnamen, offerteAangevraagd, teLaatVoorTelling, crmWacht } from "./util.js";
+import { esc, vveCodeSpan, persBadges, subBadge, taakActieKnoppen, offProg, emptyRow, berekenPrioriteit, opvolgStatus, taakTitel, kortDatum, _verschilInKalenderdagen, _vandaagAmsterdam, stilDrempel, aannSleutel, parseWeekPeriode, metDagnamen, offerteAangevraagd, teLaatVoorTelling, crmWacht, crmReactieGegeven } from "./util.js";
 import { rijSleutel } from "./rij.js";
 import { SECS, SKEYS, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
@@ -212,6 +212,8 @@ function bepaalStil(r, sec){
   // CRM telt ook zonder 'In behandeling' (v13.0): een vraag waar niemand aan zit is juist de stille.
   // LET OP — SYNC met cd_escaleerStilleDossiers (Opvolging.gs) en cd_dailySummary (Notifications.gs).
   if (r.inBehandeling !== 'TRUE' && (sec || r._sec) !== 'CRM') return null;
+  // Reactie al gegeven (Wacht op reactie / Beantwoord): niet stil, zie crmReactieGegeven (util.js).
+  if ((sec || r._sec) === 'CRM' && crmReactieGegeven(r)) return null;
   // De index alleen gebruiken als hij VOOR DEZE SECTIE gebouwd is. Anders terugvallen op de
   // volledige scan: langzamer, maar een lege trefferlijst uit de verkeerde index zou stil
   // 'geen activiteit' betekenen, en dat is precies het signaal dat we niet mogen missen.
@@ -484,6 +486,12 @@ const CRM_BIJNA_DAGEN = 2;
 // deadlinecel: dan is er niets om te tellen, maar de deadline blijft zichtbaar.
 function crmWachtCel(r){
   const w = crmWacht(r);
+  // Reactie al gegeven: geen 'te laat' of amber meer, alleen hoe lang de vraag al loopt (of de
+  // deadline, als er geen ontvangstdatum is). Besluit 25-09, zie crmReactieGegeven (util.js).
+  if(crmReactieGegeven(r)){
+    const tekst = w ? (w.dagen === 1 ? '1 dag' : `${w.dagen} dagen`) : (r.deadline || '');
+    return `<td${w ? ` title="${esc(`Ontvangen ${r.ontvangen}`)}"` : ''}><span class="s-normal">${esc(tekst)}</span></td>`;
+  }
   // Met de CRM-grens voor amber: anders kleurde dezelfde tab op twee manieren (7 hier, 2 hieronder).
   if(!w) return deadlineCel(r, 'CRM', CRM_BIJNA_DAGEN);
   const woord = w.dagen === 1 ? '1 dag' : `${w.dagen} dagen`;

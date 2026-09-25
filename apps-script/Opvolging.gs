@@ -17,6 +17,15 @@ const CD_STIL_ESCALATIE_REGELS = {
 const HR_SHEET = 'Herhaalregels';
 const CD_OPV_SKEYS = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN','CRM'];
 
+// CRM: in 'Wacht op reactie' en 'Beantwoord' (kolom D) is de reactie al gegeven — niet te laat, niet
+// stil, geen escalatie en geen deadline-push (besluit Jer, 25-09).
+// LET OP — SYNC met crmReactieGegeven in src/util.js.
+function cd_crmReactieGegeven(sec, fase) {
+  if (sec !== 'CRM') return false;
+  const f = ((fase || '') + '').trim().toLowerCase();
+  return f === 'wacht op reactie' || f === 'beantwoord';
+}
+
 function cd_opvolgingMotor() {
   cd_lockedRun('cd_opvolgingMotor', function () {
     cd_safeRun('cd_hr_zetTakenKlaar',       cd_hr_zetTakenKlaar);
@@ -316,6 +325,7 @@ function cd_escaleerStilleDossiers() {
       const beh  = (data[i][4] || '').toString().trim();
       const ib   = ((data[i][7] || '') + '').toString().toUpperCase() === 'TRUE';
       if (!ib && curSec !== 'OFFERTE-TRAJECTEN' && curSec !== 'CRM') continue;
+      if (cd_crmReactieGegeven(curSec, data[i][3])) continue;   // reactie al gegeven, zie hierboven
       const opvolg = cd_parseDate(data[i][11]);
       if (opvolg && opvolg.getTime() > today.getTime()) continue; // weggelegd = bewust geparkeerd
       const laatst = cd_laatsteActiviteit(stilMap, code, curSec);

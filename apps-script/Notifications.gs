@@ -270,6 +270,7 @@ function cd_checkDeadlines() {
         const beh  = (data[i][BEH_COL[curSec]] || '').toString().trim();
         const dlVal = data[i][DEADLINE_COL[curSec]];
         if (!code || !dlVal) continue;
+        if (cd_crmReactieGegeven(curSec, data[i][3])) continue;   // CRM: reactie al gegeven (Opvolging.gs)
 
         let dl = cd_parseDate(dlVal);
         if (!dl) continue;
@@ -361,15 +362,16 @@ function cd_dailySummary() {
       const dl = cd_parseDate(data[i][DEADLINE_COL[curSec]]);
       const ib = ((data[i][7] || '') + '').toString().toUpperCase() === 'TRUE';
       const sec = curSec;
+      const reactieGegeven = cd_crmReactieGegeven(sec, data[i][3]);   // CRM: niet te laat, niet stil
       cd_splitBehandelaar(beh).forEach(name => {
         if (!perPerson[name]) perPerson[name] = { secs:{}, telaat:0, opvolgen:0, stil:0 };
         const p = perPerson[name];
         p.secs[sec] = (p.secs[sec] || 0) + 1;
-        if (!weggelegd && dl && dl.getTime() < today.getTime()) p.telaat++;
+        if (!weggelegd && !reactieGegeven && dl && dl.getTime() < today.getTime()) p.telaat++;
         if (opvolg && opvolg.getTime() <= today.getTime()) p.opvolgen++;
         const regels = CD_STIL_ESCALATIE_REGELS[sec];
         // CRM telt ook zonder 'In behandeling': een vraag waar niemand aan zit is juist de stille.
-        if (!weggelegd && regels && (ib || sec === 'OFFERTE-TRAJECTEN' || sec === 'CRM')) {
+        if (!weggelegd && !reactieGegeven && regels && (ib || sec === 'OFFERTE-TRAJECTEN' || sec === 'CRM')) {
           const laatst = cd_laatsteActiviteit(stilMap, code, sec);
           if (laatst) {
             const dagen = cd_dagenSinds(laatst, today);   // zelfde afronding als het scherm

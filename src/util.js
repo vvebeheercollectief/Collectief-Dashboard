@@ -294,8 +294,18 @@ function offerteAangevraagd(r){
 // statusfilter, de rij-klasse, het dossier en Ctrl+K dezelfde uitzondering hanteren.
 // De SORTERING blijft bewust op de rauwe teLaat: een traject dat op opvolgen wacht hoort
 // net zo goed bovenaan.
+// CRM: in 'Wacht op reactie' en 'Beantwoord' is de reactie al gegeven — dan is de termijn van vijf
+// werkdagen gehaald en hoort de vraag niet rood 'te laat' te staan of te escaleren (besluit Jer,
+// 25-09). Alleen Ontvangen en Opgepakt tellen. Eigen kleine lijst en geen import uit crm-fase.js:
+// die importeert (via subsidie-fase.js) weer uit dit bestand.
+// LET OP — SYNC met cd_crmReactieGegeven in apps-script/Opvolging.gs.
+const CRM_REACTIE_GEGEVEN = ['wacht op reactie', 'beantwoord'];
+function crmReactieGegeven(r){
+  return CRM_REACTIE_GEGEVEN.includes((((r && r.crmFase) || '') + '').trim().toLowerCase());
+}
 function teLaatVoorTelling(r, sec, vandaag){
   if (sec === 'OFFERTE-TRAJECTEN' && offerteAangevraagd(r)) return false;
+  if (sec === 'CRM' && crmReactieGegeven(r)) return false;
   return berekenPrioriteit(r.deadline, sec, vandaag).teLaat;
 }
 
@@ -918,7 +928,7 @@ export {
   displayName, filt, splitBehandelaar, korteNaam, PRIO_REGELS, stilDrempel, STIL_ESCALATIE_REGELS,
   DEADLINE_VOORSTEL, DEADLINE_HINT, voorgesteldeDeadline, werkdagenNa, crmWacht, AF_PERIODES, periodeBereik,
   opvolgStatus, volgendeDeadline, HERHAAL_MAANDEN, _vandaagAmsterdam, isoWeek,
-  offerteAangevraagd, teLaatVoorTelling,
+  offerteAangevraagd, teLaatVoorTelling, crmReactieGegeven,
   _verschilInKalenderdagen, berekenPrioriteit, prioBadge, persBadges,
   offProg, _MAANDEN, _parseAnyDate, parseDt, toISODate, toDutchDate, leegBijErfenis, nieuwTaakId,
   emptyRow, esc, vveCodeSpan, subBadge, taakActieKnoppen, coerceDagenVooraf,

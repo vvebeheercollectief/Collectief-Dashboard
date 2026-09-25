@@ -1750,6 +1750,16 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
                                  _sec:'CRM', _row:9931 }, 'CRM');
     truthy('deadline: CRM zonder ontvangst, 4 dagen vooruit = rustig (grens 2, niet 7)', !/dl-2 bijna/.test(crmCel(4)));
     truthy('deadline: CRM zonder ontvangst, 2 dagen vooruit = amber', /dl-2 bijna/.test(crmCel(2)));
+
+    // Besluit 25-09: bij 'Wacht op reactie' en 'Beantwoord' is de reactie gegeven → niet te laat.
+    const laatCrm = fase => ({ code:'CRM-B', naam:'VvE B', onderwerp:'x', deadline:dat(-4), ontvangen:dat(-10),
+                               crmFase:fase, _sec:'CRM', _row:9932 });
+    eq('crm te laat: Ontvangen/Opgepakt wel, Wacht op reactie/Beantwoord niet',
+       ['Ontvangen','Opgepakt','Wacht op reactie','Beantwoord'].map(f => teLaatVoorTelling(laatCrm(f),'CRM')), [true,true,false,false]);
+    truthy('crm te laat: Beantwoord toont geen rode cel en geen te-laat-rij',
+       (h => !/dl-2 laat|row-telaat/.test(h) && h.includes('10 dagen'))(rowNtd(laatCrm('Beantwoord'),'CRM')));
+    truthy('crm te laat: Opgepakt blijft rood', /dl-2 laat/.test(rowNtd(laatCrm('Opgepakt'),'CRM')));
+    eq('crm stil: Beantwoord is nooit stil', bepaalStil(laatCrm('Beantwoord'),'CRM'), null);
   })();
 
   // ── Inhoud uit de Sheet komt nooit als HTML op het scherm (v12.1) ──
@@ -15634,7 +15644,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       const lang = new Date(); lang.setDate(lang.getDate() - 10);
       D.logboek = [{ code:'381057', sectie:'CRM', actie:'Aangemaakt', gebruiker:'jer', timestamp:lang.toISOString() }];
       _zetStilIndex(null);
-      eq('review: CRM zonder In behandeling is na 10 dagen stil', bepaalStil({ ...crmObj, inBehandeling:'FALSE', opvolgdatum:'' }, 'CRM'), 10);
+      eq('review: CRM zonder In behandeling is na 10 dagen stil', bepaalStil({ ...crmObj, crmFase:'Opgepakt', inBehandeling:'FALSE', opvolgdatum:'' }, 'CRM'), 10);
       D.logboek = [{ code:'1', sectie:'OPPAKKEN', actie:'Aangemaakt', gebruiker:'jer', timestamp:lang.toISOString() }];
       eq('review: Oppakken zonder In behandeling blijft niet-stil', bepaalStil({ ...oppObj, code:'1', inBehandeling:'FALSE', opvolgdatum:'' }, 'OPPAKKEN'), null);
     } finally { D.logboek = stilOud; }

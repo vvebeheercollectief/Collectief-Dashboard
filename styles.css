@@ -1412,12 +1412,16 @@
 /* Vraag-kolom: soortlabel + kort onderwerp op één regel. Het label krimpt nooit; het onderwerp
    kapt af met … zoals elke tekstcel (klik de rij open voor de rest). */
 .crm-vraag{display:flex;align-items:baseline;gap:8px;min-width:0}
-.crm-vraag .ct{min-width:0}
+/* De afkapping staat hier zelf. `.pil-rij>.ct` greep niet: de tekst zit een laag dieper, in
+   .crm-vraag, en liep dus ongehinderd over Van, Fase en Wacht heen (naloop 25-09). */
+.crm-vraag .ct{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#ntd-tbl-wrap tr.expanded .crm-vraag{align-items:flex-start}
+#ntd-tbl-wrap tr.expanded .crm-vraag .ct{overflow:visible;text-overflow:clip;white-space:normal}
 .crm-soort{flex:none;font-size:11px;font-weight:600;padding:1px 7px;border-radius:5px;background:#eef1f4;color:#5b6675}
 [data-theme=dark] .crm-soort{background:#2a2f38;color:#cfd5df}
 
 /* Van-kolom: naam, met het huisnummer (of wat er na de komma staat) gedempt eronder. */
-.crm-van .ct{font-weight:600}
+.crm-van .ct{font-weight:600;overflow-wrap:anywhere}
 .crm-nr{display:block;font-size:11px;color:var(--mut);font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* Uitklappaneel onder een opengeklikte CRM-rij: de mail en de interne notitie. */

@@ -2246,7 +2246,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         klem6.textContent = '#ntd-tbl-wrap{width:1150px !important}';
         document.head.appendChild(klem6);
         try{
-          const secs6 = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN'];
+          const secs6 = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN','CRM'];
           const leeg6 = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
           // MET ÉN ZONDER selecteerstand. In die stand komt er een vinkjeskolom van 48px bij en
           // krimpen alle gewichtskolommen mee — daar liep 'BEHANDELAAR' nog over 'DEADLINE' heen
@@ -2283,7 +2283,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       // Gemeten wordt de KRAPSTE stand: de tabel op zijn minimumbreedte. Zonder die klem meet je
       // het venster van de testrunner en is de toets groen om de verkeerde reden.
       (() => {
-        const vNtd = {}, secs = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN'];
+        const vNtd = {}, secs = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN','CRM'];
         const vA3 = state.activeNtd, vPg3 = pgs.ntd;
         const klem = document.createElement('style');
         klem.textContent = '#ntd-tbl-wrap{width:1150px !important}';
@@ -2308,7 +2308,8 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
             let gemeten = 0;
             ths.forEach((th, i) => {
               const kop = th.textContent.trim().replace(/[▲▼]$/, '');
-              if(!(kop.startsWith('Deadline') || kop.startsWith('Datum'))) return;
+              // 'Wacht' op CRM: zonder ontvangstdatum toont die kolom de deadline (crmWachtCel).
+              if(!(kop.startsWith('Deadline') || kop.startsWith('Datum') || (sec === 'CRM' && kop.startsWith('Wacht')))) return;
               gemeten++;
               const td = tr && tr.children[i];
               // 'Datum aangevr.' op Offerte is KALE tekst zonder span; meet dan de cel zelf.
@@ -2330,6 +2331,59 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
           klem.remove();
           secs.forEach(sec => { if(vNtd[sec] === undefined) delete D.ntd[sec]; else D.ntd[sec] = vNtd[sec]; });
           state.activeNtd = vA3; pgs.ntd = vPg3; setNtd(vA3);
+        }
+      })();
+
+      // ── Naloop 25-09: GEEN celinhoud mag over de buurkolom heen tekenen, op géén tabblad ──
+      // Op CRM liep een lange vraag ('Wachten op herstel riool vanuit gemeente, …') dwars over Van,
+      // Fase en Wacht heen: de afkapregel greep alleen op `.pil-rij>.ct`, en daar staat de tekst een
+      // laag dieper, in `.crm-vraag`. De toetsen hierboven meten koppen en datums; deze meet élke
+      // cel, met in élk tekstveld een waarde die er nooit in past. Zichtbaar over de rand = rood;
+      // afgekapt door een voorouder met overflow binnen de cel = goed.
+      (() => {
+        const vNtd7 = D.ntd, vSec7 = state.activeNtd, vPg7 = pgs.ntd;
+        const klem7 = document.createElement('style');
+        klem7.textContent = '#ntd-tbl-wrap{width:1150px !important}';
+        document.head.appendChild(klem7);
+        const lang = 'Wachten op herstel riool vanuit gemeente, daarna gaat Mo langs om liggend riool te herstellen en de vloer te bekijken';
+        const leeg7 = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
+        try{
+          Object.keys(leeg7).forEach(sec => {
+            // Twee rijen: één met soortlabel en afzender, één zonder (zo stond hij op productie).
+            const basis = { code:'171001', naam:'VvE Kokosnootstraat 21/23/25 en de rest van het complex', actiepunt:lang,
+              agendapunten:lang, periode:lang, subsidie:lang, status:lang, opmerkingen:lang, onderwerp:lang,
+              offertes:'1/3', datumAangevraagd:'22 september 2026', deadline:'23 september 2026',
+              behandelaar:'Jer, Cihad', inBehandeling:'', crmFase:'1', subsidieFase:'2', _sec:sec };
+            D.ntd = { ...leeg7, [sec]: [
+              { ...basis, _row:9911, soort:'Klacht', afzender:'Mevrouw A.B.C. van der Wielen-Boekhorst, nr. 151 tweede etage', ontvangen:'1 september 2026' },
+              { ...basis, _row:9912, soort:'', afzender:'', ontvangen:'' },
+              // Een afzender zonder spaties (zo komt een mailadres binnen) kan niet afbreken.
+              { ...basis, _row:9913, soort:'Vraag', afzender:'fred.en.hetty.vanderwielen5861@gmail.com', ontvangen:'1-9-2026' } ] };
+            state.activeNtd = sec; pgs.ntd = 1;
+            renderNtd(); herzetKolomBreedtes();
+            const over = [];
+            document.querySelectorAll('#ntd-tbody tr[data-row] > td').forEach(td => {
+              const tdR = td.getBoundingClientRect().right;
+              // De TEKST meten, niet het vak: in een flexrij krimpt het vak netjes mee (min-width:0)
+              // terwijl de tekst er zichtbaar uitloopt. Een Range geeft de echte inktbreedte.
+              td.querySelectorAll('*').forEach(el => {
+                if(!el.textContent.trim() || el.children.length) return;   // alleen bladeren met tekst
+                const rg = document.createRange(); rg.selectNodeContents(el);
+                const r = rg.getBoundingClientRect();
+                if(!r.width || r.right <= tdR + 1) return;
+                // Afgekapt door zichzelf of een voorouder binnen de cel? Dan is het niet zichtbaar.
+                for(let a = el; a && a !== td; a = a.parentElement){
+                  const cs = getComputedStyle(a);
+                  if(cs.overflow !== 'visible' && cs.overflowX !== 'visible' && a.getBoundingClientRect().right <= tdR + 1) return;
+                }
+                over.push(`${td.cellIndex}:${el.className||el.tagName} +${Math.round(r.right - tdR)}px`);
+              });
+            });
+            eq(`celinhoud (${sec}): niets tekent over de buurkolom heen`, over.join(', '), '');
+          });
+        } finally {
+          klem7.remove();
+          D.ntd = vNtd7; state.activeNtd = vSec7; pgs.ntd = vPg7; renderNtd();
         }
       })();
 

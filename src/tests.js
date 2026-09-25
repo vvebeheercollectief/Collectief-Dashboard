@@ -4247,21 +4247,25 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     try{
       for(let i=0;i<200 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,10));
       state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3; state._syncFails=0; state._lastDHash=null;
-      const merk={ OPPAKKEN:[{code:'GEN-1', naam:'Blijft staan'}] };
-      D.ntd=merk;
+      // Eerste lezing: 'Nog Te Doen' bevat nog de taak OUD-1, en tíjdens die lezing loopt een
+      // schrijfactie helemaal af (generatie +1). Vervolgronde: de taak is weg (zo staat de Sheet nu).
+      let ronde=0;
       window.fetch=async(url)=>{
-        // Tijdens het lezen: een schrijfactie begint én is klaar (generatie +1, teller terug op 0).
-        state._schrijfGen=(state._schrijfGen||0)+1;
         const d=decodeURIComponent(String(url));
-        if(d.includes('values:batchGet')){
-          const leeg=[...d.matchAll(/ranges=([^&]*)/g)].map(()=>({values:[]}));
-          return new Response(JSON.stringify({valueRanges:leeg}),{status:200});
-        }
-        return new Response(JSON.stringify({values:[]}),{status:200});
+        if(!d.includes('values:batchGet')) return new Response(JSON.stringify({values:[]}),{status:200});
+        ronde++;
+        if(ronde===1) state._schrijfGen=(state._schrijfGen||0)+1;
+        const namen=[...d.matchAll(/ranges=([^&]*)/g)].map(m=>m[1]);
+        const vr=namen.map(n=>({values: (ronde===1 && /^'?Nog Te Doen/.test(n))
+          ? [['OPPAKKEN'],['VvE Code','VvE','Actiepunt'],['OUD-1','VvE Oud','al afgerond']] : []}));
+        return new Response(JSON.stringify({valueRanges:vr}),{status:200});
       };
       const uit=await loadAll(true);
       window.fetch=_fetch;
-      eq('generatie: de oude lezing wordt niet toegepast', [uit, D.ntd===merk], [false, true]);
+      const codes=Object.values(D.ntd||{}).flat().map(r=>r.code);
+      eq('generatie: de oude lezing (met de al afgeronde taak) wordt niet toegepast', codes.includes('OUD-1'), false);
+      eq('generatie: er kwam een verse vervolgronde', ronde, 2);
+      eq('generatie: en de aanroeper wachtte daarop', uit, true);
       for(let i=0;i<200 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,10));
     } finally {
       window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;

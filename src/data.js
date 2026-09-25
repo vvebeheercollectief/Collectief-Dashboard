@@ -778,7 +778,14 @@ async function _loadRonde(silent){
     // op 0, maar is wat hier binnenkwam ouder dan die schrijfactie: toepassen zette de afgeronde
     // taak terug in D en oude rijnummers onder het scherm, tot de volgende ronde (naloop 25-09).
     // Weggooien en een verse ronde inplannen — de resync van die schrijfactie staat meestal al klaar.
-    if((state._schrijfGen||0)!==genBijStart){ state._loadAgain=true; return false; }
+    // De aanroeper wacht op die vervolgronde (zelfde belofte als loadAll bij een lopende ronde; de
+    // finally hieronder lost hem op) — anders kreeg een directe `await loadAll()` meteen `false`
+    // en werkte hij verder op de oude D. Een handmatige verversing blijft luid.
+    if((state._schrijfGen||0)!==genBijStart){
+      state._loadAgain=true; if(!silent) state._loadAgainLoud=true;
+      if(!state._loadAgainPromise) state._loadAgainPromise=new Promise(res=>{ state._loadAgainKlaar=res; });
+      return state._loadAgainPromise;
+    }
     // Toekennen op NAAM. Een tabblad dat niet in deze ronde zat, behoudt zijn vorige waarde in
     // plaats van door parseX(undefined) leeggeveegd te worden. Vandaag zit alles er elke ronde
     // in; de vorm is er zodat een gemiste of afwijkend gevraagde reeks nooit stil data wist.

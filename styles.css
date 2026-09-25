@@ -394,7 +394,7 @@
        (Afgerond, Recentelijk afgerond, Ontwikkeling, Herhaalregels, ALV's) hebben geen afkapping en
        verdelen de ruimte naar inhoud: daar schoven lange teksten Behandelaar, Datum en Opmerking
        buiten beeld (Afgerond: 528px zijwaarts op 1440). Daar mag de rij meegroeien (naloop 25-09). */
-    .tbl-wrap:not(#ntd-tbl-wrap) :is(.cell-name,.cell-txt,.cell-note){white-space:normal;overflow-wrap:anywhere}
+    .tbl-wrap:not(#ntd-tbl-wrap) :is(.cell-name,.cell-txt,.cell-note){white-space:normal;overflow-wrap:break-word}
     .cell-name>.ct,.cell-txt>.ct,.cell-note>.ct{display:inline-block;vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     /* Breedteverdeling (v8.9). Het actiepunt is de kolom die je écht leest, dus die krijgt
        de meeste ruimte; VvE-naam en opmerkingen leveren in. De som is zo gekozen dat de

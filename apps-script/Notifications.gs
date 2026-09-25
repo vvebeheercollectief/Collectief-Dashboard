@@ -33,10 +33,10 @@ const NOTIF_QUEUE_MAX = 200; // verwerkte rijen die we bewaren
 const APP_URL = 'https://vvebeheercollectief.github.io/Collectief-Dashboard/';
 const ICON_URL = APP_URL + 'icon-192.png';
 
-// Halve breedte van het venster per drempel in cd_checkDeadlines. Het script draait elk uur, dus
-// het venster moet precies één uur breed zijn (halfopen). Met 1 (= ±1 uur, twee uur breed) viel
-// elke drempel in twee à drie opeenvolgende runs en kwam dezelfde push meermaals (naloop 25-09).
-const DEADLINE_TOLERANCE_HOURS = 0.5;
+// Hoeveel uur tolerantie bij deadline-check (script draait elk uur). Bewust ±1 uur (twee uur breed):
+// een trigger die een paar minuten verloopt of één keer overslaat mag een drempel niet missen.
+// Dat het venster daardoor in twee runs valt, vangt de ontdubbeling in cd_checkDeadlines op.
+const DEADLINE_TOLERANCE_HOURS = 1;
 
 // ════════════════════════════════════════════════════════════
 //  CONCURRENCY + FOUTAFHANDELING HELPERS
@@ -252,6 +252,7 @@ function cd_checkDeadlines() {
     if (!sheet) return;
     const data = sheet.getDataRange().getValues();
     const now = new Date();
+    const cache = CacheService.getScriptCache();   // ontdubbeling van de pushes, zie de drempellus
     let curSec = null;
     const SKEYS = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN','CRM'];
 
@@ -295,7 +296,13 @@ function cd_checkDeadlines() {
         if (hoursUntil < 0 || hoursUntil > 72) continue;
 
         [1, 4, 8, 24, 48].forEach(h => {
-          if (hoursUntil > h - DEADLINE_TOLERANCE_HOURS && hoursUntil <= h + DEADLINE_TOLERANCE_HOURS && beh) {
+          if (Math.abs(hoursUntil - h) <= DEADLINE_TOLERANCE_HOURS && beh) {
+            // Eén push per taak per drempel. Het venster is twee uur breed en de trigger draait elk
+            // uur, dus zonder dit kwam dezelfde push twee à drie keer (naloop 25-09). De cache houdt
+            // de sleutel 3 uur vast — langer dan het venster, korter dan de afstand tot de volgende drempel.
+            const verzondenSleutel = 'dlpush-' + ((data[i][16] || code)) + '-' + h + '-' + dl.getTime();
+            if (cache.get(verzondenSleutel)) return;
+            cache.put(verzondenSleutel, '1', 3 * 3600);
             const body = code + (naam ? ' · ' + naam : '') + ' — over ' + Math.round(hoursUntil) + ' uur';
             cd_splitBehandelaar(beh).forEach(name => {
               // BEWUST GEEN cd_schrijfMelding hier, anders dan bij alle andere meldingssoorten.

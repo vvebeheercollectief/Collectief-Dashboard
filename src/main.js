@@ -109,14 +109,17 @@ document.addEventListener('DOMContentLoaded',()=>{
     // zonder Cihan en zonder de meeste duo's. Stond zo'n naam in de herhaalregel, dan kon de
     // select hem niet kiezen, zette de browser het veld op leeg en schreef submitHerhaal die
     // leegte terug naar kolom F — waarna de terugkerende taak bij niemand meer terechtkwam.
-    ['m-beh','m-beh-v','m-beh-o','m-beh-l','m-beh-s','hh-beh'].forEach(id=>vul(id, TEAM.concat(duos)));
+    // 'm-beh-c' (CRM) ontbrak: dat venster hield de handgeschreven lijst zonder Cihan (naloop 25-09).
+    ['m-beh','m-beh-v','m-beh-o','m-beh-l','m-beh-s','m-beh-c','hh-beh'].forEach(id=>vul(id, TEAM.concat(duos)));
     // En de categoriekiezer van de herhaalregel uit dezelfde bron als de rest van de app: die
     // stond op twee van de vijf secties (OPPAKKEN en LOD) en zette de andere drie bij het openen
     // stil op leeg. `vul` bewaart de eerste optie niet nodig hier — hh-sectie heeft er geen.
     {
       const el=document.getElementById('hh-sectie');
       if(el){ const gekozen=el.value; el.innerHTML='';
-        SKEYS.forEach(k=>{ const o=document.createElement('option'); o.value=k; o.textContent=SECS[k].label; el.appendChild(o); });
+        // Zonder CRM: een vraag van een eigenaar is eenmalig (spec CRM-tabblad), en een herhaalde
+        // CRM-rij zou zonder afzender en ontvangstdatum binnenkomen.
+        SKEYS.filter(k=>k!=='CRM').forEach(k=>{ const o=document.createElement('option'); o.value=k; o.textContent=SECS[k].label; el.appendChild(o); });
         if(gekozen) el.value=gekozen; }
     }
   }

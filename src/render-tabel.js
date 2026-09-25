@@ -251,7 +251,7 @@ const BIJNA_TE_LAAT_DAGEN = 7;
 //
 // Geen tweede regel als er niets te melden valt: een rij die gewoon op tijd is hoort er niet
 // hoger door te worden.
-function deadlineCel(r, sec){
+function deadlineCel(r, sec, bijnaDagen = BIJNA_TE_LAAT_DAGEN){
   // Aangevraagd offerte-traject: kolom F is dan een OPVOLGDATUM (ontwerp 2026-09-01). Altijd
   // tweeregelig — het woord 'opvolgen' is precies wat deze cel van een deadline onderscheidt.
   // Verstreken of vandaag = amber ('check of ze binnen zijn'), nooit rood 'te laat'.
@@ -267,7 +267,7 @@ function deadlineCel(r, sec){
   }
   if (!r.deadline) return `<td class="cell-sm"><span class="warn-geen-deadline">Geen deadline</span></td>`;
   const { teLaat, dagenTot } = berekenPrioriteit(r.deadline, sec);
-  const bijna = !teLaat && dagenTot !== null && dagenTot <= BIJNA_TE_LAAT_DAGEN;
+  const bijna = !teLaat && dagenTot !== null && dagenTot <= bijnaDagen;
   if (!teLaat && !bijna) return `<td><span class="s-normal">${esc(r.deadline)}</span></td>`;
   const bij = teLaat ? `${Math.abs(dagenTot)}d te laat`
                      : (dagenTot === 0 ? 'vandaag' : `nog ${dagenTot}d`);
@@ -484,7 +484,8 @@ const CRM_BIJNA_DAGEN = 2;
 // deadlinecel: dan is er niets om te tellen, maar de deadline blijft zichtbaar.
 function crmWachtCel(r){
   const w = crmWacht(r);
-  if(!w) return deadlineCel(r, 'CRM');
+  // Met de CRM-grens voor amber: anders kleurde dezelfde tab op twee manieren (7 hier, 2 hieronder).
+  if(!w) return deadlineCel(r, 'CRM', CRM_BIJNA_DAGEN);
   const woord = w.dagen === 1 ? '1 dag' : `${w.dagen} dagen`;
   const titel = `Ontvangen ${r.ontvangen}` + (r.deadline ? ` · reactie uiterlijk ${r.deadline}` : '');
   if(w.dagenTot !== null && w.dagenTot < 0)

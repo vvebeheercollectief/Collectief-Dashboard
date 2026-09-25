@@ -1430,7 +1430,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const bewaardNtd=D.ntd, bewaardSec=state.activeNtd, bewaardPg=pgs.ntd, bewaardDub=state._dubbelcheckUit;
     const failsOud=state._syncFails;   // de 403-lezingen hieronder mogen de statusbol niet besmetten
     const dotOud=document.getElementById('dot')?.className;
-    const geschreven=[];
+    const geschreven=[], batches=[];
     let _guardRij=null;                // welke rij de rij-guard hoort terug te lezen
     try{
       state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
@@ -1442,7 +1442,10 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
                             rij: JSON.parse(opt.body).values[0] });
           return new Response('{}',{status:200});
         }
-        if(methode==='POST') return new Response(JSON.stringify({replies:[{}]}),{status:200});
+        if(methode==='POST'){
+          if(/values:batchUpdate/.test(String(url))) batches.push(JSON.parse(opt.body));
+          return new Response(JSON.stringify({replies:[{}]}),{status:200});
+        }
         // Een BEWERKING gaat langs de rij-guard, en die LEEST de rij terug om te controleren dat
         // hij nog dezelfde is. Zonder antwoord blokkeert hij en wordt er niets geschreven — dan
         // toetst dit blok niets. `_rijNaarCellen` bouwt precies de cellen die de guard verwacht.
@@ -1512,6 +1515,21 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       await submitTask(); await state._writeChain;
       eq('onvertaalbaar: een onleesbare offerte-teller blijft staan i.p.v. leeg te worden',
          (geschreven[0]||{rij:[]}).rij[3], 'twee van drie');
+
+      // 6. CRM-bewerking: A..K en T..W in ÉÉN verzoek (naloop 25-09). Het waren twee losse PUT's;
+      // faalde de tweede, dan rolde het scherm alles terug terwijl T..W al in de Sheet stond.
+      geschreven.length=0; batches.length=0;
+      const crm={ _row:73, _sec:'CRM', code:'311212', naam:'Testflat', onderwerp:'Lekkage', crmFase:'Ontvangen',
+                  behandelaar:'Jer', deadline:'', opmerkingen:'', inBehandeling:'',
+                  afzender:'Mevr. Visser', ontvangen:'1-9-2026', soort:'Vraag', mail:'' };
+      D.ntd={ ...leeg, CRM:[crm] }; state.activeNtd='CRM'; pgs.ntd=1; _guardRij={...crm};
+      openModal(true, crm);
+      document.getElementById('m-van').value='Dhr. Jansen';
+      await submitTask(); await state._writeChain;
+      eq('crm-bewerking: geen losse PUT meer', geschreven.length, 0);
+      eq('crm-bewerking: één batchverzoek met A..K én T..W',
+         (batches[0]?.data||[]).map(d=>d.range.replace(/^'Nog Te Doen'!/,'').replace(/\d+/g,'')), ['A:K','T:W']);
+      eq('crm-bewerking: de nieuwe afzender staat in T', batches[0]?.data?.[1]?.values?.[0]?.[0], 'Dhr. Jansen');
 
       for(let i=0;i<100 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,5));
     } finally {
@@ -1725,6 +1743,13 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       truthy(`deadline: ${sec} toont de datum én hoe ver hij afligt`,
          /dl-2 laat/.test(h) && tekst(h).includes(dat(-3)) && tweedeRegel(h) === '3d te laat');
     });
+
+    // CRM zonder ontvangstdatum valt terug op de deadlinecel, maar met de CRM-grens van 2 dagen:
+    // met 7 kleurde een verhuisde vraag amber terwijl een gewone CRM-rij ernaast rustig bleef.
+    const crmCel = n => rowNtd({ code:'CRM-A', naam:'VvE A', onderwerp:'x', deadline:dat(n), ontvangen:'',
+                                 _sec:'CRM', _row:9931 }, 'CRM');
+    truthy('deadline: CRM zonder ontvangst, 4 dagen vooruit = rustig (grens 2, niet 7)', !/dl-2 bijna/.test(crmCel(4)));
+    truthy('deadline: CRM zonder ontvangst, 2 dagen vooruit = amber', /dl-2 bijna/.test(crmCel(2)));
   })();
 
   // ── Inhoud uit de Sheet komt nooit als HTML op het scherm (v12.1) ──
@@ -2843,11 +2868,11 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
        checkNummers([{taakId:'T1',_row:3},{taakId:'T1',_row:9}])[0].regels, [3,9]);
 
     eq('structuur: raster breed genoeg', checkRaster('Afgerond', 26), null);
-    eq('structuur: NTD vraagt nu 19 kolommen (bundel R/S)', checkRaster('Nog Te Doen', 16).nodig, 19);
+    eq('structuur: NTD vraagt nu 23 kolommen (CRM T..W)', checkRaster('Nog Te Doen', 16).nodig, 23);
     // 17 was genoeg tot kolom Q, maar sinds de Takenbundel schrijft de code t/m S.
-    eq('structuur: NTD met 17 kolommen is nu te smal', checkRaster('Nog Te Doen', 17).nodig, 19);
-    eq('structuur: NTD met 19 kolommen is in orde', checkRaster('Nog Te Doen', 19), null);
-    eq('structuur: raster te smal', checkRaster('Afgerond', 8).nodig, 19);
+    eq('structuur: NTD met 17 kolommen is nu te smal', checkRaster('Nog Te Doen', 17).nodig, 23);
+    eq('structuur: NTD met 23 kolommen is in orde', checkRaster('Nog Te Doen', 23), null);
+    eq('structuur: raster te smal', checkRaster('Afgerond', 8).nodig, 23);
     eq('structuur: onbekend tabblad → geen oordeel', checkRaster('Iets anders', 1), null);
 
     // REGRESSIE-GUARD op echte data (gemeten op de PROD-Sheet 2026-07-28): OPPAKKEN heeft
@@ -2867,13 +2892,15 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     // Sinds 2026-07-29 heeft NTD kolom Q (vast taaknummer), dus 16 is niet meer genoeg; sinds de
     // Takenbundel (2026-08-14) schrijft de code t/m S en is zelfs 17 en 18 te smal.
     truthy('structuur: Nog Te Doen op 16 kolommen is nu te smal', !!checkRaster('Nog Te Doen', 16));
-    eq('structuur: Nog Te Doen op 15 kolommen is te smal', checkRaster('Nog Te Doen', 15).nodig, 19);
+    eq('structuur: Nog Te Doen op 15 kolommen is te smal', checkRaster('Nog Te Doen', 15).nodig, 23);
     // De bewaking moet de breedste schrijfactie volgen, niet het huidige raster: serializeNtdUndo
-    // en afrondWaarden leveren 19 waarden, dus dit getal moet 19 zijn op béide tabbladen.
-    eq('structuur: RASTER_MIN volgt de 19-koloms schrijfcode',
+    // en afrondWaarden leveren voor een CRM-rij 23 waarden (A..W), dus dit getal moet 23 zijn op
+    // béide tabbladen. Gemeten op een CRM-rij: dat is sinds v13.0 de breedste (naloop 25-09).
+    eq('structuur: RASTER_MIN volgt de breedste (CRM-)schrijfcode',
        [RASTER_MIN['Nog Te Doen'], RASTER_MIN['Afgerond'],
-        serializeNtdUndo({_sec:'OPPAKKEN',code:'1',naam:'X'}).length,
-        afrondWaarden({code:'1',naam:'X'},'OPPAKKEN','2026-08-14','').length], [19,19,19,19]);
+        serializeNtdUndo({_sec:'CRM',code:'1',naam:'X'}).length,
+        afrondWaarden({code:'1',naam:'X',_sec:'CRM'},'CRM','2026-08-14','').length], [23,23,23,23]);
+    truthy('structuur: Nog Te Doen op 19 kolommen is sinds CRM te smal', !!checkRaster('Nog Te Doen', 19));
     // Datzelfde 'volgt de breedste schrijfactie' voor 'Logboek', en dáár klopte het niet: de undo
     // van een verwijderde logregel geeft insertAndWriteRow ACHT waarden, maar `_eindKolom` klemt
     // het bereik op minimaal A..I. RASTER_MIN stond op 8, dus de structuurcheck zou 'in orde'
@@ -2912,7 +2939,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     eq('raster: leesronde zonder bekende breedtes blijft stil',
        checkAlles(_gez, _gez, [], null).length, 0);
     eq('raster: leesronde met een verbreed raster blijft stil',
-       checkAlles(_gez, _gez, [], {'Nog Te Doen':19, 'Afgerond':26}).length, 0);
+       checkAlles(_gez, _gez, [], {'Nog Te Doen':23, 'Afgerond':26}).length, 0);
     // Verwacht en CORRECT zolang Taak 1 (raster verbreden) open staat: wie ingelogd iets opslaat,
     // laat getSheetIds draaien en ziet vanaf dan deze waarschuwing.
     eq('raster: leesronde met NTD op 17 kolommen meldt het raster',
@@ -2924,7 +2951,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     // uitbreiding.
     const _scheef=[['OPPAKKEN'],['311198','VvE A','iets'],['VvE Code','VvE','Actiepunt']];
     eq('raster: checkAlles houdt de sectie- en nummercontrole overeind',
-       checkAlles(_scheef, [], [{taakId:'T1',_row:3},{taakId:'T1',_row:9}], {'Nog Te Doen':19}).length, 2);
+       checkAlles(_scheef, [], [{taakId:'T1',_row:3},{taakId:'T1',_row:9}], {'Nog Te Doen':23}).length, 2);
   })();
 
   // ── De schakel zelf: getSheetIds moet de gemeten breedtes in state achterlaten ──
@@ -4202,7 +4229,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       eq('aansluiting: breedte nog onbekend (nog niet geschreven) → de ronde zwijgt',
          (await ronde(null)).length, 0);
       eq('aansluiting: raster op orde → de ronde zwijgt',
-         (await ronde({'Nog Te Doen':19, 'Afgerond':26})).length, 0);
+         (await ronde({'Nog Te Doen':23, 'Afgerond':26})).length, 0);
       // Zolang Taak 1 openstaat is dit het échte geval: schrijven naar R/S loopt stil in het niets.
       const smal=await ronde({'Nog Te Doen':17});
       eq('aansluiting: Nog Te Doen nog 17 breed → de leesronde waarschuwt', smal.length, 1);
@@ -4224,7 +4251,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       // Verdwijnt de bevinding en komt hij terug, dan is dat opnieuw nieuws: de vingerafdruk wordt
       // ook bij een lege uitkomst bijgewerkt, dus de tussenliggende gezonde ronde 'ontgrendelt'.
       eq('ontdubbeling: tussendoor gezond → daarna meldt hetzelfde geval weer',
-         (await ronde({'Nog Te Doen':19, 'Afgerond':26})).length, 0);
+         (await ronde({'Nog Te Doen':23, 'Afgerond':26})).length, 0);
       eq('ontdubbeling: en de terugkeer van de bevinding wordt gemeld',
          (await ronde({'Nog Te Doen':16})).length, 1);
       // Dezelfde ontdubbeling in de ANDERE tak: valt de controle zelf om, dan is dat één melding
@@ -5686,6 +5713,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   eq('geen wijziging → niets loggen', faseWijziging('Verleend','Verleend'), null);
   eq('lege nieuwe waarde → niets loggen', faseWijziging('Verleend',''), null);
   eq('beide leeg → niets loggen', faseWijziging('',''), null);
+  eq('leeg → Voorbereiden is hetzelfde bolletje → niets loggen (naloop 25-09)', faseWijziging('','Voorbereiden'), null);
   eq('spaties tellen niet als wijziging', faseWijziging('Verleend','  Verleend  '), null);
   eq('terugzetten wordt ook gelogd',
      faseWijziging('Afgerond','Verleend'), {van:'Afgerond', naar:'Verleend'});
@@ -6112,6 +6140,17 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     truthy(`${id} biedt CRM`, opts.includes('CRM'));
     eq(`${id} heeft Geen + zes secties`, opts.length, 7);
   });
+  // ── Naloop 25-09: CRM-venster, herhaalregel en zoekvak ──
+  {
+    const beh = [...(document.getElementById('m-beh-c')?.options||[])].map(o => o.value);
+    truthy('m-beh-c: de CRM-behandelaar kent Cihan (vulde eerst niet mee)', beh.includes('Cihan'));
+    const hh = [...(document.getElementById('hh-sectie')?.options||[])].map(o => o.value);
+    truthy('hh-sectie: wel gevuld', hh.includes('OPPAKKEN'));
+    truthy('hh-sectie: geen CRM — een vraag is eenmalig', !hh.includes('CRM'));
+    const crmRij = { code:'1', naam:'X', onderwerp:'Lekkage', afzender:'Mevr. Visser, nr. 4', soort:'Klacht', mail:'mijn plafond', _sec:'CRM', _row:1 };
+    eq('zoekvak: CRM vindt de afzender, het soortlabel en de mail',
+       ['visser','klacht','plafond','onbekend'].map(q => filterNtd([crmRij], q, '', '', '', 'CRM').length), [1,1,1,0]);
+  }
 
   // ── Schrijfwegen ──
   eq('bulk-deadline staat op kolom F', BULK_DEADLINE_KOLOM['SUBSIDIE-TRAJECTEN'], 'F');
@@ -15370,6 +15409,9 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     eq('crm-fase: buiten bereik = Ontvangen', [CF.crmFaseWoord(9), CF.crmFaseWoord(0), CF.crmFaseWoord(4)], ['Ontvangen','Ontvangen','Beantwoord']);
     eq('crm-fase: wijziging vanaf leeg telt als vanaf Ontvangen', CF.crmFaseWijziging('', 'Opgepakt'), { van:'Ontvangen', naar:'Opgepakt' });
     eq('crm-fase: geen wijziging = null', [CF.crmFaseWijziging('Opgepakt','Opgepakt'), CF.crmFaseWijziging('Opgepakt','')], [null, null]);
+    // Naloop 25-09: leeg → Ontvangen is hetzelfde bolletje, dus geen logregel 'Ontvangen (was Ontvangen)'.
+    eq('crm-fase: leeg → Ontvangen is geen wijziging', [CF.crmFaseWijziging('', 'Ontvangen'), CF.crmFaseWijziging(null, 'ontvangen')], [null, null]);
+    eq('crm-fase: rommel → Ontvangen blijft wél een wijziging (de cel wordt rechtgezet)', CF.crmFaseWijziging('???', 'Ontvangen'), { van:'???', naar:'Ontvangen' });
     const crmBalk = CF.crmFaseRijHtml('Wacht op reactie', 7);
     eq('crm-fase: vier knoppen met de eigen klikactie',
        [(crmBalk.match(/<button/g)||[]).length, (crmBalk.match(/data-action="crm-fase"/g)||[]).length], [4, 4]);

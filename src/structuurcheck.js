@@ -36,8 +36,11 @@ import { SKEYS, SECS } from "./config.js";
 // springen), en 'kolom rechts invoegen' erft de opmaak van de kolom LINKS — vandaar dat R en S
 // schoon binnenkwamen zonder de TRUE/FALSE-validatie van hun buren.
 const RASTER_MIN = {
-  'Nog Te Doen':      19,  // kolom S (bundelVolg) — verbreed en nagemeten op TEST én PROD 2026-08-17
-  'Afgerond':         19,  // A:S — taakId/bundelId/bundelVolg op Q/R/S (raster is al 26 breed)
+  // 23 sinds CRM (v13.0): CRM-rijen schrijven T..W (afzender/ontvangen/soort/mail), zowel bij
+  // toevoegen en ongedaan maken als bij afronden. Stond op 19, dus een te smal blad gaf 'in orde'
+  // terwijl juist de CRM-schrijfacties daar stil mislukken (naloop 25-09). PROD: 23 en 26 breed.
+  'Nog Te Doen':      23,  // A:W — cd_setupCrm verbreedt tot W
+  'Afgerond':         23,  // A:W — CRM-archiefrijen dragen T..W mee (raster is al 26 breed)
   'Herhaalregels':    12,  // A:L
   'Kenmerken':         6,  // A:F
   'Ontwikkeling':      6,  // A:F

@@ -179,6 +179,20 @@ async function writeRows(range,rows){
   if(!r.ok){const e=await r.json().catch(()=>({}));if(r.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Schrijffout');err.status=r.status;throw err}
   return r.json();
 }
+// Meerdere BEREIKEN in één verzoek (values:batchUpdate). Voor een bewerking die twee niet-
+// aangrenzende stukken van dezelfde rij raakt — een CRM-taak schrijft A..K én T..W. Als twee losse
+// PUT's kon de tweede mislukken nadat de eerste al stond: het scherm rolde dan alles terug terwijl
+// de Sheet half bijgewerkt was (naloop 25-09). Eén verzoek slaagt of faalt als geheel; een bereik
+// buiten het raster (blad nog niet verbreed) laat het hele verzoek weigeren.
+//   delen: [{range, values:[…]}], één rij per bereik
+async function writeRanges(delen){
+  if(!state.oauthToken) throw new Error('Niet ingelogd');
+  const url=`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values:batchUpdate`;
+  const body={valueInputOption:'USER_ENTERED',data:(delen||[]).map(d=>({range:d.range,values:[_veiligeRij(d.values)]}))};
+  const r=await _fetchGeteld(url,{method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(!r.ok){const e=await r.json().catch(()=>({}));if(r.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Schrijffout');err.status=r.status;throw err}
+  return r.json();
+}
 // Meerdere rijen in ÉÉN append. Een bulk-actie op 20 taken schreef 20 losse logregels, dus 20
 // schrijfverzoeken (~4,7 s 'Opslaan…') en een derde van het schrijfquotum van 60/min — voor
 // regels die samen één handeling zijn. values.append neemt gewoon meerdere rijen aan en zet ze
@@ -504,4 +518,4 @@ async function assertRowsMatch(checks, sheetName='Nog Te Doen'){
 const assertRowMatch=(row, bronOfCode, sheetName)=>assertRowsMatch(
   [(bronOfCode && typeof bronOfCode==='object') ? { row, r:bronOfCode } : { row, code:bronOfCode }], sheetName);
 
-export { NTD_DATUM, isOffline, fetchMetKlok, _isOffline, _isNetwerkFout, fetchSheet, fetchSheets, writeRange, writeRows, appendRange, appendRows, veiligeCel, _veiligeRij, _shiftNtdRows, _shiftAfRows, _herstelShift, _isTransient, _withRetry, askChat, _rowMismatch, _a1Bereik, vingerafdruk, rijVingerafdruk, _nummerDeel, _normCel, _rijNaarCellen, assertRowsMatch, assertRowMatch, NTD_OMSCHRIJVING, sheetsFetch };
+export { NTD_DATUM, isOffline, fetchMetKlok, _isOffline, _isNetwerkFout, fetchSheet, fetchSheets, writeRange, writeRanges, writeRows, appendRange, appendRows, veiligeCel, _veiligeRij, _shiftNtdRows, _shiftAfRows, _herstelShift, _isTransient, _withRetry, askChat, _rowMismatch, _a1Bereik, vingerafdruk, rijVingerafdruk, _nummerDeel, _normCel, _rijNaarCellen, assertRowsMatch, assertRowMatch, NTD_OMSCHRIJVING, sheetsFetch };

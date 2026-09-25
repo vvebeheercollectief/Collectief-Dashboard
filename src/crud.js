@@ -7,7 +7,7 @@ import { extraVves, wisExtraVves, extraVvesHtml, extraVvesUitleg } from "./meerv
 import { state, D, pgs } from "./state.js";
 import { verseRij, rijIndex } from "./rij.js";
 import { SECS, SKEYS, SID, OMSCHRIJVING_SLEUTEL, VELD_LABELS, CRM_SOORTEN } from "./config.js";
-import { writeRange, writeRows, _shiftNtdRows, _shiftAfRows, _herstelShift, assertRowMatch, sheetsFetch, fetchSheet, _a1Bereik, _withRetry } from "./api.js";
+import { writeRange, writeRanges, writeRows, _shiftNtdRows, _shiftAfRows, _herstelShift, assertRowMatch, sheetsFetch, fetchSheet, _a1Bereik, _withRetry } from "./api.js";
 import { isKolomKop, isSectieKop } from "./structuurcheck.js";
 import { ensureToken } from "./auth.js";
 import { showToast, showUndoToast, fireNotifEvent, undoComplete, undoDelete } from "./notifications.js";
@@ -1649,22 +1649,25 @@ async function submitTask(){
       // nog met de oude vergelijkt. Dat gaf een valse 'Iemand heeft deze taak net gewijzigd',
       // een teruggerolde bewerking op het scherm — en de schuld bij een collega die niets deed.
       // De logregels dragen om dezelfde reden hun eigen vlag: een append is niet idempotent.
-      let geschreven=false, behGelogd=false, faseGelogd=false, crmGeschreven=false;
+      let geschreven=false, behGelogd=false, faseGelogd=false;
       backgroundWrite(
         async ()=>{
           if(!geschreven){
-            if(!crmGeschreven) await assertRowMatch(doelRow._row, oudeWaarden); // bescherming: rij nog dezelfde TAAK vóór overschrijven
+            await assertRowMatch(doelRow._row, oudeWaarden); // bescherming: rij nog dezelfde TAAK vóór overschrijven
             // oudeWaarden is de snapshot VÓÓR de optimistische mutatie van doelRow — precies wat
             // er op dit moment nog in de Sheet hoort te staan.
-            // CRM: T..W EERST, dan A..K — in dezelfde beurt, na dezelfde rij-controle. Deze volgorde
-            // omdat T..W de schrijfactie is die op een (nog) niet verbreed blad mislukt: dan staat er
-            // niets half opgeslagen, en klopt de rollback hieronder (alles terug) ook met de Sheet.
-            // Eigen vlag, want bij een herkansing is die al gedaan.
-            if(crmExtra && !crmGeschreven){
-              await writeRange(`'Nog Te Doen'!T${doelRow._row}:W${doelRow._row}`,crmVelden(crmExtra));
-              crmGeschreven=true;
+            // CRM: A..K en T..W in ÉÉN verzoek (writeRanges). Het waren twee PUT's na elkaar; faalde
+            // de tweede, dan rolde de rollback hieronder alles terug terwijl de eerste al in de Sheet
+            // stond (naloop 25-09). Nu slaagt of faalt de bewerking als geheel — ook op een blad dat
+            // nog niet tot W verbreed is, waar het hele verzoek dan geweigerd wordt.
+            if(crmExtra){
+              await writeRanges([
+                { range:`'Nog Te Doen'!A${doelRow._row}:${endCol}${doelRow._row}`, values },
+                { range:`'Nog Te Doen'!T${doelRow._row}:W${doelRow._row}`, values:crmVelden(crmExtra) },
+              ]);
+            } else {
+              await writeRange(`'Nog Te Doen'!A${doelRow._row}:${endCol}${doelRow._row}`,values);
             }
-            await writeRange(`'Nog Te Doen'!A${doelRow._row}:${endCol}${doelRow._row}`,values);
             geschreven=true;
           }
           if(newBeh && newBeh!==(oudeWaarden.behandelaar||'') && !behGelogd){

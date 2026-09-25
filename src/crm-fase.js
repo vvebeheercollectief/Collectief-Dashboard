@@ -34,6 +34,9 @@ export function crmFaseWijziging(oud, nieuw){
   const o = ((oud == null ? '' : oud) + '').trim();
   const n = ((nieuw == null ? '' : nieuw) + '').trim();
   if (!n || n === o) return null;
+  // Leeg en de eerste stap tonen hetzelfde bolletje; dat invullen is geen overgang. Zonder dit
+  // schreef de eerste klik of Opslaan op een verplaatste rij 'Fase gewijzigd X (was X)' (naloop 25-09).
+  if (!o && n.toLowerCase() === CRM_FASES[0].toLowerCase()) return null;
   return { van: o || CRM_FASES[0], naar: n };
 }
 

@@ -422,7 +422,8 @@ function renderNtdCrossList(sec){
         // NIET_ZOEKBAAR erbij, net als in `filterNtd`. Kolom H bevat letterlijk 'TRUE'/'FALSE'
         // en de prioriteit is een woord: zonder deze filter gaf 'al', 'se' of 'fa' hier wél
         // treffers terwijl de hoofdtabel niets liet zien — dezelfde reparatie die filterNtd al had.
-        if(q && !SECS[s].keys.some(k=>!NIET_ZOEKBAAR.has(k)&&(r[k]||'').toLowerCase().includes(q))) return;
+        if(q && !SECS[s].keys.some(k=>!NIET_ZOEKBAAR.has(k)&&(r[k]||'').toLowerCase().includes(q))
+             && ![r.afzender, r.soort, r.mail].some(v=>String(v??'').toLowerCase().includes(q))) return;
         if(fCode && !((r.code||'').toLowerCase().includes(fCode))) return;
         if(fBeh && !((r.behandelaar||'').toLowerCase().includes(fBeh))) return;
         if(fPrio && berekenPrioriteit(r.deadline,s).prioriteit!==fPrio) return;
@@ -486,7 +487,10 @@ function filterNtd(rows,q,fCode,beh,prio,sec,status){
     // uitklap-paneel — zoeken op 'Jansen' filterde het traject mét Jansen juist wég. Alleen de
     // NAMEN, niet de rauwe cel: de |0/|1-markering hoort niet te matchen.
     if(q){
-      const extra=[r.subcategorie, r.opvolgdatum, ...parseAannemers(r.aannemers).map(a=>a.naam)];
+      // CRM: de afzender (kolom Van), het soortlabel en de mail staan in beeld maar zijn geen
+      // SECS-keys; Ctrl+K vond de afzender wél, dit zoekvak niet (naloop 25-09).
+      const extra=[r.subcategorie, r.opvolgdatum, ...parseAannemers(r.aannemers).map(a=>a.naam),
+                   r.afzender, r.soort, r.mail];
       if(!SECS[sec].keys.some(k=>!NIET_ZOEKBAAR.has(k)&&(r[k]||'').toLowerCase().includes(q))
          && !extra.some(v=>String(v??'').toLowerCase().includes(q))) return false;
     }

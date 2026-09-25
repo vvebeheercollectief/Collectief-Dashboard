@@ -41,6 +41,9 @@ export function faseWijziging(oud, nieuw){
   const o = ((oud == null ? '' : oud) + '').trim();
   const n = ((nieuw == null ? '' : nieuw) + '').trim();
   if (!n || n === o) return null;
+  // Leeg en de eerste stap tonen hetzelfde bolletje; dat invullen is geen overgang. Zonder dit
+  // schreef de eerste klik of Opslaan op een verplaatste rij 'Fase gewijzigd X (was X)' (naloop 25-09).
+  if (!o && n.toLowerCase() === SUBSIDIE_FASES[0].toLowerCase()) return null;
   return { van: o || SUBSIDIE_FASES[0], naar: n };
 }
 

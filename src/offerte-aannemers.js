@@ -56,7 +56,8 @@ async function _bewaar(r, vorige){
   // en de aannemerslijst onterecht teruggerold.
   const snap={...r};
   backgroundWrite(
-    async()=>{ if(!gedaan){ await assertRowMatch(r._row, snap); await writeRange(`'Nog Te Doen'!P${r._row}`,[r.aannemers]); gedaan=true; } },
+    // `rij` één keer gelezen: tussen controle en schrijven kan `_row` optimistisch opschuiven (naloop 25-09).
+    async()=>{ if(!gedaan){ const rij=r._row; await assertRowMatch(rij, snap); await writeRange(`'Nog Te Doen'!P${rij}`,[r.aannemers]); gedaan=true; } },
     ()=>{ r.aannemers=vorige; },
     'Aannemers opslaan'
   );
@@ -228,8 +229,9 @@ async function _schrijfOpvolg(r, nieuw, oud, actie, metUndo){
   const snap={...r, deadline:oud};
   backgroundWrite(
     async()=>{ if(!geschreven){
-        await assertRowMatch(r._row, snap);
-        await writeRange(`'Nog Te Doen'!F${r._row}`,[nieuw]);
+        const rij=r._row;   // één keer gelezen, zie _bewaar hierboven (naloop 25-09)
+        await assertRowMatch(rij, snap);
+        await writeRange(`'Nog Te Doen'!F${rij}`,[nieuw]);
         geschreven=true; heenweg.gelukt=true; }
       await logEvent(r.code,'OFFERTE-TRAJECTEN',actie,'opvolgdatum',oud,nieuw); },
     ()=>{ r.deadline=oud; },

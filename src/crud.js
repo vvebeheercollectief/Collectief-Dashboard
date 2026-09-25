@@ -913,7 +913,15 @@ export function serializeNtdUndo(r){
 // mislukken. Eén bron voor toevoegen, ongedaan maken en afronden, zodat de volgorde niet op drie
 // plekken uit elkaar kan lopen.
 export function crmVelden(r){
-  return [r.afzender||'', r.ontvangen||'', r.soort||'', r.mail||''];
+  return [r.afzender||'', r.ontvangen||'', r.soort||'', mailVoorCel(r.mail)];
+}
+// Google Sheets weigert een cel boven 50.000 tekens met een 400, en dan werd de HELE taak
+// teruggedraaid ('Niet opgeslagen') omdat er een lange mailthread in geplakt was (naloop 25-09).
+// Afkappen met een zichtbare regel is beter dan een taak die niet op te slaan is.
+export const MAIL_MAX = 45000;
+export function mailVoorCel(mail){
+  const m = (mail || '') + '';
+  return m.length > MAIL_MAX ? m.slice(0, MAIL_MAX) + '\n\n… [ingekort: de mail was te lang voor één cel]' : m;
 }
 
 // Kolommen L..S achter de sectievelden van een NIEUWE taakrij. `values` loopt tot en met K,
@@ -962,7 +970,7 @@ async function insertAndWriteRows(sheetName,afterRow,rijen){
     headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
     body:JSON.stringify({requests:[{insertDimension:{range:{sheetId,dimension:'ROWS',startIndex:afterRow,endIndex:afterRow+n},inheritFromBefore:true}}]})
   });
-  if(!insResp.ok){const e=await insResp.json();if(insResp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Invoegfout');err.status=insResp.status;throw err}
+  if(!insResp.ok){const e=await insResp.json().catch(()=>({}));if(insResp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Invoegfout');err.status=insResp.status;throw err}
   // De breedste rij bepaalt het bereik: alle rijen komen uit dezelfde `toevoegWaarden` en zijn dus
   // even breed, maar één bron voor de eindkolom voorkomt dat een smallere rij het bereik verkleint.
   const endCol=_eindKolom(lijst.reduce((a,b)=>b.length>a.length?b:a, lijst[0]));
@@ -1093,7 +1101,7 @@ async function deleteTaskRow(r, bijDoorgaan){
           headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
           body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:oudeRow-1,endIndex:oudeRow}}}]})
         });
-        if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Verwijderfout');err.status=resp.status;throw err}
+        if(!resp.ok){const e=await resp.json().catch(()=>({}));if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Verwijderfout');err.status=resp.status;throw err}
         verwijderd=true;
         undoData.gelukt=true;      // pas nu mag de undo-knop iets terugzetten
       }
@@ -1458,7 +1466,7 @@ async function doCompleteTask(){
           const resp=await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
             method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
             body:JSON.stringify(bouwBatch(afRij))});
-          if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Fout bij afhandelen taak');err.status=resp.status;throw err}
+          if(!resp.ok){const e=await resp.json().catch(()=>({}));if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Fout bij afhandelen taak');err.status=resp.status;throw err}
           afgerond=true;
           undoData.gelukt=true;    // pas nu mag de undo-knop iets terugzetten
           // Pas NA een geslaagde invoeging de rijnummers van 'Afgerond' meeschuiven, zodat de
@@ -1653,7 +1661,10 @@ async function submitTask(){
       backgroundWrite(
         async ()=>{
           if(!geschreven){
-            await assertRowMatch(doelRow._row, oudeWaarden); // bescherming: rij nog dezelfde TAAK vóór overschrijven
+            // Rijnummer één keer gelezen: een afronding elders schuift `_row` optimistisch op, en dan
+            // zou de schrijfactie een andere rij raken dan de controle net goedkeurde (naloop 25-09).
+            const rij=doelRow._row;
+            await assertRowMatch(rij, oudeWaarden); // bescherming: rij nog dezelfde TAAK vóór overschrijven
             // oudeWaarden is de snapshot VÓÓR de optimistische mutatie van doelRow — precies wat
             // er op dit moment nog in de Sheet hoort te staan.
             // CRM: A..K en T..W in ÉÉN verzoek (writeRanges). Het waren twee PUT's na elkaar; faalde
@@ -1662,11 +1673,11 @@ async function submitTask(){
             // nog niet tot W verbreed is, waar het hele verzoek dan geweigerd wordt.
             if(crmExtra){
               await writeRanges([
-                { range:`'Nog Te Doen'!A${doelRow._row}:${endCol}${doelRow._row}`, values },
-                { range:`'Nog Te Doen'!T${doelRow._row}:W${doelRow._row}`, values:crmVelden(crmExtra) },
+                { range:`'Nog Te Doen'!A${rij}:${endCol}${rij}`, values },
+                { range:`'Nog Te Doen'!T${rij}:W${rij}`, values:crmVelden(crmExtra) },
               ]);
             } else {
-              await writeRange(`'Nog Te Doen'!A${doelRow._row}:${endCol}${doelRow._row}`,values);
+              await writeRange(`'Nog Te Doen'!A${rij}:${endCol}${rij}`,values);
             }
             geschreven=true;
           }
@@ -1968,8 +1979,10 @@ async function zetSubsidieFase(rid, stap){
     async ()=>{
       // De snapshot moet de stand VÓÓR de optimistische mutatie zijn — dat is wat
       // er op dit moment nog in de Sheet hoort te staan.
-      await assertRowMatch(r._row, {...r, subsidieFase: oud});
-      await writeRange(`'Nog Te Doen'!D${r._row}`, [nieuw]);
+      const rij = r._row;   // Eén keer gelezen: een afronding elders schuift `_row` optimistisch op (_shiftNtdRows); tussen
+      // controle en schrijven mag hij dus niet opnieuw gelezen worden (naloop 25-09).
+      await assertRowMatch(rij, {...r, subsidieFase: oud});
+      await writeRange(`'Nog Te Doen'!D${rij}`, [nieuw]);
       const w=faseWijziging(oud, nieuw);
       if(w) await logEvent(r.code, 'SUBSIDIE-TRAJECTEN', 'Fase gewijzigd', 'fase', w.van, w.naar);
       showToast('Fase bijgewerkt', `${r.code} — ${nieuw}`, null, 'opslaan', {geenSysteemmelding:true});
@@ -1992,8 +2005,10 @@ async function zetCrmFase(rid, stap){
   renderAll();
   backgroundWrite(
     async ()=>{
-      await assertRowMatch(r._row, {...r, crmFase: oud});
-      await writeRange(`'Nog Te Doen'!D${r._row}`, [nieuw]);
+      const rij = r._row;   // Eén keer gelezen: een afronding elders schuift `_row` optimistisch op (_shiftNtdRows); tussen
+      // controle en schrijven mag hij dus niet opnieuw gelezen worden (naloop 25-09).
+      await assertRowMatch(rij, {...r, crmFase: oud});
+      await writeRange(`'Nog Te Doen'!D${rij}`, [nieuw]);
       const w=crmFaseWijziging(oud, nieuw);
       if(w) await logEvent(r.code, 'CRM', 'Fase gewijzigd', 'fase', w.van, w.naar);
       showToast('Fase bijgewerkt', `${r.code} — ${nieuw}`, null, 'opslaan', {geenSysteemmelding:true});

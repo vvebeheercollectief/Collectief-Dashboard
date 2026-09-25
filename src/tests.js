@@ -2677,6 +2677,12 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     return kiesAfgerondRij([eerste,tweede],'','A',bezet)===tweede;
   })());
   truthy('afrij: niets gevonden geeft null', kiesAfgerondRij([{code:'X',_row:1}],'T1','A')===null);
+  // Naloop 25-09: D.af nog niet ververst → de zojuist gearchiveerde rij ontbreekt. Dan mag de
+  // terugval op de code NIET een oudere afronding met een ánder taaknummer kiezen (en wissen).
+  truthy('afrij: met bekend nummer nooit een rij met een ánder nummer', kiesAfgerondRij([{code:'A',_row:4,taakId:'Toud'}],'Tnieuw','A')===null);
+  eq('afgerond-zoeken: vindt de afrondopmerking (kolom J = r.opmerking) en de CRM-afzender',
+     ['dakgoot','visser'].map(q=>filt([{code:'1',naam:'X',opmerking:'Dakgoot gerepareerd',afzender:'Mevr. Visser',_sec:'CRM'}], q).length), [1,1]);
+  truthy('afrij: maar een rij zónder nummer (legacy) blijft de terugval', kiesAfgerondRij([{code:'A',_row:4,taakId:'Toud'},{code:'A',_row:7}],'Tnieuw','A')?._row===7);
   // En dezelfde regel via de bulk-weg, want die geeft het nummer uit `ntdValues[16]` door — één
   // index ernaast en de keuze valt stil terug op de code zonder dat er iets afgaat.
   truthy('bulkUndoAf: twee afrondingen van dezelfde VvE op dezelfde dag → het taaknummer beslist', (()=>{
@@ -12472,13 +12478,13 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   (() => {
     console.log('%c[TESTS] Zoeken in Afgerond', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
     const rij = { _row: 12, _sec: 'OPPAKKEN', code: '340580', naam: 'VvE Weimarstraat',
-                  actiepunt: 'Schilderwerk', behandelaar: 'Jer', datum: '1 aug 2026', opmerking: '',
+                  actiepunt: 'Schilderwerk', behandelaar: 'Jer', datum: '1 aug 2026',
                   taakId: 'T7', bundelId: 'T3', bundelVolg: '20', herhaalId: 'HR-9',
                   esc: '2026-08-01', fase: 'gegund', aannemers: 'Jansen|1', duurMin: 120,
                   // Vier velden die het archief wél draagt maar de pagina nérgens toont — een
                   // treffer daarop is voor de gebruiker niet uit te leggen (naloop 2026-08-28).
                   deadline: '17 juni 2026', datumAangevraagd: '3 mei 2026',
-                  opmerkingen: 'interne notitie', toelichting: 'keurig afgerond' };
+                  opmerkingen: 'interne notitie', opmerking: 'keurig afgerond' };
     const R = [rij];
     // '12' en '120' staan er bewust bij: duurMin is een GETAL, dus een zoekterm als een huisnummer
     // of een VvE-code kan er zomaar in vallen — 120 minuten matcht als deelstring op allebei.
@@ -15490,6 +15496,10 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     eq('afronden: CRM loopt tot W en de mail gaat mee', [afrondWaarden(crmObj,'CRM','23-09-2026','Beantwoord').length, afrondWaarden(crmObj,'CRM','23-09-2026','x')[22]], [23, 'Beste beheerder,\nWie betaalt dit?']);
     eq('afronden: Oppakken blijft tot S', afrondWaarden(oppObj,'OPPAKKEN','23-09-2026','x').length, 19);
     eq('crmVelden: vaste volgorde, leeg als niets', CR.crmVelden({}), ['','','','']);
+    // Naloop 25-09: Sheets weigert cellen boven 50.000 tekens; een lange mail liet de taak mislukken.
+    { const m = CR.crmVelden({ mail:'x'.repeat(60000) })[3];
+      truthy('crmVelden: een te lange mail past daarna in één cel', m.length < 50000 && m.endsWith('te lang voor één cel]')); }
+    eq('crmVelden: een gewone mail blijft ongemoeid', CR.crmVelden({ mail:'Beste,\n\nGroet' })[3], 'Beste,\n\nGroet');
 
     // ── Verplaatsen ──
     const weg = verlorenVelden(crmObj, 'CRM', 'OPPAKKEN').map(v => v.label);

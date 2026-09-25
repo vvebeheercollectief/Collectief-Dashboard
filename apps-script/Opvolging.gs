@@ -137,7 +137,11 @@ function cd_hr_zetTakenKlaar() {
       if (!id || status !== 'ACTIEF') continue;
       const dl = cd_parseDate(rows[i][9]);            // J = VolgendeDeadline
       if (!dl) continue;                              // na-afronden zonder datum: wacht
-      const dagenVooraf = parseInt(rows[i][8]) || 14; // I
+      // I = DagenVooraf. LET OP — SYNC met coerceDagenVooraf in src/util.js: een bewuste 0 ('pas
+      // op de deadlinedag zelf klaarzetten') is geldig. `parseInt(..) || 14` maakte daar 14 van
+      // (naloop 25-09).
+      const nVooraf = parseInt(rows[i][8], 10);
+      const dagenVooraf = (isFinite(nVooraf) && nVooraf >= 0) ? nVooraf : 14;
       const zichtbaar = new Date(dl.getFullYear(), dl.getMonth(), dl.getDate() - dagenVooraf);
       if (today.getTime() < zichtbaar.getTime()) continue;
       const sectie = (rows[i][2] || 'OPPAKKEN').toString().trim().toUpperCase();
@@ -219,17 +223,24 @@ function cd_hr_verwerkAfrondingen() {
       Logger.log('cd_hr_verwerkAfrondingen: rij ' + (i + 1) + ' is verschoven — overgeslagen');
       continue;
     }
+    // Kolom L alleen leegmaken als deze afronding echt AF is: herplant, of de regel is hier niet
+    // (meer) van toepassing (onbekend ID, geen 'na afronden', niet ACTIEF). Bij een verschoven
+    // Herhaalregels-rij of een fout bleef L eerder óók leeg achter — dan was de afronding als
+    // 'verwerkt' gemarkeerd zonder dat de volgende deadline ooit gezet werd, en bleef de regel
+    // voorgoed zonder taak. Nu blijft L staan en probeert de volgende run het opnieuw (naloop 25-09).
+    let verwerkt = true;
     try {
       for (let j = 1; j < hrData.length; j++) {
         if ((hrData[j][0] || '').toString().trim() !== herhaalId) continue;
         const type = (hrData[j][6] || '').toString().trim().toLowerCase();
         const status = (hrData[j][10] || '').toString().trim().toUpperCase();
         if (type === 'na-afronden' && status === 'ACTIEF') {
-          // De verse controle op regel 188 dekt alleen de Afgerond-kant; `hrData` is óók een
+          // De verse controle hierboven dekt alleen de Afgerond-kant; `hrData` is óók een
           // momentopname en het dashboard verwijdert Herhaalregels-rijen buiten deze lock om.
           // Zonder deze regel kreeg een verschoven buurregel de nieuwe deadline (naloop 2026-08-28).
           if (((hr.getRange(j + 1, 1).getValue() || '') + '').trim() !== herhaalId) {
-            Logger.log('cd_hr_verwerkAfrondingen: Herhaalregels-rij ' + (j + 1) + ' is verschoven — niet herplant');
+            Logger.log('cd_hr_verwerkAfrondingen: Herhaalregels-rij ' + (j + 1) + ' is verschoven — niet herplant, volgende run opnieuw');
+            verwerkt = false;
             break;
           }
           const afgerondOp = cd_parseDate(afData[i][8]) || new Date(); // I = afgerond op
@@ -237,8 +248,11 @@ function cd_hr_verwerkAfrondingen() {
         }
         break;
       }
-    } catch (e) { Logger.log('cd_hr_verwerkAfrondingen rij ' + (i + 1) + ' fout: ' + e); }
-    af.getRange(i + 1, 12).setValue(''); // markeer verwerkt — voorkomt dubbele verwerking
+    } catch (e) {
+      Logger.log('cd_hr_verwerkAfrondingen rij ' + (i + 1) + ' fout: ' + e + ' — volgende run opnieuw');
+      verwerkt = false;
+    }
+    if (verwerkt) af.getRange(i + 1, 12).setValue(''); // markeer verwerkt — voorkomt dubbele verwerking
   }
 }
 
@@ -307,7 +321,16 @@ function cd_escaleerStilleDossiers() {
       const laatst = cd_laatsteActiviteit(stilMap, code, curSec);
       if (!laatst) continue; // geen activiteit-data → niet escaleren (zelfde keuze als bepaalStil)
       const dagen = cd_dagenSinds(laatst, today);
-      const esc = cd_f4val(data[i][13]);            // N = Esc-stempel
+      const esc = cd_f4val(data[i][13]);            // N = Esc-stempel, vorm 'T1:dd-mm-jjjj|T2:dd-mm-jjjj'
+      const heeftT1 = esc.indexOf('T1') !== -1;
+      const heeftT2 = esc.indexOf('T2') !== -1;
+      // Eerst bepalen óf er iets te doen is, en pas dán de verse rij lezen: die lees kost een
+      // Sheets-aanroep per kandidaat, en de meeste rijen hoeven niets (naloop 25-09).
+      // Een T2-stempel dekt ook trap 1: wie al teambreed geëscaleerd is, krijgt de lichtere
+      // trap-1-melding niet alsnog achteraf.
+      if (dagen < regels.trap1) { if (!esc) continue; }                 // alleen iets doen als er te resetten valt
+      else if (dagen >= regels.trap2) { if (heeftT2) continue; }
+      else if (heeftT1 || heeftT2) continue;
       // Zelfde verse controle als bij cd_hr_verwerkAfrondingen: `data` is een momentopname van
       // vóór de lus en er zitten pushmeldingen (0,5-2 s per stuk) tussen. Staat er op rij i+1
       // inmiddels een andere taak, dan zou het escalatiestempel in kolom N bij de verkeerde taak
@@ -324,8 +347,12 @@ function cd_escaleerStilleDossiers() {
       }
       const cel = sheet.getRange(i + 1, 14);
       if (dagen < regels.trap1) { if (esc) cel.setValue(''); continue; } // activiteit hervat → reset
-      if (dagen >= regels.trap2 && esc.indexOf('T2') === -1) {
-        cel.setValue((esc ? esc + '|' : '') + 'T2:' + cd_ddmmyyyy(today));
+      if (dagen >= regels.trap2 && !heeftT2) {
+        // Altijd óók een T1-deel in het stempel. Werd een dossier voor het eerst gezien terwijl het
+        // al over trap 2 zat, dan stond er alleen 'T2:…'; de dag erna zag de trap-1-tak geen 'T1',
+        // overschreef het stempel met 'T1:…' (T2 weg) en stuurde de trap-1-melding te laat — en de
+        // dag daarna ging de teambrede escalatie een tweede keer uit (naloop 25-09).
+        cel.setValue((heeftT1 ? esc : 'T1:' + cd_ddmmyyyy(today)) + '|T2:' + cd_ddmmyyyy(today));
         // Trap-2 = teambrede escalatie: behandelaar én alle collega's via de
         // team-tag n_newtask (zelfde audience als een nieuwe taak).
         cd_notifyByTag('n_newtask', '1', {
@@ -335,16 +362,24 @@ function cd_escaleerStilleDossiers() {
           body: code + (naam ? ' · ' + naam : '') + ' — ' + dagen + ' dagen geen activiteit (' + (beh || 'geen behandelaar') + ')',
           url: APP_URL, dedupKey: 'esc2-' + ((vers[16] || code)) + '-' + cd_ddmmyyyy(today)   // taaknummer: zie de toelichting bij 'opvolg-'
         });
-      } else if (dagen >= regels.trap1 && esc.indexOf('T1') === -1) {
+      } else if (dagen >= regels.trap1 && !heeftT1 && !heeftT2) {
         cel.setValue('T1:' + cd_ddmmyyyy(today));
-        cd_splitBehandelaar(beh).forEach(function (name) {
-          cd_notifyByExternalId(name, 'n_assigned', '1', {
-            type: 'n_escalatie',
-            title: '🔕 Stil dossier — ' + dagen + ' dagen geen activiteit',
-            body: code + (naam ? ' · ' + naam : ''),
-            url: APP_URL, dedupKey: 'esc1-' + ((vers[16] || code)) + '-' + cd_ddmmyyyy(today)   // idem
-          });
-        });
+        const t1 = {
+          type: 'n_escalatie',
+          title: '🔕 Stil dossier — ' + dagen + ' dagen geen activiteit',
+          body: code + (naam ? ' · ' + naam : ''),
+          url: APP_URL, dedupKey: 'esc1-' + ((vers[16] || code)) + '-' + cd_ddmmyyyy(today)   // idem
+        };
+        const personen = cd_splitBehandelaar(beh);
+        if (personen.length) {
+          personen.forEach(function (name) { cd_notifyByExternalId(name, 'n_assigned', '1', t1); });
+        } else {
+          // Geen behandelaar (typisch een CRM-vraag waar nog niemand aan zit — die escaleert ook
+          // zonder 'In behandeling'): dan ging trap 1 naar niemand. Naar het team, via dezelfde
+          // team-tag als trap 2 (naloop 25-09).
+          t1.body += ' (geen behandelaar)';
+          cd_notifyByTag('n_newtask', '1', t1);
+        }
       }
     } catch (e) { Logger.log('cd_escaleerStilleDossiers rij ' + (i + 1) + ' fout: ' + e); }
   }

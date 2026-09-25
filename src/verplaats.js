@@ -241,8 +241,12 @@ async function verplaatsTaak(r, doelSec, nietOpgeslagen){
         // van een bundel gewijzigd (kolom R/S), dan zou de verhuizende taak met een verouderd
         // bundelnummer worden weggeschreven en stil uit zijn bundel vallen — precies dezelfde
         // landmijn die `koppelTaak` al ontmanteld heeft.
-        const vers = await assertRowsMatch([{ row:r._row, r }]);
-        const cellen = vers.get(r._row) || [];
+        // Bron- en doelrij VÓÓR de await vastgelegd: tijdens het teruglezen kan een afronding
+        // elders `_row` optimistisch opschuiven, en dan zouden controle, invoeging en verwijdering
+        // elk een ander rijnummer gebruiken (naloop 25-09).
+        const bron = r._row, naNu = doelRij._row - 1;
+        const vers = await assertRowsMatch([{ row:bron, r }]);
+        const cellen = vers.get(bron) || [];
         // L..S: opvolgdatum, herhaal-ID, escalatiestempel, offerte-fase, aannemers, taaknummer,
         // bundelnummer, volgnummer. Wat er niet teruggelezen wordt, valt terug op het geheugen —
         // values.get kapt lege staartkolommen af, dus een korte rij is normaal en geen fout.
@@ -281,12 +285,11 @@ async function verplaatsTaak(r, doelSec, nietOpgeslagen){
         // met de INVOEGING en telt dus nog in de nummering van vóór dat verwijderen. Stond de
         // bronrij bóven de invoegplek, dan telt hij daar nog mee — vandaar de +1. Dat is precies de
         // rekensom die `naAfterRow` hierboven omgekeerd maakte.
-        const naNu   = doelRij._row - 1;
-        const insIdx = naNu + (r._row <= naNu + 1 ? 1 : 0);
+        const insIdx = naNu + (bron <= naNu + 1 ? 1 : 0);
         // De verwijderindex ná de invoeging. Google voert de verzoeken op volgorde uit, dus de oude
         // rij is één plek opgeschoven zodra hij ONDER de invoegplek stond. Zonder deze correctie
         // verdwijnt de buurrij in plaats van de verhuisde taak — de duurste denkfout in dit bestand.
-        const oudIndex = (r._row > insIdx) ? r._row : r._row - 1;
+        const oudIndex = (bron > insIdx) ? bron : bron - 1;
         const batchBody = { requests:[
           { insertDimension:{ range:{ sheetId, dimension:'ROWS', startIndex:insIdx, endIndex:insIdx+1 }, inheritFromBefore:true } },
           { updateCells:{ range:{ sheetId, startRowIndex:insIdx, endRowIndex:insIdx+1, startColumnIndex:0, endColumnIndex:rij.length },

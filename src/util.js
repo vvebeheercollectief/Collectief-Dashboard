@@ -37,7 +37,10 @@ const NIET_ZOEKBAAR = new Set(['_row','_sec','_offertesManual','_aannemers',
 // vergeten werd lekte stil de zoek in — een treffer op een onzichtbare oude deadline is voor de
 // gebruiker niet uit te leggen (naloop 2026-08-28). NIET_ZOEKBAAR blijft bestaan voor filterNtd.
 const _afZoekvelden = r => [r.code, r.naam, taakTitel(r, r._sec), r.subcategorie, r.behandelaar,
-                            r.datum, r.toelichting, ...parseAannemers(r.aannemers).map(a=>a.naam)];
+                            // `opmerking` (kolom J, zo zet parseSections hem neer) en niet `toelichting`,
+                            // dat veld bestaat niet: op de afrondopmerking zoeken vond niets (naloop 25-09).
+                            r.datum, r.opmerking, r.afzender, r.mail,
+                            ...parseAannemers(r.aannemers).map(a=>a.naam)];
 function filt(rows,q){
   if(!q)return rows;
   return rows.filter(r=>_afZoekvelden(r).some(v=>String(v??'').toLowerCase().includes(q)));
@@ -81,7 +84,12 @@ function kiesAfgerondRij(rijen, taakId, code, bezet){
     const opNummer = lijst.find(r => r && (((r.taakId ?? '') + '').trim() === nr) && vrij(r));
     if (opNummer) return opNummer;
   }
-  return lijst.find(r => r && r.code === code && vrij(r)) || null;
+  // Terugval op de code, maar met een bekend nummer NOOIT op een rij die zelf een ánder nummer
+  // draagt: dat is aantoonbaar een andere afronding. Was D.af nog niet ververst (de zojuist
+  // gearchiveerde rij ontbreekt), dan wiste de undo zo stil een oude afronding van dezelfde VvE
+  // (naloop 25-09). Liever niets vinden — dan staat de taak zichtbaar dubbel — dan historie weg.
+  const zonderAnderNummer = r => !nr || !(((r.taakId ?? '') + '').trim());
+  return lijst.find(r => r && r.code === code && vrij(r) && zonderAnderNummer(r)) || null;
 }
 
 // ══════════════════════════════════════

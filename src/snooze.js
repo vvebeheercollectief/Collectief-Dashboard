@@ -83,8 +83,10 @@ async function schrijfOpvolgdatum(r, nieuw, actie){
   renderAll();
   backgroundWrite(
     async ()=>{
-      await assertRowMatch(r._row, r); // bescherming: rij nog dezelfde TAAK vóór L-write (kolom L zit niet in de vingerafdruk)
-      await writeRange(`'Nog Te Doen'!${OPVOLG_KOLOM}${r._row}:${OPVOLG_KOLOM}${r._row}`, [nieuw]);
+      const rij = r._row;   // Eén keer gelezen: een afronding elders schuift `_row` optimistisch op (_shiftNtdRows); tussen
+      // controle en schrijven mag hij dus niet opnieuw gelezen worden (naloop 25-09).
+      await assertRowMatch(rij, r); // bescherming: rij nog dezelfde TAAK vóór L-write (kolom L zit niet in de vingerafdruk)
+      await writeRange(`'Nog Te Doen'!${OPVOLG_KOLOM}${rij}:${OPVOLG_KOLOM}${rij}`, [nieuw]);
       await logEvent(r.code, r._sec, actie, 'opvolgdatum', oud, nieuw);
       // Bevestiging pas ná de write; onderaan de writeFn zodat een herkansing er niet twee geeft.
       showToast(nieuw ? 'Weggelegd tot '+nieuw : 'Opvolgdatum gewist',

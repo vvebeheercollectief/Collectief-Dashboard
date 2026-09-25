@@ -79,8 +79,10 @@ async function zetInBehandeling(rid){
       // Kolom H zit NIET in de vingerafdruk (FP_KOLOMMEN: A, C en de deadlinekolom), dus deze
       // controle slaat geen alarm om onze eigen wijziging — hij bewaakt alleen dat we nog naar
       // dezelfde TAAK schrijven. Zelfde afweging als bij de opvolgdatum in snooze.js.
-      await assertRowMatch(r._row, r);
-      await writeRange(`'Nog Te Doen'!${kolom}${r._row}:${kolom}${r._row}`, [nieuw]);
+      const rij = r._row;   // Eén keer gelezen: een afronding elders schuift `_row` optimistisch op (_shiftNtdRows); tussen
+      // controle en schrijven mag hij dus niet opnieuw gelezen worden (naloop 25-09).
+      await assertRowMatch(rij, r);
+      await writeRange(`'Nog Te Doen'!${kolom}${rij}:${kolom}${rij}`, [nieuw]);
       // De logregel is hier geen boekhouding maar functioneel: het stil-signaal rekent vanaf de
       // LAATSTE logregel van een taak (bepaalStil). Zonder deze regel zou een taak die je zojuist
       // oppakt meteen als 'Stil 40d' in beeld komen, op grond van activiteit van vóór vandaag.

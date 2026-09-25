@@ -196,7 +196,7 @@ async function deleteOntwItem(){
         headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
         body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:oudeRow-1,endIndex:oudeRow}}}]})
       });
-      if(!resp.ok){const e=await resp.json();const err=new Error(e.error?.message||'Verwijderfout');err.status=resp.status;throw err}
+      if(!resp.ok){const e=await resp.json().catch(()=>({}));const err=new Error(e.error?.message||'Verwijderfout');err.status=resp.status;throw err}
       stand.gelukt=true;
     },
     // Op titel+datum en niet op objectidentiteit: een poll tussen de klik en deze rollback vervangt
@@ -581,7 +581,7 @@ async function deleteLogboek(row){
           headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
           body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:oudeRow-1,endIndex:oudeRow}}}]})
         });
-        if(!resp.ok){const e=await resp.json();if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Verwijderfout');err.status=resp.status;throw err}
+        if(!resp.ok){const e=await resp.json().catch(()=>({}));if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Verwijderfout');err.status=resp.status;throw err}
         verwijderd=true;
       }
     },

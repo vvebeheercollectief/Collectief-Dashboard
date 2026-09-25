@@ -596,8 +596,11 @@ function bulkVeld(rows,soort,waarde){
       // bij 'nieuw' staat de oude waarde er nog, bij 'oud' (undo) de zojuist geschreven nieuwe.
       // Zonder deze omkering zou elke bulk-deadline en elke bulk-undo gegarandeerd vals afgaan,
       // want de deadline zit in de vingerafdruk.
-      await assertRowsMatch(items.map(it=>({
-        row: it.r._row,
+      // Rijnummers één keer gelezen, vóór de controle: een afronding elders schuift `_row`
+      // optimistisch op, en dan zou de schrijfactie een andere rij raken dan de controle (naloop 25-09).
+      const rijen=items.map(it=>it.r._row);
+      await assertRowsMatch(items.map((it,i)=>({
+        row: rijen[i],
         r: { ...it.r, [conf.veld]: (welkeWaarde==='oud' ? waarde : it.oud) },
       })));
       // values:batchUpdate met USER_ENTERED — één atomaire POST (alles-of-niets) én zelfde
@@ -607,13 +610,13 @@ function bulkVeld(rows,soort,waarde){
       // óók USER_ENTERED maar liep erlangs. Zonder _veiligeRij zou een behandelaarsnaam of
       // opvolgnotitie die met =,+,-,@ begint hier alsnog als formule in de Sheet landen.
       const data=[];
-      for(const it of items){
+      for(const [i,it] of items.entries()){
         const kol=conf.kolom(it.r);
         const val=welkeWaarde==='oud'?it.oud:waarde;
-        data.push({range:`'Nog Te Doen'!${kol}${it.r._row}`, values:[_veiligeRij([val])]});
+        data.push({range:`'Nog Te Doen'!${kol}${rijen[i]}`, values:[_veiligeRij([val])]});
         if(oppDl && it.sec==='OPPAKKEN'){
           const prio=welkeWaarde==='oud'?it.oudPrio:berekenPrioriteit(waarde,'OPPAKKEN').prioriteit;
-          data.push({range:`'Nog Te Doen'!F${it.r._row}`, values:[_veiligeRij([prio])]}); // F=prioriteit, herberekend bij nieuwe deadline
+          data.push({range:`'Nog Te Doen'!F${rijen[i]}`, values:[_veiligeRij([prio])]}); // F=prioriteit, herberekend bij nieuwe deadline
         }
       }
       const resp=await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values:batchUpdate`,{

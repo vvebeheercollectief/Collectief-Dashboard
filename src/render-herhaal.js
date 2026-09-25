@@ -171,7 +171,7 @@ async function deleteHerhaal(){
     const resp=await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
       method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
       body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:r._row-1,endIndex:r._row}}}]})});
-    if(!resp.ok){const e=await resp.json();const err=new Error(e.error?.message||'Verwijderfout');err.status=resp.status;throw err}
+    if(!resp.ok){const e=await resp.json().catch(()=>({}));const err=new Error(e.error?.message||'Verwijderfout');err.status=resp.status;throw err}
     await logEvent(r.code,r.sectie,'Herhaalregel verwijderd','','',r.omschrijving);
     showToast('Herhaalregel verwijderd',r.omschrijving,null,'prullenbak',{geenDedup:true,geenSysteemmelding:true});
   },()=>{ // rollback: rij terugzetten + _row-indexen herstellen

@@ -33,8 +33,10 @@ const NOTIF_QUEUE_MAX = 200; // verwerkte rijen die we bewaren
 const APP_URL = 'https://vvebeheercollectief.github.io/Collectief-Dashboard/';
 const ICON_URL = APP_URL + 'icon-192.png';
 
-// Hoeveel uur tolerantie bij deadline-check (script draait elk uur)
-const DEADLINE_TOLERANCE_HOURS = 1;
+// Halve breedte van het venster per drempel in cd_checkDeadlines. Het script draait elk uur, dus
+// het venster moet precies één uur breed zijn (halfopen). Met 1 (= ±1 uur, twee uur breed) viel
+// elke drempel in twee à drie opeenvolgende runs en kwam dezelfde push meermaals (naloop 25-09).
+const DEADLINE_TOLERANCE_HOURS = 0.5;
 
 // ════════════════════════════════════════════════════════════
 //  CONCURRENCY + FOUTAFHANDELING HELPERS
@@ -269,8 +271,14 @@ function cd_checkDeadlines() {
         const dlVal = data[i][DEADLINE_COL[curSec]];
         if (!code || !dlVal) continue;
 
-        const dl = cd_parseDate(dlVal);
+        let dl = cd_parseDate(dlVal);
         if (!dl) continue;
+        // Een kale datum (00:00) betekent 'in de loop van die dag': de app telt een taak pas de
+        // dag erná als te laat. Zonder dit anker viel de push '1 uur vooraf' om ±23:00 de avond
+        // vóór de deadlinedag (naloop 25-09). Einde dag = 00:00 van de volgende dag.
+        if (dl.getHours() === 0 && dl.getMinutes() === 0 && dl.getSeconds() === 0) {
+          dl = new Date(dl.getFullYear(), dl.getMonth(), dl.getDate() + 1);
+        }
 
         // BEWUST GEEN weggelegd-uitzondering hier — dit is nagelopen en teruggedraaid.
         // De andere drie motoren (cd_dailySummary, cd_opvolgWakker, cd_escaleerStilleDossiers)
@@ -286,7 +294,7 @@ function cd_checkDeadlines() {
         if (hoursUntil < 0 || hoursUntil > 72) continue;
 
         [1, 4, 8, 24, 48].forEach(h => {
-          if (Math.abs(hoursUntil - h) <= DEADLINE_TOLERANCE_HOURS && beh) {
+          if (hoursUntil > h - DEADLINE_TOLERANCE_HOURS && hoursUntil <= h + DEADLINE_TOLERANCE_HOURS && beh) {
             const body = code + (naam ? ' · ' + naam : '') + ' — over ' + Math.round(hoursUntil) + ' uur';
             cd_splitBehandelaar(beh).forEach(name => {
               // BEWUST GEEN cd_schrijfMelding hier, anders dan bij alle andere meldingssoorten.
@@ -783,10 +791,13 @@ function cd_createTaskRow(categorie, code, naam, actiepunt, behandelaar, deadlin
 
   // 2) insert-positie: vanaf kop+2 tot eerste lege rij of volgende sectie-kop
   let insertRow = headerRow + 2;
+  // Uit `colA` (hierboven al gelezen) en niet met twee getValue()'s per rij: die kostten binnen de
+  // lock een Sheets-aanroep per bestaande taak in de sectie (naloop 25-09).
   while (insertRow <= lastRow) {
-    const v = (sheet.getRange(insertRow, 1).getValue() || '').toString().trim().toUpperCase();
+    const ruw = colA[insertRow - 1][0];
+    const v = (ruw || '').toString().trim().toUpperCase();
     if (CD_NTD_SECTIES.indexOf(v) !== -1) break;          // volgende sectie
-    if (sheet.getRange(insertRow, 1).getValue() === '') break; // lege rij
+    if (ruw === '') break;                                 // lege rij
     insertRow++;
   }
 

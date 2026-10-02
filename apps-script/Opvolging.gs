@@ -149,18 +149,45 @@ function cd_hr_zetTakenKlaar() {
   if (!hr) return;
   const rows = hr.getDataRange().getValues();
   const today = new Date(); today.setHours(0, 0, 0, 0);
+  let lopend;   // Herhaal-ID's met een open taak of een onverwerkte afronding; pas gelezen als nodig
   for (let i = 1; i < rows.length; i++) {
     try {
       const id = (rows[i][0] || '').toString().trim();
       const status = (rows[i][10] || '').toString().trim().toUpperCase();
       if (!id || status !== 'ACTIEF') continue;
-      const dl = cd_parseDate(rows[i][9]);            // J = VolgendeDeadline
-      if (!dl) continue;                              // na-afronden zonder datum: wacht
+      const type = (rows[i][6] || '').toString().trim().toLowerCase();
       // I = DagenVooraf. LET OP — SYNC met coerceDagenVooraf in src/util.js: een bewuste 0 ('pas
       // op de deadlinedag zelf klaarzetten') is geldig. `parseInt(..) || 14` maakte daar 14 van
       // (naloop 25-09).
       const nVooraf = parseInt(rows[i][8], 10);
       const dagenVooraf = (isFinite(nVooraf) && nVooraf >= 0) ? nVooraf : 14;
+      let dl = cd_parseDate(rows[i][9]);              // J = VolgendeDeadline
+      let herstart = '';                              // waarom een lege J toch een taak geeft (logboek)
+      if (!dl) {
+        // Een lege J kent alleen 'na afronden': die regel wacht op de afronding van zijn taak, en
+        // cd_hr_verwerkAfrondingen zet daarna J. Maar die taak ontstaat alléén hier — en hier stond
+        // `if (!dl) continue`. Een nieuwe 'na afronden'-regel (het dashboard schrijft J dan leeg,
+        // src/render-herhaal.js) kreeg dus nooit een eerste taak, en een klaargezette taak die werd
+        // VERWIJDERD in plaats van afgerond liet de regel voorgoed stil: geen taak, geen afronding,
+        // dus nooit meer een J (naloop 2026-10-02).
+        // Nu: staat er voor deze regel niets meer open — geen taak in 'Nog Te Doen' met dit
+        // Herhaal-ID (kolom M) en geen afgeronde taak die nog op verwerking wacht ('Afgerond',
+        // kolom L; cd_hr_verwerkAfrondingen draait direct hierna en zet dan zelf J) — dan zetten we
+        // de taak NU klaar, met de gewone aanlooptijd: deadline = vandaag + DagenVooraf. Dat is
+        // precies 'vandaag zichtbaar', zoals elke andere herhaaltaak die op zijn zichtbaar-dag
+        // klaargezet wordt. (Vandaag + het interval zou een taak opleveren die maanden in de lijst
+        // staat, of — als we alleen J zetten — de eerste taak pas over maanden.)
+        // Een J die WEL gevuld is maar onleesbaar, laten we staan: dat is geen lege J, en
+        // overschrijven zou wissen wat iemand er bewust in zette.
+        if (type !== 'na-afronden' || cd_f4val(rows[i][9])) continue;
+        if (lopend === undefined) lopend = cd_hr_lopendeIds(ss);
+        if (!lopend) continue;                        // tabblad ontbreekt: niet eenduidig, niets doen
+        if (lopend[id]) continue;                     // er loopt nog iets: gewoon wachten
+        dl = new Date(today.getFullYear(), today.getMonth(), today.getDate() + dagenVooraf);
+        herstart = cd_f4val(rows[i][11])
+          ? 'De vorige taak van deze regel is verdwenen zonder afronding (verwijderd?) — opnieuw klaargezet.'
+          : 'Eerste taak van deze regel.';
+      }
       const zichtbaar = new Date(dl.getFullYear(), dl.getMonth(), dl.getDate() - dagenVooraf);
       if (today.getTime() < zichtbaar.getTime()) continue;
       const sectie = (rows[i][2] || 'OPPAKKEN').toString().trim().toUpperCase();
@@ -168,7 +195,6 @@ function cd_hr_zetTakenKlaar() {
       const naam = (rows[i][4] || '').toString().trim();
       const beh  = (rows[i][5] || '').toString().trim();
       const oms  = (rows[i][1] || '').toString().trim();
-      const type = (rows[i][6] || '').toString().trim().toLowerCase();
       const dlStr = cd_ddmmyyyy(new Date(dl.getFullYear(), dl.getMonth(), dl.getDate()));
       // Verse identiteitscontrole VÓÓR het klaarzetten — zelfde patroon als
       // cd_hr_verwerkAfrondingen en cd_escaleerStilleDossiers: `rows` is één momentopname, en
@@ -192,7 +218,9 @@ function cd_hr_zetTakenKlaar() {
       }
       hr.getRange(i + 1, 10).setValue(nieuwVolgende);                            // J doorschuiven
       hr.getRange(i + 1, 12).setValue(new Date().toISOString() + ' → ' + dlStr); // L = LaatstKlaargezet
-      cd_schrijfLogboek(code, sectie, 'Terugkerende taak klaargezet', '', '', oms, 'systeem');
+      if (lopend) lopend[id] = true;   // dezelfde ID op een tweede regel niet nóg eens starten
+      cd_schrijfLogboek(code, sectie, 'Terugkerende taak klaargezet', '', '',
+        herstart ? oms + ' — ' + herstart : oms, 'systeem');
       cd_splitBehandelaar(beh).forEach(function (name) {
         // `type` los van de TAG. De tag bepaalt WIE de push krijgt (dat blijft de bestaande
         // schakelaar), het type bepaalt hoe de regel in het tabblad 'Meldingen' terechtkomt — en
@@ -210,6 +238,23 @@ function cd_hr_zetTakenKlaar() {
       });
     } catch (e) { Logger.log('cd_hr_zetTakenKlaar rij ' + (i + 1) + ' fout: ' + e); }
   }
+}
+
+// Welke Herhaal-ID's hebben nog iets lopen: een open taak in 'Nog Te Doen' (kolom M) of een
+// afgeronde taak in 'Afgerond' die cd_hr_verwerkAfrondingen nog moet verwerken (kolom L — die
+// wordt leeggemaakt zodra de afronding verwerkt is). Geeft null als een van de twee tabbladen
+// ontbreekt: dan is 'er loopt niets' niet vast te stellen en hoort de aanroeper niets te doen.
+// Kopregels ('HerhaalID', 'Herhaal-ID') komen als sleutel mee; die zijn nooit een echt regel-ID.
+function cd_hr_lopendeIds(ss) {
+  const ntd = ss.getSheetByName(NTD_SHEET);
+  const af = ss.getSheetByName('Afgerond');
+  if (!ntd || !af) return null;
+  const ids = {};
+  const ntdData = ntd.getDataRange().getValues();
+  for (let r = 0; r < ntdData.length; r++) { const v = cd_f4val(ntdData[r][12]); if (v) ids[v] = true; }
+  const afData = af.getDataRange().getValues();
+  for (let r = 0; r < afData.length; r++) { const v = cd_f4val(afData[r][11]); if (v) ids[v] = true; }
+  return ids;
 }
 
 // ── 2. Afgeronde terugkerende taken: 'na afronden'-regels opnieuw inplannen ──

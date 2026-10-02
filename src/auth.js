@@ -146,7 +146,9 @@ async function doLogin(){
     // gaat lezen en schrijven. `ensureToken` ruimt hier al op; deze weg deed dat niet.
     if(!email){state.oauthToken=null;state.oauthExpiry=0;_wisTokenSessie();errEl.textContent='Kon e-mailadres niet ophalen.';errEl.style.display='block';btn.classList.remove('is-signing');btn.disabled=false;return}
     if(!ALLOWED_EMAILS.includes(email.toLowerCase())){
-      state.oauthToken=null;state.oauthExpiry=0;
+      // Ook uit sessionStorage: de callback in doOAuth heeft hem daar al neergezet, en een token van
+      // een niet-toegestaan account hoort nergens achter te blijven — zie `_wisTokenSessie`.
+      state.oauthToken=null;state.oauthExpiry=0;_wisTokenSessie();
       errEl.textContent='Geen toegang. Gebruik je VvE Beheer Collectief account.';errEl.style.display='block';btn.classList.remove('is-signing');btn.disabled=false;return;
     }
     state.currentUserEmail=email;
@@ -287,4 +289,15 @@ function logout(reden){
   if(errEl && reden){ errEl.textContent=reden; errEl.style.display='block'; }
 }
 
-export { doOAuth, fetchUserEmail, doLogin, ensureToken, logout, _wisTokenSessie };
+// De uitlogknop (zijbalk). `logout` ruimt de sessie, de leescache en de schermstand op; dit trekt
+// daarnaast het token bij Google in. Zonder dat bleef het tot een uur geldig — op een gedeelde
+// computer kon wie de sessie in handen kreeg er nog mee lezen en schrijven. Het token eerst
+// vastpakken: `logout` zet hem op null. Intrekken is netwerkverkeer en mag het uitloggen niet
+// ophouden of laten mislukken; het lokale deel is dan al gedaan.
+function uitloggen(){
+  const token=state.oauthToken;
+  logout();
+  if(token){ try{ google.accounts.oauth2.revoke(token, ()=>{}); }catch(_){} }
+}
+
+export { doOAuth, fetchUserEmail, doLogin, ensureToken, logout, uitloggen, _wisTokenSessie };

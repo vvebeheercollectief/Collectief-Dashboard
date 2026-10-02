@@ -12,6 +12,8 @@ import { showToast } from "./notifications.js";
 import { renderThead, renderTbody, renderPag, bepaalStil, bouwStilIndex, _zetStilIndex, deadlineCel, rowNtd, rowAf } from "./render-tabel.js";
 import { _verrijkOfferteRij, offerteAannemerPaneel, offerteAannSamenvatting, herstelAannemerFocus } from "./render-offerte.js";
 import { renderAlvo, renderAlfa, toggleAlvoFlag, ALVO_ICONS, ALVO_COLS, ALVO_LABELS, flagPill, _recomputeAlvoStatus, statusIco } from "./render-alv.js";
+// Kringverwijzing data ⇄ render-lijsten: vraagAfMailOp draait alleen op runtime (in renderAf).
+import { vraagAfMailOp } from "./data.js";
 import { bundelWeergave, wordtGeabsorbeerd, bundelSleutel, bundelMetId, bouwBundelIndex, zichtbareKop, isAutoOfferteStap, telbaar } from "./bundel.js";
 
 // ══════════════════════════════════════
@@ -652,6 +654,14 @@ function renderAf(){
   // staan op wie. Zonder die kolom is een filter dat rijen weghaalt niet te controleren.
   const cols=['VvE Code','VvE','Taak','Subcategorie','Behandelaar','Afgerond op','Opmerking'];
   renderThead('af-thead',cols,SECS[state.activeAf].css);
+  // Zoeken op de tekst van een afgeronde CRM-mail. De poll leest 'Afgerond' maar t/m kolom V (zie
+  // AF_POLL in data.js), dus de mail komt hier op verzoek binnen: eerst wat er al opgehaald is aan
+  // de rijen hangen, dan (hoogstens één keer per minuut) een verse lezing vragen — die tekent zelf
+  // opnieuw zodra hij binnen is.
+  if(f.q && (D.af.CRM||[]).length){
+    if(state._afMail) hangAfMailAan(D.af.CRM, state._afMail);
+    vraagAfMailOp();
+  }
   const rows=filterAf(D.af[state.activeAf]||[],f);
   // De lege-lijst-tekst moet weten dát er gefilterd is, anders leest 'niets gevonden' als 'er is
   // niets afgerond'. Alle vier de filters tellen mee, niet alleen de zoekterm.
@@ -661,8 +671,18 @@ function renderAf(){
 }
 function setAf(s){state.activeAf=s;pgs.af=1;renderAf()}
 
+// Hangt de op verzoek opgehaalde mails (vraagAfMailOp, data.js) aan de afgeronde CRM-rijen, zodat
+// `filt` erop kan zoeken. Op taaknummer, en alleen voor een rij zonder nummer op rijnummer.
+function hangAfMailAan(rijen, kaart){
+  (rijen||[]).forEach(r=>{
+    if(r.mail) return;
+    const m=kaart.get(r.taakId ? 'T:'+r.taakId : 'R:'+r._row);
+    if(m) r.mail=m;
+  });
+}
+
 export {
-  renderNtdStats, renderNtdDonut, renderNtd, setNtd, ntdPagina, filterNtd, sorteerNtd, ntdSorteerKey, renderAf, setAf,
+  renderNtdStats, renderNtdDonut, renderNtd, setNtd, ntdPagina, filterNtd, sorteerNtd, ntdSorteerKey, renderAf, setAf, hangAfMailAan,
   filterAf, afFilterWaarden, vulPeriodeKeuze,
   kopOpen, zetKopOpen, toggleBundel, springNaarBundel, wisNtdFilters, absorbeer, isPlatteWeergave, erIsGefilterd,
   offerteAannemerPaneel, offerteAannSamenvatting,

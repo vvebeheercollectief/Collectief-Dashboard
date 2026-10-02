@@ -7,7 +7,7 @@ import { extraVves, wisExtraVves, extraVvesHtml, extraVvesUitleg } from "./meerv
 import { state, D, pgs } from "./state.js";
 import { verseRij, rijIndex } from "./rij.js";
 import { SECS, SKEYS, SID, OMSCHRIJVING_SLEUTEL, VELD_LABELS, CRM_SOORTEN } from "./config.js";
-import { writeRange, writeRanges, writeRows, _shiftNtdRows, _shiftAfRows, _herstelShift, assertRowMatch, sheetsFetch, fetchSheet, _a1Bereik, _withRetry } from "./api.js";
+import { writeRange, writeRanges, writeRows, _shiftNtdRows, _shiftAfRows, _herstelShift, assertRowMatch, sheetsFetch, fetchSheet, _a1Bereik, _withRetry, kapCel } from "./api.js";
 import { isKolomKop, isSectieKop } from "./structuurcheck.js";
 import { ensureToken } from "./auth.js";
 import { showToast, showUndoToast, fireNotifEvent, undoComplete, undoDelete } from "./notifications.js";
@@ -1529,7 +1529,7 @@ async function doCompleteTask(){
     catch(e){
       // Eerst herladen, dán melden: de tekst zegt 'opnieuw geladen', en dat hoort waar te zijn
       // op het moment dat de gebruiker hem leest. (Zelfde volgorde als in submitTask.)
-      await loadAll();
+      await loadAll(true);
       // Venster bewust NIET sluiten: de getypte toelichting moet blijven staan.
       alert(e.melding || e.message);
       return;
@@ -1550,7 +1550,7 @@ async function doCompleteTask(){
     const bouwBatch=(afRij)=>({requests:[
       {insertDimension:{range:{sheetId:afSheetId,dimension:'ROWS',startIndex:afRij,endIndex:afRij+1},inheritFromBefore:true}},
       {updateCells:{range:{sheetId:afSheetId,startRowIndex:afRij,endRowIndex:afRij+1,startColumnIndex:0,endColumnIndex:values.length},
-        rows:[{values:values.map(v=>({userEnteredValue:{stringValue:String(v)}}))}],fields:'userEnteredValue'}},
+        rows:[{values:values.map(v=>({userEnteredValue:{stringValue:kapCel(String(v))}}))}],fields:'userEnteredValue'}},
       {deleteDimension:{range:{sheetId:ntdSheetId,dimension:'ROWS',startIndex:r._row-1,endIndex:r._row}}}
     ]});
     // undo-data vastleggen vóór de mutatie
@@ -1867,7 +1867,7 @@ async function submitTask(){
       try{ await bevestigInvoegPlek(sec, afterRow); }
       catch(e){
         alert(e.melding || e.message);
-        loadAll();          // de lijst is verschoven: verse stand halen, dan kan de gebruiker opnieuw
+        loadAll(true);          // de lijst is verschoven: verse stand halen, dan kan de gebruiker opnieuw
         return;
       }
       const nieuw={_sec:sec,_row:afterRow+1};

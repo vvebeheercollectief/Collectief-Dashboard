@@ -12,7 +12,9 @@
        instellingen op bij api.onesignal.com; stond daar alleen cdn, dan blokkeerde de browser
        dat verzoek, bleef OneSignal.init() eeuwig hangen en kreeg iedereen die notificaties
        aanzette de melding "Notificatiesysteem kon niet worden geladen". -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' https://cdn.jsdelivr.net https://accounts.google.com https://*.onesignal.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://sheets.googleapis.com https://www.googleapis.com https://accounts.google.com https://oauth2.googleapis.com https://onesignal.com https://*.onesignal.com https://collectief-dashboard.vercel.app; img-src 'self' data: https:; frame-src https://accounts.google.com;"/>
+  <!-- cdn.jsdelivr.net alleen voor het ÉNE bestand dat we er laden (Chart.js, render-analytics.js,
+       mét SRI). Het hele domein toestaan liet elk npm-pakket ter wereld als script binnen. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js https://accounts.google.com https://*.onesignal.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://sheets.googleapis.com https://www.googleapis.com https://accounts.google.com https://oauth2.googleapis.com https://onesignal.com https://*.onesignal.com https://collectief-dashboard.vercel.app; img-src 'self' data: https:; frame-src https://accounts.google.com;"/>
 
   <!-- iOS / Safari -->
   <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -89,6 +91,9 @@
     <div class="sync-row"><div class="dot" id="dot"></div><span id="sync-lbl">–</span></div>
     <button class="ico-btn" id="refresh-btn" title="Vernieuwen">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0115-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 01-15 6.7L3 16"/></svg>
+    </button>
+    <button class="ico-btn" id="uitlog-btn" title="Uitloggen" aria-label="Uitloggen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
     </button>
   </div>
 </aside>

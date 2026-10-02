@@ -4208,7 +4208,9 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       //    terwijl de statusbalk 'Live' bleef zeggen.
       urls.length=0; state._syncFails=0; state._lastDHash=null; state._alfaMs=0;
       D.af={KANARIE:[{code:'blijf-staan'}]};
-      stub(['Afgerond']);
+      // Sinds 02-10 leest de poll 'Afgerond' als bereik A:V (zie AF_POLL in data.js); de losse
+      // read gaat dus naar /values/'Afgerond'!A:V.
+      stub(["'Afgerond'"]);
       await loadAll(true);
       eq('terugval: wegvallend Afgerond laat de ronde WEL falen', state._syncFails, 1);
       eq('terugval: en de bestaande lijst blijft staan i.p.v. leeggeveegd',
@@ -15886,6 +15888,197 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       D.logboek=logOud; D.ntd=ntdOud; state._rowCache=cacheOud;
       const n=document.getElementById('hist-note'); if(n) n.value='';
       state._notitieBezig=false;
+    }
+  })();
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  NALOOP 02-10-2026 — wegschrijven, lezen en de leescache
+  // ══════════════════════════════════════════════════════════════════════════
+  await (async () => {
+    console.log('%c[TESTS] Naloop 02-10: schrijven, lezen, cache', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const API = await import('./api.js');
+    const DATA = await import('./data.js');
+    const RL = await import('./render-lijsten.js');
+    const bron = async n => (await fetch(new URL(n, document.baseURI), {cache:'no-store'})).text();
+
+    // ── 3. Een tekst die met een apostrof begint houdt die apostrof ──
+    eq('apostrof: krijgt er een extra voor (Sheets slikt de eerste)', veiligeCel("'s-Gravenzandseweg"), "''s-Gravenzandseweg");
+    eq('apostrof: een apostrof midden in de tekst blijft ongemoeid', veiligeCel("Hof van 's-Gravenhage"), "Hof van 's-Gravenhage");
+    eq('apostrof: de bestaande formule-rem werkt nog', veiligeCel('=SOM(A1)'), "'=SOM(A1)");
+    eq('apostrof: geheugen en Sheet geven dezelfde vingerafdruk',
+       rijVingerafdruk('Nog Te Doen', {_sec:'OPPAKKEN', code:'311212', actiepunt:"'s-Gravenzandseweg 12", deadline:''}),
+       vingerafdruk('Nog Te Doen', ['311212','',"'s-Gravenzandseweg 12",''], 'OPPAKKEN'));
+
+    // ── 17. Elke cel boven de grens wordt afgekapt, niet alleen de CRM-mail ──
+    const lang='x'.repeat(60000);
+    const gekapt=veiligeCel(lang);
+    truthy('afkappen: een tekst van 60.000 tekens past daarna in één cel', gekapt.length < 50000 && /\[afgekapt\]$/.test(gekapt));
+    eq('afkappen: nogmaals afkappen verandert niets (idempotent)', API.kapCel(gekapt), gekapt);
+    eq('afkappen: een gewone tekst blijft gelijk', veiligeCel('Kort'), 'Kort');
+    eq('afkappen: ook een hele rij gaat erdoor', _veiligeRij(['a', lang])[1], gekapt);
+    eq('afkappen: de rij-controle ziet geheugen (vol) en Sheet (afgekapt) als gelijk', _normCel(lang), _normCel(gekapt));
+    eq('afkappen: getallen en booleans blijven ongemoeid', [veiligeCel(5), veiligeCel(true)], [5, true]);
+
+    // ── 4. De poll leest 'Afgerond' maar tot en met kolom V ──
+    eq('afgerond: het pollbereik loopt tot V', DATA.AF_POLL, "'Afgerond'!A:V");
+    {
+      const _fetch=window.fetch, tokenOud=state.oauthToken, expOud=state.oauthExpiry;
+      const failsOud=state._syncFails, hashOud=state._lastDHash, alfaMsOud=state._alfaMs, hwOud=state._logHoogwater, ankOud=state._logAnkerTs;
+      const dOud={}; Object.keys(D).forEach(k=>dOud[k]=D[k]);
+      const urls=[];
+      try{
+        for(let i=0;i<200 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,10));
+        state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3; state._syncFails=0; state._lastDHash=null;
+        window.fetch=async(url)=>{
+          const d=decodeURIComponent(String(url)); urls.push(d);
+          if(!d.includes('values:batchGet')) return new Response(JSON.stringify({values:[]}),{status:200});
+          const namen=[...d.matchAll(/ranges=([^&]*)/g)].map(m=>m[1]);
+          return new Response(JSON.stringify({valueRanges:namen.map(n=>({values: n==="'Afgerond'!A:V"
+            ? [['CRM'],['VvE Code','VvE','Onderwerp'],['381057','Testflat','Lekkage','Afgerond','Jer','','','','01-10-2026','klaar']] : []}))}),{status:200});
+        };
+        await loadAll(true);
+        const gevraagd=urls.find(u=>u.includes('values:batchGet'))||'';
+        truthy('afgerond: de batchGet vraagt A:V', gevraagd.includes("ranges='Afgerond'!A:V"));
+        truthy('afgerond: en niet meer het hele tabblad', !/ranges=Afgerond(&|$)/.test(gevraagd));
+        eq('afgerond: de rijen komen gewoon onder Afgerond binnen', (D.af.CRM||[]).map(r=>r.code), ['381057']);
+      } finally {
+        window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expOud;
+        state._syncFails=failsOud; state._lastDHash=hashOud; state._alfaMs=alfaMsOud; state._logHoogwater=hwOud; state._logAnkerTs=ankOud;
+        for(let i=0;i<200 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,10));
+        Object.keys(dOud).forEach(k=>{ D[k]=dOud[k]; });
+        document.getElementById('dot').className='dot';
+      }
+    }
+    // Zoeken op de mail van een afgeronde CRM-taak: de mail komt op verzoek (Q..W) binnen.
+    const kaart=DATA.afMailKaart([['TaakID','','','','','','Mail'],['TCRM9','','','','','','Beste beheerder, de dakgoot lekt'],['','','','','','','Zonder nummer']]);
+    eq('afgerond-mail: op taaknummer, en zonder nummer op rijnummer', [kaart.get('T:TCRM9'), kaart.get('R:3'), kaart.size], ['Beste beheerder, de dakgoot lekt', 'Zonder nummer', 2]);
+    const afRij={ _sec:'CRM', _row:7, code:'381057', taakId:'TCRM9', onderwerp:'Lekkage', mail:'' };
+    RL.hangAfMailAan([afRij], kaart);
+    eq('afgerond-mail: wordt aan de rij gehangen en is dan doorzoekbaar', filt([afRij], 'dakgoot').length, 1);
+    // Ongedaan maken zet de rij terug uit het GEHEUGEN van vóór het afronden, mét de mail.
+    eq('afgerond-mail: undo-rij draagt de mail nog (kolom W)',
+       serializeNtdUndo({ _sec:'CRM', code:'381057', taakId:'TCRM9', onderwerp:'Lekkage', mail:'De volledige mail' })[22], 'De volledige mail');
+
+    // ── 18. Een leesronde die begon terwijl er nog geschreven werd, telt niet ──
+    {
+      const _fetch=window.fetch, tokenOud=state.oauthToken, expOud=state.oauthExpiry;
+      const failsOud=state._syncFails, hashOud=state._lastDHash, alfaMsOud=state._alfaMs, hwOud=state._logHoogwater, ankOud=state._logAnkerTs;
+      const pwOud=state.pendingWrites;
+      const dOud={}; Object.keys(D).forEach(k=>dOud[k]=D[k]);
+      try{
+        for(let i=0;i<200 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,10));
+        state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3; state._syncFails=0; state._lastDHash=null;
+        let ronde=0, oudGezien=false;
+        const renderOud=state._renderSpion;
+        window.fetch=async(url)=>{
+          const d=decodeURIComponent(String(url));
+          if(!d.includes('values:batchGet')) return new Response(JSON.stringify({values:[]}),{status:200});
+          ronde++;
+          if(ronde===1) state.pendingWrites=0;   // de schrijfactie die al liep, landt tíjdens het lezen
+          const namen=[...d.matchAll(/ranges=([^&]*)/g)].map(m=>m[1]);
+          return new Response(JSON.stringify({valueRanges:namen.map(n=>({values: /^'?Nog Te Doen/.test(n)
+            ? [['OPPAKKEN'],['VvE Code','VvE','Actiepunt'],[ronde===1?'OUD-2':'NIEUW-2','VvE','x']] : []}))}),{status:200});
+        };
+        state.pendingWrites=1;   // er liep al een schrijfactie toen de ronde begon
+        const p=loadAll(true);
+        // Tussen de twee rondes kijken of de oude stand ooit in D heeft gestaan.
+        const kijk=setInterval(()=>{ if(Object.values(D.ntd||{}).flat().some(r=>r.code==='OUD-2')) oudGezien=true; }, 1);
+        await p;
+        clearInterval(kijk);
+        void renderOud;
+        const codes=Object.values(D.ntd||{}).flat().map(r=>r.code);
+        eq('leesronde: begon hij tijdens een schrijfactie, dan wordt hij niet toegepast', oudGezien || codes.includes('OUD-2'), false);
+        eq('leesronde: er komt een verse vervolgronde, en die staat erin', [ronde, codes.includes('NIEUW-2')], [2, true]);
+      } finally {
+        window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expOud; state.pendingWrites=pwOud;
+        state._syncFails=failsOud; state._lastDHash=hashOud; state._alfaMs=alfaMsOud; state._logHoogwater=hwOud; state._logAnkerTs=ankOud;
+        for(let i=0;i<200 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,10));
+        Object.keys(dOud).forEach(k=>{ D[k]=dOud[k]; });
+        document.getElementById('dot').className='dot';
+      }
+    }
+
+    // ── 22. De undo- en foutpaden verversen stil (geen volledige Logboek-lezing) ──
+    for(const f of ['notifications.js','bulk.js']){
+      const t=await bron('src/'+f);
+      eq(`stille resync: ${f} kent geen luide loadAll() meer op zijn undo-paden`, (t.match(/loadAll\(\)/g)||[]).length, 0);
+    }
+
+    // ── 23. Leescache, uitloggen, proxy, CSP ──
+    {
+      const mailOud=state.currentUserEmail;
+      const dOud={}; Object.keys(D).forEach(k=>dOud[k]=D[k]);
+      const bewaard={}; try{ for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i); if(k.startsWith(CACHE_PREFIX)) bewaard[k]=localStorage.getItem(k);} }catch(_){}
+      try{
+        _zetCacheBlokkade(false);
+        state.currentUserEmail='test@vvebeheercollectief.nl';
+        D.ntd={CRM:[{code:'381057',_row:5,_sec:'CRM',onderwerp:'Lekkage',mail:'Geheime mail van een eigenaar'}]}; D.af={CRM:[]};
+        D.alvo=[]; D.alfa=[]; D.ontw=[]; D.logboek=[]; D.herhaal=[]; D.kenmerken=[];
+        D.ntdSecInfo={CRM:{colHeaderRow:2}}; D.afSecInfo={CRM:{colHeaderRow:2}};
+        wisCache(); bewaarCache('');
+        const ruw=localStorage.getItem(_cacheSleutel(state.currentUserEmail))||'';
+        truthy('cache: de taak staat erin', ruw.includes('Lekkage'));
+        eq('cache: de CRM-mail niet', ruw.includes('Geheime mail'), false);
+        eq('cache: en het geheugen houdt de mail gewoon', D.ntd.CRM[0].mail, 'Geheime mail van een eigenaar');
+        D.ntd={CRM:[]};
+        eq('cache: terugladen lukt zonder mail', [laadUitCache(), D.ntd.CRM[0]?.onderwerp, D.ntd.CRM[0]?.mail], [true, 'Lekkage', undefined]);
+        state._uitCache=false;
+        // Ouder dan veertien dagen, of van een andere versie: weg bij het opstarten.
+        const nu=Date.now(), dag=864e5;
+        eq('cache: jong genoeg', DATA._cacheVers({t:nu-13*dag}, nu), true);
+        eq('cache: te oud', DATA._cacheVers({t:nu-15*dag}, nu), false);
+        eq('cache: zonder tijdstempel telt als oud', DATA._cacheVers({d:[]}, nu), false);
+        wisCache();
+        localStorage.setItem(CACHE_PREFIX+'0.1_a@x.nl', '{"t":'+nu+',"d":[]}');
+        localStorage.setItem(_cacheSleutel('oud@x.nl'), '{"t":'+(nu-20*dag)+',"d":[]}');
+        localStorage.setItem(_cacheSleutel('vers@x.nl'), '{"t":'+(nu-dag)+',"d":[]}');
+        DATA.ruimCacheOp(nu);
+        eq('cache: opstarten ruimt andere versies en oude caches op, de verse blijft',
+           [localStorage.getItem(CACHE_PREFIX+'0.1_a@x.nl'), localStorage.getItem(_cacheSleutel('oud@x.nl')), !!localStorage.getItem(_cacheSleutel('vers@x.nl'))],
+           [null, null, true]);
+        localStorage.setItem(_cacheSleutel(state.currentUserEmail), '{"t":'+(nu-20*dag)+',"d":[{"OPPAKKEN":[]},{}],"s":[{},{}]}');
+        eq('cache: een te oude cache wordt niet getoond', laadUitCache(), false);
+      } finally {
+        _zetCacheBlokkade(true);
+        state.currentUserEmail=mailOud; state._uitCache=false;
+        Object.keys(dOud).forEach(k=>{ D[k]=dOud[k]; });
+        try{ wisCache(); Object.entries(bewaard).forEach(([k,v])=>localStorage.setItem(k,v)); }catch(_){}
+      }
+    }
+    {
+      // Uitloggen trekt het token in bij Google.
+      const AUTH = await import('./auth.js');
+      const tokenOud=state.oauthToken, expOud=state.oauthExpiry, mailOud=state.currentUserEmail, gOud=window.google;
+      const gateOud=document.getElementById('login-gate')?.style.display;
+      let ingetrokken=null;
+      try{
+        truthy('uitloggen: er is een knop in de zijbalk', !!document.querySelector('.sb-foot #uitlog-btn'));
+        window.google={ accounts:{ oauth2:{ revoke:(t)=>{ ingetrokken=t; } } } };
+        state.oauthToken='te-intrekken'; state.oauthExpiry=Date.now()+3600e3; state.currentUserEmail='test@vvebeheercollectief.nl';
+        AUTH.uitloggen();
+        eq('uitloggen: het token wordt bij Google ingetrokken', ingetrokken, 'te-intrekken');
+        eq('uitloggen: en is lokaal weg', [state.oauthToken, sessionStorage.getItem('oauthToken')], [null, null]);
+      } finally {
+        window.google=gOud;
+        state.oauthToken=tokenOud; state.oauthExpiry=expOud; state.currentUserEmail=mailOud;
+        state._uitCache=false;
+        document.getElementById('app')?.removeAttribute('inert');
+        const gate=document.getElementById('login-gate'); if(gate) gate.style.display=gateOud||'none';
+        document.querySelectorAll('.toast').forEach(x=>x.remove());
+      }
+    }
+    {
+      const auth=await bron('src/auth.js');
+      truthy('inloggen: een token van een niet-toegestaan account gaat ook uit sessionStorage',
+             /ALLOWED_EMAILS\.includes\(email\.toLowerCase\(\)\)\)\{[\s\S]{0,400}?_wisTokenSessie\(\)/.test(auth));
+      const chat=await bron('api/chat.js');
+      truthy('chat-proxy: weigert een niet-geverifieerd e-mailadres', /email_verified\)\s*!==\s*'true'/.test(chat));
+      const csp=document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.getAttribute('content')||'';
+      const scriptSrc=(csp.split(';').find(d=>d.trim().startsWith('script-src'))||'');
+      const ana=await bron('src/render-analytics.js');
+      const chartUrl=(ana.match(/s\.src='([^']+)'/)||[])[1]||'';
+      truthy('CSP: jsdelivr alleen voor het Chart.js-bestand dat we laden', !!chartUrl && scriptSrc.split(/\s+/).includes(chartUrl));
+      eq('CSP: niet meer het hele jsdelivr-domein', scriptSrc.split(/\s+/).includes('https://cdn.jsdelivr.net'), false);
     }
   })();
 

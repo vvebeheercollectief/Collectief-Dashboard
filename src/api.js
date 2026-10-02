@@ -154,8 +154,28 @@ async function fetchSheets(names){
 // gooit de nul weg — VvE-code 021002 stond zo als 21002 in de Sheet, en telefoonnummers 06…
 // verloren hun 0 op dezelfde manier. De apostrof houdt de cel tekst. Een losse '0' (volgnummer
 // van een bundelkop) blijft een getal: dat patroon vraagt minstens twee cijfers.
-const veiligeCel=v=>(typeof v==='string'&&(/^[=+\-@\t\r]/.test(v)||/^0\d+$/.test(v)))?"'"+v:v;
+// Derde geval: een tekst die ZELF met een apostrof begint ("'s-Gravenzandseweg"). USER_ENTERED leest
+// die eerste apostrof als de tekst-markering en slikt hem in: in de Sheet stond 's-Gravenzandseweg'
+// zonder apostrof — én de rij-controle zag daarna een verschil tussen geheugen en Sheet. Een extra
+// apostrof ervoor laat de echte staan.
+//
+// En de lengte. Google weigert een cel boven 50.000 tekens met een 400, en dan werd de HELE
+// schrijfactie teruggedraaid — de tekst die iemand net in Opmerkingen of Agendapunten plakte was
+// weg. Alleen de CRM-mail werd al afgekapt (mailVoorCel, crud.js); dit is het vangnet voor elk
+// ander tekstveld, op de plek waar élke schrijfweg langskomt. Zie kapCel.
+const veiligeCel=v=>{
+  v=kapCel(v);
+  return (typeof v==='string'&&(/^[=+\-@\t\r']/.test(v)||/^0\d+$/.test(v)))?"'"+v:v;
+};
 const _veiligeRij=values=>(values||[]).map(veiligeCel);
+
+// Ruim onder de 50.000 van Google, met een zichtbare regel erachter: liever een ingekorte tekst
+// dan een wijziging die als geheel mislukt. Idempotent — een al ingekorte cel (49.000 + de staart)
+// komt er identiek uit — en daarom gebruikt `_normCel` hem ook: dan vergelijkt de rij-controle het
+// geheugen (nog de volle tekst) met wat er echt in de Sheet staat, zonder vals alarm.
+const CEL_MAX=49000;
+const CEL_STAART=' …[afgekapt]';
+const kapCel=v=>(typeof v==='string'&&v.length>CEL_MAX)?v.slice(0,CEL_MAX)+CEL_STAART:v;
 
 async function writeRange(range,values,method='PUT'){
   if(!state.oauthToken) throw new Error('Niet ingelogd');
@@ -374,7 +394,7 @@ const NTD_OMSCHRIJVING = Object.fromEntries(SKEYS.map(sec=>{
 // het dashboard houdt '17-06-2026' in het geheugen terwijl values.get (FORMATTED_VALUE)
 // '17 juni 2026' teruggeeft. Onherkenbaar als datum → val terug op de tekst ('sept/okt', '2/3').
 function _normCel(v, isDatum){
-  const s=leegBijErfenis(v);
+  const s=leegBijErfenis(kapCel(v));
   if(!isDatum||!s) return s;
   const d=_parseAnyDate(s);              // geeft {y,m,d} of null
   return d ? `${d.y}-${d.m}-${d.d}` : s;
@@ -522,4 +542,4 @@ async function assertRowsMatch(checks, sheetName='Nog Te Doen'){
 const assertRowMatch=(row, bronOfCode, sheetName)=>assertRowsMatch(
   [(bronOfCode && typeof bronOfCode==='object') ? { row, r:bronOfCode } : { row, code:bronOfCode }], sheetName);
 
-export { NTD_DATUM, isOffline, fetchMetKlok, _isOffline, _isNetwerkFout, fetchSheet, fetchSheets, writeRange, writeRanges, writeRows, appendRange, appendRows, veiligeCel, _veiligeRij, _shiftNtdRows, _shiftAfRows, _herstelShift, _isTransient, _withRetry, askChat, _rowMismatch, _a1Bereik, vingerafdruk, rijVingerafdruk, _nummerDeel, _normCel, _rijNaarCellen, assertRowsMatch, assertRowMatch, NTD_OMSCHRIJVING, sheetsFetch };
+export { kapCel, NTD_DATUM, isOffline, fetchMetKlok, _isOffline, _isNetwerkFout, fetchSheet, fetchSheets, writeRange, writeRanges, writeRows, appendRange, appendRows, veiligeCel, _veiligeRij, _shiftNtdRows, _shiftAfRows, _herstelShift, _isTransient, _withRetry, askChat, _rowMismatch, _a1Bereik, vingerafdruk, rijVingerafdruk, _nummerDeel, _normCel, _rijNaarCellen, assertRowsMatch, assertRowMatch, NTD_OMSCHRIJVING, sheetsFetch };

@@ -22,7 +22,7 @@ import { state, D } from "./state.js";
 import { verseRij, rijIndex } from "./rij.js";
 import { SECS, SID, OMSCHRIJVING_SLEUTEL, VELD_LABELS } from "./config.js";
 import { berekenPrioriteit, taakTitel } from "./util.js";
-import { assertRowsMatch, _shiftNtdRows, _herstelShift, sheetsFetch } from "./api.js";
+import { assertRowsMatch, _shiftNtdRows, _herstelShift, sheetsFetch, kapCel } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { backgroundWrite, blokkeerOffline, loadAll } from "./data.js";
 import { renderAll } from "./main.js";
@@ -208,7 +208,7 @@ async function verplaatsTaak(r, doelSec, nietOpgeslagen){
   // verversing: het rijnummer hierboven komt uit het geheugen van vóór de vraag die de gebruiker
   // net beantwoordde. Zie `bevestigInvoegPlek` in crud.js.
   try { await bevestigInvoegPlek(doelSec, doelAfterRow); }
-  catch(e){ alert(e.melding || e.message); loadAll(); return false; }
+  catch(e){ alert(e.melding || e.message); loadAll(true); return false; }
   const { doelRij } = verplaatsWaarden(r, bronSec, doelSec, doelAfterRow + 1);
 
   // Optimistisch: uit de oude sectie, in de nieuwe, en de rijnummers meeschuiven. Eerst de oude
@@ -293,7 +293,7 @@ async function verplaatsTaak(r, doelSec, nietOpgeslagen){
         const batchBody = { requests:[
           { insertDimension:{ range:{ sheetId, dimension:'ROWS', startIndex:insIdx, endIndex:insIdx+1 }, inheritFromBefore:true } },
           { updateCells:{ range:{ sheetId, startRowIndex:insIdx, endRowIndex:insIdx+1, startColumnIndex:0, endColumnIndex:rij.length },
-            rows:[{ values: rij.map(v => ({ userEnteredValue:{ stringValue:String(v) } })) }], fields:'userEnteredValue' } },
+            rows:[{ values: rij.map(v => ({ userEnteredValue:{ stringValue:kapCel(String(v)) } })) }], fields:'userEnteredValue' } },
           { deleteDimension:{ range:{ sheetId, dimension:'ROWS', startIndex:oudIndex, endIndex:oudIndex+1 } } },
         ]};
         const resp = await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{

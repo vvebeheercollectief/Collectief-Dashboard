@@ -58,6 +58,9 @@ export default async function handler(req, res){
     if (!ti.ok) { res.status(401).json({ error: 'token ongeldig' }); return; }
     const info = await ti.json().catch(() => ({}));
     if (info.aud !== EXPECTED_AUD) { res.status(401).json({ error: 'verkeerde audience' }); return; }
+    // Alleen een door Google GEVERIFIEERD adres telt. tokeninfo geeft dit veld als STRING ('true'),
+    // vandaar String(): zo werkt de controle ook als Google ooit een echte boolean teruggeeft.
+    if (String(info.email_verified) !== 'true') { res.status(403).json({ error: 'e-mailadres niet geverifieerd' }); return; }
     const email = (info.email || '').trim().toLowerCase();
     if (!email || !ALLOWED_EMAILS.includes(email)) { res.status(403).json({ error: 'geen toegang' }); return; }
 

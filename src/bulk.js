@@ -7,7 +7,7 @@ import { renderNtd } from "./render-lijsten.js";
 import { toDutchDate, taakTitel, berekenPrioriteit, _parseAnyDate, _vandaagAmsterdam, _verschilInKalenderdagen, parseDt, kiesAfgerondRij } from "./util.js";
 import { SID } from "./config.js";
 import { ensureToken } from "./auth.js";
-import { _shiftNtdRows, _shiftAfRows, _herstelShift, assertRowsMatch, _veiligeRij, sheetsFetch } from "./api.js";
+import { _shiftNtdRows, _shiftAfRows, _herstelShift, assertRowsMatch, _veiligeRij, sheetsFetch, kapCel } from "./api.js";
 import { getSheetIds, getAfInsertRow, getInsertRow, insertAndWriteRow, serializeNtdUndo, afrondWaarden, bevestigInvoegPlek } from "./crud.js";
 import { backgroundWrite, loadAll, metWriteMarkering, serieleWrite, blokkeerOffline, syncSelecteerStand } from "./data.js";
 import { showToast, showUndoToast, fireNotifEvent } from "./notifications.js";
@@ -328,7 +328,7 @@ async function bulkAfronden(rows){
   try{ afAnker=getAfInsertRow(items[0].sec); }
   catch(e){ alert(e.message || String(e)); return; }
   try{ await bevestigInvoegPlek(items[0].sec, afAnker, 'Afgerond'); }
-  catch(e){ alert(e.melding || e.message); loadAll(); return; }
+  catch(e){ alert(e.melding || e.message); loadAll(true); return; }
   // optimistisch: hoog→laag lokaal verwijderen + indexen meeschuiven
   items.forEach(it=>{
     const arr=D.ntd[it.sec]||[]; const pos=rijIndex(arr, it.r);   // identiteit, niet object — zie src/rij.js
@@ -362,7 +362,7 @@ async function bulkAfronden(rows){
       requests.push(
         {insertDimension:{range:{sheetId:afSheetId,dimension:'ROWS',startIndex:afAfterRow,endIndex:afAfterRow+1},inheritFromBefore:true}},
         {updateCells:{range:{sheetId:afSheetId,startRowIndex:afAfterRow,endRowIndex:afAfterRow+1,startColumnIndex:0,endColumnIndex:it.afValues.length},
-          rows:[{values:it.afValues.map(v=>({userEnteredValue:{stringValue:String(v)}}))}],fields:'userEnteredValue'}},
+          rows:[{values:it.afValues.map(v=>({userEnteredValue:{stringValue:kapCel(String(v))}}))}],fields:'userEnteredValue'}},
         {deleteDimension:{range:{sheetId:ntdSheetId,dimension:'ROWS',startIndex:it.origRow-1,endIndex:it.origRow}}}
       );
     }
@@ -412,7 +412,7 @@ async function bulkUndoAfronden(items, stand){
     await serieleWrite(async()=>{
       if(stand && !stand.gelukt){
         showToast('Niet ongedaan gemaakt','We konden niet bevestigen dát de taken zijn afgerond, dus er is niets teruggezet. De lijst wordt opnieuw geladen.','var(--am)','label',{geenDedup:true,geenSysteemmelding:true});
-        await loadAll();
+        await loadAll(true);
         return;
       }
       await loadAll(true);                       // verse D.af zodat we de zojuist afgeronde rijen vinden
@@ -448,7 +448,7 @@ async function bulkUndoAfronden(items, stand){
         }
       });
       showToast('Ongedaan gemaakt',`${items.length} taken terug in Nog Te Doen`,'var(--am)','ongedaan');
-      await loadAll();
+      await loadAll(true);
     });
   }catch(e){ alert('Undo fout: '+e.message); }
   finally{ state._undoInFlight=false; }
@@ -534,7 +534,7 @@ async function bulkUndoVerwijderen(items, stand){
     await serieleWrite(async()=>{
       if(stand && !stand.gelukt){
         showToast('Niet ongedaan gemaakt','We konden niet bevestigen dát de taken zijn verwijderd, dus er is niets teruggezet. De lijst wordt opnieuw geladen.','var(--am)','label',{geenDedup:true,geenSysteemmelding:true});
-        await loadAll();
+        await loadAll(true);
         return;
       }
       await metWriteMarkering(async()=>{
@@ -548,7 +548,7 @@ async function bulkUndoVerwijderen(items, stand){
         await logEvents(items.map(it=>({code:it.code,sec:it.sec,actie:'Teruggezet',veld:'status',oudeWaarde:'Verwijderd',nieuweWaarde:'Nog Te Doen (bulk-undo)'})));
       });
       showToast('Ongedaan gemaakt',`${items.length} taken terug in Nog Te Doen`,'var(--am)','ongedaan');
-      await loadAll();
+      await loadAll(true);
     });
   }catch(e){ alert('Undo fout: '+e.message); }
   finally{ state._undoInFlight=false; }

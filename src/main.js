@@ -4,7 +4,7 @@
 import { IS_STAGING, ALLOWED_EMAILS, SKEYS, SECS, APP_VERSION, TEAM } from './config.js';
 import { D, pgs, state } from './state.js';
 import { verseRij } from "./rij.js";
-import { ensureToken, doOAuth } from './auth.js';
+import { ensureToken, doOAuth, uitloggen } from './auth.js';
 import { startSplash } from './login-splash.js';
 import { goTo, syncKop, closeSb, applyTheme, applyDensity, cycleDensity, setupSearch } from './ui.js';
 import { renderNtd, renderAf, renderAlvo, renderAlfa, renderNtdStats, zetKopOpen, kopOpen } from './render-lijsten.js';
@@ -21,7 +21,7 @@ import {
   openModal, closeModal, submitTask, doCompleteTask, closeCompleteModal, kiesSectie, renderExtraVves, _bewerkRijVers, nietOpgeslagenVelden, kiesDuur,
   sluitModalVeilig,
 } from './crud.js';
-import { loadAll, magPollen, schrijfActieLoopt, setSyncOffline, showOfflineBanner, clearOfflineBanner, laadUitCache } from './data.js';
+import { loadAll, magPollen, schrijfActieLoopt, setSyncOffline, showOfflineBanner, clearOfflineBanner, laadUitCache, ruimCacheOp } from './data.js';
 import { initActions } from './actions.js';
 import { initVveZoekveld } from './vve-zoekveld.js';
 import { initWeekKiezer } from './weekkiezer.js';
@@ -41,7 +41,7 @@ import { openChat, closeChat, setChatVve } from './dossier-chat.js';
 import { initPalette, palOpen } from './palette.js';
 import { initSwUpdate } from './sw-update.js';
 import { initModalA11y, bovensteModal } from './modal-a11y.js';
-import { beantwoordBevestiging } from './bevestig.js';
+import { beantwoordBevestiging, vraagBevestiging } from './bevestig.js';
 import { ico } from './icons.js';
 import { groeiVelden } from './opmaak.js';
 
@@ -228,6 +228,14 @@ document.addEventListener('DOMContentLoaded',()=>{
   // mee als eerste argument — en dat is de 'stil'-vlag. De knop onderdrukte daardoor
   // zijn eigen 'Laden…'-melding én de foutbanner met 'Opnieuw proberen'.
   document.getElementById('refresh-btn').onclick=()=>loadAll();
+  // Uitloggen. Loopt er nog een schrijfactie, dan eerst vragen: uitloggen haalt het token weg, en
+  // dan mislukt die schrijfactie (de wijziging wordt teruggezet).
+  document.getElementById('uitlog-btn')?.addEventListener('click', async ()=>{
+    if(state.pendingWrites>0 && !await vraagBevestiging({
+        titel:'Nu uitloggen?', tekst:'Er wordt nog iets opgeslagen. Log je nu uit, dan gaat die wijziging verloren.',
+        bevestigTekst:'Toch uitloggen', gevaarlijk:true })) return;
+    uitloggen();
+  });
   document.getElementById('theme-btn').onclick=()=>applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark');
   document.getElementById('density-btn').onclick=cycleDensity;
   document.getElementById('ai-btn').onclick=openAiHelp;
@@ -589,6 +597,10 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(state.oauthExpiry - Date.now() > 5*60*1000) return;
     doOAuth(false);
   },4*60*1000);
+
+  // Oude leescaches weg (andere versie, of ouder dan twee weken) — vóór de inlog, zodat dat ook
+  // gebeurt op een computer waar niemand meer inlogt. Zie ruimCacheOp in data.js.
+  ruimCacheOp();
 
   // Sessie herstellen uit sessionStorage
   const _st=sessionStorage.getItem('oauthToken');

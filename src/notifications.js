@@ -225,7 +225,12 @@ async function undoComplete(undoData) {
         showToast('Niet ongedaan gemaakt',
                   'We konden niet bevestigen dát de taak is afgerond, dus er is niets teruggezet. De lijst wordt opnieuw geladen — kijk of de taak er nog staat.',
                   'var(--am)', 'label', { geenDedup:true, geenSysteemmelding:true });
-        await loadAll();
+        // `loadAll(true)` — de STILLE ronde — op alle undo- en foutpaden hier en in bulk.js. Een luide
+        // ronde leest het hele Logboek opnieuw (duizenden regels) en zet de balk op 'Laden…'; deze
+        // paden hebben alleen verse taken nodig, en hun eigen logregel is een append die de
+        // staartlezing gewoon meeneemt. Alleen het herstel van een verwijderde LOGregel
+        // (undoDeleteLog, render-overig.js) blijft luid: dat verschuift rijnummers in het Logboek.
+        await loadAll(true);
         return;
       }
       // De invoegplek in 'Nog Te Doen' vers narekenen, net als bij het aanmaken van een taak.
@@ -233,7 +238,7 @@ async function undoComplete(undoData) {
       // bevestigInvoegPlek meteen terug zonder iets te bewaken.
       const insertRowVooraf = getInsertRow(sec);
       try { await bevestigInvoegPlek(sec, insertRowVooraf); }
-      catch(e){ alert(e.melding || e.message); await loadAll(); return; }
+      catch(e){ alert(e.melding || e.message); await loadAll(true); return; }
       // Alleen het schrijvende deel onder de teller — de loadAll hieronder moet zijn verse data
       // WÉL kunnen gebruiken (zie de waarschuwing bij metWriteMarkering).
       await metWriteMarkering(async () => {
@@ -282,7 +287,7 @@ async function undoComplete(undoData) {
       // De loadAll hoort nog bínnen de beurt: zo staat D weer vers vóórdat een wachtende
       // schrijfactie (bijvoorbeeld een tweede undo) zijn eigen anker uit D berekent.
       showToast('Ongedaan gemaakt', `${undoData.code} terug in Nog Te Doen`, 'var(--am)', 'ongedaan');
-      await loadAll();
+      await loadAll(true);
       const terug=(D.ntd[sec]||[]).filter(x=>x.code===undoData.code).pop();
       if(terug) flashRow('ntd-tbody', terug._row, 'rij-flits-amber');
     });
@@ -307,18 +312,18 @@ async function undoDelete(undoData) {
         showToast('Niet ongedaan gemaakt',
                   'We konden niet bevestigen dát de taak is verwijderd, dus er is niets teruggezet. De lijst wordt opnieuw geladen — kijk of de taak er nog staat.',
                   'var(--am)', 'label', { geenDedup:true, geenSysteemmelding:true });
-        await loadAll();
+        await loadAll(true);
         return;
       }
       const insertRow = getInsertRow(sec);
       try { await bevestigInvoegPlek(sec, insertRow); }
-      catch(e){ alert(e.melding || e.message); await loadAll(); return; }
+      catch(e){ alert(e.melding || e.message); await loadAll(true); return; }
       await metWriteMarkering(async () => {
         await insertAndWriteRow('Nog Te Doen', insertRow, ntdValues);
         await logEvent(undoData.code, sec, 'Teruggezet', 'status', 'Verwijderd', 'Nog Te Doen');
       });
       showToast('Ongedaan gemaakt', `${undoData.code} terug in Nog Te Doen`, 'var(--am)', 'ongedaan');
-      await loadAll();
+      await loadAll(true);
       const terug=(D.ntd[sec]||[]).filter(x=>x.code===undoData.code).pop();
       if(terug) flashRow('ntd-tbody', terug._row, 'rij-flits-amber');
     });

@@ -7,7 +7,7 @@ import { SKEYS, SECS, APP_VERSION, ALLOWED_EMAILS } from "./config.js";
 import { fetchSheet, fetchSheets, _withRetry, isOffline } from "./api.js";
 import { ensureToken, doOAuth, fetchUserEmail, logout, _wisTokenSessie } from "./auth.js";
 import { buildAnalytics, buildDash } from "./render-analytics.js";
-import { renderNtdDonut, renderNtd } from "./render-lijsten.js";
+import { renderNtdDonut, renderNtd, renderAf } from "./render-lijsten.js";
 // Kringverwijzing data ⇄ bulk, net als data ⇄ main en ui ⇄ bulk: bulk.js haalt backgroundWrite en
 // loadAll hiervandaan. Allebei worden ze pas op RUNTIME aangeroepen, dus de live bindings van
 // ES-modules dekken dit — er staat aan geen van beide kanten iets op moduleniveau dat de ander
@@ -161,12 +161,24 @@ function _ruimOudeCache(huidig){
 let _cacheGeblokkeerd = location.search.includes('test=1');
 const _zetCacheBlokkade = aan => { _cacheGeblokkeerd = !!aan; };
 
+// De CRM-mail gaat er NIET in. Dat is de volledige tekst van een eigenaar (naam, adres, soms
+// een klacht over de buren) en localStorage staat onversleuteld op schijf, ook nadat de sessie
+// verlopen is. Tot de eerste verse ronde (een seconde of twee) toont het uitklappaneel dan 'Geen
+// mail bewaard'; schrijven kan in die tijd toch niet (de cache-rem in blokkeerOffline). Daarom hier
+// een eigen serialisatie in plaats van `hashJson`: het kost één extra JSON-bouw, maar alleen bij
+// een échte wijziging (zie de aanroep in _loadRonde), niet elke acht seconden.
+// `t` = wanneer bewaard. Een cache van meer dan CACHE_MAX_DAGEN oud wordt niet meer gelezen en bij
+// het opstarten weggegooid (ruimCacheOp).
+const CACHE_MAX_DAGEN=14;
 function bewaarCache(hashJson){
   if(_cacheGeblokkeerd) return;
   const sleutel=_cacheSleutel(state.currentUserEmail);
   try{
     _ruimOudeCache(sleutel);
-    localStorage.setItem(sleutel, '{"d":'+hashJson+',"s":'+JSON.stringify([D.ntdSecInfo,D.afSecInfo])+'}');
+    const d=JSON.stringify([D.ntd,D.af,D.alvo,D.alfa,D.ontw,D.logboek,D.herhaal,D.kenmerken],
+                           (k,v)=>k==='mail' ? undefined : v);
+    void hashJson;   // bewust niet hergebruikt: die draagt de mail wél
+    localStorage.setItem(sleutel, '{"t":'+Date.now()+',"d":'+d+',"s":'+JSON.stringify([D.ntdSecInfo,D.afSecInfo])+'}');
   }catch(e){
     // Vol of geweigerd (privémodus): stil opgeven en de eigen sleutel weghalen. Een cache is
     // comfort; hij mag nooit een laadronde of een voorkeur-setItem in de weg zitten.
@@ -181,6 +193,10 @@ function laadUitCache(){
     const ruw=localStorage.getItem(_cacheSleutel(state.currentUserEmail));
     if(!ruw) return false;
     const o=JSON.parse(ruw);
+    // Te oud (of van vóór de tijdstempel): niet tonen en meteen weg. Twee weken oude taken en
+    // rijnummers zijn geen 'laatst bekende stand' meer, en de cache hoort niet onbeperkt op een
+    // (gedeelde) computer te blijven staan.
+    if(!_cacheVers(o, Date.now())){ localStorage.removeItem(_cacheSleutel(state.currentUserEmail)); return false; }
     const [ntd,af,alvo,alfa,ontw,logboek,herhaal,kenmerken]=o.d||[];
     if(!ntd||!af) return false;
     D.ntd=ntd; D.af=af; D.alvo=alvo||[]; D.alfa=alfa||[]; D.ontw=ontw||[];
@@ -197,6 +213,27 @@ function laadUitCache(){
     renderAll();
     return true;
   }catch(_){ return false; }
+}
+// Pure (testbaar): is een bewaarde cache nog jong genoeg om te tonen?
+function _cacheVers(o, nu){
+  return !!(o && typeof o.t==='number' && (nu-o.t) <= CACHE_MAX_DAGEN*864e5);
+}
+// Bij het opstarten, nog vóór de inlog: elke cache van een ANDERE versie weg (het dataformaat kan
+// veranderd zijn, en een oude versie leest hem toch nooit meer), en van de huidige versie alles wat
+// ouder is dan CACHE_MAX_DAGEN. `_ruimOudeCache` deed het eerste al, maar pas bij de eerste
+// geslaagde ronde ná een inlog — wie nooit meer inlogt op die computer liet hem eeuwig staan.
+function ruimCacheOp(nu){
+  const t=nu||Date.now();
+  const huidig=CACHE_PREFIX+APP_VERSION+'_';
+  try{
+    for(let i=localStorage.length-1;i>=0;i--){
+      const k=localStorage.key(i);
+      if(!k || !k.startsWith(CACHE_PREFIX)) continue;
+      if(!k.startsWith(huidig)){ localStorage.removeItem(k); continue; }
+      let o=null; try{ o=JSON.parse(localStorage.getItem(k)||'null'); }catch(_){}
+      if(!_cacheVers(o, t)) localStorage.removeItem(k);
+    }
+  }catch(_){}
 }
 function wisCache(){
   try{
@@ -406,6 +443,50 @@ const POLL_TABS=["Nog Te Doen","Afgerond","ALV's overzicht","ALV's afgerond",
 // Dit legt expliciet vast wat eerder in de hand uitgeschreven Promise.all-regels stond — waar
 // het verschil tussen wél en géén .catch alleen uit de vorm van de regel te lezen was.
 const VERPLICHTE_TABS=new Set(["Nog Te Doen","Afgerond","ALV's overzicht","ALV's afgerond"]);
+
+// 'Afgerond' leest de poll alleen t/m kolom V. Kolom W is de volledige CRM-mail (tot 45.000 tekens
+// per cel), en die ging met elke afgeronde CRM-taak mee naar het archief: elke acht seconden over
+// de lijn, gehasht en in de leescache gezet — voor een veld dat op de Afgerond-pagina nergens in
+// beeld staat. Wie hem toch nodig heeft:
+//   · ongedaan maken van een afronding zet de rij terug uit het GEHEUGEN van vóór het afronden
+//     (serializeNtdUndo, crud.js / _ntdValues, bulk.js), niet uit 'Afgerond' — dus de mail gaat
+//     daar gewoon mee terug;
+//   · zoeken op de Afgerond-pagina haalt kolom W op verzoek op (vraagAfMailOp hieronder).
+// Onder de naam 'Afgerond' teruggezet zodra hij binnen is, zodat de rest van de ronde niets merkt.
+const AF_POLL="'Afgerond'!A:V";
+
+// Kolom W van 'Afgerond' op verzoek: alleen als iemand op de Afgerond-pagina zoekt en er afgeronde
+// CRM-taken zijn (renderAf, render-lijsten.js). Hoogstens één keer per minuut, zelfde maat als de
+// volledige Logboek-lezing. De mails landen in `state._afMail` (taaknummer → mail) en NIET in D: de
+// volgende poll vervangt D.af toch, en zo hoeft de wijzigingshash er niets van te weten. renderAf
+// hangt ze bij het zoeken aan de rij (hangAfMailAan). Een mislukte lezing telt ook als poging, zodat
+// een storing niet elke toetsaanslag een verzoek kost.
+const AF_MAIL_MS=60000;
+async function vraagAfMailOp(){
+  if(state._afMailBezig || !state.oauthToken) return;
+  if(state._afMailMs && Date.now()-state._afMailMs < AF_MAIL_MS) return;
+  state._afMailBezig=true;
+  try{
+    const rijen=await _withRetry(()=>fetchSheet("'Afgerond'!Q:W"));
+    state._afMail=afMailKaart(rijen);
+    state._afMailMs=Date.now();
+    renderAf();
+  }catch(e){ state._afMailMs=Date.now(); console.warn('[afgerond] mails niet opgehaald:', e && e.message); }
+  finally{ state._afMailBezig=false; }
+}
+// Pure (testbaar): rijen Q..W (vanaf rij 1) → Map met 'T:'+taaknummer, of 'R:'+rijnummer voor een
+// rij zonder nummer, naar de mail.
+function afMailKaart(rijen){
+  const m=new Map();
+  (rijen||[]).forEach((r,i)=>{
+    const mail=(r && r[6]!=null ? String(r[6]) : '').trim();
+    if(!mail) return;
+    const nr=leegBijErfenis(r[0]);
+    if(nr==='TaakID') return;   // een kolomkoprij, geen taak (zelfde uitzondering als vingerafdruk)
+    m.set(nr ? 'T:'+nr : 'R:'+(i+1), mail);
+  });
+  return m;
+}
 
 // Is de terugval op losse reads hier zinvol? Alleen bij een 400: dan wees Google één bereik af
 // (een tabblad dat op deze kopie van de Sheet niet bestaat) en levert per-tabblad lezen de rest
@@ -657,6 +738,12 @@ async function _loadRonde(silent){
   state._loadInFlight=true;
   // Welke schrijfgeneratie zag deze ronde bij de start? Zie de controle ná het lezen.
   const genBijStart=state._schrijfGen||0;
+  // En liep er toen al een schrijfactie? Dan kan wat deze ronde leest van vóór die schrijfactie
+  // zijn, óók als hij tijdens het lezen klaar is: de generatie hierboven telt bij het BEGIN van een
+  // schrijfactie, dus een write die al liep verandert hem niet meer. Zo zette een klik op
+  // Vernieuwen midden in een opslag even de oude stand neer (de afgeronde taak terug, oude
+  // rijnummers) tot de volgende ronde. Zie de controle ná het lezen.
+  const schrijftBijStart=(state.pendingWrites||0)>0;
   try{
     // Altijd een geldige token garanderen (ook bij Vernieuwen-knop / schrijf-resync):
     // een verlopen-maar-niet-null token gaf anders een 401 → onnodige 'Fout'.
@@ -701,7 +788,7 @@ async function _loadRonde(silent){
     const logVolledig=_logVolledigNodig(!silent, state._logHoogwater, _kijktNaarLog(), state._logVolledigMs, Date.now());
     const logNaam=logVolledig ? 'Logboek' : _logBereik(state._logHoogwater);
     const alfaMee=_alfaNodig(!silent, _kijktNaarAlfa(), state._alfaMs, Date.now());
-    const namen=POLL_TABS.map(n=>n==='Logboek' ? logNaam : n)
+    const namen=POLL_TABS.map(n=>n==='Logboek' ? logNaam : n==='Afgerond' ? AF_POLL : n)
                          .filter(n=>alfaMee || n!=="ALV's afgerond");
     // De meldingenbereiken zitten bewust NIET in POLL_TABS: ze landen nergens in D en mogen nooit
     // meetellen als een tabblad waarvan het dashboard afhangt.
@@ -758,10 +845,12 @@ async function _loadRonde(silent){
         console.warn('batchGet mislukt, terugval op losse reads:', e.message);
         R={};
         await Promise.all(namen.map(async n=>{
-          R[n]=VERPLICHTE_TABS.has(n) ? await lees(n) : await lees(n).catch(()=>[]);
+          R[n]=(VERPLICHTE_TABS.has(n) || n===AF_POLL) ? await lees(n) : await lees(n).catch(()=>[]);
         }));
       }
     }
+    // Het ingekorte Afgerond-bereik weer onder zijn eigen naam (zie AF_POLL).
+    if(R[AF_POLL]!==undefined){ R['Afgerond']=R[AF_POLL]; delete R[AF_POLL]; }
     state._syncFails=0; // alle reads geslaagd
     // Meldingen VÓÓR de pendingWrites-terugkeer hieronder: een toast is alleen-lezen en heeft geen
     // belang bij de regel 'de optimistische stand is leidend'. Die regel bestaat om D niet te
@@ -781,7 +870,7 @@ async function _loadRonde(silent){
     // De aanroeper wacht op die vervolgronde (zelfde belofte als loadAll bij een lopende ronde; de
     // finally hieronder lost hem op) — anders kreeg een directe `await loadAll()` meteen `false`
     // en werkte hij verder op de oude D. Een handmatige verversing blijft luid.
-    if((state._schrijfGen||0)!==genBijStart){
+    if((state._schrijfGen||0)!==genBijStart || schrijftBijStart){
       state._loadAgain=true; if(!silent) state._loadAgainLoud=true;
       if(!state._loadAgainPromise) state._loadAgainPromise=new Promise(res=>{ state._loadAgainKlaar=res; });
       return state._loadAgainPromise;
@@ -1095,4 +1184,5 @@ export {
   MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen,
   blokkeerOffline, showOfflineBanner, clearOfflineBanner, setSyncOffline, syncSelecteerStand, showLoadError, clearLoadError,
   bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade,
+  ruimCacheOp, _cacheVers, AF_POLL, vraagAfMailOp, afMailKaart,
 };

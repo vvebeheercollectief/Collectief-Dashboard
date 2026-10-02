@@ -168,11 +168,13 @@ function cd_archiveerRij(sheet, row) {
   if (sectie === "") return;
 
   var vveCode = rowData[0];
-  // Als TEKST 'dd-mm-jjjj', precies zoals doCompleteTask/afrondWaarden (src/crud.js) hem schrijft;
-  // Sheets maakt er net als bij het dashboard een datum van. Eerder stond hier new Date() mét
-  // tijd, en zo'n cel kan als '2-10-2026 14:33:12' verschijnen — die vorm weigert _parseAnyDate,
-  // waarna de afronding in het scherm zonder datum stond (naloop 2026-10-02).
-  var datumAfgerond = cd_ddmmyyyy(new Date());   // Opvolging.gs
+  // Als TEKST 'dd-mm-jjjj', precies zoals doCompleteTask/afrondWaarden (src/crud.js) hem schrijft:
+  // het dashboard zet hem met `stringValue`, dus als letterlijke tekst en niet als datum. De
+  // apostrof doet hier hetzelfde (anders maakt setValues er een datum van). Eerder stond hier
+  // new Date() mét tijd, en zo'n cel kan als '2-10-2026 14:33:12' verschijnen — die vorm weigert
+  // _parseAnyDate, waarna de afronding in het scherm zonder datum stond (naloop 2026-10-02).
+  // cd_hr_verwerkAfrondingen leest de tekstvorm gewoon via cd_parseDate.
+  var datumAfgerond = "'" + cd_ddmmyyyy(new Date());   // cd_ddmmyyyy: Opvolging.gs
 
   // Het archiefstramien van afrondWaarden (src/crud.js) — NIET meer de oude vijf kolommen.
   // Twee redenen. (1) Het Herhaal-ID moet mee: cd_hr_verwerkAfrondingen leest dat op kolom L van

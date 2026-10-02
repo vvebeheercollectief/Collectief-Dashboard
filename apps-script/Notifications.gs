@@ -188,6 +188,7 @@ function cd_handleNtdEdit(sheet, row, e) {
     cd_notifyByTag('n_newtask', '1', {
       title: '📋 Nieuwe taak — ' + sec.toLowerCase(),
       body: code + (naam ? ' · ' + naam : '') + (beh ? ' → ' + beh : ''),
+      pushBody: code + (beh ? ' → ' + beh : ''),   // zonder VvE-naam, zie cd_pushTekst
       url: APP_URL
     });
     if (beh) {
@@ -195,6 +196,7 @@ function cd_handleNtdEdit(sheet, row, e) {
         cd_notifyByExternalId(name, 'n_assigned', '1', {
           title: '➕ Toegewezen aan jou',
           body: code + (naam ? ' · ' + naam : ''),
+          pushBody: code + ' · ' + sec.toLowerCase(),
           url: APP_URL
         });
       });
@@ -204,6 +206,7 @@ function cd_handleNtdEdit(sheet, row, e) {
       cd_notifyByExternalId(name, 'n_assigned', '1', {
         title: '➕ Toegewezen aan jou',
         body: code + (naam ? ' · ' + naam : ''),
+        pushBody: code + ' · ' + sec.toLowerCase(),
         url: APP_URL
       });
     });
@@ -243,16 +246,18 @@ function cd_handleAlvoEdit(sheet, row, e) {
   // zetten. Tellen doen we op de kolom die bewerkt is, over het hele bereik.
   var nRijen = e.range.getNumRows();
   var tekst = code + (naam ? ' · ' + naam : '');
+  var pushTekst = code;   // zonder VvE-naam, zie cd_pushTekst
   if (nRijen > 1) {
     var blok = sheet.getRange(e.range.getRow(), col, nRijen, 1).getValues();
     var aan = 0;
     for (var z = 0; z < blok.length; z++) if ((blok[z][0] + '').toString().toUpperCase() === 'TRUE') aan++;
-    if (aan > 1) tekst = aan + " ALV's — o.a. " + tekst;
+    if (aan > 1) { tekst = aan + " ALV's — o.a. " + tekst; pushTekst = aan + " ALV's — o.a. " + pushTekst; }
   }
 
   cd_notifyByTag('n_alv', '1', {
     title: label,
     body: tekst,
+    pushBody: pushTekst,
     url: APP_URL
   });
 }
@@ -318,7 +323,9 @@ function cd_checkDeadlines() {
             const verzondenSleutel = 'dlpush-' + ((data[i][16] || code)) + '-' + h + '-' + dl.getTime();
             if (cache.get(verzondenSleutel)) return;
             cache.put(verzondenSleutel, '1', 3 * 3600);
-            const body = code + (naam ? ' · ' + naam : '') + ' — over ' + Math.round(hoursUntil) + ' uur';
+            // Alleen push (zie hieronder), dus alleen de push-veilige vorm: code + soort, geen VvE-naam
+            // (zie cd_pushTekst).
+            const body = code + ' · ' + curSec.toLowerCase() + ' — over ' + Math.round(hoursUntil) + ' uur';
             cd_splitBehandelaar(beh).forEach(name => {
               // BEWUST GEEN cd_schrijfMelding hier, anders dan bij alle andere meldingssoorten.
               // Dat is geen vergetelheid maar een gevolg van het derde tag-filter hieronder:
@@ -521,23 +528,45 @@ function cd_getApiKey() {
   return k;
 }
 
+// PRIVACY VAN DE PUSH (naloop 2026-10-02). Een push gaat naar elk toestel met de juiste OneSignal-
+// tags, en die tags zet de browser zelf (src/notifications.js, al vóór het inloggen): wie de app
+// opent kan zich als 'behandelaar = Jer' aanmelden. Wat in een push staat moet dus te verdragen
+// zijn op een onbekend toestel. Daarom twee teksten per melding:
+//   · opts.title / opts.body          → het tabblad 'Meldingen' (in-app, alleen na inloggen te
+//                                       lezen). MAG de VvE-naam en omschrijving bevatten, en blijft
+//                                       bewust ongewijzigd: de app ontdubbelt zijn eigen directe
+//                                       toast tegen deze regel op titel + tekst (meldSleutel).
+//   · opts.pushTitle / opts.pushBody  → OneSignal. Alleen VvE-code, soort melding en de voornaam
+//                                       van de behandelaar — genoeg om de taak in het dashboard te
+//                                       vinden. NOOIT de VvE-naam (een adres) of vrije tekst.
+// Ontbreekt pushTitle/pushBody, dan gaat title/body mee; geef dus bij elke melding met een naam of
+// omschrijving erin een pushBody op.
+function cd_pushTekst(opts) {
+  return {
+    title: opts.pushTitle !== undefined ? opts.pushTitle : opts.title,
+    body:  opts.pushBody  !== undefined ? opts.pushBody  : opts.body
+  };
+}
+
 function cd_notifyByTag(tagKey, tagValue, opts) {
   cd_schrijfMelding(opts.type || tagKey, opts.title, opts.body, 'allen');
+  const push = cd_pushTekst(opts);
   return cd_sendNotification({
     filters: [{ field: 'tag', key: tagKey, relation: '=', value: tagValue }],
-    title: opts.title, body: opts.body, url: opts.url, dedupKey: opts.dedupKey
+    title: push.title, body: push.body, url: opts.url, dedupKey: opts.dedupKey
   });
 }
 
 function cd_notifyByExternalId(extId, tagKey, tagValue, opts) {
   cd_schrijfMelding(opts.type || tagKey, opts.title, opts.body, extId);
+  const push = cd_pushTekst(opts);
   return cd_sendNotification({
     filters: [
       { field: 'tag', key: 'behandelaar', relation: '=', value: extId },
       { operator: 'AND' },
       { field: 'tag', key: tagKey, relation: '=', value: tagValue }
     ],
-    title: opts.title, body: opts.body, url: opts.url, dedupKey: opts.dedupKey
+    title: push.title, body: push.body, url: opts.url, dedupKey: opts.dedupKey
   });
 }
 
@@ -594,6 +623,7 @@ function cd_processNotifEvent(data) {
     cd_notifyByTag('n_newtask', '1', {
       title: '📋 Nieuwe taak — ' + sec.toLowerCase(),
       body: code + (naam ? ' · ' + naam : '') + (beh ? ' → ' + beh : ''),
+      pushBody: code + (beh ? ' → ' + beh : ''),
       url: APP_URL, dedupKey: 'new-' + code + '-' + uid
     });
     if (beh) {
@@ -602,6 +632,7 @@ function cd_processNotifEvent(data) {
           cd_notifyByExternalId(name, 'n_assigned', '1', {
             title: '➕ Toegewezen aan jou',
             body: code + (naam ? ' · ' + naam : ''),
+            pushBody: code + (sec ? ' · ' + sec.toLowerCase() : ''),
             url: APP_URL, dedupKey: 'assign-' + code + '-' + name + '-' + uid
           });
         }
@@ -614,6 +645,7 @@ function cd_processNotifEvent(data) {
           cd_notifyByExternalId(name, 'n_assigned', '1', {
             title: '➕ Toegewezen aan jou',
             body: code + (naam ? ' · ' + naam : ''),
+            pushBody: code + (sec ? ' · ' + sec.toLowerCase() : ''),
             url: APP_URL, dedupKey: 'reassign-' + code + '-' + name + '-' + uid
           });
         }
@@ -629,6 +661,7 @@ function cd_processNotifEvent(data) {
     cd_notifyByTag('n_alv', '1', {
       title: data.title || '🏢 ALV-status verandert',
       body: code + (naam ? ' · ' + naam : ''),
+      pushBody: code,
       url: APP_URL, dedupKey: 'alv-' + code + '-' + uid
     });
   } else if (ev === 'logboek') {
@@ -672,6 +705,7 @@ function cd_processNotifEvent(data) {
     cd_notifyByTag('n_newtask', '1', {
       title: '📋 Nieuwe taak — ' + (categorie || '').toLowerCase(),
       body: code + (naam ? ' · ' + naam : '') + (beh ? ' → ' + beh : ''),
+      pushBody: code + (beh ? ' → ' + beh : ''),
       url: APP_URL, dedupKey: 'mailnew-' + code + '-' + uid
     });
     if (beh) {
@@ -680,6 +714,7 @@ function cd_processNotifEvent(data) {
           cd_notifyByExternalId(name, 'n_assigned', '1', {
             title: '➕ Toegewezen aan jou',
             body: code + (naam ? ' · ' + naam : ''),
+            pushBody: code + (categorie ? ' · ' + categorie.toLowerCase() : ''),
             url: APP_URL, dedupKey: 'mailassign-' + code + '-' + name + '-' + uid
           });
         }

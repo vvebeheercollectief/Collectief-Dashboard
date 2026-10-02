@@ -204,6 +204,7 @@ function cd_hr_zetTakenKlaar() {
           type: 'n_herhaal',
           title: '🔁 Terugkerende taak klaargezet',
           body: code + (naam ? ' · ' + naam : '') + ' — ' + oms,
+          pushBody: code + ' · ' + sectie.toLowerCase(),   // geen naam/omschrijving: zie cd_pushTekst
           url: APP_URL, dedupKey: 'hr-' + id + '-' + dlStr
         });
       });
@@ -300,6 +301,7 @@ function cd_opvolgWakker() {
           type: 'n_opvolg',      // eigen type — zie de toelichting bij 'n_herhaal' hierboven
           title: '🔔 Opvolgen vandaag',
           body: code + (naam ? ' · ' + naam : ''),
+          pushBody: code + ' · ' + curSec.toLowerCase(),
           // Taaknummer (kolom Q) in de sleutel — die waarde wordt het web_push_topic, en twee
           // taken van dezelfde VvE op dezelfde dag deelden er anders één: de tweede push verving
           // dan de eerste op het toestel. Terugval op de code voor rijen zonder taaknummer.
@@ -380,6 +382,7 @@ function cd_escaleerStilleDossiers() {
                                  // meeliften op de schakelaar 'Nieuwe taak toegevoegd'
           title: '⚠️ Stil dossier — escalatie',
           body: code + (naam ? ' · ' + naam : '') + ' — ' + dagen + ' dagen geen activiteit (' + (beh || 'geen behandelaar') + ')',
+          pushBody: code + ' · ' + curSec.toLowerCase() + ' — ' + dagen + ' dagen geen activiteit (' + (beh || 'geen behandelaar') + ')',
           url: APP_URL, dedupKey: 'esc2-' + ((vers[16] || code)) + '-' + cd_ddmmyyyy(today)   // taaknummer: zie de toelichting bij 'opvolg-'
         });
       } else if (dagen >= regels.trap1 && !heeftT1 && !heeftT2) {
@@ -388,6 +391,7 @@ function cd_escaleerStilleDossiers() {
           type: 'n_escalatie',
           title: '🔕 Stil dossier — ' + dagen + ' dagen geen activiteit',
           body: code + (naam ? ' · ' + naam : ''),
+          pushBody: code + ' · ' + curSec.toLowerCase(),
           url: APP_URL, dedupKey: 'esc1-' + ((vers[16] || code)) + '-' + cd_ddmmyyyy(today)   // idem
         };
         const personen = cd_splitBehandelaar(beh);
@@ -398,6 +402,7 @@ function cd_escaleerStilleDossiers() {
           // zonder 'In behandeling'): dan ging trap 1 naar niemand. Naar het team, via dezelfde
           // team-tag als trap 2 (naloop 25-09).
           t1.body += ' (geen behandelaar)';
+          t1.pushBody += ' (geen behandelaar)';
           cd_notifyByTag('n_newtask', '1', t1);
         }
       }

@@ -2,7 +2,7 @@
 //  RENDER-ALV — ALV-overzicht + ALV-afgerond + aanvink-schrijfactie ("ALV's overzicht")
 //  Verplaatst uit render-lijsten.js (Batch D / punt 11) — zuivere refactor, geen gedragswijziging.
 // ══════════════════════════════════════
-import { esc, emptyRow, vveCodeSpan } from "./util.js";
+import { esc, emptyRow, vveCodeSpan, voortgang } from "./util.js";
 import { SID, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { getSheetIds } from "./crud.js";
@@ -13,7 +13,6 @@ import { ensureToken } from "./auth.js";
 import { renderPag } from "./render-tabel.js";
 import { renderNtdDonut } from "./render-lijsten.js";
 import { metWriteMarkering, serieleWrite, blokkeerOffline } from "./data.js";
-import { ico } from "./icons.js";
 
 // ══════════════════════════════════════
 //  ALV OVERZICHT
@@ -36,13 +35,15 @@ function renderAlvo(){
   // De tegels zijn de afstreeplijst: klikken zet het statusfilter (actie 'alvo-stat').
   const huidig=document.getElementById('f-status-alvo').value;
   const aItem=(val,cls,cap)=>`<div class="stat-item"><span class="stat-val ${cls}">${val}</span><div class="stat-meta"><span class="stat-cap">${cap}</span></div></div>`;
-  const aKnop=(val,cls,cap,status)=>`<button type="button" class="stat-item stat-klik${huidig===status?' aan':''}" data-action="alvo-stat" data-status="${status}" aria-pressed="${huidig===status}" title="Toon alleen ${cap}"><span class="stat-val ${cls}">${val}</span><div class="stat-meta"><span class="stat-cap">${cap}</span></div></button>`;
+  // Het bijschrift draagt hetzelfde voortgangsrondje als de statuskolom (v13.8): zo is de strook
+  // meteen de legenda van de tabel, en de cijfers zelf hoeven geen eigen kleur meer.
+  const aKnop=(val,cap,status)=>`<button type="button" class="stat-item stat-klik${huidig===status?' aan':''}" data-action="alvo-stat" data-status="${status}" aria-pressed="${huidig===status}" title="Toon alleen ${cap}"><span class="stat-val">${val}</span><div class="stat-meta"><span class="stat-cap">${voortgang(status,cap)}</span></div></button>`;
   document.getElementById('alvo-stats').innerHTML=
     aItem(tot,'',"Totaal VvE's")+
-    aKnop(afd,'green','Afgerond','Afgerond')+
-    aKnop(gep,'amber','Gepland','Gepland')+
-    aKnop(kla,'teal','Klaargezet','Klaargezet')+
-    aKnop(opn,opn?'red':'muted','Open','Open');
+    aKnop(afd,'Afgerond','Afgerond')+
+    aKnop(gep,'Gepland','Gepland')+
+    aKnop(kla,'Klaargezet','Klaargezet')+
+    aKnop(opn,'Open','Open');
 
   const q=document.getElementById('s-alvo').value.toLowerCase().trim();
   const fs=document.getElementById('f-status-alvo').value;
@@ -65,7 +66,7 @@ function renderAlvo(){
         <td>${flagPill(idx,'uitnodiging',r.uitnodiging,r.code)}</td>
         <td>${flagPill(idx,'notulen',r.notulen,r.code)}</td>
         <td>${flagPill(idx,'begroting',r.begroting,r.code)}</td>
-        <td><span class="badge status-${esc((r.status||'').toLowerCase().replace(/[^a-z0-9]+/g,'-'))}">${statusIco(r.status)} ${esc(r.status)}</span></td>
+        <td>${voortgang(r.status)}</td>
       </tr>`;
     }).join('')
     :emptyRow(7);
@@ -79,7 +80,9 @@ const ALVO_LABELS={uitnodiging:'Uitnodiging',notulen:'Notulen',begroting:'Begrot
 
 function flagPill(idx,field,val,code){
   const cls=val?'on':'off';
-  const lbl=val?'✓ Ja':'–';
+  // Een rondje dat gevuld is of niet (v13.8) i.p.v. een pil '✓ Ja' / '–': in een kolom van zestien
+  // rijen zie je zo in één oogopslag waar het nog open staat. De naam komt uit aria-label hieronder.
+  const lbl='<span class="vlag" aria-hidden="true"></span>';
   const aria=val?'true':'false';
   const title=`Klik om ${ALVO_LABELS[field]} ${val?'uit':'aan'} te zetten`;
   // aria-label naast de zichtbare '✓ Ja' / '–': de naam van een knop komt uit zijn inhoud, en die
@@ -246,7 +249,6 @@ async function toggleAlvoFlag(idx,field,code){
     if(btn2) btn2.classList.remove('toggling');
   }
 }
-function statusIco(s){return{Open:ico('zandloper'),Klaargezet:ico('klembord'),Gepland:ico('kalender'),Afgerond:ico('vinkCirkel')}[s]||''}
 
 // ══════════════════════════════════════
 //  ALV AFGEROND
@@ -266,4 +268,4 @@ function renderAlfa(){
   renderPag('alfa-pag',rows.length,pgs.alfa,'alfa');
 }
 
-export { ALVO_ICONS, renderAlvo, ALVO_COLS, ALVO_LABELS, flagPill, _recomputeAlvoStatus, toggleAlvoFlag, statusIco, renderAlfa };
+export { ALVO_ICONS, renderAlvo, ALVO_COLS, ALVO_LABELS, flagPill, _recomputeAlvoStatus, toggleAlvoFlag, renderAlfa };

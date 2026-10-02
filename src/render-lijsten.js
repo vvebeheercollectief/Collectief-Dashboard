@@ -11,7 +11,7 @@ import { bulkWis, renderBulkUi, allesVinkjeHtml, bulkHerstel } from "./bulk.js";
 import { showToast } from "./notifications.js";
 import { renderThead, renderTbody, renderPag, bepaalStil, bouwStilIndex, _zetStilIndex, deadlineCel, rowNtd, rowAf } from "./render-tabel.js";
 import { _verrijkOfferteRij, offerteAannemerPaneel, offerteAannSamenvatting, herstelAannemerFocus } from "./render-offerte.js";
-import { renderAlvo, renderAlfa, toggleAlvoFlag, ALVO_ICONS, ALVO_COLS, ALVO_LABELS, flagPill, _recomputeAlvoStatus, statusIco } from "./render-alv.js";
+import { renderAlvo, renderAlfa, toggleAlvoFlag, ALVO_ICONS, ALVO_COLS, ALVO_LABELS, flagPill, _recomputeAlvoStatus } from "./render-alv.js";
 // Kringverwijzing data ⇄ render-lijsten: vraagAfMailOp draait alleen op runtime (in renderAf).
 import { vraagAfMailOp } from "./data.js";
 import { bundelWeergave, wordtGeabsorbeerd, bundelSleutel, bundelMetId, bouwBundelIndex, zichtbareKop, isAutoOfferteStap, telbaar } from "./bundel.js";
@@ -771,6 +771,6 @@ export {
   kopOpen, zetKopOpen, toggleBundel, springNaarBundel, wisNtdFilters, absorbeer, isPlatteWeergave, erIsGefilterd,
   perVveActief,
   offerteAannemerPaneel, offerteAannSamenvatting,
-  ALVO_ICONS, renderAlvo, ALVO_COLS, ALVO_LABELS, flagPill, _recomputeAlvoStatus, toggleAlvoFlag, statusIco, renderAlfa,
+  ALVO_ICONS, renderAlvo, ALVO_COLS, ALVO_LABELS, flagPill, _recomputeAlvoStatus, toggleAlvoFlag, renderAlfa,
   renderThead, renderTbody, bepaalStil, bouwStilIndex, _zetStilIndex, deadlineCel, rowNtd, rowAf, renderPag,
 };

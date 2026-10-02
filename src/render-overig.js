@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  RENDER-OVERIG — Ontwikkeling + Logboek
 // ══════════════════════════════════════
-import { esc, displayName, persBadges, emptyRow, _vandaagAmsterdam, vveCodeSpan, leesbareFout } from "./util.js";
+import { esc, displayName, persBadges, emptyRow, _vandaagAmsterdam, vveCodeSpan, leesbareFout, voortgang } from "./util.js";
 import { ico } from "./icons.js";
 import { PG, SID } from "./config.js";
 import { state, D, pgs } from "./state.js";
@@ -90,7 +90,7 @@ function renderOntw(){
       <td class="cell-txt">${r.inhoud?`<span style="font-size:12px">${esc(r.inhoud.substring(0,80))}${r.inhoud.length>80?'…':''}</span>`:''}</td>
       <td>${persBadges(r.door)}</td>
       <td class="cell-sm">${esc(r.datum)}</td>
-      <td><span class="badge status-${esc((r.status||'').toLowerCase().replace(/[^a-z0-9]+/g,'-'))}">${r.status==='Afgerond'?ico('vinkCirkel'):ico('zandloper')} ${esc(r.status)}</span></td>
+      <td>${voortgang(r.status==='Afgerond'?'Afgerond':'Open', r.status)}</td>
       <td><button class="btn-edit" data-action="ontw-bewerken" data-rid="${rid}" title="Bewerken"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button></td>
     </tr>`;
   }).join('');

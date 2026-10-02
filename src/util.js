@@ -1053,3 +1053,13 @@ export {
   meldSleutel, _zonderLeidendSymbool, kiesAfgerondRij,
   duurUitCel, duurNaarCel,
 };
+
+// Voortgangsrondje + woord (v13.8). Eén vorm voor vier stappen: leeg (Open), een derde in het
+// accent (Klaargezet), twee derde amber (Gepland), vol groen (Afgerond). Vervangt vier gekleurde
+// pillen met elk een eigen icoon. Ook gebruikt in het VvE-dossier en bij Ontwikkeling (Open/Afgerond).
+// `tekst` is optioneel: de stat-strook geeft een eigen bijschrift mee.
+export function voortgang(status, tekst){
+  const s=String(status||'');
+  const k={Open:'open',Klaargezet:'klaargezet',Gepland:'gepland',Afgerond:'afgerond'}[s]||'open';
+  return`<span class="voortgang vg-${k}">${esc(tekst==null?s:tekst)}</span>`;
+}

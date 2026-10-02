@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  PER-VVE-PAGINA — alles van één VvE op één scherm (Fase 5)
 // ══════════════════════════════════════
-import { esc, displayName, persBadges, splitBehandelaar, berekenPrioriteit, teLaatVoorTelling, offerteAangevraagd, opvolgStatus, parseDt, taakTitel, taakVerwijzing, _vandaagAmsterdam, _verschilInKalenderdagen } from "./util.js";
+import { esc, voortgang, displayName, persBadges, splitBehandelaar, berekenPrioriteit, teLaatVoorTelling, offerteAangevraagd, opvolgStatus, parseDt, taakTitel, taakVerwijzing, _vandaagAmsterdam, _verschilInKalenderdagen } from "./util.js";
 import { ico } from "./icons.js";
 import { SECS, SKEYS, PAGE_META } from "./config.js";
 import { state, D } from "./state.js";
@@ -400,9 +400,11 @@ function renderVve(){
   const alvKaart=()=>{
     let html='';
     if(o.alvo){
-      html+=`<div class="vve-alv-rij"><b>Komende ALV</b><span class="badge status-${esc((o.alvo.status||'').toLowerCase().replace(/[^a-z0-9]+/g,'-'))}">${esc(o.alvo.status)}</span></div>
+      // Zelfde vormen als in ALV's Overzicht (v13.8): het voortgangsrondje voor de status en per stap
+      // een gevuld of leeg rondje — hier alleen ter inzage, aanvinken gebeurt in het overzicht.
+      html+=`<div class="vve-alv-rij"><b>Komende ALV</b>${voortgang(o.alvo.status)}</div>
         <div class="vve-alv-flags">${['klaargezet','uitnodiging','notulen','begroting'].map(f=>
-          `<span class="badge" style="background:${o.alvo[f]?'var(--gn-l)':'var(--sur2)'};color:${o.alvo[f]?'var(--gn)':'var(--mut)'}">${o.alvo[f]?'✓':'–'} ${f.charAt(0).toUpperCase()+f.slice(1)}</span>`).join('')}</div>`;
+          `<span class="vve-vlag${o.alvo[f]?' aan':''}"><span class="vlag" aria-hidden="true"></span>${f.charAt(0).toUpperCase()+f.slice(1)}<span class="alleen-voorlezer">: ${o.alvo[f]?'ja':'nee'}</span></span>`).join('')}</div>`;
     }
     if(o.alfa.length){
       const l=o.alfa[0]; // nieuwste eerst (gesorteerd in vveOverzicht)

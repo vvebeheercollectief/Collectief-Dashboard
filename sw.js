@@ -30,14 +30,14 @@ try {
 // loginscherm vervangen, en urgentie.js wordt alleen nog door de testsuite geïmporteerd. Beide
 // werden bij iedereen meegedownload en gecached. De BESTANDEN blijven wél staan: src/tests.js
 // hangt aan urgentie.js.
-const CACHE_VERSION = 'cd-v160';
+const CACHE_VERSION = 'cd-v161';
 // Dezelfde waarde als APP_VERSION in src/config.js, en die wordt bij ELKE wijziging opgehoogd.
 // Waarom hij hier staat: de browser besluit alleen dat er een nieuwe service worker is als het
 // BESTAND sw.js verandert. Een uitrol die alleen src/ raakt liet sw.js dus ongemoeid, en dan
 // verscheen de 'nieuwe versie'-balk niet — open sessies bleven de oude modules draaien tot iemand
 // toevallig herlaadde. Met deze regel verandert sw.js altijd mee. Er staat een toets in tests.js
 // die alarm slaat zodra dit getal en APP_VERSION uit elkaar lopen.
-const APP_VERSION = '13.3';
+const APP_VERSION = '13.4';
 // Geen './' meer: een navigatie naar de app krijgt altijd './index.html' uit de cache (zie
 // sw-strategie.js), dus een tweede kopie onder de kale map was alleen een extra download.
 const APP_SHELL = [
@@ -54,6 +54,7 @@ const APP_SHELL = [
   // ES-modulegraaf (zonder tests.js — alleen dev) zodat de app-shell ook offline laadt.
   './src/main.js',
   './src/sw-update.js',
+  './src/versie.js',   // NIET versie.json zelf: dat komt altijd live (minimumversie-rem)
   './src/config.js',
   './allowed-emails.js',
   './src/state.js',
@@ -194,7 +195,8 @@ self.addEventListener('fetch', e => {
   // de gecachete index.html teruggaf, mét status 200 — de aanroeper kreeg dan een SyntaxError.
   const soort = typeof self.cdSwStrategie === 'function'
     ? self.cdSwStrategie(req, self.location.href)
-    : (req.method === 'GET' && new URL(req.url).origin === self.location.origin ? 'netwerk' : 'live');
+    : (req.method === 'GET' && new URL(req.url).origin === self.location.origin
+       && !/\/versie\.json$/.test(new URL(req.url).pathname) ? 'netwerk' : 'live');   // versie.json: altijd live
   if (soort === 'live') return;   // Google, OneSignal, de proxy, POST: de browser doet het zelf
   if (soort === 'pagina') {
     e.respondWith(uitCache(req, './index.html').catch(() => caches.match('./index.html').then(schoon)));

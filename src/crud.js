@@ -13,7 +13,7 @@ import { ensureToken } from "./auth.js";
 import { showToast, showUndoToast, fireNotifEvent, undoComplete, undoDelete, getCurrentWho } from "./notifications.js";
 import { animateRowOut, flashRow } from "./anim.js";
 import { logEvent, logEvents, renderTaskHistory, addTaskNote } from "./render-overig.js";
-import { backgroundWrite, loadAll, blokkeerOffline } from "./data.js";
+import { backgroundWrite, loadAll, blokkeerOffline, blokkeerVersie } from "./data.js";
 import { faseIndex, faseWoord, faseRijHtml, faseWijziging, SUBSIDIE_FASES } from "./subsidie-fase.js";
 import { CRM_FASES, crmFaseIndex, crmFaseWoord, crmFaseWijziging, crmFaseRijHtml } from "./crm-fase.js";
 import { bouwBundelIndex, bundelVerwijzing, openSubtaken, bundelWaarschuwing, heeftSubtaken } from "./bundel.js";
@@ -1123,6 +1123,9 @@ async function deleteCurrentEditTask(){
 // al onder de gebruiker vandaan sluiten (de aanroeper deed dat toen zélf, nog vóór deze functie
 // begon), dus dáár verandert dit traject niets aan. De vraag is de enige nieuwe afbreekweg.
 async function deleteTaskRow(r, bijDoorgaan){
+  // Minimumversie-rem vóór alles: `bijDoorgaan` sluit hieronder het bewerkscherm nog vóór de
+  // offline-rem, en een te oud tabblad hoort het venster open te laten (zie blokkeerVersie, data.js).
+  if(blokkeerVersie()) return;
   // Her-ankeren als VANGNET. Vandaag komt hier maar één ingang binnen — `deleteCurrentEditTask`,
   // en die heeft zijn rij al door `_bewerkRijVers` gehaald — dus in de praktijk slaat dit blok
   // nooit aan. Het staat er voor de tweede ingang: tot v8.9 zat er een verwijderknop in de rij
@@ -1283,6 +1286,7 @@ function getAfInsertRow(sec){
 // kon wegklikken — notitie wél, afronding niet (review 2026-10-02). Hij reist mee in
 // `state._completeNotitie`; de vraag hieronder noemt hem daarom ook niet als 'niet opgeslagen'.
 async function completeCurrentEditTask(){
+  if(blokkeerVersie()) return;   // eerst de rem, dan pas een vraag over niet-opgeslagen wijzigingen
   if(modalGewijzigd() && !_alleenNotitieGewijzigd()){
     if(!await vraagBevestiging({
         titel:'Wijzigingen niet opgeslagen',
@@ -1447,6 +1451,9 @@ async function completeTask(idx, bijDoorgaan){
 // niet getekend (-1), dan vindt die selector niets en blijft de puls stil — `animateRowOut` valt bij
 // een lege <tr> gewoon door naar zijn callback.
 async function completeTaskRow(r, rid, bijDoorgaan){
+  // Minimumversie-rem vóór `bijDoorgaan`: anders sluit het bewerkscherm (met de getypte notitie)
+  // terwijl afronden pas in doCompleteTask geremd wordt.
+  if(blokkeerVersie()) return;
   // Sluit je een taak af waar nog subtaken onder hangen? Dan is dat een waarschuwing en géén
   // blokkade (§5: de volgorde is een leidraad). De vraag staat hier en niet in doCompleteTask,
   // zodat je hem krijgt vóórdat je een datum en toelichting invult. Alleen de hoofdtaak stelt hem —

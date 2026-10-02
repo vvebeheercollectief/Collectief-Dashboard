@@ -142,6 +142,8 @@ export function balkNaOvername(gearmd, hadController) {
 
 function toonUpdateBalk(onReload, onDismiss, isBezet) {
   if (document.getElementById('sw-update-bar')) return; // nooit dubbel
+  // De minimumversie-rem (versie.js) staat er al: die zegt hetzelfde, met een vaste balk.
+  if (document.getElementById('versie-rem-bar')) return;
   const bar = document.createElement('div');
   bar.id = 'sw-update-bar';
   bar.className = 'sw-update-bar';
@@ -206,6 +208,16 @@ export function bewaakRegistratie(reg, balk, ctrl, verborgen) {
     .catch(() => {});
 }
 
+// De 'Herladen'-weg voor de minimumversie-rem (versie.js): dezelfde update-flow als de knop op de
+// gewone balk — eerst update() (een open tabblad weet anders niet dat er een nieuwe sw.js staat),
+// dan via de kern: SKIP_WAITING naar een wachtende versie, wachten op een die nog installeert, of
+// meteen herladen. Zonder service worker (of vóór de registratie er is): gewoon herladen.
+let _herlaadViaKern = null;
+export function herlaadNaarNieuweVersie() {
+  if (_herlaadViaKern) return _herlaadViaKern();
+  location.reload();
+}
+
 export function initSwUpdate() {
   if (!('serviceWorker' in navigator)) return;
 
@@ -232,6 +244,9 @@ export function initSwUpdate() {
     const base = location.pathname.replace(/\/[^/]*$/, '') || '';
     pakRegistratie(base + '/sw.js', base + '/').then(reg => {
       const vraagHerladen = () => kern.klik(reg);
+      _herlaadViaKern = () => Promise.resolve()
+        .then(() => reg.update()).catch(() => {})
+        .then(() => kern.klik(reg));
       balk = () => toonUpdateBalk(vraagHerladen, () => kern.annuleer(), kern.isBezet);
 
       const check = bewaakRegistratie(reg, () => balk());

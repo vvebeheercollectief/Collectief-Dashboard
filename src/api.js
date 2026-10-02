@@ -73,6 +73,16 @@ async function fetchMetKlok(url, opts, melding, ms){
 // niet te onderscheiden van 'verbinding weg', en beide betekenen hetzelfde voor de gebruiker.
 // AbortController i.p.v. AbortSignal.timeout(): dat laatste kent Safari pas vanaf 16.
 async function _fetchGeteld(url, opts){
+  // VANGNET van de minimumversie-rem (versie.js). Élke schrijfactie naar Google loopt hierlangs
+  // (writeRange/writeRows/writeRanges/appendRows en de batchUpdates via sheetsFetch) en is een
+  // niet-GET. Lezen blijft gewoon werken. De aanroepers horen al eerder geremd te hebben
+  // (blokkeerVersie in blokkeerOffline, vóór de optimistische wijziging); dit vangt een gemiste weg
+  // en de stille journaalregels (logEvent, de meldingen-wachtrij). Vóór de fetch, dus de
+  // netwerkteller telt hem niet als netwerkfout. `melding` geeft leesbareFout (util.js) de tekst.
+  if(state._versieTeOud && String((opts && opts.method) || 'GET').toUpperCase() !== 'GET'){
+    throw Object.assign(new Error('Niet opgeslagen: herlaad eerst het dashboard (nieuwe versie).'),
+      { versieTeOud:true, melding:'Niet opgeslagen: herlaad eerst het dashboard. Kopieer eventueel je tekst.' });
+  }
   const ac = new AbortController();
   const klok = setTimeout(() => ac.abort(), state._fetchTimeoutMs || FETCH_TIMEOUT_MS);
   let r;

@@ -21,7 +21,8 @@ import {
   openModal, closeModal, submitTask, doCompleteTask, closeCompleteModal, kiesSectie, renderExtraVves, _bewerkRijVers, nietOpgeslagenVelden, kiesDuur,
   sluitModalVeilig,
 } from './crud.js';
-import { loadAll, magPollen, schrijfActieLoopt, setSyncOffline, showOfflineBanner, clearOfflineBanner, laadUitCache, ruimCacheOp } from './data.js';
+import { loadAll, magPollen, schrijfActieLoopt, setSyncOffline, showOfflineBanner, clearOfflineBanner, laadUitCache, ruimCacheOp, blokkeerVersie } from './data.js';
+import { startVersieBewaking } from './versie.js';
 import { initActions } from './actions.js';
 import { initVveZoekveld } from './vve-zoekveld.js';
 import { initWeekKiezer } from './weekkiezer.js';
@@ -318,6 +319,8 @@ document.addEventListener('DOMContentLoaded',()=>{
     // Een ander venster heeft de nieuwe versie actief gemaakt: verplaats.js zou dan uit de cache
     // van de NIEUWE versie komen en met de oude code van dit tabblad samenwerken. Niet doen.
     if(state._codeVerouderd){ e.target.value=bron; alert('Er is een nieuwe versie van het dashboard actief. Herlaad eerst het dashboard en probeer het dan opnieuw.'); return; }
+    // Minimumversie-rem (versie.js): vóór de vraag en vóór het lui laden; het venster blijft open.
+    if(blokkeerVersie()){ e.target.value=bron; return; }
     let verplaatsTaak;
     try{ ({ verplaatsTaak } = await import('./verplaats.js')); }
     catch(err){ e.target.value=bron; alert('Verplaatsen kan nu even niet: een deel van het dashboard laadde niet. Herlaad de pagina en probeer het opnieuw.'); return; }
@@ -633,6 +636,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     document.getElementById('app')?.removeAttribute('inert');   // zie logout() in auth.js
     laadUitCache();   // meteen de laatst bekende stand in beeld; loadAll vervangt hem
     loadAll();
+    startVersieBewaking();   // minimumversie-rem: meteen, elke 5 min en bij terugkeer (versie.js)
   } else {
     // Geen geldige sessie → login nodig. Speel de gebrande launch-splash
     // (na ~1,9s → login-kaart). Bewust alleen hier: ingelogde terugkeerders

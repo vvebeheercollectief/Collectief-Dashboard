@@ -6255,7 +6255,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '13.3');
+  eq('versie opgehoogd', APP_VERSION, '13.4');
 
   // ── Tabbladen ÍN de kaartkop (v11.7) ──
   // De kop van de kaart zei links exact hetzelfde als het actieve tabblad — 'Oppakken' boven
@@ -16424,8 +16424,17 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       const auth=await bron('src/auth.js');
       truthy('inloggen: een token van een niet-toegestaan account gaat ook uit sessionStorage',
              /ALLOWED_EMAILS\.includes\(email\.toLowerCase\(\)\)\)\{[\s\S]{0,400}?_wisTokenSessie\(\)/.test(auth));
-      const chat=await bron('api/chat.js');
-      truthy('chat-proxy: weigert een niet-geverifieerd e-mailadres', /email_verified\)\s*!==\s*'true'/.test(chat));
+      // api/chat.js staat bewust NIET op Pages (_config.yml exclude) en Vercel serveert de bron niet
+      // (daar is het de functie). Is de bron hier niet te lezen (404, leeg, of een HTML-pagina in
+      // plaats van JavaScript), dan is deze toets op deze host niet uit te voeren — en alleen dán
+      // slaat hij zichzelf over. Lokaal (no-store-server) staat het bestand er wél en telt hij echt.
+      const chatResp=await fetch(new URL('api/chat.js', document.baseURI), {cache:'no-store'}).catch(()=>null);
+      const chat=chatResp && chatResp.ok ? await chatResp.text() : '';
+      if(!chat.trim() || /^\s*</.test(chat)){
+        truthy('chat-proxy: bron niet op deze host (Pages/Vercel serveren api/chat.js niet) — toets overgeslagen', true);
+      } else {
+        truthy('chat-proxy: weigert een niet-geverifieerd e-mailadres', /email_verified\)\s*!==\s*'true'/.test(chat));
+      }
       const csp=document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.getAttribute('content')||'';
       const scriptSrc=(csp.split(';').find(d=>d.trim().startsWith('script-src'))||'');
       const ana=await bron('src/render-analytics.js');
@@ -17225,6 +17234,207 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       D.ntd=ntdOud; state._uitCache=uitOud; state._syncFails=failsOud;
       try{ CR.closeModal(); }catch(_){}
       document.querySelectorAll('#toast-container .toast').forEach(x=>x.remove());
+    }
+  })();
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  MINIMUMVERSIE-REM (v13.4) — een te oud tabblad schrijft niet meer, lezen blijft
+  // ══════════════════════════════════════════════════════════════════════════
+  await (async () => {
+    console.log('%c[TESTS] Minimumversie-rem', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const V  = await import('./versie.js');
+    const CR = await import('./crud.js');
+    const RO = await import('./render-overig.js');
+    const RV = await import('./render-vve.js');
+    const RA = await import('./render-alv.js');
+    const API = await import('./api.js');
+    const DA = await import('./data.js');
+    const UT = await import('./util.js');
+    const oud = { teOud:state._versieTeOud, token:state.oauthToken, exp:state.oauthExpiry, nf:state._netwerkFouten,
+                  uitCache:state._uitCache, ntd:D.ntd, alvo:D.alvo, herhaal:D.herhaal, vveCode:state.vveCode,
+                  fetch:window.fetch, alert:window.alert, pw:state.pendingWrites };
+    const echteFetch=(u,o)=>oud.fetch.call(window,u,o);
+    // Een geweigerde schrijfweg hoort METEEN terug te keren. Zonder rem kan hij blijven wachten op een
+    // vraagvenster; dan liever een rode toets dan een suite die nooit klaar is.
+    const metKlok=p=>Promise.race([p, new Promise((_,nee)=>setTimeout(()=>nee(new Error('schrijfweg keerde niet terug (wacht op een vraag?) — de rem greep niet')),3000))]);
+    const verzoeken=[];      // alles wat de app naar buiten stuurt tijdens de rem
+    const alerts=[];
+    const ruimOp=()=>{ document.querySelectorAll('#toast-container .toast').forEach(x=>x.remove()); V.verbergVersieBalk(); };
+    try {
+      // ── 1. Versievergelijking: numeriek per deel ──
+      eq('versie: 13.10 is NIEUWER dan 13.9 (numeriek, niet als tekst)', V.vergelijkVersie('13.10','13.9'), 1);
+      eq('versie: 13.3 is ouder dan 13.4', V.vergelijkVersie('13.3','13.4'), -1);
+      eq('versie: 13 en 13.0 zijn gelijk', V.vergelijkVersie('13','13.0'), 0);
+      eq('versie: 14.0 is nieuwer dan 13.99', V.vergelijkVersie('14.0','13.99'), 1);
+      eq('versie: een ongeldige versie geeft null', [V.vergelijkVersie('13.x','13.4'), V.vergelijkVersie('13.4',''), V.vergelijkVersie(null,'1')], [null,null,null]);
+      eq('versie: te oud alleen als app < minimaal', [V.versieTeOud('13.3','13.4'), V.versieTeOud('13.4','13.4'), V.versieTeOud('13.10','13.9')], [true,false,false]);
+      eq('versie: een onleesbaar minimum blokkeert nooit (fail-open)', [V.versieTeOud('13.3','abc'), V.versieTeOud('13.3',undefined)], [false,false]);
+
+      // ── 2. Ophalen: no-store + cache-buster, en fail-open bij elke fout ──
+      let gevraagd=null;
+      const ant=(ok, body, status)=>async(u,o)=>{ gevraagd={u,o}; return { ok, status:status||(ok?200:404), json:async()=>{ if(body instanceof Error) throw body; return body; } }; };
+      eq('ophalen: een goed bestand geeft de versie', await V.haalMinimum(ant(true,{minimaal:'13.3'})), '13.3');
+      truthy('ophalen: met cache-buster in de query', /versie\.json\?t=\d+$/.test(gevraagd.u));
+      eq('ophalen: en cache:no-store', gevraagd.o && gevraagd.o.cache, 'no-store');
+      eq('ophalen: 404 → null (niets blokkeren)', await V.haalMinimum(ant(false,{minimaal:'99'})), null);
+      eq('ophalen: kapotte JSON → null', await V.haalMinimum(ant(true,new SyntaxError('kapot'))), null);
+      eq('ophalen: geen geldige versie → null', await V.haalMinimum(ant(true,{minimaal:'morgen'})), null);
+      eq('ophalen: verkeerde vorm → null', await V.haalMinimum(ant(true,['13.3'])), null);
+      eq('ophalen: offline (fetch gooit) → null', await V.haalMinimum(async()=>{ throw new TypeError('Failed to fetch'); }), null);
+
+      // ── 3. controleerVersie: vlag + balk, en fail-open ──
+      state._versieTeOud=false;
+      eq('controle: mislukte lezing zet de rem NIET aan', await V.controleerVersie({ app:'13.3', haal:async()=>{ throw new TypeError('offline'); } }), false);
+      eq('controle: 404 zet de rem NIET aan', await V.controleerVersie({ app:'13.3', haal:ant(false,null) }), false);
+      eq('controle: en er staat dan geen balk', !!document.getElementById('versie-rem-bar'), false);
+      eq('controle: minimaal hoger dan de app → rem aan', await V.controleerVersie({ app:'13.3', haal:ant(true,{minimaal:'13.4'}) }), true);
+      eq('controle: de vlag staat', state._versieTeOud, true);
+      const balk=document.getElementById('versie-rem-bar');
+      truthy('balk: staat er met de juiste tekst', !!balk && /Er is een nieuwe versie van het dashboard\. Herlaad om weer te kunnen opslaan\./.test(balk.textContent));
+      eq('balk: met een Herladen-knop en zonder kruisje (vast)', [balk && balk.querySelector('button.sw-update-btn')?.textContent, !!(balk && balk.querySelector('.sw-update-x'))], ['Herladen', false]);
+      truthy('balk: zelfde stijl als de versiebalk', !!balk && balk.classList.contains('sw-update-bar'));
+      eq('controle: een latere mislukte lezing laat de rem staan', await V.controleerVersie({ app:'13.3', haal:ant(false,null) }), true);
+      eq('controle: een lager minimum heft hem op', await V.controleerVersie({ app:'13.3', haal:ant(true,{minimaal:'13.3'}) }), false);
+      eq('controle: en de balk is weg', !!document.getElementById('versie-rem-bar'), false);
+      const bronUpd=await (await fetch(new URL('src/sw-update.js', document.baseURI), {cache:'no-store'})).text();
+      truthy('balk: Herladen loopt via de update-flow (update() + kern.klik: SKIP_WAITING of herladen)',
+             /export function herlaadNaarNieuweVersie\(\)/.test(bronUpd) && /\.then\(\(\) => reg\.update\(\)\)[\s\S]{0,60}\.then\(\(\) => kern\.klik\(reg\)\)/.test(bronUpd));
+
+      // ── 4. De rem op de schrijfwegen ──
+      // Alles wat naar buiten gaat wordt hier geteld; een GET krijgt een leeg antwoord.
+      window.fetch=async(u,o)=>{ verzoeken.push({u:String(u), m:(o&&o.method)||'GET'}); return new Response(JSON.stringify({values:[], valueRanges:[]}), {status:200}); };
+      window.alert=m=>alerts.push(m);
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3; state._netwerkFouten=0; state._uitCache=false;
+      state._versieTeOud=true;
+      ruimOp();
+      eq('rem: blokkeerOffline weigert bij een te oude versie (ook online)', DA.blokkeerOffline(), true);
+      const toast=document.querySelector('#toast-container .toast:last-child');
+      truthy('rem: melding "Niet opgeslagen: herlaad eerst het dashboard. Kopieer eventueel je tekst."',
+             !!toast && /Niet opgeslagen/.test(toast.textContent) && /Herlaad eerst het dashboard\. Kopieer eventueel je tekst\./.test(toast.textContent));
+      eq('rem: de melding blijft staan (geen aftelbalk)', !!(toast && toast.querySelector('.toast-bar')), false);
+      truthy('rem: en de vaste balk verschijnt', !!document.getElementById('versie-rem-bar'));
+      ruimOp();
+
+      const leeg=()=>({ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] });
+      const rij=()=>({ _sec:'OPPAKKEN', _row:5, code:'VR-1', naam:'Rem', actiepunt:'bestaand', deadline:'', behandelaar:'', prioriteit:'', opmerkingen:'', inBehandeling:'FALSE', subcategorie:'', taakId:'TVR1', bundelId:'', bundelVolg:'' });
+
+      // 4a. Nieuwe taak: venster blijft open, tekst blijft staan, er verandert niets.
+      D.ntd=leeg();
+      CR.openModal(false);
+      document.getElementById('m-code').value='VR-1';
+      document.getElementById('m-actie').value='Mijn lang getypte tekst';
+      await metKlok(CR.submitTask());
+      eq('rem/toevoegen: venster blijft open', document.getElementById('modal-bg').classList.contains('open'), true);
+      eq('rem/toevoegen: getypte tekst blijft staan', document.getElementById('m-actie').value, 'Mijn lang getypte tekst');
+      eq('rem/toevoegen: geen optimistische taak', D.ntd.OPPAKKEN.length, 0);
+      CR.closeModal(); CR.clearModal(); ruimOp();
+
+      // 4b. Bewerkscherm: Afronden en Verwijderen laten het venster en de notitie staan.
+      const rv=rij(); D.ntd={ ...leeg(), OPPAKKEN:[rv] };
+      CR.openModal(true, rv);
+      document.getElementById('m-actie').value='bewerkt maar niet opgeslagen';
+      document.getElementById('hist-note').value='mijn notitie';
+      await metKlok(CR.completeCurrentEditTask());
+      eq('rem/afronden uit bewerkscherm: venster blijft open', document.getElementById('modal-bg').classList.contains('open'), true);
+      eq('rem/afronden uit bewerkscherm: afrondvenster gaat niet open', document.getElementById('complete-bg').classList.contains('open'), false);
+      eq('rem/afronden uit bewerkscherm: tekst en notitie blijven', [document.getElementById('m-actie').value, document.getElementById('hist-note').value], ['bewerkt maar niet opgeslagen','mijn notitie']);
+      await metKlok(CR.deleteCurrentEditTask());
+      eq('rem/verwijderen: venster blijft open en de taak staat er nog', [document.getElementById('modal-bg').classList.contains('open'), D.ntd.OPPAKKEN.length], [true, 1]);
+      eq('rem/logboek-notitie: addTaskNote weigert en laat de tekst staan', [await metKlok(RO.addTaskNote()), document.getElementById('hist-note').value], [false, 'mijn notitie']);
+      await metKlok(CR.submitTask());
+      eq('rem/opslaan bewerking: venster open, rij ongewijzigd', [document.getElementById('modal-bg').classList.contains('open'), rv.actiepunt], [true, 'bestaand']);
+      document.getElementById('hist-note').value='';
+      CR.closeModal(); CR.clearModal(); ruimOp();
+
+      // 4c. Het afrondvenster zelf: open, toelichting blijft, taak blijft.
+      state._completeRow=rv;
+      document.getElementById('complete-date').value='2026-10-02';
+      document.getElementById('complete-comment').value='toelichting bij afronden';
+      document.getElementById('complete-bg').classList.add('open');
+      await metKlok(CR.doCompleteTask());
+      eq('rem/afronden: afrondvenster blijft open met de toelichting',
+         [document.getElementById('complete-bg').classList.contains('open'), document.getElementById('complete-comment').value], [true, 'toelichting bij afronden']);
+      eq('rem/afronden: de taak staat nog in de lijst', D.ntd.OPPAKKEN.includes(rv), true);
+      document.getElementById('complete-bg').classList.remove('open'); state._completeRow=null; ruimOp();
+
+      // 4d. Dossier-composer.
+      let dos=document.getElementById('dos-tekst'), tijdelijk=false;
+      if(!dos){ dos=document.createElement('textarea'); dos.id='dos-tekst'; dos.hidden=true; document.body.appendChild(dos); tijdelijk=true; }
+      const dosOud=dos.value; dos.value='belde over de lekkage'; state.vveCode='VR-1';
+      await metKlok(RV.addContactLog());
+      eq('rem/dossier: contactmoment niet geschreven, tekst blijft', dos.value, 'belde over de lekkage');
+      dos.value=dosOud; if(tijdelijk) dos.remove(); ruimOp();
+
+      // 4e. Vinkjes/schakelaars: geen optimistische flip.
+      D.alvo=[{ code:'VR-1', naam:'Rem', klaargezet:false, uitnodiging:false, notulen:false, status:'Open', _row:3 }];
+      await metKlok(RA.toggleAlvoFlag(0,'uitnodiging','VR-1'));
+      eq('rem/ALV-vinkje: niet omgezet', D.alvo[0].uitnodiging, false);
+      D.herhaal=[{ _row:7, id:'H1', status:'ACTIEF', omschrijving:'rem', code:'VR-1', sectie:'OPPAKKEN' }];
+      toggleHerhaalStatus(7);
+      eq('rem/herhaalregel: status blijft', D.herhaal[0].status, 'ACTIEF');
+      ruimOp();
+
+      eq('rem: in dit hele blok is er NIETS naar buiten geschreven', verzoeken.filter(v=>v.m!=='GET'), []);
+
+      // ── 5. Vangnet in api.js: elk niet-GET-verzoek naar Google geweigerd, lezen gaat door ──
+      verzoeken.length=0;
+      let fout=null;
+      try{ await API.appendRange("'Logboek'!A:H", ['x']); }catch(e){ fout=e; }
+      eq('vangnet: appendRange gooit een versie-fout', !!(fout && fout.versieTeOud), true);
+      eq('vangnet: met een leesbare melding', UT.leesbareFout(fout), 'Niet opgeslagen: herlaad eerst het dashboard. Kopieer eventueel je tekst.');
+      fout=null; try{ await API.writeRange("'Nog Te Doen'!A5", ['x']); }catch(e){ fout=e; }
+      eq('vangnet: writeRange ook', !!(fout && fout.versieTeOud), true);
+      fout=null; try{ await API.sheetsFetch('https://sheets.googleapis.com/v4/spreadsheets/x:batchUpdate', {method:'POST', body:'{}'}); }catch(e){ fout=e; }
+      eq('vangnet: een batchUpdate via sheetsFetch ook', !!(fout && fout.versieTeOud), true);
+      eq('vangnet: er is niets verstuurd', verzoeken.length, 0);
+      eq('vangnet: en het telt niet als netwerkfout (geen "offline")', state._netwerkFouten, 0);
+      await API.fetchSheet('Nog Te Doen');
+      eq('vangnet: LEZEN gaat gewoon door', verzoeken.map(v=>v.m), ['GET']);
+      eq('vangnet: logEvent (fire-and-forget) faalt stil met false', await RO.logEvent('VR-1','OPPAKKEN','Opmerking','','','x'), false);
+      let teruggedraaid=false;
+      await DA.backgroundWrite(()=>API.writeRange("'Nog Te Doen'!A5", ['x']), ()=>{ teruggedraaid=true; }, 'Opslaan mislukt');
+      truthy('vangnet: backgroundWrite draait terug', teruggedraaid);
+      truthy('vangnet: en meldt "herlaad eerst"', [...document.querySelectorAll('#toast-container .toast')].some(t=>/herlaad eerst het dashboard/i.test(t.textContent)));
+      for(let i=0;i<200 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,10));
+      ruimOp();
+
+      // ── 6. Zonder rem: dezelfde poort laat alles door (geen vals alarm) ──
+      state._versieTeOud=false;
+      eq('rem uit: blokkeerOffline laat schrijven toe', DA.blokkeerOffline(), false);
+      eq('rem uit: geen balk', !!document.getElementById('versie-rem-bar'), false);
+
+      // ── 7. Service worker: versie.json is ALTIJD live, nooit uit een cache ──
+      window.fetch=oud.fetch;
+      const S=self.cdSwStrategie;
+      const prod='https://vvebeheercollectief.github.io/Collectief-Dashboard/';
+      eq('sw: versie.json is live op productie', S({method:'GET', url:prod+'versie.json?t=123', mode:'cors'}, prod+'sw.js'), 'live');
+      eq('sw: ook zonder query', S({method:'GET', url:prod+'versie.json', mode:'cors'}, prod+'sw.js'), 'live');
+      eq('sw: en op een ontwikkelmachine (niet netwerk-eerst mét cache)', S({method:'GET', url:'http://localhost:8123/versie.json?t=1', mode:'cors'}, 'http://localhost:8123/sw.js'), 'live');
+      eq('sw: de module versie.js zelf komt gewoon uit de cache', S({method:'GET', url:prod+'src/versie.js', mode:'cors'}, prod+'sw.js'), 'cache');
+      eq('sw: een ander versie.json-pad (submap) is niet hetzelfde bestand', S({method:'GET', url:prod+'src/versie.json', mode:'cors'}, prod+'sw.js'), 'cache');
+      const bronSw=await (await echteFetch(new URL('sw.js', document.baseURI), {cache:'no-store'})).text();
+      const shell=(bronSw.match(/const APP_SHELL = \[([\s\S]*?)\];/)||[])[1]||'';
+      eq('sw: versie.json staat NIET in de precache', /'\.\/versie\.json'/.test(shell), false);
+      truthy('sw: versie.js wél (modulegraaf)', /'\.\/src\/versie\.js'/.test(shell));
+      truthy('sw: ook zonder strategiebestand is versie.json live', /versie\\\.json\$\/\.test\(new URL\(req\.url\)\.pathname\)/.test(bronSw));
+
+      // ── 8. versie.json zelf: geldig en nooit hoger dan APP_VERSION ──
+      const r=await echteFetch(new URL('versie.json', document.baseURI).href+'?t='+Date.now(), {cache:'no-store'});
+      eq('versie.json: bereikbaar', r.ok, true);
+      let j=null; try{ j=await r.json(); }catch(_){}
+      truthy('versie.json: geldige JSON met een geldige "minimaal"', !!j && V.isGeldigeVersie(j.minimaal));
+      truthy('versie.json: minimaal <= APP_VERSION (anders blokkeert elke client zichzelf)', !!j && V.vergelijkVersie(j.minimaal, APP_VERSION) !== null && V.vergelijkVersie(j.minimaal, APP_VERSION) <= 0);
+      eq('versie.json: de echte haalMinimum leest hetzelfde', await V.haalMinimum(echteFetch), j && j.minimaal);
+    } catch(e) {
+      truthy('minimumversie: geen uitzondering — '+(e && e.stack || e), false);
+    } finally {
+      state._versieTeOud=oud.teOud; state.oauthToken=oud.token; state.oauthExpiry=oud.exp; state._netwerkFouten=oud.nf;
+      state._uitCache=oud.uitCache; D.ntd=oud.ntd; D.alvo=oud.alvo; D.herhaal=oud.herhaal; state.vveCode=oud.vveCode;
+      window.fetch=oud.fetch; window.alert=oud.alert; state.pendingWrites=oud.pw;
+      try{ if(_vraagStaatOpen()) beantwoordBevestiging(false); }catch(_){}
+      try{ CR.closeModal(); CR.clearModal(); }catch(_){}
+      document.getElementById('complete-bg')?.classList.remove('open');
+      ruimOp();
     }
   })();
 

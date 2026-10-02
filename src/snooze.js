@@ -6,7 +6,7 @@ import { state } from "./state.js";
 import { toDutchDate, toISODate, _parseAnyDate, _vandaagAmsterdam, _verschilInKalenderdagen, parseDt, taakTitel } from "./util.js";
 import { writeRange, assertRowMatch } from "./api.js";
 import { ensureToken } from "./auth.js";
-import { backgroundWrite, blokkeerOffline } from "./data.js";
+import { backgroundWrite, blokkeerOffline, blokkeerVersie } from "./data.js";
 import { renderAll } from "./main.js";
 import { showToast } from "./notifications.js";
 import { taakUitCache } from "./crud.js";
@@ -44,6 +44,8 @@ function snoozeKies(dagen){
 // die hoefden niet mee te veranderen.
 async function snoozeOpslaan(){
   const r = state._snoozeRow; if(!r) return;
+  // Minimumversie-rem hier al: hieronder sluit het venster ongeacht de rem in schrijfOpvolgdatum.
+  if(blokkeerVersie()) return;
   const iso = document.getElementById('snooze-datum').value;
   if(!iso){ alert('Kies een datum.'); return; }
   const nieuw = toDutchDate(iso);
@@ -74,6 +76,7 @@ async function snoozeOpslaan(){
 }
 function snoozeWis(){
   const r = state._snoozeRow; if(!r) return;
+  if(blokkeerVersie()) return;   // zie snoozeOpslaan: venster open laten
   schrijfOpvolgdatum(r, '', 'Opvolgdatum gewist');
   closeSnoozeModal();
 }

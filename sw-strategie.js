@@ -17,7 +17,8 @@
 //
 // Uitkomst:
 //   'live'    — de service worker bemoeit zich er niet mee (Google, OneSignal, de chat-proxy,
-//               alles wat geen GET is, en sw.js zelf);
+//               alles wat geen GET is, sw.js zelf, en versie.json — de minimumversie-rem moet de
+//               ECHTE stand van nu lezen, nooit een gecachete; ook niet op een ontwikkelmachine);
 //   'pagina'  — een navigatie naar de app: altijd de gecachete index.html van deze versie, zodat
 //               HTML en JavaScript gegarandeerd van dezelfde uitrol zijn;
 //   'cache'   — eerst de cache, bij een misser het netwerk (en dan in de cache);
@@ -33,8 +34,9 @@
     var url, sw;
     try { url = new URL(verzoek.url); sw = new URL(swUrl); } catch (_) { return 'live'; }
     if (url.origin !== sw.origin) return url.href === CHART ? 'cache' : 'live';
-    if (DEV[sw.hostname]) return 'netwerk';
     var basis = sw.pathname.replace(/[^/]*$/, '');          // de map van sw.js = het bereik
+    if (url.pathname === basis + 'versie.json') return 'live';   // minimumversie-rem (src/versie.js)
+    if (DEV[sw.hostname]) return 'netwerk';
     if (url.pathname.indexOf(basis) !== 0) return 'live';
     var rest = url.pathname.slice(basis.length);
     if (rest === 'sw.js' || rest === 'sw-strategie.js') return 'live';

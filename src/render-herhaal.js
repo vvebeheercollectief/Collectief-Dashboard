@@ -11,7 +11,7 @@ import { ensureToken } from "./auth.js";
 import { getSheetIds, setv } from "./crud.js";
 import { showToast } from "./notifications.js";
 import { logEvent } from "./render-overig.js";
-import { backgroundWrite, blokkeerOffline } from "./data.js";
+import { backgroundWrite, blokkeerOffline, blokkeerVersie } from "./data.js";
 import { vraagBevestiging } from "./bevestig.js";
 
 const TYPE_LABELS = { week:'Elke week', maand:'Elke maand', kwartaal:'Elk kwartaal',
@@ -145,6 +145,8 @@ function toggleHerhaalStatus(hid){
 
 async function deleteHerhaal(){
   const r=state.herhaalEditRow; if(!r) return;
+  // Minimumversie-rem vóór de vraag en vóór `closeHerhaalModal` (dat hieronder vóór de offline-rem staat).
+  if(blokkeerVersie()) return;
   // De vraag staat vóór `closeHerhaalModal()`, precies zoals de oude `confirm()`: bij 'nee' hoort
   // het bewerkscherm te blijven staan, mét wat de gebruiker er had ingevuld. Een `bijDoorgaan`-
   // callback zoals in crud.js is hier niet nodig — daar zit de vraag in een gedeelde kern die twee

@@ -4,6 +4,7 @@
 import { clientId, ALLOWED_EMAILS } from "./config.js";
 import { state, _shownToasts } from "./state.js";
 import { loadAll, laadUitCache, wisCache } from "./data.js";
+import { startVersieBewaking } from "./versie.js";
 import { toonKaart } from "./login-splash.js";
 import { refreshNotifUI, herstelNotifKoppeling } from "./notifications.js";
 import { fetchMetKlok } from "./api.js";
@@ -169,6 +170,7 @@ async function doLogin(){
     herstelNotifKoppeling().catch(()=>{});
     laadUitCache();   // meteen de laatst bekende stand in beeld; loadAll vervangt hem
     loadAll();
+    startVersieBewaking();   // minimumversie-rem: meteen, elke 5 min en bij terugkeer (versie.js)
   }finally{state._authBezig=Math.max(0,state._authBezig-1)}
 }
 

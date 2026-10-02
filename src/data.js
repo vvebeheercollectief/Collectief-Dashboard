@@ -22,6 +22,7 @@ import { showToast, verwerkMeldingRijen, toonMeldingen, getCurrentWho, getNotifP
 // (kringverwijzing data ⇄ main: renderAll wordt pas op runtime aangeroepen — live binding, veilig.
 //  Bewust niet ontvlochten: een aparte render-orchestrator zou puur cosmetisch zijn, geen bug.)
 import { renderAll } from "./main.js";
+import { toonVersieBalk } from "./versie.js";
 
 //  API
 // ══════════════════════════════════════
@@ -47,6 +48,10 @@ function backgroundWrite(writeFn, rollback, foutTitel){
       const msg=(e.message||'').toLowerCase();
       if(e&&e.offline){
         showToast(foutTitel,'Geen verbinding — de wijziging is teruggezet. Probeer het opnieuw zodra je weer online bent.','var(--rd)',null,{blijft:true});
+      }else if(e&&e.versieTeOud){
+        // Het vangnet in api.js (_fetchGeteld): dit tabblad draait een te oude versie. Ook hier
+        // hoort de aanroeper al geblokkeerd te hebben (blokkeerVersie); dit is de laatste lijn.
+        showToast(foutTitel,'Niet opgeslagen: herlaad eerst het dashboard — de wijziging is teruggezet.','var(--rd)',null,{blijft:true});
       }else if(e&&e.rowMismatch){
         // De Sheet is tussentijds gewijzigd op een manier die deze schrijfactie onveilig maakt —
         // de doelrij is verschoven of iemand heeft de taak aangepast (assertRowsMatch), of de
@@ -253,6 +258,21 @@ function wisCache(){
 // Bewust NIET gebruiken bij logEvent, queueNotif en sendTestNotif: die drie zijn
 // fire-and-forget en falen vandaag al stil. Blokkeren zou een logregel definitief laten
 // verdwijnen zonder dat iemand het ziet — erger dan de huidige situatie.
+// ── Minimumversie: een te oud tabblad schrijft niet meer ──────────────────
+// `state._versieTeOud` wordt gezet door versie.js (versie.json in de root). Zelfde plek en zelfde
+// contract als de offline-rem: vóór élke optimistische wijziging, dus er verandert niets op het
+// scherm en een open venster blijft open mét de getypte tekst. De melding blijft staan (blijft:true)
+// en zegt wat er moet gebeuren; de vaste balk met de Herladen-knop komt erbij als hij er nog niet stond.
+// Ook los aan te roepen door wegen die vóór hun offline-rem al een venster sluiten
+// (verwijderen/afronden vanuit het bewerkscherm, wegleggen, herhaalregel verwijderen).
+function blokkeerVersie(){
+  if(!state._versieTeOud) return false;
+  try{ toonVersieBalk(); }catch(_){}
+  showToast('Niet opgeslagen','Herlaad eerst het dashboard. Kopieer eventueel je tekst.',
+            'var(--rd)','waarschuwing',{blijft:true,geenSysteemmelding:true});
+  return true;
+}
+
 function blokkeerOffline(){
   // Geen verbinding is de meest specifieke reden en krijgt dus voorrang op de cache-rem hieronder.
   if(isOffline()){
@@ -263,6 +283,8 @@ function blokkeerOffline(){
     showToast('Geen verbinding','Wijzigen lukt niet zonder internet. Er is niets gewijzigd — probeer het opnieuw zodra je weer online bent.','var(--rd)','waarschuwing',{geenDedup:true,geenSysteemmelding:true});
     return true;
   }
+  // Te oude versie (minimumversie-rem): schrijven mag niet meer, ook niet als er wél verbinding is.
+  if(blokkeerVersie()) return true;
   // Nog geen verse ronde binnen: het scherm komt uit de leescache en de rijnummers erin kunnen
   // uren oud en dus verschoven zijn. Normaal duurt dit een seconde of twee; slaagt de eerste ronde
   // niet, dan blijft de rem staan — dan is het beter niet te schrijven dan een taak in het
@@ -1182,7 +1204,7 @@ export {
   backgroundWrite, schrijfActieLoopt, metWriteMarkering, serieleWrite, setSyncing, setSaving, setSynced, setSyncErr, dot, loadAll, magPollen, parseSections, parseAlvo, parseAlfa, parseHerhaal,
   POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _zetLogAnker, _verwerkLogboek, _logVolledigNodig, _alfaNodig,
   MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen,
-  blokkeerOffline, showOfflineBanner, clearOfflineBanner, setSyncOffline, syncSelecteerStand, showLoadError, clearLoadError,
+  blokkeerOffline, blokkeerVersie, showOfflineBanner, clearOfflineBanner, setSyncOffline, syncSelecteerStand, showLoadError, clearLoadError,
   bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade,
   ruimCacheOp, _cacheVers, AF_POLL, vraagAfMailOp, afMailKaart,
 };

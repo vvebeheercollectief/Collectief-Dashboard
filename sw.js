@@ -17,6 +17,14 @@ try {
 } catch (e) {
   console.warn('[sw] OneSignal-worker niet geladen, pushmeldingen uit:', e);
 }
+// Welk verzoek uit de cache komt (cache-first voor eigen bestanden), gedeeld met de zelftest.
+// Lukt het laden niet, dan valt de handler hieronder terug op 'netwerk eerst' — het oude gedrag,
+// dat in elk geval nooit oude code vasthoudt.
+try {
+  importScripts('./sw-strategie.js');
+} catch (e) {
+  console.warn('[sw] sw-strategie.js niet geladen, terug naar netwerk-eerst:', e);
+}
 
 // logo-login.png en src/urgentie.js stonden hier zonder gebruiker: het logo is bij het nieuwe
 // loginscherm vervangen, en urgentie.js wordt alleen nog door de testsuite geïmporteerd. Beide
@@ -30,8 +38,9 @@ const CACHE_VERSION = 'cd-v159';
 // toevallig herlaadde. Met deze regel verandert sw.js altijd mee. Er staat een toets in tests.js
 // die alarm slaat zodra dit getal en APP_VERSION uit elkaar lopen.
 const APP_VERSION = '13.2';
+// Geen './' meer: een navigatie naar de app krijgt altijd './index.html' uit de cache (zie
+// sw-strategie.js), dus een tweede kopie onder de kale map was alleen een extra download.
 const APP_SHELL = [
-  './',
   './index.html',
   './styles.css',
   './manifest.json',
@@ -90,13 +99,13 @@ const APP_SHELL = [
   './src/vve-zoekveld.js',
   './src/weekkiezer.js',
   './src/opmaak.js',
-  // Takenbundel. Alle drie horen tot de modulegraaf die main.js binnentrekt, dus zonder deze
-  // regels laadt de schil niet bij 'eerste bezoek en meteen offline' — de fetch-handler is
-  // network-first en vult de cache pas ná een geslaagde ophaal, en die is er dan juist niet.
+  // Takenbundel. Alle drie horen tot de modulegraaf die main.js binnentrekt. De fetch-handler is
+  // cache-first: wat hier ontbreekt wordt pas bij het eerste gebruik opgehaald, en bij 'eerste
+  // bezoek en meteen offline' laadt de schil dan niet. De wachtpost in tests.js loopt de graaf af.
   './src/bundel.js',
   './src/bundel-acties.js',
   './src/render-bundel.js',
-  // Eenmalige migratie v12.5. Wordt lazy geïmporteerd door main.js, maar de wachtpost in tests.js
+  // Eenmalige migratie v12.5. Wordt lazy geïmporteerd (alleen via de console-hulp), maar de wachtpost in tests.js
   // volgt óók dynamische imports — en terecht: een dynamische import is net zo goed een verzoek
   // dat bij 'eerste bezoek en meteen offline' niet uit de cache te beantwoorden valt.
   './src/migratie-offerte.js',
@@ -106,8 +115,11 @@ self.addEventListener('install', e => {
   e.waitUntil(
     // Per-resource cachen: één gemiste/hernoemd bestand mag de hele install niet laten falen
     // (anders blijft de oude SW hangen en komt een release nooit door).
+    // `cache:'reload'`: langs de HTTP-cache heen. GitHub Pages geeft max-age=600; zonder deze
+    // optie kon de NIEUWE cache gevuld worden met een tot tien minuten oude kopie uit de
+    // HTTP-cache — oude modules in een nieuwe versie, en met cache-first blijven die dan staan.
     caches.open(CACHE_VERSION)
-      .then(c => Promise.all(APP_SHELL.map(u => c.add(u).catch(() => {}))))
+      .then(c => Promise.all(APP_SHELL.map(u => c.add(new Request(u, { cache: 'reload' })).catch(() => {}))))
   );
 });
 
@@ -124,35 +136,50 @@ self.addEventListener('activate', e => {
   );
 });
 
+// Een goed antwoord in de cache van DEZE versie zetten. Bewust niet afwachten in de keten van de
+// pagina: het antwoord gaat meteen door, het wegschrijven loopt erachteraan.
+function bewaar(sleutel, resp) {
+  if (!resp || !resp.ok) return;
+  const kopie = resp.clone();
+  caches.open(CACHE_VERSION).then(c => c.put(sleutel, kopie)).catch(() => {});
+}
+
+// Cache-first: eerst de cache van deze versie, bij een misser het netwerk (en dat dan bewaren).
+// `sleutel` (optioneel) is de cachesleutel als die anders is dan het verzoek — bij een navigatie
+// is dat altijd './index.html', welke query er ook achter de URL staat (?test=1).
+function uitCache(req, sleutel) {
+  return caches.open(CACHE_VERSION)
+    .then(c => c.match(sleutel || req))
+    .then(hit => hit || fetch(req).then(resp => { bewaar(sleutel || req, resp); return resp; }));
+}
+
+// Netwerk-eerst, de cache als vangnet. Alleen nog op een ontwikkelmachine (zie sw-strategie.js),
+// of als sw-strategie.js niet geladen kon worden.
+function netwerkEerst(req) {
+  return fetch(req).then(resp => { bewaar(req, resp); return resp; }).catch(err =>
+    caches.match(req).then(r => {
+      if (r) return r;
+      // index.html is alleen een goed antwoord op een PAGINA-verzoek. Op een gemiste module of
+      // stylesheet leverde het HTML op waar JavaScript werd verwacht — een verwarrende
+      // parseerfout in plaats van een eerlijke netwerkfout.
+      if (req.mode === 'navigate') return caches.match('./index.html');
+      throw err;
+    }));
+}
+
 self.addEventListener('fetch', e => {
-  const url = new URL(e.request.url);
-  // Google Sheets / Google Auth — altijd live (network only).
-  if (url.hostname.includes('googleapis.com') || url.hostname.includes('google.com') || url.hostname.includes('gstatic.com')) {
-    return; // laat de browser dit zelf afhandelen
+  const req = e.request;
+  // Zonder strategie: alleen GET, en alleen het oude netwerk-eerst. Een POST (de chat-proxy) mag
+  // nooit uit een cache beantwoord worden: hier stond ooit een regel die op ÉLK mislukt verzoek
+  // de gecachete index.html teruggaf, mét status 200 — de aanroeper kreeg dan een SyntaxError.
+  const soort = typeof self.cdSwStrategie === 'function'
+    ? self.cdSwStrategie(req, self.location.href)
+    : (req.method === 'GET' && new URL(req.url).origin === self.location.origin ? 'netwerk' : 'live');
+  if (soort === 'live') return;   // Google, OneSignal, de proxy, POST: de browser doet het zelf
+  if (soort === 'pagina') {
+    e.respondWith(uitCache(req, './index.html').catch(() => caches.match('./index.html')));
+    return;
   }
-  // App-shell: network first met fallback naar cache.
-  e.respondWith(
-    fetch(e.request).then(resp => {
-      // Stop succesvolle GET-responses in cache
-      if (e.request.method === 'GET' && resp.ok) {
-        const clone = resp.clone();
-        caches.open(CACHE_VERSION).then(c => c.put(e.request, clone));
-      }
-      return resp;
-    }).catch(err => {
-      // Alleen een GET mag uit de cache worden beantwoord. Hier stond één regel die op ÉLK
-      // mislukt verzoek de gecachete index.html teruggaf, mét status 200 — ook op de POST naar
-      // de chat-proxy. De aanroeper probeerde daar JSON van te maken en kreeg een
-      // onbegrijpelijke SyntaxError, in plaats van te merken dat er geen verbinding was.
-      if (e.request.method !== 'GET') throw err;
-      return caches.match(e.request).then(r => {
-        if (r) return r;
-        // En index.html is alleen een goed antwoord op een PAGINA-verzoek. Op een gemiste module
-        // of stylesheet leverde het HTML op waar JavaScript werd verwacht — weer een verwarrende
-        // parseerfout in plaats van een eerlijke netwerkfout.
-        if (e.request.mode === 'navigate') return caches.match('./index.html');
-        throw err;
-      });
-    })
-  );
+  if (soort === 'cache') { e.respondWith(uitCache(req)); return; }
+  e.respondWith(netwerkEerst(req));
 });

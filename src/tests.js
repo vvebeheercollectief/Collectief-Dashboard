@@ -16910,6 +16910,48 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
           document.getElementById('hist-note').value='';
         }
       }
+
+      // ── 2a. Service worker: eigen bestanden cache-first, de rest live ──
+      {
+        if(typeof self.cdSwStrategie!=='function'){
+          await new Promise((res,rej)=>{ const sc=document.createElement('script'); sc.src='sw-strategie.js?toets='+Date.now();
+            sc.onload=res; sc.onerror=()=>rej(new Error('sw-strategie.js niet te laden')); document.head.appendChild(sc); });
+        }
+        const S=self.cdSwStrategie, SW='https://vve.github.io/Collectief-Dashboard/sw.js?appId=x&sdkVersion=1';
+        const v=(url, extra)=>S({ method:'GET', mode:'cors', url, ...(extra||{}) }, SW);
+        eq('sw: een eigen module komt uit de cache', v('https://vve.github.io/Collectief-Dashboard/src/main.js'), 'cache');
+        eq('sw: de stylesheet ook', v('https://vve.github.io/Collectief-Dashboard/styles.css'), 'cache');
+        eq('sw: een navigatie naar de app krijgt de gecachete index.html', v('https://vve.github.io/Collectief-Dashboard/', {mode:'navigate'}), 'pagina');
+        eq('sw: ook met ?test=1 erachter', v('https://vve.github.io/Collectief-Dashboard/index.html?test=1', {mode:'navigate'}), 'pagina');
+        eq('sw: een ándere pagina (vrijdagsoverzicht) niet als index.html', v('https://vve.github.io/Collectief-Dashboard/vrijdagsoverzicht.html', {mode:'navigate'}), 'cache');
+        eq('sw: sw.js zelf nooit uit de cache', v('https://vve.github.io/Collectief-Dashboard/sw.js'), 'live');
+        eq('sw: een POST (chat-proxy) nooit', S({ method:'POST', mode:'cors', url:'https://vve.github.io/Collectief-Dashboard/x' }, SW), 'live');
+        eq('sw: Google Sheets nooit', v('https://sheets.googleapis.com/v4/spreadsheets/abc/values:batchGet'), 'live');
+        eq('sw: Google-inlog nooit', v('https://accounts.google.com/gsi/client'), 'live');
+        eq('sw: OneSignal nooit', v('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js'), 'live');
+        eq('sw: de lettertypen nooit', v('https://fonts.googleapis.com/css2?family=x'), 'live');
+        eq('sw: de chat-proxy nooit', v('https://collectief-dashboard.vercel.app/api/chat'), 'live');
+        eq('sw: Chart.js (vast versienummer) mag uit de cache', v('https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js'), 'cache');
+        eq('sw: buiten het bereik niet', v('https://vve.github.io/vve-website/index.html'), 'live');
+        eq('sw: op een ontwikkelmachine netwerk-eerst (anders verbergt hij bewerkte code)',
+           S({ method:'GET', mode:'cors', url:'http://127.0.0.1:8123/src/main.js' }, 'http://127.0.0.1:8123/sw.js'), 'netwerk');
+        const bronSw = await (await fetch(new URL('sw.js', document.baseURI), {cache:'no-store'})).text();
+        truthy('sw: de install haalt langs de HTTP-cache heen (geen oude kopie in een nieuwe cache)', /new Request\(u,\s*\{\s*cache:\s*'reload'\s*\}\)/.test(bronSw));
+        truthy('sw: laadt de gedeelde strategie', /importScripts\('\.\/sw-strategie\.js'\)/.test(bronSw));
+        // Elk bestand uit de app-schil moet echt bestaan: een tikfout faalt in de install STIL (de
+        // .catch per bestand), en dan ontbreekt dat bestand bij 'eerste bezoek en meteen offline'.
+        const blok=(bronSw.match(/APP_SHELL\s*=\s*\[([\s\S]*?)\]/)||[])[1]||'';
+        const lijst=[...blok.matchAll(/'(\.\/[^']+)'/g)].map(m=>m[1]);
+        const kapot=[];
+        for(const u of lijst){ const r=await fetch(new URL(u, document.baseURI), {cache:'no-store'}); if(!r.ok) kapot.push(u); }
+        eq('sw: elk bestand uit de app-schil bestaat', kapot, []);
+        truthy('sw: de app-schil-lijst is gelezen', lijst.length>40);
+        // De balk na een overname door een ánder venster.
+        const SWU = await import('./sw-update.js');
+        eq('versiebalk: overgenomen zonder eigen klik → balk', SWU.balkNaOvername(false, true), true);
+        eq('versiebalk: eigen klik → geen balk (de kern herlaadt)', SWU.balkNaOvername(true, true), false);
+        eq('versiebalk: allereerste installatie → geen balk', SWU.balkNaOvername(false, false), false);
+      }
     } catch(e) {
       truthy('review 02-10: geen uitzondering — '+(e && e.stack || e), false);
     } finally {

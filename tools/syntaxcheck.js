@@ -104,6 +104,7 @@ function run() {
     { naam: 'backend (apps-script/)',      map: wortel + 'apps-script/',            ext: '.gs', kaal: false },
     { naam: 'klaarstaand (niet uitgerold)', map: wortel + 'apps-script-klaarstaand/', ext: '.gs', kaal: false },
     { naam: 'service worker',              map: wortel,                             ext: 'sw.js', kaal: false },
+    { naam: 'sw-strategie',                map: wortel,                             ext: 'sw-strategie.js', kaal: false },
   ];
   var regels = [], totaal = 0, stuk = 0;
   groepen.forEach(function (g) {

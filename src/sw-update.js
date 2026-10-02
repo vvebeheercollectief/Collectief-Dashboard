@@ -130,6 +130,16 @@ export function balkWeerTonen(verborgen, reg, controller) {
   return !verborgen && !!(reg && reg.waiting) && shouldPromptReload(controller);
 }
 
+// Puur (testbaar): een nieuwe service worker nam dit tabblad over ZONDER dat hier op 'Herladen' is
+// geklikt — een ánder venster klikte (sw.js doet clients.claim()). Dit tabblad draait dan nog de
+// oude code, terwijl alles wat het vanaf nu nog ophaalt (een lui geladen module) uit de cache van
+// de NIEUWE versie komt. Er staat dan geen wachtende versie meer, dus `balkWeerTonen` zou zwijgen.
+// Sinds de eigen bestanden cache-first komen is de balk de enige weg naar nieuwe code; dan hoort
+// hij hier dus te staan. Niet bij de allereerste installatie (er was nog geen controller).
+export function balkNaOvername(gearmd, hadController) {
+  return !gearmd && !!hadController;
+}
+
 function toonUpdateBalk(onReload, onDismiss, isBezet) {
   if (document.getElementById('sw-update-bar')) return; // nooit dubbel
   const bar = document.createElement('div');
@@ -170,17 +180,25 @@ export function initSwUpdate() {
   if (!('serviceWorker' in navigator)) return;
 
   const kern = maakHerlaadKern();
+  let balk = null;                                            // gezet zodra de registratie er is
+  let hadController = !!navigator.serviceWorker.controller;
 
   // Nieuwe SW heeft overgenomen → eenmalig herladen naar verse code, maar alléén
   // als de gebruiker hier recent op "Herladen" klikte en de pagina niet bezet is
-  // met een inlog of schrijfactie (zie maakHerlaadKern).
-  navigator.serviceWorker.addEventListener('controllerchange', () => kern.controllerChange());
+  // met een inlog of schrijfactie (zie maakHerlaadKern). Klikte een ÁNDER venster, dan de balk
+  // (zie balkNaOvername).
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    const toon = balkNaOvername(kern._gearmd(), hadController);
+    hadController = true;
+    kern.controllerChange();
+    if (toon && balk) balk();
+  });
 
   window.addEventListener('load', () => {
     const base = location.pathname.replace(/\/[^/]*$/, '') || '';
     pakRegistratie(base + '/sw.js', base + '/').then(reg => {
       const vraagHerladen = () => kern.klik(reg);
-      const balk = () => toonUpdateBalk(vraagHerladen, () => kern.annuleer(), kern.isBezet);
+      balk = () => toonUpdateBalk(vraagHerladen, () => kern.annuleer(), kern.isBezet);
 
       // Nieuwe versie gevonden tijdens deze sessie
       reg.addEventListener('updatefound', () => {
@@ -198,7 +216,10 @@ export function initSwUpdate() {
         balk();
       }
 
-      // Periodiek + bij terugkeer naar het tabblad actief checken
+      // Periodiek + bij terugkeer naar het tabblad actief checken. Sinds de eigen bestanden
+      // cache-first komen (sw-strategie.js) is dit de ENIGE manier waarop een open tabblad een
+      // nieuwe uitrol ontdekt: zonder update() bleef een dashboard dat dagen openstaat op de oude
+      // code. De browser doet dit zelf alleen bij een navigatie (en hoogstens eens per 24 uur).
       const check = () => reg.update().catch(() => {});
       setInterval(check, 30 * 60 * 1000); // elk half uur
       // Bij terugkeer naar het tabblad óók de balk terug als er nog een nieuwe versie klaarstaat.

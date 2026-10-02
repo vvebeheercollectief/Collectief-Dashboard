@@ -308,6 +308,11 @@ function springNaarBundel(bundelId){
 const zonderAutoStap = (rows, bw) => (rows||[]).filter(r => !isAutoOfferteStap(r, bw && bw.ix));
 
 function renderNtd(){
+  // Stond de cursor in een 'Aannemer toevoegen…'-veld? Dan na het tekenen terugzetten (zie
+  // herstelAannemerFocus). Nu vastleggen: zo meteen bestaat dat element niet meer.
+  const _act=document.activeElement;
+  const _aannNieuw=(_act && _act.classList && _act.classList.contains('of-aann-input') && _act.dataset.aann)
+    ? { sleutel:_act.dataset.aann, start:_act.selectionStart, eind:_act.selectionEnd } : null;
   // Eerst de selectie ontdoen van rij-objecten die na een verversing niet meer bestaan; anders
   // tekent de tabel lege vinkjes terwijl de balk nog een aantal noemt (zie bulkHerstel).
   // Viel er iets weg, dan moet de balk mee: de teller en de knoppen horen bij dezelfde selectie.
@@ -396,7 +401,7 @@ function renderNtd(){
   // element en is de cursor eruit gesprongen. Dit zet hem terug. Bewust hier en niet in
   // renderTbody: de poll tekent elke acht seconden opnieuw zodra een collega iets wijzigt, en dat
   // mag je niet merken terwijl je aan het typen bent.
-  herstelAannemerFocus();
+  herstelAannemerFocus(_aannNieuw);
   // De getekende lijst gaat terug naar de aanroeper: na filteren, sorteren én absorberen, dus in
   // exact de volgorde waarin de rijen op de pagina's verdeeld worden. `springNaarBundel` zoekt er
   // de pagina van de kop mee op zonder die hele pijplijn na te bouwen.

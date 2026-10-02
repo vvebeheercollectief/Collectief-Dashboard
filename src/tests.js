@@ -16153,6 +16153,91 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     }
   })();
 
+  // ══════════════════════════════════════════════════════════════════════════
+  //  NALOOP 02-10-2026 — scrollstand, aannemersveld, lege lijst
+  // ══════════════════════════════════════════════════════════════════════════
+  await (async () => {
+    console.log('%c[TESTS] Naloop 02-10: scroll en lege lijst', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const UI = await import('./ui.js');
+    const RV = await import('./render-vve.js');
+    const ntdOud=D.ntd, afOud=D.af, alvoOud=D.alvo, logOud=D.logboek, codeOud=state.vveCode, terugOud=state.vveTerug;
+    const secOud=state.activeNtd, pgOud=pgs.ntd, openOud=state.offerteAannOpen;
+    const paginaOud=(document.querySelector('.page.active')||{}).id?.replace('page-','')||'ntd';
+    const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
+    const content=document.getElementById('content');
+    try {
+      // ── 6. De tijdlijn in het dossier houdt zijn plek bij een hertekening ──
+      D.ntd={ ...leeg }; D.af={ ...leeg }; D.alvo=[{ code:'SC-01', naam:'Scrollhof', status:'', _row:2 }];
+      D.logboek=Array.from({length:40},(_,i)=>({ _row:i+2, timestamp:new Date(Date.now()-i*36e5).toISOString(), code:'SC-01', sectie:'OPPAKKEN', actie:'Opmerking', veld:'', oudeWaarde:'', nieuweWaarde:'Regel '+i+' — '+'tekst '.repeat(20), gebruiker:'jer' }));
+      state._vveLogAlles=true;
+      goTo('vve'); state.vveCode='SC-01'; RV.renderVve();
+      const tl=document.querySelector('#vve-inhoud .tl-scroll');
+      truthy('dossier: de tijdlijn is langer dan zijn vak (anders meet deze toets niets)', !!tl && tl.scrollHeight>tl.clientHeight+50);
+      tl.scrollTop=200;
+      const gezet=tl.scrollTop;
+      RV.renderVve();   // wat de poll doet
+      eq('dossier: na een hertekening staat de tijdlijn nog op dezelfde plek', document.querySelector('#vve-inhoud .tl-scroll').scrollTop, gezet);
+      D.alvo.push({ code:'SC-02', naam:'Andershof', status:'', _row:3 });
+      state.vveCode='SC-02'; RV.renderVve();
+      eq('dossier: een ander dossier begint bovenaan', document.querySelector('#vve-inhoud .tl-scroll').scrollTop, 0);
+      state._vveLogAlles=false;
+
+      // ── 7. Terug uit het dossier = terug op dezelfde plek in de lijst ──
+      D.ntd={ ...leeg, OPPAKKEN:Array.from({length:25},(_,i)=>({ _sec:'OPPAKKEN', _row:i+3, code:'3110'+String(i).padStart(2,'0'), naam:'VvE '+i, actiepunt:'Taak '+i, deadline:'', behandelaar:'', inBehandeling:'FALSE', taakId:'TSC'+i })) };
+      goTo('ntd'); state.activeNtd='OPPAKKEN'; pgs.ntd=1; renderNtd();
+      truthy('terug: de lijst is hoger dan het venster (anders meet deze toets niets)', content.scrollHeight>content.clientHeight+300);
+      content.scrollTop=300;
+      const stand=content.scrollTop;
+      RV.openVvePagina('311005');
+      RV.terugVanDossier();
+      eq('terug: het terug-pijltje landt op dezelfde scrollplek in de lijst', content.scrollTop, stand);
+      // Bladeren onderaan de lijst haalt de kaart weer in beeld.
+      content.scrollTop=content.scrollHeight;
+      UI.kaartInBeeld(document.getElementById('ntd-pag'));
+      const kaartBoven=document.getElementById('ntd-card').getBoundingClientRect().top - content.getBoundingClientRect().top;
+      truthy('bladeren: de bovenkant van de tabelkaart staat daarna in beeld', kaartBoven>=0 && kaartBoven<40);
+      content.scrollTop=0;
+
+      // ── 11. 'Aannemer toevoegen…' overleeft een hertekening ──
+      const traject={ _sec:'OFFERTE-TRAJECTEN', _row:50, code:'311212', naam:'Testflat', datumAangevraagd:'', offertes:'', behandelaar:'', deadline:'', opmerkingen:'Dak', taakId:'TOFF1', aannemers:'MoTec|0' };
+      D.ntd={ ...leeg, 'OFFERTE-TRAJECTEN':[traject] };
+      state.activeNtd='OFFERTE-TRAJECTEN'; state.offerteAannOpen=new Set(['nr:TOFF1']); renderNtd();
+      let inp=document.querySelector('.of-aann-input[data-aann]');
+      truthy('aannemer: het toevoegveld staat in beeld', !!inp);
+      inp.focus(); inp.value='Van der He'; inp.dispatchEvent(new Event('input',{bubbles:true}));
+      inp.setSelectionRange(10,10);
+      renderNtd();   // wat de poll doet
+      inp=document.querySelector('.of-aann-input[data-aann]');
+      eq('aannemer: de getypte tekst staat er na een hertekening nog', inp.value, 'Van der He');
+      eq('aannemer: en de cursor ook, achteraan', [document.activeElement===inp, inp.selectionStart], [true, 10]);
+      inp.blur(); state.offerteAannNieuw={};
+
+      // ── 13. 'Niets gevonden' met een knop die de filters wist; Escape maakt een zoekveld leeg ──
+      D.ntd={ ...leeg, OPPAKKEN:[{ _sec:'OPPAKKEN', _row:3, code:'311001', naam:'A', actiepunt:'Lekkage', deadline:'', behandelaar:'', inBehandeling:'FALSE', taakId:'TF1' }] };
+      state.activeNtd='OPPAKKEN'; state.offerteAannOpen=new Set();
+      const zoek=document.getElementById('s-ntd');
+      zoek.value='bestaatnietxyz'; renderNtd();
+      const knop=document.querySelector('#ntd-tbody [data-action="ntd-filters-wissen"]');
+      truthy('leeg: bij een zoekterm staat er een knop Filters wissen', !!knop);
+      knop.click();
+      eq('leeg: de knop wist de zoekterm en de taak staat er weer', [zoek.value, document.querySelectorAll('#ntd-tbody tr[data-row]').length], ['', 1]);
+      D.ntd={ ...leeg }; renderNtd();
+      eq('leeg: zonder filters geen knop (er is gewoon niets)', document.querySelectorAll('#ntd-tbody [data-action="ntd-filters-wissen"]').length, 0);
+      zoek.value='iets';
+      zoek.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
+      eq('zoeken: Escape maakt het zoekveld leeg', zoek.value, '');
+    } catch(e) {
+      // Een uitzondering hier mag de hele suite niet stilleggen (dan komt er geen uitslag).
+      truthy('naloop 02-10 scroll: geen uitzondering — '+(e && e.stack || e), false);
+    } finally {
+      D.ntd=ntdOud; D.af=afOud; D.alvo=alvoOud; D.logboek=logOud; state.vveCode=codeOud; state.vveTerug=terugOud;
+      state.activeNtd=secOud; pgs.ntd=pgOud; state.offerteAannOpen=openOud; state.offerteAannNieuw={}; state._vveLogAlles=false;
+      document.getElementById('s-ntd').value='';
+      content.scrollTop=0;
+      goTo(paginaOud); renderNtd();
+    }
+  })();
+
   console.log = _origLog;         // het voortgangsspoor weer los
   state._dubbelcheckUit = false;  // de testhaak weer los
   state._codecheckUit = false;

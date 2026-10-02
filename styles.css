@@ -804,6 +804,7 @@
 
     /* Empty */
     .empty{padding:36px;text-align:center;color:var(--mut);font-size:13px}
+    .empty-knop{margin-top:12px}
     .empty-ico{font-size:32px;margin-bottom:8px}
 
     /* Modal */

@@ -146,6 +146,9 @@ export const state = {
   // zodat de hertekening het veld mét de ingetypte tekst terugzet (zie herstelAannemerFocus).
   offerteAannEdit: null,
   offerteAannEditVal: '',
+  // Hetzelfde voor het veld 'Aannemer toevoegen…' onder elk paneel: sleutel → getypte tekst. Ook
+  // dat veld wordt bij elke hertekening als nieuw element opgebouwd (zie herstelAannemerFocus).
+  offerteAannNieuw: {},
   vveCode: null,           // VvE op de per-VvE-pagina (Fase 5)
   vveTerug: null,          // pagina waar de gebruiker vandaan kwam vóór het dossier (terug-pijltje)
   _vveAfAlles: false,      // per-VvE: alle afgeronde taken uitgeklapt

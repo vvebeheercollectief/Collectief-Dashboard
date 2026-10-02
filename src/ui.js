@@ -14,6 +14,12 @@ import { bulkSelectie, toggleBulkMode } from "./bulk.js";
 
 let _pagina = 'ntd';   // laatst geopende pagina, zodat renderAll de kop kan bijwerken
 
+// Scrollpositie van #content per pagina. Alle pagina's delen die ene scroller, dus wie in de
+// takenlijst op rij 60 een VvE-code aanklikte en via het terug-pijltje uit het dossier kwam,
+// landde bovenaan de lijst en moest zijn plek opnieuw zoeken. goTo onthoudt de stand van de pagina
+// die hij verlaat; terugVanDossier (render-vve.js) zet hem terug met herstelScroll.
+const _scrollPerPagina = {};
+
 // De kop-pillen vervangen de ondertitel op Nog Te Doen — maar pas zodra ze gevuld zijn.
 // Tot de eerste databeurt binnen is blijft de ondertitel staan, anders toont de kop
 // tijdens het laden alleen de titel en verder niets.
@@ -33,6 +39,8 @@ function goTo(page){
   // paginawissel sluiten we 'm, anders kan een verouderd formulier later opslaan.
   // Nogmaals klikken op de huidige pagina telt niet — dat mag geen getypte tekst wissen.
   const _huidige=document.querySelector('.page.active')?.id;
+  const _content=document.getElementById('content');
+  if(_huidige && _content) _scrollPerPagina[_huidige]=_content.scrollTop;
   if(_huidige!=='page-'+page && state.logEdit!=null){ state.logEdit=null; state.logEditTs=null; state.logEditSoort=null; }
   // Een VERGETEN lege selecteerstand legt het hele dashboard stil: de 8s-ronde slaat over zolang
   // `bulkMode` aanstaat, en de meldingen liften op diezelfde ronde mee. Buiten de takenlijst is er
@@ -63,6 +71,23 @@ function goTo(page){
   if(page==='analytics') buildAnalytics();
   if(page==='dash') buildDash();
 }
+function herstelScroll(page){
+  const c=document.getElementById('content');
+  if(c) c.scrollTop=_scrollPerPagina['page-'+page]||0;
+}
+
+// Na het bladeren de tabelkaart in beeld halen als zijn bovenkant boven het zichtbare deel van
+// #content is verdwenen. De bladerknoppen staan ONDER de tabel: klikte je op pagina 3 terwijl je
+// helemaal onderaan stond, dan bleef je daar staan en zag je van de nieuwe pagina alleen de staart.
+// Staat de kaart al (deels) in beeld met zijn kop, dan blijft alles waar het is.
+function kaartInBeeld(el){
+  const kaart=el && el.closest('.card');
+  const c=document.getElementById('content');
+  if(!kaart || !c) return;
+  const boven=kaart.getBoundingClientRect().top - c.getBoundingClientRect().top;
+  if(boven<0) c.scrollTop=Math.max(0, c.scrollTop+boven-8);
+}
+
 function closeSb(){document.getElementById('sb').classList.remove('open');document.getElementById('overlay').classList.remove('on');document.getElementById('hamburger')?.setAttribute('aria-expanded','false')}
 
 // ══════════════════════════════════════
@@ -99,6 +124,14 @@ function cycleDensity(){
 function setupSearch(id,cb){
   const el=document.getElementById(id);if(!el)return;
   let t;el.addEventListener('input',()=>{clearTimeout(t);t=setTimeout(cb,200)});
+  // Escape in een zoekveld maakt het leeg — de gewoonte uit elk ander zoekvak. Alleen als er iets
+  // in staat: een leeg veld laat de toets door naar de centrale Escape (main.js), die dan bijv. de
+  // zijbalk sluit. Meteen opnieuw tekenen, zonder de 200 ms wachttijd van het typen.
+  el.addEventListener('keydown',e=>{
+    if(e.key!=='Escape' || !el.value) return;
+    e.stopPropagation();
+    el.value=''; clearTimeout(t); cb();
+  });
 }
 
-export { goTo, syncKop, closeSb, applyTheme, applyDensity, cycleDensity, setupSearch };
+export { goTo, syncKop, closeSb, applyTheme, applyDensity, cycleDensity, setupSearch, herstelScroll, kaartInBeeld };

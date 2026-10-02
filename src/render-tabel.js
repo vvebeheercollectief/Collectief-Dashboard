@@ -126,7 +126,12 @@ function renderTbody(tbodyId,rows,sec,page,isAf,filtered){
   // 7 sinds de Behandelaar-kolom erbij kwam; dit getal is de colspan van de 'niets gevonden'-rij
   // en moet dus gelijk lopen met `cols` in renderAf.
   const leegCols=isAf?7:(SECS[sec].cols.length+1+(state.bulkMode?1:0));
-  if(!sl.length){el.innerHTML=`<tr><td colspan="${leegCols}">${emptyRow(leegCols,true,filtered)}</td></tr>`;return}
+  // Op Nog Te Doen met een zoekterm of filter erbij: één knop die ze allemaal wist. 'Pas je filter
+  // aan' zonder knop liet de gebruiker zoeken wélk van de vijf filters (zoekveld, code,
+  // behandelaar, prioriteit, statuspil) de lijst leeg maakte.
+  const wisKnop=(!isAf && filtered)
+    ? '<button type="button" class="btn btn-sec btn-sm" data-action="ntd-filters-wissen">Filters wissen</button>' : '';
+  if(!sl.length){el.innerHTML=`<tr><td colspan="${leegCols}">${emptyRow(leegCols,true,filtered,wisKnop)}</td></tr>`;return}
   if(isAf){el.innerHTML=sl.map(r=>rowAf(r,sec)).join('');return}
   // Drie groepen (Fase 4): actief / in behandeling / weggelegd
   const grpOf = r => opvolgStatus(r).weggelegd ? 2 : (r.inBehandeling==='TRUE' ? 1 : 0);

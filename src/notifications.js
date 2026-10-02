@@ -118,6 +118,7 @@ function showToast(title, msg, color, icoNaam, opts) {
   // melding zegt dat er iets NIET gebeurd is, en na vijf seconden stil verdwijnen betekende: wie
   // net even wegkeek, heeft nooit geweten dat zijn wijziging is teruggezet. Geen aftelbalk dus.
   const blijft = color === 'var(--rd)';
+  const balkHtml = blijft ? '' : `<div class="toast-bar" style="animation-duration:${TOAST_DURATION}ms"></div>`;
   const el = document.createElement('div');
   el.className = 'toast';
   el.style.setProperty('--toast-clr', color || 'var(--ac)');
@@ -130,7 +131,7 @@ function showToast(title, msg, color, icoNaam, opts) {
       ${msg ? `<div class="toast-msg">${esc(msg)}</div>` : ''}
     </div>
     <button class="toast-close" data-action="toast-sluiten" aria-label="Melding sluiten">×</button>
-    ${blijft ? '' : `<div class="toast-bar" style="animation-duration:${TOAST_DURATION}ms"></div>`}`;
+    ${balkHtml}`;
 
   const container = document.getElementById('toast-container');
   container.appendChild(el);

@@ -729,11 +729,14 @@ function toDutchDate(s){
   return d?`${String(d.d).padStart(2,'0')}-${String(d.m).padStart(2,'0')}-${d.y}`:'';
 }
 
-function emptyRow(cols,inline,filtered){
+// `knopHtml` (optioneel) is kant-en-klare HTML onder de tekst — de takenlijst zet daar 'Filters wissen'
+// neer, zodat 'pas je filter aan' ook meteen te dóén is (zie renderTbody, render-tabel.js).
+function emptyRow(cols,inline,filtered,knopHtml){
   const leegIco=filtered?ICONS.zoek:ICONS.postvakLeeg;
   const txt=filtered?'Niets gevonden — pas je filter of zoekopdracht aan':'Geen resultaten';
-  if(inline)return`<div class="empty"><div class="empty-ico">${leegIco}</div>${txt}</div>`;
-  return`<tr><td colspan="${cols}"><div class="empty"><div class="empty-ico">${leegIco}</div>${txt}</div></td></tr>`;
+  const extraHtml=knopHtml?`<div class="empty-knop">${knopHtml}</div>`:'';
+  if(inline)return`<div class="empty"><div class="empty-ico">${leegIco}</div>${txt}${extraHtml}</div>`;
+  return`<tr><td colspan="${cols}"><div class="empty"><div class="empty-ico">${leegIco}</div>${txt}${extraHtml}</div></td></tr>`;
 }
 
 // String(s??'') i.p.v. (s||''): `??` vangt alleen null/undefined, zodat 0/false correct

@@ -6,7 +6,7 @@ import { ico } from "./icons.js";
 import { SECS, SKEYS, PAGE_META } from "./config.js";
 import { state, D } from "./state.js";
 import { verseRij } from "./rij.js";
-import { goTo } from "./ui.js";
+import { goTo, herstelScroll } from "./ui.js";
 import { fmtLogTs, logItemHtml, logDayLabel, logPaginaSoort, _herankerLogEdit } from "./render-overig.js";
 import { vveKenmerken, KENMERK_WAARDEN } from "./kenmerken.js";
 import { backgroundWrite, blokkeerOffline } from "./data.js";
@@ -163,7 +163,9 @@ function terugDoel(v){
 
 // Terug-pijltje in de dossier-kop: naar de pagina waar je vandaan kwam.
 function terugVanDossier(){
-  goTo(terugDoel(state.vveTerug));
+  const doel=terugDoel(state.vveTerug);
+  goTo(doel);
+  herstelScroll(doel);   // terug op de plek waar je de VvE aanklikte, niet bovenaan (ui.js)
 }
 
 // Navigeer naar het dossier van een VvE (en onthoud 'm voor het commandocentrum)
@@ -283,7 +285,15 @@ function renderVve(){
   const wrap=document.getElementById('vve-inhoud');
   if(!wrap) return;
   const code=state.vveCode;
-  if(!code){ wrap.innerHTML=`<div class="empty"><div class="empty-ico">${ico('gebouw')}</div>Zoek een VvE via Ctrl+K of klik op een VvE-code</div>`; return; }
+  if(!code){ wrap.dataset.code=''; wrap.innerHTML=`<div class="empty"><div class="empty-ico">${ico('gebouw')}</div>Zoek een VvE via Ctrl+K of klik op een VvE-code</div>`; return; }
+  // De scrollstand van de tijdlijn en de drie panelen. De 8s-poll tekent deze pagina bij elke
+  // wijziging opnieuw (renderAll), en het nieuwe .tl-scroll begon dan weer bovenaan — midden in het
+  // teruglezen van de geschiedenis sprong de lijst weg. Alleen bij DEZELFDE VvE terugzetten: een
+  // ander dossier hoort bovenaan te beginnen.
+  const _scrollTerug = wrap.dataset.code===code ? {
+    tl: wrap.querySelector('.tl-scroll')?.scrollTop || 0,
+    panelen: [...wrap.querySelectorAll('.vve-paneel')].map(p=>p.scrollTop),
+  } : null;
   const o=vveOverzicht(code,D);
   // Composer-behoud: de 8s-poll re-rendert deze pagina; half getypte tekst mag
   // niet verdwijnen — alleen bewaren als het om dezelfde VvE gaat.
@@ -474,6 +484,11 @@ function renderVve(){
     const b=document.getElementById('kmk-bron');     if(b) b.value=_kmkBewaar.bron;
     const ba=document.getElementById('kmk-balkons'); if(ba&&_kmkBewaar.balkons) ba.value=_kmkBewaar.balkons;
     const ko=document.getElementById('kmk-kozijnen');if(ko&&_kmkBewaar.kozijnen) ko.value=_kmkBewaar.kozijnen;
+  }
+  wrap.dataset.code=code;
+  if(_scrollTerug){
+    const tl=wrap.querySelector('.tl-scroll'); if(tl) tl.scrollTop=_scrollTerug.tl;
+    wrap.querySelectorAll('.vve-paneel').forEach((p,i)=>{ if(_scrollTerug.panelen[i]) p.scrollTop=_scrollTerug.panelen[i]; });
   }
   if(_focusHerstel){
     const el=_focusHerstel.id ? document.getElementById(_focusHerstel.id)

@@ -6,7 +6,7 @@ import { pgs, state, D } from './state.js';
 import { bouwBundelIndex, zichtbareKop, volgendeVolg, bundelSleutel } from './bundel.js';
 import {
   setNtd, renderNtd, renderNtdStats, setAf, renderAf, renderAlvo, toggleAlvoFlag, renderAlfa,
-  kopOpen, zetKopOpen, toggleBundel, springNaarBundel,
+  kopOpen, zetKopOpen, toggleBundel, springNaarBundel, wisNtdFilters,
 } from './render-lijsten.js';
 import {
   setOntw, renderOntw, editOntwItem, addTaskNote, renderLogboek,
@@ -18,6 +18,7 @@ import { modalAannemerAdd, modalAannemerBinnen, modalAannemerWeg } from './modal
 import { copyAiPrompt, aiOvernemen, aiActieTaak, aiKopieerConcept, prefillNieuweTaak } from './ai.js';
 import { dismissToast, saveNotifPrefs, showToast } from './notifications.js';
 import { leesbareFout } from './util.js';
+import { kaartInBeeld } from './ui.js';
 import { doLogin } from './auth.js';
 import { openSnoozeModal, snoozeKies } from './snooze.js';
 import { zetInBehandeling } from './inbehandeling.js';
@@ -164,7 +165,10 @@ export const ACTIONS = {
   // stuk op `rowData._sec` — een lege pagina met een console-fout in plaats van een uitleg.
   'taak-bewerken':         (el) => { const r=taakUitCache(el.dataset.rid); if(r) openModal(true, r); },
   'taak-afronden':         (el) => completeTask(+el.dataset.rid),
-  'pagineer':              (el) => { const d=el.dataset.doel; pgs[d]=+el.dataset.pg; PAG_RENDER[d](); },
+  'pagineer':              (el) => { const d=el.dataset.doel; pgs[d]=+el.dataset.pg; PAG_RENDER[d]();
+                                     kaartInBeeld(document.getElementById(d+'-pag')); },
+  // 'Niets gevonden' op Nog Te Doen: alle zoektermen, filters en de statuspil in één keer weg.
+  'ntd-filters-wissen':    ()   => { const w=wisNtdFilters(); pgs.ntd=1; if(w.iets) renderNtdStats(); renderNtd(); },
   'ai-overnemen':          (el) => aiOvernemen(el.dataset.sec),
   'ai-actie-taak':         (el) => aiActieTaak(el),
   'ai-kopieer-concept':    (el) => aiKopieerConcept(el),
@@ -181,7 +185,7 @@ export const ACTIONS = {
   // Klik op de naam = naam aanpassen. De knop maakt plaats voor een invoerveld; opslaan gebeurt
   // met Enter of door ergens anders te klikken (zie de toetsen- en blur-afhandeling hieronder).
   'offerte-aann-hernoem':  (el) => startHernoem(el.dataset.aann, +el.dataset.idx),
-  'offerte-aann-add':      (el) => { const inp=el.closest('.of-aann-add')?.querySelector('.of-aann-input'); if(!inp) return; const v=inp.value; inp.value=''; addAannemer(el.dataset.aann, v); },
+  'offerte-aann-add':      (el) => { const inp=el.closest('.of-aann-add')?.querySelector('.of-aann-input'); if(!inp) return; const v=inp.value; inp.value=''; delete state.offerteAannNieuw[el.dataset.aann]; addAannemer(el.dataset.aann, v); },
   // 'Opgevolgd · +2 wk' (paneel van een aangevraagd traject): opvolgdatum in kolom F 2 weken verder.
   'offerte-opgevolgd':     (el) => opgevolgd(el.dataset.aann),
   // Zelfde lijst, maar dan in het aanmaak-/bewerkscherm: mutaties op de WERKKOPIE
@@ -280,6 +284,7 @@ export function initActions() {
       e.preventDefault();
       const sleutel = e.target.dataset.aann, val = e.target.value;
       e.target.value = '';
+      delete state.offerteAannNieuw[sleutel];   // de tekst is nu verwerkt; hoort niet terug te komen
       addAannemer(sleutel, val);
     }
     // Offerte-aannemer HERNOEMEN: Enter bewaart, Escape laat de oude naam staan. Zelfde delegatie
@@ -327,6 +332,10 @@ export function initActions() {
   document.addEventListener('input', (e) => {
     if (e.target && e.target.classList && e.target.classList.contains('of-aann-naam-inp')) {
       state.offerteAannEditVal = e.target.value;
+    }
+    // Idem voor 'Aannemer toevoegen…' (niet het veld in het bewerkscherm: dat heeft geen data-aann).
+    if (e.target && e.target.classList && e.target.classList.contains('of-aann-input') && e.target.dataset.aann) {
+      state.offerteAannNieuw[e.target.dataset.aann] = e.target.value;
     }
     // 'Datum aangevraagd' in het offerte-scherm: label en opvolgdatum-voorstel meteen laten
     // meebewegen terwijl de gebruiker typt of kiest (zie offerteAanvraagGewijzigd in crud.js).

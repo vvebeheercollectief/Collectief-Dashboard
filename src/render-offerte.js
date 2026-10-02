@@ -75,7 +75,7 @@ function offerteAannemerPaneel(r){
     : '';
   return `<div class="of-aann-paneel">${rijen}
     <div class="of-aann-add">
-      <input class="of-aann-input" data-aann="${sl}" placeholder="Aannemer toevoegen…" autocomplete="off" aria-label="Aannemer toevoegen">
+      <input class="of-aann-input" data-aann="${sl}" value="${esc((state.offerteAannNieuw||{})[slRuw]||'')}" placeholder="Aannemer toevoegen…" autocomplete="off" aria-label="Aannemer toevoegen">
       <button class="of-aann-toevoeg" data-action="offerte-aann-add" data-aann="${sl}">+ Toevoegen</button>
       ${opvolgKnop}<button type="button" class="of-aann-dicht" data-action="offerte-aann-open" data-aann="${sl}" title="Aannemerslijst inklappen">${ico('chevronBoven',12)}Inklappen</button>
     </div>
@@ -87,7 +87,19 @@ function offerteAannemerPaneel(r){
 // element geworden. Zonder dit sprong de cursor eruit; mét dit merkt de gebruiker er niets van, en
 // de blur-afhandeling in actions.js herkent aan de teruggekeerde focus dat het om een hertekening
 // ging en niet om wegklikken.
-function herstelAannemerFocus(){
+// `nieuw` (optioneel): het veld 'Aannemer toevoegen…' dat vóór de hertekening de focus had —
+// {sleutel, start, eind}, door renderNtd vastgelegd vóór het tekenen. Zelfde probleem als bij het
+// naam-veld: de poll verving het veld halverwege het typen door een leeg, ongefocust exemplaar. De
+// tekst komt via state.offerteAannNieuw terug in het nieuwe veld; dit zet de cursor er weer in.
+function herstelAannemerFocus(nieuw){
+  if(nieuw && !state.offerteAannEdit){
+    const inp=document.querySelector(`.of-aann-input[data-aann="${CSS.escape(nieuw.sleutel)}"]`);
+    if(inp && document.activeElement!==inp){
+      inp.focus();
+      try{ inp.setSelectionRange(nieuw.start ?? inp.value.length, nieuw.eind ?? inp.value.length); }catch(_){}
+    }
+    return;
+  }
   const e=state.offerteAannEdit; if(!e) return;
   const inp=document.querySelector(
     `.of-aann-naam-inp[data-aann="${CSS.escape(e.sleutel)}"][data-idx="${e.idx}"]`);

@@ -5,7 +5,7 @@ import { parseDt, _parseAnyDate, coerceDagenVooraf, leegBijErfenis, duurUitCel }
 import { state, D } from "./state.js";
 import { SKEYS, SECS, APP_VERSION, ALLOWED_EMAILS } from "./config.js";
 import { fetchSheet, fetchSheets, _withRetry, isOffline } from "./api.js";
-import { ensureToken, doOAuth, fetchUserEmail, logout, _wisTokenSessie } from "./auth.js";
+import { ensureToken, doOAuth, fetchUserEmail, logout, _wisTokenSessie, deelToken } from "./auth.js";
 import { buildAnalytics, buildDash } from "./ui.js";   // lui: laadt render-analytics.js pas bij gebruik
 import { renderNtdDonut, renderNtd, renderAf } from "./render-lijsten.js";
 // Kringverwijzing data ⇄ bulk, net als data ⇄ main en ui ⇄ bulk: bulk.js haalt backgroundWrite en
@@ -357,7 +357,19 @@ function setSyncErr(){dot('err');_bulkLblOnthoud('Fout');document.getElementById
 // 'Fout' suggereert een storing aan de andere kant; 'Offline' benoemt wat er werkelijk aan de
 // hand is en waarom wijzigen nu niet lukt.
 function setSyncOffline(){dot('err');_bulkLblOnthoud('Offline');document.getElementById('sync-lbl').textContent='Offline'}
-function dot(cls){const d=document.getElementById('dot');d.className='dot'+(cls?' '+cls:'')}
+// Het token is verlopen terwijl de gebruiker in een ander venster zat. Vernieuwen opent een
+// Google-venster, en dat mag alleen als hij hier zit (zie 'Geen inlogflits' in auth.js). Dus geen
+// fout maar een pauze: zodra hij in het dashboard klikt of terugkomt gaat het vanzelf verder.
+const PAUZE_TEKST='Gepauzeerd — klik in het dashboard';
+function setSyncGepauzeerd(){
+  dot('pauze'); _bulkLblOnthoud(PAUZE_TEKST);
+  const lbl=document.getElementById('sync-lbl');
+  if(lbl){ lbl.textContent=PAUZE_TEKST; lbl.title='Bijwerken gepauzeerd: je Google-sessie wordt pas vernieuwd als je weer in het dashboard werkt.'; }
+}
+function dot(cls){
+  const d=document.getElementById('dot');d.className='dot'+(cls?' '+cls:'');
+  document.getElementById('sync-lbl')?.removeAttribute('title');   // alleen de pauzestand zet er een (setSyncGepauzeerd)
+}
 
 // Nette foutmelding in beeld bij een harde laadfout (niet de zwijgende achtergrond-polls).
 // Een verlopen sessie wordt elders al via het inlogscherm afgevangen; dit vangt
@@ -431,6 +443,7 @@ function showLoadError(opties){
       }
       state.currentUserEmail=email;
       sessionStorage.setItem('currentUserEmail', email);
+      deelToken();   // ná de controle: de andere tabbladen van deze gebruiker kunnen meteen verder
     }
     loadAll();
   };
@@ -757,6 +770,11 @@ async function _loadRonde(silent){
   // inlogvenster openstaat; dat is een zeldzaam en zichtbaar geval, en de gebruiker heeft er zelf
   // om gevraagd.
   if(silent && state._herinlogBezig) return false;
+  // Staat de sessiebanner (drie stille vernieuwingen mislukt), dan doet de STILLE ronde geen
+  // vierde, vijfde, … poging meer: elke poging opent een Google-venster, en met focus op het
+  // dashboard flitste dat dan elke acht seconden. De knop 'Opnieuw inloggen' is de weg terug
+  // (of een klik/focus: die proberen het met een rem van 10 s, zie vernieuwMetFocus).
+  if(silent && (state._authFails||0)>=3 && !(state.oauthToken && Date.now()<state.oauthExpiry)) return false;
   state._loadInFlight=true;
   // Welke schrijfgeneratie zag deze ronde bij de start? Zie de controle ná het lezen.
   const genBijStart=state._schrijfGen||0;
@@ -777,6 +795,10 @@ async function _loadRonde(silent){
     // schrijfactie; daar hoort een klik bij en mag Google desnoods om toestemming vragen. De
     // STILLE 8s-ronde mag dat niet: zie de toelichting bij `ensureToken`.
     if(!await ensureToken(!silent)){
+      // Geen focus: niet vernieuwd, en dat is GEEN fout (zie 'Geen inlogflits' in auth.js). Niet
+      // meetellen in _syncFails/_authFails — de sessiebanner hoort alleen te komen als een
+      // vernieuwing MÉT focus echt mislukt.
+      if(state._tokenGepauzeerd){ setSyncGepauzeerd(); return false; }
       state._syncFails=(state._syncFails||0)+1;
       if(isOffline()){ setSyncOffline(); showOfflineBanner(); return false; }
       if(!silent || state._syncFails>=2) setSyncErr();
@@ -1204,7 +1226,7 @@ export {
   backgroundWrite, schrijfActieLoopt, metWriteMarkering, serieleWrite, setSyncing, setSaving, setSynced, setSyncErr, dot, loadAll, magPollen, parseSections, parseAlvo, parseAlfa, parseHerhaal,
   POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _zetLogAnker, _verwerkLogboek, _logVolledigNodig, _alfaNodig,
   MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen,
-  blokkeerOffline, blokkeerVersie, showOfflineBanner, clearOfflineBanner, setSyncOffline, syncSelecteerStand, showLoadError, clearLoadError,
+  blokkeerOffline, blokkeerVersie, showOfflineBanner, clearOfflineBanner, setSyncOffline, setSyncGepauzeerd, PAUZE_TEKST, syncSelecteerStand, showLoadError, clearLoadError,
   bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade,
   ruimCacheOp, _cacheVers, AF_POLL, vraagAfMailOp, afMailKaart,
 };

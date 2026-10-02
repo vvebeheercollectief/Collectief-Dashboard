@@ -107,6 +107,7 @@
     .dot{width:6px;height:6px;border-radius:50%;background:var(--gn);flex-shrink:0}
     .dot.loading{background:var(--am);animation:pulse 1s infinite}
     .dot.err{background:var(--rd);animation:none}
+    .dot.pauze{background:var(--am);animation:none}
     @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 
     /* Header */

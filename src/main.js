@@ -4,7 +4,7 @@
 import { IS_STAGING, ALLOWED_EMAILS, SKEYS, SECS, APP_VERSION, TEAM } from './config.js';
 import { D, pgs, state } from './state.js';
 import { verseRij } from "./rij.js";
-import { ensureToken, doOAuth, uitloggen } from './auth.js';
+import { ensureToken, uitloggen, vernieuwMetFocus, opGebaar, opFocusTerug, startTokenDelen, vraagTokenBijAnderen } from './auth.js';
 import { startSplash } from './login-splash.js';
 import { goTo, syncKop, closeSb, applyTheme, applyDensity, cycleDensity, setupSearch, zetBijOpenen } from './ui.js';
 import { renderNtd, renderAf, renderAlvo, renderAlfa, renderNtdStats, zetKopOpen, kopOpen } from './render-lijsten.js';
@@ -612,15 +612,27 @@ document.addEventListener('DOMContentLoaded',()=>{
     loadAll(true);   // loadAll vernieuwt de token zelf en toont fouten in de statusbalk
   },8000);
 
-  // Token-refresh heartbeat — elke 4 min proactief vernieuwen vóór expiry.
-  // Via doOAuth(false) i.p.v. de client direct: dan wordt de callback correct (her)gebonden,
-  // zodat een heartbeat geen lopende ensureToken-refresh kapot maakt (gedeelde-callback-race).
+  // Token-refresh heartbeat — elke 4 min proactief vernieuwen vóór expiry, maar ALLEEN als de
+  // gebruiker in dit venster zit (v13.5). Ook een stille vernieuwing opent een Google-venster dat
+  // de focus pakt; vanuit deze timer gebeurde dat ook als hij in TwinQ of zijn mail werkte — de
+  // inlogflits om de 5-15 minuten. Zie 'Geen inlogflits' in auth.js; vernieuwMetFocus loopt via
+  // doOAuth(false), dus de callback wordt nog steeds per aanvraag (her)gebonden.
   // Id bewaard voor diagnose — logout() stopt hem BEWUST niet; zie de toelichting daar.
   state._heartbeatTimer=setInterval(()=>{
-    if(!state.oauthToken) return;
-    if(state.oauthExpiry - Date.now() > 5*60*1000) return;
-    doOAuth(false);
+    if(state._zelftestLoopt) return;
+    vernieuwMetFocus(5*60*1000);
   },4*60*1000);
+
+  // Vernieuwen op het moment dat de gebruiker hier toch al zit: bij een klik (capture, zodat geen
+  // stopPropagation hem mist) en bij terugkeer in het venster. Zie opGebaar/opFocusTerug in auth.js.
+  // Niet tijdens de zelftest: die klikt honderden keren en mag nooit een echt Google-venster openen.
+  document.addEventListener('click', ()=>{ if(!state._zelftestLoopt) opGebaar(); }, true);
+  window.addEventListener('focus', ()=>{ if(!state._zelftestLoopt) opFocusTerug(); });
+  document.addEventListener('visibilitychange', ()=>{
+    if(!document.hidden && !state._zelftestLoopt) opFocusTerug();
+  });
+  // Tokens delen met de andere dashboardtabbladen in deze browser (BroadcastChannel).
+  startTokenDelen();
 
   // Oude leescaches weg (andere versie, of ouder dan twee weken) — vóór de inlog, zodat dat ook
   // gebeurt op een computer waar niemand meer inlogt. Zie ruimCacheOp in data.js.
@@ -630,13 +642,16 @@ document.addEventListener('DOMContentLoaded',()=>{
   const _st=sessionStorage.getItem('oauthToken');
   const _se=parseInt(sessionStorage.getItem('oauthExpiry')||'0');
   const _sm=sessionStorage.getItem('currentUserEmail');
-  if(_st&&Date.now()<_se&&_sm&&ALLOWED_EMAILS.includes(_sm.toLowerCase())){
-    state.oauthToken=_st;state.oauthExpiry=_se;state.currentUserEmail=_sm;
+  const _herstelSessie=(tok,exp,mail)=>{
+    state.oauthToken=tok;state.oauthExpiry=exp;state.currentUserEmail=mail;
     document.getElementById('login-gate').style.display='none';
     document.getElementById('app')?.removeAttribute('inert');   // zie logout() in auth.js
     laadUitCache();   // meteen de laatst bekende stand in beeld; loadAll vervangt hem
     loadAll();
     startVersieBewaking();   // minimumversie-rem: meteen, elke 5 min en bij terugkeer (versie.js)
+  };
+  if(_st&&Date.now()<_se&&_sm&&ALLOWED_EMAILS.includes(_sm.toLowerCase())){
+    _herstelSessie(_st,_se,_sm);
   } else {
     // Geen geldige sessie → login nodig. Speel de gebrande launch-splash
     // (na ~1,9s → login-kaart). Bewust alleen hier: ingelogde terugkeerders
@@ -644,7 +659,24 @@ document.addEventListener('DOMContentLoaded',()=>{
     // De schil erachter uit de tabvolgorde halen zolang het inlogscherm staat — zie logout()
     // in auth.js voor de reden. `doLogin` haalt hem er weer af.
     document.getElementById('app')?.setAttribute('inert','');
-    startSplash();
+    // Eerst kort (300 ms) een ander dashboardtabblad in deze browser om een geldig token vragen
+    // (v13.5). Staat er een sessie in sessionStorage, dan alleen een token van díe gebruiker.
+    // Geen antwoord (of geen BroadcastChannel) → gewoon de splash en de inlogkaart.
+    // Niet tijdens de zelftest: die draait per definitie niet ingelogd.
+    const _bekend=(_sm&&ALLOWED_EMAILS.includes(_sm.toLowerCase()))?_sm:null;
+    if(location.search.includes('test=1') || typeof BroadcastChannel!=='function') startSplash();
+    else vraagTokenBijAnderen(_bekend).then(t=>{
+      if(t && !state.currentUserEmail){
+        try{
+          sessionStorage.setItem('oauthToken',t.token);
+          sessionStorage.setItem('oauthExpiry',String(t.expiry));
+          sessionStorage.setItem('currentUserEmail',t.email);
+        }catch(_){}
+        _herstelSessie(t.token,t.expiry,t.email);
+      } else if(!state.currentUserEmail){
+        startSplash();
+      }
+    }, ()=>{ if(!state.currentUserEmail) startSplash(); });
   }
 
   goTo('ntd');

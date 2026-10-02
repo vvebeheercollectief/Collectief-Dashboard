@@ -24,7 +24,7 @@ import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _eindKolom, _ver
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages, renderChat } from "./dossier-chat.js";
 import { shouldPromptReload, maakHerlaadKern, zelfdeWorker } from "./sw-update.js";
-import { doOAuth, ensureToken, logout } from "./auth.js";
+import { doOAuth, ensureToken, logout, heeftFocus, vernieuwMetFocus, opGebaar, opFocusTerug, neemTokenOver, vraagTokenBijAnderen, VERNIEUW_VOORAF_MS, TOKEN_KANAAL } from "./auth.js";
 import { SPLASH_MS, _setFase } from "./login-splash.js";
 import { opmaakHtml, htmlNaarMarkers, zonderOpmaak, pasToe, opmaakBalk } from "./opmaak.js";
 import { goTo, applyTheme } from "./ui.js";
@@ -3280,6 +3280,9 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   await (async()=>{
     const googleOud=window.google, clientOud=state._gsiTokenClient, bezigOud=state._authBezig;
     const tokenOud=state.oauthToken, expiryOud=state.oauthExpiry;
+    // Deze toetsen meten de vernieuwing zelf; die mag sinds v13.5 alleen mét focus (zie 'Geen
+    // inlogflits' in auth.js). In een headless venster is hasFocus() altijd false → nabootsen.
+    state._focusFn=()=>true;
     try{
       let cfg=null, tijdensAanvraag=0;
       window.google={accounts:{oauth2:{initTokenClient:c=>{cfg=c;return{
@@ -3380,6 +3383,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       state._authBezig=0;
       delete state._authTimeoutMs;
     } finally {
+      delete state._focusFn;
       window.google=googleOud; state._gsiTokenClient=clientOud; state._authBezig=bezigOud;
       state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
       try{['oauthToken','oauthExpiry'].forEach(k=>sessionStorage.removeItem(k))}catch(_){}
@@ -3408,6 +3412,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   await (async()=>{
     const googleOud=window.google, clientOud=state._gsiTokenClient, failsOud=state._syncFails;
     const tokenOud=state.oauthToken, expiryOud=state.oauthExpiry, mailOud=state.currentUserEmail;
+    state._focusFn=()=>true;   // een mislukte vernieuwing MÉT focus (zonder focus: 'gepauzeerd', zie v13.5)
     try{
       window.google={accounts:{oauth2:{initTokenClient:()=>{
         const o={requestAccessToken:()=>o.callback({error:'access_denied'})};return o;
@@ -3451,6 +3456,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       eq('sessie: zonder ingelogde gebruiker komt die banner er niet',
          [state._authFails, document.getElementById('load-err-banner')], [0, null]);
     } finally {
+      delete state._focusFn;
       window.google=googleOud; state._gsiTokenClient=clientOud; state._syncFails=failsOud;
       state._authFails=0; document.getElementById('load-err-banner')?.remove();
       state.oauthToken=tokenOud; state.oauthExpiry=expiryOud; state.currentUserEmail=mailOud;
@@ -6255,7 +6261,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '13.4');
+  eq('versie opgehoogd', APP_VERSION, '13.5');
 
   // ── Tabbladen ÍN de kaartkop (v11.7) ──
   // De kop van de kaart zei links exact hetzelfde als het actieve tabblad — 'Oppakken' boven
@@ -17435,6 +17441,210 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       try{ CR.closeModal(); CR.clearModal(); }catch(_){}
       document.getElementById('complete-bg')?.classList.remove('open');
       ruimOp();
+    }
+  })();
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  GEEN INLOGFLITS (v13.5) — stil vernieuwen alleen mét focus, token delen tussen tabbladen
+  // ══════════════════════════════════════════════════════════════════════════
+  // Klacht: elke 5-15 minuten flitste een Google-venster voorbij en trok de gebruiker uit TwinQ.
+  // Ook een stille GIS-vernieuwing opent een popup; die mocht vanuit een timer starten terwijl
+  // het dashboard geen focus had. Nu: alleen met focus, bij een klik of bij terugkeer.
+  await (async () => {
+    console.log('%c[TESTS] Geen inlogflits', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const DA = await import('./data.js');
+    const oud={ google:window.google, gis:state._gsiTokenClient, token:state.oauthToken, exp:state.oauthExpiry,
+                mail:state.currentUserEmail, fails:state._syncFails, auth:state._authFails, fetch:window.fetch,
+                bezig:state._authBezig, uitCache:state._uitCache };
+    const MAIL='info@vvebeheercollectief.nl';
+    let aanvragen=0, antwoord='ok', vertraging=0;
+    const nepGoogle=()=>{ window.google={accounts:{oauth2:{initTokenClient:c=>{ const o={
+      requestAccessToken:()=>{ aanvragen++;
+        const geef=()=>{ if(antwoord==='ok') o.callback({access_token:'vers-'+aanvragen, expires_in:3600});
+                         else if(antwoord==='fout') o.callback({error:'interaction_required'}); };
+        if(vertraging) setTimeout(geef, vertraging); else geef(); },
+      callback:c.callback }; return o; }}}};
+      state._gsiTokenClient=null; };
+    const reset=()=>{ aanvragen=0; antwoord='ok'; vertraging=0; state._laatsteStilPoging=0; state._authFails=0;
+                      state._syncFails=0; state._tokenGepauzeerd=false; state._authBezig=0; nepGoogle(); };
+    const wachtRonde=async()=>{ for(let i=0;i<300 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,10)); };
+    const lbl=()=>document.getElementById('sync-lbl').textContent;
+    const MIN=60*1000;
+    let kanaal=null;
+    try{
+      await wachtRonde();
+      state.currentUserEmail=MAIL; state._uitCache=false;
+
+      // ── (a) Geen focus → nul vernieuwingen, ook met een verlopen token; 'gepauzeerd', geen banner ──
+      reset(); state._focusFn=()=>false;
+      eq('focus: de injecteerbare focuscheck wordt gelezen', heeftFocus(), false);
+      state.oauthToken='oud'; state.oauthExpiry=Date.now()-1000;   // verlopen
+      // Wat de 4-minutenhartslag doet:
+      eq('geen focus: hartslag vernieuwt niet (verlopen token)', await vernieuwMetFocus(5*MIN), false);
+      // Wat een klik zou doen (kan zonder focus niet, maar de regel moet ook dan houden):
+      await opGebaar();
+      await opFocusTerug();
+      // Drie stille 8s-rondes:
+      let batch=0;
+      window.fetch=async(u)=>{ if(String(u).includes('batchGet')) batch++; return new Response('{}',{status:403}); };
+      document.getElementById('dot').className='dot';
+      document.getElementById('load-err-banner')?.remove();
+      await DA.loadAll(true); await DA.loadAll(true); await DA.loadAll(true);
+      eq('geen focus: hartslag, klik, focus en drie poll-rondes doen NUL Google-aanvragen', aanvragen, 0);
+      eq('geen focus: en ook geen leesronde met een verlopen token', batch, 0);
+      eq('geen focus: de statusbalk zegt "gepauzeerd"', lbl(), DA.PAUZE_TEKST);
+      truthy('geen focus: met de pauzekleur, niet de foutkleur',
+             document.getElementById('dot').classList.contains('pauze') && !document.getElementById('dot').classList.contains('err'));
+      eq('geen focus: telt NIET als fout (geen sessiebanner, tellers op nul)',
+         [state._syncFails, state._authFails, document.getElementById('load-err-banner')], [0, 0, null]);
+      eq('geen focus: het token wordt niet weggegooid', state.oauthToken, 'oud');
+      // Een schrijfweg zonder focus (zou uit een timer moeten komen) vraagt ook niets aan:
+      eq('geen focus: ensureToken() geeft false zonder venster', await ensureToken(), false);
+      eq('geen focus: … en zonder één aanvraag', aanvragen, 0);
+      // De hartslag in main.js roept zelf geen doOAuth meer aan.
+      const bronMain=(await (await oud.fetch.call(window, new URL('src/main.js', document.baseURI), {cache:'no-store'})).text()).replace(/\/\/.*$/gm,'');
+      eq('main.js: nergens meer een kale doOAuth-aanroep (alles via de focuspoort)', /\bdoOAuth\s*\(/.test(bronMain), false);
+      truthy('main.js: de hartslag loopt via vernieuwMetFocus', /setInterval\(\(\)=>\{[^}]*vernieuwMetFocus\(/.test(bronMain));
+
+      // ── Met focus en een nog ruim geldig token: niets ──
+      reset(); state._focusFn=()=>true;
+      state.oauthToken='ruim'; state.oauthExpiry=Date.now()+40*MIN;
+      await opGebaar();
+      eq('focus + 40 min over: een klik vernieuwt niet', aanvragen, 0);
+
+      // ── (b) Focus + < 15 min: precies één vernieuwing bij een klik, ook bij vijf klikken ──
+      reset(); state._focusFn=()=>true; vertraging=30;
+      state.oauthToken='bijna'; state.oauthExpiry=Date.now()+10*MIN;
+      await Promise.all([opGebaar(),opGebaar(),opGebaar(),opGebaar(),opGebaar()]);
+      for(let i=0;i<50 && state._authBezig>0;i++) await new Promise(r=>setTimeout(r,10));
+      eq('focus + 10 min over: vijf klikken → precies één vernieuwing', aanvragen, 1);
+      eq('… en het verse token staat er', state.oauthToken, 'vers-1');
+      truthy('… met een nieuwe vervaltijd van bijna een uur', state.oauthExpiry-Date.now() > 50*MIN);
+      eq('… ook in sessionStorage', sessionStorage.getItem('oauthToken'), 'vers-1');
+      // Mislukt hij, dan blijven vijf losse klikken binnen de rem bij één poging, en het oude
+      // (nog geldige) token blijft staan.
+      reset(); state._focusFn=()=>true; antwoord='fout';
+      state.oauthToken='bijna2'; state.oauthExpiry=Date.now()+10*MIN;
+      for(let i=0;i<5;i++) await opGebaar();
+      eq('mislukte vernieuwing: vijf klikken na elkaar → één poging (rem)', aanvragen, 1);
+      eq('mislukte vernieuwing: het oude, nog geldige token blijft', state.oauthToken, 'bijna2');
+      // Staat de sessiebanner al, dan geen stille pogingen meer (elke poging is een flits).
+      reset(); state._focusFn=()=>true; state._authFails=3;
+      state.oauthToken=null; state.oauthExpiry=0;
+      await opGebaar();
+      eq('sessiebanner staat: een klik doet geen stille poging', aanvragen, 0);
+      batch=0; await DA.loadAll(true);
+      eq('sessiebanner staat: de stille ronde ook niet', [aanvragen, batch], [0, 0]);
+      // 'Opnieuw inloggen' heeft zijn eigen aanvraag open: niet ertussen.
+      reset(); state._focusFn=()=>true; state._herinlogBezig=true;
+      state.oauthToken='x'; state.oauthExpiry=Date.now()+5*MIN;
+      await opGebaar();
+      eq('Opnieuw inloggen loopt: een klik start geen tweede aanvraag', aanvragen, 0);
+      state._herinlogBezig=false;
+      // Inlogscherm (geen gebruiker): ook niet — daar doet doLogin het werk.
+      reset(); state._focusFn=()=>true; state.currentUserEmail=null;
+      state.oauthToken=null; state.oauthExpiry=0;
+      await opGebaar();
+      eq('inlogscherm: een klik start geen vernieuwing', aanvragen, 0);
+      state.currentUserEmail=MAIL;
+
+      // ── (c) Focus terug met een verlopen token: één vernieuwing + meteen een leesronde ──
+      reset(); state._focusFn=()=>false;
+      state.oauthToken='oud'; state.oauthExpiry=Date.now()-1000;
+      batch=0;
+      await DA.loadAll(true);
+      eq('focus terug: vooraf staat het bijwerken stil', [lbl(), aanvragen, batch], [DA.PAUZE_TEKST, 0, 0]);
+      state._focusFn=()=>true;
+      eq('focus terug: vernieuwd', await opFocusTerug(), true);
+      await wachtRonde();
+      eq('focus terug: precies één vernieuwing', aanvragen, 1);
+      eq('focus terug: en meteen een leesronde met het verse token', batch, 1);
+      eq('focus terug: de pauze is voorbij', state._tokenGepauzeerd, false);
+      // Focus terug met een nog ruim geldig token: niets.
+      reset(); state._focusFn=()=>true;
+      state.oauthToken='ruim'; state.oauthExpiry=Date.now()+40*MIN; batch=0;
+      await opFocusTerug(); await wachtRonde();
+      eq('focus terug met 40 min over: geen vernieuwing en geen extra ronde', [aanvragen, batch], [0, 0]);
+      // Zonder echte focus (de gebeurtenis kwam, maar het venster heeft hem niet): niets.
+      reset(); state._focusFn=()=>false;
+      state.oauthToken='oud'; state.oauthExpiry=Date.now()-1000;
+      eq('focus-gebeurtenis zonder focus: niets', [await opFocusTerug(), aanvragen], [false, 0]);
+      // Met focus doet de 8s-ronde het zelf ook (zoals altijd): één vernieuwing, dan lezen.
+      reset(); state._focusFn=()=>true; batch=0;
+      state.oauthToken='oud'; state.oauthExpiry=Date.now()-1000;
+      await DA.loadAll(true);
+      eq('met focus: de 8s-ronde vernieuwt een verlopen token en leest', [aanvragen, batch], [1, 1]);
+
+      // ── (d) Token delen tussen tabbladen (BroadcastChannel) ──
+      if(typeof BroadcastChannel==='function'){
+        kanaal=new BroadcastChannel(TOKEN_KANAAL);   // 'het andere tabblad'
+        const ontvangen=[];
+        kanaal.onmessage=e=>ontvangen.push(e.data);
+        const wacht=(ms=60)=>new Promise(r=>setTimeout(r,ms));
+        // Tabblad A (deze app) vernieuwt → het andere tabblad krijgt het token.
+        reset(); state._focusFn=()=>true;
+        state.oauthToken='bijna'; state.oauthExpiry=Date.now()+5*MIN;
+        await opGebaar(); await wacht();
+        const bericht=ontvangen.find(m=>m && m.soort==='token');
+        truthy('delen: na een vernieuwing gaat het token naar de andere tabbladen', !!bericht && bericht.token===state.oauthToken);
+        eq('delen: met het e-mailadres en de vervaltijd erbij', bericht && [bericht.email, bericht.expiry], [MAIL, state.oauthExpiry]);
+        // Tabblad B neemt het over — maar alleen voor dezelfde gebruiker.
+        const B={currentUserEmail:'Info@VvEBeheerCollectief.nl', oauthToken:'oud-b', oauthExpiry:Date.now()+2*MIN, _tokenGepauzeerd:true};
+        eq('delen: tabblad B (zelfde adres) neemt het over', [neemTokenOver(B, bericht), B.oauthToken, B._tokenGepauzeerd], [true, bericht && bericht.token, false]);
+        const C={currentUserEmail:'djiowchico@gmail.com', oauthToken:'van-c', oauthExpiry:Date.now()+2*MIN};
+        eq('delen: een tabblad van een ander adres negeert het', [neemTokenOver(C, bericht), C.oauthToken], [false, 'van-c']);
+        const D0={currentUserEmail:null, oauthToken:null, oauthExpiry:0};
+        eq('delen: een tabblad op het inlogscherm neemt niets over', neemTokenOver(D0, bericht), false);
+        const E={currentUserEmail:MAIL, oauthToken:'nieuwer', oauthExpiry:Date.now()+59*MIN};
+        eq('delen: een ouder token vervangt geen nieuwer', neemTokenOver(E, {...bericht, expiry:Date.now()+30*MIN}), false);
+        eq('delen: een (bijna) verlopen token wordt niet overgenomen',
+           neemTokenOver({currentUserEmail:MAIL, oauthToken:null, oauthExpiry:0}, {...bericht, expiry:Date.now()+30*1000}), false);
+        eq('delen: een adres buiten de allowlist nooit',
+           neemTokenOver({currentUserEmail:'iemand@elders.nl', oauthToken:null, oauthExpiry:0}, {...bericht, email:'iemand@elders.nl'}), false);
+        // Andersom: het andere tabblad stuurt, deze app (B) neemt over.
+        state.oauthToken=null; state.oauthExpiry=0; state._tokenGepauzeerd=true;
+        const exp=Date.now()+50*MIN;
+        kanaal.postMessage({soort:'token', token:'van-ander-tabblad', expiry:exp, email:'INFO@vvebeheercollectief.nl'});
+        await wacht();
+        eq('delen: de app neemt een token van een ander tabblad over', [state.oauthToken, state.oauthExpiry, state._tokenGepauzeerd], ['van-ander-tabblad', exp, false]);
+        eq('delen: … ook in sessionStorage (en dus niet in localStorage)',
+           [sessionStorage.getItem('oauthToken'), JSON.stringify(localStorage).includes('van-ander-tabblad')], ['van-ander-tabblad', false]);
+        kanaal.postMessage({soort:'token', token:'van-cihad', expiry:Date.now()+55*MIN, email:'djiowchico@gmail.com'});
+        await wacht();
+        eq('delen: een token van een ánder adres laat de app links liggen', state.oauthToken, 'van-ander-tabblad');
+        eq('delen: en het overnemen kost geen eigen vernieuwing', aanvragen, 1);
+        // Een nieuw tabblad vraagt; een tabblad met een geldig token antwoordt.
+        ontvangen.length=0;
+        kanaal.postMessage({soort:'vraag'});
+        await wacht();
+        truthy('vraag: de app beantwoordt een vraag met zijn geldige token',
+               ontvangen.some(m=>m && m.soort==='token' && m.token==='van-ander-tabblad'));
+        // vraagTokenBijAnderen: het andere tabblad antwoordt → het token komt terug.
+        kanaal.onmessage=e=>{ if(e.data && e.data.soort==='vraag')
+          kanaal.postMessage({soort:'token', token:'antwoord', expiry:Date.now()+45*MIN, email:MAIL}); };
+        const t1=await vraagTokenBijAnderen(MAIL, 300);
+        eq('vraag: een nieuw tabblad krijgt binnen 300 ms een token', t1 && t1.token, 'antwoord');
+        const t2=await vraagTokenBijAnderen('djiowchico@gmail.com', 120);
+        eq('vraag: van een ander adres neemt hij het niet aan', t2, null);
+        kanaal.onmessage=null;
+        const t3=await vraagTokenBijAnderen(null, 80);
+        eq('vraag: geen antwoord → na de wachttijd gewoon null (inlogkaart)', t3, null);
+      } else {
+        truthy('delen: BroadcastChannel ontbreekt in deze browser — gewoon zonder delen', true);
+      }
+    } catch(e) {
+      truthy('geen inlogflits: geen uitzondering — '+(e && e.stack || e), false);
+    } finally {
+      try{ kanaal && kanaal.close(); }catch(_){}
+      await wachtRonde();
+      delete state._focusFn; state._herinlogBezig=false; state._tokenGepauzeerd=false; state._laatsteStilPoging=0;
+      window.google=oud.google; state._gsiTokenClient=oud.gis; window.fetch=oud.fetch;
+      state.oauthToken=oud.token; state.oauthExpiry=oud.exp; state.currentUserEmail=oud.mail;
+      state._syncFails=oud.fails; state._authFails=oud.auth; state._authBezig=oud.bezig; state._uitCache=oud.uitCache;
+      try{ ['oauthToken','oauthExpiry'].forEach(k=>sessionStorage.removeItem(k)); }catch(_){}
+      document.getElementById('dot').className='dot';
+      document.getElementById('sync-lbl').removeAttribute('title');
+      document.querySelectorAll('.load-err').forEach(b=>b.remove());
     }
   })();
 

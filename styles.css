@@ -155,10 +155,10 @@
     .btn-sm{padding:5px 10px;font-size:12px}
     .btn-edit{width:28px;height:28px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid var(--bor);background:var(--sur2);color:var(--mut);transition:all var(--tr);flex-shrink:0}
     .btn-edit:hover{background:var(--ac-l);color:var(--ac);border-color:var(--ac-b)}
-    .btn-del{padding:4px 10px;border-radius:6px;border:1px solid var(--rd-b);background:var(--rd-l);color:var(--rd);font-size:11px;font-weight:600;transition:all var(--tr)}
-    .btn-del:hover{background:var(--rd);color:#fff;border-color:var(--rd)}
-    .btn-afr{padding:4px 10px;border-radius:6px;border:1px solid var(--gn-b);background:var(--gn-l);color:var(--gn);font-size:11px;font-weight:600;transition:all var(--tr);display:inline-flex;align-items:center;gap:5px}
-    .btn-afr:hover{background:var(--gn);border-color:var(--gn);color:#fff}
+    .btn-del{border:1px solid var(--rd);background:var(--rd);color:#fff}
+    .btn-del:hover{filter:brightness(1.1)}
+    .btn-afr{border:1px solid var(--bor-input);background:var(--sur);color:var(--txt);transition:all var(--tr);display:inline-flex;align-items:center;gap:5px}
+    .btn-afr:hover{background:var(--sur2)}
     /* V3 — lichte, menselijke actieknoppen (Afronden / Bewerken) */
     .acts{display:flex;gap:5px;align-items:center}
     /* Inline-acties (altijd zichtbaar) — Operator: groene afrond-knop + grijze icoonknoppen */
@@ -846,7 +846,13 @@
     .modal-close{font-size:20px;color:var(--mut);width:30px;height:30px;display:flex;align-items:center;justify-content:center;padding:0;border-radius:6px;line-height:1;transition:background var(--tr)}
     .modal-close:hover{background:var(--sur2)}
     .modal-body{padding:18px 20px;max-height:70vh;overflow-y:auto}
-    .modal-foot{padding:13px 20px;border-top:1px solid var(--bor);display:flex;justify-content:flex-end;gap:8px}
+    .modal-foot{padding:12px 20px;border-top:1px solid var(--bor);display:flex;justify-content:flex-end;gap:8px}
+    /* Verwijderen in een bewerkscherm (v14.0): rode tekst helemaal links, los van Annuleren /
+       Afronden / Opslaan. De bevestiging die erop volgt draagt de stevige rode knop. */
+    .modal-foot :is(#m-del,#ontw-m-del,#hh-del){order:-1;margin-right:auto;background:none;border-color:transparent;color:var(--rd)}
+    .modal-foot :is(#m-del,#ontw-m-del,#hh-del):hover{background:var(--rd-l);filter:none}
+    [data-theme=dark] .modal-foot :is(#m-del,#ontw-m-del,#hh-del),
+    [data-theme=dark] .modal-foot :is(#m-del,#ontw-m-del,#hh-del):hover{color:var(--rd)}
     /* Het bevestigingsvenster kan bovenóp een ander venster staan — de verwijdervraag komt vanuit
        het bewerkscherm. Alle .modal-bg's delen z-index 500, en dan wint de laatste in de HTML;
        dit blok maakt de stapeling onafhankelijk van die volgorde. */
@@ -860,7 +866,7 @@
 
     /* Form */
     .fld{margin-bottom:13px}
-    .fld label{display:block;font-size:12px;font-weight:600;color:var(--mut);margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em}
+    .fld label{display:block;font-size:12px;font-weight:500;color:var(--mut);margin-bottom:6px}
     /* Het zinnetje onder een deadline-veld: 'dit is een voorstel' of, bij LOD en subsidie, waaróm
        er geen voorstel staat. Bewust klein en gedempt — het is uitleg, geen waarschuwing — maar
        niet zó licht dat het onleesbaar wordt: var(--mut) haalt op beide thema's de contrastnorm.
@@ -939,12 +945,10 @@
       #sb.open{transform:none;box-shadow:var(--shl)}
       .hamburger{display:flex}
     }
-    .logboek-box{margin-top:18px;background:linear-gradient(180deg,var(--ac-l),color-mix(in srgb,var(--ac-l) 25%,transparent));border:1px solid var(--ac-b);border-radius:var(--r);padding:14px 15px}
+    .logboek-box{margin-top:16px;background:var(--sur2);border:1px solid var(--bor);border-radius:var(--r);padding:12px 16px}
     .logboek-hdr{display:flex;align-items:center;gap:9px;margin-bottom:4px}
-    .logboek-hdr svg{width:21px;height:21px;color:var(--ac);flex-shrink:0}
-    .logboek-hdr h4{font-size:13px;font-weight:600;color:var(--ac);text-transform:uppercase;letter-spacing:.04em;margin:0}
-    .logboek-hdr .hist-count{font-size:11px;font-weight:600;color:var(--ac);background:var(--sur);border:1px solid var(--ac-b);padding:1px 8px;border-radius:8px}
-    .logboek-sub{font-size:12px;color:var(--mut);margin:0 0 11px;line-height:1.45}
+    .logboek-hdr h4{font-size:13px;font-weight:600;color:var(--txt);margin:0}
+    .logboek-hdr .hist-count{font-size:12px;font-weight:500;color:var(--fnt)}
     .logboek-body{max-height:200px;overflow-y:auto;margin-bottom:11px}
     .logboek-add{display:flex;flex-direction:column;gap:8px}
     .logboek-add textarea{width:100%;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rs);padding:9px 11px;color:var(--txt);font-size:13px;outline:none;resize:vertical;min-height:74px;line-height:1.5;font-family:inherit;transition:border var(--tr),box-shadow var(--tr)}
@@ -1591,8 +1595,7 @@ body:has(.modal-bg.open) #chat-bg{display:none}
    waren vergeten in het omkeer-blok hierboven. De undo-knop weegt het zwaarst: die is volgens
    notifications.js 'de ENIGE weg terug'. */
 [data-theme=dark] .toast-undo,
-[data-theme=dark] .bb-groen,
-[data-theme=dark] .btn-afr:hover{color:#15181d}
+[data-theme=dark] .bb-groen{color:#15181d}
 /* Dezelfde omkering, maar dan voor de drie ZWEEF-standen die ook aan beide blokken hierboven
    ontsnapt zijn. Ze vullen zich met --rd / --am / --ac, en die drie zijn in de donkere modus net
    zo licht als --gn. Gemeten met getComputedStyle op de echte knoppen in donkere modus, met de
@@ -1603,6 +1606,7 @@ body:has(.modal-bg.open) #chat-bg{display:none}
    .btn-del is niet alleen 'Verwijder' in het bewerkscherm, maar via bevestig.js ook de ja-knop
    van élke gevaarlijke bevestiging — precies de knop die je moet kunnen lezen vóór je hem indrukt.
    De andere twee zijn pictogrammen (de norm is daar 3:1) en zaten daar allebei onder. */
+[data-theme=dark] .btn-del,
 [data-theme=dark] .btn-del:hover,
 [data-theme=dark] .act-ib.aan:hover,
 [data-theme=dark] .mv-x:hover{color:#15181d}

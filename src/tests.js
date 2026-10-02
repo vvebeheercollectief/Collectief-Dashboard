@@ -16538,14 +16538,22 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       state._vveLogAlles=true;
       goTo('vve'); state.vveCode='SC-01'; RV.renderVve();
       const tl=document.querySelector('#vve-inhoud .tl-scroll');
-      truthy('dossier: de tijdlijn is langer dan zijn vak (anders meet deze toets niets)', !!tl && tl.scrollHeight>tl.clientHeight+50);
-      tl.scrollTop=200;
-      const gezet=tl.scrollTop;
-      RV.renderVve();   // wat de poll doet
-      eq('dossier: na een hertekening staat de tijdlijn nog op dezelfde plek', document.querySelector('#vve-inhoud .tl-scroll').scrollTop, gezet);
-      D.alvo.push({ code:'SC-02', naam:'Andershof', status:'', _row:3 });
-      state.vveCode='SC-02'; RV.renderVve();
-      eq('dossier: een ander dossier begint bovenaan', document.querySelector('#vve-inhoud .tl-scroll').scrollTop, 0);
+      // Op een smal venster (onder ±1200 breed) staan de dossierpanelen onder elkaar en is de
+      // tijdlijn GEEN eigen scrollvak (overflow: visible) — dan scrolt de pagina en valt er hier
+      // niets te meten. Daar de toets overslaan in plaats van te falen op zijn voorwaarde.
+      const eigenVak = !!tl && getComputedStyle(tl).overflowY !== 'visible';
+      if(eigenVak){
+        truthy('dossier: de tijdlijn is langer dan zijn vak (anders meet deze toets niets)', tl.scrollHeight>tl.clientHeight+50);
+        tl.scrollTop=200;
+        const gezet=tl.scrollTop;
+        RV.renderVve();   // wat de poll doet
+        eq('dossier: na een hertekening staat de tijdlijn nog op dezelfde plek', document.querySelector('#vve-inhoud .tl-scroll').scrollTop, gezet);
+        D.alvo.push({ code:'SC-02', naam:'Andershof', status:'', _row:3 });
+        state.vveCode='SC-02'; RV.renderVve();
+        eq('dossier: een ander dossier begint bovenaan', document.querySelector('#vve-inhoud .tl-scroll').scrollTop, 0);
+      } else {
+        truthy('dossier: op dit smalle venster is de tijdlijn geen eigen scrollvak (scrolltoets n.v.t.)', !!tl);
+      }
       state._vveLogAlles=false;
 
       // ── 7. Terug uit het dossier = terug op dezelfde plek in de lijst ──
@@ -17117,6 +17125,32 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
                && (bronnen['main.js'].match(/import\('\.\/migratie-offerte\.js'\)/g)||[]).length===1);
         const UI = await import('./ui.js');
         eq('lui: de wrappers bestaan (goTo en de poll roepen ze aan)', [typeof UI.buildAnalytics, typeof UI.buildDash], ['function','function']);
+      }
+
+      // ── 2h. Geen afgedwongen layout voor niets ──
+      {
+        const OP = await import('./opmaak.js');
+        const RL = await import('./render-lijsten.js');
+        const UI = await import('./ui.js');
+        const paginaOud=(document.querySelector('.page.active')||{}).id?.replace('page-','')||'ntd';
+        const notitie=document.getElementById('hist-note');
+        notitie.style.height='';
+        OP.groeiVelden();
+        eq('groeien: een veld in een gesloten venster wordt overgeslagen (geen height:0px)', notitie.style.height, '');
+        bg.classList.add('open');
+        OP.groeiVelden();
+        truthy('groeien: in een open venster wél', /px$/.test(notitie.style.height) && parseFloat(notitie.style.height)>0);
+        bg.classList.remove('open'); notitie.style.height='';
+        // De kolombreedtes: een tweede hertekening met dezelfde verdeling meet de tabel niet opnieuw.
+        UI.goTo('ntd'); RL.renderNtd();
+        const tbl=document.getElementById('ntd-thead').closest('table');
+        const cgVoor=tbl.querySelector('colgroup')?.outerHTML;
+        let gemeten=0; const echt=tbl.getBoundingClientRect.bind(tbl);
+        tbl.getBoundingClientRect=()=>{ gemeten++; return echt(); };
+        try{ RL.renderNtd(); } finally { delete tbl.getBoundingClientRect; }
+        eq('kolommen: een tweede hertekening meet de tabel niet opnieuw', gemeten, 0);
+        eq('kolommen: en houdt dezelfde verdeling', tbl.querySelector('colgroup')?.outerHTML, cgVoor);
+        UI.goTo(paginaOud);
       }
     } catch(e) {
       truthy('review 02-10: geen uitzondering — '+(e && e.stack || e), false);

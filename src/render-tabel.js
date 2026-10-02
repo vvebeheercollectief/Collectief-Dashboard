@@ -86,7 +86,8 @@ function renderThead(id,cols,css,sort,breedtes){
   // vensterwijziging.
   const tbl=document.getElementById(id).closest('table');
   if(tbl){
-    tbl.querySelector('colgroup')?.remove();
+    const oudeCg=tbl.querySelector('colgroup');
+    oudeCg?.remove();
     // ALLEEN een tabel MÉT breedtes neemt de registratie over. Dit is geen detail: er is één
     // registratie voor de hele app, en `renderAll` tekent ná de takentabel ook 'Afgerond' en
     // 'Ontwikkeling' — allebei zónder breedtes. Die zetten `_kolGewichten` op null en `_kolTabel`
@@ -98,12 +99,21 @@ function renderThead(id,cols,css,sort,breedtes){
     // De ResizeObserver hoort om dezelfde reden op de takentabel te blijven staan: die vangt het
     // geval dat de tabel van maat verandert zonder dat het venster dat doet (tabbladwissel).
     if(breedtes && breedtes.length===cols.length){
-      _kolTabel     = tbl;
-      _kolGewichten = breedtes;
-      _kolLaatste   = 0;                       // dwing een verse berekening af
-      herzetKolomBreedtes();
-      if(!_kolObs && typeof ResizeObserver === 'function') _kolObs = new ResizeObserver(herzetKolomBreedtes);
-      if(_kolObs){ _kolObs.disconnect(); _kolObs.observe(tbl); }
+      // Zelfde tabel, zelfde kolomverdeling, en de breedte al eens gemeten? Dan de <colgroup> die
+      // er al stond terugzetten in plaats van opnieuw te meten. `getBoundingClientRect` dwong bij
+      // ELKE hertekening van de takenlijst een layout af (review 2026-10-02); een echte
+      // breedtewijziging komt via de ResizeObserver en de resize-wekker hieronder toch binnen.
+      const zelfde = tbl===_kolTabel && _kolLaatste && _kolGewichten && breedtes.join('|')===_kolGewichten.join('|');
+      if(zelfde && oudeCg){
+        tbl.insertAdjacentElement('afterbegin', oudeCg);   // de wachter staat al op deze tabel
+      } else {
+        _kolTabel     = tbl;
+        _kolGewichten = breedtes;
+        _kolLaatste   = 0;                       // dwing een verse berekening af
+        herzetKolomBreedtes();
+        if(!_kolObs && typeof ResizeObserver === 'function') _kolObs = new ResizeObserver(herzetKolomBreedtes);
+        if(_kolObs){ _kolObs.disconnect(); _kolObs.observe(tbl); }
+      }
     }
   }
   document.getElementById(id).innerHTML=`<tr>${cols.map(c=>{

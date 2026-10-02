@@ -233,8 +233,21 @@ function groei(el){
 
 // Alle opmaakvelden in beeld opnieuw op maat brengen. Wordt na elke render
 // aangeroepen: de 8s-poll tekent het dossier opnieuw en dan is de hoogte weg.
+// Alleen ZICHTBARE velden (review 2026-10-02): een veld op een verborgen pagina of in een gesloten
+// venster heeft scrollHeight 0 en kreeg dan height:0px — werk voor niets, en een veld dat bij het
+// openen eerst geen hoogte had. Zichtbaarheid via de klassen (.page.active / .modal-bg.open) en
+// niet via offsetParent: dat laatste dwingt per veld een layout af.
+// En in twee slagen: eerst alle hoogtes op 'auto', dan alles meten, dan alles zetten. Per veld
+// schrijven-lezen-schrijven dwong voor élk veld een eigen layout af.
 function groeiVelden(root){
-  (root||document).querySelectorAll('.opmaak-veld textarea').forEach(groei);
+  const velden=[...(root||document).querySelectorAll('.opmaak-veld textarea')].filter(el=>{
+    const pagina=el.closest('.page');      if(pagina && !pagina.classList.contains('active')) return false;
+    const venster=el.closest('.modal-bg'); if(venster && !venster.classList.contains('open')) return false;
+    return true;
+  });
+  velden.forEach(el=>{ el.style.height='auto'; });
+  const hoogtes=velden.map(el=>el.scrollHeight);
+  velden.forEach((el,i)=>{ el.style.height=hoogtes[i]+'px'; });
 }
 
 // Zoek de textarea die bij een knop hoort. Via closest(), want hetzelfde

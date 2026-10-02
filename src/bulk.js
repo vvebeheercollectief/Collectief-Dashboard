@@ -7,9 +7,9 @@ import { renderNtd } from "./render-lijsten.js";
 import { toDutchDate, taakTitel, berekenPrioriteit, _parseAnyDate, _vandaagAmsterdam, _verschilInKalenderdagen, parseDt, kiesAfgerondRij, leesbareFout } from "./util.js";
 import { SID } from "./config.js";
 import { ensureToken } from "./auth.js";
-import { _shiftNtdRows, _shiftAfRows, _herstelShift, assertRowsMatch, _veiligeRij, sheetsFetch, kapCel } from "./api.js";
-import { getSheetIds, getAfInsertRow, getInsertRow, insertAndWriteRow, serializeNtdUndo, afrondWaarden, bevestigInvoegPlek } from "./crud.js";
-import { backgroundWrite, loadAll, metWriteMarkering, serieleWrite, blokkeerOffline, syncSelecteerStand } from "./data.js";
+import { _shiftNtdRows, _shiftAfRows, _herstelShift, assertRowsMatch, _veiligeRij, sheetsFetch, kapCel, _withRetry, fetchSheet } from "./api.js";
+import { getSheetIds, getAfInsertRow, getInsertRow, insertAndWriteRows, serializeNtdUndo, afrondWaarden, bevestigInvoegPlek } from "./crud.js";
+import { backgroundWrite, loadAll, metWriteMarkering, serieleWrite, blokkeerOffline, syncSelecteerStand, parseSections } from "./data.js";
 import { showToast, showUndoToast, fireNotifEvent } from "./notifications.js";
 import { vraagBevestiging } from "./bevestig.js";
 import { bouwBundelIndex, openSubtaken } from "./bundel.js";
@@ -401,6 +401,45 @@ function _bulkUndoAfDoelRijen(items, afPerSec){
   return doel.sort((a,b)=>b._row-a._row);
 }
 
+// ── Terugzetten in blokken ──────────────────────────────────────────────────────────────────
+// Beide bulk-undo's zetten hun taken terug in 'Nog Te Doen'. Dat ging één voor één met losse
+// insertAndWriteRow-aanroepen: bij dertig taken zestig verzoeken, zonder herkansing, op ankers
+// uit één momentopname. Een 429 halverwege liet de helft terug en de helft niet — en bij
+// verwijderen kwam het anker niet eens langs `bevestigInvoegPlek`. Nu per SECTIE één blok
+// (insertAndWriteRows: één invoeging + één schrijfactie, alles of niets), op een gecontroleerd
+// anker, met herkansing en een vlag per blok zodat een herkansing een geslaagd blok niet nog eens
+// invoegt.
+// Puur (testbaar): items → blokken {sec, anker, rijen}, in de volgorde van de selectie binnen een
+// sectie, en de blokken van ONDER naar BOVEN. Een invoeging verschuift alleen wat eronder ligt; zo
+// blijven de ankers van de blokken die nog moeten komen (die erboven liggen) kloppen.
+function _bulkUndoBlokken(items, ankerVan){
+  const perSec=new Map();
+  for(const it of items){
+    if(!perSec.has(it.sec)) perSec.set(it.sec, []);
+    perSec.get(it.sec).push(it.ntdValues);
+  }
+  return [...perSec].map(([sec, rijen])=>({ sec, anker:(ankerVan||getInsertRow)(sec), rijen }))
+                    .sort((a,b)=>b.anker-a.anker);
+}
+// De ankers vers narekenen (één leesverzoek per blok), vóór metWriteMarkering — daarbinnen staat
+// pendingWrites al op >0 en kijkt bevestigInvoegPlek niet meer.
+async function _bevestigBlokken(blokken){
+  for(const b of blokken) await bevestigInvoegPlek(b.sec, b.anker);
+}
+// De blokken invoegen, mét herkansing bij 429/5xx. `klaar` (per sectie) overleeft die herkansing:
+// een blok dat al staat wordt niet nog eens ingevoegd. insertAndWriteRows ruimt bij een mislukte
+// schrijfactie zijn eigen lege rijen op, dus een half blok blijft niet achter.
+async function _voegBlokkenIn(blokken){
+  const klaar=new Set();
+  await _withRetry(async()=>{
+    for(const b of blokken){
+      if(klaar.has(b.sec)) continue;
+      await insertAndWriteRows('Nog Te Doen', b.anker, b.rijen);
+      klaar.add(b.sec);
+    }
+  });
+}
+
 async function bulkUndoAfronden(items, stand){
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){ alert('Inloggen mislukt.'); return; }
@@ -415,36 +454,43 @@ async function bulkUndoAfronden(items, stand){
         await loadAll(true);
         return;
       }
-      await loadAll(true);                       // verse D.af zodat we de zojuist afgeronde rijen vinden
+      await loadAll(true);                       // verse D.ntd voor de invoegplekken
       // Pas hierná de teller ophogen: bínnen metWriteMarkering zou loadAll zijn verse data
-      // weggooien (pendingWrites>0) en werkten we op een stale D.af.
+      // weggooien (pendingWrites>0) en werkten we op een stale D.
+      let blokken;
+      try{ blokken=_bulkUndoBlokken(items); await _bevestigBlokken(blokken); }
+      catch(e){ alert(e.melding || e.message); await loadAll(true); return; }
       await metWriteMarkering(async()=>{
         const ids=await getSheetIds();
-        // 1) Bepaal welke Afgerond-rijen weg moeten (nieuwste per code), hoog→laag _row.
-        const teVerwijderen=_bulkUndoAfDoelRijen(items, D.af);
-        // 2) EERST terugzetten in Nog Te Doen (per-sectie offset, getInsertRow verandert niet
-        //    tussendoor), DAN pas weghalen uit Afgerond. Breekt de verbinding ertussen, dan staat
-        //    de taak dubbel (zichtbaar, herstelbaar) in plaats van nergens (onzichtbaar, verloren).
-        const offset={};
-        for(const it of items){
-          await insertAndWriteRow('Nog Te Doen',getInsertRow(it.sec)+(offset[it.sec]||0),it.ntdValues);
-          offset[it.sec]=(offset[it.sec]||0)+1;
-        }
-        // Pas ná de lus loggen, in één append: de logregels zijn een journaal van deze ene
-        // handeling en hoeven niet tussen de inserts door. Scheelt bij 20 taken 19 verzoeken.
+        // 1) EERST terugzetten in Nog Te Doen, DAN pas weghalen uit Afgerond. Breekt de verbinding
+        //    ertussen, dan staat de taak dubbel (zichtbaar, herstelbaar) in plaats van nergens
+        //    (onzichtbaar, verloren). Per sectie één blok — zie _bulkUndoBlokken.
+        await _voegBlokkenIn(blokken);
+        // Pas ná de invoeging loggen, in één append: de logregels zijn een journaal van deze ene
+        // handeling. Scheelt bij 20 taken 19 verzoeken.
         await logEvents(items.map(it=>({code:it.code,sec:it.sec,actie:'Teruggezet',veld:'status',oudeWaarde:'Afgerond',nieuweWaarde:'Nog Te Doen (bulk-undo)'})));
-        // 3) Verwijder de Afgerond-rijen in één batch in aflopende _row-volgorde, zodat de
-        //    delete-indexen elkaar niet verschuiven (i.t.t. de oude code die de oudste rij koos).
-        //    De inserts hierboven raakten een ánder tabblad, dus deze _row-nummers kloppen nog.
+        // 2) Welke Afgerond-rijen weg moeten, uit een VERSE lezing vlak vóór het wissen — zelfde
+        //    werkwijze als undoComplete (notifications.js). D.af is van vóór de invoeging hierboven
+        //    en kan intussen verschoven zijn. Nieuwste eerst, net als D.af (zie kiesAfgerondRij).
+        const afVers=parseSections(await _withRetry(()=>fetchSheet('Afgerond')), 'Afgerond').data;
+        Object.values(afVers).forEach(l=>l.sort((a,b)=>parseDt(b.datum)-parseDt(a.datum)));
+        const teVerwijderen=_bulkUndoAfDoelRijen(items, afVers);
+        // 3) Verwijder ze in één batch in aflopende _row-volgorde, zodat de delete-indexen elkaar
+        //    niet verschuiven. Mét herkansing, en met een vlag: een deleteDimension is positioneel
+        //    en NIET idempotent — een herkansing na een geslaagde batch zou de rijen eronder raken.
         if(teVerwijderen.length){
-          // 'Afgerond' had als énige tabblad een positionele deleteDimension zónder guard, en juist
-          // op de undo-weg: de rij wordt weggegooid op grond van een onthouden rijnummer. Klopte dat
-          // nummer niet meer, dan verdween er stil een ándere afronding. Nu eerst controleren.
-          await assertRowsMatch(teVerwijderen.map(af=>({row:af._row, r:af})), 'Afgerond');
-          const resp=await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
-            method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
-            body:JSON.stringify({requests:teVerwijderen.map(af=>({deleteDimension:{range:{sheetId:ids['Afgerond'],dimension:'ROWS',startIndex:af._row-1,endIndex:af._row}}}))})});
-          if(!resp.ok){const e=await resp.json().catch(()=>({}));if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Bulk-undo verwijderfout');err.status=resp.status;throw err}
+          let verwijderd=false;
+          await _withRetry(async()=>{
+            if(verwijderd) return;
+            // 'Afgerond' had als énige tabblad een positionele deleteDimension zónder guard, en juist
+            // op de undo-weg. Nu eerst controleren dat de rijen nog dezelfde afrondingen zijn.
+            await assertRowsMatch(teVerwijderen.map(af=>({row:af._row, r:af})), 'Afgerond');
+            const resp=await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
+              method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
+              body:JSON.stringify({requests:teVerwijderen.map(af=>({deleteDimension:{range:{sheetId:ids['Afgerond'],dimension:'ROWS',startIndex:af._row-1,endIndex:af._row}}}))})});
+            if(!resp.ok){const e=await resp.json().catch(()=>({}));if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Bulk-undo verwijderfout');err.status=resp.status;throw err}
+            verwijderd=true;
+          });
         }
       });
       showToast('Ongedaan gemaakt',`${items.length} taken terug in Nog Te Doen`,'var(--am)','ongedaan');
@@ -537,14 +583,14 @@ async function bulkUndoVerwijderen(items, stand){
         await loadAll(true);
         return;
       }
+      // Per sectie één blok op een vers gecontroleerd anker (zie _bulkUndoBlokken). Deze weg had
+      // geen enkele ankercontrole: na een verwijdering elders landde de eerste terugzetting al op
+      // een verkeerde plek, en de rest erachteraan.
+      let blokken;
+      try{ blokken=_bulkUndoBlokken(items); await _bevestigBlokken(blokken); }
+      catch(e){ alert(e.melding || e.message); await loadAll(true); return; }
       await metWriteMarkering(async()=>{
-        // Offset per sectie: getInsertRow leest D.ntd (verandert niet tussen inserts), dus zonder
-        // offset belanden alle rijen op dezelfde positie en stapelen ze in omgekeerde volgorde.
-        const offset={};
-        for(const it of items){
-          await insertAndWriteRow('Nog Te Doen',getInsertRow(it.sec)+(offset[it.sec]||0),it.ntdValues);
-          offset[it.sec]=(offset[it.sec]||0)+1;
-        }
+        await _voegBlokkenIn(blokken);
         await logEvents(items.map(it=>({code:it.code,sec:it.sec,actie:'Teruggezet',veld:'status',oudeWaarde:'Verwijderd',nieuweWaarde:'Nog Te Doen (bulk-undo)'})));
       });
       showToast('Ongedaan gemaakt',`${items.length} taken terug in Nog Te Doen`,'var(--am)','ongedaan');
@@ -587,42 +633,59 @@ function bulkVeld(rows,soort,waarde){
   // opvolg-/escalatieklok van de motor (naloop 2026-08-28).
   const heenweg={gelukt:false};
   const schrijf=(welkeWaarde)=>{
-    let gelogd=false, gemeld=false;
+    // `geschreven` om dezelfde reden als in submitTask (crud.js): backgroundWrite draait deze
+    // closure opnieuw bij een tijdelijke fout, en ná een geslaagde batch vergelijkt de rij-controle
+    // dan de oude waarde met de nieuwe die er al staat — een valse 'Iemand heeft deze taak net
+    // gewijzigd', een teruggedraaid scherm, en de schuld bij een collega die niets deed.
+    let gelogd=false, gemeld=false, geschreven=false, poging=0;
     return async()=>{
-      // Bescherming: alle rijen nog dezelfde TAAK vóór bulk-celschrijf.
-      // Let op de richting. Deze closure schrijft zowel de nieuwe waarde als (bij undo) de oude
-      // terug, en het rij-object is op dát moment al bijgewerkt. De guard moet vergelijken met
-      // wat er NU in de Sheet hoort te staan, en dat is juist de waarde die we NIET schrijven:
-      // bij 'nieuw' staat de oude waarde er nog, bij 'oud' (undo) de zojuist geschreven nieuwe.
-      // Zonder deze omkering zou elke bulk-deadline en elke bulk-undo gegarandeerd vals afgaan,
-      // want de deadline zit in de vingerafdruk.
       // Rijnummers één keer gelezen, vóór de controle: een afronding elders schuift `_row`
       // optimistisch op, en dan zou de schrijfactie een andere rij raken dan de controle (naloop 25-09).
       const rijen=items.map(it=>it.r._row);
-      await assertRowsMatch(items.map((it,i)=>({
-        row: rijen[i],
-        r: { ...it.r, [conf.veld]: (welkeWaarde==='oud' ? waarde : it.oud) },
-      })));
-      // values:batchUpdate met USER_ENTERED — één atomaire POST (alles-of-niets) én zelfde
-      // invoer-parsing als de modal-flow (writeRange): een datum-string wordt zo óók via bulk
-      // een echte datum-waarde, niet platte tekst. (updateCells/stringValue zou RAW opslaan.)
-      // Formule-rem: veiligeCel zit alleen in writeRange/appendRange, en deze route gebruikt
-      // óók USER_ENTERED maar liep erlangs. Zonder _veiligeRij zou een behandelaarsnaam of
-      // opvolgnotitie die met =,+,-,@ begint hier alsnog als formule in de Sheet landen.
-      const data=[];
-      for(const [i,it] of items.entries()){
-        const kol=conf.kolom(it.r);
-        const val=welkeWaarde==='oud'?it.oud:waarde;
-        data.push({range:`'Nog Te Doen'!${kol}${rijen[i]}`, values:[_veiligeRij([val])]});
-        if(oppDl && it.sec==='OPPAKKEN'){
-          const prio=welkeWaarde==='oud'?it.oudPrio:berekenPrioriteit(waarde,'OPPAKKEN').prioriteit;
-          data.push({range:`'Nog Te Doen'!F${rijen[i]}`, values:[_veiligeRij([prio])]}); // F=prioriteit, herberekend bij nieuwe deadline
+      if(!geschreven){
+        // Bescherming: alle rijen nog dezelfde TAAK vóór bulk-celschrijf.
+        // Let op de richting. Deze closure schrijft zowel de nieuwe waarde als (bij undo) de oude
+        // terug, en het rij-object is op dát moment al bijgewerkt. De guard moet vergelijken met
+        // wat er NU in de Sheet hoort te staan, en dat is juist de waarde die we NIET schrijven:
+        // bij 'nieuw' staat de oude waarde er nog, bij 'oud' (undo) de zojuist geschreven nieuwe.
+        // Zonder deze omkering zou elke bulk-deadline en elke bulk-undo gegarandeerd vals afgaan,
+        // want de deadline zit in de vingerafdruk.
+        poging++;
+        const verwacht=(v)=>items.map((it,i)=>({ row: rijen[i], r: { ...it.r, [conf.veld]: v(it) } }));
+        try{
+          await assertRowsMatch(verwacht(it=>welkeWaarde==='oud' ? waarde : it.oud));
+        }catch(err){
+          // Een HERKANSING na een 5xx: Google kan de batch tóch hebben uitgevoerd terwijl het
+          // antwoord verloren ging. Staat de waarde die we wilden schrijven er al, dan is dat geen
+          // conflict maar onze eigen schrijfactie — niet opnieuw schrijven, wel gewoon doorgaan.
+          if(poging<2 || !err.rowMismatch) throw err;
+          await assertRowsMatch(verwacht(it=>welkeWaarde==='oud' ? it.oud : waarde));
+          geschreven=true;
         }
       }
-      const resp=await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values:batchUpdate`,{
-        method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
-        body:JSON.stringify({valueInputOption:'USER_ENTERED', data})});
-      if(!resp.ok){const e=await resp.json().catch(()=>({}));if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Bulk-actie fout');err.status=resp.status;throw err}
+      if(!geschreven){
+        // values:batchUpdate met USER_ENTERED — één atomaire POST (alles-of-niets) én zelfde
+        // invoer-parsing als de modal-flow (writeRange): een datum-string wordt zo óók via bulk
+        // een echte datum-waarde, niet platte tekst. (updateCells/stringValue zou RAW opslaan.)
+        // Formule-rem: veiligeCel zit alleen in writeRange/appendRange, en deze route gebruikt
+        // óók USER_ENTERED maar liep erlangs. Zonder _veiligeRij zou een behandelaarsnaam of
+        // opvolgnotitie die met =,+,-,@ begint hier alsnog als formule in de Sheet landen.
+        const data=[];
+        for(const [i,it] of items.entries()){
+          const kol=conf.kolom(it.r);
+          const val=welkeWaarde==='oud'?it.oud:waarde;
+          data.push({range:`'Nog Te Doen'!${kol}${rijen[i]}`, values:[_veiligeRij([val])]});
+          if(oppDl && it.sec==='OPPAKKEN'){
+            const prio=welkeWaarde==='oud'?it.oudPrio:berekenPrioriteit(waarde,'OPPAKKEN').prioriteit;
+            data.push({range:`'Nog Te Doen'!F${rijen[i]}`, values:[_veiligeRij([prio])]}); // F=prioriteit, herberekend bij nieuwe deadline
+          }
+        }
+        const resp=await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values:batchUpdate`,{
+          method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
+          body:JSON.stringify({valueInputOption:'USER_ENTERED', data})});
+        if(!resp.ok){const e=await resp.json().catch(()=>({}));if(resp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Bulk-actie fout');err.status=resp.status;throw err}
+        geschreven=true;
+      }
       if(welkeWaarde==='nieuw') heenweg.gelukt=true;   // pas nu mag de undo-knop iets terugzetten
       if(!gelogd){ await logEvents(items.map(it=>({code:it.code,sec:it.sec,actie:conf.log,veld:conf.veld,oudeWaarde:welkeWaarde==='oud'?waarde:it.oud,nieuweWaarde:welkeWaarde==='oud'?it.oud:waarde}))); gelogd=true; }
       // Melding aan de nieuwe behandelaar. Eén taak toewijzen deed dit al (crud.js, submitTask);
@@ -695,4 +758,5 @@ function bulkVeld(rows,soort,waarde){
 
 export { _bulkVolgorde, bulkGeselecteerd, bulkSelectie, toggleBulkMode, bulkVink, bulkWis,
          bulkAlles, allesVinkjeHtml, allesVinkjeStand, bulkHerstel,
-         renderBulkUi, toggleBulkMenu, _sluitMenus, bulkDoe, bulkVeld, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen };
+         renderBulkUi, toggleBulkMenu, _sluitMenus, bulkDoe, bulkVeld, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen, _bulkUndoBlokken,
+         bulkUndoAfronden, bulkUndoVerwijderen };

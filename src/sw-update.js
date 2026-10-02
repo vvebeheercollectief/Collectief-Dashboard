@@ -124,6 +124,12 @@ export function maakHerlaadKern(deps = {}) {
 // hoort per definitie ná die van de kern te liggen.
 const HERLAAD_WACHTHOND_MS = 35_000;
 
+// Puur (testbaar): hoort de balk er (weer) te staan? Tabblad zichtbaar, een wachtende nieuwe
+// versie, en die nieuwe versie is een ÉCHTE update (zie shouldPromptReload).
+export function balkWeerTonen(verborgen, reg, controller) {
+  return !verborgen && !!(reg && reg.waiting) && shouldPromptReload(controller);
+}
+
 function toonUpdateBalk(onReload, onDismiss, isBezet) {
   if (document.getElementById('sw-update-bar')) return; // nooit dubbel
   const bar = document.createElement('div');
@@ -195,7 +201,14 @@ export function initSwUpdate() {
       // Periodiek + bij terugkeer naar het tabblad actief checken
       const check = () => reg.update().catch(() => {});
       setInterval(check, 30 * 60 * 1000); // elk half uur
-      document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+      // Bij terugkeer naar het tabblad óók de balk terug als er nog een nieuwe versie klaarstaat.
+      // Een weggeklikte balk kwam in dit tabblad nooit meer terug: `updatefound` vuurt maar één
+      // keer per versie, dus wie hem één keer wegklikte bleef dagen op de oude code werken.
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) return;
+        check();
+        if (balkWeerTonen(document.hidden, reg, navigator.serviceWorker.controller)) balk();
+      });
     }).catch(e => console.warn('SW registratie mislukt:', e));
   });
 }

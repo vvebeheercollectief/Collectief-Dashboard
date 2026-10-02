@@ -26,7 +26,7 @@
 // Eén lezing, geen extra verzoek.
 import { SID, SKEYS } from "./config.js";
 import { state, D } from "./state.js";
-import { rijIndex } from "./rij.js";
+import { rijIndex, verseRij } from "./rij.js";
 import { _veiligeRij, assertRowsMatch, fetchSheet, sheetsFetch } from "./api.js";
 import { backgroundWrite, blokkeerOffline } from "./data.js";
 import { ensureToken } from "./auth.js";
@@ -248,8 +248,14 @@ export async function koppelTaak(sub, doel){
                   'var(--am)', 'label', { geenDedup:true, geenSysteemmelding:true });
         return;
       }
-      if ((oudSub.bundelId||'').trim()) await herstelBundel(sub, oudSub);
-      else await ontkoppelTaak(sub);
+      // De rij VERS opzoeken, zoals de bulk-undo (bulk.js) dat doet. De stapel-write doet in zijn
+      // finally een `loadAll(true)` die élk rij-object in D vervangt — ruim binnen de acht seconden
+      // dat deze knop er staat. `sub` wees dan nergens meer naar: het scherm bleef de gestapelde
+      // stand tonen, en de schrijfactie nam het `_row` van het oude object, dat door geen enkele
+      // latere verschuiving meer was bijgewerkt.
+      const subNu = verseRij(sub) || sub;
+      if ((oudSub.bundelId||'').trim()) await herstelBundel(subNu, oudSub);
+      else await ontkoppelTaak(subNu);
     }, 'plus', { geenDedup:true });
   backgroundWrite(
     async () => {
@@ -503,6 +509,11 @@ export async function herordenBundel(nieuweVolgorde, volgordeGewijzigd){
     // backgroundWrite door en komt er een kale 'Undo mislukt' uit een 401 in plaats van een
     // melding die zegt wat eraan te doen is.
     if (!await ensureToken()){ alert('Inloggen mislukt. Probeer het opnieuw.'); return; }
+    // Vers opzoeken vóór het terugzetten — zie de stapel-undo hierboven. `oud` en `wijzigingen`
+    // wijzen naar dezelfde rij-objecten; allebei bijwerken, want de rollback hieronder leest de
+    // tweede en de schrijfactie de eerste.
+    oud.forEach(o => { o.r = verseRij(o.r) || o.r; });
+    wijzigingen.forEach(w => { w.r = verseRij(w.r) || w.r; });
     oud.forEach(o => { o.r.bundelVolg = o.volg; });
     renderAll();
     backgroundWrite(schrijfVolg(oud), () => { wijzigingen.forEach(w => { w.r.bundelVolg = w.volg; }); }, 'Ongedaan maken mislukt');

@@ -16238,6 +16238,172 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     }
   })();
 
+  // ══════════════════════════════════════════════════════════════════════════
+  //  NALOOP 02-10-2026 — bulk-undo in blokken, herkansingen, verse rijen, token, versiebalk
+  // ══════════════════════════════════════════════════════════════════════════
+  await (async () => {
+    console.log('%c[TESTS] Naloop 02-10: schrijfwegen', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const BU = await import('./bulk.js');
+    const CR = await import('./crud.js');
+    const SW = await import('./sw-update.js');
+    const BA = await import('./bundel-acties.js');
+    const _fetch=window.fetch, tokenOud=state.oauthToken, expOud=state.oauthExpiry, idsOud=state._sheetIds;
+    const ntdOud=D.ntd, afOud=D.af, infoOud=D.ntdSecInfo, logOud=D.logboek, uitOud=state._uitCache, failsOud=state._syncFails;
+    const alertOud=window.alert, gOud=window.google, gisOud=state._gsiTokenClient;
+    const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
+    const wachtKeten=async()=>{ await state._writeChain; for(let i=0;i<300 && (state._loadInFlight||state.pendingWrites>0);i++) await new Promise(r=>setTimeout(r,10)); };
+    // Een Sheet-rij uit het geheugen, zoals de rij-controle hem terugleest.
+    const cellen=r=>{ const c=_rijNaarCellen('Nog Te Doen', r); while(c.length<19) c.push(''); return c; };
+    const rijOp=(n)=>Object.values(D.ntd||{}).flat().find(r=>r._row===n);
+    try{
+      window.alert=()=>{};
+      state.oauthToken='tok'; state.oauthExpiry=Date.now()+3600e3; state._uitCache=false;
+      state._sheetIds={'Nog Te Doen':0,'Afgerond':7,'Logboek':9};
+      await wachtKeten();
+
+      // ── 15. Bulk-undo: per sectie één blok, van onder naar boven, met herkansing ──
+      const blokken=BU._bulkUndoBlokken([{sec:'OPPAKKEN',ntdValues:['a']},{sec:'LOD',ntdValues:['b']},{sec:'OPPAKKEN',ntdValues:['c']}],
+                                        s=>({OPPAKKEN:10, LOD:40})[s]);
+      eq('bulk-undo: één blok per sectie, onderste eerst, volgorde binnen de sectie behouden',
+         blokken.map(b=>[b.sec,b.anker,b.rijen.map(r=>r[0]).join('')]), [['LOD',40,'b'],['OPPAKKEN',10,'ac']]);
+      {
+        D.ntd={ ...leeg, OPPAKKEN:[{_sec:'OPPAKKEN',_row:5,code:'311001',actiepunt:'blijft',taakId:'TA'}],
+                         LOD:[{_sec:'LOD',_row:20,code:'311002',actiepunt:'blijft',taakId:'TL'}] };
+        D.ntdSecInfo={OPPAKKEN:{colHeaderRow:3},LOD:{colHeaderRow:18}};
+        const inserts=[], deletes=[], puts=[]; let putTeller=0;
+        window.fetch=async(url,opt)=>{
+          const u=decodeURIComponent(String(url)); const m=(opt&&opt.method)||'GET';
+          if(m==='GET' && /values\/'Nog Te Doen'!A(\d+):S\1/.test(u)){
+            const n=+u.match(/!A(\d+):S/)[1]; const r=rijOp(n);
+            return new Response(JSON.stringify({values: r ? [cellen(r)] : []}),{status:200});
+          }
+          if(m==='POST' && u.includes(':batchUpdate')){
+            const b=JSON.parse(opt.body).requests[0];
+            if(b.insertDimension) inserts.push([b.insertDimension.range.startIndex, b.insertDimension.range.endIndex]);
+            if(b.deleteDimension) deletes.push([b.deleteDimension.range.startIndex, b.deleteDimension.range.endIndex]);
+            return new Response('{}',{status:200});
+          }
+          if(m==='PUT'){
+            putTeller++;
+            if(putTeller===2) return new Response(JSON.stringify({error:{message:'Quota exceeded'}}),{status:429});
+            puts.push(u.match(/'Nog Te Doen'!([A-Z0-9:]+)/)[1]); return new Response('{}',{status:200});
+          }
+          if(u.includes(':append')) return new Response('{}',{status:200});
+          return new Response(JSON.stringify({error:{message:'niet in deze toets'}}),{status:403});
+        };
+        const items=[{sec:'OPPAKKEN',code:'311003',ntdValues:['311003','X','een']},{sec:'LOD',code:'311004',ntdValues:['311004','Y','twee']},
+                     {sec:'OPPAKKEN',code:'311005',ntdValues:['311005','Z','drie']}];
+        await BU.bulkUndoVerwijderen(items, {gelukt:true});
+        await wachtKeten();
+        eq('bulk-undo: twee blokken, het onderste (LOD) eerst; het mislukte blok één keer opnieuw',
+           inserts, [[20,21],[5,7],[5,7]]);
+        eq('bulk-undo: het half ingevoegde blok wordt opgeruimd vóór de herkansing', deletes, [[5,7]]);
+        eq('bulk-undo: elke sectie staat er precies één keer', puts, ['A21:I21','A6:I7']);
+      }
+
+      // ── 21. Opruimen na een 401 gebruikt niet 'Bearer null' ──
+      {
+        state._gsiTokenClient=null;
+        window.google={ accounts:{ oauth2:{ initTokenClient(){ throw new Error('geen inlog in de toets'); } } } };
+        const koppen=[];
+        window.fetch=async(url,opt)=>{
+          const u=decodeURIComponent(String(url)); const m=(opt&&opt.method)||'GET';
+          if(m==='POST' && u.includes(':batchUpdate')){ koppen.push(opt.headers.Authorization); return new Response('{}',{status:200}); }
+          if(m==='PUT') return new Response(JSON.stringify({error:{message:'Request had invalid authentication credentials'}}),{status:401});
+          return new Response('{}',{status:200});
+        };
+        state.oauthToken='tok'; state.oauthExpiry=Date.now()+3600e3;
+        let fout=null;
+        try{ await CR.insertAndWriteRows('Nog Te Doen', 10, [['311001','X']]); }catch(e){ fout=e; }
+        eq('invoegen na 401: de fout komt gewoon terug', fout && fout.status, 401);
+        eq('invoegen na 401: het opruimen gaat met een écht token, niet "Bearer null"', koppen, ['Bearer tok','Bearer tok']);
+        window.google=gOud; state._gsiTokenClient=gisOud;
+        state.oauthToken='tok'; state.oauthExpiry=Date.now()+3600e3;
+      }
+
+      // ── 19. Bulk-deadline: een herkansing ná een geslaagde (maar onbevestigde) write is geen conflict ──
+      {
+        const r={_sec:'OPPAKKEN',_row:7,code:'311001',naam:'N',actiepunt:'dak',deadline:'01-10-2026',behandelaar:'',prioriteit:'',opmerkingen:'',inBehandeling:'FALSE',taakId:'TD'};
+        D.ntd={ ...leeg, OPPAKKEN:[r] };
+        let sheetDeadline='01-10-2026', schrijf=0;
+        window.fetch=async(url,opt)=>{
+          const u=decodeURIComponent(String(url)); const m=(opt&&opt.method)||'GET';
+          if(m==='GET' && /values\/'Nog Te Doen'!A7:S7/.test(u))
+            return new Response(JSON.stringify({values:[cellen({...r, deadline:sheetDeadline})]}),{status:200});
+          if(m==='POST' && u.includes('values:batchUpdate')){
+            schrijf++;
+            if(schrijf===1){ sheetDeadline='15-10-2026'; return new Response(JSON.stringify({error:{message:'Backend Error'}}),{status:500}); }
+            return new Response('{}',{status:200});
+          }
+          if(u.includes(':append')) return new Response('{}',{status:200});
+          return new Response(JSON.stringify({error:{message:'niet in deze toets'}}),{status:403});
+        };
+        document.querySelectorAll('#toast-container .toast').forEach(x=>x.remove());
+        bulkVeld([r], 'deadline', '15-10-2026');
+        await wachtKeten();
+        const titels=[...document.querySelectorAll('#toast-container .toast-title')].map(x=>x.textContent);
+        eq('bulk-deadline: na een 5xx die tóch landde geen tweede schrijfactie', schrijf, 1);
+        eq('bulk-deadline: en geen valse foutmelding', titels.includes('Bulk-actie mislukt'), false);
+        eq('bulk-deadline: de nieuwe deadline blijft staan', r.deadline, '15-10-2026');
+        document.querySelectorAll('#toast-container .toast').forEach(x=>x.remove());
+      }
+
+      // ── 20. Undo van stapelen en slepen werkt op de VERSE rij ──
+      {
+        const nieuw=()=>({ kop:{_sec:'OPPAKKEN',_row:11,code:'311212',naam:'Testflat',actiepunt:'Kop-werk',deadline:'',taakId:'Tkop',bundelId:'',bundelVolg:''},
+                           sub:{_sec:'OPPAKKEN',_row:12,code:'311212',naam:'Testflat',actiepunt:'Sub-werk',deadline:'',taakId:'Tsub',bundelId:'',bundelVolg:''} });
+        let { kop, sub }=nieuw();
+        D.ntd={ ...leeg, OPPAKKEN:[kop, sub] }; D.af={ ...leeg };
+        window.fetch=async(url,opt)=>{
+          const u=decodeURIComponent(String(url)); const m=(opt&&opt.method)||'GET';
+          const g=u.match(/values\/'Nog Te Doen'!A(\d+):S(\d+)/);
+          if(m==='GET' && g){ const rijen=[]; for(let n=+g[1]; n<=+g[2]; n++){ const r=rijOp(n); rijen.push(r?cellen(r):[]); } return new Response(JSON.stringify({values:rijen}),{status:200}); }
+          if(m==='POST' || m==='PUT') return new Response('{}',{status:200});
+          return new Response(JSON.stringify({error:{message:'niet in deze toets'}}),{status:403});
+        };
+        document.querySelectorAll('#toast-container .toast').forEach(x=>x.remove());
+        await BA.koppelTaak(sub, kop);
+        await wachtKeten();
+        // De verse parse: andere objecten, zelfde inhoud.
+        const subVers={...sub}, kopVers={...kop};
+        D.ntd={ ...leeg, OPPAKKEN:[kopVers, subVers] };
+        const undo=document.querySelector('#toast-container .toast-undo');
+        truthy('stapel-undo: er is een undo', !!undo);
+        if(undo) await undo.onclick();
+        await wachtKeten();
+        eq('stapel-undo: de VERSE rij is weer los (niet alleen het oude object)', [subVers.bundelId, subVers.bundelVolg], ['', '']);
+        // Slepen: zelfde vorm.
+        kopVers.bundelId='Tkop'; kopVers.bundelVolg='0'; subVers.bundelId='Tkop'; subVers.bundelVolg='10';
+        document.querySelectorAll('#toast-container .toast').forEach(x=>x.remove());
+        await BA.herordenBundel([{ r:subVers, af:false }, { r:kopVers, af:false }]);
+        await wachtKeten();
+        const sub3={...subVers}, kop3={...kopVers};
+        D.ntd={ ...leeg, OPPAKKEN:[kop3, sub3] };
+        const undo2=document.querySelector('#toast-container .toast-undo');
+        if(undo2) await undo2.onclick();
+        await wachtKeten();
+        eq('sleep-undo: de oude volgorde staat terug op de VERSE rijen', [kop3.bundelVolg, sub3.bundelVolg], ['0', '10']);
+        document.querySelectorAll('#toast-container .toast').forEach(x=>x.remove());
+      }
+
+      // ── 24. De versiebalk komt terug bij terugkeer naar het tabblad ──
+      eq('versiebalk: zichtbaar tabblad + wachtende versie → weer tonen', SW.balkWeerTonen(false, {waiting:{}}, {}), true);
+      eq('versiebalk: niet in een verborgen tabblad', SW.balkWeerTonen(true, {waiting:{}}, {}), false);
+      eq('versiebalk: niet zonder wachtende versie', SW.balkWeerTonen(false, {waiting:null}, {}), false);
+      eq('versiebalk: niet bij de allereerste installatie (geen controller)', SW.balkWeerTonen(false, {waiting:{}}, null), false);
+    } catch(e) {
+      truthy('naloop 02-10 schrijfwegen: geen uitzondering — '+(e && e.stack || e), false);
+    } finally {
+      await wachtKeten();
+      window.fetch=_fetch; window.alert=alertOud; window.google=gOud; state._gsiTokenClient=gisOud;
+      state.oauthToken=tokenOud; state.oauthExpiry=expOud; state._sheetIds=idsOud; state._uitCache=uitOud; state._syncFails=failsOud;
+      D.ntd=ntdOud; D.af=afOud; D.ntdSecInfo=infoOud; D.logboek=logOud;
+      document.querySelectorAll('#toast-container .toast').forEach(x=>x.remove());
+      document.querySelectorAll('.load-err').forEach(b=>b.remove());
+      document.getElementById('dot').className='dot';
+    }
+  })();
+
   console.log = _origLog;         // het voortgangsspoor weer los
   state._dubbelcheckUit = false;  // de testhaak weer los
   state._codecheckUit = false;

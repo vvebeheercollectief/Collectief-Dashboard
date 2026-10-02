@@ -1049,9 +1049,13 @@ async function insertAndWriteRows(sheetName,afterRow,rijen){
   const sheetId=ids[sheetName];
   if(sheetId==null) throw new Error('Sheet niet gevonden: '+sheetName);
   const n=lijst.length;
+  // Het token van het INVOEGEN bewaren. `writeRows` hieronder zet `state.oauthToken` op null bij
+  // een 401, en dan ging het opruimen van de net ingevoegde lege rijen de deur uit met
+  // 'Bearer null' — die mislukte gegarandeerd, en de lege rijen bleven in de Sheet staan.
+  const tokenInvoeg=state.oauthToken;
   const insResp=await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
     method:'POST',
-    headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
+    headers:{Authorization:`Bearer ${tokenInvoeg}`,'Content-Type':'application/json'},
     body:JSON.stringify({requests:[{insertDimension:{range:{sheetId,dimension:'ROWS',startIndex:afterRow,endIndex:afterRow+n},inheritFromBefore:true}}]})
   });
   if(!insResp.ok){const e=await insResp.json().catch(()=>({}));if(insResp.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Invoegfout');err.status=insResp.status;throw err}
@@ -1063,10 +1067,14 @@ async function insertAndWriteRows(sheetName,afterRow,rijen){
   }catch(e){
     // De rijen zijn wél ingevoegd maar niet gevuld → ruim ze weer op zodat de Sheet niet vervuilt
     // met ghost-rijen. Schrijfacties zijn geserialiseerd, dus deze delete is veilig.
+    // Welk token: was het een 401, dan is het bewaarde token net zo verlopen — dan eerst stil een
+    // vers token halen (geen inlogvenster: dit draait op de achtergrond). Lukt dat niet, dan het
+    // bewaarde; dat is nooit slechter dan 'Bearer null'.
     try{
+      const tokenOpruim = state.oauthToken || (await ensureToken(false) && state.oauthToken) || tokenInvoeg;
       await sheetsFetch(`https://sheets.googleapis.com/v4/spreadsheets/${SID}:batchUpdate`,{
         method:'POST',
-        headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
+        headers:{Authorization:`Bearer ${tokenOpruim}`,'Content-Type':'application/json'},
         body:JSON.stringify({requests:[{deleteDimension:{range:{sheetId,dimension:'ROWS',startIndex:afterRow,endIndex:afterRow+n}}}]})
       });
     }catch(_){ /* opruimen mislukte; de stille resync (loadAll) negeert de lege rijen toch */ }

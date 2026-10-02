@@ -61,5 +61,6 @@ function cd_schrijfLogboek(code, sectie, actie, veld, oudeWaarde, nieuweWaarde, 
       cd_safeCell(nieuweWaarde || ''),
       cd_safeCell(gebruiker || '')
     ]);
-  } catch(e) { Logger.log('cd_schrijfLogboek fout: ' + e); }
+    return true;   // cd_meldFout wil weten of de regel er echt staat
+  } catch(e) { Logger.log('cd_schrijfLogboek fout: ' + e); return false; }
 }

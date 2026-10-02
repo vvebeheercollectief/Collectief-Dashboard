@@ -270,7 +270,17 @@ function cd_archiveerRij(sheet, row) {
   // Apps Script met een fout die de hele trigger stillegt. 'Afgerond' is 26 kolommen breed
   // (gemeten), dus in de praktijk gaan alle 19 mee; de klem is het vangnet voor een smaller blad.
   // De code als tekst: een code met voorloopnul (021002) werd anders een getal zonder nul.
+  // En alle andere TEKST-cellen door dezelfde rem als de afrondweg van het dashboard (veiligeCel in
+  // src/api.js, via afrondWaarden): getValues geeft een cel die in de Sheet als tekst
+  // "'s-Gravenzande" staat terug als "'s-Gravenzande" (de prefix-apostrof is weg, deze is echt), en
+  // setValues van die tekst slikt die apostrof weer — de archiefregel werd "s-Gravenzande". Net zo
+  // werd een tekst-cel "06…" (telefoon in CRM) een getal en een tekst-cel "- zie mail" een formule.
+  // Datums, getallen en vinkjes blijven ongemoeid (cd_safeWaarde raakt alleen strings). Kolom I
+  // (index 8) NIET: dat is de afronddatum, die hierboven al bewust met één apostrof is opgebouwd.
   archief[0] = cd_safeCell(archief[0]);
+  for (var ai = 1; ai < archief.length; ai++) {
+    if (ai !== 8) archief[ai] = cd_safeWaarde(archief[ai]);   // cd_safeWaarde: Notifications.gs
+  }
   var schrijfBreedte = Math.min(archief.length, targetSheet.getMaxColumns());
   targetSheet.getRange(insertRow, 1, 1, schrijfBreedte)
              .setValues([archief.slice(0, schrijfBreedte)]);
@@ -516,7 +526,9 @@ function cd_archiveerALVs(sheet, rijen, blok) {
     // De datum als tekst 'd-m-jjjj' (`vandaag`), precies wat toggleAlvoFlag (src/render-alv.js)
     // schrijft. Eerder een Date mét tijd: zo'n cel kan als '2-10-2026 14:33:12' verschijnen en die
     // vorm leest _parseAnyDate niet — dan telde de ALV niet mee als 'laatst gehouden'.
-    nieuw.push([cd_safeCell(vveCode), vveNaam, vandaag]);   // code als tekst: houdt de voorloopnul
+    // Code als tekst (houdt de voorloopnul); de naam door dezelfde rem, anders verloor een naam die
+    // met een apostrof begint ('t Hof) die apostrof bij appendRow (zie cd_archiveerRij).
+    nieuw.push([cd_safeCell(vveCode), cd_safeWaarde(vveNaam), vandaag]);
   }
   if (!nieuw.length) return;
   // De BREEDTE klemmen, net als de leesbreedte in cd_archiveerRij. Het tabblad wordt met de

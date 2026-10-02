@@ -93,10 +93,16 @@ function cd_safeRun(label, fn) {
 //     VvE-code, en 'systeem' telt niet als activiteit (bepaalStil / cd_laatsteActiviteitMap).
 //     Hij staat wél in de Sheet. Eén regel per soort fout per uitvoering, en dezelfde soort
 //     hoogstens eens per uur (CacheService) — de 5-minuten-veegbeurt mag het tabblad niet volschrijven.
-//  2. Aan het eind van een TIJDTRIGGER gooit cd_gooiVerzameldeFouten de fouten alsnog op, zodat de
-//     uitvoering als 'mislukt' te boek staat en Google zijn foutmail naar de eigenaar stuurt.
-// Apps Script begint elke uitvoering met verse globals, dus deze teller is per uitvoering.
-var CD_RUN_FOUTEN = {};
+//  2. Aan het eind van een DAGELIJKSE/UURLIJKSE tijdtrigger gooit cd_gooiVerzameldeFouten de fouten
+//     alsnog op, zodat de uitvoering als 'mislukt' te boek staat en Google zijn foutmail naar de
+//     eigenaar stuurt — maar ALLEEN als er in deze uitvoering echt een nieuwe Logboek-regel bij kwam.
+//     Een fout die het afgelopen uur al gemeld was (de CacheService-rem) laat de uitvoering dus niet
+//     opnieuw falen. De 5-minuten-veegbeurt gooit nooit: die zou anders bij elke tijdelijke
+//     OneSignal-hik of blijvende fout in een setup-stap tot 288 mislukte runs (en foutmails) per
+//     dag opleveren; daar is de Logboek-regel het signaal.
+// Apps Script begint elke uitvoering met verse globals, dus deze tellers zijn per uitvoering.
+var CD_RUN_FOUTEN = {};    // label → aantal fouten in deze uitvoering
+var CD_RUN_GEMELD = {};    // label → true als deze uitvoering er een Logboek-regel voor schreef
 var CD_FOUT_STILTE_S = 3600;
 
 function cd_meldFout(label, fout) {
@@ -110,19 +116,26 @@ function cd_meldFout(label, fout) {
     if (cache.get(sleutel)) return;               // het afgelopen uur al gemeld
     cache.put(sleutel, '1', CD_FOUT_STILTE_S);
   } catch (_) {}
-  cd_schrijfLogboek('', '', 'Fout', label, '', tekst, 'systeem');   // vangt zelf zijn fouten af
+  // vangt zelf zijn fouten af; true = de regel staat er echt
+  if (cd_schrijfLogboek('', '', 'Fout', label, '', tekst, 'systeem')) CD_RUN_GEMELD[label] = true;
 }
 
-// Aan het eind van een tijdtrigger: waren er fouten, gooi dan één samenvatting op.
-function cd_gooiVerzameldeFouten(label) {
+// Aan het eind van een tijdtrigger: schreef deze uitvoering een NIEUWE Fout-regel, gooi dan één
+// samenvatting op (→ 'mislukt' + foutmail). Gedempte fouten (al gemeld het afgelopen uur) gaan
+// alleen naar Logger. `alleenLoggen` (de veegbeurt): nooit gooien, wel de samenvatting loggen.
+function cd_gooiVerzameldeFouten(label, alleenLoggen) {
   var labels = Object.keys(CD_RUN_FOUTEN);
   if (!labels.length) return;
   var samenvatting = labels.map(function (l) {
     return l + (CD_RUN_FOUTEN[l] > 1 ? ' (' + CD_RUN_FOUTEN[l] + '×)' : '');
   }).join(', ');
+  var nieuwGemeld = Object.keys(CD_RUN_GEMELD).length > 0;
   CD_RUN_FOUTEN = {};
-  throw new Error(label + ': fout(en) tijdens deze uitvoering — ' + samenvatting
-    + '. Details: tabblad Logboek (actie Fout) en de uitvoeringslogboeken.');
+  CD_RUN_GEMELD = {};
+  var bericht = label + ': fout(en) tijdens deze uitvoering — ' + samenvatting
+    + '. Details: tabblad Logboek (actie Fout) en de uitvoeringslogboeken.';
+  if (alleenLoggen || !nieuwGemeld) { Logger.log(bericht + (nieuwGemeld ? '' : ' (al gemeld, niet opgegooid)')); return; }
+  throw new Error(bericht);
 }
 
 // ════════════════════════════════════════════════════════════
@@ -643,9 +656,13 @@ function cd_sendNotification(p) {
     // Een weigering (≥300: verkeerde sleutel, app-id, kapotte filter, storing) telde nergens mee:
     // alleen een Logger-regel, en de wachtrij markeerde de rij daarna gewoon als verwerkt. Nu
     // geteld (de wachtrij probeert het dan opnieuw, zie cd_drainNotifQueue) en via cd_meldFout
-    // één keer per uitvoering in het Logboek. Een 200 zonder ontvangers is GEEN fout: dan heeft
-    // gewoon niemand die melding aanstaan.
+    // één keer per uitvoering in het Logboek. 'Geen ontvangers' is GEEN fout: dan heeft gewoon
+    // niemand die melding aanstaan (bv. een behandelaar zonder abonnement). OneSignal meldt dat
+    // doorgaans als 200 met een errors-veld ('All included players are not subscribed'), maar
+    // kan het ook als 400 met diezelfde tekst teruggeven — beide tellen niet mee, anders zou de
+    // wachtrij voor iemand zonder abonnement drie POGING-rondes draaien en op FOUT eindigen.
     if (code >= 300) {
+      if (cd_geenOntvangers(tekst)) { Logger.log('OneSignal: geen ontvangers (HTTP ' + code + ')'); return null; }
       CD_PUSH_MISLUKT++;
       cd_meldFout('OneSignal', 'HTTP ' + code + ': ' + tekst.slice(0, 300));
       return null;
@@ -659,6 +676,11 @@ function cd_sendNotification(p) {
 }
 // Aantal mislukte pushes in deze uitvoering (cd_drainNotifQueue vergelijkt voor/na per rij).
 var CD_PUSH_MISLUKT = 0;
+// OneSignal-antwoord 'niemand om naar te sturen'. Bewust alleen op de tekst van die situatie: een
+// verkeerde sleutel (401/403), een kapotte filter of een storing (429/5xx) blijft wél een fout.
+function cd_geenOntvangers(tekst) {
+  return /not subscribed|no (?:subscribers|subscriptions|recipients)/i.test(tekst || '');
+}
 
 // ════════════════════════════════════════════════════════════
 //  MELDINGEN — kernlogica, hergebruikt door de webhook (doPost)
@@ -833,11 +855,13 @@ function cd_setupNotifQueue() {
 }
 
 // onChange vuurt — anders dan onEdit — óók bij wijzigingen via de Sheets-API.
-function cd_onNotifQueueChange(e) { cd_drainNotifQueue(); }
+// Alleen NIEUWE rijen: herkansingen (POGING n) zijn voor de veegbeurt, anders zou elke schrijfactie
+// van het dashboard een mislukte push meteen opnieuw proberen en zijn de pogingen binnen een minuut op.
+function cd_onNotifQueueChange(e) { cd_drainNotifQueue(false); }
 
-// Vangnet: pakt rijen op die een gemiste onChange anders zou laten liggen.
+// Vangnet: pakt rijen op die een gemiste onChange anders zou laten liggen, én de herkansingen.
 function cd_sweepNotifQueue() {
-  cd_drainNotifQueue();
+  cd_drainNotifQueue(true);
   // Kreeg de opvolgmotor vanochtend de lock niet, dan probeert hij het hier opnieuw (Opvolging.gs).
   cd_safeRun('cd_motorHerkansing', cd_motorHerkansing);
   // CRM (v13.0): zet één keer het CRM-blok klaar — op TEST meteen, op PROD pas als de nieuwe code
@@ -848,7 +872,10 @@ function cd_sweepNotifQueue() {
   cd_safeRun('cd_vveCodesAutomatisch', cd_vveCodesAutomatisch);
   // Vier VvE's uit beheer (25-09-2026) één keer uit het register. Zie Code.gs.
   cd_safeRun('cd_vveCodesUitBeheerAutomatisch', cd_vveCodesUitBeheerAutomatisch);
-  cd_gooiVerzameldeFouten('cd_sweepNotifQueue');
+  // Nooit opgooien: deze trigger draait 288× per dag, en een tijdelijke OneSignal-hik of een blijvende
+  // fout in een setup-stap zou dan een stroom mislukte runs en foutmails geven. De Fout-regel in het
+  // Logboek (via cd_meldFout, hoogstens eens per uur per soort) is hier het signaal.
+  cd_gooiVerzameldeFouten('cd_sweepNotifQueue', true);
 }
 
 // Alleen push-only events mogen via de (semi-vertrouwde, OAuth-append) Notif-wachtrij. Privileged
@@ -862,29 +889,48 @@ const CD_QUEUE_ALLOWED = { newtask: 1, assigned: 1, alv_update: 1, test: 1, comp
 // vrijwel altijd is er niets te doen. Voorheen nam elke zo'n wijziging eerst de document-lock en
 // las 200×4 cellen — en hield zo de lock bezet voor de afvink-triggers en de motor.
 // Alleen een hint: binnen de lock leest cd_drainNotifQueue alles opnieuw.
-function cd_wachtrijHeeftWerk() {
+// `metHerkansingen` (alleen de veegbeurt): ook POGING-rijen waarvan de wachttijd om is tellen mee.
+// Vanuit onChange alleen echt nieuwe (lege) rijen.
+function cd_wachtrijHeeftWerk(metHerkansingen) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(NOTIF_QUEUE_SHEET);
   if (!sheet) return false;
   const last = sheet.getLastRow();
   if (last < 2) return false;
   const kolomD = sheet.getRange(2, 4, last - 1, 1).getValues();
-  for (let i = 0; i < kolomD.length; i++) if (cd_wachtrijOpen(kolomD[i][0])) return true;
+  const nu = Date.now();
+  for (let i = 0; i < kolomD.length; i++) if (cd_wachtrijOpen(kolomD[i][0], metHerkansingen, nu)) return true;
   return false;
 }
 
 // Kolom D ('Verwerkt') van de wachtrij: leeg = nog te doen; een tijdstempel = gelukt; 'FOUT: …' of
-// 'GEWEIGERD: …' = definitief niet; 'POGING n: …' = de push mislukte n keer, opnieuw proberen.
+// 'GEWEIGERD: …' = definitief niet; 'POGING n (tijdstip): …' = de push mislukte n keer, opnieuw
+// proberen. Herkansingen alleen vanuit de 5-minuten-veegbeurt en pas na n × CD_WACHTRIJ_WACHT_MS
+// (5, dan 10 min), zodat een storing van een paar minuten de drie pogingen niet in één keer opmaakt.
 // Na CD_WACHTRIJ_MAX_POGINGEN wordt het 'FOUT: …', zodat een blijvende storing (verkeerde sleutel)
-// niet eindeloos elke vijf minuten dezelfde rijen blijft aanbieden.
+// niet eindeloos dezelfde rijen blijft aanbieden.
 const CD_WACHTRIJ_MAX_POGINGEN = 3;
+const CD_WACHTRIJ_WACHT_MS = 5 * 60 * 1000;
 function cd_wachtrijPoging(v) {
   const m = /^POGING (\d+)/.exec((v == null ? '' : v) + '');
   return m ? +m[1] : 0;
 }
-function cd_wachtrijOpen(v) { return !v || cd_wachtrijPoging(v) > 0; }
+// Tijdstip van de laatste mislukte poging (ms), of 0 als het er niet in staat (oude vorm → meteen).
+function cd_wachtrijPogingTijd(v) {
+  const m = /^POGING \d+ \(([^)]+)\)/.exec((v == null ? '' : v) + '');
+  const t = m ? new Date(m[1]).getTime() : NaN;
+  return isNaN(t) ? 0 : t;
+}
+function cd_wachtrijOpen(v, metHerkansingen, nu) {
+  if (!v) return true;                                   // nieuw
+  const n = cd_wachtrijPoging(v);
+  if (!n || !metHerkansingen) return false;              // klaar, definitief, of niet de veegbeurt
+  return (nu || Date.now()) - cd_wachtrijPogingTijd(v) >= n * CD_WACHTRIJ_WACHT_MS;
+}
 
-function cd_drainNotifQueue() {
-  if (!cd_wachtrijHeeftWerk()) return;
+// `metHerkansingen`: true vanuit de veegbeurt (ook POGING-rijen), false vanuit onChange.
+function cd_drainNotifQueue(metHerkansingen) {
+  metHerkansingen = metHerkansingen === true;
+  if (!cd_wachtrijHeeftWerk(metHerkansingen)) return;
   cd_lockedRun('cd_drainNotifQueue', function() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName(NOTIF_QUEUE_SHEET);
@@ -892,9 +938,10 @@ function cd_drainNotifQueue() {
     const last = sheet.getLastRow();
     if (last < 2) return;
     const rows = sheet.getRange(2, 1, last - 1, 4).getValues(); // A:D
+    const nu = Date.now();
     for (let i = 0; i < rows.length; i++) {
       const payload = rows[i][2], verwerkt = rows[i][3];
-      if (!cd_wachtrijOpen(verwerkt)) continue; // al gedaan (of door de andere trigger)
+      if (!cd_wachtrijOpen(verwerkt, metHerkansingen, nu)) continue; // al gedaan, of (nog) niet aan de beurt
       const eerderePogingen = cd_wachtrijPoging(verwerkt);
       let data;
       try { data = JSON.parse(payload); }
@@ -905,7 +952,7 @@ function cd_drainNotifQueue() {
       }
       data._uid = rows[i][0]; // rij-timestamp → stabiele dedup-sleutel (zie cd_processNotifEvent)
       // Pas 'verwerkt' als de push ook echt de deur uit ging. Mislukte er een (OneSignal ≥300 of een
-      // netwerkfout), dan 'POGING n' en bij de volgende ronde opnieuw — alleen de push, de in-app
+      // netwerkfout), dan 'POGING n' en bij een latere veegbeurt opnieuw — alleen de push, de in-app
       // regel staat er al (CD_INAPP_UIT). Een herhaalde push vervangt de eerste op het toestel:
       // web_push_topic is per wachtrij-rij stabiel (_uid).
       const mislukt = CD_PUSH_MISLUKT;
@@ -916,7 +963,8 @@ function cd_drainNotifQueue() {
           const n = eerderePogingen + 1;
           sheet.getRange(i + 2, 4).setValue(n >= CD_WACHTRIJ_MAX_POGINGEN
             ? 'FOUT: push mislukt na ' + n + ' pogingen (zie Logboek, actie Fout)'
-            : 'POGING ' + n + ': push mislukt — volgende ronde opnieuw');
+            : 'POGING ' + n + ' (' + new Date().toISOString() + '): push mislukt — de veegbeurt probeert het over '
+              + (n * CD_WACHTRIJ_WACHT_MS / 60000) + ' min opnieuw');
         } else {
           sheet.getRange(i + 2, 4).setValue(new Date().toISOString());
         }
@@ -941,12 +989,23 @@ const CD_NTD_SECTIES = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD'
 
 // Formule-injectie-rem: waarden uit een onvertrouwde bron (mail-intake) die met = + - @ (of een
 // stuur-teken) beginnen, zou Sheets als formule uitvoeren. Een apostrof-prefix forceert platte tekst.
+// LET OP — SYNC met veiligeCel + kapCel in src/api.js (zelfde regels, zelfde grens en staart).
+//  · alleen cijfers, beginnend met een 0 (VvE-code 021002, telefoon 06…): Sheets maakt daar anders
+//    een getal van en gooit de nul weg;
+//  · tekst die zelf met een apostrof begint ('s-Gravenzande, 't Hof): Sheets slikt die eerste
+//    apostrof als tekst-prefix, dus zonder een extra apostrof ervoor verdwijnt hij;
+//  · langer dan CD_CEL_MAX: afkappen met een zichtbare staart. Google weigert cellen boven 50.000
+//    tekens, en dan mislukt de hele schrijfactie (de hele rij) in plaats van alleen de lange tekst.
+const CD_CEL_MAX = 49000;
+const CD_CEL_STAART = ' …[afgekapt]';
 function cd_safeCell(s) {
   s = (s == null ? '' : s).toString();
-  // Tweede geval: alleen cijfers, beginnend met een 0 (VvE-code 021002, telefoon 06…). Sheets maakt
-  // daar anders een getal van en gooit de nul weg. Spiegel van veiligeCel in src/api.js.
-  return (/^[=+\-@\t\r]/.test(s) || /^0\d+$/.test(s)) ? "'" + s : s;
+  if (s.length > CD_CEL_MAX) s = s.slice(0, CD_CEL_MAX) + CD_CEL_STAART;
+  return (/^[=+\-@\t\r']/.test(s) || /^0\d+$/.test(s)) ? "'" + s : s;
 }
+// Voor rijen met gemengde waarden (zoals getValues ze teruggeeft): alleen TEKST door cd_safeCell,
+// datums, getallen en vinkjes ongemoeid — precies wat veiligeCel in de frontend ook doet.
+function cd_safeWaarde(v) { return typeof v === 'string' ? cd_safeCell(v) : v; }
 
 // SHA-256 → lowercase hex. Gebruikt om het oude gelekte webhook-secret te herkennen
 // zonder de gelekte waarde zelf in dit openbaar gevolgde bestand te bewaren.

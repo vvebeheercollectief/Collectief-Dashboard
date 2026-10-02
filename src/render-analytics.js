@@ -196,11 +196,30 @@ function computeTrend(series){
   return{huidig,vorig,deltaPct,dir,label};
 }
 
+// Een grafiek tekenen of BIJWERKEN. Staat er al een op hetzelfde canvas en van hetzelfde type, dan
+// alleen data en opties vervangen en zonder animatie bijwerken. Voorheen ging bij élke geslaagde
+// ronde met nieuwe data (data.js) elke grafiek weg en kwam er een nieuwe — de donut draaide dan
+// telkens 900 ms opnieuw open, en dat kostte ook nog een volledige opbouw per grafiek.
+// Een themawissel (applyTheme in ui.js) gooit ze nog steeds allemaal weg: kleuren en verlopen
+// horen dan opnieuw opgebouwd te worden. `animeer`: een bewuste wissel door de gebruiker (een
+// ander donut-tabblad) mag wél vloeiend overgaan.
+function _tekenGrafiek(id, el, config, animeer){
+  const oud=state.charts[id];
+  if(oud && oud.canvas===el && oud.config && oud.config.type===config.type){
+    oud.data=config.data;
+    oud.options=config.options;
+    oud.update(animeer ? undefined : 'none');
+    return oud;
+  }
+  if(oud){ try{ oud.destroy(); }catch(_){} }
+  state.charts[id]=new Chart(el, config);
+  return state.charts[id];
+}
+
 // Sparkline — kleine lijngrafiek zonder assen
 function renderSparkline(canvasId,values,color){
-  if(state.charts[canvasId]) state.charts[canvasId].destroy();
   const el=document.getElementById(canvasId); if(!el) return;
-  state.charts[canvasId]=new Chart(el,{
+  _tekenGrafiek(canvasId,el,{
     type:'line',
     data:{labels:values.map((_,i)=>i),datasets:[{
       data:values,
@@ -292,8 +311,8 @@ function renderHeroChart(metric,period){
   document.getElementById('hero-chart-title').textContent=title;
   const periodeNoun={dag:'dagen',week:'weken',maand:'maanden',kwartaal:'kwartalen'}[period]||period;
   document.getElementById('hero-chart-sub').textContent=` — laatste ${n} ${periodeNoun}`;
-  if(state.charts['chart-hero']) state.charts['chart-hero'].destroy();
-  state.charts['chart-hero']=new Chart(document.getElementById('chart-hero'),{
+  const heroEl=document.getElementById('chart-hero'); if(!heroEl) return;
+  _tekenGrafiek('chart-hero',heroEl,{
     type:'bar',
     data:{
       labels:curr.map(b=>b.label),
@@ -491,8 +510,7 @@ function getWeekNum(d){
   return Math.ceil((((d2-yearStart)/86400000)+1)/7);
 }
 
-function buildDonut(id,labels,data,colors,tc,centerVal,centerLbl){
-  if(state.charts[id]) state.charts[id].destroy();
+function buildDonut(id,labels,data,colors,tc,centerVal,centerLbl,animeer){
   const el=document.getElementById(id); if(!el) return;
   // Maak verticale gradient van basiskleur naar lichtere variant
   const ctxG=el.getContext('2d');
@@ -502,9 +520,13 @@ function buildDonut(id,labels,data,colors,tc,centerVal,centerLbl){
     g.addColorStop(1,_lightenHex(c,18));
     return g;
   });
+  // De middentekst leest zijn waarden van de GRAFIEK ($midden) en niet uit deze closure: bij het
+  // bijwerken van een bestaande grafiek (_tekenGrafiek) blijft de plugin van de eerste opbouw
+  // staan, en die zou anders het getal van toen blijven tekenen.
   const centerPlugin={
     id:'center',
     afterDraw(chart){
+      const {val:centerVal, lbl:centerLbl, kleuren:colors, tc}=chart.$midden||{};
       if(!centerVal) return;
       const {ctx,chartArea}=chart;
       const cx=(chartArea.left+chartArea.right)/2;
@@ -539,7 +561,7 @@ function buildDonut(id,labels,data,colors,tc,centerVal,centerLbl){
       ctx.restore();
     }
   };
-  state.charts[id]=new Chart(el,{
+  const grafiek=_tekenGrafiek(id,el,{
     type:'doughnut',
     data:{labels,datasets:[{data,backgroundColor:gradients,borderWidth:0,hoverOffset:10,hoverBorderWidth:3,hoverBorderColor:_cssKleur('--sur'),spacing:2}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:'72%',
@@ -552,7 +574,10 @@ function buildDonut(id,labels,data,colors,tc,centerVal,centerLbl){
           titleFont:{size:12,weight:'600'},bodyFont:{size:12}}
       }},
     plugins:[centerPlugin]
-  });
+  }, animeer);
+  grafiek.$midden={ val:centerVal, lbl:centerLbl, kleuren:colors, tc };
+  // Een bijgewerkte grafiek is al getekend vóór $midden er stond: één keer opnieuw tekenen.
+  grafiek.draw();
 }
 
 // Lichten/donker maken van hex-kleur (perc -100..+100)
@@ -636,7 +661,7 @@ const HERO_VIEWS=[
   },
 ];
 
-function renderHeroDonut(){
+function renderHeroDonut(animeer){
   const dark=document.documentElement.dataset.theme==='dark';
   const tc=dark?'#94a3b8':'#64748b';
   const view=HERO_VIEWS.find(v=>v.key===state.activeHeroView)||HERO_VIEWS[0];
@@ -653,7 +678,7 @@ function renderHeroDonut(){
       `<button class="hdt-tab" data-key="${v.key}">${DASH_ICONS[v.icon]||''}<span>${v.label}</span></button>`
     ).join('');
     tabsEl.querySelectorAll('.hdt-tab').forEach(btn=>{
-      btn.onclick=()=>{ if(btn.dataset.key===state.activeHeroView) return; state.activeHeroView=btn.dataset.key; renderHeroDonut(); };
+      btn.onclick=()=>{ if(btn.dataset.key===state.activeHeroView) return; state.activeHeroView=btn.dataset.key; renderHeroDonut(true); };
     });
   }
   if(tabsEl) tabsEl.querySelectorAll('.hdt-tab').forEach(btn=>{
@@ -662,7 +687,7 @@ function renderHeroDonut(){
     btn.style.setProperty('--hero-color', on?view.color:'');
   });
   const cfg=view.build();
-  buildDonut('chart-hero-donut',cfg.labels,cfg.data,cfg.colors,tc,cfg.centerVal,cfg.centerLbl);
+  buildDonut('chart-hero-donut',cfg.labels,cfg.data,cfg.colors,tc,cfg.centerVal,cfg.centerLbl,animeer);
 }
 
 function buildDash(){

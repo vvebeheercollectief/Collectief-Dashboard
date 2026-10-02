@@ -17070,6 +17070,39 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         }
         eq('ntd-volgorde: exact gelijk aan de oude comparator (300 willekeurige rijen, vier secties)', verschil, []);
       }
+
+      // ── 2f. Grafieken bijwerken in plaats van weggooien en opnieuw maken ──
+      {
+        const RA = await import('./render-analytics.js');
+        const chartOud=window.Chart, chartsOud=state.charts;
+        const gemaakt=[], updates=[];
+        class NepChart{
+          constructor(canvas, config){ this.canvas=canvas; this.config=config; this.data=config.data; this.options=config.options; gemaakt.push(this); }
+          update(modus){ updates.push(modus); }
+          destroy(){ this.weg=true; }
+          draw(){}
+        }
+        try{
+          window.Chart=NepChart; state.charts={};
+          RA.renderSparkline('spark-taken',[1,2,3],'#123456');
+          RA.renderSparkline('spark-taken',[4,5,6],'#123456');
+          eq('grafiek: een tweede tekenronde maakt GEEN nieuwe grafiek', gemaakt.length, 1);
+          eq('grafiek: maar werkt de bestaande bij, zonder animatie', [updates, state.charts['spark-taken'].data.datasets[0].data], [['none'], [4,5,6]]);
+          RA.buildDonut('chart-hero-donut',['a','b'],[1,2],['#111111','#222222'],'#333','1/3','Klaar');
+          RA.buildDonut('chart-hero-donut',['a','b'],[2,1],['#111111','#222222'],'#333','2/3','Klaar');
+          eq('donut: bijgewerkt, niet opnieuw (geen 900 ms-animatie bij elke ronde)', gemaakt.length, 2);
+          eq('donut: de middentekst volgt de nieuwe stand', state.charts['chart-hero-donut'].$midden.val, '2/3');
+          RA.buildDonut('chart-hero-donut',['a','b'],[1,1],['#111111','#222222'],'#333','1/2','Klaar',true);
+          eq('donut: een bewuste tabwissel mag wél vloeiend overgaan', updates[updates.length-1], undefined);
+          // Na een themawissel (applyTheme gooit alles weg) komt er gewoon een nieuwe.
+          state.charts={};
+          RA.renderSparkline('spark-taken',[1],'#123456');
+          eq('grafiek: na het wissen van de grafieken (thema) een nieuwe', gemaakt.length, 3);
+        } finally {
+          if(chartOud) window.Chart=chartOud; else delete window.Chart;
+          state.charts=chartsOud;
+        }
+      }
     } catch(e) {
       truthy('review 02-10: geen uitzondering — '+(e && e.stack || e), false);
     } finally {

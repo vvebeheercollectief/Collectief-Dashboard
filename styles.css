@@ -657,16 +657,14 @@
        De knop zelf blijft een doelvlak van 28px; aria-label (render-alv.js) zegt welke stap het is. */
     .flag-toggle{position:relative;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;border-radius:var(--rs);border:1px solid transparent;background:none;cursor:pointer;font-family:inherit;transition:background var(--tr);user-select:none}
     .flag-toggle:hover{background:var(--row-hover)}
-    .vlag{position:relative;display:inline-block;flex:none;width:16px;height:16px;box-sizing:border-box;border-radius:50%;border:1.5px solid var(--fnt);transition:background var(--tr),border-color var(--tr)}
-    .flag-toggle.off:hover .vlag{border-color:var(--ac-500)}
-    .flag-toggle.on .vlag,.vve-vlag.aan .vlag{background:var(--ac);border-color:var(--ac)}
-    .flag-toggle.on .vlag::after,.vve-vlag.aan .vlag::after{content:'';position:absolute;left:4.5px;top:1.5px;width:3.5px;height:7px;border:solid var(--sur);border-width:0 1.75px 1.75px 0;transform:rotate(45deg)}
-    .flag-toggle.on:hover .vlag{background:var(--ac-900);border-color:var(--ac-900)}
+    .vlag{display:block;flex:none;width:16px;height:16px;color:var(--fnt);shape-rendering:geometricPrecision;transition:color var(--tr)}
+    .flag-toggle.off:hover .vlag{color:var(--ac-500)}
+    .flag-toggle.on .vlag,.vve-vlag.aan .vlag{color:var(--ac)}
+    .flag-toggle.on:hover .vlag{color:var(--ac-900)}
     /* Dossier: dezelfde rondjes als tekstregel, alleen ter inzage. */
     .vve-vlag{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--mut);margin-right:14px}
     .vve-vlag.aan{color:var(--txt)}
     .vve-vlag .vlag{width:14px;height:14px}
-    .vve-vlag.aan .vlag::after{left:3.5px;top:1px;width:3px;height:6px}
     .flag-toggle:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
     .flag-toggle.toggling{pointer-events:none;opacity:.6;animation:flagPulse 1s ease-in-out infinite}
     @keyframes flagPulse{0%,100%{opacity:.6}50%{opacity:.85}}

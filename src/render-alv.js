@@ -2,7 +2,7 @@
 //  RENDER-ALV — ALV-overzicht + ALV-afgerond + aanvink-schrijfactie ("ALV's overzicht")
 //  Verplaatst uit render-lijsten.js (Batch D / punt 11) — zuivere refactor, geen gedragswijziging.
 // ══════════════════════════════════════
-import { esc, emptyRow, vveCodeSpan, voortgang } from "./util.js";
+import { esc, emptyRow, vveCodeSpan, voortgang, vlagSvg } from "./util.js";
 import { SID, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { getSheetIds } from "./crud.js";
@@ -82,7 +82,7 @@ function flagPill(idx,field,val,code){
   const cls=val?'on':'off';
   // Een rondje dat gevuld is of niet (v13.8) i.p.v. een pil '✓ Ja' / '–': in een kolom van zestien
   // rijen zie je zo in één oogopslag waar het nog open staat. De naam komt uit aria-label hieronder.
-  const lbl='<span class="vlag" aria-hidden="true"></span>';
+  const lbl=vlagSvg(val);
   const aria=val?'true':'false';
   const title=`Klik om ${ALVO_LABELS[field]} ${val?'uit':'aan'} te zetten`;
   // aria-label naast de zichtbare '✓ Ja' / '–': de naam van een knop komt uit zijn inhoud, en die

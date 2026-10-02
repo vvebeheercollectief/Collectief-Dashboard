@@ -1074,3 +1074,12 @@ const VG_SVG={
   gepland:_vgSvg(_VG_RING+'<path d="M8 8V4A4 4 0 1 1 4.54 10Z" fill="currentColor"/>'),
   afgerond:_vgSvg('<circle cx="8" cy="8" r="7.5" fill="currentColor"/><path d="M5 8.3l2.1 2 3.9-4.1" fill="none" stroke="var(--sur)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>'),
 };
+
+// Aan/uit-rondje van een ALV-stap (v14.2, SVG): vol rondje met vinkje of een lege ring. Zelfde
+// tekening als 'Afgerond' hierboven, zodat beide soorten bolletjes in één tabel gelijk ogen.
+// Tot v14.1 was het CSS (rand + gedraaid hoekje als vinkje) en stond het vinkje net uit het midden.
+export function vlagSvg(aan){
+  return aan
+    ? '<svg class="vlag" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7.5" fill="currentColor"/><path d="M5 8.3l2.1 2 3.9-4.1" fill="none" stroke="var(--sur)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    : '<svg class="vlag" viewBox="0 0 16 16" aria-hidden="true">'+_VG_RING+'</svg>';
+}

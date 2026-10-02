@@ -919,11 +919,6 @@
       #sb.open{transform:none;box-shadow:var(--shl)}
       .hamburger{display:flex}
     }
-    .hist-entry{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--bor);font-size:12px}
-    .hist-entry:last-child{border-bottom:none}
-    .hist-ts{color:var(--mut);white-space:nowrap;flex-shrink:0;min-width:110px}
-    .hist-detail{flex:1}
-    .hist-change{color:var(--mut);font-size:11px;margin-top:2px}
     .logboek-box{margin-top:18px;background:linear-gradient(180deg,var(--ac-l),color-mix(in srgb,var(--ac-l) 25%,transparent));border:1px solid var(--ac-b);border-radius:var(--r);padding:14px 15px}
     .logboek-hdr{display:flex;align-items:center;gap:9px;margin-bottom:4px}
     .logboek-hdr svg{width:21px;height:21px;color:var(--ac);flex-shrink:0}
@@ -949,35 +944,18 @@
     .log-feed{padding:6px 16px 14px;display:flex;flex-direction:column}
     .log-day{margin:13px 0 7px;font-size:11px;font-weight:800;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;position:sticky;top:0;background:var(--sur);padding:5px 0;z-index:2}
     .log-day:first-child{margin-top:4px}
+    /* .log-item is alleen nog het omhulsel van het bewerkformulier (logEditForm); de regels zelf
+       zijn .log-r — zie 'Compacte logregel' onderaan. */
     .log-item{display:flex;gap:13px;padding:10px 10px;border-radius:10px;transition:background var(--tr);position:relative}
     .log-item:hover{background:var(--sur2)}
-    .log-item::before{content:'';position:absolute;left:27px;top:44px;bottom:-10px;width:2px;background:var(--bor)}
-    .log-item:last-child::before{display:none}
-    .log-item:has(+ .log-mini)::before{display:none}
-    .log-item:has(+ .log-day)::before{display:none}
-    .log-av{width:32px;height:32px;border-radius:50%;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800;color:#fff;position:relative;z-index:1}
-    .log-body{flex:1;min-width:0}
-    .log-line{font-size:13.5px;line-height:1.45;color:var(--txt)}
-    .log-line b{font-weight:700}
     .log-act{font-weight:700}
-    .log-change{margin-top:5px;font-size:12px;color:var(--mut);background:var(--sur2);border:1px solid var(--bor);border-radius:7px;padding:6px 10px;display:inline-block}
-    .log-change .old{text-decoration:line-through;opacity:.7}
-    .log-change .arr{color:var(--ac);font-weight:800;margin:0 5px}
-    .log-change .new{color:var(--txt);font-weight:600}
-    .log-note{margin-top:4px;font-size:13px;color:var(--txt);line-height:1.55;white-space:pre-wrap;word-break:break-word}
-    .log-mini{display:flex;align-items:center;gap:9px;padding:3px 10px 3px 13px;font-size:12px;color:var(--mut);line-height:1.4}
-    .log-mini-dot{flex:none;width:6px;height:6px;border-radius:50%}
-    .log-mini-txt{flex:1;min-width:0}
-    .log-mini-txt b{color:var(--txt);font-weight:600}
-    .log-time{font-size:11.5px;color:var(--mut);white-space:nowrap;flex-shrink:0;padding-top:3px}
     .log-empty{text-align:center;color:var(--mut);padding:40px;font-style:italic}
     /* ── Logboek: bewerken/verwijderen ── */
     .log-acts{display:flex;gap:1px;align-items:flex-start;flex-shrink:0;opacity:0;transition:opacity var(--tr)}
-    .log-item:hover .log-acts,.log-mini:hover .log-acts{opacity:1}
+    .log-item:hover .log-acts{opacity:1}
     .log-act-btn{border:none;background:transparent;color:var(--txt);cursor:pointer;font-size:15px;line-height:1;padding:4px 5px;border-radius:6px;transition:background var(--tr),color var(--tr)}
     .log-act-btn:hover{background:var(--sur2);color:var(--txt)}
     .log-act-btn.del:hover{background:var(--rd-l);color:var(--rd)}
-    .log-mini .log-act-btn{font-size:12px;padding:2px 4px}
     @media(hover:none){.log-acts{opacity:.5}}
     .log-edit{flex:1;display:flex;flex-direction:column;gap:8px;padding:10px;border:1px solid var(--ac-b);border-radius:10px;background:var(--sur2)}
     .log-edit-tekst{width:100%;resize:vertical;font:inherit;font-size:13px;line-height:1.5;padding:8px;border:1px solid var(--bor);border-radius:8px;background:var(--sur);color:var(--txt)}
@@ -1633,7 +1611,6 @@ body:has(.modal-bg.open) #chat-bg{display:none}
 .toast-undo svg{vertical-align:-1.5px;margin-right:2px}
 .soort-chip svg,.ai-chip svg,.lchip svg{width:13px;height:13px;vertical-align:-2.5px;margin-right:3px}
 .log-act-btn svg{width:14px;height:14px;display:block}
-.log-mini .log-act-btn svg{width:12px;height:12px}
 .empty-ico svg{width:34px;height:34px;opacity:.9}
 .pal-ico svg{width:15px;height:15px}
 .bb-knop svg{width:13px;height:13px;vertical-align:-2px;margin-right:3px}
@@ -2076,3 +2053,38 @@ td>.stapel-h{margin-right:9px}
 .crm-mail-tr{display:none}
 tr.expanded + .crm-mail-tr{display:table-row}
 #ntd-tbody tr[data-row] + .crm-mail-tr td{border-top:none}
+
+/* ── Compacte logregel ─────────────────────────────────────────────────────────────────────
+   Op alle drie de plekken dezelfde vorm: de logboekpagina, de VvE-dossier-tijdlijn en de tijdlijn
+   in het bewerkscherm. Was een blok van ~64px (avatar 32px + zin + notitie eronder); nu ÉÉN regel
+   van ~30px: pictogram (wat er gebeurde) + code + de tekst als inhoud + wie/tijd rechts. Het
+   bewerkformulier (logEditForm) houdt zijn eigen .log-item-omhulsel. */
+.log-r{display:flex;gap:10px;align-items:baseline;padding:6px 10px;border-radius:8px;
+       transition:background var(--tr);position:relative}
+.log-r:hover{background:var(--sur2)}
+.log-ic{flex:none;width:16px;display:inline-flex;align-items:center;justify-content:center;
+        position:relative;top:2px}
+.log-ic svg{display:block}
+.log-tx{flex:1;min-width:0;font-size:13px;line-height:1.5;color:var(--txt);
+        white-space:pre-wrap;word-break:break-word}
+/* De code-chip en het 'met wie' van een contactmoment lopen mee in de tekstregel. */
+/* Alleen de chip VOORAAN (regel met eigen tekst); in een gedempte zin staat de code midden in de
+   zin en zou dezelfde marge een dubbele spatie geven ('rondde 311134  af'). */
+.log-tx>.code:first-child{margin-right:6px;vertical-align:1px}
+.log-met{color:var(--mut);margin-right:6px}
+.log-met::after{content:'·';margin-left:6px;color:var(--fnt)}
+/* Gedempt: een regel zónder eigen tekst (een teruggezette taak, een afronding zonder opmerking).
+   Die hoort er te staan, maar niet te schreeuwen. De zin houdt zijn onderwerp, rechts alleen de tijd. */
+.log-r.dof .log-tx{color:var(--mut);font-size:12.5px}
+.log-r.dof .log-tx b{color:var(--txt);font-weight:600}
+.log-wie{flex:none;font-size:11.5px;color:var(--mut);white-space:nowrap;font-variant-numeric:tabular-nums}
+/* Vaste breedte (twee knoppen van 22px + 1px tussenruimte), rechts uitgelijnd: een regel met
+   alleen een prullenbak zou 'wie · tijd' anders 23px verder naar rechts zetten dan de regel erboven
+   met potlood én prullenbak — de rechterkolom stond dan zichtbaar scheef. */
+.log-r .log-acts{align-self:center;min-width:45px;justify-content:flex-end}
+.log-r:hover .log-acts,.log-r:focus-within .log-acts{opacity:1}
+.log-r .log-act-btn{font-size:13px;padding:2px 4px}
+/* Het geschiedenisblok in het bewerkscherm gebruikt dezelfde regel, iets compacter. */
+#hist-body .log-r{padding:4px 6px}
+#hist-body .log-tx{font-size:12.5px}
+.hist-veld{display:block;font-size:11px;color:var(--mut);margin-bottom:1px}

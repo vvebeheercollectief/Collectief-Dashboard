@@ -3,7 +3,7 @@
 // ══════════════════════════════════════
 import { taakTitel, taakVerwijzing, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, stilDrempel, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, subBadge, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel, kiesAfgerondRij, filt, splitBehandelaar, korteNaam, persBadges, taakActieKnoppen, voorgesteldeDeadline, DEADLINE_VOORSTEL, DEADLINE_HINT, periodeBereik, AF_PERIODES, duurUitCel, duurNaarCel, offerteAangevraagd, teLaatVoorTelling } from "./util.js";
 import { verwerkMeldingRijen, toonMeldingen, MAX_TOAST_BURST, _whoSleutel, getCurrentWho, undoDelete } from "./notifications.js";
-import { logZin, logPaginaSoort, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek, logEvents, renderOntw, openOntwModal, closeOntwModal, submitOntwItem, _logRegelSleutel, _ontwSleutel, addTaskNote } from "./render-overig.js";
+import { logZin, logTijd, logPaginaSoort, afrondOpmerking, logBewerkbaar, LOG_ZIN_EIGEN, renderTaskHistory, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek, logEvents, renderOntw, openOntwModal, closeOntwModal, submitOntwItem, _logRegelSleutel, _ontwSleutel, addTaskNote } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM, VELD_LABELS } from "./config.js";
 import { maandagVan, isoWeekJaar, weekDagen, weekPeriodeLabel, parseWeekPeriode, weekOpties, weekAfstand } from "./util.js";
 import { ACTIONS } from "./actions.js";
@@ -36,6 +36,7 @@ import { openSnoozeModal, snoozeOpslaan, closeSnoozeModal } from "./snooze.js";
 import { zetInBehandeling, inBehandelingKolom, heeftInBehandeling, volgendeStand } from "./inbehandeling.js";
 import { zoekDubbels, gelijkenis, zitErinVervat, lijktOp, woorden, dubbelVraagTekst, DUBBEL_DREMPEL } from "./dubbelcheck.js";
 import { extraVves, wisExtraVves, voegExtraVveToe, verwijderExtraVve, extraVvesHtml, extraVvesUitleg } from "./meervve.js";
+import { ico } from "./icons.js";
 import { verplaatsTaak, verplaatsWaarden, verlorenVelden, verplaatsVraagTekst, _veldLabel } from "./verplaats.js";
 import { addAannemer, verwijderAannemer, toggleAannemerBinnen, hernoemAannemer, startHernoem, stopHernoem, opgevolgd } from "./offerte-aannemers.js";
 import { zetModalAannemers, modalAannemersCel, modalAannemerBinnen } from "./modal-aannemers.js";
@@ -232,11 +233,103 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   // ── logItemHtml: de dunne (subtiele) regel gebruikt dezelfde zinnengenerator als de volle regel ──
   truthy('logItemHtml subtiel Aangevinkt geeft nette zin', logItemHtml({actie:'Aangevinkt', code:'TEST01', veld:'Notulen', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, false).includes('vinkte'));
   truthy('logItemHtml subtiel Aangevinkt is geen "maakte aan"', !logItemHtml({actie:'Aangevinkt', code:'TEST01', veld:'Notulen', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, false).includes('maakte'));
-  truthy('logItemHtml subtiel gebruikt log-mini', logItemHtml({actie:'Afgerond', code:'TEST01', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, false).includes('log-mini'));
+  truthy('logItemHtml gedempt gebruikt log-r dof', logItemHtml({actie:'Afgerond', code:'TEST01', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, false).includes('class="log-r dof"'));
   truthy('logItemHtml subtiel Afgerond zegt nog "rondde"', logItemHtml({actie:'Afgerond', code:'TEST01', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, false).includes('rondde'));
   truthy('logItemHtml subtiel met acties heeft verwijderknop', logItemHtml({actie:'Afgerond', code:'TEST01', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, true).includes('log-verwijderen'));
-  truthy('logItemHtml stip volgt werkwoordkleur (Uitgevinkt=amber)', logItemHtml({actie:'Uitgevinkt', code:'TEST01', veld:'Notulen', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, false).includes('background:var(--am)'));
-  truthy('logItemHtml stip Verwijderd is rood', logItemHtml({actie:'Verwijderd', code:'TEST01', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, false).includes('background:var(--rd)'));
+  // Sinds de compacte logregel draagt het PICTOGRAM de kleur (geen stip, geen avatar meer); de
+  // kleur komt nog steeds uit dezelfde LOG_KLEUR-tabel, zodat werkwoord en teken niet botsen.
+  truthy('logItemHtml pictogram volgt werkwoordkleur (Uitgevinkt=amber)', /class="log-ic" style="color:var\(--am\)"/.test(logItemHtml({actie:'Uitgevinkt', code:'TEST01', veld:'Notulen', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, false)));
+  truthy('logItemHtml pictogram Verwijderd is rood', /class="log-ic" style="color:var\(--rd\)"/.test(logItemHtml({actie:'Verwijderd', code:'TEST01', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, false)));
+
+  // ── Compacte logregel ── (één regel: pictogram + code + tekst als inhoud + wie/tijd rechts)
+  (() => {
+    const _u='info@vvebeheercollectief.nl', _ts='2026-07-15T12:41:00Z';
+    const wieVan=h=>{ const m=h.match(/<span class="log-wie">([^<]*)<\/span>/); return m?m[1]:null; };
+    // Een notitie: de TEKST is de inhoud, en wie het deed staat rechts — niet ook nog in een zin.
+    const opm=logItemHtml({actie:'Opmerking', code:'TEST01', nieuweWaarde:'Dak lekt bij nr 12', timestamp:_ts, gebruiker:_u, _row:5}, false, true);
+    truthy('compacte regel: de notitie is de inhoud', opm.includes('Dak lekt bij nr 12'));
+    eq('compacte regel: een notitie is niet gedempt', opm.includes('log-r dof'), false);
+    eq('compacte regel: geen avatar meer', opm.includes('log-av'), false);
+    eq('compacte regel: en niet de zin "noteerde"', opm.includes('noteerde'), false);
+    truthy('compacte regel: rechts staat wie · tijd', /·/.test(wieVan(opm)||'') && (wieVan(opm)||'').includes(displayName(_u)));
+    truthy('compacte regel: de code loopt mee in de tekstregel', /class="log-tx"><span class="code/.test(opm));
+    truthy('compacte regel: potlood bij een notitie', opm.includes('log-bewerken'));
+    // Een contactmoment: 'met wie' staat er als voorvoegsel bij, het pictogram volgt de soort.
+    const con=logItemHtml({actie:'Contact', code:'TEST01', veld:'E-mail', oudeWaarde:'Bestuur', nieuweWaarde:'Offerte doorgestuurd', timestamp:_ts, gebruiker:_u, _row:6}, false, false);
+    truthy('compacte regel: contact toont met wie', con.includes('<span class="log-met">Bestuur</span>'));
+    truthy('compacte regel: contact toont de tekst', con.includes('Offerte doorgestuurd'));
+    truthy('compacte regel: E-mail krijgt het envelop-pictogram', con.includes(ico('envelop',13)));
+    // Een afronding MET opmerking (huidig formaat: G = 'Afgerond op <datum> — opmerking'): de
+    // opmerking is de inhoud, de regel is niet gedempt, en er komt GEEN potlood (logEditWrite
+    // schrijft kolom G, en daar staat ook 'Afgerond op <datum>').
+    const af=logItemHtml({actie:'Afgerond', code:'TEST01', veld:'status', oudeWaarde:'Nog Te Doen',
+      nieuweWaarde:'Afgerond op 03-09-2026 — Dak hersteld', timestamp:_ts, gebruiker:_u, _row:7}, true, true);
+    truthy('compacte regel: afrondopmerking is de inhoud', af.includes('Dak hersteld'));
+    eq('compacte regel: en niet de datum-aanloop', af.includes('Afgerond op'), false);
+    eq('compacte regel: afronding mét opmerking is niet gedempt', af.includes('log-r dof'), false);
+    eq('compacte regel: geen potlood op een afronding', af.includes('log-bewerken'), false);
+    truthy('compacte regel: wel de prullenbak', af.includes('log-verwijderen'));
+    // De afrondopmerking komt uit een kale textarea: geen opmaak toepassen.
+    const afSter=logItemHtml({actie:'Afgerond', code:'T', nieuweWaarde:'Afgerond op 03-09-2026 — kosten *incl* btw', timestamp:_ts, gebruiker:_u, _row:8}, true, false);
+    truthy('compacte regel: afrondopmerking houdt zijn sterretjes', afSter.includes('kosten *incl* btw'));
+    // Zonder eigen tekst: gedempt, de zin houdt zijn ONDERWERP, en rechts alleen de tijd —
+    // anders staat de naam er twee keer.
+    const terug=logItemHtml({actie:'Teruggezet', code:'311059', veld:'status', oudeWaarde:'Afgerond', nieuweWaarde:'Nog Te Doen', timestamp:_ts, gebruiker:_u, _row:9}, false, false);
+    truthy('gedempte regel: is dof', terug.includes('class="log-r dof"'));
+    truthy('gedempte regel: de zin houdt zijn onderwerp', terug.includes(`<b>${displayName(_u)}</b>`) && terug.includes('zette'));
+    eq('gedempte regel: rechts alleen de tijd', wieVan(terug), logTijd(_ts));
+    // Bulk-afronding: 'Afgerond op … (bulk)' is GEEN opmerking.
+    const bulk=logItemHtml({actie:'Afgerond', code:'T', nieuweWaarde:'Afgerond op 14-08-2026 (bulk)', timestamp:_ts, gebruiker:_u, _row:10}, true, false);
+    truthy('gedempte regel: bulk-afronding blijft een gedempte zin', bulk.includes('log-r dof') && bulk.includes('rondde'));
+  })();
+
+  // ── Tijdlijn in het bewerkscherm: dezelfde compacte regel ──
+  (() => {
+    const _lb=D.logboek, _u='info@vvebeheercollectief.nl';
+    const body=document.getElementById('hist-body');
+    if(!body){ truthy('hist-body bestaat', false); return; }
+    try{
+      D.logboek=[
+        {actie:'Opmerking', code:'HT01', sectie:'OPPAKKEN', nieuweWaarde:'Bewoner teruggebeld', timestamp:'2026-07-15T12:41:00Z', gebruiker:_u, _row:3},
+        {actie:'Afgerond', code:'HT01', sectie:'OPPAKKEN', veld:'status', oudeWaarde:'Nog Te Doen', nieuweWaarde:'Afgerond op 15-07-2026 — Klaar met de schilder', timestamp:'2026-07-15T12:40:00Z', gebruiker:_u, _row:4},
+        {actie:'Weggelegd', code:'HT01', sectie:'OPPAKKEN', veld:'opvolgdatum', oudeWaarde:'', nieuweWaarde:'24-07-2026', timestamp:'2026-07-15T12:39:00Z', gebruiker:_u, _row:5},
+        {actie:'Bewerkt', code:'HT01', sectie:'OPPAKKEN', veld:'deadline', oudeWaarde:'1-7-2026', nieuweWaarde:'8-7-2026', timestamp:'2026-07-15T12:38:00Z', gebruiker:_u, _row:6},
+      ];
+      renderTaskHistory('HT01','OPPAKKEN');
+      const regels=[...body.querySelectorAll('.log-r')];
+      eq('tijdlijn bewerkscherm: vier compacte regels', regels.length, 4);
+      eq('tijdlijn bewerkscherm: geen oude hist-entry meer', body.querySelectorAll('.hist-entry').length, 0);
+      truthy('tijdlijn bewerkscherm: notitie is de inhoud', regels[0].querySelector('.log-tx').textContent.includes('Bewoner teruggebeld'));
+      truthy('tijdlijn bewerkscherm: notitie toont wie rechts', regels[0].querySelector('.log-wie').textContent.includes(displayName(_u)));
+      eq('tijdlijn bewerkscherm: afrondopmerking is de inhoud', regels[1].querySelector('.log-tx').textContent, 'Klaar met de schilder');
+      truthy('tijdlijn bewerkscherm: weggelegd is een gedempte zin mét onderwerp',
+        regels[2].classList.contains('dof') && regels[2].querySelector('.log-tx').textContent.includes(displayName(_u)+' legde'));
+      eq('tijdlijn bewerkscherm: gedempt → rechts geen naam', regels[2].querySelector('.log-wie').textContent.includes(displayName(_u)), false);
+      eq('tijdlijn bewerkscherm: weggelegd zonder dubbele veldregel', regels[2].querySelector('.hist-veld'), null);
+      truthy('tijdlijn bewerkscherm: default-tak houdt veld: oud → nieuw',
+        (regels[3].querySelector('.hist-veld')||{}).textContent==='deadline: 1-7-2026 → 8-7-2026');
+    } finally { D.logboek=_lb; const fh=document.getElementById('fg-history'); if(fh) fh.style.display='none'; }
+  })();
+
+  // ── afrondOpmerking ── (de opmerking staat achter de eerste ' — ' in kolom G)
+  eq('afrondOpmerking: met opmerking', afrondOpmerking({actie:'Afgerond', nieuweWaarde:'Afgerond op 03-09-2026 — Dak hersteld'}), 'Dak hersteld');
+  eq('afrondOpmerking: een streepje in de opmerking blijft staan', afrondOpmerking({actie:'Afgerond', nieuweWaarde:'Afgerond op 03-09-2026 — a — b'}), 'a — b');
+  eq('afrondOpmerking: zonder opmerking', afrondOpmerking({actie:'Afgerond', nieuweWaarde:'Afgerond op 03-09-2026'}), '');
+  eq('afrondOpmerking: bulk is geen opmerking', afrondOpmerking({actie:'Afgerond', nieuweWaarde:'Afgerond op 14-08-2026 (bulk)'}), '');
+  eq('afrondOpmerking: alleen voor Afgerond', afrondOpmerking({actie:'Opmerking', nieuweWaarde:'x — y'}), '');
+  eq('afrondOpmerking: lege regel', afrondOpmerking(null), '');
+  eq('logBewerkbaar: notitie', logBewerkbaar({actie:'Opmerking'}), true);
+  eq('logBewerkbaar: contact', logBewerkbaar({actie:'Contact'}), true);
+  eq('logBewerkbaar: afronding niet', logBewerkbaar({actie:'Afgerond'}), false);
+
+  // ── logZin zonderNaam ── (voor een plek die WIE al apart toont)
+  truthy('logZin zonderNaam laat de naam weg', !logZin({actie:'Teruggezet', code:'T', gebruiker:'info@vvebeheercollectief.nl'}, {zonderNaam:true}).includes('<b>'));
+  truthy('logZin zonderNaam houdt het werkwoord', logZin({actie:'Teruggezet', code:'T', gebruiker:'info@vvebeheercollectief.nl'}, {zonderNaam:true}).includes('zette'));
+  eq('logZin zonderNaam in de default-tak', logZin({actie:'Iets', code:'', gebruiker:'x'}, {zonderNaam:true, zonderCode:true}), 'Iets');
+  // LOG_ZIN_EIGEN moet gelijk lopen met de cases in logZin: geen van die acties mag in de
+  // default-tak vallen (die herken je aan '— <actie>').
+  truthy('LOG_ZIN_EIGEN: elke actie heeft een eigen zin',
+    [...LOG_ZIN_EIGEN].every(a=>!logZin({actie:a, code:'T', gebruiker:'x', veld:'v'}).includes('— '+a)));
 
   // ── logPaginaSoort ── (welke logregels horen op de Logboek-pagina: notities/contact=normaal, afgerond/aangemaakt=subtiel, rest=ruis)
   eq('logPaginaSoort Opmerking → normaal', logPaginaSoort('Opmerking'), 'normaal');
@@ -893,8 +986,8 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     {actie:'Contact', code:'TST', veld:'Telefoon', oudeWaarde:'Bestuur', nieuweWaarde:'Gebeld over de ALV', timestamp:'2026-07-15T10:24:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:2},
     {actie:'Aangevinkt', code:'TST', veld:'Notulen', timestamp:'2026-07-15T09:00:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:3},
   ];
-  truthy('dossierFeed: contact is een volle regel', dossierFeed(_dosMix).includes('log-item'));
-  truthy('dossierFeed: aangevinkt is een dunne regel', dossierFeed(_dosMix).includes('log-mini'));
+  truthy('dossierFeed: contact is een volwaardige regel', /class="log-r"/.test(dossierFeed(_dosMix)));
+  truthy('dossierFeed: aangevinkt is een gedempte regel', /class="log-r dof"/.test(dossierFeed(_dosMix)));
   truthy('dossierFeed: aangevinkt toont nette zin', dossierFeed(_dosMix).includes('vinkte'));
   truthy('dossierFeed: code-chip is weg in het dossier', !dossierFeed(_dosMix).includes('data-action="vve-open"'));
   truthy('dossierFeed: dunne regel behoudt verwijderknop', dossierFeed(_dosMix).includes('log-verwijderen'));

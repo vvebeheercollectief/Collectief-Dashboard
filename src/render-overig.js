@@ -323,15 +323,19 @@ const logKleur=a=>LOG_KLEUR[a]||'var(--pu)';
 
 // Eén zinnengenerator voor alle logregels (gedeeld door Logboek-pagina en VvE-dossier).
 // opts.zonderCode → laat de VvE-code weg; in een dossier is die redundant.
+// opts.zonderNaam → laat het onderwerp weg, voor een plek die WIE al apart toont. De compacte
+// logregel (logItemHtml) doet dat bewust niet: een gedempte regel zonder eigen tekst houdt zijn
+// onderwerp ('Jer zette 311059 terug'), want 'zette 311059 terug' leest als een zin zonder kop.
 function logZin(r, opts){
   const zonderCode=!!(opts&&opts.zonderCode);
+  const zonderNaam=!!(opts&&opts.zonderNaam);
   const naam=esc(displayName(r.gebruiker)||'Iemand');
   const chip=vveCodeSpan(r.code, '--sec:var(--ac);--sec-l:var(--ac-l)');
   // "… bij 121027" → in het dossier gewoon niets; anders blijft "bij" bungelen.
   const bij=zonderCode?'':' bij '+chip;
   const staart=zonderCode?'':' '+chip;   // default-geval: chip los achter de ruwe actienaam
   const kleur=logKleur(r.actie);
-  const A=verb=>`<b>${naam}</b> <span class="log-act" style="color:${kleur}">${verb}</span> `;
+  const A=verb=>`${zonderNaam?'':`<b>${naam}</b> `}<span class="log-act" style="color:${kleur}">${verb}</span> `;
   switch(r.actie){
     case'Afgerond':            return A('rondde')+(zonderCode?'een taak':chip)+' af';
     case'Verwijderd':          return A('verwijderde')+'een taak'+bij;
@@ -355,9 +359,18 @@ function logZin(r, opts){
     case'Opvolgdatum teruggezet':return A('zette')+'de opvolgdatum'+bij+' terug'+(r.nieuweWaarde?` naar <b>${esc(r.nieuweWaarde)}</b>`:'');
     case'Fase gewijzigd':      return A('zette')+(zonderCode?(r.sectie==='CRM'?'de vraag':'het subsidietraject'):chip)+` op <b>${esc(r.nieuweWaarde||'—')}</b>`+(r.oudeWaarde?` <span style="color:var(--mut)">(was ${esc(r.oudeWaarde)})</span>`:'');
     case'Auto-prioriteit':     return A('paste')+'de prioriteit automatisch aan'+(r.nieuweWaarde?` <span style="color:var(--mut)">· ${esc(r.nieuweWaarde)}</span>`:'');
-    default:                   return `<b>${naam}</b> — ${esc(r.actie||'')}`+staart;
+    default:                   return zonderNaam ? esc(r.actie||'')+staart
+                                                  : `<b>${naam}</b> — ${esc(r.actie||'')}`+staart;
   }
 }
+
+// De acties waarvoor logZin een eigen zin heeft (alles behalve de default-tak). Die zin noemt de
+// nieuwe waarde zelf al ('legde 311059 weg tot 24-07-2026'), dus de tijdlijn in het bewerkscherm
+// hoeft er dan geen 'veld: oud → nieuw' meer onder te zetten. LET OP: gelijk houden met de cases
+// in logZin — een toets loopt deze lijst langs en eist dat geen ervan in de default-tak valt.
+const LOG_ZIN_EIGEN=new Set(['Afgerond','Verwijderd','Teruggezet','Opmerking','Behandelaar gewijzigd',
+  'Aangemaakt','Aangemaakt (sheet)','Contact','Aangevinkt','Uitgevinkt','Kenmerk','Weggelegd',
+  'Opvolgdatum gewist','Opgevolgd','Opvolgdatum teruggezet','Fase gewijzigd','Auto-prioriteit']);
 
 function logTijd(iso){
   const d=new Date(iso);
@@ -379,41 +392,101 @@ function logPaginaSoort(actie){
   return null;
 }
 
+// De opmerking die bij een afronding is meegegeven, of '' als er geen is.
+//
+// crud.js schrijft een afronding als F='Nog Te Doen', G='Afgerond op <datum>[ — opmerking]'; een
+// bulk-afronding als 'Afgerond op <datum> (bulk)', zonder opmerking. De opmerking staat dus
+// achter de EERSTE ' — ' in kolom G. Bewust die exacte splitsing en geen datum-regex om het begin
+// weg te knippen: 'Afgerond op 14-08-2026 (bulk)' zou daar als 'opmerking' doorheen glippen.
+export function afrondOpmerking(r){
+  if(!r || (r.actie||'').trim()!=='Afgerond') return '';
+  const t=String(r.nieuweWaarde||'').trim(), i=t.indexOf(' — ');
+  return i<0 ? '' : t.slice(i+3).trim();
+}
+
+// Mag deze logregel BEWERKT worden? Los van 'hoe prominent staat hij er': een afronding mét
+// opmerking wordt in de compacte regel volwaardig getoond (de opmerking is de inhoud), maar
+// `logEditWrite` schrijft voor alles behalve Contact alleen kolom G — en daar staat bij een
+// afronding ook 'Afgerond op <datum>'. Een potlood zou die datum stil overschrijven.
+export function logBewerkbaar(r){
+  const a=((r&&r.actie)||'').trim();
+  return a==='Opmerking'||a==='Contact';
+}
+
+// Het pictogram vóór een logregel. Het zegt WAT er gebeurde, zodat de zin dat niet meer hoeft:
+// in de compacte regel is de TEKST de inhoud en het pictogram de categorie. De kleur komt uit
+// dezelfde LOG_KLEUR-tabel als het werkwoord in logZin, zodat teken en zin elkaar nooit
+// tegenspreken.
+const LOG_ICOON={Afgerond:'vinkCirkel', Opmerking:'chat', Teruggezet:'ongedaan',
+                 Verwijderd:'prullenbak', Aangemaakt:'plus', 'Aangemaakt (sheet)':'plus',
+                 Weggelegd:'pauze', Kenmerk:'label'};
+const CONTACT_ICOON={Telefoon:'telefoon','E-mail':'envelop', Gesprek:'gesprek', Notitie:'chat'};
+function logIcoon(r){
+  const a=(r&&r.actie||'').trim();
+  if(a==='Contact') return CONTACT_ICOON[(r.veld||'').trim()]||'telefoon';
+  return LOG_ICOON[a]||'cirkelOpen';
+}
+
+// De eigen tekst van een logregel: de notitie of het contactverslag, of de opmerking bij een
+// afronding. '' = deze regel heeft geen eigen tekst en wordt een gedempte zin.
+function logEigenTekst(r){
+  const a=((r&&r.actie)||'').trim();
+  return (a==='Opmerking'||a==='Contact') ? String(r.nieuweWaarde||'').trim() : afrondOpmerking(r);
+}
+
+// Eigen tekst als HTML. Notitie en contact komen uit een veld MÉT opmaakbalk; de afrondopmerking
+// komt uit een kale textarea (#complete-comment) en mag dus niet door opmaakHtml — anders verliest
+// 'kosten *inclusief* btw' zijn sterretjes en wordt 'dak hersteld\n- factuur door' een opsomming.
+// Die gaat als esc() + pre-wrap (.log-tx).
+function logEigenHtml(r, eigen){
+  const a=((r&&r.actie)||'').trim();
+  return (a==='Opmerking'||a==='Contact') ? opmaakHtml(eigen) : esc(eigen);
+}
+
 // Eén logregel als HTML (gedeeld door Logboek-pagina en VvE-dossier).
-// subtiel=true → gedempte dunne regel voor automatische acties.
-// opts.zonderCode → geef door aan logZin (dossier: code is redundant).
+// subtiel=true → gedempte regel voor automatische acties (zie logPaginaSoort).
+// opts.zonderCode → geen VvE-code; in een dossier is die redundant.
+//
+// ÉÉN COMPACTE REGEL (~30px; was een blok van ~64px: avatar van 32px, de zin 'Jer rondde 311199
+// af', en de notitie daar nog eens onder). Nu is de TEKST de inhoud, zegt het pictogram wat er
+// gebeurde en staat wie het deed rechts op dezelfde regel.
+//   · MET eigen tekst (notitie, contact, afronding mét opmerking): pictogram + code + tekst, en
+//     rechts 'naam · tijd'.
+//   · ZONDER eigen tekst: de zin zelf is de inhoud, gedempt — mét onderwerp ('Jer zette 311059
+//     terug'), en rechts alleen de tijd. Zo staat de naam er nooit twee keer.
+// Wélke regels er staan beslissen logPaginaSoort en de aanroepers; dit bepaalt alleen de vorm.
 function logItemHtml(r,subtiel,acties,opts){
   // Optimistische regels (_row<=0: net toegevoegd, nog niet terug uit de Sheet) hebben
   // geen echt rijnummer — bewerk-/verwijderknoppen zouden niets (of het verkeerde) doen.
   // Na de stille resync krijgt de regel z'n echte _row en verschijnen de knoppen alsnog.
   const magActies=!!acties&&r._row>0;
-  if(subtiel){
-    const kleur=logKleur(r.actie);
-    const acts=magActies?`<span class="log-acts"><button class="log-act-btn del" data-action="log-verwijderen" data-row="${r._row}" title="Verwijderen" aria-label="Regel verwijderen">${ico('prullenbak')}</button></span>`:'';
-    return `<div class="log-mini">
-      <span class="log-mini-dot" style="background:${kleur}"></span>
-      <span class="log-mini-txt">${logZin(r,opts)}</span>
-      <span class="log-time">${esc(logTijd(r.timestamp))}</span>
-      ${acts}
-    </div>`;
+  // Een gedempte regel krijgt nooit een potlood — ook niet als het een notitie is die er
+  // onverhoopt als subtiel binnenkomt. Dat was het gedrag van de oude dunne regel, en zo blijft het.
+  const magBewerken=magActies&&!subtiel&&logBewerkbaar(r);
+  if(magBewerken && state.logEdit===r._row) return logEditForm(r);
+  const zonderCode=!!(opts&&opts.zonderCode);
+  const eigen=logEigenTekst(r);
+  let inhoud, dof=!!subtiel;
+  if(eigen){
+    const chip=zonderCode?'':vveCodeSpan(r.code,'--sec:var(--ac);--sec-l:var(--ac-l)');
+    // Bij een contactmoment zegt 'met wie' iets wat niet in de tekst zelf staat.
+    const met=r.actie==='Contact'&&r.oudeWaarde ? `<span class="log-met">${esc(r.oudeWaarde)}</span>` : '';
+    inhoud=`${chip}${met}${logEigenHtml(r,eigen)}`;
+    dof=false;
+  } else {
+    inhoud=logZin(r,opts);
+    dof=true;
   }
-  if(magActies && state.logEdit===r._row) return logEditForm(r);
-  let extra='';
-  if((r.actie==='Behandelaar gewijzigd'||r.actie==='Kenmerk') && r.veld && (r.oudeWaarde||r.nieuweWaarde)){
-    extra=`<div class="log-change"><span class="old">${esc(r.oudeWaarde||'—')}</span><span class="arr">→</span><span class="new">${esc(r.nieuweWaarde||'—')}</span></div>`;
-  }
-  if((r.actie==='Opmerking'||r.actie==='Contact') && r.nieuweWaarde){
-    extra=`<div class="log-note">${opmaakHtml(r.nieuweWaarde)}</div>`;
-  }
-  const init=(displayName(r.gebruiker)||'?').charAt(0).toUpperCase();
+  const rechts=dof ? esc(logTijd(r.timestamp))
+                   : `${esc(displayName(r.gebruiker)||'?')} · ${esc(logTijd(r.timestamp))}`;
   const acts=magActies?`<span class="log-acts">
-    <button class="log-act-btn" data-action="log-bewerken" data-row="${r._row}" title="Bewerken" aria-label="Regel bewerken">${ico('potlood')}</button>
+    ${magBewerken?`<button class="log-act-btn" data-action="log-bewerken" data-row="${r._row}" title="Bewerken" aria-label="Regel bewerken">${ico('potlood')}</button>`:''}
     <button class="log-act-btn del" data-action="log-verwijderen" data-row="${r._row}" title="Verwijderen" aria-label="Regel verwijderen">${ico('prullenbak')}</button>
   </span>`:'';
-  return `<div class="log-item">
-    <span class="log-av" style="background:${avatarKleur(displayName(r.gebruiker))}">${esc(init)}</span>
-    <div class="log-body"><div class="log-line">${logZin(r,opts)}</div>${extra}</div>
-    <span class="log-time">${esc(logTijd(r.timestamp))}</span>
+  return `<div class="log-r${dof?' dof':''}">
+    <span class="log-ic" style="color:${logKleur(r.actie)}" aria-hidden="true">${ico(logIcoon(r),13)}</span>
+    <div class="log-tx">${inhoud}</div>
+    <span class="log-wie">${rechts}</span>
     ${acts}
   </div>`;
 }
@@ -762,15 +835,30 @@ function renderTaskHistory(code,sec){
   if(!entries.length){
     body.innerHTML='<div style="color:var(--mut);font-size:12px;padding:4px 0 8px">Nog geen notities — wees de eerste die iets vastlegt.</div>';
   } else {
-    body.innerHTML=entries.slice(0,50).map(r=>`<div class="hist-entry">
-      <div class="hist-ts">${esc(fmtLogTs(r.timestamp))}</div>
-      <div class="hist-detail">
-        ${actieBadge(r.actie)}
-        <span style="margin-left:6px;color:var(--mut)">${esc(displayName(r.gebruiker))}</span>
-        ${r.veld?`<div class="hist-change">${esc(r.veld)}: ${esc(r.oudeWaarde)} → ${esc(r.nieuweWaarde)}</div>`:''}
-        ${r.actie==='Opmerking'&&r.nieuweWaarde?`<div class="log-note">${opmaakHtml(r.nieuweWaarde)}</div>`:''}
-      </div>
-    </div>`).join('');
+    // Dezelfde compacte vorm als de logboekpagina en het dossier (logItemHtml): het pictogram zegt
+    // wat er gebeurde, de TEKST is de inhoud, en wie het deed staat rechts. Een regel zonder eigen
+    // tekst is een gedempte zin mét onderwerp, met rechts alleen het moment. De losse badge met de
+    // naam eronder is weg — die zei twee keer hetzelfde en kostte drie regels hoogte.
+    // Anders dan op de logboekpagina staat hier ÁLLES van deze taak (ook 'Bewerkt' met zijn
+    // veld: oud → nieuw); welke regels dat zijn verandert hier niet.
+    body.innerHTML=entries.slice(0,50).map(r=>{
+      const eigen=logEigenTekst(r);
+      // 'veld: oud → nieuw' alleen waar de zin het zelf niet zegt — de default-tak van logZin
+      // ('Jer — Bewerkt'). Bij 'Jer legde een taak weg tot 24-07' zou dezelfde datum er twee keer
+      // staan, en bij afronden zou 'status: Nog Te Doen → Afgerond op …' de compacte regel weer
+      // een blok maken.
+      const veldRegel=(!eigen && r.veld && (r.oudeWaarde||r.nieuweWaarde) && !LOG_ZIN_EIGEN.has((r.actie||'').trim()))
+        ? `<span class="hist-veld">${esc(r.veld)}: ${esc(r.oudeWaarde||'—')} → ${esc(r.nieuweWaarde||'—')}</span>` : '';
+      const met=eigen && r.actie==='Contact' && r.oudeWaarde ? `<span class="log-met">${esc(r.oudeWaarde)}</span>` : '';
+      const tekst=eigen ? met+logEigenHtml(r,eigen) : veldRegel+logZin(r,{zonderCode:true});
+      const rechts=eigen ? `${esc(displayName(r.gebruiker)||'?')} · ${esc(fmtLogTs(r.timestamp))}`
+                         : esc(fmtLogTs(r.timestamp));
+      return `<div class="log-r${eigen?'':' dof'}">
+        <span class="log-ic" style="color:${logKleur(r.actie)}" aria-hidden="true">${ico(logIcoon(r),13)}</span>
+        <div class="log-tx">${tekst}</div>
+        <span class="log-wie">${rechts}</span>
+      </div>`;
+    }).join('');
   }
 }
 
@@ -840,7 +928,7 @@ async function logEvents(regels) {
 export {
   ONTW_CATS, ONTW_CAT_COLORS, parseOntw, renderOntw, setOntw, openOntwModal, closeOntwModal,
   submitOntwItem, deleteOntwItem, editOntwItem, parseLogboek, _logSleutel, _logRegelSleutel, _ontwSleutel, _nogNietBevestigd, fmtLogTs, actieBadge, _LOG_AVKLEUR, avatarKleur,
-  logDayLabel, logZin, logTijd, logItemHtml, logPaginaSoort, renderLogboek, histNoteKey, renderTaskHistory, addTaskNote, logEvent, logEvents,
+  logDayLabel, logZin, logTijd, logItemHtml, logPaginaSoort, LOG_ZIN_EIGEN, renderLogboek, histNoteKey, renderTaskHistory, addTaskNote, logEvent, logEvents,
   _shiftRows, _shiftLogboekRows, _shiftLogEditRef, _herankerLogEdit, logEditWrite, logDeleteLabel,
   logEditForm, editLogboek, saveLogboek, cancelLogboek, setLogSoort, deleteLogboek, undoDeleteLog,
 };

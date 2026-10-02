@@ -26,6 +26,16 @@ function cd_crmReactieGegeven(sec, fase) {
   return f === 'wacht op reactie' || f === 'beantwoord';
 }
 
+// Offerte-trajecten: zodra 'Datum aangevraagd' (kolom C) als datum leesbaar is, is kolom F geen
+// aanvraag-deadline meer maar een OPVOLGDATUM. Het scherm toont hem dan amber als 'opvolgen' en telt
+// de rij nooit als 'te laat'. De briefing zei intussen '1 te laat' en de uurlijkse controle stuurde
+// 'Deadline nadert'-pushes over een datum die in beeld geen deadline is (naloop 2026-10-02).
+// LET OP — SYNC met offerteAangevraagd + teLaatVoorTelling in src/util.js. Sheets geeft hier voor
+// een datumcel een Date en het scherm de opgemaakte tekst; cd_parseDate leest beide.
+function cd_offerteAangevraagd(sec, datumAangevraagd) {
+  return sec === 'OFFERTE-TRAJECTEN' && !!cd_parseDate(datumAangevraagd);
+}
+
 function cd_opvolgingMotor() {
   cd_lockedRun('cd_opvolgingMotor', function () {
     cd_safeRun('cd_hr_zetTakenKlaar',       cd_hr_zetTakenKlaar);

@@ -272,6 +272,7 @@ function cd_checkDeadlines() {
         const dlVal = data[i][DEADLINE_COL[curSec]];
         if (!code || !dlVal) continue;
         if (cd_crmReactieGegeven(curSec, data[i][3])) continue;   // CRM: reactie al gegeven (Opvolging.gs)
+        if (cd_offerteAangevraagd(curSec, data[i][2])) continue;  // offerte aangevraagd: F is een opvolgdatum (SYNC, Opvolging.gs)
 
         let dl = cd_parseDate(dlVal);
         if (!dl) continue;
@@ -370,11 +371,13 @@ function cd_dailySummary() {
       const ib = ((data[i][7] || '') + '').toString().toUpperCase() === 'TRUE';
       const sec = curSec;
       const reactieGegeven = cd_crmReactieGegeven(sec, data[i][3]);   // CRM: niet te laat, niet stil
+      // Aangevraagd offerte-traject: F is een opvolgdatum, nooit 'te laat' (SYNC teLaatVoorTelling).
+      const aangevraagd = cd_offerteAangevraagd(sec, data[i][2]);
       cd_splitBehandelaar(beh).forEach(name => {
         if (!perPerson[name]) perPerson[name] = { secs:{}, telaat:0, opvolgen:0, stil:0 };
         const p = perPerson[name];
         p.secs[sec] = (p.secs[sec] || 0) + 1;
-        if (!weggelegd && !reactieGegeven && dl && dl.getTime() < today.getTime()) p.telaat++;
+        if (!weggelegd && !reactieGegeven && !aangevraagd && dl && dl.getTime() < today.getTime()) p.telaat++;
         if (opvolg && opvolg.getTime() <= today.getTime()) p.opvolgen++;
         const regels = CD_STIL_ESCALATIE_REGELS[sec];
         // CRM telt ook zonder 'In behandeling': een vraag waar niemand aan zit is juist de stille.
@@ -441,21 +444,38 @@ function cd_splitBehandelaar(s) {
 var CD_MAANDEN = { jan:1,feb:2,mrt:3,maa:3,apr:4,mei:5,jun:6,jul:7,aug:8,sep:9,sept:9,okt:10,nov:11,dec:12,
   januari:1,februari:2,maart:3,april:4,juni:6,juli:7,augustus:8,september:9,oktober:10,november:11,december:12 };
 
+// LET OP — SYNC: letterlijk dezelfde regels als _valDate + _parseAnyDate in src/util.js. Het enige
+// verschil is de uitvoer: hier een Date (lokale middernacht), daar {y,m,d}.
+// Tot 2026-10-02 was deze kant ruimer dan het scherm, op twee punten:
+//  1. GEEN round-trip-controle: '31-02-2026' werd stil 3 maart, terwijl het scherm hem als
+//     onleesbaar liet staan. De briefing telde dan een taak als 'te laat' die in beeld geen
+//     deadline had.
+//  2. Een TERUGVAL op new Date(s): '2026-06-21' werd UTC-middernacht (in de zomer 02:00 lokaal, dus
+//     geen 'kale datum' meer voor het einde-dag-anker in cd_checkDeadlines), en allerlei losse tekst
+//     ('46000', 'Q3 2026') werd een geldige datum in een ander millennium.
+// Echte Date-objecten (Sheets geeft die voor een datumcel) blijven ongewijzigd door; het scherm
+// krijgt dezelfde cel als opgemaakte tekst en leest die met dezelfde regels hieronder.
+function cd_valDate(y, mn, d) {
+  const dt = new Date(y, mn - 1, d);
+  return (dt.getFullYear() === y && dt.getMonth() === mn - 1 && dt.getDate() === d) ? dt : null;
+}
 function cd_parseDate(v) {
   if (!v) return null;
-  if (v instanceof Date) return v;
+  if (v instanceof Date) return isNaN(v.getTime()) ? null : v;
   const s = v.toString().trim();
-  // dd-mm-yyyy / dd/mm/yyyy
-  let m = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/);
-  if (m) return new Date(+m[3], +m[2] - 1, +m[1]);
-  // "21 mei 2026" / "3 jan. 2025" / "21 mei '26"
-  m = s.match(/^(\d{1,2})\s+([a-zA-Z]+)\.?\s+'?(\d{2,4})$/);
-  if (m) { const mn = CD_MAANDEN[m[2].toLowerCase()]; if (mn) { let y = +m[3]; if (y < 100) y += 2000; return new Date(y, mn - 1, +m[1]); } }
-  const d = new Date(s);
-  return isNaN(d) ? null : d;
+  // yyyy-mm-dd of yyyy-mm-ddT... (ISO, met of zonder tijdgedeelte — het tijdgedeelte telt niet)
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(T.*)?$/);
+  if (m) return cd_valDate(+m[1], +m[2], +m[3]);
+  // dd-mm-yyyy / dd/mm/yyyy / dd-mm-yy (2-cijferig jaar → 20xx). Precies twee óf vier cijfers.
+  m = s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{2}|[1-9]\d{3})$/);
+  if (m) { let y = +m[3]; if (y < 100) y += 2000; return cd_valDate(y, +m[2], +m[1]); }
+  // "21 mei 2026" / "3 jan. 2025" / "21 mei '26" — zelfde jaarregel als hierboven
+  m = s.match(/^(\d{1,2})\s+([a-zA-Z]+)\.?\s+'?(\d{2}|[1-9]\d{3})$/);
+  if (m) { const mn = CD_MAANDEN[m[2].toLowerCase()]; if (mn) { let y = +m[3]; if (y < 100) y += 2000; return cd_valDate(y, mn, +m[1]); } }
+  return null;
 }
 
-// Handmatig draaibaar in de editor: controleert de maandnaam-parsing.
+// Handmatig draaibaar in de editor: controleert de parsing (null = moet onleesbaar zijn).
 function test_cd_parseDate() {
   const cases = [
     ['21 mei 2026',  2026, 4, 21],
@@ -463,10 +483,17 @@ function test_cd_parseDate() {
     ['1 december 2026', 2026, 11, 1],
     ['01-06-2026',   2026, 5, 1],
     ['2026-06-21',   2026, 5, 21],
+    ['2026-06-21T23:30:00.000Z', 2026, 5, 21],
+    ['5-9-26',       2026, 8, 5],
+    ['31-02-2026',   null],
+    ['15-09-202',    null],
+    ['46000',        null],
+    ['2-10-2026 14:33:12', null],
   ];
   cases.forEach(function (t) {
     const d = cd_parseDate(t[0]);
-    const ok = d && d.getFullYear() === t[1] && d.getMonth() === t[2] && d.getDate() === t[3];
+    const ok = (t[1] === null) ? d === null
+      : !!(d && d.getFullYear() === t[1] && d.getMonth() === t[2] && d.getDate() === t[3]);
     Logger.log((ok ? 'OK   ' : 'FAIL ') + t[0] + ' → ' + (d ? d.toDateString() : 'null'));
   });
 }

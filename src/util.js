@@ -1061,5 +1061,16 @@ export {
 export function voortgang(status, tekst){
   const s=String(status||'');
   const k={Open:'open',Klaargezet:'klaargezet',Gepland:'gepland',Afgerond:'afgerond'}[s]||'open';
-  return`<span class="voortgang vg-${k}">${esc(tekst==null?s:tekst)}</span>`;
+  return`<span class="voortgang vg-${k}">${VG_SVG[k]}${esc(tekst==null?s:tekst)}</span>`;
 }
+// Getekend als SVG (v14.2) i.p.v. CSS: de conic-gradient-taart rafelde op 14px en 'Afgerond' (ring
+// met losse stip) leek op een keuzerondje. Nu: ring, ring + taartpunt van ⅓ of ⅔, of een vol rondje
+// met vinkje — dezelfde vorm als de gevinkte stappen ernaast. Kleur via currentColor (zie .vg-*).
+const _VG_RING='<circle cx="8" cy="8" r="6.75" fill="none" stroke="currentColor" stroke-width="1.5"/>';
+const _vgSvg=binnen=>`<svg class="vg-ico" viewBox="0 0 16 16" aria-hidden="true">${binnen}</svg>`;
+const VG_SVG={
+  open:_vgSvg(_VG_RING),
+  klaargezet:_vgSvg(_VG_RING+'<path d="M8 8V4A4 4 0 0 1 11.46 10Z" fill="currentColor"/>'),
+  gepland:_vgSvg(_VG_RING+'<path d="M8 8V4A4 4 0 1 1 4.54 10Z" fill="currentColor"/>'),
+  afgerond:_vgSvg('<circle cx="8" cy="8" r="7.5" fill="currentColor"/><path d="M5 8.3l2.1 2 3.9-4.1" fill="none" stroke="var(--sur)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>'),
+};

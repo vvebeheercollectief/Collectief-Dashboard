@@ -626,20 +626,17 @@
        hoofdletters vragen 4,5:1. Vandaar per thema een eigen waarde, zoals bij de pillen. */
     .grp-kop{background:var(--group-bg);padding:9px 26px;font-size:12px;font-weight:600;color:#66707e;text-transform:uppercase;letter-spacing:.04em;border:none}
     [data-theme=dark] .grp-kop{color:#808a98}
-    /* Voortgangsrondje (v13.8) — ALV-status, het dossier en Ontwikkeling. Eén vorm die vult per
-       stap: leeg (Open), een derde accent (Klaargezet), twee derde amber (Gepland), vol groen
-       (Afgerond). Vervangt vier gekleurde pillen met elk een icoon: dezelfde informatie in één
-       oogopslag, zonder vlakken. De taartpunt is een conic-gradient binnen een witte ring
-       (padding + background-clip), zodat hij ook op 14px nog als 'vullend' leest. */
+    /* Voortgangsrondje (v13.8, SVG sinds v14.2) — ALV-status, het dossier en Ontwikkeling. Eén vorm
+       die vult per stap: lege ring (Open), ring + ⅓ accent (Klaargezet), ring + ⅔ amber (Gepland),
+       vol groen rondje met vinkje (Afgerond). De vormen zelf staan in voortgang() (util.js). */
     .voortgang{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:500;color:var(--txt);white-space:nowrap}
-    .voortgang::before{content:'';flex:none;width:14px;height:14px;box-sizing:border-box;border-radius:50%;
-      border:1.5px solid var(--vg);padding:1.5px;background:conic-gradient(var(--vg) var(--vg-vul),transparent 0) content-box}
-    .vg-open{--vg:var(--fnt);--vg-vul:0%}
-    .vg-klaargezet{--vg:var(--ac);--vg-vul:34%}
-    .vg-gepland{--vg:var(--am);--vg-vul:67%}
-    .vg-afgerond{--vg:var(--gn);--vg-vul:100%;color:var(--mut)}
+    .vg-ico{flex:none;width:14px;height:14px;display:block;color:var(--vg);shape-rendering:geometricPrecision}
+    .vg-open{--vg:var(--fnt)}
+    .vg-klaargezet{--vg:var(--ac)}
+    .vg-gepland{--vg:var(--am)}
+    .vg-afgerond{--vg:var(--gn);color:var(--mut)}
     .stat-cap .voortgang{font-size:inherit;font-weight:inherit;color:inherit;gap:6px}
-    .stat-cap .voortgang::before{width:12px;height:12px}
+    .stat-cap .vg-ico{width:12px;height:12px}
     /* Budgetpakket: gewone gedempte tekst achter de naam, geen label. */
     .badge.budget-tag{background:none;padding:0;color:var(--mut);font-weight:400;font-size:12px;margin-left:8px;vertical-align:baseline}
     /* Behandelaar-chip — Operator: één neutrale chip */

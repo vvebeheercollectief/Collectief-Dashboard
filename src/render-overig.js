@@ -22,7 +22,6 @@ import { opmaakHtml, opmaakBalk } from "./opmaak.js";
 //  ONTWIKKELING
 // ══════════════════════════════════════
 const ONTW_CATS=['Opmerkingen','Verbeteringen','Vragen aan Cihan','Ideeën'];
-const ONTW_CAT_COLORS={'Opmerkingen':'var(--ac)','Verbeteringen':'var(--gn)','Vragen aan Cihan':'var(--am)','Ideeën':'var(--ac)'};
 
 function parseOntw(rows){
   if(!rows||rows.length<2) return [];
@@ -83,10 +82,9 @@ function renderOntw(){
   if(!sl.length){el.innerHTML=`<tr><td colspan="7">${emptyRow(7,true,!!q)}</td></tr>`;renderPag('ontw-pag',rows.length,pgs.ontw,'ontw');return}
   el.innerHTML=sl.map(r=>{
     const rid=state._rowCache.length;state._rowCache.push(Object.assign({},r,{_sec:'ONTW'}));
-    const clr=ONTW_CAT_COLORS[r.categorie]||'var(--mut)';
     return`<tr data-row="${r._row}">
       <td class="cell-name">${esc(r.titel)}</td>
-      <td><span class="badge" style="background:color-mix(in srgb,${clr} 15%,transparent);color:${clr}">${esc(r.categorie)}</span></td>
+      <td class="cell-note">${esc(r.categorie)}</td>
       <td class="cell-txt">${r.inhoud?`<span style="font-size:12px">${esc(r.inhoud.substring(0,80))}${r.inhoud.length>80?'…':''}</span>`:''}</td>
       <td>${persBadges(r.door)}</td>
       <td class="cell-sm">${esc(r.datum)}</td>
@@ -316,10 +314,15 @@ function logDayLabel(iso){
   return s.charAt(0).toUpperCase()+s.slice(1);
 }
 
-// Eén kleurbron per logboek-actie: het werkwoord in de zin én de stip van de dunne
-// regel gebruiken dezelfde kleur, zodat ze elkaar nooit tegenspreken.
+// Kleur in het logboek (v13.9, afwerking): bijna niets. Tot v13.8 kreeg elke actie een eigen kleur
+// voor werkwoord én pictogram (groen afgerond, amber opmerking, leiblauw aangemaakt …) — een feed
+// van veertig regels werd daardoor een kleurenwaaier. Nu zijn pictogrammen grijs en werkwoorden
+// gewone tekst; alleen 'Verwijderd' blijft rood (dat is een waarschuwing) en de automatische
+// prioriteit blijft gedempt (dat is geen mensenwerk). De tabel hieronder is de oude indeling en
+// bepaalt nog alleen wélke acties onder 'waarschuwing' vallen — zie logKleur/werkwoordKleur.
 const LOG_KLEUR={Afgerond:'var(--gn)',Aangevinkt:'var(--gn)',Uitgevinkt:'var(--am)',Teruggezet:'var(--am)',Opmerking:'var(--am)',Verwijderd:'var(--rd)','Behandelaar gewijzigd':'var(--ac)',Contact:'var(--ac)',Aangemaakt:'var(--ac)','Aangemaakt (sheet)':'var(--ac)',Kenmerk:'var(--ac)',Weggelegd:'var(--am)','Opvolgdatum gewist':'var(--am)','Auto-prioriteit':'var(--mut)',Opgevolgd:'var(--ac)','Opvolgdatum teruggezet':'var(--am)'};
-const logKleur=a=>LOG_KLEUR[a]||'var(--ac)';
+const logKleur=a=>LOG_KLEUR[a]==='var(--rd)'?'var(--rd)':'var(--fnt)';
+const werkwoordKleur=a=>LOG_KLEUR[a]==='var(--rd)'||LOG_KLEUR[a]==='var(--mut)'?LOG_KLEUR[a]:'';
 
 // Eén zinnengenerator voor alle logregels (gedeeld door Logboek-pagina en VvE-dossier).
 // opts.zonderCode → laat de VvE-code weg; in een dossier is die redundant.
@@ -334,8 +337,8 @@ function logZin(r, opts){
   // "… bij 121027" → in het dossier gewoon niets; anders blijft "bij" bungelen.
   const bij=zonderCode?'':' bij '+chip;
   const staart=zonderCode?'':' '+chip;   // default-geval: chip los achter de ruwe actienaam
-  const kleur=logKleur(r.actie);
-  const A=verb=>`${zonderNaam?'':`<b>${naam}</b> `}<span class="log-act" style="color:${kleur}">${verb}</span> `;
+  const kleur=werkwoordKleur(r.actie);
+  const A=verb=>`${zonderNaam?'':`<b>${naam}</b> `}<span class="log-act"${kleur?` style="color:${kleur}"`:''}>${verb}</span> `;
   switch(r.actie){
     case'Afgerond':            return A('rondde')+(zonderCode?'een taak':chip)+' af';
     case'Verwijderd':          return A('verwijderde')+'een taak'+bij;
@@ -926,7 +929,7 @@ async function logEvents(regels) {
 
 
 export {
-  ONTW_CATS, ONTW_CAT_COLORS, parseOntw, renderOntw, setOntw, openOntwModal, closeOntwModal,
+  ONTW_CATS, parseOntw, renderOntw, setOntw, openOntwModal, closeOntwModal,
   submitOntwItem, deleteOntwItem, editOntwItem, parseLogboek, _logSleutel, _logRegelSleutel, _ontwSleutel, _nogNietBevestigd, fmtLogTs, actieBadge, _LOG_AVKLEUR, avatarKleur,
   logDayLabel, logZin, logTijd, logItemHtml, logPaginaSoort, LOG_ZIN_EIGEN, renderLogboek, histNoteKey, renderTaskHistory, addTaskNote, logEvent, logEvents,
   _shiftRows, _shiftLogboekRows, _shiftLogEditRef, _herankerLogEdit, logEditWrite, logDeleteLabel,

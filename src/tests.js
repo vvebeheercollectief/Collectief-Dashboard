@@ -226,11 +226,13 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('logZin Behandelaar toont aan wie', logZin({actie:'Behandelaar gewijzigd', code:'TEST01', nieuweWaarde:'Cihad', gebruiker:'info@vvebeheercollectief.nl'}, {zonderCode:true}).includes('Cihad'));
   truthy('logZin Weggelegd bevat "legde … weg"', (()=>{const z=logZin({actie:'Weggelegd', code:'TEST01', veld:'opvolgdatum', oudeWaarde:'', nieuweWaarde:'24-07-2026', gebruiker:'info@vvebeheercollectief.nl'}).replace(/<[^>]*>/g,''); return z.includes('legde') && /\bweg\b/.test(z);})());
   truthy('logZin Weggelegd toont de opvolgdatum', logZin({actie:'Weggelegd', code:'TEST01', veld:'opvolgdatum', nieuweWaarde:'24-07-2026', gebruiker:'info@vvebeheercollectief.nl'}).includes('24-07-2026'));
-  truthy('logZin Weggelegd kleurt amber', logZin({actie:'Weggelegd', code:'TEST01', nieuweWaarde:'24-07-2026', gebruiker:'info@vvebeheercollectief.nl'}).includes('var(--am)'));
+  // v13.9: werkwoorden dragen geen eigen kleur meer, behalve een waarschuwing (rood) en de gedempte automaat.
+  truthy('logZin Weggelegd: werkwoord zonder eigen kleur', !logZin({actie:'Weggelegd', code:'TEST01', nieuweWaarde:'24-07-2026', gebruiker:'info@vvebeheercollectief.nl'}).includes('log-act" style='));
   truthy('logZin Weggelegd toont niet de ruwe actienaam', !logZin({actie:'Weggelegd', code:'TEST01', nieuweWaarde:'24-07-2026', gebruiker:'info@vvebeheercollectief.nl'}).includes('— Weggelegd'));
   truthy('logZin Weggelegd zonderCode verbergt de code', (()=>{const z=logZin({actie:'Weggelegd', code:'TEST01', nieuweWaarde:'24-07-2026', gebruiker:'info@vvebeheercollectief.nl'}, {zonderCode:true}); return !z.includes('TEST01') && z.includes('legde');})());
   truthy('logZin Opvolgdatum gewist bevat "haalde … terug"', (()=>{const z=logZin({actie:'Opvolgdatum gewist', code:'TEST01', veld:'opvolgdatum', oudeWaarde:'24-07-2026', nieuweWaarde:'', gebruiker:'info@vvebeheercollectief.nl'}).replace(/<[^>]*>/g,''); return z.includes('haalde') && z.includes('terug');})());
-  truthy('logZin Opvolgdatum gewist kleurt amber', logZin({actie:'Opvolgdatum gewist', code:'TEST01', gebruiker:'info@vvebeheercollectief.nl'}).includes('var(--am)'));
+  truthy('logZin Opvolgdatum gewist: werkwoord zonder eigen kleur', !logZin({actie:'Opvolgdatum gewist', code:'TEST01', gebruiker:'info@vvebeheercollectief.nl'}).includes('log-act" style='));
+  truthy('logZin Verwijderd blijft rood (waarschuwing)', logZin({actie:'Verwijderd', code:'TEST01', gebruiker:'info@vvebeheercollectief.nl'}).includes('log-act" style="color:var(--rd)'));
   truthy('logZin Auto-prioriteit bevat "automatisch"', logZin({actie:'Auto-prioriteit', code:'', nieuweWaarde:'Bijgewerkt: 3', gebruiker:'systeem'}).includes('automatisch'));
   truthy('logZin Auto-prioriteit kleurt gedempt', logZin({actie:'Auto-prioriteit', code:'', nieuweWaarde:'Bijgewerkt: 3', gebruiker:'systeem'}).includes('log-act" style="color:var(--mut)'));
   truthy('logZin Auto-prioriteit toont niet de ruwe actienaam', !logZin({actie:'Auto-prioriteit', code:'', nieuweWaarde:'Bijgewerkt: 3', gebruiker:'systeem'}).includes('— Auto-prioriteit'));
@@ -241,9 +243,8 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('logItemHtml gedempt gebruikt log-r dof', logItemHtml({actie:'Afgerond', code:'TEST01', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, false).includes('class="log-r dof"'));
   truthy('logItemHtml subtiel Afgerond zegt nog "rondde"', logItemHtml({actie:'Afgerond', code:'TEST01', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, false).includes('rondde'));
   truthy('logItemHtml subtiel met acties heeft verwijderknop', logItemHtml({actie:'Afgerond', code:'TEST01', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, true).includes('log-verwijderen'));
-  // Sinds de compacte logregel draagt het PICTOGRAM de kleur (geen stip, geen avatar meer); de
-  // kleur komt nog steeds uit dezelfde LOG_KLEUR-tabel, zodat werkwoord en teken niet botsen.
-  truthy('logItemHtml pictogram volgt werkwoordkleur (Uitgevinkt=amber)', /class="log-ic" style="color:var\(--am\)"/.test(logItemHtml({actie:'Uitgevinkt', code:'TEST01', veld:'Notulen', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, false)));
+  // v13.9: pictogrammen zijn grijs (--fnt); alleen Verwijderd blijft rood.
+  truthy('logItemHtml pictogram is grijs (Uitgevinkt)', /class="log-ic" style="color:var\(--fnt\)"/.test(logItemHtml({actie:'Uitgevinkt', code:'TEST01', veld:'Notulen', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, false)));
   truthy('logItemHtml pictogram Verwijderd is rood', /class="log-ic" style="color:var\(--rd\)"/.test(logItemHtml({actie:'Verwijderd', code:'TEST01', timestamp:'2026-07-15T12:41:00Z', gebruiker:'info@vvebeheercollectief.nl', _row:5}, true, false)));
 
   // ── Compacte logregel ── (één regel: pictogram + code + tekst als inhoud + wie/tijd rechts)
@@ -6249,7 +6250,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '13.8');
+  eq('versie opgehoogd', APP_VERSION, '13.9');
 
   // ── Tabbladen ÍN de kaartkop (v11.7) ──
   // De kop van de kaart zei links exact hetzelfde als het actieve tabblad — 'Oppakken' boven

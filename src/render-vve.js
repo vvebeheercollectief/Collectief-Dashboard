@@ -127,8 +127,8 @@ async function addContactLog(){
 }
 
 // Kenmerken-kaart: weergave- of bewerkmodus (Beheerderskenmerken)
-const KMK_PIL={'Gemeenschappelijk':'background:var(--gn-l);color:var(--gn)','Individueel':'background:var(--ac-l);color:var(--ac)'};
-const kmkPil=v=>{const w=v||'Onbekend';return `<span class="badge" style="${KMK_PIL[w]||'background:var(--sur2);color:var(--mut)'}">${esc(w)}</span>`;};
+// Kenmerkwaarde als gewone tekst (v13.9); 'Onbekend' gedempt. Was een groene/blauwe/grijze pil.
+const kmkPil=v=>{const w=v||'Onbekend';return `<span class="kmk-w${v?'':' leeg'}">${esc(w)}</span>`;};
 function kenmerkenKaart(code){
   const k=vveKenmerken(code,D);
   if(state.kenmerkenEdit){
@@ -434,7 +434,7 @@ function renderVve(){
       <div class="kerncijfers">
         ${kc(o.cijfers.open,o.cijfers.open===1?'open taak':'open taken','teal')}
         ${kc(o.cijfers.laatsteDagen==null?'—':o.cijfers.laatsteDagen+' d','laatste activiteit','grijs')}
-        <button class="kc-plus" data-action="vve-taak-nieuw" data-code="${esc(o.code)}" data-naam="${esc(o.naam||'')}" title="Nieuwe taak voor deze VvE" aria-label="Nieuwe taak voor deze VvE"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+        <button class="btn btn-pri kc-plus" data-action="vve-taak-nieuw" data-code="${esc(o.code)}" data-naam="${esc(o.naam||'')}" title="Nieuwe taak voor deze VvE"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Nieuwe taak</button>
       </div>
     </div>
     <div class="vve-grid">

@@ -356,7 +356,6 @@ function renderLeaderboard(period){
   document.getElementById('lb-prev-hdr').textContent=PERIODE_LABEL_PREV[period].charAt(0).toUpperCase()+PERIODE_LABEL_PREV[period].slice(1);
 
   const tbody=document.getElementById('lb-tbody');
-  const medalCls=['gold','silver','bronze',''];
   const totaal=data.reduce((a,b)=>a+b.huidig,0);
   // Taken zónder behandelaar vallen buiten dit overzicht — een ranglijst per persoon kan ze
   // nergens kwijt. Maar ze verdwenen ook uit het BEELD: de tegel 'Taken afgerond' erboven telt ze
@@ -377,9 +376,8 @@ function renderLeaderboard(period){
   tbody.innerHTML=data.map((r,i)=>{
     const arrow=r.trend.dir==='up'?'▲':r.trend.dir==='down'?'▼':'■';
     // Geen medaille toekennen aan een score van 0 (anders 'goud' voor wie niets deed)
-    const medal=r.huidig>0?(medalCls[i]||''):'';
     return`<tr>
-      <td class="lb-rank ${medal}">${i+1}</td>
+      <td class="lb-rank">${i+1}</td>
       <td class="lb-name">${esc(r.name)}</td>
       <td class="lb-now">${r.huidig}</td>
       <td class="lb-prev">${r.vorig}</td>
@@ -488,7 +486,7 @@ function buildAnalytics(){
       trend:tTrend,
       sparkId:'spark-taken',
       sparkValues:tSeries.map(b=>b.count),
-      sparkColor:'#047857'
+      sparkColor:acColor()
     });
   });
 
@@ -670,12 +668,12 @@ function renderHeroDonut(animeer){
   document.getElementById('hero-donut-title').textContent=view.title;
   document.getElementById('hero-donut-sub').textContent=view.sub;
   const tabsEl=document.getElementById('hero-donut-tabs');
-  // Bouw de tab-knoppen ÉÉN keer (incl. SVG-iconen + onclick); daarna bij een tabwissel alleen de
+  // Bouw de tab-knoppen ÉÉN keer (sinds v14.1 zonder icoon) + onclick; daarna bij een tabwissel alleen de
   // actieve-staat bijwerken. Voorheen werd per klik de hele tab-DOM herbouwd + iconen herparsed +
   // handlers herbonden, plus een vroege-return ontbrak zodat her-klikken de 900ms-donut herhaalde.
   if(tabsEl && !tabsEl.children.length){
     tabsEl.innerHTML=HERO_VIEWS.map(v=>
-      `<button class="hdt-tab" data-key="${v.key}">${DASH_ICONS[v.icon]||''}<span>${v.label}</span></button>`
+      `<button class="hdt-tab" data-key="${v.key}"><span>${v.label}</span></button>`
     ).join('');
     tabsEl.querySelectorAll('.hdt-tab').forEach(btn=>{
       btn.onclick=()=>{ if(btn.dataset.key===state.activeHeroView) return; state.activeHeroView=btn.dataset.key; renderHeroDonut(true); };
@@ -720,14 +718,9 @@ function buildDash(){
   renderHeroDonut();
 
   // Recent afgerond
-  const secPill={
-    OPPAKKEN:`<span style="background:var(--ac-l);color:var(--ac)" class="badge">Oppakken</span>`,
-    VERGADERVERZOEKEN:`<span style="background:var(--am-l);color:var(--am)" class="badge">Vergadering</span>`,
-    'OFFERTE-TRAJECTEN':`<span style="background:var(--ac-l);color:var(--ac)" class="badge">Offerte</span>`,
-    LOD:`<span style="background:var(--rd-l);color:var(--rd)" class="badge">LOD</span>`,
-    'SUBSIDIE-TRAJECTEN':`<span style="background:var(--ac-l);color:var(--ac)" class="badge">Subsidie</span>`,
-    'CRM':`<span style="background:var(--ac-l);color:var(--ac)" class="badge">CRM</span>`,
-  };
+  // Categorie als gewone tekst (v14.1); was een gekleurde pil per sectie.
+  const secPill=Object.fromEntries(SKEYS.map(s=>[s,`<span class="cell-note">${esc(SECS[s].label)}</span>`]));
+
   const all=SKEYS.flatMap(s=>(D.af[s]||[]).map(r=>({...r,_sec:s})));
   all.sort((a,b)=>parseDt(b.datum)-parseDt(a.datum));
   document.getElementById('recent-tbody').innerHTML=all.slice(0,10).map(r=>`<tr>

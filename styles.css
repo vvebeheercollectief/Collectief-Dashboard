@@ -713,7 +713,7 @@
 
     /* Charts */
     .period-btn{padding:3px 9px;border-radius:6px;border:1px solid var(--bor);background:var(--sur2);color:var(--mut);font-size:11px;font-weight:600;cursor:pointer;transition:all var(--tr)}
-    .period-btn.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+    .period-btn.on{background:var(--ac-l);color:var(--ac-900);border-color:var(--ac-b)}
 
     /* Hero donut card — één grote donut met categorie-filter */
     .hero-donut-card{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);padding:22px 26px;box-shadow:var(--sh);margin-bottom:18px;position:relative;overflow:hidden}
@@ -724,8 +724,7 @@
     .hero-donut-tabs{display:inline-flex;background:var(--sur2);border:1px solid var(--bor);border-radius:8px;padding:4px;gap:2px}
     .hdt-tab{padding:7px 14px;border-radius:8px;border:none;background:transparent;color:var(--mut);font-size:12px;font-weight:600;cursor:pointer;transition:all var(--tr);font-family:inherit;display:flex;align-items:center;gap:6px;white-space:nowrap}
     .hdt-tab:hover{color:var(--fg)}
-    .hdt-tab.on{background:var(--sur);color:var(--hero-color,var(--ac));box-shadow:0 1px 3px rgba(0,0,0,.06),0 2px 6px color-mix(in srgb,var(--hero-color,var(--ac)) 14%,transparent)}
-    .hdt-tab svg{width:14px;height:14px}
+    .hdt-tab.on{background:var(--sur);color:var(--txt);box-shadow:0 0 0 1px var(--bor)}
     .hero-donut-body{position:relative;height:340px;display:flex;align-items:center;justify-content:center}
     .hero-donut-wrap{position:relative;width:100%;height:100%;max-width:680px}
     @media(max-width:720px){
@@ -736,26 +735,21 @@
 
     /* Productivity tracker */
     .prod-hdr{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px}
-    .prod-hdr h2{font-size:18px;font-weight:600;letter-spacing:-.02em;color:var(--txt);display:flex;align-items:center;gap:9px}
-    .prod-hdr h2 svg{color:var(--ac);width:22px;height:22px;flex-shrink:0}
+    .prod-hdr h2{font-size:18px;font-weight:600;letter-spacing:0;color:var(--txt);display:flex;align-items:center;gap:9px}
     .period-bar{display:inline-flex;background:var(--sur);border:1px solid var(--bor);border-radius:8px;padding:4px;gap:2px;box-shadow:var(--sh)}
     .period-bar .period-btn{padding:6px 14px;border:none;background:transparent;border-radius:6px;font-size:12px}
-    .period-bar .period-btn.on{background:var(--ac);color:#fff;box-shadow:0 1px 3px color-mix(in srgb,var(--ac) 30%,transparent)}
+    .period-bar .period-btn.on{background:var(--ac-l);color:var(--ac-900);box-shadow:none}
 
     .kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-bottom:18px}
-    .kpi{position:relative;background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);padding:18px 20px 14px;box-shadow:var(--sh),0 4px 12px color-mix(in srgb,var(--sec,var(--ac)) 10%,transparent);overflow:hidden;transition:transform var(--tr),box-shadow var(--tr)}
-    .kpi:hover{transform:translateY(-2px);box-shadow:var(--shm),0 8px 20px color-mix(in srgb,var(--sec,var(--ac)) 18%,transparent)}
-    .kpi::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--sec,var(--ac))}
+    .kpi{position:relative;background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);padding:16px 20px;overflow:hidden}
     .kpi-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px}
     .kpi-lbl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--mut)}
-    .kpi-ico{width:34px;height:34px;border-radius:8px;background:var(--sec-l,var(--ac-l));display:flex;align-items:center;justify-content:center;color:var(--sec,var(--ac));font-size:20px;flex-shrink:0}
-    .kpi-ico svg{width:20px;height:20px}
-    .kpi-num{font-size:34px;font-weight:600;line-height:1;letter-spacing:-.04em;color:var(--sec,var(--ac));margin-bottom:4px}
+    .kpi-num{font-size:28px;font-weight:600;line-height:1;letter-spacing:-.02em;color:var(--txt);margin-bottom:4px;font-variant-numeric:tabular-nums}
     .kpi-sub{font-size:11px;color:var(--mut);margin-bottom:8px;min-height:14px}
-    .kpi-trend{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:3px 8px;border-radius:6px;line-height:1}
-    .kpi-trend.up{background:var(--gn-l);color:var(--gn)}
-    .kpi-trend.down{background:var(--rd-l);color:var(--rd)}
-    .kpi-trend.flat{background:var(--sur2);color:var(--mut)}
+    .kpi-trend{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:500;line-height:1}
+    /* Trend als tekst: alleen een daling is een signaal (rood); stijgen en gelijk blijven gedempt. */
+    .kpi-trend.up,.kpi-trend.flat{color:var(--mut)}
+    .kpi-trend.down{color:var(--rd)}
     .kpi-trend i{font-size:13px}
     .kpi-trend-arrow{font-size:10px;line-height:1;display:inline-block;transform:translateY(-1px)}
 
@@ -808,15 +802,7 @@
     .leaderboard tbody tr:last-child td{border-bottom:none}
     .leaderboard tbody tr:hover{background:var(--sur2)}
     .lb-rank{font-weight:600;color:var(--mut);width:30px;font-variant-numeric:tabular-nums}
-    /* Medaillekleuren per thema. Eén set haalde het niet in allebei: goud zakte op wit naar 3,19
-       en zilver/brons op de donkere kaart naar 3,28 en 3,10 — allemaal onder de 4,5 die tekst
-       van dit formaat vraagt. Gemeten waarden staan erachter. */
-    .lb-rank.gold{color:#bd5b00}    /* 4,51 op wit */
-    .lb-rank.silver{color:#64748B}  /* 4,76 op wit */
-    .lb-rank.bronze{color:#B45309}  /* 5,02 op wit */
-    [data-theme=dark] .lb-rank.gold{color:#D97706}    /* 4,89 op de donkere kaart */
-    [data-theme=dark] .lb-rank.silver{color:#7c8ca3}  /* 4,56 */
-    [data-theme=dark] .lb-rank.bronze{color:#d27127}  /* 4,55 */
+    /* Geen medaillekleuren meer (v14.1): de plaats staat er al als getal. */
     .lb-name{font-weight:600;color:var(--txt)}
     .lb-now{font-weight:600;color:var(--ac);font-variant-numeric:tabular-nums}
     .lb-prev{color:var(--mut);font-variant-numeric:tabular-nums}
@@ -1329,7 +1315,6 @@
     [data-theme=dark] .btn-pri,
     [data-theme=dark] .sw-update-btn,
     [data-theme=dark] .pb.on,
-    [data-theme=dark] .period-btn.on,
     [data-theme=dark] .ai-step .dot,
     [data-theme=dark] .ai-mini.plus,
     [data-theme=dark] .cb.aan::after,
@@ -1478,7 +1463,6 @@ input:focus-visible,select:focus-visible,textarea:focus-visible,.search-box inpu
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}
   .dot,.dot.loading{animation:none!important}
-  .kpi:hover{transform:none!important}
 }
 
 /* ── Grotere klikzone voor kleine bedienelementen op touch ── */

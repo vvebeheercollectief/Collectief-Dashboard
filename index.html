@@ -382,53 +382,49 @@
     <!-- ══ ANALYTICS ══ -->
     <div class="page" id="page-analytics">
       <div class="prod-hdr">
-        <h2><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 15l3.5-3.5 3 3L20 7v8H7z" fill="currentColor" fill-opacity="0.18" stroke="none"/><path d="M4 4v15a1 1 0 001 1h15"/><path d="M7 15l3.5-3.5 3 3L20 7"/><path d="M20 11V7h-4"/></svg>Productiviteit</h2>
+        <h2>Productiviteit</h2>
         <div class="period-bar" id="ana-period-bar"></div>
       </div>
 
       <div class="kpi-grid" id="ana-kpi-grid">
-        <div class="kpi" id="kpi-vergader" style="--sec:var(--ac);--sec-l:var(--ac-l)">
+        <div class="kpi" id="kpi-vergader">
           <div class="kpi-top">
             <div>
               <div class="kpi-lbl">Vergaderingen afgerond</div>
             </div>
-            <div class="kpi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l4 4v13a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 016 20V4.5A1.5 1.5 0 017.5 3z" fill="currentColor" fill-opacity="0.18"/><path d="M14 3v4h4"/><path d="M9 12h6M9 15h6M9 18h3"/></svg></div>
           </div>
           <div class="kpi-num" id="kpi-vergader-num">–</div>
           <div class="kpi-sub" id="kpi-vergader-sub"></div>
           <div class="kpi-spark"><canvas id="spark-vergader"></canvas></div>
         </div>
 
-        <div class="kpi" id="kpi-openalv" style="--sec:var(--am);--sec-l:var(--am-l)">
+        <div class="kpi" id="kpi-openalv">
           <div class="kpi-top">
             <div>
               <div class="kpi-lbl">Open ALV's (werkvoorraad)</div>
             </div>
-            <div class="kpi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3c0 5 5 6 5 9s-5 4-5 9M17 3c0 5-5 6-5 9s5 4 5 9" fill="currentColor" fill-opacity="0.18"/><path d="M6 3h12M6 21h12"/></svg></div>
           </div>
           <div class="kpi-num" id="kpi-openalv-num">–</div>
           <div class="kpi-sub" id="kpi-openalv-sub">nog niet afgerond</div>
-          <div class="kpi-spark" style="height:36px;display:flex;align-items:center"><div style="width:100%;height:8px;background:var(--sur2);border-radius:4px;overflow:hidden"><div id="kpi-openalv-bar" style="height:100%;background:var(--am);border-radius:4px;width:0;transition:width .6s ease"></div></div></div>
+          <div class="kpi-spark" style="height:36px;display:flex;align-items:center"><div style="width:100%;height:8px;background:var(--sur2);border-radius:4px;overflow:hidden"><div id="kpi-openalv-bar" style="height:100%;background:var(--ac);border-radius:4px;width:0;transition:width .6s ease"></div></div></div>
         </div>
 
-        <div class="kpi" id="kpi-taken" style="--sec:var(--gn);--sec-l:var(--gn-l)">
+        <div class="kpi" id="kpi-taken">
           <div class="kpi-top">
             <div>
               <div class="kpi-lbl">Taken afgerond</div>
             </div>
-            <div class="kpi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="currentColor" fill-opacity="0.18"/><path d="M8 12.5l2.7 2.7L16 9.8"/></svg></div>
           </div>
           <div class="kpi-num" id="kpi-taken-num">–</div>
           <div class="kpi-sub" id="kpi-taken-sub"></div>
           <div class="kpi-spark"><canvas id="spark-taken"></canvas></div>
         </div>
 
-        <div class="kpi" id="kpi-pers" style="--sec:var(--ac);--sec-l:var(--ac-l)">
+        <div class="kpi" id="kpi-pers">
           <div class="kpi-top">
             <div>
               <div class="kpi-lbl">Taken per behandelaar</div>
             </div>
-            <div class="kpi-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2" fill="currentColor" fill-opacity="0.18"/><path d="M3.6 19c0-3 2.4-4.9 5.4-4.9s5.4 1.9 5.4 4.9z" fill="currentColor" fill-opacity="0.18"/><path d="M16 5.3a3 3 0 010 5.5M17.6 14.4c2.1.5 3.4 2 3.4 4.6"/></svg></div>
           </div>
           <div class="kpi-persons" id="kpi-pers-rows"></div>
         </div>

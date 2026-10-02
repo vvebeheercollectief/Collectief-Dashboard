@@ -34,6 +34,12 @@ function doOAuth(forcePrompt){
   if(_lopendeAanvraag && _lopendePrompt===!!forcePrompt) return _lopendeAanvraag;
   const p=_doOAuth(forcePrompt);
   _lopendeAanvraag=p; _lopendePrompt=!!forcePrompt;
+  // Oplopende rem na mislukte STILLE vernieuwingen (zie stilRemMs). Elk geslaagd token — ook een
+  // inlog mét venster — zet de teller terug.
+  p.then(t=>{
+    if(t){ state._stilMislukt=0; }
+    else if(!forcePrompt){ state._stilMislukt=(state._stilMislukt||0)+1; state._stilMisluktMs=Date.now(); }
+  });
   p.finally(()=>{ if(_lopendeAanvraag===p){ _lopendeAanvraag=null; _lopendePrompt=null; } });
   return p;
 }
@@ -83,24 +89,33 @@ function _doOAuth(forcePrompt){
       // De callback (en dus de resolve van DEZE aanroep) bij elke aanvraag opnieuw binden.
       // Anders bleef een tweede doOAuth (bv. token-refresh na expiry) hangen: de client
       // riep de eerste, al-afgehandelde resolve aan i.p.v. die van de nieuwe Promise.
+      // Bij een fout het token alleen wissen als het nog het token van vóór DEZE aanvraag is: is er
+      // intussen langs een andere weg een vers token binnengekomen, dan mag deze fout dat niet
+      // weggooien.
+      const tokenVooraf=state.oauthToken;
       state._gsiTokenClient.callback=resp=>{
-        if(resp.error){console.warn('OAuth fout:',resp.error);state.oauthToken=null;state.oauthExpiry=0;klaar(null);return}
+        if(resp.error){
+          console.warn('OAuth fout:',resp.error);
+          if(state.oauthToken===tokenVooraf){ state.oauthToken=null; state.oauthExpiry=0; }
+          klaar(null); return;
+        }
         state.oauthToken=resp.access_token;
         state.oauthExpiry=Date.now()+((resp.expires_in||3600)-120)*1000;
         sessionStorage.setItem('oauthToken',state.oauthToken);
         sessionStorage.setItem('oauthExpiry',String(state.oauthExpiry));
-        // Alleen een STILLE vernieuwing van een al ingelogde sessie delen met de andere tabbladen.
-        // Een aanvraag mét venster toont de accountkiezer: van wie dát token is weten we pas na
-        // `fetchUserEmail` + de allowlist, en die wegen (doLogin, de knop 'Opnieuw inloggen')
-        // delen zelf, ná die controle.
-        if(!forcePrompt && state.currentUserEmail) deelToken();
         klaar(state.oauthToken);
       };
       state._gsiErrorCb=err=>{
         console.warn('OAuth geannuleerd/mislukt:',(err&&err.type)||err);
         klaar(null);
       };
-      state._gsiTokenClient.requestAccessToken(forcePrompt?{}:{prompt:''});
+      // Met het bekende adres als hint: dan hoeft Google bij meerdere ingelogde accounts niet te
+      // kiezen (dat lukt stil niet, en dan mislukt de stille vernieuwing). `login_hint` is de
+      // huidige naam, `hint` de oudere; GIS negeert wat hij niet kent. Bij de eerste inlog is er
+      // nog geen adres en komt gewoon de accountkiezer.
+      const opt=forcePrompt?{}:{prompt:''};
+      if(state.currentUserEmail){ opt.login_hint=state.currentUserEmail; opt.hint=state.currentUserEmail; }
+      state._gsiTokenClient.requestAccessToken(opt);
     }catch(e){console.error('OAuth:',e);klaar(null)}
   });
 }
@@ -159,7 +174,6 @@ async function doLogin(){
     }
     state.currentUserEmail=email;
     sessionStorage.setItem('currentUserEmail',email);
-    deelToken();   // een gepauzeerd tabblad van dezelfde gebruiker kan meteen verder
     document.getElementById('login-gate').style.display='none';
     // De schil weer bedienbaar. Zie `logout()` voor waarom `inert` er überhaupt op gaat.
     document.getElementById('app')?.removeAttribute('inert');
@@ -190,14 +204,24 @@ async function doLogin(){
 // inlogvenster open'. De weg terug loopt via die banner, en die verschijnt vanzelf zodra de stille
 // vernieuwing drie keer op rij mislukt.
 //
-// GEEN FOCUS → GEEN VERNIEUWING (v13.5, zie 'Geen inlogflits' hieronder). Ook de stille
-// vernieuwing opent een Google-venster, dus zonder focus op dit dashboardvenster geeft
-// ensureToken meteen `false` en zet hij `state._tokenGepauzeerd`. De 8s-ronde leest die vlag en
-// toont dan 'gepauzeerd' i.p.v. een fout (en telt niet mee voor de sessiebanner). Schrijfacties
-// starten altijd vanuit een klik en hebben dus focus; die merken hier niets van.
+// FOCUSPOORT (v13.5, zie 'Geen inlogflits' hieronder). Ook de stille vernieuwing opent een
+// Google-venster. Daarom:
+//   · loopt er al een aanvraag, dan daarop MEELIFTEN, ongeacht focus — dat opent geen tweede
+//     venster. Nodig voor 'terugkomen en meteen klikken': de focus-vernieuwing start, haar venster
+//     pakt de focus, en de klik-afhandeling van de schrijfweg zag dan hasFocus()=false en meldde
+//     'Inloggen mislukt';
+//   · de STILLE ronde (magVragen=false, de 8s-poll) vernieuwt alleen mét focus. Zonder focus:
+//     `false` + `state._tokenGepauzeerd`; de ronde toont dan 'gepauzeerd' i.p.v. een fout en
+//     telt niet mee voor de sessiebanner;
+//   · schrijfwegen (magVragen=true) komen van een klik en mogen stil vernieuwen; alleen de
+//     terugval naar een venster MÉT accountkiezer vraagt opnieuw om focus.
 async function ensureToken(magVragen=true){
   if(state.oauthToken && Date.now()<state.oauthExpiry){ state._tokenGepauzeerd=false; return true; }
-  if(!heeftFocus()){ state._tokenGepauzeerd=true; return false; }
+  if(_lopendeAanvraag){
+    await _lopendeAanvraag;
+    if(state.oauthToken && Date.now()<state.oauthExpiry && state.currentUserEmail){ state._tokenGepauzeerd=false; return true; }
+  }
+  if(!magVragen && !heeftFocus()){ state._tokenGepauzeerd=true; return false; }
   state._tokenGepauzeerd=false;
   // Bezig-teller over de hele vernieuwing: een auto-herlading midden in een
   // token-refresh zou met een verlopen sessie herstarten → terug op het inlogscherm.
@@ -208,6 +232,7 @@ async function ensureToken(magVragen=true){
     await doOAuth(false);
     if(!state.oauthToken){
       if(!magVragen) return false;
+      if(!heeftFocus()) return false;   // nooit een accountkiezer als de gebruiker hier niet zit
       await doOAuth(true);
       if(!state.oauthToken) return false;
     }
@@ -239,9 +264,7 @@ async function ensureToken(magVragen=true){
 //   · komt hij terug in het venster (focus) met een verlopen of bijna verlopen token → idem,
 //     en meteen een leesronde als het bijwerken stillag;
 //   · verloopt het token terwijl hij elders werkt → de 8s-ronde pauzeert stil ('gepauzeerd' in
-//     de statusbalk, telt NIET als fout) tot hij terugkomt;
-//   · vernieuwt één tabblad, dan krijgen de andere tabbladen van dezelfde gebruiker het nieuwe
-//     token via een BroadcastChannel en hoeven zelf niet.
+//     de statusbalk en '⏸' in de tabtitel, telt NIET als fout) tot hij terugkomt.
 
 // Heeft de gebruiker dít venster nu voor zich? Injecteerbaar voor de zelftest (`state._focusFn`):
 // in een headless of voorbeeldvenster is `document.hasFocus()` altijd false.
@@ -252,6 +275,13 @@ function heeftFocus(){
 
 const VERNIEUW_VOORAF_MS = 15*60*1000;   // bij een klik vernieuwen zodra er minder dan dit over is
 const POGING_REM_MS      = 10_000;       // hoogstens één poging per 10 s (vijf klikken = één venster)
+// Oplopende rem na 1, 2, 3+ mislukte stille vernieuwingen op rij. Blijft stil vernieuwen falen
+// (bv. Google wil eerst opnieuw toestemming), dan zou anders elke klik een venster openen.
+const STIL_REMMEN_MS = [2*60*1000, 5*60*1000, 10*60*1000];
+function stilRemMs(mislukt){
+  if(!(mislukt>0)) return 0;
+  return STIL_REMMEN_MS[Math.min(mislukt, STIL_REMMEN_MS.length)-1];
+}
 
 // Eén stille vernieuwing, alleen met focus. Geeft true als er daarna een vers token staat.
 // `voorafMs`: hoe lang het huidige token nog minstens geldig moet zijn om NIET te vernieuwen.
@@ -268,6 +298,7 @@ async function vernieuwMetFocus(voorafMs=VERNIEUW_VOORAF_MS){
   if((state._authFails||0)>=3) return false;
   if(_lopendeAanvraag) return false;                                     // er loopt er al een
   if(nu-(state._laatsteStilPoging||0) < POGING_REM_MS) return false;
+  if(nu-(state._stilMisluktMs||0) < stilRemMs(state._stilMislukt||0)) return false;
   state._laatsteStilPoging=nu;
   const oudT=state.oauthToken, oudE=state.oauthExpiry;
   state._authBezig++;
@@ -278,7 +309,8 @@ async function vernieuwMetFocus(voorafMs=VERNIEUW_VOORAF_MS){
     if(vers && state.oauthToken===vers && Date.now()<state.oauthExpiry){ state._tokenGepauzeerd=false; return true; }
     // Mislukt. De callback zet het token bij een fout op null, maar het OUDE was nog geldig
     // (we vernieuwen vooraf): dat terugzetten, anders verliest de sessie een kwartier voor niets.
-    if(oudT && Date.now()<oudE){
+    // Alleen als er niets staat: een token dat intussen langs een andere weg binnenkwam wint.
+    if(state.oauthToken==null && oudT && Date.now()<oudE){
       state.oauthToken=oudT; state.oauthExpiry=oudE;
       try{ sessionStorage.setItem('oauthToken',oudT); sessionStorage.setItem('oauthExpiry',String(oudE)); }catch(_){}
     }
@@ -300,8 +332,8 @@ async function _vernieuwEnHervat(){
   return ok;
 }
 
-// Een klik in het dashboard (main.js hangt dit in de capture-fase aan `click`). Bewust `click` en
-// niet `pointerdown`/`keydown`: het venster opent pas ná de klik, dus de klik zelf landt nog
+// Een klik in het dashboard (installeerVernieuwTriggers hangt dit in de capture-fase aan `click`).
+// Bewust `click` en niet `pointerdown`/`keydown`: het venster opent pas ná de klik, dus de klik zelf landt nog
 // gewoon in het dashboard; en een toets in een tekstveld start nooit een venster dat dan de
 // volgende letters opeet. Een knop met Enter/spatie geeft óók een click.
 // Uitgesteld tot ná de eigen klikafhandeling van de app: start die knop zelf een aanvraag
@@ -317,79 +349,40 @@ function opFocusTerug(){
   return _vernieuwEnHervat().catch(()=>false);
 }
 
-// ── Token delen tussen tabbladen ─────────────────────────────────────────────────────────────
-// Eén BroadcastChannel per tabblad. Alleen in het geheugen en in sessionStorage, NOOIT in
-// localStorage: het token hoort niet op schijf. Zonder BroadcastChannel werkt alles gewoon, maar
-// vernieuwt elk tabblad voor zich.
-const TOKEN_KANAAL='cd-token';
-let _kanaal;   // undefined = nog niet geprobeerd, null = niet beschikbaar
-function _tokenKanaal(){
-  if(_kanaal!==undefined) return _kanaal;
-  try{
-    _kanaal = (typeof BroadcastChannel==='function') ? new BroadcastChannel(TOKEN_KANAAL) : null;
-    if(_kanaal) _kanaal.onmessage = e => _opTokenBericht(e && e.data);
-  }catch(_){ _kanaal=null; }
-  return _kanaal;
-}
-function _post(bericht){ try{ _tokenKanaal()?.postMessage(bericht); }catch(_){} }
-function _eigenToken(){
-  const nu=Date.now();
-  if(!state.currentUserEmail || !state.oauthToken || state.oauthExpiry-nu < 60_000) return null;
-  return { soort:'token', token:state.oauthToken, expiry:state.oauthExpiry, email:state.currentUserEmail };
-}
-
-// Stuur het eigen (verse) token naar de andere tabbladen.
-function deelToken(){ const t=_eigenToken(); if(t) _post(t); }
-
-// Is dit een bruikbaar token van een ánder tabblad voor de gebruiker `email`? Pure regel.
-function _bruikbaarToken(m, email, nu){
-  return !!(m && m.soort==='token' && typeof m.token==='string' && m.token
-    && typeof m.expiry==='number' && m.expiry-nu > 60_000
-    && typeof m.email==='string' && ALLOWED_EMAILS.includes(m.email.toLowerCase())
-    && (!email || m.email.toLowerCase()===String(email).toLowerCase()));
-}
-
-// Neem een gedeeld token over in `s` (de app-toestand). Alleen voor DEZELFDE gebruiker (een tabblad
-// zonder ingelogde gebruiker neemt niets over: daar doet de inlogkaart het werk) en alleen als het
-// nieuwer is dan wat er al staat. Geeft true als er iets is overgenomen.
-function neemTokenOver(s, m, nu=Date.now()){
-  if(!s || !s.currentUserEmail) return false;
-  if(!_bruikbaarToken(m, s.currentUserEmail, nu)) return false;
-  if(s.oauthToken && m.expiry <= (s.oauthExpiry||0)) return false;
-  s.oauthToken=m.token; s.oauthExpiry=m.expiry; s._tokenGepauzeerd=false;
+// Een klik in een typveld start GEEN vernieuwing: dan opent het venster net als iemand gaat
+// typen, en de eerste letters verdwijnen erin. Knoppen, vinkjes en keuzerondjes wél.
+const _GEEN_TYPVELD=['checkbox','radio','button','submit','reset','file','range','color','image'];
+function isTypVeld(el){
+  const v=el && el.closest ? el.closest('input,textarea,select,[contenteditable]') : null;
+  if(!v) return false;
+  if(v.getAttribute('contenteditable')==='false') return false;
+  if(v.tagName==='INPUT') return !_GEEN_TYPVELD.includes(String(v.type||'text').toLowerCase());
   return true;
 }
 
-function _opTokenBericht(m){
-  if(!m || typeof m!=='object') return;
-  if(m.soort==='vraag'){ const t=_eigenToken(); if(t) _post(t); return; }
-  if(m.soort!=='token') return;
-  if(neemTokenOver(state, m)){
-    try{ sessionStorage.setItem('oauthToken',state.oauthToken); sessionStorage.setItem('oauthExpiry',String(state.oauthExpiry)); }catch(_){}
-  }
-}
-
-// Bij het opstarten zonder geldig token: kort (300 ms) de andere tabbladen om een token vragen.
-// Geeft {token, expiry, email} of null. `email` = het adres uit deze sessie (als dat er nog staat):
-// dan alleen een token van dezelfde gebruiker. Een helemaal nieuw tabblad neemt het token én de
-// gebruiker over van een ander tabblad in deze browser — mits het adres op de allowlist staat.
-function vraagTokenBijAnderen(email, wachtMs=300){
-  const k=_tokenKanaal();
-  if(!k) return Promise.resolve(null);
-  return new Promise(res=>{
-    let klaar=false;
-    const luister=e=>{
-      if(klaar || !_bruikbaarToken(e && e.data, email, Date.now())) return;
-      klaar=true; k.removeEventListener('message', luister); res(e.data);
-    };
-    k.addEventListener('message', luister);
-    setTimeout(()=>{ if(!klaar){ klaar=true; k.removeEventListener('message', luister); res(null); } }, wachtMs);
-    _post({ soort:'vraag' });
+// De drie aanleidingen aan de pagina hangen (main.js, één keer). De klik in de CAPTURE-fase, zodat
+// een stopPropagation verderop hem niet wegvangt. Niet tijdens de zelftest — die klikt honderden
+// keren en mag nooit een echt Google-venster openen — tenzij een toets de bedrading zelf meet
+// (`state._zelftestTriggers`). De belofte van de laatste aanleiding staat in
+// `state._laatsteTrigger`, zodat een toets erop kan wachten.
+function installeerVernieuwTriggers(doc=document, win=window){
+  const mag=()=>!state._zelftestLoopt || !!state._zelftestTriggers;
+  doc.addEventListener('click', e=>{
+    if(mag() && !isTypVeld(e.target)) state._laatsteTrigger=opGebaar();
+  }, true);
+  win.addEventListener('focus', ()=>{ if(mag()) state._laatsteTrigger=opFocusTerug(); });
+  doc.addEventListener('visibilitychange', ()=>{
+    if(mag() && !doc.hidden) state._laatsteTrigger=opFocusTerug();
   });
 }
 
-// Het kanaal openen zodat dit tabblad vragen van andere tabbladen kan beantwoorden (main.js).
-function startTokenDelen(){ _tokenKanaal(); }
+// ── Bewust GEEN token delen tussen tabbladen ─────────────────────────────────────────────────
+// Elk tabblad vernieuwt zijn eigen token (alleen met focus, zie hierboven). Delen via een
+// BroadcastChannel is in v13.5 gebouwd en weer verwijderd (review 2026-10-02): de origin
+// vvebeheercollectief.github.io wordt GEDEELD met de vve-website (React/Babel uit een CDN), en elke
+// pagina op die origin kan op zo'n kanaal meeluisteren of om een token vragen — en krijgt dan een
+// token met spreadsheets-scope. Ook localStorage valt om dezelfde reden af. Niet opnieuw bouwen
+// zolang het dashboard geen eigen origin heeft.
 
 // Schone uitlog: stopt poll + heartbeat, wist de sessie en toont de login-gate weer.
 // Aangeroepen wanneer een token wél geldig is maar het account niet (meer) is toegestaan;
@@ -424,7 +417,7 @@ function logout(reden){
   // voorganger, en een blijven-hangen vlag zou de 8s-ronde of het opslaan blokkeren.
   state._authFails=0; state._renderFails=0; state._structErnstig=null;
   state._syncLblVoorBulk=null; state._submitBezig=false; state._herinlogBezig=false;
-  state._tokenGepauzeerd=false; state._laatsteStilPoging=0;
+  state._tokenGepauzeerd=false; state._laatsteStilPoging=0; state._stilMislukt=0; state._stilMisluktMs=0;
   try{ _shownToasts.clear(); }catch(_){}
   // De 8s-poll, de token-heartbeat en de meldingen-visibilityhandler worden UITSLUITEND bij
   // DOMContentLoaded gestart (main.js). Stopten we ze hier, dan kwamen ze na een tweede inlog
@@ -492,5 +485,5 @@ function uitloggen(){
 }
 
 export { doOAuth, fetchUserEmail, doLogin, ensureToken, logout, uitloggen, _wisTokenSessie,
-  heeftFocus, vernieuwMetFocus, opGebaar, opFocusTerug, deelToken, neemTokenOver, vraagTokenBijAnderen,
-  startTokenDelen, VERNIEUW_VOORAF_MS, TOKEN_KANAAL };
+  heeftFocus, vernieuwMetFocus, opGebaar, opFocusTerug, isTypVeld, installeerVernieuwTriggers,
+  stilRemMs, VERNIEUW_VOORAF_MS, STIL_REMMEN_MS };

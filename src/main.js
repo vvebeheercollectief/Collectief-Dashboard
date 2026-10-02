@@ -4,7 +4,7 @@
 import { IS_STAGING, ALLOWED_EMAILS, SKEYS, SECS, APP_VERSION, TEAM } from './config.js';
 import { D, pgs, state } from './state.js';
 import { verseRij } from "./rij.js";
-import { ensureToken, uitloggen, vernieuwMetFocus, opGebaar, opFocusTerug, startTokenDelen, vraagTokenBijAnderen } from './auth.js';
+import { ensureToken, uitloggen, vernieuwMetFocus, installeerVernieuwTriggers } from './auth.js';
 import { startSplash } from './login-splash.js';
 import { goTo, syncKop, closeSb, applyTheme, applyDensity, cycleDensity, setupSearch, zetBijOpenen } from './ui.js';
 import { renderNtd, renderAf, renderAlvo, renderAlfa, renderNtdStats, zetKopOpen, kopOpen } from './render-lijsten.js';
@@ -623,16 +623,9 @@ document.addEventListener('DOMContentLoaded',()=>{
     vernieuwMetFocus(5*60*1000);
   },4*60*1000);
 
-  // Vernieuwen op het moment dat de gebruiker hier toch al zit: bij een klik (capture, zodat geen
-  // stopPropagation hem mist) en bij terugkeer in het venster. Zie opGebaar/opFocusTerug in auth.js.
-  // Niet tijdens de zelftest: die klikt honderden keren en mag nooit een echt Google-venster openen.
-  document.addEventListener('click', ()=>{ if(!state._zelftestLoopt) opGebaar(); }, true);
-  window.addEventListener('focus', ()=>{ if(!state._zelftestLoopt) opFocusTerug(); });
-  document.addEventListener('visibilitychange', ()=>{
-    if(!document.hidden && !state._zelftestLoopt) opFocusTerug();
-  });
-  // Tokens delen met de andere dashboardtabbladen in deze browser (BroadcastChannel).
-  startTokenDelen();
+  // Vernieuwen op het moment dat de gebruiker hier toch al zit: bij een klik (capture) en bij
+  // terugkeer in het venster. Zie installeerVernieuwTriggers in auth.js (daar ook de zelftest-rem).
+  installeerVernieuwTriggers(document, window);
 
   // Oude leescaches weg (andere versie, of ouder dan twee weken) — vóór de inlog, zodat dat ook
   // gebeurt op een computer waar niemand meer inlogt. Zie ruimCacheOp in data.js.
@@ -642,16 +635,13 @@ document.addEventListener('DOMContentLoaded',()=>{
   const _st=sessionStorage.getItem('oauthToken');
   const _se=parseInt(sessionStorage.getItem('oauthExpiry')||'0');
   const _sm=sessionStorage.getItem('currentUserEmail');
-  const _herstelSessie=(tok,exp,mail)=>{
-    state.oauthToken=tok;state.oauthExpiry=exp;state.currentUserEmail=mail;
+  if(_st&&Date.now()<_se&&_sm&&ALLOWED_EMAILS.includes(_sm.toLowerCase())){
+    state.oauthToken=_st;state.oauthExpiry=_se;state.currentUserEmail=_sm;
     document.getElementById('login-gate').style.display='none';
     document.getElementById('app')?.removeAttribute('inert');   // zie logout() in auth.js
     laadUitCache();   // meteen de laatst bekende stand in beeld; loadAll vervangt hem
     loadAll();
     startVersieBewaking();   // minimumversie-rem: meteen, elke 5 min en bij terugkeer (versie.js)
-  };
-  if(_st&&Date.now()<_se&&_sm&&ALLOWED_EMAILS.includes(_sm.toLowerCase())){
-    _herstelSessie(_st,_se,_sm);
   } else {
     // Geen geldige sessie → login nodig. Speel de gebrande launch-splash
     // (na ~1,9s → login-kaart). Bewust alleen hier: ingelogde terugkeerders
@@ -659,24 +649,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     // De schil erachter uit de tabvolgorde halen zolang het inlogscherm staat — zie logout()
     // in auth.js voor de reden. `doLogin` haalt hem er weer af.
     document.getElementById('app')?.setAttribute('inert','');
-    // Eerst kort (300 ms) een ander dashboardtabblad in deze browser om een geldig token vragen
-    // (v13.5). Staat er een sessie in sessionStorage, dan alleen een token van díe gebruiker.
-    // Geen antwoord (of geen BroadcastChannel) → gewoon de splash en de inlogkaart.
-    // Niet tijdens de zelftest: die draait per definitie niet ingelogd.
-    const _bekend=(_sm&&ALLOWED_EMAILS.includes(_sm.toLowerCase()))?_sm:null;
-    if(location.search.includes('test=1') || typeof BroadcastChannel!=='function') startSplash();
-    else vraagTokenBijAnderen(_bekend).then(t=>{
-      if(t && !state.currentUserEmail){
-        try{
-          sessionStorage.setItem('oauthToken',t.token);
-          sessionStorage.setItem('oauthExpiry',String(t.expiry));
-          sessionStorage.setItem('currentUserEmail',t.email);
-        }catch(_){}
-        _herstelSessie(t.token,t.expiry,t.email);
-      } else if(!state.currentUserEmail){
-        startSplash();
-      }
-    }, ()=>{ if(!state.currentUserEmail) startSplash(); });
+    startSplash();
   }
 
   goTo('ntd');

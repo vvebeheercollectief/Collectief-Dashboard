@@ -5,7 +5,7 @@ import { parseDt, _parseAnyDate, coerceDagenVooraf, leegBijErfenis, duurUitCel }
 import { state, D } from "./state.js";
 import { SKEYS, SECS, APP_VERSION, ALLOWED_EMAILS } from "./config.js";
 import { fetchSheet, fetchSheets, _withRetry, isOffline } from "./api.js";
-import { ensureToken, doOAuth, fetchUserEmail, logout, _wisTokenSessie, deelToken } from "./auth.js";
+import { ensureToken, doOAuth, fetchUserEmail, logout, _wisTokenSessie } from "./auth.js";
 import { buildAnalytics, buildDash } from "./ui.js";   // lui: laadt render-analytics.js pas bij gebruik
 import { renderNtdDonut, renderNtd, renderAf } from "./render-lijsten.js";
 // Kringverwijzing data ⇄ bulk, net als data ⇄ main en ui ⇄ bulk: bulk.js haalt backgroundWrite en
@@ -360,15 +360,24 @@ function setSyncOffline(){dot('err');_bulkLblOnthoud('Offline');document.getElem
 // Het token is verlopen terwijl de gebruiker in een ander venster zat. Vernieuwen opent een
 // Google-venster, en dat mag alleen als hij hier zit (zie 'Geen inlogflits' in auth.js). Dus geen
 // fout maar een pauze: zodra hij in het dashboard klikt of terugkomt gaat het vanzelf verder.
+// Ook in de TABTITEL ('⏸ '), want wie het dashboard op een tweede scherm open heeft staan ziet
+// de statusbalk vaak niet, en dit is precies de stand waarin er stil niets meer binnenkomt. Geen
+// systeemmelding: daar zou hij weer uit zijn werk door gehaald worden. `dot()` haalt het teken weer
+// weg zodra de balk iets anders gaat zeggen.
 const PAUZE_TEKST='Gepauzeerd — klik in het dashboard';
+const PAUZE_TITEL='⏸ ';
 function setSyncGepauzeerd(){
   dot('pauze'); _bulkLblOnthoud(PAUZE_TEKST);
   const lbl=document.getElementById('sync-lbl');
   if(lbl){ lbl.textContent=PAUZE_TEKST; lbl.title='Bijwerken gepauzeerd: je Google-sessie wordt pas vernieuwd als je weer in het dashboard werkt.'; }
+  if(!document.title.startsWith(PAUZE_TITEL)) document.title=PAUZE_TITEL+document.title;
 }
 function dot(cls){
   const d=document.getElementById('dot');d.className='dot'+(cls?' '+cls:'');
-  document.getElementById('sync-lbl')?.removeAttribute('title');   // alleen de pauzestand zet er een (setSyncGepauzeerd)
+  if(cls!=='pauze'){
+    document.getElementById('sync-lbl')?.removeAttribute('title');   // alleen de pauzestand zet er een
+    if(document.title.startsWith(PAUZE_TITEL)) document.title=document.title.slice(PAUZE_TITEL.length);
+  }
 }
 
 // Nette foutmelding in beeld bij een harde laadfout (niet de zwijgende achtergrond-polls).
@@ -421,7 +430,10 @@ function showLoadError(opties){
       let email=null;
       try{
         await doOAuth(true);
-        if(!state.oauthToken){ showLoadError({soort:'sessie'}); return; }
+        // Geannuleerd of mislukt: de banner blijft, en de teller BLIJFT op 'banner staat' (3).
+        // Hierboven ging hij naar 0; bleef dat zo, dan deden de 8s-ronde en elke klik weer stille
+        // pogingen — elk een Google-venster — tot hij opnieuw op drie stond.
+        if(!state.oauthToken){ state._authFails=3; showLoadError({soort:'sessie'}); return; }
         // Hetzelfde als `doLogin`: `doOAuth(true)` toont juist de ACCOUNTKIEZER, en `ensureToken`
         // komt hier nooit meer aan toe (die keert terug zodra `currentUserEmail` gevuld is). Zonder
         // deze controle kan iemand per ongeluk zijn privé-Gmail kiezen: er staat dan een geldig
@@ -435,7 +447,7 @@ function showLoadError(opties){
       // geen token in de sessie te blijven staan. `doOAuth(true)` heeft hierboven de ACCOUNTKIEZER
       // getoond, dus dit token kan van een ander account zijn dan het ingelogde — en dan zou de
       // eerstvolgende poll met dat vreemde token gaan lezen en schrijven.
-      if(!email){ state.oauthToken=null; state.oauthExpiry=0; _wisTokenSessie(); showLoadError({soort:'sessie'}); return; }
+      if(!email){ state.oauthToken=null; state.oauthExpiry=0; _wisTokenSessie(); state._authFails=3; showLoadError({soort:'sessie'}); return; }
       if(!ALLOWED_EMAILS.includes(email.toLowerCase()) ||
          (state.currentUserEmail && email.toLowerCase()!==state.currentUserEmail.toLowerCase())){
         logout('Je logde in met een ander account. Log in met je VvE Beheer Collectief-account.');
@@ -443,7 +455,6 @@ function showLoadError(opties){
       }
       state.currentUserEmail=email;
       sessionStorage.setItem('currentUserEmail', email);
-      deelToken();   // ná de controle: de andere tabbladen van deze gebruiker kunnen meteen verder
     }
     loadAll();
   };
@@ -1226,7 +1237,7 @@ export {
   backgroundWrite, schrijfActieLoopt, metWriteMarkering, serieleWrite, setSyncing, setSaving, setSynced, setSyncErr, dot, loadAll, magPollen, parseSections, parseAlvo, parseAlfa, parseHerhaal,
   POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _zetLogAnker, _verwerkLogboek, _logVolledigNodig, _alfaNodig,
   MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen,
-  blokkeerOffline, blokkeerVersie, showOfflineBanner, clearOfflineBanner, setSyncOffline, setSyncGepauzeerd, PAUZE_TEKST, syncSelecteerStand, showLoadError, clearLoadError,
+  blokkeerOffline, blokkeerVersie, showOfflineBanner, clearOfflineBanner, setSyncOffline, setSyncGepauzeerd, PAUZE_TEKST, PAUZE_TITEL, syncSelecteerStand, showLoadError, clearLoadError,
   bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade,
   ruimCacheOp, _cacheVers, AF_POLL, vraagAfMailOp, afMailKaart,
 };

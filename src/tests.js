@@ -17002,6 +17002,34 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
           UI.goTo(paginaOud); M.renderAll();
         }
       }
+
+      // ── 2d. Ctrl+K: logboek zonder sorteren, stoppen bij genoeg, en niet bij elke toets ──
+      {
+        const P = await import('./palette.js');
+        let gelezen=0;
+        const ruw=Array.from({length:5000},(_,i)=>({ _row:5000-i, timestamp:new Date(Date.UTC(2026,0,1)+(5000-i)*6e4).toISOString(),
+          code:'LG-'+i, sectie:'OPPAKKEN', actie:'Opmerking', veld:'', oudeWaarde:'', nieuweWaarde:'dakgoot '+i, gebruiker:'jer' }));
+        const teller=new Proxy(ruw,{ get(t,k){ if(typeof k==='string' && /^\d+$/.test(k)) gelezen++; return t[k]; } });
+        const res=P.zoekAlles('dakgoot', { alvo:[], ntd:{}, af:{}, logboek:teller });
+        eq('palet: het logboek levert de eerste treffers in lijstvolgorde (nieuwste eerst)', res.logboek.map(e=>e.code), ['LG-0','LG-1','LG-2']);
+        truthy('palet: en stopt zodra er genoeg zijn (niet 5000 regels doorlopen)', gelezen<20);
+        // Debounce: een toets tekent niet meteen, Enter tekent eerst bij.
+        const bg=document.getElementById('pal-bg'), inp=document.getElementById('pal-input'), bd=document.getElementById('pal-bd');
+        const logO=D.logboek, alvoO=D.alvo;
+        try{
+          D.alvo=[{ code:'PZ-1', naam:'Paletzoekhof', status:'', _row:2 }]; D.logboek=[];
+          P.openPalette();
+          inp.value='paletzoek'; inp.dispatchEvent(new Event('input'));
+          eq('palet: direct na een toets nog geen nieuwe zoekronde', /Paletzoekhof/.test(bd.textContent), false);
+          await new Promise(r=>setTimeout(r,150));
+          truthy('palet: na een korte pauze wél', /Paletzoekhof/.test(bd.textContent));
+          inp.value='niets-dat-bestaat-xyz'; inp.dispatchEvent(new Event('input'));
+          inp.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true}));
+          eq('palet: een pijltoets tekent eerst de wachtende ronde (nooit een lijst van een oude zoekterm bedienen)', /Paletzoekhof/.test(bd.textContent), false);
+        } finally {
+          P.closePalette(); D.logboek=logO; D.alvo=alvoO; inp.value='';
+        }
+      }
     } catch(e) {
       truthy('review 02-10: geen uitzondering — '+(e && e.stack || e), false);
     } finally {

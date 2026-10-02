@@ -72,24 +72,40 @@ function zoekAlles(q, data, max){
     return (parseDt(b.datum)||0)-(parseDt(a.datum)||0);   // daarna: laatst afgerond bovenaan
   });
   res.afgerond=alleAf.slice(0,max.afgerond);
-  res.logboek=(data.logboek||[])
-    // Alleen regels MÉT VvE-code: klikken op een treffer opent het dossier van die code, en een
-    // logregel zonder code (de ALV-reset schrijft er zo een) leidde naar een leeg dossier.
-    .filter(e=>String(e.code||'').trim())
-    .filter(e=>hit(e.code,e.actie,e.veld,e.oudeWaarde,e.nieuweWaarde,displayName(e.gebruiker)))
-    .sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp))
-    .slice(0,max.logboek);
+  // Het logboek staat al NIEUWSTE-EERST: parseLogboek draait de Sheet-volgorde om (een append komt
+  // onderaan, dus de laatste rij is de nieuwste) en de nog-niet-bevestigde eigen regels staan
+  // vooraan (_verwerkLogboek in data.js). Dus niet alles filteren en dan sorteren — met twee
+  // `new Date` per vergelijking, over duizenden regels, bij élke toetsaanslag — maar van voren af
+  // lopen en stoppen zodra er genoeg treffers zijn.
+  // Alleen regels MÉT VvE-code: klikken op een treffer opent het dossier van die code, en een
+  // logregel zonder code (de ALV-reset schrijft er zo een) leidde naar een leeg dossier.
+  const log=data.logboek||[];
+  for(let i=0; i<log.length && res.logboek.length<max.logboek; i++){
+    const e=log[i];
+    if(!String(e.code||'').trim()) continue;
+    if(hit(e.code,e.actie,e.veld,e.oudeWaarde,e.nieuweWaarde,displayName(e.gebruiker))) res.logboek.push(e);
+  }
   return res;
 }
 
 // ── UI-laag ──────────────────────────────────────────────────────────
 let _palItems=[];   // platte lijst aanklikbare items (over groepsgrenzen heen)
+const PAL_DEBOUNCE_MS=80;
+let _palTimer=null; // een nog niet getekende zoekronde (zie initPalette)
+// Een wachtende ronde meteen tekenen. Voor de toetsen die op de lijst werken (pijltjes, Enter):
+// die mogen nooit een lijst van een eerdere zoekterm bedienen.
+function palBij(){
+  if(_palTimer==null) return;
+  clearTimeout(_palTimer); _palTimer=null; _palSel=0;
+  renderPal(document.getElementById('pal-input')?.value||'');
+}
 let _palSel=0;      // geselecteerde index (pijltjes)
 
 function openPalette(){
   document.getElementById('pal-bg').classList.add('open');
   const inp=document.getElementById('pal-input');
   inp.value='';
+  clearTimeout(_palTimer); _palTimer=null;   // geen ronde van een vorige opening meer laten landen
   _palSel=0;
   renderPal('');
   setTimeout(()=>inp.focus(),30);
@@ -176,6 +192,7 @@ function renderPal(q){
 function palKies(idx){ const it=_palItems[idx]; if(it) it.doe(); }
 
 function palToets(e){
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'||e.key==='Enter') palBij();
   if(e.key==='ArrowDown'){ e.preventDefault(); _palSel=Math.min(_palSel+1,_palItems.length-1); _palMarkeer(); }
   else if(e.key==='ArrowUp'){ e.preventDefault(); _palSel=Math.max(_palSel-1,0); _palMarkeer(); }
   else if(e.key==='Enter'){ e.preventDefault(); palKies(_palSel); }
@@ -189,7 +206,14 @@ function _palMarkeer(){
 }
 function initPalette(){
   const inp=document.getElementById('pal-input');
-  inp.addEventListener('input',()=>{ _palSel=0; renderPal(inp.value); });
+  // Na een korte pauze in het typen, niet bij élke toets: elke ronde doorzoekt alle open en
+  // afgeronde taken, het VvE-register en het logboek. Wie 'dakgoot' typt kreeg zeven volledige
+  // rondes waarvan alleen de laatste te zien was. Enter kiest altijd op de lijst van NU: palToets
+  // tekent eerst bij als er nog een ronde klaarstaat (palBij).
+  inp.addEventListener('input',()=>{
+    clearTimeout(_palTimer);
+    _palTimer=setTimeout(()=>{ _palTimer=null; _palSel=0; renderPal(inp.value); }, PAL_DEBOUNCE_MS);
+  });
   inp.addEventListener('keydown',palToets);
   document.getElementById('pal-bg').addEventListener('mousedown',e=>{ if(e.target.id==='pal-bg') closePalette(); });
   document.getElementById('zoek-btn').onclick=openPalette;

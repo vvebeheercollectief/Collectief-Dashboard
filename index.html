@@ -107,7 +107,7 @@
     <button class="ico-btn hamburger" id="hamburger" aria-label="Menu" aria-expanded="false" aria-controls="sb">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
     </button>
-    <div class="hdr-info"><h1 id="page-title">Nog Te Doen</h1><p id="page-sub">Openstaande taken en actiepunten</p><div class="kop-pillen" id="ntd-kop-pillen" hidden></div></div>
+    <div class="hdr-info"><h1 id="page-title">Nog Te Doen</h1><div class="kop-pillen" id="ntd-kop-pillen" hidden></div></div>
     <button class="ico-btn" id="zoek-btn" title="Zoeken (Ctrl+K)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
     </button>
@@ -215,7 +215,7 @@
       <div class="stat-strip" id="alvo-stats"></div>
       <div class="card">
         <div class="card-hdr">
-          <h2>ALV's Overzicht</h2>
+          <h2 class="alleen-voorlezer">ALV's Overzicht</h2>
           <div class="filter-bar">
             <div class="search-box">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
@@ -248,7 +248,7 @@
     <div class="page" id="page-alfa">
       <div class="card">
         <div class="card-hdr">
-          <h2>ALV's Afgerond</h2>
+          <h2 class="alleen-voorlezer">ALV's Afgerond</h2>
           <div class="search-box">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
             <input type="text" id="s-alfa" placeholder="Zoek…" aria-label="Zoek in afgeronde ALV's"/>
@@ -329,7 +329,7 @@
     <div class="page" id="page-logboek">
       <div class="card">
         <div class="card-hdr">
-          <h2>Logboek</h2>
+          <h2 class="alleen-voorlezer">Logboek</h2>
           <div class="filter-bar">
             <div class="search-box">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
@@ -363,7 +363,7 @@
     <div class="page" id="page-herhaal">
       <div class="card">
         <div class="card-hdr">
-          <h2>Herhaalregels</h2>
+          <h2 class="alleen-voorlezer">Herhaalregels</h2>
           <div class="filter-bar">
             <span id="herhaal-sub" style="font-size:12px;color:var(--mut)"></span>
             <button class="btn btn-pri btn-sm" id="btn-add-herhaal"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Nieuwe herhaalregel</button>

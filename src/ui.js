@@ -40,18 +40,13 @@ function zetBijOpenen(fn){ _bijOpenen = fn; }
 // die hij verlaat; terugVanDossier (render-vve.js) zet hem terug met herstelScroll.
 const _scrollPerPagina = {};
 
-// De kop-pillen vervangen de ondertitel op Nog Te Doen — maar pas zodra ze gevuld zijn.
-// Tot de eerste databeurt binnen is blijft de ondertitel staan, anders toont de kop
-// tijdens het laden alleen de titel en verder niets.
+// De kop-tellers horen alleen bij Nog Te Doen. Tot v13.5 stond op de andere pagina's een
+// ondertitel naast de titel ('Voortgang vergaderingen per VvE'); die is in de afwerking (v13.6)
+// weg: niemand las hem en hij herhaalde wat de pagina zelf al laat zien. De tweede waarde in
+// PAGE_META blijft bestaan als omschrijving voor wie de code leest, maar komt niet meer in beeld.
 function syncKop(){
-  const [,s] = PAGE_META[_pagina] || ['',''];
-  const sub = document.getElementById('page-sub');
   const pillen = document.getElementById('ntd-kop-pillen');
-  const opNtd = _pagina === 'ntd';
-  const gevuld = !!(pillen && pillen.children.length);
-  sub.textContent = opNtd && gevuld ? '' : s;
-  sub.hidden = opNtd && gevuld;
-  if (pillen) pillen.hidden = !opNtd;
+  if (pillen) pillen.hidden = _pagina !== 'ntd';
 }
 
 function goTo(page){
@@ -78,7 +73,7 @@ function goTo(page){
     el.setAttribute('aria-current',actief?'page':'false');
   });
   document.querySelectorAll('.page').forEach(el=>el.classList.toggle('active',el.id==='page-'+page));
-  const[t]=PAGE_META[page]||['',''];   // ondertitel haalt syncKop zelf op
+  const[t]=PAGE_META[page]||['',''];
   document.getElementById('page-title').textContent=t;
   _pagina = page;
   syncKop();

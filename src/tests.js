@@ -5814,30 +5814,18 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     }
   })();
 
-  // ── De pillen horen alleen bij Nog Te Doen; elders staat de ondertitel ──
+  // ── De tellers horen alleen bij Nog Te Doen; een ondertitel bestaat niet meer (v13.6) ──
   (()=>{
     const pillen = document.getElementById('ntd-kop-pillen');
-    const sub    = document.getElementById('page-sub');
+    eq('afwerking: er staat geen ondertitel meer in de kop', document.getElementById('page-sub'), null);
     // Dit blok wisselt van pagina; zonder herstel eindigt een ?test=1-ronde op Nog Te Doen
     // i.p.v. de startpagina, met de neptellingen van een eerder testblok in de kop.
     const _paginaVoor = (document.querySelector('.page.active')?.id||'page-ntd').replace('page-','');
     try{
-      // Met nog lege pillen (vóór de eerste databeurt) moet de ondertitel blijven staan,
-      // anders toont de kop tijdens het laden alleen de titel.
-      const _pilHtml = pillen.innerHTML;
-      pillen.innerHTML = '';
-      goTo('ntd');
-      truthy('lege pillen → ondertitel blijft staan', !sub.hidden);
-      truthy('lege pillen → ondertitel heeft tekst', sub.textContent.length > 0);
-      pillen.innerHTML = _pilHtml;
-
       goTo('ntd');
       truthy('op NTD zijn de pillen zichtbaar', !pillen.hidden);
-      truthy('op NTD is de ondertitel verborgen', sub.hidden);
       goTo('alvo');
       truthy('elders zijn de pillen verborgen', pillen.hidden);
-      truthy('elders is de ondertitel zichtbaar', !sub.hidden);
-      truthy('elders staat er tekst in de ondertitel', sub.textContent.length > 0);
       goTo('ntd');
       truthy('terug op NTD zijn de pillen weer zichtbaar', !pillen.hidden);
     } finally {
@@ -6261,7 +6249,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '13.5');
+  eq('versie opgehoogd', APP_VERSION, '13.6');
 
   // ── Tabbladen ÍN de kaartkop (v11.7) ──
   // De kop van de kaart zei links exact hetzelfde als het actieve tabblad — 'Oppakken' boven

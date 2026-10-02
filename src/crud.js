@@ -44,8 +44,6 @@ import { zetWeekKiezer } from './weekkiezer.js';
 function toonSectie(sec,isEdit){
   state.editSec=sec;
   document.getElementById('m-title').textContent=(isEdit?'Taak bewerken — ':'Taak toevoegen — ')+SECS[sec].label;
-  // Section colour for focus rings
-  document.documentElement.style.setProperty('--modal-sec',SECS[sec].color);
   // Show correct field group
   Object.values(FG_PER_SECTIE).forEach(id=>{const el=document.getElementById(id);if(el)el.style.display='none';});
   const fg=FG_PER_SECTIE[sec];

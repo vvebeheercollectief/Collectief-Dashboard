@@ -22,7 +22,7 @@ import { opmaakHtml, opmaakBalk } from "./opmaak.js";
 //  ONTWIKKELING
 // ══════════════════════════════════════
 const ONTW_CATS=['Opmerkingen','Verbeteringen','Vragen aan Cihan','Ideeën'];
-const ONTW_CAT_COLORS={'Opmerkingen':'var(--ac)','Verbeteringen':'var(--gn)','Vragen aan Cihan':'var(--am)','Ideeën':'var(--pu)'};
+const ONTW_CAT_COLORS={'Opmerkingen':'var(--ac)','Verbeteringen':'var(--gn)','Vragen aan Cihan':'var(--am)','Ideeën':'var(--ac)'};
 
 function parseOntw(rows){
   if(!rows||rows.length<2) return [];
@@ -57,7 +57,7 @@ function renderOntw(){
     else if(c==='Afgerond') cnt=doneItems.length;
     else cnt=openItems.filter(r=>r.categorie===c).length;
     const activeStyle = c===state.activeOntw
-      ? (c==='Afgerond' ? '--sec:var(--gn);--sec-l:var(--gn-l);--sec-b:var(--gn-b)' : '--sec:var(--pk);--sec-l:var(--pk-l);--sec-b:var(--pk-b)')
+      ? (c==='Afgerond' ? '--sec:var(--gn);--sec-l:var(--gn-l);--sec-b:var(--gn-b)' : '--sec:var(--ac);--sec-l:var(--ac-l);--sec-b:var(--ac-b)')
       : '';
     return`<button type="button" class="tab ${c===state.activeOntw?'on':''}" role="tab" aria-selected="${c===state.activeOntw}" style="${activeStyle}" data-action="ontw-cat" data-cat="${esc(c)}">${c}<span class="cnt">${cnt}</span></button>`;
   }).join('');
@@ -68,7 +68,7 @@ function renderOntw(){
   else rows=openItems.filter(r=>r.categorie===state.activeOntw);
   // (het zoekfilter zit al in openItems/doneItems hierboven)
 
-  renderThead('ontw-thead',['Titel','Categorie','Inhoud','Door','Datum','Status',''],'--sec:var(--pk);--sec-l:var(--pk-l);--sec-b:var(--pk-b)');
+  renderThead('ontw-thead',['Titel','Categorie','Inhoud','Door','Datum','Status',''],'--sec:var(--ac);--sec-l:var(--ac-l);--sec-b:var(--ac-b)');
   // Clamp, zoals de ALV-lijsten al doen: verwijder je op pagina 2 het laatste item, dan wees
   // pgs.ontw naar een pagina die niet meer bestaat en bleef de lijst permanent op 'Geen
   // resultaten' staan — óók na verversen, want niets zette het paginanummer terug.
@@ -282,17 +282,17 @@ function actieBadge(actie){
   const map={
     'Afgerond':['--sec:var(--gn);--sec-l:var(--gn-l)',ico('vink')],
     'Verwijderd':['--sec:var(--rd);--sec-l:var(--rd-l)',ico('kruis')],
-    'Aangemaakt':['--sec:var(--pu);--sec-l:var(--pu-l)',ico('plus')],
+    'Aangemaakt':['--sec:var(--ac);--sec-l:var(--ac-l)',ico('plus')],
     'Teruggezet':['--sec:var(--am);--sec-l:var(--am-l)',ico('ongedaan')],
     'Behandelaar gewijzigd':['--sec:var(--ac);--sec-l:var(--ac-l)',ico('persoon')],
-    'Aangemaakt (sheet)':['--sec:var(--pu);--sec-l:var(--pu-l)',ico('plus')],
+    'Aangemaakt (sheet)':['--sec:var(--ac);--sec-l:var(--ac-l)',ico('plus')],
     'Opmerking':['--sec:var(--am);--sec-l:var(--am-l)',ico('chat')],
     'Contact':['--sec:var(--ac);--sec-l:var(--ac-l)',ico('telefoon')],
-    'Kenmerk':['--sec:var(--pu);--sec-l:var(--pu-l)',ico('klembord')],
-    'Fase gewijzigd':['--sec:var(--tl);--sec-l:var(--tl-l)',ico('chevronRechts')],
+    'Kenmerk':['--sec:var(--ac);--sec-l:var(--ac-l)',ico('klembord')],
+    'Fase gewijzigd':['--sec:var(--ac);--sec-l:var(--ac-l)',ico('chevronRechts')],
     // Zelfde paars/pauze als de Opgevolgd-knop en zijn toast; teruggezet in het amber/ongedaan
     // van de andere terugzet-acties.
-    'Opgevolgd':['--sec:var(--pu);--sec-l:var(--pu-l)',ico('pauze')],
+    'Opgevolgd':['--sec:var(--ac);--sec-l:var(--ac-l)',ico('pauze')],
     'Opvolgdatum teruggezet':['--sec:var(--am);--sec-l:var(--am-l)',ico('ongedaan')],
   };
   const[css,badgeIco]=map[actie]||['',''];
@@ -301,7 +301,7 @@ function actieBadge(actie){
 
 // Filterstatus voor de tijdlijn (leeg = alles)
 
-const _LOG_AVKLEUR={Jer:'var(--ac)',Cihad:'var(--pu)',Gabos:'var(--pk)',Cihan:'var(--am)'};
+const _LOG_AVKLEUR={Jer:'var(--ac)',Cihad:'var(--ac)',Gabos:'var(--ac)',Cihan:'var(--am)'};
 function avatarKleur(naam){ return _LOG_AVKLEUR[naam] || 'var(--nv)'; }
 
 function logDayLabel(iso){
@@ -318,8 +318,8 @@ function logDayLabel(iso){
 
 // Eén kleurbron per logboek-actie: het werkwoord in de zin én de stip van de dunne
 // regel gebruiken dezelfde kleur, zodat ze elkaar nooit tegenspreken.
-const LOG_KLEUR={Afgerond:'var(--gn)',Aangevinkt:'var(--gn)',Uitgevinkt:'var(--am)',Teruggezet:'var(--am)',Opmerking:'var(--am)',Verwijderd:'var(--rd)','Behandelaar gewijzigd':'var(--ac)',Contact:'var(--ac)',Aangemaakt:'var(--pu)','Aangemaakt (sheet)':'var(--pu)',Kenmerk:'var(--pu)',Weggelegd:'var(--am)','Opvolgdatum gewist':'var(--am)','Auto-prioriteit':'var(--mut)',Opgevolgd:'var(--pu)','Opvolgdatum teruggezet':'var(--am)'};
-const logKleur=a=>LOG_KLEUR[a]||'var(--pu)';
+const LOG_KLEUR={Afgerond:'var(--gn)',Aangevinkt:'var(--gn)',Uitgevinkt:'var(--am)',Teruggezet:'var(--am)',Opmerking:'var(--am)',Verwijderd:'var(--rd)','Behandelaar gewijzigd':'var(--ac)',Contact:'var(--ac)',Aangemaakt:'var(--ac)','Aangemaakt (sheet)':'var(--ac)',Kenmerk:'var(--ac)',Weggelegd:'var(--am)','Opvolgdatum gewist':'var(--am)','Auto-prioriteit':'var(--mut)',Opgevolgd:'var(--ac)','Opvolgdatum teruggezet':'var(--am)'};
+const logKleur=a=>LOG_KLEUR[a]||'var(--ac)';
 
 // Eén zinnengenerator voor alle logregels (gedeeld door Logboek-pagina en VvE-dossier).
 // opts.zonderCode → laat de VvE-code weg; in een dossier is die redundant.

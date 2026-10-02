@@ -5,7 +5,7 @@ import { ALLOWED_EMAILS } from '../allowed-emails.js';
 
 // ── Versie (zichtbaar in de UI) ────────────────────────────────────────
 // Ophogen bij ELKE wijziging: 4.1, 4.2, … 5.0 voor grote sprongen.
-export const APP_VERSION = '13.6';
+export const APP_VERSION = '13.7';
 
 // ── Omgeving (productie vs. testomgeving) ──────────────────────────────
 // Fail-safe: alleen deze exacte hosts zijn PRODUCTIE; al het andere
@@ -124,15 +124,15 @@ export const SECS = {
     cols:['VvE Code','VvE','Actiepunt','Deadline','Wie','Opmerkingen'],
                    breedtes:['130px',27.3,38,'165px',7,27.7,'150px'],
     keys:['code','naam','actiepunt','deadline','behandelaar','prioriteit','opmerkingen','inBehandeling']},
-  VERGADERVERZOEKEN:{label:'Vergaderverzoeken',css:'--sec:var(--am);--sec-l:var(--am-l);--sec-b:var(--am-b)',color:'#AE5008',
+  VERGADERVERZOEKEN:{label:'Vergaderverzoeken',css:'--sec:var(--ac);--sec-l:var(--ac-l);--sec-b:var(--ac-b)',color:'#AE5008',
     cols:['VvE Code','VvE','Periode','Agendapunten','Wie','Deadline uitschr.','Opmerkingen'],
                    breedtes:['130px',26,19.1,23,7,'165px',21.1,'150px'],
     keys:['code','naam','periode','agendapunten','behandelaar','deadline','opmerkingen','inBehandeling']},
-  'OFFERTE-TRAJECTEN':{label:'Offerte-trajecten',css:'--sec:var(--pu);--sec-l:var(--pu-l);--sec-b:var(--pu-b)',color:'#6855C9',
+  'OFFERTE-TRAJECTEN':{label:'Offerte-trajecten',css:'--sec:var(--ac);--sec-l:var(--ac-l);--sec-b:var(--ac-b)',color:'#6855C9',
     cols:['VvE Code','VvE','Datum aangevr.','Ontvangen/Aangevr.','Behandelaar','Deadline','Opmerkingen'],
                    breedtes:['130px',19.6,'165px',24.5,16.5,'165px',16.9,'120px'],
     keys:['code','naam','datumAangevraagd','offertes','behandelaar','deadline','opmerkingen']},
-  LOD:{label:'LOD',css:'--sec:var(--rd);--sec-l:var(--rd-l);--sec-b:var(--rd-b)',color:'#B91C1C',
+  LOD:{label:'LOD',css:'--sec:var(--ac);--sec-l:var(--ac-l);--sec-b:var(--ac-b)',color:'#B91C1C',
     cols:['VvE Code','VvE','Actiepunt','Status','Wie','Deadline LOD','Opmerkingen'],
                    breedtes:['130px',24,29.7,20,7,'165px',25.6,'150px'],
     keys:['code','naam','actiepunt','status','behandelaar','deadline','opmerkingen','inBehandeling']},
@@ -145,14 +145,15 @@ export const SECS = {
   //     een var()-string overweg.
   // Opmerkingen (kolom G) bestaat wel als veld maar staat bewust niet in `cols`:
   // de gebruiker koos zes kolommen om de rij rustig te houden.
-  'SUBSIDIE-TRAJECTEN':{label:'Subsidie-trajecten',css:'--sec:var(--tl);--sec-l:var(--tl-l);--sec-b:var(--tl-b)',color:'#0F766E',
+  'SUBSIDIE-TRAJECTEN':{label:'Subsidie-trajecten',css:'--sec:var(--ac);--sec-l:var(--ac-l);--sec-b:var(--ac-b)',color:'#0F766E',
     cols:['VvE Code','VvE','Subsidie','Fase','Behandelaar','Deadline'],
                    breedtes:['130px',27.5,19,19,13.3,'165px','150px'],
     keys:['code','naam','subsidie','subsidieFase','behandelaar','deadline','opmerkingen','inBehandeling']},
   // CRM (v13.0, 2026-09-23): vragen, klachten en meldingen van eigenaren die op antwoord wachten.
   // Volledig los van Subsidie-trajecten — eigen fases (crm-fase.js), eigen kleur, eigen blok.
   //   - de sleutel heet `crmFase`, NIET `fase` (zelfde reden als `subsidieFase`).
-  //   - `color` is de letterlijke hex van --pk (roze): groen betekent 'afgerond', teal is Subsidie.
+  //   - `color` (roze) wordt alleen nog in de grafieken op Analytics gebruikt; in de app zelf is
+  //     CRM sinds v13.7 leiblauw, net als elk ander tabblad.
   //   - Van/Ontvangen/Soort/Mail staan NIET in `keys` (dat mag er maar 8 hebben, zie afOff in
   //     parseSections) maar in de vaste kolommen T..W, net als taaknummer en bundel op Q..S.
   //   - 'Van' en 'Wacht' zijn kolommen zonder eigen sleutel: Van toont `afzender`, Wacht rekent
@@ -160,7 +161,7 @@ export const SECS = {
   // Breedtes: 'Van' vast op 150 (naam + huisnummer eronder), 'Fase' op 176 (vier bolletjes met
   // 'Wacht op reactie' eronder), 'Wacht' op 120 ('33 dagen' / '26d te laat', en 'Geen deadline' = 94px), 'Wie' vast op 76
   // (twee ronde naamplaatjes; als gewicht werd dat bij de smalste tabel 42px en brak de kop af).
-  CRM:{label:'CRM',css:'--sec:var(--pk);--sec-l:var(--pk-l);--sec-b:var(--pk-b)',color:'#BE185D',
+  CRM:{label:'CRM',css:'--sec:var(--ac);--sec-l:var(--ac-l);--sec-b:var(--ac-b)',color:'#BE185D',
     cols:['VvE Code','VvE','Vraag','Van','Fase','Wacht','Wie'],
                    breedtes:['130px',24,40,'150px','176px','120px','76px','150px'],
     keys:['code','naam','onderwerp','crmFase','behandelaar','deadline','opmerkingen','inBehandeling']},

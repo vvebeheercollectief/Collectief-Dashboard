@@ -64,7 +64,7 @@ const TOAST_ICONS  = {
 // nog wel mee op een bestaande tag (dat is de enige tag die mensen op hun toestel hebben staan),
 // maar in de app horen ze altijd zichtbaar te zijn — een stil dossier dat escaleert is de zwaarste
 // melding die dit systeem kent en mag niet verdwijnen omdat iemand 'Nieuwe taak' heeft uitgezet.
-const TOAST_COLORS = { n_newtask:'var(--ac)', n_assigned:'var(--gn)', n_deadline:'var(--am)', n_alv:'var(--pu)', n_daily:'var(--am)',
+const TOAST_COLORS = { n_newtask:'var(--ac)', n_assigned:'var(--gn)', n_deadline:'var(--am)', n_alv:'var(--ac)', n_daily:'var(--am)',
                        n_escalatie:'var(--rd)', n_opvolg:'var(--am)', n_herhaal:'var(--ac)', test:'var(--ac)' };
 const TOAST_DURATION = 5000;
 // Dedup-venster: vangt de dubbele toast (zelfde event via directe fire én via de meelezende

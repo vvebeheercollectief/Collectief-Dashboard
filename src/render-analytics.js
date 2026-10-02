@@ -721,12 +721,12 @@ function buildDash(){
 
   // Recent afgerond
   const secPill={
-    OPPAKKEN:`<span style="background:var(--bl-l);color:var(--bl)" class="badge">Oppakken</span>`,
+    OPPAKKEN:`<span style="background:var(--ac-l);color:var(--ac)" class="badge">Oppakken</span>`,
     VERGADERVERZOEKEN:`<span style="background:var(--am-l);color:var(--am)" class="badge">Vergadering</span>`,
-    'OFFERTE-TRAJECTEN':`<span style="background:var(--pu-l);color:var(--pu)" class="badge">Offerte</span>`,
+    'OFFERTE-TRAJECTEN':`<span style="background:var(--ac-l);color:var(--ac)" class="badge">Offerte</span>`,
     LOD:`<span style="background:var(--rd-l);color:var(--rd)" class="badge">LOD</span>`,
-    'SUBSIDIE-TRAJECTEN':`<span style="background:var(--tl-l);color:var(--tl)" class="badge">Subsidie</span>`,
-    'CRM':`<span style="background:var(--pk-l);color:var(--pk)" class="badge">CRM</span>`,
+    'SUBSIDIE-TRAJECTEN':`<span style="background:var(--ac-l);color:var(--ac)" class="badge">Subsidie</span>`,
+    'CRM':`<span style="background:var(--ac-l);color:var(--ac)" class="badge">CRM</span>`,
   };
   const all=SKEYS.flatMap(s=>(D.af[s]||[]).map(r=>({...r,_sec:s})));
   all.sort((a,b)=>parseDt(b.datum)-parseDt(a.datum));

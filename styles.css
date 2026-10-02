@@ -10,24 +10,21 @@
       --r:8px;--rs:6px;--sh:none;
       --shm:0 6px 24px rgba(16,22,34,.10);--shl:0 16px 48px rgba(16,22,34,.16);
       --sb:240px;--hh:60px;--tr:.17s ease;
-      --bl:#1D6AA5;--bl-l:#E0EEF9;--bl-b:#B8D4EC;
-      /* B45309 -> AE5008 (v11.8): zelfde reden als bij --pu hieronder. Als tekst op --am-l stond
-         amber op 4,51:1 — nét boven de 4,5, te krap om op te vertrouwen. Nu 4,77. */
+      /* Eén accent (v13.7, afwerking). De vier sectiekleuren (--bl blauw, --pu paars, --pk roze,
+         --tl teal) zijn weg: elk tabblad, fasebolletje en sectielabel gebruikt nu --ac. Kleur
+         betekent alleen nog iets: --rd te laat, --am binnenkort/in behandeling, --gn afgerond.
+         De grafieken op Analytics houden hun eigen reeks (SECS[...].color in config.js): daar is
+         onderscheid tussen categorieën de inhoud zelf.
+         B45309 -> AE5008 (v11.8): als tekst op --am-l stond amber op 4,51:1 — te krap. Nu 4,77. */
       --am:#AE5008;--am-l:#fef3c7;--am-b:#FCD34D;
-      /* 6D5BD0 -> 6855C9 (v11.8): met de gekleurde kolombalk staat --pu nu ook als TEKST op
-         --pu-l, en dat haalde 4,39:1 — net onder de 4,5 die dit project aanhoudt. Drie procent
-         donkerder maakt er 4,78 van; het verschil is met het oog niet te zien en overal waar
-         --pu al stond (pillen, badges, de kaartkleur) wordt het contrast alleen beter.
-         Zelfde soort ingreep als --sig-crit hierboven. */
-      --pu:#6855C9;--pu-l:#EEEAFD;--pu-b:#D4CCFA;
       --rd:#B91C1C;--rd-l:#fee2e2;--rd-b:#fecaca;
       --gn:#047857;--gn-l:#d1fae5;--gn-b:#a7f3d0;
-      --pk:#BE185D;--pk-l:#fce7f3;--pk-b:#fbcfe8;
-      /* Teal = sectiekleur Subsidie-trajecten. Bewust niet --gn: groen betekent in
-         dit dashboard overal 'afgerond' (afrondknop, status-afgerond, check-yes). */
-      --tl:#0F766E;--tl-l:#e3f2f0;--tl-b:#b3ddd7;
       /* Accent = Operator-leiblauw (#4a5b7a) i.p.v. teal */
       --ac:#4a5b7a;--ac-l:#eef1f6;--ac-b:#d6deea;--ac-900:#3a4a66;--ac-500:#6f81a3;
+      /* Focusrand en schakelaar in het bewerkscherm. Bewust NIET in [data-theme=dark] herhaald:
+         de schakelaar draagt een witte knop en die vraagt in beide thema's een donkere vulling.
+         Tot v13.6 zette crud.js hier per sectie een eigen kleur in. */
+      --modal-sec:#4a5b7a;
       --nv:#2B3544;--nv-d:#1E2530;
       /* Zijbalk — Operator donker (vast, in beide thema's) */
       --sbbg:#1b1e24;--sbedge:#2a2e36;--sbglow:#7f9ce0;
@@ -58,13 +55,9 @@
       --txt:#f2f4f7;--mut:#9aa1ad;--fnt:#6b7280;
       --sh:none;
       --shm:0 8px 28px rgba(0,0,0,.5);--shl:0 24px 64px rgba(0,0,0,.65);
-      --bl:#5FA8E0;--bl-l:#15293D;--bl-b:#244159;
       --am:#F0B44C;--am-l:#382912;--am-b:#5A451F;
-      --pu:#A896F0;--pu-l:#241C44;--pu-b:#392C62;
       --rd:#F0746F;--rd-l:#371A1B;--rd-b:#582A2A;
       --gn:#34D39A;--gn-l:#103129;--gn-b:#1F4A3C;
-      --pk:#F06BAA;--pk-l:#371628;--pk-b:#582441;
-      --tl:#5EC8BC;--tl-l:#10302E;--tl-b:#1F5049;
       --ac:#8b9dc4;--ac-l:#262b35;--ac-b:#3a4256;--ac-900:#a8b8d8;--ac-500:#9fb0d4;
       --fg:#f2f4f7;--prio:#e08b82;--sig-crit:#f0a29a;
     }
@@ -169,23 +162,23 @@
     /* V3 — lichte, menselijke actieknoppen (Afronden / Bewerken) */
     .acts{display:flex;gap:5px;align-items:center}
     /* Inline-acties (altijd zichtbaar) — Operator: groene afrond-knop + grijze icoonknoppen */
-    .act-af{height:28px;padding:0 11px;border-radius:6px;background:#eef6f1;border:1px solid #cfe0d6;color:#3a7a55;font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0;cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;transition:all var(--tr)}
-    .act-af:hover{background:#3a7a55;border-color:#3a7a55;color:#fff}
+    .act-af{height:28px;padding:0 11px;border-radius:6px;background:none;border:1px solid transparent;color:var(--ac);font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0;cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;transition:all var(--tr)}
+    .act-af:hover{background:var(--ac);border-color:var(--ac);color:#fff}
     .act-af svg{width:14px;height:14px}
         /* #888f9b i.p.v. #9aa1ad: dit pictogram haalde 2,60:1 op wit en een pictogram moet 3:1 halen.
        Op de donkere kaart komt dezelfde kleur op 4,7:1 uit, dus één waarde volstaat. */
-    .act-bw{height:28px;padding:0 11px;border-radius:6px;background:var(--sur);border:1px solid #e8eaee;color:#888f9b;font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0;cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;transition:all var(--tr)}
-    .act-bw:hover{background:var(--sur2);color:var(--txt);border-color:var(--bor-input)}
+    .act-bw{height:28px;padding:0 11px;border-radius:6px;background:none;border:1px solid transparent;color:#888f9b;font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0;cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;transition:all var(--tr)}
+    .act-bw:hover{background:var(--row-hover);color:var(--txt)}
     .act-bw svg{width:13px;height:13px}
     .act-ico{padding:0;width:28px;justify-content:center}
     /* 'In behandeling' vanaf de rij. Uit staat hij precies zo neutraal als de bewerk- en
        weglegknop ernaast (`.act-bw`), aan kleurt hij amber — dezelfde twee kleurtokens als het
        'In behandeling'-label in het bundelpaneel (`.bdl-ib`), zodat dezelfde toestand op twee
        plekken niet twee kleuren krijgt. */
-    .act-ib{height:28px;padding:0;width:28px;justify-content:center;border-radius:6px;background:var(--sur);border:1px solid #e8eaee;color:#888f9b;font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;transition:all var(--tr)}
-    .act-ib:hover{background:var(--sur2);color:var(--txt);border-color:var(--bor-input)}
+    .act-ib{height:28px;padding:0;width:28px;justify-content:center;border-radius:6px;background:none;border:1px solid transparent;color:#888f9b;font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;transition:all var(--tr)}
+    .act-ib:hover{background:var(--row-hover);color:var(--txt)}
     .act-ib svg{width:13px;height:13px}
-    .act-ib.aan{background:var(--am-l);border-color:var(--am-b);color:var(--am)}
+    .act-ib.aan{color:var(--am)}
     .act-ib.aan:hover{background:var(--am);border-color:var(--am);color:#fff}
     tr.ib-row td{background:#fafbfc!important;border-color:var(--row-divider)!important}
     tr.ib-row .code{background:none!important;color:#6b7280!important}
@@ -258,7 +251,7 @@
     .filter-check{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 12px;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rs);color:var(--txt);font-size:13px;font-weight:500;cursor:pointer;user-select:none;white-space:nowrap;transition:border var(--tr),box-shadow var(--tr)}
     .filter-check:hover{border-color:var(--ac-b)}
     .filter-check:focus-within{border-color:var(--ac);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 14%,transparent)}
-    .filter-check input{accent-color:var(--bl);width:15px;height:15px;margin:0;cursor:pointer}
+    .filter-check input{accent-color:var(--ac);width:15px;height:15px;margin:0;cursor:pointer}
     /* Filterbalk-knoppen: gelijke hoogte + on-brand */
     .filter-bar .btn{height:36px;padding:0 16px;border-radius:var(--rs);font-size:13px;font-weight:600}
     .filter-bar .btn-sm{padding:0 13px}
@@ -359,7 +352,9 @@
        alleen de selecteerstand en een toekomstige letter- of labelwijziging op. */
     thead th{background:var(--sur2);padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--bor);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     /* Sorteerbare kolomkoppen (NTD): knop erft de th-typografie; pijl toont de richting */
-    /* De kolombalk draagt de kleur van het tabblad waar je in zit (v11.8, op verzoek).
+    /* De kolombalk draagt een lichte tint van het accent, op elk tabblad dezelfde (v13.7: de
+       zes tabkleuren van v11.8 zijn één leiblauw geworden; grijs vond de gebruiker te levenloos).
+       Oorspronkelijk (v11.8): de kolombalk droeg de kleur van het tabblad waar je in zit.
        De waarden komen uit SECS[...].css, dat renderThead als inline stijl op elke <th> zet —
        die stonden er al, ze werden alleen niet gebruikt. Blauwgrijs bij Oppakken, amber bij
        Vergaderverzoeken, paars bij Offerte-trajecten, rood bij LOD, teal bij Subsidie-trajecten
@@ -388,7 +383,7 @@
     .code{font-family:var(--font-mono);font-size:12px;font-weight:500;letter-spacing:0;color:#69707e;background:none;padding:0;white-space:nowrap}
     /* Inklapbare tekstcellen — Operator: 1 regel met …; klik op de rij klapt uit.
        Clamp zit op een inline-block .ct (td blijft table-cell, zodat kolommen netjes uitlijnen). */
-    .cell-name{font-weight:600;color:var(--txt)}
+    .cell-name{font-weight:500;color:var(--txt)}
     .cell-txt{color:#48505c;font-size:calc(var(--row-fs,13px) - .5px)}
     .cell-note{color:var(--mut);font-size:12px}
     .cell-name,.cell-txt,.cell-note{line-height:var(--row-lh,1.4);cursor:pointer;white-space:nowrap}
@@ -554,9 +549,11 @@
     /* Zelfde terugval als bij .row-telaat hieronder: de sticky actiekolom heeft een DEKKENDE
        achtergrond nodig (anders schijnt de rij eronder erdoorheen), dus hier de gemengde kleur
        uitgeschreven in plaats van een translucente laag. */
+    @media(max-width:900px){
     #ntd-tbl-wrap tbody tr.row-telaat td:not([colspan]):last-child{background:#f6eceb}
     #ntd-tbl-wrap tbody tr.row-telaat td:not([colspan]):last-child{background:color-mix(in srgb,var(--prio) 7%,var(--sur))}
     #ntd-tbl-wrap tbody tr.row-telaat:hover td:not([colspan]):last-child{background:color-mix(in srgb,var(--prio) 7%,var(--row-hover))}
+    }
     /* Bewust géén slagschaduw links van de vastgezette kolom: die tekende een donkere rand
        dwars door de rij, waardoor een gekleurde (te late) of aangewezen rij daar optisch
        ophield. De kolom hoeft niet apart te ogen — hij hoort bij de rij. */
@@ -577,8 +574,12 @@
        browser het rode waas over te late rijen volledig, en dat is op de telefoon het ENIGE
        urgentieteken dat je zonder vegen ziet. De rgba komt overeen met 7% van --prio in de lichte
        modus; als translucente laag werkt hij ook op de donkere achtergrond. */
+    /* v13.7: alleen nog op smalle schermen. Op de computer staan rode balk, rode datum en
+       'Xd te laat' er al naast; het waas maakte er vier signalen van voor één feit. */
+    @media(max-width:900px){
     .row-telaat td{background:rgba(181,84,75,.07)}
     .row-telaat td{background:color-mix(in srgb,var(--prio) 7%,transparent)}
+    }
     /* In de donkere modus is --rd lichtzalm (#F0746F) en haalt wit erop maar 2,83:1. Donkere tekst
        op diezelfde pil haalt 6,30:1 — zelfde truc als bij .staging-balk en de logboek-avatars. */
     .pill-telaat{display:inline-block;background:var(--prio);color:#fff;font-size:11px;font-weight:600;padding:2px 7px;border-radius:6px;margin-left:6px;letter-spacing:.02em}
@@ -629,18 +630,18 @@
     .status-klaargezet{background:var(--ac-l);color:var(--ac)}
     .status-gepland{background:var(--am-l);color:var(--am)}
     .status-afgerond{background:var(--gn-l);color:var(--gn)}
-    .badge.budget-tag{background:var(--bl-l);color:var(--bl);margin-left:8px;vertical-align:middle}
+    .badge.budget-tag{background:var(--ac-l);color:var(--ac);margin-left:8px;vertical-align:middle}
     /* Behandelaar-chip — Operator: één neutrale chip */
-    .pers{padding:2px 7px;border-radius:4px;font-size:12px;font-weight:600;margin:1px 2px 1px 0;display:inline-flex;align-items:center;background:#eef1f4;color:#5b6675}
+    .pers{padding:0;font-size:12px;font-weight:500;margin:1px 8px 1px 0;display:inline-flex;align-items:center;color:var(--mut)}
     /* Eén of twee tekens worden een rondje; een naam die niet in te korten viel blijft een gewone
        chip. Vaste maten, want een rondje met tekstbreedte is een ei. 21px is dezelfde hoogte als
        de chip ernaast, zodat een gemengde rij (JC naast Gerrit) niet gaat springen. */
-    .pers.pers-rond{width:21px;height:21px;padding:0;border-radius:50%;justify-content:center;font-size:10px;font-weight:600;letter-spacing:-.02em}
+    .pers.pers-rond{min-width:21px;height:21px;padding:0;letter-spacing:.02em}
     /* Eén klasse: `persBadges` zet altijd `pers-default`. De drie naam-klassen die hier stonden
        hadden exact dezelfde waarden, werden nergens meer gezet en liepen achter op TEAM (Cihan
        ontbrak). Ze bleven staan 'voor oude opgeslagen HTML' — maar dit dashboard bewaart nergens
        HTML, dus die reden bestond niet. Wil je ooit kleur per persoon: leid hem af uit TEAM. */
-    .pers-default{background:#eef1f4;color:#5b6675}
+    .pers-default{color:var(--mut)}
 
     /* Aanvinkbare ALV-flag pills — zelfde vormtaal als .badge/.btn-afr: 6px, 11px/600, vlakke hover.
        Kleur per kolom via --flag, gestuurd door het data-field dat render-alv.js al meegeeft.
@@ -1168,7 +1169,7 @@
     .pal-res.actief{background:var(--ac-l);outline:1.5px solid var(--ac-b)}
     .pal-ico{width:32px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0}
     .pal-ico-vve{background:var(--ac-l);color:var(--ac);font-size:10px}
-    .pal-ico-taak{background:var(--bl-l);color:var(--bl)}
+    .pal-ico-taak{background:var(--ac-l);color:var(--ac)}
     .pal-ico-af{background:var(--gn-l);color:var(--gn)}
     .pal-ico-log{background:var(--sur2);color:var(--mut);border:1px solid var(--bor)}
     .pal-ico-act{background:var(--nv);color:#fff}
@@ -1265,8 +1266,8 @@
        In de toevoeg-regel en niet op een eigen kopbalk: het paneel neemt al ruimte in. */
     .of-aann-dicht{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;font-family:inherit;font-size:12px;font-weight:600;color:var(--mut);background:none;border:1px solid var(--bor);border-radius:6px;padding:0 10px;height:30px;cursor:pointer;white-space:nowrap}
     .of-aann-dicht:hover{color:var(--txt);background:var(--sur);border-color:var(--bor-input)}
-    .of-aann-opvolg{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;font-family:inherit;font-size:12px;font-weight:600;color:var(--pu);background:none;border:1px solid var(--pu);border-radius:6px;padding:0 10px;height:30px;cursor:pointer;white-space:nowrap}
-    .of-aann-opvolg:hover{background:var(--pu-l)}
+    .of-aann-opvolg{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;font-family:inherit;font-size:12px;font-weight:600;color:var(--ac);background:none;border:1px solid var(--ac);border-radius:6px;padding:0 10px;height:30px;cursor:pointer;white-space:nowrap}
+    .of-aann-opvolg:hover{background:var(--ac-l)}
     /* Aannemerslijst in het bewerkscherm (v12.5): zelfde onderdelen als het tabelpaneel,
        alleen de naam is hier stilstaande tekst — hernoemen kan in het paneel. */
     #m-aann{border:1px solid var(--bor);border-radius:8px;background:var(--sur)}
@@ -1299,19 +1300,15 @@
     [data-theme=dark] .prio-hoog{color:#e08b82}
     [data-theme=dark] .prio-mid{color:#d4b06a}
     [data-theme=dark] .prio-laag{color:#8b929e}
-    [data-theme=dark] .pers,[data-theme=dark] .pers-default{background:#2a2f38;color:#cfd5df}
-    [data-theme=dark] .act-bw{background:var(--sur);border-color:var(--bor-input);color:var(--mut)}
-    [data-theme=dark] .act-ib{background:var(--sur);border-color:var(--bor-input);color:var(--mut)}
-    [data-theme=dark] .act-af{background:#12302a;border-color:#1f4a3c;color:#34d39a}
-    [data-theme=dark] .act-af:hover{background:#34d39a;border-color:#34d39a;color:#0f1b1a}
+    [data-theme=dark] .act-bw,[data-theme=dark] .act-ib{color:var(--mut)}
+    [data-theme=dark] .act-af:hover{color:#15181d}
     [data-theme=dark] tbody tr[data-prio=laag]{--prio-bar:#3a414d}
     /* Accent-gevulde elementen: in donker thema is de vulling licht (--ac #8b9dc4, sec-pastellen),
        dus wit erop haalt maar ~1.9–2.8:1. Donkere inkt op de lichte vulling — zelfde omkering als
        .act-af:hover hierboven; gemeten ≥6.2:1 op elke vulling (norm: 4.5 tekst, 3 iconen).
-       .tog.on doet níet mee: die krijgt via --modal-sec een vaste donkere kleur, daar hoort de
-       witte knop juist. De stagingbalk (--am-vulling) volgt hetzelfde patroon. */
+       .tog.on doet níet mee: die krijgt via --modal-sec (:root) een vaste donkere kleur, daar
+       hoort de witte knop juist. De stagingbalk (--am-vulling) volgt hetzelfde patroon. */
     [data-theme=dark] .btn-pri,
-    [data-theme=dark] .kop-pil-klik.aan,
     [data-theme=dark] .sw-update-btn,
     [data-theme=dark] .pb.on,
     [data-theme=dark] .period-btn.on,
@@ -1327,8 +1324,6 @@
     /* De streep van het kopvinkje is een vlakje en geen tekst, dus de kleurregel hierboven
        (die `color` zet) raakt hem niet. Apart, met dezelfde donkere inkt. */
     [data-theme=dark] .cb.deels::after{background:#15181d}
-    /* Het getal in een actieve pil zet zelf color:#fff en is specifieker — hier terugdraaien. */
-    [data-theme=dark] .kop-pil-klik.aan b{color:#15181d}
     /* Avatars kleuren per persoon via inline background (pastel in donker) → donkere initiaal;
        alleen de vaste navy (--nv) houdt witte tekst, donkere inkt is dáár juist onleesbaar. */
     [data-theme=dark] .lchip .av,[data-theme=dark] .log-av{color:#15181d}
@@ -1389,11 +1384,11 @@
 .fase-rail{display:flex;align-items:center}
 .fase-bol{position:relative;width:11px;height:11px;padding:0;border-radius:50%;box-sizing:border-box;flex:none;background:var(--bor-input);border:2px solid var(--bor-input);cursor:pointer;transition:background var(--tr),border-color var(--tr),transform var(--tr-fast)}
 .fase-bol:hover{transform:scale(1.28)}
-.fase-bol.af{background:var(--tl);border-color:var(--tl)}
-.fase-bol.nu{background:var(--sur);border-color:var(--tl)}
-.fase-bol:focus-visible{outline:2px solid var(--tl);outline-offset:2px}
+.fase-bol.af{background:var(--ac);border-color:var(--ac)}
+.fase-bol.nu{background:var(--sur);border-color:var(--ac)}
+.fase-bol:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 .fase-lijn{height:2px;flex:1;min-width:9px;background:var(--bor-input)}
-.fase-lijn.af{background:var(--tl)}
+.fase-lijn.af{background:var(--ac)}
 .fase-lbl{font-size:12px;font-weight:600;color:var(--mut);white-space:nowrap}
 .fase-rij-modal{min-width:0;max-width:280px}
 /* Op aanraakschermen is 11px te klein om te raken. Alleen in de tabel: in het
@@ -1404,14 +1399,14 @@
 
 /* ══ CRM (v13.0) ══
    Alles hieronder hangt aan een CRM-klasse of aan #fg-crm, zodat de andere vijf tabbladen niets
-   merken. Kleur via --pk (roze), in beide thema's al gedefinieerd in :root en [data-theme=dark]. */
+   merken. Kleur via het accent (--ac), zoals elk tabblad sinds v13.7. */
 
-/* Fase-bolletjes: zelfde balk als Subsidie, maar roze en met vier stappen. */
+/* Fase-bolletjes: zelfde balk als Subsidie, met vier stappen. */
 .fase-rij.crm-fase{min-width:140px}
-.fase-rij.crm-fase .fase-bol.af{background:var(--pk);border-color:var(--pk)}
-.fase-rij.crm-fase .fase-bol.nu{background:var(--sur);border-color:var(--pk)}
-.fase-rij.crm-fase .fase-bol:focus-visible{outline-color:var(--pk)}
-.fase-rij.crm-fase .fase-lijn.af{background:var(--pk)}
+.fase-rij.crm-fase .fase-bol.af{background:var(--ac);border-color:var(--ac)}
+.fase-rij.crm-fase .fase-bol.nu{background:var(--sur);border-color:var(--ac)}
+.fase-rij.crm-fase .fase-bol:focus-visible{outline-color:var(--ac)}
+.fase-rij.crm-fase .fase-lijn.af{background:var(--ac)}
 .fase-rij.crm-fase.fase-rij-modal{min-width:0;max-width:220px}
 
 /* Vraag-kolom: soortlabel + kort onderwerp op één regel. Het label krimpt nooit; het onderwerp
@@ -1422,8 +1417,8 @@
 .crm-vraag .ct{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #ntd-tbl-wrap tr.expanded .crm-vraag{align-items:flex-start}
 #ntd-tbl-wrap tr.expanded .crm-vraag .ct{overflow:visible;text-overflow:clip;white-space:normal;overflow-wrap:anywhere}
-.crm-soort{flex:none;font-size:11px;font-weight:600;padding:1px 7px;border-radius:4px;background:#eef1f4;color:#5b6675}
-[data-theme=dark] .crm-soort{background:#2a2f38;color:#cfd5df}
+.crm-soort{flex:none;font-size:12px;font-weight:500;color:var(--mut)}
+.crm-soort::after{content:'·';margin-left:6px;color:var(--fnt)}
 
 /* Van-kolom: naam, met het huisnummer (of wat er na de komma staat) gedempt eronder. */
 .crm-van .ct{font-weight:600;overflow-wrap:anywhere}
@@ -1431,7 +1426,7 @@
 
 /* Uitklappaneel onder een opengeklikte CRM-rij: de mail en de interne notitie. */
 .crm-mail-tr td{padding:0 16px 14px;background:var(--sur)}
-.crm-mail{border-left:2px solid var(--pk);background:var(--bg);border-radius:0 8px 8px 0;padding:12px 16px;display:grid;gap:10px;max-width:980px}
+.crm-mail{border-left:2px solid var(--ac);background:var(--bg);border-radius:0 8px 8px 0;padding:12px 16px;display:grid;gap:10px;max-width:980px}
 .crm-mail-kop{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 16px;font-size:12px;color:var(--txt)}
 .crm-mail-meta{color:var(--mut);font-family:var(--font-mono);font-size:12px}
 .crm-mail-tekst{font-size:13px;line-height:1.65;max-width:72ch;color:var(--txt);white-space:pre-wrap;overflow-wrap:anywhere}
@@ -1442,8 +1437,8 @@
 /* Soort-knoppen in het bewerkscherm. */
 .crm-keuzes{display:flex;flex-wrap:wrap;gap:6px}
 .crm-keus{border:1px solid var(--bor-input,var(--bor));background:var(--sur);border-radius:8px;padding:7px 13px;font:inherit;font-size:13px;font-weight:600;color:var(--mut);cursor:pointer}
-.crm-keus.aan{background:var(--pk-l);border-color:var(--pk);color:var(--pk)}
-.crm-keus:focus-visible{outline:2px solid var(--pk);outline-offset:2px}
+.crm-keus.aan{background:var(--ac-l);border-color:var(--ac);color:var(--ac)}
+.crm-keus:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 
 /* Het zoekveld van Nog Te Doen: 203 → 140px. Met zes tabbladen paste de kopbalk bij 1920px anders
    niet meer op één regel (gemeten: 8px speelruimte, de CRM-tab kost 66). 12+14+8+92+12+2 = 140.
@@ -2107,6 +2102,5 @@ tr.expanded + .crm-mail-tr{display:table-row}
 /* 'Per VvE' als pil in de kop, naast 'te laat' en 'weggelegd'. Leiblauw i.p.v. rood/amber: die
    twee zijn signalen, dit is een manier van kijken. Gedempt zodra kolomkop-sortering de
    groepering tijdelijk overneemt — anders lijkt de pil stuk. */
-.kop-pil-klik.pil-vve{border-color:var(--ac-b)}
-.kop-pil-klik.aan.pil-vve{background:var(--ac);border-color:var(--ac);color:#fff}
+.kop-pil-klik.aan.pil-vve{background:var(--ac-l);color:var(--ac-900)}
 .kop-pil-klik.pil-vve.gedempt{opacity:.5}

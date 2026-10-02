@@ -655,8 +655,8 @@ function offProg(v){
   if(!v)return'';
   const [recv,req]=parseOff(v);
   const pct=req>0?Math.min(100,Math.round(recv/req*100)):0;
-  return`<div class="prog-wrap"><span style="font-size:12px;font-weight:700;color:var(--pu)">${esc(v)}</span>
-    <div class="prog-bar"><div class="prog-fill" style="width:${pct}%;background:var(--pu)"></div></div></div>`;
+  return`<div class="prog-wrap"><span style="font-size:12px;font-weight:700;color:var(--ac)">${esc(v)}</span>
+    <div class="prog-bar"><div class="prog-fill" style="width:${pct}%;background:var(--ac)"></div></div></div>`;
 }
 
 const _MAANDEN={jan:1,feb:2,mrt:3,maa:3,apr:4,mei:5,jun:6,jul:7,aug:8,sep:9,sept:9,okt:10,nov:11,dec:12,

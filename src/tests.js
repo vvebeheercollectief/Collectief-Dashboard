@@ -2323,7 +2323,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         try{
           const leeg5 = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
           const t5 = (taakId, volg) => ({ _row: 20 + (+volg||0)/10, taakId, bundelId:'Tkop', bundelVolg:volg,
-            _sec:'OPPAKKEN', code:'311212', naam:'Vereniging Parkzicht Noord', actiepunt:'Werk',
+            _sec:'OPPAKKEN', code:'311212', naam:'Vereniging van Eigenaars Parkzicht Noord', actiepunt:'Werk',
             deadline:'', behandelaar:'Jer', opmerkingen:'', inBehandeling:'' });
           D.af = { ...leeg5 };
           D.ntd = { ...leeg5, OPPAKKEN: [ t5('Tkop','0'), t5('Tb','10') ] };
@@ -6249,7 +6249,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '13.6');
+  eq('versie opgehoogd', APP_VERSION, '13.7');
 
   // ── Tabbladen ÍN de kaartkop (v11.7) ──
   // De kop van de kaart zei links exact hetzelfde als het actieve tabblad — 'Oppakken' boven

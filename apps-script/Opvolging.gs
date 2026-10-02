@@ -2,7 +2,7 @@
 // Spec: docs/superpowers/specs/2026-06-11-fase4-opvolging-herhaling-design.md
 // Kolommen 'Nog Te Doen' (1-geteld): L=12 Opvolgdatum, M=13 Herhaal-ID, N=14 Esc-stempel.
 // Hergebruikt: cd_parseDate, cd_splitBehandelaar, cd_notifyByExternalId, cd_createTaskRow
-// (Notifications.gs), cd_schrijfLogboek (Extra functies.gs), cd_safeRun/cd_lockedRun.
+// (Notifications.gs), cd_schrijfLogboek (Extra functies.gs), cd_safeRun/cd_lockedRun/cd_meldFout.
 
 // LET OP — SYNC: gelijk houden aan STIL_ESCALATIE_REGELS in src/util.js
 const CD_STIL_ESCALATIE_REGELS = {
@@ -36,13 +36,53 @@ function cd_offerteAangevraagd(sec, datumAangevraagd) {
   return sec === 'OFFERTE-TRAJECTEN' && !!cd_parseDate(datumAangevraagd);
 }
 
+// De dagelijkse trigger (±06:30). Fouten in de vier stappen komen via cd_safeRun in het Logboek en
+// worden aan het eind opgegooid, zodat Google de foutmail stuurt (zie cd_meldFout, Notifications.gs).
 function cd_opvolgingMotor() {
+  cd_opvolgingMotorRun();
+  cd_gooiVerzameldeFouten('cd_opvolgingMotor');
+}
+
+// Kreeg de motor de document-lock niet (2× 10 s — bv. omdat de wachtrij of een afvink-trigger hem
+// net vasthield), dan vielen de herhaaltaken, de opvolg-pushes en de escalaties van die dag stil
+// weg: de trigger draait maar één keer per dag. Nu zet hij een vlag, en de 5-minuten-veegbeurt
+// (cd_sweepNotifQueue) probeert het opnieuw tot het lukt (naloop 2026-10-02).
+var CD_MOTOR_HERKANSING = 'CD_MOTOR_HERKANSING';
+var CD_MOTOR_HERKANSING_MAX_MS = 12 * 3600 * 1000;   // daarna opgeven: de volgende ochtend draait hij weer
+
+// Geeft true als de motor gedraaid heeft (de lock gekregen), false als niet.
+function cd_opvolgingMotorRun() {
+  var gedraaid = false;
   cd_lockedRun('cd_opvolgingMotor', function () {
+    gedraaid = true;
     cd_safeRun('cd_hr_zetTakenKlaar',       cd_hr_zetTakenKlaar);
     cd_safeRun('cd_hr_verwerkAfrondingen',  cd_hr_verwerkAfrondingen);
     cd_safeRun('cd_opvolgWakker',           cd_opvolgWakker);
     cd_safeRun('cd_escaleerStilleDossiers', cd_escaleerStilleDossiers);
+  }, function () {
+    var props = PropertiesService.getScriptProperties();
+    if (!props.getProperty(CD_MOTOR_HERKANSING)) props.setProperty(CD_MOTOR_HERKANSING, new Date().toISOString());
+    Logger.log('cd_opvolgingMotor: lock bezet — de 5-minuten-veegbeurt probeert het opnieuw');
   });
+  if (gedraaid) {
+    try { PropertiesService.getScriptProperties().deleteProperty(CD_MOTOR_HERKANSING); } catch (_) {}
+  }
+  return gedraaid;
+}
+
+// Vanuit cd_sweepNotifQueue. Doet niets zolang er geen vlag staat (één Properties-lezing).
+function cd_motorHerkansing() {
+  var props = PropertiesService.getScriptProperties();
+  var sinds = props.getProperty(CD_MOTOR_HERKANSING);
+  if (!sinds) return;
+  var t = new Date(sinds).getTime();
+  if (isNaN(t) || Date.now() - t > CD_MOTOR_HERKANSING_MAX_MS) {
+    props.deleteProperty(CD_MOTOR_HERKANSING);
+    cd_meldFout('cd_opvolgingMotor', 'kreeg sinds ' + sinds + ' twaalf uur lang de lock niet. De herhaaltaken, '
+      + 'opvolg-pushes en escalaties van die dag zijn NIET gedraaid; de volgende ochtend draait hij weer.');
+    return;
+  }
+  if (cd_opvolgingMotorRun()) Logger.log('cd_motorHerkansing: motor alsnog gedraaid (vlag van ' + sinds + ')');
 }
 
 function cd_ddmmyyyy(d) {
@@ -236,7 +276,7 @@ function cd_hr_zetTakenKlaar() {
           url: APP_URL, dedupKey: 'hr-' + id + '-' + dlStr
         });
       });
-    } catch (e) { Logger.log('cd_hr_zetTakenKlaar rij ' + (i + 1) + ' fout: ' + e); }
+    } catch (e) { cd_meldFout('cd_hr_zetTakenKlaar', 'rij ' + (i + 1) + ': ' + e); }
   }
 }
 
@@ -314,7 +354,7 @@ function cd_hr_verwerkAfrondingen() {
         break;
       }
     } catch (e) {
-      Logger.log('cd_hr_verwerkAfrondingen rij ' + (i + 1) + ' fout: ' + e + ' — volgende run opnieuw');
+      cd_meldFout('cd_hr_verwerkAfrondingen', 'rij ' + (i + 1) + ': ' + e + ' — volgende run opnieuw');
       verwerkt = false;
     }
     if (verwerkt) af.getRange(i + 1, 12).setValue(''); // markeer verwerkt — voorkomt dubbele verwerking
@@ -353,7 +393,7 @@ function cd_opvolgWakker() {
           url: APP_URL, dedupKey: 'opvolg-' + ((data[i][16] || code)) + '-' + cd_ddmmyyyy(today)
         });
       });
-    } catch (e) { Logger.log('cd_opvolgWakker rij ' + (i + 1) + ' fout: ' + e); }
+    } catch (e) { cd_meldFout('cd_opvolgWakker', 'rij ' + (i + 1) + ': ' + e); }
   }
 }
 
@@ -451,7 +491,7 @@ function cd_escaleerStilleDossiers() {
           cd_notifyByTag('n_newtask', '1', t1);
         }
       }
-    } catch (e) { Logger.log('cd_escaleerStilleDossiers rij ' + (i + 1) + ' fout: ' + e); }
+    } catch (e) { cd_meldFout('cd_escaleerStilleDossiers', 'rij ' + (i + 1) + ': ' + e); }
   }
 }
 

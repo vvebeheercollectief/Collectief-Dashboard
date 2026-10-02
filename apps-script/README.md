@@ -74,6 +74,14 @@ gaat debuggen. En let op: `onEdit` vuurt alleen op echte edits in de Sheets-UI �
 - Notificaties lopen via **OneSignal** (`cd_sendNotification` in `Notifications.gs`).
   `cd_notifyByTag` / `cd_notifyByExternalId` schrijven óók naar de `Meldingen`-sheet
   (in-app toasts) én sturen een OneSignal-push. Niet verwijderen.
+- Fouten in triggers (sinds 2026-10-02): `cd_meldFout` schrijft één regel in het Logboek (actie
+  `Fout`, gebruiker `systeem`, hoogstens eens per uur per soort) en de tijdtriggers gooien aan het
+  eind een samenvatting op, zodat Google de foutmail stuurt. Kreeg `cd_opvolgingMotor` de lock niet,
+  dan staat Script Property `CD_MOTOR_HERKANSING` en probeert `cd_sweepNotifQueue` het opnieuw
+  (max. 12 uur). Een mislukte push in de Notif-wachtrij krijgt `POGING n` in kolom D en wordt tot
+  3× opnieuw geprobeerd.
+- Pushteksten bevatten alleen VvE-code, soort en behandelaar (`pushBody`, zie `cd_pushTekst`); de
+  VvE-naam en omschrijving staan alleen in de in-app regel in 'Meldingen'.
 - Alle `.gs`-bestanden delen één globale scope in Apps Script — declareer constanten
   daarom maar in één bestand (geen dubbele `const`-namen over bestanden heen).
 

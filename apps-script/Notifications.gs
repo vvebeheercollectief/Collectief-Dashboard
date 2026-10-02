@@ -73,14 +73,56 @@ function cd_lockedRun(label, fn, bijGeenLock) {
     }
     return fn();
   } catch (e) {
-    Logger.log(label + ' fout: ' + e);
+    cd_meldFout(label, e);
   } finally {
     try { lock.releaseLock(); } catch (_) {}
   }
 }
 // Alleen foutopvang: voor read-only triggers, zodat één foute rij niet de hele run sloopt.
 function cd_safeRun(label, fn) {
-  try { return fn(); } catch (e) { Logger.log(label + ' fout: ' + e); }
+  try { return fn(); } catch (e) { cd_meldFout(label, e); }
+}
+
+// ── Fouten zichtbaar maken (naloop 2026-10-02) ──
+// Alles hierboven ving fouten af en schreef ze alleen naar Logger — en dat logboek leest niemand.
+// Een kapotte motor, een geweigerde push of een trigger die elke ochtend omviel was dus nergens te
+// zien. Nu op twee plekken:
+//  1. ÉÉN regel in het tabblad Logboek (actie 'Fout', gebruiker 'systeem', VvE-code leeg). Zo'n
+//     regel komt in de app nergens in een lijst: de Logboek-pagina toont alleen notities/contact/
+//     afgerond/aangemaakt/fase (logPaginaSoort in src/render-overig.js), het dossier filtert op
+//     VvE-code, en 'systeem' telt niet als activiteit (bepaalStil / cd_laatsteActiviteitMap).
+//     Hij staat wél in de Sheet. Eén regel per soort fout per uitvoering, en dezelfde soort
+//     hoogstens eens per uur (CacheService) — de 5-minuten-veegbeurt mag het tabblad niet volschrijven.
+//  2. Aan het eind van een TIJDTRIGGER gooit cd_gooiVerzameldeFouten de fouten alsnog op, zodat de
+//     uitvoering als 'mislukt' te boek staat en Google zijn foutmail naar de eigenaar stuurt.
+// Apps Script begint elke uitvoering met verse globals, dus deze teller is per uitvoering.
+var CD_RUN_FOUTEN = {};
+var CD_FOUT_STILTE_S = 3600;
+
+function cd_meldFout(label, fout) {
+  var tekst = String(fout && fout.message ? fout.message : fout).slice(0, 500);
+  Logger.log(label + ' fout: ' + tekst);
+  CD_RUN_FOUTEN[label] = (CD_RUN_FOUTEN[label] || 0) + 1;
+  if (CD_RUN_FOUTEN[label] > 1) return;           // één logregel per soort per uitvoering
+  try {
+    var cache = CacheService.getScriptCache();
+    var sleutel = 'cdfout-' + label;
+    if (cache.get(sleutel)) return;               // het afgelopen uur al gemeld
+    cache.put(sleutel, '1', CD_FOUT_STILTE_S);
+  } catch (_) {}
+  cd_schrijfLogboek('', '', 'Fout', label, '', tekst, 'systeem');   // vangt zelf zijn fouten af
+}
+
+// Aan het eind van een tijdtrigger: waren er fouten, gooi dan één samenvatting op.
+function cd_gooiVerzameldeFouten(label) {
+  var labels = Object.keys(CD_RUN_FOUTEN);
+  if (!labels.length) return;
+  var samenvatting = labels.map(function (l) {
+    return l + (CD_RUN_FOUTEN[l] > 1 ? ' (' + CD_RUN_FOUTEN[l] + '×)' : '');
+  }).join(', ');
+  CD_RUN_FOUTEN = {};
+  throw new Error(label + ': fout(en) tijdens deze uitvoering — ' + samenvatting
+    + '. Details: tabblad Logboek (actie Fout) en de uitvoeringslogboeken.');
 }
 
 // ════════════════════════════════════════════════════════════
@@ -129,7 +171,7 @@ function cd_onEditChange(e) {
       cd_handleAlvoEdit(sheet, row, e);
     }
   } catch (err) {
-    Logger.log('onEditChange error: ' + err);
+    cd_meldFout('cd_onEditChange', err);
   }
 }
 
@@ -356,9 +398,10 @@ function cd_checkDeadlines() {
             });
           }
         });
-      } catch (rowErr) { Logger.log('cd_checkDeadlines rij ' + (i + 1) + ' fout: ' + rowErr); }
+      } catch (rowErr) { cd_meldFout('cd_checkDeadlines', 'rij ' + (i + 1) + ': ' + rowErr); }
     }
   });
+  cd_gooiVerzameldeFouten('cd_checkDeadlines');
 }
 
 // ════════════════════════════════════════════════════════════
@@ -432,9 +475,10 @@ function cd_dailySummary() {
           body: parts.join(' · '),
           url: APP_URL
         });
-      } catch (e) { Logger.log('cd_dailySummary persoon ' + name + ' fout: ' + e); }
+      } catch (e) { cd_meldFout('cd_dailySummary', 'persoon ' + name + ': ' + e); }
     });
   });
+  cd_gooiVerzameldeFouten('cd_dailySummary');
 }
 
 // ════════════════════════════════════════════════════════════
@@ -548,8 +592,12 @@ function cd_pushTekst(opts) {
   };
 }
 
+// Bij een HERPOGING uit de wachtrij staat de in-app regel er al (die wordt vóór de push
+// geschreven); alleen de push opnieuw. Wordt alleen door cd_drainNotifQueue gezet, in een finally.
+var CD_INAPP_UIT = false;
+
 function cd_notifyByTag(tagKey, tagValue, opts) {
-  cd_schrijfMelding(opts.type || tagKey, opts.title, opts.body, 'allen');
+  if (!CD_INAPP_UIT) cd_schrijfMelding(opts.type || tagKey, opts.title, opts.body, 'allen');
   const push = cd_pushTekst(opts);
   return cd_sendNotification({
     filters: [{ field: 'tag', key: tagKey, relation: '=', value: tagValue }],
@@ -558,7 +606,7 @@ function cd_notifyByTag(tagKey, tagValue, opts) {
 }
 
 function cd_notifyByExternalId(extId, tagKey, tagValue, opts) {
-  cd_schrijfMelding(opts.type || tagKey, opts.title, opts.body, extId);
+  if (!CD_INAPP_UIT) cd_schrijfMelding(opts.type || tagKey, opts.title, opts.body, extId);
   const push = cd_pushTekst(opts);
   return cd_sendNotification({
     filters: [
@@ -591,12 +639,26 @@ function cd_sendNotification(p) {
       muteHttpExceptions: true,
     });
     const code = resp.getResponseCode();
-    if (code >= 300) Logger.log('OneSignal error ' + code + ': ' + resp.getContentText());
-    return JSON.parse(resp.getContentText());
+    const tekst = resp.getContentText();
+    // Een weigering (≥300: verkeerde sleutel, app-id, kapotte filter, storing) telde nergens mee:
+    // alleen een Logger-regel, en de wachtrij markeerde de rij daarna gewoon als verwerkt. Nu
+    // geteld (de wachtrij probeert het dan opnieuw, zie cd_drainNotifQueue) en via cd_meldFout
+    // één keer per uitvoering in het Logboek. Een 200 zonder ontvangers is GEEN fout: dan heeft
+    // gewoon niemand die melding aanstaan.
+    if (code >= 300) {
+      CD_PUSH_MISLUKT++;
+      cd_meldFout('OneSignal', 'HTTP ' + code + ': ' + tekst.slice(0, 300));
+      return null;
+    }
+    try { return JSON.parse(tekst); } catch (_) { return null; }
   } catch(e) {
-    Logger.log('OneSignal call faalde: ' + e);
+    CD_PUSH_MISLUKT++;
+    cd_meldFout('OneSignal', e);
+    return null;
   }
 }
+// Aantal mislukte pushes in deze uitvoering (cd_drainNotifQueue vergelijkt voor/na per rij).
+var CD_PUSH_MISLUKT = 0;
 
 // ════════════════════════════════════════════════════════════
 //  MELDINGEN — kernlogica, hergebruikt door de webhook (doPost)
@@ -670,7 +732,7 @@ function cd_processNotifEvent(data) {
     const who   = (data.who   || '').toString();
     const title = (data.title || '🔔 Test melding').toString();
     const body  = (data.body  || 'Notificaties werken correct!').toString();
-    cd_schrijfMelding('test', title, body, who || 'allen');
+    if (!CD_INAPP_UIT) cd_schrijfMelding('test', title, body, who || 'allen');
     // ÉN echt pushen. Dit is de knop 'Test melding', en die is er om te toetsen of de PUSH-weg
     // werkt — de in-app toast toont `sendTestNotif` al zelf, meteen bij de klik, en die lukt ook
     // zonder abonnement. Zonder deze regel bewees een geslaagde test dus helemaal niets: er
@@ -776,6 +838,8 @@ function cd_onNotifQueueChange(e) { cd_drainNotifQueue(); }
 // Vangnet: pakt rijen op die een gemiste onChange anders zou laten liggen.
 function cd_sweepNotifQueue() {
   cd_drainNotifQueue();
+  // Kreeg de opvolgmotor vanochtend de lock niet, dan probeert hij het hier opnieuw (Opvolging.gs).
+  cd_safeRun('cd_motorHerkansing', cd_motorHerkansing);
   // CRM (v13.0): zet één keer het CRM-blok klaar — op TEST meteen, op PROD pas als de nieuwe code
   // al een kwartier live staat. Daarna nooit meer (Script Property CD_CRM_SETUP). Zie Code.gs.
   cd_safeRun('cd_crmSetupAutomatisch', cd_crmSetupAutomatisch);
@@ -784,6 +848,7 @@ function cd_sweepNotifQueue() {
   cd_safeRun('cd_vveCodesAutomatisch', cd_vveCodesAutomatisch);
   // Vier VvE's uit beheer (25-09-2026) één keer uit het register. Zie Code.gs.
   cd_safeRun('cd_vveCodesUitBeheerAutomatisch', cd_vveCodesUitBeheerAutomatisch);
+  cd_gooiVerzameldeFouten('cd_sweepNotifQueue');
 }
 
 // Alleen push-only events mogen via de (semi-vertrouwde, OAuth-append) Notif-wachtrij. Privileged
@@ -803,9 +868,20 @@ function cd_wachtrijHeeftWerk() {
   const last = sheet.getLastRow();
   if (last < 2) return false;
   const kolomD = sheet.getRange(2, 4, last - 1, 1).getValues();
-  for (let i = 0; i < kolomD.length; i++) if (!kolomD[i][0]) return true;
+  for (let i = 0; i < kolomD.length; i++) if (cd_wachtrijOpen(kolomD[i][0])) return true;
   return false;
 }
+
+// Kolom D ('Verwerkt') van de wachtrij: leeg = nog te doen; een tijdstempel = gelukt; 'FOUT: …' of
+// 'GEWEIGERD: …' = definitief niet; 'POGING n: …' = de push mislukte n keer, opnieuw proberen.
+// Na CD_WACHTRIJ_MAX_POGINGEN wordt het 'FOUT: …', zodat een blijvende storing (verkeerde sleutel)
+// niet eindeloos elke vijf minuten dezelfde rijen blijft aanbieden.
+const CD_WACHTRIJ_MAX_POGINGEN = 3;
+function cd_wachtrijPoging(v) {
+  const m = /^POGING (\d+)/.exec((v == null ? '' : v) + '');
+  return m ? +m[1] : 0;
+}
+function cd_wachtrijOpen(v) { return !v || cd_wachtrijPoging(v) > 0; }
 
 function cd_drainNotifQueue() {
   if (!cd_wachtrijHeeftWerk()) return;
@@ -818,7 +894,8 @@ function cd_drainNotifQueue() {
     const rows = sheet.getRange(2, 1, last - 1, 4).getValues(); // A:D
     for (let i = 0; i < rows.length; i++) {
       const payload = rows[i][2], verwerkt = rows[i][3];
-      if (verwerkt) continue; // al gedaan (of door de andere trigger)
+      if (!cd_wachtrijOpen(verwerkt)) continue; // al gedaan (of door de andere trigger)
+      const eerderePogingen = cd_wachtrijPoging(verwerkt);
       let data;
       try { data = JSON.parse(payload); }
       catch (err) { sheet.getRange(i + 2, 4).setValue('FOUT: ' + err); continue; }
@@ -827,11 +904,27 @@ function cd_drainNotifQueue() {
         continue;
       }
       data._uid = rows[i][0]; // rij-timestamp → stabiele dedup-sleutel (zie cd_processNotifEvent)
+      // Pas 'verwerkt' als de push ook echt de deur uit ging. Mislukte er een (OneSignal ≥300 of een
+      // netwerkfout), dan 'POGING n' en bij de volgende ronde opnieuw — alleen de push, de in-app
+      // regel staat er al (CD_INAPP_UIT). Een herhaalde push vervangt de eerste op het toestel:
+      // web_push_topic is per wachtrij-rij stabiel (_uid).
+      const mislukt = CD_PUSH_MISLUKT;
+      CD_INAPP_UIT = eerderePogingen > 0;
       try {
         cd_processNotifEvent(data);
-        sheet.getRange(i + 2, 4).setValue(new Date().toISOString());
+        if (CD_PUSH_MISLUKT > mislukt) {
+          const n = eerderePogingen + 1;
+          sheet.getRange(i + 2, 4).setValue(n >= CD_WACHTRIJ_MAX_POGINGEN
+            ? 'FOUT: push mislukt na ' + n + ' pogingen (zie Logboek, actie Fout)'
+            : 'POGING ' + n + ': push mislukt — volgende ronde opnieuw');
+        } else {
+          sheet.getRange(i + 2, 4).setValue(new Date().toISOString());
+        }
       } catch (err) {
         sheet.getRange(i + 2, 4).setValue('FOUT: ' + err);
+        cd_meldFout('cd_drainNotifQueue', err);
+      } finally {
+        CD_INAPP_UIT = false;
       }
     }
     const now = sheet.getLastRow();

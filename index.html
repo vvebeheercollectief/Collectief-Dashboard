@@ -25,13 +25,16 @@
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png"/>
   <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png"/>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-  <!-- Alleen nog de twee letters van het INLOGSCHERM. Het dashboard zelf gebruikt sinds v11.8
-       de standaardletter van het toestel (--font-app / --font-mono in styles.css), dus IBM Plex
-       Sans en IBM Plex Mono worden niet meer opgehaald — scheelt twee bestanden bij het laden. -->
-  <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <!-- async en NIET defer: een defer-script loopt in dezelfde rij als de module src/main.js en
+       hield die dus op tot de OneSignal-SDK van het CDN binnen en uitgevoerd was. Met async maakt
+       de volgorde niet uit: notifications.js gebruikt het OneSignalDeferred-patroon, dat werkt of
+       de SDK nu vóór of ná de module laadt. -->
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" async></script>
+  <!-- De twee letters van het INLOGSCHERM (Hanken Grotesk / JetBrains Mono) staan hier niet meer:
+       een stylesheet in de kop blokkeert het uitvoeren van src/main.js tot Google Fonts antwoordt,
+       ook voor wie al ingelogd is en het inlogscherm nooit ziet. src/login-splash.js
+       (laadLoginLetters) zet de link pas neer zodra het inlogscherm getoond wordt. Het dashboard
+       zelf gebruikt sinds v11.8 de standaardletter van het toestel (styles.css). -->
   <link rel="stylesheet" href="styles.css"/>
 </head>
 <body>

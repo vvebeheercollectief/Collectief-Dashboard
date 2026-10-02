@@ -16952,6 +16952,18 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         eq('versiebalk: eigen klik → geen balk (de kern herlaadt)', SWU.balkNaOvername(true, true), false);
         eq('versiebalk: allereerste installatie → geen balk', SWU.balkNaOvername(false, false), false);
       }
+
+      // ── 2b. Niets in de kop dat het starten van main.js ophoudt ──
+      {
+        const html = await (await fetch(new URL('index.html', document.baseURI), {cache:'no-store'})).text();
+        const kop = html.split('</head>')[0];
+        truthy('start: geen Google-Fonts-stylesheet meer in de kop (blokkeert main.js)', !/<link[^>]+fonts\.googleapis\.com[^>]+stylesheet|<link[^>]+stylesheet[^>]+fonts\.googleapis\.com/.test(kop));
+        truthy('start: de OneSignal-SDK laadt async (defer houdt main.js op)', /<script src="https:\/\/cdn\.onesignal\.com\/[^"]+" async><\/script>/.test(kop));
+        const LS = await import('./login-splash.js');
+        LS.laadLoginLetters(); LS.laadLoginLetters();
+        eq('start: de inlogletters komen er één keer bij zodra het inlogscherm getoond wordt',
+           [...document.querySelectorAll('link#login-letters')].map(l=>l.href), [LS.LOGIN_LETTERS_URL]);
+      }
     } catch(e) {
       truthy('review 02-10: geen uitzondering — '+(e && e.stack || e), false);
     } finally {

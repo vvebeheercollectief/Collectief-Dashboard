@@ -14,6 +14,12 @@ import { bulkSelectie, toggleBulkMode } from "./bulk.js";
 
 let _pagina = 'ntd';   // laatst geopende pagina, zodat renderAll de kop kan bijwerken
 
+// Wat goTo moet bijtekenen bij het openen van een pagina die renderAll terwijl hij verborgen was
+// heeft overgeslagen (zie renderAll in main.js). Via een haak en niet met een import van de
+// render-functies: main.js houdt bij wélke pagina's vies zijn, en ui.js hoeft dat niet te weten.
+let _bijOpenen = null;
+function zetBijOpenen(fn){ _bijOpenen = fn; }
+
 // Scrollpositie van #content per pagina. Alle pagina's delen die ene scroller, dus wie in de
 // takenlijst op rij 60 een VvE-code aanklikte en via het terug-pijltje uit het dossier kwam,
 // landde bovenaan de lijst en moest zijn plek opnieuw zoeken. goTo onthoudt de stand van de pagina
@@ -63,6 +69,7 @@ function goTo(page){
   _pagina = page;
   syncKop();
   document.getElementById('btn-add').style.display=page==='ntd'?'inline-flex':'none';
+  if(_bijOpenen) _bijOpenen(page);   // af / alvo / alfa: bijtekenen als renderAll ze oversloeg
   if(page==='ontw') renderOntw();
   if(page==='logboek') renderLogboek();
   if(page==='herhaal') renderHerhaal();
@@ -134,4 +141,4 @@ function setupSearch(id,cb){
   });
 }
 
-export { goTo, syncKop, closeSb, applyTheme, applyDensity, cycleDensity, setupSearch, herstelScroll, kaartInBeeld };
+export { goTo, syncKop, closeSb, applyTheme, applyDensity, cycleDensity, setupSearch, herstelScroll, kaartInBeeld, zetBijOpenen };

@@ -16964,6 +16964,44 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         eq('start: de inlogletters komen er één keer bij zodra het inlogscherm getoond wordt',
            [...document.querySelectorAll('link#login-letters')].map(l=>l.href), [LS.LOGIN_LETTERS_URL]);
       }
+
+      // ── 2c. renderAll tekent alleen wat in beeld is; de rest bij het openen ──
+      {
+        const M = await import('./main.js');
+        const UI = await import('./ui.js');
+        const afO=D.af, alvoO=D.alvo, codeO=state.vveCode;
+        const paginaOud=(document.querySelector('.page.active')||{}).id?.replace('page-','')||'ntd';
+        const versLeeg=()=>({ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] });
+        const taak=(code,i)=>({ _sec:'OPPAKKEN', _row:10+i, code, naam:'Hof '+code, actiepunt:'Taak '+i, deadline:'', behandelaar:'', prioriteit:'',
+          opmerkingen:'', inBehandeling:'FALSE', subcategorie:'', taakId:'TL'+i, bundelId:'', bundelVolg:'' });
+        try{
+          D.ntd={ ...versLeeg(), OPPAKKEN:[taak('LZ-1',1), taak('LZ-2',2), taak('LZ-1',3)] }; D.af=versLeeg();
+          D.alvo=[{ code:'LZ-1', naam:'Lazyhof', status:'', _row:2 }];
+          UI.goTo('alvo'); M.renderAll();
+          truthy('lui: een zichtbare pagina wordt gewoon getekend', /Lazyhof/.test(document.getElementById('alvo-tbody').textContent));
+          UI.goTo('ntd');
+          D.alvo=[{ code:'LZ-1', naam:'Nieuwhof', status:'', _row:2 }];
+          M.renderAll();
+          eq('lui: een verborgen pagina wordt bij renderAll NIET hertekend', /Nieuwhof/.test(document.getElementById('alvo-tbody').textContent), false);
+          UI.goTo('alvo');
+          truthy('lui: …maar wél zodra hij geopend wordt', /Nieuwhof/.test(document.getElementById('alvo-tbody').textContent));
+          // De rij-cache: een dossier dat verborgen lag en bij openen opnieuw getekend wordt, wijst met
+          // elke data-rid naar een taak van DIE VvE — niet naar wat de tussentijdse renderAll erin zette.
+          state.vveCode='LZ-1'; UI.goTo('vve');
+          UI.goTo('ntd');
+          D.ntd={ ...versLeeg(), OPPAKKEN:[taak('LZ-2',4), taak('LZ-1',5), taak('LZ-2',6), taak('LZ-1',7)] };
+          M.renderAll(); M.renderAll();
+          UI.goTo('vve');
+          const rids=[...document.querySelectorAll('#vve-inhoud [data-rid]')].map(el=>+el.dataset.rid);
+          truthy('lui: het dossier heeft taakrijen (anders meet deze toets niets)', rids.length>0);
+          eq('lui: elke data-rid in het heropende dossier wijst naar een taak van die VvE',
+             [...new Set(rids.map(i=>(state._rowCache[i]||{}).code))], ['LZ-1']);
+          eq('lui: en naar de VERSE rijen', [...new Set(rids.map(i=>(state._rowCache[i]||{}).taakId))].sort(), ['TL5','TL7']);
+        } finally {
+          D.af=afO; D.alvo=alvoO; state.vveCode=codeO;
+          UI.goTo(paginaOud); M.renderAll();
+        }
+      }
     } catch(e) {
       truthy('review 02-10: geen uitzondering — '+(e && e.stack || e), false);
     } finally {

@@ -6,7 +6,7 @@ import { D, pgs, state } from './state.js';
 import { verseRij } from "./rij.js";
 import { ensureToken, doOAuth, uitloggen } from './auth.js';
 import { startSplash } from './login-splash.js';
-import { goTo, syncKop, closeSb, applyTheme, applyDensity, cycleDensity, setupSearch } from './ui.js';
+import { goTo, syncKop, closeSb, applyTheme, applyDensity, cycleDensity, setupSearch, zetBijOpenen } from './ui.js';
 import { renderNtd, renderAf, renderAlvo, renderAlfa, renderNtdStats, zetKopOpen, kopOpen } from './render-lijsten.js';
 import {
   renderOntw, renderLogboek, openOntwModal, closeOntwModal,
@@ -651,6 +651,32 @@ document.addEventListener('DOMContentLoaded',()=>{
 // wel (af, alvo, alfa, ontw, logboek), maar `renderNtd` is de enige render hieronder die zijn
 // getekende lijst teruggeeft. Vraagt een andere lijst er ooit om, dan hoort die eerst hetzelfde te
 // doen; hier iets nabouwen zou een tweede kopie van die filter/sorteer-pijplijn opleveren.
+// ALLEEN DE ZICHTBARE PAGINA'S (meting 2026-10-02: 42-79 ms per renderAll, bij elke datawijziging,
+// voor zeven pagina's waarvan er één in beeld is). Wat altijd getekend wordt:
+//   · Nog Te Doen (renderNtd, met de 'Ook hier'-lijst en de bundelpanelen) en de tellers in de
+//     zijbalk/kop — die zijn op elke pagina zichtbaar of leveren de rij-cache;
+// Wat verborgen blijft liggen:
+//   · Afgerond, ALV's overzicht, ALV's afgerond → als 'vies' gemarkeerd, en goTo tekent ze bij
+//     het openen (zetBijOpenen hieronder);
+//   · Ontwikkeling, Logboek, Herhaalregels, VvE-dossier → goTo tekende die bij het openen al
+//     altijd opnieuw, dus daar hoeft niets bij.
+// DE RIJ-CACHE. `state._rowCache` wordt hier leeggemaakt en opnieuw gevuld door renderNtd, de
+// 'Ook hier'-lijst, het dossier (renderVve) en Ontwikkeling (renderOntw). Een verborgen pagina die
+// níet hertekend wordt houdt dus data-rid's die na deze regel naar andere rijen wijzen. Dat is
+// alleen veilig omdat zo'n pagina niet te bedienen is zolang hij verborgen is, en goTo hem bij het
+// openen ALTIJD opnieuw tekent vóór hij in beeld komt (ontw/logboek/herhaal/vve rechtstreeks in
+// goTo, af/alvo/alfa via de haak). Een nieuwe weg naar een pagina buiten goTo om moet dat ook doen.
+const _vies = new Set();
+const _lui = { af: () => renderAf(), alvo: () => renderAlvo(), alfa: () => renderAlfa() };
+const _paginaActief = p => !!document.getElementById('page-' + p)?.classList.contains('active');
+function _tekenOfMarkeer(p){
+  if(_paginaActief(p)){ _vies.delete(p); _lui[p](); } else _vies.add(p);
+}
+zetBijOpenen(p => {
+  // Afgerond altijd: het is goedkoop (1-4 ms), en daar hangt de mail-lezing voor de zoekfunctie
+  // aan, die alleen loopt als de pagina in beeld is (renderAf, review 2026-10-02).
+  if(p === 'af' || _vies.has(p)){ _vies.delete(p); if(_lui[p]) _lui[p](); }
+});
 export function renderAll(){
   state._rowCache=[];
   // Zelfde telling als de kop-pil 'N open' en de tegel op Cijfers: zonder de automatische
@@ -662,13 +688,13 @@ export function renderAll(){
   syncKop();
   zetKopOpen(kopOpen());
   const zichtbaar=renderNtd();
-  renderAf();
-  renderAlvo();
-  renderAlfa();
-  renderOntw();
-  renderLogboek();
-  renderHerhaal();
-  renderVve();
+  _tekenOfMarkeer('af');
+  _tekenOfMarkeer('alvo');
+  _tekenOfMarkeer('alfa');
+  if(_paginaActief('ontw')) renderOntw();
+  if(_paginaActief('logboek')) renderLogboek();
+  if(_paginaActief('herhaal')) renderHerhaal();
+  if(_paginaActief('vve')) renderVve();
   groeiVelden();   // de poll hertekent de velden; hun meegroei-hoogte moet terug
   // De bulk-balk hoort bij de lijst en moet dus mee-hertekend worden. Zonder deze regel bleef hij
   // na een verversing '30 geselecteerd' zeggen terwijl `renderNtd` alle vinkjes al leeg had

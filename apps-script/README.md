@@ -41,7 +41,8 @@ goedkoper dan een gemiste deploy — laat staan tenzij de Action-minuten echt ga
 - `Code.gs` — sheet-automatisering: afgeronde taken verplaatsen, ALV's afhandelen, secties sorteren
 - `Notifications.gs` — **OneSignal push-notificaties** + webhook (`doPost`/`doGet`) + trigger-setup
 - `Extra functies.gs` — in-app meldingen (`Meldingen`-sheet) + logboek
-- `AutoPrioriteit.gs` — dagelijkse auto-prioriteit voor Oppakken (06:00)
+- `AutoPrioriteit.gs` — UITGEZET (2026-10-02): het dashboard rekent de prioriteit live uit; de functie
+  bestaat nog alleen zodat de oude trigger niet faalt, en ruimt die trigger bij de eerste aanroep zelf op
 - `Opvolging.gs` — fase 4: opvolging, herhaalregels en stille-dossier-escalatie (dagelijks ±06:30)
 - `appsscript.json` — manifest (tijdzone, V8, webapp-instellingen); wordt meegepusht
 
@@ -50,7 +51,8 @@ goedkoper dan een gemiste deploy — laat staan tenzij de Action-minuten echt ga
 Installeerbaar vanuit de editor:
 - `setupNotificationTriggers()` (Notifications.gs) — `cd_onEditChange`, `cd_checkDeadlines`,
   `cd_dailySummary`, `cd_onNotifQueueChange`, `cd_sweepNotifQueue`
-- `ap_installeerTrigger()` (AutoPrioriteit.gs) — `cd_recalcPrioriteiten`, dagelijks 06:00
+- `ap_installeerTrigger()` (AutoPrioriteit.gs) — installeert niets meer; verwijdert de oude
+  `cd_recalcPrioriteiten`-trigger (die doet dat ook zelf bij zijn eerstvolgende run)
 - `cd_installeerOpvolgingTrigger()` (Opvolging.gs) — `cd_opvolgingMotor`, dagelijks ±06:30
 
 **Legacy-triggers staan in géén enkele setup-functie.** `verplaatsAfgerond`, `verplaatsALV`

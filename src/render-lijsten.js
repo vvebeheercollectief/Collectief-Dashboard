@@ -356,8 +356,14 @@ function renderNtd(){
   }
 
   // Tabs
+  // Per tabblad alleen FILTEREN voor de teller (niet sorteren); de gefilterde lijst van het actieve
+  // tabblad wordt hieronder hergebruikt en pas dán gesorteerd. Filteren en daarna sorteren geeft
+  // dezelfde volgorde als andersom: de sortering is stabiel en de filters laten de onderlinge
+  // volgorde staan.
+  let actiefGefilterd=null;
   document.getElementById('ntd-tabs').innerHTML=SKEYS.map(s=>{
-    const rows=zonderAutoStap(filterNtd(D.ntd[s]||[],q,fCode,fBeh,fPrio,s,state.ntdStatus), bw);
+    const rows=zonderAutoStap(_filterNtdRijen(D.ntd[s]||[],q,fCode,fBeh,fPrio,s,state.ntdStatus), bw);
+    if(s===state.activeNtd) actiefGefilterd=rows;
     return`<button type="button" class="tab ${s===state.activeNtd?'on':''}" role="tab" aria-selected="${s===state.activeNtd}" style="${s===state.activeNtd?SECS[s].css:''}" data-action="ntd-sectie" data-sec="${s}">${SECS[s].label}<span class="cnt">${rows.length}</span></button>`;
   }).join('');
 
@@ -387,7 +393,9 @@ function renderNtd(){
   //   · NIET in de selecteerstand (bulk): daar staat `stapel` én `merk` uit, dus het traject toont
   //     geen chevron en geen merkje en is de stap onbereikbaar. Bewuste keuze — bulk is een stand
   //     waar de gebruiker zelf in en uit stapt, en een bulk-actie op deze stappen heeft geen zin.
-  const zichtbaar=absorbeer(sorteerNtd(zonderAutoStap(filterNtd(D.ntd[state.activeNtd]||[],q,fCode,fBeh,fPrio,state.activeNtd,state.ntdStatus), bw),state.ntdSort),state.activeNtd,bw);
+  const zichtbaar=absorbeer(sorteerNtd(sorteerStandaard(
+      actiefGefilterd || zonderAutoStap(_filterNtdRijen(D.ntd[state.activeNtd]||[],q,fCode,fBeh,fPrio,state.activeNtd,state.ntdStatus), bw),
+      state.activeNtd),state.ntdSort),state.activeNtd,bw);
   // De bulk-kolom krijgt een px-ONDERGRENS en geen gewicht, precies zoals elke andere kolom met een
   // bekende minimuminhoud (VvE-code 130, datums 165, acties 150/120 — zie config.js).
   // Met een gewicht van 3 deelde hij mee in de ruimte die ná de px-kolommen overblijft, en bij de
@@ -505,7 +513,12 @@ function ntdPagina(zichtbaar, r){
   return i<0 ? 0 : Math.floor(i/PG)+1;
 }
 
+// Gefilterd én in de standaardvolgorde. Het filter zelf staat in _filterNtdRijen, de sortering in
+// sorteerStandaard — de tab-tellers gebruiken alleen het eerste.
 function filterNtd(rows,q,fCode,beh,prio,sec,status){
+  return sorteerStandaard(_filterNtdRijen(rows,q,fCode,beh,prio,sec,status), sec);
+}
+function _filterNtdRijen(rows,q,fCode,beh,prio,sec,status){
   const out=rows.filter(r=>{
     // Dezelfde uitsluitlijst als NIET_ZOEKBAAR (util.js). Twee velden vallen daarmee buiten de zoekterm:
     //  · `inBehandeling` draagt letterlijk 'TRUE'/'FALSE', dus elke term die in die twee woorden zit
@@ -540,37 +553,47 @@ function filterNtd(rows,q,fCode,beh,prio,sec,status){
   // render gebeuren, anders blijft het uitklap-paneel leeg en toont de teller de rauwe
   // kolom D. Sortering loopt daarna via hetzelfde generieke pad als de andere secties.
   if(sec==='OFFERTE-TRAJECTEN') out.forEach(r=>_verrijkOfferteRij(r));
-  return out.sort((a,b)=>{
-    // Groepen (Fase 4): 0 = actief, 1 = in behandeling, 2 = weggelegd (opvolgdatum in toekomst)
-    const grp = r => opvolgStatus(r).weggelegd ? 2 : (r.inBehandeling==='TRUE' ? 1 : 0);
-    const gA = grp(a), gB = grp(b);
-    if (gA !== gB) return gA - gB;
-    if (gA === 2){ // binnen Weggelegd: vroegste opvolgdatum eerst
-      const oA = parseDt(a.opvolgdatum), oB = parseDt(b.opvolgdatum);
-      if (oA !== oB) return oA - oB;
-    }
-    const pa = berekenPrioriteit(a.deadline, sec);
-    const pb = berekenPrioriteit(b.deadline, sec);
-    // 1. Te laat altijd bovenaan — bewust de rauwe teLaat en niet teLaatVoorTelling (util.js):
-    //    een aangevraagd offerte-traject waarvan de opvolgdatum over is hoort óók bovenaan.
-    //    Uitzondering: een CRM-vraag waarop al gereageerd is (crmReactieGegeven) telt niet als te laat.
-    const laatA = pa.teLaat && !(sec === 'CRM' && crmReactieGegeven(a));
-    const laatB = pb.teLaat && !(sec === 'CRM' && crmReactieGegeven(b));
-    if (laatA !== laatB) return laatA ? -1 : 1;
-    // 2. Opvolgen-vandaag direct daarna (Fase 4)
-    const ovA = opvolgStatus(a).vandaag ? 0 : 1, ovB = opvolgStatus(b).vandaag ? 0 : 1;
-    if (ovA !== ovB) return ovA - ovB;
-    // 3. Prioriteit-rang
-    const rang = { 'Hoog':0, 'Midden':1, 'Laag':2, '':3 };
-    if (rang[pa.prioriteit] !== rang[pb.prioriteit]) return rang[pa.prioriteit] - rang[pb.prioriteit];
-    // 4. Deadline oplopend (vroegste eerst)
-    const dA = parseDt(a.deadline), dB = parseDt(b.deadline);
-    if (dA && dB && dA !== dB) return dA - dB;
-    if (dA && !dB) return -1;
-    if (dB && !dA) return 1;
-    // 5. VvE-code alfabetisch
-    return (a.code || '').localeCompare(b.code || '');
+  return out;
+}
+
+// De standaardvolgorde van een sectie (zonder kolomkop-sortering). Gesplitst van het filter: de
+// tab-tellers hebben alleen het AANTAL nodig, en filterNtd sorteerde voor elk van de zes
+// tabbladen de hele lijst — alleen om er `.length` van te lezen (meting 2026-10-02).
+// De sorteersleutels worden één keer per rij uitgerekend en niet per vergelijking: de oude
+// comparator deed per vergelijking twee keer berekenPrioriteit + opvolgStatus (elk met een
+// datumlezing én een eigen `new Date()` voor vandaag), en een sortering doet n·log n vergelijkingen.
+// 'Vandaag' één keer per sortering. De volgorde is EXACT die van de oude comparator (toets in
+// tests.js vergelijkt beide op willekeurige rijen):
+//   groep (0 actief, 1 in behandeling, 2 weggelegd; binnen weggelegd vroegste opvolgdatum) →
+//   te laat (rauwe teLaat, behalve een CRM-vraag waarop al gereageerd is) → opvolgen-vandaag →
+//   prioriteit-rang → deadline oplopend (zonder deadline achteraan) → VvE-code.
+const _PRIO_RANG = { 'Hoog':0, 'Midden':1, 'Laag':2, '':3 };
+function sorteerStandaard(rows, sec){
+  const vandaag = _vandaagAmsterdam();
+  const items = rows.map(r => {
+    const ov = opvolgStatus(r, vandaag);
+    const p = berekenPrioriteit(r.deadline, sec, vandaag);
+    return { r,
+      g: ov.weggelegd ? 2 : (r.inBehandeling==='TRUE' ? 1 : 0),
+      o: ov.weggelegd ? parseDt(r.opvolgdatum) : 0,
+      laat: p.teLaat && !(sec === 'CRM' && crmReactieGegeven(r)),
+      ov: ov.vandaag ? 0 : 1,
+      rang: _PRIO_RANG[p.prioriteit],
+      d: parseDt(r.deadline),
+      code: r.code || '' };
   });
+  items.sort((A, B) => {
+    if (A.g !== B.g) return A.g - B.g;
+    if (A.g === 2 && A.o !== B.o) return A.o - B.o;
+    if (A.laat !== B.laat) return A.laat ? -1 : 1;
+    if (A.ov !== B.ov) return A.ov - B.ov;
+    if (A.rang !== B.rang) return A.rang - B.rang;
+    if (A.d && B.d && A.d !== B.d) return A.d - B.d;
+    if (A.d && !B.d) return -1;
+    if (B.d && !A.d) return 1;
+    return A.code.localeCompare(B.code);
+  });
+  return items.map(x => x.r);
 }
 
 // Groeperen per VvE is aan als de pil aanstaat ÉN er niet op een kolomkop gesorteerd wordt.

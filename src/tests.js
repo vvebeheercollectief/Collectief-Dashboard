@@ -17030,6 +17030,46 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
           P.closePalette(); D.logboek=logO; D.alvo=alvoO; inp.value='';
         }
       }
+
+      // ── 2e. De standaardvolgorde van Nog Te Doen is exact die van de oude comparator ──
+      {
+        const RL = await import('./render-lijsten.js');
+        const U = await import('./util.js');
+        // De comparator zoals hij tot 02-10-2026 in filterNtd stond, letterlijk.
+        const oud=(rows,sec)=>rows.slice().sort((a,b)=>{
+          const grp = r => U.opvolgStatus(r).weggelegd ? 2 : (r.inBehandeling==='TRUE' ? 1 : 0);
+          const gA = grp(a), gB = grp(b);
+          if (gA !== gB) return gA - gB;
+          if (gA === 2){ const oA = U.parseDt(a.opvolgdatum), oB = U.parseDt(b.opvolgdatum); if (oA !== oB) return oA - oB; }
+          const pa = U.berekenPrioriteit(a.deadline, sec), pb = U.berekenPrioriteit(b.deadline, sec);
+          const laatA = pa.teLaat && !(sec === 'CRM' && U.crmReactieGegeven(a));
+          const laatB = pb.teLaat && !(sec === 'CRM' && U.crmReactieGegeven(b));
+          if (laatA !== laatB) return laatA ? -1 : 1;
+          const ovA = U.opvolgStatus(a).vandaag ? 0 : 1, ovB = U.opvolgStatus(b).vandaag ? 0 : 1;
+          if (ovA !== ovB) return ovA - ovB;
+          const rang = { 'Hoog':0, 'Midden':1, 'Laag':2, '':3 };
+          if (rang[pa.prioriteit] !== rang[pb.prioriteit]) return rang[pa.prioriteit] - rang[pb.prioriteit];
+          const dA = U.parseDt(a.deadline), dB = U.parseDt(b.deadline);
+          if (dA && dB && dA !== dB) return dA - dB;
+          if (dA && !dB) return -1;
+          if (dB && !dA) return 1;
+          return (a.code || '').localeCompare(b.code || '');
+        });
+        let zaad=12345; const rnd=n=>{ zaad=(zaad*1103515245+12345)%2147483648; return zaad%n; };
+        const dag=k=>{ const d=new Date(); d.setDate(d.getDate()+k); return `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`; };
+        const verschil=[];
+        for(const sec of ['OPPAKKEN','CRM','OFFERTE-TRAJECTEN','LOD']){
+          const rows=Array.from({length:300},(_,i)=>({ _sec:sec, _row:i+3, taakId:'S'+i, code:String(300000+rnd(40)), naam:'x', actiepunt:'a',
+            deadline:[ '', dag(rnd(60)-30), dag(rnd(5)-2), 'onleesbaar' ][rnd(4)],
+            opvolgdatum:[ '', '', dag(rnd(20)-5), dag(0) ][rnd(4)],
+            inBehandeling:rnd(4)?'FALSE':'TRUE', crmFase:sec==='CRM'?['','wacht op reactie','beantwoord'][rnd(3)]:'',
+            datumAangevraagd:sec==='OFFERTE-TRAJECTEN'&&rnd(2)?dag(-10):'', behandelaar:'', opmerkingen:'', aannemers:'' }));
+          const nu=RL.filterNtd(rows,'','','','',sec,'').map(r=>r.taakId).join(',');
+          const ref=oud(rows,sec).map(r=>r.taakId).join(',');
+          if(nu!==ref) verschil.push(sec);
+        }
+        eq('ntd-volgorde: exact gelijk aan de oude comparator (300 willekeurige rijen, vier secties)', verschil, []);
+      }
     } catch(e) {
       truthy('review 02-10: geen uitzondering — '+(e && e.stack || e), false);
     } finally {

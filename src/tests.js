@@ -17103,6 +17103,21 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
           state.charts=chartsOud;
         }
       }
+
+      // ── 2g. Modules die pas later nodig zijn, laden pas bij gebruik ──
+      {
+        const lees=async n=>(await fetch(new URL('src/'+n, document.baseURI), {cache:'no-store'})).text();
+        const statisch=(bron, mod)=>new RegExp(`^import[^;]*from\\s*["']\\./${mod.replace('.','\\.')}["']`, 'm').test(bron);
+        const bronnen={}; for(const n of ['main.js','ui.js','data.js','actions.js']) bronnen[n]=await lees(n);
+        eq('lui: render-analytics.js wordt nergens bij de start statisch geïmporteerd',
+           Object.keys(bronnen).filter(n=>statisch(bronnen[n],'render-analytics.js')), []);
+        eq('lui: verplaats.js ook niet', Object.keys(bronnen).filter(n=>statisch(bronnen[n],'verplaats.js')), []);
+        truthy('lui: de migratie-module staat alleen achter de console-hulp',
+               /window\.migreerOfferteStappen\s*=\s*\(\.\.\.args\)\s*=>\s*import\('\.\/migratie-offerte\.js'\)/.test(bronnen['main.js'])
+               && (bronnen['main.js'].match(/import\('\.\/migratie-offerte\.js'\)/g)||[]).length===1);
+        const UI = await import('./ui.js');
+        eq('lui: de wrappers bestaan (goTo en de poll roepen ze aan)', [typeof UI.buildAnalytics, typeof UI.buildDash], ['function','function']);
+      }
     } catch(e) {
       truthy('review 02-10: geen uitzondering — '+(e && e.stack || e), false);
     } finally {

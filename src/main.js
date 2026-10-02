@@ -26,7 +26,6 @@ import { initActions } from './actions.js';
 import { initVveZoekveld } from './vve-zoekveld.js';
 import { initWeekKiezer } from './weekkiezer.js';
 import { voegExtraVveToe } from './meervve.js';
-import { verplaatsTaak } from './verplaats.js';
 import { renderBulkUi } from './bulk.js';
 import { vulPeriodeKeuze } from './render-lijsten.js';
 import { bouwBundelIndex, koppelKandidaten, taakFilter, telbaar } from './bundel.js';
@@ -314,6 +313,11 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(!r){ e.target.value = state.editRowData ? state.editRowData._sec : doel; return; }
     // Wat er in de invoervelden staat en nog niet is opgeslagen gaat NIET mee met de verhuizing —
     // die bouwt de nieuwe rij uit de opgeslagen taak. Dat hoort in de vraag te staan.
+    // verplaats.js pas laden als er echt verplaatst wordt (25 kB die bij de start niets doen).
+    // Lukt het laden niet (een uitrol die net wisselt), dan zeggen we dat en blijft alles staan.
+    let verplaatsTaak;
+    try{ ({ verplaatsTaak } = await import('./verplaats.js')); }
+    catch(err){ e.target.value=bron; alert('Verplaatsen kan nu even niet: een deel van het dashboard laadde niet. Herlaad de pagina en probeer het opnieuw.'); return; }
     const gelukt=await verplaatsTaak(r, doel, nietOpgeslagenVelden(r));
     if(gelukt){ closeModal(); }
     else if(bron){ e.target.value=bron; }
@@ -556,14 +560,15 @@ document.addEventListener('DOMContentLoaded',()=>{
   });
 
   // Eenmalige migratie v12.5 (offerte-stappen) — handmatig vanuit de console; zie migratie-offerte.js.
-  // Lazy import: de module weegt zo niets mee in de normale start, en de kringverwijzing met main.js
-  // (hij heeft renderAll nodig) knelt niet omdat hij pas ná main.js geladen wordt.
-  import('./migratie-offerte.js')
-    .then(m=>{ window.migreerOfferteStappen=m.migreerOfferteStappen; })
-    // Zonder deze vangst mislukt de import stil (bv. een bestand dat bij het laden nog niet
-    // uitgerold was) en staat er in de console alleen 'undefined is not a function' — zonder
-    // enige aanwijzing waaróm. Gebeurd bij de uitrol van 12.5 op 02-09-2026.
-    .catch(e=>console.warn('[migratie] module niet geladen:', e && e.message));
+  // Alleen de console-hulp staat klaar; de module zelf wordt pas geladen als iemand hem aanroept.
+  // Hij werd hier bij ELKE start geïmporteerd (een extra verzoek en 11 kB parsen) voor een functie
+  // die op productie al gedraaid heeft. De kringverwijzing met main.js (hij heeft renderAll nodig)
+  // knelt zo ook niet: hij laadt pas lang ná main.js.
+  window.migreerOfferteStappen=(...args)=>import('./migratie-offerte.js')
+    .then(m=>m.migreerOfferteStappen(...args))
+    // Zonder deze regel staat er in de console alleen een kale importfout, zonder aanwijzing
+    // waaróm (gebeurd bij de uitrol van 12.5 op 02-09-2026).
+    .catch(e=>{ console.warn('[migratie] module niet geladen of mislukt:', e && e.message); throw e; });
 
   // Live updates — auto-refresh elke 8 seconden (smart diff voorkomt onnodige re-renders)
   // Id bewaard voor diagnose — logout() stopt hem BEWUST niet: dan zou een tweede inlog in

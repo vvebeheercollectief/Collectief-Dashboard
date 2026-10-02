@@ -3,7 +3,11 @@
 // ══════════════════════════════════════
 import { PAGE_META } from "./config.js";
 import { state } from "./state.js";
-import { buildAnalytics, buildDash } from "./render-analytics.js";
+// render-analytics.js (38 kB, plus Chart.js van het CDN) pas laden als Cijfers of Statistiek
+// geopend wordt. Daarvoor heeft niemand hem nodig.
+const _analytics = () => import("./render-analytics.js");
+function buildAnalytics(){ return _analytics().then(m=>m.buildAnalytics()).catch(e=>console.warn('[statistiek] niet geladen:', e && e.message)); }
+function buildDash(){ return _analytics().then(m=>m.buildDash()).catch(e=>console.warn('[cijfers] niet geladen:', e && e.message)); }
 import { renderOntw, renderLogboek } from "./render-overig.js";
 import { renderHerhaal } from "./render-herhaal.js";
 import { renderVve } from "./render-vve.js";
@@ -141,4 +145,4 @@ function setupSearch(id,cb){
   });
 }
 
-export { goTo, syncKop, closeSb, applyTheme, applyDensity, cycleDensity, setupSearch, herstelScroll, kaartInBeeld, zetBijOpenen };
+export { goTo, syncKop, closeSb, applyTheme, applyDensity, cycleDensity, setupSearch, herstelScroll, kaartInBeeld, zetBijOpenen, buildAnalytics, buildDash };

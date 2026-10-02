@@ -6,7 +6,7 @@ import { state, D } from "./state.js";
 import { SKEYS, SECS, APP_VERSION, ALLOWED_EMAILS } from "./config.js";
 import { fetchSheet, fetchSheets, _withRetry, isOffline } from "./api.js";
 import { ensureToken, doOAuth, fetchUserEmail, logout, _wisTokenSessie } from "./auth.js";
-import { buildAnalytics, buildDash } from "./render-analytics.js";
+import { buildAnalytics, buildDash } from "./ui.js";   // lui: laadt render-analytics.js pas bij gebruik
 import { renderNtdDonut, renderNtd, renderAf } from "./render-lijsten.js";
 // Kringverwijzing data ⇄ bulk, net als data ⇄ main en ui ⇄ bulk: bulk.js haalt backgroundWrite en
 // loadAll hiervandaan. Allebei worden ze pas op RUNTIME aangeroepen, dus de live bindings van

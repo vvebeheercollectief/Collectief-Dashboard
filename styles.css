@@ -1,8 +1,10 @@
     :root{
-      /* ——— "Operator" content-palet (licht, zakelijk, hoge dichtheid) ——— */
-      --bg:#f4f5f7;--sur:#ffffff;--sur2:#fbfcfd;--bor:#ebedf0;
-      --txt:#1b1e24;--mut:#5b6675;--fnt:#9aa1ad;
-      --bor-input:#e4e7ec;--row-divider:#f1f3f5;--row-hover:#f7f9fb;--group-bg:#f5f7f9;
+      /* ——— Kleuren van de huisstijl (v14.4) — dezelfde als de website (Richting D): leisteen
+         #222B36 als tekst en zijbalk, papierwit/sectiegrijs als vlakken, staalblauw #4E6885 als
+         enige accent. De letter blijft de standaardletter van het toestel (keuze gebruiker). ——— */
+      --bg:#F5F7F9;--sur:#ffffff;--sur2:#FBFCFD;--bor:#E1E6EB;
+      --txt:#222B36;--mut:#59616B;--fnt:#7A828C;
+      --bor-input:#DCE2E8;--row-divider:#EEF1F4;--row-hover:#F7F9FB;--group-bg:#F5F7F9;
       /* Ontwerpsysteem (v13.6, afwerking). Drie hoeken: 4 klein · 6 knop/veld (--rs) · 8 kaart/venster (--r).
          Kaarten dragen alleen een lijn (--sh is leeg); schaduw is voor wat zweeft: --shm (menu, paneel)
          en --shl (venster, Ctrl+K). Letter: 11 kolomkop · 12 bijschrift · 13 tekst · 15 kaarttitel ·
@@ -19,17 +21,18 @@
       --am:#AE5008;--am-l:#fef3c7;--am-b:#FCD34D;
       --rd:#B91C1C;--rd-l:#fee2e2;--rd-b:#fecaca;
       --gn:#047857;--gn-l:#d1fae5;--gn-b:#a7f3d0;
-      /* Accent = Operator-leiblauw (#4a5b7a) i.p.v. teal */
-      --ac:#4a5b7a;--ac-l:#eef1f6;--ac-b:#d6deea;--ac-900:#3a4a66;--ac-500:#6f81a3;
+      /* Accent = staalblauw van de website (was Operator-leiblauw #4a5b7a tot v14.3) */
+      --ac:#4E6885;--ac-l:#EDF1F5;--ac-b:#D3DCE6;--ac-900:#3F566F;--ac-500:#5A7796;
       /* Focusrand en schakelaar in het bewerkscherm. Bewust NIET in [data-theme=dark] herhaald:
          de schakelaar draagt een witte knop en die vraagt in beide thema's een donkere vulling.
          Tot v13.6 zette crud.js hier per sectie een eigen kleur in. */
-      --modal-sec:#4a5b7a;
-      --nv:#2B3544;--nv-d:#1E2530;
-      /* Zijbalk — Operator donker (vast, in beide thema's) */
-      --sbbg:#1b1e24;--sbedge:#2a2e36;--sbglow:#7f9ce0;
+      --modal-sec:#4E6885;
+      --nv:#222B36;--nv-d:#1C242E;
+      /* Zijbalk — leisteen, vast in beide thema's. In donker is hij daardoor lichter dan de
+         pagina (#161C24) en valt hij niet meer weg zoals de oude #1b1e24 deed. */
+      --sbbg:#222B36;--sbedge:#2E3946;--sbglow:#9DB2CB;
       /* Voorgrond-tekst op kaarten (donut e.d.) */
-      --fg:#1b1e24;
+      --fg:#222B36;
       /* Eén gedempt 'urgent/te-laat'-rood (baksteen), los van het felle --rd-signaal */
       --prio:#b5544b;
       /* Een tint donkerder, voor de te-laat-TEKST in de signaal-kolom: --prio zelf haalt daar
@@ -49,17 +52,17 @@
       --font-mono:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace;
     }
     [data-theme=dark]{
-      --bg:#15181d;--sur:#1f242c;--sur2:#191d23;--bor:#2a2e36;
-      --bor-input:#343a44;--row-divider:#23272f;--row-hover:#22272f;--group-bg:#1c2026;
-      --sbbg:#1b1e24;--sbedge:#2a2e36;--sbglow:#7f9ce0;
-      --txt:#f2f4f7;--mut:#9aa1ad;--fnt:#6b7280;
+      --bg:#161C24;--sur:#1C242E;--sur2:#19202A;--bor:#2B3542;
+      --bor-input:#334050;--row-divider:#232C38;--row-hover:#222B36;--group-bg:#19202A;
+      --sbbg:#222B36;--sbedge:#2E3946;--sbglow:#9DB2CB;
+      --txt:#EEF1F4;--mut:#A3ACB7;--fnt:#7A828C;
       --sh:none;
       --shm:0 8px 28px rgba(0,0,0,.5);--shl:0 24px 64px rgba(0,0,0,.65);
       --am:#F0B44C;--am-l:#382912;--am-b:#5A451F;
       --rd:#F0746F;--rd-l:#371A1B;--rd-b:#582A2A;
       --gn:#34D39A;--gn-l:#103129;--gn-b:#1F4A3C;
-      --ac:#8b9dc4;--ac-l:#262b35;--ac-b:#3a4256;--ac-900:#a8b8d8;--ac-500:#9fb0d4;
-      --fg:#f2f4f7;--prio:#e08b82;--sig-crit:#f0a29a;
+      --ac:#8FA6C2;--ac-l:#243041;--ac-b:#334458;--ac-900:#B4C5D9;--ac-500:#9DB2CB;
+      --fg:#EEF1F4;--prio:#e08b82;--sig-crit:#f0a29a;
     }
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     html,body{height:100%;font-family:var(--font-app);font-size:14px;background:var(--bg);color:var(--txt);line-height:1.5;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
@@ -85,22 +88,22 @@
     #sb{width:var(--sb);background:var(--sbbg);border-right:1px solid var(--sbedge);display:flex;flex-direction:column;flex-shrink:0;z-index:200;transition:transform var(--tr);color:#8b929e}
     .sb-logo{padding:20px 20px 18px;border-bottom:1px solid var(--sbedge);display:flex;align-items:center;gap:11px}
     .sb-logo img{height:32px;width:auto;object-fit:contain}
-    .sb-logo-fb{width:34px;height:34px;background:#2b313c;border:1px solid #3a414d;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#cfd5df;font-weight:600;font-size:14px;flex-shrink:0}
+    .sb-logo-fb{width:34px;height:34px;background:#2E3946;border:1px solid #3A4757;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#cfd5df;font-weight:600;font-size:14px;flex-shrink:0}
     .sb-brand{font-size:15px;font-weight:600;line-height:1.25;color:#f2f4f7}
-    .sb-brand span{display:block;font-size:11px;font-weight:500;color:#8b929e}
+    .sb-brand span{display:block;font-size:11px;font-weight:500;color:#9AA5B2}
     .sb-nav{flex:1;padding:14px 12px;overflow-y:auto}
-    .sb-lbl{font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#828894;padding:16px 10px 6px} /* #828894 i.p.v. #7c828e: op de zijbalk-achtergrond (#1b1e24) haalt dat 4,69:1 i.p.v. 4,33:1 — 10px hoofdletters vragen de gewone AA-eis van 4,5:1 */
+    .sb-lbl{font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#8C96A3;padding:16px 10px 6px} /* #8C96A3 op leisteen (#222B36) haalt 4,78:1 — 10px hoofdletters vragen de gewone AA-eis van 4,5:1 (v14.4; daarvoor #828894 op #1b1e24) */
     .sb-nav>.sb-lbl:first-child{padding-top:2px}
-    .ni{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:7px 10px;border-radius:6px;color:#8b929e;font-weight:500;font-size:13px;cursor:pointer;transition:background var(--tr),color var(--tr);user-select:none}
-    .ni:hover{background:rgba(255,255,255,.05);color:#cfd5df}
-    .ni.on{background:#272c34;color:#f2f4f7;font-weight:600}
+    .ni{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:7px 10px;border-radius:6px;color:#9AA5B2;font-weight:500;font-size:13px;cursor:pointer;transition:background var(--tr),color var(--tr);user-select:none}
+    .ni:hover{background:rgba(255,255,255,.05);color:#D5DCE4}
+    .ni.on{background:#2E3946;color:#F2F4F7;font-weight:600}
     .ni.on svg{color:var(--sbglow)}
     .ni svg{width:16px;height:16px;flex-shrink:0}
-    .ni-badge{margin-left:auto;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;background:#3a414d;color:#cfd5df}
-    .ni.on .ni-badge{background:#3a414d;color:#cfd5df}
+    .ni-badge{margin-left:auto;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;background:#3A4757;color:#D5DCE4}
+    .ni.on .ni-badge{background:#3A4757;color:#D5DCE4}
     .sb-foot{padding:13px 18px;border-top:1px solid var(--sbedge);display:flex;align-items:center;justify-content:space-between;gap:6px}
     /* De statusregel neemt de ruimte, de twee knoppen (Vernieuwen, Uitloggen) staan samen rechts. */
-    .sync-row{display:flex;align-items:center;gap:8px;font-size:11px;color:#8b929e;font-family:var(--font-mono);flex:1;min-width:0}
+    .sync-row{display:flex;align-items:center;gap:8px;font-size:11px;color:#9AA5B2;font-family:var(--font-mono);flex:1;min-width:0}
     .dot{width:6px;height:6px;border-radius:50%;background:var(--gn);flex-shrink:0}
     .dot.loading{background:var(--am);animation:pulse 1s infinite}
     .dot.err{background:var(--rd);animation:none}
@@ -147,8 +150,8 @@
     .ico-btn:hover{background:var(--row-hover);color:var(--txt)}
     .ico-btn svg{width:16px;height:16px}
     /* Refresh-knop in de donkere zijbalk-voet */
-    .sb-foot .ico-btn{border-color:#3a414d;background:transparent;color:#7c818e}
-    .sb-foot .ico-btn:hover{background:rgba(255,255,255,.05);color:#cfd5df}
+    .sb-foot .ico-btn{border-color:#3A4757;background:transparent;color:#9AA5B2}
+    .sb-foot .ico-btn:hover{background:rgba(255,255,255,.05);color:#D5DCE4}
     .btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--rs);font-size:13px;font-weight:600;transition:background var(--tr),color var(--tr),border-color var(--tr),filter var(--tr),transform var(--tr-fast);white-space:nowrap;cursor:pointer}
     .btn-pri{background:var(--ac);color:#fff;border:none}.btn-pri:hover{filter:brightness(1.1)}
     .btn-sec{background:var(--sur);color:var(--mut);border:1px solid var(--bor)}.btn-sec:hover{background:var(--sur2);color:var(--txt)}
@@ -759,7 +762,7 @@
     .ntd-progress-track{position:relative;height:22px;border-radius:999px;background:var(--sur2);overflow:hidden;flex:1 1 auto;min-width:120px}
     /* Voorloopstuk: wél klaargezet, nog niet verstuurd. Ligt onder de gevulde balk. */
     .ntd-progress-voor{position:absolute;inset:0 auto 0 0;width:0;border-radius:999px;background:var(--ac-b);transition:width .9s cubic-bezier(.22,1,.36,1)}
-    .ntd-progress-fill{position:absolute;inset:0 auto 0 0;width:0;border-radius:999px;background:linear-gradient(135deg,#4a5b7a,#6f81a3);transition:width .9s cubic-bezier(.22,1,.36,1)}
+    .ntd-progress-fill{position:absolute;inset:0 auto 0 0;width:0;border-radius:999px;background:var(--ac);transition:width .9s cubic-bezier(.22,1,.36,1)}
     .ntd-progress-val{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;letter-spacing:-.01em;white-space:nowrap;pointer-events:none;font-variant-numeric:tabular-nums}
     .ntd-progress-val-base{color:var(--txt)}
     .ntd-progress-val-rev{color:#fff;clip-path:inset(0 100% 0 0);transition:clip-path .9s cubic-bezier(.22,1,.36,1)}
@@ -846,7 +849,7 @@
     #bevestig-tekst{white-space:pre-line;overflow-wrap:anywhere}
 
     /* Form */
-    .fld{margin-bottom:13px}
+    .fld{margin-bottom:12px}
     .fld label{display:block;font-size:12px;font-weight:500;color:var(--mut);margin-bottom:6px}
     /* Het zinnetje onder een deadline-veld: 'dit is een voorstel' of, bij LOD en subsidie, waaróm
        er geen voorstel staat. Bewust klein en gedempt — het is uitleg, geen waarschuwing — maar
@@ -890,9 +893,12 @@
        eronder ('Afhandelen') heeft dat probleem óók, maar dat is een bestaande fout en geen
        reden om er hier een tweede bij te maken. */
     [data-theme=dark] .duur-knop[aria-pressed=true]{color:#0d1f19}
-    .fld-row{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+    .fld-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    /* Een veld dat alleen op zijn rij staat (Opmerkingen) neemt de hele breedte; het stond op de
+       halve breedte van een lege tweede kolom (v14.4). */
+    .fld-row>.fld:only-child{grid-column:1/-1}
     @media(max-width:480px){.fld-row{grid-template-columns:1fr}}
-    .toggle-row{display:flex;align-items:center;gap:10px;padding:7px 0}
+    .toggle-row{display:flex;align-items:center;gap:10px;padding:4px 0;margin-bottom:12px}
     .tog{width:36px;height:20px;border-radius:8px;background:var(--bor);position:relative;cursor:pointer;transition:background var(--tr);flex-shrink:0}
     .tog.on{background:var(--modal-sec,var(--ac))}
     .tog::after{content:'';width:16px;height:16px;background:#fff;border-radius:50%;position:absolute;top:2px;left:2px;transition:left var(--tr);box-shadow:0 1px 2px rgba(0,0,0,.2)}

@@ -1,167 +1,123 @@
-# VvE Beheer Collectief — Brand Guidelines
+# VvE Beheer Collectief — Huisstijl
 
-Volledige huisstijl voor alle uitingen van VvE Beheer Collectief: dashboard, documenten, website, e-mailhandtekeningen en visitekaartjes.
+Eén huisstijl voor de website, het dashboard, documenten en e-mail. Bijgewerkt oktober 2026 (dashboard v14.4).
+De kleuren komen van de website ("Richting D"). Het dashboard gebruikt dezelfde kleuren, maar een eigen, rustige letter (zie §3).
+
+Vervangt de eerdere versie met teal, DM Sans en Phosphor-iconen. Die is niet meer geldig.
 
 ## 1. Logo
 
-**Primair logo:** handdruk-in-huisvorm icoon + "VVE BEHEER COLLECTIEF" tekst.
+Twee handen die elkaar vasthouden onder een dak, met de woorden VVE BEHEER COLLECTIEF.
+Alle bestanden staan in `logo-pakket/` (zie de README daar).
 
-### Varianten
+| Variant | Gebruik |
+|---|---|
+| Donker op licht | Website, documenten, briefpapier |
+| Wit op donker | Zijbalk dashboard, donkere kop- en voetbalk, e-mailhandtekening |
+| Alleen icoon | Favicon, app-icoon |
 
-| Variant | Gebruik | Kleuren |
+- Vrije ruimte rondom het logo: minstens de hoogte van het huisje.
+- Niet vervormen, kantelen of in andere kleuren zetten dan donker of wit.
+
+## 2. Kleur
+
+Weinig kleur, en kleur betekent altijd iets. Er is één accent (staalblauw) voor actie en selectie. Rood, amber en groen zijn alleen signalen.
+
+### Basis
+
+| Naam | Hex | Gebruik |
 |---|---|---|
-| Primair | Briefpapier, website, documenten | Navy `#2B3544` op witte achtergrond |
-| Omgekeerd | Sidebar, donkere headers, e-mailhandtekeningen | Wit op navy of teal achtergrond |
-| Icoon-only | Favicon, app-icoon, kleine toepassingen | Navy of wit, afhankelijk van achtergrond |
+| Leisteen | `#222B36` | Tekst, zijbalk, donkere balken |
+| Navy | `#1C242E` | Donkerste vlak (donkere modus, voetbalk website) |
+| Papierwit | `#FBFCFD` | Vlakken, zachte achtergrond |
+| Sectiegrijs | `#F5F7F9` | Paginaachtergrond |
+| Lijn | `#E1E6EB` | Randen en scheidingslijnen |
+| Gedempt | `#59616B` | Bijschriften, tweede tekst |
+| Zwak | `#7A828C` | Pictogrammen, lege toestanden |
 
-### Regels
+### Accent
 
-- Minimale vrije ruimte rondom het logo: gelijk aan de hoogte van het huisje-icoon
-- Nooit vervormen, kantelen, of in andere kleuren dan navy/wit/teal gebruiken
-- Het "VBC" vierkant in het dashboard wordt vervangen door het echte logo-icoon
-
-## 2. Kleurenpalet
-
-### Primaire kleuren (afgeleid van het logo)
-
-| Kleur | Hex | Gebruik |
+| Naam | Hex | Gebruik |
 |---|---|---|
-| Navy | `#2B3544` | Tekst, sidebar, headers, logo |
-| Navy donker | `#1E2530` | Dark mode, hover-states |
-| Wit | `#FFFFFF` | Achtergronden, kaarten |
-| Lichtgrijs | `#F0F2F5` | Pagina-achtergrond |
+| Staalblauw | `#4E6885` | Hoofdknop, actief tabblad, links, vinkjes |
+| Staalblauw donker | `#3F566F` | Hover, tekst op lichte accenttint |
+| Accenttint | `#EDF1F5` | Kolombalk in tabellen, geselecteerde filter |
 
-### Accentkleur (teal-schaal)
+### Signalen (alleen waar ze iets betekenen)
 
-| Tint | Hex | Gebruik |
+| Kleur | Hex | Betekenis |
 |---|---|---|
-| Teal 900 | `#064E50` | Hover op primaire knoppen |
-| Teal 700 | `#0D7377` | Primaire knoppen, actieve navigatie, links |
-| Teal 500 | `#14B8A6` | Secundaire highlights |
-| Teal 300 | `#5EEAD4` | Lichte accenten |
-| Teal 100 | `#CCFBF1` | Badges, lichte achtergronden |
+| Rood | `#B91C1C` | Te laat, verwijderen |
+| Amber | `#AE5008` | Binnenkort, in behandeling, gepland |
+| Groen | `#047857` | Afgerond |
 
-### Functionele kleuren (status)
-
-| Kleur | Hex | Gebruik |
-|---|---|---|
-| Groen | `#059669` | Succes, afgerond |
-| Amber | `#D97706` | Waarschuwing, deadline |
-| Rood | `#DC2626` | Fout, verlopen |
-| Grijs | `#64748B` | Inactief, muted tekst |
+Contrast: tekst haalt minstens 4,5:1 en pictogrammen 3:1, in licht en donker. De zelftest van het dashboard controleert dit.
 
 ## 3. Typografie
 
-**Font:** DM Sans (Google Fonts, gratis)
-
-Gekozen vanwege de subtiel rondere vormen die warmte en toegankelijkheid geven, terwijl het strakke snit professioneel blijft. Past bij de gewenste uitstraling: krachtig en vertrouwd, met een vleugje toegankelijkheid.
-
-### Scherm (dashboard, website)
-
-| Toepassing | Gewicht | Grootte |
-|---|---|---|
-| Koptekst H1 | 800 (Extra Bold) | 24px |
-| Koptekst H2 | 700 (Bold) | 18px |
-| Koptekst H3 | 600 (Semi Bold) | 15px |
-| Body tekst | 400 (Regular) | 14px |
-| Labels/badges | 700 (Bold) | 11px, uppercase, letter-spacing 0.05em |
-| Kleine tekst | 400 (Regular) | 12px |
-
-### Print (brieven, offertes, notulen)
-
-- Body tekst: DM Sans Regular, 11pt, donkergrijs `#334155`
-- Kopteksten: DM Sans Bold, navy `#2B3544`
-- Accentkleur teal voor highlights, tabelheaders en kaders
-
-## 4. Iconografie
-
-**Bibliotheek:** Phosphor Icons, duotone stijl
-
-Gekozen vanwege de combinatie van stevigheid (professionaliteit) en warmte (duotone teal-accent). Vervangt de huidige emoji-iconen die per apparaat verschillen.
-
-### Dashboard navigatie-iconen
-
-| Sectie | Icoon |
+| Waar | Letter |
 |---|---|
-| Nog te doen | `ClipboardText` duotone |
-| Afgerond | `CheckCircle` duotone |
-| ALV's overzicht | `CalendarBlank` duotone |
-| Logboek | `BookOpen` duotone |
-| Meldingen | `Bell` duotone |
-| Statistieken | `ChartBar` duotone |
-| Ontwikkeling | `Gear` duotone |
+| Website, documenten, print | Koppen **Source Serif 4**, tekst **Karla**, kleine labels **Jost** (hoofdletters, ruim gespatieerd) |
+| Dashboard | De standaardletter van het toestel (SF Pro / Segoe UI / Roboto). Codes en datums in de standaard vaste-breedteletter. |
+| Inlogscherm dashboard | Eigen gemerkt scherm (Hanken Grotesk + JetBrains Mono) |
 
-### Kleurgebruik iconen
+Het dashboard is een werkinstrument met dichte tabellen. De systeemletter leest daar het rustigst. Bovendien zijn de kolombreedtes erop afgestemd: een andere letter maakt kolommen 30–35% breder of smaller.
 
-- **Sidebar (donkere achtergrond):** wit, actief item in teal-achtergrond
-- **Lichte achtergrond:** teal `#0D7377` op teal 100 `#CCFBF1` achtergrond
-- **Functioneel:** statuskleuren (groen/amber/rood) voor relevante context
+### Maten in het dashboard
 
-### In knoppen
+Zes lettergroottes en drie diktes; geen tussenmaten.
 
-- Icoon links van de tekst, 16px groot
-- Zelfde kleur als de knoptekst
+| px | Gebruik |
+|---|---|
+| 28 | Grote getallen (tellers) |
+| 18 | Paginatitel |
+| 15 | Kaarttitel, venstertitel |
+| 13 | Tekst, tabellen, invoervelden, knoppen |
+| 12 | Bijschriften, namen, labels in formulieren |
+| 11 | Kolomkoppen (hoofdletters, 0,04em gespatieerd) |
 
-## 5. Toepassingsregels
+Diktes: 400 (gewoon), 500 (nadruk), 600 (koppen, knoppen).
 
-### Dashboard
+## 4. Vorm
 
-- Sidebar: navy `#2B3544` achtergrond, actieve navigatie in teal `#0D7377`
-- Knoppen primair: teal achtergrond, witte tekst
-- Knoppen secundair: transparant met teal border
-- Stat-kaarten: teal accent-balk bovenaan
-- Badges: teal 100 achtergrond met teal tekst voor "in behandeling"
-- Dark mode: navy donker `#1E2530` als basis, teal ongewijzigd
+- **Hoeken:** 4 px (klein), 6 px (knoppen, velden), 8 px (kaarten, vensters). De website gebruikt 4 px voor knoppen.
+- **Schaduw:** kaarten krijgen alleen een lijn. Schaduw is er alleen voor wat zweeft: vensters, Ctrl+K, uitklapmenu's.
+- **Afstanden:** stappen van 4 px (4, 8, 12, 16, 24, 32).
 
-### Documenten (brieven, offertes, notulen)
+## 5. Ontwerpregels dashboard
 
-- Logo linksboven, contactgegevens rechtsboven
-- Kopteksten in DM Sans Bold, navy kleur
-- Teal als accentkleur voor lijnen, tabelheaders en kaders
-- Body tekst in DM Sans Regular, 11pt, donkergrijs `#334155`
+Deze regels houden het dashboard rustig, ook bij nieuwe onderdelen.
 
-### E-mail & handtekeningen
+1. **Geen pillen of gekleurde labels.** Status, namen, categorieën en "te laat" zijn gewone (eventueel gekleurde) tekst.
+2. **Eén accent.** Tabbladen hebben geen eigen kleur. Alleen grafieken krijgen een reeks kleuren, omdat daar het onderscheid de inhoud is.
+3. **Voortgang als vorm:** ALV-stappen zijn een gevuld rondje met vinkje of een lege ring. Status is een rondje dat per stap vult (leeg, ⅓, ⅔, vol). In de code: `voortgang()` en `vlagSvg()` in `src/util.js`.
+4. **Iconen spaarzaam.** Wel in de zijbalk en op icoonknoppen in tabelrijen. Niet in vensterknoppen, filters of naast koppen. Eigen set in `src/icons.js`, met lijn en lichte vulling.
+5. **Geen uitlegzinnen** naast titels en geen dubbele titels.
+6. **Rij-acties zonder kaders.** Grijze icoontjes; het afrondvinkje in het accent.
+7. **Verwijderen** is in een bewerkscherm rode tekst links. De bevestiging daarna heeft een stevige rode knop.
 
-- Logo-icoon + naam in navy
-- Teal accent voor scheidingslijnen
-- DM Sans als primair font, Arial als websafe fallback
+## 6. Donkere modus (dashboard)
 
-### Visitekaartjes & print
+Dezelfde regels met eigen waarden: pagina `#161C24`, vlakken `#1C242E`, tekst `#EEF1F4`, accent `#8FA6C2`. De zijbalk blijft leisteen `#222B36` in beide thema's, zodat hij in donker lichter is dan de pagina.
 
-- Voorkant: logo gecentreerd op wit, teal lijn als accent
-- Achterkant: navy achtergrond, witte tekst, contactgegevens
+## 7. Documenten en e-mail
 
-## 6. Technische referentie
+- Logo linksboven, contactgegevens rechtsboven.
+- Koppen Source Serif 4 in leisteen; tekst Karla 11 pt in `#334155`; staalblauw voor lijnen en tabelkoppen.
+- E-mailhandtekening: logo-icoon + naam in leisteen, scheidingslijn in staalblauw. Terugvalletter Arial.
 
-### CSS Custom Properties (dashboard)
+## 8. Technisch (dashboard)
+
+Alle kleuren en maten staan als variabelen bovenaan `styles.css` (`:root` en `[data-theme=dark]`). Gebruik altijd die variabelen en geen losse kleurcodes:
 
 ```css
-:root {
-  /* Primair */
-  --navy: #2B3544;
-  --navy-dark: #1E2530;
-  --white: #FFFFFF;
-  --gray-bg: #F0F2F5;
-
-  /* Accent (teal) */
-  --teal-900: #064E50;
-  --teal-700: #0D7377;
-  --teal-500: #14B8A6;
-  --teal-300: #5EEAD4;
-  --teal-100: #CCFBF1;
-
-  /* Functioneel */
-  --green: #059669;
-  --amber: #D97706;
-  --red: #DC2626;
-  --muted: #64748B;
-
-  /* Typografie */
-  --font: 'DM Sans', sans-serif;
-}
+--txt / --mut / --fnt        tekst, gedempt, zwak
+--bg / --sur / --sur2        pagina, vlak, zacht vlak
+--bor / --bor-input          lijnen
+--ac / --ac-l / --ac-900     accent, tint, donker
+--rd / --am / --gn           signalen
+--r / --rs                   hoeken 8 / 6
+--shm / --shl                schaduw voor zwevende delen
 ```
 
-### Externe bronnen
-
-- Font: `https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap`
-- Iconen: `https://unpkg.com/@phosphor-icons/web@2.1.1` (of npm: `@phosphor-icons/web`)
+Websitebronnen: `https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=Karla:wght@400;500;600;700&family=Jost:wght@300;400;500&display=swap`

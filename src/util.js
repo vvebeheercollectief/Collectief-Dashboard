@@ -655,7 +655,7 @@ function offProg(v){
   if(!v)return'';
   const [recv,req]=parseOff(v);
   const pct=req>0?Math.min(100,Math.round(recv/req*100)):0;
-  return`<div class="prog-wrap"><span style="font-size:12px;font-weight:700;color:var(--ac)">${esc(v)}</span>
+  return`<div class="prog-wrap"><span style="font-size:12px;font-weight:600;color:var(--ac)">${esc(v)}</span>
     <div class="prog-bar"><div class="prog-fill" style="width:${pct}%;background:var(--ac)"></div></div></div>`;
 }
 

@@ -16,7 +16,7 @@ import { ico } from "./icons.js";
 function _cssKleur(naam, terugval){
   return (getComputedStyle(document.documentElement).getPropertyValue(naam)||'').trim() || terugval || '#ffffff';
 }
-function acColor(){ return (getComputedStyle(document.documentElement).getPropertyValue('--ac')||'').trim()||'#4a5b7a'; }
+function acColor(){ return (getComputedStyle(document.documentElement).getPropertyValue('--ac')||'').trim()||'#4E6885'; }
 // Leeg/onbenut donut-segment: licht in lichte modus, donkergrijs in donkere modus
 // (zodat het niet als felle witte vlek op een donkere kaart blijft staan).
 function emptyDonutClr(){ return document.documentElement.dataset.theme==='dark'?'#343a44':'#E5E'+'7EB'; }
@@ -396,7 +396,7 @@ function renderLeaderboard(period){
   // welke van de twee tellingen 'goed' is, is een keuze van de gebruiker en niet van de code.
   if(data.some(r=>r.huidig>0)){
     tbody.insertAdjacentHTML('beforeend',
-      `<tr class="lb-rest"><td></td><td class="lb-name" colspan="4" style="color:var(--mut);font-size:11.5px">`
+      `<tr class="lb-rest"><td></td><td class="lb-name" colspan="4" style="color:var(--mut);font-size:12px">`
       + `Een taak met twee behandelaars telt bij allebei mee.</td></tr>`);
   }
 }
@@ -609,7 +609,7 @@ const DASH_ICONS={
 const HERO_VIEWS=[
   {
     key:'alv', label:'ALV Voortgang', icon:'tabAlv',
-    color:'#4a5b7a',
+    color:'#4E6885',
     title:'ALV Voortgang — Uitnodigingen',
     sub:'Hoeveel uitnodigingen zijn de deur uit',
     build:()=>{

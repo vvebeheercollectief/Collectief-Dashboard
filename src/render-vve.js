@@ -414,7 +414,7 @@ function renderVve(){
       // normaal — die worden in één ronde afgewerkt.
       html+=`<div class="vve-alv-rij" style="color:var(--mut)">Laatste ALV afgerond: ${esc(l.datum||'')}</div>`;
     }
-    return html||'<span style="color:var(--mut);font-size:12.5px">Geen ALV-gegevens</span>';
+    return html||'<span style="color:var(--mut);font-size:12px">Geen ALV-gegevens</span>';
   };
 
   const dosEntries=filterDossierLog(o.logboek,state.vveLogFilter);

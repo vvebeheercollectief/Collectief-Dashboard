@@ -7,7 +7,7 @@
 
   <!-- PWA manifest -->
   <link rel="manifest" href="manifest.json"/>
-  <meta name="theme-color" content="#1b1e24"/>
+  <meta name="theme-color" content="#222B36"/>
   <!-- script-src: *.onesignal.com en NIET alleen cdn.onesignal.com. De SDK haalt zijn
        instellingen op bij api.onesignal.com; stond daar alleen cdn, dan blokkeerde de browser
        dat verzoek, bleef OneSignal.init() eeuwig hangen en kreeg iedereen die notificaties
@@ -546,7 +546,7 @@
           </div>
         </div>
         <div class="fld-row">
-          <div class="fld" style="flex:1"><label>Opmerkingen</label><input type="text" id="m-opm"/></div>
+          <div class="fld"><label>Opmerkingen</label><input type="text" id="m-opm"/></div>
         </div>
         <div class="fld"><label>Subcategorie</label><select id="m-sub-opp"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option><option>Subsidie-trajecten</option><option>CRM</option></select></div>
         <div class="toggle-row"><button type="button" class="tog" role="switch" aria-checked="false" id="tog-ib" data-action="toggle"></button><span>In behandeling</span></div>
@@ -898,7 +898,7 @@
         <input type="text" id="notif-who-other" placeholder="Typ je naam" style="display:none;margin-top:8px;width:100%;background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rs);padding:8px 11px;color:var(--txt);font-size:13px;outline:none"/>
       </div>
 
-      <div style="font-size:11.5px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin:18px 0 6px">Soorten meldingen</div>
+      <div style="font-size:12px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin:18px 0 6px">Soorten meldingen</div>
       <div class="toggle-row"><button type="button" class="tog" role="switch" aria-checked="false" id="tog-notif-newtask" data-action="notif-toggle"></button><span>Nieuwe taak toegevoegd</span></div>
       <div class="toggle-row"><button type="button" class="tog" role="switch" aria-checked="false" id="tog-notif-assigned" data-action="notif-toggle"></button><span>Taak aan mij toegewezen</span></div>
       <div class="toggle-row"><button type="button" class="tog" role="switch" aria-checked="false" id="tog-notif-deadline" data-action="notif-toggle"></button><span>Deadline nadert</span></div>
@@ -916,7 +916,7 @@
       <div class="toggle-row"><button type="button" class="tog" role="switch" aria-checked="false" id="tog-notif-daily" data-action="notif-toggle"></button><span>Dagelijkse samenvatting (08:30)</span></div>
 
       <div style="border-top:1px solid var(--bor);margin-top:20px;padding-top:16px">
-        <div style="font-size:11.5px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px">Push-meldingen</div>
+        <div style="font-size:12px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px">Push-meldingen</div>
         <div id="notif-subscribe-section">
           <button class="btn btn-pri" id="notif-subscribe-btn" style="width:100%;justify-content:center"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6z" fill="currentColor" fill-opacity="0.18"/><path d="M10 19a2 2 0 0 0 4 0"/></svg> Push-meldingen aanzetten</button>
           <p style="font-size:12px;color:var(--mut);margin-top:8px;line-height:1.5">Eenmalige toestemming nodig — je browser vraagt om bevestiging.<br>Alles behalve de deadline-waarschuwing komt ook zonder push binnen, als melding in de app zelf.</p>
@@ -944,7 +944,7 @@
       <button class="modal-close" id="ai-close">×</button>
     </div>
     <div class="modal-body">
-      <p style="font-size:12.5px;color:var(--mut);margin:0 0 14px;line-height:1.5">Plak een mail, kies wat je nodig hebt, en het dashboard bouwt de vraag mét VvE-context. Kopieer naar Claude of Gemini en plak het antwoord terug. <b>Geen kosten, jij houdt de regie.</b></p>
+      <p style="font-size:12px;color:var(--mut);margin:0 0 14px;line-height:1.5">Plak een mail, kies wat je nodig hebt, en het dashboard bouwt de vraag mét VvE-context. Kopieer naar Claude of Gemini en plak het antwoord terug. <b>Geen kosten, jij houdt de regie.</b></p>
 
       <div class="ai-grid">
         <!-- LINKS -->
@@ -977,7 +977,7 @@
             <button class="btn ai-claude" data-action="ai-kopieer" data-waar="Claude"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.2 11.6l-8 8a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg> Kopieer &amp; open Claude</button>
             <button class="btn ai-gemini" data-action="ai-kopieer" data-waar="Gemini"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.2 11.6l-8 8a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg> Kopieer &amp; open Gemini</button>
           </div>
-          <p style="font-size:11.5px;color:var(--mut);margin:9px 0 0">De vraag staat dan op je klembord — plak met <kbd>Ctrl/⌘+V</kbd>.</p>
+          <p style="font-size:12px;color:var(--mut);margin:9px 0 0">De vraag staat dan op je klembord — plak met <kbd>Ctrl/⌘+V</kbd>.</p>
 
           <p class="ai-step" style="margin-top:16px"><span class="dot">5</span> Plak het antwoord van de AI terug</p>
           <textarea id="ai-answer" class="ai-ta" rows="4" placeholder="Plak hier wat Claude/Gemini teruggeeft…" aria-label="Plak hier het antwoord van de AI"></textarea>

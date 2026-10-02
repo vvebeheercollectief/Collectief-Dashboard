@@ -168,12 +168,42 @@ function toonUpdateBalk(onReload, onDismiss, isBezet) {
       if (isBezet && isBezet()) { setTimeout(wachthond, HERLAAD_WACHTHOND_MS); return; }
       knop.disabled = false;
       knop.textContent = 'Opnieuw proberen';
-      if (tekst) tekst.textContent = 'Het herladen kwam niet door. Probeer het nog eens, of ververs de pagina zelf.';
+      // Een gewone verversing helpt hier niet meer: sinds de eigen bestanden cache-first komen
+      // (sw-strategie.js) geeft een gewone verversing zolang de oude versie actief is gewoon weer
+      // de oude code. Pas als geen enkel venster de oude versie nog vasthoudt, neemt de nieuwe over.
+      if (tekst) tekst.textContent = 'Het herladen kwam niet door. Probeer het nog eens, of sluit alle vensters van het dashboard en open het opnieuw.';
     };
     setTimeout(wachthond, HERLAAD_WACHTHOND_MS);
     onReload();
   });
   document.getElementById('sw-update-dismiss').addEventListener('click', () => { bar.remove(); onDismiss(); });
+}
+
+// De update-bewaking van één registratie, los van `navigator` zodat hij te toetsen is met een nep-
+// registratie. Drie wegen naar de balk, want elke weg alleen laat een gat:
+//   · `updatefound` — een nieuwe versie die tijdens deze sessie begint te installeren;
+//   · een versie die AL aan het installeren was toen we de registratie kregen (de listener komt
+//     pas na 'load' + getRegistration; dan vuurt updatefound niet meer voor die versie);
+//   · een versie die al klaarstond (`reg.waiting`), en na elke update()-controle opnieuw kijken —
+//     een update() die een versie vindt die meteen 'installed' is, gaf anders pas bij de volgende
+//     tabbladwissel een balk.
+// Geeft `check` terug: update() en daarna de balk als er een wachtende versie is.
+export function bewaakRegistratie(reg, balk, ctrl, verborgen) {
+  ctrl = ctrl || (() => navigator.serviceWorker.controller);
+  verborgen = verborgen || (() => document.hidden);
+  const volg = nw => {
+    if (!nw) return;
+    nw.addEventListener('statechange', () => {
+      if (nw.state === 'installed' && shouldPromptReload(ctrl())) balk();
+    });
+  };
+  reg.addEventListener('updatefound', () => volg(reg.installing));
+  volg(reg.installing);
+  if (reg.waiting && shouldPromptReload(ctrl())) balk();
+  return () => Promise.resolve()
+    .then(() => reg.update())
+    .then(() => { if (balkWeerTonen(verborgen(), reg, ctrl())) balk(); })
+    .catch(() => {});
 }
 
 export function initSwUpdate() {
@@ -190,6 +220,10 @@ export function initSwUpdate() {
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     const toon = balkNaOvername(kern._gearmd(), hadController);
     hadController = true;
+    // Dit tabblad draait vanaf nu OUDE code terwijl alles wat het nog ophaalt (een lui geladen
+    // module) uit de cache van de NIEUWE versie komt. Wie daarop leunt (verplaatsen, statistiek)
+    // weigert dan netjes in plaats van twee versies door elkaar te draaien.
+    if (toon) state._codeVerouderd = true;
     kern.controllerChange();
     if (toon && balk) balk();
   });
@@ -200,27 +234,12 @@ export function initSwUpdate() {
       const vraagHerladen = () => kern.klik(reg);
       balk = () => toonUpdateBalk(vraagHerladen, () => kern.annuleer(), kern.isBezet);
 
-      // Nieuwe versie gevonden tijdens deze sessie
-      reg.addEventListener('updatefound', () => {
-        const nw = reg.installing;
-        if (!nw) return;
-        nw.addEventListener('statechange', () => {
-          if (nw.state === 'installed' && shouldPromptReload(navigator.serviceWorker.controller)) {
-            balk();
-          }
-        });
-      });
-
-      // Er stond al een nieuwe versie klaar bij het laden van de pagina
-      if (reg.waiting && shouldPromptReload(navigator.serviceWorker.controller)) {
-        balk();
-      }
+      const check = bewaakRegistratie(reg, () => balk());
 
       // Periodiek + bij terugkeer naar het tabblad actief checken. Sinds de eigen bestanden
       // cache-first komen (sw-strategie.js) is dit de ENIGE manier waarop een open tabblad een
       // nieuwe uitrol ontdekt: zonder update() bleef een dashboard dat dagen openstaat op de oude
       // code. De browser doet dit zelf alleen bij een navigatie (en hoogstens eens per 24 uur).
-      const check = () => reg.update().catch(() => {});
       setInterval(check, 30 * 60 * 1000); // elk half uur
       // Bij terugkeer naar het tabblad óók de balk terug als er nog een nieuwe versie klaarstaat.
       // Een weggeklikte balk kwam in dit tabblad nooit meer terug: `updatefound` vuurt maar één

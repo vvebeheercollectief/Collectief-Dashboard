@@ -119,6 +119,7 @@ export const state = {
                            // laat de aanvraag van de knop los (één callback per client).
   _completeRow: null,      // rij-OBJECT waarvoor de afhandel-modal open staat (identiteit, geen index)
   _completeNotitie: null,  // {code, sec, tekst}: notitie uit het bewerkscherm, pas geschreven als het afronden doorgaat (doCompleteTask)
+  _codeVerouderd: false,   // true als een ánder venster de nieuwe versie activeerde: dit tabblad draait oude code (sw-update.js)
   _completeRid: null,      // geklikte data-rid, alléén voor de groene puls op de juiste DOM-rij
   _completeBusy: false,    // afhandelen loopt (dubbelklik-rem over het async-gat)
   _notitieBezig: false,    // dubbelklik-rem op 'Opmerking toevoegen' (bewerkscherm) én het

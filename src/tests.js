@@ -6255,7 +6255,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '13.2');
+  eq('versie opgehoogd', APP_VERSION, '13.3');
 
   // ── Tabbladen ÍN de kaartkop (v11.7) ──
   // De kop van de kaart zei links exact hetzelfde als het actieve tabblad — 'Oppakken' boven
@@ -16887,18 +16887,28 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
           await CR.completeCurrentEditTask();
           eq('afronden+notitie: het afrondvenster staat open, de notitie is nog NIET geschreven',
              [document.getElementById('complete-bg').classList.contains('open'), appends().length], [true, 0]);
+          document.querySelectorAll('#toast-container .toast').forEach(x=>x.remove());
           CR.closeCompleteModal();
-          eq('afronden+notitie: afrondvenster weggeklikt → geen notitie in het Logboek', [appends().length, state._completeNotitie], [0, null]);
+          const toastTitels=()=>[...document.querySelectorAll('#toast-container .toast-title')].map(x=>x.textContent);
+          for(let i=0;i<200 && !toastTitels().includes('Notitie bewaard');i++) await tik();
+          // Weggeklikt: de taak is NIET afgerond, maar de getypte tekst gaat niet stil verloren — het
+          // bewerkscherm is al dicht, dus hij wordt alsnog als gewone notitie bewaard.
+          eq('afronden+notitie: afrondvenster weggeklikt → de notitie wordt alsnog als notitie bewaard, niet afgerond',
+             [appends().filter(p=>p.body.includes('Gebeld met de aannemer')).length, posts.filter(p=>/:batchUpdate/.test(p.url)).length, state._completeNotitie],
+             [1, 0, null]);
+          truthy('afronden+notitie: en zegt dat de taak niet is afgerond',
+                 [...document.querySelectorAll('#toast-container .toast-title')].some(x=>x.textContent==='Notitie bewaard'));
           // Nu wél doorzetten: eerst de notitie, dan de afronding.
+          posts=[];
           CR.openModal(true, r);
-          document.getElementById('hist-note').value='Gebeld met de aannemer';
+          document.getElementById('hist-note').value='Tweede notitie bij afronden';
           await CR.completeCurrentEditTask();
           document.getElementById('complete-date').value='2026-10-02';
           await CR.doCompleteTask(); await leeglopen();
-          const iNotitie=posts.findIndex(p=>/:append/.test(p.url) && p.body.includes('Gebeld met de aannemer'));
+          const iNotitie=posts.findIndex(p=>/:append/.test(p.url) && p.body.includes('Tweede notitie bij afronden'));
           const iAfrond=posts.findIndex(p=>/:batchUpdate/.test(p.url));
-          eq('afronden+notitie: na de knop in het afrondvenster staat de notitie er precies één keer',
-             posts.filter(p=>/:append/.test(p.url) && p.body.includes('Gebeld met de aannemer')).length, 1);
+          eq('afronden+notitie: na de knop in het afrondvenster staat de notitie er precies één keer (ook niet nog eens bij het sluiten)',
+             posts.filter(p=>/:append/.test(p.url) && p.body.includes('Tweede notitie bij afronden')).length, 1);
           truthy('afronden+notitie: en vóór de afronding zelf', iNotitie>-1 && iAfrond>-1 && iNotitie<iAfrond);
           eq('afronden+notitie: geen onverwachte melding', alerts, []);
           // De vraag bij gewijzigde velden noemt de notitie niet als 'niet opgeslagen'.
@@ -17151,6 +17161,63 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         eq('kolommen: een tweede hertekening meet de tabel niet opnieuw', gemeten, 0);
         eq('kolommen: en houdt dezelfde verdeling', tbl.querySelector('colgroup')?.outerHTML, cgVoor);
         UI.goTo(paginaOud);
+      }
+
+      // ── Slotreview: doorverwijzing, update-bewaking, verouderde code ──
+      {
+        // 2. Een doorverwezen antwoord (Vercel cleanUrls) wordt schoon. De lokale server verwijst
+        // '/src' door naar '/src/', dus dat is een echt 'redirected' antwoord.
+        const r=await fetch(new URL('src', document.baseURI), {cache:'no-store'});
+        if(r.redirected){
+          const sch=self.cdSchoonAntwoord(r);
+          eq('sw: een doorverwezen antwoord wordt schoongemaakt (anders weigert de browser hem op een navigatie)', [sch.redirected, sch.status], [false, r.status]);
+        } else {
+          truthy('sw: de toetsserver verwijst /src niet door (schoonmaaktoets n.v.t.)', true);
+        }
+        const gewoon=new Response('x');
+        eq('sw: een gewoon antwoord blijft hetzelfde object', self.cdSchoonAntwoord(gewoon), gewoon);
+        const bronSw=await (await fetch(new URL('sw.js', document.baseURI), {cache:'no-store'})).text();
+        truthy('sw: een cache-misser gaat langs de HTTP-cache heen (no-cache)', /fetch\(new Request\(req, \{ cache: 'no-cache' \}\)\)/.test(bronSw) && /fetch\(sleutel, \{ cache: 'no-cache' \}\)/.test(bronSw));
+        truthy('sw: de install gebruikt geen c.add meer (die bewaart een doorverwezen antwoord)', !/c\.add\(/.test(bronSw));
+
+        // 3. Update-bewaking: ook een versie die al aan het installeren was, en na elke update().
+        const SWU = await import('./sw-update.js');
+        let balken=0;
+        const nepReg=()=>{ const reg=new EventTarget(); reg.installing=null; reg.waiting=null; reg.update=async()=>{}; return reg; };
+        const nepWorker=()=>{ const w=new EventTarget(); w.state='installing'; return w; };
+        const reg1=nepReg(); reg1.installing=nepWorker();
+        SWU.bewaakRegistratie(reg1, ()=>balken++, ()=>({}), ()=>false);
+        reg1.installing.state='installed'; reg1.installing.dispatchEvent(new Event('statechange'));
+        eq('versiebalk: een versie die al installeerde bij het registreren geeft óók een balk', balken, 1);
+        const reg2=nepReg(); balken=0;
+        const check=SWU.bewaakRegistratie(reg2, ()=>balken++, ()=>({}), ()=>false);
+        reg2.update=async()=>{ reg2.waiting={}; };
+        await check();
+        eq('versiebalk: een update() die een wachtende versie oplevert geeft meteen een balk', balken, 1);
+        const reg3=nepReg(); balken=0;
+        SWU.bewaakRegistratie(reg3, ()=>balken++, ()=>null, ()=>false);
+        reg3.installing=nepWorker(); reg3.dispatchEvent(new Event('updatefound'));
+        reg3.installing.state='installed'; reg3.installing.dispatchEvent(new Event('statechange'));
+        eq('versiebalk: niet bij de allereerste installatie (geen controller)', balken, 0);
+        const bronUpd=await (await fetch(new URL('src/sw-update.js', document.baseURI), {cache:'no-store'})).text();
+        truthy('versiebalk: de wachthond zegt niet meer "ververs de pagina zelf" (cache-first)', !/ververs de pagina zelf/.test(bronUpd) && /sluit alle vensters van het dashboard/.test(bronUpd));
+
+        // 6. Een tabblad met verouderde code verplaatst niet (verplaats.js zou van de nieuwe versie zijn).
+        const verOud=state._codeVerouderd, alertOud2=window.alert;
+        const meldingen=[];
+        const versLeeg=()=>({ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] });
+        const rv={ _sec:'OPPAKKEN', _row:5, code:'VO-1', naam:'x', actiepunt:'y', deadline:'', behandelaar:'', prioriteit:'', opmerkingen:'', inBehandeling:'FALSE', subcategorie:'', taakId:'TVO1', bundelId:'', bundelVolg:'' };
+        try{
+          window.alert=m=>meldingen.push(m); state._codeVerouderd=true;
+          D.ntd={ ...versLeeg(), OPPAKKEN:[rv] };
+          CR.openModal(true, rv);
+          const sel=document.getElementById('m-sec'); sel.value='LOD';
+          await sel.onchange({ target:sel });
+          truthy('verouderd: verplaatsen weigert met "Herlaad eerst het dashboard"', meldingen.some(m=>/Herlaad eerst het dashboard/.test(m)));
+          eq('verouderd: en de kiezer staat terug op de eigen categorie', sel.value, 'OPPAKKEN');
+        } finally {
+          state._codeVerouderd=verOud; window.alert=alertOud2; CR.closeModal(); CR.clearModal();
+        }
       }
     } catch(e) {
       truthy('review 02-10: geen uitzondering — '+(e && e.stack || e), false);

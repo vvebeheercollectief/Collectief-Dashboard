@@ -1590,14 +1590,21 @@ async function doCompleteTask(){
     // doorgaat. Zelfde weg als de knop 'Toevoegen' (logEvent, direct en zonder herkansing: een
     // append is niet idempotent). Mislukt hij, dan stopt het afronden en blijft dit venster open,
     // zodat er niets half gebeurt; de tekst blijft bewaard voor de volgende klik.
+    // EERST claimen (op null), dán schrijven: sluit de gebruiker het venster terwijl deze append
+    // loopt, dan zou closeCompleteModal hem anders als losse notitie nóg een keer wegschrijven.
     const notitie=state._completeNotitie;
     if(notitie){
+      state._completeNotitie=null;
       if(!await logEvent(notitie.code, notitie.sec, 'Opmerking', '', '', notitie.tekst)){
-        alert('De notitie kon niet worden opgeslagen, dus de taak is nog niet afgerond. Controleer je verbinding en probeer het opnieuw.');
+        if(state._completeRow===r){
+          state._completeNotitie=notitie;   // venster staat nog: bij de volgende klik (of bij sluiten) opnieuw
+          alert('De notitie kon niet worden opgeslagen, dus de taak is nog niet afgerond. Controleer je verbinding en probeer het opnieuw.');
+        } else {
+          _notitieNietBewaard(notitie);
+        }
         return;
       }
-      state._completeNotitie=null;
-      D.logboek.unshift({_row:0,timestamp:new Date().toISOString(),code:notitie.code,sectie:notitie.sec,actie:'Opmerking',veld:'',oudeWaarde:'',nieuweWaarde:notitie.tekst,gebruiker:getCurrentWho()||'?'});
+      _notitieInBeeld(notitie);
       if(state._completeRow!==r){ closeCompleteModal(); return; }
     }
     // De batch wordt PAS IN DE WRITEFN gebouwd, met een dan vers berekende archiefplek. Zetten we
@@ -1696,7 +1703,31 @@ export function wisDuurKeuze(wortel){
   if(bron) bron.querySelectorAll('.duur-knop').forEach(b=>b.removeAttribute('aria-pressed'));
 }
 
-function closeCompleteModal(){document.getElementById('complete-bg').classList.remove('open');state._completeRow=null;state._completeRid=null;state._completeNotitie=null}
+function closeCompleteModal(){
+  document.getElementById('complete-bg').classList.remove('open');state._completeRow=null;state._completeRid=null;
+  // Een notitie uit het bewerkscherm die nog niet geschreven is (het afronden ging niet door: ×,
+  // Annuleren, Escape, klik naast het venster). Het bewerkscherm is dan al dicht, dus zonder deze
+  // regel was de getypte tekst stil weg (review 2026-10-02). Dan alsnog als gewone notitie bij de
+  // taak — dezelfde schrijfweg als de knop 'Toevoegen' — en zeggen dat de taak niet is afgerond.
+  const n=state._completeNotitie; state._completeNotitie=null;
+  if(n) _bewaarLosseNotitie(n);
+}
+function _notitieInBeeld(n){
+  D.logboek.unshift({_row:0,timestamp:new Date().toISOString(),code:n.code,sectie:n.sec,actie:'Opmerking',veld:'',oudeWaarde:'',nieuweWaarde:n.tekst,gebruiker:getCurrentWho()||'?'});
+}
+// Lukt ook dat niet (offline, sessie verlopen), dan de tekst in de melding zelf, zodat hij te
+// kopiëren is — een alert en geen toast, want die verdwijnt niet voordat iemand hem gelezen heeft.
+function _notitieNietBewaard(n){
+  alert('Je notitie kon niet worden opgeslagen. Kopieer hem zo nodig en voeg hem later opnieuw toe:\n\n'+n.tekst);
+}
+async function _bewaarLosseNotitie(n){
+  if(await logEvent(n.code, n.sec, 'Opmerking', '', '', n.tekst)){
+    _notitieInBeeld(n);
+    showToast('Notitie bewaard', 'De taak is niet afgerond; je notitie staat wel in het Logboek.', 'var(--ac)', null, { geenSysteemmelding:true, geenDedup:true });
+  } else {
+    _notitieNietBewaard(n);
+  }
+}
 
 // ══════════════════════════════════════
 //  SUBMIT TASK (Add + Edit)

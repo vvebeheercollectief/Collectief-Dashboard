@@ -30,14 +30,14 @@ try {
 // loginscherm vervangen, en urgentie.js wordt alleen nog door de testsuite geïmporteerd. Beide
 // werden bij iedereen meegedownload en gecached. De BESTANDEN blijven wél staan: src/tests.js
 // hangt aan urgentie.js.
-const CACHE_VERSION = 'cd-v159';
+const CACHE_VERSION = 'cd-v160';
 // Dezelfde waarde als APP_VERSION in src/config.js, en die wordt bij ELKE wijziging opgehoogd.
 // Waarom hij hier staat: de browser besluit alleen dat er een nieuwe service worker is als het
 // BESTAND sw.js verandert. Een uitrol die alleen src/ raakt liet sw.js dus ongemoeid, en dan
 // verscheen de 'nieuwe versie'-balk niet — open sessies bleven de oude modules draaien tot iemand
 // toevallig herlaadde. Met deze regel verandert sw.js altijd mee. Er staat een toets in tests.js
 // die alarm slaat zodra dit getal en APP_VERSION uit elkaar lopen.
-const APP_VERSION = '13.2';
+const APP_VERSION = '13.3';
 // Geen './' meer: een navigatie naar de app krijgt altijd './index.html' uit de cache (zie
 // sw-strategie.js), dus een tweede kopie onder de kale map was alleen een extra download.
 const APP_SHELL = [
@@ -118,8 +118,11 @@ self.addEventListener('install', e => {
     // `cache:'reload'`: langs de HTTP-cache heen. GitHub Pages geeft max-age=600; zonder deze
     // optie kon de NIEUWE cache gevuld worden met een tot tien minuten oude kopie uit de
     // HTTP-cache — oude modules in een nieuwe versie, en met cache-first blijven die dan staan.
+    // Geen cache.add: die bewaart een doorverwezen antwoord ongewijzigd (zie schoon() hieronder).
     caches.open(CACHE_VERSION)
-      .then(c => Promise.all(APP_SHELL.map(u => c.add(new Request(u, { cache: 'reload' })).catch(() => {}))))
+      .then(c => Promise.all(APP_SHELL.map(u => fetch(new Request(u, { cache: 'reload' }))
+        .then(resp => { if (resp.ok) return c.put(u, schoon(resp)); })
+        .catch(() => {}))))
   );
 });
 
@@ -136,21 +139,38 @@ self.addEventListener('activate', e => {
   );
 });
 
+// Een doorverwezen antwoord (Vercel cleanUrls: /index.html → /) schoonmaken; zie sw-strategie.js.
+// Zonder strategie-bestand doen we het hier zelf, met dezelfde regel.
+function schoon(resp) {
+  if (typeof self.cdSchoonAntwoord === 'function') return self.cdSchoonAntwoord(resp);
+  if (!resp || !resp.redirected) return resp;
+  return new Response(resp.body, { status: resp.status, statusText: resp.statusText, headers: resp.headers });
+}
+
 // Een goed antwoord in de cache van DEZE versie zetten. Bewust niet afwachten in de keten van de
 // pagina: het antwoord gaat meteen door, het wegschrijven loopt erachteraan.
 function bewaar(sleutel, resp) {
   if (!resp || !resp.ok) return;
-  const kopie = resp.clone();
+  const kopie = schoon(resp.clone());
   caches.open(CACHE_VERSION).then(c => c.put(sleutel, kopie)).catch(() => {});
 }
 
 // Cache-first: eerst de cache van deze versie, bij een misser het netwerk (en dat dan bewaren).
 // `sleutel` (optioneel) is de cachesleutel als die anders is dan het verzoek — bij een navigatie
 // is dat altijd './index.html', welke query er ook achter de URL staat (?test=1).
+// De misser gaat met cache:'no-cache' de deur uit: anders kon de HTTP-cache (GitHub Pages:
+// max-age=600) een tot tien minuten oude kopie leveren, en die bleef dan de hele versie in de
+// versiecache staan. Een paginamisser vraagt './index.html' zelf op (een navigatieverzoek is niet
+// met andere opties na te bouwen). Elk antwoord wordt geschoond: een doorverwezen antwoord mag
+// nooit op een navigatie terugkomen, ook niet uit een cache van vóór deze regel.
 function uitCache(req, sleutel) {
   return caches.open(CACHE_VERSION)
     .then(c => c.match(sleutel || req))
-    .then(hit => hit || fetch(req).then(resp => { bewaar(sleutel || req, resp); return resp; }));
+    .then(hit => {
+      if (hit) return schoon(hit);
+      const netwerk = sleutel ? fetch(sleutel, { cache: 'no-cache' }) : fetch(new Request(req, { cache: 'no-cache' }));
+      return netwerk.then(resp => { bewaar(sleutel || req, resp); return schoon(resp); });
+    });
 }
 
 // Netwerk-eerst, de cache als vangnet. Alleen nog op een ontwikkelmachine (zie sw-strategie.js),
@@ -162,7 +182,7 @@ function netwerkEerst(req) {
       // index.html is alleen een goed antwoord op een PAGINA-verzoek. Op een gemiste module of
       // stylesheet leverde het HTML op waar JavaScript werd verwacht — een verwarrende
       // parseerfout in plaats van een eerlijke netwerkfout.
-      if (req.mode === 'navigate') return caches.match('./index.html');
+      if (req.mode === 'navigate') return caches.match('./index.html').then(schoon);
       throw err;
     }));
 }
@@ -177,7 +197,7 @@ self.addEventListener('fetch', e => {
     : (req.method === 'GET' && new URL(req.url).origin === self.location.origin ? 'netwerk' : 'live');
   if (soort === 'live') return;   // Google, OneSignal, de proxy, POST: de browser doet het zelf
   if (soort === 'pagina') {
-    e.respondWith(uitCache(req, './index.html').catch(() => caches.match('./index.html')));
+    e.respondWith(uitCache(req, './index.html').catch(() => caches.match('./index.html').then(schoon)));
     return;
   }
   if (soort === 'cache') { e.respondWith(uitCache(req)); return; }

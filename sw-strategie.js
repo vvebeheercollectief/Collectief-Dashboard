@@ -41,4 +41,14 @@
     if (verzoek.mode === 'navigate' && (rest === '' || rest === 'index.html')) return 'pagina';
     return 'cache';
   };
+
+  // Een antwoord dat via een DOORVERWIJZING binnenkwam, schoon maken voor de cache. Vercel staat op
+  // cleanUrls (vercel.json): /index.html geeft een 308 naar /. Het antwoord daarop draagt
+  // `redirected: true`, en zo'n antwoord teruggeven op een navigatie (die altijd met
+  // redirect-modus 'manual' loopt) WEIGERT de browser — de app laadde dan niet meer op Vercel en
+  // staging. Een nieuw Response met dezelfde inhoud, status en koppen is niet 'redirected'.
+  g.cdSchoonAntwoord = function (resp) {
+    if (!resp || !resp.redirected) return resp;
+    return new Response(resp.body, { status: resp.status, statusText: resp.statusText, headers: resp.headers });
+  };
 })(self);

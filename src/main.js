@@ -315,6 +315,9 @@ document.addEventListener('DOMContentLoaded',()=>{
     // die bouwt de nieuwe rij uit de opgeslagen taak. Dat hoort in de vraag te staan.
     // verplaats.js pas laden als er echt verplaatst wordt (25 kB die bij de start niets doen).
     // Lukt het laden niet (een uitrol die net wisselt), dan zeggen we dat en blijft alles staan.
+    // Een ander venster heeft de nieuwe versie actief gemaakt: verplaats.js zou dan uit de cache
+    // van de NIEUWE versie komen en met de oude code van dit tabblad samenwerken. Niet doen.
+    if(state._codeVerouderd){ e.target.value=bron; alert('Er is een nieuwe versie van het dashboard actief. Herlaad eerst het dashboard en probeer het dan opnieuw.'); return; }
     let verplaatsTaak;
     try{ ({ verplaatsTaak } = await import('./verplaats.js')); }
     catch(err){ e.target.value=bron; alert('Verplaatsen kan nu even niet: een deel van het dashboard laadde niet. Herlaad de pagina en probeer het opnieuw.'); return; }

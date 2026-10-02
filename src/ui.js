@@ -5,9 +5,19 @@ import { PAGE_META } from "./config.js";
 import { state } from "./state.js";
 // render-analytics.js (38 kB, plus Chart.js van het CDN) pas laden als Cijfers of Statistiek
 // geopend wordt. Daarvoor heeft niemand hem nodig.
-const _analytics = () => import("./render-analytics.js");
-function buildAnalytics(){ return _analytics().then(m=>m.buildAnalytics()).catch(e=>console.warn('[statistiek] niet geladen:', e && e.message)); }
-function buildDash(){ return _analytics().then(m=>m.buildDash()).catch(e=>console.warn('[cijfers] niet geladen:', e && e.message)); }
+// Niet in een tabblad waarvan een ánder venster de nieuwe versie actief maakte (state._codeVerouderd,
+// sw-update.js): de module zou dan van de nieuwe versie zijn en de rest van dit tabblad van de oude.
+// Was hij al geladen, dan is het gewoon de module van deze (oude) versie en mag hij blijven werken.
+let _analyticsGeladen = false;
+const _analytics = () => (state._codeVerouderd && !_analyticsGeladen)
+  ? Promise.reject(Object.assign(new Error('nieuwe versie actief'), { verouderd:true }))
+  : import("./render-analytics.js").then(m => { _analyticsGeladen = true; return m; });
+const _analyticsFout = e => {
+  if(e && e.verouderd) showToast('Herlaad eerst het dashboard', 'Er is een nieuwe versie actief; de grafieken laden na een herlading.', 'var(--am)', null, { geenSysteemmelding:true });
+  else console.warn('[statistiek] niet geladen:', e && e.message);
+};
+function buildAnalytics(){ return _analytics().then(m=>m.buildAnalytics()).catch(_analyticsFout); }
+function buildDash(){ return _analytics().then(m=>m.buildDash()).catch(_analyticsFout); }
 import { renderOntw, renderLogboek } from "./render-overig.js";
 import { renderHerhaal } from "./render-herhaal.js";
 import { renderVve } from "./render-vve.js";

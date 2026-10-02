@@ -22,7 +22,9 @@ function openSnoozeModal(rid){
   const r = taakUitCache(rid);
   if(!r) return;
   state._snoozeRow = r;
-  document.getElementById('snooze-title').textContent = `Wegleggen — ${r.code} ${r.naam||''}`;
+  // De TAAK noemen, niet alleen de VvE: heeft een VvE twee open taken, dan was hier niet te zien
+  // wélke je weglegt. Zelfde bron als de titel van het afrondvenster (completeTaskRow, crud.js).
+  document.getElementById('snooze-title').textContent = `Wegleggen — ${taakTitel(r, r._sec)||r.code||''}`;
   document.getElementById('snooze-datum').value = toISODate(r.opvolgdatum||'');
   document.getElementById('snooze-wis').style.display = r.opvolgdatum ? '' : 'none';
   document.getElementById('snooze-bg').classList.add('open');

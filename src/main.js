@@ -19,6 +19,7 @@ import {
 } from './notifications.js';
 import {
   openModal, closeModal, submitTask, doCompleteTask, closeCompleteModal, kiesSectie, renderExtraVves, _bewerkRijVers, nietOpgeslagenVelden, kiesDuur,
+  sluitModalVeilig,
 } from './crud.js';
 import { loadAll, magPollen, schrijfActieLoopt, setSyncOffline, showOfflineBanner, clearOfflineBanner, laadUitCache } from './data.js';
 import { initActions } from './actions.js';
@@ -47,7 +48,9 @@ import { groeiVelden } from './opmaak.js';
 // Centrale Escape-sluiting: per venster de juiste sluitfunctie (met opruimlogica),
 // i.p.v. alleen de .open-class te verwijderen zodat er geen toestand achterblijft.
 const MODAL_SLUITERS = {
-  'modal-bg': closeModal,
+  // Het bewerkscherm via de VEILIGE sluitweg: met niet-opgeslagen wijzigingen komt er eerst een
+  // vraag (zie sluitModalVeilig in crud.js). Ongewijzigd sluit hij net zo direct als closeModal.
+  'modal-bg': sluitModalVeilig,
   'complete-bg': closeCompleteModal,
   'ontw-modal-bg': closeOntwModal,
   'hh-bg': closeHerhaalModal,
@@ -263,11 +266,13 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('overlay').onclick=closeSb;
 
   document.getElementById('btn-add').onclick=()=>openModal(false);
-  document.getElementById('m-close').onclick=closeModal;
-  document.getElementById('m-cancel').onclick=closeModal;
+  // Kruisje, Annuleren en een klik naast het venster: dezelfde veilige sluitweg als Escape. Een
+  // wikkel en geen kale verwijzing, zodat het klik-event niet als argument meegaat.
+  document.getElementById('m-close').onclick=()=>sluitModalVeilig();
+  document.getElementById('m-cancel').onclick=()=>sluitModalVeilig();
   let _modalMouseDownTarget=null;
   document.getElementById('modal-bg').addEventListener('mousedown',e=>{_modalMouseDownTarget=e.target});
-  document.getElementById('modal-bg').addEventListener('click',e=>{if(e.target.id==='modal-bg'&&_modalMouseDownTarget?.id==='modal-bg')closeModal()});
+  document.getElementById('modal-bg').addEventListener('click',e=>{if(e.target.id==='modal-bg'&&_modalMouseDownTarget?.id==='modal-bg')sluitModalVeilig()});
   document.getElementById('m-submit').onclick=submitTask;
   // Categorie-kiezer: een <select> geeft `change`, geen `click`, en komt dus niet langs de
   // delegatie in actions.js (zelfde reden als bij hh-type hieronder).
@@ -360,6 +365,25 @@ document.addEventListener('DOMContentLoaded',()=>{
     // vanuit het bewerkscherm) en dan hoort Escape de bovenste te sluiten, niet de eerste in de HTML.
     const open=bovensteModal();
     if(open && open.id!=='pal-bg'){ const fn=MODAL_SLUITERS[open.id]; fn?fn():open.classList.remove('open'); }
+  });
+
+  // Ctrl/⌘+Enter in een open venster = de hoofdknop van dat venster. Zo hoef je na het typen van
+  // een opmerking niet naar de muis. Alleen de drie vensters waar de hoofdknop eenduidig is.
+  // Het Logboek-vak in het bewerkscherm heeft hier al een EIGEN betekenis (notitie toevoegen,
+  // histNoteKey in render-overig.js) en de dossier-composer ook (actions.js) — die twee laten we
+  // met rust, ook als hun eigen afhandeling de toets ooit niet zou opeten.
+  // Via `.click()` op de knop en niet de functie rechtstreeks: dan loopt de toets langs precies
+  // dezelfde weg (en dezelfde dubbelklik-remmen) als de muis.
+  const PRIMAIRE_KNOP = { 'modal-bg':'m-submit', 'complete-bg':'complete-confirm', 'snooze-bg':'snooze-opslaan' };
+  document.addEventListener('keydown',e=>{
+    if(e.key!=='Enter' || !(e.ctrlKey||e.metaKey) || e.defaultPrevented) return;
+    const t=e.target;
+    if(t && (t.id==='hist-note' || t.id==='dos-tekst')) return;
+    const open=bovensteModal();
+    const knop=open && document.getElementById(PRIMAIRE_KNOP[open.id]||'');
+    if(!knop || knop.disabled) return;
+    e.preventDefault();
+    knop.click();
   });
 
   // Bevestigingsvenster. Vier uitwegen, één functie: alleen de bevestigknop is 'ja'.

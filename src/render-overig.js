@@ -774,27 +774,32 @@ function renderTaskHistory(code,sec){
   }
 }
 
+// Geeft true terug als de notitie is weggeschreven (of als er niets te schrijven viel omdat het
+// venster bij geen taak hoort), false bij elke andere uitkomst. Opslaan en Afronden in het
+// bewerkscherm nemen een getypte notitie hierlangs mee (notitieMeenemen in crud.js) en stoppen bij
+// false — dan blijft het venster met de tekst staan.
 async function addTaskNote(){
   const note=(document.getElementById('hist-note').value||'').trim();
-  if(!note){alert('Typ eerst een opmerking.');return}
-  if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
+  if(!note){alert('Typ eerst een opmerking.');return false}
+  if(blokkeerOffline()) return false;   // offline: niets wijzigen, ook niet optimistisch
   // Dubbelklik-rem over het async-gat hieronder (ensureToken + logEvent): twee snelle klikken
   // lazen allebei hetzelfde veld en schreven dezelfde opmerking twee keer (naloop 2026-08-28).
-  if(state._notitieBezig) return;
+  if(state._notitieBezig) return false;
   state._notitieBezig=true;
   try{
-    if(!await ensureToken()){alert('Inloggen mislukt.');return}
+    if(!await ensureToken()){alert('Inloggen mislukt.');return false}
     const container=document.getElementById('fg-history');
     const code=container.dataset.code;
     const sec=container.dataset.sec;
-    if(!code)return;
+    if(!code)return true;
     // Eerst écht wegschrijven; pas bij succes optimistisch tonen + veld legen. Zo "verdwijnt"
     // een opmerking nooit stil bij een schrijffout — de tekst blijft staan om te herproberen.
     const ok=await logEvent(code,sec,'Opmerking','','',note);
-    if(!ok){ alert('Opmerking kon niet worden opgeslagen. Controleer je verbinding en probeer het opnieuw.'); return; }
+    if(!ok){ alert('Opmerking kon niet worden opgeslagen. Controleer je verbinding en probeer het opnieuw.'); return false; }
     document.getElementById('hist-note').value='';
     D.logboek.unshift({_row:0,timestamp:new Date().toISOString(),code,sectie:sec,actie:'Opmerking',veld:'',oudeWaarde:'',nieuweWaarde:note,gebruiker:getCurrentWho()||'?'});
     renderTaskHistory(code,sec);
+    return true;
   } finally { state._notitieBezig=false; }
 }
 

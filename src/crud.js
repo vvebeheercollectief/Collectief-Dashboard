@@ -12,7 +12,7 @@ import { isKolomKop, isSectieKop } from "./structuurcheck.js";
 import { ensureToken } from "./auth.js";
 import { showToast, showUndoToast, fireNotifEvent, undoComplete, undoDelete } from "./notifications.js";
 import { animateRowOut, flashRow } from "./anim.js";
-import { logEvent, logEvents, renderTaskHistory } from "./render-overig.js";
+import { logEvent, logEvents, renderTaskHistory, addTaskNote } from "./render-overig.js";
 import { backgroundWrite, loadAll, blokkeerOffline } from "./data.js";
 import { faseIndex, faseWoord, faseRijHtml, faseWijziging, SUBSIDIE_FASES } from "./subsidie-fase.js";
 import { CRM_FASES, crmFaseIndex, crmFaseWoord, crmFaseWijziging, crmFaseRijHtml } from "./crm-fase.js";
@@ -321,13 +321,97 @@ function openModal(isEdit,rowData,opts){
   toonOnvertaalbaar(sec);   // ná het voorstel: dat maakt élk hint-zinnetje eerst leeg
   toonMeerVve(isEdit);
 
+  // Waar de cursor begint. Het eerste invoerveld is 'm-code', en bij BEWERKEN is dat de verkeerde
+  // plek: de code staat er al, en de focus klapte via het zoekveld (vve-zoekveld.js) meteen de
+  // suggestielijst open over het formulier heen. Bij bewerken dus het omschrijvingsveld van de
+  // sectie, bij een nieuwe taak de VvE-code. modal-a11y.js laat `data-autofocus` voorgaan.
+  _zetAutofocus(isEdit ? (OMSCHRIJVING_VELD[sec] || 'm-code') : 'm-code');
   document.getElementById('modal-bg').classList.add('open');
+  // De stand ZOALS GEOPEND vastleggen, ná alle voorinvulling hierboven (deadline-voorstel, code
+  // vanuit het dossier). Een sluitweg vergelijkt hiermee: wat daarna nog verschilt heeft de
+  // gebruiker zelf veranderd — of een AI-hulp/het palet die na het openen nog iets invulde, en ook
+  // dat gaat bij sluiten verloren. Zie `modalGewijzigd`.
+  state._modalFoto=_modalFoto();
+}
+
+function _zetAutofocus(id){
+  document.querySelectorAll('#modal-bg [data-autofocus]').forEach(el=>el.removeAttribute('data-autofocus'));
+  document.getElementById(id)?.setAttribute('data-autofocus','');
+}
+
+// ── Niet-opgeslagen wijzigingen ──
+// Een vingerafdruk van alles wat de gebruiker in dit venster kan veranderen: de invoervelden, de
+// schakelaars 'In behandeling', en de vier dingen die in een modulestand leven en niet in een veld
+// (aannemerslijst, subsidie-/CRM-fase, soort vraag), plus de extra VvE's en een aangewezen
+// 'Hoort bij'-doeltaak. Het 'Hoort bij'-VELD zelf telt niet mee: dat wordt na een ontkoppel-klik
+// door de app zelf herschreven (zie 'taak-ontkoppel' in actions.js), en dat is geen wijziging van
+// de gebruiker die nog bewaard moet worden — de keuze zelf (`_hbDoel`) wél.
+function _modalFoto(){
+  const bg=document.getElementById('modal-bg'); if(!bg) return '';
+  const velden=[...bg.querySelectorAll('input,select,textarea')]
+    .filter(el=>el.id && el.id!=='m-hoortbij')
+    .map(el=>el.id+'='+(el.type==='checkbox'?el.checked:el.value));
+  const togs=['tog-ib','tog-ib-v','tog-ib-l','tog-ib-s','tog-ib-c']
+    .map(id=>document.getElementById(id)?.classList.contains('on')?'1':'0').join('');
+  return [velden.join('\x1f'), togs, modalAannemersCel(), _modalFaseWoord(), _modalCrmFaseWoord(), _modalSoort(),
+          extraVves().map(v=>v.code).join(','), (state._hbDoel&&(state._hbDoel.taakId||state._hbDoel._row))||''].join('\x1e');
+}
+// Staat er in het OPEN bewerkscherm iets dat bij sluiten verloren zou gaan?
+function modalGewijzigd(){
+  if(!document.getElementById('modal-bg')?.classList.contains('open')) return false;
+  if(state._modalFoto==null) return false;
+  return _modalFoto()!==state._modalFoto;
+}
+// De vraagtekst: bij bewerken met de veldnamen (dezelfde lijst als bij verplaatsen), anders
+// algemeen. Een getypte notitie in het Logboek-vak noemen we apart — die hoort niet bij de taak
+// zelf en valt dus buiten `nietOpgeslagenVelden`.
+function _wijzigingZin(){
+  const namen=state.editMode&&state.editRowData ? nietOpgeslagenVelden(state.editRowData) : [];
+  if(state.editMode && (document.getElementById('hist-note')?.value||'').trim()) namen.push('de notitie in het Logboek-vak');
+  return namen.length ? `Nog niet opgeslagen: ${namen.join(', ')}.` : 'Er staan wijzigingen in dit scherm die nog niet zijn opgeslagen.';
+}
+
+// De sluitweg van de GEBRUIKER (kruisje, Annuleren, klik naast het venster, Escape — allemaal in
+// main.js hieraan geknoopt). `closeModal` zelf blijft onvoorwaardelijk: die wordt ook ná een
+// geslaagde opslag, verplaatsing of verwijdering aangeroepen, en daar valt niets meer te vragen.
+// Ongewijzigd → meteen (synchroon) dicht, zodat Escape en Annuleren precies zo snel blijven als
+// ze waren. Gewijzigd → eerst vragen; 'nee' laat het venster met alle invoer staan.
+let _sluitVraagt=false;
+async function sluitModalVeilig(){
+  if(!modalGewijzigd()){ closeModal(); return true; }
+  if(_sluitVraagt) return false;
+  _sluitVraagt=true;
+  try{
+    const weg=await vraagBevestiging({
+      titel:'Wijzigingen weggooien?',
+      tekst:_wijzigingZin()+' Sluit je dit scherm, dan gaan ze verloren.',
+      bevestigTekst:'Weggooien', gevaarlijk:true });
+    if(!weg) return false;
+    closeModal();
+    return true;
+  }finally{ _sluitVraagt=false; }
+}
+
+// Een getypte notitie in het Logboek-vak van het bewerkscherm wegschrijven vóórdat het venster
+// sluit. Dat vak heeft een eigen knop 'Toevoegen', maar wie tekst typt en dan op de grote knop
+// Opslaan of Afronden klikt, verwacht dat die meegaat — en `clearModal` veegde hem stil weg.
+// Dezelfde weg als de knop (addTaskNote): direct wegschrijven, pas bij succes het vak legen, en bij
+// een fout de tekst laten staan. Die weg loopt bewust NIET via backgroundWrite: een append is niet
+// idempotent, en een herkansing na een 5xx zou de notitie twee keer in het Logboek zetten.
+// false = de notitie is niet weggeschreven; de aanroeper stopt dan en het venster blijft open.
+function _heeftNotitie(){
+  return !!state.editMode && !!(document.getElementById('hist-note')?.value||'').trim();
+}
+async function notitieMeenemen(){
+  if(!_heeftNotitie()) return true;   // een nieuwe taak toont het Logboek-vak niet
+  return await addTaskNote();
 }
 
 function editRow(r){ openModal(true,r); }
 
 function closeModal(){
   document.getElementById('modal-bg').classList.remove('open');
+  state._modalFoto=null;
   // Élke sluitweg van dit venster loopt hierlangs — kruisje, Annuleren, klik naast het venster en
   // Escape zijn in main.js alle vier aan closeModal geknoopt. Dit is dus de plek waar een
   // niet-verstuurde subtaak zijn bundel weer loslaat.
@@ -1158,10 +1242,45 @@ function getAfInsertRow(sec){
 // NTD-lijst hertekenen en daarmee `state._rowCache` herbouwen.
 // Het sluiten gaat als `bijDoorgaan` mee naar completeTaskRow: die stelt eerst de vraag over
 // openstaande subtaken, en bij een 'nee' hoort het bewerkscherm er nog te staan (zie daar).
+// Afronden neemt de rij zoals hij OPGESLAGEN is (`afrondWaarden` leest het rij-object, niet de
+// velden). Wat er in het scherm gewijzigd is en nog niet opgeslagen, verdween dus stil met het
+// sluiten. Nu eerst de vraag; 'nee' laat het scherm staan, zodat de gebruiker eerst op Opslaan kan
+// klikken. Bewust geen 'eerst opslaan, dan afronden' in één klik: dat zijn twee schrijfacties met
+// elk een eigen rij-controle en rollback, en mislukt de eerste dan archiveert de tweede een stand
+// die de gebruiker nooit zo bedoeld heeft. Een getypte notitie gaat wél mee (notitieMeenemen).
 async function completeCurrentEditTask(){
+  if(modalGewijzigd() && !_alleenNotitieGewijzigd()){
+    if(!await vraagBevestiging({
+        titel:'Wijzigingen niet opgeslagen',
+        tekst:_wijzigingZin()+' Afronden neemt de taak zoals hij opgeslagen is — klik eerst op Opslaan als je die wijzigingen wilt bewaren.',
+        bevestigTekst:'Afronden zonder opslaan' })) return;
+  }
   const r=_bewerkRijVers();
   if(!r) return;
+  // Alleen awaiten als er écht een notitie ligt: zonder notitie hoort de subtaak-vraag van
+  // completeTaskRow in dezelfde beurt te verschijnen als de klik, net als vóór deze stap.
+  if(_heeftNotitie() && !await notitieMeenemen()) return;
   await completeTaskRow(r, state._rowCache.indexOf(r), closeModal);   // vorm-ok: rid voor de puls-animatie
+}
+// Is de getypte notitie het ENIGE verschil? Die gaat via notitieMeenemen gewoon mee, dus daarvoor
+// hoeft Afronden niets te vragen.
+function _alleenNotitieGewijzigd(){
+  const veld=document.getElementById('hist-note');
+  if(!veld || !veld.value) return false;
+  const bewaard=veld.value; veld.value='';
+  try{ return _modalFoto()===state._modalFoto; } finally { veld.value=bewaard; }
+}
+
+// Pure (testbaar): mag deze code zonder vraag door? Ja als hij in het register staat, als het
+// register nog niet geladen is (dan valt er niets te controleren en hoort er ook geen vraag te
+// komen), of als het een bestaande taak is waarvan de code niet is veranderd.
+function onbekendeCodeOk(code, bestaand, register){
+  const c=String(code||'').trim().toLowerCase();
+  if(!c) return true;
+  if(bestaand && String(bestaand.code||'').trim().toLowerCase()===c) return true;
+  const lijst=register || D.alvo || [];
+  if(!lijst.length) return true;
+  return lijst.some(r=>String(r.code||'').trim().toLowerCase()===c);
 }
 
 // Pure (testbaar): zoek het bewaarde rij-object vers op in de huidige _rowCache.
@@ -1587,6 +1706,18 @@ async function submitTask(){
       : null;
     if(sec==='CRM' && !gv('m-onderwerp')){ alert('Onderwerp is verplicht: één korte regel waar de vraag over gaat.'); return; }
 
+    // Een VvE-code die niet in het register staat ('ALV's overzicht' = de lijst uit TwinQ) werd
+    // zonder één woord opgeslagen. Een tikfout (311221 i.p.v. 311212) gaf zo een taak die in geen
+    // dossier opduikt. Alleen vragen als de code NIEUW is in dit scherm: een bestaande taak met
+    // een oude code (een VvE die uit beheer ging) hoort niet bij elke opslag een vraag te geven.
+    // `state._codecheckUit` is een TESTHAAK, zelfde soort als `_dubbelcheckUit` hieronder: de
+    // zelftest maakt taken aan voor verzonnen codes en beantwoordt deze vraag niet.
+    if(!state._codecheckUit && !onbekendeCodeOk(code, state.editMode ? state.editRowData : null)
+       && !await vraagBevestiging({
+         titel:'Onbekende VvE-code',
+         tekst:`VvE-code '${code}' staat niet in het register. Controleer of hij goed is getypt.`,
+         bevestigTekst:'Toch opslaan' })) return;
+
     const endCol=String.fromCharCode(64+Math.max(values.length,9));
     const keys=SECS[sec].keys;
     const norm=v=>v===true?'TRUE':v===false?'FALSE':v; // boolean → Sheets-stringvorm
@@ -1620,6 +1751,10 @@ async function submitTask(){
           tekst:dubbelVraagTekst(dubbels),
           bevestigTekst:'Toch aanmaken' })) return;
     }
+
+    // Een getypte notitie in het Logboek-vak gaat mee — vóór de rij-mutatie hieronder, zodat het
+    // venster bij een mislukte notitie gewoon open blijft met alles erin. Zie notitieMeenemen.
+    if(_heeftNotitie() && !await notitieMeenemen()) return;
 
     if(state.editMode&&state.editRowData?._row){
       // ── Bewerken: lokale rij meteen bijwerken, dan op de achtergrond opslaan ──
@@ -2029,4 +2164,5 @@ export {
   zetDeadlineVoorstel, DEADLINE_VELD, DEADLINE_HINT_VELD, renderExtraVves, toonMeerVve, herzieAlsSubtaak,
   offerteAanvraagGewijzigd,
   _bewerkRijVers,
+  sluitModalVeilig, modalGewijzigd, onbekendeCodeOk, notitieMeenemen,
 };

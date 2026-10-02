@@ -68,6 +68,8 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   // de hele suite hangen op een venster dat niemand wegklikt, zonder één regel uitvoer. Standaard
   // dus uit; het blok dat de dubbelcheck zélf toetst zet hem tijdelijk aan.
   state._dubbelcheckUit = true;
+  // Zelfde reden voor de vraag over een VvE-code die niet in het register staat (submitTask).
+  state._codecheckUit = true;
   const _origLog = console.log;
   console.log = function(...a){
     const m = String(a[0] || '');
@@ -15729,8 +15731,167 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
        [getComputedStyle(document.getElementById('s-ntd')).width, getComputedStyle(document.getElementById('s-af')).width], ['92px', '155px']);
   })();
 
+  // ══════════════════════════════════════════════════════════════════════════
+  //  NALOOP 02-10-2026 — het bewerkscherm: sluiten, notitie, focus, sneltoets
+  // ══════════════════════════════════════════════════════════════════════════
+  // Vier manieren om het bewerkscherm te sluiten (Escape, Annuleren, kruisje, klik ernaast) gooiden
+  // getypte wijzigingen stil weg, en een notitie in het Logboek-vak verdween bij Opslaan/Afronden.
+  await (async () => {
+    console.log('%c[TESTS] Naloop 02-10: bewerkscherm', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const CR = await import('./crud.js');
+    const fetchOud=window.fetch, tokenOud=state.oauthToken, expOud=state.oauthExpiry, alertOud=window.alert;
+    const logOud=D.logboek, ntdOud=D.ntd, cacheOud=state._rowCache, uitCacheOud=state._uitCache, submitOud=document.getElementById('m-submit').onclick;
+    const bg=document.getElementById('modal-bg'), bevBg=document.getElementById('bevestig-bg');
+    const cbg=document.getElementById('complete-bg');
+    const tik=()=>new Promise(r=>setTimeout(r,0));
+    const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
+    const rij={ _sec:'OPPAKKEN', _row:5, code:'311212', naam:'Testflat', actiepunt:'Halve zin', deadline:'',
+                behandelaar:'Jer', prioriteit:'', opmerkingen:'', inBehandeling:'FALSE', subcategorie:'', taakId:'TNL1' };
+    try{
+      window.alert=()=>{};
+      state._uitCache=false; state._ntdVoorModal=null;
+      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
+      D.ntd={ ...leeg, OPPAKKEN:[rij] }; state._rowCache=[rij]; D.logboek=[];
+
+      // ── 2. Sluiten zonder wijziging gaat meteen, mét wijziging eerst een vraag ──
+      openModal(true, rij);
+      eq('sluiten: een net geopend scherm geldt niet als gewijzigd', CR.modalGewijzigd(), false);
+      document.getElementById('m-cancel').click();
+      eq('sluiten: Annuleren sluit een ongewijzigd scherm meteen, zonder vraag',
+         [bg.classList.contains('open'), bevBg.classList.contains('open')], [false, false]);
+      openModal(true, rij);
+      document.getElementById('m-actie').value='Halve zin, nu af';
+      truthy('sluiten: een getypte wijziging telt', CR.modalGewijzigd());
+      document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
+      eq('sluiten: Escape met een wijziging vraagt eerst', [bevBg.classList.contains('open'), bg.classList.contains('open')], [true, true]);
+      truthy('sluiten: de vraag noemt het gewijzigde veld', /Actiepunt/.test(document.getElementById('bevestig-tekst').textContent));
+      document.getElementById('bevestig-nee').click(); await tik();
+      eq('sluiten: nee laat het scherm én de tekst staan', [bg.classList.contains('open'), document.getElementById('m-actie').value], [true, 'Halve zin, nu af']);
+      document.getElementById('m-close').click();
+      eq('sluiten: ook het kruisje vraagt', bevBg.classList.contains('open'), true);
+      document.getElementById('bevestig-nee').click(); await tik();
+      bg.dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));
+      bg.dispatchEvent(new MouseEvent('click',{bubbles:true}));
+      eq('sluiten: en een klik naast het venster ook', bevBg.classList.contains('open'), true);
+      document.getElementById('bevestig-ja').click(); await tik();
+      eq('sluiten: ja gooit weg en sluit', bg.classList.contains('open'), false);
+      // Een nieuwe taak: leeg = niets te verliezen; een ingevulde code wél.
+      openModal(false, null, { sec:'OPPAKKEN' });
+      eq('sluiten: een leeg toevoegscherm geldt niet als gewijzigd', CR.modalGewijzigd(), false);
+      document.getElementById('m-code').value='311212';
+      truthy('sluiten: een ingevulde code in een nieuw scherm wél', CR.modalGewijzigd());
+      closeModal(); clearModal();
+      // Een vooraf ingevulde VvE (de +-knop in het dossier) is geen wijziging van de gebruiker.
+      openModal(false, null, { sec:'OPPAKKEN', code:'311212', naam:'Testflat' });
+      eq('sluiten: een vooraf ingevulde code telt niet als wijziging', CR.modalGewijzigd(), false);
+      closeModal(); clearModal();
+      // Alleen tekst in het Logboek-vak is óók iets wat verloren gaat.
+      openModal(true, rij);
+      document.getElementById('hist-note').value='Gebeld met de voorzitter';
+      truthy('sluiten: een getypte notitie telt als niet opgeslagen', CR.modalGewijzigd());
+      document.getElementById('hist-note').value='';
+      closeModal();
+
+      // ── 2b. Afronden met gewijzigde velden vraagt eerst ──
+      openModal(true, rij);
+      document.getElementById('m-actie').value='Gewijzigd maar niet opgeslagen';
+      const pAf=completeCurrentEditTask();
+      eq('afronden: met een niet-opgeslagen wijziging komt eerst een vraag', bevBg.classList.contains('open'), true);
+      truthy('afronden: de vraag noemt het veld', /Actiepunt/.test(document.getElementById('bevestig-tekst').textContent));
+      document.getElementById('bevestig-nee').click(); await pAf;
+      eq('afronden: nee laat het bewerkscherm staan, zonder afrondvenster',
+         [bg.classList.contains('open'), cbg.classList.contains('open'), document.getElementById('m-actie').value],
+         [true, false, 'Gewijzigd maar niet opgeslagen']);
+      const pAf2=completeCurrentEditTask();
+      document.getElementById('bevestig-ja').click(); await pAf2;
+      eq('afronden: ja opent het afrondvenster', [bg.classList.contains('open'), cbg.classList.contains('open')], [false, true]);
+      closeCompleteModal();
+
+      // ── 1. Een notitie in het Logboek-vak gaat mee met Opslaan/Afronden ──
+      let appends=0, faal=false;
+      window.fetch=async(url,opt)=>{
+        const u=decodeURIComponent(String(url));
+        if(opt&&opt.method==='POST'&&/:append/.test(u)){
+          if(faal) return new Response(JSON.stringify({error:{message:'stuk'}}),{status:400});
+          appends++; return new Response('{}',{status:200});
+        }
+        return new Response(JSON.stringify({error:{message:'niet in deze toets'}}),{status:403});
+      };
+      openModal(true, rij);
+      document.getElementById('hist-note').value='Notitie die mee moet';
+      eq('notitie: notitieMeenemen schrijft hem weg', await CR.notitieMeenemen(), true);
+      eq('notitie: precies één logregel, en het vak is leeg', [appends, document.getElementById('hist-note').value], [1, '']);
+      eq('notitie: zonder tekst is er niets te doen', [await CR.notitieMeenemen(), appends], [true, 1]);
+      faal=true;
+      document.getElementById('hist-note').value='Deze lukt niet';
+      document.getElementById('m-actie').value='Ook gewijzigd';
+      await submitTask();
+      eq('notitie: mislukt de notitie, dan blijft het scherm open met alles erin',
+         [bg.classList.contains('open'), document.getElementById('hist-note').value, document.getElementById('m-actie').value],
+         [true, 'Deze lukt niet', 'Ook gewijzigd']);
+      eq('notitie: … en de taak is niet opgeslagen', D.ntd.OPPAKKEN[0].actiepunt, 'Halve zin');
+      document.getElementById('hist-note').value='';
+      closeModal(); faal=false;
+
+      // ── 8. Waar de cursor begint ──
+      openModal(true, rij);
+      eq('focus: bij bewerken het omschrijvingsveld, niet de VvE-code',
+         [...bg.querySelectorAll('[data-autofocus]')].map(el=>el.id), ['m-actie']);
+      closeModal();
+      openModal(true, { ...rij, _sec:'CRM', onderwerp:'Lekkage', crmFase:'' });
+      eq('focus: bij een CRM-taak het onderwerp', [...bg.querySelectorAll('[data-autofocus]')].map(el=>el.id), ['m-onderwerp']);
+      closeModal();
+      openModal(false, null, { sec:'OPPAKKEN' });
+      eq('focus: bij een nieuwe taak de VvE-code', [...bg.querySelectorAll('[data-autofocus]')].map(el=>el.id), ['m-code']);
+      closeModal(); clearModal();
+      eq('focus: het afrondvenster begint bij de opmerking', document.getElementById('complete-comment').hasAttribute('data-autofocus'), true);
+
+      // ── 9. Ctrl/⌘+Enter = de hoofdknop ──
+      let geklikt=0;
+      document.getElementById('m-submit').onclick=()=>{ geklikt++; };
+      openModal(true, rij);
+      document.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',ctrlKey:true,bubbles:true}));
+      eq('sneltoets: Ctrl+Enter in het bewerkscherm drukt op Opslaan', geklikt, 1);
+      document.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',metaKey:true,bubbles:true}));
+      eq('sneltoets: ⌘+Enter ook', geklikt, 2);
+      document.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));
+      eq('sneltoets: een kale Enter niet', geklikt, 2);
+      document.getElementById('hist-note').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',ctrlKey:true,bubbles:true}));
+      eq('sneltoets: in het Logboek-vak blijft Ctrl+Enter de notitie-toets', geklikt, 2);
+      closeModal();
+      document.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',ctrlKey:true,bubbles:true}));
+      eq('sneltoets: zonder open venster gebeurt er niets', geklikt, 2);
+
+      // ── 10. Onbekende VvE-code ──
+      const reg=[{code:'311212'},{code:'021002'}];
+      eq('code: in het register → geen vraag', CR.onbekendeCodeOk('311212', null, reg), true);
+      eq('code: hoofdletters en spaties maken niet uit', CR.onbekendeCodeOk(' 021002 ', null, reg), true);
+      eq('code: niet in het register → vraag', CR.onbekendeCodeOk('311221', null, reg), false);
+      eq('code: een bestaande taak met een ongewijzigde oude code → geen vraag', CR.onbekendeCodeOk('201090', { code:'201090' }, reg), true);
+      eq('code: een bestaande taak die naar een onbekende code gaat → vraag', CR.onbekendeCodeOk('201091', { code:'201090' }, reg), false);
+      eq('code: register nog niet geladen → geen vraag', CR.onbekendeCodeOk('999999', null, []), true);
+
+      // ── 14. Het wegleggen-venster noemt de taak ──
+      state._rowCache=[rij];
+      openSnoozeModal(0);
+      truthy('wegleggen: de titel noemt de taak, niet alleen de VvE',
+             /Halve zin/.test(document.getElementById('snooze-title').textContent));
+      closeSnoozeModal();
+    } finally {
+      document.getElementById('m-submit').onclick=submitOud;
+      if(_vraagStaatOpen()) beantwoordBevestiging(false);
+      closeModal(); clearModal(); closeCompleteModal();
+      window.fetch=fetchOud; window.alert=alertOud;
+      state.oauthToken=tokenOud; state.oauthExpiry=expOud; state._uitCache=uitCacheOud;
+      D.logboek=logOud; D.ntd=ntdOud; state._rowCache=cacheOud;
+      const n=document.getElementById('hist-note'); if(n) n.value='';
+      state._notitieBezig=false;
+    }
+  })();
+
   console.log = _origLog;         // het voortgangsspoor weer los
   state._dubbelcheckUit = false;  // de testhaak weer los
+  state._codecheckUit = false;
   state._zelftestLoopt = false;
   // De schil terug in de stand waarin de suite hem aantrof (zie de removeAttribute bovenaan).
   if(_inertOud) document.getElementById('app')?.setAttribute('inert',''); else document.getElementById('app')?.removeAttribute('inert');   // de poll mag weer; de suite is klaar

@@ -7,7 +7,7 @@
 var MAX_AFVINK_PER_KEER = 25;
 
 function verplaatsAfgerond(e) {
- cd_lockedRun('verplaatsAfgerond', () => {
+  if (!e || !e.range) return;
   // `e.range.getSheet()` en NIET `e.source.getActiveSheet()`. Die laatste zegt welk tabblad er in
   // de spreadsheet-UI vooraan staat op het moment dat de trigger draait, en dat hoeft niet het
   // tabblad te zijn waar de bewerking op landde: een installeerbare onEdit-trigger draait
@@ -38,6 +38,11 @@ function verplaatsAfgerond(e) {
   // behandeld. De rest bleef afgevinkt in de lijst staan, zonder melding en zonder logregel.
   if (range.getColumn() !== 9 || range.getNumColumns() !== 1) return;
 
+  // De twee controles hierboven staan bewust VÓÓR de document-lock: deze trigger vuurt op élke
+  // handmatige bewerking in élk tabblad, en vrijwel geen daarvan is een afvinkje. Ze lezen alleen
+  // het event zelf (geen Sheet-cellen), dus er kan niets tussen schuiven. Voorheen wachtte elke
+  // typbeweging eerst tot 2× 10 s op de lock, en hield hem bezet voor de motor en de wachtrij.
+ cd_lockedRun('verplaatsAfgerond', () => {
   // GOEDKOPE VOORFILTER. `cd_archiveerRij` doet per rij eerst een brede lezing (A..S) vóórdat hij
   // op TRUE kan toetsen. Bij een bereik van honderden rijen — één sleepbeweging over kolom I is zo
   // gemaakt — zijn dat honderden losse Sheet-lezingen binnen de document-lock, terwijl er meestal
@@ -342,7 +347,7 @@ function setupAfgerondSheet(sheet) {
 }
 
 function verplaatsALV(e) {
- cd_lockedRun('verplaatsALV', () => {
+  if (!e || !e.range) return;
   // `e.range.getSheet()` om dezelfde reden als bij verplaatsAfgerond hierboven: het tabblad waar de
   // bewerking op landde, niet het tabblad dat toevallig vooraan staat.
   var sheet = e.range.getSheet();
@@ -362,6 +367,8 @@ function verplaatsALV(e) {
   // 26-08-2026 voor 50 regels ook echt is moeten gebeuren).
   if (range.getColumn() !== 4 || range.getNumColumns() !== 1) return;
 
+  // Tabblad- en kolomcontrole VÓÓR de lock — zelfde reden als bij verplaatsAfgerond hierboven.
+ cd_lockedRun('verplaatsALV', () => {
   var eersteRij = range.getRow(), aantal = range.getNumRows();
   var vinkjes = sheet.getRange(eersteRij, 4, aantal, 1).getValues();
   var teDoen = [];
@@ -524,6 +531,14 @@ function cd_archiveerALVs(sheet, rijen, blok) {
   for (var w = 0; w < nieuw.length; w++) targetSheet.appendRow(nieuw[w].slice(0, br));
 }
 function sorteerOfferteTrajecten(e) {
+  // Goedkope filters VÓÓR de lock: een bewerking in een ander tabblad, of een afvinkje in kolom I
+  // (zie de toelichting in _sorteerOfferteTrajectenImpl), hoeft niet eerst op de document-lock te
+  // wachten om daarna niets te doen. Ze lezen alleen het event. De impl houdt dezelfde controles
+  // voor een directe aanroep.
+  if (e && e.range) {
+    if (e.range.getSheet().getName() !== "Nog Te Doen") return;
+    if (e.range.getColumn() === 9 && e.range.getNumColumns() === 1) return;
+  }
   // Serialiseer t.o.v. de andere mutatie-triggers (verplaatsAfgerond/-ALV, opvolg-motor,
   // queue-drain) via dezelfde document-lock. Voorheen liep deze sort als enige zónder lock.
   cd_lockedRun('sorteerOfferteTrajecten', function() { _sorteerOfferteTrajectenImpl(e); });

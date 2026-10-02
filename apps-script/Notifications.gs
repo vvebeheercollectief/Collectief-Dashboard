@@ -757,7 +757,23 @@ function cd_sweepNotifQueue() {
 // blind: wie naar de Sheet kon schrijven kon zo de privileged backend aansturen (confused deputy).
 const CD_QUEUE_ALLOWED = { newtask: 1, assigned: 1, alv_update: 1, test: 1, completed: 1, ping: 1 };
 
+// Staat er in de wachtrij iets open? Bewust ZONDER lock en alleen kolom D: onChange vuurt bij
+// élke wijziging in de hele spreadsheet (ook elke dashboard-schrijfactie, in elk tabblad), en
+// vrijwel altijd is er niets te doen. Voorheen nam elke zo'n wijziging eerst de document-lock en
+// las 200×4 cellen — en hield zo de lock bezet voor de afvink-triggers en de motor.
+// Alleen een hint: binnen de lock leest cd_drainNotifQueue alles opnieuw.
+function cd_wachtrijHeeftWerk() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(NOTIF_QUEUE_SHEET);
+  if (!sheet) return false;
+  const last = sheet.getLastRow();
+  if (last < 2) return false;
+  const kolomD = sheet.getRange(2, 4, last - 1, 1).getValues();
+  for (let i = 0; i < kolomD.length; i++) if (!kolomD[i][0]) return true;
+  return false;
+}
+
 function cd_drainNotifQueue() {
+  if (!cd_wachtrijHeeftWerk()) return;
   cd_lockedRun('cd_drainNotifQueue', function() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName(NOTIF_QUEUE_SHEET);

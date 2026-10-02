@@ -166,8 +166,22 @@ function cd_handleNtdEdit(sheet, row, e) {
   // eerlijk: bij een breder bereik weten we het simpelweg niet, en dan is zwijgen beter dan een
   // melding die niet klopt.
   const enkeleCel = e.range.getNumRows() === 1 && e.range.getNumColumns() === 1;
-  const isNew = enkeleCel && !e.oldValue && code;
   const colChanged = e.range.getColumn();
+  const nieuweWaarde = (e.value === undefined || e.value === null) ? null : e.value.toString().trim();
+  // Een nieuwe taak alleen als we óók weten wát er getypt is (e.value) — zie de rijcontrole hieronder.
+  const isNew = enkeleCel && !e.oldValue && code && nieuweWaarde !== null;
+
+  // Is de rij die we hierboven lazen nog de rij die bewerkt is? Deze trigger leest ZONDER lock,
+  // terwijl `sorteerOfferteTrajecten` op dezelfde bewerking het sectieblok herschikt. Won de
+  // sortering, dan stond er op `row` al een ándere taak en ging de melding 'Nieuwe taak' over de
+  // verkeerde VvE (naloop 2026-10-02). `e.value` is wat er écht in de cel gezet is (alleen bij één
+  // cel); klopt de gelezen rij daar niet mee, dan zwijgen — een gemiste melding is minder erg dan
+  // een melding over een andere VvE.
+  const gelezenInBewerkteKolom = colChanged === 1 ? code : (colChanged === behandelaarColMap[sec] ? beh : null);
+  if (nieuweWaarde !== null && gelezenInBewerkteKolom !== null && nieuweWaarde !== gelezenInBewerkteKolom) {
+    Logger.log('cd_handleNtdEdit: rij ' + row + ' verschoof (gesorteerd?) — geen melding');
+    return;
+  }
 
   if (isNew && colChanged === 1) {
     cd_schrijfLogboek(code, sec, 'Aangemaakt (sheet)', '', '', '', beh);
@@ -857,22 +871,33 @@ function cd_createTaskRow(categorie, code, naam, actiepunt, behandelaar, deadlin
   //    LET OP — SYNC: gelijk houden aan OMSCHRIJVING_VELD in src/crud.js. Dat is dezelfde afspraak
   //    over 'waar staat de omschrijving van deze categorie', en twee antwoorden daarop laten de
   //    backend stil in een ander veld schrijven dan het scherm leest.
-  sheet.insertRowBefore(insertRow);
-  sheet.getRange(insertRow, 1, 1, 2).setValues([[cd_safeCell(code), cd_safeCell(naam)]]);
+  //
+  //    De hele rij wordt VÓÓR het invoegen opgebouwd en direct erna in ÉÉN setValues geschreven.
+  //    Eerder waren het zes losse schrijfacties na de insertRowBefore: het dashboard schrijft
+  //    buiten deze lock om en kan in dat venster een rij boven deze verwijderen, waarna de latere
+  //    schrijfacties (Herhaal-ID in M, taaknummer in Q) in de buurrij landden — een taak met het
+  //    nummer van een andere (naloop 2026-10-02). De lege cellen ertussen zijn op een vers
+  //    ingevoegde rij al leeg, dus '' schrijven verandert daar niets.
+  var rij = ['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''];   // A..Q
+  rij[0] = cd_safeCell(code);                                  // A
+  rij[1] = cd_safeCell(naam);                                  // B
   var omschrijvingCol = CD_OMSCHRIJVING_COL[sectie] || 3;
-  if (actiepunt) sheet.getRange(insertRow, omschrijvingCol).setValue(cd_safeCell(actiepunt));
-  sheet.getRange(insertRow, 5).setValue(cd_safeCell(behandelaar)); // E = behandelaar
+  if (actiepunt) rij[omschrijvingCol - 1] = cd_safeCell(actiepunt);
+  rij[4] = cd_safeCell(behandelaar);                           // E = behandelaar
   const deadlineCol = (sectie === 'OPPAKKEN') ? 4 : 6;      // D voor Oppakken, F voor rest
-  if (deadline) sheet.getRange(insertRow, deadlineCol).setValue(cd_safeCell(deadline));
-  if (herhaalId) sheet.getRange(insertRow, 13).setValue(herhaalId);  // M = Herhaal-ID (Fase 4)
+  if (deadline) rij[deadlineCol - 1] = cd_safeCell(deadline);
+  if (herhaalId) rij[12] = herhaalId;                          // M = Herhaal-ID (Fase 4)
   // Q = vast taaknummer. Ontbrak hier, waardoor élke taak die de backend aanmaakt (mail-intake,
   // herhaalregels) zonder identiteit in de lijst kwam. Gevolg: de schrijf-bescherming van het
   // dashboard valt voor zo'n rij terug op de vingerafdruk van de inhoud in plaats van op het
   // nummer, en bouwBundelIndex kan hem nooit als bundellid herkennen. Zelfde vorm als
   // nieuwTaakId() in src/util.js — tijdstempel in base36 plus zes toevalstekens.
+  rij[16] = cd_nieuwTaakId();                                  // Q
   // Nooit buiten het raster schrijven: dat mislukt in Apps Script met een fout die de hele
   // trigger stillegt. Beide bladen zijn breed genoeg (gemeten), de klem is het vangnet.
-  if (sheet.getMaxColumns() >= 17) sheet.getRange(insertRow, 17).setValue(cd_nieuwTaakId());
+  const breedte = Math.min(rij.length, sheet.getMaxColumns());
+  sheet.insertRowBefore(insertRow);
+  sheet.getRange(insertRow, 1, 1, breedte).setValues([rij.slice(0, breedte)]);
   return insertRow;
 }
 

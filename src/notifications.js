@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  NOTIFICATIONS — meldingen (wachtrij/push) + in-app toasts
 // ══════════════════════════════════════
-import { esc, displayName, parseDt, meldSleutel, kiesAfgerondRij, splitBehandelaar } from "./util.js";
+import { esc, displayName, parseDt, meldSleutel, kiesAfgerondRij, splitBehandelaar, leesbareFout } from "./util.js";
 import { state, D, _shownToasts } from "./state.js";
 import { SID, ONESIGNAL_APP_ID } from "./config.js";
 import { ensureToken } from "./auth.js";
@@ -114,6 +114,10 @@ function showToast(title, msg, color, icoNaam, opts) {
     setTimeout(() => _shownToasts.delete(key), TOAST_DEDUP_MS);
   }
 
+  // Een RODE melding (een fout, een mislukte opslag) blijft staan tot hij weggeklikt wordt. Zo'n
+  // melding zegt dat er iets NIET gebeurd is, en na vijf seconden stil verdwijnen betekende: wie
+  // net even wegkeek, heeft nooit geweten dat zijn wijziging is teruggezet. Geen aftelbalk dus.
+  const blijft = color === 'var(--rd)';
   const el = document.createElement('div');
   el.className = 'toast';
   el.style.setProperty('--toast-clr', color || 'var(--ac)');
@@ -126,7 +130,7 @@ function showToast(title, msg, color, icoNaam, opts) {
       ${msg ? `<div class="toast-msg">${esc(msg)}</div>` : ''}
     </div>
     <button class="toast-close" data-action="toast-sluiten" aria-label="Melding sluiten">×</button>
-    <div class="toast-bar" style="animation-duration:${TOAST_DURATION}ms"></div>`;
+    ${blijft ? '' : `<div class="toast-bar" style="animation-duration:${TOAST_DURATION}ms"></div>`}`;
 
   const container = document.getElementById('toast-container');
   container.appendChild(el);
@@ -143,7 +147,35 @@ function showToast(title, msg, color, icoNaam, opts) {
     }
   }
 
-  setTimeout(() => dismissToast(el), TOAST_DURATION);
+  if (!blijft) toastTimer(el, TOAST_DURATION);
+}
+
+// De aftelklok van een melding, met PAUZE zolang de muis erop staat (of de focus erin zit). Een
+// melding van vijf seconden — of de undo-knop van acht — verdween anders onder de cursor van wie
+// hem net aan het lezen was, of op weg was naar 'Ongedaan maken'. De balk onderaan staat dan ook
+// stil, zodat hij blijft zeggen hoeveel tijd er nog is. Bij het verlaten loopt de resterende tijd
+// verder, met een ondergrens van een seconde om de melding niet onder je weg te laten springen.
+function toastTimer(el, ms) {
+  const bar = el.querySelector('.toast-bar');
+  let rest = ms, start = Date.now();
+  let tid = setTimeout(() => dismissToast(el), rest);
+  const pauze = () => {
+    if (tid == null) return;
+    clearTimeout(tid); tid = null;
+    rest -= Date.now() - start;
+    if (bar) bar.style.animationPlayState = 'paused';
+  };
+  const verder = () => {
+    if (tid != null || el.classList.contains('removing')) return;
+    if (el.matches(':hover') || el.contains(document.activeElement)) return;   // nog op de melding
+    start = Date.now();
+    tid = setTimeout(() => dismissToast(el), Math.max(rest, 1000));
+    if (bar) bar.style.animationPlayState = 'running';
+  };
+  el.addEventListener('mouseenter', pauze);
+  el.addEventListener('focusin', pauze);
+  el.addEventListener('mouseleave', verder);
+  el.addEventListener('focusout', () => setTimeout(verder, 0));
 }
 
 function dismissToast(el) {
@@ -158,8 +190,8 @@ function dismissToast(el) {
 // blijft 30 seconden staan terwijl de toast na 8 seconden verdwijnt. In dat gat van 22 seconden
 // voorkomt de ontdubbeling dus niets dubbels; ze laat een herhaalde handeling gewoon onherstelbaar.
 // De standaard blijft ontdubbelen: een dubbelklik op dezelfde knop hoort geen twee toasts te geven.
+const UNDO_DURATION = 8000;
 function showUndoToast(title, msg, undoFn, icoNaam, opts) {
-  const UNDO_DURATION = 8000;
   if (!(opts||{}).geenDedup) {
     // `opts.sleutel` laat de aanroeper ontdubbelen op IDENTITEIT (het vaste taaknummer) in plaats
     // van op tekst. Twee taken van dezelfde VvE kunnen dezelfde titel+tekst hebben — bij
@@ -193,11 +225,11 @@ function showUndoToast(title, msg, undoFn, icoNaam, opts) {
   undoBtn.onclick = async () => {
     undoBtn.disabled = true;
     undoBtn.innerHTML = `${ico('zandloper',12)} Bezig…`;
-    try { await undoFn(); } catch(e) { alert('Undo mislukt: ' + e.message); }
+    try { await undoFn(); } catch(e) { alert('Ongedaan maken mislukt. ' + leesbareFout(e)); }
     dismissToast(el);
   };
 
-  setTimeout(() => dismissToast(el), UNDO_DURATION);
+  toastTimer(el, UNDO_DURATION);
 }
 
 async function undoComplete(undoData) {
@@ -291,7 +323,7 @@ async function undoComplete(undoData) {
       const terug=(D.ntd[sec]||[]).filter(x=>x.code===undoData.code).pop();
       if(terug) flashRow('ntd-tbody', terug._row, 'rij-flits-amber');
     });
-  } catch(e) { alert('Undo fout: ' + e.message); }
+  } catch(e) { alert('Ongedaan maken mislukt. ' + leesbareFout(e)); }
   finally { state._undoInFlight = false; }
 }
 
@@ -327,7 +359,7 @@ async function undoDelete(undoData) {
       const terug=(D.ntd[sec]||[]).filter(x=>x.code===undoData.code).pop();
       if(terug) flashRow('ntd-tbody', terug._row, 'rij-flits-amber');
     });
-  } catch(e) { alert('Undo fout: ' + e.message); }
+  } catch(e) { alert('Ongedaan maken mislukt. ' + leesbareFout(e)); }
   finally { state._undoInFlight = false; }
 }
 
@@ -678,7 +710,7 @@ OneSignalDeferred.push(async function(OneSignal) {
 // ══════════════════════════════════════
 
 export {
-  fireNotifEvent, TOAST_ICONS, TOAST_COLORS, TOAST_DURATION, MAX_TOAST_BURST, showToast, dismissToast, showUndoToast,
+  fireNotifEvent, TOAST_ICONS, TOAST_COLORS, TOAST_DURATION, MAX_TOAST_BURST, showToast, dismissToast, showUndoToast, toastTimer,
   undoComplete, undoDelete, getNotifPrefs, verwerkMeldingRijen, toonMeldingen, initMeldingen, openNotifModal, closeNotifModal,
   refreshNotifUI, onWhoChange, getCurrentWho, _whoSleutel, saveNotifPrefs, herstelNotifKoppeling, waitForOneSignal, subscribeNotifs,
   unsubscribeNotifs, sendTestNotif,

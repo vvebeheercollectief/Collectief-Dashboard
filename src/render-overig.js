@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  RENDER-OVERIG — Ontwikkeling + Logboek
 // ══════════════════════════════════════
-import { esc, displayName, persBadges, emptyRow, _vandaagAmsterdam, vveCodeSpan } from "./util.js";
+import { esc, displayName, persBadges, emptyRow, _vandaagAmsterdam, vveCodeSpan, leesbareFout } from "./util.js";
 import { ico } from "./icons.js";
 import { PG, SID } from "./config.js";
 import { state, D, pgs } from "./state.js";
@@ -157,7 +157,7 @@ async function submitOntwItem(){
     }));
     closeOntwModal();
     await loadAll();
-  }catch(e){alert('Fout: '+e.message)}
+  }catch(e){alert('Opslaan mislukt. '+leesbareFout(e))}
 }
 
 async function deleteOntwItem(){
@@ -225,7 +225,7 @@ async function undoOntwDelete(values, titel, stand){
       showToast('Ongedaan gemaakt', `"${titel||''}" teruggezet`, 'var(--am)', 'ongedaan');
       await loadAll();
     });
-  }catch(e){alert('Undo fout: '+e.message)}
+  }catch(e){alert('Ongedaan maken mislukt. '+leesbareFout(e))}
 }
 
 // ══════════════════════════════════════
@@ -625,7 +625,7 @@ async function undoDeleteLog(vals, oudeRow, wasVerwijderd){
       showToast('Ongedaan gemaakt','Logregel teruggezet','var(--am)','ongedaan');
       await loadAll();                               // _row-indexen vers uit de Sheet
     });
-  }catch(e){ alert('Undo fout: '+e.message); }
+  }catch(e){ alert('Ongedaan maken mislukt. '+leesbareFout(e)); }
   finally{ state._undoInFlight=false; }
 }
 

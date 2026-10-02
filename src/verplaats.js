@@ -21,7 +21,7 @@
 import { state, D } from "./state.js";
 import { verseRij, rijIndex } from "./rij.js";
 import { SECS, SID, OMSCHRIJVING_SLEUTEL, VELD_LABELS } from "./config.js";
-import { berekenPrioriteit, taakTitel } from "./util.js";
+import { berekenPrioriteit, taakTitel, leesbareFout } from "./util.js";
 import { assertRowsMatch, _shiftNtdRows, _herstelShift, sheetsFetch, kapCel } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { backgroundWrite, blokkeerOffline, loadAll } from "./data.js";
@@ -193,7 +193,7 @@ async function verplaatsTaak(r, doelSec, nietOpgeslagen){
   // gebeurd — een stille mislukking die pas dagen later opvalt.
   let ids;
   try { ids = await getSheetIds(); }
-  catch(e){ alert('Verplaatsen mislukt: ' + (e && e.message ? e.message : e)); return false; }
+  catch(e){ alert('Verplaatsen mislukt. ' + leesbareFout(e)); return false; }
   const sheetId = ids['Nog Te Doen'];
   if(sheetId == null){ alert('Sheet "Nog Te Doen" niet gevonden'); return false; }
 

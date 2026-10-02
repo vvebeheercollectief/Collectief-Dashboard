@@ -922,7 +922,40 @@ function duurNaarCel(v){
   return n === null ? '' : String(n);
 }
 
+// ── Een fout in gewone taal ──
+// Op een handvol plekken kwam de kale technische tekst op het scherm: 'Undo fout: Failed to fetch',
+// 'Fout: Request had insufficient authentication scopes', 'Quota exceeded for quota metric…'. Daar
+// kan een collega niets mee. Dit vertaalt de fout naar dezelfde soort zin die backgroundWrite
+// (data.js) al geeft: wat er aan de hand is en wat je kunt doen. Puur, dus los te toetsen.
+//   · e.melding  — onze eigen, al leesbare uitleg (de rij-controle, de invoegplek) gaat voor;
+//   · netwerk    — een fetch die REJECTET heeft geen .status (zie _isNetwerkFout in api.js), en een
+//                  afgebroken verzoek zegt 'Geen antwoord van Google';
+//   · 401/403, 429, 5xx en de overige 4xx elk hun eigen zin;
+//   · een programmeerfout (TypeError e.d. zonder netwerk-tekst) krijgt een algemene zin;
+//   · een eigen Error zonder status ('Sheet niet gevonden: …') is al Nederlands en blijft staan.
+function leesbareFout(e){
+  if(!e) return 'Er ging iets mis.';
+  if(e.melding) return e.melding;
+  const msg=String(e.message||e||'');
+  const m=msg.toLowerCase();
+  const geenStatus=e.status===undefined;
+  if(e.offline || /geen antwoord van google|geen verbinding/.test(m)
+     || (geenStatus && /failed to fetch|networkerror|load failed|network request failed/.test(m)))
+    return 'Geen verbinding met Google — controleer je internet en probeer het opnieuw.';
+  if(e.status===401 || /authenticat|unauthori|niet ingelogd/.test(m))
+    return 'Je sessie is verlopen — probeer het opnieuw; zo nodig vraagt Google je om opnieuw in te loggen.';
+  if(e.status===429 || /quota|rate.?limit|resource_exhausted/.test(m))
+    return 'Google krijgt even te veel verzoeken — wacht een halve minuut en probeer het opnieuw.';
+  if(e.status>=500) return 'Google had even een storing — probeer het zo opnieuw.';
+  if(e.status===403) return 'Dit account heeft geen toegang tot de Sheet.';
+  if(e.status>=400) return 'Google weigerde de wijziging. Vernieuw de lijst en probeer het opnieuw.';
+  if(e instanceof TypeError || e instanceof ReferenceError || e instanceof RangeError || e instanceof SyntaxError)
+    return 'Er ging iets mis in het dashboard. Vernieuw de pagina en probeer het opnieuw.';
+  return msg || 'Er ging iets mis.';
+}
+
 export {
+  leesbareFout,
   maandagVan, isoWeekJaar, weekDagen, weekPeriodeLabel, parseWeekPeriode, weekOpties, weekAfstand, metDagnamen, MND_KORT, MND_LANG,
   taakTitel, taakVerwijzing, kortDatum, NIET_ZOEKBAAR,
   displayName, filt, splitBehandelaar, korteNaam, PRIO_REGELS, stilDrempel, STIL_ESCALATIE_REGELS,

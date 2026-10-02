@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  CRUD — taak-modals, sheet-helpers, toevoegen/afronden/verwijderen
 // ══════════════════════════════════════
-import { esc, berekenPrioriteit, toISODate, toDutchDate, nieuwTaakId, taakVerwijzing, voorgesteldeDeadline, DEADLINE_HINT, taakTitel, reconcileOffertes, parseAannemers, duurNaarCel, duurUitCel, _parseAnyDate, offerteAangevraagd } from "./util.js";
+import { esc, berekenPrioriteit, toISODate, toDutchDate, nieuwTaakId, taakVerwijzing, voorgesteldeDeadline, DEADLINE_HINT, taakTitel, reconcileOffertes, parseAannemers, duurNaarCel, duurUitCel, _parseAnyDate, offerteAangevraagd, leesbareFout } from "./util.js";
 import { zoekDubbels, dubbelVraagTekst } from "./dubbelcheck.js";
 import { extraVves, wisExtraVves, extraVvesHtml, extraVvesUitleg } from "./meervve.js";
 import { state, D, pgs } from "./state.js";
@@ -1600,7 +1600,7 @@ async function doCompleteTask(){
     );
     // 3) groene puls + fade op de oude rij; daarná pas hertekenen
     animateRowOut(tr,'rij-puls-groen',renderAll);
-  }catch(e){alert('Fout bij afhandelen: '+e.message)}
+  }catch(e){alert('Afronden mislukt. '+leesbareFout(e))}
   finally{ state._completeBusy=false; }
 }
 
@@ -2086,7 +2086,7 @@ async function submitTask(){
     if(msg.includes('invalid authentication')||msg.includes('unauthenticated')||msg.includes('unauthorized')){
       state.oauthToken=null;state.oauthExpiry=0;
       alert('Je sessie is verlopen. Klik nogmaals op Opslaan om opnieuw in te loggen.');
-    }else{alert('Fout: '+e.message)}
+    }else{alert('Opslaan mislukt. '+leesbareFout(e))}
   }finally{
     // Alle vroege returns (dubbelcheck 'nee', een niet-teruggevonden rij, de mismatch-tak) zitten
     // binnen deze try en komen dus vanzelf hierlangs.

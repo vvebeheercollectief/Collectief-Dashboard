@@ -72,6 +72,15 @@ if (window.top !== window.self) {
   catch (_) { document.documentElement.style.display = 'none'; }
 }
 
+// ── Vangnet voor promises die niemand afvangt ──
+// Alleen LOGGEN, geen melding: dit vangt ook wat er buiten een klik om misgaat (een achtergrond-
+// verversing, OneSignal, een lazy import), en een toast voor elk daarvan zou de gebruiker
+// bestoken met fouten waar hij niets mee kan. De klikacties krijgen hun eigen, wél zichtbare
+// vangnet in actions.js (voerActieUit). Hier gaat het erom dat zo'n fout niet spoorloos is.
+window.addEventListener('unhandledrejection', e => {
+  console.error('[onafgevangen]', e && e.reason);
+});
+
 // ══════════════════════════════════════
 //  BOOT
 // ══════════════════════════════════════

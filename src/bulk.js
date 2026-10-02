@@ -4,7 +4,7 @@
 import { state, D } from "./state.js";
 import { verseRij, rijIndex } from "./rij.js";
 import { renderNtd } from "./render-lijsten.js";
-import { toDutchDate, taakTitel, berekenPrioriteit, _parseAnyDate, _vandaagAmsterdam, _verschilInKalenderdagen, parseDt, kiesAfgerondRij } from "./util.js";
+import { toDutchDate, taakTitel, berekenPrioriteit, _parseAnyDate, _vandaagAmsterdam, _verschilInKalenderdagen, parseDt, kiesAfgerondRij, leesbareFout } from "./util.js";
 import { SID } from "./config.js";
 import { ensureToken } from "./auth.js";
 import { _shiftNtdRows, _shiftAfRows, _herstelShift, assertRowsMatch, _veiligeRij, sheetsFetch, kapCel } from "./api.js";
@@ -450,7 +450,7 @@ async function bulkUndoAfronden(items, stand){
       showToast('Ongedaan gemaakt',`${items.length} taken terug in Nog Te Doen`,'var(--am)','ongedaan');
       await loadAll(true);
     });
-  }catch(e){ alert('Undo fout: '+e.message); }
+  }catch(e){ alert('Ongedaan maken mislukt. '+leesbareFout(e)); }
   finally{ state._undoInFlight=false; }
 }
 
@@ -550,7 +550,7 @@ async function bulkUndoVerwijderen(items, stand){
       showToast('Ongedaan gemaakt',`${items.length} taken terug in Nog Te Doen`,'var(--am)','ongedaan');
       await loadAll(true);
     });
-  }catch(e){ alert('Undo fout: '+e.message); }
+  }catch(e){ alert('Ongedaan maken mislukt. '+leesbareFout(e)); }
   finally{ state._undoInFlight=false; }
 }
 

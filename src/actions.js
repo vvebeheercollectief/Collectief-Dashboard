@@ -17,6 +17,7 @@ import { ontkoppelTaak } from './bundel-acties.js';
 import { modalAannemerAdd, modalAannemerBinnen, modalAannemerWeg } from './modal-aannemers.js';
 import { copyAiPrompt, aiOvernemen, aiActieTaak, aiKopieerConcept, prefillNieuweTaak } from './ai.js';
 import { dismissToast, saveNotifPrefs, showToast } from './notifications.js';
+import { leesbareFout } from './util.js';
 import { doLogin } from './auth.js';
 import { openSnoozeModal, snoozeKies } from './snooze.js';
 import { zetInBehandeling } from './inbehandeling.js';
@@ -237,12 +238,29 @@ export const ACTIONS = {
   'stapel-greep':          ()   => {},
 };
 
+// Elke actie loopt hierlangs, en een groot deel is async: `fn(el, e)` geeft dan een promise terug
+// die niemand afving. Gooide zo'n actie (een netwerkfout vóór de eigen afhandeling, een
+// programmeerfout), dan gebeurde er op het scherm NIETS — een knop die niet reageert. Nu een
+// melding in gewone taal (leesbareFout, util.js) en de echte fout in de console. Ook een fout die
+// synchroon gooit komt hier langs.
+export function voerActieUit(fn, el, e) {
+  const meld = (err) => {
+    console.error('[actie]', el && el.dataset && el.dataset.action, err);
+    showToast('Dat lukte niet', leesbareFout(err), 'var(--rd)', 'waarschuwing', { geenSysteemmelding: true });
+  };
+  try {
+    const uit = fn(el, e);
+    if (uit && typeof uit.then === 'function') return Promise.resolve(uit).catch(meld);
+    return uit;
+  } catch (err) { meld(err); }
+}
+
 export function initActions() {
   document.addEventListener('click', (e) => {
     const el = e.target.closest('[data-action]');
     if (!el) return;
     const fn = ACTIONS[el.dataset.action];
-    if (fn) fn(el, e);
+    if (fn) voerActieUit(fn, el, e);
   });
   // Ctrl/Cmd+Enter in de dossier-composer = contactmoment vastleggen
   // (delegatie op document-niveau: het element wordt bij elke render opnieuw aangemaakt)
@@ -298,7 +316,7 @@ export function initActions() {
       const kb = e.target.closest('[data-action][tabindex]');
       if (kb && kb === e.target && !kb.closest('button') && kb.tagName !== 'BUTTON' && kb.tagName !== 'A') {
         const fn = ACTIONS[kb.dataset.action];
-        if (fn) { e.preventDefault(); fn(kb, e); }
+        if (fn) { e.preventDefault(); voerActieUit(fn, kb, e); }
       }
     }
   });

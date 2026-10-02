@@ -16082,6 +16082,77 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     }
   })();
 
+  // ══════════════════════════════════════════════════════════════════════════
+  //  NALOOP 02-10-2026 — meldingen: pauze bij aanwijzen, gewone taal, vangnet
+  // ══════════════════════════════════════════════════════════════════════════
+  await (async () => {
+    console.log('%c[TESTS] Naloop 02-10: meldingen', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const N = await import('./notifications.js');
+    const U = await import('./util.js');
+    const A = await import('./actions.js');
+    const wacht = ms => new Promise(r => setTimeout(r, ms));
+    try {
+      // ── 5. Pauze bij aanwijzen, rode meldingen blijven staan ──
+      document.querySelectorAll('#toast-container .toast').forEach(x => x.remove());
+      N.showToast('Gewone melding', 'tekst', 'var(--ac)', null, { geenDedup:true, geenSysteemmelding:true });
+      const gewoon = document.querySelector('#toast-container .toast:last-child');
+      const bar = gewoon.querySelector('.toast-bar');
+      gewoon.dispatchEvent(new MouseEvent('mouseenter'));
+      eq('toast: aanwijzen zet de aftelbalk stil', bar.style.animationPlayState, 'paused');
+      gewoon.dispatchEvent(new MouseEvent('mouseleave'));
+      eq('toast: weggaan laat hem weer lopen', bar.style.animationPlayState, 'running');
+      N.showToast('Opslaan mislukt', 'Niet opgeslagen — wijziging teruggezet.', 'var(--rd)', null, { geenDedup:true, geenSysteemmelding:true });
+      const rood = document.querySelector('#toast-container .toast:last-child');
+      eq('toast: een rode melding heeft geen aftelbalk (blijft tot hij weggeklikt wordt)', rood.querySelectorAll('.toast-bar').length, 0);
+      // De klok zelf, met een korte duur zodat de toets niet seconden hoeft te wachten.
+      const nep = document.createElement('div'); nep.className = 'toast';
+      document.getElementById('toast-container').appendChild(nep);
+      N.toastTimer(nep, 60);
+      nep.dispatchEvent(new MouseEvent('mouseenter'));
+      await wacht(150);
+      eq('toast: zolang de muis erop staat verdwijnt hij niet', nep.classList.contains('removing'), false);
+      nep.dispatchEvent(new MouseEvent('mouseleave'));
+      await wacht(1150);
+      eq('toast: na het weggaan loopt de resterende tijd af', nep.classList.contains('removing'), true);
+      N.showUndoToast('Taak afgerond', 'x', async () => {}, null, { geenDedup:true });
+      const undo = document.querySelector('#toast-container .toast:last-child');
+      undo.dispatchEvent(new MouseEvent('mouseenter'));
+      eq('toast: ook de undo-melding pauzeert', undo.querySelector('.toast-bar').style.animationPlayState, 'paused');
+      truthy('toast: en de knop heet Ongedaan maken', /Ongedaan maken/.test(undo.querySelector('.toast-undo').textContent));
+
+      // ── 12. Fouten in gewone taal ──
+      const met = (msg, extra) => Object.assign(new Error(msg), extra || {});
+      eq('fout: netwerk', U.leesbareFout(new TypeError('Failed to fetch')), 'Geen verbinding met Google — controleer je internet en probeer het opnieuw.');
+      eq('fout: geen antwoord binnen de tijd', U.leesbareFout(met('Geen antwoord van Google binnen 20 seconden')), 'Geen verbinding met Google — controleer je internet en probeer het opnieuw.');
+      truthy('fout: sessie verlopen (401)', /sessie is verlopen/.test(U.leesbareFout(met('Request had invalid authentication credentials', { status:401 }))));
+      truthy('fout: quotum (429)', /te veel verzoeken/.test(U.leesbareFout(met('Quota exceeded for quota metric', { status:429 }))));
+      truthy('fout: storing bij Google (503)', /storing/.test(U.leesbareFout(met('The service is currently unavailable', { status:503 }))));
+      truthy('fout: geen toegang (403)', /geen toegang/.test(U.leesbareFout(met('The caller does not have permission', { status:403 }))));
+      truthy('fout: overige weigering (400) zonder Engelse tekst', /weigerde/.test(U.leesbareFout(met('Unable to parse range', { status:400 }))));
+      eq('fout: een eigen uitleg (conflict) gaat voor', U.leesbareFout(met('x', { rowMismatch:true, melding:'Iemand heeft deze taak net gewijzigd.' })), 'Iemand heeft deze taak net gewijzigd.');
+      eq('fout: een eigen Nederlandse fout blijft staan', U.leesbareFout(met('Sheet niet gevonden: Afgerond')), 'Sheet niet gevonden: Afgerond');
+      truthy('fout: een programmeerfout wordt een algemene zin', /iets mis in het dashboard/.test(U.leesbareFout(new TypeError("Cannot read properties of null (reading 'x')"))));
+      for (const f of ['notifications.js','bulk.js','render-overig.js','crud.js','verplaats.js']) {
+        const t = await (await fetch(new URL('src/'+f, document.baseURI), {cache:'no-store'})).text();
+        eq(`fout: ${f} zet geen kale e.message meer in een melding`, /alert\('(Undo fout|Undo mislukt|Fout|Fout bij afhandelen|Verplaatsen mislukt): ' *\+/.test(t), false);
+      }
+
+      // ── 25. Vangnet voor klikacties ──
+      document.querySelectorAll('#toast-container .toast').forEach(x => x.remove());
+      const errOud = console.error; console.error = () => {};
+      try {
+        await A.voerActieUit(async () => { throw Object.assign(new Error('Quota exceeded'), { status:429 }); }, document.body);
+        A.voerActieUit(() => { throw new TypeError('kapot'); }, document.body);
+      } finally { console.error = errOud; }
+      const titels = [...document.querySelectorAll('#toast-container .toast-title')].map(x => x.textContent);
+      eq('vangnet: een async én een synchrone fout geven elk een melding', titels.filter(t => t === 'Dat lukte niet').length, 2);
+      truthy('vangnet: in gewone taal', [...document.querySelectorAll('#toast-container .toast-msg')].some(x => /te veel verzoeken/.test(x.textContent)));
+      eq('vangnet: een gewone actie geeft zijn waarde gewoon door', A.voerActieUit(() => 7, document.body), 7);
+    } finally {
+      document.querySelectorAll('#toast-container .toast').forEach(x => x.remove());
+    }
+  })();
+
   console.log = _origLog;         // het voortgangsspoor weer los
   state._dubbelcheckUit = false;  // de testhaak weer los
   state._codecheckUit = false;

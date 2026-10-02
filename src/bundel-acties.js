@@ -505,7 +505,7 @@ export async function herordenBundel(nieuweVolgorde, volgordeGewijzigd){
     if (!await ensureToken()){ alert('Inloggen mislukt. Probeer het opnieuw.'); return; }
     oud.forEach(o => { o.r.bundelVolg = o.volg; });
     renderAll();
-    backgroundWrite(schrijfVolg(oud), () => { wijzigingen.forEach(w => { w.r.bundelVolg = w.volg; }); }, 'Undo mislukt');
+    backgroundWrite(schrijfVolg(oud), () => { wijzigingen.forEach(w => { w.r.bundelVolg = w.volg; }); }, 'Ongedaan maken mislukt');
   }, 'herhaal', { geenDedup:true });
 
   const schrijf = schrijfVolg(wijzigingen);

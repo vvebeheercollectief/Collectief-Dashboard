@@ -1,14 +1,14 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { taakTitel, taakVerwijzing, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, stilDrempel, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, subBadge, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel, kiesAfgerondRij, filt, splitBehandelaar, korteNaam, persBadges, taakActieKnoppen, voorgesteldeDeadline, DEADLINE_VOORSTEL, DEADLINE_HINT, periodeBereik, AF_PERIODES, duurUitCel, duurNaarCel, offerteAangevraagd, teLaatVoorTelling } from "./util.js";
+import { taakTitel, taakVerwijzing, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, stilDrempel, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, subBadge, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel, kiesAfgerondRij, filt, splitBehandelaar, korteNaam, persBadges, taakActieKnoppen, voorgesteldeDeadline, DEADLINE_VOORSTEL, DEADLINE_HINT, periodeBereik, AF_PERIODES, duurUitCel, duurNaarCel, offerteAangevraagd, teLaatVoorTelling, groepeerPerVve, groepeerPerBlok } from "./util.js";
 import { verwerkMeldingRijen, toonMeldingen, MAX_TOAST_BURST, _whoSleutel, getCurrentWho, undoDelete } from "./notifications.js";
 import { logZin, logTijd, logPaginaSoort, afrondOpmerking, logBewerkbaar, LOG_ZIN_EIGEN, renderTaskHistory, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek, logEvents, renderOntw, openOntwModal, closeOntwModal, submitOntwItem, _logRegelSleutel, _ontwSleutel, addTaskNote } from "./render-overig.js";
 import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM, VELD_LABELS } from "./config.js";
 import { maandagVan, isoWeekJaar, weekDagen, weekPeriodeLabel, parseWeekPeriode, weekOpties, weekAfstand } from "./util.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
-import { filterNtd, setNtd, renderNtd, ntdPagina, renderNtdStats, renderAf, setAf, bepaalStil, bouwStilIndex, _zetStilIndex, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey, kopOpen, zetKopOpen, toggleBundel, springNaarBundel, wisNtdFilters, absorbeer, isPlatteWeergave, erIsGefilterd, rowNtd, filterAf, afFilterWaarden } from "./render-lijsten.js";
+import { filterNtd, setNtd, renderNtd, ntdPagina, renderNtdStats, renderAf, setAf, bepaalStil, bouwStilIndex, _zetStilIndex, offerteAannemerPaneel, offerteAannSamenvatting, sorteerNtd, ntdSorteerKey, kopOpen, zetKopOpen, toggleBundel, springNaarBundel, wisNtdFilters, absorbeer, isPlatteWeergave, erIsGefilterd, perVveActief, rowNtd, filterAf, afFilterWaarden } from "./render-lijsten.js";
 import { HERO_VIEWS } from "./render-analytics.js";
 import { state, D, pgs } from "./state.js";
 import { verseRij, rijIndex, regelIndex, rijSleutel } from "./rij.js";
@@ -29,7 +29,7 @@ import { SPLASH_MS, _setFase } from "./login-splash.js";
 import { opmaakHtml, htmlNaarMarkers, zonderOpmaak, pasToe, opmaakBalk } from "./opmaak.js";
 import { goTo, applyTheme } from "./ui.js";
 import { checkSecties, checkRaster, checkRasters, checkNummers, checkAlles, ernstigeBevindingen, RASTER_MIN } from "./structuurcheck.js";
-import { herzetKolomBreedtes, kolBreedtes, periodeCel, deadlineCel } from "./render-tabel.js";
+import { herzetKolomBreedtes, kolBreedtes, periodeCel, deadlineCel, renderTbody } from "./render-tabel.js";
 import { SUBSIDIE_FASES, faseIndex, faseWoord, faseRijHtml, faseWijziging } from "./subsidie-fase.js";
 import { toggleHerhaalStatus, renderHerhaal, openHerhaalModal, deleteHerhaal, submitHerhaal } from "./render-herhaal.js";
 import { openSnoozeModal, snoozeOpslaan, closeSnoozeModal } from "./snooze.js";
@@ -71,6 +71,11 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   state._dubbelcheckUit = true;
   // Zelfde reden voor de vraag over een VvE-code die niet in het register staat (submitTask).
   state._codecheckUit = true;
+  // Groeperen per VvE staat in localStorage. Heeft wie de suite draait hem aan, dan zou elke
+  // toets op de volgorde van de takenlijst de gegroepeerde volgorde zien. De suite meet de
+  // standaardstand; het blok 'Groeperen per VvE' zet hem zelf tijdelijk aan.
+  const _perVveOud = state.ntdPerVve;
+  state.ntdPerVve = false;
   const _origLog = console.log;
   console.log = function(...a){
     const m = String(a[0] || '');
@@ -5687,8 +5692,11 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
 
       const host = document.getElementById('ntd-kop-pillen');
       truthy('kop-pillen container bestaat', !!host);
-      eq('vier pillen in de kop', host.querySelectorAll('.kop-pil').length, 4);
-      eq('twee pillen zijn knoppen', host.querySelectorAll('button.kop-pil').length, 2);
+      // Vijf: open · te laat · weggelegd · af · Per VvE. Die laatste staat hier en niet in de
+      // filterbalk — daar was op staging geen plek meer (de kaartkop brak naar twee regels).
+      eq('vijf pillen in de kop', host.querySelectorAll('.kop-pil').length, 5);
+      eq('drie pillen zijn knoppen', host.querySelectorAll('button.kop-pil').length, 3);
+      truthy('de Per VvE-pil hoort erbij', !!host.querySelector('[data-action="pervve-toggle"]'));
 
       const pil = s => host.querySelector(`[data-action="ntd-stat"][data-status="${s}"]`);
       truthy('pil te laat bestaat',    !!pil('telaat'));
@@ -5837,6 +5845,251 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
        (document.querySelector('.page.active')?.id||''), 'page-'+_paginaVoor);
     truthy('pillen tonen na afloop weer een telling',
        document.getElementById('ntd-kop-pillen').children.length > 0);
+  })();
+
+  // ══ Groeperen per VvE ══════════════════════════════════════════════════════════════════════
+  console.log('%c[TESTS] Groeperen per VvE', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+  // Elke fixture een eigen rijnummer én taaknummer: `rowNtd` loopt langs de bundel-index en
+  // `zelfdeTaak`, en rijen zonder identiteit lijken daar allemaal op elkaar.
+  let _gvN = 0;
+  const _gv = (code,naam,dl)=>({code, naam:naam||('VvE '+code), actiepunt:'x', deadline:dl||'',
+                                behandelaar:'Jer', prioriteit:'', opmerkingen:'',
+                                inBehandeling:'FALSE', _sec:'OPPAKKEN',
+                                _row:9500+(++_gvN), taakId:'TGV'+_gvN});
+  (() => {
+    // Eén taak blijft staan waar hij stond; alleen VvE's met twee of meer worden bij elkaar
+    // gehaald, en de groep gaat naar de plek van zijn URGENTSTE lid. Alleen naar voren, nooit
+    // naar achteren — een restbak 'Losse taken' onderaan zou een te late taak wegduwen.
+    const {rijen,koppen}=groepeerPerVve([_gv('A'), _gv('B'), _gv('A'), _gv('C'), _gv('B')]);
+    eq('groepeer: evenveel rijen', rijen.length, 5);
+    eq('groepeer: de A-groep staat vooraan', rijen.slice(0,2).map(r=>r.code), ['A','A']);
+    eq('groepeer: de losse C blijft achter de twee groepen', rijen.map(r=>r.code), ['A','A','B','B','C']);
+    eq('groepeer: twee koppen', koppen.size, 2);
+    eq('groepeer: kop op index 0', koppen.get(0).code, 'A');
+    eq('groepeer: kop telt de zichtbare taken', koppen.get(0).aantal, 2);
+    eq('groepeer: geen kop voor een VvE met één taak', [...koppen.values()].some(k=>k.code==='C'), false);
+    // Een losse taak vóór de eerste groep blijft vóór die groep staan.
+    eq('groepeer: losse taak bovenaan blijft bovenaan',
+       groepeerPerVve([_gv('L'), _gv('A'), _gv('A')]).rijen.map(r=>r.code), ['L','A','A']);
+  })();
+  (() => {
+    // Groeperen op de GETRIMDE, kleingeschreven code.
+    const {koppen}=groepeerPerVve([_gv(' 311129 '), _gv('311129'), _gv('B')]);
+    eq('groepeer: getrimde code vormt één groep', koppen.size, 1);
+    eq('groepeer: de groep telt er twee', [...koppen.values()][0].aantal, 2);
+    eq('groepeer: en de kop toont de code zonder spaties', [...koppen.values()][0].code, '311129');
+  })();
+  (() => {
+    // INDEX-gesleuteld, niet op rijSleutel: twee rijen met hetzelfde taaknummer bestaan echt.
+    const a={..._gv('A'), taakId:'T1'}, b={..._gv('A'), taakId:'T1'};
+    const c={..._gv('B'), taakId:'T1'}, d={..._gv('B'), taakId:'T1'};
+    eq('groepeer: dubbele taaknummers leveren nog steeds twee koppen', groepeerPerVve([a,b,c,d]).koppen.size, 2);
+    const x=_gv('A'), y=_gv('A'), z=_gv('B');
+    const {rijen}=groepeerPerVve([x,z,y]);
+    // Dezelfde objecten (een permutatie): bulk werkt verzamelingsgebaseerd op state._ntdZichtbaar.
+    eq('groepeer: permutatie, geen kopieën', rijen.every(r=>[x,y,z].includes(r)), true);
+  })();
+  eq('groepeer: lege lijst', groepeerPerVve([]).rijen.length, 0);
+  eq('groepeer: geen lijst', groepeerPerVve(null).rijen.length, 0);
+  eq('groepeer: rijen zonder code krijgen een leesbare kop',
+     [...groepeerPerVve([{..._gv(''), code:''},{..._gv(''), code:''}]).koppen.values()][0].code, 'Zonder code');
+  (() => {
+    // Groeperen gebeurt VÓÓR het pagineren: de twee X-taken op plek 0 en 29 vinden elkaar.
+    const lang=[]; for(let i=0;i<30;i++) lang.push(_gv(i===0||i===29 ? 'X' : 'C'+i));
+    const g=groepeerPerBlok(lang, ()=>0);
+    eq('groepeer vóór pagineren: de twee X-taken staan naast elkaar', [g.rijen[0].code, g.rijen[1].code], ['X','X']);
+    // De blokgrens: een taak 'in behandeling' komt nooit tussen de actieve.
+    const ib={..._gv('A'), inBehandeling:'TRUE'};
+    const g2=groepeerPerBlok([_gv('A'), ib, _gv('A')], r=>r.inBehandeling==='TRUE'?1:0);
+    eq('groepeer per blok: de actieve taken eerst, de in-behandeling erna', g2.rijen.map(r=>r.inBehandeling), ['FALSE','FALSE','TRUE']);
+    eq('groepeer per blok: alleen het actieve paar krijgt een kop', g2.koppen.size, 1);
+    const g3=groepeerPerVve([_gv('A'),_gv('A'),_gv('B')]);
+    truthy('groepeer: hoort[] wijst de leden naar hun kop', g3.hoort[0] && g3.hoort[0]===g3.hoort[1]);
+    eq('groepeer: een losse taak hoort nergens bij', g3.hoort[2], null);
+  })();
+  (() => {
+    // De te-laat-telling van de kop volgt de regel van de sectie: een CRM-vraag waarop al
+    // gereageerd is, is niet te laat — dezelfde regel als de rode rij eronder.
+    const crm=(fase)=>({..._gv('Q'), _sec:'CRM', deadline:'01-01-2020', crmFase:fase});
+    eq('groepeer CRM: te laat volgt crmReactieGegeven',
+       [...groepeerPerVve([crm('Nieuw'), crm('Wacht op reactie')]).koppen.values()][0].teLaat, 1);
+  })();
+
+  // ── De groepskop in de tabel ──
+  (() => {
+    const vA=state.activeNtd, vPg=pgs.ntd, vBulk=state.bulkMode, vStatus=state.ntdStatus;
+    const tb=document.getElementById('ntd-tbody');
+    const _blok=r=>r.inBehandeling==='TRUE'?1:0;
+    try{
+      state.bulkMode=false; state.ntdStatus='';
+      const _g1=groepeerPerBlok([_gv('A'),_gv('A'),_gv('B')],_blok);
+      renderTbody('ntd-tbody',_g1.rijen,'OPPAKKEN',1,false,false,_g1);
+      const koppen=tb.querySelectorAll('tr.grp-vve');
+      eq('groepskop: één kop voor de VvE met twee taken', koppen.length, 1);
+      truthy('groepskop: toont "2 taken hier"', koppen[0].textContent.includes('2 taken hier'));
+      eq('groepskop: geen tabstop erbij', koppen[0].querySelector('[tabindex]'), null);
+      eq('groepskop: geen data-row (niet te verwarren met een taakrij)', koppen[0].hasAttribute('data-row'), false);
+      eq('groepskop: rowheader voor een schermlezer', koppen[0].querySelector('td').getAttribute('role'), 'rowheader');
+      truthy('groepskop: de flex zit op een wikkel, niet op de td', !!koppen[0].querySelector('td > .grp-in'));
+      eq('groepskop: colspan telt alle kolommen', Number(koppen[0].querySelector('td').getAttribute('colspan')), SECS['OPPAKKEN'].cols.length+1);
+      truthy('groepskop: de kop staat direct boven zijn eerste taak',
+         koppen[0].nextElementSibling && koppen[0].nextElementSibling.getAttribute('data-row')===String(_g1.rijen[0]._row));
+      // Zonder groepering geen koppen, en exact de oude volgorde.
+      renderTbody('ntd-tbody',[_gv('A'),_gv('B'),_gv('A')],'OPPAKKEN',1,false,false,null);
+      eq('groepskop: uit betekent geen enkele kop', tb.querySelectorAll('tr.grp-vve').length, 0);
+      // In de selecteerstand schuift er een kolom vóór; de colspan moet meetellen.
+      state.bulkMode=true;
+      const _g2=groepeerPerBlok([_gv('A'),_gv('A')],_blok);
+      renderTbody('ntd-tbody',_g2.rijen,'OPPAKKEN',1,false,false,_g2);
+      eq('groepskop: colspan in de selecteerstand', Number(tb.querySelector('tr.grp-vve td').getAttribute('colspan')), SECS['OPPAKKEN'].cols.length+2);
+      state.bulkMode=false;
+      // Binnen de blokken: een VvE-kop vóór 'In behandeling' én een binnen dat blok.
+      const ib1={..._gv('A'), inBehandeling:'TRUE'}, ib2={..._gv('A'), inBehandeling:'TRUE'};
+      const _g3=groepeerPerBlok([_gv('A'),_gv('A'),ib1,ib2],_blok);
+      renderTbody('ntd-tbody',_g3.rijen,'OPPAKKEN',1,false,false,_g3);
+      const html=tb.innerHTML;
+      truthy('groepskop: het blok "In behandeling" staat er nog', html.includes('In behandeling'));
+      truthy('groepskop: en er staat een VvE-kop vóór dat blok', html.indexOf('grp-vve') > -1 && html.indexOf('grp-vve') < html.indexOf('In behandeling'));
+      eq('groepskop: én een tweede kop binnen het blok In behandeling', tb.querySelectorAll('tr.grp-vve').length, 2);
+      // Te-laat-pil, en die vervalt als het statusfilter 'te laat' aanstaat.
+      const _g5=groepeerPerBlok([_gv('L','VvE L','01-01-2020'),_gv('L','VvE L','01-01-2020')],_blok);
+      renderTbody('ntd-tbody',_g5.rijen,'OPPAKKEN',1,false,false,_g5);
+      truthy('groepskop: "2 te laat"-pil', (tb.querySelector('tr.grp-vve .grp-w')||{}).textContent==='2 te laat');
+      state.ntdStatus='telaat';
+      renderTbody('ntd-tbody',_g5.rijen,'OPPAKKEN',1,false,false,_g5);
+      eq('groepskop: geen te-laat-pil als het filter "te laat" aanstaat', tb.querySelector('tr.grp-vve .grp-w'), null);
+      state.ntdStatus='';
+      // Een groep die over een paginagrens valt herhaalt zijn kop met '· vervolg', met het
+      // aantal over de HELE groep.
+      const veel=[]; for(let i=0;i<30;i++) veel.push(_gv(i>=24 && i<=27 ? 'SPLIT' : 'U'+i));
+      const _g4=groepeerPerBlok(veel,_blok);
+      eq('groepskop: de gesplitste groep begint op index 24', !!_g4.koppen.get(24), true);
+      renderTbody('ntd-tbody',_g4.rijen,'OPPAKKEN',1,false,false,_g4);
+      truthy('groepskop: pagina 1 toont de gewone kop', ![...tb.querySelectorAll('tr.grp-vve')].some(t=>t.textContent.includes('vervolg')));
+      renderTbody('ntd-tbody',_g4.rijen,'OPPAKKEN',2,false,false,_g4);
+      const eersteKop=tb.querySelector('tr.grp-vve');
+      truthy('groepskop: pagina 2 begint met een vervolgkop', !!eersteKop && eersteKop.textContent.includes('vervolg'));
+      truthy('groepskop: en die telt de HELE groep, niet het zichtbare deel', !!eersteKop && eersteKop.textContent.includes('4 taken hier'));
+      // CRM: elke vraag heeft een uitklaprij eronder die met `tr.expanded + .crm-mail-tr` opengaat.
+      // De VvE-kop mag daar dus nooit tussen komen.
+      const crm=(code)=>({..._gv(code), _sec:'CRM', onderwerp:'vraag', crmFase:'Nieuw', afzender:'Bewoner, nr 3', mail:'tekst'});
+      const _gc=groepeerPerBlok([crm('Q'),crm('R'),crm('Q')],_blok);
+      renderTbody('ntd-tbody',_gc.rijen,'CRM',1,false,false,_gc);
+      eq('groepskop CRM: één kop', tb.querySelectorAll('tr.grp-vve').length, 1);
+      eq('groepskop CRM: colspan telt de CRM-kolommen', Number(tb.querySelector('tr.grp-vve td').getAttribute('colspan')), SECS['CRM'].cols.length+1);
+      truthy('groepskop CRM: elke uitklaprij staat direct onder zijn eigen vraag',
+         [...tb.querySelectorAll('tr.crm-mail-tr')].every(t=>t.previousElementSibling && t.previousElementSibling.hasAttribute('data-row')));
+    } finally {
+      state.activeNtd=vA; pgs.ntd=vPg; state.bulkMode=vBulk; state.ntdStatus=vStatus; setNtd(vA);
+    }
+  })();
+
+  // ── De schakelaar ──
+  (() => {
+    const wasP=state.ntdPerVve, wasS=state.ntdSort;
+    try{
+      state.ntdPerVve=true; state.ntdSort={key:null,asc:true};
+      truthy('perVveActief: aan als de pil aanstaat', perVveActief());
+      // Kolomkop-sortering WINT; anders belooft aria-sort een volgorde die de groepering breekt.
+      state.ntdSort={key:'deadline',asc:true};
+      eq('perVveActief: uit zodra er op een kolomkop gesorteerd wordt', perVveActief(), false);
+      state.ntdSort={key:null,asc:true}; state.ntdPerVve=false;
+      eq('perVveActief: uit als de pil uitstaat', perVveActief(), false);
+      // Zoeken zet hem NIET uit — 'N taken hier' blijft binnen een gefilterde lijst kloppen.
+      state.ntdPerVve=true;
+      const veld=document.getElementById('s-ntd'), wasQ=veld.value;
+      veld.value='x';
+      truthy('perVveActief: blijft aan tijdens zoeken', perVveActief());
+      veld.value=wasQ;
+    } finally { state.ntdPerVve=wasP; state.ntdSort=wasS; }
+  })();
+  (() => {
+    const was=state.ntdPerVve, wasS=state.ntdSort;
+    try{
+      state.ntdPerVve=true; state.ntdSort={key:null,asc:true}; renderNtdStats();
+      const pil=()=>document.querySelector('#ntd-kop-pillen [data-action="pervve-toggle"]');
+      truthy('schakelaar Per VvE staat in de kop-pillenrij', !!pil());
+      eq('schakelaar staat NIET in de filterbalk', !!document.querySelector('.filter-bar [data-action="pervve-toggle"]'), false);
+      eq('schakelaar heeft aria-pressed', pil() && pil().getAttribute('aria-pressed'), 'true');
+      truthy('schakelaar toont zijn aan-stand', pil() && pil().classList.contains('aan'));
+      // Sorteren roept alleen renderNtd aan (actie 'ntd-sorteer') — en tóch moet de pil dempen.
+      state.ntdSort={key:'deadline',asc:true}; renderNtd();
+      truthy('schakelaar dempt bij kolomkop-sortering, ook zonder renderNtdStats', pil() && pil().classList.contains('gedempt'));
+      state.ntdSort={key:null,asc:true}; renderNtd();
+      eq('schakelaar niet meer gedempt zonder sortering', pil() && pil().classList.contains('gedempt'), false);
+      state.ntdPerVve=false; renderNtdStats();
+      eq('schakelaar uit', pil() && pil().getAttribute('aria-pressed'), 'false');
+      // De actie zelf: zet de stand om en bewaart hem.
+      const vLs=(()=>{ try{ return localStorage.getItem('ntdPerVve'); }catch(_){ return null; } })();
+      ACTIONS['pervve-toggle'](pil());
+      eq('actie pervve-toggle zet de stand aan', state.ntdPerVve, true);
+      eq('actie pervve-toggle bewaart de stand', (()=>{ try{ return localStorage.getItem('ntdPerVve'); }catch(_){ return '1'; } })(), '1');
+      ACTIONS['pervve-toggle'](pil());
+      eq('actie pervve-toggle zet hem weer uit', state.ntdPerVve, false);
+      try{ if(vLs===null) localStorage.removeItem('ntdPerVve'); else localStorage.setItem('ntdPerVve', vLs); }catch(_){}
+    } finally { state.ntdPerVve=was; state.ntdSort=wasS; renderNtdStats(); renderNtd(); }
+  })();
+
+  // ── Groeperen in de echte lijst (renderNtd): vóór het pagineren, en state._ntdZichtbaar volgt ──
+  (() => {
+    const vOpp=D.ntd.OPPAKKEN, vA=state.activeNtd, vPg=pgs.ntd, vP=state.ntdPerVve, vS=state.ntdSort;
+    try{
+      const lijst=[]; for(let i=0;i<30;i++) lijst.push(_gv(i===0||i===29 ? 'XX' : 'R'+i, null, '0'+(1+i%9)+'-01-2030'));
+      D.ntd.OPPAKKEN=lijst; state.activeNtd='OPPAKKEN'; pgs.ntd=1; state.ntdSort={key:null,asc:true};
+      state.ntdPerVve=true;
+      const zicht=renderNtd();
+      const xx=zicht.map((r,i)=>r.code==='XX'?i:-1).filter(i=>i>-1);
+      eq('renderNtd: de twee XX-taken staan naast elkaar, over de paginagrens heen', xx[1]-xx[0], 1);
+      truthy('renderNtd: state._ntdZichtbaar is de gegroepeerde volgorde', state._ntdZichtbaar===zicht);
+      truthy('renderNtd: er staat een VvE-kop in de tabel', !!document.querySelector('#ntd-tbody tr.grp-vve'));
+      state.ntdPerVve=false;
+      renderNtd();
+      eq('renderNtd: uit → geen VvE-kop', document.querySelector('#ntd-tbody tr.grp-vve'), null);
+    } finally {
+      if(vOpp===undefined) delete D.ntd.OPPAKKEN; else D.ntd.OPPAKKEN=vOpp;
+      state.activeNtd=vA; pgs.ntd=vPg; state.ntdPerVve=vP; state.ntdSort=vS; setNtd(vA);
+    }
+  })();
+
+  // ── GEOMETRIE: de kopbalk blijft op één regel ──
+  // De pil kwam erbij in de paginakop (h1 + pillen). Een toets die alleen kijkt óf hij bestaat
+  // had op staging de regressie niet gevangen waarbij een knop de kop naar twee regels duwde.
+  // Dit meet het echt, met drie-cijferige tellingen (de breedste realistische stand). Op een
+  // venster onder 1440 is er geen eis; toetsen.py draait standaard op 1440, en met --breed 1920.
+  (() => {
+    const ntdOud=D.ntd, afOud=D.af, wasP=state.ntdPerVve;
+    const _paginaVoor=(document.querySelector('.page.active')?.id||'page-ntd').replace('page-','');
+    try{
+      const vol={}; let n=0;
+      SKEYS.forEach(s=>{ vol[s]=[]; for(let i=0;i<130;i++) vol[s].push({..._gv('G'+(i%40),null,'01-01-2020'), _sec:s, _row:20000+(++n)}); });
+      D.ntd=vol; D.af={};
+      state.ntdPerVve=true;
+      goTo('ntd'); renderNtdStats();
+      const host=document.getElementById('ntd-kop-pillen');
+      const h1=document.getElementById('page-title');
+      const kinderen=[...host.children].filter(e=>e.getBoundingClientRect().width>0);
+      if(window.innerWidth>=1440){
+        truthy(`kopbalk: de pillen zijn zichtbaar (${kinderen.length})`, kinderen.length>=6);
+        const tops=kinderen.map(e=>Math.round(e.getBoundingClientRect().top));
+        truthy(`kopbalk @${window.innerWidth}: alle pillen op één regel (tops ${[...new Set(tops)].join(',')})`,
+           Math.max(...tops)-Math.min(...tops) <= 4);
+        const hb=h1.getBoundingClientRect(), pb=host.getBoundingClientRect();
+        truthy(`kopbalk @${window.innerWidth}: titel en pillen op dezelfde regel (h1 ${Math.round(hb.top)}–${Math.round(hb.bottom)}, pillen ${Math.round(pb.top)}–${Math.round(pb.bottom)})`,
+           Math.abs((hb.top+hb.bottom)/2 - (pb.top+pb.bottom)/2) < 8 && pb.height < 34);
+        const zoek=document.getElementById('zoek-btn');
+        truthy(`kopbalk @${window.innerWidth}: de pillen lopen niet onder de knoppen rechts door (${Math.round(pb.right)} ≤ ${Math.round(zoek.getBoundingClientRect().left)})`,
+           pb.right <= zoek.getBoundingClientRect().left);
+      }
+      // De filterbalk in de kaartkop: daar komt NIETS bij. Breedte-onafhankelijk budget op de som
+      // van zijn onderdelen (op staging: 927px nodig naast de tabbladen, 969 beschikbaar op 1920).
+      const bar=document.querySelector('#ntd-card .hdr-tabs .filter-bar');
+      const delen=[...bar.children].filter(el=>el.getBoundingClientRect().width>0);
+      const nodig=delen.reduce((a,el)=>a+el.getBoundingClientRect().width+8,0)-8;
+      if(window.innerWidth>0) truthy(`kopbalk: de filterbalk blijft binnen zijn budget (${Math.round(nodig)}px van 960, ${delen.length} onderdelen)`, nodig<=960);
+    } finally {
+      D.ntd=ntdOud; D.af=afOud; state.ntdPerVve=wasP;
+      renderNtdStats(); goTo(_paginaVoor);
+    }
   })();
 
   // ══════════════════════════════════════
@@ -16500,6 +16753,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   console.log = _origLog;         // het voortgangsspoor weer los
   state._dubbelcheckUit = false;  // de testhaak weer los
   state._codecheckUit = false;
+  state.ntdPerVve = _perVveOud;   // de eigen stand van wie de suite draait (zie bovenaan)
   state._zelftestLoopt = false;
   // De schil terug in de stand waarin de suite hem aantrof (zie de removeAttribute bovenaan).
   if(_inertOud) document.getElementById('app')?.setAttribute('inert',''); else document.getElementById('app')?.removeAttribute('inert');   // de poll mag weer; de suite is klaar

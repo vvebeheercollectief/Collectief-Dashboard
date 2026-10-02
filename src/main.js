@@ -168,6 +168,10 @@ document.addEventListener('DOMContentLoaded',()=>{
 
   if(localStorage.getItem('theme')==='dark') applyTheme('dark');
   applyDensity(localStorage.getItem('density')||'standaard');
+  // Groeperen per VvE: de stand overleeft een herlading, net als de dichtheidsknop. In een
+  // afgeschermde context (privé-venster met geblokkeerde opslag) gooit localStorage; dan blijft
+  // hij gewoon uit staan.
+  try{ state.ntdPerVve = localStorage.getItem('ntdPerVve')==='1'; }catch(_){}
 
   document.querySelectorAll('.ni[data-page]').forEach(el=>
     el.addEventListener('click',()=>goTo(el.dataset.page)));

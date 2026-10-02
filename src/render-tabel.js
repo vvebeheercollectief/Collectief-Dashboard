@@ -116,7 +116,36 @@ function renderThead(id,cols,css,sort,breedtes){
   }).join('')}</tr>`;
 }
 
-function renderTbody(tbodyId,rows,sec,page,isAf,filtered){
+// De kopregel boven de taken van één VvE (groeperen per VvE, zie groepeerPerVve in util.js).
+//
+// GEEN tabindex en geen role="button": de kop is niet klikbaar, en tien koppen met een tabstop
+// ertussen maken de lijst met het toetsenbord onbruikbaar — te meer omdat de tbody elke acht
+// seconden hertekend wordt. `role="rowheader"` kost niets en geeft een schermlezer wél het
+// verband met de rijen eronder.
+//
+// De flex staat op de WIKKEL en niet op de <td>: display:flex op een td haalt hem uit de
+// tabelopmaak, de browser wikkelt er een anonieme cel omheen, de colspan telt niet meer mee en de
+// kopband klapt terug naar de breedte van kolom 1.
+//
+// 'taken hier' en niet 'taken': het getal gaat over de ZICHTBARE lijst. Staat er een filter aan,
+// dan is het kleiner dan wat de VvE werkelijk open heeft. Het staat in de zichtbare tekst en niet
+// alleen in een title — op een telefoon is er geen hover en met het toetsenbord is title
+// onbereikbaar.
+function vveGroepKop(k, cols, vervolg){
+  // De te-laat-pil vervalt als het statusfilter 'te laat' aanstaat: dan is élke zichtbare rij te
+  // laat en zou er twee keer hetzelfde getal op de kop staan.
+  const pil = (k.teLaat>0 && state.ntdStatus!=='telaat')
+    ? `<span class="grp-w">${k.teLaat} te laat</span>` : '';
+  return `<tr class="grp-kop grp-vve"><td colspan="${cols}" role="rowheader"><div class="grp-in">`
+       + `<span class="grp-cd">${esc(k.code)}</span>`
+       + `<span class="grp-nm">${esc(k.naam)}</span>`
+       + `<span class="grp-ct">${k.aantal} ${k.aantal===1?'taak':'taken'} hier${vervolg?' · vervolg':''}</span>${pil}`
+       + `</div></td></tr>`;
+}
+
+// `grp` (optioneel) = de uitkomst van groepeerPerBlok, met `koppen` en `hoort` gesleuteld op de
+// index in de VOLLEDIGE lijst `rows` — groeperen gebeurt vóór het pagineren (zie renderNtd).
+function renderTbody(tbodyId,rows,sec,page,isAf,filtered,grp){
   // Clamp de pagina: krimpt de dataset (bv. collega haalt rijen weg) tot onder het
   // huidige paginanummer, dan toonden we anders een lege lijst terwijl er wél data is.
   const p=Math.min(Math.max(1,page),Math.max(1,Math.ceil(rows.length/PG)));
@@ -135,21 +164,34 @@ function renderTbody(tbodyId,rows,sec,page,isAf,filtered){
   if(isAf){el.innerHTML=sl.map(r=>rowAf(r,sec)).join('');return}
   // Drie groepen (Fase 4): actief / in behandeling / weggelegd
   const grpOf = r => opvolgStatus(r).weggelegd ? 2 : (r.inBehandeling==='TRUE' ? 1 : 0);
-  const main=sl.filter(r=>grpOf(r)===0);
-  const ib=sl.filter(r=>grpOf(r)===1);
-  const wg=sl.filter(r=>grpOf(r)===2);
   // Groeptellingen over álle pagina's i.p.v. alleen de huidige slice.
   const ibAll=rows.filter(r=>grpOf(r)===1).length, wgAll=rows.filter(r=>grpOf(r)===2).length;
   const cols=SECS[sec].cols.length+1+(state.bulkMode?1:0);
-  let html=main.map(r=>rowNtd(r,sec)).join('');
-  if(ib.length){
-    html+=`<tr><td colspan="${cols}" class="grp-kop">${ico('chevronRechts',12)} In behandeling (${ibAll})</td></tr>`;
-    html+=ib.map(r=>rowNtd(r,sec)).join('');
-  }
-  if(wg.length){
-    html+=`<tr><td colspan="${cols}" class="grp-kop">${ico('pauze',12)} Weggelegd (${wgAll}) — komt terug op de opvolgdatum</td></tr>`;
-    html+=wg.map(r=>rowNtd(r,sec)).join('');
-  }
+  // De drie blokken staan in de volgorde actief / in behandeling / weggelegd. Zonder groepering
+  // filteren we elk blok apart uit de pagina, precies zoals altijd. MET groepering is de lijst al
+  // blok-geordend (groepeerPerBlok) en lopen we hem één keer door: de blokkop komt waar het blok
+  // wisselt, en alleen zo staan de VvE-koppen op hun juiste plek ertussen.
+  const koppen=(grp&&grp.koppen)||new Map(), hoort=(grp&&grp.hoort)||[];
+  const volgorde = koppen.size ? sl : [0,1,2].flatMap(b=>sl.filter(r=>grpOf(r)===b));
+  const begin=(p-1)*PG;
+  let html='', vorigBlok=0;
+  volgorde.forEach((r,j)=>{
+    const b=grpOf(r);
+    if(b!==vorigBlok){
+      if(b===1) html+=`<tr><td colspan="${cols}" class="grp-kop">${ico('chevronRechts',12)} In behandeling (${ibAll})</td></tr>`;
+      if(b===2) html+=`<tr><td colspan="${cols}" class="grp-kop">${ico('pauze',12)} Weggelegd (${wgAll}) — komt terug op de opvolgdatum</td></tr>`;
+      vorigBlok=b;
+    }
+    if(koppen.size){
+      const i=begin+j, k=koppen.get(i);
+      if(k) html+=vveGroepKop(k,cols,false);
+      // Begint deze pagina MIDDEN in een groep, dan herhaalt de kop zich met '· vervolg'. Het
+      // aantal gaat over de hele groep, niet over het zichtbare deel — anders zegt de vervolgkop
+      // '1 taak hier' voor een groep van vier.
+      else if(j===0 && hoort[i]) html+=vveGroepKop(hoort[i],cols,true);
+    }
+    html+=rowNtd(r,sec);
+  });
   el.innerHTML=html;
 }
 

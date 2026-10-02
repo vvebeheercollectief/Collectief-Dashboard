@@ -2088,3 +2088,25 @@ tr.expanded + .crm-mail-tr{display:table-row}
 #hist-body .log-r{padding:4px 6px}
 #hist-body .log-tx{font-size:12.5px}
 .hist-veld{display:block;font-size:11px;color:var(--mut);margin-bottom:1px}
+
+/* ── Groeperen per VvE ─────────────────────────────────────────────────────────────────────
+   De koppen volgen de dichtheidsknop. `.grp-kop` stond op vaste padding en luisterde niet naar
+   --row-py/--row-px; bij tien groepen kost dat in de compacte stand ~300px die de compacte
+   gebruiker juist niet wilde. Alleen de HOOGTE volgt; de inspringing van 26px van de blokkoppen
+   ('In behandeling', 'Weggelegd') blijft zoals hij was. */
+.grp-kop{padding-top:var(--row-py,9px);padding-bottom:var(--row-py,9px)}
+/* Border-top en géén cursor:pointer: `.bdl-paneel` gebruikt dezelfde --group-bg en ÍS
+   uitklapbaar. Zonder onderscheid nodigt deze kop uit tot een klik die niets doet. */
+.grp-vve td{border-top:1px solid var(--bor)}
+/* De flex op de WIKKEL, niet op de td — zie de toelichting bij vveGroepKop. */
+.grp-in{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.grp-cd{font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--ac)}
+.grp-nm{font-size:12.5px;font-weight:700;color:var(--txt);text-transform:none;letter-spacing:0}
+.grp-ct{font-size:11px;font-weight:600;color:var(--mut);text-transform:none;letter-spacing:0}
+.grp-w{font-size:10.5px;font-weight:700;color:var(--sig-crit);background:var(--rd-l);border:1px solid var(--rd-b);padding:1px 6px;border-radius:999px;text-transform:none;letter-spacing:0}
+/* 'Per VvE' als pil in de kop, naast 'te laat' en 'weggelegd'. Leiblauw i.p.v. rood/amber: die
+   twee zijn signalen, dit is een manier van kijken. Gedempt zodra kolomkop-sortering de
+   groepering tijdelijk overneemt — anders lijkt de pil stuk. */
+.kop-pil-klik.pil-vve{border-color:var(--ac-b)}
+.kop-pil-klik.aan.pil-vve{background:var(--ac);border-color:var(--ac);color:#fff}
+.kop-pil-klik.pil-vve.gedempt{opacity:.5}

@@ -68,6 +68,14 @@ export const ACTIONS = {
                                      state.ntdStatus = state.ntdStatus===s ? '' : s;
                                      pgs.ntd=1; renderNtd(); renderNtdStats(); },
   'ntd-kop-toggle':        ()   => zetKopOpen(!kopOpen()),
+  // Groeperen per VvE aan/uit. Puur weergave: er wordt niets geschreven, dus geen poorten.
+  // Ook de statregel opnieuw: de pil ZIT daarin. Die tekent hij opnieuw (innerHTML), dus de focus
+  // gaat terug naar de nieuwe pil — anders valt een toetsenbordgebruiker na Enter terug op <body>.
+  'pervve-toggle':         (el) => { const hadFocus=document.activeElement===el;
+                                     state.ntdPerVve = !state.ntdPerVve;
+                                     try{ localStorage.setItem('ntdPerVve', state.ntdPerVve?'1':'0'); }catch(_){}
+                                     pgs.ntd=1; renderNtdStats(); renderNtd();
+                                     if(hadFocus) document.querySelector('#ntd-kop-pillen [data-action="pervve-toggle"]')?.focus(); },
   // Chevron op de kop-rij van een bundel, en het bundel-merkje op een lid ervan. Allebei niets meer dan
   // de sleutel doorgeven: het normaliseren én het omschakelen gebeuren in render-lijsten.js, zodat
   // lezen en schrijven van `state.bundelOpen` gegarandeerd dezelfde sleutel gebruiken.

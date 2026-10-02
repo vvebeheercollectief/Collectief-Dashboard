@@ -3,7 +3,7 @@
 //  + re-export van render-offerte / render-alv / render-tabel (publieke interface stabiel).
 //  Batch D / punt 11: offerte/ALV/tabel-render zijn naar eigen modules verplaatst.
 // ══════════════════════════════════════
-import { esc, filt, NIET_ZOEKBAAR, berekenPrioriteit, teLaatVoorTelling, crmReactieGegeven, parseDt, opvolgStatus, _vandaagAmsterdam, toISODate, isoWeek, vveCodeSpan, splitBehandelaar, periodeBereik, AF_PERIODES, parseAannemers } from "./util.js";
+import { groepeerPerBlok, esc, filt, NIET_ZOEKBAAR, berekenPrioriteit, teLaatVoorTelling, crmReactieGegeven, parseDt, opvolgStatus, _vandaagAmsterdam, toISODate, isoWeek, vveCodeSpan, splitBehandelaar, periodeBereik, AF_PERIODES, parseAannemers } from "./util.js";
 import { rijSleutel } from "./rij.js";
 import { SECS, SKEYS, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
@@ -59,11 +59,21 @@ function renderNtdStats(){
   const paneelOpen=kopOpen();
   const chev=`<button type="button" class="kop-chev" data-action="ntd-kop-toggle" aria-expanded="${paneelOpen}" aria-controls="ntd-top-row" aria-label="${paneelOpen?'Details verbergen':'Week en vergaderingen tonen'}" title="${paneelOpen?'Details verbergen':'Week en vergaderingen tonen'}">${CHEV_SVG}</button>`;
 
+  // 'Per VvE' staat HIER en niet in de filterbalk. Gemeten op staging bij een venster van 1920:
+  // die balk houdt naast de tabbladen nog 42px over, en de knop kostte er 103 — de kaartkop brak
+  // daardoor naar twee regels, precies de dubbele regel die v11.7/v11.8 heeft weggehaald. Deze rij
+  // heeft ruimte, en 'te laat' en 'weggelegd' staan er al als aan/uit-knop. Leiblauw in plaats van
+  // rood/amber: die twee zijn signalen, dit is een manier van kijken.
+  const pv=perVvePilStand();
+  const pervve=`<button type="button" class="kop-pil kop-pil-klik pil-vve${pv.aan?' aan':''}${pv.gedempt?' gedempt':''}" `+
+    `data-action="pervve-toggle" aria-pressed="${pv.aan}" title="${pv.titel}">Per VvE</button>`;
+
   host.innerHTML=
     plat(open,'open')+
     knop(telaat,'te laat','pil-rd','telaat')+
     knop(weg,'weggelegd','pil-am','weggelegd')+
     plat(afVandaag,'af','pil-dof')+
+    pervve+
     chev;
 
   renderNtdWeek();
@@ -388,24 +398,37 @@ function renderNtd(){
   renderThead('ntd-thead',[...(state.bulkMode?[allesVinkjeHtml(zichtbaar)]:[]),...SECS[state.activeNtd].cols,''],SECS[state.activeNtd].css,
     {active:state.ntdSort, keyFor:ntdSorteerKey},
     [...(state.bulkMode?['48px']:[]),...(SECS[state.activeNtd].breedtes||[])]);
-  renderTbody('ntd-tbody',zichtbaar,state.activeNtd,pgs.ntd,false,erIsGefilterd(filters));
+  // Groeperen per VvE staat HIER en niet in renderTbody: dit is de lijst waar de paginering
+  // overheen loopt, waar `state._ntdZichtbaar` (bulk) uit komt en waar `ntdPagina` mee rekent.
+  // Groepeerde je pas binnen één pagina, dan zouden twee taken van dezelfde VvE die toevallig op
+  // pagina 1 en 2 staan elkaar nooit vinden. De groepering is een permutatie van `zichtbaar`
+  // (dezelfde objecten), dus bulk en bundels blijven gewoon werken.
+  const grp = perVveActief()
+    ? groepeerPerBlok(zichtbaar, r => opvolgStatus(r).weggelegd ? 2 : (r.inBehandeling==='TRUE' ? 1 : 0))
+    : { rijen: zichtbaar, koppen: new Map(), hoort: [] };
+  renderTbody('ntd-tbody',grp.rijen,state.activeNtd,pgs.ntd,false,erIsGefilterd(filters),grp);
+  // De pil dempt zodra kolomkop-sortering de groepering overneemt. Die stand hangt aan ELKE
+  // hertekening (sorteren roept alleen renderNtd aan, niet renderNtdStats), dus hier bijwerken.
+  zetPerVvePil();
   // Dezelfde lijst die hierboven over de pagina's verdeeld is, ook op state — daar leest
   // 'alles selecteren' hem. Bewust hier en niet in `renderTbody`: die krijgt alleen de rijen van
   // ÉÉN pagina, en 'alles' moet juist over de paginagrens heen gaan.
   // En bewust ná `renderTbody`: gooit het tekenen, dan hoort 'alles selecteren' niet te werken op
   // een lijst die nooit in beeld is gekomen (zie de catch rond renderAll in data.js).
-  state._ntdZichtbaar=zichtbaar;
-  renderPag('ntd-pag',zichtbaar.length,pgs.ntd,'ntd');
+  // De gegroepeerde volgorde, want dat is wat er getekend staat: 'alles selecteren' en
+  // `ntdPagina` moeten met dezelfde lijst rekenen als het scherm toont.
+  state._ntdZichtbaar=grp.rijen;
+  renderPag('ntd-pag',grp.rijen.length,pgs.ntd,'ntd');
   renderNtdCrossList(state.activeNtd);
   // Werd er een aannemersnaam aangepast, dan is dat invoerveld hierboven vervangen door een NIEUW
   // element en is de cursor eruit gesprongen. Dit zet hem terug. Bewust hier en niet in
   // renderTbody: de poll tekent elke acht seconden opnieuw zodra een collega iets wijzigt, en dat
   // mag je niet merken terwijl je aan het typen bent.
   herstelAannemerFocus(_aannNieuw);
-  // De getekende lijst gaat terug naar de aanroeper: na filteren, sorteren én absorberen, dus in
-  // exact de volgorde waarin de rijen op de pagina's verdeeld worden. `springNaarBundel` zoekt er
-  // de pagina van de kop mee op zonder die hele pijplijn na te bouwen.
-  return zichtbaar;
+  // De getekende lijst gaat terug naar de aanroeper: na filteren, sorteren, absorberen én
+  // groeperen, dus in exact de volgorde waarin de rijen op de pagina's verdeeld worden.
+  // `springNaarBundel` zoekt er de pagina van de kop mee op zonder die hele pijplijn na te bouwen.
+  return grp.rijen;
 }
 // Cross-list (bug #2): taken die fysiek in een ándere sectie staan maar via hun
 // Subcategorie-veld óók bij dit scherm horen. We tonen ze als apart lijstje onderaan
@@ -550,6 +573,35 @@ function filterNtd(rows,q,fCode,beh,prio,sec,status){
   });
 }
 
+// Groeperen per VvE is aan als de pil aanstaat ÉN er niet op een kolomkop gesorteerd wordt.
+// Sortering wint: `aria-sort="ascending"` op de kop belooft anders een volgorde die de groepering
+// breekt, en `sorteerNtd` legt expliciet vast dat een taak zonder deadline altijd onderaan hoort.
+// Zoeken en filteren zetten hem NIET uit — anders dan de bundelstapel — want de kop zegt 'N taken
+// hier' en dat blijft binnen een gefilterde lijst gewoon kloppen. Geldt op alle zes de tabbladen,
+// CRM inbegrepen: ook daar staan meerdere vragen van één VvE, en de te-laat-telling van de kop
+// volgt de CRM-regel (teLaatVoorTelling met crmReactieGegeven).
+function perVveActief(){
+  return !!state.ntdPerVve && !(state.ntdSort && state.ntdSort.key);
+}
+
+// Hoe de pil 'Per VvE' erbij staat. Eén bron voor renderNtdStats (die hem tekent) en zetPerVvePil
+// (die hem na elke renderNtd bijwerkt). GEDEMPT = de stand staat aan, maar kolomkop-sortering
+// heeft de groepering tijdelijk overgenomen — zonder die aanwijzing lijkt de pil stuk.
+function perVvePilStand(){
+  const aan=!!state.ntdPerVve, gedempt=aan && !perVveActief();
+  return { aan, gedempt,
+    titel: gedempt ? 'Staat uit zolang er op een kolomkop gesorteerd wordt'
+         : aan ? 'Groepering uitzetten' : 'Taken van dezelfde VvE bij elkaar zetten' };
+}
+function zetPerVvePil(){
+  const b=document.querySelector('#ntd-kop-pillen [data-action="pervve-toggle"]'); if(!b) return;
+  const pv=perVvePilStand();
+  b.classList.toggle('aan', pv.aan);
+  b.classList.toggle('gedempt', pv.gedempt);
+  b.setAttribute('aria-pressed', String(pv.aan));
+  b.title=pv.titel;
+}
+
 // Welke kolomkoppen zijn sorteerbaar? 'VvE Code' → code; elke 'Deadline…'-kop → deadline.
 function ntdSorteerKey(lbl){
   // 'Wacht' (CRM) sorteert op de deadline: die is ontvangen + 5 werkdagen, dus dezelfde volgorde als
@@ -690,6 +742,7 @@ export {
   renderNtdStats, renderNtdDonut, renderNtd, setNtd, ntdPagina, filterNtd, sorteerNtd, ntdSorteerKey, renderAf, setAf, hangAfMailAan,
   filterAf, afFilterWaarden, vulPeriodeKeuze,
   kopOpen, zetKopOpen, toggleBundel, springNaarBundel, wisNtdFilters, absorbeer, isPlatteWeergave, erIsGefilterd,
+  perVveActief,
   offerteAannemerPaneel, offerteAannSamenvatting,
   ALVO_ICONS, renderAlvo, ALVO_COLS, ALVO_LABELS, flagPill, _recomputeAlvoStatus, toggleAlvoFlag, statusIco, renderAlfa,
   renderThead, renderTbody, bepaalStil, bouwStilIndex, _zetStilIndex, deadlineCel, rowNtd, rowAf, renderPag,

@@ -46,18 +46,18 @@ function backgroundWrite(writeFn, rollback, foutTitel){
       try{ rollback(); renderAll(); }catch(_){}
       const msg=(e.message||'').toLowerCase();
       if(e&&e.offline){
-        showToast(foutTitel,'Geen verbinding — de wijziging is teruggezet. Probeer het opnieuw zodra je weer online bent.','var(--rd)');
+        showToast(foutTitel,'Geen verbinding — de wijziging is teruggezet. Probeer het opnieuw zodra je weer online bent.','var(--rd)',null,{blijft:true});
       }else if(e&&e.rowMismatch){
         // De Sheet is tussentijds gewijzigd op een manier die deze schrijfactie onveilig maakt —
         // de doelrij is verschoven of iemand heeft de taak aangepast (assertRowsMatch), of de
         // doeltaak zit intussen zelf in een bundel (koppelTaak). Niet geschreven, teruggedraaid;
         // de melding komt van de werper, want alleen die weet wát er mis was.
-        showToast(foutTitel, e.melding || 'De lijst was net gewijzigd — opnieuw geladen, probeer nog eens.','var(--rd)');
+        showToast(foutTitel, e.melding || 'De lijst was net gewijzigd — opnieuw geladen, probeer nog eens.','var(--rd)',null,{blijft:true});
       }else if(msg.includes('authentication')||msg.includes('unauthenticated')||msg.includes('unauthorized')){
         state.oauthToken=null;state.oauthExpiry=0;
-        showToast(foutTitel,'Sessie verlopen — wijziging teruggezet. Probeer opnieuw.','var(--rd)');
+        showToast(foutTitel,'Sessie verlopen — wijziging teruggezet. Probeer opnieuw.','var(--rd)',null,{blijft:true});
       }else{
-        showToast(foutTitel,'Niet opgeslagen — wijziging teruggezet.','var(--rd)');
+        showToast(foutTitel,'Niet opgeslagen — wijziging teruggezet.','var(--rd)',null,{blijft:true});
       }
       console.error(foutTitel,e);
     }finally{

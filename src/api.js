@@ -325,7 +325,10 @@ async function askChat(system, messages){
 //   N  escalatie   — alleen door Apps Script geschreven; cd_opvolgingMotor stempelt hem élke
 //                    ochtend ±06:30. Meenemen zou stil álle schrijfacties blokkeren op precies
 //                    de taken die het langst stilliggen.
-//   F  prioriteit  — cd_recalcPrioriteiten herschrijft die dagelijks (alleen OPPAKKEN)
+//   F  prioriteit  — werd vroeger dagelijks door cd_recalcPrioriteiten herschreven; die job doet sinds
+//                    2026-10-02 niets meer (AutoPrioriteit.gs). Het dashboard rekent de prioriteit
+//                    live uit de deadline (berekenPrioriteit) en leest F nergens: identiteit hoort er
+//                    dus nog steeds niet op te leunen.
 //   L  opvolgdatum — door de opvolgmotor geschreven
 //   I,J            — afvink-selectievakje / ongebruikt; dragen TRUE/FALSE-erfenis
 //   O,P            — offerte-fase en aannemerslijst; voegen niets toe aan identiteit. P's

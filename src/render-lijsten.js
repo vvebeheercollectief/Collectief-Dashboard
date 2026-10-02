@@ -715,9 +715,13 @@ function renderAf(){
   // AF_POLL in data.js), dus de mail komt hier op verzoek binnen: eerst wat er al opgehaald is aan
   // de rijen hangen, dan (hoogstens één keer per minuut) een verse lezing vragen — die tekent zelf
   // opnieuw zodra hij binnen is.
+  // Alleen als de Afgerond-pagina ZICHTBAAR is. Het zoekveld houdt zijn tekst ook als je naar een
+  // andere pagina gaat, en renderAf liep tot nu toe bij elke renderAll mee — dan haalde elke
+  // datawijziging eens per minuut 'Afgerond'!Q:W op voor een lijst die niemand zag (review
+  // 2026-10-02). Bij het openen van de pagina tekent goTo hem opnieuw, en dan gaat de vraag alsnog.
   if(f.q && (D.af.CRM||[]).length){
     if(state._afMail) hangAfMailAan(D.af.CRM, state._afMail);
-    vraagAfMailOp();
+    if(document.getElementById('page-af')?.classList.contains('active')) vraagAfMailOp();
   }
   const rows=filterAf(D.af[state.activeAf]||[],f);
   // De lege-lijst-tekst moet weten dát er gefilterd is, anders leest 'niets gevonden' als 'er is

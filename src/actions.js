@@ -258,7 +258,7 @@ export const ACTIONS = {
 export function voerActieUit(fn, el, e) {
   const meld = (err) => {
     console.error('[actie]', el && el.dataset && el.dataset.action, err);
-    showToast('Dat lukte niet', leesbareFout(err), 'var(--rd)', 'waarschuwing', { geenSysteemmelding: true });
+    showToast('Dat lukte niet', leesbareFout(err), 'var(--rd)', 'waarschuwing', { geenSysteemmelding: true, blijft: true });
   };
   try {
     const uit = fn(el, e);

@@ -275,7 +275,7 @@ function logout(reden){
   try{ document.getElementById('chat-bg')?.classList.remove('open'); }catch(_){}
   state._chatHistorie=null; state._chatVve=null; state._chatBezig=false;
   state.editMode=false; state.editRowData=null; state.editFoto=null; state.editSec=null;
-  state._completeRow=null; state._completeRid=null;
+  state._completeRow=null; state._completeRid=null; state._completeNotitie=null;
   // Het inlogscherm is een `position:fixed`-overlay: hij dekt het dashboard alleen VISUEEL af.
   // Zonder `inert` bleven alle knoppen erachter met Tab bereikbaar én klikbaar via het
   // toetsenbord — dertig stuks, gemeten — en die knoppen doen echte dingen (verversen, een taak
@@ -289,15 +289,17 @@ function logout(reden){
   if(errEl && reden){ errEl.textContent=reden; errEl.style.display='block'; }
 }
 
-// De uitlogknop (zijbalk). `logout` ruimt de sessie, de leescache en de schermstand op; dit trekt
-// daarnaast het token bij Google in. Zonder dat bleef het tot een uur geldig — op een gedeelde
-// computer kon wie de sessie in handen kreeg er nog mee lezen en schrijven. Het token eerst
-// vastpakken: `logout` zet hem op null. Intrekken is netwerkverkeer en mag het uitloggen niet
-// ophouden of laten mislukken; het lokale deel is dan al gedaan.
+// De uitlogknop (zijbalk). Uitloggen is LOKAAL: `logout` gooit het token uit het geheugen en uit
+// sessionStorage, wist de leescache en de schermstand en zet het inlogscherm terug. Het token NIET
+// bij Google intrekken (`google.accounts.oauth2.revoke`): dat trekt de toestemming van de
+// gebruiker voor deze client op ALLE apparaten in — de telefoon en een tweede tabblad kregen dan
+// een 401 en moesten opnieuw toestemming geven (review 2026-10-02). Een achtergebleven token is
+// hooguit een uur geldig en staat na deze uitlog nergens meer in deze browser.
+// Stil opnieuw hetzelfde account inloggen kan daarna niet: de inlogknop roept `doOAuth(true)`,
+// en die vraagt het token zonder `prompt:''` aan — GIS toont dan de accountkiezer. One Tap
+// (`google.accounts.id`, met zijn auto-select) gebruikt deze app niet.
 function uitloggen(){
-  const token=state.oauthToken;
   logout();
-  if(token){ try{ google.accounts.oauth2.revoke(token, ()=>{}); }catch(_){} }
 }
 
 export { doOAuth, fetchUserEmail, doLogin, ensureToken, logout, uitloggen, _wisTokenSessie };

@@ -44,7 +44,7 @@ async function _bewaar(r, vorige){
   if(!await ensureToken()){
     r.aannemers=vorige; renderNtd();
     showToast('Niet opgeslagen','Inloggen mislukt — de aannemerslijst staat weer zoals hij was',
-              'var(--rd)',null,{geenDedup:true});
+              'var(--rd)',null,{geenDedup:true, blijft:true});
     return;
   }
   let gedaan=false;
@@ -215,7 +215,7 @@ async function _schrijfOpvolg(r, nieuw, oud, actie, metUndo){
     // Richtingneutraal geformuleerd ('niet gewijzigd'): deze functie is ook de terugweg van de
     // undo, en dáár is 'staat nog zoals hij was' precies de waarde die NIET bereikt is.
     showToast('Niet opgeslagen','Inloggen mislukt — de opvolgdatum is niet gewijzigd',
-              'var(--rd)',null,{geenDedup:true});
+              'var(--rd)',null,{geenDedup:true, blijft:true});
     return;
   }
   r.deadline=nieuw; renderNtd();

@@ -107,7 +107,7 @@ async function toggleAlvoFlag(idx,field,code){
   if(kode && (!r || (r.code||'').trim()!==kode)) r=D.alvo.find(x=>(x.code||'').trim()===kode)||null;
   if(!r){console.warn('toggleAlvoFlag: rij niet gevonden',idx,kode);return}
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
-  if(!await ensureToken()){showToast('Niet ingelogd','Kan wijziging niet opslaan','var(--rd)');return}
+  if(!await ensureToken()){showToast('Niet ingelogd','Kan wijziging niet opslaan','var(--rd)',null,{blijft:true});return}
 
   // Dubbelklik-rem. De oude rem was een class op de knop, maar renderAlvo() hieronder
   // herschrijft de hele tabel en gooit die knop meteen weg — de rem leefde nul
@@ -238,7 +238,7 @@ async function toggleAlvoFlag(idx,field,code){
     r.status=oldStatus;
     renderAlvo();
     renderNtdDonut();
-    showToast('Opslaan mislukt',e.message||'Onbekende fout','var(--rd)');
+    showToast('Opslaan mislukt',e.message||'Onbekende fout','var(--rd)',null,{blijft:true});
     console.error('toggleAlvoFlag fout:',e);
   }finally{
     state._alvoFlagBezig.delete(sleutel);

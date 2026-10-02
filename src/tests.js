@@ -20,7 +20,7 @@ import { sheetsFetch, NTD_OMSCHRIJVING, _isTransient, _rowMismatch, _a1Bereik, _
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, serieleWrite, POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, showLoadError, clearLoadError, syncSelecteerStand, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
-import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _eindKolom, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, getAfInsertRow, OMSCHRIJVING_VELD, zetOmschrijving, _sheetBreedtes, getSheetIds, bevestigInvoegPlek, _naamBijCode, _zetNaamVeld, taakUitCache, kiesSectie, deleteTaskRow, deleteCurrentEditTask, completeCurrentEditTask, renderExtraVves, toonMeerVve, zetDeadlineVoorstel, herzieAlsSubtaak, kiesDuur, gekozenDuur, wisDuurKeuze, nietOpgeslagenVelden, offerteAanvraagGewijzigd } from "./crud.js";
+import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _eindKolom, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, getAfInsertRow, OMSCHRIJVING_VELD, zetOmschrijving, _sheetBreedtes, getSheetIds, bevestigInvoegPlek, _naamBijCode, _zetNaamVeld, taakUitCache, kiesSectie, deleteTaskRow, deleteCurrentEditTask, completeCurrentEditTask, renderExtraVves, toonMeerVve, zetDeadlineVoorstel, herzieAlsSubtaak, kiesDuur, gekozenDuur, wisDuurKeuze, nietOpgeslagenVelden, offerteAanvraagGewijzigd, modalGewijzigd } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
 import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages, renderChat } from "./dossier-chat.js";
 import { shouldPromptReload, maakHerlaadKern, zelfdeWorker } from "./sw-update.js";
@@ -8534,6 +8534,10 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       ACTIONS['bundel-nieuw']({ dataset:{ bundel:'Tkop' } });
       eq('nieuw: een bundel van één lid krijgt er wél een subtaak bij',
          state._nieuwBundel, { bundelId:'Tkop', volg:'10' });
+      // Het scherm is net open en de gebruiker heeft niets veranderd: sluiten mag niet vragen of
+      // er wijzigingen weg moeten (herzieAlsSubtaak leegt de deadline ná de foto van openModal).
+      eq('nieuw: een net geopende subtaak geldt niet als gewijzigd (geen vals "weggooien?")',
+         modalGewijzigd(), false);
     } finally {
       D.ntd = bewaardNtd; D.af = bewaardAf; pgs.ntd = bewaardPg;
       state.bundelOpen = new Set(); state._nieuwBundel = null;
@@ -16392,7 +16396,8 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       }
     }
     {
-      // Uitloggen trekt het token in bij Google.
+      // Uitloggen is lokaal: het token wordt NIET bij Google ingetrokken (dat trok de toestemming
+      // op alle apparaten in), maar is na de uitlog wel overal in deze browser weg.
       const AUTH = await import('./auth.js');
       const tokenOud=state.oauthToken, expOud=state.oauthExpiry, mailOud=state.currentUserEmail, gOud=window.google;
       const gateOud=document.getElementById('login-gate')?.style.display;
@@ -16400,9 +16405,11 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       try{
         truthy('uitloggen: er is een knop in de zijbalk', !!document.querySelector('.sb-foot #uitlog-btn'));
         window.google={ accounts:{ oauth2:{ revoke:(t)=>{ ingetrokken=t; } } } };
-        state.oauthToken='te-intrekken'; state.oauthExpiry=Date.now()+3600e3; state.currentUserEmail='test@vvebeheercollectief.nl';
+        state.oauthToken='niet-intrekken'; state.oauthExpiry=Date.now()+3600e3; state.currentUserEmail='test@vvebeheercollectief.nl';
+        sessionStorage.setItem('oauthToken','niet-intrekken');
         AUTH.uitloggen();
-        eq('uitloggen: het token wordt bij Google ingetrokken', ingetrokken, 'te-intrekken');
+        eq('uitloggen: het token wordt NIET bij Google ingetrokken (toestemming op andere apparaten blijft)', ingetrokken, null);
+        eq('uitloggen: de inlogkaart staat weer', document.getElementById('login-gate')?.style.display, '');
         eq('uitloggen: en is lokaal weg', [state.oauthToken, sessionStorage.getItem('oauthToken')], [null, null]);
       } finally {
         window.google=gOud;
@@ -16447,9 +16454,22 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       eq('toast: aanwijzen zet de aftelbalk stil', bar.style.animationPlayState, 'paused');
       gewoon.dispatchEvent(new MouseEvent('mouseleave'));
       eq('toast: weggaan laat hem weer lopen', bar.style.animationPlayState, 'running');
-      N.showToast('Opslaan mislukt', 'Niet opgeslagen — wijziging teruggezet.', 'var(--rd)', null, { geenDedup:true, geenSysteemmelding:true });
+      N.showToast('Opslaan mislukt', 'Niet opgeslagen — wijziging teruggezet.', 'var(--rd)', null, { geenDedup:true, geenSysteemmelding:true, blijft:true });
       const rood = document.querySelector('#toast-container .toast:last-child');
-      eq('toast: een rode melding heeft geen aftelbalk (blijft tot hij weggeklikt wordt)', rood.querySelectorAll('.toast-bar').length, 0);
+      eq('toast: een schrijffout heeft geen aftelbalk (blijft tot hij weggeklikt wordt)', rood.querySelectorAll('.toast-bar').length, 0);
+      // Maar niet élke rode melding: 'Geen verbinding' komt bij elke klik opnieuw (geenDedup), en een
+      // escalatie of 'Taak niet gevonden' is geen schrijffout. Die verdwijnen gewoon vanzelf.
+      N.showToast('Geen verbinding', 'Wijzigen lukt niet zonder internet.', 'var(--rd)', 'waarschuwing', { geenDedup:true, geenSysteemmelding:true });
+      eq('toast: een rode melding zonder blijft:true loopt gewoon af', document.querySelector('#toast-container .toast:last-child').querySelectorAll('.toast-bar').length, 1);
+      // De schrijfweg zelf (backgroundWrite) zet hem wél vast.
+      {
+        const DA = await import('./data.js');
+        const errOud = console.error; console.error = () => {};
+        try { await DA.backgroundWrite(async () => { throw new Error('kapot'); }, () => {}, 'Opslaan mislukt'); }
+        finally { console.error = errOud; }
+        const t = [...document.querySelectorAll('#toast-container .toast')].pop();
+        eq('toast: een mislukte backgroundWrite blijft staan', [t.querySelector('.toast-title').textContent, t.querySelectorAll('.toast-bar').length], ['Opslaan mislukt', 0]);
+      }
       // De klok zelf, met een korte duur zodat de toets niet seconden hoeft te wachten.
       const nep = document.createElement('div'); nep.className = 'toast';
       document.getElementById('toast-container').appendChild(nep);
@@ -16747,6 +16767,155 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       document.querySelectorAll('#toast-container .toast').forEach(x=>x.remove());
       document.querySelectorAll('.load-err').forEach(b=>b.remove());
       document.getElementById('dot').className='dot';
+    }
+  })();
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  REVIEW 02-10-2026 — nalopen op de reparaties van vandaag
+  // ══════════════════════════════════════════════════════════════════════════
+  await (async () => {
+    console.log('%c[TESTS] Review 02-10', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const CR = await import('./crud.js');
+    const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
+    const ntdOud=D.ntd, uitOud=state._uitCache, failsOud=state._syncFails;
+    const bg=document.getElementById('modal-bg');
+    try {
+      // ── 1d. Een CRM-taak uit de leescache (mail ontbreekt) opent pas na de eerste verse ronde ──
+      const crm={ _sec:'CRM', _row:40, code:'311212', naam:'Testflat', onderwerp:'Lekkage', afzender:'a@b.nl',
+                  ontvangen:'', soort:'', mail:'', behandelaar:'', deadline:'', opmerkingen:'', subcategorie:'',
+                  inBehandeling:'FALSE', taakId:'TRV1', bundelId:'', bundelVolg:'' };
+      D.ntd={ ...leeg, CRM:[crm] };
+      state._uitCache=true; state._syncFails=0;
+      document.querySelectorAll('#toast-container .toast').forEach(x=>x.remove());
+      CR.openModal(true, crm);
+      eq('cache-CRM: het bewerkscherm gaat NIET open zolang de mail nog niet vers is', bg.classList.contains('open'), false);
+      truthy('cache-CRM: en zegt waarom', [...document.querySelectorAll('#toast-container .toast-title')].some(x=>x.textContent==='Even wachten'));
+      state._uitCache=false;
+      CR.openModal(true, crm);
+      eq('cache-CRM: na de eerste verse ronde wél', bg.classList.contains('open'), true);
+      CR.closeModal(); CR.clearModal();
+      // Een gewone taak heeft geen mail en mag gewoon open, ook uit de cache.
+      const opp={ _sec:'OPPAKKEN', _row:5, code:'311212', naam:'Testflat', actiepunt:'x', deadline:'', behandelaar:'',
+                  prioriteit:'', opmerkingen:'', inBehandeling:'FALSE', subcategorie:'', taakId:'TRV2' };
+      D.ntd={ ...leeg, OPPAKKEN:[opp] }; state._uitCache=true;
+      CR.openModal(true, opp);
+      eq('cache-CRM: een gewone taak opent wél uit de cache', bg.classList.contains('open'), true);
+      CR.closeModal(); CR.clearModal();
+
+      // ── 1e. De mails van Afgerond alleen ophalen als die pagina in beeld is ──
+      {
+        const RL = await import('./render-lijsten.js');
+        const UI = await import('./ui.js');
+        const afOud=D.af, tokOud=state.oauthToken, msOud=state._afMailMs, fetchOud=window.fetch;
+        const paginaOud=(document.querySelector('.page.active')||{}).id?.replace('page-','')||'ntd';
+        const zoek=document.getElementById('s-af'), zoekOud=zoek.value;
+        let gevraagd=0;
+        try{
+          window.fetch=async(url)=>{ if(String(url).includes(encodeURIComponent("'Afgerond'!Q:W"))||String(url).includes("Q:W")) gevraagd++;
+                                      return new Response(JSON.stringify({values:[]}),{status:200}); };
+          state.oauthToken='nep'; state._afMailMs=0;
+          D.af={ ...leeg, CRM:[{ _sec:'CRM', _row:3, code:'311212', onderwerp:'x', taakId:'TAF1', datum:'' }] };
+          zoek.value='lekkage';
+          UI.goTo('ntd'); RL.renderAf();
+          await new Promise(r=>setTimeout(r,0));
+          eq('afgerond-mail: met tekst in het zoekveld maar op een ANDERE pagina geen leesverzoek', gevraagd, 0);
+          UI.goTo('af'); RL.renderAf();
+          await new Promise(r=>setTimeout(r,0));
+          eq('afgerond-mail: op de Afgerond-pagina zelf wél', gevraagd, 1);
+          await new Promise(r=>setTimeout(r,20));
+        } finally {
+          window.fetch=fetchOud; D.af=afOud; state.oauthToken=tokOud; state._afMailMs=msOud; zoek.value=zoekOud;
+          UI.goTo(paginaOud); RL.renderAf();
+        }
+      }
+
+      // ── 1f. Herkansing van de Afgerond-delete na een zoekgeraakt antwoord ──
+      {
+        const BU = await import('./bulk.js');
+        const doel=[{ _sec:'OPPAKKEN', _row:12, taakId:'T1' }, { _sec:'OPPAKKEN', _row:9, taakId:'T2' }];
+        eq('herkansing: rijen staan er niet meer → al weg (geslaagd, geen vals conflict)',
+           BU._alleAlWeg(doel, { OPPAKKEN:[{ taakId:'T9' }], LOD:[] }), true);
+        eq('herkansing: één staat er nog → niet weg (gewone rij-controle beslist)',
+           BU._alleAlWeg(doel, { OPPAKKEN:[{ taakId:'T2' }] }), false);
+        eq('herkansing: een rij zonder taaknummer → nooit gokken',
+           BU._alleAlWeg([{ _sec:'OPPAKKEN', _row:4, taakId:'' }], { OPPAKKEN:[] }), false);
+      }
+
+      // ── 1g. De notitie uit het bewerkscherm pas wegschrijven als het afronden echt doorgaat ──
+      {
+        const API = await import('./api.js');
+        const fetchOud=window.fetch, alertOud=window.alert, tokOud=state.oauthToken, expOud=state.oauthExpiry;
+        const afOud=D.af, infoOud=D.afSecInfo, idsOud=state._sheetIds, cacheOud=state._rowCache, logOud=D.logboek;
+        const versLeeg=()=>({ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] });
+        const taak=row=>({ _sec:'OPPAKKEN', _row:row, code:'NOT-1', naam:'VvE Notitietoets', actiepunt:'Notitietoets', deadline:'',
+          behandelaar:'', prioriteit:'', opmerkingen:'', inBehandeling:'', subcategorie:'', opvolgdatum:'', taakId:'TN-'+row, bundelId:'', bundelVolg:'' });
+        let posts=[], blad={}, alerts=[];
+        const tik=()=>new Promise(r=>{const k=new MessageChannel();k.port1.onmessage=()=>r();k.port2.postMessage(0);});
+        const leeglopen=async()=>{ await state._writeChain; for(let i=0;i<200 && state._loadInFlight;i++) await tik(); };
+        try{
+          window.alert=m=>{ alerts.push(m); };
+          state.oauthToken='stub'; state.oauthExpiry=Date.now()+3600e3; state._uitCache=false;
+          state._sheetIds={ 'Nog Te Doen':0, 'Afgerond':1, 'Logboek':2 };
+          D.afSecInfo={ OPPAKKEN:{colHeaderRow:2}, VERGADERVERZOEKEN:{colHeaderRow:20}, 'OFFERTE-TRAJECTEN':{colHeaderRow:40}, LOD:{colHeaderRow:60}, 'SUBSIDIE-TRAJECTEN':{colHeaderRow:80} };
+          D.logboek=[];
+          window.fetch=async(url, opt)=>{
+            const u=decodeURIComponent(String(url)), methode=(opt&&opt.method)||'GET';
+            if(u.includes('values:batchGet')) return new Response(JSON.stringify({error:{message:'geen leesronde'}}),{status:403});
+            if(methode==='GET'){
+              const m=/!A(\d+):S(\d+)/.exec(u)||[];
+              const opAf=/afgerond/i.test(u.split('!')[0]||'');
+              const rijen=[]; for(let r=+m[1]; r<=+m[2]; r++) rijen.push(opAf ? (r===2?['VvE Code']:[]) : (blad[r]||[]));
+              return new Response(JSON.stringify({values:rijen}),{status:200});
+            }
+            posts.push({ url:u, body:(opt&&opt.body)||'' });
+            return new Response('{}',{status:200});
+          };
+          const appends=()=>posts.filter(p=>/:append/.test(p.url));
+          let r=taak(5);
+          D.af=versLeeg(); D.ntd={ ...versLeeg(), OPPAKKEN:[r] }; state._rowCache=[r];
+          blad={ 5: API._rijNaarCellen('Nog Te Doen', r).map(v=>String(v ?? '')) };
+          CR.openModal(true, r);
+          document.getElementById('hist-note').value='Gebeld met de aannemer';
+          await CR.completeCurrentEditTask();
+          eq('afronden+notitie: het afrondvenster staat open, de notitie is nog NIET geschreven',
+             [document.getElementById('complete-bg').classList.contains('open'), appends().length], [true, 0]);
+          CR.closeCompleteModal();
+          eq('afronden+notitie: afrondvenster weggeklikt → geen notitie in het Logboek', [appends().length, state._completeNotitie], [0, null]);
+          // Nu wél doorzetten: eerst de notitie, dan de afronding.
+          CR.openModal(true, r);
+          document.getElementById('hist-note').value='Gebeld met de aannemer';
+          await CR.completeCurrentEditTask();
+          document.getElementById('complete-date').value='2026-10-02';
+          await CR.doCompleteTask(); await leeglopen();
+          const iNotitie=posts.findIndex(p=>/:append/.test(p.url) && p.body.includes('Gebeld met de aannemer'));
+          const iAfrond=posts.findIndex(p=>/:batchUpdate/.test(p.url));
+          eq('afronden+notitie: na de knop in het afrondvenster staat de notitie er precies één keer',
+             posts.filter(p=>/:append/.test(p.url) && p.body.includes('Gebeld met de aannemer')).length, 1);
+          truthy('afronden+notitie: en vóór de afronding zelf', iNotitie>-1 && iAfrond>-1 && iNotitie<iAfrond);
+          eq('afronden+notitie: geen onverwachte melding', alerts, []);
+          // De vraag bij gewijzigde velden noemt de notitie niet als 'niet opgeslagen'.
+          r=taak(6); D.ntd={ ...versLeeg(), OPPAKKEN:[r] }; state._rowCache=[r];
+          CR.openModal(true, r);
+          document.getElementById('hist-note').value='Notitie';
+          document.getElementById('m-actie').value='Gewijzigd';
+          const p=CR.completeCurrentEditTask();
+          const tekst=document.getElementById('bevestig-tekst').textContent;
+          truthy('afronden+notitie: de vraag noemt de notitie niet als niet-opgeslagen', !/de notitie in het Logboek-vak,|de notitie in het Logboek-vak\./.test(tekst.split(' Afronden neemt')[0]));
+          truthy('afronden+notitie: maar zegt dat hij wél meegaat', /notitie in het Logboek-vak gaat wél mee/.test(tekst));
+          document.getElementById('bevestig-nee').click(); await p;
+        } finally {
+          window.fetch=fetchOud; window.alert=alertOud; state.oauthToken=tokOud; state.oauthExpiry=expOud;
+          D.af=afOud; D.afSecInfo=infoOud; state._sheetIds=idsOud; state._rowCache=cacheOud; D.logboek=logOud;
+          CR.closeCompleteModal(); CR.closeModal(); CR.clearModal();
+          document.getElementById('hist-note').value='';
+        }
+      }
+    } catch(e) {
+      truthy('review 02-10: geen uitzondering — '+(e && e.stack || e), false);
+    } finally {
+      D.ntd=ntdOud; state._uitCache=uitOud; state._syncFails=failsOud;
+      try{ CR.closeModal(); }catch(_){}
+      document.querySelectorAll('#toast-container .toast').forEach(x=>x.remove());
     }
   })();
 

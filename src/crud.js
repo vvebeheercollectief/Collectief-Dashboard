@@ -10,7 +10,7 @@ import { SECS, SKEYS, SID, OMSCHRIJVING_SLEUTEL, VELD_LABELS, CRM_SOORTEN } from
 import { writeRange, writeRanges, writeRows, _shiftNtdRows, _shiftAfRows, _herstelShift, assertRowMatch, sheetsFetch, fetchSheet, _a1Bereik, _withRetry, kapCel } from "./api.js";
 import { isKolomKop, isSectieKop } from "./structuurcheck.js";
 import { ensureToken } from "./auth.js";
-import { showToast, showUndoToast, fireNotifEvent, undoComplete, undoDelete } from "./notifications.js";
+import { showToast, showUndoToast, fireNotifEvent, undoComplete, undoDelete, getCurrentWho } from "./notifications.js";
 import { animateRowOut, flashRow } from "./anim.js";
 import { logEvent, logEvents, renderTaskHistory, addTaskNote } from "./render-overig.js";
 import { backgroundWrite, loadAll, blokkeerOffline } from "./data.js";
@@ -269,6 +269,10 @@ function herzieAlsSubtaak(sec){
   const hintEl = document.getElementById(DEADLINE_HINT_VELD[sec]);
   if(veldEl) veldEl.value = '';
   if(hintEl) hintEl.textContent = '';
+  // De stand-zoals-geopend opnieuw vastleggen. `openModal` nam hem al op MET het deadlinevoorstel,
+  // en het leegmaken hierboven telde daarna als 'wijziging van de gebruiker': een subtaak openen
+  // en meteen weer sluiten vroeg dan vals 'Wijzigingen weggooien?' (review 2026-10-02).
+  if(document.getElementById('modal-bg')?.classList.contains('open')) state._modalFoto=_modalFoto();
 }
 
 // De inhoud van de taak op het moment dat het bewerkscherm openging. Alleen de velden die DIT
@@ -286,6 +290,20 @@ function _inhoudsFoto(r){
 }
 
 function openModal(isEdit,rowData,opts){
+  // Een CRM-taak pas bewerken na de eerste VERSE ronde. De leescache bewaart de mail bewust niet
+  // (bewaarCache in data.js), dus tot die ronde binnen is staat er een lege mail in het rij-object.
+  // Open je het scherm in die seconde of twee, dan (1) vult het mailveld zich leeg, en (2) ziet
+  // `_bewerkRijVers` bij Opslaan een andere mail dan bij openen en meldt vals 'intussen gewijzigd
+  // door een collega'. De mail daar negeren zou erger zijn: dan schreef Opslaan het lege mailveld
+  // over de echte mail heen. Wachten is hier dus de enige veilige weg (review 2026-10-02).
+  if(isEdit && rowData && rowData._sec==='CRM' && state._uitCache){
+    const gefaald=(state._syncFails||0)>0;
+    showToast(gefaald ? 'Gegevens niet vernieuwd' : 'Even wachten',
+      gefaald ? 'De gegevens konden niet worden opgehaald. Klik op Vernieuwen en open de vraag daarna opnieuw.'
+              : 'De mail wordt nog opgehaald — open de vraag over een seconde opnieuw.',
+      'var(--am)','zandloper',{geenDedup:true,geenSysteemmelding:true});
+    return;
+  }
   state.editMode=!!isEdit;
   const sec=isEdit?rowData._sec:((opts&&opts.sec)||state.activeNtd);
   state.editRowData=rowData||null;
@@ -365,9 +383,11 @@ function modalGewijzigd(){
 // De vraagtekst: bij bewerken met de veldnamen (dezelfde lijst als bij verplaatsen), anders
 // algemeen. Een getypte notitie in het Logboek-vak noemen we apart — die hoort niet bij de taak
 // zelf en valt dus buiten `nietOpgeslagenVelden`.
-function _wijzigingZin(){
+// `zonderNotitie`: bij Afronden gaat de notitie wél mee (zie completeCurrentEditTask), dus daar hoort
+// hij niet in het lijstje van wat NIET bewaard wordt.
+function _wijzigingZin(zonderNotitie){
   const namen=state.editMode&&state.editRowData ? nietOpgeslagenVelden(state.editRowData) : [];
-  if(state.editMode && (document.getElementById('hist-note')?.value||'').trim()) namen.push('de notitie in het Logboek-vak');
+  if(!zonderNotitie && state.editMode && (document.getElementById('hist-note')?.value||'').trim()) namen.push('de notitie in het Logboek-vak');
   return namen.length ? `Nog niet opgeslagen: ${namen.join(', ')}.` : 'Er staan wijzigingen in dit scherm die nog niet zijn opgeslagen.';
 }
 
@@ -1255,22 +1275,37 @@ function getAfInsertRow(sec){
 // sluiten. Nu eerst de vraag; 'nee' laat het scherm staan, zodat de gebruiker eerst op Opslaan kan
 // klikken. Bewust geen 'eerst opslaan, dan afronden' in één klik: dat zijn twee schrijfacties met
 // elk een eigen rij-controle en rollback, en mislukt de eerste dan archiveert de tweede een stand
-// die de gebruiker nooit zo bedoeld heeft. Een getypte notitie gaat wél mee (notitieMeenemen).
+// die de gebruiker nooit zo bedoeld heeft. Een getypte notitie gaat wél mee (zie hieronder).
+//
+// De getypte notitie wordt NIET meer hier al weggeschreven, maar pas als het afronden écht doorgaat:
+// in doCompleteTask, na de knop in het afrondvenster. Schreven we hem hier, dan stond hij in het
+// Logboek terwijl de gebruiker daarna nog 'nee' kon zeggen op de subtaak-vraag of het afrondvenster
+// kon wegklikken — notitie wél, afronding niet (review 2026-10-02). Hij reist mee in
+// `state._completeNotitie`; de vraag hieronder noemt hem daarom ook niet als 'niet opgeslagen'.
 async function completeCurrentEditTask(){
   if(modalGewijzigd() && !_alleenNotitieGewijzigd()){
     if(!await vraagBevestiging({
         titel:'Wijzigingen niet opgeslagen',
-        tekst:_wijzigingZin()+' Afronden neemt de taak zoals hij opgeslagen is — klik eerst op Opslaan als je die wijzigingen wilt bewaren.',
+        tekst:_wijzigingZin(true)+' Afronden neemt de taak zoals hij opgeslagen is — klik eerst op Opslaan als je die wijzigingen wilt bewaren.'
+              +(_heeftNotitie() ? ' De notitie in het Logboek-vak gaat wél mee.' : ''),
         bevestigTekst:'Afronden zonder opslaan' })) return;
   }
   const r=_bewerkRijVers();
   if(!r) return;
-  // Alleen awaiten als er écht een notitie ligt: zonder notitie hoort de subtaak-vraag van
-  // completeTaskRow in dezelfde beurt te verschijnen als de klik, net als vóór deze stap.
-  if(_heeftNotitie() && !await notitieMeenemen()) return;
-  await completeTaskRow(r, state._rowCache.indexOf(r), closeModal);   // vorm-ok: rid voor de puls-animatie
+  const notitie=_heeftNotitie() ? _notitieBijKlik() : null;
+  await completeTaskRow(r, state._rowCache.indexOf(r), ()=>{   // vorm-ok: rid voor de puls-animatie
+    closeModal();
+    state._completeNotitie=notitie;   // ná closeModal; completeTaskRow heeft hem net leeggemaakt
+  });
 }
-// Is de getypte notitie het ENIGE verschil? Die gaat via notitieMeenemen gewoon mee, dus daarvoor
+// De notitie zoals hij NU in het Logboek-vak staat, met de taak waar hij bij hoort. Vastgelegd op
+// het klikmoment: het bewerkscherm sluit straks, en dan is het vak leeg.
+function _notitieBijKlik(){
+  const c=document.getElementById('fg-history');
+  const tekst=(document.getElementById('hist-note')?.value||'').trim();
+  return tekst && c && c.dataset.code ? { code:c.dataset.code, sec:c.dataset.sec, tekst } : null;
+}
+// Is de getypte notitie het ENIGE verschil? Die gaat bij het afronden gewoon mee, dus daarvoor
 // hoeft Afronden niets te vragen.
 function _alleenNotitieGewijzigd(){
   const veld=document.getElementById('hist-note');
@@ -1422,6 +1457,9 @@ async function completeTaskRow(r, rid, bijDoorgaan){
   const waarschuwing=bundelWaarschuwing(bouwBundelIndex(D.ntd, D.af), r);
   if(waarschuwing && !await vraagBevestiging({
       titel:'Taak afronden?', tekst:waarschuwing, bevestigTekst:'Toch afronden' })) return;
+  // Een notitie uit een vórig bewerkscherm mag nooit aan déze afronding blijven hangen; alleen
+  // `bijDoorgaan` van completeCurrentEditTask zet hem (opnieuw).
+  state._completeNotitie=null;
   if(bijDoorgaan) bijDoorgaan();
   // Rij-OBJECT bewaren, geen index: terwijl de modal open staat kan een vertraagde
   // renderAll (animateRowOut, ~1,2s) of de stille resync _rowCache herbouwen — een
@@ -1548,6 +1586,20 @@ async function doCompleteTask(){
     // gewoon door en rondde de taak alsnog af, mét een groene bevestiging. Vóór deze wijziging was
     // er geen meetbaar gat (getSheetIds komt uit de cache), dus deze rem hoort bij die await.
     if(state._completeRow!==r){ closeCompleteModal(); return; }
+    // De notitie uit het bewerkscherm (completeCurrentEditTask) — pas NU, nu het afronden echt
+    // doorgaat. Zelfde weg als de knop 'Toevoegen' (logEvent, direct en zonder herkansing: een
+    // append is niet idempotent). Mislukt hij, dan stopt het afronden en blijft dit venster open,
+    // zodat er niets half gebeurt; de tekst blijft bewaard voor de volgende klik.
+    const notitie=state._completeNotitie;
+    if(notitie){
+      if(!await logEvent(notitie.code, notitie.sec, 'Opmerking', '', '', notitie.tekst)){
+        alert('De notitie kon niet worden opgeslagen, dus de taak is nog niet afgerond. Controleer je verbinding en probeer het opnieuw.');
+        return;
+      }
+      state._completeNotitie=null;
+      D.logboek.unshift({_row:0,timestamp:new Date().toISOString(),code:notitie.code,sectie:notitie.sec,actie:'Opmerking',veld:'',oudeWaarde:'',nieuweWaarde:notitie.tekst,gebruiker:getCurrentWho()||'?'});
+      if(state._completeRow!==r){ closeCompleteModal(); return; }
+    }
     // De batch wordt PAS IN DE WRITEFN gebouwd, met een dan vers berekende archiefplek. Zetten we
     // het rijnummer hier al vast, dan draagt een tweede afronding die binnen hetzelfde
     // schrijfvenster start een ABSOLUUT anker in zijn batch dat door een rollback van de eerste
@@ -1644,7 +1696,7 @@ export function wisDuurKeuze(wortel){
   if(bron) bron.querySelectorAll('.duur-knop').forEach(b=>b.removeAttribute('aria-pressed'));
 }
 
-function closeCompleteModal(){document.getElementById('complete-bg').classList.remove('open');state._completeRow=null;state._completeRid=null}
+function closeCompleteModal(){document.getElementById('complete-bg').classList.remove('open');state._completeRow=null;state._completeRid=null;state._completeNotitie=null}
 
 // ══════════════════════════════════════
 //  SUBMIT TASK (Add + Edit)

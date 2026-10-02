@@ -66,7 +66,7 @@ export function maakVoorlegSubtaken(trajecten, gebruikt){
   try{ afterRow=getInsertRow('OPPAKKEN'); }
   catch(e){
     console.warn('[voorleg] OPPAKKEN-anker niet te bepalen, subtaak overgeslagen:', e && e.message);
-    showToast('Subtaak niet aangemaakt', 'Het offerte-traject zelf is wél opgeslagen. Maak "'+VOORLEG_ACTIE+'" zo nodig met de hand aan in Oppakken.', 'var(--rd)');
+    showToast('Subtaak niet aangemaakt', 'Het offerte-traject zelf is wél opgeslagen. Maak "'+VOORLEG_ACTIE+'" zo nodig met de hand aan in Oppakken.', 'var(--rd)', null, { blijft:true });
     return;
   }
   // Vangrail op de blokVOLGORDE: de dwingende wachtrij-volgorde hieronder leunt erop dat het

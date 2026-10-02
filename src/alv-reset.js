@@ -159,7 +159,7 @@ async function doeReset(){
     showToast('Nieuwe ronde gestart',`${bereik.aantal} VvE's op Open, archief '${naam}'`,'var(--gn)','herhaal');
   }catch(e){
     console.error('doeReset fout:',e);
-    showToast('Reset mislukt',e.message||'Onbekende fout','var(--rd)');
+    showToast('Reset mislukt',e.message||'Onbekende fout','var(--rd)',null,{blijft:true});
   }finally{
     state._alvoResetBezig=false;
     const k=document.getElementById('alvoreset-doe');

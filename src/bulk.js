@@ -401,6 +401,16 @@ function _bulkUndoAfDoelRijen(items, afPerSec){
   return doel.sort((a,b)=>b._row-a._row);
 }
 
+// Puur (testbaar): staan deze Afgerond-rijen NERGENS meer in de verse lezing? Alleen op het vaste
+// taaknummer: een rij zonder nummer is op inhoud niet met zekerheid 'weg' te verklaren (twee gelijke
+// afrondingen), en dan liever de gewone rij-controle laten beslissen dan een geslaagde delete gokken.
+function _alleAlWeg(rijen, afPerSec){
+  if(!rijen.length || rijen.some(af=>!String(af.taakId||'').trim())) return false;
+  const nog=new Set();
+  Object.values(afPerSec||{}).forEach(l=>(l||[]).forEach(r=>{ const t=String(r.taakId||'').trim(); if(t) nog.add(t); }));
+  return rijen.every(af=>!nog.has(String(af.taakId).trim()));
+}
+
 // ── Terugzetten in blokken ──────────────────────────────────────────────────────────────────
 // Beide bulk-undo's zetten hun taken terug in 'Nog Te Doen'. Dat ging één voor één met losse
 // insertAndWriteRow-aanroepen: bij dertig taken zestig verzoeken, zonder herkansing, op ankers
@@ -479,9 +489,17 @@ async function bulkUndoAfronden(items, stand){
         //    niet verschuiven. Mét herkansing, en met een vlag: een deleteDimension is positioneel
         //    en NIET idempotent — een herkansing na een geslaagde batch zou de rijen eronder raken.
         if(teVerwijderen.length){
-          let verwijderd=false;
+          let verwijderd=false, poging=0;
           await _withRetry(async()=>{
             if(verwijderd) return;
+            // Een HERKANSING kan volgen op een batch die wél landde maar waarvan het antwoord
+            // zoekraakte (5xx/netwerk ná het verwerken). Dan zijn de rijen al weg, schuift alles
+            // eronder op, en zou de rij-controle hieronder vals 'gewijzigd' melden — met 'Ongedaan
+            // maken mislukt' terwijl het gelukt is (review 2026-10-02). Eerst kijken of ze er nog zijn.
+            if(poging++>0){
+              const nu=parseSections(await fetchSheet('Afgerond'), 'Afgerond').data;
+              if(_alleAlWeg(teVerwijderen, nu)){ verwijderd=true; return; }
+            }
             // 'Afgerond' had als énige tabblad een positionele deleteDimension zónder guard, en juist
             // op de undo-weg. Nu eerst controleren dat de rijen nog dezelfde afrondingen zijn.
             await assertRowsMatch(teVerwijderen.map(af=>({row:af._row, r:af})), 'Afgerond');
@@ -758,5 +776,5 @@ function bulkVeld(rows,soort,waarde){
 
 export { _bulkVolgorde, bulkGeselecteerd, bulkSelectie, toggleBulkMode, bulkVink, bulkWis,
          bulkAlles, allesVinkjeHtml, allesVinkjeStand, bulkHerstel,
-         renderBulkUi, toggleBulkMenu, _sluitMenus, bulkDoe, bulkVeld, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen, _bulkUndoBlokken,
+         renderBulkUi, toggleBulkMenu, _sluitMenus, bulkDoe, bulkVeld, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen, _bulkUndoBlokken, _alleAlWeg,
          bulkUndoAfronden, bulkUndoVerwijderen };

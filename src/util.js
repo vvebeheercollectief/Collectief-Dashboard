@@ -285,6 +285,8 @@ function opvolgStatus(r, vandaag){
 // OPVOLGDATUM (zie deadlineCel in render-tabel.js) en telt de rij niet meer als 'te laat'.
 // LET OP: er bestaan twee LOSSE dingen die allebei 'opvolgen' heten — kolom L (wegleggen,
 // `opvolgStatus` hierboven) en kolom F-als-opvolgdatum (dit). Niet samenvoegen.
+// LET OP — SYNC met cd_offerteAangevraagd in apps-script/Opvolging.gs (de backend gebruikt dezelfde
+// regel voor de briefing en de deadline-pushes). Wijzig je hier iets, wijzig het daar ook.
 function offerteAangevraagd(r){
   return !!_parseAnyDate((((r && r.datumAangevraagd) || '') + ''));
 }
@@ -697,6 +699,9 @@ function _valDate(y,mn,d){
   const dt=new Date(y,mn-1,d);
   return (dt.getFullYear()===y && dt.getMonth()===mn-1 && dt.getDate()===d) ? {y,m:mn,d} : null;
 }
+// LET OP — SYNC met cd_parseDate in apps-script/Notifications.gs: de backend leest dezelfde
+// datumvormen (plus echte Date-objecten uit een datumcel). Een vorm die hier wél en daar niet
+// gelezen wordt, geeft een taak die op het scherm een deadline heeft en in de pushes niet.
 function _parseAnyDate(s){
   if(!s)return null;
   s=s.trim();

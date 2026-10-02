@@ -74,12 +74,26 @@ gaat debuggen. En let op: `onEdit` vuurt alleen op echte edits in de Sheets-UI �
 - Notificaties lopen via **OneSignal** (`cd_sendNotification` in `Notifications.gs`).
   `cd_notifyByTag` / `cd_notifyByExternalId` schrijven óók naar de `Meldingen`-sheet
   (in-app toasts) én sturen een OneSignal-push. Niet verwijderen.
-- Fouten in triggers (sinds 2026-10-02): `cd_meldFout` schrijft één regel in het Logboek (actie
-  `Fout`, gebruiker `systeem`, hoogstens eens per uur per soort) en de tijdtriggers gooien aan het
-  eind een samenvatting op, zodat Google de foutmail stuurt. Kreeg `cd_opvolgingMotor` de lock niet,
-  dan staat Script Property `CD_MOTOR_HERKANSING` en probeert `cd_sweepNotifQueue` het opnieuw
-  (max. 12 uur). Een mislukte push in de Notif-wachtrij krijgt `POGING n` in kolom D en wordt tot
-  3× opnieuw geprobeerd.
+- Fouten in triggers (sinds 2026-10-02, zie `cd_meldFout` / `cd_gooiVerzameldeFouten` in
+  `Notifications.gs`):
+  - `cd_meldFout` schrijft één regel in het Logboek (actie `Fout`, gebruiker `systeem`, VvE-code
+    leeg): één per soort per uitvoering, en dezelfde soort hoogstens eens per uur (CacheService).
+  - Alleen de dagelijkse/uurlijkse tijdtriggers (`cd_opvolgingMotor`, `cd_checkDeadlines`,
+    `cd_dailySummary`) gooien aan het eind een samenvatting op — en dan alleen als déze uitvoering
+    echt een NIEUWE Fout-regel schreef. Een fout die het afgelopen uur al gemeld was laat de run niet
+    opnieuw mislukken. Alleen bij zo'n opgegooide run stuurt Google de foutmail.
+  - De 5-minuten-veegbeurt `cd_sweepNotifQueue` gooit NOOIT op (anders tot 288 mislukte runs en
+    foutmails per dag); daar is de Fout-regel in het Logboek het enige signaal.
+  - Kreeg `cd_opvolgingMotor` de lock niet, dan staat Script Property `CD_MOTOR_HERKANSING` en
+    probeert de veegbeurt het opnieuw (`cd_motorHerkansing`); na 12 uur geeft hij op met een
+    Fout-regel en draait hij de volgende ochtend gewoon weer.
+- Notif-wachtrij (`cd_drainNotifQueue`), kolom D 'Verwerkt': leeg = nieuw, een tijdstempel =
+  gelukt, `GEWEIGERD: …` / `FOUT: …` = definitief niet. Mislukt de push, dan
+  `POGING n (tijdstip): …`. `cd_onNotifQueueChange` (onChange) pakt alleen NIEUWE rijen; de
+  herkansingen doet uitsluitend de veegbeurt, en pas na n × 5 minuten (dus na 5, dan 10 min). Bij
+  de herkansing gaat alleen de push opnieuw, niet de in-app regel. Na 3 pogingen wordt het
+  `FOUT: push mislukt na 3 pogingen`. `cd_wachtrijHeeftWerk` kijkt eerst zonder lock of er iets
+  open staat, zodat een onChange zonder werk de document-lock niet pakt.
 - Pushteksten bevatten alleen VvE-code, soort en behandelaar (`pushBody`, zie `cd_pushTekst`); de
   VvE-naam en omschrijving staan alleen in de in-app regel in 'Meldingen'.
 - Alle `.gs`-bestanden delen één globale scope in Apps Script — declareer constanten
@@ -94,7 +108,7 @@ onder een ander account.
 
 | Functie | Type | Draait als |
 |---|---|---|
-| `cd_recalcPrioriteiten` | Tijdgebonden (dagelijks ±06:00) | eigenaar |
+| `cd_recalcPrioriteiten` | Tijdgebonden (dagelijks ±06:00) — doet sinds 2026-10-02 niets meer en ruimt zijn eigen trigger op (AutoPrioriteit.gs) | eigenaar |
 | `cd_opvolgingMotor` | Tijdgebonden (dagelijks ±06:30) | eigenaar |
 | `cd_dailySummary` | Tijdgebonden (dagelijks ±08:30) | eigenaar |
 | `cd_checkDeadlines` | Tijdgebonden (elk uur) | eigenaar |

@@ -101,6 +101,8 @@ const toastIco = (naam) => {
 // opts: { geenDedup:true }        → sla de 15s-ontdubbeling over. Nodig voor opslagbevestigingen:
 //                                   twee keer dezelfde taak opslaan binnen 15 s zou anders de
 //                                   TWEEDE bevestiging inslikken, wat als 'mislukt' leest.
+//       { blijft:true }            → geen aftelklok: blijft staan tot hij weggeklikt wordt. Alleen
+//                                   voor echte schrijffouten (zie de toelichting in de functie).
 //       { geenSysteemmelding:true } → geen OS-notificatie als het venster niet in focus is.
 //                                   Anders krijgt de gebruiker bij élke opslag met het venster
 //                                   op de achtergrond een systeemmelding — precies het scenario
@@ -114,10 +116,13 @@ function showToast(title, msg, color, icoNaam, opts) {
     setTimeout(() => _shownToasts.delete(key), TOAST_DEDUP_MS);
   }
 
-  // Een RODE melding (een fout, een mislukte opslag) blijft staan tot hij weggeklikt wordt. Zo'n
-  // melding zegt dat er iets NIET gebeurd is, en na vijf seconden stil verdwijnen betekende: wie
-  // net even wegkeek, heeft nooit geweten dat zijn wijziging is teruggezet. Geen aftelbalk dus.
-  const blijft = color === 'var(--rd)';
+  // Een SCHRIJFFOUT (een mislukte opslag, een teruggezette wijziging) blijft staan tot hij
+  // weggeklikt wordt: na vijf seconden stil verdwijnen betekende dat wie net even wegkeek nooit
+  // wist dat zijn wijziging is teruggezet. Geen aftelbalk dus. Bewust een EXPLICIETE optie en niet
+  // 'elke rode melding': ook een escalatiemelding, 'Taak niet gevonden' en 'Geen verbinding' zijn
+  // rood, en de laatste komt bij elke klik opnieuw (geenDedup) — die stapelden dan op als vaste
+  // meldingen die je één voor één moest wegklikken (review 2026-10-02).
+  const blijft = !!o.blijft;
   const balkHtml = blijft ? '' : `<div class="toast-bar" style="animation-duration:${TOAST_DURATION}ms"></div>`;
   const el = document.createElement('div');
   el.className = 'toast';

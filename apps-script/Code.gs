@@ -100,16 +100,28 @@ function verplaatsAfgerond(e) {
 // de lijst (X = aantal |1, N = lijstlengte). Geen lijst → kolom D rauw (rijen van vóór de
 // aannemerslijst). Sinds v12.5 — de oude ondergrens (Math.max per kant) is weg, gelijk met
 // de frontend; anders archiveerden Sheet-afvinken en dashboard-afronden verschillende tellers.
+// Een regel ZONDER naam ('|1', of ' | 0') telt niet mee — parseAannemers gooit die weg
+// (`.filter(a=>a.naam)`), en deze kant telde hem wél: '2/3' in het archief tegen '1/2' op het
+// scherm (naloop 2026-10-02).
 function cd_reconcileOffertes(rauwD, aannemersCel) {
-  var lijst = ((aannemersCel == null ? '' : aannemersCel) + '').split('\n')
-    .map(function (l) { return l.trim(); }).filter(function (l) { return l; });
+  var lijst = [];
+  ((aannemersCel == null ? '' : aannemersCel) + '').split('\n').forEach(function (l) {
+    l = l.trim();
+    if (!l) return;
+    var p = l.lastIndexOf('|');
+    var naam = p < 0 ? l : l.slice(0, p).trim();
+    if (naam) lijst.push(p >= 0 && l.slice(p + 1).trim() === '1');
+  });
   if (!lijst.length) return (rauwD == null ? '' : rauwD) + '';
   var binnen = 0;
-  for (var i = 0; i < lijst.length; i++) {
-    var p = lijst[i].lastIndexOf('|');
-    if (p >= 0 && lijst[i].slice(p + 1).trim() === '1') binnen++;
-  }
+  for (var i = 0; i < lijst.length; i++) if (lijst[i]) binnen++;
   return binnen + '/' + lijst.length;
+}
+
+// LET OP — SYNC met nulVeilig in src/crud.js: 0 is een echt bundel-volgnummer (het eerste lid).
+// `v || ""` maakte er een lege cel van.
+function cd_nulVeilig(v) {
+  return (v === 0 || v) ? v : '';
 }
 
 function cd_archiveerRij(sheet, row) {
@@ -151,7 +163,11 @@ function cd_archiveerRij(sheet, row) {
   if (sectie === "") return;
 
   var vveCode = rowData[0];
-  var datumAfgerond = new Date();
+  // Als TEKST 'dd-mm-jjjj', precies zoals doCompleteTask/afrondWaarden (src/crud.js) hem schrijft;
+  // Sheets maakt er net als bij het dashboard een datum van. Eerder stond hier new Date() mét
+  // tijd, en zo'n cel kan als '2-10-2026 14:33:12' verschijnen — die vorm weigert _parseAnyDate,
+  // waarna de afronding in het scherm zonder datum stond (naloop 2026-10-02).
+  var datumAfgerond = cd_ddmmyyyy(new Date());   // Opvolging.gs
 
   // Het archiefstramien van afrondWaarden (src/crud.js) — NIET meer de oude vijf kolommen.
   // Twee redenen. (1) Het Herhaal-ID moet mee: cd_hr_verwerkAfrondingen leest dat op kolom L van
@@ -177,7 +193,7 @@ function cd_archiveerRij(sheet, row) {
   archief.push(cd_f4val(rowData[12]));      // L = Herhaal-ID (M in de bron)
   archief.push("", "", "", "");             // M = duur in minuten, blijft hier leeg: afvinken in
                                              // de Sheet zelf kent geen duur. N..P blijven ook leeg.
-  archief.push(rowData[16] || "", rowData[17] || "", rowData[18] || "");  // Q/R/S: taaknummer + bundel
+  archief.push(rowData[16] || "", rowData[17] || "", cd_nulVeilig(rowData[18]));  // Q/R/S: taaknummer + bundel (S: 0 is geldig)
   // T..W alleen bij CRM, net als afrondWaarden in src/crud.js: de mail gaat mee naar het archief.
   if (sectie === "CRM") archief.push(rowData[19] || "", rowData[20] || "", rowData[21] || "", rowData[22] || "");
 
@@ -488,7 +504,10 @@ function cd_archiveerALVs(sheet, rijen, blok) {
     if (bestaand[sleutel]) continue;      // staat er al — niets doen
     if (blok && recent[(vveCode + '').trim()]) continue;   // blok-bewerking: zie ALFA_RECENT_DAGEN
     bestaand[sleutel] = true;             // ook binnen dit bereik niet dubbel
-    nieuw.push([cd_safeCell(vveCode), vveNaam, datumAfgerond]);   // tekst: houdt de voorloopnul
+    // De datum als tekst 'd-m-jjjj' (`vandaag`), precies wat toggleAlvoFlag (src/render-alv.js)
+    // schrijft. Eerder een Date mét tijd: zo'n cel kan als '2-10-2026 14:33:12' verschijnen en die
+    // vorm leest _parseAnyDate niet — dan telde de ALV niet mee als 'laatst gehouden'.
+    nieuw.push([cd_safeCell(vveCode), vveNaam, vandaag]);   // code als tekst: houdt de voorloopnul
   }
   if (!nieuw.length) return;
   // De BREEDTE klemmen, net als de leesbreedte in cd_archiveerRij. Het tabblad wordt met de

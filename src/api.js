@@ -1,5 +1,5 @@
 import { state, D } from "./state.js";
-import { SID, SKEYS, PROXY_URL, SECS, OMSCHRIJVING_SLEUTEL } from "./config.js";
+import { SID, SKEYS, PROXY_URL, OFFERTE_URL, SECS, OMSCHRIJVING_SLEUTEL } from "./config.js";
 import { _parseAnyDate, leegBijErfenis } from "./util.js";
 
 // ── Offline-signaal ────────────────────────────────────────────────────────
@@ -340,6 +340,34 @@ async function askZoek(system, messages, laatste){
   return { content: Array.isArray(data.content) ? data.content : [], stop_reason: data.stop_reason || '', model: data.model || '' };
 }
 
+// ── Offertevergelijker (api/offerte.js) ──
+// Lezen door Claude kan bij vier offertes ruim een minuut duren; de proxy mag 120 s.
+const OFFERTE_TIMEOUT_MS = 150_000;
+async function _offertePost(actie, { query = '', headers, body }, melding, ms){
+  if(!state.oauthToken) throw new Error('Niet ingelogd');
+  const url = `${OFFERTE_URL}?actie=${actie}${query ? '&' + query : ''}`;
+  const r = await fetchMetKlok(url, { method:'POST', headers:{ ...headers, Authorization:`Bearer ${state.oauthToken}` }, body }, melding, ms);
+  const data = await r.json().catch(() => ({}));
+  if(!r.ok){ const e = new Error(data.error || 'Fout bij de offertevergelijker'); e.status = r.status; throw e; }
+  return data;
+}
+// Eén PDF of deel als ruwe bytes; terug komt het bewijs dat de proxy ondertekende.
+async function offerteUpload(bytes, naam){
+  const d = await _offertePost('upload', { query:'naam=' + encodeURIComponent(naam), headers:{ 'Content-Type':'application/octet-stream' }, body:bytes },
+    'Het versturen van een offerte duurde te lang', AI_TIMEOUT_MS);
+  return d.bewijs;
+}
+async function offerteVergelijk(invoer){
+  return _offertePost('vergelijk', { headers:{ 'Content-Type':'application/json' }, body:JSON.stringify(invoer) },
+    'Claude gaf binnen tweeënhalve minuut geen antwoord', OFFERTE_TIMEOUT_MS);
+}
+// Opruimen na een fout of annuleren. Gooit nooit: de bestanden verlopen bij Anthropic sowieso na een uur.
+async function offerteWis(bewijzen){
+  if(!bewijzen || !bewijzen.length) return;
+  try { await _offertePost('wis', { headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ bewijzen }) }, 'Wissen duurde te lang', AI_TIMEOUT_MS); }
+  catch(_) {}
+}
+
 // ── Vingerafdruk van een rij ───────────────────────────────────────────────
 // De guard vergeleek tot v9.5 alléén kolom A. Dat bewijst 'deze rij hoort nog bij dezelfde
 // VvE', niet 'dit is nog dezelfde taak' — en voor een VvE met meerdere openstaande taken ving
@@ -570,4 +598,4 @@ async function assertRowsMatch(checks, sheetName='Nog Te Doen'){
 const assertRowMatch=(row, bronOfCode, sheetName)=>assertRowsMatch(
   [(bronOfCode && typeof bronOfCode==='object') ? { row, r:bronOfCode } : { row, code:bronOfCode }], sheetName);
 
-export { kapCel, NTD_DATUM, isOffline, fetchMetKlok, _isOffline, _isNetwerkFout, fetchSheet, fetchSheets, writeRange, writeRanges, writeRows, appendRange, appendRows, veiligeCel, _veiligeRij, _shiftNtdRows, _shiftAfRows, _herstelShift, _isTransient, _withRetry, askChat, askZoek, _rowMismatch, _a1Bereik, vingerafdruk, rijVingerafdruk, _nummerDeel, _normCel, _rijNaarCellen, assertRowsMatch, assertRowMatch, NTD_OMSCHRIJVING, sheetsFetch };
+export { kapCel, NTD_DATUM, isOffline, fetchMetKlok, _isOffline, _isNetwerkFout, fetchSheet, fetchSheets, writeRange, writeRanges, writeRows, appendRange, appendRows, veiligeCel, _veiligeRij, _shiftNtdRows, _shiftAfRows, _herstelShift, _isTransient, _withRetry, askChat, askZoek, offerteUpload, offerteVergelijk, offerteWis, _rowMismatch, _a1Bereik, vingerafdruk, rijVingerafdruk, _nummerDeel, _normCel, _rijNaarCellen, assertRowsMatch, assertRowMatch, NTD_OMSCHRIJVING, sheetsFetch };

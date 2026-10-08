@@ -16610,12 +16610,18 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       // (daar is het de functie). Is de bron hier niet te lezen (404, leeg, of een HTML-pagina in
       // plaats van JavaScript), dan is deze toets op deze host niet uit te voeren — en alleen dán
       // slaat hij zichzelf over. Lokaal (no-store-server) staat het bestand er wél en telt hij echt.
-      const chatResp=await fetch(new URL('api/chat.js', document.baseURI), {cache:'no-store'}).catch(()=>null);
-      const chat=chatResp && chatResp.ok ? await chatResp.text() : '';
-      if(!chat.trim() || /^\s*</.test(chat)){
-        truthy('chat-proxy: bron niet op deze host (Pages/Vercel serveren api/chat.js niet) — toets overgeslagen', true);
+      const bronVan=async pad=>{ const r=await fetch(new URL(pad, document.baseURI), {cache:'no-store'}).catch(()=>null); const t=r && r.ok ? await r.text() : ''; return (!t.trim() || /^\s*</.test(t)) ? '' : t; };
+      const toegang=await bronVan('api/_toegang.js'), chat=await bronVan('api/chat.js'), offerte=await bronVan('api/offerte.js');
+      if(!toegang || !chat || !offerte){
+        truthy('proxy: bron niet op deze host (Pages/Vercel serveren api/ niet) — toets overgeslagen', true);
       } else {
-        truthy('chat-proxy: weigert een niet-geverifieerd e-mailadres', /email_verified\)\s*!==\s*'true'/.test(chat));
+        truthy('proxy-toegang: weigert een niet-geverifieerd e-mailadres', /email_verified\)\s*!==\s*'true'/.test(toegang));
+        truthy('proxy-toegang: controleert de audience', /info\.aud\s*!==\s*EXPECTED_AUD/.test(toegang));
+        truthy('chat-proxy: gebruikt de gedeelde toegang', /from '\.\/_toegang\.js'/.test(chat) && /controleerGebruiker\(req, res\)/.test(chat));
+        truthy('offerte-proxy: gebruikt de gedeelde toegang', /from '\.\/_toegang\.js'/.test(offerte) && /controleerGebruiker\(req, res\)/.test(offerte));
+        truthy('offerte-proxy: bestanden verlopen na een uur', /expires_in_seconds', '3600'/.test(offerte));
+        truthy('offerte-proxy: wist altijd na het vergelijken', /finally\s*\{\s*await wis\(key, ids\)/.test(offerte));
+        truthy('offerte-proxy: alleen eigen bewijzen', /leesBewijs\(d\.bewijs, sleutel\)/.test(offerte));
       }
       const csp=document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.getAttribute('content')||'';
       const scriptSrc=(csp.split(';').find(d=>d.trim().startsWith('script-src'))||'');
@@ -17968,6 +17974,44 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     eq('ov schema-fout herkend', P.schemaNietOndersteund(400, 'output_config.format: this model does not support structured outputs'), true);
     eq('ov andere fout geen schema-fout', P.schemaNietOndersteund(500, 'output_config'), false);
     eq('ov PDF-fout geen schema-fout', P.schemaNietOndersteund(400, 'messages.0.content.0: unsupported document format'), false);
+  })();
+
+  // ══════════════════════════════════════════════════════════════════════════
+  //  OFFERTEVERGELIJKER — aanroepen naar de proxy (src/api.js)
+  // ══════════════════════════════════════════════════════════════════════════
+  await (async () => {
+    console.log('%c[TESTS] Offertevergelijker: proxy-aanroepen', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const A = await import('./api.js');
+    const C = await import('./config.js');
+    const oud = { fetch: window.fetch, token: state.oauthToken };
+    const calls = [];
+    try {
+      state.oauthToken = 'tok-ov';
+      window.fetch = async (url, opts) => {
+        calls.push({ url:String(url), opts });
+        if(String(url).includes('actie=upload')) return new Response(JSON.stringify({ bewijs:'file_a.sig' }), { status:200 });
+        if(String(url).includes('actie=vergelijk')) return new Response(JSON.stringify({ error:'Het AI-tegoed is op.' }), { status:502 });
+        return new Response(JSON.stringify({ ok:true }), { status:200 });
+      };
+      truthy('ov url: eigen route naast de chat', /\/api\/offerte$/.test(C.OFFERTE_URL));
+      const bewijs = await A.offerteUpload(new Uint8Array([37,80,68,70,45]), 'Offerte A B.pdf');
+      eq('ov upload: geeft het bewijs terug', bewijs, 'file_a.sig');
+      truthy('ov upload: actie en naam in de url', calls[0].url.includes('?actie=upload&naam=Offerte%20A%20B.pdf'));
+      eq('ov upload: ruwe bytes', calls[0].opts.headers['Content-Type'], 'application/octet-stream');
+      eq('ov upload: met token', calls[0].opts.headers.Authorization, 'Bearer tok-ov');
+      let fout = null;
+      try { await A.offerteVergelijk({ offertes:[] }); } catch(e) { fout = e; }
+      eq('ov vergelijk: foutmelding van de proxy', fout && fout.message, 'Het AI-tegoed is op.');
+      eq('ov vergelijk: status mee', fout && fout.status, 502);
+      truthy('ov vergelijk: json', calls[1].opts.headers['Content-Type'] === 'application/json');
+      window.fetch = async () => { throw new Error('net weg'); };
+      await A.offerteWis(['file_a.sig']);
+      truthy('ov wissen: gooit nooit', true);
+      state.oauthToken = '';
+      let geenToken = null;
+      try { await A.offerteUpload(new Uint8Array([1]), 'x.pdf'); } catch(e) { geenToken = e; }
+      truthy('ov upload: zonder inloggen geweigerd', !!geenToken);
+    } finally { window.fetch = oud.fetch; state.oauthToken = oud.token; }
   })();
 
   console.log = _origLog;         // het voortgangsspoor weer los

@@ -17891,6 +17891,84 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     }
   })();
 
+  // ══════════════════════════════════════════════════════════════════════════
+  //  OFFERTEVERGELIJKER — proxy-regels (offerte-proxy.js, offerte-schema.js)
+  // ══════════════════════════════════════════════════════════════════════════
+  await (async () => {
+    console.log('%c[TESTS] Offertevergelijker: proxy-regels', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const P = await import('../offerte-proxy.js');
+    const S = await import('../offerte-schema.js');
+
+    // Schema: elk object heeft additionalProperties:false en alle velden verplicht (eis van structured outputs)
+    const objecten = [];
+    (function loop(n){ if(!n || typeof n!=='object') return; if(n.type==='object') objecten.push(n); Object.values(n).forEach(loop); })(S.OFFERTE_SCHEMA);
+    truthy('ov schema: er zijn objecten', objecten.length > 5);
+    eq('ov schema: overal additionalProperties false', objecten.every(o => o.additionalProperties === false), true);
+    eq('ov schema: overal alle velden verplicht', objecten.every(o => JSON.stringify(Object.keys(o.properties).sort()) === JSON.stringify([...o.required].sort())), true);
+    eq('ov schema: geen minimum/maxLength (niet ondersteund)', /"(minimum|maximum|minLength|maxLength|minItems|maxItems)"/.test(JSON.stringify(S.OFFERTE_SCHEMA)), false);
+    eq('ov schema: drie statussen', S.ONDERDEEL_STATUS, ['inbegrepen','uitgesloten','niet_genoemd']);
+
+    // Bewijzen
+    const k = await P.bewijsSleutel('sk-test-1');
+    const b = await P.maakBewijs('file_abc123', k);
+    truthy('ov bewijs: vorm id.handtekening', /^file_abc123\.[A-Za-z0-9_-]+$/.test(b));
+    eq('ov bewijs: eigen bewijs wordt gelezen', await P.leesBewijs(b, k), 'file_abc123');
+    // Een teken middenin de handtekening wijzigen: het laatste teken van base64url draagt bits die
+    // bij het decoderen wegvallen, dus daar zou een wijziging onopgemerkt blijven.
+    const [bid, bsig] = b.split('.');
+    const vals = bid + '.' + bsig.slice(0, 5) + (bsig[5] === 'A' ? 'B' : 'A') + bsig.slice(6);
+    eq('ov bewijs: gewijzigde handtekening geweigerd', await P.leesBewijs(vals, k), null);
+    eq('ov bewijs: andere sleutel geweigerd', await P.leesBewijs(b, await P.bewijsSleutel('sk-test-2')), null);
+    eq('ov bewijs: los file_id zonder handtekening geweigerd', await P.leesBewijs('file_abc123', k), null);
+    eq('ov bewijs: rare tekens in id geweigerd', await P.leesBewijs('file_../x.' + b.split('.')[1], k), null);
+    eq('ov bewijs: geen tekst geweigerd', await P.leesBewijs({}, k), null);
+
+    // Invoercontrole
+    const o = (naam, paginas, delen) => ({ naam, paginas, delen });
+    const d = (van, tot) => ({ bewijs:'x', van, tot });
+    const goed = { vve:'VvE Drebbelstraat 40-44', traject:'Gevelonderhoud', offertes:[ o('Heijstek', 8, [d(1,8)]), o('Klusbouw', 17, [d(1,6), d(7,17)]) ] };
+    eq('ov invoer: goed', P.controleerVergelijk(goed), { ok:true });
+    truthy('ov invoer: één offerte geweigerd', !!P.controleerVergelijk({ ...goed, offertes:[goed.offertes[0]] }).fout);
+    truthy('ov invoer: vijf offertes geweigerd', !!P.controleerVergelijk({ ...goed, offertes:Array(5).fill(goed.offertes[0]) }).fout);
+    truthy('ov invoer: deel voorbij laatste pagina geweigerd', !!P.controleerVergelijk({ ...goed, offertes:[o('A', 5, [d(1,6)]), goed.offertes[0]] }).fout);
+    truthy('ov invoer: 13 delen geweigerd', !!P.controleerVergelijk({ ...goed, offertes:[o('A', 13, Array.from({length:13}, (_, i) => d(i+1, i+1))), goed.offertes[0]] }).fout);
+    truthy('ov invoer: 101 pagina\'s geweigerd', !!P.controleerVergelijk({ ...goed, offertes:[o('A', 93, [d(1,93)]), goed.offertes[0]] }).fout);
+    truthy('ov invoer: lege naam geweigerd', !!P.controleerVergelijk({ ...goed, offertes:[o(' ', 3, [d(1,3)]), goed.offertes[0]] }).fout);
+    truthy('ov invoer: niets geweigerd', !!P.controleerVergelijk(null).fout);
+
+    // Model
+    eq('ov model: staging mag Haiku kiezen', P.kiesModel('claude-haiku-5-5', false), 'claude-haiku-5-5');
+    eq('ov model: productie negeert de keuze', P.kiesModel('claude-haiku-5-5', true), P.STANDAARD_MODEL);
+    eq('ov model: onbekend model valt terug', P.kiesModel('gpt-4', false), P.STANDAARD_MODEL);
+
+    // Verzoek
+    const offs = [ { naam:'Heijstek Schilders', paginas:8, delen:[{ fileId:'file_a', van:1, tot:8 }] },
+                   { naam:'Klusbouw Meesters', paginas:17, delen:[{ fileId:'file_b', van:1, tot:6 }, { fileId:'file_c', van:7, tot:17 }] } ];
+    const v = P.bouwVerzoek({ offertes:offs, vve:'VvE Drebbelstraat 40-44', traject:'Gevelonderhoud', model:'claude-sonnet-5-5' });
+    const docs = v.messages[0].content.filter(c => c.type === 'document');
+    eq('ov verzoek: één document per deel', docs.map(x => x.source.file_id), ['file_a','file_b','file_c']);
+    eq('ov verzoek: bron is een bestand', docs[0].source.type, 'file');
+    truthy('ov verzoek: deel noemt de echte pagina\'s', docs[2].context.includes('Pagina 7 tot en met 17') && docs[2].context.includes('Klusbouw Meesters'));
+    truthy('ov verzoek: heel bestand gewoon benoemd', docs[0].context.includes('volledige offerte'));
+    const tekst = v.messages[0].content[v.messages[0].content.length - 1];
+    truthy('ov verzoek: lijst met indexen', tekst.type === 'text' && tekst.text.includes('0: Heijstek Schilders') && tekst.text.includes('1: Klusbouw Meesters'));
+    eq('ov verzoek: vast formaat', v.output_config.format.type, 'json_schema');
+    eq('ov verzoek: model', v.model, 'claude-sonnet-5-5');
+    truthy('ov verzoek: systeemregels verbieden oordeel', /goedkoopst/.test(v.system) && /geen advies/i.test(v.system));
+    const zonder = P.bouwVerzoek({ offertes:offs, vve:'', traject:'', model:'claude-haiku-5-5', metSchema:false });
+    eq('ov verzoek zonder schema: geen format', zonder.output_config.format, undefined);
+    truthy('ov verzoek zonder schema: schema in de instructie', zonder.system.includes('uitsluitend één JSON-object') && zonder.system.includes('"onderdelen"'));
+
+    // Antwoord lezen
+    truthy('ov antwoord: weigering', !!P.leesAntwoord({ stop_reason:'refusal', content:[] }).fout);
+    truthy('ov antwoord: afgekapt', !!P.leesAntwoord({ stop_reason:'max_tokens', content:[{ type:'text', text:'{' }] }).fout);
+    eq('ov antwoord: JSON', P.leesAntwoord({ stop_reason:'end_turn', content:[{ type:'thinking', thinking:'' }, { type:'text', text:'{"aannemers":[]}' }] }), { antwoord:{ aannemers:[] } });
+    eq('ov antwoord: JSON in codeblok', P.leesAntwoord({ stop_reason:'end_turn', content:[{ type:'text', text:'```json\n{"a":1}\n```' }] }), { antwoord:{ a:1 } });
+    truthy('ov antwoord: onzin', !!P.leesAntwoord({ stop_reason:'end_turn', content:[{ type:'text', text:'Hier is het overzicht.' }] }).fout);
+    eq('ov schema-fout herkend', P.schemaNietOndersteund(400, 'output_config.format: this model does not support structured outputs'), true);
+    eq('ov andere fout geen schema-fout', P.schemaNietOndersteund(500, 'output_config'), false);
+  })();
+
   console.log = _origLog;         // het voortgangsspoor weer los
   state._dubbelcheckUit = false;  // de testhaak weer los
   state._codecheckUit = false;

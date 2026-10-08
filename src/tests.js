@@ -18020,9 +18020,10 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   await (async () => {
     console.log('%c[TESTS] Offertevergelijker: rekenkern', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
     const M = await import('./vergelijk-model.js');
-    const N = ' ';
+    const N = '\u00a0';
 
     eq('ov bedrag: notatie', M.formatBedrag(160500), `€${N}1.605,00`);
+    eq('ov bedrag: vaste spatie na euroteken', M.formatBedrag(160500).charCodeAt(1), 0xA0);
     eq('ov bedrag: groot', M.formatBedrag(4351690), `€${N}43.516,90`);
     eq('ov bedrag: negatief', M.formatBedrag(-3871875), `−${N}€${N}38.718,75`);
     eq('ov bedrag: geen getal', M.formatBedrag(null), '');

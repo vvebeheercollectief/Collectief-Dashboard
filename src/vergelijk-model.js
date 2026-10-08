@@ -6,7 +6,7 @@
 // ══════════════════════════════════════
 import { BEDRAGEN, VOORWAARDEN, ONDERDEEL_STATUS } from '../offerte-schema.js';
 
-const NBSP = ' ';
+const NBSP = '\u00a0';
 const MAANDEN = ['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december'];
 
 export function formatBedrag(cent){

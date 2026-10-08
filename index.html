@@ -122,7 +122,7 @@
          bovenop de actiekolom van de takentabel: het vinkje 'afronden' van de rij eronder was niet
          aanklikbaar, je opende de chat. Gemeten op 1440x900 en op 375x812 — in de bovenbalk kan dat
          niet meer gebeuren. -->
-    <button class="ico-btn" id="chat-btn" title="Vraag over een VvE" aria-label="Vraag over een VvE" aria-expanded="false" aria-controls="chat-bg">
+    <button class="ico-btn" id="chat-btn" title="Vraag over het dashboard" aria-label="Vraag over het dashboard" aria-expanded="false" aria-controls="chat-bg">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 11.8a8.2 8.2 0 0 1-8.8 8.2 8.6 8.6 0 0 1-3.6-.9L3.5 20.5l1.4-4.6a8.6 8.6 0 0 1-.9-3.6 8.2 8.2 0 0 1 8.2-8.8 8.2 8.2 0 0 1 8.3 8.3z" fill="currentColor" fill-opacity="0.16"/></svg>
     </button>
     <button class="ico-btn" id="density-btn" title="Weergave: dichtheid">
@@ -1017,21 +1017,21 @@
 </div>
 
 <div id="chat-bg">
-  <div id="chat-paneel" role="dialog" aria-modal="false" aria-label="VvE-dossier chat-assistent">
+  <div id="chat-paneel" role="dialog" aria-modal="false" aria-label="Dashboard-chat">
     <div class="chat-hdr">
       <div class="chat-hdr-l">
-        <span class="chat-titel">Vraag over deze VvE</span>
-        <span id="chat-vve-label" class="chat-vve-label">—</span>
+        <span class="chat-titel">Vraag over het dashboard</span>
+        <span class="chat-vve-rij"><span id="chat-vve-label" class="chat-vve-label">Alle VvE's</span><button type="button" id="chat-vve-wis" class="chat-vve-wis" data-action="chat-vve-wis" hidden aria-label="VvE-filter wissen" title="Over het hele dashboard vragen">×</button></span>
       </div>
       <button class="modal-close" id="chat-close" aria-label="Sluiten">×</button>
     </div>
     <div class="chat-vve-wrap">
-      <input type="text" id="chat-vve-zoek" placeholder="Andere VvE kiezen… (code of naam)" autocomplete="off" aria-label="Kies een andere VvE"/>
+      <input type="text" id="chat-vve-zoek" placeholder="Alleen over één VvE? Kies hem hier (optioneel)" autocomplete="off" aria-label="Kies een VvE (optioneel)"/>
       <div class="vve-suggestions" id="chat-vve-sug"></div>
     </div>
     <div id="chat-bubbles" class="chat-bubbles"></div>
     <div class="chat-invoer">
-      <input type="text" id="chat-input" placeholder="Stel een vraag…" autocomplete="off" aria-label="Stel een vraag over dit dossier"/>
+      <input type="text" id="chat-input" placeholder="Stel een vraag…" autocomplete="off" aria-label="Stel een vraag over het dashboard"/>
       <button id="chat-send" data-action="chat-send" aria-label="Versturen"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5.5M5.5 12L12 5.5 18.5 12"/></svg></button>
     </div>
     <div class="chat-foot"><svg width="13" height="13" style="vertical-align:-2.5px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.8 12S6.5 5.7 12 5.7 21.2 12 21.2 12 17.5 18.3 12 18.3 2.8 12 2.8 12z" fill="currentColor" fill-opacity="0.18"/><circle cx="12" cy="12" r="2.7"/></svg> Leest alleen mee · verandert niets · via Claude (Haiku)</div>

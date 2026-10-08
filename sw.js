@@ -30,14 +30,14 @@ try {
 // loginscherm vervangen, en urgentie.js wordt alleen nog door de testsuite geïmporteerd. Beide
 // werden bij iedereen meegedownload en gecached. De BESTANDEN blijven wél staan: src/tests.js
 // hangt aan urgentie.js.
-const CACHE_VERSION = 'cd-v172';
+const CACHE_VERSION = 'cd-v173';
 // Dezelfde waarde als APP_VERSION in src/config.js, en die wordt bij ELKE wijziging opgehoogd.
 // Waarom hij hier staat: de browser besluit alleen dat er een nieuwe service worker is als het
 // BESTAND sw.js verandert. Een uitrol die alleen src/ raakt liet sw.js dus ongemoeid, en dan
 // verscheen de 'nieuwe versie'-balk niet — open sessies bleven de oude modules draaien tot iemand
 // toevallig herlaadde. Met deze regel verandert sw.js altijd mee. Er staat een toets in tests.js
 // die alarm slaat zodra dit getal en APP_VERSION uit elkaar lopen.
-const APP_VERSION = '14.5';
+const APP_VERSION = '15.0';
 // Geen './' meer: een navigatie naar de app krijgt altijd './index.html' uit de cache (zie
 // sw-strategie.js), dus een tweede kopie onder de kale map was alleen een extra download.
 const APP_SHELL = [
@@ -57,6 +57,7 @@ const APP_SHELL = [
   './src/versie.js',   // NIET versie.json zelf: dat komt altijd live (minimumversie-rem)
   './src/config.js',
   './allowed-emails.js',
+  './zoek-tools.js',
   './src/state.js',
   './src/rij.js',
   './src/util.js',
@@ -82,6 +83,7 @@ const APP_SHELL = [
   './src/kenmerken.js',
   './src/ai.js',
   './src/dossier-chat.js',
+  './src/dashboard-zoek.js',
   './src/notifications.js',
   './src/render-lijsten.js',
   './src/subsidie-fase.js',

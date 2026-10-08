@@ -325,6 +325,21 @@ async function askChat(system, messages){
   return (data.antwoord || '').trim();
 }
 
+// Zoekmodus van de dashboard-chat: één ronde van de zoeklus. Geeft de ruwe blokken van Claude
+// terug ({content, stop_reason}); dossier-chat.js voert de gevraagde filters uit en roept dit
+// opnieuw aan. `laatste` = de zoekrondes zijn op, Claude moet nu antwoorden.
+async function askZoek(system, messages, laatste){
+  if(!state.oauthToken) throw new Error('Niet ingelogd');
+  const r = await fetchMetKlok(PROXY_URL, {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${state.oauthToken}` },
+    body: JSON.stringify({ modus:'zoek', system, messages, laatste: !!laatste }),
+  }, 'De AI gaf binnen een minuut geen antwoord', AI_TIMEOUT_MS);
+  const data = await r.json().catch(()=>({}));
+  if(!r.ok){ const e=new Error(data.error||'AI-fout'); e.status=r.status; throw e; }
+  return { content: Array.isArray(data.content) ? data.content : [], stop_reason: data.stop_reason || '' };
+}
+
 // ── Vingerafdruk van een rij ───────────────────────────────────────────────
 // De guard vergeleek tot v9.5 alléén kolom A. Dat bewijst 'deze rij hoort nog bij dezelfde
 // VvE', niet 'dit is nog dezelfde taak' — en voor een VvE met meerdere openstaande taken ving
@@ -555,4 +570,4 @@ async function assertRowsMatch(checks, sheetName='Nog Te Doen'){
 const assertRowMatch=(row, bronOfCode, sheetName)=>assertRowsMatch(
   [(bronOfCode && typeof bronOfCode==='object') ? { row, r:bronOfCode } : { row, code:bronOfCode }], sheetName);
 
-export { kapCel, NTD_DATUM, isOffline, fetchMetKlok, _isOffline, _isNetwerkFout, fetchSheet, fetchSheets, writeRange, writeRanges, writeRows, appendRange, appendRows, veiligeCel, _veiligeRij, _shiftNtdRows, _shiftAfRows, _herstelShift, _isTransient, _withRetry, askChat, _rowMismatch, _a1Bereik, vingerafdruk, rijVingerafdruk, _nummerDeel, _normCel, _rijNaarCellen, assertRowsMatch, assertRowMatch, NTD_OMSCHRIJVING, sheetsFetch };
+export { kapCel, NTD_DATUM, isOffline, fetchMetKlok, _isOffline, _isNetwerkFout, fetchSheet, fetchSheets, writeRange, writeRanges, writeRows, appendRange, appendRows, veiligeCel, _veiligeRij, _shiftNtdRows, _shiftAfRows, _herstelShift, _isTransient, _withRetry, askChat, askZoek, _rowMismatch, _a1Bereik, vingerafdruk, rijVingerafdruk, _nummerDeel, _normCel, _rijNaarCellen, assertRowsMatch, assertRowMatch, NTD_OMSCHRIJVING, sheetsFetch };

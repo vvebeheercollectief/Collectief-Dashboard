@@ -27,7 +27,7 @@ import { openResetModal, closeResetModal, doeReset } from './alv-reset.js';
 import { addAannemer, toggleAannemerBinnen, verwijderAannemer, startHernoem, stopHernoem, opgevolgd } from './offerte-aannemers.js';
 import { openHerhaalModal, toggleHerhaalStatus, deleteHerhaal } from './render-herhaal.js';
 import { openVvePagina, renderVve, addContactLog, terugVanDossier } from './render-vve.js';
-import { vraagChat, chatSuggestie } from './dossier-chat.js';
+import { vraagChat, chatSuggestie, setChatVve } from './dossier-chat.js';
 import { saveKenmerken } from './kenmerken.js';
 import { palKies, closePalette } from './palette.js';
 import { toggleBulkMode, bulkVink, bulkAlles, toggleBulkMenu, bulkDoe } from './bulk.js';
@@ -234,6 +234,7 @@ export const ACTIONS = {
   'vve-log-alles':         ()   => { state._vveLogAlles=true; renderVve(); },
   'chat-send':             ()   => vraagChat(),
   'chat-suggest':          (el) => chatSuggestie(el.dataset.q),
+  'chat-vve-wis':          ()   => setChatVve(''),
   'log-bewerken':          (el) => editLogboek(+el.dataset.row),
   'log-opslaan':           (el) => saveLogboek(+el.dataset.row, el.closest('.log-edit')),
   'log-annuleren':         ()   => cancelLogboek(),

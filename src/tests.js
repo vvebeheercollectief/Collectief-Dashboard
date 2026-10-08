@@ -22,7 +22,9 @@ import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFla
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
 import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _eindKolom, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, getAfInsertRow, OMSCHRIJVING_VELD, zetOmschrijving, _sheetBreedtes, getSheetIds, bevestigInvoegPlek, _naamBijCode, _zetNaamVeld, taakUitCache, kiesSectie, deleteTaskRow, deleteCurrentEditTask, completeCurrentEditTask, renderExtraVves, toonMeerVve, zetDeadlineVoorstel, herzieAlsSubtaak, kiesDuur, gekozenDuur, wisDuurKeuze, nietOpgeslagenVelden, offerteAanvraagGewijzigd, modalGewijzigd } from "./crud.js";
 import { urgentieScore, dagenStil, isVanMij, letOpSignalen } from "./urgentie.js";
-import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages, renderChat } from "./dossier-chat.js";
+import { dossierContextTekst, buildChatSysteemPrompt, _chatMessages, renderChat, buildZoekSysteemPrompt, vraagMetContext, zoekLus, antwoordHtml, ZOEK_MAX_RONDES } from "./dossier-chat.js";
+import { voerZoekUit, beschrijfZoek, vindVve, MAX_REGELS } from "./dashboard-zoek.js";
+import { ZOEK_TOOLS } from "../zoek-tools.js";
 import { shouldPromptReload, maakHerlaadKern, zelfdeWorker } from "./sw-update.js";
 import { doOAuth, ensureToken, logout, heeftFocus, vernieuwMetFocus, opGebaar, opFocusTerug, isTypVeld, stilRemMs } from "./auth.js";
 import { SPLASH_MS, _setFase } from "./login-splash.js";
@@ -3188,6 +3190,175 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('chat: context bevat geen opmaakmarkeringen', !_ctxOpm.includes('**') && !_ctxOpm.includes('_stil_'));
   truthy('chat: context houdt de tekst zelf wél', _ctxOpm.includes('dit is dringend en stil'));
 
+  // ══════════════════════════════════════════════════════════════════════════
+  //  DASHBOARD-CHAT (v15.0) — de zes zoekfilters en de zoeklus
+  // ══════════════════════════════════════════════════════════════════════════
+  // De filters tellen zelf (het model niet), kappen af op 25 regels, en een gekozen VvE werkt als
+  // extra filter. De zoeklus is getoetst met een nep-proxy: geen netwerk, wel de echte vorm.
+  await (async () => {
+    console.log('%c[TESTS] Dashboard-chat zoekfilters', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const T = new Date(2026, 9, 8);   // donderdag 8 oktober 2026
+    const leeg = () => Object.fromEntries(SKEYS.map(k => [k, []]));
+    const Dz = { ntd: leeg(), af: leeg(), alvo: [], alfa: [], logboek: [] };
+    Dz.ntd.OPPAKKEN = [
+      { code:'311001', naam:'VvE Alfa', actiepunt:'Lekkage dak herstellen', behandelaar:'Cihad', deadline:'01-10-2026', _sec:'OPPAKKEN' },
+      { code:'311002', naam:'VvE Beta', actiepunt:'Schilderwerk bespreken', behandelaar:'Jer', deadline:'20-10-2026', _sec:'OPPAKKEN' },
+      { code:'311001', naam:'VvE Alfa', actiepunt:'Terugkoppeling geven aan bestuur', behandelaar:'Jer, Cihad', deadline:'05-10-2026', opvolgdatum:'15-10-2026', _sec:'OPPAKKEN' },
+    ];
+    Dz.ntd['OFFERTE-TRAJECTEN'] = [
+      { code:'311002', naam:'VvE Beta', datumAangevraagd:'01-08-2026', offertes:'1/3', behandelaar:'Jer', deadline:'01-09-2026', _sec:'OFFERTE-TRAJECTEN' },
+      { code:'311003', naam:'VvE Gamma', datumAangevraagd:'', offertes:'0/2', behandelaar:'Cihad', _sec:'OFFERTE-TRAJECTEN' },
+    ];
+    Dz.af.OPPAKKEN = [
+      { code:'311001', naam:'VvE Alfa', actiepunt:'Lift gekeurd', datum:'15-09-2026', behandelaar:'Cihad' },
+      { code:'311002', naam:'VvE Beta', actiepunt:'Hekwerk vervangen', datum:'02-10-2026', behandelaar:'Jer' },
+      { code:'311003', naam:'VvE Gamma', actiepunt:'Dakgoot gereinigd', datum:'20-08-2026', behandelaar:'Jer' },
+    ];
+    Dz.alvo = [
+      { code:'311001', naam:'VvE Alfa', status:'Open', klaargezet:false, uitnodiging:false, notulen:false, begroting:false },
+      { code:'311002', naam:'VvE Beta', status:'Klaargezet', klaargezet:true, uitnodiging:false, notulen:false, begroting:true },
+      { code:'311003', naam:'VvE Gamma', status:'Gepland', klaargezet:true, uitnodiging:true, notulen:false, begroting:true, budget:true },
+    ];
+    Dz.alfa = [{ code:'311002', naam:'VvE Beta', datum:'10-06-2026' }];
+    Dz.logboek = [
+      { code:'311001', timestamp:'2026-10-06T09:00:00.000Z', actie:'Contact', veld:'Telefoon', oudeWaarde:'Bestuur',
+        nieuweWaarde:'lekkage gemeld door de **voorzitter**', gebruiker:'info@vvebeheercollectief.nl' },
+      { code:'311002', timestamp:'2026-09-01T09:00:00.000Z', actie:'Notitie', veld:'', oudeWaarde:'',
+        nieuweWaarde:'aannemer nabellen', gebruiker:'djiowchico@gmail.com' },
+    ];
+    const z = (n, inv, d = Dz) => voerZoekUit(n, inv, d, T, { dossier: dossierContextTekst });
+    const regels = t => t.split('\n').filter(l => l.startsWith('- ')).length;
+
+    // 1. Taken
+    truthy('zoek: alle open taken, exact geteld', z('zoek_taken', {}).startsWith('Open taken: 5 gevonden'));
+    truthy('zoek: te laat telt alleen verstreken deadlines (aangevraagde offerte niet)', z('zoek_taken', { te_laat:true }).startsWith('Open taken: 2 gevonden'));
+    truthy('zoek: weggelegd uitsluiten', z('zoek_taken', { te_laat:true, weggelegd:false }).startsWith('Open taken: 1 gevonden'));
+    truthy('zoek: alleen weggelegd', z('zoek_taken', { weggelegd:true }).includes('weggelegd tot 15-10-2026'));
+    truthy('zoek: behandelaar Cihad (ook in een duo)', z('zoek_taken', { behandelaar:'Cihad' }).startsWith('Open taken: 3 gevonden'));
+    truthy('zoek: behandelaar op hele naam, niet op een stukje', z('zoek_taken', { behandelaar:'Je' }).startsWith('Open taken: 0 gevonden'));
+    truthy('zoek: VvE-code als filter', z('zoek_taken', { vve_code:'311001' }).startsWith('Open taken: 2 gevonden'));
+    truthy('zoek: VvE ook op naam te vinden', z('zoek_taken', { vve_code:'Alfa' }).startsWith('Open taken: 2 gevonden'));
+    truthy('zoek: dubbelzinnige naam vraagt om de code', z('zoek_taken', { vve_code:'VvE' }).includes('Gebruik de VvE-code'));
+    truthy('zoek: onbekende VvE wordt gemeld, niet stil leeg', z('zoek_taken', { vve_code:'999999' }).includes('niet in het register'));
+    truthy('zoek: zoekwoord', z('zoek_taken', { zoekwoord:'LEKKAGE' }).startsWith('Open taken: 1 gevonden'));
+    truthy('zoek: deadline-periode inclusief beide grenzen', z('zoek_taken', { deadline_van:'2026-10-01', deadline_tot:'2026-10-05' }).startsWith('Open taken: 2 gevonden'));
+    truthy('zoek: tabblad', z('zoek_taken', { tabblad:'Offerte-trajecten' }).startsWith('Open taken: 2 gevonden'));
+    truthy('zoek: onbekend tabblad gemeld', z('zoek_taken', { tabblad:'Bestaat niet' }).includes('Onbekend tabblad'));
+    const _gr = z('zoek_taken', { groepeer_op:'behandelaar' });
+    truthy('zoek: groeperen per behandelaar telt', _gr.includes('- Cihad: 3') && _gr.includes('- Jer: 3') && _gr.includes('5 in totaal'));
+    truthy('zoek: te laat staat bovenaan', z('zoek_taken', { tabblad:'Oppakken' }).split('\n')[1].includes('TE LAAT'));
+    // De 25-regelgrens: het aantal blijft exact, de lijst wordt kort.
+    const Dveel = { ...Dz, ntd: { ...leeg(), OPPAKKEN: Array.from({ length: 30 }, (_, i) =>
+      ({ code:'311001', naam:'VvE Alfa', actiepunt:'Taak ' + i, behandelaar:'Jer', deadline:'20-10-2026', _sec:'OPPAKKEN' })) } };
+    const _veel = z('zoek_taken', {}, Dveel);
+    truthy('zoek: 30 treffers worden 30 genoemd', _veel.startsWith('Open taken: 30 gevonden, de eerste 25'));
+    eq('zoek: hoogstens 25 regels', regels(_veel), MAX_REGELS);
+    truthy('zoek: de rest wordt genoemd', _veel.includes('nog 5 meer'));
+
+    // 2. Afgerond
+    truthy('zoek afgerond: periode', z('zoek_afgerond', { van:'2026-09-01', tot:'2026-09-30' }).startsWith('Afgeronde taken: 1 gevonden'));
+    truthy('zoek afgerond: behandelaar', z('zoek_afgerond', { behandelaar:'Jer' }).startsWith('Afgeronde taken: 2 gevonden'));
+    const _mnd = z('zoek_afgerond', { groepeer_op:'maand' });
+    truthy('zoek afgerond: per maand', _mnd.includes('- 2026-10: 1') && _mnd.includes('- 2026-09: 1') && _mnd.includes('- 2026-08: 1'));
+    truthy('zoek afgerond: nieuwste eerst', z('zoek_afgerond', {}).split('\n')[1].includes('Hekwerk'));
+
+    // 3. ALV's
+    const _alv = z('zoek_alvs', { status:'Open' });
+    truthy('zoek alv: stand per status klopt', _alv.includes('Open 1, Klaargezet 1, Gepland 1, Afgerond 0'));
+    truthy('zoek alv: status-filter', _alv.includes("ALV's met status Open: 1 gevonden") && _alv.includes('311001'));
+    truthy('zoek alv: budgetpakket', z('zoek_alvs', { budget:true }).includes("ALV's: 1 gevonden") && z('zoek_alvs', { budget:true }).includes('311003'));
+    truthy('zoek alv: afgeronde ALV\'s per periode', z('zoek_alvs', { afgerond_van:'2026-01-01' }).includes("Afgeronde ALV's: 1 gevonden"));
+
+    // 4. Offertes
+    const _off = z('zoek_offertes', { min_dagen_open:60 });
+    truthy('zoek offertes: dagen open berekend', _off.startsWith('Offerte-trajecten: 1 gevonden') && _off.includes('68 dagen open') && _off.includes('1/3 offertes binnen'));
+    truthy('zoek offertes: geen binnen', z('zoek_offertes', { binnen:'geen' }).includes('311003'));
+    truthy('zoek offertes: deels binnen', z('zoek_offertes', { binnen:'deels' }).startsWith('Offerte-trajecten: 1 gevonden'));
+    truthy('zoek offertes: niet aangevraagd heet zo', z('zoek_offertes', { vve_code:'311003' }).includes('nog niet aangevraagd'));
+
+    // 5. Logboek
+    const _log = z('zoek_logboek', { zoekwoord:'lekkage' });
+    truthy('zoek logboek: zoekwoord + medewerker op naam', _log.startsWith('Logboekregels: 1 gevonden') && _log.includes('(Jer)'));
+    truthy('zoek logboek: zonder opmaakmarkeringen', !_log.includes('**'));
+    truthy('zoek logboek: soort notitie', z('zoek_logboek', { soort:'notitie' }).startsWith('Logboekregels: 1 gevonden'));
+    truthy('zoek logboek: medewerker', z('zoek_logboek', { medewerker:'Cihad' }).includes('aannemer nabellen'));
+    truthy('zoek logboek: periode', z('zoek_logboek', { van:'2026-10-01' }).startsWith('Logboekregels: 1 gevonden'));
+
+    // 6. Dossier + vangnetten
+    truthy('zoek dossier: het dossier van de VvE', z('vve_dossier', { vve_code:'311001' }).includes('Lekkage dak herstellen'));
+    truthy('zoek dossier: zonder code een melding', z('vve_dossier', {}).includes('Geef een VvE-code'));
+    truthy('zoek: onbekend filter gemeld', z('bestaat_niet', {}).includes('Onbekend filter'));
+    truthy('zoek: een vastlopend filter stopt het gesprek niet', z('zoek_taken', {}, null).includes('liep vast'));
+    eq('zoek: vindVve leeg = geen filter', vindVve('', Dz), { code:'' });
+    eq('zoek: statusregel voor de gebruiker', beschrijfZoek('zoek_logboek', { zoekwoord:'lekkage' }), 'zoekt in het logboek op "lekkage"…');
+    // Elk filter dat de proxy aanbiedt, bestaat hier ook (en andersom), en geen enkel schema laat
+    // onbekende velden toe.
+    truthy('zoek: elk tool uit zoek-tools.js is uitvoerbaar', ZOEK_TOOLS.every(t => !z(t.name, { vve_code:'311001' }).includes('Onbekend filter')));
+    truthy('zoek: alle schema\'s zijn dicht', ZOEK_TOOLS.every(t => t.input_schema.additionalProperties === false));
+
+    // Systeeminstructie en vraag
+    eq('chat zoek: systeeminstructie is bij elke vraag gelijk (cache)', buildZoekSysteemPrompt(), buildZoekSysteemPrompt());
+    truthy('chat zoek: systeeminstructie bevat geen datum', !/20\d\d/.test(buildZoekSysteemPrompt()));
+    truthy('chat zoek: statusinversie-regel blijft', /terugkoppeling gegeven/i.test(buildZoekSysteemPrompt()) && /status of voltooiing/i.test(buildZoekSysteemPrompt()));
+    truthy('chat zoek: tellen doet het filter', /Tel nooit zelf/i.test(buildZoekSysteemPrompt()));
+    const _vm = vraagMetContext('Wat is te laat?', '311001', 'VvE Alfa', T);
+    truthy('chat zoek: vraag draagt de datum', _vm.includes('donderdag 8 oktober 2026 (2026-10-08)'));
+    truthy('chat zoek: vraag draagt de gekozen VvE', _vm.includes('Gekozen VvE: 311001 (VvE Alfa)') && _vm.endsWith('Wat is te laat?'));
+    truthy('chat zoek: zonder VvE het hele dashboard', vraagMetContext('x', '', '', T).includes('hele dashboard'));
+
+    // Antwoord als HTML
+    const _ah = antwoordHtml('Zie 311001 en 999999 <script>x</script> **let op**', new Set(['311001']));
+    truthy('chat zoek: bekende VvE-code klikbaar', _ah.includes('data-action="vve-open"') && _ah.includes('data-code="311001"'));
+    truthy('chat zoek: onbekend getal niet klikbaar', !_ah.includes('data-code="999999"'));
+    truthy('chat zoek: geen HTML uit het antwoord', !_ah.includes('<script>') && _ah.includes('&lt;script&gt;'));
+    truthy('chat zoek: vet wordt vet', _ah.includes('<b>let op</b>'));
+
+    // De zoeklus met een nep-proxy
+    const oproepen = [], statussen = [];
+    const begin = [{ role:'user', content:'[Vandaag: …]\n\nWat is te laat?' }];
+    const antwoord = await zoekLus('SYS', begin, {
+      vraag: async (sys, msgs, laatste) => {
+        oproepen.push({ sys, msgs: msgs.map(m => m), laatste });
+        if(oproepen.length === 1) return { stop_reason:'tool_use', content:[
+          { type:'thinking', thinking:'', signature:'sig-1' },
+          { type:'tool_use', id:'tu_1', name:'zoek_taken', input:{ te_laat:true } } ] };
+        return { stop_reason:'end_turn', content:[{ type:'text', text:'Er zijn 2 taken te laat: 311001.' }] };
+      },
+      voerUit: (n, inv) => z(n, inv),
+      opStatus: t => statussen.push(t),
+    });
+    eq('zoeklus: antwoord komt door', antwoord, 'Er zijn 2 taken te laat: 311001.');
+    eq('zoeklus: twee rondes', oproepen.length, 2);
+    const ronde2 = oproepen[1].msgs;
+    eq('zoeklus: thinking-blok onveranderd terug', ronde2[1].content[0].signature, 'sig-1');
+    eq('zoeklus: resultaat hoort bij de juiste aanvraag', ronde2[2].content[0].tool_use_id, 'tu_1');
+    truthy('zoeklus: resultaat is het filter', ronde2[2].content[0].content.startsWith('Open taken: 2 gevonden'));
+    eq('zoeklus: de gebruiker ziet waar hij zoekt', statussen, ['zoekt in de open taken (te laat)…']);
+    eq('zoeklus: het meegegeven gesprek blijft onaangeroerd', begin.length, 1);
+    eq('zoeklus: gewone ronde is niet de laatste', oproepen[0].laatste, false);
+
+    // Blijft Claude zoeken, dan stopt de lus na vier rondes en moet hij antwoorden.
+    const op2 = [];
+    const ant2 = await zoekLus('SYS', begin, {
+      vraag: async (sys, msgs, laatste) => {
+        op2.push({ msgs, laatste });
+        return laatste
+          ? { stop_reason:'end_turn', content:[{ type:'text', text:'Mogelijk onvolledig.' }] }
+          : { stop_reason:'tool_use', content:[{ type:'tool_use', id:'tu_' + op2.length, name:'zoek_logboek', input:{} }] };
+      },
+      voerUit: (n, inv) => z(n, inv),
+    });
+    eq('zoeklus: hoogstens vier zoekrondes + één antwoordronde', op2.length, ZOEK_MAX_RONDES + 1);
+    eq('zoeklus: de vijfde aanroep is de laatste', op2.map(o => o.laatste), [false, false, false, false, true]);
+    truthy('zoeklus: Claude hoort dat de rondes op zijn', JSON.stringify(op2[4].msgs[op2[4].msgs.length - 1]).includes('zoekrondes zijn op'));
+    eq('zoeklus: en antwoordt dan', ant2, 'Mogelijk onvolledig.');
+
+    const ant3 = await zoekLus('SYS', begin, { vraag: async () => ({ stop_reason:'max_tokens', content:[{ type:'text', text:'Half' }] }), voerUit: () => '' });
+    truthy('zoeklus: afgekapt antwoord wordt gemeld', ant3.startsWith('Half') && ant3.includes('afgekapt'));
+    const ant4 = await zoekLus('SYS', begin, { vraag: async () => ({ stop_reason:'end_turn', content:[] }), voerUit: () => '' });
+    truthy('zoeklus: leeg antwoord wordt geen lege bubbel', ant4.length > 10);
+  })();
+
   // ── SW-update: balk alleen bij echte update, niet bij eerste installatie ──
   eq('sw: geen balk bij eerste installatie (geen controller)', shouldPromptReload(null), false);
   eq('sw: geen balk bij undefined controller', shouldPromptReload(undefined), false);
@@ -6250,7 +6421,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '14.5');
+  eq('versie opgehoogd', APP_VERSION, '15.0');
 
   // ── Tabbladen ÍN de kaartkop (v11.7) ──
   // De kop van de kaart zei links exact hetzelfde als het actieve tabblad — 'Oppakken' boven

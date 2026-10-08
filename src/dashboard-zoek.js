@@ -13,8 +13,10 @@
 // Alles hier is puur (gegevens en datum gaan erin), zodat het zonder netwerk te toetsen is.
 import { SECS, SKEYS } from './config.js';
 import { displayName, taakTitel, parseDt, parseOff, opvolgStatus, teLaatVoorTelling,
-         offerteAangevraagd, splitBehandelaar, _vandaagAmsterdam } from './util.js';
-import { fmtLogTs } from './render-overig.js';
+         offerteAangevraagd, splitBehandelaar, _vandaagAmsterdam, _verschilInKalenderdagen,
+         parseAannemers, reconcileOffertes } from './util.js';
+import { fmtLogTs, logPaginaSoort } from './render-overig.js';
+import { telbaar } from './bundel.js';
 import { zonderOpmaak } from './opmaak.js';
 import { ZOEK_TOOL_NAMEN } from '../zoek-tools.js';
 
@@ -71,6 +73,11 @@ function vindVve(invoer, data){
   if(!v) return { code: '' };
   const reg = _vveRegister(data);
   if(reg.has(v)) return { code: v };
+  // Een VvE die alleen nog in de historie staat (bijv. uit beheer) moet op zijn exacte code wél te
+  // vinden zijn: juist dan wil je terugzoeken wat er speelde.
+  const inHistorie = SKEYS.some(s => (data.af?.[s] || []).some(r => r.code === v))
+    || (data.alfa || []).some(r => r.code === v) || (data.logboek || []).some(r => r.code === v);
+  if(inHistorie) return { code: v };
   const treffers = [...reg].filter(([, naam]) => _klein(naam).includes(_klein(v)));
   if(treffers.length === 1) return { code: treffers[0][0] };
   if(treffers.length > 1){
@@ -123,8 +130,11 @@ function zoekTaken(inv, data, vandaag){
   const v = vindVve(inv.vve_code, data); if(v.fout) return v.fout;
   const van = _invoerDatum(inv.deadline_van), tot = _invoerDatum(inv.deadline_tot);
   const woord = _klein(inv.zoekwoord).trim();
+  // `telbaar` laat de automatische stap 'offertes voorleggen' weg, net als de pillen bovenin en
+  // Analytics. Zonder dat noemde de chat een ander aantal dan het scherm ernaast.
+  const tel = telbaar(data.ntd, data.af);
   const items = [];
-  s.secs.forEach(sec => (data.ntd?.[sec] || []).forEach(r => {
+  s.secs.forEach(sec => (tel.ntd[sec] || []).forEach(r => {
     if(v.code && r.code !== v.code) return;
     if(inv.behandelaar && !_isBehandelaar(r.behandelaar, inv.behandelaar)) return;
     const weg = opvolgStatus(r, vandaag).weggelegd;
@@ -156,8 +166,9 @@ function zoekAfgerond(inv, data){
   const v = vindVve(inv.vve_code, data); if(v.fout) return v.fout;
   const van = _invoerDatum(inv.van), tot = _invoerDatum(inv.tot);
   const woord = _klein(inv.zoekwoord).trim();
+  const tel = telbaar(data.ntd, data.af);   // zie zoekTaken
   const items = [];
-  s.secs.forEach(sec => (data.af?.[sec] || []).forEach(r => {
+  s.secs.forEach(sec => (tel.af[sec] || []).forEach(r => {
     if(v.code && r.code !== v.code) return;
     if(inv.behandelaar && !_isBehandelaar(r.behandelaar, inv.behandelaar)) return;
     if(!_inPeriode(parseDt(r.datum), van, tot)) return;
@@ -204,13 +215,19 @@ function zoekOffertes(inv, data, vandaag){
   const v = vindVve(inv.vve_code, data); if(v.fout) return v.fout;
   const nu = (vandaag || _vandaagAmsterdam()).getTime();
   const items = [];
-  (data.ntd?.['OFFERTE-TRAJECTEN'] || []).forEach(r => {
+  (telbaar(data.ntd, data.af).ntd['OFFERTE-TRAJECTEN'] || []).forEach(r => {
     if(v.code && r.code !== v.code) return;
     if(inv.behandelaar && !_isBehandelaar(r.behandelaar, inv.behandelaar)) return;
     const aangevraagd = offerteAangevraagd(r);
-    const dagen = aangevraagd ? Math.floor((nu - parseDt(r.datumAangevraagd)) / DAG_MS) : null;
+    // In kalenderdagen en niet in milliseconden: over de overgang naar zomertijd heen scheelt het
+    // anders een uur, en dan valt een traject van precies 30 dagen buiten 'minstens 30'.
+    const dagen = aangevraagd ? -_verschilInKalenderdagen(new Date(parseDt(r.datumAangevraagd)), vandaag || new Date(nu)) : null;
     if(inv.min_dagen_open != null && (dagen == null || dagen < inv.min_dagen_open)) return;
-    const [binnen, gevraagd] = parseOff(r.offertes);
+    // De teller uit de aannemerslijst, zoals het Offerte-tabblad hem toont. Kolom D zelf loopt achter
+    // zodra er een lijst is; het tabblad verrijkt de rij pas bij het tekenen (_verrijkOfferteRij),
+    // en na elke poll staat de ruwe waarde er weer.
+    const teller = reconcileOffertes(r._offertesManual !== undefined ? r._offertesManual : r.offertes, parseAannemers(r.aannemers));
+    const [binnen, gevraagd] = parseOff(teller);
     const stand = !gevraagd ? null : binnen === 0 ? 'geen' : binnen >= gevraagd ? 'alle' : 'deels';
     if(inv.binnen && stand !== inv.binnen) return;
     items.push({ r, dagen, binnen, gevraagd });
@@ -230,10 +247,15 @@ function zoekLogboek(inv, data){
   const v = vindVve(inv.vve_code, data); if(v.fout) return v.fout;
   const van = _invoerDatum(inv.van), tot = _invoerDatum(inv.tot);
   const woord = _klein(inv.zoekwoord).trim();
+  // Een notitie heet in het logboek 'Opmerking' (crud.js, addTaskNote); 'Notitie' bestaat alleen als
+  // SOORT contactmoment (actie 'Contact', veld 'Notitie'). Zonder soort dezelfde selectie als de
+  // Logboek-pagina (logPaginaSoort): geen kenmerk-, vinkje- of wegleg-ruis.
+  const isNotitie = r => r.actie === 'Opmerking' || (r.actie === 'Contact' && r.veld === 'Notitie');
   const items = (data.logboek || []).filter(r => {
     if(v.code && r.code !== v.code) return false;
-    if(inv.soort === 'contact' && r.actie !== 'Contact') return false;
-    if(inv.soort === 'notitie' && r.actie !== 'Notitie') return false;
+    if(!logPaginaSoort(r.actie)) return false;
+    if(inv.soort === 'contact' && (r.actie !== 'Contact' || isNotitie(r))) return false;
+    if(inv.soort === 'notitie' && !isNotitie(r)) return false;
     if(inv.medewerker && _klein(displayName(r.gebruiker)) !== _klein(inv.medewerker).trim()) return false;
     if((van != null || tot != null) && !_inPeriode(new Date(r.timestamp).getTime(), van, tot)) return false;
     if(woord && !_klein([r.code, r.veld, r.oudeWaarde, zonderOpmaak(r.nieuweWaarde)].join(' ')).includes(woord)) return false;
@@ -243,7 +265,7 @@ function zoekLogboek(inv, data){
     const wie = displayName(r.gebruiker) || r.gebruiker || '?';
     const wat = r.actie === 'Contact'
       ? `${r.veld || 'Contact'} met ${r.oudeWaarde || '?'}: ${_kap(r.nieuweWaarde)}`
-      : `${r.actie}${r.nieuweWaarde ? ': ' + _kap(r.nieuweWaarde) : ''}`;
+      : `${r.actie === 'Opmerking' ? 'Notitie' : r.actie}${r.nieuweWaarde ? ': ' + _kap(r.nieuweWaarde) : ''}`;
     return `- ${fmtLogTs(r.timestamp)} · ${r.code || '—'} · (${wie}) ${wat}`;
   });
   return _resultaat('Logboekregels', regels, items.length);

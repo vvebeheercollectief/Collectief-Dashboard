@@ -46,6 +46,9 @@ const ZOEK_MAX_BLOKKEN = 24;          // per bericht; Claude mag een paar filter
 const ZOEK_MAX_RESULTAAT = 20000;      // één filterresultaat; de browser kapt al af op 25 regels
 const ZOEK_MAX_TOTAAL = 300000;       // het hele verzoek, als JSON — ruwweg 100k tokens
 const ASSISTENT_BLOKKEN = new Set(['text', 'tool_use', 'thinking', 'redacted_thinking']);
+// Een eerder antwoord gaat bij een vervolgvraag als platte tekst mee. Met max_tokens 4096 kan dat
+// ruim 8.000 tekens zijn; met de dossiergrens zou het gesprek na één lang antwoord voorgoed vastlopen.
+const ZOEK_MAX_TEKST = 24000;
 
 function dossierBerichtenOk(messages){
   if (!Array.isArray(messages) || !messages.length || messages.length > MAX_MESSAGES) return false;
@@ -55,25 +58,29 @@ function dossierBerichtenOk(messages){
 
 function zoekBlokOk(rol, b){
   if (!b || typeof b !== 'object') return false;
-  if (b.type === 'text') return typeof b.text === 'string' && b.text.length <= MAX_MSG_CHARS;
+  if (b.type === 'text') return typeof b.text === 'string' && b.text.length <= ZOEK_MAX_TEKST;
   if (rol === 'user') {
     return b.type === 'tool_result' && typeof b.tool_use_id === 'string'
       && typeof b.content === 'string' && b.content.length <= ZOEK_MAX_RESULTAAT;
   }
-  if (b.type === 'tool_use') return ZOEK_TOOL_NAMEN.includes(b.name) && typeof b.id === 'string';
+  if (b.type === 'tool_use') return ZOEK_TOOL_NAMEN.includes(b.name) && typeof b.id === 'string'
+    && !!b.input && typeof b.input === 'object' && !Array.isArray(b.input);
   return b.type === 'thinking' || b.type === 'redacted_thinking';
 }
 
 function zoekBerichtenOk(messages){
   if (!Array.isArray(messages) || !messages.length || messages.length > ZOEK_MAX_MESSAGES) return false;
-  if (messages[messages.length - 1].role !== 'user') return false;
-  if (JSON.stringify(messages).length > ZOEK_MAX_TOTAAL) return false;
-  return messages.every(m => {
+  // Eerst de vorm van elk bericht, dán pas naar de eerste en laatste kijken: een `null` ertussen
+  // moet een 400 geven en geen 500.
+  const vormOk = messages.every(m => {
     if (!m || (m.role !== 'user' && m.role !== 'assistant')) return false;
-    if (typeof m.content === 'string') return m.content.length > 0 && m.content.length <= MAX_MSG_CHARS;
+    if (typeof m.content === 'string') return m.content.length > 0 && m.content.length <= ZOEK_MAX_TEKST;
     return Array.isArray(m.content) && m.content.length > 0 && m.content.length <= ZOEK_MAX_BLOKKEN
       && m.content.every(b => zoekBlokOk(m.role, b));
   });
+  if (!vormOk) return false;
+  if (messages[0].role !== 'user' || messages[messages.length - 1].role !== 'user') return false;
+  return JSON.stringify(messages).length <= ZOEK_MAX_TOTAAL;
 }
 
 function setCors(req, res){

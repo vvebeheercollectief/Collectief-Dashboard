@@ -3223,8 +3223,13 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     Dz.logboek = [
       { code:'311001', timestamp:'2026-10-06T09:00:00.000Z', actie:'Contact', veld:'Telefoon', oudeWaarde:'Bestuur',
         nieuweWaarde:'lekkage gemeld door de **voorzitter**', gebruiker:'info@vvebeheercollectief.nl' },
-      { code:'311002', timestamp:'2026-09-01T09:00:00.000Z', actie:'Notitie', veld:'', oudeWaarde:'',
+      { code:'311002', timestamp:'2026-09-01T09:00:00.000Z', actie:'Opmerking', veld:'', oudeWaarde:'',
         nieuweWaarde:'aannemer nabellen', gebruiker:'djiowchico@gmail.com' },
+      // Ruis die de Logboek-pagina ook niet toont, en een notitie die als contactsoort is gelogd.
+      { code:'311002', timestamp:'2026-09-02T09:00:00.000Z', actie:'Kenmerk', veld:'Lift', oudeWaarde:'', nieuweWaarde:'ja', gebruiker:'info@vvebeheercollectief.nl' },
+      { code:'311003', timestamp:'2026-09-03T09:00:00.000Z', actie:'Contact', veld:'Notitie', oudeWaarde:'Bestuur', nieuweWaarde:'bestuur wil uitstel', gebruiker:'info@vvebeheercollectief.nl' },
+      // Een VvE die alleen nog in de historie staat.
+      { code:'399999', timestamp:'2026-05-01T09:00:00.000Z', actie:'Opmerking', veld:'', oudeWaarde:'', nieuweWaarde:'oud dossier', gebruiker:'info@vvebeheercollectief.nl' },
     ];
     const z = (n, inv, d = Dz) => voerZoekUit(n, inv, d, T, { dossier: dossierContextTekst });
     const regels = t => t.split('\n').filter(l => l.startsWith('- ')).length;
@@ -3275,12 +3280,23 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     truthy('zoek offertes: geen binnen', z('zoek_offertes', { binnen:'geen' }).includes('311003'));
     truthy('zoek offertes: deels binnen', z('zoek_offertes', { binnen:'deels' }).startsWith('Offerte-trajecten: 1 gevonden'));
     truthy('zoek offertes: niet aangevraagd heet zo', z('zoek_offertes', { vve_code:'311003' }).includes('nog niet aangevraagd'));
+    // Met een aannemerslijst is díé de teller, ook als kolom D nog een oude waarde draagt.
+    const Doff = { ...Dz, ntd: { ...leeg(), 'OFFERTE-TRAJECTEN': [{ code:'311002', naam:'VvE Beta', datumAangevraagd:'01-08-2026',
+      offertes:'0/2', aannemers:'Jansen|1\nPietersen|1\nKlaassen|0', _sec:'OFFERTE-TRAJECTEN' }] } };
+    truthy('zoek offertes: teller uit de aannemerslijst', z('zoek_offertes', {}, Doff).includes('2/3 offertes binnen'));
+    // Over de zomertijdgrens heen (aangevraagd in de winter, vandaag in de zomer) telt hij kalenderdagen.
+    const Dzt = { ...Dz, ntd: { ...leeg(), 'OFFERTE-TRAJECTEN': [{ code:'311002', naam:'VvE Beta', datumAangevraagd:'01-03-2026', offertes:'0/1', _sec:'OFFERTE-TRAJECTEN' }] } };
+    truthy('zoek offertes: dagen in kalenderdagen, ook over zomertijd', voerZoekUit('zoek_offertes', { min_dagen_open:31 }, Dzt, new Date(2026, 3, 1)).includes('31 dagen open'));
 
     // 5. Logboek
     const _log = z('zoek_logboek', { zoekwoord:'lekkage' });
     truthy('zoek logboek: zoekwoord + medewerker op naam', _log.startsWith('Logboekregels: 1 gevonden') && _log.includes('(Jer)'));
     truthy('zoek logboek: zonder opmaakmarkeringen', !_log.includes('**'));
-    truthy('zoek logboek: soort notitie', z('zoek_logboek', { soort:'notitie' }).startsWith('Logboekregels: 1 gevonden'));
+    const _not = z('zoek_logboek', { soort:'notitie' });
+    truthy('zoek logboek: notitie = Opmerking + contactsoort Notitie', _not.startsWith('Logboekregels: 3 gevonden') && _not.includes('Notitie: aannemer nabellen'));
+    truthy('zoek logboek: contact zonder de notities', z('zoek_logboek', { soort:'contact' }).startsWith('Logboekregels: 1 gevonden'));
+    truthy('zoek logboek: geen kenmerk-ruis', z('zoek_logboek', {}).startsWith('Logboekregels: 4 gevonden') && !z('zoek_logboek', {}).includes('Kenmerk'));
+    truthy('zoek: VvE die alleen in de historie staat is op code te vinden', z('zoek_logboek', { vve_code:'399999' }).includes('oud dossier'));
     truthy('zoek logboek: medewerker', z('zoek_logboek', { medewerker:'Cihad' }).includes('aannemer nabellen'));
     truthy('zoek logboek: periode', z('zoek_logboek', { van:'2026-10-01' }).startsWith('Logboekregels: 1 gevonden'));
 

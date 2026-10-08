@@ -6437,7 +6437,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '15.3');
+  eq('versie opgehoogd', APP_VERSION, '15.4');
 
   // ── Tabbladen ÍN de kaartkop (v11.7) ──
   // De kop van de kaart zei links exact hetzelfde als het actieve tabblad — 'Oppakken' boven
@@ -17964,7 +17964,12 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     truthy('ov verzoek: heel bestand gewoon benoemd', docs[0].context.includes('volledige offerte'));
     const tekst = v.messages[0].content[v.messages[0].content.length - 1];
     truthy('ov verzoek: lijst met indexen', tekst.type === 'text' && tekst.text.includes('0: Heijstek Schilders') && tekst.text.includes('1: Klusbouw Meesters'));
-    eq('ov verzoek: vast formaat', v.output_config.format.type, 'json_schema');
+    // Standaard GEEN afgedwongen formaat: Anthropic weigerde het schema op staging (8-10-2026) eerst om
+    // de 16-unies-grens en daarna met 'The compiled grammar is too large' — een grens die nergens staat.
+    // Het schema gaat als instructie mee; de browser loopt het antwoord na (valideerAntwoord/maakOverzicht).
+    eq('ov verzoek: standaard geen afgedwongen formaat', v.output_config.format, undefined);
+    truthy('ov verzoek: standaard het schema in de instructie', v.system.includes('uitsluitend één JSON-object') && v.system.includes('"onderdelen"'));
+    eq('ov verzoek: afdwingen blijft mogelijk', P.bouwVerzoek({ offertes:offs, vve:'', traject:'', model:'claude-sonnet-5-5', metSchema:true }).output_config.format.type, 'json_schema');
     eq('ov verzoek: model', v.model, 'claude-sonnet-5-5');
     truthy('ov verzoek: systeemregels verbieden oordeel', /goedkoopst/.test(v.system) && /geen advies/i.test(v.system));
     const zonder = P.bouwVerzoek({ offertes:offs, vve:'', traject:'', model:'claude-haiku-5-5', metSchema:false });
@@ -17977,6 +17982,9 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     eq('ov antwoord: JSON', P.leesAntwoord({ stop_reason:'end_turn', content:[{ type:'thinking', thinking:'' }, { type:'text', text:'{"aannemers":[]}' }] }), { antwoord:{ aannemers:[] } });
     eq('ov antwoord: JSON in codeblok', P.leesAntwoord({ stop_reason:'end_turn', content:[{ type:'text', text:'```json\n{"a":1}\n```' }] }), { antwoord:{ a:1 } });
     truthy('ov antwoord: onzin', !!P.leesAntwoord({ stop_reason:'end_turn', content:[{ type:'text', text:'Hier is het overzicht.' }] }).fout);
+    eq('ov antwoord: zinnetje om het JSON-object heen', P.leesAntwoord({ stop_reason:'end_turn', content:[{ type:'text', text:'Hier is het overzicht:\n{"a":{"b":1}}\nSucces.' }] }), { antwoord:{ a:{ b:1 } } });
+    truthy('ov antwoord: een lijst is geen antwoord', !!P.leesAntwoord({ stop_reason:'end_turn', content:[{ type:'text', text:'[1,2]' }] }).fout);
+    truthy('ov antwoord: half object', !!P.leesAntwoord({ stop_reason:'end_turn', content:[{ type:'text', text:'{"a":' }] }).fout);
     eq('ov schema-fout herkend', P.schemaNietOndersteund(400, 'output_config.format: this model does not support structured outputs'), true);
     eq('ov andere fout geen schema-fout', P.schemaNietOndersteund(500, 'output_config'), false);
     eq('ov PDF-fout geen schema-fout', P.schemaNietOndersteund(400, 'messages.0.content.0: unsupported document format'), false);

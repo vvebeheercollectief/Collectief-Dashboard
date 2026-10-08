@@ -89,7 +89,13 @@ Regels:
 const ZONDER_SCHEMA = '\n\nAntwoord met uitsluitend één JSON-object, zonder tekst eromheen, volgens dit schema:\n'
   + JSON.stringify(OFFERTE_SCHEMA);
 
-export function bouwVerzoek({ offertes, vve, traject, model, metSchema = true }){
+// Standaard NIET afgedwongen. Anthropic weigerde het schema op staging (8 oktober 2026) eerst om de
+// grens van 16 velden met een unie en daarna met 'The compiled grammar is too large' — een grens die
+// nergens beschreven staat. Het schema gaat daarom als instructie mee, en de browser loopt het
+// antwoord zelf na (valideerAntwoord en maakOverzicht in src/vergelijk-model.js).
+export const SCHEMA_AFDWINGEN = false;
+
+export function bouwVerzoek({ offertes, vve, traject, model, metSchema = SCHEMA_AFDWINGEN }){
   const content = [];
   offertes.forEach((o, i) => o.delen.forEach(d => {
     const heel = d.van === 1 && d.tot === o.paginas;
@@ -118,10 +124,18 @@ export function leesAntwoord(data){
   if(data.stop_reason === 'max_tokens') return { fout:'Het antwoord werd te lang en is afgebroken. Probeer minder of kortere offertes.' };
   const tekst = (data.content || []).filter(b => b && b.type === 'text').map(b => b.text).join('').trim()
     .replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '');
-  try {
-    const a = JSON.parse(tekst);
-    return a && typeof a === 'object' ? { antwoord:a } : { fout:'Het antwoord was onleesbaar.' };
-  } catch(_) { return { fout:'Het antwoord was onleesbaar.' }; }
+  // Zonder afgedwongen formaat kan er een zinnetje om het JSON-object heen staan: probeer dan het
+  // stuk van de eerste { tot de laatste }.
+  const kandidaten = [tekst];
+  const i = tekst.indexOf('{'), j = tekst.lastIndexOf('}');
+  if(i > 0 || (j >= 0 && j < tekst.length - 1)) kandidaten.push(tekst.slice(i, j + 1));
+  for(const t of kandidaten){
+    try {
+      const a = JSON.parse(t);
+      if(a && typeof a === 'object' && !Array.isArray(a)) return { antwoord:a };
+    } catch(_) {}
+  }
+  return { fout:'Het antwoord was onleesbaar.' };
 }
 
 // Een model dat het vaste formaat niet kent, geeft een 400 die het veld noemt. Dan één keer

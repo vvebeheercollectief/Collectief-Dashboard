@@ -18237,6 +18237,8 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const V = await import('./vergelijk-pdf.js');
     const N = '\u00a0';
     const rij = { taakId:'T-OV1', code:'311145', naam:'Drebbelstraat 40-44', opmerkingen:'Gevelonderhoud', aannemers:'Heijstek Schilders|1\nKlusbouw Meesters|1' };
+    const rijB = { taakId:'T-OV2', code:'311146', naam:'Proefweg 1', opmerkingen:'Dakwerk', aannemers:'A Dak|1\nB Dak|1' };
+    const wachtOp = async (f, ms = 4000) => { const t0 = Date.now(); while(!f() && Date.now() - t0 < ms) await new Promise(r => setTimeout(r, 20)); return f(); };
     const oud = { fetch:window.fetch, token:state.oauthToken, ntd:D.ntd['OFFERTE-TRAJECTEN'], log:D.logboek.length };
     const calls = [];
     let vergelijkAntwoord = null;
@@ -18250,7 +18252,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       opvallend:[ { index:1, tekst:'Subsidie verrekend.', pagina:8 } ],
     };
     try {
-      D.ntd['OFFERTE-TRAJECTEN'] = [...(oud.ntd || []), rij];
+      D.ntd['OFFERTE-TRAJECTEN'] = [...(oud.ntd || []), rij, rijB];
       state.oauthToken = 'tok-ov';
       window.fetch = async (url, opts) => {
         const u = decodeURIComponent(String(url));
@@ -18317,10 +18319,29 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       truthy('ov bewerk: nieuwe waarde', document.getElementById('ov-body').textContent.includes(`€${N}43.000,00`));
       truthy('ov bewerk: optelsom-waarschuwing', !!document.querySelector('#ov-body .ov-waarsch'));
 
+      // Fix-ronde 1 (#2): met een open invoerveld op een andere cel klikken = bewaren ÉN die cel openen.
+      // De echte volgorde: pointerdown → mousedown → focus verhuist (focusout) → click.
+      OV.startBewerk('voorwaarden', 1, 0);
+      document.getElementById('ov-edit').value = 'OFF-123';
+      const doel = document.querySelector('#ov-body .ov-cel[data-blok="voorwaarden"][data-rij="3"][data-kol="1"]');
+      doel.dispatchEvent(new PointerEvent('pointerdown', { bubbles:true, cancelable:true }));
+      doel.dispatchEvent(new MouseEvent('mousedown', { bubbles:true, cancelable:true }));
+      const oudVeld = document.getElementById('ov-edit');
+      doel.focus();
+      // Zonder vensterfocus (headless) vuurt focus() geen focusout: dan doen we die hier zelf.
+      if(document.querySelector('#ov-body .ov-editor')) oudVeld.dispatchEvent(new FocusEvent('focusout', { bubbles:true, relatedTarget:doel }));
+      doel.click();
+      truthy('ov klik tijdens bewerken: oude waarde bewaard', document.getElementById('ov-body').textContent.includes('OFF-123'));
+      eq('ov klik tijdens bewerken: volgende cel open', [OV._vergelijkerSessie().bewerk, document.getElementById('ov-edit')?.value], [{ blok:'voorwaarden', rij:3, kol:1 }, 'Alg. voorwaarden']);
+      OV.stopBewerk(false);
+      truthy('ov klik tijdens bewerken: Escape-pad laat waarde staan', document.getElementById('ov-body').textContent.includes('Alg. voorwaarden') && !document.getElementById('ov-edit'));
+
       // Logregel
+      // Fix-ronde 1 (#1): een tweede klik terwijl de eerste nog schrijft, geeft géén tweede regel.
+      await Promise.all([OV.schrijfLogregel(), OV.schrijfLogregel()]);
       await OV.schrijfLogregel();
       const log = calls.filter(c => c.url.includes('Logboek'));
-      eq('ov log: één schrijfactie', log.length, 1);
+      eq('ov log: één schrijfactie, ook bij gelijktijdige en latere aanroepen', log.length, 1);
       truthy('ov log: tekst', JSON.stringify(log[0].opts.body).includes('Offertevergelijking gemaakt: Heijstek Schilders, Klusbouw Meesters (2 offertes) — Gevelonderhoud'));
       eq('ov log: direct zichtbaar in het logboek', D.logboek[0].nieuweWaarde.startsWith('Offertevergelijking gemaakt'), true);
       eq('ov log: gemarkeerd als gedaan', OV._vergelijkerSessie().gelogd, true);
@@ -18341,6 +18362,40 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       truthy('ov fout: melding', document.querySelector('#ov-body .ov-fout')?.textContent.includes('Het AI-tegoed is op.'));
       eq('ov fout: bestanden blijven staan', document.querySelectorAll('#ov-body .ov-frij').length, 2);
       truthy('ov fout: bewijzen opgeruimd', calls.some(c => c.url.includes('actie=wis')));
+
+      // Fix-ronde 1 (#4): een PDF NAAST het sleepvlak (maar in het venster) mag de browser niet openen.
+      const dt = new DataTransfer();
+      dt.items.add(new File([await maakPdf(1)], 'Derde offerte.pdf', { type:'application/pdf' }));
+      const over = new DragEvent('dragover', { bubbles:true, cancelable:true, dataTransfer:dt });
+      document.getElementById('ov-body').dispatchEvent(over);
+      const val = new DragEvent('drop', { bubbles:true, cancelable:true, dataTransfer:dt });
+      document.getElementById('ov-body').dispatchEvent(val);
+      eq('ov slepen naast het vlak: browser opent niets', [over.defaultPrevented, val.defaultPrevented], [true, true]);
+      truthy('ov slepen naast het vlak: bestand toegevoegd', await wachtOp(() => document.querySelectorAll('#ov-body .ov-frij').length === 3));
+      OV.verwijderBestand(2);
+
+      // Fix-ronde 1 (#3): een vergelijking die op de achtergrond klaar is, tekent het ANDERE traject niet over.
+      OV.openVergelijker('nr:T-OV2');
+      await OV.voegBestandenToe([f1, f2]);
+      document.querySelectorAll('#ov-body .ov-fkol').forEach((x, i) => { x.value = ['A Dak', 'B Dak'][i]; x.dispatchEvent(new Event('input', { bubbles:true })); });
+      vergelijkAntwoord = () => new Response(JSON.stringify({ antwoord:ANT, model:'claude-sonnet-5-5' }), { status:200 });
+      await OV.vergelijk();
+      eq('ov twee trajecten: B klaar', OV._vergelijkerSessie().stap, 'nakijken');
+      OV.openVergelijker('nr:T-OV1');
+      let laat = null;
+      vergelijkAntwoord = () => new Promise(r => { laat = () => r(new Response(JSON.stringify({ antwoord:ANT, model:'claude-sonnet-5-5' }), { status:200 })); });
+      const pA = OV.vergelijk();
+      await wachtOp(() => laat);
+      OV.openVergelijker('nr:T-OV2');
+      OV.startBewerk('voorwaarden', 0, 0);
+      document.getElementById('ov-edit').value = 'getypt';
+      const toastVoor = document.getElementById('toast-container')?.textContent.split('Vergelijking klaar').length;
+      laat(); await pA;
+      eq('ov twee trajecten: invoerveld van B blijft staan', [document.getElementById('ov-sub').textContent.includes('311146'), document.getElementById('ov-edit')?.value], [true, 'getypt']);
+      truthy('ov twee trajecten: melding dat A klaar is', document.getElementById('toast-container')?.textContent.split('Vergelijking klaar').length > toastVoor);
+      OV.stopBewerk(false);
+      OV.openVergelijker('nr:T-OV1');
+      eq('ov twee trajecten: A in nakijken', OV._vergelijkerSessie().stap, 'nakijken');
     } finally {
       OV.sluitVergelijker(); OV._resetVergelijker();
       window.fetch = oud.fetch; state.oauthToken = oud.token;

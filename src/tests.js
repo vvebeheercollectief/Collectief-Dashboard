@@ -6437,7 +6437,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '15.2');
+  eq('versie opgehoogd', APP_VERSION, '15.3');
 
   // ── Tabbladen ÍN de kaartkop (v11.7) ──
   // De kop van de kaart zei links exact hetzelfde als het actieve tabblad — 'Oppakken' boven
@@ -17913,6 +17913,12 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     eq('ov schema: overal alle velden verplicht', objecten.every(o => JSON.stringify(Object.keys(o.properties).sort()) === JSON.stringify([...o.required].sort())), true);
     eq('ov schema: geen minimum/maxLength (niet ondersteund)', /"(minimum|maximum|minLength|maxLength|minItems|maxItems)"/.test(JSON.stringify(S.OFFERTE_SCHEMA)), false);
     eq('ov schema: drie statussen', S.ONDERDEEL_STATUS, ['inbegrepen','uitgesloten','niet_genoemd']);
+    // Anthropic weigert een schema met meer dan 16 velden met een unie (anyOf of een type-lijst,
+    // zoals 'string of null'): "Schemas contains too many parameters with union types" — staging
+    // 8-10-2026, 28 stuks. 'Leeg' loopt daarom via vaste waarden ('' / 0 / vermeld:false).
+    let unies = 0;
+    (function tel(n){ if(!n || typeof n!=='object') return; if(Array.isArray(n.anyOf) || Array.isArray(n.type)) unies++; Object.values(n).forEach(tel); })(S.OFFERTE_SCHEMA);
+    eq('ov schema: geen velden met een unie (Anthropic staat er hoogstens 16 toe)', unies, 0);
 
     // Bewijzen
     const k = await P.bewijsSleutel('sk-test-1');
@@ -18086,6 +18092,20 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     eq('ov reken: posten opgeteld', [r4.inclBtw.cent, r4.inclBtw.bron, r4.inclBtw.som], [125050, 'berekend', 'som van 2 posten (p. 3, 4)']);
     const r5 = M.rekenUit(B({ exclBtw:{ bedrag:100, pagina:2, posten:[] }, btw:{ bedrag:21, pagina:2, posten:[] }, inclBtw:{ bedrag:121, pagina:2, posten:[] } }), [21]);
     eq('ov reken: alles letterlijk blijft letterlijk', [r5.exclBtw.bron, r5.btw.bron, r5.inclBtw.bron], ['letterlijk','letterlijk','letterlijk']);
+    // Het schema kent geen null meer: 'niet vermeld' komt binnen als vermeld:false met bedrag 0 en pagina 0.
+    const nv = { vermeld:false, bedrag:0, pagina:0, posten:[] };
+    const r6 = M.rekenUit({ exclBtw:nv, btw:nv, inclBtw:{ vermeld:true, bedrag:11253.16, pagina:6, posten:[] }, subsidie:nv }, [21]);
+    eq('ov reken: vermeld:false is niet € 0,00', [r6.subsidie.cent, r6.subsidie.bron], [null, 'niet_vermeld']);
+    eq('ov reken: vermeld:false wordt wel uitgerekend', [r6.exclBtw.cent, r6.exclBtw.bron], [930013, 'berekend']);
+    eq('ov reken: pagina 0 = geen pagina', M.rekenUit({ exclBtw:nv, btw:nv, inclBtw:{ vermeld:true, bedrag:100, pagina:0, posten:[] }, subsidie:nv }, []).inclBtw.pagina, null);
+    const r7 = M.rekenUit({ exclBtw:nv, btw:nv, inclBtw:{ vermeld:false, bedrag:0, pagina:0, posten:[{ omschrijving:'Gevel', bedrag:1000, pagina:3 }] }, subsidie:nv }, []);
+    eq('ov reken: posten bij vermeld:false', [r7.inclBtw.cent, r7.inclBtw.bron], [100000, 'berekend']);
+    const o2 = M.maakOverzicht({ aannemers:[{ index:0, naam:'A', bedragen:{ exclBtw:nv, btw:nv, inclBtw:nv, subsidie:nv }, btwPercentages:[],
+      voorwaarden:{ offertedatum:{ tekst:'', pagina:0 }, offertenummer:{ tekst:'', pagina:0 }, betaling:{ tekst:'30%', pagina:0 }, garantie:{ tekst:'', pagina:0 }, planning:{ tekst:'', pagina:0 }, geldigheid:{ tekst:'', pagina:0 }, stelposten:{ tekst:'', pagina:0 } } }],
+      onderdelen:[{ naam:'Dak', perAannemer:[{ index:0, status:'niet_genoemd', toelichting:'', pagina:0 }] }], opvallend:[] }, ['A']);
+    eq('ov overzicht: lege tekst = niet vermeld', [o2.voorwaarden[0].cellen[0].tekst, M.celMarkering(o2.voorwaarden[0].cellen[0])], ['', 'ontbreekt']);
+    eq('ov overzicht: pagina 0 = geen pagina', M.celMarkering(o2.voorwaarden[2].cellen[0]), 'geen_pagina');
+    eq('ov overzicht: niet vermeld bedrag blijft leeg', o2.bedragen[2].cellen[0].tekst, '');
 
     const ANT = {
       aannemers:[

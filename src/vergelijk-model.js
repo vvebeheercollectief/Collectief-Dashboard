@@ -42,7 +42,8 @@ export function rekenUit(bedragen, btwPercentages){
   const uit = {};
   for(const [k] of BEDRAGEN){
     const v = b[k] || {};
-    const cent = euroNaarCent(v.bedrag);
+    // vermeld:false = niet in de offerte (het schema kent geen null, zie offerte-schema.js).
+    const cent = v.vermeld === false ? null : euroNaarCent(v.bedrag);
     const posten = Array.isArray(v.posten) ? v.posten.filter(p => p && Number.isFinite(p.bedrag)) : [];
     if(cent !== null) uit[k] = { cent, bron:'letterlijk', pagina:geldigePagina(v.pagina), som:'' };
     else if(posten.length){

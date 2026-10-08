@@ -2,15 +2,15 @@
 // Gedeeld: api/offerte.js stuurt het mee naar Claude (structured outputs) en src/vergelijk-model.js
 // leest het antwoord ermee uit. Eén bron, zodat proxy en dashboard niet uit elkaar lopen.
 // Structured outputs eist dat élk object additionalProperties:false heeft en alle velden verplicht
-// zijn; 'mag leeg' loopt daarom via null (anyOf met type null), niet via een optioneel veld.
+// zijn. 'Mag leeg' loopt via vaste waarden — lege tekst, pagina 0, vermeld:false — en NIET via null:
+// Anthropic weigert een schema met meer dan 16 velden met een unie ('string of null'), en dit schema
+// had er 28 (staging, 8 oktober 2026). De toets 'geen velden met een unie' bewaakt dat.
 
 function obj(properties){
   return { type:'object', additionalProperties:false, required:Object.keys(properties), properties };
 }
-const NUL = { type:'null' };
-const TEKST_OF_NUL = { anyOf:[{ type:'string' }, NUL] };
-const GETAL_OF_NUL = { anyOf:[{ type:'number' }, NUL] };
-const PAGINA = { anyOf:[{ type:'integer' }, NUL] };
+const TEKST = { type:'string' };    // '' = niet vermeld
+const PAGINA = { type:'integer' };  // 0 = geen pagina
 
 export const ONDERDEEL_STATUS = ['inbegrepen', 'uitgesloten', 'niet_genoemd'];
 export const BEDRAGEN = [
@@ -21,11 +21,11 @@ export const VOORWAARDEN = [
   ['garantie', 'Garantie'], ['planning', 'Planning'], ['geldigheid', 'Geldig tot'], ['stelposten', 'Stelposten en meerwerk'],
 ];
 
-const VELD = obj({ tekst:TEKST_OF_NUL, pagina:PAGINA });
+const VELD = obj({ tekst:TEKST, pagina:PAGINA });
 const POST = obj({ omschrijving:{ type:'string' }, bedrag:{ type:'number' }, pagina:PAGINA });
-// bedrag = letterlijk uit de offerte, in euro's (1605.00). Geen totaal maar wel losse posten:
-// bedrag null en de posten in `posten`; de browser telt op.
-const BEDRAG = obj({ bedrag:GETAL_OF_NUL, pagina:PAGINA, posten:{ type:'array', items:POST } });
+// bedrag = letterlijk uit de offerte, in euro's (1605.00), alleen geldig bij vermeld:true. Geen
+// totaal maar wel losse posten: vermeld:false en de posten in `posten`; de browser telt op.
+const BEDRAG = obj({ vermeld:{ type:'boolean' }, bedrag:{ type:'number' }, pagina:PAGINA, posten:{ type:'array', items:POST } });
 
 export const OFFERTE_SCHEMA = obj({
   aannemers: { type:'array', items: obj({

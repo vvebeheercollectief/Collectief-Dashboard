@@ -74,9 +74,9 @@ export function kiesModel(gevraagd, productie){
 export const SYSTEEM = `Je vergelijkt offertes van aannemers voor een Vereniging van Eigenaars (VvE). Je antwoord wordt een overzicht dat de beheerder nakijkt en daarna naar het VvE-bestuur stuurt.
 
 Regels:
-- Gebruik alleen wat in de offertes staat. Weet je iets niet zeker, vul dan null in (bij bedrag, tekst of pagina) of de status niet_genoemd. Raad nooit.
+- Gebruik alleen wat in de offertes staat. Weet je iets niet zeker, laat het dan leeg: tekst "", pagina 0, bij een bedrag vermeld false (en bedrag 0), of de status niet_genoemd. Raad nooit.
 - Geef geen advies en geen oordeel. Gebruik geen woorden als goedkoopst, duurst, beste, voordeligst of aan te raden.
-- Neem bedragen letterlijk over als getal in euro's (1605.00, niet "€ 1.605"). Reken zelf niets uit. Staat er geen totaal maar wel losse posten, laat bedrag dan null en zet de posten in posten.
+- Neem bedragen letterlijk over als getal in euro's (1605.00, niet "€ 1.605"), met vermeld true. Reken zelf niets uit. Staat er geen totaal maar wel losse posten, zet dan vermeld false en de posten in posten.
 - btwPercentages: alleen de percentages die in de offerte genoemd worden, als getal (21, 9).
 - Bij elk bedrag, elke voorwaarde, elk onderdeel en elk opvallend punt hoort het paginanummer waar het staat. Is een offerte in delen gestuurd, gebruik dan het paginanummer van de hele offerte; de context van elk deel zegt welke pagina's het bevat.
 - onderdelen: één gezamenlijke lijst van de werkzaamheden, zodat dezelfde post bij elke aannemer in dezelfde rij staat. Geef per onderdeel voor elke aannemer: inbegrepen, uitgesloten (de offerte zegt uitdrukkelijk dat het er niet in zit) of niet_genoemd. Toelichting hoogstens zes woorden, of leeg.

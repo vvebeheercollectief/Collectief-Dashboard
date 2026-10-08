@@ -341,15 +341,32 @@ async function askZoek(system, messages, laatste){
 }
 
 // ── Offertevergelijker (api/offerte.js) ──
-// Lezen door Claude kan bij vier offertes ruim een minuut duren; de proxy mag 120 s.
-const OFFERTE_TIMEOUT_MS = 150_000;
-async function _offertePost(actie, { query = '', headers, body }, melding, ms){
+// Lezen door Claude kan bij vier offertes enkele minuten duren; de proxy mag 300 s (vercel.json).
+// De browser wacht net iets langer, zodat de proxy zelf zijn fout kan melden.
+const OFFERTE_TIMEOUT_MS = 310_000;
+const OFFERTE_TE_LANG = 'Het lezen duurde te lang. Probeer het met minder of kleinere offertes.';
+async function _offertePost(actie, { query = '', headers, body }, melding, ms, opnieuw = true){
   if(!state.oauthToken) throw new Error('Niet ingelogd');
   const url = `${OFFERTE_URL}?actie=${actie}${query ? '&' + query : ''}`;
   const r = await fetchMetKlok(url, { method:'POST', headers:{ ...headers, Authorization:`Bearer ${state.oauthToken}` }, body }, melding, ms);
-  const data = await r.json().catch(() => ({}));
-  if(!r.ok){ const e = new Error(data.error || 'Fout bij de offertevergelijker'); e.status = r.status; throw e; }
-  return data;
+  const tekst = await r.text().catch(() => '');
+  let data = null;
+  try { data = tekst ? JSON.parse(tekst) : {}; } catch(_) { data = null; }
+  // 401: het token verliep onderweg (het lezen duurt minuten; een token leeft een uur). Zelfde
+  // opruiming als de Sheets-aanroepen, dan één keer vernieuwen en opnieuw. De proxy controleert de
+  // inlog vóór hij iets doet, dus er is nog niets betaald. auth.js laadt hier pas bij gebruik: een
+  // vaste import zou api.js ↔ auth.js in een kring zetten (auth importeert fetchMetKlok van hier).
+  if(r.status === 401 && opnieuw){
+    state.oauthToken = null; state.oauthExpiry = 0;
+    const { ensureToken } = await import('./auth.js');
+    if(await ensureToken()) return _offertePost(actie, { query, headers, body }, melding, ms, false);
+  }
+  if(!r.ok){
+    // 504 (of een andere fout zonder JSON) komt van Vercel zelf: de functie liep over zijn tijd.
+    const e = new Error(r.status === 504 || data === null ? OFFERTE_TE_LANG : (data.error || 'Fout bij de offertevergelijker'));
+    e.status = r.status; throw e;
+  }
+  return data || {};
 }
 // Eén PDF of deel als ruwe bytes; terug komt het bewijs dat de proxy ondertekende.
 async function offerteUpload(bytes, naam){
@@ -359,7 +376,7 @@ async function offerteUpload(bytes, naam){
 }
 async function offerteVergelijk(invoer){
   return _offertePost('vergelijk', { headers:{ 'Content-Type':'application/json' }, body:JSON.stringify(invoer) },
-    'Claude gaf binnen tweeënhalve minuut geen antwoord', OFFERTE_TIMEOUT_MS);
+    'Claude gaf binnen vijf minuten geen antwoord. Probeer het met minder of kleinere offertes.', OFFERTE_TIMEOUT_MS);
 }
 // Opruimen na een fout of annuleren. Gooit nooit: de bestanden verlopen bij Anthropic sowieso na een uur.
 async function offerteWis(bewijzen){

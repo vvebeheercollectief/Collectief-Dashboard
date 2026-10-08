@@ -17983,10 +17983,10 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     console.log('%c[TESTS] Offertevergelijker: proxy-aanroepen', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
     const A = await import('./api.js');
     const C = await import('./config.js');
-    const oud = { fetch: window.fetch, token: state.oauthToken };
+    const oud = { fetch: window.fetch, token: state.oauthToken, expiry: state.oauthExpiry, client: state._gsiTokenClient, mail: state.currentUserEmail, bezig: state._authBezig };
     const calls = [];
     try {
-      state.oauthToken = 'tok-ov';
+      state.oauthToken = 'tok-ov'; state.oauthExpiry = Date.now() + 3600e3;
       window.fetch = async (url, opts) => {
         calls.push({ url:String(url), opts });
         if(String(url).includes('actie=upload')) return new Response(JSON.stringify({ bewijs:'file_a.sig' }), { status:200 });
@@ -18004,6 +18004,36 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       eq('ov vergelijk: foutmelding van de proxy', fout && fout.message, 'Het AI-tegoed is op.');
       eq('ov vergelijk: status mee', fout && fout.status, 502);
       truthy('ov vergelijk: json', calls[1].opts.headers['Content-Type'] === 'application/json');
+
+      // Eindronde #3: een time-out van Vercel (504, een HTML-pagina) geeft een begrijpelijke melding.
+      window.fetch = async () => new Response('<html><body>FUNCTION_INVOCATION_TIMEOUT</body></html>', { status:504, headers:{ 'Content-Type':'text/html' } });
+      let traag = null;
+      try { await A.offerteVergelijk({ offertes:[] }); } catch(e) { traag = e; }
+      eq('ov 504: duidelijke melding', [traag && traag.message, traag && traag.status], ['Het lezen duurde te lang. Probeer het met minder of kleinere offertes.', 504]);
+      window.fetch = async () => new Response('Bad gateway', { status:502 });
+      let geenJson = null;
+      try { await A.offerteVergelijk({ offertes:[] }); } catch(e) { geenJson = e; }
+      eq('ov fout zonder json: zelfde melding', geenJson && geenJson.message, 'Het lezen duurde te lang. Probeer het met minder of kleinere offertes.');
+
+      // Eindronde #1: een 401 (token verlopen tijdens het minutenlange lezen) → token vernieuwen en
+      // precies één keer opnieuw. De Google-inlog is nagebootst: de stille aanvraag levert meteen een vers token.
+      state.currentUserEmail = state.currentUserEmail || 'proef@voorbeeld.nl';
+      state._gsiTokenClient = { callback:null, requestAccessToken(){ setTimeout(() => this.callback({ access_token:'tok-vers', expires_in:3600 }), 0); } };
+      const auth = [];
+      window.fetch = async (url, opts) => {
+        auth.push(opts.headers.Authorization);
+        return auth.length === 1 ? new Response(JSON.stringify({ error:'Niet ingelogd' }), { status:401 })
+                                 : new Response(JSON.stringify({ antwoord:{ x:1 }, model:'m' }), { status:200 });
+      };
+      const na = await A.offerteVergelijk({ offertes:[] }).catch(e => ({ fout:e }));
+      eq('ov 401: token vernieuwd en één keer opnieuw', [na && na.model, auth], ['m', ['Bearer tok-ov', 'Bearer tok-vers']]);
+      const auth2 = [];
+      window.fetch = async (url, opts) => { auth2.push(opts.headers.Authorization); return new Response(JSON.stringify({ error:'Niet ingelogd' }), { status:401 }); };
+      let blijft = null;
+      try { await A.offerteVergelijk({ offertes:[] }); } catch(e) { blijft = e; }
+      eq('ov 401: niet eindeloos opnieuw', [blijft && blijft.status, auth2.length], [401, 2]);
+      state.oauthToken = 'tok-ov'; state.oauthExpiry = Date.now() + 3600e3;
+
       window.fetch = async () => { throw new Error('net weg'); };
       await A.offerteWis(['file_a.sig']);
       truthy('ov wissen: gooit nooit', true);
@@ -18011,7 +18041,11 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       let geenToken = null;
       try { await A.offerteUpload(new Uint8Array([1]), 'x.pdf'); } catch(e) { geenToken = e; }
       truthy('ov upload: zonder inloggen geweigerd', !!geenToken);
-    } finally { window.fetch = oud.fetch; state.oauthToken = oud.token; }
+    } finally {
+      window.fetch = oud.fetch; state.oauthToken = oud.token; state.oauthExpiry = oud.expiry;
+      state._gsiTokenClient = oud.client; state.currentUserEmail = oud.mail; state._authBezig = oud.bezig;
+      try { ['oauthToken','oauthExpiry'].forEach(k => sessionStorage.removeItem(k)); } catch(_) {}
+    }
   })();
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -18129,7 +18163,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     truthy('ov bestanden: één is te weinig', M.controleerBestanden([f('A')]).some(t => t.includes('minstens 2')));
     truthy('ov bestanden: vijf is te veel', M.controleerBestanden(['A','B','C','D','E'].map(n => f(n))).some(t => t.includes('Hoogstens 4')));
     truthy('ov bestanden: geen PDF', M.controleerBestanden([f('A'), f('foto.jpg', { isPdf:false })]).some(t => t.includes('foto.jpg is geen PDF')));
-    truthy('ov bestanden: wachtwoord', M.controleerBestanden([f('A'), f('B', { versleuteld:true })]).some(t => t.includes('wachtwoord')));
+    truthy('ov bestanden: beveiligd', M.controleerBestanden([f('A'), f('B', { versleuteld:true })]).includes('B is beveiligd. Druk hem af als PDF (Bewaar als PDF) en probeer het opnieuw.'));
     truthy('ov bestanden: onleesbaar', M.controleerBestanden([f('A'), f('B', { paginas:0 })]).some(t => t.includes('niet gelezen')));
     truthy('ov bestanden: aannemer ontbreekt', M.controleerBestanden([f('A'), f('B', { kolom:' ' })]).some(t => t.includes('welke aannemer')));
     truthy('ov bestanden: twee keer dezelfde aannemer', M.controleerBestanden([f('A', { kolom:'X' }), f('B', { kolom:'x' })]).some(t => t.includes('dezelfde aannemer')));
@@ -18224,6 +18258,12 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     // Echt een PDF maken: bewijst dat lettertypes, vinkje en dubbele streep werken onder de CSP van de app.
     const buf = await V.maakPdfBuffer(doc);
     truthy('ov pdf: er komt een PDF uit', buf && buf.length > 5000 && String.fromCharCode(...buf.slice(0, 5)) === '%PDF-');
+    // Eindronde #5: pdfmake meldt een fout in zijn eigen promise en roept dan nooit terug. Zowel
+    // maakPdfBuffer als downloadPdf moeten dan AFWIJZEN (en niet blijven hangen of 'gelukt' zeggen).
+    const uitkomst = p => Promise.race([p.then(() => 'gelukt', e => 'fout: ' + ((e && e.message) || e)), new Promise(r => setTimeout(() => r('HANGT'), 15000))]);
+    const kapot = { content:[{ image:'bestaat-niet' }] };
+    truthy('ov pdf: kapotte inhoud → fout, niet hangen', (await uitkomst(V.maakPdfBuffer(kapot))).startsWith('fout: '));
+    truthy('ov pdf: download van kapotte inhoud → fout', (await uitkomst(V.downloadPdf(kapot, 'kapot.pdf'))).startsWith('fout: '));
   })();
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -18239,7 +18279,10 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const rij = { taakId:'T-OV1', code:'311145', naam:'Drebbelstraat 40-44', opmerkingen:'Gevelonderhoud', aannemers:'Heijstek Schilders|1\nKlusbouw Meesters|1' };
     const rijB = { taakId:'T-OV2', code:'311146', naam:'Proefweg 1', opmerkingen:'Dakwerk', aannemers:'A Dak|1\nB Dak|1' };
     const wachtOp = async (f, ms = 4000) => { const t0 = Date.now(); while(!f() && Date.now() - t0 < ms) await new Promise(r => setTimeout(r, 20)); return f(); };
-    const oud = { fetch:window.fetch, token:state.oauthToken, ntd:D.ntd['OFFERTE-TRAJECTEN'], log:D.logboek.length };
+    const oud = { fetch:window.fetch, token:state.oauthToken, expiry:state.oauthExpiry, ntd:D.ntd['OFFERTE-TRAJECTEN'], log:D.logboek.length,
+      client:state._gsiTokenClient, focus:state._focusFn, stil:state._stilMislukt, stilMs:state._stilMisluktMs, bezig:state._authBezig };
+    const aantal = (tekst, wat) => String(tekst || '').split(wat).length - 1;
+    const toasts = wat => aantal(document.getElementById('toast-container')?.textContent, wat);
     const calls = [];
     let vergelijkAntwoord = null;
     const ANT = {
@@ -18253,7 +18296,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     };
     try {
       D.ntd['OFFERTE-TRAJECTEN'] = [...(oud.ntd || []), rij, rijB];
-      state.oauthToken = 'tok-ov';
+      state.oauthToken = 'tok-ov'; state.oauthExpiry = Date.now() + 3600e3;
       window.fetch = async (url, opts) => {
         const u = decodeURIComponent(String(url));
         calls.push({ url:u, opts });
@@ -18297,6 +18340,18 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       // Aannemer kiezen en vergelijken
       const inp = document.querySelector('#ov-body .ov-fkol[data-idx="0"]');
       inp.value = 'Heijstek Schilders'; inp.dispatchEvent(new Event('input', { bubbles:true }));
+
+      // Eindronde #1: lukt het inloggen niet, dan wordt er NIETS verstuurd (en dus niets betaald) en
+      // blijft alles staan. Nagebootst: een VERLOPEN token (het gewone geval na een uur), de stille
+      // Google-aanvraag weigert, en de gebruiker zit niet achter het scherm (dus ook geen inlogvenster).
+      state.oauthToken = 'verlopen'; state.oauthExpiry = Date.now() - 1000; state._focusFn = () => false;
+      state._gsiTokenClient = { callback:null, requestAccessToken(){ setTimeout(() => this.callback({ error:'access_denied' }), 0); } };
+      const voorInlog = calls.length;
+      await OV.vergelijk();
+      eq('ov inlog mislukt: niets verstuurd', calls.length, voorInlog);
+      truthy('ov inlog mislukt: melding, bestanden blijven', /inlog/i.test(document.querySelector('#ov-body .ov-fout')?.textContent) && document.querySelectorAll('#ov-body .ov-frij').length === 2);
+      state.oauthToken = 'tok-ov'; state.oauthExpiry = Date.now() + 3600e3; state._focusFn = oud.focus; state._gsiTokenClient = oud.client;
+
       vergelijkAntwoord = () => new Response(JSON.stringify({ antwoord:ANT, model:'claude-sonnet-5-5' }), { status:200 });
       await OV.vergelijk();
       const verzoek = JSON.parse(calls.find(c => c.url.includes('actie=vergelijk')).opts.body);
@@ -18352,6 +18407,23 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       OV.openVergelijker('nr:T-OV1');
       truthy('ov heropenen: verbetering bewaard', document.getElementById('ov-body').textContent.includes(`€${N}43.000,00`));
 
+      // Eindronde #2a: 'Opnieuw laten lezen' met verbeteringen vraagt eerst; 'nee' = niets verstuurd.
+      const lezenVoor = calls.filter(c => /actie=(upload|vergelijk)/.test(c.url)).length;
+      const pNee = OV.vergelijk();
+      truthy('ov opnieuw lezen: eerst een vraag', await wachtOp(() => document.getElementById('bevestig-bg').classList.contains('open')));
+      truthy('ov opnieuw lezen: vraag noemt de verbeteringen', /verbeteringen/.test(document.getElementById('bevestig-tekst').textContent));
+      beantwoordBevestiging(false); await pNee;
+      eq('ov opnieuw lezen, nee: niets verstuurd', calls.filter(c => /actie=(upload|vergelijk)/.test(c.url)).length, lezenVoor);
+      truthy('ov opnieuw lezen, nee: verbetering staat er nog', OV._vergelijkerSessie().stap === 'nakijken' && document.getElementById('ov-body').textContent.includes(`€${N}43.000,00`));
+      // Eindronde #2b: mislukt het opnieuw lezen, dan terug naar het nakijkscherm met het OUDE overzicht.
+      vergelijkAntwoord = () => new Response(JSON.stringify({ error:'Het AI-tegoed is op.' }), { status:502 });
+      const pJa = OV.vergelijk();
+      await wachtOp(() => document.getElementById('bevestig-bg').classList.contains('open'));
+      beantwoordBevestiging(true); await pJa;
+      eq('ov opnieuw lezen mislukt: terug in nakijken', OV._vergelijkerSessie().stap, 'nakijken');
+      truthy('ov opnieuw lezen mislukt: oud overzicht intact', document.getElementById('ov-body').textContent.includes(`€${N}43.000,00`) && document.getElementById('ov-body').textContent.includes('OFF-123'));
+      truthy('ov opnieuw lezen mislukt: melding in het nakijkscherm', document.querySelector('#ov-body .ov-fout')?.textContent.includes('Het AI-tegoed is op.'));
+
       // Fout van Claude: terug naar slepen, melding, bestanden blijven, bewijzen gewist
       OV.nieuweVergelijking();
       await OV.voegBestandenToe([f1, f2]);
@@ -18396,9 +18468,32 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       OV.stopBewerk(false);
       OV.openVergelijker('nr:T-OV1');
       eq('ov twee trajecten: A in nakijken', OV._vergelijkerSessie().stap, 'nakijken');
+
+      // Eindronde #4: mislukt een vergelijking terwijl het venster dicht is, dan komt er een melding.
+      let laatFout = null;
+      vergelijkAntwoord = () => new Promise(r => { laatFout = () => r(new Response(JSON.stringify({ error:'Het AI-tegoed is op.' }), { status:502 })); });
+      const pF = OV.vergelijk();
+      await wachtOp(() => laatFout);
+      OV.sluitVergelijker();
+      const misVoor = toasts('Vergelijking mislukt');
+      if(laatFout) laatFout(); await pF;
+      eq('ov achtergrond mislukt: melding', toasts('Vergelijking mislukt'), misVoor + 1);
+      OV.openVergelijker('nr:T-OV1');
+      eq('ov achtergrond mislukt: oud overzicht blijft', OV._vergelijkerSessie().stap, 'nakijken');
+
+      // Eindronde #5: een PDF die niet gemaakt kan worden, geeft GEEN logregel 'Offertevergelijking gemaakt'.
+      // pdfmake is nagebootst zoals hij echt faalt: de fout zit in zijn eigen promise en de callback komt nooit.
+      const pm = window.pdfMake, echt = pm.createPdf;
+      pm.createPdf = () => ({ getBuffer(){ Promise.reject(new Error('pdfmake kapot')); }, download(){ Promise.reject(new Error('pdfmake kapot')); } });
+      const logVoor = calls.filter(c => c.url.includes('Logboek')).length;
+      try { await Promise.race([OV.download(), new Promise(r => setTimeout(r, 15000))]); } finally { pm.createPdf = echt; }
+      eq('ov pdf mislukt: geen logregel', [calls.filter(c => c.url.includes('Logboek')).length, OV._vergelijkerSessie().gelogd], [logVoor, false]);
+      truthy('ov pdf mislukt: melding', document.querySelector('#ov-body .ov-fout')?.textContent.includes('De PDF kon niet gemaakt worden'));
     } finally {
       OV.sluitVergelijker(); OV._resetVergelijker();
-      window.fetch = oud.fetch; state.oauthToken = oud.token;
+      window.fetch = oud.fetch; state.oauthToken = oud.token; state.oauthExpiry = oud.expiry;
+      state._gsiTokenClient = oud.client; state._focusFn = oud.focus; state._stilMislukt = oud.stil; state._stilMisluktMs = oud.stilMs; state._authBezig = oud.bezig;
+      if(document.getElementById('bevestig-bg').classList.contains('open')) beantwoordBevestiging(false);
       D.ntd['OFFERTE-TRAJECTEN'] = oud.ntd;
       while(D.logboek.length > oud.log) D.logboek.shift();
     }

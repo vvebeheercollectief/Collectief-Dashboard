@@ -184,7 +184,8 @@ export function controleerBestanden(lijst){
   if(lijst.length > MAX_OFFERTES) fouten.push(`Hoogstens ${MAX_OFFERTES} offertes per vergelijking.`);
   for(const b of lijst){
     if(!b.isPdf) fouten.push(`${b.naam} is geen PDF.`);
-    else if(b.versleuteld) fouten.push(`${b.naam} is beveiligd met een wachtwoord. Sla hem zonder wachtwoord op en probeer het opnieuw.`);
+    // pdf-lib weigert ook PDF's met alleen een eigenaarsslot (niet afdrukken/kopiëren), dus geen 'wachtwoord'.
+    else if(b.versleuteld) fouten.push(`${b.naam} is beveiligd. Druk hem af als PDF (Bewaar als PDF) en probeer het opnieuw.`);
     else if(!b.paginas) fouten.push(`${b.naam} kon niet gelezen worden.`);
     if(!String(b.kolom || '').trim()) fouten.push(`Kies bij ${b.naam} welke aannemer het is.`);
   }

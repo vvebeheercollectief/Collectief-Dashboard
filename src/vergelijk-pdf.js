@@ -157,16 +157,39 @@ async function letters(){
   }));
   return (_vfs = vfs);
 }
+// pdfmake 0.2 bouwt de PDF in een eigen promise. Gaat daar iets mis, dan roept hij de callback
+// nooit aan en blijft de fout 'onafgevangen' rondzweven: zonder vangnet wachtte de aanroeper
+// eeuwig. Die fout pakken we hier op (unhandledrejection, alleen zolang deze PDF gemaakt wordt),
+// met een tijdslimiet als laatste rem.
+const PDF_MAX_MS = 60_000;
 export async function maakPdfBuffer(doc){
   const pdfMake = await laadPdfMake();
   const vfs = await letters();
   return new Promise((ok, nee) => {
-    try { pdfMake.createPdf(doc, null, LETTERS, vfs).getBuffer(b => ok(new Uint8Array(b))); }
-    catch(e){ nee(e); }
+    let klaar = false, tid = 0;
+    const vang = e => einde(nee, e && e.reason instanceof Error ? e.reason : new Error(String((e && e.reason) || 'onbekende fout')));
+    function einde(f, v){
+      if(klaar) return;
+      klaar = true; clearTimeout(tid); window.removeEventListener('unhandledrejection', vang);
+      f(v);
+    }
+    tid = setTimeout(() => einde(nee, new Error('het maken duurde te lang')), PDF_MAX_MS);
+    window.addEventListener('unhandledrejection', vang);
+    try { pdfMake.createPdf(doc, null, LETTERS, vfs).getBuffer(b => einde(ok, new Uint8Array(b))); }
+    catch(e){ einde(nee, e); }
   });
 }
+// Lost pas op als het bestand er echt is: eerst de hele PDF maken, dan pas opslaan. Zo schrijft een
+// mislukte PDF geen logregel 'Offertevergelijking gemaakt' (pdfmake's eigen .download() gaf meteen
+// antwoord, nog vóór er iets gemaakt was).
 export async function downloadPdf(doc, naam){
-  const pdfMake = await laadPdfMake();
-  const vfs = await letters();
-  pdfMake.createPdf(doc, null, LETTERS, vfs).download(naam);
+  const bytes = await maakPdfBuffer(doc);
+  const url = URL.createObjectURL(new Blob([bytes], { type:'application/pdf' }));
+  const a = document.createElement('a');
+  a.href = url; a.download = naam; a.hidden = true;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  // Niet meteen intrekken: de browser leest de blob pas na de klik.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }

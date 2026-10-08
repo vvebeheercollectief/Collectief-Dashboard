@@ -10,6 +10,8 @@ import { IS_STAGING } from './config.js';
 import { offerteUpload, offerteVergelijk, offerteWis } from './api.js';
 import { logEvent } from './render-overig.js';
 import { getCurrentWho, showToast } from './notifications.js';
+import { ensureToken } from './auth.js';
+import { vraagBevestiging } from './bevestig.js';
 import { DEEL_MAX, controleerBestanden, raadAannemer, planDelen, valideerAntwoord, maakOverzicht,
   controleerSommen, celMarkering, zetCel, logRegelTekst, bestandsNaam, trajectNaam } from './vergelijk-model.js';
 import { laadPdfLib, knipDeel, pdfInhoud, downloadPdf } from './vergelijk-pdf.js';
@@ -97,7 +99,8 @@ export function verwijderBestand(i){
 }
 
 function foutTekst(e){
-  if(e && e.status === 401) return 'Je sessie is verlopen. Vernieuw de pagina en log opnieuw in.';
+  // Niet 'vernieuw de pagina': dat gooit elke (betaalde) vergelijking in het geheugen weg.
+  if(e && e.status === 401) return 'Je inlog was verlopen. Log opnieuw in via de melding en probeer het nog eens.';
   if(e && e.status === 403) return 'Je hebt geen toegang tot de offertevergelijker.';
   return (e && e.message) || 'Er ging iets mis. Probeer het opnieuw.';
 }
@@ -119,11 +122,29 @@ async function delenVan(PDFLib, b){
   return delen;
 }
 
+const INLOG_MISLUKT = 'Inloggen lukte niet, dus er is niets verstuurd. Log opnieuw in via de melding en probeer het nog eens.';
+const TOAST = { geenSysteemmelding:true };
+// Staat dit traject nu níét in beeld (venster dicht, of een ander traject open)?
+const uitBeeld = s => !document.getElementById('ov-bg').classList.contains('open') || s !== sessie();
+const heeftVerbeteringen = o => !!o && (['bedragen', 'onderdelen', 'voorwaarden'].some(b => o[b].some(r => r.cellen.some(c => c.handmatig)))
+  || o.opvallend.some(p => p.handmatig));
+
 export async function vergelijk(){
   const s = sessie(); if(!s || s.bezig) return;
   s.fouten = controleerBestanden(s.bestanden);
   if(s.fouten.length){ s.stap = 'slepen'; render(s); return; }
-  s.bezig = true; s.stap = 'lezen'; s.melding = ''; s.voortgang = 'Offertes klaarmaken…';
+  // 'Opnieuw laten lezen' gooit het huidige overzicht weg en kost opnieuw geld: met verbeteringen eerst vragen.
+  if(s.stap === 'nakijken' && heeftVerbeteringen(s.overzicht)){
+    const ja = await vraagBevestiging({ titel:'Opnieuw laten lezen?', tekst:'Je verbeteringen gaan verloren en het lezen kost opnieuw.',
+      bevestigTekst:'Opnieuw laten lezen', gevaarlijk:true });
+    if(!ja || s.bezig) return;
+  }
+  s.bezig = true;
+  // Het token leeft een uur; een verlopen token gaf pas na het uploaden een 401. Eerst vernieuwen,
+  // en lukt dat niet: niets versturen en alles laten staan.
+  if(!await ensureToken()){ s.bezig = false; s.melding = INLOG_MISLUKT; render(s); return; }
+  const terug = s.overzicht ? 'nakijken' : 'slepen';
+  s.stap = 'lezen'; s.melding = ''; s.voortgang = 'Offertes klaarmaken…';
   render(s);
   const bewijzen = [];
   try {
@@ -150,12 +171,13 @@ export async function vergelijk(){
     for(const o of offertes) s.paginas += o.paginas;
     s.stap = 'nakijken'; s.gelogd = false; s.logFout = false; s.bewerk = null;
     // Ook als er intussen een ánder traject in het venster staat: dan zie je deze niet.
-    if(!document.getElementById('ov-bg').classList.contains('open') || s !== sessie())
-      showToast('Vergelijking klaar', 'Open de offertevergelijker bij het traject om na te kijken.', 'var(--gn)', null, { geenSysteemmelding:true });
+    if(uitBeeld(s)) showToast('Vergelijking klaar', 'Open de offertevergelijker bij het traject om na te kijken.', 'var(--gn)', null, TOAST);
   } catch(e){
     // Na een geslaagde vergelijking heeft de proxy de bestanden al gewist; dit vangt een fout halverwege.
     offerteWis(bewijzen);
-    s.stap = 'slepen'; s.melding = foutTekst(e);
+    // Mislukt 'Opnieuw laten lezen', dan blijft het vorige overzicht (met verbeteringen) gewoon staan.
+    s.stap = terug; s.melding = foutTekst(e);
+    if(uitBeeld(s)) showToast('Vergelijking mislukt', s.melding, 'var(--rd)', null, TOAST);
   } finally { s.bezig = false; render(s); }
 }
 
@@ -229,13 +251,14 @@ export async function schrijfLogregel(s = sessie()){
   s.logBezig = true;
   const tekst = logRegelTekst(s.overzicht.kolommen, s.traject);
   let ok = false;
-  try { ok = await logEvent(s.code, 'OFFERTE-TRAJECTEN', 'Opmerking', '', '', tekst); }
+  // Lukt inloggen niet, dan is het een gewone mislukte logregel: de knop 'Opnieuw proberen' verschijnt.
+  try { ok = await ensureToken() && await logEvent(s.code, 'OFFERTE-TRAJECTEN', 'Opmerking', '', '', tekst); }
   finally { s.logBezig = false; }
   s.gelogd = ok; s.logFout = !ok;
   if(ok){
     D.logboek.unshift({ _row:0, timestamp:new Date().toISOString(), code:s.code, sectie:'OFFERTE-TRAJECTEN', actie:'Opmerking',
       veld:'', oudeWaarde:'', nieuweWaarde:tekst, gebruiker:getCurrentWho() || '?' });
-    showToast('In het logboek gezet', tekst, 'var(--gn)', null, { geenSysteemmelding:true });
+    showToast('In het logboek gezet', tekst, 'var(--gn)', null, TOAST);
   }
   render(s);
 }

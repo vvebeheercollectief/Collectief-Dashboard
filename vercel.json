@@ -3,7 +3,7 @@
   "cleanUrls": true,
   "trailingSlash": false,
   "functions": {
-    "api/offerte.js": { "maxDuration": 120 }
+    "api/offerte.js": { "maxDuration": 300 }
   },
   "headers": [
     {

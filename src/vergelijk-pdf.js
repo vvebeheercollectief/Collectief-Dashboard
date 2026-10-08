@@ -73,7 +73,8 @@ function kostRijen(o){
     return [{ text:r.label, style:'rijkop' }, ...r.cellen.map(c => {
       if(!c.tekst) return { ...NIET, alignment:'right' };
       const cel = { text:c.tekst, alignment:'right', color:KLEUR.inkt };
-      if(totaal) Object.assign(cel, { bold:true, decoration:'underline', decorationStyle:'double', decorationColor:KLEUR.inkt });
+      // Het totaal staat in Spectral 500 (enige gewicht, dus geen bold), iets groter dan de lopende tekst; gewone bedragen blijven Karla.
+      if(totaal) Object.assign(cel, { font:'Spectral', fontSize:10.5, decoration:'underline', decorationStyle:'double', decorationColor:KLEUR.inkt });
       return cel;
     })];
   });

@@ -18208,6 +18208,8 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const kost = doc.content[2].stack[1].table.body;
     eq('ov pdf: kop + drie bedragrijen', kost.length, 4);
     eq('ov pdf: totaal dubbel onderstreept', [kost[3][1].decoration, kost[3][1].decorationStyle], ['underline', 'double']);
+    eq('ov pdf: totaal in Spectral', [kost[3][1].font, kost[3][1].bold], ['Spectral', undefined]);
+    eq('ov pdf: gewoon bedrag in de tekstletter', kost[1][1].font, undefined);
     eq('ov pdf: ontbrekend bedrag = Niet vermeld, cursief', [kost[3][2].text, kost[3][2].italics], ['Niet vermeld', true]);
     truthy('ov pdf: geen "berekend" in de PDF', !/berekend/i.test(plat));
     const inhoud = doc.content[3].stack[1].table.body;

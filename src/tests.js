@@ -17967,6 +17967,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     truthy('ov antwoord: onzin', !!P.leesAntwoord({ stop_reason:'end_turn', content:[{ type:'text', text:'Hier is het overzicht.' }] }).fout);
     eq('ov schema-fout herkend', P.schemaNietOndersteund(400, 'output_config.format: this model does not support structured outputs'), true);
     eq('ov andere fout geen schema-fout', P.schemaNietOndersteund(500, 'output_config'), false);
+    eq('ov PDF-fout geen schema-fout', P.schemaNietOndersteund(400, 'messages.0.content.0: unsupported document format'), false);
   })();
 
   console.log = _origLog;         // het voortgangsspoor weer los

@@ -127,5 +127,5 @@ export function leesAntwoord(data){
 // Een model dat het vaste formaat niet kent, geeft een 400 die het veld noemt. Dan één keer
 // opnieuw zonder schema (zie api/offerte.js); de browser loopt het antwoord daarna zelf na.
 export function schemaNietOndersteund(status, bericht){
-  return status === 400 && /output_config|format|schema/i.test(bericht || '');
+  return status === 400 && /output_config|structured output|json_schema/i.test(bericht || '');
 }

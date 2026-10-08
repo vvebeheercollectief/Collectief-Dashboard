@@ -18116,6 +18116,51 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     eq('ov tekst: titel', [M.pdfTitel(2), M.pdfTitel(4)], ['Twee offertes naast elkaar', 'Vier offertes naast elkaar']);
   })();
 
+  // ══════════════════════════════════════════════════════════════════════════
+  //  OFFERTEVERGELIJKER — bestanden (controleren, raden, knippen)
+  // ══════════════════════════════════════════════════════════════════════════
+  await (async () => {
+    console.log('%c[TESTS] Offertevergelijker: bestanden', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const M = await import('./vergelijk-model.js');
+    const V = await import('./vergelijk-pdf.js');
+    const f = (naam, extra) => ({ naam, isPdf:true, versleuteld:false, paginas:4, kolom:naam, ...extra });
+
+    eq('ov bestanden: twee goede', M.controleerBestanden([f('A'), f('B')]), []);
+    truthy('ov bestanden: één is te weinig', M.controleerBestanden([f('A')]).some(t => t.includes('minstens 2')));
+    truthy('ov bestanden: vijf is te veel', M.controleerBestanden(['A','B','C','D','E'].map(n => f(n))).some(t => t.includes('Hoogstens 4')));
+    truthy('ov bestanden: geen PDF', M.controleerBestanden([f('A'), f('foto.jpg', { isPdf:false })]).some(t => t.includes('foto.jpg is geen PDF')));
+    truthy('ov bestanden: wachtwoord', M.controleerBestanden([f('A'), f('B', { versleuteld:true })]).some(t => t.includes('wachtwoord')));
+    truthy('ov bestanden: onleesbaar', M.controleerBestanden([f('A'), f('B', { paginas:0 })]).some(t => t.includes('niet gelezen')));
+    truthy('ov bestanden: aannemer ontbreekt', M.controleerBestanden([f('A'), f('B', { kolom:' ' })]).some(t => t.includes('welke aannemer')));
+    truthy('ov bestanden: twee keer dezelfde aannemer', M.controleerBestanden([f('A', { kolom:'X' }), f('B', { kolom:'x' })]).some(t => t.includes('dezelfde aannemer')));
+    truthy('ov bestanden: 101 pagina\'s', M.controleerBestanden([f('A', { paginas:60 }), f('B', { paginas:41 })]).some(t => t.includes('101')));
+
+    const namen = ['Heijstek Schilders', 'Klusbouw Meesters'];
+    eq('ov raden: naam in bestandsnaam', M.raadAannemer('Klusbouw Meesters - 200115 Offerte VvE Withuysstraat.pdf', namen), 1);
+    eq('ov raden: één woord volstaat', M.raadAannemer('offerte_heijstek_2026.pdf', namen), 0);
+    eq('ov raden: niets herkenbaar', M.raadAannemer('Offerte VVE Drebbelstraat 40-42-44.pdf', namen), -1);
+    eq('ov raden: algemene woorden tellen niet', M.raadAannemer('Schilders offerte.pdf', ['Heijstek Schilders']), -1);
+
+    const groot = (van, tot) => Promise.resolve((tot - van + 1) * 1_000_000);
+    eq('ov delen: alles in één', await M.planDelen(3, groot, 4_000_000), [{ van:1, tot:3 }]);
+    eq('ov delen: gehalveerd tot het past', await M.planDelen(10, groot, 4_000_000), [{ van:1, tot:3 }, { van:4, tot:5 }, { van:6, tot:8 }, { van:9, tot:10 }]);
+    let teGroot = null;
+    try { await M.planDelen(3, (van, tot) => Promise.resolve((van <= 2 && tot >= 2 ? 5_000_000 : 0) + (tot - van + 1)), 4_000_000); } catch(e) { teGroot = e; }
+    eq('ov delen: één pagina te groot', teGroot && teGroot.pagina, 2);
+
+    // Echt knippen met pdf-lib. De pagina's hebben geen tekst, zoals een scan.
+    const PDFLib = await V.laadPdfLib();
+    truthy('ov pdf-lib: geladen', !!(PDFLib && PDFLib.PDFDocument));
+    const doc = await PDFLib.PDFDocument.create();
+    for(let i = 0; i < 5; i++) doc.addPage([595, 842]);
+    const bytes = await doc.save();
+    const bron = await PDFLib.PDFDocument.load(bytes);
+    eq('ov pdf-lib: pagina\'s geteld', bron.getPageCount(), 5);
+    const deel = await V.knipDeel(PDFLib, bron, 2, 4);
+    eq('ov pdf-lib: deel heeft de goede pagina\'s', (await PDFLib.PDFDocument.load(deel)).getPageCount(), 3);
+    truthy('ov pdf-lib: deel is een PDF', String.fromCharCode(...deel.slice(0, 5)) === '%PDF-');
+  })();
+
   console.log = _origLog;         // het voortgangsspoor weer los
   state._dubbelcheckUit = false;  // de testhaak weer los
   state._codecheckUit = false;

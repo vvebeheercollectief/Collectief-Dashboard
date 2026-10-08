@@ -5,6 +5,7 @@
 //  als de PDF tekent. Wat de gebruiker verbetert, verandert dat overzicht (zetCel).
 // ══════════════════════════════════════
 import { BEDRAGEN, VOORWAARDEN, ONDERDEEL_STATUS } from '../offerte-schema.js';
+import { MIN_OFFERTES, MAX_OFFERTES, MAX_PAGINAS } from '../offerte-proxy.js';
 
 const NBSP = '\u00a0';
 const MAANDEN = ['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december'];
@@ -172,3 +173,59 @@ export const bestandsNaam = (vveNaam, d) =>
 export const trajectNaam = opmerkingen => String(opmerkingen || '').split('\n')[0].replace(/\*\*/g, '').trim();
 const AANTAL = { 2:'Twee', 3:'Drie', 4:'Vier' };
 export const pdfTitel = n => `${AANTAL[n] || n} offertes naast elkaar`;
+
+// ── Bestanden ──
+// Een deel blijft onder de 4 MB; Vercel weigert boven 4,5 MB per verzoek (zie MAX_UPLOAD).
+export const DEEL_MAX = 4_000_000;
+
+export function controleerBestanden(lijst){
+  const fouten = [];
+  if(lijst.length < MIN_OFFERTES) fouten.push(`Sleep minstens ${MIN_OFFERTES} offertes in het venster.`);
+  if(lijst.length > MAX_OFFERTES) fouten.push(`Hoogstens ${MAX_OFFERTES} offertes per vergelijking.`);
+  for(const b of lijst){
+    if(!b.isPdf) fouten.push(`${b.naam} is geen PDF.`);
+    else if(b.versleuteld) fouten.push(`${b.naam} is beveiligd met een wachtwoord. Sla hem zonder wachtwoord op en probeer het opnieuw.`);
+    else if(!b.paginas) fouten.push(`${b.naam} kon niet gelezen worden.`);
+    if(!String(b.kolom || '').trim()) fouten.push(`Kies bij ${b.naam} welke aannemer het is.`);
+  }
+  const namen = lijst.map(b => String(b.kolom || '').trim().toLowerCase()).filter(Boolean);
+  if(new Set(namen).size !== namen.length) fouten.push('Twee bestanden staan op dezelfde aannemer.');
+  let totaal = 0;
+  for(const b of lijst) totaal += b.paginas || 0;
+  if(totaal > MAX_PAGINAS) fouten.push(`Samen ${totaal} pagina's; het maximum is ${MAX_PAGINAS}.`);
+  return fouten;
+}
+
+// Woorden die in veel bedrijfs- en bestandsnamen staan en dus niets zeggen over wélke aannemer.
+const ALGEMEEN = new Set(['offerte','offertes','bouw','bouwbedrijf','aannemer','aannemersbedrijf','bedrijf','schilders',
+  'schildersbedrijf','installatie','installatiebedrijf','techniek','onderhoud','vve','van','der','den','het','en','pdf']);
+const woordenVan = t => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  .split(/[^a-z0-9]+/).filter(w => w.length >= 3 && !ALGEMEEN.has(w));
+export function raadAannemer(bestandsnaam, namen){
+  const inBestand = new Set(woordenVan(bestandsnaam));
+  let beste = -1, score = 0;
+  namen.forEach((naam, i) => {
+    const s = woordenVan(naam).filter(w => inBestand.has(w)).length;
+    if(s > score){ beste = i; score = s; }
+  });
+  return beste;
+}
+
+// Halveert een paginabereik tot elk deel onder `max` blijft. `grootte(van, tot)` geeft de grootte
+// van dat deel in bytes (de browser knipt het echt om te meten). De volgorde blijft die van de offerte.
+export async function planDelen(paginas, grootte, max = DEEL_MAX){
+  const delen = [];
+  async function splits(van, tot){
+    if(await grootte(van, tot) <= max){ delen.push({ van, tot }); return; }
+    if(van === tot){
+      const e = new Error(`Pagina ${van} is op zich al groter dan 4 MB. Sla de offerte kleiner op en probeer het opnieuw.`);
+      e.pagina = van;
+      throw e;
+    }
+    const mid = Math.floor((van + tot) / 2);
+    await splits(van, mid);
+    await splits(mid + 1, tot);
+  }
+  await splits(1, paginas);
+  return delen;
+}

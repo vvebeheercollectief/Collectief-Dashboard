@@ -112,6 +112,14 @@ const APP_SHELL = [
   // volgt óók dynamische imports — en terecht: een dynamische import is net zo goed een verzoek
   // dat bij 'eerste bezoek en meteen offline' niet uit de cache te beantwoorden valt.
   './src/migratie-offerte.js',
+  // Offertevergelijker (v15.2). actions.js trekt het venster statisch binnen, en vergelijk-model.js
+  // haalt de gedeelde regels uit de map erboven — zonder die twee laadt de schil offline niet.
+  // De PDF-bibliotheken in vendor/ komen pas bij gebruik (laadScript) en horen hier niet.
+  './src/offerte-vergelijker.js',
+  './src/vergelijk-model.js',
+  './src/vergelijk-pdf.js',
+  './offerte-schema.js',
+  './offerte-proxy.js',
 ];
 
 self.addEventListener('install', e => {

@@ -18226,6 +18226,128 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     truthy('ov pdf: er komt een PDF uit', buf && buf.length > 5000 && String.fromCharCode(...buf.slice(0, 5)) === '%PDF-');
   })();
 
+  // ══════════════════════════════════════════════════════════════════════════
+  //  OFFERTEVERGELIJKER — het venster (src/offerte-vergelijker.js)
+  // ══════════════════════════════════════════════════════════════════════════
+  await (async () => {
+    console.log('%c[TESTS] Offertevergelijker: venster', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const OV = await import('./offerte-vergelijker.js');
+    const R = await import('./render-offerte.js');
+    const Act = await import('./actions.js');
+    const V = await import('./vergelijk-pdf.js');
+    const N = '\u00a0';
+    const rij = { taakId:'T-OV1', code:'311145', naam:'Drebbelstraat 40-44', opmerkingen:'Gevelonderhoud', aannemers:'Heijstek Schilders|1\nKlusbouw Meesters|1' };
+    const oud = { fetch:window.fetch, token:state.oauthToken, ntd:D.ntd['OFFERTE-TRAJECTEN'], log:D.logboek.length };
+    const calls = [];
+    let vergelijkAntwoord = null;
+    const ANT = {
+      aannemers:[
+        { index:0, naam:'Heijstek', bedragen:{ exclBtw:{ bedrag:null, pagina:null, posten:[] }, btw:{ bedrag:null, pagina:null, posten:[] }, inclBtw:{ bedrag:11253.16, pagina:6, posten:[] }, subsidie:{ bedrag:null, pagina:null, posten:[] } }, btwPercentages:[21],
+          voorwaarden:{ offertedatum:{ tekst:'7 juli 2026', pagina:1 }, offertenummer:{ tekst:null, pagina:null }, betaling:{ tekst:'50% bij aanvang', pagina:7 }, garantie:{ tekst:'Onderhoud NL', pagina:7 }, planning:{ tekst:null, pagina:null }, geldigheid:{ tekst:null, pagina:null }, stelposten:{ tekst:null, pagina:null } } },
+        { index:1, naam:'Klusbouw', bedragen:{ exclBtw:{ bedrag:35964.38, pagina:8, posten:[] }, btw:{ bedrag:7552.52, pagina:8, posten:[] }, inclBtw:{ bedrag:43516.90, pagina:8, posten:[] }, subsidie:{ bedrag:null, pagina:null, posten:[] } }, btwPercentages:[21],
+          voorwaarden:{ offertedatum:{ tekst:'13 mei 2026', pagina:1 }, offertenummer:{ tekst:null, pagina:null }, betaling:{ tekst:'30% bij opdracht', pagina:9 }, garantie:{ tekst:'Alg. voorwaarden', pagina:9 }, planning:{ tekst:null, pagina:null }, geldigheid:{ tekst:null, pagina:null }, stelposten:{ tekst:null, pagina:null } } } ],
+      onderdelen:[ { naam:'Dakrenovatie', perAannemer:[{ index:0, status:'niet_genoemd', toelichting:'', pagina:null }, { index:1, status:'inbegrepen', toelichting:'ca. 75 m²', pagina:4 }] } ],
+      opvallend:[ { index:1, tekst:'Subsidie verrekend.', pagina:8 } ],
+    };
+    try {
+      D.ntd['OFFERTE-TRAJECTEN'] = [...(oud.ntd || []), rij];
+      state.oauthToken = 'tok-ov';
+      window.fetch = async (url, opts) => {
+        const u = decodeURIComponent(String(url));
+        calls.push({ url:u, opts });
+        if(u.includes('actie=upload')) return new Response(JSON.stringify({ bewijs:'file_a' + calls.length + '.sig' }), { status:200 });
+        if(u.includes('actie=vergelijk')) return vergelijkAntwoord();
+        if(u.includes('actie=wis')) return new Response('{"ok":true}', { status:200 });
+        if(u.includes('Logboek')) return new Response(JSON.stringify({ updates:{ updatedRange:"'Logboek'!A9:H9" } }), { status:200 });
+        // Niets naar buiten: met het neptoken zou een echte Google-aanroep een 401 en een herinlogpoging geven.
+        return new Response('{}', { status:200 });
+      };
+
+      // Knop in de aannemerslijst
+      const paneel = R.offerteAannemerPaneel({ ...rij, _aannemers:[{ naam:'Heijstek Schilders', binnen:true }, { naam:'Klusbouw Meesters', binnen:true }] });
+      truthy('ov knop: in de aannemerslijst', paneel.includes('data-action="ov-open"') && paneel.includes('data-aann="nr:T-OV1"') && paneel.includes('Offertes vergelijken'));
+      for(const a of ['ov-open','ov-sluit','ov-kies','ov-verwijder','ov-vergelijk','ov-cel','ov-download','ov-log-opnieuw','ov-nieuw'])
+        truthy('ov actie bestaat: ' + a, typeof Act.ACTIONS[a] === 'function');
+
+      // Openen
+      OV._resetVergelijker();
+      OV.openVergelijker('nr:T-OV1');
+      truthy('ov venster: open', document.getElementById('ov-bg').classList.contains('open'));
+      truthy('ov venster: VvE en traject in de kop', document.getElementById('ov-sub').textContent.includes('311145') && document.getElementById('ov-sub').textContent.includes('Gevelonderhoud'));
+      truthy('ov venster: sleepvlak', !!document.getElementById('ov-drop'));
+
+      // Twee echte (lege) PDF's
+      const PDFLib = await V.laadPdfLib();
+      const maakPdf = async n => { const d = await PDFLib.PDFDocument.create(); for(let i = 0; i < n; i++) d.addPage([595, 842]); return d.save(); };
+      const f1 = new File([await maakPdf(2)], 'Offerte VVE Drebbelstraat.pdf', { type:'application/pdf' });
+      const f2 = new File([await maakPdf(3)], 'Klusbouw Meesters offerte.pdf', { type:'application/pdf' });
+      await OV.voegBestandenToe([f1, f2]);
+      const kols = [...document.querySelectorAll('#ov-body .ov-fkol')].map(x => x.value);
+      eq('ov venster: aannemer geraden waar mogelijk', kols, ['', 'Klusbouw Meesters']);
+      truthy('ov venster: pagina\'s getoond', document.getElementById('ov-body').textContent.includes('3 pag.'));
+
+      // Vergelijken zonder aannemer bij bestand 1: melding, niets verstuurd
+      const voor = calls.length;
+      await OV.vergelijk();
+      truthy('ov controle: melding vóór versturen', document.querySelector('#ov-body .ov-fout')?.textContent.includes('welke aannemer'));
+      eq('ov controle: niets verstuurd', calls.length, voor);
+
+      // Aannemer kiezen en vergelijken
+      const inp = document.querySelector('#ov-body .ov-fkol[data-idx="0"]');
+      inp.value = 'Heijstek Schilders'; inp.dispatchEvent(new Event('input', { bubbles:true }));
+      vergelijkAntwoord = () => new Response(JSON.stringify({ antwoord:ANT, model:'claude-sonnet-5-5' }), { status:200 });
+      await OV.vergelijk();
+      const verzoek = JSON.parse(calls.find(c => c.url.includes('actie=vergelijk')).opts.body);
+      eq('ov vergelijk: namen uit het venster', verzoek.offertes.map(x => x.naam), ['Heijstek Schilders', 'Klusbouw Meesters']);
+      eq('ov vergelijk: pagina\'s en delen', verzoek.offertes.map(x => [x.paginas, x.delen.length, x.delen[0].van, x.delen[0].tot]), [[2, 1, 1, 2], [3, 1, 1, 3]]);
+      eq('ov vergelijk: VvE en traject mee', [verzoek.vve, verzoek.traject], ['Drebbelstraat 40-44', 'Gevelonderhoud']);
+      eq('ov vergelijk: twee uploads', calls.filter(c => c.url.includes('actie=upload')).length, 2);
+      const body = document.getElementById('ov-body');
+      truthy('ov nakijken: tabel met berekend bedrag', body.textContent.includes(`€${N}9.300,13`) && body.querySelector('.ov-berekend'));
+      truthy('ov nakijken: paginanummer', body.textContent.includes('p. 8'));
+      truthy('ov nakijken: niet vermeld in oranje', !!body.querySelector('.ov-oranje'));
+      truthy('ov nakijken: model in de voet', document.getElementById('ov-foot').textContent.includes('Claude Sonnet 5.5'));
+
+      // Een cel verbeteren
+      OV.startBewerk('bedragen', 2, 1);
+      const ed = document.getElementById('ov-edit');
+      truthy('ov bewerk: invoerveld open', !!ed);
+      ed.value = '43.000,00';
+      OV.stopBewerk(true);
+      truthy('ov bewerk: nieuwe waarde', document.getElementById('ov-body').textContent.includes(`€${N}43.000,00`));
+      truthy('ov bewerk: optelsom-waarschuwing', !!document.querySelector('#ov-body .ov-waarsch'));
+
+      // Logregel
+      await OV.schrijfLogregel();
+      const log = calls.filter(c => c.url.includes('Logboek'));
+      eq('ov log: één schrijfactie', log.length, 1);
+      truthy('ov log: tekst', JSON.stringify(log[0].opts.body).includes('Offertevergelijking gemaakt: Heijstek Schilders, Klusbouw Meesters (2 offertes) — Gevelonderhoud'));
+      eq('ov log: direct zichtbaar in het logboek', D.logboek[0].nieuweWaarde.startsWith('Offertevergelijking gemaakt'), true);
+      eq('ov log: gemarkeerd als gedaan', OV._vergelijkerSessie().gelogd, true);
+
+      // Sluiten en terugkomen: nakijkstand blijft
+      OV.sluitVergelijker();
+      eq('ov sluiten: dicht', document.getElementById('ov-bg').classList.contains('open'), false);
+      OV.openVergelijker('nr:T-OV1');
+      truthy('ov heropenen: verbetering bewaard', document.getElementById('ov-body').textContent.includes(`€${N}43.000,00`));
+
+      // Fout van Claude: terug naar slepen, melding, bestanden blijven, bewijzen gewist
+      OV.nieuweVergelijking();
+      await OV.voegBestandenToe([f1, f2]);
+      const i0 = document.querySelector('#ov-body .ov-fkol[data-idx="0"]');
+      i0.value = 'Heijstek Schilders'; i0.dispatchEvent(new Event('input', { bubbles:true }));
+      vergelijkAntwoord = () => new Response(JSON.stringify({ error:'Het AI-tegoed is op.' }), { status:502 });
+      await OV.vergelijk();
+      truthy('ov fout: melding', document.querySelector('#ov-body .ov-fout')?.textContent.includes('Het AI-tegoed is op.'));
+      eq('ov fout: bestanden blijven staan', document.querySelectorAll('#ov-body .ov-frij').length, 2);
+      truthy('ov fout: bewijzen opgeruimd', calls.some(c => c.url.includes('actie=wis')));
+    } finally {
+      OV.sluitVergelijker(); OV._resetVergelijker();
+      window.fetch = oud.fetch; state.oauthToken = oud.token;
+      D.ntd['OFFERTE-TRAJECTEN'] = oud.ntd;
+      while(D.logboek.length > oud.log) D.logboek.shift();
+    }
+  })();
   console.log = _origLog;         // het voortgangsspoor weer los
   state._dubbelcheckUit = false;  // de testhaak weer los
   state._codecheckUit = false;

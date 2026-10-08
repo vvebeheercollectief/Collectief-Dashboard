@@ -1283,6 +1283,78 @@
     .of-aann-tbl-tog{margin-top:4px}
     .of-aann-tr>td{padding:0 14px 12px!important;background:var(--sur)}
     .of-aann-tr .of-aann-paneel{max-width:580px;margin:0}
+    /* ── Offertevergelijker (v15.2) ── */
+    .of-aann-vergelijk{font-size:12px;font-weight:600;padding:5px 10px;border-radius:6px;background:var(--ac);color:#fff;border:1px solid var(--ac);white-space:nowrap}
+    .of-aann-vergelijk:hover{background:var(--ac-900);border-color:var(--ac-900)}
+    .of-aann-vergelijk:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+    /* Kolom met een plafond: de voet blijft altijd in beeld en alleen het midden scrolt. De gewone
+       .modal-body rekent met een vaste 170px voor kop en voet; hier is de kop twee regels en wikkelt
+       de voet op een telefoon, waardoor 'PDF downloaden' onder de rand viel (378 breed: 934px venster). */
+    .ov-modal{max-width:900px;display:flex;flex-direction:column;max-height:calc(100vh - 64px)}
+    .ov-modal .modal-body{max-height:none;flex:1 1 auto;min-height:0}
+    .ov-kop{display:flex;flex-direction:column;gap:2px;min-width:0}
+    #ov-sub{font-size:12px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .ov-drop{border:1.5px dashed var(--ac-b);border-radius:var(--r);background:var(--ac-l);padding:22px;display:grid;gap:4px;justify-items:center;text-align:center;cursor:pointer}
+    .ov-drop.over{border-color:var(--ac);background:var(--sur)}
+    .ov-drop:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+    .ov-drop span{color:var(--mut);font-size:12.5px}
+    .ov-flist{display:grid;border:1px solid var(--bor);border-radius:var(--r);overflow:hidden;margin-top:12px}
+    .ov-frij{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(140px,210px) auto;gap:10px;align-items:center;padding:8px 10px;border-bottom:1px solid var(--row-divider)}
+    .ov-frij:last-child{border-bottom:0}
+    .ov-fnaam{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .ov-fmeta{color:var(--fnt);font-size:12px;white-space:nowrap}
+    .ov-fkol{min-width:0;border:1px solid var(--bor-input);border-radius:var(--rs);padding:4px 8px;background:var(--sur);color:var(--txt);font:inherit;font-size:12.5px}
+    .ov-fweg{color:var(--mut);font-size:16px;line-height:1;padding:2px 6px;border-radius:var(--rs)}
+    .ov-fweg:hover{background:var(--sur2)}
+    .ov-klein{margin:10px 0 0;font-size:12.5px;color:var(--mut)}
+    .ov-fout{margin:10px 0 0;padding:8px 10px;border-radius:var(--rs);background:var(--rd-l);color:var(--rd);font-size:12.5px}
+    .ov-model{display:flex;gap:8px;align-items:center;margin-top:12px;font-size:12px;color:var(--mut)}
+    .ov-balk{height:6px;border-radius:3px;background:var(--bg);overflow:hidden;margin-top:14px;position:relative}
+    .ov-balk span{position:absolute;top:0;bottom:0;left:-35%;width:35%;background:var(--ac);border-radius:3px;animation:ov-loop 1.4s ease-in-out infinite}
+    @keyframes ov-loop{to{left:100%}}
+    @media (prefers-reduced-motion:reduce){.ov-balk span{animation:none;left:0;width:100%;opacity:.5}}
+    .ov-tip{background:var(--ac-l);border-radius:var(--rs);padding:8px 10px;font-size:12.5px}
+    .ov-scroll{overflow-x:auto;margin-top:12px}
+    .ov-t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:12.5px}
+    /* white-space:normal: de algemene `thead th` kapt af met een …, en dan viel de optelsom-waarschuwing
+       onder de aannemersnaam weg. De eerste kopcel plakt mee met de labelkolom. */
+    .ov-t th{text-align:left;font-size:11px;color:var(--mut);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--bor);vertical-align:bottom;white-space:normal}
+    .ov-t thead th:first-child{position:sticky;left:0;z-index:1}
+    .ov-t td{padding:0;border-bottom:1px solid var(--row-divider);vertical-align:top}
+    /* Plakt links bij opzij scrollen (telefoon), zodat je blijft zien wélke rij je leest. Dekkende
+       achtergrond, anders schuiven de cellen er zichtbaar onderdoor. */
+    .ov-t .ov-lbl{padding:7px 8px;font-weight:600;color:var(--mut);width:150px;position:sticky;left:0;background:var(--sur);z-index:1}
+    .ov-t tr.ov-sectie th{padding-top:14px;color:var(--txt);font-size:12px}
+    .ov-cel{display:block;width:100%;text-align:inherit;padding:7px 8px;border-radius:4px;color:var(--txt);font:inherit;line-height:1.45}
+    .ov-cel:hover{background:var(--row-hover)}
+    .ov-cel:focus-visible{outline:2px solid var(--ac);outline-offset:-2px}
+    .ov-t td.r{text-align:right}
+    .ov-ref{margin-left:5px;font-size:10.5px;color:var(--fnt);white-space:nowrap}
+    .ov-berekend{display:block;font-size:10.5px;color:var(--ac)}
+    .ov-oranje .ov-cel{color:var(--am)}
+    .ov-waarsch{display:block;margin-top:4px;font-weight:400;color:var(--am);font-size:11px;text-transform:none;letter-spacing:normal}
+    .ov-st{font-weight:600}
+    .ov-st-inbegrepen{color:var(--gn)}
+    .ov-st-uitgesloten{color:var(--rd)}
+    .ov-st-niet_genoemd{color:var(--mut)}
+    .ov-bew{padding:4px!important}
+    .ov-editor{display:flex;gap:6px}
+    .ov-editor input,.ov-editor select{flex:1;min-width:0;border:2px solid var(--ac);border-radius:4px;padding:4px 6px;font:inherit;background:var(--sur);color:var(--txt)}
+    .ov-editor select{flex:0 0 auto}
+    .ov-h3{margin:16px 0 6px;font-size:12px;font-weight:600}
+    .ov-opv{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+    .ov-leeg{color:var(--mut);font-size:12.5px;padding:7px 8px}
+    .ov-link{color:var(--ac);text-decoration:underline;font:inherit;padding:0}
+    .ov-foot{justify-content:space-between;align-items:center;flex-wrap:wrap}
+    .ov-voet-info{font-size:12px;color:var(--fnt)}
+    .ov-knoppen{display:flex;gap:8px;flex-wrap:wrap}
+    @media (max-width:600px){
+      /* Naam + meta op de eerste regel, invoerveld + kruisje op de tweede (anders viel het kruisje los op een derde). */
+      .ov-frij{grid-template-columns:minmax(0,1fr) auto}
+      .ov-modal{max-height:calc(100vh - 16px)}
+      .ov-t .ov-lbl{width:104px}
+      .ov-knoppen{width:100%}.ov-knoppen .btn{flex:1 1 auto}
+    }
 
     /* Cross-list "Ook hier" (bug #2): taken die via Subcategorie óók in dit scherm horen */
     .xl-blok{margin-top:18px;border-top:1px solid var(--bor);padding-top:14px}

@@ -44,6 +44,7 @@ import { initModalA11y, bovensteModal } from './modal-a11y.js';
 import { beantwoordBevestiging, vraagBevestiging } from './bevestig.js';
 import { ico } from './icons.js';
 import { groeiVelden } from './opmaak.js';
+import { sluitVergelijker } from './offerte-vergelijker.js';
 
 // Centrale Escape-sluiting: per venster de juiste sluitfunctie (met opruimlogica),
 // i.p.v. alleen de .open-class te verwijderen zodat er geen toestand achterblijft.
@@ -58,6 +59,7 @@ const MODAL_SLUITERS = {
   'alvoreset-bg': closeResetModal,
   'notif-bg': closeNotifModal,
   'ai-bg': closeAiHelp,
+  'ov-bg': sluitVergelijker,
   // Escape op de bevestigingsvraag is 'nee'. Alleen de .open-class weghalen zou de wachtende
   // aanroeper eeuwig laten hangen — die staat op een Promise die alleen hierlangs afloopt.
   'bevestig-bg': () => beantwoordBevestiging(false),
@@ -294,6 +296,10 @@ document.addEventListener('DOMContentLoaded',()=>{
   let _modalMouseDownTarget=null;
   document.getElementById('modal-bg').addEventListener('mousedown',e=>{_modalMouseDownTarget=e.target});
   document.getElementById('modal-bg').addEventListener('click',e=>{if(e.target.id==='modal-bg'&&_modalMouseDownTarget?.id==='modal-bg')sluitModalVeilig()});
+  // Offertevergelijker: klik naast het venster sluit het, net als bij het bewerkscherm.
+  let _ovMouseDownTarget=null;
+  document.getElementById('ov-bg').addEventListener('mousedown',e=>{_ovMouseDownTarget=e.target});
+  document.getElementById('ov-bg').addEventListener('click',e=>{if(e.target.id==='ov-bg'&&_ovMouseDownTarget?.id==='ov-bg')sluitVergelijker()});
   document.getElementById('m-submit').onclick=submitTask;
   // Categorie-kiezer: een <select> geeft `change`, geen `click`, en komt dus niet langs de
   // delegatie in actions.js (zelfde reden als bij hh-type hieronder).

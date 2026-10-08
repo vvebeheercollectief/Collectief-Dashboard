@@ -70,6 +70,10 @@ function offerteAannemerPaneel(r){
   //
   // 'Opgevolgd · +2 wk' alleen bij een AANGEVRAAGD traject: pas dan draagt kolom F een
   // opvolgdatum (zie offerteAangevraagd in util.js) die je 2 weken verder kunt zetten.
+  // De offertevergelijker hoort bij het traject: VvE, traject en aannemersnamen staan hier al
+  // (spec: knop in de aannemerslijst). Altijd zichtbaar; met minder dan twee PDF's zegt het
+  // venster zelf wat er nodig is.
+  const vergelijkKnop = `<button type="button" class="of-aann-vergelijk" data-action="ov-open" data-aann="${sl}" title="Offerte-PDF's naast elkaar laten zetten">Offertes vergelijken</button>`;
   const opvolgKnop = offerteAangevraagd(r)
     ? `<button type="button" class="of-aann-opvolg" data-action="offerte-opgevolgd" data-aann="${sl}" title="Herinnering gestuurd — zet de opvolgdatum 2 weken verder">Opgevolgd · +2 wk</button>`
     : '';
@@ -77,7 +81,7 @@ function offerteAannemerPaneel(r){
     <div class="of-aann-add">
       <input class="of-aann-input" data-aann="${sl}" value="${esc((state.offerteAannNieuw||{})[slRuw]||'')}" placeholder="Aannemer toevoegen…" autocomplete="off" aria-label="Aannemer toevoegen">
       <button class="of-aann-toevoeg" data-action="offerte-aann-add" data-aann="${sl}">+ Toevoegen</button>
-      ${opvolgKnop}<button type="button" class="of-aann-dicht" data-action="offerte-aann-open" data-aann="${sl}" title="Aannemerslijst inklappen">${ico('chevronBoven',12)}Inklappen</button>
+      ${vergelijkKnop}${opvolgKnop}<button type="button" class="of-aann-dicht" data-action="offerte-aann-open" data-aann="${sl}" title="Aannemerslijst inklappen">${ico('chevronBoven',12)}Inklappen</button>
     </div>
   </div>`;
 }

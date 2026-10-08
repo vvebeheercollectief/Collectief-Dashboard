@@ -32,6 +32,7 @@ import { saveKenmerken } from './kenmerken.js';
 import { palKies, closePalette } from './palette.js';
 import { toggleBulkMode, bulkVink, bulkAlles, toggleBulkMenu, bulkDoe } from './bulk.js';
 import { doeOpmaak, initOpmaak } from './opmaak.js';
+import { openVergelijker, sluitVergelijker, nieuweVergelijking, verwijderBestand, vergelijk, startBewerk, download, schrijfLogregel } from './offerte-vergelijker.js';
 
 const PAG_RENDER = { ntd:renderNtd, af:renderAf, alvo:renderAlvo, alfa:renderAlfa, ontw:renderOntw, logboek:renderLogboek };
 
@@ -196,6 +197,15 @@ export const ACTIONS = {
   'offerte-aann-add':      (el) => { const inp=el.closest('.of-aann-add')?.querySelector('.of-aann-input'); if(!inp) return; const v=inp.value; inp.value=''; delete state.offerteAannNieuw[el.dataset.aann]; addAannemer(el.dataset.aann, v); },
   // 'Opgevolgd · +2 wk' (paneel van een aangevraagd traject): opvolgdatum in kolom F 2 weken verder.
   'offerte-opgevolgd':     (el) => opgevolgd(el.dataset.aann),
+  'ov-open':        (el) => openVergelijker(el.dataset.aann),
+  'ov-sluit':       () => sluitVergelijker(),
+  'ov-kies':        () => document.getElementById('ov-file')?.click(),
+  'ov-verwijder':   (el) => verwijderBestand(+el.dataset.idx),
+  'ov-vergelijk':   () => vergelijk(),
+  'ov-cel':         (el) => startBewerk(el.dataset.blok, +el.dataset.rij, +el.dataset.kol),
+  'ov-download':    () => download(),
+  'ov-log-opnieuw': () => schrijfLogregel(),
+  'ov-nieuw':       () => nieuweVergelijking(),
   // Zelfde lijst, maar dan in het aanmaak-/bewerkscherm: mutaties op de WERKKOPIE
   // (modal-aannemers.js), er wordt pas bij Opslaan geschreven.
   'maann-binnen':          (el) => modalAannemerBinnen(+el.dataset.idx),

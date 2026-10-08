@@ -337,7 +337,7 @@ async function askZoek(system, messages, laatste){
   }, 'De AI gaf binnen een minuut geen antwoord', AI_TIMEOUT_MS);
   const data = await r.json().catch(()=>({}));
   if(!r.ok){ const e=new Error(data.error||'AI-fout'); e.status=r.status; throw e; }
-  return { content: Array.isArray(data.content) ? data.content : [], stop_reason: data.stop_reason || '' };
+  return { content: Array.isArray(data.content) ? data.content : [], stop_reason: data.stop_reason || '', model: data.model || '' };
 }
 
 // ── Vingerafdruk van een rij ───────────────────────────────────────────────

@@ -160,7 +160,7 @@ export default async function handler(req, res){
     // Alleen aantallen, nooit inhoud: zo zijn de kosten per vraag in de Vercel-logs na te gaan.
     if (data.usage) {
       const u = data.usage;
-      console.log('chat: tokens', zoek ? 'zoek' : 'dossier', 'in', u.input_tokens, 'cache-lees', u.cache_read_input_tokens || 0,
+      console.log('chat: tokens', zoek ? 'zoek' : 'dossier', 'model', data.model, 'in', u.input_tokens, 'cache-lees', u.cache_read_input_tokens || 0,
         'cache-schrijf', u.cache_creation_input_tokens || 0, 'uit', u.output_tokens, 'stop', data.stop_reason);
     }
     const WEIGERING = 'Deze vraag kan ik niet beantwoorden. Probeer het anders te formuleren.';
@@ -173,7 +173,9 @@ export default async function handler(req, res){
         res.status(200).json({ content: [{ type: 'text', text: WEIGERING }], stop_reason: 'refusal' }); return;
       }
       const content = (data.content || []).filter(b => b && ASSISTENT_BLOKKEN.has(b.type));
-      res.status(200).json({ content, stop_reason: data.stop_reason || '' }); return;
+      // `model` = het model dat Anthropic écht heeft gebruikt (uit het antwoord, niet uit ons verzoek).
+      // De chat toont dit onderin, zodat iedereen kan zien waar het antwoord vandaan komt.
+      res.status(200).json({ content, stop_reason: data.stop_reason || '', model: data.model || '' }); return;
     }
 
     // Haiku 5.5 kan een vraag weigeren (veiligheidsfilter); dan komt er geen tekst. Zeg dat, in

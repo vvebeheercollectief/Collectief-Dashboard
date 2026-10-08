@@ -294,6 +294,10 @@ function renderChat(){
   const lbl = document.getElementById('chat-vve-label');
   if(lbl) lbl.textContent = code ? `${code}${naam?' — '+naam:''}` : 'Alle VvE\'s';
   const wis = document.getElementById('chat-vve-wis'); if(wis) wis.hidden = !code;
+  // De voetregel noemt het model zoals Anthropic het in zijn laatste antwoord opgaf — niet wat wij
+  // vroegen. Zo is altijd na te gaan welk model er echt antwoordt.
+  const mdl = document.getElementById('chat-model');
+  if(mdl) mdl.textContent = state._chatModel ? `model: ${state._chatModel}` : 'Claude Haiku 5.5';
   const box = document.getElementById('chat-bubbles');
   if(!box) return;
   const codes = _bekendeCodes();
@@ -346,7 +350,8 @@ async function vraagChat(){
   try{
     if(!await ensureToken()) throw new Error('Niet ingelogd');
     const antwoord = await zoekLus(buildZoekSysteemPrompt(), _chatMessages(gesprek), {
-      vraag: askZoek,
+      // Het model dat Anthropic meldt, onthouden voor de voetregel (zie renderChat).
+      vraag: async (sys, msgs, laatste) => { const r = await askZoek(sys, msgs, laatste); if(r.model) state._chatModel = r.model; return r; },
       voerUit: (n, inv) => voerZoekUit(n, inv, D, vandaag, { dossier: dossierContextTekst }),
       opStatus: t => { if(nogHier()){ state._chatStatus = t; renderChat(); } },
     });

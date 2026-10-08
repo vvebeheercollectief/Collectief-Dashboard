@@ -18169,6 +18169,61 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     truthy('ov pdf-lib: deel is een PDF', String.fromCharCode(...deel.slice(0, 5)) === '%PDF-');
   })();
 
+  // ══════════════════════════════════════════════════════════════════════════
+  //  OFFERTEVERGELIJKER — de PDF (src/vergelijk-pdf.js)
+  // ══════════════════════════════════════════════════════════════════════════
+  await (async () => {
+    console.log('%c[TESTS] Offertevergelijker: PDF', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const V = await import('./vergelijk-pdf.js');
+    const N = '\u00a0';
+    const cel = (tekst, extra) => ({ tekst, pagina:1, berekend:false, som:'', ...extra });
+    const o = {
+      kolommen:['Heijstek Schilders', 'Klusbouw Meesters'],
+      bedragen:[
+        { sleutel:'exclBtw', label:'Exclusief btw', cellen:[cel(`€${N}9.300,13`, { berekend:true, som:'x' }), cel(`€${N}35.964,38`)] },
+        { sleutel:'btw', label:'Btw', cellen:[cel(`€${N}1.953,03`), cel(`€${N}7.552,52`)] },
+        { sleutel:'inclBtw', label:'Inclusief btw', cellen:[cel(`€${N}11.253,16`), cel('')] },
+      ],
+      onderdelen:[
+        { label:'Dakrenovatie', cellen:[{ status:'niet_genoemd', toelichting:'', pagina:null }, { status:'inbegrepen', toelichting:'ca. 75 m²', pagina:4 }] },
+        { label:'Houtrotherstel', cellen:[{ status:'uitgesloten', toelichting:'apart aanbod', pagina:3 }, { status:'inbegrepen', toelichting:'', pagina:5 }] },
+      ],
+      voorwaarden:[
+        { sleutel:'offertenummer', label:'Offertenummer', cellen:[cel(''), cel('')] },
+        { sleutel:'betaling', label:'Betaling', cellen:[cel('50% bij aanvang'), cel('30% bij opdracht')] },
+        { sleutel:'planning', label:'Planning', cellen:[cel(''), cel('')] },
+      ],
+      opvallend:[{ kolom:1, tekst:'Subsidie van € 38.718,75 verrekend.', pagina:8 }],
+    };
+    const doc = V.pdfInhoud(o, { vveNaam:'Drebbelstraat 40-44', traject:'Gevelonderhoud', datum:new Date(2026, 9, 8) });
+    const plat = JSON.stringify(doc.content);
+    eq('ov pdf: A4 staand', [doc.pageSize, doc.pageOrientation || 'portrait'], ['A4', 'portrait']);
+    eq('ov pdf: titel', doc.content[0].text, 'Twee offertes naast elkaar');
+    eq('ov pdf: inleiding', doc.content[1].text, 'Wat de aannemers aanbieden, volgens hun eigen offertes.');
+    const kop = JSON.stringify(doc.header(1, 2));
+    truthy('ov pdf: kopregel', kop.includes('OFFERTEVERGELIJKING · VVE DREBBELSTRAAT 40-44') && kop.includes('GEVELONDERHOUD'));
+    const voet = JSON.stringify(doc.footer(1, 2));
+    truthy('ov pdf: voetregel met code en 1 / 2', voet.includes('VBC · Offertevergelijking 2026.10.08 · versie 1.0') && voet.includes('"1"') && voet.includes(' / 2'));
+    eq('ov pdf: vier blokken in volgorde', doc.content.filter(c => c.stack && c.stack[0].style === 'tussenkop').map(c => c.stack[0].text), ['Wat het kost', 'Wat er in zit', 'Voorwaarden', 'Opvallend']);
+    const kost = doc.content[2].stack[1].table.body;
+    eq('ov pdf: kop + drie bedragrijen', kost.length, 4);
+    eq('ov pdf: totaal dubbel onderstreept', [kost[3][1].decoration, kost[3][1].decorationStyle], ['underline', 'double']);
+    eq('ov pdf: ontbrekend bedrag = Niet vermeld, cursief', [kost[3][2].text, kost[3][2].italics], ['Niet vermeld', true]);
+    truthy('ov pdf: geen "berekend" in de PDF', !/berekend/i.test(plat));
+    const inhoud = doc.content[3].stack[1].table.body;
+    truthy('ov pdf: vinkje als tekening', JSON.stringify(inhoud[1][2]).includes('<svg'));
+    truthy('ov pdf: niet genoemd zichtbaar', JSON.stringify(inhoud[1][1]).includes('niet genoemd'));
+    truthy('ov pdf: uitgesloten met toelichting', JSON.stringify(inhoud[2][1]).includes('uitgesloten, apart aanbod'));
+    const vw = doc.content[4].stack[1].table.body.map(r => r[0].text);
+    eq('ov pdf: lege offertenummer-rij weg, lege planning blijft', vw, ['', 'Betaling', 'Planning']);
+    truthy('ov pdf: opvallend met aannemer', plat.includes('Klusbouw Meesters') && plat.includes('Subsidie van € 38.718,75 verrekend.'));
+    truthy('ov pdf: noot', plat.includes('de inhoud van elke offerte is de verantwoordelijkheid van de aannemer'));
+    truthy('ov pdf: geen oordeelwoorden in vaste teksten', !/goedkoopst|voordeligst|aan te raden/i.test(plat));
+    // Echt een PDF maken: bewijst dat lettertypes, vinkje en dubbele streep werken onder de CSP van de app.
+    const buf = await V.maakPdfBuffer(doc);
+    truthy('ov pdf: er komt een PDF uit', buf && buf.length > 5000 && String.fromCharCode(...buf.slice(0, 5)) === '%PDF-');
+  })();
+
   console.log = _origLog;         // het voortgangsspoor weer los
   state._dubbelcheckUit = false;  // de testhaak weer los
   state._codecheckUit = false;

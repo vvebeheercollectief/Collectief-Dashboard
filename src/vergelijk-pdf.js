@@ -4,15 +4,26 @@
 //  trager van, en de CSP (script-src 'self') hoeft niet te veranderen.
 // ══════════════════════════════════════
 
+// Twee gelijktijdige aanroepen mogen de bibliotheek maar één keer laden.
+const _laden = new Map();
+
 export function laadScript(src, globaal){
   if(window[globaal]) return Promise.resolve(window[globaal]);
-  return new Promise((ok, nee) => {
+  if(_laden.has(src)) return _laden.get(src);
+
+  const belofte = new Promise((ok, nee) => {
     const s = document.createElement('script');
     s.src = src;
     s.onload = () => window[globaal] ? ok(window[globaal]) : nee(new Error('Bibliotheek niet geladen: ' + src));
-    s.onerror = () => nee(new Error('Bibliotheek niet geladen: ' + src));
+    s.onerror = () => {
+      _laden.delete(src);
+      s.remove();
+      nee(new Error('Bibliotheek niet geladen: ' + src));
+    };
     document.head.appendChild(s);
   });
+  _laden.set(src, belofte);
+  return belofte;
 }
 const vendor = pad => new URL('vendor/' + pad, document.baseURI).href;
 export const laadPdfLib = () => laadScript(vendor('pdf-lib.min.js'), 'PDFLib');

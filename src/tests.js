@@ -18148,9 +18148,17 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     try { await M.planDelen(3, (van, tot) => Promise.resolve((van <= 2 && tot >= 2 ? 5_000_000 : 0) + (tot - van + 1)), 4_000_000); } catch(e) { teGroot = e; }
     eq('ov delen: één pagina te groot', teGroot && teGroot.pagina, 2);
 
+    let laadFout = null;
+    try { await V.laadScript(new URL('vendor/bestaat-niet.js', document.baseURI).href, '_ovBestaatNiet'); } catch(e) { laadFout = e; }
+    truthy('ov laden: mislukt laden geeft een fout', !!laadFout);
+    eq('ov laden: mislukte scripttag opgeruimd', document.querySelectorAll('script[src$="vendor/bestaat-niet.js"]').length, 0);
+
     // Echt knippen met pdf-lib. De pagina's hebben geen tekst, zoals een scan.
     const PDFLib = await V.laadPdfLib();
     truthy('ov pdf-lib: geladen', !!(PDFLib && PDFLib.PDFDocument));
+    const [l1, l2] = await Promise.all([V.laadPdfLib(), V.laadPdfLib()]);
+    eq('ov laden: gelijktijdig één exemplaar', l1 === l2 && l1 === PDFLib, true);
+    eq('ov laden: één scripttag', document.querySelectorAll('script[src$="vendor/pdf-lib.min.js"]').length, 1);
     const doc = await PDFLib.PDFDocument.create();
     for(let i = 0; i < 5; i++) doc.addPage([595, 842]);
     const bytes = await doc.save();

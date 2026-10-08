@@ -146,7 +146,7 @@ Na de eerste geslaagde download van een vergelijking: `logEvent(code, 'OFFERTE-T
 |---|---|
 | Geen PDF, PDF met wachtwoord, minder dan 2 of meer dan 4 bestanden, meer dan 100 pagina's samen | Melding in het venster vóór het versturen. Kost niets. |
 | Eén pagina groter dan 4 MB | Melding met de naam van de offerte: sla die kleiner op. |
-| Versturen van een bestand mislukt | Per bestand *Opnieuw proberen*; de rest blijft staan. |
+| Versturen van een bestand mislukt | Melding in het venster; de bestanden blijven staan en *Vergelijken* probeert het opnieuw. Wat al verstuurd was, wordt gewist. |
 | Sessie verlopen | Dezelfde afhandeling als de chat (opnieuw inloggen). |
 | Claude weigert, antwoord afgekapt, fout in het antwoord | Melding met *Opnieuw laten lezen*. Bestanden zijn al gewist; opnieuw lezen verstuurt ze opnieuw. |
 | Tegoed op | Melding *Het AI-tegoed is op.* |

@@ -18014,6 +18014,107 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     } finally { window.fetch = oud.fetch; state.oauthToken = oud.token; }
   })();
 
+  // ══════════════════════════════════════════════════════════════════════════
+  //  OFFERTEVERGELIJKER — rekenkern (src/vergelijk-model.js)
+  // ══════════════════════════════════════════════════════════════════════════
+  await (async () => {
+    console.log('%c[TESTS] Offertevergelijker: rekenkern', 'background:#0D7377;color:white;padding:2px 6px;border-radius:3px');
+    const M = await import('./vergelijk-model.js');
+    const N = ' ';
+
+    eq('ov bedrag: notatie', M.formatBedrag(160500), `€${N}1.605,00`);
+    eq('ov bedrag: groot', M.formatBedrag(4351690), `€${N}43.516,90`);
+    eq('ov bedrag: negatief', M.formatBedrag(-3871875), `−${N}€${N}38.718,75`);
+    eq('ov bedrag: geen getal', M.formatBedrag(null), '');
+    eq('ov lezen: notatie', M.parseBedrag(`€${N}11.253,16`), 1125316);
+    eq('ov lezen: punt als komma', M.parseBedrag('11253.16'), 1125316);
+    eq('ov lezen: duizendtal', M.parseBedrag('1.605'), 160500);
+    eq('ov lezen: kaal getal', M.parseBedrag('1605'), 160500);
+    eq('ov lezen: negatief', M.parseBedrag('− € 38.718,75'), -3871875);
+    eq('ov lezen: tekst', M.parseBedrag('ca. 5000'), null);
+    eq('ov lezen: leeg', M.parseBedrag(''), null);
+
+    const leeg = { bedrag:null, pagina:null, posten:[] };
+    const B = (x) => ({ exclBtw:leeg, btw:leeg, inclBtw:leeg, subsidie:leeg, ...x });
+    const r1 = M.rekenUit(B({ inclBtw:{ bedrag:11253.16, pagina:6, posten:[] } }), [21]);
+    eq('ov reken: excl uit incl', [r1.exclBtw.cent, r1.exclBtw.bron], [930013, 'berekend']);
+    eq('ov reken: som erbij', r1.exclBtw.som, `€${N}11.253,16 ÷ 1,21`);
+    eq('ov reken: btw = incl − excl', r1.btw.cent, 195303);
+    eq('ov reken: incl blijft letterlijk', [r1.inclBtw.bron, r1.inclBtw.pagina], ['letterlijk', 6]);
+    eq('ov reken: subsidie niet vermeld', r1.subsidie.bron, 'niet_vermeld');
+    const r2 = M.rekenUit(B({ exclBtw:{ bedrag:9300.13, pagina:5, posten:[] } }), [21]);
+    eq('ov reken: btw uit excl', [r2.btw.cent, r2.btw.som], [195303, `21% van €${N}9.300,13`]);
+    eq('ov reken: incl = excl + btw', r2.inclBtw.cent, 1125316);
+    const r3 = M.rekenUit(B({ inclBtw:{ bedrag:11253.16, pagina:6, posten:[] } }), [9, 21]);
+    eq('ov reken: twee percentages → niet rekenen', [r3.exclBtw.bron, r3.btw.bron], ['niet_vermeld', 'niet_vermeld']);
+    const r4 = M.rekenUit(B({ inclBtw:{ bedrag:null, pagina:null, posten:[{ omschrijving:'Gevel', bedrag:1000, pagina:3 }, { omschrijving:'Dak', bedrag:250.5, pagina:4 }] } }), []);
+    eq('ov reken: posten opgeteld', [r4.inclBtw.cent, r4.inclBtw.bron, r4.inclBtw.som], [125050, 'berekend', 'som van 2 posten (p. 3, 4)']);
+    const r5 = M.rekenUit(B({ exclBtw:{ bedrag:100, pagina:2, posten:[] }, btw:{ bedrag:21, pagina:2, posten:[] }, inclBtw:{ bedrag:121, pagina:2, posten:[] } }), [21]);
+    eq('ov reken: alles letterlijk blijft letterlijk', [r5.exclBtw.bron, r5.btw.bron, r5.inclBtw.bron], ['letterlijk','letterlijk','letterlijk']);
+
+    const ANT = {
+      aannemers:[
+        { index:0, naam:'Heijstek', bedragen:B({ inclBtw:{ bedrag:11253.16, pagina:6, posten:[] } }), btwPercentages:[21],
+          voorwaarden:{ offertedatum:{ tekst:'7 juli 2026', pagina:1 }, offertenummer:{ tekst:null, pagina:null }, betaling:{ tekst:'50% bij aanvang', pagina:7 },
+            garantie:{ tekst:'Onderhoud NL Garantie', pagina:7 }, planning:{ tekst:null, pagina:null }, geldigheid:{ tekst:null, pagina:null }, stelposten:{ tekst:null, pagina:null } } },
+        { index:1, naam:'Klusbouw', bedragen:B({ exclBtw:{ bedrag:35964.38, pagina:8, posten:[] }, btw:{ bedrag:7552.52, pagina:8, posten:[] }, inclBtw:{ bedrag:43516.90, pagina:8, posten:[] } }), btwPercentages:[21],
+          voorwaarden:{ offertedatum:{ tekst:'13 mei 2026', pagina:1 }, offertenummer:{ tekst:null, pagina:null }, betaling:{ tekst:'30% bij opdracht', pagina:9 },
+            garantie:{ tekst:'Volgens algemene voorwaarden', pagina:null }, planning:{ tekst:null, pagina:null }, geldigheid:{ tekst:null, pagina:null }, stelposten:{ tekst:null, pagina:null } } },
+      ],
+      onderdelen:[
+        { naam:'Dakrenovatie', perAannemer:[{ index:0, status:'niet_genoemd', toelichting:'', pagina:null }, { index:1, status:'inbegrepen', toelichting:'ca. 75 m²', pagina:4 }] },
+        { naam:'Houtrotherstel', perAannemer:[{ index:0, status:'uitgesloten', toelichting:'apart aanbod', pagina:3 }, { index:1, status:'raar', toelichting:'', pagina:5 }] },
+      ],
+      opvallend:[ { index:1, tekst:'Subsidie van € 38.718,75 verrekend.', pagina:8 }, { index:7, tekst:'Bestaat niet', pagina:1 } ],
+    };
+    eq('ov valideer: goed', M.valideerAntwoord(ANT, 2), '');
+    truthy('ov valideer: aannemer ontbreekt', M.valideerAntwoord({ ...ANT, aannemers:[ANT.aannemers[0]] }, 2).includes('aannemer 2'));
+    truthy('ov valideer: geen onderdelen', !!M.valideerAntwoord({ ...ANT, onderdelen:[] }, 2));
+    truthy('ov valideer: leeg', !!M.valideerAntwoord(null, 2));
+
+    const o = M.maakOverzicht(ANT, ['Heijstek Schilders', 'Klusbouw Meesters']);
+    eq('ov overzicht: kolommen uit het venster', o.kolommen, ['Heijstek Schilders', 'Klusbouw Meesters']);
+    eq('ov overzicht: geen subsidierij zonder subsidie', o.bedragen.map(r => r.sleutel), ['exclBtw', 'btw', 'inclBtw']);
+    eq('ov overzicht: berekend bedrag', [o.bedragen[0].cellen[0].tekst, o.bedragen[0].cellen[0].berekend], [`€${N}9.300,13`, true]);
+    eq('ov overzicht: letterlijk bedrag', [o.bedragen[2].cellen[1].tekst, o.bedragen[2].cellen[1].pagina, o.bedragen[2].cellen[1].berekend], [`€${N}43.516,90`, 8, false]);
+    eq('ov overzicht: onbekende status wordt niet_genoemd', o.onderdelen[1].cellen[1].status, 'niet_genoemd');
+    eq('ov overzicht: voorwaarden in vaste volgorde', o.voorwaarden.map(r => r.sleutel), ['offertedatum','offertenummer','betaling','garantie','planning','geldigheid','stelposten']);
+    eq('ov overzicht: niet vermeld = lege tekst', o.voorwaarden[4].cellen[0].tekst, '');
+    eq('ov overzicht: opvallend met onbekende index valt weg', o.opvallend, [{ kolom:1, tekst:'Subsidie van € 38.718,75 verrekend.', pagina:8 }]);
+
+    eq('ov sommen: kloppen', M.controleerSommen(o), ['', '']);
+    eq('ov markering: ontbreekt', M.celMarkering(o.voorwaarden[4].cellen[0]), 'ontbreekt');
+    eq('ov markering: berekend', M.celMarkering(o.bedragen[0].cellen[0]), 'berekend');
+    eq('ov markering: geen pagina', M.celMarkering(o.voorwaarden[3].cellen[1]), 'geen_pagina');
+    eq('ov markering: in orde', M.celMarkering(o.bedragen[2].cellen[1]), '');
+
+    M.zetCel(o, 'bedragen', 2, 1, '43000');
+    eq('ov bewerk: bedrag genormaliseerd', o.bedragen[2].cellen[1].tekst, `€${N}43.000,00`);
+    eq('ov bewerk: handmatig zonder markering', M.celMarkering(o.bedragen[2].cellen[1]), '');
+    truthy('ov sommen: waarschuwing na bewerken', M.controleerSommen(o)[1].includes(`€${N}43.516,90`) && M.controleerSommen(o)[1].includes(`€${N}43.000,00`));
+    M.zetCel(o, 'bedragen', 0, 0, '');
+    eq('ov bewerk: leeggemaakt = niet vermeld', M.celMarkering(o.bedragen[0].cellen[0]), 'ontbreekt');
+    M.zetCel(o, 'onderdelen', 0, 0, { status:'uitgesloten', toelichting:' staat er expliciet niet in ' });
+    eq('ov bewerk: onderdeel', [o.onderdelen[0].cellen[0].status, o.onderdelen[0].cellen[0].toelichting], ['uitgesloten', 'staat er expliciet niet in']);
+    M.zetCel(o, 'onderdelen', 0, 0, { status:'onzin', toelichting:'' });
+    eq('ov bewerk: onbekende status genegeerd', o.onderdelen[0].cellen[0].status, 'uitgesloten');
+    M.zetCel(o, 'voorwaarden', 4, 1, 'Week 12 tot en met 16');
+    eq('ov bewerk: voorwaarde', o.voorwaarden[4].cellen[1].tekst, 'Week 12 tot en met 16');
+    M.zetCel(o, 'opvallend', 0, -1, '');
+    eq('ov bewerk: leeg opvallend punt valt weg', o.opvallend.length, 0);
+
+    const d = new Date(2026, 9, 8);
+    eq('ov tekst: logregel', M.logRegelTekst(['Heijstek Schilders', 'Klusbouw Meesters'], 'Gevelonderhoud'), 'Offertevergelijking gemaakt: Heijstek Schilders, Klusbouw Meesters (2 offertes) — Gevelonderhoud');
+    eq('ov tekst: logregel zonder traject', M.logRegelTekst(['A', 'B', 'C'], ''), 'Offertevergelijking gemaakt: A, B, C (3 offertes)');
+    eq('ov tekst: datum voluit', M.datumVoluit(d), '8 oktober 2026');
+    eq('ov tekst: documentcode', M.documentCode(d), 'VBC · Offertevergelijking 2026.10.08 · versie 1.0');
+    eq('ov tekst: VvE ervoor', M.vveTitel('Drebbelstraat 40-44'), 'VvE Drebbelstraat 40-44');
+    eq('ov tekst: geen dubbele VvE', M.vveTitel('VvE Drebbelstraat 40-44'), 'VvE Drebbelstraat 40-44');
+    eq('ov tekst: bestandsnaam', M.bestandsNaam('Drebbelstraat 40/44', d), 'Offertevergelijking VvE Drebbelstraat 40-44 - 8 oktober 2026.pdf');
+    eq('ov tekst: traject = eerste regel zonder opmaak', M.trajectNaam('**Gevelonderhoud**\nnog iets'), 'Gevelonderhoud');
+    eq('ov tekst: titel', [M.pdfTitel(2), M.pdfTitel(4)], ['Twee offertes naast elkaar', 'Vier offertes naast elkaar']);
+  })();
+
   console.log = _origLog;         // het voortgangsspoor weer los
   state._dubbelcheckUit = false;  // de testhaak weer los
   state._codecheckUit = false;

@@ -38,7 +38,7 @@ const isOffline = () => _isOffline(navigator.onLine, state._netwerkFouten||0);
 // antwoord toch niet meer interessant. Tests verlagen hem via state._fetchTimeoutMs.
 const FETCH_TIMEOUT_MS = 20_000;
 // De AI-proxy is iets heel anders dan een Sheets-lezing: die doet eerst een tokeninfo-aanroep en
-// daarna een NIET-streamende aanroep naar het model met max_tokens 1024 — het antwoord komt pas
+// daarna een NIET-streamende aanroep naar het model met max_tokens 4096 — het antwoord komt pas
 // als het hele stuk tekst klaar is. Bij een groot dossier is 20 seconden daarvoor te krap, en dan
 // zou de klok een gesprek afbreken dat gewoon onderweg was. Een minuut is ruim en houdt nog steeds
 // de belofte dat de chat niet eeuwig op 'aan het typen…' blijft staan.

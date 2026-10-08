@@ -88,12 +88,22 @@ export default async function handler(req, res){
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: 'claude-haiku-4-5', max_tokens: 1024, system, messages }),
+      // Haiku 5.5 denkt standaard eerst na, en dat denkwerk telt mee in max_tokens. Daarom ruimer
+      // dan de 1024 van Haiku 4.5 (anders kan het denken het hele budget opeten vóór er tekst komt),
+      // en effort 'low': dossiervragen zijn opzoekwerk, geen puzzel — sneller en goedkoper.
+      body: JSON.stringify({
+        model: 'claude-haiku-5-5', max_tokens: 4096, output_config: { effort: 'low' }, system, messages,
+      }),
     });
     const data = await r.json().catch(() => ({}));
     if (!r.ok) {
       console.error('chat: Anthropic-fout', r.status, (data.error && data.error.message) || '');
       res.status(502).json({ error: (data.error && data.error.message) || 'AI-fout' }); return;
+    }
+    // Haiku 5.5 kan een vraag weigeren (veiligheidsfilter); dan komt er geen tekst. Zeg dat, in
+    // plaats van een lege bubbel te tonen.
+    if (data.stop_reason === 'refusal') {
+      res.status(200).json({ antwoord: 'Deze vraag kan ik niet beantwoorden. Probeer het anders te formuleren.' }); return;
     }
     const antwoord = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
     // Liep het antwoord tegen max_tokens aan, dan is het middenin een zin afgebroken. Zonder deze

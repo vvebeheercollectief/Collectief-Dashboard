@@ -1527,7 +1527,10 @@ export function afrondWaarden(r, sec, datum, toelichting, duurMin){
     // aan en laat M dus altijd leeg — bulk is opruimwerk en hoort niet in de meting.
     duurNaarCel(duurMin), '', '', '',         // M, N, O, P
     r.taakId||'', r.bundelId||'', nulVeilig(r.bundelVolg),  // Q, R, S
-  ], sec==='CRM' ? crmVelden(r) : []);        // T..W — de mail gaat mee naar het archief
+  // T..W bij CRM: afzender, ontvangen en soort gaan mee, de MAIL (W) niet (besluit 2026-10-15): die
+  // staat al in TwinQ en is na het afronden niet meer nodig. W blijft als lege cel bestaan zodat de
+  // archiefrij 23 kolommen houdt. Dezelfde regel staat in cd_archiveerRij (apps-script/Code.gs).
+  ], sec==='CRM' ? crmVelden(r).slice(0,3).concat(['']) : []);
 }
 
 async function doCompleteTask(){

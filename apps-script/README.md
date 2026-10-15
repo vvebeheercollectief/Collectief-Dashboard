@@ -118,6 +118,7 @@ onder een ander account.
 | `verplaatsAfgerond` | Uit spreadsheet — Bij bewerken (`onEdit`) | eigenaar |
 | `verplaatsALV` | Uit spreadsheet — Bij bewerken (`onEdit`) | eigenaar |
 | `sorteerOfferteTrajecten` | Uit spreadsheet — Bij bewerken (`onEdit`) | eigenaar |
+| `cd_logboekSnoeien` | Tijdgebonden (dagelijks ±03:30) — wist Logboek-regels ouder dan 7 dagen; de trigger zet zichzelf via de veegbeurt (sinds 2026-10-15, `Extra functies.gs`) | eigenaar |
 
 De legacy onEdit-triggers (`verplaatsAfgerond`, `verplaatsALV`, `sorteerOfferteTrajecten`)
 staan in geen enkele setup-functie, maar draaien op PROD wél degelijk. Er verschuiven dus

@@ -872,6 +872,9 @@ function cd_sweepNotifQueue() {
   cd_safeRun('cd_vveCodesAutomatisch', cd_vveCodesAutomatisch);
   // Vier VvE's uit beheer (25-09-2026) één keer uit het register. Zie Code.gs.
   cd_safeRun('cd_vveCodesUitBeheerAutomatisch', cd_vveCodesUitBeheerAutomatisch);
+  // Logboek-snoei (2026-10-15): zet één keer de dagelijkse trigger die regels ouder dan 7 dagen wist.
+  // Zie cd_logboekSnoeien in 'Extra functies.gs'.
+  cd_safeRun('cd_logboekSnoeiTriggerAutomatisch', cd_logboekSnoeiTriggerAutomatisch);
   // Nooit opgooien: deze trigger draait 288× per dag, en een tijdelijke OneSignal-hik of een blijvende
   // fout in een setup-stap zou dan een stroom mislukte runs en foutmails geven. De Fout-regel in het
   // Logboek (via cd_meldFout, hoogstens eens per uur per soort) is hier het signaal.

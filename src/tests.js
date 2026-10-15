@@ -6437,7 +6437,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '15.2');
+  eq('versie opgehoogd', APP_VERSION, '15.3');
 
   // ── Tabbladen ÍN de kaartkop (v11.7) ──
   // De kop van de kaart zei links exact hetzelfde als het actieve tabblad — 'Oppakken' boven
@@ -16136,7 +16136,8 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     eq('toevoegen: een andere sectie blijft tot S, ook met velden op het object', CR.toevoegWaarden(vals11, oppObj).length, 19);
     eq('undo: CRM loopt tot W, Oppakken tot S', [serializeNtdUndo(crmObj).length, serializeNtdUndo(oppObj).length], [23, 19]);
     eq('undo: het taaknummer blijft op Q', serializeNtdUndo(crmObj)[16], 'TCRM1');
-    eq('afronden: CRM loopt tot W en de mail gaat mee', [afrondWaarden(crmObj,'CRM','23-09-2026','Beantwoord').length, afrondWaarden(crmObj,'CRM','23-09-2026','x')[22]], [23, 'Beste beheerder,\nWie betaalt dit?']);
+    eq('afronden: CRM loopt tot W, maar de mail gaat NIET mee (W leeg)', [afrondWaarden(crmObj,'CRM','23-09-2026','Beantwoord').length, afrondWaarden(crmObj,'CRM','23-09-2026','x')[22]], [23, '']);
+    eq('afronden: T..V (afzender, ontvangen, soort) gaan wél mee', afrondWaarden(crmObj,'CRM','23-09-2026','x').slice(19,22), ['Mw. Jansen, nr. 71','10-09-2026','Vraag']);
     eq('afronden: Oppakken blijft tot S', afrondWaarden(oppObj,'OPPAKKEN','23-09-2026','x').length, 19);
     eq('crmVelden: vaste volgorde, leeg als niets', CR.crmVelden({}), ['','','','']);
     // Naloop 25-09: Sheets weigert cellen boven 50.000 tekens; een lange mail liet de taak mislukken.

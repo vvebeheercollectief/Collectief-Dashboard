@@ -201,8 +201,9 @@ function cd_archiveerRij(sheet, row) {
   archief.push("", "", "", "");             // M = duur in minuten, blijft hier leeg: afvinken in
                                              // de Sheet zelf kent geen duur. N..P blijven ook leeg.
   archief.push(rowData[16] || "", rowData[17] || "", cd_nulVeilig(rowData[18]));  // Q/R/S: taaknummer + bundel (S: 0 is geldig)
-  // T..W alleen bij CRM, net als afrondWaarden in src/crud.js: de mail gaat mee naar het archief.
-  if (sectie === "CRM") archief.push(rowData[19] || "", rowData[20] || "", rowData[21] || "", rowData[22] || "");
+  // T..W alleen bij CRM, net als afrondWaarden in src/crud.js. De MAIL (W) gaat sinds 2026-10-15 NIET
+  // mee naar het archief (staat al in TwinQ); de cel blijft leeg zodat de rij 23 kolommen houdt.
+  if (sectie === "CRM") archief.push(rowData[19] || "", rowData[20] || "", rowData[21] || "", "");
 
   // Via `sheet.getParent()` en niet via het onEdit-event: deze functie staat sinds de opsplitsing
   // LOS van de trigger (een bereik van meerdere rijen loopt er rij voor rij langs), dus `e` bestaat

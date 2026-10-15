@@ -640,8 +640,10 @@
     .vg-afgerond{--vg:var(--gn);color:var(--mut)}
     .stat-cap .voortgang{font-size:inherit;font-weight:inherit;color:inherit;gap:6px}
     .stat-cap .vg-ico{width:12px;height:12px}
-    /* Budgetpakket: gewone gedempte tekst achter de naam, geen label. */
-    .badge.budget-tag{background:none;padding:0;color:var(--mut);font-weight:400;font-size:12px;margin-left:8px;vertical-align:baseline}
+    /* Budgetpakket (v15.2): bewuste uitzondering op 'geen gekleurde labels'. Als gedempte tekst
+       keek je eroverheen, terwijl een Budget-VvE zelf vergadert en anders behandeld wordt. Nu een
+       gevuld accentlabel. Letter in --sur: wit op staalblauw (licht), donker op lichtblauw (donker). */
+    .badge.budget-tag{background:var(--ac);color:var(--sur);padding:1px 7px;border-radius:4px;font-weight:600;font-size:11px;letter-spacing:.02em;margin-left:8px;vertical-align:1px}
     /* Behandelaar-chip — Operator: één neutrale chip */
     .pers{padding:0;font-size:12px;font-weight:500;margin:1px 8px 1px 0;display:inline-flex;align-items:center;color:var(--mut)}
     /* Eén of twee tekens worden een rondje; een naam die niet in te korten viel blijft een gewone

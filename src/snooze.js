@@ -8,7 +8,7 @@ import { writeRange, assertRowMatch } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { backgroundWrite, blokkeerOffline, blokkeerVersie } from "./data.js";
 import { renderAll } from "./main.js";
-import { showToast } from "./notifications.js";
+import { showToast, showUndoToast, meldFout } from "./notifications.js";
 import { taakUitCache } from "./crud.js";
 import { verseRij } from "./rij.js";
 import { logEvent } from "./render-overig.js";
@@ -63,11 +63,11 @@ async function snoozeOpslaan(){
   // Minimumversie-rem hier al: hieronder sluit het venster ongeacht de rem in schrijfOpvolgdatum.
   if(blokkeerVersie()) return;
   const iso = document.getElementById('snooze-datum').value;
-  if(!iso){ alert('Kies een datum.'); return; }
+  if(!iso){ meldFout('Kies een datum.'); return; }
   const nieuw = toDutchDate(iso);
   const p = _parseAnyDate(nieuw);
   const d = new Date(p.y, p.m-1, p.d);
-  if(_verschilInKalenderdagen(d, _vandaagAmsterdam()) <= 0){ alert('Kies een datum in de toekomst.'); return; }
+  if(_verschilInKalenderdagen(d, _vandaagAmsterdam()) <= 0){ meldFout('Kies een datum in de toekomst.'); return; }
   const dl = parseDt(r.deadline);
   // De constatering in de tekst, de vraag zelf op de knop — het venster stelt zijn vraag mét
   // knoppen, en de `\n` uit de oude `confirm()`-tekst zou hier toch geen regelovergang meer geven
@@ -96,9 +96,12 @@ function snoozeWis(){
   schrijfOpvolgdatum(r, '', 'Opvolgdatum gewist');
   closeSnoozeModal();
 }
-async function schrijfOpvolgdatum(r, nieuw, actie){
+// `opties.zonderUndo`: dit IS al de undo — geen tweede knop (anders ping-pong). `opties.titel`:
+// de bevestigingstitel van die undo ('Wegleggen ongedaan gemaakt').
+async function schrijfOpvolgdatum(r, nieuw, actie, opties){
+  const o = opties || {};
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
-  if(!await ensureToken()){ alert('Inloggen mislukt. Probeer het opnieuw.'); return; }
+  if(!await ensureToken()){ showToast('Inloggen mislukt','Probeer het opnieuw.','var(--rd)','waarschuwing',{geenDedup:true,geenSysteemmelding:true}); return; }
   const oud = r.opvolgdatum || '';
   // Momentopname VÓÓR de mutatie, voor de rij-controle. De controle draait pas als deze schrijfactie
   // in de seriële wachtrij aan de beurt is; een actie die daarna is ingeschreven maar al optimistisch
@@ -116,16 +119,26 @@ async function schrijfOpvolgdatum(r, nieuw, actie){
       await writeRange(`'Nog Te Doen'!${OPVOLG_KOLOM}${rij}:${OPVOLG_KOLOM}${rij}`, [nieuw]);
       await logEvent(r.code, r._sec, actie, 'opvolgdatum', oud, nieuw);
       // Bevestiging pas ná de write; onderaan de writeFn zodat een herkansing er niet twee geeft.
-      showToast(nieuw ? 'Weggelegd tot '+nieuw : 'Opvolgdatum gewist',
-                // Via de centrale `taakTitel` en niet via een eigen terugvalketen: die kende
-                // `opmerkingen` (Offerte-trajecten) niet en viel daar terug op de VvE-naam, zodat
-                // de bevestiging de VERENIGING noemde in plaats van de taak. Zelfde keuze als in
-                // inbehandeling.js en deleteTaskRow.
-                `${r.code} — ${taakTitel(r, r._sec)||r.naam||''}`, null, nieuw ? 'pauze' : 'bel',
-                {geenDedup:true,geenSysteemmelding:true});
+      // Via de centrale `taakTitel` en niet via een eigen terugvalketen: die kende `opmerkingen`
+      // (Offerte-trajecten) niet en viel daar terug op de VvE-naam, zodat de bevestiging de
+      // VERENIGING noemde in plaats van de taak. Zelfde keuze als in inbehandeling.js en deleteTaskRow.
+      const titel = o.titel || (nieuw ? 'Weggelegd tot '+nieuw : 'Opvolgdatum gewist');
+      const tekst = `${r.code} — ${taakTitel(r, r._sec)||r.naam||''}`;
+      // Mét 'Ongedaan maken' (U7): de oude opvolgdatum terug (of weer leeg). De undo zoekt de rij
+      // op dát moment vers op — dezelfde taak, ook als de lijst intussen hertekend is.
+      if(o.zonderUndo) showToast(titel, tekst, null, nieuw ? 'pauze' : 'bel', {geenDedup:true,geenSysteemmelding:true});
+      else showUndoToast(titel, tekst, ()=>maakWeglegOngedaan(r, oud), nieuw ? 'pauze' : 'bel', {geenDedup:true, sleutel:r.taakId||(r._sec+':'+r._row)});
     },
     ()=>{ r.opvolgdatum = oud; },
     'Wegleggen mislukt'
   );
 }
-export { openSnoozeModal, closeSnoozeModal, snoozeKies, snoozeOpslaan, snoozeWis };
+// De undo-knop uit de toast: zet de opvolgdatum terug op wat hij was. Zelfde schrijfweg, dus ook
+// dezelfde rij-controle en logregel ('Opvolgdatum teruggezet' bestaat al als actienaam).
+async function maakWeglegOngedaan(rij, oud){
+  const r = verseRij(rij);
+  if(!r){ showToast('Niet ongedaan gemaakt','De taak is intussen afgerond of verwijderd.','var(--am)','waarschuwing',{geenDedup:true,geenSysteemmelding:true}); return; }
+  await schrijfOpvolgdatum(r, oud, oud ? 'Opvolgdatum teruggezet' : 'Opvolgdatum gewist',
+                           { zonderUndo:true, titel:'Wegleggen ongedaan gemaakt' });
+}
+export { openSnoozeModal, closeSnoozeModal, snoozeKies, snoozeOpslaan, snoozeWis, maakWeglegOngedaan };

@@ -14,6 +14,10 @@ import { _verrijkOfferteRij, offerteAannemerPaneel, offerteAannSamenvatting, her
 import { renderAlvo, renderAlfa, toggleAlvoFlag, ALVO_COLS, ALVO_LABELS, flagPill, _recomputeAlvoStatus } from "./render-alv.js";
 // Kringverwijzing data ⇄ render-lijsten: vraagAfMailOp draait alleen op runtime (in renderAf).
 import { vraagAfMailOp } from "./data.js";
+// U6/U8: de weergave-knopjes en de focusrij volgen elke hertekening van de lijst. Beide modules
+// importeren op hun beurt uit dit bestand of crud.js; alleen op runtime aangeroepen, dus veilig.
+import { renderWeergaven } from "./weergaven.js";
+import { markeerRijFocus } from "./sneltoetsen.js";
 import { bundelWeergave, wordtGeabsorbeerd, bundelSleutel, bundelMetId, bouwBundelIndex, zichtbareKop, isAutoOfferteStap, telbaar } from "./bundel.js";
 
 // ══════════════════════════════════════
@@ -433,6 +437,8 @@ function renderNtd(){
   // renderTbody: de poll tekent elke acht seconden opnieuw zodra een collega iets wijzigt, en dat
   // mag je niet merken terwijl je aan het typen bent.
   herstelAannemerFocus(_aannNieuw);
+  renderWeergaven();    // U6: welke opgeslagen weergave is nu actief?
+  markeerRijFocus();    // U8: de focusrij (toetsenbord) terug op dezelfde taak
   // De getekende lijst gaat terug naar de aanroeper: na filteren, sorteren, absorberen én
   // groeperen, dus in exact de volgorde waarin de rijen op de pagina's verdeeld worden.
   // `springNaarBundel` zoekt er de pagina van de kop mee op zonder die hele pijplijn na te bouwen.

@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  CRUD — taak-modals, sheet-helpers, toevoegen/afronden/verwijderen
 // ══════════════════════════════════════
-import { esc, berekenPrioriteit, toISODate, toDutchDate, nieuwTaakId, taakVerwijzing, voorgesteldeDeadline, DEADLINE_HINT, taakTitel, reconcileOffertes, parseAannemers, duurNaarCel, duurUitCel, _parseAnyDate, offerteAangevraagd, leesbareFout } from "./util.js";
+import { esc, berekenPrioriteit, toISODate, toDutchDate, nieuwTaakId, taakVerwijzing, voorgesteldeDeadline, DEADLINE_HINT, taakTitel, reconcileOffertes, parseAannemers, duurNaarCel, duurUitCel, _parseAnyDate, offerteAangevraagd, leesbareFout, displayName } from "./util.js";
 import { zoekDubbels, dubbelVraagTekst } from "./dubbelcheck.js";
 import { extraVves, wisExtraVves, extraVvesHtml, extraVvesUitleg } from "./meervve.js";
 import { state, D, pgs } from "./state.js";
@@ -10,9 +10,9 @@ import { SECS, SKEYS, SID, OMSCHRIJVING_SLEUTEL, VELD_LABELS, CRM_SOORTEN } from
 import { writeRange, writeRanges, writeRows, _shiftNtdRows, _shiftAfRows, _herstelShift, assertRowMatch, sheetsFetch, fetchSheet, _a1Bereik, _withRetry, kapCel } from "./api.js";
 import { isKolomKop, isSectieKop } from "./structuurcheck.js";
 import { ensureToken } from "./auth.js";
-import { showToast, showUndoToast, fireNotifEvent, undoComplete, undoDelete, getCurrentWho } from "./notifications.js";
+import { showToast, showUndoToast, fireNotifEvent, undoComplete, undoDelete, getCurrentWho, meldFout, dismissToast } from "./notifications.js";
 import { animateRowOut, flashRow } from "./anim.js";
-import { logEvent, logEvents, renderTaskHistory, addTaskNote } from "./render-overig.js";
+import { logEvent, logEvents, renderTaskHistory, addTaskNote, logDayLabel, logTijd } from "./render-overig.js";
 import { backgroundWrite, loadAll, blokkeerOffline, blokkeerVersie } from "./data.js";
 import { faseIndex, faseWoord, faseRijHtml, faseWijziging, SUBSIDIE_FASES } from "./subsidie-fase.js";
 import { CRM_FASES, crmFaseIndex, crmFaseWoord, crmFaseWijziging, crmFaseRijHtml } from "./crm-fase.js";
@@ -348,6 +348,15 @@ function openModal(isEdit,rowData,opts){
   // gebruiker zelf veranderd — of een AI-hulp/het palet die na het openen nog iets invulde, en ook
   // dat gaat bij sluiten verloren. Zie `modalGewijzigd`.
   state._modalFoto=_modalFoto();
+  // U1/U4/U10: de invoer zoals geopend (per veld, voor het terugzetten na een conflict), de rij
+  // zoals geopend (om te kunnen zeggen wélke velden een collega veranderde), de gele regel weg en
+  // de regel 'laatst gewijzigd door' erbij.
+  state._modalOpenInvoer=_modalInvoer();
+  state._editOrigineel=(isEdit&&rowData)?{...rowData}:null;
+  state._collegaFoto=null;
+  _toonCollegaBanner(null);
+  _wisVeldMarkering();
+  toonLaatstGewijzigd(isEdit?rowData:null);
 }
 
 function _zetAutofocus(id){
@@ -387,6 +396,192 @@ function _wijzigingZin(zonderNotitie){
   const namen=state.editMode&&state.editRowData ? nietOpgeslagenVelden(state.editRowData) : [];
   if(!zonderNotitie && state.editMode && (document.getElementById('hist-note')?.value||'').trim()) namen.push('de notitie in het Logboek-vak');
   return namen.length ? `Nog niet opgeslagen: ${namen.join(', ')}.` : 'Er staan wijzigingen in dit scherm die nog niet zijn opgeslagen.';
+}
+
+// ── Samen aan dezelfde taak (U1, U4, U10) ──
+// Het bewerkscherm remt de 8s-poll sinds v15.4 niet meer (main.js): de ronde leest wél, en na elke
+// hertekening kijkt `controleerBewerkConflict` of de OPEN taak door een ander is veranderd. Zo ja,
+// dan komt er een gele regel bovenin het scherm — vóórdat de gebruiker op Opslaan drukt en te horen
+// krijgt dat het niet kan. En kan het toch niet (de rij-controle weigert ná het sluiten), dan gaat
+// het scherm weer open op de verse stand met de eigen invoer per veld teruggezet en gemarkeerd.
+// Alle velden van het scherm als {id: waarde}. Schakelaars (de 'In behandeling'-knoppen zijn geen
+// checkbox maar een element met de class 'on') als 'aan'/'uit'. Het naamveld niet: dat volgt de code.
+function _modalInvoer(){
+  const bg=document.getElementById('modal-bg'); const uit={};
+  if(!bg) return uit;
+  bg.querySelectorAll('input,select,textarea').forEach(el=>{
+    if(!el.id || el.id==='m-hoortbij' || el.id==='m-naam') return;
+    uit[el.id]= el.type==='checkbox' ? (el.checked?'aan':'uit') : String(el.value==null?'':el.value);
+  });
+  ['tog-ib','tog-ib-v','tog-ib-l','tog-ib-s','tog-ib-c'].forEach(id=>{
+    const el=document.getElementById(id); if(el) uit[id]=el.classList.contains('on')?'aan':'uit';
+  });
+  return uit;
+}
+// Welke velden heeft de gebruiker zelf veranderd sinds het openen? Puur: {id: waarde nu}.
+function _eigenWijzigingen(open, nu){
+  const uit={};
+  Object.keys(nu||{}).forEach(id=>{ if(open && open[id]!==undefined && open[id]!==nu[id]) uit[id]=nu[id]; });
+  return uit;
+}
+const _VELD_LABEL_VAST={ 'm-code':'VvE Code', 'hist-note':'de notitie', 'm-aann-input':'Aannemer', 'm-extra-code':'Extra VvE' };
+function _veldLabel(id, sec){
+  const spec=_MODAL_VELDEN[sec]||[]; const labels=VELD_LABELS[sec]||{};
+  const hit=spec.find(([vid])=>vid===id);
+  if(hit) return labels[hit[1]]||_MODAL_EXTRA_LABEL[hit[1]]||hit[1];
+  return _VELD_LABEL_VAST[id]||id;
+}
+// Welke velden verschillen tussen de rij zoals geopend en de verse rij? Puur, geeft labels.
+function _gewijzigdeVelden(oud, nieuw){
+  if(!oud||!nieuw) return [];
+  const sec=nieuw._sec; const spec=_MODAL_VELDEN[sec]||[]; const labels=VELD_LABELS[sec]||{};
+  const uit=[];
+  const anders=(k)=>String(oud[k]==null?'':oud[k]).trim()!==String(nieuw[k]==null?'':nieuw[k]).trim();
+  spec.forEach(([,k])=>{ if(anders(k)) uit.push(labels[k]||_MODAL_EXTRA_LABEL[k]||k); });
+  if(sec==='OFFERTE-TRAJECTEN' && anders('aannemers')) uit.push('Aangevraagd bij');
+  if(sec==='CRM') ['afzender','ontvangen','soort','mail'].forEach(k=>{ if(anders(k)) uit.push(_MODAL_EXTRA_LABEL[k]||k); });
+  return [...new Set(uit)];
+}
+// De eigen invoer terugzetten in het (opnieuw geopende) scherm en die velden markeren. Geeft de
+// labels terug voor de melding. `setv` voor gewone velden: die voegt een waarde die niet in een
+// keuzelijst staat als optie toe, precies zoals bij het openen.
+function _pasInvoerToe(wijzigingen, sec){
+  const namen=[];
+  Object.entries(wijzigingen||{}).forEach(([id,w])=>{
+    const el=document.getElementById(id); if(!el) return;
+    if(/^tog-ib/.test(id)){ el.classList.toggle('on',w==='aan'); el.setAttribute('aria-checked',w==='aan'); }
+    else if(el.type==='checkbox') el.checked=(w==='aan');
+    else setv(id,w);
+    (el.closest('.fld')||el).classList.add('veld-eigen');
+    namen.push(_veldLabel(id,sec));
+  });
+  return [...new Set(namen)];
+}
+function _wisVeldMarkering(){ document.querySelectorAll('#modal-bg .veld-eigen').forEach(el=>el.classList.remove('veld-eigen')); }
+// De gele regel bovenin het bewerkscherm. soort: 'collega' (live gezien), 'conflict' (opslaan
+// geweigerd), 'weg' (taak bestaat niet meer), 'hersteld' (eigen invoer teruggezet); null = weg.
+function _toonCollegaBanner(soort, velden){
+  const el=document.getElementById('m-collega'); if(!el) return;
+  state._collegaStand=soort||null;
+  if(!soort){ el.hidden=true; el.innerHTML=''; el.className='m-collega'; return; }
+  const lijst=(velden&&velden.length)?` (${esc(velden.join(', '))})`:'';
+  const knop=`<button type="button" class="btn btn-sec btn-sm" data-action="collega-overnemen">Nieuwe stand overnemen</button>`;
+  const T={
+    collega:  [`Een collega heeft deze taak net gewijzigd${lijst}. Je kijkt nog naar de oude stand; wat je typt blijft staan.`, knop],
+    conflict: [`Niet opgeslagen: een collega wijzigde deze taak intussen${lijst}. Je invoer staat er nog.`, knop],
+    weg:      ['Deze taak is intussen afgerond of verwijderd door een collega. Opslaan kan niet meer — kopieer wat je nodig hebt.', ''],
+    hersteld: [velden&&velden.length ? `Nieuwe stand geladen. Jouw invoer staat gemarkeerd${lijst} — controleer en sla opnieuw op.` : 'Nieuwe stand geladen.', ''],
+  }[soort]||['',''];
+  el.className='m-collega m-collega-'+soort;
+  el.innerHTML=`<span>${T[0]}</span>${T[1]}`;
+  el.hidden=false;
+}
+// U4: na elke hertekening (renderAll, main.js). Alleen zolang het bewerkscherm open staat.
+function controleerBewerkConflict(){
+  if(!state.editMode || !state.editRowData) return;
+  if(!document.getElementById('modal-bg')?.classList.contains('open')) return;
+  const r=verseRij(state.editRowData);
+  if(!r){ if(state._collegaStand!=='weg') _toonCollegaBanner('weg'); return; }
+  state.editRowData=r;   // het verse object (zelfde identiteit) — zie _bewerkRijVers
+  const foto=_inhoudsFoto(r);
+  if(!state.editFoto || foto===state.editFoto){
+    // Weer gelijk (de ander draaide het terug, of de taak is er weer): de melding mag weg.
+    if(state._collegaStand==='collega'||state._collegaStand==='weg') _toonCollegaBanner(null);
+    state._collegaFoto=null;
+    return;
+  }
+  if(state._collegaFoto===foto) return;   // deze stand is al gemeld
+  state._collegaFoto=foto;
+  if(state._collegaStand!=='conflict') _toonCollegaBanner('collega', _gewijzigdeVelden(state._editOrigineel, r));
+}
+// De knop 'Nieuwe stand overnemen' (actions.js): verse stand laden, eigen invoer terugzetten.
+function neemNieuweStandOver(){
+  const bewaard=state.editRowData; if(!bewaard) return;
+  const r=verseRij(bewaard);
+  if(!r){ _toonCollegaBanner('weg'); return; }
+  const eigen=_eigenWijzigingen(state._modalOpenInvoer, _modalInvoer());
+  heropenMetInvoer(r, eigen);
+}
+function heropenMetInvoer(r, eigen){
+  openModal(true, r);   // verse stand, verse vingerafdruk, banner en markeringen weg
+  const namen=_pasInvoerToe(eigen, r._sec);
+  _toonCollegaBanner('hersteld', namen);
+}
+// U1: de opslag is door de rij-controle geweigerd nadat het scherm al dicht was (de ronde die de
+// wijziging van de collega bracht, kwam ná het sluiten). De toast 'Opslaan mislukt' blijft staan;
+// daarbovenop gaat het scherm weer open op de verse stand, met de eigen invoer gemarkeerd. Niet
+// als er intussen een ander venster open staat: dan is de gebruiker alweer ergens anders mee bezig.
+function herstelNaConflict(rij, invoer, openInvoer){
+  if(document.querySelector('.modal-bg.open')) return;
+  const r=verseRij(rij);
+  if(!r){
+    showToast('Taak niet meer gevonden','De taak is intussen afgerond of verwijderd; je wijziging is niet opgeslagen.','var(--rd)','waarschuwing',{blijft:true,geenSysteemmelding:true});
+    return;
+  }
+  const eigen=_eigenWijzigingen(openInvoer, invoer);
+  delete eigen['hist-note'];   // de notitie is vóór de rij-write al weggeschreven (notitieMeenemen)
+  // De blijvende toast 'Opslaan mislukt' zegt nu niets meer wat het scherm zelf niet zegt.
+  document.querySelectorAll('#toast-container .toast').forEach(t=>{ if((t.querySelector('.toast-title')?.textContent||'')==='Opslaan mislukt') dismissToast(t); });
+  heropenMetInvoer(r, eigen);
+}
+// U10: 'Laatst gewijzigd door … · vandaag 14:02'. Uit het logboek, dat nieuwste-eerst staat. Het
+// logboek kent geen taaknummers, dus dit is de laatste regel van deze VvE in deze categorie — dat
+// staat ook in de titel van de regel. Puur deel apart, voor de zelftest.
+function laatsteWijziging(r, logboek){
+  if(!r) return null;
+  return (logboek||[]).find(e=>e.code===r.code && (!e.sectie || e.sectie===r._sec)
+    && e.gebruiker && e.gebruiker!=='systeem' && e.actie!=='Auto-prioriteit') || null;
+}
+function toonLaatstGewijzigd(r){
+  const el=document.getElementById('m-laatst'); if(!el) return;
+  const e=r ? laatsteWijziging(r, D.logboek) : null;
+  if(!e){ el.hidden=true; el.textContent=''; return; }
+  const dag=logDayLabel(e.timestamp); const wanneer=dag.charAt(0).toLowerCase()+dag.slice(1)+' '+logTijd(e.timestamp);
+  el.textContent=`Laatst gewijzigd door ${displayName(e.gebruiker)} · ${wanneer} · ${e.actie||''}`.replace(/ · $/,'');
+  el.title='De laatste logboekregel van deze VvE in deze categorie';
+  el.hidden=false;
+}
+// De cellen A..K van een rij zoals submitTask ze schrijft, uit een rij-object: de sectievelden in
+// kolomvolgorde (tot H), I en J leeg, K de subcategorie. Voor het terugdraaien van een bewerking (U7).
+function _rijWaardenAK(r){
+  const v=SECS[r._sec].keys.map(k=> k==='inBehandeling' ? (r[k]==='TRUE'?'TRUE':'FALSE') : celWaarde(r,k));
+  while(v.length<8) v.push('');
+  v.push('','',r.subcategorie||'');
+  return v;
+}
+// U7: een opgeslagen bewerking terugdraaien vanuit de toast. Alleen als de taak er nog is én sinds
+// onze opslag niet opnieuw is veranderd (anders zou de undo de wijziging van een ander wegpoetsen).
+async function maakBewerkingOngedaan(doelRow, oudeWaarden, oudeValues, crmOud, fotoNa){
+  if(blokkeerOffline()||blokkeerVersie()) return;
+  if(!await ensureToken()){ showToast('Inloggen mislukt','Probeer het opnieuw.','var(--rd)','waarschuwing',{geenDedup:true,geenSysteemmelding:true}); return; }
+  const r=verseRij(doelRow);
+  const nee=t=>showToast('Niet ongedaan gemaakt',t,'var(--am)','waarschuwing',{geenDedup:true,geenSysteemmelding:true});
+  if(!r){ nee('De taak is intussen afgerond of verwijderd.'); return; }
+  if(_inhoudsFoto(r)!==fotoNa){ nee('De taak is daarna opnieuw gewijzigd — open hem en pas hem met de hand aan.'); return; }
+  const snap={...r};
+  const keys=SECS[r._sec].keys;
+  keys.forEach(k=>{ r[k]=oudeWaarden[k]; }); r.subcategorie=oudeWaarden.subcategorie; delete r._offertesManual;
+  if(crmOud) Object.assign(r, crmOud);
+  renderAll(); flashRow('ntd-tbody', r._row, 'rij-flits-amber');
+  const endCol=String.fromCharCode(64+Math.max(oudeValues.length,9));
+  let geschreven=false;
+  backgroundWrite(
+    async ()=>{
+      if(!geschreven){
+        const rij=r._row;
+        await assertRowMatch(rij, snap);
+        if(crmOud) await writeRanges([{ range:`'Nog Te Doen'!A${rij}:${endCol}${rij}`, values:oudeValues },
+                                      { range:`'Nog Te Doen'!T${rij}:W${rij}`, values:crmVelden(crmOud) }]);
+        else await writeRange(`'Nog Te Doen'!A${rij}:${endCol}${rij}`, oudeValues);
+        geschreven=true;
+      }
+      await logEvent(r.code, r._sec, 'Bewerkt', 'bewerking', 'opgeslagen', 'ongedaan gemaakt');
+      showToast('Bewerking ongedaan gemaakt', `${r.code} — ${taakTitel(r, r._sec)||''}`, 'var(--am)', 'ongedaan', {geenDedup:true,geenSysteemmelding:true});
+    },
+    ()=>{ keys.forEach(k=>{ r[k]=snap[k]; }); r.subcategorie=snap.subcategorie;
+          if(crmOud) ['afzender','ontvangen','soort','mail'].forEach(k=>{ r[k]=snap[k]; }); },
+    'Ongedaan maken mislukt'
+  );
 }
 
 // De sluitweg van de GEBRUIKER (kruisje, Annuleren, klik naast het venster, Escape — allemaal in
@@ -1165,7 +1360,7 @@ async function deleteTaskRow(r, bijDoorgaan){
       bevestigTekst:'Toch verwijderen', gevaarlijk:true })) return;
   if(bijDoorgaan) bijDoorgaan();
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
-  if(!await ensureToken()){alert('Inloggen mislukt. Probeer het opnieuw.');return}
+  if(!await ensureToken()){meldFout('Inloggen mislukt. Probeer het opnieuw.');return}
   const sec=r._sec;
   // undo-data vastleggen vóór de mutatie (zelfde serialisatie als afronden)
   const ntdValues=serializeNtdUndo(r);
@@ -1386,7 +1581,7 @@ function _bewerkRijVers(){
   // `verseRij` doet allebei de stappen in één: staat dit object er nog, dan krijg je het terug;
   // is D vervangen, dan het verse exemplaar met dezelfde identiteit; en anders null.
   const r=verseRij(bewaard);
-  if(!r){alert('Taak niet gevonden. De lijst is intussen ververst — probeer opnieuw.');return null}
+  if(!r){meldFout('Taak niet gevonden. De lijst is intussen ververst — probeer opnieuw.');return null}
   // Wél de juiste rij, maar met andere INHOUD dan toen dit scherm openging. Dat betekent dat een
   // collega (of een eigen handeling in een ander scherm) de taak intussen heeft aangepast. Vóór
   // `verseRij` bestond deze bescherming per ongeluk: her-ankeren lukte alleen bij een letterlijk
@@ -1396,7 +1591,11 @@ function _bewerkRijVers(){
   // Daarom hier expliciet, met een melding die zegt wat er aan de hand is. Het scherm blijft open
   // staan, dus getypte tekst gaat niet verloren.
   if(state.editFoto && _inhoudsFoto(r)!==state.editFoto){
-    alert('Deze taak is intussen gewijzigd — door een collega of vanuit een ander scherm.\n\nSluit dit scherm en open de taak opnieuw, dan zie je de nieuwe stand. Wat je hier getypt hebt blijft tot die tijd staan.');
+    // Geen alert meer maar de gele regel in het scherm zelf (U1): die noemt de velden die de ander
+    // veranderde en biedt 'Nieuwe stand overnemen' — dat laadt de verse stand en zet de eigen
+    // invoer per veld gemarkeerd terug (heropenMetInvoer). Het scherm blijft open, niets gaat weg.
+    state._collegaFoto=_inhoudsFoto(r);
+    _toonCollegaBanner('conflict', _gewijzigdeVelden(state._editOrigineel, r));
     return null;
   }
   // Meteen vastzetten, zoals doCompleteTask dat met `state._completeRow` doet: het scherm kan open
@@ -1414,7 +1613,7 @@ function _bewerkRijVers(){
 // getekend is tussen het tekenen van de knop en de klik erop. Deze situatie werd op vijf plekken
 // verschillend afgehandeld: twee keer een blokkerende alert, drie keer helemaal niets. En 'er
 // gebeurt niets' leest als een kapotte app — juist bij een knop die een venster hoort te openen.
-// Een toast en geen alert(): de rest van het dashboard meldt fouten ook zo, en een alert legt de
+// Een toast en geen meldFout(): de rest van het dashboard meldt fouten ook zo, en een alert legt de
 // hele pagina stil voor iets waar je niets aan hoeft te doen behalve opnieuw klikken.
 function taakUitCache(rid){
   const bewaard = state._rowCache[+rid];
@@ -1546,14 +1745,14 @@ async function doCompleteTask(){
     r=_herankerRij(r, D.ntd);
     if(r) state._completeRow=r;
   }
-  if(!r){alert('Taak niet gevonden. De lijst is intussen ververst — probeer opnieuw.');closeCompleteModal();return}
+  if(!r){meldFout('Taak niet gevonden. De lijst is intussen ververst — probeer opnieuw.');closeCompleteModal();return}
   const dateVal=document.getElementById('complete-date').value;
   const comment=document.getElementById('complete-comment').value.trim();
-  if(!dateVal){alert('Datum is verplicht.');return}
+  if(!dateVal){meldFout('Datum is verplicht.');return}
   const dp=dateVal.split('-');
   const today=`${dp[2]}-${dp[1]}-${dp[0]}`;
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
-  if(!await ensureToken()){alert('Inloggen mislukt. Probeer het opnieuw.');return}
+  if(!await ensureToken()){meldFout('Inloggen mislukt. Probeer het opnieuw.');return}
   // Dubbelklik-rem NÁ ensureToken: het gevaarlijke gat is tussen de token en de
   // batch-write (getSheetIds is nog een await), waar een tweede klik de taak dubbel
   // zou afronden. Bewust niet vóór ensureToken: een hangende/geblokkeerde OAuth-popup
@@ -1582,7 +1781,7 @@ async function doCompleteTask(){
       // op het moment dat de gebruiker hem leest. (Zelfde volgorde als in submitTask.)
       await loadAll(true);
       // Venster bewust NIET sluiten: de getypte toelichting moet blijven staan.
-      alert(e.melding || e.message);
+      meldFout(e.melding || e.message);
       return;
     }
     // Deze controle doet een ECHT leesverzoek (met herkansing bij 429/5xx), en al die tijd blijft
@@ -1603,7 +1802,7 @@ async function doCompleteTask(){
       if(!await logEvent(notitie.code, notitie.sec, 'Opmerking', '', '', notitie.tekst)){
         if(state._completeRow===r){
           state._completeNotitie=notitie;   // venster staat nog: bij de volgende klik (of bij sluiten) opnieuw
-          alert('De notitie kon niet worden opgeslagen, dus de taak is nog niet afgerond. Controleer je verbinding en probeer het opnieuw.');
+          meldFout('De notitie kon niet worden opgeslagen, dus de taak is nog niet afgerond. Controleer je verbinding en probeer het opnieuw.');
         } else {
           _notitieNietBewaard(notitie);
         }
@@ -1672,7 +1871,7 @@ async function doCompleteTask(){
     );
     // 3) groene puls + fade op de oude rij; daarná pas hertekenen
     animateRowOut(tr,'rij-puls-groen',renderAll);
-  }catch(e){alert('Afronden mislukt. '+leesbareFout(e))}
+  }catch(e){meldFout('Afronden mislukt. '+leesbareFout(e))}
   finally{ state._completeBusy=false; }
 }
 
@@ -1723,7 +1922,7 @@ function _notitieInBeeld(n){
 // Lukt ook dat niet (offline, sessie verlopen), dan de tekst in de melding zelf, zodat hij te
 // kopiëren is — een alert en geen toast, want die verdwijnt niet voordat iemand hem gelezen heeft.
 function _notitieNietBewaard(n){
-  alert('Je notitie kon niet worden opgeslagen. Kopieer hem zo nodig en voeg hem later opnieuw toe:\n\n'+n.tekst);
+  meldFout('Je notitie kon niet worden opgeslagen. Kopieer hem zo nodig en voeg hem later opnieuw toe:\n\n'+n.tekst);
 }
 async function _bewaarLosseNotitie(n){
   if(await logEvent(n.code, n.sec, 'Opmerking', '', '', n.tekst)){
@@ -1739,7 +1938,7 @@ async function _bewaarLosseNotitie(n){
 // ══════════════════════════════════════
 async function submitTask(){
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
-  if(!await ensureToken()){alert('Inloggen mislukt. Probeer het opnieuw.');return}
+  if(!await ensureToken()){meldFout('Inloggen mislukt. Probeer het opnieuw.');return}
   const code=document.getElementById('m-code').value.trim();
   const _naamEl=document.getElementById('m-naam');
   // De naam alleen overnemen als hij ook ECHT bij deze code hoort. Het naamveld is readonly en
@@ -1748,7 +1947,7 @@ async function submitTask(){
   // staan en belandt die zo in kolom B. Klopt de stempel niet, dan zoeken we de naam zelf op; is
   // de code onbekend, dan liever leeg dan onwaar.
   const naam=((_naamEl.dataset.code||'').trim()===code ? _naamEl.value.trim() : _naamBijCode(code));
-  if(!code){alert('VvE Code is verplicht.');return}
+  if(!code){meldFout('VvE Code is verplicht.');return}
 
   const sec=state.editSec||state.activeNtd;
   let values;
@@ -1800,7 +1999,7 @@ async function submitTask(){
           soort:(!_crmSoortGekozen && _onvertaalbaar['m-soort']) ? _onvertaalbaar['m-soort'] : _modalSoort(),
           mail:gv('m-mail') }
       : null;
-    if(sec==='CRM' && !gv('m-onderwerp')){ alert('Onderwerp is verplicht: één korte regel waar de vraag over gaat.'); return; }
+    if(sec==='CRM' && !gv('m-onderwerp')){ meldFout('Onderwerp is verplicht: één korte regel waar de vraag over gaat.'); return; }
 
     // Een VvE-code die niet in het register staat ('ALV's overzicht' = de lijst uit TwinQ) werd
     // zonder één woord opgeslagen. Een tikfout (311221 i.p.v. 311212) gaf zo een taak die in geen
@@ -1879,6 +2078,12 @@ async function submitTask(){
       // Offerte: gooi de gecachete handmatige X/N weg zodat de net-bewerkte kolom-D-waarde
       // meteen wordt herkend (anders pas zichtbaar ná de stille resync). Harmloos elders.
       delete doelRow._offertesManual;
+      // Voor de toast 'Ongedaan maken' (U7) en het heropenen na een geweigerde opslag (U1): de
+      // oude cellen, de stand ná onze wijziging en de invoer zoals die nu in het scherm staat.
+      const oudeValues=_rijWaardenAK(oudeWaarden);
+      const crmOud=crmExtra ? { afzender:oudeWaarden.afzender, ontvangen:oudeWaarden.ontvangen, soort:oudeWaarden.soort, mail:oudeWaarden.mail } : null;
+      const fotoNa=_inhoudsFoto(doelRow);
+      const invoerBijOpslaan=_modalInvoer(), openInvoer=state._modalOpenInvoer;
       renderAll();
       flashRow('ntd-tbody', doelRow._row);
       closeModal();clearModal();
@@ -1935,11 +2140,16 @@ async function submitTask(){
           // Helemaal onderaan de writeFn, zodat een _withRetry-herkansing er geen tweede
           // kan opleveren. geenDedup: twee keer dezelfde taak opslaan binnen 15 s moet
           // twee bevestigingen geven, anders leest de tweede als 'mislukt'.
-          showToast('Opgeslagen',`${code} — ${naam||''}`,null,'opslaan',{geenDedup:true,geenSysteemmelding:true});
+          // Mét 'Ongedaan maken' (U7): dezelfde knop als bij afronden en verwijderen.
+          showUndoToast('Opgeslagen',`${code} — ${naam||''}`,
+            ()=>maakBewerkingOngedaan(doelRow, oudeWaarden, oudeValues, crmOud, fotoNa),'opslaan',{geenDedup:true});
         },
         ()=>{ keys.forEach(k=>{ doelRow[k]=oudeWaarden[k]; }); doelRow.subcategorie=oudeWaarden.subcategorie; delete doelRow._offertesManual;
               if(crmExtra) ['afzender','ontvangen','soort','mail'].forEach(k=>{ doelRow[k]=oudeWaarden[k]; }); },
-        'Opslaan mislukt'
+        'Opslaan mislukt',
+        // Geweigerd door de rij-controle (een collega was ons voor): scherm weer open met de eigen
+        // invoer gemarkeerd (U1). Loopt ná de stille resync, zodat de verse stand er al staat.
+        { bijFout:e=>{ if(e&&e.rowMismatch) herstelNaConflict(doelRow, invoerBijOpslaan, openInvoer); } }
       );
       // De bundelkoppeling is een APARTE schrijfweg (kolom Q, R en S) en loopt bewust niet mee in
       // de write hierboven: die schrijft A..K en raakt de bundelkolommen dus sowieso niet — maar
@@ -1962,7 +2172,7 @@ async function submitTask(){
       // heeft de verversing stilgezet zolang de gebruiker zat te typen.
       try{ await bevestigInvoegPlek(sec, afterRow); }
       catch(e){
-        alert(e.melding || e.message);
+        meldFout(e.melding || e.message);
         loadAll(true);          // de lijst is verschoven: verse stand halen, dan kan de gebruiker opnieuw
         return;
       }
@@ -2181,8 +2391,8 @@ async function submitTask(){
     const msg=(e.message||'').toLowerCase();
     if(msg.includes('invalid authentication')||msg.includes('unauthenticated')||msg.includes('unauthorized')){
       state.oauthToken=null;state.oauthExpiry=0;
-      alert('Je sessie is verlopen. Klik nogmaals op Opslaan om opnieuw in te loggen.');
-    }else{alert('Opslaan mislukt. '+leesbareFout(e))}
+      meldFout('Je sessie is verlopen. Klik nogmaals op Opslaan om opnieuw in te loggen.');
+    }else{meldFout('Opslaan mislukt. '+leesbareFout(e))}
   }finally{
     // Alle vroege returns (dubbelcheck 'nee', een niet-teruggevonden rij, de mismatch-tak) zitten
     // binnen deze try en komen dus vanzelf hierlangs.
@@ -2203,7 +2413,7 @@ async function zetSubsidieFase(rid, stap){
   const nieuw = faseWoord(stap), oud = r.subsidieFase || '';
   if(nieuw === oud) return;
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
-  if(!await ensureToken()){alert('Inloggen mislukt. Probeer het opnieuw.');return}
+  if(!await ensureToken()){meldFout('Inloggen mislukt. Probeer het opnieuw.');return}
   r.subsidieFase = nieuw;
   renderAll();
   backgroundWrite(
@@ -2231,7 +2441,7 @@ async function zetCrmFase(rid, stap){
   const nieuw = crmFaseWoord(stap), oud = r.crmFase || '';
   if(nieuw === oud) return;
   if(blokkeerOffline()) return;
-  if(!await ensureToken()){alert('Inloggen mislukt. Probeer het opnieuw.');return}
+  if(!await ensureToken()){meldFout('Inloggen mislukt. Probeer het opnieuw.');return}
   r.crmFase = nieuw;
   renderAll();
   backgroundWrite(
@@ -2261,4 +2471,5 @@ export {
   offerteAanvraagGewijzigd,
   _bewerkRijVers,
   sluitModalVeilig, modalGewijzigd, onbekendeCodeOk, notitieMeenemen,
+  controleerBewerkConflict, neemNieuweStandOver, laatsteWijziging, _eigenWijzigingen, _gewijzigdeVelden, _rijWaardenAK, _modalInvoer,
 };

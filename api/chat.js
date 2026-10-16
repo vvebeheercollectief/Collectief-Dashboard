@@ -1,7 +1,8 @@
 // api/chat.js — Vercel serverless proxy naar Claude (sleutel server-side).
 // Anthropic gebruikt API-data niet voor training → AVG-vriendelijk voor dossiergegevens.
 // Controleert de ingelogde Google-gebruiker tegen de allowlist; proxyt dan naar Anthropic.
-import { ALLOWED_EMAILS } from '../allowed-emails.js'; // één bron, gedeeld met src/config.js
+import { createHash } from 'node:crypto';
+import { ALLOWED_EMAIL_HASHES } from '../allowed-emails.js'; // één bron, gedeeld met src/config.js (SHA-256-hashes)
 import { ZOEK_TOOLS, ZOEK_TOOL_NAMEN } from '../zoek-tools.js'; // idem, gedeeld met src/dashboard-zoek.js
 
 // Alleen de eigen frontends mogen cross-origin de proxy aanroepen. Dit zijn de
@@ -112,7 +113,7 @@ export default async function handler(req, res){
     // vandaar String(): zo werkt de controle ook als Google ooit een echte boolean teruggeeft.
     if (String(info.email_verified) !== 'true') { res.status(403).json({ error: 'e-mailadres niet geverifieerd' }); return; }
     const email = (info.email || '').trim().toLowerCase();
-    if (!email || !ALLOWED_EMAILS.includes(email)) { res.status(403).json({ error: 'geen toegang' }); return; }
+    if (!email || !ALLOWED_EMAIL_HASHES.includes(createHash('sha256').update(email).digest('hex'))) { res.status(403).json({ error: 'geen toegang' }); return; }
 
     const { system, messages, modus, laatste } = req.body || {};
     const zoek = modus === 'zoek';

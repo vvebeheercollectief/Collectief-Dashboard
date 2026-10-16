@@ -1,4 +1,7 @@
-# AUDIT — grote naloopronde Collectief Dashboard (16 oktober 2026, v15.2 → v15.3)
+# AUDIT — grote naloopronde Collectief Dashboard (16 oktober 2026, v15.2 → v15.3 → v15.4)
+
+> **v15.4 (zelfde dag, na akkoord): alle tien UX-voorstellen uit §4 zijn gebouwd.** Zie §8 voor wat er
+> precies is gemaakt, hoe het getest is en wat het betekent voor de stap naar live.
 
 Doel: volledige doorlichting van de testversie op bugs, robuustheid, gelijktijdig gebruik,
 veiligheid en privacy; alles wat stuk of riskant is gefixt, UX-verbeteringen als voorstel.
@@ -199,7 +202,7 @@ tak tegelijk. Status: **gefixt** (geen gedragsverandering voor een gewone push).
 - **S3 — `icon-maskable.png` is identiek aan `icon-512.png`**: op Android wordt het icoon
   afgesneden. Cosmetisch; heeft het logo-bronbestand nodig. Open.
 
-## 4. UX-voorstellen (alleen voorstellen — pas bouwen na je akkoord)
+## 4. UX-voorstellen — **gebouwd in v15.4** (akkoord gegeven; de tabel is de oorspronkelijke lijst, de uitwerking staat in §8)
 
 | # | Wat | Waarom | Impact | Moeite |
 |---|-----|--------|--------|--------|
@@ -286,3 +289,50 @@ stub-fouten van de suite zelf).
    backend-aanvulling O4 is een aparte, kleine release.
 4. Na livegang: één keer `?test=1` op productie draaien en de console van de eerste sessie
    bekijken.
+
+## 8. v15.4 — de tien voorstellen gebouwd
+
+Alles in de testversie; live is niet geraakt. Versie 15.4 / cd-v177. Nieuwe modules: `src/hash.js`,
+`src/verbinding.js`, `src/weergaven.js`, `src/sneltoetsen.js` (alle vier in de app-shell van `sw.js`).
+
+| # | Wat er gebouwd is | Waar |
+|---|---|---|
+| U1 | **Conflict bij opslaan: invoer bewaren.** Weigert de rij-controle de opslag nadat het scherm al dicht was, dan gaat het scherm na de stille verversing weer open op de stand van de collega, met jouw eigen gewijzigde velden teruggezet, oranje gemarkeerd en benoemd ("Jouw invoer staat gemarkeerd (Opmerkingen)"). De notitie uit het Logboek-vak wordt niet dubbel gezet (die was al weggeschreven). Wordt de conflicterende stand al vóór het opslaan gezien, dan blijft het scherm gewoon open met een gele regel en de knop 'Nieuwe stand overnemen'. | `crud.js` (`herstelNaConflict`, `heropenMetInvoer`, `_pasInvoerToe`), `data.js` (`backgroundWrite` kreeg `opties.bijFout`, die ná de resync draait) |
+| U2 | **Geen `alert()` meer.** Alle 85 aanroepen vervangen door `meldFout` (rode toast, zonder ontdubbeling, geen systeemmelding). De zelftest ving alerts op via `window.alert`; die stubs zetten nu `state._meldStub`. | `notifications.js` + 11 modules |
+| U3 | **Palet uitgebreid.** Acties zijn doorzoekbaar ('thema', 'vernieuwen', 'ga naar logboek', 'selecteren', 'sneltoetsen'); met een focusrij (U8) staan Bewerken/Afronden/Wegleggen/In behandeling voor díe taak bovenaan. Laatst bezochte VvE's komen vooraan in de treffers. `/`-opdrachten: `/vve code`, `/log tekst` (notitie in het open dossier, of `/log 311212 tekst`), `/taak omschrijving`, `/ga pagina`; `/` alleen toont de lijst. | `palette.js` (`palActies`, `zoekActies`, `renderCommando`, `snelleNotitie`, `ontleedLog`) |
+| U4 | **Live melding "collega heeft deze taak net gewijzigd".** De 8s-poll loopt nu door terwijl het bewerkscherm open staat (elk ánder venster remt nog steeds: `modalRemtPoll` in `main.js`). Na elke hertekening vergelijkt `controleerBewerkConflict` de open taak met de verse stand; verschilt die, dan verschijnt bovenin een gele regel die de veranderde velden noemt, met 'Nieuwe stand overnemen'. Is de taak verdwenen (afgerond/verwijderd), dan zegt de regel dat. Gemeten: melding binnen één pollronde (≈8 s). | `crud.js`, `main.js` (`renderAll` roept de controle aan) |
+| U5 | **Klikbare verbindingsstatus.** De bol/het label in de zijbalk is een knop; het paneel legt per stand uit wat er aan de hand is en wat de volgende stap is (Live, Laden, Opslaan met aantal wijzigingen, Fout, Offline, Gepauzeerd, Sessie verlopen, Selecteren, Verouderde versie) met 'Laatste geslaagde verversing: HH:MM' en waar zinvol een knop 'Nu vernieuwen'. Zodra het label zelf geen tijd meer toont (Fout/Offline/Gepauzeerd) staat er '· stand HH:MM' onder. Geen koppeling met data.js: een MutationObserver kijkt mee met de bol. | `verbinding.js` (`statusUitleg` is puur), `index.html`, `data.js` (`state._laatsteSyncMs`) |
+| U6 | **Opgeslagen weergaven.** Rij boven de takenlijst: tabblad + zoekterm + code + behandelaar + prioriteit + statuspil + sortering + 'Per VvE' als benoemde weergave in localStorage (max. 12, per browser). Chip = toepassen, × = verwijderen (met vraag), '+ Weergave opslaan' = naam typen, Enter. De actieve weergave licht op; na herladen staan ze er nog. In de selecteerstand wisselt hij niet (dat zou de selectie legen). | `weergaven.js`, `render-lijsten.js` (na elke `renderNtd`) |
+| U7 | **Ongedaan maken ook voor in behandeling, wegleggen en bewerken.** Dezelfde undo-knop in de toast als bij afronden/verwijderen (8 s). De undo zoekt de rij op dát moment vers op (identiteit), draait via dezelfde schrijfweg met rij-controle en logregel, en weigert netjes als de taak intussen weg is of — bij bewerken — daarna opnieuw is gewijzigd. Geen undo-op-undo (ping-pong). | `inbehandeling.js` (`schrijfInBehandeling`), `snooze.js` (`maakWeglegOngedaan`), `crud.js` (`maakBewerkingOngedaan`, `_rijWaardenAK`) |
+| U8 | **Sneltoetsen op de lijst.** `j`/`k` kiezen een rij (dunne rand, onthouden op taaknummer dus ook na hertekenen), `e` bewerken, `a` afronden, `w` wegleggen, `i` in behandeling, `?` overzicht (ook `Shift+/`). Klikken op een rij maakt hem de focusrij. Niet actief in invoervelden, in een open venster, het palet of de chat; de focus die na Escape in een gesloten venster achterblijft telt niet mee. | `sneltoetsen.js`, overzichtsvenster `#sneltoets-bg` in `index.html` |
+| U9 | **Allowlist als hashes.** `allowed-emails.js` bevat SHA-256-hashes; `EMAIL_NAMES` is op hash gesleuteld; `emailToegestaan(email)` en `naamBijEmail(email)` normaliseren en hashen zelf (memoized, dus ook in de logboeklus goedkoop). De Vercel-proxy hasht met `node:crypto`. Een collega toevoegen: zie het commentaar in `allowed-emails.js`. Getoetst tegen de SHA-256-testvectoren. Let op bij livegang: `api/chat.js` en de frontend moeten samen uitrollen (zelfde bestand `allowed-emails.js`). | `hash.js`, `allowed-emails.js`, `config.js`, `util.js`, `auth.js`, `data.js`, `main.js`, `api/chat.js` |
+| U10 | **'Laatst gewijzigd door … · vandaag 14:02 · actie'** bovenin het bewerkscherm, uit het logboek (laatste regel van deze VvE in deze categorie — het logboek kent geen taaknummers; dat staat in de tooltip). Systeemregels tellen niet mee. | `crud.js` (`laatsteWijziging`, `toonLaatstGewijzigd`) |
+
+**Bewust niet gedaan:** geen eigen opslag buiten de browser (weergaven staan in localStorage, niet in de Sheet),
+geen websockets, geen undo-op-undo.
+
+**Getest (v15.4)**
+- Zelftest: 3.581 OK / 0 FAIL (50 nieuwe asserties: SHA-256-vectoren en allowlist, statusuitleg per stand,
+  actie-zoeken, `/log`-ontleding, recente VvE's vooraan, weergave-vergelijking en -omschrijving, eigen
+  wijzigingen, gewijzigde velden, laatste wijziging, oude cellen A..K).
+- Browser (Playwright, 1440×900 licht én donker, 375×812): U1 (collega wijzigt het actiepunt tussen poll en
+  opslaan → 'Opslaan mislukt', scherm heropent met de nieuwe stand én mijn opmerking gemarkeerd; tweede
+  opslag landt met beide), U4 (collega wijzigt opmerking terwijl ik typ → gele regel binnen 7,9 s; 'Nieuwe
+  stand overnemen' houdt mijn tekst; opslaan bewaart beide), U7 (undo op in behandeling: H terug op FALSE met
+  'Aangevinkt' + 'Uitgevinkt' in het logboek; undo op wegleggen: L weer leeg; undo op bewerken: oude tekst
+  terug), U8 (j/k/e/a/w/?; in een zoekveld doen de toetsen niets), U3 (acties, thema wisselen, `/`, `/vve`,
+  `/log` schrijft een Opmerking-regel, `/taak` opent het scherm met de tekst, 'ga naar logboek'), U6 (opslaan,
+  actief, toepassen, overleeft herladen, verwijderen met vraag), U5 (Live-paneel; bij 8× 429 'Fout bij
+  verversen' met stand-tijd en knop; knop herstelt naar Live), U2 (lege code → toast, geen dialoog), U9 (een
+  vreemd account blijft op de inlogkaart, geen enkele leesronde), U10 (regel zichtbaar met naam, dag en actie).
+  Console schoon, op de opzettelijke conflict- en 429-fouten na. Regressie: smoke, flows1–3 uit §6 opnieuw groen.
+- Kanttekening: in de reeks flows2 viel de AI-hulp-stap om doordat het testscript twee velden binnen de
+  30 ms van de autofocus van het venster (modal-a11y.js) invulde; de autofocus trok de cursor terug naar het
+  eerste veld en de suggestielijst sloot. Een mens haalt dat tempo niet; het script wacht nu op de autofocus.
+
+**Naar live (aanvulling op §7)**
+- `versie.json` hoeft nog steeds niet omhoog (kolomindeling en schrijfgedrag ongewijzigd).
+- Frontend en `api/chat.js` samen uitrollen (U9): beide lezen `allowed-emails.js`; Vercel bouwt ze uit dezelfde commit.
+- Eerste werkdag: let op de gele regel in het bewerkscherm (U4) en op de undo-toasts (U7); het palet
+  en de sneltoetsen zijn opt-in en raken niemand die ze niet gebruikt.
+

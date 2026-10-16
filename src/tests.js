@@ -14,7 +14,13 @@ import { state, D, pgs } from "./state.js";
 import { verseRij, rijIndex, regelIndex, rijSleutel } from "./rij.js";
 import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel, renderVve, groepeerBundels, addContactLog } from "./render-vve.js";
 import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN, saveKenmerken } from "./kenmerken.js";
-import { zoekAlles, openPalette, closePalette, palOpen } from "./palette.js";
+import { zoekAlles, openPalette, closePalette, palOpen, zoekActies, metRecentVooraan, ontleedLog, COMMANDOS } from "./palette.js";
+import { sha256Hex, emailHash } from "./hash.js";
+import { emailToegestaan, naamBijEmail } from "./config.js";
+import { statusUitleg } from "./verbinding.js";
+import { weergaveActief, weergaveOmschrijving, huidigeWeergave } from "./weergaven.js";
+import { RIJ_ACTIES } from "./sneltoetsen.js";
+import { laatsteWijziging, _eigenWijzigingen, _gewijzigdeVelden, _rijWaardenAK, controleerBewerkConflict } from "./crud.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen, bulkSelectie, bulkWis, renderBulkUi, bulkDoe, bulkVink, bulkVeld, bulkAlles, allesVinkjeHtml, allesVinkjeStand } from "./bulk.js";
 import { sheetsFetch, NTD_OMSCHRIJVING, _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, _shiftNtdRows, _shiftAfRows, veiligeCel, _veiligeRij, fetchSheet, fetchSheets, vingerafdruk, rijVingerafdruk, _normCel, _rijNaarCellen, assertRowMatch, NTD_DATUM, _isOffline, _isNetwerkFout, appendRange, appendRows } from "./api.js";
 import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, serieleWrite, POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, showLoadError, clearLoadError, syncSelecteerStand, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
@@ -5360,7 +5366,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   // afgerond' over een taak die net gearchiveerd wás.
   (()=>{
     const afOud=D.af, _alert=window.alert, meldingen=[];
-    window.alert=m=>meldingen.push(String(m));
+    state._meldStub=window.alert=m=>meldingen.push(String(m));
     try{
       const leegAf={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
       const t=(row,id,act)=>({ _row:row, _sec:'OPPAKKEN', taakId:id, bundelId:'', bundelVolg:'',
@@ -5389,7 +5395,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
              blokkeerAfgerond(open) === false && meldingen.length === 0);
       D.af={ ...leegAf };
       truthy('afgerond-guard: leeg archief blokkeert niets', blokkeerAfgerond(gearchiveerd, open) === false);
-    } finally { D.af=afOud; window.alert=_alert; }
+    } finally { D.af=afOud; state._meldStub=null; window.alert=_alert; }
   })();
 
   // ── De rollback-sleutels van Logboek en Ontwikkeling moeten de regel ECHT uniek maken ──
@@ -5503,7 +5509,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   // ── doCompleteTask zelf (de echte bug-site): vangnet bij verdwenen taak,
   //    her-anker bij ongewijzigde taak — synchroon pad vóór de eerste await ──
   (()=>{
-    const _alert=window.alert; let alerts=[]; window.alert=m=>alerts.push(m);
+    const _alert=window.alert; let alerts=[]; state._meldStub=window.alert=m=>alerts.push(m);
     const cacheOud=state._rowCache, ntdOud=D.ntd;
     try{
       // 1) taak bestaat nergens meer → alert + modal dicht + opgeruimd
@@ -5544,7 +5550,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       truthy('doCompleteTask: her-ankert óók als de rij nog in de rendercache staat',
              state._completeRow===vers3);
     } finally {
-      window.alert=_alert;
+      state._meldStub=null; window.alert=_alert;
       state._rowCache=cacheOud; D.ntd=ntdOud;
       state._completeRow=null; state._completeRid=null;
       document.getElementById('complete-bg').classList.remove('open');
@@ -5685,7 +5691,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const cacheOud=state._rowCache, sheetIdsOud=state._sheetIds, ntdOud=D.ntd.OPPAKKEN;
     const tokenOud=state.oauthToken, expiryOud=state.oauthExpiry;
     const _fetch=window.fetch; let fetches=0; window.fetch=()=>{fetches++;return Promise.reject(new Error('geen echt netwerk in test'))};
-    const _alert=window.alert; let alerts=0; window.alert=()=>{alerts++};
+    const _alert=window.alert; let alerts=0; state._meldStub=window.alert=()=>{alerts++};
     try{
       const rX={_sec:'OPPAKKEN',code:'DK-1',_row:4,naam:'VvE DK',actiepunt:'dubbelklik-test',deadline:'',behandelaar:'',prioriteit:'',opmerkingen:'',inBehandeling:''};
       state._rowCache=[rX];
@@ -5704,7 +5710,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       eq('dubbelklik: geen alert, stil genegeerd', alerts, 0);
       truthy('dubbelklik: bewaarde rij blijft staan (eerste klik rondt af)', state._completeRow===rX);
     } finally {
-      window.fetch=_fetch; window.alert=_alert;
+      window.fetch=_fetch; state._meldStub=null; window.alert=_alert;
       state._completeBusy=false; state._completeRow=null; state._completeRid=null;
       state._rowCache=cacheOud; state._sheetIds=sheetIdsOud;
       if(ntdOud===undefined) delete D.ntd.OPPAKKEN; else D.ntd.OPPAKKEN=ntdOud;
@@ -6437,7 +6443,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '15.3');
+  eq('versie opgehoogd', APP_VERSION, '15.4');
 
   // ── Tabbladen ÍN de kaartkop (v11.7) ──
   // De kop van de kaart zei links exact hetzelfde als het actieve tabblad — 'Oppakken' boven
@@ -7087,7 +7093,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     // moet met de stub nog actief zijn tegen de tijd dat hij loopt.
     const leeglopen=async()=>{ await state._writeChain; await wachtTot(()=>!state._loadInFlight); };
     try{
-      window.alert=m=>{ alerts.push(m); };
+      state._meldStub=window.alert=m=>{ alerts.push(m); };
       state.oauthToken='stub'; state.oauthExpiry=Date.now()+3600e3;
       state._uitCache=false;                 // de cache-rem in blokkeerOffline mag hier niet dichtstaan
       state._sheetIds={ 'Nog Te Doen':0, 'Afgerond':1, 'Logboek':2 };   // scheelt een fetch in getSheetIds
@@ -7147,7 +7153,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       await completeTask(0);                 // een ANDERE taak openen — géén doCompleteTask ertussen
       eq('duur-wissen: het openen van een andere taak wist de vorige keuze', aantalAan(), 0);
     } finally {
-      window.fetch=_fetch; window.alert=_alert;
+      window.fetch=_fetch; state._meldStub=null; window.alert=_alert;
       state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
       D.ntd=ntdOud; D.af=afOud; D.afSecInfo=afSecInfoOud; state._sheetIds=sheetIdsOud;
       state._rowCache=rowCacheOud; state._uitCache=uitCacheOud;
@@ -9204,7 +9210,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     try {
       state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;  // ensureToken keert meteen true
       state._uitCache=false;                                        // blokkeerOffline laat schrijven toe
-      window.alert=(m)=>meldingen.push(m);
+      state._meldStub=window.alert=(m)=>meldingen.push(m);
       // Het blad zoals de guard het terugleest: kolom A/C/D (de vingerafdruk van OPPAKKEN) plus
       // kolom Q. R en S staan er bewust NIET in — die doen in de vingerafdruk niet mee, en dat is
       // precies wat deze test moet bewijzen: de guard slaat niet alarm op de kolommen die we zelf
@@ -10627,7 +10633,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       for(let i=0;i<100 && state._loadInFlight;i++) await new Promise(r=>setTimeout(r,5));
     } finally {
       faalSchrijven=false;
-      window.fetch=_fetch; window.alert=_alert;
+      window.fetch=_fetch; state._meldStub=null; window.alert=_alert;
       state.oauthToken=tokenOud; state.oauthExpiry=expiryOud; state._uitCache=cacheOud;
       state._syncFails=failsOud;
       D.ntd=bewaardNtd; D.af=bewaardAf; state.activeNtd=bewaardSec; pgs.ntd=bewaardPg;
@@ -10663,7 +10669,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     try {
       state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;  // ensureToken keert meteen true
       state._uitCache=false;                                        // blokkeerOffline laat schrijven toe
-      window.alert=(m)=>meldingen.push(m);
+      state._meldStub=window.alert=(m)=>meldingen.push(m);
       const bladRij=(actie, taakId) => { const c=['311212','Testflat',actie,'','','','','']; c[16]=taakId; return c; };
       let blad={};
       window.fetch=async (url, opt) => {
@@ -11019,7 +11025,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       // _loadInFlight-les bij de schrijfweg-tests hierboven).
       for(let i=0;i<200 && state._loadInFlight;i++) await tik();
     } finally {
-      window.fetch=_fetch; window.alert=_alert;
+      window.fetch=_fetch; state._meldStub=null; window.alert=_alert;
       state.oauthToken=tokenOud; state.oauthExpiry=expiryOud; state._uitCache=cacheOud;
       state._syncFails=failsOud;
       D.ntd=bewaardNtd; D.af=bewaardAf; state.activeNtd=bewaardSec; pgs.ntd=bewaardPg;
@@ -11547,7 +11553,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     try {
       state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
       state._sheetIds={'Nog Te Doen':0}; state._uitCache=false;
-      window.alert=(m)=>meldingen.push(m);
+      state._meldStub=window.alert=(m)=>meldingen.push(m);
       window.fetch=async (url, opt) => {
         const methode=(opt&&opt.method)||'GET';
         if(methode==='PUT'){
@@ -11583,7 +11589,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       eq('vlag: pas nu is hij opgebruikt', state._nieuwBundel, null);
       for(let i=0;i<200 && state._loadInFlight;i++) await tik();
     } finally {
-      window.fetch=_fetch; window.alert=_alert;
+      window.fetch=_fetch; state._meldStub=null; window.alert=_alert;
       state.oauthToken=tokenOud; state.oauthExpiry=expiryOud; state._sheetIds=idsOud;
       state._uitCache=cacheOud; state._syncFails=failsOud;
       D.ntd=bewaardNtd; D.af=bewaardAf; pgs.ntd=bewaardPg;
@@ -11754,7 +11760,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     try {
       // De meldingen worden meegelezen i.p.v. weggegooid: de drie knoppen in het bewerkscherm horen
       // bij een verdwenen rij dezelfde tekst te geven, en dat is alleen te toetsen als je 'm ziet.
-      window.alert=m=>{ meldingen.push(m); };
+      state._meldStub=window.alert=m=>{ meldingen.push(m); };
       // De twee remmen die vóór de vraag staan open: `blokkeerOffline` mag hier niet als eerste
       // terugkeren, anders meet dit blok stilte in plaats van een vraag.
       state._uitCache=false;
@@ -12040,7 +12046,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       closeModal();
     } finally {
       state._writeChain=chainOud; state.pendingWrites=pendingOud; state.editRowData=bewerkOud;
-      window.alert=_alert;
+      state._meldStub=null; window.alert=_alert;
       // Is er onderweg een assert geklapt, dan kan er een onbeantwoorde vraag blijven staan. Die
       // is meteen de dubbelklik-rem van `vraagBevestiging`, dus zonder dit antwoord zouden álle
       // vragen ná dit blok stil op 'nee' uitkomen en zou de rest van de suite iets anders meten.
@@ -12274,7 +12280,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const putBereiken=()=>posts.filter(p=>p.methode==='PUT')
       .map(p=>p.url.replace(/^.*\/values\//,'').replace(/\?.*$/,''));
     try {
-      window.alert=m=>{ meldingen.push(m); };
+      state._meldStub=window.alert=m=>{ meldingen.push(m); };
       state.oauthToken='stub'; state.oauthExpiry=Date.now()+3600e3;
       state.activeNtd='OPPAKKEN'; pgs.ntd=1;
       state._sheetIds={ 'Nog Te Doen':0, 'Afgerond':1, 'Logboek':2 };   // scheelt een fetch in getSheetIds
@@ -12681,7 +12687,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       eq('bulk-afronden: … en precies rij 7, 6 en 5 gaan eruit, hoog→laag', wisRijen(), [7, 6, 5]);
       D.afSecInfo = afSecOud;
     } finally {
-      window.fetch=_fetch; window.alert=_alert;
+      window.fetch=_fetch; state._meldStub=null; window.alert=_alert;
       // Is er onderweg een assert geklapt, dan kan er een onbeantwoorde vraag blijven staan. Die is
       // meteen de dubbelklik-rem van `vraagBevestiging`, dus zonder dit antwoord zouden álle vragen
       // ná dit blok stil op 'nee' uitkomen en zou de rest van de suite iets anders meten.
@@ -13966,7 +13972,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const logRegels   = () => posts.filter(p=>p.methode==='POST' && /Logboek/.test(p.url))
       .flatMap(p=>((p.body&&p.body.values)||[]));
     try {
-      window.alert = ()=>{};
+      state._meldStub=window.alert = ()=>{};
       state.oauthToken='stub'; state.oauthExpiry=Date.now()+3600e3;
       state._sheetIds={ 'Nog Te Doen':0, 'Afgerond':1, 'Logboek':2 };
       state._uitCache=false;
@@ -14041,7 +14047,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       await state._writeChain;
       eq('in-behandeling: een verdwenen rij schrijft niets', posts.length, 0);
     } finally {
-      window.fetch=fetchOud; window.alert=alertOud;
+      window.fetch=fetchOud; state._meldStub=null; window.alert=alertOud;
       state.oauthToken=tokenOud; state.oauthExpiry=expOud;
       D.ntd=ntdOud; D.af=afOud; state._rowCache=cacheOud; state._sheetIds=idsOud;
       state._uitCache=uitCacheOud;
@@ -14409,7 +14415,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       await hooguit(klaar);
     };
     try {
-      window.alert = ()=>{};
+      state._meldStub=window.alert = ()=>{};
       // GEEN `state._uitCache = true` hier: `blokkeerOffline()` staat als ALLEREERSTE regel in
       // `submitTask`, dus met de offline-rem aan komt de vraag nooit in beeld en zou dit blok
       // stilte meten. (Bij het losse wegleggen staat die rem juist ná de vraag; vandaar dat het
@@ -14515,7 +14521,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       // blok posts die er niet bij horen. Precies zo verscheen hier een invoeging met een leeg
       // rijbereik in de meting van 'meer-vve'.
       await state._writeChain.catch(()=>{});
-      window.alert = alertOud; state._uitCache = uitCacheOud; window.fetch = fetchOud;
+      state._meldStub=null; window.alert = alertOud; state._uitCache = uitCacheOud; window.fetch = fetchOud;
       state._dubbelcheckUit = true;     // en de rest van de suite mag er weer geen last van hebben
       state.oauthToken = tokenOud; state.oauthExpiry = expOud; state._sheetIds = idsOud;
       D.ntd = ntdOud; D.af = afOud; D.ntdSecInfo = infoOud;
@@ -14593,7 +14599,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const leeg = { OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
     let posts = [];
     try {
-      window.alert = ()=>{};
+      state._meldStub=window.alert = ()=>{};
       state.oauthToken='stub'; state.oauthExpiry=Date.now()+3600e3;
       state._sheetIds={ 'Nog Te Doen':0, 'Afgerond':1, 'Logboek':2 };
       state._uitCache=false;
@@ -14678,7 +14684,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       eq('meer-vve: een extra VvE die gelijk is aan de hoofd-VvE levert géén tweede taak op',
          D.ntd.OPPAKKEN.length, 1);
     } finally {
-      window.fetch=fetchOud; window.alert=alertOud;
+      window.fetch=fetchOud; state._meldStub=null; window.alert=alertOud;
       state.oauthToken=tokenOud; state.oauthExpiry=expOud; state._sheetIds=idsOud;
       D.ntd=ntdOud; D.af=afOud; D.ntdSecInfo=infoOud; state.activeNtd=secOud;
       state._uitCache=uitCacheOud; state.editMode=false; state.editRowData=null; state.editSec=null;
@@ -14805,7 +14811,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       await hooguit(klaar);
     };
     try {
-      window.alert = ()=>{};
+      state._meldStub=window.alert = ()=>{};
       state.oauthToken='stub'; state.oauthExpiry=Date.now()+3600e3;
       state._sheetIds={ 'Nog Te Doen':0, 'Afgerond':1, 'Logboek':2 };
       state._uitCache=false;
@@ -14887,7 +14893,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       eq('verplaatsen: naar dezelfde categorie gebeurt er niets', [vragen.length, posts.length], [0, 0]);
     } finally {
       if(bevBg.classList.contains('open')) document.getElementById('bevestig-nee').click();
-      window.fetch=fetchOud; window.alert=alertOud;
+      window.fetch=fetchOud; state._meldStub=null; window.alert=alertOud;
       state.oauthToken=tokenOud; state.oauthExpiry=expOud; state._sheetIds=idsOud;
       D.ntd=ntdOud; D.af=afOud; D.ntdSecInfo=infoOud; state._uitCache=uitCacheOud;
     }
@@ -15124,7 +15130,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const leeg=()=>({OPPAKKEN:[],VERGADERVERZOEKEN:[],'OFFERTE-TRAJECTEN':[],LOD:[],'SUBSIDIE-TRAJECTEN':[],CRM:[]});
     let meldingen=[], inserts=[], ankerRij=null;
     try{
-      window.alert=m=>meldingen.push(String(m));
+      state._meldStub=window.alert=m=>meldingen.push(String(m));
       state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
       state._uitCache=false; state._netwerkFouten=0;
       state._sheetIds={'Nog Te Doen':0,'Afgerond':1,'Logboek':2};
@@ -15176,7 +15182,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       truthy('undo: … en de gebruiker krijgt de melding te zien',
              meldingen.some(m=>/net gewijzigd/.test(m)));
     } finally {
-      window.fetch=fetchOud; window.alert=alertOud;
+      window.fetch=fetchOud; state._meldStub=null; window.alert=alertOud;
       state.oauthToken=tokenOud; state.oauthExpiry=expOud; state._sheetIds=idsOud;
       D.ntd=ntdOud; D.ntdSecInfo=infoOud; state._uitCache=cacheOud; state._netwerkFouten=nfOud;
       state._undoInFlight=false;
@@ -15204,7 +15210,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     let insertTeller=0, laatInsert1=null;
     const poort=new Promise(res=>{ laatInsert1=res; });
     try{
-      window.alert=m=>meldingen.push(String(m));
+      state._meldStub=window.alert=m=>meldingen.push(String(m));
       state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
       state._uitCache=false; state._netwerkFouten=0;
       state._sheetIds={'Nog Te Doen':0,'Afgerond':1,'Logboek':2};
@@ -15248,7 +15254,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       await serieleWrite(async()=>{ tweedeLiep=true; });
       truthy('serialisatie: een fout in de ene beurt laat de volgende gewoon starten', tweedeLiep);
     } finally {
-      window.fetch=fetchOud; window.alert=alertOud;
+      window.fetch=fetchOud; state._meldStub=null; window.alert=alertOud;
       state.oauthToken=tokenOud; state.oauthExpiry=expOud; state._sheetIds=idsOud;
       D.ntd=ntdOud; D.ntdSecInfo=infoOud; state._uitCache=cacheOud; state._netwerkFouten=nfOud;
       state._undoInFlight=false;
@@ -15400,7 +15406,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const fetchOud=window.fetch, tokenOud=state.oauthToken, expOud=state.oauthExpiry;
     const logOud=D.logboek, alertOud=window.alert;
     try{
-      window.alert=()=>{};
+      state._meldStub=window.alert=()=>{};
       state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
       D.logboek=[];
       let appends=0;
@@ -15418,7 +15424,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       eq('notitie: twee snelle klikken schrijven precies één logregel', appends, 1);
       eq('notitie: … en er staat er ook maar één in het geheugen', D.logboek.length, 1);
     } finally {
-      window.fetch=fetchOud; window.alert=alertOud;
+      window.fetch=fetchOud; state._meldStub=null; window.alert=alertOud;
       state.oauthToken=tokenOud; state.oauthExpiry=expOud; D.logboek=logOud;
       const n=document.getElementById('hist-note'); if(n) n.value='';
       state._notitieBezig=false;
@@ -15797,7 +15803,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const ntdOud = D.ntd, infoOud = D.ntdSecInfo, cacheOud = state._uitCache;
     const meldingen = [];
     try {
-      window.alert = m => meldingen.push(String(m));
+      state._meldStub=window.alert = m => meldingen.push(String(m));
       state._uitCache = false;
       state.oauthToken = 'stub'; state.oauthExpiry = Date.now() + 3600e3;
       state._sheetIds = null;                    // dwingt getSheetIds het net op
@@ -15824,7 +15830,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     } finally {
       if (bevBg.classList.contains('open')) document.getElementById('bevestig-nee').click();
       beantwoordBevestiging(false);
-      window.fetch = _fetch; window.alert = _alert;
+      window.fetch = _fetch; state._meldStub=null; window.alert = _alert;
       state.oauthToken = tokenOud; state.oauthExpiry = expOud; state._sheetIds = idsOud;
       D.ntd = ntdOud; D.ntdSecInfo = infoOud; state._uitCache = cacheOud;
     }
@@ -15895,7 +15901,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
     let inserts=0;
     try{
-      window.alert=()=>{};
+      state._meldStub=window.alert=()=>{};
       state.oauthToken='stub'; state.oauthExpiry=Date.now()+3600e3;
       state._sheetIds={ 'Nog Te Doen':0, 'Afgerond':1, 'Logboek':2 };
       state._uitCache=false; state._dubbelcheckUit=true;
@@ -15932,7 +15938,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       eq('dubbelklik: en de rem staat daarna weer los', state._submitBezig, false);
     } finally {
       closeModal(); clearModal();
-      window.fetch=_fetch; window.alert=_alert;
+      window.fetch=_fetch; state._meldStub=null; window.alert=_alert;
       state.oauthToken=tokenOud; state.oauthExpiry=expOud; state._sheetIds=idsOud;
       D.ntd=ntdOud; D.af=afOud; D.ntdSecInfo=infoOud; state._uitCache=cacheOud;
       state._dubbelcheckUit=dcOud; state.activeNtd=secOud; state.editMode=editOud;
@@ -16282,7 +16288,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const rij={ _sec:'OPPAKKEN', _row:5, code:'311212', naam:'Testflat', actiepunt:'Halve zin', deadline:'',
                 behandelaar:'Jer', prioriteit:'', opmerkingen:'', inBehandeling:'FALSE', subcategorie:'', taakId:'TNL1' };
     try{
-      window.alert=()=>{};
+      state._meldStub=window.alert=()=>{};
       state._uitCache=false; state._ntdVoorModal=null;
       state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
       D.ntd={ ...leeg, OPPAKKEN:[rij] }; state._rowCache=[rij]; D.logboek=[];
@@ -16415,7 +16421,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       document.getElementById('m-submit').onclick=submitOud;
       if(_vraagStaatOpen()) beantwoordBevestiging(false);
       closeModal(); clearModal(); closeCompleteModal();
-      window.fetch=fetchOud; window.alert=alertOud;
+      window.fetch=fetchOud; state._meldStub=null; window.alert=alertOud;
       state.oauthToken=tokenOud; state.oauthExpiry=expOud; state._uitCache=uitCacheOud;
       D.logboek=logOud; D.ntd=ntdOud; state._rowCache=cacheOud;
       const n=document.getElementById('hist-note'); if(n) n.value='';
@@ -16605,7 +16611,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     {
       const auth=await bron('src/auth.js');
       truthy('inloggen: een token van een niet-toegestaan account gaat ook uit sessionStorage',
-             /ALLOWED_EMAILS\.includes\(email\.toLowerCase\(\)\)\)\{[\s\S]{0,400}?_wisTokenSessie\(\)/.test(auth));
+             /emailToegestaan\(email\)\)\{[\s\S]{0,400}?_wisTokenSessie\(\)/.test(auth));
       // api/chat.js staat bewust NIET op Pages (_config.yml exclude) en Vercel serveert de bron niet
       // (daar is het de functie). Is de bron hier niet te lezen (404, leeg, of een HTML-pagina in
       // plaats van JavaScript), dan is deze toets op deze host niet uit te voeren — en alleen dán
@@ -16821,7 +16827,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     const cellen=r=>{ const c=_rijNaarCellen('Nog Te Doen', r); while(c.length<19) c.push(''); return c; };
     const rijOp=(n)=>Object.values(D.ntd||{}).flat().find(r=>r._row===n);
     try{
-      window.alert=()=>{};
+      state._meldStub=window.alert=()=>{};
       state.oauthToken='tok'; state.oauthExpiry=Date.now()+3600e3; state._uitCache=false;
       state._sheetIds={'Nog Te Doen':0,'Afgerond':7,'Logboek':9};
       await wachtKeten();
@@ -16960,7 +16966,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       truthy('naloop 02-10 schrijfwegen: geen uitzondering — '+(e && e.stack || e), false);
     } finally {
       await wachtKeten();
-      window.fetch=_fetch; window.alert=alertOud; window.google=gOud; state._gsiTokenClient=gisOud;
+      window.fetch=_fetch; state._meldStub=null; window.alert=alertOud; window.google=gOud; state._gsiTokenClient=gisOud;
       state.oauthToken=tokenOud; state.oauthExpiry=expOud; state._sheetIds=idsOud; state._uitCache=uitOud; state._syncFails=failsOud;
       D.ntd=ntdOud; D.af=afOud; D.ntdSecInfo=infoOud; D.logboek=logOud;
       document.querySelectorAll('#toast-container .toast').forEach(x=>x.remove());
@@ -17052,7 +17058,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         const tik=()=>new Promise(r=>{const k=new MessageChannel();k.port1.onmessage=()=>r();k.port2.postMessage(0);});
         const leeglopen=async()=>{ await state._writeChain; for(let i=0;i<200 && state._loadInFlight;i++) await tik(); };
         try{
-          window.alert=m=>{ alerts.push(m); };
+          state._meldStub=window.alert=m=>{ alerts.push(m); };
           state.oauthToken='stub'; state.oauthExpiry=Date.now()+3600e3; state._uitCache=false;
           state._sheetIds={ 'Nog Te Doen':0, 'Afgerond':1, 'Logboek':2 };
           D.afSecInfo={ OPPAKKEN:{colHeaderRow:2}, VERGADERVERZOEKEN:{colHeaderRow:20}, 'OFFERTE-TRAJECTEN':{colHeaderRow:40}, LOD:{colHeaderRow:60}, 'SUBSIDIE-TRAJECTEN':{colHeaderRow:80} };
@@ -17113,7 +17119,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
           truthy('afronden+notitie: maar zegt dat hij wél meegaat', /notitie in het Logboek-vak gaat wél mee/.test(tekst));
           document.getElementById('bevestig-nee').click(); await p;
         } finally {
-          window.fetch=fetchOud; window.alert=alertOud; state.oauthToken=tokOud; state.oauthExpiry=expOud;
+          window.fetch=fetchOud; state._meldStub=null; window.alert=alertOud; state.oauthToken=tokOud; state.oauthExpiry=expOud;
           D.af=afOud; D.afSecInfo=infoOud; state._sheetIds=idsOud; state._rowCache=cacheOud; D.logboek=logOud;
           CR.closeCompleteModal(); CR.closeModal(); CR.clearModal();
           document.getElementById('hist-note').value='';
@@ -17399,7 +17405,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         const versLeeg=()=>({ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] });
         const rv={ _sec:'OPPAKKEN', _row:5, code:'VO-1', naam:'x', actiepunt:'y', deadline:'', behandelaar:'', prioriteit:'', opmerkingen:'', inBehandeling:'FALSE', subcategorie:'', taakId:'TVO1', bundelId:'', bundelVolg:'' };
         try{
-          window.alert=m=>meldingen.push(m); state._codeVerouderd=true;
+          state._meldStub=window.alert=m=>meldingen.push(m); state._codeVerouderd=true;
           D.ntd={ ...versLeeg(), OPPAKKEN:[rv] };
           CR.openModal(true, rv);
           const sel=document.getElementById('m-sec'); sel.value='LOD';
@@ -17407,7 +17413,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
           truthy('verouderd: verplaatsen weigert met "Herlaad eerst het dashboard"', meldingen.some(m=>/Herlaad eerst het dashboard/.test(m)));
           eq('verouderd: en de kiezer staat terug op de eigen categorie', sel.value, 'OPPAKKEN');
         } finally {
-          state._codeVerouderd=verOud; window.alert=alertOud2; CR.closeModal(); CR.clearModal();
+          state._codeVerouderd=verOud; state._meldStub=null; window.alert=alertOud2; CR.closeModal(); CR.clearModal();
         }
       }
     } catch(e) {
@@ -17485,7 +17491,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       // ── 4. De rem op de schrijfwegen ──
       // Alles wat naar buiten gaat wordt hier geteld; een GET krijgt een leeg antwoord.
       window.fetch=async(u,o)=>{ verzoeken.push({u:String(u), m:(o&&o.method)||'GET'}); return new Response(JSON.stringify({values:[], valueRanges:[]}), {status:200}); };
-      window.alert=m=>alerts.push(m);
+      state._meldStub=window.alert=m=>alerts.push(m);
       state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3; state._netwerkFouten=0; state._uitCache=false;
       state._versieTeOud=true;
       ruimOp();
@@ -17612,7 +17618,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     } finally {
       state._versieTeOud=oud.teOud; state.oauthToken=oud.token; state.oauthExpiry=oud.exp; state._netwerkFouten=oud.nf;
       state._uitCache=oud.uitCache; D.ntd=oud.ntd; D.alvo=oud.alvo; D.herhaal=oud.herhaal; state.vveCode=oud.vveCode;
-      window.fetch=oud.fetch; window.alert=oud.alert; state.pendingWrites=oud.pw;
+      window.fetch=oud.fetch; state._meldStub=null; window.alert=oud.alert; state.pendingWrites=oud.pw;
       try{ if(_vraagStaatOpen()) beantwoordBevestiging(false); }catch(_){}
       try{ CR.closeModal(); CR.clearModal(); }catch(_){}
       document.getElementById('complete-bg')?.classList.remove('open');
@@ -17889,6 +17895,92 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       document.title=oud.titel;
       document.querySelectorAll('.load-err').forEach(b=>b.remove());
     }
+  })();
+
+  // ── v15.4: U1–U10 (pure delen) ──
+  console.log('[TESTS] v15.4 samenwerken, palet, weergaven, status, hashes');
+  await (async ()=>{
+    // U9: SHA-256 tegen de bekende testvector, en de allowlist op hash
+    eq('sha256: testvector abc', sha256Hex('abc'), 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+    eq('sha256: lege string', sha256Hex(''), 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
+    eq('sha256: lang bericht (meer dan één blok)', sha256Hex('abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq'), '248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1');
+    eq('emailHash normaliseert (hoofdletters, spaties)', emailHash('  Info@VvEbeheercollectief.NL '), emailHash('info@vvebeheercollectief.nl'));
+    truthy('allowlist: het kantooradres mag erin', emailToegestaan('info@vvebeheercollectief.nl'));
+    truthy('allowlist: een vreemd adres niet', !emailToegestaan('indringer@example.com') && !emailToegestaan('') && !emailToegestaan(null));
+    eq('naamBijEmail: kantooradres → Jer', naamBijEmail('INFO@vvebeheercollectief.nl'), 'Jer');
+    eq('displayName via hash: onbekend adres blijft zichzelf', displayName('iemand@elders.nl'), 'iemand@elders.nl');
+    // De bron zelf: geen e-mailadres meer in de code (commentaar niet meegerekend — daar staat de
+    // uitleg met een voorbeeldadres). Is de bron niet te lezen, dan telt dat als mislukt.
+    try{
+      const ae = await _leesBron('allowed-emails.js', 'export ');
+      truthy('allowlist-bron bevat geen e-mailadressen meer', !/[\w.+-]+@[\w-]+\.[\w.]+/.test(ae.replace(/\/\/.*$/gm, '')));
+      truthy('allowlist-bron bevat alleen 64-tekens hexhashes', (ae.match(/'[0-9a-f]{64}'/g)||[]).length >= 4);
+    }catch(e){ truthy('allowlist-bron te lezen ('+(e&&e.message)+')', false); }
+  })();
+  (()=>{
+    // U5: statusuitleg per stand
+    const basis={ dot:'', label:'Live · 14:02', laatsteMs:Date.now(), pendingWrites:0, bulkMode:false, offline:false, versieTeOud:false, authFails:0 };
+    eq('status: live', statusUitleg(basis).kop, 'Live');
+    eq('status: fout met knop', [statusUitleg({...basis, dot:'err', label:'Fout'}).kop, statusUitleg({...basis, dot:'err', label:'Fout'}).knop], ['Fout bij verversen','vernieuwen']);
+    eq('status: offline wint van de bol', statusUitleg({...basis, dot:'', offline:true}).kop, 'Offline');
+    eq('status: selecteren', statusUitleg({...basis, bulkMode:true}).kop, 'Selecteren — verversen staat stil');
+    eq('status: gepauzeerd', statusUitleg({...basis, dot:'pauze', label:'Gepauzeerd — klik in het dashboard'}).kop, 'Gepauzeerd');
+    eq('status: sessie verlopen na 3 mislukte vernieuwingen', statusUitleg({...basis, dot:'err', label:'Fout', authFails:3}).kop, 'Sessie verlopen');
+    eq('status: opslaan telt wijzigingen', statusUitleg({...basis, dot:'loading', label:'Opslaan…', pendingWrites:2}).tekst, '2 wijzigingen onderweg naar de Sheet.');
+    eq('status: verouderde versie wint van alles', statusUitleg({...basis, versieTeOud:true, offline:true}).kop, 'Verouderde versie');
+    truthy('status: zonder geslaagde ronde zegt hij dat', /Nog geen/.test(statusUitleg({...basis, laatsteMs:0}).sinds));
+  })();
+  (()=>{
+    // U3: acties zoeken, recente VvE's vooraan, /log ontleden
+    const acties=[{lbl:'Thema wisselen (licht/donker)', zoek:'thema donker'},{lbl:'Ga naar Logboek', zoek:'pagina'},{lbl:'Nu vernieuwen', zoek:''}];
+    eq('zoekActies: één woord', zoekActies('thema', acties).map(a=>a.lbl), ['Thema wisselen (licht/donker)']);
+    eq('zoekActies: alle woorden moeten raken', zoekActies('ga logboek', acties).length, 1);
+    eq('zoekActies: leeg → niets', zoekActies('', acties).length, 0);
+    eq('zoekActies: hoofdletters', zoekActies('NU VERNIEUWEN', acties).length, 1);
+    eq('metRecentVooraan: recente eerst, rest in volgorde, gecapt', metRecentVooraan([{code:'A'},{code:'B'},{code:'C'},{code:'D'}], ['C','A'], 3).map(v=>v.code), ['C','A','B']);
+    eq('ontleedLog: open dossier + tekst', ontleedLog('gebeld met Jansen', '311212', ['311212']), {code:'311212', tekst:'gebeld met Jansen'});
+    eq('ontleedLog: code vooraan wint van het open dossier', ontleedLog('381105 gebeld', '311212', ['381105','311212']), {code:'381105', tekst:'gebeld'});
+    eq('ontleedLog: onbekende code is gewoon tekst', ontleedLog('999999 gebeld', '311212', ['311212']), {code:'311212', tekst:'999999 gebeld'});
+    eq('ontleedLog: zonder dossier en zonder code → null', ontleedLog('gebeld', null, ['311212']), null);
+    eq('ontleedLog: leeg → null', ontleedLog('', '311212', []), null);
+    eq('opdrachten: vier', COMMANDOS.map(c=>c[0]), ['/vve','/log','/taak','/ga']);
+    eq('rij-acties: dezelfde vier toetsen als het overzicht', RIJ_ACTIES.map(a=>a.toets), ['e','a','w','i']);
+  })();
+  (()=>{
+    // U6: weergave vergelijken en omschrijven
+    const w={ naam:'x', tab:'OPPAKKEN', q:'Dak', code:'', beh:'Jer', prio:'', status:'telaat', sort:{key:null, asc:true}, perVve:false };
+    const nu={ tab:'OPPAKKEN', q:' dak ', code:'', beh:'Jer', prio:'', status:'telaat', sort:{key:null, asc:true}, perVve:false };
+    truthy('weergaveActief: zoekterm hoofdletter-/spatie-ongevoelig', weergaveActief(w, nu));
+    truthy('weergaveActief: ander tabblad → niet actief', !weergaveActief(w, {...nu, tab:'LOD'}));
+    truthy('weergaveActief: andere sortering → niet actief', !weergaveActief(w, {...nu, sort:{key:'deadline', asc:true}}));
+    truthy('weergaveActief: sorteerrichting telt alleen mét sleutel', weergaveActief({...w, sort:{key:null, asc:false}}, nu));
+    truthy('weergaveActief: null-invoer', !weergaveActief(null, nu) && !weergaveActief(w, null));
+    eq('weergaveOmschrijving', weergaveOmschrijving({...w, sort:{key:'deadline', asc:false}, perVve:true}), 'Oppakken · zoek "Dak" · Jer · te laat · sortering deadline ▼ · per VvE');
+    eq('weergaveOmschrijving: leeg', weergaveOmschrijving({}), 'standaardweergave');
+    truthy('huidigeWeergave: leest de stand van nu', huidigeWeergave().tab===state.activeNtd);
+  })();
+  (()=>{
+    // U1/U4/U10: eigen wijzigingen, gewijzigde velden, laatste wijziging, oude cellen
+    eq('_eigenWijzigingen: alleen wat verschilt', _eigenWijzigingen({a:'1', b:'2', c:'3'}, {a:'1', b:'x', c:'3', d:'nieuw'}), {b:'x'});
+    eq('_eigenWijzigingen: zonder openstand niets', _eigenWijzigingen(null, {a:'1'}), {});
+    const oud={ _sec:'OPPAKKEN', code:'311212', naam:'Flat', actiepunt:'dak', deadline:'1 aug 2026', behandelaar:'Jer', prioriteit:'Hoog', opmerkingen:'', inBehandeling:'', subcategorie:'' };
+    eq('_gewijzigdeVelden: labels van de velden die de ander veranderde', _gewijzigdeVelden(oud, {...oud, opmerkingen:'nieuw', behandelaar:'Cihad'}), ['Wie','Opmerkingen']);
+    eq('_gewijzigdeVelden: schakelaar telt mee', _gewijzigdeVelden(oud, {...oud, inBehandeling:'TRUE'}), ['In behandeling']);
+    eq('_gewijzigdeVelden: niets', _gewijzigdeVelden(oud, {...oud}), []);
+    const log=[{code:'311212', sectie:'OPPAKKEN', actie:'Auto-prioriteit', gebruiker:'systeem', timestamp:'2026-10-16T10:00:00Z'},
+               {code:'311212', sectie:'LOD', actie:'Bewerkt', gebruiker:'a@b.nl', timestamp:'2026-10-16T09:00:00Z'},
+               {code:'311212', sectie:'', actie:'Contact', gebruiker:'c@d.nl', timestamp:'2026-10-15T09:00:00Z'},
+               {code:'311212', sectie:'OPPAKKEN', actie:'Opmerking', gebruiker:'e@f.nl', timestamp:'2026-10-14T09:00:00Z'}];
+    eq('laatsteWijziging: slaat systeem en andere sectie over, neemt sectieloos contact mee', laatsteWijziging(oud, log).gebruiker, 'c@d.nl');
+    eq('laatsteWijziging: geen rij → null', laatsteWijziging(null, log), null);
+    eq('laatsteWijziging: leeg logboek → null', laatsteWijziging(oud, []), null);
+    const cellen=_rijWaardenAK({ ...oud, inBehandeling:'', subcategorie:'Sub' });
+    eq('_rijWaardenAK: A..K, schakelaar als FALSE, K = subcategorie', [cellen.length, cellen[7], cellen[10], cellen[0]], [11, 'FALSE', 'Sub', '311212']);
+    eq('_rijWaardenAK: offerte vult tot H aan', _rijWaardenAK({ _sec:'OFFERTE-TRAJECTEN', code:'1', naam:'n', datumAangevraagd:'', offertes:'2/3', behandelaar:'', deadline:'', opmerkingen:'' }).length, 11);
+    // controleerBewerkConflict doet niets zonder open bewerkscherm (geen fout, geen banner)
+    const emOud=state.editMode, erOud=state.editRowData;
+    try{ state.editMode=true; state.editRowData=oud; controleerBewerkConflict(); truthy('controleerBewerkConflict: zonder open venster blijft de regel weg', document.getElementById('m-collega').hidden); }
+    finally{ state.editMode=emOud; state.editRowData=erOud; }
   })();
 
   console.log = _origLog;         // het voortgangsspoor weer los

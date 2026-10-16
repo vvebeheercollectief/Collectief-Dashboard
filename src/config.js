@@ -1,11 +1,12 @@
 // ══════════════════════════════════════
 //  CONFIG — constanten (omgeving, ids, secties)
 // ══════════════════════════════════════
-import { ALLOWED_EMAILS } from '../allowed-emails.js';
+import { ALLOWED_EMAIL_HASHES } from '../allowed-emails.js';
+import { emailHash } from './hash.js';
 
 // ── Versie (zichtbaar in de UI) ────────────────────────────────────────
 // Ophogen bij ELKE wijziging: 4.1, 4.2, … 5.0 voor grote sprongen.
-export const APP_VERSION = '15.3';
+export const APP_VERSION = '15.4';
 
 // ── Omgeving (productie vs. testomgeving) ──────────────────────────────
 // Fail-safe: alleen deze exacte hosts zijn PRODUCTIE; al het andere
@@ -36,13 +37,21 @@ export const ONESIGNAL_APP_ID      = IS_STAGING ? ONESIGNAL_APP_ID_TEST : ONESIG
 // Google OAuth client-id (vaste constante)
 export const clientId = '560046984985-1371r4bbt28umi6uslims6mlkucn1278.apps.googleusercontent.com';
 
-export { ALLOWED_EMAILS }; // één bron: ../allowed-emails.js (ook door api/chat.js gebruikt)
+// Mag dit adres inloggen? Eén bron: ../allowed-emails.js (SHA-256-hashes, ook door api/chat.js
+// gebruikt). De hash normaliseert zelf (kleine letters, zonder witruimte), dus aanroepers hoeven
+// dat niet meer te doen.
+export const emailToegestaan = email => !!email && ALLOWED_EMAIL_HASHES.includes(emailHash(email));
+// Naam per collega, op de HASH van het adres (zie allowed-emails.js voor het waarom en het
+// toevoegen van een collega). De sleutelvolgorde is dezelfde als in de allowlist.
 export const EMAIL_NAMES = {
-  'info@vvebeheercollectief.nl':'Jer',
-  'djiowchico@gmail.com':'Cihad',
-  'gabrielateterycz1616@gmail.com':'Gabos',
-  'giocan175@gmail.com':'Cihan',
+  '33f0fe21146283058710f1a0fde19dc5f940453cd0e7e76fb5dfb00a9a8dc644':'Jer',
+  'cb884483e517829a56da8206f35f2c80f82629338a279573e4dac6a5909814a3':'Cihad',
+  '2091b21099f4297a28f9a49f5507aebb6bfb25ed57cfd49ac46f055ebb2d6498':'Gabos',
+  'ca55c1b1d601ac26a500d0827d5f7986f1f285f5ed2a037fad32dd67ce39029e':'Cihan',
 };
+// De naam bij een adres, of '' als het geen collega is. `emailHash` onthoudt per adres, dus dit
+// is ook in de logboeklus goedkoop.
+export const naamBijEmail = email => (email && EMAIL_NAMES[emailHash(email)]) || '';
 // Het vaste team, afgeleid uit EMAIL_NAMES — één bron. Analytics (KPI-tegels, leaderboard)
 // gebruikt dit i.p.v. losse literals, zodat een nieuwe collega in EMAIL_NAMES automatisch
 // meetelt. De cijfers vullen dit bovendien aan met namen die in de data voorkomen maar hier

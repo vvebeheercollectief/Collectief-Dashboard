@@ -12,7 +12,7 @@ import {
   setOntw, renderOntw, editOntwItem, addTaskNote, renderLogboek,
   editLogboek, saveLogboek, cancelLogboek, setLogSoort, deleteLogboek,
 } from './render-overig.js';
-import { openModal, completeTask, completeCurrentEditTask, deleteCurrentEditTask, zetSubsidieFase, kiesModalFase, zetHoortBij, taakUitCache, renderExtraVves, herzieAlsSubtaak, _bewerkRijVers, offerteAanvraagGewijzigd, zetCrmFase, kiesModalCrmFase, kiesModalSoort, crmOntvangenGewijzigd } from './crud.js';
+import { openModal, completeTask, completeCurrentEditTask, deleteCurrentEditTask, zetSubsidieFase, kiesModalFase, zetHoortBij, taakUitCache, renderExtraVves, herzieAlsSubtaak, _bewerkRijVers, offerteAanvraagGewijzigd, zetCrmFase, kiesModalCrmFase, kiesModalSoort, crmOntvangenGewijzigd, neemNieuweStandOver } from './crud.js';
 import { ontkoppelTaak } from './bundel-acties.js';
 import { modalAannemerAdd, modalAannemerBinnen, modalAannemerWeg } from './modal-aannemers.js';
 import { copyAiPrompt, aiOvernemen, aiActieTaak, aiKopieerConcept, prefillNieuweTaak } from './ai.js';
@@ -32,6 +32,7 @@ import { saveKenmerken } from './kenmerken.js';
 import { palKies, closePalette } from './palette.js';
 import { toggleBulkMode, bulkVink, bulkAlles, toggleBulkMenu, bulkDoe } from './bulk.js';
 import { doeOpmaak, initOpmaak } from './opmaak.js';
+import { pasWeergaveToe, leesWeergaven, verwijderWeergave, toonWeergaveInvoer } from './weergaven.js';
 
 const PAG_RENDER = { ntd:renderNtd, af:renderAf, alvo:renderAlvo, alfa:renderAlfa, ontw:renderOntw, logboek:renderLogboek };
 
@@ -216,6 +217,12 @@ export const ACTIONS = {
   'bulk-vink':             (el, e) => bulkVink(+el.dataset.rid, e),
   'bulk-alles':            ()   => bulkAlles(),
   'taak-inbehandeling':    (el) => zetInBehandeling(+el.dataset.rid),
+  // De gele regel in het bewerkscherm (U1/U4): verse stand laden, eigen invoer gemarkeerd terug.
+  'collega-overnemen':     ()   => neemNieuweStandOver(),
+  // Opgeslagen weergaven (U6)
+  'weergave-kies':         (el) => pasWeergaveToe(leesWeergaven().find(w=>w.naam===el.dataset.naam)),
+  'weergave-weg':          (el, e) => { e.stopPropagation(); verwijderWeergave(el.dataset.naam); },
+  'weergave-opslaan':      ()   => toonWeergaveInvoer(true),
   'extra-vve-weg':         (el) => { verwijderExtraVve(el.dataset.code); renderExtraVves(); },
   'bulk-menu':             (el) => toggleBulkMenu(el.dataset.menu),
   'bulk-doe':              (el) => bulkDoe(el),

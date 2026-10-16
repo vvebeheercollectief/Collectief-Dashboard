@@ -9,7 +9,7 @@ import { SID } from "./config.js";
 import { appendRange, writeRange, assertRowMatch, sheetsFetch } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { getSheetIds, setv } from "./crud.js";
-import { showToast } from "./notifications.js";
+import { showToast, meldFout } from "./notifications.js";
 import { logEvent } from "./render-overig.js";
 import { backgroundWrite, blokkeerOffline, blokkeerVersie } from "./data.js";
 import { vraagBevestiging } from "./bevestig.js";
@@ -78,15 +78,15 @@ function gvh(id){const el=document.getElementById(id);return el?el.value.trim():
 
 async function submitHerhaal(){
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
-  if(!await ensureToken()){alert('Inloggen mislukt. Probeer het opnieuw.');return}
+  if(!await ensureToken()){meldFout('Inloggen mislukt. Probeer het opnieuw.');return}
   const oms=gvh('hh-omschrijving'), code=gvh('hh-code'), naam=gvh('hh-naam');
   const sectie=gvh('hh-sectie'), beh=gvh('hh-beh'), type=gvh('hh-type');
   const interval=gvh('hh-interval'), vooraf=coerceDagenVooraf(gvh('hh-vooraf'));
   const dlIso=gvh('hh-deadline');
-  if(!oms||!code){alert('Omschrijving en VvE Code zijn verplicht.');return}
-  if(type==='na-afronden'&&(parseInt(interval)||0)<1){alert('Vul het aantal maanden na afronden in.');return}
-  if(type!=='na-afronden'&&!dlIso){alert('Kies de eerstvolgende deadline.');return}
-  if(type==='week'&&vooraf>=7){alert('Bij een wekelijkse herhaling moet "dagen vooraf" kleiner zijn dan 7, anders stapelen de taken op.');return}
+  if(!oms||!code){meldFout('Omschrijving en VvE Code zijn verplicht.');return}
+  if(type==='na-afronden'&&(parseInt(interval)||0)<1){meldFout('Vul het aantal maanden na afronden in.');return}
+  if(type!=='na-afronden'&&!dlIso){meldFout('Kies de eerstvolgende deadline.');return}
+  if(type==='week'&&vooraf>=7){meldFout('Bij een wekelijkse herhaling moet "dagen vooraf" kleiner zijn dan 7, anders stapelen de taken op.');return}
   const volgende=type==='na-afronden'?'':toDutchDate(dlIso);
   // Dubbelklik-rem (naloop 2026-10-16). De `await ensureToken()` hierboven kan een echte
   // netwerkronde zijn, en twee klikken in dat gat gaven bij een NIEUWE regel twee appends: twee
@@ -194,7 +194,7 @@ async function deleteHerhaal(){
       bevestigTekst:'Definitief verwijderen', gevaarlijk:true })) return;
   closeHerhaalModal();
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
-  if(!await ensureToken()){alert('Inloggen mislukt.');return}
+  if(!await ensureToken()){meldFout('Inloggen mislukt.');return}
   const pos=regelIndex(D.herhaal, r, x=>x.id); if(pos>-1)D.herhaal.splice(pos,1);
   // Alleen meeschuiven als de regel lokaal ook echt weg is: was hij al verdwenen (een poll verving
   // de lijst), dan verschoof deze regel nummers van rijen die níet verschoven zijn — dezelfde

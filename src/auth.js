@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  OAUTH / login
 // ══════════════════════════════════════
-import { clientId, ALLOWED_EMAILS } from "./config.js";
+import { clientId, emailToegestaan } from "./config.js";
 import { state, _shownToasts } from "./state.js";
 import { loadAll, laadUitCache, wisCache } from "./data.js";
 import { startVersieBewaking } from "./versie.js";
@@ -166,7 +166,7 @@ async function doLogin(){
     // waarin `ensureToken` meteen `true` teruggeeft en het dashboard achter de inlogkaart alsnog
     // gaat lezen en schrijven. `ensureToken` ruimt hier al op; deze weg deed dat niet.
     if(!email){state.oauthToken=null;state.oauthExpiry=0;_wisTokenSessie();errEl.textContent='Kon e-mailadres niet ophalen.';errEl.style.display='block';btn.classList.remove('is-signing');btn.disabled=false;return}
-    if(!ALLOWED_EMAILS.includes(email.toLowerCase())){
+    if(!emailToegestaan(email)){
       // Ook uit sessionStorage: de callback in doOAuth heeft hem daar al neergezet, en een token van
       // een niet-toegestaan account hoort nergens achter te blijven — zie `_wisTokenSessie`.
       state.oauthToken=null;state.oauthExpiry=0;_wisTokenSessie();
@@ -239,7 +239,7 @@ async function ensureToken(magVragen=true){
     if(state.currentUserEmail) return true;
     const email=await fetchUserEmail();
     if(!email){ state.oauthToken=null;state.oauthExpiry=0;return false; } // mogelijk tijdelijk → sessie laten staan, later opnieuw
-    if(!ALLOWED_EMAILS.includes(email.toLowerCase())){ logout('Geen toegang met dit account. Log in met je VvE Beheer Collectief-account.'); return false; }
+    if(!emailToegestaan(email)){ logout('Geen toegang met dit account. Log in met je VvE Beheer Collectief-account.'); return false; }
     state.currentUserEmail=email;
     sessionStorage.setItem('currentUserEmail',email);
     return true;

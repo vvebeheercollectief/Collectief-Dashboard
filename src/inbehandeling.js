@@ -18,7 +18,8 @@ import { writeRange, assertRowMatch } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { backgroundWrite, blokkeerOffline } from "./data.js";
 import { renderAll } from "./main.js";
-import { showToast } from "./notifications.js";
+import { showToast, showUndoToast } from "./notifications.js";
+import { verseRij } from "./rij.js";
 import { taakUitCache } from "./crud.js";
 import { logEvent } from "./render-overig.js";
 import { taakTitel } from "./util.js";
@@ -49,10 +50,17 @@ async function zetInBehandeling(rid){
   // van een knop die zijn werk deed.
   const r = taakUitCache(rid);
   if(!r) return;
+  return schrijfInBehandeling(r, volgendeStand(r.inBehandeling));
+}
+
+// De kern, los van de klik: de knop op de rij komt hier met de omgekeerde stand, de undo-knop uit
+// de toast (U7) met de oude stand en `zonderUndo` (anders ping-pong van undo-knoppen).
+async function schrijfInBehandeling(r, nieuw, opties){
+  const o = opties || {};
   const kolom = inBehandelingKolom(r._sec);
   if(!kolom) return;                       // sectie zonder de vlag (offerte-trajecten)
   if(blokkeerOffline()) return;            // offline: niets wijzigen, ook niet optimistisch
-  if(!await ensureToken()){ alert('Inloggen mislukt. Probeer het opnieuw.'); return; }
+  if(!await ensureToken()){ showToast('Inloggen mislukt','Probeer het opnieuw.','var(--rd)','waarschuwing',{geenDedup:true,geenSysteemmelding:true}); return; }
 
   // Dubbelklik-rem, per taak. Zonder deze rem geven twee snelle klikken twee tegengestelde
   // schrijfacties: de eindstand klopt (de wachtrij is serieel) maar er komen twee logboekregels
@@ -67,7 +75,7 @@ async function zetInBehandeling(rid){
   state._ibBezig.add(sleutel);
 
   const oud = r.inBehandeling === 'TRUE' ? 'TRUE' : 'FALSE';
-  const nieuw = volgendeStand(r.inBehandeling);
+  if(nieuw === oud){ state._ibBezig.delete(sleutel); return; }   // niets te doen (undo op een al teruggezette stand)
   // Momentopname vóór de mutatie voor de rij-controle — zie `snap` in snooze.js voor het waarom.
   const snap = {...r};
   r.inBehandeling = nieuw;
@@ -94,10 +102,12 @@ async function zetInBehandeling(rid){
       // woordenschat heeft.
       await logEvent(r.code, r._sec, nieuw==='TRUE' ? 'Aangevinkt' : 'Uitgevinkt',
                      'In behandeling', oud, nieuw);
-      showToast(nieuw==='TRUE' ? 'In behandeling' : 'Niet meer in behandeling',
-                `${r.code} — ${taakTitel(r, r._sec)}`, null,
-                nieuw==='TRUE' ? 'afspelen' : 'pauze',
-                { geenDedup:true, geenSysteemmelding:true });
+      const titel = o.titel || (nieuw==='TRUE' ? 'In behandeling' : 'Niet meer in behandeling');
+      const tekst = `${r.code} — ${taakTitel(r, r._sec)}`;
+      const icoon = nieuw==='TRUE' ? 'afspelen' : 'pauze';
+      // Mét 'Ongedaan maken' (U7). De undo zoekt de rij op dát moment vers op (verseRij).
+      if(o.zonderUndo) showToast(titel, tekst, null, icoon, { geenDedup:true, geenSysteemmelding:true });
+      else showUndoToast(titel, tekst, ()=>maakInBehandelingOngedaan(r, oud), icoon, { geenDedup:true, sleutel });
     },
     ()=>{ r.inBehandeling = oud === 'TRUE' ? 'TRUE' : ''; },
     'Wijzigen mislukt'
@@ -107,4 +117,10 @@ async function zetInBehandeling(rid){
   state._writeChain.finally(()=>{ state._ibBezig.delete(sleutel); });
 }
 
-export { zetInBehandeling, inBehandelingKolom, heeftInBehandeling, volgendeStand };
+async function maakInBehandelingOngedaan(rij, oud){
+  const r = verseRij(rij);
+  if(!r){ showToast('Niet ongedaan gemaakt','De taak is intussen afgerond of verwijderd.','var(--am)','waarschuwing',{geenDedup:true,geenSysteemmelding:true}); return; }
+  await schrijfInBehandeling(r, oud, { zonderUndo:true, titel:'Ongedaan gemaakt' });
+}
+
+export { zetInBehandeling, schrijfInBehandeling, maakInBehandelingOngedaan, inBehandelingKolom, heeftInBehandeling, volgendeStand };

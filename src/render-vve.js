@@ -15,7 +15,7 @@ import { STAPEL_GREEP } from "./render-bundel.js";
 import { bouwBundelIndex, bundelVerwijzing, bundelSleutel, zelfdeTaak, opBundelVolg } from "./bundel.js";
 import { appendRange } from "./api.js";
 import { ensureToken } from "./auth.js";
-import { getCurrentWho } from "./notifications.js";
+import { getCurrentWho, meldFout } from "./notifications.js";
 import { opmaakHtml, opmaakBalk } from "./opmaak.js";
 // (kringverwijzing render-vve ⇄ ui/kenmerken is hetzelfde patroon als crud ⇄ main:
 //  live bindings, de aanroep gebeurt pas op runtime)
@@ -98,7 +98,7 @@ function dossierFeed(entries){
 // Handmatig contactmoment vastleggen (composer op de VvE-pagina)
 async function addContactLog(){
   const tekst=(document.getElementById('dos-tekst')?.value||'').trim();
-  if(!tekst){ alert('Typ eerst wat er gebeurd is.'); return; }
+  if(!tekst){ meldFout('Typ eerst wat er gebeurd is.'); return; }
   const code=state.vveCode;
   if(!code) return;
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
@@ -107,7 +107,7 @@ async function addContactLog(){
   if(state._notitieBezig) return;
   state._notitieBezig=true;
   try{
-  if(!await ensureToken()){ alert('Inloggen mislukt.'); return; }
+  if(!await ensureToken()){ meldFout('Inloggen mislukt.'); return; }
   const soort=state._contactSoort||'Telefoon';
   const wie=document.getElementById('dos-wie')?.value||'Overig';
   const who=getCurrentWho()||'?', ts=new Date().toISOString();

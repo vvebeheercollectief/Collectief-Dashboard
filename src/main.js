@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  MAIN — boot/orchestrator
 // ══════════════════════════════════════
-import { IS_STAGING, ALLOWED_EMAILS, SKEYS, SECS, APP_VERSION, TEAM } from './config.js';
+import { IS_STAGING, emailToegestaan, SKEYS, SECS, APP_VERSION, TEAM } from './config.js';
 import { D, pgs, state } from './state.js';
 import { verseRij } from "./rij.js";
 import { ensureToken, uitloggen, vernieuwMetFocus, installeerVernieuwTriggers } from './auth.js';
@@ -15,11 +15,10 @@ import {
 import { openAiHelp, closeAiHelp, buildAiPrompt, parseAiAnswer } from './ai.js';
 import {
   openNotifModal, closeNotifModal, onWhoChange, saveNotifPrefs,
-  subscribeNotifs, unsubscribeNotifs, sendTestNotif, getCurrentWho, initMeldingen,
-} from './notifications.js';
+  subscribeNotifs, unsubscribeNotifs, sendTestNotif, getCurrentWho, initMeldingen, meldFout } from './notifications.js';
 import {
   openModal, closeModal, submitTask, doCompleteTask, closeCompleteModal, kiesSectie, renderExtraVves, _bewerkRijVers, nietOpgeslagenVelden, kiesDuur,
-  sluitModalVeilig,
+  sluitModalVeilig, controleerBewerkConflict,
 } from './crud.js';
 import { loadAll, magPollen, schrijfActieLoopt, setSyncOffline, showOfflineBanner, clearOfflineBanner, laadUitCache, ruimCacheOp, blokkeerVersie } from './data.js';
 import { startVersieBewaking } from './versie.js';
@@ -39,6 +38,9 @@ import { renderHerhaal, openHerhaalModal, closeHerhaalModal, syncHerhaalVelden, 
 import { renderVve } from './render-vve.js';
 import { openChat, closeChat, setChatVve } from './dossier-chat.js';
 import { initPalette, palOpen } from './palette.js';
+import { initVerbinding } from './verbinding.js';
+import { initWeergaven } from './weergaven.js';
+import { initSneltoetsen, sluitSneltoetsOverzicht } from './sneltoetsen.js';
 import { initSwUpdate } from './sw-update.js';
 import { initModalA11y, bovensteModal } from './modal-a11y.js';
 import { beantwoordBevestiging, vraagBevestiging } from './bevestig.js';
@@ -61,7 +63,18 @@ const MODAL_SLUITERS = {
   // Escape op de bevestigingsvraag is 'nee'. Alleen de .open-class weghalen zou de wachtende
   // aanroeper eeuwig laten hangen — die staat op een Promise die alleen hierlangs afloopt.
   'bevestig-bg': () => beantwoordBevestiging(false),
+  'sneltoets-bg': sluitSneltoetsOverzicht,
 };
+
+// Remt een open venster de 8s-poll? Elk venster behalve het BEWERKSCHERM (U4): dat scherm kan
+// tegen een verse ronde (zijn rij wordt op identiteit teruggevonden, zie _bewerkRijVers), en juist
+// dáár wil je horen dat een collega dezelfde taak net veranderde — vóór je op Opslaan drukt. Na
+// elke hertekening kijkt `controleerBewerkConflict` (crud.js) daarnaar. Het afrond-, wegleg- en
+// bevestigingsvenster (ook bóven het bewerkscherm) remmen nog steeds: die houden rij-objecten vast
+// over een wachttijd heen en zijn niet op een verse D gebouwd.
+function modalRemtPoll(){
+  return [...document.querySelectorAll('.modal-bg.open')].some(m=>m.id!=='modal-bg');
+}
 
 // ── Clickjacking-bescherming (frame-buster) ────────────────────────────
 // De echte productie draait op GitHub Pages; daar kunnen geen X-Frame-Options/
@@ -88,6 +101,9 @@ document.addEventListener('DOMContentLoaded',()=>{
   // Centraal klik-systeem: één delegatie-listener voor alle data-action-elementen
   initActions();
   initPalette();
+  initVerbinding();   // U5: klikbare verbindingsstatus
+  initWeergaven();    // U6: opgeslagen weergaven
+  initSneltoetsen();  // U8: j/k/e/a/w/i/? op de takenlijst
   initModalA11y();
 
   // Behandelaar-kiezers uit TEAM (config.js) i.p.v. handgeschreven <option>-lijstjes. Die lijstjes
@@ -318,12 +334,12 @@ document.addEventListener('DOMContentLoaded',()=>{
     // Lukt het laden niet (een uitrol die net wisselt), dan zeggen we dat en blijft alles staan.
     // Een ander venster heeft de nieuwe versie actief gemaakt: verplaats.js zou dan uit de cache
     // van de NIEUWE versie komen en met de oude code van dit tabblad samenwerken. Niet doen.
-    if(state._codeVerouderd){ e.target.value=bron; alert('Er is een nieuwe versie van het dashboard actief. Herlaad eerst het dashboard en probeer het dan opnieuw.'); return; }
+    if(state._codeVerouderd){ e.target.value=bron; meldFout('Er is een nieuwe versie van het dashboard actief. Herlaad eerst het dashboard en probeer het dan opnieuw.'); return; }
     // Minimumversie-rem (versie.js): vóór de vraag en vóór het lui laden; het venster blijft open.
     if(blokkeerVersie()){ e.target.value=bron; return; }
     let verplaatsTaak;
     try{ ({ verplaatsTaak } = await import('./verplaats.js')); }
-    catch(err){ e.target.value=bron; alert('Verplaatsen kan nu even niet: een deel van het dashboard laadde niet. Herlaad de pagina en probeer het opnieuw.'); return; }
+    catch(err){ e.target.value=bron; meldFout('Verplaatsen kan nu even niet: een deel van het dashboard laadde niet. Herlaad de pagina en probeer het opnieuw.'); return; }
     const gelukt=await verplaatsTaak(r, doel, nietOpgeslagenVelden(r));
     if(gelukt){ closeModal(); }
     else if(bron){ e.target.value=bron; }
@@ -560,7 +576,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     // lopende undo onder de gebruiker weghalen. Blijft dit staan, dan haalt de poll het zo op.
     if(state._zelftestLoopt) return;   // en tijdens de zelftest helemaal niet (zie de timer hieronder)
     if(!magPollen(state)) return;
-    if(document.querySelector('.modal-bg.open')) return;
+    if(modalRemtPoll()) return;
     if(state.pendingWrites>0 || state.bulkMode || state._animBusy || state._undoInFlight) return;
     loadAll(true);
   });
@@ -590,7 +606,8 @@ document.addEventListener('DOMContentLoaded',()=>{
     if(document.hidden) return;
     // F4: alle modal-achtergronden delen class 'modal-bg' (index.html); één check volstaat.
     // Nieuwe modals hoeven hier niet meer te worden toegevoegd zolang ze .modal-bg gebruiken.
-    if(document.querySelector('.modal-bg.open')) return;
+    // Uitzondering sinds v15.4: het bewerkscherm zelf (zie modalRemtPoll).
+    if(modalRemtPoll()) return;
     // 'Loopt er al een ronde?' — aan de toestand vragen, niet aan een CSS-klasse. Dit stond hier
     // als `dot.classList.contains('loading')`, en dat was een dodelijke koppeling: `setSaving()`
     // zet die klasse ook bij een schrijfactie, en de stille resync die daarná loopt zet hem alleen
@@ -635,7 +652,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   const _st=sessionStorage.getItem('oauthToken');
   const _se=parseInt(sessionStorage.getItem('oauthExpiry')||'0');
   const _sm=sessionStorage.getItem('currentUserEmail');
-  if(_st&&Date.now()<_se&&_sm&&ALLOWED_EMAILS.includes(_sm.toLowerCase())){
+  if(_st&&Date.now()<_se&&_sm&&emailToegestaan(_sm)){
     state.oauthToken=_st;state.oauthExpiry=_se;state.currentUserEmail=_sm;
     document.getElementById('login-gate').style.display='none';
     document.getElementById('app')?.removeAttribute('inert');   // zie logout() in auth.js
@@ -717,6 +734,7 @@ export function renderAll(){
   // na een verversing '30 geselecteerd' zeggen terwijl `renderNtd` alle vinkjes al leeg had
   // getekend — en die balk werkte gewoon, op rijen die niemand meer aangevinkt zag staan.
   renderBulkUi();
+  controleerBewerkConflict();   // U4: is de taak in het open bewerkscherm intussen door een ander veranderd?
   return zichtbaar;
 }
 

@@ -2125,3 +2125,56 @@ tr.expanded + .crm-mail-tr{display:table-row}
   .tbl-wrap{overflow:visible}
   body{background:#fff}
 }
+
+/* ── v15.4: samenwerken, status, weergaven, sneltoetsen ─────────────────────────────── */
+/* U10: wie zat er het laatst aan — een gedempte regel bovenin het bewerkscherm. */
+.m-laatst{font-size:11.5px;color:var(--mut);margin:-4px 0 10px}
+/* U1/U4: de gele regel. Amber voor 'let op', rood als opslaan niet meer kan. */
+.m-collega{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--am-l);color:var(--txt);border:1px solid color-mix(in srgb,var(--am) 45%,transparent);border-radius:var(--rs);padding:8px 12px;font-size:12.5px;line-height:1.45;margin:0 0 12px}
+.m-collega-weg{background:var(--rd-l);border-color:color-mix(in srgb,var(--rd) 45%,transparent)}
+.m-collega-hersteld{background:var(--ac-l);border-color:var(--ac-b)}
+.m-collega .btn{flex:none}
+/* De velden met jouw eigen, teruggezette invoer. */
+.fld.veld-eigen input,.fld.veld-eigen textarea,.fld.veld-eigen select,.veld-eigen.tog{box-shadow:0 0 0 2px var(--am)!important;border-color:var(--am)!important}
+.fld.veld-eigen>label::after{content:' · jouw invoer';color:var(--am);font-weight:600;text-transform:none;letter-spacing:0}
+/* U5: de status als knop + het uitlegpaneel in de zijbalk. */
+button.sync-row{background:none;border:0;padding:0;text-align:left;cursor:pointer;font:inherit;font-family:var(--font-mono);font-size:11px;color:#9AA5B2;border-radius:6px}
+button.sync-row:hover,button.sync-row:focus-visible{color:#e3e8ee;outline:none}
+button.sync-row:focus-visible{box-shadow:0 0 0 2px var(--ac)}
+.sync-tekst{display:flex;flex-direction:column;min-width:0;line-height:1.3}
+.sync-sinds{font-size:10px;opacity:.75;white-space:nowrap}
+@media (min-width:681px){#sb{position:relative}}   /* op telefoonbreedte blijft #sb de vaste lade (zie max-width:680px) */
+.status-pop{position:absolute;left:12px;right:12px;bottom:64px;background:var(--sur);color:var(--txt);border:1px solid var(--bor);border-radius:var(--r);box-shadow:var(--shl);padding:12px 14px;font-size:12px;line-height:1.5;z-index:210}
+.status-pop p{margin:0 0 6px}
+.status-kop{font-weight:700;font-size:13px;margin-bottom:4px}
+.status-stap{color:var(--txt)}
+.status-sinds{color:var(--mut);font-size:11.5px}
+.status-pop .btn{margin-top:4px}
+/* U6: de weergave-knopjes boven de tabel. */
+.weergaven{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 18px;border-bottom:1px solid var(--bor);font-size:12px}
+.wg-lbl{color:var(--mut);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-right:4px}
+.wg-chip{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;height:26px;padding:0 9px 0 10px;border-radius:13px;border:1px solid var(--bor);background:var(--sur);color:var(--txt);font:inherit;font-size:12px;font-weight:500;cursor:pointer;transition:background var(--tr),border-color var(--tr)}
+.wg-chip:hover{background:var(--sur2)}
+.wg-chip.aan{background:var(--ac-l);border-color:var(--ac-b);color:var(--ac-900);font-weight:600}
+.wg-chip:focus-visible,.wg-x:focus-visible{outline:2px solid var(--ac);outline-offset:1px}
+.wg-x{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;color:var(--mut);font-size:13px;line-height:1;margin-right:-4px}
+.wg-x:hover{background:var(--rd-l);color:var(--rd)}
+.wg-nieuw{border-style:dashed;color:var(--mut)}
+.wg-nieuw:hover{color:var(--txt)}
+.wg-naam{height:26px;border:1px solid var(--ac-b);border-radius:13px;padding:0 10px;font:inherit;font-size:12px;background:var(--sur);color:var(--txt);min-width:220px;outline:none}
+/* U8: de focusrij van het toetsenbord. */
+#ntd-tbody tr.rij-focus>td{box-shadow:inset 0 0 0 1.5px var(--ac)}
+#ntd-tbody tr.rij-focus>td:first-child{box-shadow:inset 2px 0 0 var(--ac),inset 0 1.5px 0 var(--ac),inset 0 -1.5px 0 var(--ac)}
+.sneltoets-kop{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:4px 0 6px}
+.sneltoets-lijst{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0 0 14px;font-size:13px}
+.sneltoets-lijst dt{white-space:nowrap}
+.sneltoets-lijst dd{margin:0;color:var(--txt)}
+.sneltoets-lijst kbd,.pal-tip b{font-family:var(--font-mono);font-size:11px;background:var(--sur2);border:1px solid var(--bor);border-bottom-width:2px;border-radius:4px;padding:1px 6px;color:var(--txt)}
+.sneltoets-voet{font-size:12px;color:var(--mut);margin:0}
+/* U3: de tipregel onderin het palet. */
+.pal-tip{font-size:11.5px;color:var(--mut);padding:10px 12px 14px;border-top:1px solid var(--bor);margin-top:4px;line-height:1.6}
+.pal-tekst i{font-style:normal;color:var(--mut);font-weight:500}
+@media (max-width:760px){
+  .weergaven{padding:8px 12px}
+  .status-pop{bottom:70px}
+}

@@ -26,7 +26,7 @@ import { assertRowsMatch, _shiftNtdRows, _herstelShift, sheetsFetch, kapCel } fr
 import { ensureToken } from "./auth.js";
 import { backgroundWrite, blokkeerOffline, loadAll } from "./data.js";
 import { renderAll } from "./main.js";
-import { showToast } from "./notifications.js";
+import { showToast, meldFout } from "./notifications.js";
 import { getSheetIds, getInsertRow, bevestigInvoegPlek, toevoegWaarden } from "./crud.js";
 import { logEvent } from "./render-overig.js";
 import { vraagBevestiging } from "./bevestig.js";
@@ -182,7 +182,7 @@ async function verplaatsTaak(r, doelSec, nietOpgeslagen){
       tekst:verplaatsVraagTekst(r, bronSec, doelSec, nietOpgeslagen),
       bevestigTekst:'Verplaatsen' })) return false;
   if(blokkeerOffline()) return false;
-  if(!await ensureToken()){ alert('Inloggen mislukt. Probeer het opnieuw.'); return false; }
+  if(!await ensureToken()){ meldFout('Inloggen mislukt. Probeer het opnieuw.'); return false; }
 
   const verloren = verlorenVelden(r, bronSec, doelSec);
   // Zelfde reden als de try rond `getInsertRow` hieronder: deze functie wordt door de
@@ -193,9 +193,9 @@ async function verplaatsTaak(r, doelSec, nietOpgeslagen){
   // gebeurd — een stille mislukking die pas dagen later opvalt.
   let ids;
   try { ids = await getSheetIds(); }
-  catch(e){ alert('Verplaatsen mislukt. ' + leesbareFout(e)); return false; }
+  catch(e){ meldFout('Verplaatsen mislukt. ' + leesbareFout(e)); return false; }
   const sheetId = ids['Nog Te Doen'];
-  if(sheetId == null){ alert('Sheet "Nog Te Doen" niet gevonden'); return false; }
+  if(sheetId == null){ meldFout('Sheet "Nog Te Doen" niet gevonden'); return false; }
 
   // `getInsertRow` GOOIT als het sectieblok niet in het tabblad staat — bewust, want een taak die
   // ongemerkt in een andere sectie belandt is duurder dan een mislukte handeling. Hier opvangen:
@@ -203,12 +203,12 @@ async function verplaatsTaak(r, doelSec, nietOpgeslagen){
   // en gebeurt er zichtbaar niets.
   let doelAfterRow;
   try { doelAfterRow = getInsertRow(doelSec); }   // 1-gebaseerd: invoegen ná deze rij
-  catch(e){ alert(e.message); return false; }
+  catch(e){ meldFout(e.message); return false; }
   // En klopt die plek nog? Ook deze weg loopt met een OPEN venster, dus met een stilstaande
   // verversing: het rijnummer hierboven komt uit het geheugen van vóór de vraag die de gebruiker
   // net beantwoordde. Zie `bevestigInvoegPlek` in crud.js.
   try { await bevestigInvoegPlek(doelSec, doelAfterRow); }
-  catch(e){ alert(e.melding || e.message); loadAll(true); return false; }
+  catch(e){ meldFout(e.melding || e.message); loadAll(true); return false; }
   const { doelRij } = verplaatsWaarden(r, bronSec, doelSec, doelAfterRow + 1);
 
   // Optimistisch: uit de oude sectie, in de nieuwe, en de rijnummers meeschuiven. Eerst de oude

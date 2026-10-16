@@ -11,7 +11,7 @@ import { writeRange, appendRange, appendRows, assertRowMatch, _herstelShift, she
 import { renderThead, renderPag } from "./render-lijsten.js";
 import { getSheetIds, setv, gv, insertAndWriteRow, taakUitCache } from "./crud.js";
 import { loadAll, backgroundWrite, metWriteMarkering, serieleWrite, blokkeerOffline } from "./data.js";
-import { getCurrentWho, showToast, showUndoToast } from "./notifications.js";
+import { getCurrentWho, showToast, showUndoToast, meldFout } from "./notifications.js";
 import { animateRowOut } from "./anim.js";
 import { renderVve } from "./render-vve.js";
 import { opmaakHtml, opmaakBalk } from "./opmaak.js";
@@ -121,11 +121,11 @@ function editOntwItem(idx){
 
 async function submitOntwItem(){
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
-  if(!await ensureToken()){alert('Inloggen mislukt.');return}
+  if(!await ensureToken()){meldFout('Inloggen mislukt.');return}
   const titel=gv('ontw-m-titel');
   const cat=gv('ontw-m-cat');
-  if(!titel){alert('Titel is verplicht.');return}
-  if(!cat){alert('Categorie is verplicht.');return}
+  if(!titel){meldFout('Titel is verplicht.');return}
+  if(!cat){meldFout('Categorie is verplicht.');return}
   const inhoud=gv('ontw-m-inhoud');
   const status=gv('ontw-m-status')||'Open';
   const who=getCurrentWho()||'?';
@@ -160,14 +160,14 @@ async function submitOntwItem(){
     }));
     closeOntwModal();
     await loadAll();
-  }catch(e){alert('Opslaan mislukt. '+leesbareFout(e))}
+  }catch(e){meldFout('Opslaan mislukt. '+leesbareFout(e))}
   finally{ state._ontwBezig=false; }
 }
 
 async function deleteOntwItem(){
   if(!state.ontwEditRow) return;
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
-  if(!await ensureToken()){alert('Inloggen mislukt.');return}
+  if(!await ensureToken()){meldFout('Inloggen mislukt.');return}
   // Dezelfde dubbelklik-rem als submitOntwItem: een tweede klik in het ensureToken-gat vond via
   // `_row` het intussen opgeschoven BUUR-item en liet dat lokaal verdwijnen (de guard in de Sheet
   // ving het, maar met een 'Verwijderen mislukt' voor een handeling die wél slaagde).
@@ -221,7 +221,7 @@ async function deleteOntwItem(){
 
 async function undoOntwDelete(values, titel, stand){
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
-  if(!await ensureToken()){alert('Inloggen mislukt.');return}
+  if(!await ensureToken()){meldFout('Inloggen mislukt.');return}
   try{
     // Eén beurt in de seriële schrijfwachtrij; pas dán is ook bekend of de verwijdering ècht
     // doorging. Ging hij níet door, dan heeft de rollback het item al teruggezet en stáát de rij
@@ -236,7 +236,7 @@ async function undoOntwDelete(values, titel, stand){
       showToast('Ongedaan gemaakt', `"${titel||''}" teruggezet`, 'var(--am)', 'ongedaan');
       await loadAll();
     });
-  }catch(e){alert('Ongedaan maken mislukt. '+leesbareFout(e))}
+  }catch(e){meldFout('Ongedaan maken mislukt. '+leesbareFout(e))}
 }
 
 // ══════════════════════════════════════
@@ -602,9 +602,9 @@ async function saveLogboek(row, box){
   // document-brede lookup verouderde tekst kunnen leveren.
   box=box||document.querySelector('.page.active .log-edit');
   const tekst=(box?.querySelector('.log-edit-tekst')?.value||'').trim();
-  if(!tekst){ alert('De tekst mag niet leeg zijn.'); return; }
+  if(!tekst){ meldFout('De tekst mag niet leeg zijn.'); return; }
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
-  if(!await ensureToken()){ alert('Inloggen mislukt.'); return; }
+  if(!await ensureToken()){ meldFout('Inloggen mislukt.'); return; }
   const isContact=entry.actie==='Contact';
   const soort=isContact ? (state.logEditSoort||entry.veld||'Telefoon') : entry.veld;
   const wie=isContact ? (box?.querySelector('.log-edit-wie')?.value||entry.oudeWaarde||'Overig') : entry.oudeWaarde;
@@ -642,7 +642,7 @@ async function deleteLogboek(row){
   if(idx<0) return;
   const entry=entries[idx];
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
-  if(!await ensureToken()){ alert('Inloggen mislukt.'); return; }
+  if(!await ensureToken()){ meldFout('Inloggen mislukt.'); return; }
   const vals=[entry.timestamp, entry.code, entry.sectie, entry.actie, entry.veld, entry.oudeWaarde, entry.nieuweWaarde, entry.gebruiker];
   const oudeRow=entry._row;
   // optimistisch: lokaal weg + rij-indexen meeschuiven + edit sluiten óf meeschuiven
@@ -697,7 +697,7 @@ async function deleteLogboek(row){
 // wasVerwijderd = kijkgaatje op de idempotentie-vlag van de delete-closure.
 async function undoDeleteLog(vals, oudeRow, wasVerwijderd){
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
-  if(!await ensureToken()){ alert('Inloggen mislukt.'); return; }
+  if(!await ensureToken()){ meldFout('Inloggen mislukt.'); return; }
   state._undoInFlight=true; // pauzeer de 8s-poll; deze undo doet z'n eigen loadAll
   try{
     // Eén beurt in de seriële schrijfwachtrij: de delete (of z'n rollback) is dan gegarandeerd
@@ -718,7 +718,7 @@ async function undoDeleteLog(vals, oudeRow, wasVerwijderd){
       showToast('Ongedaan gemaakt','Logregel teruggezet','var(--am)','ongedaan');
       await loadAll();                               // _row-indexen vers uit de Sheet
     });
-  }catch(e){ alert('Ongedaan maken mislukt. '+leesbareFout(e)); }
+  }catch(e){ meldFout('Ongedaan maken mislukt. '+leesbareFout(e)); }
   finally{ state._undoInFlight=false; }
 }
 
@@ -888,14 +888,14 @@ function renderTaskHistory(code,sec){
 // false — dan blijft het venster met de tekst staan.
 async function addTaskNote(){
   const note=(document.getElementById('hist-note').value||'').trim();
-  if(!note){alert('Typ eerst een opmerking.');return false}
+  if(!note){meldFout('Typ eerst een opmerking.');return false}
   if(blokkeerOffline()) return false;   // offline: niets wijzigen, ook niet optimistisch
   // Dubbelklik-rem over het async-gat hieronder (ensureToken + logEvent): twee snelle klikken
   // lazen allebei hetzelfde veld en schreven dezelfde opmerking twee keer (naloop 2026-08-28).
   if(state._notitieBezig) return false;
   state._notitieBezig=true;
   try{
-    if(!await ensureToken()){alert('Inloggen mislukt.');return false}
+    if(!await ensureToken()){meldFout('Inloggen mislukt.');return false}
     const container=document.getElementById('fg-history');
     const code=container.dataset.code;
     const sec=container.dataset.sec;
@@ -903,7 +903,7 @@ async function addTaskNote(){
     // Eerst écht wegschrijven; pas bij succes optimistisch tonen + veld legen. Zo "verdwijnt"
     // een opmerking nooit stil bij een schrijffout — de tekst blijft staan om te herproberen.
     const ok=await logEvent(code,sec,'Opmerking','','',note);
-    if(!ok){ alert('Opmerking kon niet worden opgeslagen. Controleer je verbinding en probeer het opnieuw.'); return false; }
+    if(!ok){ meldFout('Opmerking kon niet worden opgeslagen. Controleer je verbinding en probeer het opnieuw.'); return false; }
     document.getElementById('hist-note').value='';
     D.logboek.unshift({_row:0,timestamp:new Date().toISOString(),code,sectie:sec,actie:'Opmerking',veld:'',oudeWaarde:'',nieuweWaarde:note,gebruiker:getCurrentWho()||'?'});
     renderTaskHistory(code,sec);

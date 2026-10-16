@@ -1,13 +1,12 @@
 // ══════════════════════════════════════
 //  UTIL — gedeelde pure helpers (datums, prioriteit, tekst, badges)
 // ══════════════════════════════════════
-import { EMAIL_NAMES, OFFERTE_FASES, SECS, KORTE_NAMEN } from './config.js';
+import { naamBijEmail, OFFERTE_FASES, SECS, KORTE_NAMEN } from './config.js';
 import { ICONS } from './icons.js';
 
 function displayName(s){
   if(!s) return '';
-  const key = String(s).toLowerCase().trim();
-  return EMAIL_NAMES[key] || s;
+  return naamBijEmail(s) || s;
 }
 
 // Velden die de gebruiker NIET ziet en dus ook niet hoort te doorzoeken. Zonder deze lijst gaf

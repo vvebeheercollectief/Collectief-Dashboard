@@ -3,7 +3,7 @@
 // ══════════════════════════════════════
 import { parseDt, _parseAnyDate, coerceDagenVooraf, leegBijErfenis, duurUitCel } from "./util.js";
 import { state, D } from "./state.js";
-import { SKEYS, SECS, APP_VERSION, ALLOWED_EMAILS } from "./config.js";
+import { SKEYS, SECS, APP_VERSION, emailToegestaan } from "./config.js";
 import { fetchSheet, fetchSheets, _withRetry, isOffline } from "./api.js";
 import { ensureToken, doOAuth, fetchUserEmail, logout, _wisTokenSessie } from "./auth.js";
 import { buildAnalytics, buildDash } from "./ui.js";   // lui: laadt render-analytics.js pas bij gebruik
@@ -30,12 +30,16 @@ import { toonVersieBalk } from "./versie.js";
 // Voert een Sheets-schrijfactie op de achtergrond uit (serieel). De UI is al
 // optimistisch bijgewerkt door de aanroeper. Bij fout draait `rollback` de lokale
 // wijziging terug en verschijnt een foutmelding.
-function backgroundWrite(writeFn, rollback, foutTitel){
+// `opties.bijFout(e)` (optioneel): draait ná de rollback, de melding én de stille resync die in
+// de finally hieronder volgt — zodat de aanroeper met VERSE gegevens kan reageren op een mislukte
+// schrijfactie (het bewerkscherm heropent zo met de stand van de collega, zie herstelNaConflict).
+function backgroundWrite(writeFn, rollback, foutTitel, opties){
   state.pendingWrites++;
   state._schrijfGen=(state._schrijfGen||0)+1;   // zie de generatiecontrole in _loadRonde
   setSaving();
   state._writeChain=state._writeChain.then(async()=>{
     state._writeStart=Date.now();   // pas hier begint deze write écht (de wachtrij is serieel)
+    let fout=null;
     try{
       // Laatste lijn. De aanroeper hoort al geblokkeerd te hebben (zie blokkeerOffline): het
       // contract van backgroundWrite is dat de UI al optimistisch gemuteerd is, dus hier komen
@@ -65,10 +69,16 @@ function backgroundWrite(writeFn, rollback, foutTitel){
         showToast(foutTitel,'Niet opgeslagen — wijziging teruggezet.','var(--rd)',null,{blijft:true});
       }
       console.error(foutTitel,e);
+      fout=e;
     }finally{
       state._writeStart=null;
       state.pendingWrites--;
-      if(state.pendingWrites===0){ loadAll(true); } // stille resync van rij-indexen; zet ook de balk weer op Live
+      let resync=null;
+      if(state.pendingWrites===0){ resync=loadAll(true); } // stille resync van rij-indexen; zet ook de balk weer op Live
+      if(fout && opties && typeof opties.bijFout==='function'){
+        const f=fout;
+        Promise.resolve(resync).catch(()=>{}).then(()=>{ try{ opties.bijFout(f); }catch(e2){ console.warn('[bijFout]', e2); } });
+      }
     }
   });
   return state._writeChain;
@@ -322,6 +332,7 @@ function setSaving(){dot('loading');document.getElementById('sync-lbl').textCont
 // op Vernieuwen klikt (data.js keert dan vroegtijdig terug en riep setSynced aan).
 function setSynced(){
   if(state.pendingWrites>0) return;
+  state._laatsteSyncMs=Date.now();   // voor het statuspaneel (verbinding.js): 'laatste geslaagde verversing'
   dot('');
   const _live='Live · '+new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
   _bulkLblOnthoud(_live);   // zelfde reden als bij setSyncErr/setSyncOffline
@@ -448,7 +459,7 @@ function showLoadError(opties){
       // getoond, dus dit token kan van een ander account zijn dan het ingelogde — en dan zou de
       // eerstvolgende poll met dat vreemde token gaan lezen en schrijven.
       if(!email){ state.oauthToken=null; state.oauthExpiry=0; _wisTokenSessie(); state._authFails=3; showLoadError({soort:'sessie'}); return; }
-      if(!ALLOWED_EMAILS.includes(email.toLowerCase()) ||
+      if(!emailToegestaan(email) ||
          (state.currentUserEmail && email.toLowerCase()!==state.currentUserEmail.toLowerCase())){
         logout('Je logde in met een ander account. Log in met je VvE Beheer Collectief-account.');
         return;

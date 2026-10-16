@@ -30,7 +30,7 @@ import { rijIndex, verseRij } from "./rij.js";
 import { _veiligeRij, assertRowsMatch, fetchSheet, sheetsFetch } from "./api.js";
 import { backgroundWrite, blokkeerOffline } from "./data.js";
 import { ensureToken } from "./auth.js";
-import { showUndoToast, showToast } from "./notifications.js";
+import { showUndoToast, showToast, meldFout } from "./notifications.js";
 import { nieuwTaakId, taakTitel, taakVerwijzing, leegBijErfenis } from "./util.js";
 import { bouwBundelIndex, volgendeVolg, hernummerLeden, magKoppelen, bundelSleutel, zichtbareKop } from "./bundel.js";
 import { renderAll } from "./main.js";
@@ -125,7 +125,7 @@ async function schrijfBereiken(data){
 // 'Nog Te Doen'!Qundefined gaan. Liever hier stoppen met een melding die de gebruiker kan volgen.
 function heeftRij(...rijen){
   if (rijen.every(r => r && r._row)) return true;
-  alert('Deze taak is niet meer op zijn plek te vinden. Vernieuw de pagina en probeer het opnieuw.');
+  meldFout('Deze taak is niet meer op zijn plek te vinden. Vernieuw de pagina en probeer het opnieuw.');
   return false;
 }
 
@@ -160,19 +160,19 @@ function heeftRij(...rijen){
 export function blokkeerAfgerond(...rijen){
   const uitAfgerond = r => SKEYS.some(s => rijIndex((D.af && D.af[s]) || [], r) > -1);
   if (!rijen.some(uitAfgerond)) return false;
-  alert('Deze taak is al afgerond. Zet hem eerst terug voordat je de bundel wijzigt.');
+  meldFout('Deze taak is al afgerond. Zet hem eerst terug voordat je de bundel wijzigt.');
   return true;
 }
 
 // Hang `sub` als subtaak onder `doel`.
 export async function koppelTaak(sub, doel){
   if (blokkeerOffline()) return;
-  if (!await ensureToken()){ alert('Inloggen mislukt. Probeer het opnieuw.'); return; }
+  if (!await ensureToken()){ meldFout('Inloggen mislukt. Probeer het opnieuw.'); return; }
   if (!heeftRij(sub, doel)) return;
   if (blokkeerAfgerond(sub, doel)) return;
   const ix = bouwBundelIndex(D.ntd, D.af);
   const check = magKoppelen(sub, doel, ix);
-  if (!check.mag){ alert(check.reden); return; }
+  if (!check.mag){ meldFout(check.reden); return; }
 
   // Had de kop al een bundel? Die vraag hoort hier beantwoord te worden en niet straks in de
   // writeFn: tegen die tijd staat het bundelnummer er optimistisch allang op. Het antwoord stuurt
@@ -371,7 +371,7 @@ export async function koppelTaak(sub, doel){
 // `ontkoppelTaak`, met dezelfde rij-guard; alleen de waarden verschillen.
 export async function herstelBundel(r, oud){
   if (blokkeerOffline()) return;
-  if (!await ensureToken()){ alert('Inloggen mislukt. Probeer het opnieuw.'); return; }
+  if (!await ensureToken()){ meldFout('Inloggen mislukt. Probeer het opnieuw.'); return; }
   if (!heeftRij(r)) return;
   if (blokkeerAfgerond(r)) return;
   const huidig = { bundelId: r.bundelId, bundelVolg: r.bundelVolg };
@@ -395,7 +395,7 @@ export async function herstelBundel(r, oud){
 // Maak van een subtaak weer een losse taak.
 export async function ontkoppelTaak(r){
   if (blokkeerOffline()) return;
-  if (!await ensureToken()){ alert('Inloggen mislukt. Probeer het opnieuw.'); return; }
+  if (!await ensureToken()){ meldFout('Inloggen mislukt. Probeer het opnieuw.'); return; }
   if (!heeftRij(r)) return;
   if (blokkeerAfgerond(r)) return;
   const oud = { bundelId: r.bundelId, bundelVolg: r.bundelVolg };
@@ -443,7 +443,7 @@ export async function herordenBundel(nieuweVolgorde, volgordeGewijzigd){
   // hertekent alleen bij een gewijzigde datahash, dus offline kan dat de hele reis duren. De tak
   // 'Deze volgorde kan niet' hieronder doet dit al goed; deze vier deden het niet.
   if (blokkeerOffline()){ renderAll(); return; }
-  if (!await ensureToken()){ renderAll(); alert('Inloggen mislukt. Probeer het opnieuw.'); return; }
+  if (!await ensureToken()){ renderAll(); meldFout('Inloggen mislukt. Probeer het opnieuw.'); return; }
   const wijzigingen = hernummerLeden(nieuweVolgorde);
   if (!wijzigingen.length){                             // niets te schrijven → geen verzoek
     // Nul wijzigingen is normaal zolang de gebruiker niets verschoven heeft. Maar sleepte hij wél
@@ -518,7 +518,7 @@ export async function herordenBundel(nieuweVolgorde, volgordeGewijzigd){
     // Zelfde poort als élke andere schrijfweg in dit bestand: zonder token loopt de undo tot in
     // backgroundWrite door en komt er een kale 'Undo mislukt' uit een 401 in plaats van een
     // melding die zegt wat eraan te doen is.
-    if (!await ensureToken()){ alert('Inloggen mislukt. Probeer het opnieuw.'); return; }
+    if (!await ensureToken()){ meldFout('Inloggen mislukt. Probeer het opnieuw.'); return; }
     // Vers opzoeken vóór het terugzetten — zie de stapel-undo hierboven. `oud` en `wijzigingen`
     // wijzen naar dezelfde rij-objecten; allebei bijwerken, want de rollback hieronder leest de
     // tweede en de schrijfactie de eerste.

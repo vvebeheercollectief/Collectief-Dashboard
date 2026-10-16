@@ -10,7 +10,7 @@ import { ensureToken } from "./auth.js";
 import { _shiftNtdRows, _shiftAfRows, _herstelShift, assertRowsMatch, _veiligeRij, sheetsFetch, kapCel, _withRetry, fetchSheet } from "./api.js";
 import { getSheetIds, getAfInsertRow, getInsertRow, insertAndWriteRows, serializeNtdUndo, afrondWaarden, bevestigInvoegPlek } from "./crud.js";
 import { backgroundWrite, loadAll, metWriteMarkering, serieleWrite, blokkeerOffline, syncSelecteerStand, parseSections } from "./data.js";
-import { showToast, showUndoToast, fireNotifEvent } from "./notifications.js";
+import { showToast, showUndoToast, fireNotifEvent, meldFout } from "./notifications.js";
 import { vraagBevestiging } from "./bevestig.js";
 import { bouwBundelIndex, openSubtaken } from "./bundel.js";
 import { logEvents } from "./render-overig.js";
@@ -198,7 +198,7 @@ async function bulkDoe(el){
   const rows=bulkSelectie();             // hoog→laag _row
   if(!rows.length) return;
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
-  if(!await ensureToken()){ alert('Inloggen mislukt. Probeer het opnieuw.'); return; }
+  if(!await ensureToken()){ meldFout('Inloggen mislukt. Probeer het opnieuw.'); return; }
   // DUBBELKLIK-REM, ná ensureToken — zelfde idioom en dezelfde reden als `_submitBezig` in
   // crud.js. Sinds `bulkAfronden` een echte lezing tussen de klik en de mutatie doet
   // (`bevestigInvoegPlek`), is het gat honderden milliseconden breed; de knoppen in de bulk-balk
@@ -223,11 +223,11 @@ async function _bulkDoeKern(el, wat, rows){
     let iso=document.getElementById('bb-datum-weg').value;
     if(el.dataset.dagen){ const d=new Date(); d.setDate(d.getDate()+ +el.dataset.dagen);
       iso=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
-    if(!iso){ alert('Kies een datum.'); return; }
+    if(!iso){ meldFout('Kies een datum.'); return; }
     // Zelfde guards als de losse snooze: geen verleden-datum, en waarschuw bij ná-deadline.
     const nieuw=toDutchDate(iso);
     const p=_parseAnyDate(nieuw); const dWeg=p?new Date(p.y,p.m-1,p.d):null;
-    if(!dWeg||_verschilInKalenderdagen(dWeg,_vandaagAmsterdam())<=0){ alert('Kies een datum in de toekomst.'); return; }
+    if(!dWeg||_verschilInKalenderdagen(dWeg,_vandaagAmsterdam())<=0){ meldFout('Kies een datum in de toekomst.'); return; }
     const naDeadline=rows.filter(r=>{ const dl=parseDt(r.deadline); return dl && dWeg.getTime()>dl; });
     // De staart van de vraag ('Toch wegleggen?') zit in het knoplabel en niet in de tekst: het
     // venster stelt zijn vraag mét knoppen, en dan zou hij er twee keer staan. Waar `confirm()` de
@@ -249,7 +249,7 @@ async function _bulkDoeKern(el, wat, rows){
   }
   else if(wat==='deadline'){
     const iso=document.getElementById('bb-datum-dl').value;
-    if(!iso){ alert('Kies een datum.'); return; }
+    if(!iso){ meldFout('Kies een datum.'); return; }
     bulkVeld(rows,'deadline',toDutchDate(iso));
   }
   // Als enige tak geAWAIT: `bulkVerwijderen` is sinds de eigen bevestigingsvraag async, en de
@@ -318,7 +318,7 @@ async function bulkAfronden(rows){
   // klopt vandaag omdat `setNtd` de selectie bij een tabbladwissel wist, maar dat is een gedrag
   // elders — verdwijnt het ooit, dan zou dit stil naar het verkeerde blok schrijven.
   if(new Set(items.map(i=>i.sec)).size!==1){
-    alert('Afronden kan alleen binnen één categorie tegelijk. Maak de selectie leeg en probeer opnieuw.');
+    meldFout('Afronden kan alleen binnen één categorie tegelijk. Maak de selectie leeg en probeer opnieuw.');
     return;
   }
   const standAf={gelukt:false};
@@ -326,9 +326,9 @@ async function bulkAfronden(rows){
   // klik-delegatie niet gecatcht, dus zonder deze try zou de knop zichtbaar niets doen.
   let afAnker;
   try{ afAnker=getAfInsertRow(items[0].sec); }
-  catch(e){ alert(e.message || String(e)); return; }
+  catch(e){ meldFout(e.message || String(e)); return; }
   try{ await bevestigInvoegPlek(items[0].sec, afAnker, 'Afgerond'); }
-  catch(e){ alert(e.melding || e.message); loadAll(true); return; }
+  catch(e){ meldFout(e.melding || e.message); loadAll(true); return; }
   // optimistisch: hoog→laag lokaal verwijderen + indexen meeschuiven
   items.forEach(it=>{
     const arr=D.ntd[it.sec]||[]; const pos=rijIndex(arr, it.r);   // identiteit, niet object — zie src/rij.js
@@ -452,7 +452,7 @@ async function _voegBlokkenIn(blokken){
 
 async function bulkUndoAfronden(items, stand){
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
-  if(!await ensureToken()){ alert('Inloggen mislukt.'); return; }
+  if(!await ensureToken()){ meldFout('Inloggen mislukt.'); return; }
   state._undoInFlight=true; // pauzeer de 8s-poll; deze undo doet z'n eigen loadAll
   try{
     // Eén beurt in de seriële schrijfwachtrij (serieleWrite, data.js) — zelfde constructie en
@@ -469,7 +469,7 @@ async function bulkUndoAfronden(items, stand){
       // weggooien (pendingWrites>0) en werkten we op een stale D.
       let blokken;
       try{ blokken=_bulkUndoBlokken(items); await _bevestigBlokken(blokken); }
-      catch(e){ alert(e.melding || e.message); await loadAll(true); return; }
+      catch(e){ meldFout(e.melding || e.message); await loadAll(true); return; }
       await metWriteMarkering(async()=>{
         const ids=await getSheetIds();
         // 1) EERST terugzetten in Nog Te Doen, DAN pas weghalen uit Afgerond. Breekt de verbinding
@@ -514,7 +514,7 @@ async function bulkUndoAfronden(items, stand){
       showToast('Ongedaan gemaakt',`${items.length} taken terug in Nog Te Doen`,'var(--am)','ongedaan');
       await loadAll(true);
     });
-  }catch(e){ alert('Ongedaan maken mislukt. '+leesbareFout(e)); }
+  }catch(e){ meldFout('Ongedaan maken mislukt. '+leesbareFout(e)); }
   finally{ state._undoInFlight=false; }
 }
 
@@ -591,7 +591,7 @@ async function bulkVerwijderen(rows){
 }
 async function bulkUndoVerwijderen(items, stand){
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
-  if(!await ensureToken()){ alert('Inloggen mislukt.'); return; }
+  if(!await ensureToken()){ meldFout('Inloggen mislukt.'); return; }
   state._undoInFlight=true; // pauzeer de 8s-poll; deze undo doet z'n eigen loadAll
   try{
     // Zelfde beurt-constructie als bulkUndoAfronden hierboven (naloop 2026-08-28).
@@ -606,7 +606,7 @@ async function bulkUndoVerwijderen(items, stand){
       // een verkeerde plek, en de rest erachteraan.
       let blokken;
       try{ blokken=_bulkUndoBlokken(items); await _bevestigBlokken(blokken); }
-      catch(e){ alert(e.melding || e.message); await loadAll(true); return; }
+      catch(e){ meldFout(e.melding || e.message); await loadAll(true); return; }
       await metWriteMarkering(async()=>{
         await _voegBlokkenIn(blokken);
         await logEvents(items.map(it=>({code:it.code,sec:it.sec,actie:'Teruggezet',veld:'status',oudeWaarde:'Verwijderd',nieuweWaarde:'Nog Te Doen (bulk-undo)'})));
@@ -614,7 +614,7 @@ async function bulkUndoVerwijderen(items, stand){
       showToast('Ongedaan gemaakt',`${items.length} taken terug in Nog Te Doen`,'var(--am)','ongedaan');
       await loadAll(true);
     });
-  }catch(e){ alert('Ongedaan maken mislukt. '+leesbareFout(e)); }
+  }catch(e){ meldFout('Ongedaan maken mislukt. '+leesbareFout(e)); }
   finally{ state._undoInFlight=false; }
 }
 

@@ -184,6 +184,16 @@ function toastTimer(el, ms) {
   el.addEventListener('focusout', () => setTimeout(verder, 0));
 }
 
+// U2: geen `alert()` meer in de app. Chrome tekent die bovenaan het venster, met de URL erbij, en
+// blokkeert alles tot er geklikt is — ook op de telefoon. Dit is dezelfde rode melding als elke
+// andere fout, zonder aftelklok-ontdubbeling (twee keer dezelfde validatiefout hoort twee keer te
+// verschijnen). `state._meldStub` is een TESTHAAK: de zelftest ving deze meldingen tot v15.3 op
+// door `window.alert` te vervangen; nu zet hij dáár zijn stub.
+function meldFout(tekst, titel) {
+  if (typeof state._meldStub === 'function') { state._meldStub(String(tekst)); return; }
+  showToast(titel || 'Let op', String(tekst == null ? '' : tekst).replace(/\s*\n+\s*/g, ' '), 'var(--rd)', 'waarschuwing', { geenDedup: true, geenSysteemmelding: true });
+}
+
 function dismissToast(el) {
   if (!el || el.classList.contains('removing')) return;
   el.classList.add('removing');
@@ -231,7 +241,7 @@ function showUndoToast(title, msg, undoFn, icoNaam, opts) {
   undoBtn.onclick = async () => {
     undoBtn.disabled = true;
     undoBtn.innerHTML = `${ico('zandloper',12)} Bezig…`;
-    try { await undoFn(); } catch(e) { alert('Ongedaan maken mislukt. ' + leesbareFout(e)); }
+    try { await undoFn(); } catch(e) { meldFout('Ongedaan maken mislukt. ' + leesbareFout(e)); }
     dismissToast(el);
   };
 
@@ -240,7 +250,7 @@ function showUndoToast(title, msg, undoFn, icoNaam, opts) {
 
 async function undoComplete(undoData) {
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
-  if (!await ensureToken()) { alert('Inloggen mislukt.'); return; }
+  if (!await ensureToken()) { meldFout('Inloggen mislukt.'); return; }
   const { sec, ntdValues, ntdRow } = undoData;
   state._undoInFlight = true; // pauzeer de 8s-poll; deze undo doet z'n eigen loadAll
   try {
@@ -276,7 +286,7 @@ async function undoComplete(undoData) {
       // bevestigInvoegPlek meteen terug zonder iets te bewaken.
       const insertRowVooraf = getInsertRow(sec);
       try { await bevestigInvoegPlek(sec, insertRowVooraf); }
-      catch(e){ alert(e.melding || e.message); await loadAll(true); return; }
+      catch(e){ meldFout(e.melding || e.message); await loadAll(true); return; }
       // Alleen het schrijvende deel onder de teller — de loadAll hieronder moet zijn verse data
       // WÉL kunnen gebruiken (zie de waarschuwing bij metWriteMarkering).
       await metWriteMarkering(async () => {
@@ -329,13 +339,13 @@ async function undoComplete(undoData) {
       const terug=(D.ntd[sec]||[]).filter(x=>x.code===undoData.code).pop();
       if(terug) flashRow('ntd-tbody', terug._row, 'rij-flits-amber');
     });
-  } catch(e) { alert('Ongedaan maken mislukt. ' + leesbareFout(e)); }
+  } catch(e) { meldFout('Ongedaan maken mislukt. ' + leesbareFout(e)); }
   finally { state._undoInFlight = false; }
 }
 
 async function undoDelete(undoData) {
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
-  if (!await ensureToken()) { alert('Inloggen mislukt.'); return; }
+  if (!await ensureToken()) { meldFout('Inloggen mislukt.'); return; }
   state._undoInFlight = true; // pauzeer de 8s-poll; deze undo doet z'n eigen loadAll
   try {
     // Zelfde beurt-constructie als undoComplete hierboven: de delete-write is klaar vóór de
@@ -355,7 +365,7 @@ async function undoDelete(undoData) {
       }
       const insertRow = getInsertRow(sec);
       try { await bevestigInvoegPlek(sec, insertRow); }
-      catch(e){ alert(e.melding || e.message); await loadAll(true); return; }
+      catch(e){ meldFout(e.melding || e.message); await loadAll(true); return; }
       await metWriteMarkering(async () => {
         await insertAndWriteRow('Nog Te Doen', insertRow, ntdValues);
         await logEvent(undoData.code, sec, 'Teruggezet', 'status', 'Verwijderd', 'Nog Te Doen');
@@ -365,7 +375,7 @@ async function undoDelete(undoData) {
       const terug=(D.ntd[sec]||[]).filter(x=>x.code===undoData.code).pop();
       if(terug) flashRow('ntd-tbody', terug._row, 'rij-flits-amber');
     });
-  } catch(e) { alert('Ongedaan maken mislukt. ' + leesbareFout(e)); }
+  } catch(e) { meldFout('Ongedaan maken mislukt. ' + leesbareFout(e)); }
   finally { state._undoInFlight = false; }
 }
 
@@ -612,20 +622,20 @@ async function waitForOneSignal(timeoutMs) {
 
 async function subscribeNotifs() {
   const who = getCurrentWho();
-  if (!who) { alert('Selecteer of typ eerst je naam.'); return; }
+  if (!who) { meldFout('Selecteer of typ eerst je naam.'); return; }
   const btn = document.getElementById('notif-subscribe-btn');
   const orig = btn.innerHTML;
   btn.disabled = true; btn.innerHTML = `${ico('zandloper',12)} Bezig…`;
   const ready = await waitForOneSignal();
   if (!ready) {
     btn.disabled = false; btn.innerHTML = orig;
-    alert('Notificatiesysteem kon niet worden geladen.\n\nMogelijke oorzaken:\n• Geen internet\n• Ad-blocker blokkeert OneSignal\n• Probeer Cmd+Shift+R');
+    meldFout('Notificatiesysteem kon niet worden geladen.\n\nMogelijke oorzaken:\n• Geen internet\n• Ad-blocker blokkeert OneSignal\n• Probeer Cmd+Shift+R');
     return;
   }
   try {
     await OneSignal.Notifications.requestPermission();
     if (!OneSignal.Notifications.permission) {
-      alert('Geen toestemming gegeven. Zet notificaties aan in je browserinstellingen.');
+      meldFout('Geen toestemming gegeven. Zet notificaties aan in je browserinstellingen.');
       return;
     }
     await OneSignal.User.PushSubscription.optIn();
@@ -642,7 +652,7 @@ async function subscribeNotifs() {
     sendTestNotif(who, 'Notificaties zijn aan!', 'Je ontvangt voortaan meldingen op dit apparaat.');
   } catch(e) {
     console.error('subscribeNotifs error:', e);
-    alert('Aanzetten mislukt: ' + (e.message || e));
+    meldFout('Aanzetten mislukt: ' + (e.message || e));
   } finally {
     btn.disabled = false; btn.innerHTML = orig;
   }
@@ -670,7 +680,7 @@ async function unsubscribeNotifs() {
     }
     state.isSubscribed = false;
     refreshNotifUI();
-  } catch(e) { alert('Uitzetten mislukt: ' + e.message); }
+  } catch(e) { meldFout('Uitzetten mislukt: ' + e.message); }
 }
 
 function sendTestNotif(who, title, body) {
@@ -719,5 +729,4 @@ export {
   fireNotifEvent, TOAST_ICONS, TOAST_COLORS, TOAST_DURATION, MAX_TOAST_BURST, showToast, dismissToast, showUndoToast, toastTimer,
   undoComplete, undoDelete, getNotifPrefs, verwerkMeldingRijen, toonMeldingen, initMeldingen, openNotifModal, closeNotifModal,
   refreshNotifUI, onWhoChange, getCurrentWho, _whoSleutel, saveNotifPrefs, herstelNotifKoppeling, waitForOneSignal, subscribeNotifs,
-  unsubscribeNotifs, sendTestNotif,
-};
+  unsubscribeNotifs, sendTestNotif, meldFout };

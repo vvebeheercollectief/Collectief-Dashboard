@@ -91,7 +91,9 @@
     </button>
   </nav>
   <div class="sb-foot">
-    <div class="sync-row"><div class="dot" id="dot"></div><span id="sync-lbl">–</span></div>
+    <!-- U5: de status is een knop; het paneel #status-pop (verbinding.js) legt uit wat de stand
+         betekent en wat de volgende stap is, met het tijdstip van de laatste geslaagde verversing. -->
+    <button type="button" class="sync-row" id="sync-btn" aria-haspopup="dialog" aria-expanded="false" aria-controls="status-pop" title="Verbindingsstatus — klik voor uitleg"><div class="dot" id="dot"></div><span class="sync-tekst"><span id="sync-lbl">–</span><span id="sync-sinds" class="sync-sinds" hidden></span></span></button>
     <button class="ico-btn" id="refresh-btn" title="Vernieuwen">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0115-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 01-15 6.7L3 16"/></svg>
     </button>
@@ -99,6 +101,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
     </button>
   </div>
+  <div id="status-pop" class="status-pop" role="dialog" aria-label="Verbindingsstatus" hidden></div>
 </aside>
 
 <!-- ═══════ MAIN ═══════ -->
@@ -178,6 +181,8 @@
             <button class="btn btn-pri btn-sm" id="btn-add"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Toevoegen</button>
           </div>
         </div>
+        <!-- U6: opgeslagen weergaven (filters + sortering + groepering), per browser. weergaven.js -->
+        <div class="weergaven" id="ntd-weergaven" aria-label="Opgeslagen weergaven" hidden></div>
         <div class="tbl-wrap" id="ntd-tbl-wrap" role="tabpanel" aria-label="Openstaande taken in de gekozen categorie"><table><thead id="ntd-thead"></thead><tbody id="ntd-tbody"></tbody></table></div>
         <div class="pag" id="ntd-pag"></div>
         <!-- Cross-list (bug #2): taken die via Subcategorie óók in dit scherm horen -->
@@ -499,6 +504,10 @@
       <button class="modal-close" id="m-close">×</button>
     </div>
     <div class="modal-body">
+      <!-- U10: wie zat er het laatst aan (uit het logboek). U1/U4: de gele regel als een collega
+           dezelfde taak intussen wijzigde — gevuld door crud.js (_toonCollegaBanner). -->
+      <div id="m-laatst" class="m-laatst" hidden></div>
+      <div id="m-collega" class="m-collega" role="status" hidden></div>
       <!-- VvE Code lookup -->
       <div class="fld-row">
         <div class="fld">
@@ -863,7 +872,7 @@
   <div class="pal" role="dialog" aria-label="Zoeken en acties">
     <div class="pal-zoek">
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      <input id="pal-input" type="text" placeholder="Zoek VvE, taak of logboek…" autocomplete="off" role="combobox" aria-expanded="true" aria-controls="pal-bd" aria-autocomplete="list" aria-label="Zoek VvE, taak of logboek"/>
+      <input id="pal-input" type="text" placeholder="Zoek VvE, taak of logboek… of typ / voor opdrachten" autocomplete="off" role="combobox" aria-expanded="true" aria-controls="pal-bd" aria-autocomplete="list" aria-label="Zoek VvE, taak of logboek"/>
       <span class="pal-esc">ESC</span>
     </div>
     <div class="pal-bd" id="pal-bd" role="listbox" aria-label="Zoekresultaten"></div>
@@ -998,6 +1007,37 @@
      klopt de stapeling ook zonder dat je die regel kent. `data-bovenop` zegt hetzelfde tegen Escape
      en de focus-trap (modal-a11y.js), die allebei 'het bovenste open venster' opzoeken.
      Titel, tekst en het label van de bevestigknop worden per vraag gezet — zie src/bevestig.js. -->
+<!-- ═══════ SNELTOETSEN (U8) — toets ? ═══════ -->
+<div class="modal-bg" id="sneltoets-bg">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-hdr">
+      <h2>Sneltoetsen</h2>
+      <button class="modal-close" id="sneltoets-sluit" aria-label="Sluiten">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="sneltoets-kop">Takenlijst (Nog Te Doen)</div>
+      <dl class="sneltoets-lijst">
+        <dt><kbd>j</kbd> <kbd>k</kbd></dt><dd>Volgende / vorige taak kiezen</dd>
+        <dt><kbd>e</kbd></dt><dd>Gekozen taak bewerken</dd>
+        <dt><kbd>a</kbd></dt><dd>Gekozen taak afronden</dd>
+        <dt><kbd>w</kbd></dt><dd>Gekozen taak wegleggen</dd>
+        <dt><kbd>i</kbd></dt><dd>In behandeling aan/uit</dd>
+      </dl>
+      <div class="sneltoets-kop">Overal</div>
+      <dl class="sneltoets-lijst">
+        <dt><kbd>Ctrl</kbd>+<kbd>K</kbd></dt><dd>Zoeken en acties (typ <b>/</b> voor /vve, /log, /taak, /ga)</dd>
+        <dt><kbd>Ctrl</kbd>+<kbd>Enter</kbd></dt><dd>Hoofdknop van het open venster (opslaan, afhandelen)</dd>
+        <dt><kbd>Esc</kbd></dt><dd>Venster of zijbalk sluiten; zoekveld leegmaken</dd>
+        <dt><kbd>?</kbd></dt><dd>Dit overzicht</dd>
+      </dl>
+      <p class="sneltoets-voet">De toetsen werken niet terwijl je in een invoerveld typt.</p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-sec" id="sneltoets-dicht" data-autofocus>Sluiten</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-bg" id="bevestig-bg" data-bovenop>
   <div class="modal" style="max-width:420px">
     <div class="modal-hdr">

@@ -9,7 +9,7 @@ import { SID } from "./config.js";
 import { ensureToken } from "./auth.js";
 import { loadAll, metWriteMarkering, serieleWrite, blokkeerOffline } from "./data.js";
 import { assertRowsMatch, sheetsFetch } from "./api.js";
-import { showToast } from "./notifications.js";
+import { showToast, meldFout } from "./notifications.js";
 import { logEvent } from "./render-overig.js";
 
 // Welke rijen mag de reset raken? Onderaan het tabblad staan samenvattingsregels
@@ -48,7 +48,7 @@ function _archiefNaam(jaar,bestaandeNamen){
 
 function openResetModal(){
   const b=_resetBereik(D.alvo||[]);
-  if(!b.aantal){ alert('Er staan geen VvE-rijen in het overzicht om te resetten.'); return; }
+  if(!b.aantal){ meldFout('Er staan geen VvE-rijen in het overzicht om te resetten.'); return; }
   document.getElementById('alvoreset-tekst').textContent =
     `Alle vier de vinkjes gaan uit bij ${b.aantal} ${b.aantal===1?'VvE':"VvE's"}. `+
     `Elke VvE staat daarna weer op Open. De huidige ronde wordt eerst weggeschreven naar een `+

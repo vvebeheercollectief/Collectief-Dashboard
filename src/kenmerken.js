@@ -7,7 +7,7 @@ import { writeRange, appendRange, assertRowMatch } from "./api.js";
 import { ensureToken } from "./auth.js";
 import { backgroundWrite, blokkeerOffline } from "./data.js";
 import { logEvent } from "./render-overig.js";
-import { getCurrentWho } from "./notifications.js";
+import { getCurrentWho, meldFout } from "./notifications.js";
 import { renderVve } from "./render-vve.js";
 // (kringverwijzing kenmerken ⇄ render-vve/data: zelfde live-bindings-patroon als crud ⇄ main)
 
@@ -62,7 +62,7 @@ async function saveKenmerken(){
   // Pas NÁ de tokenpoort uit de bewerkstand, om dezelfde reden als de offline-poort hierboven:
   // mislukt de vernieuwing, dan blijft de invoer staan in plaats van dat `renderVve()` de
   // leeskaart tekent en de gekozen waarden weg zijn zonder dat er iets is opgeslagen.
-  if(!await ensureToken()){ alert('Inloggen mislukt. Probeer het opnieuw.'); return; }
+  if(!await ensureToken()){ meldFout('Inloggen mislukt. Probeer het opnieuw.'); return; }
   state.kenmerkenEdit=false;
   const who=getCurrentWho()||'?', ts=new Date().toISOString();
   const sn={...oud};                       // snapshot voor rollback

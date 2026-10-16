@@ -5,15 +5,23 @@
 // velden (zijn omschrijving staat in `opmerkingen`), dus zulke treffers kwamen met een
 // LEGE vetgedrukte regel in de lijst — terwijl zoekAlles ze wél vindt.
 import { esc, displayName, berekenPrioriteit, teLaatVoorTelling, offerteAangevraagd, parseDt, taakTitel } from "./util.js";
-import { SECS, SKEYS } from "./config.js";
+import { SECS, SKEYS, PAGE_META } from "./config.js";
 import { bouwBundelIndex, isAutoOfferteStap, bundelVerwijzing } from "./bundel.js";
 import { state, D } from "./state.js";
-import { goTo } from "./ui.js";
+import { goTo, applyTheme, cycleDensity } from "./ui.js";
 import { openModal, zetOmschrijving } from "./crud.js";
 import { openVvePagina, vveOverzicht } from "./render-vve.js";
 import { logZin } from "./render-overig.js";
 import { toggleBulkMode } from "./bulk.js";
 import { ico } from "./icons.js";
+// U3: acties, /-opdrachten en een snelle notitie vanuit het palet. Kringverwijzingen (sneltoetsen
+// ⇄ palette, main ⇄ palette) worden alleen op runtime aangeroepen — zelfde patroon als ui ⇄ bulk.
+import { loadAll, backgroundWrite, blokkeerOffline } from "./data.js";
+import { appendRange } from "./api.js";
+import { ensureToken } from "./auth.js";
+import { showToast, getCurrentWho } from "./notifications.js";
+import { renderAll } from "./main.js";
+import { rijFocusTaak, rijFocusTr, RIJ_ACTIES, toggleSneltoetsOverzicht } from "./sneltoetsen.js";
 
 // `stappen` staat los van `taken` en niet erin: de automatische offerte-stap staat sinds v12.6
 // niet meer in de takenlijst, dus het palet is voor hém de snelle weg terug — en in de gedeelde
@@ -117,35 +125,142 @@ function _item(html,doe){ const idx=_palItems.length; _palItems.push({doe});
   return `<div class="pal-res${idx===_palSel?' actief':''}" role="option" id="pal-opt-${idx}" aria-selected="${idx===_palSel}" data-action="pal-kies" data-idx="${idx}">${html}</div>`; }
 function _groep(kop,inhoud){ return inhoud?`<div class="pal-groep"><div class="pal-groep-kop">${kop}</div>${inhoud}</div>`:''; }
 
+// ── Acties (U3) ──
+// Eén lijst voor de lege staat én voor zoeken op een actiewoord ('afronden', 'thema', 'logboek').
+// `basis` = ook tonen zonder zoekterm. De rij-acties komen van sneltoetsen.js (dezelfde als de
+// toetsen e/a/w/i) en gelden voor de focusrij in de takenlijst.
+const PAG_ICO={ ntd:'checkbox', af:'vinkCirkel', alvo:'gebouw', alfa:'feest', ontw:'kolf', logboek:'notitieboek', herhaal:'herhaal', analytics:'grafiek', dash:'grafiek' };
+function _recent(){ try{ return JSON.parse(localStorage.getItem('recentVves')||'[]'); }catch(e){ return []; } }
+function palActies(){
+  const a=[];
+  a.push({ basis:true, ico:'plus', lbl:'Nieuwe taak aanmaken', zoek:'nieuw taak toevoegen', doe:()=>{ closePalette(); goTo('ntd'); openModal(false); } });
+  const taak=rijFocusTaak(), tr=rijFocusTr();
+  if(taak && tr){
+    const rid=tr.dataset.rid;
+    RIJ_ACTIES.forEach(ra=>a.push({ basis:true, ico:ra.ico, lbl:`${ra.lbl}: ${taakTitel(taak, taak._sec)||taak.code}`, sub:`${taak.code} ${taak.naam||''}`.trim(),
+      zoek:ra.lbl.toLowerCase()+' taak rij', hint:`toets ${ra.toets}`, doe:()=>{ closePalette(); ra.doe(rid); } }));
+  }
+  if(state.vveCode && document.getElementById('page-vve')?.classList.contains('active')){
+    a.push({ basis:true, ico:'plus', lbl:`Nieuwe taak voor ${state.vveCode}`, zoek:'nieuw taak dossier vve', doe:()=>{ closePalette(); openModal(false,null,{ sec:'OPPAKKEN', code:state.vveCode }); } });
+  }
+  Object.entries(PAGE_META).forEach(([id,[titel]])=>{
+    if(id==='vve') return;
+    a.push({ basis:['analytics','herhaal','logboek'].includes(id), ico:PAG_ICO[id]||'chevronRechts', lbl:'Ga naar '+titel, zoek:'ga naar pagina open '+titel.toLowerCase(), doe:()=>{ closePalette(); goTo(id); } });
+  });
+  a.push({ ico:'oog', lbl:'Thema wisselen (licht/donker)', zoek:'thema donker licht modus', doe:()=>{ closePalette(); applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark'); } });
+  a.push({ ico:'label', lbl:'Weergave: dichtheid wisselen', zoek:'dichtheid compact ruim standaard', doe:()=>{ closePalette(); cycleDensity(); } });
+  a.push({ ico:'checkbox', lbl: state.bulkMode ? 'Selecteren uitzetten' : 'Meerdere taken selecteren', zoek:'selecteren bulk meerdere', doe:()=>{ closePalette(); goTo('ntd'); toggleBulkMode(); } });
+  a.push({ ico:'herhaal', lbl:'Nu vernieuwen', zoek:'vernieuwen verversen herladen', doe:()=>{ closePalette(); loadAll(); } });
+  a.push({ basis:true, ico:'klembord', lbl:'Sneltoetsen tonen', zoek:'sneltoetsen toetsen hulp', hint:'toets ?', doe:()=>{ closePalette(); toggleSneltoetsOverzicht(true); } });
+  return a;
+}
+// Puur (zelftest): alle woorden van de zoekterm moeten in label of zoekwoorden voorkomen.
+function zoekActies(q, acties){
+  const woorden=String(q||'').toLowerCase().split(/\s+/).filter(Boolean);
+  if(!woorden.length) return [];
+  return (acties||[]).filter(a=>{ const t=(a.lbl+' '+(a.zoek||'')).toLowerCase(); return woorden.every(w=>t.includes(w)); });
+}
+function _actieItem(a){
+  return _item(`<span class="pal-ico pal-ico-act">${ico(a.ico||'chevronRechts')}</span><div class="pal-tekst"><b>${esc(a.lbl)}</b>${a.sub?`<span>${esc(a.sub)}</span>`:''}</div>${a.hint?`<span class="pal-hint">${esc(a.hint)}</span>`:''}`, a.doe);
+}
+// Laatst bezochte VvE's vooraan in de treffers (puur).
+function metRecentVooraan(vves, recent, max){
+  const idx=c=>{ const i=(recent||[]).indexOf(c); return i<0 ? 99 : i; };
+  return (vves||[]).slice().sort((a,b)=>idx(a.code)-idx(b.code)).slice(0, max);
+}
+
+// ── /-opdrachten (U3) ──
+const COMMANDOS=[
+  ['/vve',  'code of naam',  'Open een dossier'],
+  ['/log',  'tekst',         'Notitie in het open dossier — of: /log 311212 tekst'],
+  ['/taak', 'omschrijving',  'Nieuwe taak met deze omschrijving'],
+  ['/ga',   'pagina',        'Ga naar een pagina'],
+];
+// Puur (zelftest): wat betekent deze /log-invoer? → {code, tekst} of null.
+function ontleedLog(rest, openCode, codes){
+  const r=String(rest||'').trim();
+  const m=r.match(/^(\S+)\s+([\s\S]+)$/);
+  if(m && (codes||[]).includes(m[1])) return { code:m[1], tekst:m[2].trim() };
+  if(openCode && r) return { code:openCode, tekst:r };
+  return null;
+}
+// Een notitie in het logboek van een VvE, zonder dossier te openen. Zelfde regel als addTaskNote
+// (render-overig.js): actie 'Opmerking', optimistisch in D.logboek, en de bevestiging pas na de append.
+async function snelleNotitie(code, tekst){
+  if(blokkeerOffline()) return;
+  if(!await ensureToken()){ showToast('Inloggen mislukt','Probeer het opnieuw.','var(--rd)','waarschuwing',{geenDedup:true,geenSysteemmelding:true}); return; }
+  const who=getCurrentWho()||'?', ts=new Date().toISOString();
+  const entry={ _row:0, timestamp:ts, code, sectie:'', actie:'Opmerking', veld:'', oudeWaarde:'', nieuweWaarde:tekst, gebruiker:who };
+  D.logboek.unshift(entry);
+  renderAll();
+  backgroundWrite(
+    async ()=>{
+      await appendRange("'Logboek'!A:H", [ts, code, '', 'Opmerking', '', '', tekst, who]);
+      showToast('Notitie vastgelegd', `${code} — ${tekst.length>60 ? tekst.slice(0,57)+'…' : tekst}`, null, 'potlood', {geenDedup:true,geenSysteemmelding:true});
+    },
+    ()=>{ const i=D.logboek.indexOf(entry); if(i>-1) D.logboek.splice(i,1); },   // vorm-ok: eigen optimistische regel
+    'Notitie vastleggen'
+  );
+}
+function _vveItem(v){
+  const ov=vveOverzicht(v.code,D);
+  return _item(`<span class="pal-ico pal-ico-vve">${esc(v.code)}</span><div class="pal-tekst"><b>${esc(v.naam||v.code)}</b><span>${ov.cijfers.open} open · ${ov.cijfers.teLaat} te laat${ov.cijfers.laatsteDagen!=null?` · laatste activiteit ${ov.cijfers.laatsteDagen} d`:''}</span></div><span class="pal-hint">Enter → dossier</span>`,
+    ()=>{ closePalette(); openVvePagina(v.code); });
+}
+function _hintItem(tekst){ return `<div class="pal-leeg">${esc(tekst)}</div>`; }
+function renderCommando(q){
+  const m=q.match(/^\/(\S*)\s*([\s\S]*)$/);
+  const cmd='/'+(m[1]||'').toLowerCase(), rest=(m[2]||'').trim();
+  if(cmd==='/vve'){
+    if(!rest) return _groep("VvE's", _hintItem('Typ een code of naam, bijvoorbeeld /vve 311212'));
+    const res=zoekAlles(rest, D, { vves:8, taken:0, stappen:0, afgerond:0, logboek:0 });
+    return res.vves.length ? _groep("VvE's", res.vves.map(_vveItem).join('')) : _groep("VvE's", _hintItem('Geen VvE gevonden'));
+  }
+  if(cmd==='/log'){
+    const open=document.getElementById('page-vve')?.classList.contains('active') ? state.vveCode : null;
+    const o=ontleedLog(rest, open, (D.alvo||[]).map(v=>v.code));
+    if(o) return _groep('Notitie', _actieItem({ ico:'potlood', lbl:`Notitie bij ${o.code}: "${o.tekst}"`, hint:'Enter → vastleggen', doe:()=>{ closePalette(); snelleNotitie(o.code, o.tekst); } }));
+    return _groep('Notitie', _hintItem(open ? `Typ de notitie voor ${open}` : 'Gebruik: /log 311212 tekst — of open eerst een dossier'));
+  }
+  if(cmd==='/taak'){
+    if(!rest) return _groep('Nieuwe taak', _hintItem('Typ de omschrijving, bijvoorbeeld /taak dakgoot nakijken'));
+    return _groep('Nieuwe taak', _actieItem({ ico:'plus', lbl:`Nieuwe taak: "${rest}"`, hint:'opent invulscherm', doe:()=>{ closePalette(); goTo('ntd'); openModal(false); zetOmschrijving(state.editSec||state.activeNtd, rest); } }));
+  }
+  if(cmd==='/ga'){
+    const paginas=palActies().filter(a=>a.lbl.startsWith('Ga naar '));
+    const lijst=rest ? zoekActies(rest, paginas) : paginas;
+    return _groep("Pagina's", lijst.map(_actieItem).join('')) || _groep("Pagina's", _hintItem('Geen pagina gevonden'));
+  }
+  const kandidaten=COMMANDOS.filter(([c])=>c.startsWith(cmd));
+  return _groep('Opdrachten', kandidaten.map(([c,arg,uitleg])=>_item(
+    `<span class="pal-ico pal-ico-act">${ico('chevronRechts')}</span><div class="pal-tekst"><b>${esc(c)} <i>${esc(arg)}</i></b><span>${esc(uitleg)}</span></div>`,
+    ()=>{ const inp=document.getElementById('pal-input'); if(!inp) return; inp.value=c+' '; inp.focus(); _palSel=0; renderPal(inp.value); })).join(''))
+    || _groep('Opdrachten', _hintItem('Onbekende opdracht. Beschikbaar: /vve, /log, /taak, /ga'));
+}
+
 function renderPal(q){
   _palItems=[]; if(_palSel<0)_palSel=0;
   const bd=document.getElementById('pal-bd');
   let html='';
-  if(!q.trim()){
-    // lege staat: laatst bezochte VvE's + snelkoppelingen
-    let recent=[];
-    try{ recent=JSON.parse(localStorage.getItem('recentVves')||'[]'); }catch(e){}
+  const z=q.trim();
+  if(!z){
+    // lege staat: laatst bezochte VvE's + acties
+    const recent=_recent();
     const rHtml=recent.map(code=>{
       const v=(D.alvo||[]).find(r=>r.code===code);
       return _item(`<span class="pal-ico pal-ico-vve">${esc(code)}</span><div class="pal-tekst"><b>${esc(v?.naam||code)}</b><span>laatst bezocht</span></div>`,
         ()=>{ closePalette(); openVvePagina(code); });
     }).join('');
     html+=_groep("Laatst bezochte VvE's",rHtml);
-    const acties=[
-      [ico('plus'),'Nieuwe taak aanmaken',()=>{ closePalette(); goTo('ntd'); openModal(false); }],
-      [ico('grafiek'),'Ga naar statistieken',()=>{ closePalette(); goTo('analytics'); }],
-      [ico('herhaal'),'Ga naar herhaalregels',()=>{ closePalette(); goTo('herhaal'); }],
-      [ico('notitieboek'),'Ga naar logboek',()=>{ closePalette(); goTo('logboek'); }],
-    ];
-    html+=_groep('Acties',acties.map(([icoSvg,lbl,doe])=>
-      _item(`<span class="pal-ico pal-ico-act">${icoSvg}</span><div class="pal-tekst"><b>${esc(lbl)}</b></div>`,doe)).join(''));
+    html+=_groep('Acties', palActies().filter(a=>a.basis).map(_actieItem).join(''));
+    html+=`<div class="pal-tip">Typ <b>/</b> voor opdrachten (/vve, /log, /taak, /ga) · typ een actie zoals <b>thema</b> of <b>afronden</b> · <b>?</b> toont de sneltoetsen</div>`;
+  }else if(z.startsWith('/')){
+    html+=renderCommando(z);
   }else{
-    const res=zoekAlles(q,D);
-    html+=_groep("VvE's",res.vves.map(v=>{
-      const ov=vveOverzicht(v.code,D);
-      return _item(`<span class="pal-ico pal-ico-vve">${esc(v.code)}</span><div class="pal-tekst"><b>${esc(v.naam||v.code)}</b><span>${ov.cijfers.open} open · ${ov.cijfers.teLaat} te laat${ov.cijfers.laatsteDagen!=null?` · laatste activiteit ${ov.cijfers.laatsteDagen} d`:''}</span></div><span class="pal-hint">Enter → dossier</span>`,
-        ()=>{ closePalette(); openVvePagina(v.code); });
-    }).join(''));
+    // Acties eerst als de zoekterm er een raakt: wie 'thema' typt zoekt geen VvE.
+    html+=_groep('Acties', zoekActies(z, palActies()).slice(0,4).map(_actieItem).join(''));
+    const res=zoekAlles(q,D,{ ...PAL_MAX, vves:12 });
+    html+=_groep("VvE's", metRecentVooraan(res.vves, _recent(), PAL_MAX.vves).map(_vveItem).join(''));
     html+=_groep('Open taken',res.taken.map(r=>{
       const p=berekenPrioriteit(r.deadline,r._sec);
       const laat=teLaatVoorTelling(r,r._sec);
@@ -173,7 +288,7 @@ function renderPal(q){
     html+=_groep('Logboek',res.logboek.map(e=>
       _item(`<span class="pal-ico pal-ico-log">${ico('potlood')}</span><div class="pal-tekst"><b class="pal-logzin">${logZin(e)}</b></div>`,
         ()=>{ closePalette(); openVvePagina(e.code); })).join(''));
-    html+=_groep('Acties',
+    html+=_groep('Nieuwe taak',
       _item(`<span class="pal-ico pal-ico-act">${ico('plus')}</span><div class="pal-tekst"><b>Nieuwe taak aanmaken met "${esc(q)}"</b></div><span class="pal-hint">opent invulscherm</span>`,
         ()=>{ closePalette(); goTo('ntd'); openModal(false);
               // Naar het veld van de sectie waar de gebruiker staat, niet vast naar 'm-actie'.
@@ -235,4 +350,4 @@ function initPalette(){
   });
 }
 
-export { zoekAlles, PAL_MAX, openPalette, closePalette, palKies, initPalette, palOpen };
+export { zoekAlles, PAL_MAX, openPalette, closePalette, palKies, initPalette, palOpen, zoekActies, metRecentVooraan, ontleedLog, palActies, COMMANDOS };

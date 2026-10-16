@@ -68,6 +68,8 @@ async function zetInBehandeling(rid){
 
   const oud = r.inBehandeling === 'TRUE' ? 'TRUE' : 'FALSE';
   const nieuw = volgendeStand(r.inBehandeling);
+  // Momentopname vóór de mutatie voor de rij-controle — zie `snap` in snooze.js voor het waarom.
+  const snap = {...r};
   r.inBehandeling = nieuw;
   // Hertekenen en niet alleen de knop omzetten: de rij VERHUIST. 'In behandeling' is een eigen
   // groep in de tabel (zie renderTbody), dus de rij springt naar dat blok — dat is meteen de
@@ -81,7 +83,7 @@ async function zetInBehandeling(rid){
       // dezelfde TAAK schrijven. Zelfde afweging als bij de opvolgdatum in snooze.js.
       const rij = r._row;   // Eén keer gelezen: een afronding elders schuift `_row` optimistisch op (_shiftNtdRows); tussen
       // controle en schrijven mag hij dus niet opnieuw gelezen worden (naloop 25-09).
-      await assertRowMatch(rij, r);
+      await assertRowMatch(rij, snap);
       await writeRange(`'Nog Te Doen'!${kolom}${rij}:${kolom}${rij}`, [nieuw]);
       // De logregel is hier geen boekhouding maar functioneel: het stil-signaal rekent vanaf de
       // LAATSTE logregel van een taak (bepaalStil). Zonder deze regel zou een taak die je zojuist

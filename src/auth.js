@@ -456,6 +456,14 @@ function logout(reden){
   // inlogkaart staan — met de dossiergegevens van een VvE er nog in.
   try{ document.getElementById('chat-bg')?.classList.remove('open'); }catch(_){}
   state._chatHistorie=null; state._chatVve=null; state._chatBezig=false;
+  // De AI-hulp om dezelfde reden: de geplakte mail van een eigenaar en de gekoppelde VvE bleven
+  // anders staan voor de volgende gebruiker op dezelfde computer (naloop 2026-10-16).
+  state._aiVveCode=''; state._aiLastCode=''; state._aiLastNaam='';
+  try{
+    ['ai-mail','ai-answer','ai-vve-input'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+    const res=document.getElementById('ai-result'); if(res){ res.style.display='none'; res.innerHTML=''; }
+    const wis=document.getElementById('ai-vve-wis'); if(wis) wis.style.display='none';
+  }catch(_){}
   state.editMode=false; state.editRowData=null; state.editFoto=null; state.editSec=null;
   state._completeRow=null; state._completeRid=null; state._completeNotitie=null;
   // Het inlogscherm is een `position:fixed`-overlay: hij dekt het dashboard alleen VISUEEL af.

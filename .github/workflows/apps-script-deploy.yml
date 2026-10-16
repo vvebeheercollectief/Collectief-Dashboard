@@ -8,6 +8,16 @@ on:
       - '.github/workflows/apps-script-deploy.yml'
   workflow_dispatch: {}
 
+# Het GITHUB_TOKEN hoeft alleen te lezen (clasp werkt met eigen credentials uit de secrets).
+permissions:
+  contents: read
+
+# Nooit twee uitrollen van dezelfde tak door elkaar: twee snelle pushes gaven twee parallelle
+# `clasp push --force` zonder volgordegarantie, zodat de oudere commit als laatste kon landen.
+concurrency:
+  group: apps-script-${{ github.ref_name }}
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest

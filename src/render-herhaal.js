@@ -2,7 +2,7 @@
 //  HERHAALREGELS — beheerpagina voor terugkerende taken (Fase 4)
 //  De dagelijkse Apps Script-motor zet de taken klaar; hier alleen regel-CRUD.
 // ══════════════════════════════════════
-import { esc, emptyRow, vveCodeSpan, toISODate, toDutchDate, _parseAnyDate, coerceDagenVooraf } from "./util.js";
+import { esc, emptyRow, vveCodeSpan, toISODate, toDutchDate, _parseAnyDate, coerceDagenVooraf, volgendeDeadline, _vandaagAmsterdam } from "./util.js";
 import { state, D } from "./state.js";
 import { regelIndex } from "./rij.js";
 import { SID } from "./config.js";
@@ -88,6 +88,13 @@ async function submitHerhaal(){
   if(type!=='na-afronden'&&!dlIso){alert('Kies de eerstvolgende deadline.');return}
   if(type==='week'&&vooraf>=7){alert('Bij een wekelijkse herhaling moet "dagen vooraf" kleiner zijn dan 7, anders stapelen de taken op.');return}
   const volgende=type==='na-afronden'?'':toDutchDate(dlIso);
+  // Dubbelklik-rem (naloop 2026-10-16). De `await ensureToken()` hierboven kan een echte
+  // netwerkronde zijn, en twee klikken in dat gat gaven bij een NIEUWE regel twee appends: twee
+  // herhaalregels met elk een eigen HR-nummer, en de motor zette dan twee taken klaar. De rem gaat
+  // pas hier aan — ná de invoercontroles, die het venster open laten — en weer uit zodra de
+  // schrijfactie in de wachtrij staat (het venster is dan al dicht).
+  if(state._hhBezig) return;
+  state._hhBezig=true;
   const r=state.herhaalEditRow;
   const id=r?r.id:'HR-'+Date.now().toString(36).toUpperCase();
   const values=[id,oms,sectie,code,naam,beh,type,type==='na-afronden'?interval:'',String(vooraf),volgende,r?r.status:'ACTIEF',r?r.laatstKlaargezet:''];
@@ -128,19 +135,45 @@ async function submitHerhaal(){
       showToast('Herhaalregel toegevoegd',oms,null,'plus',{geenDedup:true,geenSysteemmelding:true});
     },()=>{},'Toevoegen mislukt');
   }
+  state._hhBezig=false;   // de schrijfactie staat in de wachtrij en het venster is dicht
+}
+
+// Bij het HERACTIVEREN schuift de volgende deadline (J) door tot de eerste op of na vandaag. De
+// motor (cd_hr_zetTakenKlaar, Opvolging.gs) doet per ochtend precies één stap: taak klaarzetten en
+// J één interval verder. Een maandregel die drie maanden gepauzeerd stond leverde zo op drie
+// opeenvolgende ochtenden drie taken op, alle al 'te laat', plus drie pushes. Puur, dus los
+// toetsbaar; '' als er niets te verschuiven valt (na-afronden, lege of onleesbare J, of J ligt
+// al in de toekomst).
+function ingehaaldeDeadline(r, vandaag){
+  if(!r || r.type==='na-afronden' || !r.volgendeDeadline) return '';
+  const nu=vandaag||_vandaagAmsterdam();
+  let huidig=r.volgendeDeadline, p=_parseAnyDate(huidig);
+  if(!p || new Date(p.y,p.m-1,p.d)>=nu) return '';
+  for(let i=0;i<600;i++){                       // 600 weken ≈ 11 jaar: meer dan genoeg
+    const volgende=volgendeDeadline(huidig, r.type, r.interval);
+    if(!volgende) return '';
+    huidig=volgende; p=_parseAnyDate(huidig);
+    if(p && new Date(p.y,p.m-1,p.d)>=nu) return huidig;
+  }
+  return '';
 }
 
 function toggleHerhaalStatus(hid){
   const r=(D.herhaal||[]).find(x=>x._row===hid); if(!r) return;
   if(blokkeerOffline()) return;   // vóór de mutatie: deze weg heeft geen ensureToken-poort
   const oud=r.status, nieuw=oud==='ACTIEF'?'GEPAUZEERD':'ACTIEF';
-  r.status=nieuw; renderHerhaal();
+  const oudeJ=r.volgendeDeadline;
+  const nieuweJ=nieuw==='ACTIEF' ? ingehaaldeDeadline(r) : '';
+  r.status=nieuw; if(nieuweJ) r.volgendeDeadline=nieuweJ;
+  renderHerhaal();
   backgroundWrite(async()=>{
     await assertRowMatch(r._row, r.id, 'Herhaalregels'); // bescherming: rij nog dezelfde regel vóór status-write
-    await writeRange(`'Herhaalregels'!K${r._row}:K${r._row}`,[nieuw]);
-    await logEvent(r.code,r.sectie,'Herhaalregel '+(nieuw==='ACTIEF'?'geactiveerd':'gepauzeerd'),'','',r.omschrijving);
+    if(nieuweJ) await writeRange(`'Herhaalregels'!J${r._row}:K${r._row}`,[nieuweJ, nieuw]);
+    else        await writeRange(`'Herhaalregels'!K${r._row}:K${r._row}`,[nieuw]);
+    await logEvent(r.code,r.sectie,'Herhaalregel '+(nieuw==='ACTIEF'?'geactiveerd':'gepauzeerd'),'','',
+                   r.omschrijving+(nieuweJ?` — volgende deadline doorgeschoven naar ${nieuweJ}`:''));
     showToast(nieuw==='ACTIEF'?'Regel geactiveerd':'Regel gepauzeerd',r.omschrijving,null,nieuw==='ACTIEF'?'afspelen':'pauze',{geenDedup:true,geenSysteemmelding:true});
-  },()=>{r.status=oud;},'Status wijzigen mislukt');
+  },()=>{r.status=oud; r.volgendeDeadline=oudeJ;},'Status wijzigen mislukt');
 }
 
 async function deleteHerhaal(){
@@ -163,7 +196,10 @@ async function deleteHerhaal(){
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){alert('Inloggen mislukt.');return}
   const pos=regelIndex(D.herhaal, r, x=>x.id); if(pos>-1)D.herhaal.splice(pos,1);
-  (D.herhaal||[]).forEach(x=>{if(x._row>r._row)x._row--;});
+  // Alleen meeschuiven als de regel lokaal ook echt weg is: was hij al verdwenen (een poll verving
+  // de lijst), dan verschoof deze regel nummers van rijen die níet verschoven zijn — dezelfde
+  // reparatie als deleteOntwItem (render-overig.js).
+  if(pos>-1) (D.herhaal||[]).forEach(x=>{if(x._row>r._row)x._row--;});
   renderHerhaal();
   backgroundWrite(async()=>{
     const ids=await getSheetIds();

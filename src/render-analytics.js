@@ -40,11 +40,16 @@ function ensureChartJs(){
     s.integrity='sha384-FcQlsUOd0TJjROrBxhJdUhXTUgNJQxTMcxZe6nHbaEfFL1zjQ+bq/uRoBQxb0KMo';
     s.crossOrigin='anonymous';
     s.onload=res;
-    s.onerror=()=>{ _chartJsPromise=null; rej(new Error('Chart.js laden mislukt')); };
+    // Bij een mislukking het dode <script> weghalen en de uitkomst een minuut vasthouden. Zonder dat
+    // groeide <head> bij een geblokkeerd CDN elke pollronde met een extra script-element plus een
+    // nieuw netwerkverzoek (buildDash/buildAnalytics draaien bij elke gewijzigde ronde). De knop
+    // 'Opnieuw proberen' in de foutbox zet de klok zelf terug (zie _resetChartJs).
+    s.onerror=()=>{ s.remove(); setTimeout(()=>{ _chartJsPromise=null; }, 60_000); rej(new Error('Chart.js laden mislukt')); };
     document.head.appendChild(s);
   });
   return _chartJsPromise;
 }
+const _resetChartJs=()=>{ _chartJsPromise=null; };
 
 // Chart.js komt van een CDN. Lukt dat niet — geen internet, een filter op kantoor, een storing bij
 // jsDelivr — dan bleef de hele pagina leeg met alleen een regel in de console: geen grafieken,
@@ -63,9 +68,9 @@ function toonGrafiekFout(paginaId, opnieuw){
     box.style.margin='0 0 16px';
     box.innerHTML='<span>'+ico('waarschuwing',15)
       +' De grafieken konden niet geladen worden (het onderdeel komt van een externe bron). '
-      +'De cijfers in de lijsten kloppen gewoon.</span>'
+      +'De cijfers hieronder kloppen gewoon.</span>'
       +'<button class="btn btn-sec btn-sm" type="button">Opnieuw proberen</button>';
-    box.querySelector('button').addEventListener('click',()=>{ box.remove(); opnieuw(); });
+    box.querySelector('button').addEventListener('click',()=>{ box.remove(); _resetChartJs(); opnieuw(); });
     pagina.insertBefore(box, pagina.firstChild);
   }
 }
@@ -204,6 +209,7 @@ function computeTrend(series){
 // horen dan opnieuw opgebouwd te worden. `animeer`: een bewuste wissel door de gebruiker (een
 // ander donut-tabblad) mag wél vloeiend overgaan.
 function _tekenGrafiek(id, el, config, animeer){
+  if(!window.Chart) return null;   // bibliotheek (nog) niet geladen: de cijfers staan er wél, zie _chartKlaar
   const oud=state.charts[id];
   if(oud && oud.canvas===el && oud.config && oud.config.type===config.type){
     oud.data=config.data;
@@ -436,10 +442,20 @@ function renderMetricToggle(){
 
 function _try(label,fn){try{fn()}catch(e){console.error('[Analytics]',label,e)}}
 
+// Chart.js alleen voor de GRAFIEKEN. Tot v15.3 stond `if(!window.Chart) return` als eerste regel
+// van beide bouwfuncties, dus bij een geblokkeerd CDN bleef de héle pagina leeg — ook de getallen
+// (KPI-tegels, stat-strook, leaderboard, 'recent afgerond') die geen grafiek nodig hebben — terwijl
+// de foutbox zei dat 'de cijfers gewoon kloppen'. Nu: de cijfers altijd, de grafieken zodra de
+// bibliotheek er is; `_tekenGrafiek`/`buildDonut` slaan stil over zolang hij ontbreekt en de
+// tweede aanroep (ná het laden) tekent ze alsnog.
+function _chartKlaar(paginaId, opnieuw){
+  if(window.Chart){ _wisGrafiekFout(paginaId); return true; }
+  ensureChartJs().then(opnieuw).catch(e=>{ console.warn(e); toonGrafiekFout(paginaId, opnieuw); });
+  return false;
+}
+
 function buildAnalytics(){
-  if(!window.Chart){ ensureChartJs().then(buildAnalytics)
-    .catch(e=>{ console.warn(e); toonGrafiekFout('page-analytics', buildAnalytics); }); return; }
-  _wisGrafiekFout('page-analytics');
+  _chartKlaar('page-analytics', buildAnalytics);
   _try('periode-bar',()=>renderPeriodBar());
   _try('metric-toggle',()=>renderMetricToggle());
 
@@ -573,6 +589,7 @@ function buildDonut(id,labels,data,colors,tc,centerVal,centerLbl,animeer){
       }},
     plugins:[centerPlugin]
   }, animeer);
+  if(!grafiek) return;   // Chart.js (nog) niet geladen — zie _chartKlaar
   grafiek.$midden={ val:centerVal, lbl:centerLbl, kleuren:colors, tc };
   // Een bijgewerkte grafiek is al getekend vóór $midden er stond: één keer opnieuw tekenen.
   grafiek.draw();
@@ -590,21 +607,8 @@ function _lightenHex(hex,perc){
 // ══════════════════════════════════════
 //  DASHBOARD
 // ══════════════════════════════════════
-const DASH_ICONS={
-  // Klembord met lijntjes — open taken
-  open:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2" fill="currentColor" fill-opacity="0.18"/><rect x="9" y="2.5" width="6" height="3.5" rx="1" fill="currentColor" fill-opacity="0.35"/><path d="M9 11h6M9 14.5h6M9 18h4"/></svg>`,
-  // Cirkel met dikke vink — taken afgerond
-  done:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="currentColor" fill-opacity="0.18"/><path d="M8 12.5l2.7 2.7L16 9.8"/></svg>`,
-  // Envelop met vinkje en pijl — ALV uitgeschreven
-  alv:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6.5a2 2 0 012-2h14a2 2 0 012 2v11a2 2 0 01-2 2H5a2 2 0 01-2-2v-11z" fill="currentColor" fill-opacity="0.18"/><path d="M3.5 7l8.5 6 8.5-6"/><path d="M9 16.5l1.6 1.6L14 14.7"/></svg>`,
-  // Document met pen — notulen verstuurd
-  notes:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l4 4v13a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 016 20V4.5A1.5 1.5 0 017.5 3z" fill="currentColor" fill-opacity="0.18"/><path d="M14 3v4h4"/><path d="M9 12h6M9 15h6M9 18h3"/><path d="M17.6 13.4l1.4-1.4a1.1 1.1 0 011.6 1.6l-1.4 1.4-1.6-1.6z" fill="currentColor" fill-opacity="0.35"/></svg>`,
-  // Tab-iconen (kleine 14px versies)
-  tabAlv:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5a2 2 0 012-2h14a2 2 0 012 2v11a2 2 0 01-2 2H5a2 2 0 01-2-2v-11z"/><path d="M3.5 7l8.5 6 8.5-6"/></svg>`,
-  tabNotes:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l4 4v13a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 016 20V4.5A1.5 1.5 0 017.5 3z"/><path d="M14 3v4h4"/><path d="M9 13h6M9 16h4"/></svg>`,
-  tabBudget:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M14.5 9.5c-.6-.7-1.5-1.1-2.5-1.1-1.7 0-3 1.1-3 2.5s1.3 2.5 3 2.5 3 1.1 3 2.5-1.3 2.5-3 2.5c-1 0-1.9-.4-2.5-1.1"/><path d="M12 7v10"/></svg>`,
-  tabTasks:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><rect x="9" y="2.5" width="6" height="3.5" rx="1"/><path d="M9 11h6M9 14.5h6M9 18h4"/></svg>`,
-};
+// (DASH_ICONS — de duotone-iconen van de oude stat-tegels op Dashboard — stonden hier tot v15.3
+//  zonder één gebruiker; de tegels tekenen sinds v14.1 zonder icoon.)
 
 const HERO_VIEWS=[
   {
@@ -689,9 +693,7 @@ function renderHeroDonut(animeer){
 }
 
 function buildDash(){
-  if(!window.Chart){ ensureChartJs().then(buildDash)
-    .catch(e=>{ console.warn(e); toonGrafiekFout('page-dash', buildDash); }); return; }
-  _wisGrafiekFout('page-dash');
+  _chartKlaar('page-dash', buildDash);   // zie de toelichting bij buildAnalytics
   const uitnD=D.alvo.filter(r=>r.uitnodiging).length;
   const notulenD=D.alvo.filter(r=>r.notulen).length;
   // Eén keer opbouwen en dan pas optellen: `telbaar` bouwt intern de volledige bundelindex, en
@@ -739,5 +741,5 @@ export {
   _toDateObj, bucketKey, bucketLabel, lastBucketKeys, seriesByPeriod, _splitBeh,
   seriesPerPersonByPeriod, computeTrend, renderSparkline, renderKpiTile, renderKpiPersonTile,
   renderHeroChart, renderLeaderboard, renderPeriodBar, renderMetricToggle, _try, buildAnalytics,
-  getWeekNum, buildDonut, _lightenHex, DASH_ICONS, HERO_VIEWS, renderHeroDonut, buildDash,
+  getWeekNum, buildDonut, _lightenHex, HERO_VIEWS, renderHeroDonut, buildDash,
 };

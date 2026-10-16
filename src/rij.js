@@ -92,10 +92,6 @@ export function verseRij(r, lijst){
   return i > -1 ? arr[i] : null;
 }
 
-// Staat deze rij nog in de lijst? Bewust een eigen naam: `rijIndex(...) > -1` leest als een
-// positievraag, terwijl het antwoord over identiteit gaat.
-export function rijBestaatNog(r, lijst){ return rijIndex(lijst || (r && D.ntd[r._sec]) || [], r) > -1; }
-
 // Sleutel voor per-rij-UI-toestand (zoals de uitklapstand van een taakrij): het vaste taaknummer
 // als dat er is, anders het rijnummer als terugval voor rijen van vóór de backfill. DE REGEL van
 // dit bestand geldt ook voor onthouden toestand: een Set op `_row` wijst na een verwijdering

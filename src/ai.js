@@ -95,9 +95,22 @@ function buildAiPrompt(){
   p.innerHTML=out;
 }
 
-function copyAiPrompt(waar){
+// Eerst kopiëren, dán pas 'Gekopieerd' zeggen. Het kopiëren werd niet afgewacht en kan weigeren
+// (geen klembordrecht, venster niet in focus, geen beveiligde context): de melding zei dan
+// 'Gekopieerd' terwijl er oude klembordinhoud in Claude belandde (naloop 2026-10-16).
+async function kopieerNaarKlembord(txt){
+  try{
+    if(!navigator.clipboard) throw new Error('geen klembord');
+    await navigator.clipboard.writeText(txt);
+    return true;
+  }catch(_){
+    showToast('Kopiëren mislukt','Selecteer de tekst en kopieer hem zelf met Ctrl/⌘+C.','var(--rd)','waarschuwing',{geenSysteemmelding:true});
+    return false;
+  }
+}
+async function copyAiPrompt(waar){
   const txt=document.getElementById('ai-prompt').innerText;
-  if(navigator.clipboard) navigator.clipboard.writeText(txt).catch(()=>{});
+  if(!await kopieerNaarKlembord(txt)) return;
   showToast('Gekopieerd','Plak in '+waar+' met Ctrl/⌘+V','var(--ac)','paperclip');
   const url=waar==='Claude'?'https://claude.ai/new':'https://gemini.google.com/app';
   try{ window.open(url,'_blank'); }catch(e){}
@@ -189,9 +202,9 @@ function aiActieTaak(btn){
   const txt=btn.closest('li').querySelector('.atxt').textContent;
   prefillNieuweTaak('OPPAKKEN',state._aiLastCode,state._aiLastNaam,txt);
 }
-function aiKopieerConcept(btn){
+async function aiKopieerConcept(btn){
   const txt=btn.closest('.ai-card').querySelector('.ai-reply').innerText;
-  if(navigator.clipboard) navigator.clipboard.writeText(txt).catch(()=>{});
+  if(!await kopieerNaarKlembord(txt)) return;
   showToast('Gekopieerd','Concept-antwoord klaar voor je mail','var(--gn)','klembord');
 }
 

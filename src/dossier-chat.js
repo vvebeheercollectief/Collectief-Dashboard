@@ -260,7 +260,9 @@ function openChat(){
   // bezochte VvE in; nu de VvE optioneel is zou dat stil een filter aanzetten dat je niet koos.
   // `setChatVve` maakt het gesprek leeg, dus alleen aanroepen als het echt een andere VvE is.
   const opDossier = document.querySelector('.page.active')?.id === 'page-vve';
-  if(opDossier && state.vveCode && state.vveCode !== state._chatVve) setChatVve(state.vveCode);
+  // …maar niet als de gebruiker het filter voor DIT dossier zelf net heeft gewist (het kruisje):
+  // dan zou sluiten en weer openen zijn dashboardbrede gesprek stil weggooien (naloop 2026-10-16).
+  if(opDossier && state.vveCode && state.vveCode !== state._chatVve && state.vveCode !== state._chatZelfGewist) setChatVve(state.vveCode);
   renderChat();
   const bg = document.getElementById('chat-bg');
   // Het paneel hangt onder de bovenbalk. Die staat niet altijd op dezelfde hoogte: in de
@@ -281,8 +283,17 @@ function closeChat(){
 // Een andere VvE (of '' = het hele dashboard) begint een nieuw gesprek: de antwoorden hierboven
 // gingen over iets anders, en een vervolgvraag zou daar anders op voortbouwen.
 function setChatVve(code){
+  // Wist de gebruiker het filter terwijl hij op een dossier staat, dan onthouden voor wélk dossier
+  // — `openChat` zet het dan niet bij het volgende openen stil weer aan.
+  state._chatZelfGewist = code ? null : (state.vveCode || null);
   state._chatVve = code || '';
   state._chatHistorie = [];
+  // Een lopende vraag hoort bij het VORIGE gesprek. De beurt-teller maakt dat haar afloop (in de
+  // finally van vraagChat) dit nieuwe gesprek niet meer raakt, en de bezig-stand gaat meteen uit:
+  // anders toonde het lege gesprek nog 'denkt na…' en werd élke nieuwe vraag zonder één woord
+  // genegeerd tot het oude antwoord (tot een minuut later) binnen was.
+  state._chatBeurt = (state._chatBeurt || 0) + 1;
+  state._chatBezig = false; state._chatStatus = '';
   const z = document.getElementById('chat-vve-zoek'); if(z) z.value='';
   const s = document.getElementById('chat-vve-sug'); if(s){ s.innerHTML=''; s.classList.remove('show'); }
   renderChat();
@@ -345,6 +356,9 @@ async function vraagChat(){
   const naam = code ? (((D.alvo||[]).find(r=>r.code===code)||{}).naam || '') : '';
   const vandaag = _vandaagAmsterdam();
   gesprek.push({ rol:'user', tekst:vraag, api: vraagMetContext(vraag, code, naam, vandaag) });
+  // Welke beurt dit is: `setChatVve` hoogt de teller op, en dan mag de finally hieronder de
+  // bezig-stand van het NIEUWE gesprek niet meer wegnemen.
+  const beurt = state._chatBeurt = (state._chatBeurt || 0) + 1;
   state._chatBezig = true; state._chatStatus = 'denkt na…'; renderChat();
   const nogHier = () => state._chatVve === vveBijStart && state._chatHistorie === gesprek;
   try{
@@ -364,8 +378,14 @@ async function vraagChat(){
     // Een fout ZONDER .status komt niet van de proxy maar van de verbinding of van de klok
     // (fetchMetKlok gooit dan een eigen, leesbare melding). Die melding tonen in plaats van hem
     // weg te gooien: 'probeer het later opnieuw' zegt niets over wat er misging.
+    // 401/403 van de proxy zijn geen storing maar een toegangsvraag: de sessie is verlopen of dit
+    // account staat niet op de lijst. 'Probeer het later opnieuw' zou daar de verkeerde raad zijn.
     const tekst = (e && e.status === 400)
       ? 'Dit gesprek is te groot geworden voor de chat. Kies hierboven opnieuw een VvE (of wis hem) om een nieuw gesprek te beginnen.'
+      : (e && e.status === 403)
+        ? 'Dit account heeft geen toegang tot de chat. Log in met je VvE Beheer Collectief-account.'
+      : (e && e.status === 401)
+        ? 'Je Google-sessie is verlopen. Stel je vraag zo nog eens; zo nodig vraagt Google je opnieuw in te loggen.'
       : (e && !e.status && e.message)
         ? `${e.message}. Probeer het zo nog eens.`
         : 'Kon nu geen antwoord ophalen. Probeer het later opnieuw.';
@@ -375,7 +395,9 @@ async function vraagChat(){
     // ophalen' zou hebben gezegd — een beurt die hij nooit heeft geproduceerd.
     gesprek.push({ rol:'assistant', tekst, fout:true });
   }finally{
-    state._chatBezig = false; state._chatStatus = ''; renderChat();
+    // Alleen de bezig-stand van DEZE beurt wegnemen; een nieuwer gesprek (setChatVve) heeft zijn eigen.
+    if(state._chatBeurt === beurt){ state._chatBezig = false; state._chatStatus = ''; }
+    renderChat();
   }
 }
 

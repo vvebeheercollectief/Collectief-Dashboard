@@ -907,6 +907,7 @@ async function _loadRonde(silent){
     // Het ingekorte Afgerond-bereik weer onder zijn eigen naam (zie AF_POLL).
     if(R[AF_POLL]!==undefined){ R['Afgerond']=R[AF_POLL]; delete R[AF_POLL]; }
     state._syncFails=0; // alle reads geslaagd
+    state._na401=false; // de 401-herkansing mag bij een volgende storing opnieuw (zie de catch)
     // Meldingen VÓÓR de pendingWrites-terugkeer hieronder: een toast is alleen-lezen en heeft geen
     // belang bij de regel 'de optimistische stand is leidend'. Die regel bestaat om D niet te
     // overschrijven, niet om meldingen tegen te houden. Stond dit bij de zetAls-regels, dan zou
@@ -1068,11 +1069,19 @@ async function _loadRonde(silent){
     // herstelt zich vaak vanzelf bij de volgende ronde. Pas na 2 mislukkingen op rij
     // (of bij een handmatige, niet-stille verversing) tonen we 'Fout'.
     state._syncFails=(state._syncFails||0)+1;
+    // Een 401 op het LEZEN: het token is tussentijds verlopen of ingetrokken, en fetchSheet(s)
+    // heeft het al weggegooid. Dan één vervolgronde inplannen — die haalt via ensureToken stil
+    // een nieuw token en leest opnieuw — in plaats van 'Fout' en (bij een handmatige verversing)
+    // 'controleer je verbinding' te tonen terwijl de verbinding prima is. Eén keer per storing:
+    // de vlag gaat pas bij een geslaagde ronde weer uit, anders zou een blijvende 401 (account
+    // zonder rechten) een lus van rondes geven. Gemeten in de naloop van 2026-10-16.
+    const herkans401 = !!(e && e.status===401 && !state._na401);
+    if(herkans401){ state._na401=true; state._loadAgain=true; if(!silent) state._loadAgainLoud=true; }
     if(isOffline()){
       // Meteen eerlijk zijn, ook bij een stille poll: de verbinding is weg, dat herstelt zich
       // niet vanzelf bij de volgende ronde en het bepaalt of wijzigen nu kan.
       setSyncOffline(); showOfflineBanner();
-    }else{
+    }else if(!herkans401){
       if(!silent || state._syncFails>=2) setSyncErr();
       if(!silent) showLoadError(); // alleen bij eerste/handmatige lading, niet bij zwijgende polls
     }

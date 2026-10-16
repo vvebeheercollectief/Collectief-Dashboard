@@ -375,13 +375,16 @@ export async function herstelBundel(r, oud){
   if (!heeftRij(r)) return;
   if (blokkeerAfgerond(r)) return;
   const huidig = { bundelId: r.bundelId, bundelVolg: r.bundelVolg };
+  // Momentopname voor de rij-controle (zie `snap` in snooze.js): R/S zitten niet in de
+  // vingerafdruk, maar een later ingeschreven bewerking van dezelfde taak wél.
+  const snap = { ...r };
   r.bundelId = oud.bundelId || ''; r.bundelVolg = oud.bundelVolg || '';
   if (r.bundelId) state.bundelOpen.add(bundelSleutel(r.bundelId));
   renderAll();
   backgroundWrite(
     async () => {
       const rij = r._row;                 // één keer lezen, vóór de lezing — zie koppelTaak
-      await assertRowsMatch([{ row: rij, r }]);
+      await assertRowsMatch([{ row: rij, r: snap }]);
       await schrijfBereiken(herstelBundelBereiken(rij, oud));
     },
     () => { r.bundelId = huidig.bundelId; r.bundelVolg = huidig.bundelVolg; },
@@ -396,12 +399,13 @@ export async function ontkoppelTaak(r){
   if (!heeftRij(r)) return;
   if (blokkeerAfgerond(r)) return;
   const oud = { bundelId: r.bundelId, bundelVolg: r.bundelVolg };
+  const snap = { ...r };                  // momentopname voor de rij-controle, zie herstelBundel
   r.bundelId = ''; r.bundelVolg = '';
   renderAll();
   backgroundWrite(
     async () => {
       const rij = r._row;                 // één keer lezen, vóór de lezing — zie koppelTaak
-      await assertRowsMatch([{ row: rij, r }]);
+      await assertRowsMatch([{ row: rij, r: snap }]);
       await schrijfBereiken(ontkoppelBereiken(rij));
     },
     () => { r.bundelId = oud.bundelId; r.bundelVolg = oud.bundelVolg; },
@@ -413,12 +417,18 @@ export async function ontkoppelTaak(r){
 // sleepactie en zijn undo. Bewust gedeeld: de undo schrijft naar dezelfde rijnummers, maar pas
 // seconden later — juist dán is de kans het grootst dat er intussen een rij is bijgekomen of weg
 // is, en dus juist dáár mag de guard niet ontbreken.
-const schrijfVolg = wijzigingen => async () => {
-  // Rijnummers één keer, vóór de lezing (zie koppelTaak): daarna gaan exact dezelfde nummers de
-  // controle én het bereik in.
-  const regels = wijzigingen.map(w => ({ rij: w.r._row, r: w.r, volg: w.volg }));
-  await assertRowsMatch(regels.map(x => ({ row: x.rij, r: x.r })));
-  await schrijfBereiken(herordenBereiken(regels));
+const schrijfVolg = wijzigingen => {
+  // Momentopname van de rijen op het moment van INSCHRIJVEN, voor de rij-controle: die draait pas
+  // als deze beurt aan de wachtrij toe is, en een latere bewerking van een van de leden zou anders al
+  // in de vingerafdruk staan terwijl de Sheet hem nog niet heeft (zie `snap` in snooze.js).
+  const foto = wijzigingen.map(w => ({ ...w.r }));
+  return async () => {
+    // Rijnummers één keer, vóór de lezing (zie koppelTaak): daarna gaan exact dezelfde nummers de
+    // controle én het bereik in. Het rijnummer wél LIVE: dat schuift mee met invoegingen erboven.
+    const regels = wijzigingen.map((w, i) => ({ rij: w.r._row, r: foto[i], volg: w.volg }));
+    await assertRowsMatch(regels.map(x => ({ row: x.rij, r: x.r })));
+    await schrijfBereiken(herordenBereiken(regels));
+  };
 };
 
 // Nieuwe volgorde vastleggen na slepen. `nieuweVolgorde` is de lijst leden in de gewenste

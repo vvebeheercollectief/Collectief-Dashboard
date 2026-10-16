@@ -329,11 +329,28 @@ function volgendeDeadline(huidigStr, type, intervalMaanden){
   return `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;
 }
 
+// 'Vandaag' is de kalenderdag in EUROPE/AMSTERDAM, niet die van het toestel. Tot v15.3 was dit
+// `new Date()` met de uren op nul, dus de dag van de browserklok: wie het dashboard vanaf een
+// toestel in een andere tijdzone opende (vakantie, een telefoon die op een andere zone staat) zag
+// 's avonds een 'vandaag' die een dag voor- of achterliep — en daarmee verkeerde te-laat-tellingen,
+// prioriteiten, 'nog 3d' en deadline-voorstellen. Op kantoor is het verschil nul.
+// Teruggegeven als LOKALE middernacht van díe kalenderdag, want alle deadlines worden ook als
+// lokale `new Date(y, m-1, d)` opgebouwd (zie _parseAnyDate/berekenPrioriteit); zo blijft het
+// rekenen in kalenderdagen kloppen. Valt Intl weg (oude browser), dan het oude gedrag.
+// De formatter één keer bouwen: deze functie draait per rij (deadline-cel, sortering, tellingen),
+// en `new Intl.DateTimeFormat` is het dure deel, niet het formatteren zelf.
+let _amsterdamFmt = null;
 function _vandaagAmsterdam(){
-  // Lokale datum (Europe/Amsterdam = browser-locale van de gebruiker), tijd op 00:00
-  const d = new Date();
-  d.setHours(0,0,0,0);
-  return d;
+  try{
+    _amsterdamFmt = _amsterdamFmt || new Intl.DateTimeFormat('en-CA', { timeZone:'Europe/Amsterdam', year:'numeric', month:'2-digit', day:'2-digit' });
+    const delen = _amsterdamFmt.formatToParts(new Date());
+    const g = t => +delen.find(p => p.type === t).value;
+    return new Date(g('year'), g('month') - 1, g('day'));
+  }catch(_){
+    const d = new Date();
+    d.setHours(0,0,0,0);
+    return d;
+  }
 }
 
 // ISO-8601 weeknummer (Nederlandse weektelling: ma-start, week 1 = de week met

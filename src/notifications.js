@@ -219,7 +219,7 @@ function showUndoToast(title, msg, undoFn, icoNaam, opts) {
     <div class="toast-body">
       <div class="toast-title">${esc(title)}</div>
       ${msg ? `<div class="toast-msg">${esc(msg)}</div>` : ''}
-      <button class="toast-undo" id="undo-btn-${Date.now()}">${ico('ongedaan',12)} Ongedaan maken</button>
+      <button class="toast-undo">${ico('ongedaan',12)} Ongedaan maken</button>
     </div>
     <button class="toast-close" data-action="toast-sluiten" aria-label="Melding sluiten">×</button>
     <div class="toast-bar" style="animation-duration:${UNDO_DURATION}ms"></div>`;

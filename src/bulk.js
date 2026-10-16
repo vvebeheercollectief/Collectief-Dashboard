@@ -339,7 +339,7 @@ async function bulkAfronden(rows){
   // …en de rijnummers van 'Afgerond' meeschuiven met de N invoegingen die zo meteen gebeuren,
   // zodat een losse afronding binnen hetzelfde schrijfvenster niet op een verouderd anker rekent.
   _eindBulk();
-  showUndoToast(`${items.length} taken afgerond`,items.map(i=>i.code).join(', '),()=>bulkUndoAfronden(items,standAf),'vinkCirkel',
+  showUndoToast(items.length===1 ? '1 taak afgerond' : `${items.length} taken afgerond`,items.map(i=>i.code).join(', '),()=>bulkUndoAfronden(items,standAf),'vinkCirkel',
                 {sleutel:`bulkafrond|${items.map(i=>i.r.taakId||i.origRow).join('_')}`});
   backgroundWrite(async()=>{
     const ids=await getSheetIds();
@@ -566,7 +566,7 @@ async function bulkVerwijderen(rows){
     it.pos=pos;
   });
   _eindBulk();
-  showUndoToast(`${items.length} taken verwijderd`,items.map(i=>i.code).join(', '),()=>bulkUndoVerwijderen(items,stand),'prullenbak',
+  showUndoToast(items.length===1 ? '1 taak verwijderd' : `${items.length} taken verwijderd`,items.map(i=>i.code).join(', '),()=>bulkUndoVerwijderen(items,stand),'prullenbak',
                 {sleutel:`bulkverwijder|${items.map(i=>i.r.taakId||i.origRow).join('_')}`});
   backgroundWrite(async()=>{
     const ids=await getSheetIds();
@@ -631,7 +631,11 @@ function bulkVeld(rows,soort,waarde){
   // OPPAKKEN: een nieuwe deadline herberekent de opgeslagen prioriteit-kolom F mee
   // (zoals de losse bewerk-flow). Anders blijft F stale voor externe lezers.
   const oppDl = soort==='deadline';
-  const items=rows.map(r=>({r,sec:r._sec,code:r.code,taakId:r.taakId||'',oud:r[conf.veld]||'',oudPrio:r.prioriteit||''}));
+  // `foto` = de rij zoals hij NU is, vóór de mutatie hieronder: de rij-controle in `schrijf` draait
+  // pas als deze batch in de wachtrij aan de beurt is, en een actie die daarna op een van deze rijen
+  // is ingeschreven (een opgeslagen bewerking, 'Opgevolgd') zou anders al in de vingerafdruk zitten
+  // terwijl de Sheet hem nog niet heeft — vals 'gewijzigd door een collega' voor de hele batch.
+  const items=rows.map(r=>({r,foto:{...r},sec:r._sec,code:r.code,taakId:r.taakId||'',oud:r[conf.veld]||'',oudPrio:r.prioriteit||''}));
   items.forEach(it=>{
     it.r[conf.veld]=waarde;
     if(oppDl && it.sec==='OPPAKKEN') it.r.prioriteit=berekenPrioriteit(waarde,'OPPAKKEN').prioriteit;
@@ -669,7 +673,7 @@ function bulkVeld(rows,soort,waarde){
         // Zonder deze omkering zou elke bulk-deadline en elke bulk-undo gegarandeerd vals afgaan,
         // want de deadline zit in de vingerafdruk.
         poging++;
-        const verwacht=(v)=>items.map((it,i)=>({ row: rijen[i], r: { ...it.r, [conf.veld]: v(it) } }));
+        const verwacht=(v)=>items.map((it,i)=>({ row: rijen[i], r: { ...it.foto, [conf.veld]: v(it) } }));
         try{
           await assertRowsMatch(verwacht(it=>welkeWaarde==='oud' ? waarde : it.oud));
         }catch(err){

@@ -10,6 +10,7 @@ import { backgroundWrite, blokkeerOffline, blokkeerVersie } from "./data.js";
 import { renderAll } from "./main.js";
 import { showToast } from "./notifications.js";
 import { taakUitCache } from "./crud.js";
+import { verseRij } from "./rij.js";
 import { logEvent } from "./render-overig.js";
 import { vraagBevestiging } from "./bevestig.js";
 
@@ -42,8 +43,23 @@ function snoozeKies(dagen){
 // Async sinds de eigen bevestigingsvraag. Beide aanroepers laten het resultaat liggen — de
 // Wegleggen-knop (main.js) en `snoozeKies` — en er gebeurt bij allebei niets ná de aanroep, dus
 // die hoefden niet mee te veranderen.
+// De rij VERS opzoeken op het klikmoment (zelfde reden als `_bewerkRijVers` in crud.js): de stille
+// resync ná een eerdere schrijfactie vervangt alle rij-objecten in D terwijl dit venster openstaat,
+// en dan muteerde `schrijfOpvolgdatum` een wees — de Sheet werd goed beschreven, maar het scherm
+// liet niets zien tot de volgende ronde (naloop 2026-10-16).
+function _snoozeRijVers(){
+  const bewaard = state._snoozeRow; if(!bewaard) return null;
+  const r = verseRij(bewaard);
+  if(!r){
+    showToast('Taak niet gevonden','De lijst is intussen ververst. Probeer het opnieuw.','var(--rd)','waarschuwing',{geenDedup:true,geenSysteemmelding:true});
+    closeSnoozeModal();
+    return null;
+  }
+  state._snoozeRow = r;
+  return r;
+}
 async function snoozeOpslaan(){
-  const r = state._snoozeRow; if(!r) return;
+  const r = _snoozeRijVers(); if(!r) return;
   // Minimumversie-rem hier al: hieronder sluit het venster ongeacht de rem in schrijfOpvolgdatum.
   if(blokkeerVersie()) return;
   const iso = document.getElementById('snooze-datum').value;
@@ -75,7 +91,7 @@ async function snoozeOpslaan(){
   closeSnoozeModal();
 }
 function snoozeWis(){
-  const r = state._snoozeRow; if(!r) return;
+  const r = _snoozeRijVers(); if(!r) return;
   if(blokkeerVersie()) return;   // zie snoozeOpslaan: venster open laten
   schrijfOpvolgdatum(r, '', 'Opvolgdatum gewist');
   closeSnoozeModal();
@@ -84,13 +100,19 @@ async function schrijfOpvolgdatum(r, nieuw, actie){
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){ alert('Inloggen mislukt. Probeer het opnieuw.'); return; }
   const oud = r.opvolgdatum || '';
+  // Momentopname VÓÓR de mutatie, voor de rij-controle. De controle draait pas als deze schrijfactie
+  // in de seriële wachtrij aan de beurt is; een actie die daarna is ingeschreven maar al optimistisch
+  // in `r` staat (een opgeslagen bewerking, 'Opgevolgd') zou anders in de vingerafdruk zitten terwijl
+  // de Sheet nog de oude waarde heeft — vals 'Iemand heeft deze taak net gewijzigd' en een
+  // teruggedraaide weglegging (naloop 2026-10-16). Zelfde idioom als `snap` in offerte-aannemers.js.
+  const snap = {...r};
   r.opvolgdatum = nieuw;
   renderAll();
   backgroundWrite(
     async ()=>{
       const rij = r._row;   // Eén keer gelezen: een afronding elders schuift `_row` optimistisch op (_shiftNtdRows); tussen
       // controle en schrijven mag hij dus niet opnieuw gelezen worden (naloop 25-09).
-      await assertRowMatch(rij, r); // bescherming: rij nog dezelfde TAAK vóór L-write (kolom L zit niet in de vingerafdruk)
+      await assertRowMatch(rij, snap); // bescherming: rij nog dezelfde TAAK vóór L-write (kolom L zit niet in de vingerafdruk)
       await writeRange(`'Nog Te Doen'!${OPVOLG_KOLOM}${rij}:${OPVOLG_KOLOM}${rij}`, [nieuw]);
       await logEvent(r.code, r._sec, actie, 'opvolgdatum', oud, nieuw);
       // Bevestiging pas ná de write; onderaan de writeFn zodat een herkansing er niet twee geeft.

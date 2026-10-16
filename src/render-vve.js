@@ -132,7 +132,13 @@ const kmkPil=v=>{const w=v||'Onbekend';return `<span class="kmk-w${v?'':' leeg'}
 function kenmerkenKaart(code){
   const k=vveKenmerken(code,D);
   if(state.kenmerkenEdit){
-    const sel=(id,val)=>`<select id="${id}">${KENMERK_WAARDEN.map(w=>`<option${(val||'Onbekend')===w?' selected':''}>${w}</option>`).join('')}</select>`;
+    // Een waarde die niet in de vaste lijst staat (met de hand in de Sheet gezet, bv. 'Deels')
+    // komt als extra optie mee en blijft geselecteerd. Zonder dat viel de select terug op
+    // 'Onbekend' en schreef Opslaan die leegte stil over de echte waarde heen — dezelfde regel als
+    // `setv` in crud.js: een waarde die er al is mag nooit verdampen omdat een lijstje hem niet kent.
+    const sel=(id,val)=>{ const huidig=val||'Onbekend';
+      const opties=KENMERK_WAARDEN.includes(huidig)?KENMERK_WAARDEN:[...KENMERK_WAARDEN,huidig];
+      return `<select id="${id}">${opties.map(w=>`<option${huidig===w?' selected':''}>${esc(w)}</option>`).join('')}</select>`; };
     // Echte <label for=…> en geen <span>: deze drie velden worden pas bij het bewerken getekend en
     // vielen daarmee buiten de eenmalige koppelpas bij het opstarten (modal-a11y.js). Ze waren de
     // enige naamloze velden die er nog waren — en een klik op het woord 'Balkons' deed niets.

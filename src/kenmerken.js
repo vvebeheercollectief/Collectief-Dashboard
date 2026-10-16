@@ -58,9 +58,12 @@ async function saveKenmerken(){
   // Offline-poort staat hier, vóór het sluiten van het bewerkscherm: doe je dit later, dan is de
   // invoer van de gebruiker weg terwijl er niets is opgeslagen.
   if(gewijzigd.length && blokkeerOffline()) return;
+  if(!gewijzigd.length){ state.kenmerkenEdit=false; renderVve(); return; }
+  // Pas NÁ de tokenpoort uit de bewerkstand, om dezelfde reden als de offline-poort hierboven:
+  // mislukt de vernieuwing, dan blijft de invoer staan in plaats van dat `renderVve()` de
+  // leeskaart tekent en de gekozen waarden weg zijn zonder dat er iets is opgeslagen.
+  if(!await ensureToken()){ alert('Inloggen mislukt. Probeer het opnieuw.'); return; }
   state.kenmerkenEdit=false;
-  if(!gewijzigd.length){ renderVve(); return; }
-  if(!await ensureToken()){ renderVve(); alert('Inloggen mislukt.'); return; }
   const who=getCurrentWho()||'?', ts=new Date().toISOString();
   const sn={...oud};                       // snapshot voor rollback
   let rec=(D.kenmerken||[]).find(k=>k.code===code);

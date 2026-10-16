@@ -45,7 +45,7 @@ const FETCH_TIMEOUT_MS = 20_000;
 const AI_TIMEOUT_MS = 60_000;
 
 // Dezelfde tijdslimiet, maar ZONDER de netwerkteller — voor verzoeken die niet naar Sheets gaan:
-// het e-mailadres van de ingelogde gebruiker (auth.js) en de AI-proxy (askChat hieronder). Die
+// het e-mailadres van de ingelogde gebruiker (auth.js) en de AI-proxy (askZoek hieronder). Die
 // twee liepen als enige zónder klok, en dat is precies waar deze grens voor bestaat: een `fetch`
 // die nooit antwoordt hangt voor altijd, en beide aanroepers staan in een try/finally waarvan de
 // finally dan óók nooit draait — `_authBezig` bleef 1 (Herladen-knop dood), `_herinlogBezig` bleef
@@ -310,20 +310,9 @@ async function _withRetry(fn){
   }
 }
 
-// Stuurt de systeem-instructie + gespreksgeschiedenis naar de Vercel-proxy, die
-// server-side Claude aanroept. Geeft de antwoordtekst terug. Vereist een ingelogde
-// gebruiker (OAuth-token gaat mee voor de allowlist-check in de proxy).
-async function askChat(system, messages){
-  if(!state.oauthToken) throw new Error('Niet ingelogd');
-  const r = await fetchMetKlok(PROXY_URL, {
-    method:'POST',
-    headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${state.oauthToken}` },
-    body: JSON.stringify({ system, messages }),
-  }, 'De AI gaf binnen een minuut geen antwoord', AI_TIMEOUT_MS);
-  const data = await r.json().catch(()=>({}));
-  if(!r.ok){ const e=new Error(data.error||'AI-fout'); e.status=r.status; throw e; }
-  return (data.antwoord || '').trim();
-}
+// (De oude dossier-modus `askChat` — één vraag met het hele dossier als systeemtekst — is in de
+//  naloop van 2026-10-16 weggehaald: sinds v15.0 loopt élke chatvraag via askZoek, en niets riep hem
+//  nog aan. De proxy kent die modus nog, zodat een verouderd tabblad er niet op stukloopt.)
 
 // Zoekmodus van de dashboard-chat: één ronde van de zoeklus. Geeft de ruwe blokken van Claude
 // terug ({content, stop_reason}); dossier-chat.js voert de gevraagde filters uit en roept dit
@@ -336,6 +325,10 @@ async function askZoek(system, messages, laatste){
     body: JSON.stringify({ modus:'zoek', system, messages, laatste: !!laatste }),
   }, 'De AI gaf binnen een minuut geen antwoord', AI_TIMEOUT_MS);
   const data = await r.json().catch(()=>({}));
+  // 401 = de proxy kon het token niet bij Google verifiëren (verlopen of ingetrokken). Dan het
+  // token weggooien, net als de Sheets-wegen hierboven doen: de volgende aanroep vernieuwt het dan
+  // stil via ensureToken in plaats van nog eens met hetzelfde dode token aan te kloppen.
+  if(r.status===401){ state.oauthToken=null; state.oauthExpiry=0; }
   if(!r.ok){ const e=new Error(data.error||'AI-fout'); e.status=r.status; throw e; }
   return { content: Array.isArray(data.content) ? data.content : [], stop_reason: data.stop_reason || '', model: data.model || '' };
 }
@@ -570,4 +563,4 @@ async function assertRowsMatch(checks, sheetName='Nog Te Doen'){
 const assertRowMatch=(row, bronOfCode, sheetName)=>assertRowsMatch(
   [(bronOfCode && typeof bronOfCode==='object') ? { row, r:bronOfCode } : { row, code:bronOfCode }], sheetName);
 
-export { kapCel, NTD_DATUM, isOffline, fetchMetKlok, _isOffline, _isNetwerkFout, fetchSheet, fetchSheets, writeRange, writeRanges, writeRows, appendRange, appendRows, veiligeCel, _veiligeRij, _shiftNtdRows, _shiftAfRows, _herstelShift, _isTransient, _withRetry, askChat, askZoek, _rowMismatch, _a1Bereik, vingerafdruk, rijVingerafdruk, _nummerDeel, _normCel, _rijNaarCellen, assertRowsMatch, assertRowMatch, NTD_OMSCHRIJVING, sheetsFetch };
+export { kapCel, NTD_DATUM, isOffline, fetchMetKlok, _isOffline, _isNetwerkFout, fetchSheet, fetchSheets, writeRange, writeRanges, writeRows, appendRange, appendRows, veiligeCel, _veiligeRij, _shiftNtdRows, _shiftAfRows, _herstelShift, _isTransient, _withRetry, askZoek, _rowMismatch, _a1Bereik, vingerafdruk, rijVingerafdruk, _nummerDeel, _normCel, _rijNaarCellen, assertRowsMatch, assertRowMatch, NTD_OMSCHRIJVING, sheetsFetch };

@@ -2108,3 +2108,20 @@ tr.expanded + .crm-mail-tr{display:table-row}
    groepering tijdelijk overneemt — anders lijkt de pil stuk. */
 .kop-pil-klik.aan.pil-vve{background:var(--ac-l);color:var(--ac-900)}
 .kop-pil-klik.pil-vve.gedempt{opacity:.5}
+
+/* ── Naloop 2026-10-16 ── */
+/* Toetsenbordfocus op de twee velden die de globale regel hierboven (input:focus-visible{outline:none})
+   zonder eigen vervanger liet: het datumveld in de bulk-balk en het zoekveld van Ctrl+K. */
+.bb-datum input:focus{outline:none;border-color:var(--ac);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 14%,transparent)}
+.pal-zoek:focus-within{box-shadow:inset 0 -2px 0 var(--ac)}
+/* Donker thema: de omgekeerde cijfers op de gevulde voortgangsbalk waren wit op #8FA6C2 (2,5:1). */
+[data-theme=dark] .ntd-progress-val-rev{color:#15181d}
+/* Afdrukken: de schil staat op 100vh met overflow:hidden, dus op papier kwam alleen het eerste
+   scherm. Zijbalk, knoppen en meldingen horen niet op papier. */
+@media print{
+  #app{height:auto;overflow:visible;display:block}
+  #main,#content{overflow:visible;height:auto;padding:0}
+  #sb,#hdr .ico-btn,#bulk-balk,#toast-container,.sw-update-bar,.staging-balk,.pag,.acts{display:none !important}
+  .tbl-wrap{overflow:visible}
+  body{background:#fff}
+}

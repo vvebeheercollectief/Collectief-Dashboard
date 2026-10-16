@@ -14,7 +14,7 @@
 import { SECS, SKEYS } from './config.js';
 import { displayName, taakTitel, parseDt, parseOff, opvolgStatus, teLaatVoorTelling,
          offerteAangevraagd, splitBehandelaar, _vandaagAmsterdam, _verschilInKalenderdagen,
-         parseAannemers, reconcileOffertes } from './util.js';
+         parseAannemers, reconcileOffertes, _parseAnyDate } from './util.js';
 import { fmtLogTs, logPaginaSoort } from './render-overig.js';
 import { telbaar } from './bundel.js';
 import { zonderOpmaak } from './opmaak.js';
@@ -35,11 +35,14 @@ const SEC_OP_LABEL = Object.fromEntries(SKEYS.map(k => [_klein(SECS[k].label), k
 const _secLabel = k => (SECS[k] && SECS[k].label) || k;
 
 // 'jjjj-mm-dd' → ms om 00:00 lokale tijd; ongeldig of leeg → null.
+// Via `_parseAnyDate`, dat een onbestaande datum (2026-02-31, maand 13) afwijst. `new Date(…)`
+// rolde die stil door naar 3 maart of januari van het jaar erna, en dan was 'N gevonden' het
+// antwoord op een andere periode dan Claude vroeg (naloop 2026-10-16).
 function _invoerDatum(s){
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || '').trim());
-  if(!m) return null;
-  const d = new Date(+m[1], +m[2] - 1, +m[3]);
-  return isNaN(d) ? null : d.getTime();
+  const t = String(s || '').trim();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(t)) return null;
+  const p = _parseAnyDate(t);
+  return p ? new Date(p.y, p.m - 1, p.d).getTime() : null;
 }
 // Valt `ms` binnen [van, tot]? Beide grenzen inclusief, 'tot' tot het eind van die dag.
 function _inPeriode(ms, van, tot){

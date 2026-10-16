@@ -139,6 +139,11 @@ async function submitOntwItem(){
   const door  = bewerken ? ((state.ontwEditRow.door  || '').trim() || who)   : who;
   const datum = bewerken ? ((state.ontwEditRow.datum || '').trim() || today) : today;
   const values=[titel,cat,inhoud,door,datum,status];
+  // Dubbelklik-rem (naloop 2026-10-16): de `await ensureToken()` hierboven kan een echte
+  // netwerkronde zijn, en twee klikken in dat gat gaven bij een NIEUW item twee appends en dus
+  // een dubbel item. Ná de invoercontroles (die laten het venster open), in de finally weer los.
+  if(state._ontwBezig) return;
+  state._ontwBezig=true;
   try{
     // Eén beurt in de seriële schrijfwachtrij (serieleWrite): dit pad kon tot nu toe dwars door
     // een lopende undo of bulk heen schrijven (naloop 2026-08-28).
@@ -156,12 +161,18 @@ async function submitOntwItem(){
     closeOntwModal();
     await loadAll();
   }catch(e){alert('Opslaan mislukt. '+leesbareFout(e))}
+  finally{ state._ontwBezig=false; }
 }
 
 async function deleteOntwItem(){
   if(!state.ontwEditRow) return;
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if(!await ensureToken()){alert('Inloggen mislukt.');return}
+  // Dezelfde dubbelklik-rem als submitOntwItem: een tweede klik in het ensureToken-gat vond via
+  // `_row` het intussen opgeschoven BUUR-item en liet dat lokaal verdwijnen (de guard in de Sheet
+  // ving het, maar met een 'Verwijderen mislukt' voor een handeling die wél slaagde).
+  if(state._ontwBezig) return;
+  state._ontwBezig=true;
   const r=state.ontwEditRow;
   const values=[r.titel||'',r.categorie||'',r.inhoud||'',r.door||'',r.datum||'',r.status||''];
   const oudeRow=r._row;
@@ -202,6 +213,8 @@ async function deleteOntwItem(){
     ()=>{ if(echte&&regelIndex(D.ontw, echte, _ontwSleutel)===-1){ D.ontw.forEach(x=>{ if(x._row>=oudeRow) x._row++; }); D.ontw.splice(Math.min(pos<0?D.ontw.length:pos,D.ontw.length),0,echte); } },
     'Verwijderen mislukt'
   );
+  // De rem los zodra de schrijfactie klaar is (geslaagd of niet) — zelfde idioom als inbehandeling.js.
+  state._writeChain.finally(()=>{ state._ontwBezig=false; });
   // rode puls + fade op de oude rij; daarná pas hertekenen
   animateRowOut(tr,'rij-puls-rood',renderOntw);
 }
@@ -298,9 +311,6 @@ function actieBadge(actie){
 }
 
 // Filterstatus voor de tijdlijn (leeg = alles)
-
-const _LOG_AVKLEUR={Jer:'var(--ac)',Cihad:'var(--ac)',Gabos:'var(--ac)',Cihan:'var(--am)'};
-function avatarKleur(naam){ return _LOG_AVKLEUR[naam] || 'var(--nv)'; }
 
 function logDayLabel(iso){
   const d=new Date(iso);
@@ -620,6 +630,13 @@ async function saveLogboek(row, box){
 }
 
 async function deleteLogboek(row){
+  // Dubbelklik-rem op TIJD en niet per regel: na de eerste klik hertekent `_rerenderLog()` meteen,
+  // de lijst schuift één regel op en de tweede klik van een dubbelklik landt op het prullenbakje van
+  // de VOLGENDE regel — met hetzelfde rijnummer, dus een per-rij-sleutel zou hem doorlaten. Twee
+  // bewuste verwijderingen liggen nooit 400 ms uit elkaar (naloop 2026-10-16).
+  const nu=Date.now();
+  if(nu-(state._logDelLaatst||0)<400) return;
+  state._logDelLaatst=nu;
   const entries=D.logboek||[];
   const idx=entries.findIndex(e=>e._row===row);
   if(idx<0) return;
@@ -930,7 +947,7 @@ async function logEvents(regels) {
 
 export {
   ONTW_CATS, parseOntw, renderOntw, setOntw, openOntwModal, closeOntwModal,
-  submitOntwItem, deleteOntwItem, editOntwItem, parseLogboek, _logSleutel, _logRegelSleutel, _ontwSleutel, _nogNietBevestigd, fmtLogTs, actieBadge, _LOG_AVKLEUR, avatarKleur,
+  submitOntwItem, deleteOntwItem, editOntwItem, parseLogboek, _logSleutel, _logRegelSleutel, _ontwSleutel, _nogNietBevestigd, fmtLogTs, actieBadge,
   logDayLabel, logZin, logTijd, logItemHtml, logPaginaSoort, LOG_ZIN_EIGEN, renderLogboek, histNoteKey, renderTaskHistory, addTaskNote, logEvent, logEvents,
   _shiftRows, _shiftLogboekRows, _shiftLogEditRef, _herankerLogEdit, logEditWrite, logDeleteLabel,
   logEditForm, editLogboek, saveLogboek, cancelLogboek, setLogSoort, deleteLogboek, undoDeleteLog,

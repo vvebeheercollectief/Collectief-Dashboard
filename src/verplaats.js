@@ -19,7 +19,7 @@
 // `verlorenVelden` ze op een rij en toont de vraag ze met naam en waarde — en het logboek legt ze
 // vast, zodat ze ook achteraf nog terug te lezen zijn.
 import { state, D } from "./state.js";
-import { verseRij, rijIndex } from "./rij.js";
+import { rijIndex } from "./rij.js";
 import { SECS, SID, OMSCHRIJVING_SLEUTEL, VELD_LABELS } from "./config.js";
 import { berekenPrioriteit, taakTitel, leesbareFout } from "./util.js";
 import { assertRowsMatch, _shiftNtdRows, _herstelShift, sheetsFetch, kapCel } from "./api.js";

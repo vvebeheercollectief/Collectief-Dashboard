@@ -2162,9 +2162,15 @@ button.sync-row:focus-visible{box-shadow:0 0 0 2px var(--ac)}
 .wg-nieuw{border-style:dashed;color:var(--mut)}
 .wg-nieuw:hover{color:var(--txt)}
 .wg-naam{height:26px;border:1px solid var(--ac-b);border-radius:13px;padding:0 10px;font:inherit;font-size:12px;background:var(--sur);color:var(--txt);min-width:220px;outline:none}
-/* U8: de focusrij van het toetsenbord. */
-#ntd-tbody tr.rij-focus>td{box-shadow:inset 0 0 0 1.5px var(--ac)}
-#ntd-tbody tr.rij-focus>td:first-child{box-shadow:inset 2px 0 0 var(--ac),inset 0 1.5px 0 var(--ac),inset 0 -1.5px 0 var(--ac)}
+/* U8: de focusrij van het toetsenbord. Tot v15.5 een binnenrand per cel; dat gaf een hoekig kader om
+   elke kolom en is op verzoek vervangen door een zachte accenttint over de hele rij. De tweede regel
+   overstemt de dekkende achtergrond van de sticky actiekolom (ook bij .row-telaat en bij hover), anders
+   breekt de tint daar af. De derde moet tegen de !important van tr.ib-row op, maar laat de groene/rode
+   bevestigingsflits (.rij-puls-*) voorgaan. */
+#ntd-tbody tr.rij-focus>td{background:var(--ac-l)}
+#ntd-tbl-wrap tbody tr.rij-focus td:not([colspan]):last-child,
+#ntd-tbl-wrap tbody tr.rij-focus:hover td:not([colspan]):last-child{background:var(--ac-l)}
+#ntd-tbody tr.ib-row.rij-focus:not(.rij-puls-groen):not(.rij-puls-rood)>td{background:var(--ac-l)!important}
 .sneltoets-kop{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:4px 0 6px}
 .sneltoets-lijst{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0 0 14px;font-size:13px}
 .sneltoets-lijst dt{white-space:nowrap}

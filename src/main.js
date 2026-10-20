@@ -1,10 +1,10 @@
 // ══════════════════════════════════════
 //  MAIN — boot/orchestrator
 // ══════════════════════════════════════
-import { IS_STAGING, emailToegestaan, SKEYS, SECS, APP_VERSION, TEAM } from './config.js';
+import { IS_STAGING, emailToegestaan, SKEYS, SECS, APP_VERSION, TEAM, VERHUISD_NAAR, _verhuisDoel } from './config.js';
 import { D, pgs, state } from './state.js';
 import { verseRij } from "./rij.js";
-import { ensureToken, uitloggen, vernieuwMetFocus, installeerVernieuwTriggers } from './auth.js';
+import { uitloggen, vernieuwMetFocus, installeerVernieuwTriggers } from './auth.js';
 import { startSplash } from './login-splash.js';
 import { goTo, syncKop, closeSb, applyTheme, applyDensity, cycleDensity, setupSearch, zetBijOpenen } from './ui.js';
 import { renderNtd, renderAf, renderAlvo, renderAlfa, renderNtdStats, zetKopOpen, kopOpen } from './render-lijsten.js';
@@ -20,7 +20,7 @@ import {
   openModal, closeModal, submitTask, doCompleteTask, closeCompleteModal, kiesSectie, renderExtraVves, _bewerkRijVers, nietOpgeslagenVelden, kiesDuur,
   sluitModalVeilig, controleerBewerkConflict,
 } from './crud.js';
-import { loadAll, magPollen, schrijfActieLoopt, setSyncOffline, showOfflineBanner, clearOfflineBanner, laadUitCache, ruimCacheOp, blokkeerVersie } from './data.js';
+import { loadAll, magPollen, pollActief, pollNu, schrijfActieLoopt, setSyncOffline, showOfflineBanner, clearOfflineBanner, laadUitCache, ruimCacheOp, blokkeerVersie } from './data.js';
 import { startVersieBewaking } from './versie.js';
 import { initActions } from './actions.js';
 import { initVveZoekveld } from './vve-zoekveld.js';
@@ -46,6 +46,12 @@ import { initModalA11y, bovensteModal } from './modal-a11y.js';
 import { beantwoordBevestiging, vraagBevestiging } from './bevestig.js';
 import { ico } from './icons.js';
 import { groeiVelden } from './opmaak.js';
+
+// Verhuisd naar het eigen domein? Dan meteen door, vóór er iets opstart (geen inlog, geen poll,
+// geen schrijfactie op de oude origin). Werkt ook vanuit een gecachte versie: de service worker
+// haalt deze main.js bij de eerstvolgende update binnen. Zie VERHUISD_NAAR in config.js.
+const _verhuis = _verhuisDoel(VERHUISD_NAAR, location.hostname, location.search, location.hash);
+if (_verhuis) location.replace(_verhuis);
 
 // Centrale Escape-sluiting: per venster de juiste sluitfunctie (met opruimlogica),
 // i.p.v. alleen de .open-class te verwijderen zodat er geen toestand achterblijft.
@@ -98,6 +104,7 @@ window.addEventListener('unhandledrejection', e => {
 //  BOOT
 // ══════════════════════════════════════
 document.addEventListener('DOMContentLoaded',()=>{
+  if(_verhuis) return;
   // Centraal klik-systeem: één delegatie-listener voor alle data-action-elementen
   initActions();
   initPalette();
@@ -581,22 +588,12 @@ document.addEventListener('DOMContentLoaded',()=>{
     loadAll(true);
   });
 
-  // Eenmalige migratie v12.5 (offerte-stappen) — handmatig vanuit de console; zie migratie-offerte.js.
-  // Alleen de console-hulp staat klaar; de module zelf wordt pas geladen als iemand hem aanroept.
-  // Hij werd hier bij ELKE start geïmporteerd (een extra verzoek en 11 kB parsen) voor een functie
-  // die op productie al gedraaid heeft. De kringverwijzing met main.js (hij heeft renderAll nodig)
-  // knelt zo ook niet: hij laadt pas lang ná main.js.
-  window.migreerOfferteStappen=(...args)=>import('./migratie-offerte.js')
-    .then(m=>m.migreerOfferteStappen(...args))
-    // Zonder deze regel staat er in de console alleen een kale importfout, zonder aanwijzing
-    // waaróm (gebeurd bij de uitrol van 12.5 op 02-09-2026).
-    .catch(e=>{ console.warn('[migratie] module niet geladen of mislukt:', e && e.message); throw e; });
-
   // Live updates — auto-refresh elke 8 seconden (smart diff voorkomt onnodige re-renders)
   // Id bewaard voor diagnose — logout() stopt hem BEWUST niet: dan zou een tweede inlog in
   // hetzelfde tabblad stil bevriezen. De poll ligt na een uitlog vanzelf stil (magPollen eist
   // state.currentUserEmail). Zie de toelichting in logout(), auth.js.
-  state._resyncTimer=setInterval(async ()=>{
+  // `geforceerd`: de terugkeer na een rustige periode (zie hieronder) slaat de tempo-regel over.
+  const pollTik=(geforceerd=false)=>{
     // Tijdens de zelftest (?test=1) niet pollen. De suite zet `window.fetch` om de beurt naar een
     // eigen stub en meet dán wat er gevraagd wordt en wat de statusbalk zegt; een ronde die daar
     // dwars doorheen loopt overschrijft de gemeten URL en zet de balk op 'Live'. Dat gaf twee
@@ -626,8 +623,27 @@ document.addEventListener('DOMContentLoaded',()=>{
     // Nog geen sessie → niet pollen. Anders vroeg deze timer op het inlogscherm elke
     // 8 s zélf een token aan en kaapte hij het antwoord van een lopende inlogpoging.
     if(!magPollen(state)) return;
+    // Rustig tempo als niemand in dit venster werkt (pollNu, data.js).
+    const nu=Date.now();
+    if(!geforceerd && !pollNu(nu, state._laatsteInvoer, document.hasFocus(), state._laatstePollMs)) return;
+    state._laatstePollMs=nu;
     loadAll(true);   // loadAll vernieuwt de token zelf en toont fouten in de statusbalk
-  },8000);
+  };
+  state._resyncTimer=setInterval(()=>pollTik(),8000);
+  // Invoer en terugkeer in het venster bijhouden. Was het venster rustig (pollActief onwaar) en is
+  // de laatste ronde ouder dan één tik, dan meteen verversen: wie terugkomt, ziet de verse stand en
+  // niet die van tot 30 s geleden. Capture + passive: nooit in de weg van de eigen handlers.
+  state._laatsteInvoer=Date.now();
+  const merkInvoer=()=>{
+    const nu=Date.now();
+    const wasRustig=!pollActief(nu, state._laatsteInvoer, document.hasFocus()) || state._wasZonderFocus;
+    state._laatsteInvoer=nu; state._wasZonderFocus=false;
+    if(wasRustig && nu-(state._laatstePollMs||0) >= 8000) pollTik(true);
+  };
+  ['pointerdown','keydown','wheel','touchstart'].forEach(t=>document.addEventListener(t, merkInvoer, {capture:true, passive:true}));
+  window.addEventListener('focus', merkInvoer);
+  window.addEventListener('blur', ()=>{ state._wasZonderFocus=true; });
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) merkInvoer(); });
 
   // Token-refresh heartbeat — elke 4 min proactief vernieuwen vóór expiry, maar ALLEEN als de
   // gebruiker in dit venster zit (v13.5). Ook een stille vernieuwing opent een Google-venster dat

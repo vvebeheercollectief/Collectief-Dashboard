@@ -244,9 +244,9 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 // Controleert de ingelogde Google-gebruiker tegen de allowlist; proxyt dan naar Anthropic.
 const ALLOWED_EMAILS = [
   'info@vvebeheercollectief.nl',
-  'djiowchico@gmail.com',
-  'gabrielateterycz1616@gmail.com',
-  'giocan175@gmail.com',
+  'collega1@voorbeeld.nl',
+  'collega2@voorbeeld.nl',
+  'collega3@voorbeeld.nl',
 ];
 const ALLOWED_ORIGINS = [
   'https://vvebeheercollectief.github.io',

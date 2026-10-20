@@ -26,18 +26,15 @@ try {
   console.warn('[sw] sw-strategie.js niet geladen, terug naar netwerk-eerst:', e);
 }
 
-// logo-login.png en src/urgentie.js stonden hier zonder gebruiker: het logo is bij het nieuwe
-// loginscherm vervangen, en urgentie.js wordt alleen nog door de testsuite geïmporteerd. Beide
-// werden bij iedereen meegedownload en gecached. De BESTANDEN blijven wél staan: src/tests.js
-// hangt aan urgentie.js.
-const CACHE_VERSION = 'cd-v178';
+// src/urgentie.js staat hier bewust niet: alleen de testsuite importeert hem.
+const CACHE_VERSION = 'cd-v179';
 // Dezelfde waarde als APP_VERSION in src/config.js, en die wordt bij ELKE wijziging opgehoogd.
 // Waarom hij hier staat: de browser besluit alleen dat er een nieuwe service worker is als het
 // BESTAND sw.js verandert. Een uitrol die alleen src/ raakt liet sw.js dus ongemoeid, en dan
 // verscheen de 'nieuwe versie'-balk niet — open sessies bleven de oude modules draaien tot iemand
 // toevallig herlaadde. Met deze regel verandert sw.js altijd mee. Er staat een toets in tests.js
 // die alarm slaat zodra dit getal en APP_VERSION uit elkaar lopen.
-const APP_VERSION = '15.5';
+const APP_VERSION = '15.6';
 // Geen './' meer: een navigatie naar de app krijgt altijd './index.html' uit de cache (zie
 // sw-strategie.js), dus een tweede kopie onder de kale map was alleen een extra download.
 const APP_SHELL = [
@@ -46,7 +43,6 @@ const APP_SHELL = [
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
-  './icon-maskable.png',
   './apple-touch-icon.png',
   './logo-sidebar.png',
   './beeldmerk-wit.svg',
@@ -112,22 +108,21 @@ const APP_SHELL = [
   './src/bundel.js',
   './src/bundel-acties.js',
   './src/render-bundel.js',
-  // Eenmalige migratie v12.5. Wordt lazy geïmporteerd (alleen via de console-hulp), maar de wachtpost in tests.js
-  // volgt óók dynamische imports — en terecht: een dynamische import is net zo goed een verzoek
-  // dat bij 'eerste bezoek en meteen offline' niet uit de cache te beantwoorden valt.
-  './src/migratie-offerte.js',
 ];
 
 self.addEventListener('install', e => {
   e.waitUntil(
     // Per-resource cachen: één gemiste/hernoemd bestand mag de hele install niet laten falen
     // (anders blijft de oude SW hangen en komt een release nooit door).
-    // `cache:'reload'`: langs de HTTP-cache heen. GitHub Pages geeft max-age=600; zonder deze
-    // optie kon de NIEUWE cache gevuld worden met een tot tien minuten oude kopie uit de
-    // HTTP-cache — oude modules in een nieuwe versie, en met cache-first blijven die dan staan.
+    // `cache:'no-cache'`: de HTTP-cache mag alleen antwoorden na een controle bij de server
+    // (ETag/If-None-Match). GitHub Pages geeft max-age=600; zonder deze optie kon de NIEUWE cache
+    // gevuld worden met een tot tien minuten oude kopie — oude modules in een nieuwe versie, en met
+    // cache-first blijven die dan staan. Tot v15.5 stond hier 'reload' (altijd opnieuw downloaden);
+    // dat haalde bij elke release alle ~65 bestanden opnieuw binnen, ook de ongewijzigde, en bij
+    // een eerste bezoek alles twee keer. Met 'no-cache' komt een ongewijzigd bestand terug als 304.
     // Geen cache.add: die bewaart een doorverwezen antwoord ongewijzigd (zie schoon() hieronder).
     caches.open(CACHE_VERSION)
-      .then(c => Promise.all(APP_SHELL.map(u => fetch(new Request(u, { cache: 'reload' }))
+      .then(c => Promise.all(APP_SHELL.map(u => fetch(new Request(u, { cache: 'no-cache' }))
         .then(resp => { if (resp.ok) return c.put(u, schoon(resp)); })
         .catch(() => {}))))
   );

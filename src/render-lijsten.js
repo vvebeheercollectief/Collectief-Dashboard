@@ -9,9 +9,9 @@ import { SECS, SKEYS, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { bulkWis, renderBulkUi, allesVinkjeHtml, bulkHerstel } from "./bulk.js";
 import { showToast } from "./notifications.js";
-import { renderThead, renderTbody, renderPag, bepaalStil, bouwStilIndex, _zetStilIndex, deadlineCel, rowNtd, rowAf } from "./render-tabel.js";
+import { renderThead, renderTbody, renderPag, bepaalStil, bouwStilIndex, _zetStilIndex, rowNtd } from "./render-tabel.js";
 import { _verrijkOfferteRij, offerteAannemerPaneel, offerteAannSamenvatting, herstelAannemerFocus } from "./render-offerte.js";
-import { renderAlvo, renderAlfa, toggleAlvoFlag, ALVO_COLS, ALVO_LABELS, flagPill, _recomputeAlvoStatus } from "./render-alv.js";
+import { renderAlvo, renderAlfa, toggleAlvoFlag } from "./render-alv.js";
 // Kringverwijzing data ⇄ render-lijsten: vraagAfMailOp draait alleen op runtime (in renderAf).
 import { vraagAfMailOp } from "./data.js";
 // U6/U8: de weergave-knopjes en de focusrij volgen elke hertekening van de lijst. Beide modules
@@ -777,6 +777,6 @@ export {
   kopOpen, zetKopOpen, toggleBundel, springNaarBundel, wisNtdFilters, absorbeer, isPlatteWeergave, erIsGefilterd,
   perVveActief,
   offerteAannemerPaneel, offerteAannSamenvatting,
-  renderAlvo, ALVO_COLS, ALVO_LABELS, flagPill, _recomputeAlvoStatus, toggleAlvoFlag, renderAlfa,
-  renderThead, renderTbody, bepaalStil, bouwStilIndex, _zetStilIndex, deadlineCel, rowNtd, rowAf, renderPag,
+  renderAlvo, toggleAlvoFlag, renderAlfa,
+  renderThead, renderTbody, bepaalStil, bouwStilIndex, _zetStilIndex, rowNtd, renderPag,
 };

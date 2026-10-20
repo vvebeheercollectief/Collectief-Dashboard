@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  DATA — laden, parsen, achtergrond-schrijven, sync-indicator
 // ══════════════════════════════════════
-import { parseDt, _parseAnyDate, coerceDagenVooraf, leegBijErfenis, duurUitCel } from "./util.js";
+import { _parseAnyDate, coerceDagenVooraf, leegBijErfenis, duurUitCel, sorteerOpDatum } from "./util.js";
 import { state, D } from "./state.js";
 import { SKEYS, SECS, APP_VERSION, emailToegestaan } from "./config.js";
 import { fetchSheet, fetchSheets, _withRetry, isOffline } from "./api.js";
@@ -146,20 +146,26 @@ function serieleWrite(taak){
 // Comfort bij het openen: meteen de laatst bekende stand in beeld in plaats van een leeg scherm.
 // Uitdrukkelijk GEEN offline-vermogen — bij een koude start is inloggen netwerkafhankelijk.
 //
-// De sleutel hangt aan APP_VERSION én aan het e-mailadres. localStorage is origin-gebonden en
-// niet gebruiker-gebonden, dus zonder dat adres ziet collega B bij het openen eerst de stand van
-// collega A. De versie erin zodat een gewijzigd dataformaat nooit een oude cache leest.
+// De sleutel hangt aan APP_VERSION én aan het e-mailadres, zodat collega B na een wissel in hetzelfde
+// tabblad nooit de stand van collega A ziet. De versie erin zodat een gewijzigd dataformaat nooit
+// een oude cache leest.
+//
+// sessionStorage, NIET localStorage (sinds v15.6). localStorage is gedeeld met élke pagina op de
+// origin en blijft op schijf staan; op vvebeheercollectief.github.io deelt het dashboard die origin
+// met de website (zie auth.js, 'Bewust GEEN token delen'). sessionStorage hoort bij dit ene tabblad
+// en verdwijnt bij sluiten. Prijs: een nieuw tabblad start zonder 'laatst bekende stand' en wacht
+// de eerste leesronde af (een seconde of twee). Een oude localStorage-cache wordt bij het opstarten
+// gewist (ruimCacheOp).
 const CACHE_PREFIX='cd_cache_';
 const _cacheSleutel = email => `${CACHE_PREFIX}${APP_VERSION}_${(email||'onbekend').toLowerCase()}`;
 
-// Alles wat níet de sleutel van nu is, weg. Zonder dit blijft er per uitgebrachte versie ~1 MB
-// achter in een ruimte van ~5 MB — na een paar releases loopt localStorage vol en faalt élke
-// setItem, óók die van de voorkeuren (thema, dichtheid).
+// Alles wat níet de sleutel van nu is, weg. sessionStorage heeft dezelfde ~5 MB als localStorage;
+// twee caches naast elkaar (gebruikerswissel in één tabblad) laten die snel vollopen.
 function _ruimOudeCache(huidig){
   try{
-    for(let i=localStorage.length-1;i>=0;i--){
-      const k=localStorage.key(i);
-      if(k && k.startsWith(CACHE_PREFIX) && k!==huidig) localStorage.removeItem(k);
+    for(let i=sessionStorage.length-1;i>=0;i--){
+      const k=sessionStorage.key(i);
+      if(k && k.startsWith(CACHE_PREFIX) && k!==huidig) sessionStorage.removeItem(k);
     }
   }catch(_){}
 }
@@ -177,8 +183,7 @@ let _cacheGeblokkeerd = location.search.includes('test=1');
 const _zetCacheBlokkade = aan => { _cacheGeblokkeerd = !!aan; };
 
 // De CRM-mail gaat er NIET in. Dat is de volledige tekst van een eigenaar (naam, adres, soms
-// een klacht over de buren) en localStorage staat onversleuteld op schijf, ook nadat de sessie
-// verlopen is. Tot de eerste verse ronde (een seconde of twee) toont het uitklappaneel dan 'Geen
+// een klacht over de buren); die hoort niet in browseropslag, ook niet voor de duur van een tabblad. Tot de eerste verse ronde (een seconde of twee) toont het uitklappaneel dan 'Geen
 // mail bewaard'; schrijven kan in die tijd toch niet (de cache-rem in blokkeerOffline). Daarom hier
 // een eigen serialisatie in plaats van `hashJson`: het kost één extra JSON-bouw, maar alleen bij
 // een échte wijziging (zie de aanroep in _loadRonde), niet elke acht seconden.
@@ -193,11 +198,11 @@ function bewaarCache(hashJson){
     const d=JSON.stringify([D.ntd,D.af,D.alvo,D.alfa,D.ontw,D.logboek,D.herhaal,D.kenmerken],
                            (k,v)=>k==='mail' ? undefined : v);
     void hashJson;   // bewust niet hergebruikt: die draagt de mail wél
-    localStorage.setItem(sleutel, '{"t":'+Date.now()+',"d":'+d+',"s":'+JSON.stringify([D.ntdSecInfo,D.afSecInfo])+'}');
+    sessionStorage.setItem(sleutel, '{"t":'+Date.now()+',"d":'+d+',"s":'+JSON.stringify([D.ntdSecInfo,D.afSecInfo])+'}');
   }catch(e){
     // Vol of geweigerd (privémodus): stil opgeven en de eigen sleutel weghalen. Een cache is
     // comfort; hij mag nooit een laadronde of een voorkeur-setItem in de weg zitten.
-    try{ localStorage.removeItem(sleutel); }catch(_){}
+    try{ sessionStorage.removeItem(sleutel); }catch(_){}
   }
 }
 
@@ -205,13 +210,12 @@ function bewaarCache(hashJson){
 // vóór het e-mailadres bekend is, is er geen sleutel om te lezen.
 function laadUitCache(){
   try{
-    const ruw=localStorage.getItem(_cacheSleutel(state.currentUserEmail));
+    const ruw=sessionStorage.getItem(_cacheSleutel(state.currentUserEmail));
     if(!ruw) return false;
     const o=JSON.parse(ruw);
     // Te oud (of van vóór de tijdstempel): niet tonen en meteen weg. Twee weken oude taken en
-    // rijnummers zijn geen 'laatst bekende stand' meer, en de cache hoort niet onbeperkt op een
-    // (gedeelde) computer te blijven staan.
-    if(!_cacheVers(o, Date.now())){ localStorage.removeItem(_cacheSleutel(state.currentUserEmail)); return false; }
+    // rijnummers zijn geen 'laatst bekende stand' meer (een tabblad kan zo lang openstaan).
+    if(!_cacheVers(o, Date.now())){ sessionStorage.removeItem(_cacheSleutel(state.currentUserEmail)); return false; }
     const [ntd,af,alvo,alfa,ontw,logboek,herhaal,kenmerken]=o.d||[];
     if(!ntd||!af) return false;
     D.ntd=ntd; D.af=af; D.alvo=alvo||[]; D.alfa=alfa||[]; D.ontw=ontw||[];
@@ -240,21 +244,33 @@ function _cacheVers(o, nu){
 function ruimCacheOp(nu){
   const t=nu||Date.now();
   const huidig=CACHE_PREFIX+APP_VERSION+'_';
+  _wisLegacyCache();
   try{
-    for(let i=localStorage.length-1;i>=0;i--){
-      const k=localStorage.key(i);
+    for(let i=sessionStorage.length-1;i>=0;i--){
+      const k=sessionStorage.key(i);
       if(!k || !k.startsWith(CACHE_PREFIX)) continue;
-      if(!k.startsWith(huidig)){ localStorage.removeItem(k); continue; }
-      let o=null; try{ o=JSON.parse(localStorage.getItem(k)||'null'); }catch(_){}
-      if(!_cacheVers(o, t)) localStorage.removeItem(k);
+      if(!k.startsWith(huidig)){ sessionStorage.removeItem(k); continue; }
+      let o=null; try{ o=JSON.parse(sessionStorage.getItem(k)||'null'); }catch(_){}
+      if(!_cacheVers(o, t)) sessionStorage.removeItem(k);
     }
   }catch(_){}
 }
-function wisCache(){
+// Tot en met v15.5 stond de cache in localStorage. Die blijft daar (op schijf, leesbaar voor de
+// hele origin) tot iemand hem weghaalt; dat doen we hier, bij elke start en bij uitloggen.
+function _wisLegacyCache(){
   try{
     for(let i=localStorage.length-1;i>=0;i--){
       const k=localStorage.key(i);
       if(k && k.startsWith(CACHE_PREFIX)) localStorage.removeItem(k);
+    }
+  }catch(_){}
+}
+function wisCache(){
+  _wisLegacyCache();
+  try{
+    for(let i=sessionStorage.length-1;i>=0;i--){
+      const k=sessionStorage.key(i);
+      if(k && k.startsWith(CACHE_PREFIX)) sessionStorage.removeItem(k);
     }
   }catch(_){}
 }
@@ -747,6 +763,20 @@ async function _verwerkLogboek(R, naam, volledig, lees){
 // Pure functie, zodat de regel testbaar is los van timers en DOM.
 function magPollen(s){ return !!(s && s.currentUserEmail); }
 
+// Adaptief verversen (v15.6). Werkt iemand in dit venster (focus én invoer in de laatste vijf
+// minuten), dan ververst het dashboard elke tik van 8 s. Staat het open op de achtergrond — een
+// tweede scherm, of de gebruiker zit in TwinQ of de mail — dan hooguit eens per 30 s. Dat scheelt
+// ~70% van de leesrondes (en het parsen van alle tabbladen) over een werkdag; bij terugkeer volgt
+// meteen een ronde (zie pollTik in main.js), dus wie kijkt ziet geen verouderde stand.
+// Pure functies, zodat de regel testbaar is los van timers en DOM.
+const POLL_RUST_NA_MS=5*60*1000, POLL_RUST_MS=30*1000;
+function pollActief(nu, laatsteInvoer, heeftFocus){
+  return !!heeftFocus && (nu-(laatsteInvoer||0)) < POLL_RUST_NA_MS;
+}
+function pollNu(nu, laatsteInvoer, heeftFocus, laatsteRonde){
+  return pollActief(nu, laatsteInvoer, heeftFocus) || (nu-(laatsteRonde||0)) >= POLL_RUST_MS;
+}
+
 // Vangnet-tijd voor een aanroeper die op de volgende ronde wacht. De Sheets-fetches kennen geen
 // eigen timeout, dus een hangende ronde zou `await loadAll()` voorgoed laten staan en een undo
 // of de ALV-reset eeuwig op 'Bezig…' zetten. Zelfde idioom als AUTH_ANTWOORD_TIMEOUT in auth.js;
@@ -948,7 +978,7 @@ async function _loadRonde(silent){
     const zetAls=(naam,fn)=>{ if(R[naam]!==undefined) fn(R[naam]); };
     zetAls('Nog Te Doen', r=>{ const p=parseSections(r,'Nog Te Doen'); D.ntd=p.data; D.ntdSecInfo=p.secInfo; });
     zetAls('Afgerond',    r=>{ const p=parseSections(r,'Afgerond'); D.af=p.data; D.afSecInfo=p.secInfo;
-                               SKEYS.forEach(s=>{if(D.af[s])D.af[s].sort((a,b)=>parseDt(b.datum)-parseDt(a.datum))}); });
+                               SKEYS.forEach(s=>{if(D.af[s])sorteerOpDatum(D.af[s], r=>r.datum)}); });
     // Fase 3, trap 1: alleen meekijken. Zodra dit een tijd lang stil blijft op gezonde data
     // gaat de banner aan (trap 2). Nooit blokkerend — dit mag het laden niet beïnvloeden.
     try{
@@ -1064,7 +1094,7 @@ async function _loadRonde(silent){
       state._renderFails=0;
       clearRenderError();
       state._lastDHash=hash;
-      // Alleen bij een echte wijziging naar de leescache, niet elke 8 seconden: localStorage
+      // Alleen bij een echte wijziging naar de leescache, niet elke 8 seconden: sessionStorage
       // schrijft synchroon naar schijf en dit is ~1 MB. Zo blijft het een handjevol keer per
       // sessie in plaats van 450 keer per uur.
       bewaarCache(hash);
@@ -1254,7 +1284,7 @@ function parseAlfa(rows){
 // ══════════════════════════════════════
 
 export {
-  backgroundWrite, schrijfActieLoopt, metWriteMarkering, serieleWrite, setSyncing, setSaving, setSynced, setSyncErr, dot, loadAll, magPollen, parseSections, parseAlvo, parseAlfa, parseHerhaal,
+  backgroundWrite, schrijfActieLoopt, metWriteMarkering, serieleWrite, setSyncing, setSaving, setSynced, setSyncErr, dot, loadAll, magPollen, pollActief, pollNu, parseSections, parseAlvo, parseAlfa, parseHerhaal,
   POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _zetLogAnker, _verwerkLogboek, _logVolledigNodig, _alfaNodig,
   MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen,
   blokkeerOffline, blokkeerVersie, showOfflineBanner, clearOfflineBanner, setSyncOffline, setSyncGepauzeerd, PAUZE_TEKST, PAUZE_TITEL, syncSelecteerStand, showLoadError, clearLoadError,

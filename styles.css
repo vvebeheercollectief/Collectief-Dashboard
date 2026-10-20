@@ -71,7 +71,9 @@
     ul{list-style:none}
 
     /* Layout */
-    #app{display:flex;height:100vh;overflow:hidden}
+    /* De schil draagt de zijbalkkleur: waar #main linksboven afrondt, loopt het donker van de
+       zijbalk (en in de app de titelbalk, theme-color) als één L-profiel om de hoek (v15.7). */
+    #app{display:flex;height:100vh;overflow:hidden;background:var(--sbbg)}
     /* Testomgeving. De balk zelf staat op `position:fixed` en neemt dus GEEN ruimte in; de 34px
        komt van de opvuldiv die main.js er direct achter zet (zie IS_STAGING daar). Die div staat
        wél in de bladstroom, vóór #app, dus de schil moet die 34px inleveren — anders schuift de
@@ -83,7 +85,7 @@
     #overlay.on{display:block}
 
     /* Sidebar — "Operator" donker (#1b1e24), vast in beide thema's */
-    #sb{width:var(--sb);background:var(--sbbg);border-right:1px solid var(--sbedge);display:flex;flex-direction:column;flex-shrink:0;z-index:200;transition:transform var(--tr);color:#8b929e}
+    #sb{width:var(--sb);background:var(--sbbg);display:flex;flex-direction:column;flex-shrink:0;z-index:200;transition:transform var(--tr);color:#8b929e}
     .sb-logo{padding:20px 20px 18px;border-bottom:1px solid var(--sbedge);display:flex;align-items:center;gap:11px}
     .sb-logo img{height:32px;width:auto;object-fit:contain}
     .sb-logo-fb{width:34px;height:34px;background:#2E3946;border:1px solid #3A4757;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#cfd5df;font-weight:600;font-size:14px;flex-shrink:0}
@@ -109,7 +111,12 @@
     @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 
     /* Header */
-    #main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+    /* Zachte binnenhoek (v15.7): 12px linksboven, de rest blijft haaks. De rechterrand van de
+       zijbalk is daarvoor weg — in licht thema is het contrast genoeg. In donker ligt het
+       werkvlak dicht bij leisteen, dus daar tekent ::before de lijn van --sbedge mét de
+       boog. Een gewone border kan niet: #hdr zou hem bovenin overschilderen. */
+    #main{flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative;background:var(--bg);border-top-left-radius:12px}
+    [data-theme=dark] #main::before{content:'';position:absolute;inset:0;border-left:1px solid var(--sbedge);border-top:1px solid var(--sbedge);border-top-left-radius:inherit;pointer-events:none;z-index:5}
     #hdr{height:var(--hh);background:var(--sur);border-bottom:1px solid var(--bor);display:flex;align-items:center;padding:0 26px;gap:8px;flex-shrink:0}
     .hdr-info{flex:1;display:flex;align-items:baseline;gap:10px;min-width:0}
     .hdr-info h1{font-size:18px;font-weight:600;line-height:1.2;letter-spacing:-.01em;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:1;min-width:0}
@@ -929,6 +936,9 @@
       #sb{position:fixed;top:0;left:0;height:100%;transform:translateX(-100%)}
       #sb.open{transform:none;box-shadow:var(--shl)}
       .hamburger{display:flex}
+      /* Zonder zijbalk ernaast is er geen hoek om af te ronden. */
+      #main{border-top-left-radius:0}
+      [data-theme=dark] #main::before{content:none}
     }
     .logboek-box{margin-top:16px;background:var(--sur2);border:1px solid var(--bor);border-radius:var(--r);padding:12px 16px}
     .logboek-hdr{display:flex;align-items:center;gap:9px;margin-bottom:4px}
@@ -2104,6 +2114,9 @@ tr.expanded + .crm-mail-tr{display:table-row}
 @media print{
   #app{height:auto;overflow:visible;display:block}
   #main,#content{overflow:visible;height:auto;padding:0}
+  #app{background:none}
+  #main{border-radius:0}
+  #main::before{content:none !important}
   #sb,#hdr .ico-btn,#bulk-balk,#toast-container,.sw-update-bar,.staging-balk,.pag,.acts{display:none !important}
   .tbl-wrap{overflow:visible}
   body{background:#fff}

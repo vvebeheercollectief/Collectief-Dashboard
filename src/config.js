@@ -6,13 +6,14 @@ import { emailHash } from './hash.js';
 
 // ── Versie (zichtbaar in de UI) ────────────────────────────────────────
 // Ophogen bij ELKE wijziging: 4.1, 4.2, … 5.0 voor grote sprongen.
-export const APP_VERSION = '15.5';
+export const APP_VERSION = '15.6';
 
 // ── Omgeving (productie vs. testomgeving) ──────────────────────────────
 // Fail-safe: alleen deze exacte hosts zijn PRODUCTIE; al het andere
 // (staging-branch, andere previews, localhost) draait op de TEST-data.
 export const PROD_HOSTS = [
-  'vvebeheercollectief.github.io',                            // ECHTE productie (GitHub Pages, source=main)
+  'dashboard.vvebeheercollectief.nl',                         // EIGEN domein (Vercel, main) — de productie na de verhuizing
+  'vvebeheercollectief.github.io',                            // oude productie (GitHub Pages, source=main) — tot de verhuizing
   'collectief-dashboard.vercel.app',                          // Vercel-spiegel van main (parallel/handmatig)
   'collectief-dashboard-vve-beheer-collectief.vercel.app',
   'collectief-dashboard-vvebeheercollectief-vve-beheer-collectief.vercel.app',
@@ -25,8 +26,27 @@ export const SID_PROD = '1fnUsbwb4nDMNttWym9FWBw1CMMMAVTuZ3v88b35isUw';
 export const SID_TEST = '1-6Q36CrwB0szX2DS2eLjPwfiY-jAw8lK9JOPDSlljm4';   // test-Sheet "Collectief Dashboard - Kopie" (Taak 3)
 export const SID = IS_STAGING ? SID_TEST : SID_PROD;
 export const PG   = 25;
-// AI-proxy: op staging same-origin (/api/chat); op productie de vaste Vercel-functie-URL.
-export const PROXY_URL = IS_STAGING ? '/api/chat' : 'https://collectief-dashboard.vercel.app/api/chat';
+// AI-proxy: same-origin (/api/chat) overal waar Vercel de pagina zelf serveert — staging, het eigen
+// domein en de vercel.app-spiegel. Alleen GitHub Pages heeft geen functies en roept de vaste
+// Vercel-URL cross-origin aan.
+export const _proxyUrl = hostname => hostname === 'vvebeheercollectief.github.io'
+  ? 'https://collectief-dashboard.vercel.app/api/chat' : '/api/chat';
+export const PROXY_URL = _proxyUrl(location.hostname);
+
+// ── Verhuizing naar een eigen origin ────────────────────────────────────
+// Op vvebeheercollectief.github.io deelt het dashboard zijn origin (en dus localStorage, de
+// service-workercache en elk token dat in de pagina zit) met de VvE-website en elke andere
+// GitHub Pages-site van het account. Het eigen domein heeft dat probleem niet.
+// VERHUISD_NAAR blijft LEEG tot het nieuwe adres volledig werkt (DNS, Vercel-domein, Google
+// OAuth-origin, OneSignal). Daarna één regel: zet hier 'https://dashboard.vvebeheercollectief.nl/'
+// en elke start op github.io stuurt meteen door (main.js), ook vanuit een gecachte versie.
+export const VERHUISD_NAAR = '';
+export const OUDE_HOST = 'vvebeheercollectief.github.io';
+// Pure: waarheen moet deze start, of '' als hij hier mag blijven. Querystring en #-anker gaan mee.
+export function _verhuisDoel(doel, hostname, search, hash){
+  if(!doel || hostname !== OUDE_HOST) return '';
+  return doel.replace(/\/?$/, '/') + (search || '') + (hash || '');
+}
 // Meldingen lopen via de 'Notif-wachtrij'-tab (OAuth-append vanuit de ingelogde
 // gebruiker) — een Apps Script-trigger verstuurt de push. Geen webhook-URL of
 // secret meer nodig in deze (publieke) frontend.
@@ -176,11 +196,9 @@ export const SECS = {
     keys:['code','naam','onderwerp','crmFase','behandelaar','deadline','opmerkingen','inBehandeling']},
 };
 
-// CRM: de vier soorten vraag (één klik in het bewerkscherm) en de reactietermijn in werkdagen.
-// De termijn bepaalt de automatische deadline (ontvangen + 5 werkdagen) en daarmee wanneer de
-// wachtcel amber of rood wordt. Weekenden tellen niet mee; feestdagen (nog) wel.
+// CRM: de vier soorten vraag (één klik in het bewerkscherm). De reactietermijn (5 werkdagen)
+// staat in DEADLINE_VOORSTEL.CRM (util.js).
 export const CRM_SOORTEN = ['Vraag', 'Klacht', 'Schade', 'Financieel'];
-export const CRM_TERMIJN_WERKDAGEN = 5;
 
 // De kolomkop zoals de gebruiker hem ziet, per VELDNAAM in plaats van per kolompositie.
 //
@@ -251,10 +269,6 @@ export const OMSCHRIJVING_SLEUTEL = {
   'CRM':                'onderwerp',
 };
 
-// Fase van een offerte-traject (kolom O). Het dashboard schrijft deze kolom sinds v6.2 niet
-// meer — offerteFase() leidt 'aangevraagd'/'ontvangen' af uit de X/N-teller; 'bij_vve' en
-// 'gegund' worden alleen nog gelézen als ze handmatig in de Sheet staan.
-export const OFFERTE_FASES = ['aangevraagd', 'ontvangen', 'bij_vve', 'gegund'];
 
 export const PAGE_META = {
   ntd:['Nog Te Doen','Openstaande taken en actiepunten'],

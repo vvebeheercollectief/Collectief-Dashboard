@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  NOTIFICATIONS — meldingen (wachtrij/push) + in-app toasts
 // ══════════════════════════════════════
-import { esc, displayName, parseDt, meldSleutel, kiesAfgerondRij, splitBehandelaar, leesbareFout } from "./util.js";
+import { esc, displayName, meldSleutel, kiesAfgerondRij, splitBehandelaar, leesbareFout, sorteerOpDatum } from "./util.js";
 import { state, D, _shownToasts } from "./state.js";
 import { SID, ONESIGNAL_APP_ID } from "./config.js";
 import { ensureToken } from "./auth.js";
@@ -251,7 +251,7 @@ function showUndoToast(title, msg, undoFn, icoNaam, opts) {
 async function undoComplete(undoData) {
   if(blokkeerOffline()) return;   // offline: niets wijzigen, ook niet optimistisch
   if (!await ensureToken()) { meldFout('Inloggen mislukt.'); return; }
-  const { sec, ntdValues, ntdRow } = undoData;
+  const { sec, ntdValues } = undoData;
   state._undoInFlight = true; // pauzeer de 8s-poll; deze undo doet z'n eigen loadAll
   try {
     // Eén beurt in de seriële schrijfwachtrij (serieleWrite, data.js): de afronding-write is dan
@@ -298,8 +298,8 @@ async function undoComplete(undoData) {
         // eerst op het vaste taaknummer uit `ntdValues[16]` en valt alleen daarna terug op de code.
         // Zoeken op code + datum is namelijk een GOK zodra er twee afrondingen van dezelfde VvE op
         // dezelfde dag in dezelfde sectie staan — zie de toelichting daar.
-        const afData = (parseSections(await fetchSheet('Afgerond'), 'Afgerond').data[sec] || [])
-          .slice().sort((a, b) => parseDt(b.datum) - parseDt(a.datum));
+        const afData = sorteerOpDatum((parseSections(await fetchSheet('Afgerond'), 'Afgerond').data[sec] || []).slice(), r => r.datum);
+
         const doelAf = kiesAfgerondRij(afData, (ntdValues || [])[16], undoData.code);
         // EERST terugzetten, DAN pas weghalen. Breekt de verbinding ertussen, dan staat de taak
         // dubbel (zichtbaar, herstelbaar) in plaats van nergens (onzichtbaar, verloren).
@@ -588,6 +588,7 @@ async function _syncNotifTags(who, prefs, deadlineHours) {
 // Herstel de koppeling met OneSignal vanuit de OPGESLAGEN stand. Aangeroepen na een geslaagde
 // inlog (logout() koppelt het toestel los en gooit de tags weg) en na het inschrijven.
 async function herstelNotifKoppeling() {
+  laadOneSignal();
   const who = getCurrentWho();
   const uren = localStorage.getItem(_prefSleutel('deadline_hours', state.currentUserEmail)) || '1';
   await _syncNotifTags(who, getNotifPrefs(), uren);
@@ -626,6 +627,7 @@ async function subscribeNotifs() {
   const btn = document.getElementById('notif-subscribe-btn');
   const orig = btn.innerHTML;
   btn.disabled = true; btn.innerHTML = `${ico('zandloper',12)} Bezig…`;
+  laadOneSignal();
   const ready = await waitForOneSignal();
   if (!ready) {
     btn.disabled = false; btn.innerHTML = orig;
@@ -693,6 +695,16 @@ function sendTestNotif(who, title, body) {
 // ══════════════════════════════════════
 //  ONESIGNAL INIT
 // ══════════════════════════════════════
+// De page-SDK pas na het inloggen laden (herstelNotifKoppeling, en voor de zekerheid bij het
+// inschrijven). Stond tot v15.6 als <script async> in index.html en laadde dus ook op het
+// inlogscherm. Het OneSignalDeferred-patroon hieronder werkt ongeacht wanneer de SDK binnenkomt.
+const ONESIGNAL_SDK_URL = 'https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js';
+function laadOneSignal() {
+  if (document.getElementById('onesignal-sdk')) return;
+  const s = document.createElement('script');
+  s.id = 'onesignal-sdk'; s.src = ONESIGNAL_SDK_URL; s.async = true;
+  document.head.appendChild(s);
+}
 window.OneSignalDeferred = window.OneSignalDeferred || [];
 OneSignalDeferred.push(async function(OneSignal) {
   try {
@@ -728,5 +740,5 @@ OneSignalDeferred.push(async function(OneSignal) {
 export {
   fireNotifEvent, TOAST_ICONS, TOAST_COLORS, TOAST_DURATION, MAX_TOAST_BURST, showToast, dismissToast, showUndoToast, toastTimer,
   undoComplete, undoDelete, getNotifPrefs, verwerkMeldingRijen, toonMeldingen, initMeldingen, openNotifModal, closeNotifModal,
-  refreshNotifUI, onWhoChange, getCurrentWho, _whoSleutel, saveNotifPrefs, herstelNotifKoppeling, waitForOneSignal, subscribeNotifs,
+  refreshNotifUI, onWhoChange, getCurrentWho, _whoSleutel, saveNotifPrefs, herstelNotifKoppeling, laadOneSignal, ONESIGNAL_SDK_URL, waitForOneSignal, subscribeNotifs,
   unsubscribeNotifs, sendTestNotif, meldFout };

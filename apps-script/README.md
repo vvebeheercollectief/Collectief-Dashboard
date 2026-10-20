@@ -101,7 +101,7 @@ gaat debuggen. En let op: `onEdit` vuurt alleen op echte edits in de Sheets-UI �
 
 ## Werkelijk geïnstalleerde triggers (gecontroleerd 2026-07-28)
 
-PROD-script `Afgerond script`, id `1BALy8QbzWr7DbJy_RjYi7m-c6HdNDRs_47ndYcKV_cFIHh6GDR-GicKF`
+PROD-script `Afgerond script` (id: zie het GitHub-secret `PROD_SCRIPT_ID`)
 (bereikbaar via de PROD-Sheet → Uitbreidingen → Apps Script → wekker-icoon). Tien triggers,
 állemaal in eigendom van de Sheet-eigenaar `info@vvebeheercollectief.nl` — er draait niets
 onder een ander account.

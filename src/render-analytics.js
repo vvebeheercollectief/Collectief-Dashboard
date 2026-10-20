@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  RENDER-ANALYTICS — grafieken, KPI's, dashboard
 // ══════════════════════════════════════
-import { esc, displayName, persBadges, emptyRow, parseDt, _parseAnyDate, vveCodeSpan, taakTitel, splitBehandelaar } from "./util.js";
+import { esc, displayName, persBadges, emptyRow, _parseAnyDate, vveCodeSpan, taakTitel, splitBehandelaar, sorteerOpDatum } from "./util.js";
 import { SECS, SKEYS, TEAM } from "./config.js";
 import { state, D } from "./state.js";
 import { telbaar } from "./bundel.js";
@@ -116,7 +116,7 @@ function bucketKey(date,period){
 function bucketLabel(key,period){
   if(!key) return '';
   if(period==='dag'){
-    const [y,m,d]=key.split('-').map(Number);
+    const [,m,d]=key.split('-').map(Number);
     return`${d} ${MAAND_KORT[m-1].toLowerCase()}`;
   }
   if(period==='week'){
@@ -724,7 +724,7 @@ function buildDash(){
   const secPill=Object.fromEntries(SKEYS.map(s=>[s,`<span class="cell-note">${esc(SECS[s].label)}</span>`]));
 
   const all=SKEYS.flatMap(s=>(D.af[s]||[]).map(r=>({...r,_sec:s})));
-  all.sort((a,b)=>parseDt(b.datum)-parseDt(a.datum));
+  sorteerOpDatum(all, r=>r.datum);
   document.getElementById('recent-tbody').innerHTML=all.slice(0,10).map(r=>`<tr>
     <td>${secPill[r._sec]||''}</td>
     <td>${vveCodeSpan(r.code, SECS[r._sec].css)}</td>

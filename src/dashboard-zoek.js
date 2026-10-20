@@ -12,7 +12,7 @@
 //     zegt Claude dat er meer is, zodat hij gerichter kan zoeken of het erbij kan zeggen.
 // Alles hier is puur (gegevens en datum gaan erin), zodat het zonder netwerk te toetsen is.
 import { SECS, SKEYS } from './config.js';
-import { displayName, taakTitel, parseDt, parseOff, opvolgStatus, teLaatVoorTelling,
+import { displayName, taakTitel, parseDt, sorteerOpDatum, parseOff, opvolgStatus, teLaatVoorTelling,
          offerteAangevraagd, splitBehandelaar, _vandaagAmsterdam, _verschilInKalenderdagen,
          parseAannemers, reconcileOffertes, _parseAnyDate } from './util.js';
 import { fmtLogTs, logPaginaSoort } from './render-overig.js';
@@ -179,7 +179,7 @@ function zoekAfgerond(inv, data){
     items.push({ r, sec });
   }));
   if(inv.groepeer_op && _groepSleutel[inv.groepeer_op]) return _groepeer(items, _groepSleutel[inv.groepeer_op], 'Afgeronde taken');
-  items.sort((a, b) => parseDt(b.r.datum) - parseDt(a.r.datum));
+  sorteerOpDatum(items, it => it.r.datum);
   const regels = items.map(({ r, sec }) => {
     const extra = [r.datum ? `afgerond ${r.datum}` : '', r.behandelaar ? displayName(r.behandelaar) : ''].filter(Boolean).join(' · ');
     const opm = r.opmerking ? ` | afrondopmerking: ${_kap(r.opmerking, 120)}` : '';
@@ -194,8 +194,8 @@ function zoekAlvs(inv, data){
   const van = _invoerDatum(inv.afgerond_van), tot = _invoerDatum(inv.afgerond_tot);
   if(van != null || tot != null){
     // De archieflijst: per gehouden ALV de dag waarop 'notulen versturen' is afgevinkt.
-    const items = (data.alfa || []).filter(r => (!v.code || r.code === v.code) && _inPeriode(parseDt(r.datum), van, tot))
-      .sort((a, b) => parseDt(b.datum) - parseDt(a.datum));
+    const items = sorteerOpDatum((data.alfa || []).filter(r => (!v.code || r.code === v.code) && _inPeriode(parseDt(r.datum), van, tot)), r => r.datum);
+
     return _resultaat('Afgeronde ALV\'s', items.map(r => `- ${r.code}${r.naam ? ' ' + r.naam : ''} — afgerond op ${r.datum}`), items.length);
   }
   const alle = (data.alvo || []).filter(r => (!v.code || r.code === v.code) && (inv.budget !== true || r.budget));

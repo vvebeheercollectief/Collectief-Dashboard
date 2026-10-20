@@ -112,8 +112,9 @@ async function copyAiPrompt(waar){
   const txt=document.getElementById('ai-prompt').innerText;
   if(!await kopieerNaarKlembord(txt)) return;
   showToast('Gekopieerd','Plak in '+waar+' met Ctrl/⌘+V','var(--ac)','paperclip');
-  const url=waar==='Claude'?'https://claude.ai/new':'https://gemini.google.com/app';
-  try{ window.open(url,'_blank'); }catch(e){}
+  // Alleen Claude (v15.6). De Gemini-knop is weg: de consumentenversie van Gemini mag geplakte
+  // tekst gebruiken voor training en menselijke review, en hier gaat een mail van een eigenaar in.
+  try{ window.open('https://claude.ai/new','_blank'); }catch(e){}
 }
 
 // Antwoord ontleden op de vaste kopjes

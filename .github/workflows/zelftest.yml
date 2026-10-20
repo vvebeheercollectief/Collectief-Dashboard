@@ -1,0 +1,35 @@
+name: Zelftest
+
+# Bij elke push en pull request: de volledige zelftest (index.html?test=1) op de bron, de bouwstap
+# en een rooktest van de verkleinde build. Zie tools/zelftest.mjs. Vervangt het handmatig draaien
+# van ?test=1 op productie: daar staat sinds v15.6 de verkleinde versie, zonder tests.js.
+on:
+  push:
+  pull_request:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zelftest-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  zelftest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Installeer esbuild (bouwstap)
+        run: npm ci --no-audit --no-fund
+      - name: Installeer Playwright + Chromium
+        run: |
+          npm install --no-save --no-audit --no-fund playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Zelftest, bouwen en rooktest
+        run: node tools/zelftest.mjs

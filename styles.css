@@ -18,7 +18,7 @@
          De grafieken op Analytics houden hun eigen reeks (SECS[...].color in config.js): daar is
          onderscheid tussen categorieën de inhoud zelf.
          B45309 -> AE5008 (v11.8): als tekst op --am-l stond amber op 4,51:1 — te krap. Nu 4,77. */
-      --am:#AE5008;--am-l:#fef3c7;--am-b:#FCD34D;
+      --am:#AE5008;--am-l:#fef3c7;
       --rd:#B91C1C;--rd-l:#fee2e2;--rd-b:#fecaca;
       --gn:#047857;--gn-l:#d1fae5;--gn-b:#a7f3d0;
       /* Accent = staalblauw van de website (was Operator-leiblauw #4a5b7a tot v14.3) */
@@ -40,9 +40,7 @@
          --prio, alleen tekst gebruikt deze. */
       --sig-crit:#9e463e;
       /* Bewegings-schaal: één set duraties + easing voor heel de app */
-      --tr-fast:.1s ease;--tr-slow:.3s cubic-bezier(.22,1,.36,1);--ease:cubic-bezier(.22,1,.36,1);
-      /* Grotere kaart-radius (was los hardgecodeerd als 14px) */
-      --r-lg:8px;
+      --tr-fast:.1s ease;
       /* Letters. Op verzoek (v11.8) van IBM Plex naar de standaardletter van het toestel:
          SF Pro op een Mac/iPhone, Segoe UI op Windows, Roboto op Android. Twee stapels en
          verder nergens een letternaam in dit bestand, dus terugzetten is deze twee regels.
@@ -58,7 +56,7 @@
       --txt:#EEF1F4;--mut:#A3ACB7;--fnt:#7A828C;
       --sh:none;
       --shm:0 8px 28px rgba(0,0,0,.5);--shl:0 24px 64px rgba(0,0,0,.65);
-      --am:#F0B44C;--am-l:#382912;--am-b:#5A451F;
+      --am:#F0B44C;--am-l:#382912;
       --rd:#F0746F;--rd-l:#371A1B;--rd-b:#582A2A;
       --gn:#34D39A;--gn-l:#103129;--gn-b:#1F4A3C;
       --ac:#8FA6C2;--ac-l:#243041;--ac-b:#334458;--ac-900:#B4C5D9;--ac-500:#9DB2CB;
@@ -67,7 +65,7 @@
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     html,body{height:100%;font-family:var(--font-app);font-size:14px;background:var(--bg);color:var(--txt);line-height:1.5;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
     /* Vaste-breedte letter — codes, datums, badges, ⌘K-hint (zie --font-mono) */
-    .mono,.code,.s-normal,.s-telaat,.cell-sm,.ni-badge,.sb-brand span{font-family:var(--font-mono)}
+    .code,.s-normal,.s-telaat,.cell-sm,.ni-badge,.sb-brand span{font-family:var(--font-mono)}
     button{cursor:pointer;border:none;background:none;font:inherit;color:inherit}
     input,select,textarea{font:inherit}
     ul{list-style:none}
@@ -205,7 +203,7 @@
     .stat-item.stat-klik:hover .stat-cap{color:var(--txt)}
     .stat-item.stat-klik.aan{box-shadow:inset 0 -2px 0 var(--ac)}
     .stat-val{font-size:28px;font-weight:600;letter-spacing:-.02em;line-height:1;color:var(--txt);font-variant-numeric:tabular-nums}
-    .stat-val.red{color:var(--rd)} .stat-val.amber,.stat-val.green,.stat-val.teal{color:var(--txt)} .stat-val.muted{color:var(--mut)} /* --fnt gaf 2,6:1 op wit; een cijfer van 30px valt onder 'grote tekst' en moet 3:1 halen. --mut blijft duidelijk gedempt t.o.v. --txt en haalt het in beide thema's */
+    .stat-val.amber,.stat-val.green,.stat-val.teal{color:var(--txt)} /* --fnt gaf 2,6:1 op wit; een cijfer van 30px valt onder 'grote tekst' en moet 3:1 halen. --mut blijft duidelijk gedempt t.o.v. --txt en haalt het in beide thema's */
     .stat-meta{display:flex;flex-direction:column;gap:1px;padding-bottom:2px}
     .stat-cap{font-size:12px;font-weight:500;color:var(--mut);white-space:nowrap}
     /* var(--ac) i.p.v. var(--ac-500): die laatste (#14B8A6) haalde maar 3,93:1 op wit. --ac is de
@@ -568,9 +566,7 @@
     /* Badges */
     .badge{display:inline-flex;align-items:center;gap:3px;padding:2px 9px;border-radius:6px;font-size:11px;font-weight:600;white-space:nowrap}
     /* Prioriteit = ingetogen tekstlabel (geen pill, geen pijltje) */
-    .badge.prio-hoog,.badge.prio-mid,.badge.prio-laag{background:none;padding:0;border-radius:0;gap:0;font-size:12px;font-weight:600}
-    .prio-hoog{color:#a8463e}
-    .prio-mid{color:#946d1f}
+    .badge.prio-laag{background:none;padding:0;border-radius:0;gap:0;font-size:12px;font-weight:600}
     .prio-laag{color:var(--mut)}
     /* Terugval vóór de color-mix, voor Safari 15 (dat color-mix nog niet kent — zelfde reden als
        de @supports rond overflow:clip elders in dit bestand). Zonder deze regel verdwijnt op zo'n
@@ -1004,7 +1000,6 @@
     .ai-prompt .empty{color:#8b929e;font-style:italic}
     .ai-send{display:flex;gap:8px;margin-top:11px;flex-wrap:wrap}
     .ai-claude{background:#bb5634;color:#fff} /* iets dieper dan het merk-oranje #C96442: wit op 12,5px haalde daar 3,9:1, hier 4,67:1 */
-    .ai-gemini{background:#3a6df0;color:#fff}
     .ai-send .btn{font-size:12px;padding:9px 13px}
     .ai-result{margin-top:14px;display:flex;flex-direction:column;gap:11px}
     .ai-rhead{font-size:11px;font-weight:600;color:var(--ac-900);text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;gap:8px}
@@ -1059,7 +1054,7 @@
     .kc{padding:0 4px;text-align:right;min-width:0}
     .kc b{display:block;font-size:18px;font-weight:600;line-height:1.2;font-variant-numeric:tabular-nums}
     .kc span{font-size:12px;color:var(--mut);font-weight:400}
-    .kc.rood b{color:var(--rd)}.kc.teal b{color:var(--txt)}.kc.grijs b{color:var(--mut)}
+    .kc.teal b{color:var(--txt)}.kc.grijs b{color:var(--mut)}
     /* + tegel: zelfde vorm als een kerncijfer-tegel, gevuld in het accent. Alleen het +-teken. */
     .kc-plus{align-self:center;margin-left:12px}
     .kc-plus:hover{background:var(--ac-900)}
@@ -1304,8 +1299,6 @@
     /* ═══════ "Operator" — donkere-modus correcties voor vaste kleuren ═══════ */
     [data-theme=dark] .code{color:#9aa1ad}
     [data-theme=dark] .cell-txt,[data-theme=dark] .cell-sm,[data-theme=dark] .s-normal{color:#c2c8d0}
-    [data-theme=dark] .prio-hoog{color:#e08b82}
-    [data-theme=dark] .prio-mid{color:#d4b06a}
     [data-theme=dark] .prio-laag{color:#8b929e}
     [data-theme=dark] .act-bw,[data-theme=dark] .act-ib{color:var(--mut)}
     [data-theme=dark] .act-af:hover{color:#15181d}
@@ -1372,16 +1365,6 @@
 .chat-foot{padding:8px 12px;font-size:11px;color:var(--mut);border-top:1px solid var(--bor)}
 
 /* ═══════ Naloop-afwerking (ontwerp-naloop 2026-06-22) ═══════ */
-
-/* ── Offerte-teller (ontvangen/aangevraagd) — was volledig ongestyled ── */
-.off-counter{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
-.off-lbl{font-size:12px;font-weight:600;color:var(--mut)}
-.off-sep{color:var(--fnt);font-weight:600}
-.off-spin{display:inline-flex;align-items:center;border:1px solid var(--bor);border-radius:8px;overflow:hidden;background:var(--sur)}
-.off-btn{width:34px;height:34px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600;color:var(--ac);background:var(--sur2);transition:background var(--tr)}
-.off-btn:hover{background:var(--ac-l)}
-.off-inp{width:46px;height:34px;text-align:center;border:none;border-left:1px solid var(--bor);border-right:1px solid var(--bor);background:var(--sur);color:var(--txt);font-size:14px;font-weight:600;-moz-appearance:textfield;appearance:textfield;outline:none}
-.off-inp::-webkit-outer-spin-button,.off-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 
 /* ── Fase-indicator (Subsidie-trajecten): vijf stappen op een lijn ──
    Alleen var()-kleuren, zodat er geen aparte [data-theme=dark]-regels nodig zijn. */
@@ -1606,7 +1589,7 @@ body:has(.modal-bg.open) #chat-bg{display:none}
 /* ── Custom iconenset (src/icons.js) — maatvoering per context ── */
 .toast-ico{display:flex;align-items:center;flex-shrink:0;color:var(--toast-clr,var(--ac));margin-top:1px}
 .toast-ico svg{width:18px;height:18px}
-.toast-undo svg,.btn svg.ic{flex:none}
+.toast-undo svg{flex:none}
 .toast-undo svg{vertical-align:-1.5px;margin-right:2px}
 .soort-chip svg,.ai-chip svg,.lchip svg{width:13px;height:13px;vertical-align:-2.5px;margin-right:3px}
 .log-act-btn svg{width:14px;height:14px;display:block}

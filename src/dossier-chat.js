@@ -386,6 +386,8 @@ async function vraagChat(){
         ? 'Dit account heeft geen toegang tot de chat. Log in met je VvE Beheer Collectief-account.'
       : (e && e.status === 401)
         ? 'Je Google-sessie is verlopen. Stel je vraag zo nog eens; zo nodig vraagt Google je opnieuw in te loggen.'
+      : (e && e.status === 429)
+        ? 'Er zijn net veel vragen achter elkaar gesteld. Probeer het over een paar minuten opnieuw.'
       : (e && !e.status && e.message)
         ? `${e.message}. Probeer het zo nog eens.`
         : 'Kon nu geen antwoord ophalen. Probeer het later opnieuw.';

@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  UTIL — gedeelde pure helpers (datums, prioriteit, tekst, badges)
 // ══════════════════════════════════════
-import { naamBijEmail, OFFERTE_FASES, SECS, KORTE_NAMEN } from './config.js';
+import { naamBijEmail, SECS, KORTE_NAMEN } from './config.js';
 import { ICONS } from './icons.js';
 
 function displayName(s){
@@ -550,17 +550,6 @@ function berekenPrioriteit(deadlineStr, categorie, vandaag){
   return { prioriteit, dagenTot, teLaat };
 }
 
-// NIET IN GEBRUIK door de app. De Prioriteit-kolom is er sinds v8.9 uit; alleen de zelftest
-// roept deze functie nog aan. Blijft staan omdat de berekening zelf (berekenPrioriteit) wél
-// levend is en dit de enige plek is waar de bijbehorende opmaak beschreven staat — maar bouw er
-// niets nieuws op zonder eerst te controleren of de kolom terugkomt.
-function prioBadge(r, sec){
-  const { prioriteit } = berekenPrioriteit(r.deadline, sec);
-  if(!prioriteit)return'';
-  const cls={Hoog:'prio-hoog',Midden:'prio-mid',Laag:'prio-laag'}[prioriteit]||'prio-mid';
-  return`<span class="badge ${cls}">${esc(prioriteit)}</span>`;
-}
-
 // Het veld Behandelaar kan meer dan één persoon bevatten ('Jer, Cihad'). Deze regel stond op zes
 // plekken los uitgeschreven en op één daarvan (het leaderboard) net anders: die splitste óók op een
 // puntkomma. 'Jer; Cihad' was daardoor twee personen in de statistiek en één rare naam in de rest
@@ -617,14 +606,6 @@ function parseOff(v){
   return [recv||0, req||0];
 }
 
-// Fase van een offerte-traject. Expliciet `fase`-veld wint; anders afgeleid uit X/N.
-function offerteFase(r){
-  const f = (((r&&r.fase)||'')+'').trim().toLowerCase().replace(/\s+/g,'_');
-  if (OFFERTE_FASES.includes(f)) return f;
-  const [recv] = parseOff(r && r.offertes);
-  return recv > 0 ? 'ontvangen' : 'aangevraagd';
-}
-
 // Identiteit van één offerte-traject, voor het aannemers-paneel. Bewust NIET de VvE-code:
 // een VvE kan meerdere offerte-trajecten tegelijk hebben (dak én schilderwerk), en op de
 // code sturen liet elke toevoeging/verwijdering op het EERSTE traject landen — het kruisje
@@ -649,13 +630,6 @@ function parseAannemers(cel){
 }
 function serializeAannemers(lijst){
   return (lijst||[]).map(a=>`${(a.naam||'').replace(/[|\n]/g,' ').trim()}|${a.binnen?1:0}`).join('\n');
-}
-// Afgeleide "X/N binnen": N = aantal aannemers, X = aantal met offerte binnen. Leeg → ''.
-// NIET IN GEBRUIK door de app: `reconcileOffertes` hieronder heeft hem vervangen, want die kent
-// ook het geval ZONDER lijst (dan blijft kolom D staan). Alleen de zelftest roept hem nog aan.
-function deriveOffertes(lijst){
-  if(!lijst||!lijst.length) return '';
-  return `${lijst.filter(a=>a.binnen).length}/${lijst.length}`;
 }
 // Effectieve "X/N": staat er een aannemerslijst (kolom P), dan telt alléén de lijst —
 // X = aantal binnen, N = lijstlengte. Zonder lijst blijft de handmatige kolom-D-waarde staan
@@ -740,6 +714,14 @@ function _parseAnyDate(s){
 function parseDt(s){
   const d=_parseAnyDate(s);
   return d?new Date(d.y,d.m-1,d.d).getTime():0;
+}
+// Sorteer op een datum (in place, zoals Array.sort), nieuwste eerst tenzij `oplopend`. Elke datum
+// wordt één keer geparseerd in plaats van in elke vergelijking: `sort((a,b)=>parseDt(b.datum)-
+// parseDt(a.datum))` parseert ~2·n·log n keer, en dat draaide elke 8 seconden over heel Afgerond
+// (gemeten: 12 ms → 1,7 ms bij 2.000 rijen). Zelfde sleutel, dus dezelfde (stabiele) volgorde.
+function sorteerOpDatum(lijst, datumVan, oplopend=false){
+  const t=new Map(); for(const r of lijst) t.set(r, parseDt(datumVan(r)));
+  return lijst.sort(oplopend ? (a,b)=>t.get(a)-t.get(b) : (a,b)=>t.get(b)-t.get(a));
 }
 function toISODate(s){
   const d=_parseAnyDate(s);
@@ -1061,11 +1043,11 @@ export {
   DEADLINE_VOORSTEL, DEADLINE_HINT, voorgesteldeDeadline, werkdagenNa, crmWacht, AF_PERIODES, periodeBereik,
   opvolgStatus, volgendeDeadline, HERHAAL_MAANDEN, _vandaagAmsterdam, isoWeek,
   offerteAangevraagd, teLaatVoorTelling, crmReactieGegeven,
-  _verschilInKalenderdagen, berekenPrioriteit, prioBadge, persBadges,
-  offProg, _MAANDEN, _parseAnyDate, parseDt, toISODate, toDutchDate, leegBijErfenis, nieuwTaakId,
+  _verschilInKalenderdagen, berekenPrioriteit, persBadges,
+  offProg, _MAANDEN, _parseAnyDate, parseDt, sorteerOpDatum, toISODate, toDutchDate, leegBijErfenis, nieuwTaakId,
   emptyRow, esc, vveCodeSpan, subBadge, taakActieKnoppen, coerceDagenVooraf,
-  parseOff, offerteFase,
-  parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, aannSleutel,
+  parseOff,
+  parseAannemers, serializeAannemers, reconcileOffertes, aannSleutel,
   meldSleutel, _zonderLeidendSymbool, kiesAfgerondRij,
   duurUitCel, duurNaarCel,
 };

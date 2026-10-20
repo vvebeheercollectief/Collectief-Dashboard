@@ -4,7 +4,7 @@
 // ══════════════════════════════════════
 import { esc, vveCodeSpan, persBadges, subBadge, taakActieKnoppen, offProg, emptyRow, berekenPrioriteit, opvolgStatus, taakTitel, kortDatum, _verschilInKalenderdagen, _vandaagAmsterdam, stilDrempel, aannSleutel, parseWeekPeriode, metDagnamen, offerteAangevraagd, teLaatVoorTelling, crmWacht, crmReactieGegeven } from "./util.js";
 import { rijSleutel } from "./rij.js";
-import { SECS, SKEYS, PG } from "./config.js";
+import { SECS, PG } from "./config.js";
 import { state, D, pgs } from "./state.js";
 import { bulkGeselecteerd } from "./bulk.js";
 import { offerteAannSamenvatting, offerteAannemerPaneel } from "./render-offerte.js";

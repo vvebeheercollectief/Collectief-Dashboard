@@ -21,6 +21,11 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # Een GitHub-omgeving per doel (v15.6). Zonder instellingen gedraagt hij zich als voorheen (de
+    # repo-secrets blijven gewoon bereikbaar). Zet in Settings → Environments → 'productie' een
+    # verplichte reviewer en 'Deployment branches: main', en verplaats CLASPRC_JSON en
+    # PROD_SCRIPT_ID daarheen: dan kan geen andere tak of workflow meer bij de productiesleutel.
+    environment: ${{ github.ref_name == 'main' && 'productie' || 'test' }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5

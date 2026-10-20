@@ -9,3 +9,4 @@ node_modules/
 
 # Superpowers brainstorm-werkmap (mockups, lokale server-state)
 .superpowers/
+dist/

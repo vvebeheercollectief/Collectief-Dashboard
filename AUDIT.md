@@ -336,3 +336,38 @@ geen websockets, geen undo-op-undo.
 - Eerste werkdag: let op de gele regel in het bewerkscherm (U4) en op de undo-toasts (U7); het palet
   en de sneltoetsen zijn opt-in en raken niemand die ze niet gebruikt.
 
+
+## 9. v15.6 (20 oktober 2026) — opruimen, sneller, veiliger, verhuizing voorbereid
+
+Na een tweede doorlichting (dode code, snelheid, beveiliging). Zelftest 3.564 OK / 0 FAIL; draait nu
+ook automatisch in GitHub Actions (`.github/workflows/zelftest.yml`, `tools/zelftest.mjs`).
+
+**Veiligheid en privacy**
+- Leescache van localStorage naar sessionStorage (`data.js`): op github.io was de hele dataset 14
+  dagen leesbaar voor elke pagina op de gedeelde origin. Een oude localStorage-cache wordt gewist.
+- Privé-adressen van collega's en een adres dat op een eigenaar leek uit `tests.js` en `docs/`
+  (U9 was daarmee niet af). Productie-script-id uit `apps-script/README.md` (S2).
+- `AUDIT.md` niet meer publiek (Pages en Vercel). Vercel publiceert alleen nog een allowlist
+  (`tools/bouw.mjs` → `dist/`); een nieuw bestand is standaard niet publiek.
+- OneSignal-SDK pas na het inloggen (`laadOneSignal`). Gemini-knop uit de AI-hulp (AVG).
+- Chat-proxy: rem van 150 aanroepen per 10 min per collega, Anthropic-foutdetails alleen in de log.
+- HSTS-header; deploy-workflow met GitHub-omgeving per doel (reviewer instellen in Settings).
+
+**Sneller**
+- Service-worker-install met `no-cache` i.p.v. `reload` (ongewijzigde bestanden komen als 304).
+- Verkleinde build op Vercel: JS+CSS 534 → 194 kB gzip. Zijbalklogo 37 → 3 kB; dubbel icoon weg.
+- Verversen in een rustig venster (geen focus of 5 min geen invoer) eens per 30 s i.p.v. 8 s;
+  bij terugkeer meteen een ronde. Datums één keer parsen bij sorteren (`sorteerOpDatum`).
+- Bewust niet: parsen overslaan bij ongewijzigde Sheet-data. Elke ronde bouwt de lokale
+  (optimistische) stand opnieuw op uit de Sheet; overslaan kan een mislukte wijziging laten staan.
+
+**Opgeruimd**: `migratie-offerte.js` (v12.5, gedraaid), `logo-login.png`, `icon-maskable.png`,
+`prioBadge`, `editRow`, `offerteFase`/`OFFERTE_FASES`, `deriveOffertes`, `CRM_TERMIJN_WERKDAGEN`,
+ongebruikte imports/her-exports, ~1,5 kB CSS (`.off-*`, ongebruikte varianten en variabelen).
+
+**Verhuizing naar `dashboard.vvebeheercollectief.nl` (voorbereid, nog niet actief)**
+De code werkt op beide adressen (`PROD_HOSTS`, `_proxyUrl`, proxy-origins). De doorverwijzing staat
+klaar achter `VERHUISD_NAAR` in `config.js` (leeg). Volgorde: DNS → domein in Vercel → Google
+OAuth-origin → deze tak naar main → OneSignal-site-URL → `VERHUISD_NAAR` zetten +
+`APP_URL`/`CD_*_FRONTEND_URL` in Apps Script → iedereen opent het oude adres één keer →
+na een week Pages uit en repo privé.

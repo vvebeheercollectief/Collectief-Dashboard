@@ -25,11 +25,9 @@
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png"/>
   <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png"/>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <!-- async en NIET defer: een defer-script loopt in dezelfde rij als de module src/main.js en
-       hield die dus op tot de OneSignal-SDK van het CDN binnen en uitgevoerd was. Met async maakt
-       de volgorde niet uit: notifications.js gebruikt het OneSignalDeferred-patroon, dat werkt of
-       de SDK nu vóór of ná de module laadt. -->
-  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" async></script>
+  <!-- De OneSignal-SDK staat hier niet meer (v15.6): notifications.js (laadOneSignal) zet hem pas
+       neer na het inloggen. Op het inlogscherm heeft niemand hem nodig, en code van een derde partij
+       hoort niet mee te draaien vóór er een sessie is. De push zelf komt binnen via sw.js. -->
   <!-- De twee letters van het INLOGSCHERM (Hanken Grotesk / JetBrains Mono) staan hier niet meer:
        een stylesheet in de kop blokkeert het uitvoeren van src/main.js tot Google Fonts antwoordt,
        ook voor wie al ingelogd is en het inlogscherm nooit ziet. src/login-splash.js
@@ -953,7 +951,7 @@
       <button class="modal-close" id="ai-close">×</button>
     </div>
     <div class="modal-body">
-      <p style="font-size:12px;color:var(--mut);margin:0 0 14px;line-height:1.5">Plak een mail, kies wat je nodig hebt, en het dashboard bouwt de vraag mét VvE-context. Kopieer naar Claude of Gemini en plak het antwoord terug. <b>Geen kosten, jij houdt de regie.</b></p>
+      <p style="font-size:12px;color:var(--mut);margin:0 0 14px;line-height:1.5">Plak een mail, kies wat je nodig hebt, en het dashboard bouwt de vraag mét VvE-context. Kopieer naar Claude en plak het antwoord terug. <b>Geen kosten, jij houdt de regie.</b></p>
 
       <div class="ai-grid">
         <!-- LINKS -->
@@ -984,12 +982,11 @@
           <div class="ai-prompt" id="ai-prompt"></div>
           <div class="ai-send">
             <button class="btn ai-claude" data-action="ai-kopieer" data-waar="Claude"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.2 11.6l-8 8a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg> Kopieer &amp; open Claude</button>
-            <button class="btn ai-gemini" data-action="ai-kopieer" data-waar="Gemini"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.2 11.6l-8 8a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg> Kopieer &amp; open Gemini</button>
           </div>
           <p style="font-size:12px;color:var(--mut);margin:9px 0 0">De vraag staat dan op je klembord — plak met <kbd>Ctrl/⌘+V</kbd>.</p>
 
           <p class="ai-step" style="margin-top:16px"><span class="dot">5</span> Plak het antwoord van de AI terug</p>
-          <textarea id="ai-answer" class="ai-ta" rows="4" placeholder="Plak hier wat Claude/Gemini teruggeeft…" aria-label="Plak hier het antwoord van de AI"></textarea>
+          <textarea id="ai-answer" class="ai-ta" rows="4" placeholder="Plak hier wat Claude teruggeeft…" aria-label="Plak hier het antwoord van de AI"></textarea>
           <div class="ai-result" id="ai-result" style="display:none"></div>
         </div>
       </div>

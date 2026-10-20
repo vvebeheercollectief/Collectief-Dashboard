@@ -4,7 +4,7 @@
 import { state, D } from "./state.js";
 import { verseRij, rijIndex } from "./rij.js";
 import { renderNtd } from "./render-lijsten.js";
-import { toDutchDate, taakTitel, berekenPrioriteit, _parseAnyDate, _vandaagAmsterdam, _verschilInKalenderdagen, parseDt, kiesAfgerondRij, leesbareFout } from "./util.js";
+import { toDutchDate, taakTitel, berekenPrioriteit, _parseAnyDate, _vandaagAmsterdam, _verschilInKalenderdagen, parseDt, kiesAfgerondRij, leesbareFout, sorteerOpDatum } from "./util.js";
 import { SID } from "./config.js";
 import { ensureToken } from "./auth.js";
 import { _shiftNtdRows, _shiftAfRows, _herstelShift, assertRowsMatch, _veiligeRij, sheetsFetch, kapCel, _withRetry, fetchSheet } from "./api.js";
@@ -483,7 +483,7 @@ async function bulkUndoAfronden(items, stand){
         //    werkwijze als undoComplete (notifications.js). D.af is van vóór de invoeging hierboven
         //    en kan intussen verschoven zijn. Nieuwste eerst, net als D.af (zie kiesAfgerondRij).
         const afVers=parseSections(await _withRetry(()=>fetchSheet('Afgerond')), 'Afgerond').data;
-        Object.values(afVers).forEach(l=>l.sort((a,b)=>parseDt(b.datum)-parseDt(a.datum)));
+        Object.values(afVers).forEach(l=>sorteerOpDatum(l, r=>r.datum));
         const teVerwijderen=_bulkUndoAfDoelRijen(items, afVers);
         // 3) Verwijder ze in één batch in aflopende _row-volgorde, zodat de delete-indexen elkaar
         //    niet verschuiven. Mét herkansing, en met een vlag: een deleteDimension is positioneel

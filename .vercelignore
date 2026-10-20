@@ -1,6 +1,6 @@
-# Interne bestanden en bronassets die niet mee hoeven in de publieke Vercel-deploy.
-# (De app zelf — index.html, src/, styles.css, sw.js, manifest, iconen en de losse
-#  logo-*.png in de root — blijft gewoon meegedeployed.)
+# Bestanden die niet eens naar Vercel geüpload hoeven te worden.
+# Sinds v15.6 bepaalt tools/bouw.mjs met een ALLOWLIST wat er online komt (dist/); deze lijst is
+# alleen nog een tweede slot. tools/ staat er daarom NIET meer in: de bouwstap draait op Vercel.
 README.md
 BRAND-GUIDELINES.md
 beheer-playbook.md
@@ -9,11 +9,11 @@ docs/
 apps-script/
 apps-script-backup/
 apps-script-klaarstaand/
-tools/
 mockups/
 logo-pakket/
 vrijdagsoverzicht.html
 OVERDRACHT-subsidie-trajecten.md
+AUDIT.md
 # Let op: dit is gitignore-syntax en matcht NIET op prefix — 'apps-script/' weert
 # apps-script-backup/ dus niet. Elke map hier apart noemen.
 #

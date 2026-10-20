@@ -11,6 +11,7 @@ import { ZOEK_TOOLS, ZOEK_TOOL_NAMEN } from '../zoek-tools.js'; // idem, gedeeld
 // geen CORS nodig). Bare vorm zonder tussensegment staat er expliciet bij omdat
 // de preview-regex hieronder een niet-leeg segment eist.
 const ALLOWED_ORIGINS = [
+  'https://dashboard.vvebeheercollectief.nl',
   'https://vvebeheercollectief.github.io',
   'https://collectief-dashboard.vercel.app',
   'https://collectief-dashboard-vve-beheer-collectief.vercel.app',
@@ -36,6 +37,21 @@ const MAX_MESSAGES = 16;
 const MAX_MSG_CHARS = 8000;
 
 const MODEL = 'claude-haiku-5-5';
+
+// Kostenrem per collega (v15.6). Eén dashboardvraag is hooguit vijf aanroepen (vier zoekrondes
+// plus het antwoord), dus 150 per tien minuten is ruim dertig vragen: een mens haalt dat niet,
+// een lus of een gestolen token wel. De teller leeft in het geheugen van één functie-instantie:
+// geen harde garantie (Vercel kan meerdere instanties draaien), wel een rem op een ontsporing.
+// De echte bovengrens is de maandlimiet in de Anthropic-console.
+const LIMIET_AANTAL = 150;
+const LIMIET_VENSTER_MS = 10 * 60 * 1000;
+const _gebruik = new Map();   // e-mailhash → tijdstempels binnen het venster
+function binnenLimiet(sleutel, nu){
+  const recent = (_gebruik.get(sleutel) || []).filter(t => nu - t < LIMIET_VENSTER_MS);
+  if (recent.length >= LIMIET_AANTAL) { _gebruik.set(sleutel, recent); return false; }
+  recent.push(nu); _gebruik.set(sleutel, recent);
+  return true;
+}
 
 // ── Zoekmodus (dashboard-chat) ──
 // Hier bestaat een bericht niet alleen uit tekst maar ook uit blokken: Claude vraagt een filter aan
@@ -113,7 +129,12 @@ export default async function handler(req, res){
     // vandaar String(): zo werkt de controle ook als Google ooit een echte boolean teruggeeft.
     if (String(info.email_verified) !== 'true') { res.status(403).json({ error: 'e-mailadres niet geverifieerd' }); return; }
     const email = (info.email || '').trim().toLowerCase();
-    if (!email || !ALLOWED_EMAIL_HASHES.includes(createHash('sha256').update(email).digest('hex'))) { res.status(403).json({ error: 'geen toegang' }); return; }
+    const emailHash = email ? createHash('sha256').update(email).digest('hex') : '';
+    if (!email || !ALLOWED_EMAIL_HASHES.includes(emailHash)) { res.status(403).json({ error: 'geen toegang' }); return; }
+    if (!binnenLimiet(emailHash, Date.now())) {
+      console.warn('chat: limiet bereikt');
+      res.status(429).json({ error: 'Te veel vragen achter elkaar. Probeer het over een paar minuten opnieuw.' }); return;
+    }
 
     const { system, messages, modus, laatste } = req.body || {};
     const zoek = modus === 'zoek';
@@ -155,8 +176,10 @@ export default async function handler(req, res){
     });
     const data = await r.json().catch(() => ({}));
     if (!r.ok) {
+      // De details alleen in de Vercel-log: de tekst van Anthropic kan interne informatie bevatten
+      // (limieten, accountstatus) die niet in de browser hoort.
       console.error('chat: Anthropic-fout', r.status, (data.error && data.error.message) || '');
-      res.status(502).json({ error: (data.error && data.error.message) || 'AI-fout' }); return;
+      res.status(502).json({ error: 'AI-fout' }); return;
     }
     // Alleen aantallen, nooit inhoud: zo zijn de kosten per vraag in de Vercel-logs na te gaan.
     if (data.usage) {

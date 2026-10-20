@@ -1,10 +1,10 @@
 // ══════════════════════════════════════
 //  TESTS — zelftest (lazy-geladen, alleen met ?test=1)
 // ══════════════════════════════════════
-import { taakTitel, taakVerwijzing, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, stilDrempel, offerteFase, parseOff, parseAannemers, serializeAannemers, deriveOffertes, reconcileOffertes, esc, vveCodeSpan, subBadge, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel, kiesAfgerondRij, filt, splitBehandelaar, korteNaam, persBadges, taakActieKnoppen, voorgesteldeDeadline, DEADLINE_VOORSTEL, DEADLINE_HINT, periodeBereik, AF_PERIODES, duurUitCel, duurNaarCel, offerteAangevraagd, teLaatVoorTelling, groepeerPerVve, groepeerPerBlok } from "./util.js";
+import { taakTitel, taakVerwijzing, nieuwTaakId, berekenPrioriteit, kortDatum, _parseAnyDate, displayName, opvolgStatus, volgendeDeadline, STIL_ESCALATIE_REGELS, stilDrempel, parseOff, parseAannemers, serializeAannemers, reconcileOffertes, esc, vveCodeSpan, subBadge, isoWeek, coerceDagenVooraf, _vandaagAmsterdam, meldSleutel, aannSleutel, kiesAfgerondRij, filt, splitBehandelaar, korteNaam, persBadges, taakActieKnoppen, voorgesteldeDeadline, DEADLINE_VOORSTEL, DEADLINE_HINT, periodeBereik, AF_PERIODES, duurUitCel, duurNaarCel, offerteAangevraagd, teLaatVoorTelling, groepeerPerVve, groepeerPerBlok } from "./util.js";
 import { verwerkMeldingRijen, toonMeldingen, MAX_TOAST_BURST, _whoSleutel, getCurrentWho, undoDelete } from "./notifications.js";
 import { logZin, logTijd, logPaginaSoort, afrondOpmerking, logBewerkbaar, LOG_ZIN_EIGEN, renderTaskHistory, parseLogboek, _nogNietBevestigd, _shiftRows, _shiftLogEditRef, logEditWrite, logItemHtml, logEditForm, undoDeleteLog, actieBadge, saveLogboek, logEvents, renderOntw, openOntwModal, closeOntwModal, submitOntwItem, _logRegelSleutel, _ontwSleutel, addTaskNote } from "./render-overig.js";
-import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM, VELD_LABELS } from "./config.js";
+import { _isStagingHost, APP_VERSION, SECS, SKEYS, TEAM, VELD_LABELS, _proxyUrl, _verhuisDoel, VERHUISD_NAAR } from "./config.js";
 import { maandagVan, isoWeekJaar, weekDagen, weekPeriodeLabel, parseWeekPeriode, weekOpties, weekAfstand } from "./util.js";
 import { ACTIONS } from "./actions.js";
 import { filterVves } from "./vve-zoekveld.js";
@@ -16,14 +16,14 @@ import { vveOverzicht, filterDossierLog, dossierFeed, afOmschrijving, terugDoel,
 import { parseKenmerken, vveKenmerken, KENMERK_WAARDEN, saveKenmerken } from "./kenmerken.js";
 import { zoekAlles, openPalette, closePalette, palOpen, zoekActies, metRecentVooraan, ontleedLog, COMMANDOS } from "./palette.js";
 import { sha256Hex, emailHash } from "./hash.js";
-import { emailToegestaan, naamBijEmail } from "./config.js";
+import { emailToegestaan, naamBijEmail, EMAIL_NAMES } from "./config.js";
 import { statusUitleg } from "./verbinding.js";
 import { weergaveActief, weergaveOmschrijving, huidigeWeergave } from "./weergaven.js";
 import { RIJ_ACTIES } from "./sneltoetsen.js";
 import { laatsteWijziging, _eigenWijzigingen, _gewijzigdeVelden, _rijWaardenAK, controleerBewerkConflict } from "./crud.js";
 import { _bulkVolgorde, BULK_DEADLINE_KOLOM, _bulkUndoAfDoelRijen, bulkSelectie, bulkWis, renderBulkUi, bulkDoe, bulkVink, bulkVeld, bulkAlles, allesVinkjeHtml, allesVinkjeStand } from "./bulk.js";
 import { sheetsFetch, NTD_OMSCHRIJVING, _isTransient, _rowMismatch, _a1Bereik, _nummerDeel, _herstelShift, _shiftNtdRows, _shiftAfRows, veiligeCel, _veiligeRij, fetchSheet, fetchSheets, vingerafdruk, rijVingerafdruk, _normCel, _rijNaarCellen, assertRowMatch, NTD_DATUM, _isOffline, _isNetwerkFout, appendRange, appendRows } from "./api.js";
-import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, schrijfActieLoopt, serieleWrite, POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, showLoadError, clearLoadError, syncSelecteerStand, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
+import { parseSections, parseAlvo, parseAlfa, parseHerhaal, loadAll, magPollen, pollActief, pollNu, schrijfActieLoopt, serieleWrite, POLL_TABS, VERPLICHTE_TABS, magTerugvalLosseReads, _logBereik, _verwerkLogboek, _logVolledigNodig, _alfaNodig, MELD_KOP, MELD_MARGE, _meldBereik, _meldVolgendeStart, _verwerkMeldingen, blokkeerOffline, clearOfflineBanner, showLoadError, clearLoadError, syncSelecteerStand, backgroundWrite, bewaarCache, laadUitCache, wisCache, _cacheSleutel, CACHE_PREFIX, _zetCacheBlokkade } from "./data.js";
 import { _recomputeAlvoStatus, ALVO_COLS, ALVO_LABELS, renderAlvo, toggleAlvoFlag } from "./render-alv.js";
 import { _resetBereik, _resetBlokken, _archiefNaam, doeReset } from "./alv-reset.js";
 import { setv, serializeNtdUndo, afrondWaarden, toevoegWaarden, _eindKolom, _verseRijIdx, _herankerRij, completeTask, doCompleteTask, closeCompleteModal, clearModal, closeModal, openModal, submitTask, kiesModalFase, _modalFaseWoord, getInsertRow, getAfInsertRow, OMSCHRIJVING_VELD, zetOmschrijving, _sheetBreedtes, getSheetIds, bevestigInvoegPlek, _naamBijCode, _zetNaamVeld, taakUitCache, kiesSectie, deleteTaskRow, deleteCurrentEditTask, completeCurrentEditTask, renderExtraVves, toonMeerVve, zetDeadlineVoorstel, herzieAlsSubtaak, kiesDuur, gekozenDuur, wisDuurKeuze, nietOpgeslagenVelden, offerteAanvraagGewijzigd, modalGewijzigd } from "./crud.js";
@@ -49,7 +49,6 @@ import { verplaatsTaak, verplaatsWaarden, verlorenVelden, verplaatsVraagTekst, _
 import { addAannemer, verwijderAannemer, toggleAannemerBinnen, hernoemAannemer, startHernoem, stopHernoem, opgevolgd } from "./offerte-aannemers.js";
 import { zetModalAannemers, modalAannemersCel, modalAannemerBinnen } from "./modal-aannemers.js";
 import { voorlegValues, VOORLEG_ACTIE, maakVoorlegSubtaken } from "./offerte-stappen.js";
-import { migratieSelectie, migreerOfferteStappen } from "./migratie-offerte.js";
 import { _verrijkOfferteRij, herstelAannemerFocus } from "./render-offerte.js";
 import { bouwBundelIndex, bundelWeergave, zichtbareKop, isBundel, bundelVan, bundelMetId, hernummerLeden, volgendeVolg, magKoppelen, wordtGeabsorbeerd, koppelKandidaten, taakFilter, openSubtaken, bundelWaarschuwing, bundelVerwijzing, bundelStand, zelfdeTaak, isAutoOfferteStap, telbaar } from "./bundel.js";
 import { bundelPaneelHtml, bundelMerkje, bundelKopExtra, STAPEL_GREEP } from "./render-bundel.js";
@@ -524,6 +523,19 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('andere preview = staging (veilig)', _isStagingHost('collectief-dashboard-git-experiment-vve-beheer-collectief.vercel.app') === true);
   truthy('localhost = staging',          _isStagingHost('localhost') === true);
   truthy('github.io = echte productie (geen staging)', _isStagingHost('vvebeheercollectief.github.io') === false);
+  truthy('eigen domein = productie (geen staging)', _isStagingHost('dashboard.vvebeheercollectief.nl') === false);
+  // Proxy: alleen GitHub Pages roept cross-origin aan; overal waar Vercel serveert same-origin.
+  eq('proxy: github.io → vaste Vercel-URL', _proxyUrl('vvebeheercollectief.github.io'), 'https://collectief-dashboard.vercel.app/api/chat');
+  eq('proxy: eigen domein → same-origin', _proxyUrl('dashboard.vvebeheercollectief.nl'), '/api/chat');
+  eq('proxy: staging → same-origin', _proxyUrl('collectief-dashboard-git-staging-vve-beheer-collectief.vercel.app'), '/api/chat');
+  // Verhuizing: alleen vanaf de oude host, alleen als het doel gezet is; query en anker gaan mee.
+  const NIEUW='https://dashboard.vvebeheercollectief.nl/';
+  eq('verhuizing: zonder doel blijft alles staan', _verhuisDoel('', 'vvebeheercollectief.github.io', '', ''), '');
+  eq('verhuizing: github.io → nieuw adres met query en anker', _verhuisDoel(NIEUW, 'vvebeheercollectief.github.io', '?vve=311001', '#ntd'), NIEUW+'?vve=311001#ntd');
+  eq('verhuizing: doel zonder slash krijgt er één', _verhuisDoel('https://dashboard.vvebeheercollectief.nl', 'vvebeheercollectief.github.io', '', ''), NIEUW);
+  eq('verhuizing: het nieuwe adres zelf stuurt nooit door', _verhuisDoel(NIEUW, 'dashboard.vvebeheercollectief.nl', '', ''), '');
+  eq('verhuizing: staging stuurt nooit door', _verhuisDoel(NIEUW, 'localhost', '', ''), '');
+  truthy('verhuizing: het doel is leeg of https', VERHUISD_NAAR === '' || /^https:\/\//.test(VERHUISD_NAAR));
 
   // ── filterVves ── (VvE-zoekveld: zoekt op code én naam, case-insensitief)
   const _vves=[{code:'VVE-001',naam:'Parkzicht'},{code:'VVE-002',naam:'De Boog'},{code:'B-100',naam:'Vveldzicht'}];
@@ -1070,13 +1082,6 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   // ── chart.js lazy-load ── (Fase 5: niet meer vooraf geladen)
   truthy('chart.js niet vooraf geladen', typeof window.Chart === 'undefined');
 
-  // ── offerte-motor: fase-afleiding ──
-  eq('fase leeg → aangevraagd', offerteFase({offertes:'0/3'}), 'aangevraagd');
-  eq('fase X>0 → ontvangen',    offerteFase({offertes:'2/3'}), 'ontvangen');
-  eq('fase expliciet bij_vve',  offerteFase({offertes:'3/3', fase:'bij_vve'}), 'bij_vve');
-  eq('fase expliciet "Bij VvE"',offerteFase({fase:'Bij VvE'}), 'bij_vve');
-  eq('fase gegund',             offerteFase({fase:'gegund'}), 'gegund');
-
   eq('parseOff normaal', parseOff('2/3'), [2,3]);
   eq('parseOff half',    parseOff('3/'),  [3,0]);
   eq('parseOff rommel',  parseOff('abc'), [0,0]);
@@ -1095,9 +1100,6 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
      [{naam:'Heijstek en Klus',binnen:true},{naam:'Alvin Lin',binnen:false}]);
   eq('serialize stript pipe/newline uit naam',
      serializeAannemers([{naam:'A|B\nC',binnen:false}]), 'A B C|0');
-  eq('deriveOffertes leeg', deriveOffertes([]), '');
-  eq('deriveOffertes 1 van 3',
-     deriveOffertes([{naam:'a',binnen:true},{naam:'b',binnen:false},{naam:'c',binnen:false}]), '1/3');
 
   // ── offerte: reconcileOffertes — de aannemerslijst wint volledig (v12.5). Kolom D telt
   //    alleen nog voor rijen ZONDER lijst (van vóór de aannemerslijst).
@@ -1114,11 +1116,11 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
 
   // ── offerte: aannemerslijst stuurt de X/N-teller (via filterNtd-verrijking) ──
   // Sinds v12.5 wint de lijst volledig: kolom D "1/3" met 3 aannemers allen "nog niet"
-  // toont "0/3" (en fase 'aangevraagd') — het vinkje is de enige waarheid geworden.
+  // toont "0/3" — het vinkje is de enige waarheid geworden.
   truthy('381109 onder v12.5: de lijst wint — 0/3 bij nog-niet-aannemers', (()=>{
     const row={code:'ZZ-381109',naam:'Test',offertes:'1/3',aannemers:'De Lange|0\nZegwaard|0\nRioolservice West|0',_row:9996};
     filterNtd([row],'','','','','OFFERTE-TRAJECTEN');
-    return row.offertes==='0/3' && offerteFase(row)==='aangevraagd';
+    return row.offertes==='0/3';
   })());
 
   // ── offerte: na 'aangevraagd' is kolom F een opvolgdatum, geen deadline (v12.5) ──
@@ -1205,10 +1207,10 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     filterNtd([row],'','','','','OFFERTE-TRAJECTEN');
     return row.offertes==='2/4';
   })());
-  truthy('2/2 uit lijst → fase ontvangen', (()=>{
+  truthy('2/2 uit lijst', (()=>{
     const row={code:'ZZ-ONS',naam:'Test',offertes:'',aannemers:'A|1\nB|1',_row:9997};
     filterNtd([row],'','','','','OFFERTE-TRAJECTEN');
-    return row.offertes==='2/2' && offerteFase(row)==='ontvangen';
+    return row.offertes==='2/2';
   })());
 
   // ── offerte-aannemers: paneel- en samenvatting-component ──
@@ -2512,7 +2514,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
               { ...basis, _row:9911, soort:'Klacht', afzender:'Mevrouw A.B.C. van der Wielen-Boekhorst, nr. 151 tweede etage', ontvangen:'1 september 2026' },
               { ...basis, _row:9912, soort:'', afzender:'', ontvangen:'' },
               // Een afzender zonder spaties (zo komt een mailadres binnen) kan niet afbreken.
-              { ...basis, _row:9913, code:'121034 - G', subcategorie:'', soort:'Vraag', afzender:'fred.en.hetty.vanderwielen5861@gmail.com', ontvangen:'1-9-2026' },
+              { ...basis, _row:9913, code:'121034 - G', subcategorie:'', soort:'Vraag', afzender:'familie.voorbeeldnaam1234@voorbeeld.nl', ontvangen:'1-9-2026' },
               { ...basis, _row:9914, naam:'VvE Appartementencomplexvereniging', actiepunt:url, opmerkingen:url, onderwerp:url, subsidie:url, agendapunten:url, status:url } ] };
             state.activeNtd = sec; pgs.ntd = 1; state.bulkMode = bulk;
             state.expandedRows = open ? new Set(D.ntd[sec].map(r => rijSleutel(r))) : new Set();
@@ -3230,7 +3232,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       { code:'311001', timestamp:'2026-10-06T09:00:00.000Z', actie:'Contact', veld:'Telefoon', oudeWaarde:'Bestuur',
         nieuweWaarde:'lekkage gemeld door de **voorzitter**', gebruiker:'info@vvebeheercollectief.nl' },
       { code:'311002', timestamp:'2026-09-01T09:00:00.000Z', actie:'Opmerking', veld:'', oudeWaarde:'',
-        nieuweWaarde:'aannemer nabellen', gebruiker:'djiowchico@gmail.com' },
+        nieuweWaarde:'aannemer nabellen', gebruiker:'collega@voorbeeld.nl' },
       // Ruis die de Logboek-pagina ook niet toont, en een notitie die als contactsoort is gelogd.
       { code:'311002', timestamp:'2026-09-02T09:00:00.000Z', actie:'Kenmerk', veld:'Lift', oudeWaarde:'', nieuweWaarde:'ja', gebruiker:'info@vvebeheercollectief.nl' },
       { code:'311003', timestamp:'2026-09-03T09:00:00.000Z', actie:'Contact', veld:'Notitie', oudeWaarde:'Bestuur', nieuweWaarde:'bestuur wil uitstel', gebruiker:'info@vvebeheercollectief.nl' },
@@ -3303,7 +3305,10 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     truthy('zoek logboek: contact zonder de notities', z('zoek_logboek', { soort:'contact' }).startsWith('Logboekregels: 1 gevonden'));
     truthy('zoek logboek: geen kenmerk-ruis', z('zoek_logboek', {}).startsWith('Logboekregels: 4 gevonden') && !z('zoek_logboek', {}).includes('Kenmerk'));
     truthy('zoek: VvE die alleen in de historie staat is op code te vinden', z('zoek_logboek', { vve_code:'399999' }).includes('oud dossier'));
-    truthy('zoek logboek: medewerker', z('zoek_logboek', { medewerker:'Cihad' }).includes('aannemer nabellen'));
+    // Verzonnen collega-adres (zie allowed-emails.js): de hash staat alleen tijdens deze toets in EMAIL_NAMES.
+    EMAIL_NAMES[emailHash('collega@voorbeeld.nl')]='Cihad';
+    try{ truthy('zoek logboek: medewerker', z('zoek_logboek', { medewerker:'Cihad' }).includes('aannemer nabellen')); }
+    finally{ delete EMAIL_NAMES[emailHash('collega@voorbeeld.nl')]; }
     truthy('zoek logboek: periode', z('zoek_logboek', { van:'2026-10-01' }).startsWith('Logboekregels: 1 gevonden'));
 
     // 6. Dossier + vangnetten
@@ -3590,6 +3595,17 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   eq('poll: geen sessie → niet pollen', magPollen({currentUserEmail:null}), false);
   eq('poll: lege sessie-naam → niet pollen', magPollen({currentUserEmail:''}), false);
   truthy('poll: ingelogd → wel pollen', magPollen({currentUserEmail:'info@vvebeheercollectief.nl'}));
+  // Adaptief tempo (v15.6): elke tik als iemand hier werkt, anders hooguit eens per 30 s.
+  {
+    const nu=1_000_000_000, min=60_000;
+    eq('poll-tempo: focus + invoer net → actief', pollActief(nu, nu-10_000, true), true);
+    eq('poll-tempo: geen focus → niet actief', pollActief(nu, nu-10_000, false), false);
+    eq('poll-tempo: 5 min geen invoer → niet actief', pollActief(nu, nu-5*min, true), false);
+    eq('poll-tempo: actief → elke tik, ook vlak na de vorige ronde', pollNu(nu, nu-1000, true, nu-8000), true);
+    eq('poll-tempo: rustig en vorige ronde 10 s geleden → overslaan', pollNu(nu, nu-10*min, true, nu-10_000), false);
+    eq('poll-tempo: rustig en vorige ronde 30 s geleden → wel', pollNu(nu, nu-10*min, false, nu-30_000), true);
+    eq('poll-tempo: nog nooit gepold → meteen', pollNu(nu, 0, false, undefined), true);
+  }
   // ── Vernieuwen-knop: de DOM geeft het klik-event als eerste argument mee. Was de functie
   //    rechtstreeks aan onclick gehangen, dan kwam dat event binnen als de 'stil'-vlag en
   //    onderdrukte het de 'Laden…'-melding én de foutbanner. ──
@@ -4168,10 +4184,14 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       localStorage.setItem(_whoSleutel(state.currentUserEmail),'Jer');
       if(sel) sel.value='';                       // select leeg: dan wint de opgeslagen naam
       eq('who: eigen naam komt terug bij dezelfde gebruiker', getCurrentWho(), 'Jer');
-      state.currentUserEmail='djiowchico@gmail.com';
+      // Een verzonnen collega-adres (de echte adressen horen niet in de broncode, zie
+      // allowed-emails.js); zijn hash staat alleen tijdens deze toets in EMAIL_NAMES.
+      EMAIL_NAMES[emailHash('collega@voorbeeld.nl')]='Cihad';
+      state.currentUserEmail='collega@voorbeeld.nl';
       truthy('who: de naam van de vorige gebruiker lekt NIET door', getCurrentWho() !== 'Jer');
       eq('who: en valt terug op de naam van wie er nu is ingelogd', getCurrentWho(), 'Cihad');
     } finally {
+      delete EMAIL_NAMES[emailHash('collega@voorbeeld.nl')];
       try{ localStorage.removeItem('notif_who_info@vvebeheercollectief.nl'); }catch(_){}
       state.currentUserEmail=mailOud; if(sel && selOud!==null) sel.value=selOud;
     }
@@ -4179,7 +4199,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   (()=>{
     const mailOud=state.currentUserEmail, cacheOud=state._uitCache;
     const dOud={}; Object.keys(D).forEach(k=>dOud[k]=D[k]);
-    const bewaard={}; try{ for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i); if(k.startsWith(CACHE_PREFIX)) bewaard[k]=localStorage.getItem(k);} }catch(_){}
+    const bewaard={}; try{ for(let i=0;i<sessionStorage.length;i++){const k=sessionStorage.key(i); if(k.startsWith(CACHE_PREFIX)) bewaard[k]=sessionStorage.getItem(k);} }catch(_){}
     try{
       state.currentUserEmail='test@vvebeheercollectief.nl';
       D.ntd={OPPAKKEN:[{code:'X1',_row:5,_sec:'OPPAKKEN'}]}; D.af={OPPAKKEN:[]};
@@ -4191,17 +4211,17 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       // zou anders bij de volgende echte start één ronde lang in beeld staan.
       wisCache(); bewaarCache(hash);
       eq('cache: in de testomgeving wordt er niets bewaard',
-         localStorage.getItem(_cacheSleutel(state.currentUserEmail)), null);
+         sessionStorage.getItem(_cacheSleutel(state.currentUserEmail)), null);
       _zetCacheBlokkade(false);   // vanaf hier de échte schrijfweg beproeven
       // Een oude sleutel van een vorige versie moet bij het schrijven verdwijnen: zonder dat
       // opruimen blijft er per release ~1 MB achter in een ruimte van ~5 MB en faalt uiteindelijk
       // élke setItem — óók die van het thema en de dichtheid.
-      localStorage.setItem(CACHE_PREFIX+'0.1_test@vvebeheercollectief.nl','{"d":[]}');
+      sessionStorage.setItem(CACHE_PREFIX+'0.1_test@vvebeheercollectief.nl','{"d":[]}');
       bewaarCache(hash);
       truthy('cache: er staat iets onder de huidige sleutel',
-             !!localStorage.getItem(_cacheSleutel(state.currentUserEmail)));
+             !!sessionStorage.getItem(_cacheSleutel(state.currentUserEmail)));
       eq('cache: de sleutel van een oudere versie is opgeruimd',
-         localStorage.getItem(CACHE_PREFIX+'0.1_test@vvebeheercollectief.nl'), null);
+         sessionStorage.getItem(CACHE_PREFIX+'0.1_test@vvebeheercollectief.nl'), null);
       // Leegmaken en terugladen: alle tien velden moeten terugkomen.
       Object.keys(D).forEach(k=>{ D[k]=Array.isArray(dOud[k])?[]:{}; });
       eq('cache: terugladen lukt', laadUitCache(), true);
@@ -4217,15 +4237,15 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       eq('cache: schrijven is geblokkeerd zolang de eerste verse ronde onderweg is', blokkeerOffline(), true);
       state._uitCache=false;
       // Uitloggen moet de cache wissen, anders blijft de stand van de vorige gebruiker op een
-      // gedeelde computer staan. logout() raakte localStorage voorheen nergens aan.
+      // gedeelde computer staan. logout() raakte sessionStorage voorheen nergens aan.
       wisCache();
-      eq('cache: uitloggen wist de cache', localStorage.getItem(_cacheSleutel(state.currentUserEmail)), null);
+      eq('cache: uitloggen wist de cache', sessionStorage.getItem(_cacheSleutel(state.currentUserEmail)), null);
       eq('cache: en terugladen levert dan niets meer op', laadUitCache(), false);
     } finally {
       _zetCacheBlokkade(true);   // testomgeving weer op 'niets bewaren'
       state.currentUserEmail=mailOud; state._uitCache=cacheOud;
       Object.keys(dOud).forEach(k=>{ D[k]=dOud[k]; });
-      try{ wisCache(); Object.entries(bewaard).forEach(([k,v])=>localStorage.setItem(k,v)); }catch(_){}
+      try{ wisCache(); Object.entries(bewaard).forEach(([k,v])=>sessionStorage.setItem(k,v)); }catch(_){}
       document.querySelectorAll('.toast').forEach(t=>t.remove());
     }
   })();
@@ -6443,7 +6463,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
   truthy('elke donutkleur is een echte kleurwaarde',
      _donut.colors.every(c => /^(#|rgb)/.test(String(c))));
 
-  eq('versie opgehoogd', APP_VERSION, '15.5');
+  eq('versie opgehoogd', APP_VERSION, '15.6');
 
   // ── Tabbladen ÍN de kaartkop (v11.7) ──
   // De kop van de kaart zei links exact hetzelfde als het actieve tabblad — 'Oppakken' boven
@@ -8554,73 +8574,6 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
        toevoegWaarden(voorlegValues('411006','X',''), {taakId:'T9', bundelId:'Tkop', bundelVolg:'10'}).slice(16),
        ['T9','Tkop','10']);
 
-    // ── De eenmalige migratie (v12.5): alleen de SELECTIE, want daar hangt de idempotentie aan.
-    // De schrijfweg zelf draait handmatig en wordt op de TEST-Sheet echt gedaan.
-    (() => {
-      const T = new Date(2026, 8, 15);                       // 15-09-2026
-      const tr = (taakId, extra) => ({ taakId, bundelId:'', bundelVolg:'', _row:10,
-        _sec:'OFFERTE-TRAJECTEN', code:'311212', naam:'Testflat', deadline:'', datumAangevraagd:'',
-        ...extra });
-      const ixVan = leden => new Map(leden ? [['Tkop', leden]] : []);
-
-      // A — alleen een AANGEVRAAGD traject met een verstreken datum verhuist naar een opvolgdatum.
-      const verstreken = tr('T1', { datumAangevraagd:'1-8-2026', deadline:'1-9-2026' });
-      const toekomst   = tr('T2', { datumAangevraagd:'1-8-2026', deadline:'1-10-2026' });
-      const nietAangev = tr('T3', { deadline:'1-9-2026' });
-      eq('migratie A: alleen het aangevraagde traject met verstreken datum',
-         migratieSelectie([verstreken, toekomst, nietAangev], ixVan(null), T)
-           .naarOpvolg.map(r => r.taakId), ['T1']);
-      // De idempotentie van A, expliciet: na de run staat F in de toekomst en valt de rij eruit.
-      eq('migratie A: een tweede run pakt de al verzette rij niet nog eens',
-         migratieSelectie([{ ...verstreken, deadline:'29-9-2026' }], ixVan(null), T)
-           .naarOpvolg.length, 0);
-
-      // B — een traject telt als 'gedaan' zodra er een OPEN voorleg-subtaak in zijn bundel zit.
-      const kop = tr('Tkop', { bundelId:'Tkop', bundelVolg:'0' });
-      const sub = (af, actie) => ({ af, r:{ taakId:'Ts', bundelId:'Tkop', actiepunt:actie } });
-      eq('migratie B: zonder bundel hoort het traject erbij',
-         migratieSelectie([tr('T4')], ixVan(null), T).zonderSub.map(r => r.taakId), ['T4']);
-      eq('migratie B: met een open voorleg-subtaak niet meer',
-         migratieSelectie([kop], ixVan([{ af:false, r:kop }, sub(false, VOORLEG_ACTIE)]), T)
-           .zonderSub.length, 0);
-      // Bewust: een AFGERONDE voorleg-subtaak telt niet mee — anders zou de migratie werk
-      // teruggeven dat al gedaan is. Zie de kop van migratie-offerte.js.
-      eq('migratie B: een afgeronde voorleg-subtaak telt niet als dekking',
-         migratieSelectie([kop], ixVan([{ af:false, r:kop }, sub(true, VOORLEG_ACTIE)]), T)
-           .zonderSub.map(r => r.taakId), ['Tkop']);
-      eq('migratie B: een andere subtaak in dezelfde bundel dekt het traject niet af',
-         migratieSelectie([kop], ixVan([{ af:false, r:kop }, sub(false, 'Iets anders')]), T)
-           .zonderSub.map(r => r.taakId), ['Tkop']);
-      // Een traject dat zélf subtaak is in andermans bundel (R ≠ eigen nummer) krijgt géén eigen
-      // voorleg-subtaak — zelfde regel als submitTask, bundels blijven één laag diep. Zonder deze
-      // uitzondering ging de subtaak met de vreemde bundelId mee en stond hij als broer/zus naast
-      // het traject in die andere bundel (tegenlezing 2026-09-02).
-      const inVreemde = tr('T6', { bundelId:'Talv', bundelVolg:'10' });
-      const uitVreemde = migratieSelectie([inVreemde], ixVan(null), T);
-      eq('migratie B: een traject dat zelf in andermans bundel zit wordt overgeslagen en apart geteld',
-         [uitVreemde.zonderSub.length, uitVreemde.inAndereBundel.map(r => r.taakId)], [0, ['T6']]);
-      // …en die uitzondering wint óók als de vreemde bundel toevallig al een open voorleg-rij heeft:
-      // hij hoort in geen van beide lijsten, want hij is niet 'gedekt' — hij is uitgesloten.
-      const vreemdeIx = new Map([['Talv', [{ af:false, r:{ taakId:'Talv', bundelId:'Talv', actiepunt:'ALV' } },
-                                          { af:false, r:inVreemde }, sub(false, VOORLEG_ACTIE)]]]);
-      eq('migratie B: … ongeacht wat er in die andere bundel staat',
-         [migratieSelectie([inVreemde], vreemdeIx, T).zonderSub.length,
-          migratieSelectie([inVreemde], vreemdeIx, T).inAndereBundel.length], [0, 1]);
-      // Een echte kop (R = eigen nummer) valt hier niet onder; die gaat gewoon de B-selectie in.
-      eq('migratie B: een eigen kop telt niet als "andere bundel"',
-         migratieSelectie([kop], ixVan([{ af:false, r:kop }]), T).inAndereBundel.length, 0);
-
-      // Een rij zonder rijnummer zou 'Nog Te Doen'!Qundefined worden — die schrijft de API
-      // klakkeloos ergens weg. Hij hoort dus in geen van beide lijsten te staan.
-      const zonderRij = { ...tr('T5', { datumAangevraagd:'1-8-2026', deadline:'1-9-2026' }), _row:0 };
-      eq('migratie: een rij zonder rijnummer valt overal buiten',
-         [migratieSelectie([zonderRij], ixVan(null), T).naarOpvolg.length,
-          migratieSelectie([zonderRij], ixVan(null), T).zonderSub.length], [0, 0]);
-      eq('migratie: een lege lijst geeft twee lege uitkomsten',
-         [migratieSelectie(null, ixVan(null), T).naarOpvolg.length,
-          migratieSelectie(undefined, ixVan(null), T).zonderSub.length], [0, 0]);
-    })();
-
     // ── De anker-vangrails: een mislukt subtaak-anker mag de traject-opslag nooit meetrekken ──
     // maakVoorlegSubtaken staat bínnen submitTask's try; zou getInsertRow('OPPAKKEN') hier hard
     // doorgooien, dan verviel de hele traject-write terwijl het traject al optimistisch op het
@@ -8880,102 +8833,6 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
       }
     })();
   })();
-
-  // ── De migratie-schrijfweg zelf, met gestubde fetch: guard VÓÓR de batch, terugweg bij een
-  // verschoven blad, en run 2 leeg. Dit is de toets die rood wordt zodra iemand de rij-guard
-  // weer uit de beurt haalt — de routine gaat één keer op ~31 productie-rijen draaien, zonder
-  // rollback; 'de idempotente selectie is het vangnet' vangt géén rij die n te hoog geschreven is.
-  await (async () => {
-    const _fetch=window.fetch, tokenOud=state.oauthToken, expiryOud=state.oauthExpiry;
-    const idsOud=state._sheetIds, cacheOud=state._uitCache, failsOud=state._syncFails;
-    const bewaardNtd=D.ntd, bewaardAf=D.af, bewaardSec=state.activeNtd, bewaardPg=pgs.ntd;
-    const tik=() => new Promise(r => { const k=new MessageChannel(); k.port1.onmessage=()=>r(); k.port2.postMessage(0); });
-    const leeg={ OPPAKKEN:[], VERGADERVERZOEKEN:[], 'OFFERTE-TRAJECTEN':[], LOD:[], 'SUBSIDIE-TRAJECTEN':[], CRM:[] };
-    const opp=(row) => ({ _row:row, _sec:'OPPAKKEN', taakId:'To'+row, bundelId:'', bundelVolg:'',
-      code:'311212', naam:'Testflat', actiepunt:'Iets', deadline:'', behandelaar:'', inBehandeling:'' });
-    const traject=() => ({ _row:90, _sec:'OFFERTE-TRAJECTEN', taakId:'Toff', bundelId:'', bundelVolg:'',
-      code:'311999', naam:'Ander', datumAangevraagd:'1 mei 2026', offertes:'0 / 3', behandelaar:'Cihad',
-      deadline:'1-8-2026', opmerkingen:'Dakofferte' });
-    // Wat de "Sheet" teruggeeft op de guard-lezing van rij 90, per scenario instelbaar.
-    let sheetRij=null; const verkeer=[];
-    try {
-      await state._writeChain;
-      state.oauthToken='nep'; state.oauthExpiry=Date.now()+3600e3;
-      state._sheetIds={'Nog Te Doen':0}; state._uitCache=false;
-      window.fetch=async (url, opt) => {
-        const methode=(opt&&opt.method)||'GET', u=decodeURIComponent(String(url));
-        if(methode==='GET' && u.includes('/values/') && !u.includes('batchGet')){
-          verkeer.push({ soort:'guard', bereik:u.split('/values/')[1].split('?')[0] });
-          return new Response(JSON.stringify({ values:[sheetRij||[]] }),{status:200});
-        }
-        if(methode==='POST' && u.includes('values:batchUpdate')){
-          verkeer.push({ soort:'batch', data:JSON.parse(opt.body).data });
-          return new Response('{}',{status:200});
-        }
-        if(methode==='PUT'){ verkeer.push({ soort:'put', bereik:u.split('/values/')[1].split('?')[0] }); return new Response('{}',{status:200}); }
-        if(methode==='POST'){ verkeer.push({ soort:'post' }); return new Response(JSON.stringify({replies:[{}]}),{status:200}); }
-        return new Response(JSON.stringify({error:{message:'geen leesverkeer in deze test'}}),{status:403});
-      };
-
-      // 1) Verschoven blad: rij 90 draagt intussen een ándere taak → guard gaat af, niets geschreven,
-      //    optimistische stand terug, geen subtaak.
-      D.ntd={ ...leeg, OPPAKKEN:[ opp(60), opp(61) ], 'OFFERTE-TRAJECTEN':[ traject() ] }; D.af={ ...leeg };
-      state.activeNtd='OFFERTE-TRAJECTEN'; pgs.ntd=1;
-      sheetRij=_rijNaarCellen('Nog Te Doen', { ...traject(), code:'999999', taakId:'Tvreemd' });
-      const uit1=await migreerOfferteStappen();
-      await state._writeChain;
-      const t1=D.ntd['OFFERTE-TRAJECTEN'][0];
-      truthy('migratie-e2e: bij een verschoven blad meldt de uitslag "niet geschreven"', /^niet geschreven/.test(uit1));
-      eq('migratie-e2e: … en er is dan alleen gelezen, niets geschreven',
-         verkeer.map(v => v.soort), ['guard']);
-      eq('migratie-e2e: … de guard las precies de doelrij',
-         verkeer[0].bereik, "'Nog Te Doen'!A90:S90");
-      eq('migratie-e2e: … en de optimistische stand is terug naar hoe hij was',
-         [t1.deadline, t1.bundelId, t1.bundelVolg, D.ntd.OPPAKKEN.length], ['1-8-2026', '', '', 2]);
-      eq('migratie-e2e: … zonder een schrijfactie open te laten staan', state.pendingWrites, 0);
-      for(let i=0;i<200 && state._loadInFlight;i++) await tik();
-
-      // 2) Blad klopt: guard eerst, dán de batch (Q:S én F op rij 90), dán de subtaak-insert.
-      verkeer.length=0;
-      D.ntd={ ...leeg, OPPAKKEN:[ opp(60), opp(61) ], 'OFFERTE-TRAJECTEN':[ traject() ] }; D.af={ ...leeg };
-      sheetRij=_rijNaarCellen('Nog Te Doen', traject());
-      const uit2=await migreerOfferteStappen();
-      await state._writeChain;
-      const t2=D.ntd['OFFERTE-TRAJECTEN'][0], sub=D.ntd.OPPAKKEN.slice(-1)[0]||{};
-      truthy('migratie-e2e: de uitslag telt 1 opvolgdatum en 1 subtaak',
-             /: 1 trajecten · nieuwe subtaken: 1$/.test(uit2));
-      eq('migratie-e2e: de guard-lezing gaat VÓÓR de batch, en de batch vóór de subtaak-insert',
-         verkeer.map(v => v.soort), ['guard', 'batch', 'post', 'put', 'post']);
-      const batch=(verkeer[1]||{}).data||[];
-      eq('migratie-e2e: de batch zet Q/R/S én F op de rij van het traject',
-         batch.map(b => [b.range, b.values[0]]),
-         [["'Nog Te Doen'!Q90:S90", ['Toff','Toff','0']], ["'Nog Te Doen'!F90", [t2.deadline]]]);
-      truthy('migratie-e2e: de nieuwe opvolgdatum ligt in de toekomst (dd-mm-jjjj)',
-             /^\d{2}-\d{2}-\d{4}$/.test(t2.deadline) && !berekenPrioriteit(t2.deadline,'OFFERTE-TRAJECTEN').teLaat);
-      eq('migratie-e2e: het traject is nu zijn eigen bundelkop', [t2.bundelId, t2.bundelVolg], ['Toff','0']);
-      eq('migratie-e2e: de subtaak hangt onder het traject, in Oppakken',
-         [sub.actiepunt, sub.bundelId, sub.bundelVolg, sub._sec], [VOORLEG_ACTIE, 'Toff', '10', 'OPPAKKEN']);
-      eq('migratie-e2e: … en de subtaakrij landt onder het Oppakken-blok',
-         (verkeer[3]||{}).bereik, "'Nog Te Doen'!A62:S62");
-      for(let i=0;i<200 && state._loadInFlight;i++) await tik();
-
-      // 3) Run 2 direct erna, zónder herlaad: de index uit D.ntd ziet de open voorleg-subtaak en
-      //    de verzette F — er valt niets meer te doen en er wordt ook niets gelezen of geschreven.
-      verkeer.length=0;
-      const uit3=await migreerOfferteStappen();
-      await state._writeChain;
-      truthy('migratie-e2e: run 2 meldt 0 · 0', /: 0 trajecten · nieuwe subtaken: 0$/.test(uit3));
-      eq('migratie-e2e: … en raakt de Sheet niet aan', verkeer.length, 0);
-      for(let i=0;i<200 && state._loadInFlight;i++) await tik();
-    } finally {
-      window.fetch=_fetch; state.oauthToken=tokenOud; state.oauthExpiry=expiryOud;
-      state._sheetIds=idsOud; state._uitCache=cacheOud; state._syncFails=failsOud;
-      D.ntd=bewaardNtd; D.af=bewaardAf; pgs.ntd=bewaardPg; state.activeNtd=bewaardSec;
-      document.querySelectorAll('.toast').forEach(el => el.remove());
-      renderNtd(); renderNtdStats();
-    }
-  })();
-
 
   // ── En de schakel ertussen: van de knop naar de rij die écht wordt weggeschreven ──
   // De twee helften hierboven raken submitTask niet, en juist dáár zit de stilste breuk van deze
@@ -16546,7 +16403,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
     {
       const mailOud=state.currentUserEmail;
       const dOud={}; Object.keys(D).forEach(k=>dOud[k]=D[k]);
-      const bewaard={}; try{ for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i); if(k.startsWith(CACHE_PREFIX)) bewaard[k]=localStorage.getItem(k);} }catch(_){}
+      const bewaard={}; try{ for(let i=0;i<sessionStorage.length;i++){const k=sessionStorage.key(i); if(k.startsWith(CACHE_PREFIX)) bewaard[k]=sessionStorage.getItem(k);} }catch(_){}
       try{
         _zetCacheBlokkade(false);
         state.currentUserEmail='test@vvebeheercollectief.nl';
@@ -16554,7 +16411,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         D.alvo=[]; D.alfa=[]; D.ontw=[]; D.logboek=[]; D.herhaal=[]; D.kenmerken=[];
         D.ntdSecInfo={CRM:{colHeaderRow:2}}; D.afSecInfo={CRM:{colHeaderRow:2}};
         wisCache(); bewaarCache('');
-        const ruw=localStorage.getItem(_cacheSleutel(state.currentUserEmail))||'';
+        const ruw=sessionStorage.getItem(_cacheSleutel(state.currentUserEmail))||'';
         truthy('cache: de taak staat erin', ruw.includes('Lekkage'));
         eq('cache: de CRM-mail niet', ruw.includes('Geheime mail'), false);
         eq('cache: en het geheugen houdt de mail gewoon', D.ntd.CRM[0].mail, 'Geheime mail van een eigenaar');
@@ -16567,20 +16424,28 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         eq('cache: te oud', DATA._cacheVers({t:nu-15*dag}, nu), false);
         eq('cache: zonder tijdstempel telt als oud', DATA._cacheVers({d:[]}, nu), false);
         wisCache();
-        localStorage.setItem(CACHE_PREFIX+'0.1_a@x.nl', '{"t":'+nu+',"d":[]}');
-        localStorage.setItem(_cacheSleutel('oud@x.nl'), '{"t":'+(nu-20*dag)+',"d":[]}');
-        localStorage.setItem(_cacheSleutel('vers@x.nl'), '{"t":'+(nu-dag)+',"d":[]}');
+        sessionStorage.setItem(CACHE_PREFIX+'0.1_a@x.nl', '{"t":'+nu+',"d":[]}');
+        sessionStorage.setItem(_cacheSleutel('oud@x.nl'), '{"t":'+(nu-20*dag)+',"d":[]}');
+        sessionStorage.setItem(_cacheSleutel('vers@x.nl'), '{"t":'+(nu-dag)+',"d":[]}');
         DATA.ruimCacheOp(nu);
         eq('cache: opstarten ruimt andere versies en oude caches op, de verse blijft',
-           [localStorage.getItem(CACHE_PREFIX+'0.1_a@x.nl'), localStorage.getItem(_cacheSleutel('oud@x.nl')), !!localStorage.getItem(_cacheSleutel('vers@x.nl'))],
+           [sessionStorage.getItem(CACHE_PREFIX+'0.1_a@x.nl'), sessionStorage.getItem(_cacheSleutel('oud@x.nl')), !!sessionStorage.getItem(_cacheSleutel('vers@x.nl'))],
            [null, null, true]);
-        localStorage.setItem(_cacheSleutel(state.currentUserEmail), '{"t":'+(nu-20*dag)+',"d":[{"OPPAKKEN":[]},{}],"s":[{},{}]}');
+        sessionStorage.setItem(_cacheSleutel(state.currentUserEmail), '{"t":'+(nu-20*dag)+',"d":[{"OPPAKKEN":[]},{}],"s":[{},{}]}');
         eq('cache: een te oude cache wordt niet getoond', laadUitCache(), false);
+        // v15.6: de cache staat in sessionStorage. Een achtergebleven localStorage-cache van een
+        // eerdere versie (op schijf, leesbaar voor de hele origin) moet bij het opstarten weg.
+        localStorage.setItem(_cacheSleutel('vers@x.nl'), '{"t":'+nu+',"d":[]}');
+        DATA.ruimCacheOp(nu);
+        eq('cache: een oude localStorage-cache wordt bij het opstarten gewist',
+           localStorage.getItem(_cacheSleutel('vers@x.nl')), null);
+        bewaarCache('');
+        eq('cache: en er komt niets meer in localStorage', localStorage.getItem(_cacheSleutel(state.currentUserEmail)), null);
       } finally {
         _zetCacheBlokkade(true);
         state.currentUserEmail=mailOud; state._uitCache=false;
         Object.keys(dOud).forEach(k=>{ D[k]=dOud[k]; });
-        try{ wisCache(); Object.entries(bewaard).forEach(([k,v])=>localStorage.setItem(k,v)); }catch(_){}
+        try{ wisCache(); Object.entries(bewaard).forEach(([k,v])=>sessionStorage.setItem(k,v)); }catch(_){}
       }
     }
     {
@@ -17151,7 +17016,7 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         eq('sw: op een ontwikkelmachine netwerk-eerst (anders verbergt hij bewerkte code)',
            S({ method:'GET', mode:'cors', url:'http://127.0.0.1:8123/src/main.js' }, 'http://127.0.0.1:8123/sw.js'), 'netwerk');
         const bronSw = await (await fetch(new URL('sw.js', document.baseURI), {cache:'no-store'})).text();
-        truthy('sw: de install haalt langs de HTTP-cache heen (geen oude kopie in een nieuwe cache)', /new Request\(u,\s*\{\s*cache:\s*'reload'\s*\}\)/.test(bronSw));
+        truthy('sw: de install laat de HTTP-cache eerst bij de server controleren (geen oude kopie in een nieuwe cache)', /new Request\(u,\s*\{\s*cache:\s*'no-cache'\s*\}\)/.test(bronSw));
         truthy('sw: laadt de gedeelde strategie', /importScripts\('\.\/sw-strategie\.js'\)/.test(bronSw));
         // Elk bestand uit de app-schil moet echt bestaan: een tikfout faalt in de install STIL (de
         // .catch per bestand), en dan ontbreekt dat bestand bij 'eerste bezoek en meteen offline'.
@@ -17173,7 +17038,15 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         const html = await (await fetch(new URL('index.html', document.baseURI), {cache:'no-store'})).text();
         const kop = html.split('</head>')[0];
         truthy('start: geen Google-Fonts-stylesheet meer in de kop (blokkeert main.js)', !/<link[^>]+fonts\.googleapis\.com[^>]+stylesheet|<link[^>]+stylesheet[^>]+fonts\.googleapis\.com/.test(kop));
-        truthy('start: de OneSignal-SDK laadt async (defer houdt main.js op)', /<script src="https:\/\/cdn\.onesignal\.com\/[^"]+" async><\/script>/.test(kop));
+        eq('start: de OneSignal-SDK staat niet in de kop (laadt pas na het inloggen)', /<script[^>]+onesignal\.com/.test(kop), false);
+        {
+          const NS = await import('./notifications.js');
+          const oud = document.getElementById('onesignal-sdk');
+          NS.laadOneSignal(); NS.laadOneSignal();
+          const sdk = [...document.querySelectorAll('script#onesignal-sdk')];
+          eq('start: laadOneSignal zet de SDK er één keer bij, async', [sdk.length, sdk[0]?.src, sdk[0]?.async], [1, NS.ONESIGNAL_SDK_URL, true]);
+          if (!oud) sdk.forEach(s => s.remove());
+        }
         const LS = await import('./login-splash.js');
         LS.laadLoginLetters(); LS.laadLoginLetters();
         eq('start: de inlogletters komen er één keer bij zodra het inlogscherm getoond wordt',
@@ -17327,9 +17200,6 @@ import { koppelBereiken, ontkoppelBereiken, herordenBereiken, koppelTaak, ontkop
         eq('lui: render-analytics.js wordt nergens bij de start statisch geïmporteerd',
            Object.keys(bronnen).filter(n=>statisch(bronnen[n],'render-analytics.js')), []);
         eq('lui: verplaats.js ook niet', Object.keys(bronnen).filter(n=>statisch(bronnen[n],'verplaats.js')), []);
-        truthy('lui: de migratie-module staat alleen achter de console-hulp',
-               /window\.migreerOfferteStappen\s*=\s*\(\.\.\.args\)\s*=>\s*import\('\.\/migratie-offerte\.js'\)/.test(bronnen['main.js'])
-               && (bronnen['main.js'].match(/import\('\.\/migratie-offerte\.js'\)/g)||[]).length===1);
         const UI = await import('./ui.js');
         eq('lui: de wrappers bestaan (goTo en de poll roepen ze aan)', [typeof UI.buildAnalytics, typeof UI.buildDash], ['function','function']);
       }

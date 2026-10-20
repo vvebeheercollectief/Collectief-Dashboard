@@ -620,7 +620,6 @@ async function notitieMeenemen(){
   return await addTaskNote();
 }
 
-function editRow(r){ openModal(true,r); }
 
 function closeModal(){
   document.getElementById('modal-bg').classList.remove('open');
@@ -1169,8 +1168,8 @@ async function bevestigInvoegPlek(sec, afterRow, tabblad){
 // altijd strings ('0' is truthy), maar het herordenen zet bundelVolg optimistisch op het
 // rij-object; zet dat ooit een getal neer, dan zou die taak bij afronden of undo stil zijn
 // plek in de bundel verliezen — precies de soort schade die dit traject wil voorkomen.
-// Geëxporteerd sinds v12.5: de eenmalige migratieroutine (migratie-offerte.js) schrijft dezelfde
-// Q/R/S-cellen en moet dus per definitie dezelfde 0-behandeling hanteren — één functie, geen tweede.
+// Geëxporteerd: bundel.js en bundel-acties.js schrijven dezelfde Q/R/S-cellen en moeten dus
+// dezelfde 0-behandeling hanteren — één functie, geen tweede.
 export const nulVeilig = v => (v === 0 || v) ? String(v) : '';
 
 // De RAUWE celwaarde van een veld — dus wat er in de Sheet hoort te staan, niet wat het scherm
@@ -1826,7 +1825,7 @@ async function doCompleteTask(){
     ]});
     // undo-data vastleggen vóór de mutatie
     const ntdValues=serializeNtdUndo(r);
-    const undoData={sec,code:r.code,ntdValues,ntdRow:r._row,gelukt:false};
+    const undoData={sec,code:r.code,ntdValues,gelukt:false};
     // 1) optimistisch: meteen uit de lokale lijst + indexen meeschuiven;
     //    de oude DOM-rij pulst groen en pas daarná hertekenen we (anim.js)
     // Rij voor de groene puls: NTD-tabel, of anders de GEKLIKTE taakrij (bewaard rid)
@@ -2460,7 +2459,7 @@ async function zetCrmFase(rid, stap){
 }
 
 export {
-  openModal, editRow, closeModal, fillModalFields, setv, clearModal, kiesSectie,
+  openModal, closeModal, fillModalFields, setv, clearModal, kiesSectie,
   getSheetIds, _sheetBreedtes, getInsertRow, bevestigInvoegPlek, insertAndWriteRow, insertAndWriteRows, deleteCurrentEditTask, deleteTaskRow,
   _naamBijCode, _zetNaamVeld,
   getAfInsertRow, completeTask, completeCurrentEditTask, doCompleteTask, closeCompleteModal, submitTask, gv,

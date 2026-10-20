@@ -1,7 +1,7 @@
 // ══════════════════════════════════════
 //  PER-VVE-PAGINA — alles van één VvE op één scherm (Fase 5)
 // ══════════════════════════════════════
-import { esc, voortgang, vlagSvg, displayName, persBadges, splitBehandelaar, berekenPrioriteit, teLaatVoorTelling, offerteAangevraagd, opvolgStatus, parseDt, taakTitel, taakVerwijzing, _vandaagAmsterdam, _verschilInKalenderdagen } from "./util.js";
+import { esc, voortgang, vlagSvg, displayName, persBadges, splitBehandelaar, berekenPrioriteit, teLaatVoorTelling, offerteAangevraagd, opvolgStatus, parseDt, taakTitel, taakVerwijzing, _vandaagAmsterdam, _verschilInKalenderdagen, sorteerOpDatum } from "./util.js";
 import { ico } from "./icons.js";
 import { SECS, SKEYS, PAGE_META } from "./config.js";
 import { state, D } from "./state.js";
@@ -37,10 +37,10 @@ function vveOverzicht(code, data, vandaag){
     if(pa.teLaat!==pb.teLaat) return pa.teLaat?-1:1;
     return (parseDt(a.deadline)||Infinity)-(parseDt(b.deadline)||Infinity);
   });
-  weggelegd.sort((a,b)=>parseDt(a.opvolgdatum)-parseDt(b.opvolgdatum));
+  sorteerOpDatum(weggelegd, r=>r.opvolgdatum, true);
   const afgerond=[];
   SKEYS.forEach(s=>(data.af[s]||[]).forEach(r=>{ if(r.code===code) afgerond.push(r); }));
-  afgerond.sort((a,b)=>parseDt(b.datum)-parseDt(a.datum));
+  sorteerOpDatum(afgerond, r=>r.datum);
   const teLaat=open.filter(r=>teLaatVoorTelling(r,r._sec,vandaag)).length;
   const logboek=(data.logboek||[]).filter(e=>e.code===code)
     .slice().sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp));
@@ -50,8 +50,7 @@ function vveOverzicht(code, data, vandaag){
     if(!isNaN(t)) laatsteDagen=_verschilInKalenderdagen(vandaag,t);
   }
   const alvo=(data.alvo||[]).find(r=>r.code===code)||null;
-  const alfa=(data.alfa||[]).filter(r=>r.code===code)
-    .sort((a,b)=>parseDt(b.datum)-parseDt(a.datum)); // nieuwste eerst → alfa[0] = laatst gehouden
+  const alfa=sorteerOpDatum((data.alfa||[]).filter(r=>r.code===code), r=>r.datum); // nieuwste eerst → alfa[0] = laatst gehouden
   const naam=(open[0]?.naam)||(weggelegd[0]?.naam)||(alvo?.naam)||(afgerond[0]?.naam)||'';
   const behandelaars=[...new Set(open.concat(weggelegd)
     .flatMap(r=>splitBehandelaar(r.behandelaar)))];

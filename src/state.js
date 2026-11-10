@@ -1,192 +1,41 @@
 // ══════════════════════════════════════
-//  STATE — gedeelde, veranderlijke toestand
+//  STATE — gedeelde gegevens en toestand
 // ══════════════════════════════════════
-// Twee soorten (zie plan 2026-06-10-fase2-modularisatie):
-//  1. Objecten die alleen ÍN-PLAATS worden gemuteerd (nooit hertoegekend) →
-//     direct exporteren; consumenten importeren ze en doen X.prop = ...
-//  2. Waarden die WÉL hertoegekend worden → op het `state`-object, zodat een
-//     andere module ze kan herzetten via state.X = ... (imports zijn read-only).
+// `D` is wat er uit de Sheet komt; `state` is alles wat over de sessie gaat. Beide zijn één object
+// dat iedereen importeert en muteert, nooit vervangt.
 
-// ── Groep 1: ín-plaats gemuteerde objecten (direct export) ──────────────
-export const D = {ntd:{},af:{},alvo:[],alfa:[],ontw:[],logboek:[],herhaal:[],kenmerken:[],ntdSecInfo:{},afSecInfo:{}};
-export const pgs = {ntd:1,af:1,alvo:1,alfa:1,ontw:1,logboek:1};
-export const _shownToasts = new Set();
+export const D = {
+  taken: [],            // 'Mijn taken'  — {id, eigenaar, taak, code, vve, notitie, aangemaakt, afgevinkt, _row}
+  dossiers: { LOD: [], 'SUBSIDIE-TRAJECTEN': [] },   // 'Nog Te Doen' — alleen de twee blokken die we tonen
+  alvo: [],             // "ALV's overzicht"
+  alfa: [],             // "ALV's afgerond"
+};
 
-// ── Groep 2: hertoegekende waarden (state.X) ────────────────────────────
 export const state = {
-  // grafieken
-  charts: {},
-  // notificaties
-  oneSignalReady: false,
-  isSubscribed: false,
-  _lastNotifTs: null,      // basislijn wordt op de eerste ronde op de echte sheet-timestamp gezet (niet op de browserklok)
-  _meldStart: 0,           // eerste rij van het meldingen-venster; 0 = nog niet gekalibreerd → volledig lezen
-  _meldUit: false,         // tabblad 'Meldingen' onleesbaar (verse Sheet-kopie) → deze sessie niet meer opvragen
-  // De twee timer-id's zijn er voor DIAGNOSE, niet om te stoppen. `logout()` (auth.js) legt
-  // uitgebreid uit waarom hij ze bewust laat staan: stoppen zou een tweede inlog in hetzelfde
-  // tabblad stil laten bevriezen, want ze worden alleen bij DOMContentLoaded gestart. Alle drie
-  // hebben ze hun eigen sessiepoort en liggen na een uitlog vanzelf stil.
-  // `_notifVisibilityHandler` stond hier met de tekst "logout() koppelt 'm los" — dat gebeurde
-  // nooit en niets las het veld. Weg; de listener zelf keert terug op !state.oauthToken.
-  _resyncTimer: null,      // 8s live-resync-interval (id alleen voor diagnose — zie logout())
-  _heartbeatTimer: null,   // token-refresh heartbeat-interval (idem)
-  // actieve secties / tabs
-  activeOntw: 'Alles',
-  activeNtd: 'OPPAKKEN',
-  activeAf: 'OPPAKKEN',
-  // OAuth / sessie
+  // inloggen
   oauthToken: null,
   oauthExpiry: 0,
   currentUserEmail: null,
-  _gsiTokenClient: null,
-  _authBezig: 0,           // teller: >0 = inlog/tokenvernieuwing loopt → sw-update stelt auto-herladen uit
-  _gsiErrorCb: null,       // per-aanvraag gebonden GIS error_callback (popup gesloten/geblokkeerd)
-  // taak-bewerkmodus
-  editMode: false,
-  editFoto:null, editRowData: null,
-  editSec: null,
-  // analytics
-  anaPeriod: 'maand',     // 'dag' | 'week' | 'maand' | 'kwartaal'
-  anaMetric: 'vergader',  // 'vergader' | 'taken'
-  activeHeroView: 'alv',
-  // rij-cache / undo
-  _rowCache: [],
-  // De lijst die renderNtd als laatste tekende: ná filteren, sorteren én absorberen, dus ALLE
-  // pagina's van het huidige tabblad. 'Alles selecteren' leunt hierop, want dat moet de hele
-  // gefilterde lijst pakken en niet alleen de 25 rijen die nu in beeld staan — precies het punt
-  // waarop bulk nu stukliep (22 taken = 22 vinkjes, en na pagina 1 opnieuw beginnen).
-  _ntdZichtbaar: [],
-  // schrijf-pijplijn
-  pendingWrites: 0,
-  _writeChain: Promise.resolve(),
-  _writeStart: null,       // tijdstip waarop de LOPENDE write echt begon (null = niets onderweg).
-                           // Bewust niet gezet bij het in de wachtrij zetten: de wachtrij is serieel,
-                           // dus een wachtende bulk-write zou anders meteen als 'vastgelopen' gelden.
-  _lastDHash: null,
-  _logHoogwater: 0,        // hoogste Sheet-rijnummer van het Logboek dat we gelezen hebben
-                           // (0 = nog niets → volgende ronde volledig lezen)
-  _logAnkerTs: '',         // kolom A van díe rij. Komt die niet terug bij de staartlezing, dan
-                           // heeft iemand een logregel verwijderd en zijn de rijnummers
-                           // opgeschoven → volledig herlezen i.p.v. stil bevriezen.
-  _logVolledigMs: 0,       // wanneer het Logboek voor het laatst VOLLEDIG gelezen is. Een staart-
-                           // lezing ziet geen bewerkte bestaande regels, dus af en toe volledig —
-                           // maar alleen als er logboektekst in beeld staat (zie _logVolledigNodig).
-  _alfaMs: 0,              // wanneer "ALV's afgerond" voor het laatst is gelezen. Dat archief
-                           // verandert alleen bij de jaarlijkse reset en het dashboard schrijft er
-                           // NOOIT naartoe, dus het hoeft niet elke 8 seconden mee (zie _alfaNodig).
-  _uitCache: false,        // staat het scherm op de leescache en is de eerste verse ronde nog
-                           // onderweg? Dan zijn de rijnummers mogelijk verschoven → schrijven
-                           // kort geblokkeerd (zie blokkeerOffline).
+  _authBezig: 0,
+  _authFails: 0,
+  // laden en opslaan
   _loadInFlight: false,
   _loadAgain: false,
-  _loadAgainLoud: false,   // werd de onderdrukte aanroep door een NIET-stille (handmatige) verversing getriggerd? → herstart luid, zodat de fout-banner/spinner zichtbaar blijft
-  _loadAgainPromise: null, // awaitbare belofte voor wie op de VOLGENDE ronde wacht (zie loadAll)
-  _loadAgainKlaar: null,   // resolver daarvan
-  _syncFails: 0,           // opeenvolgende mislukte sync-rondes; 'Fout' pas na 2 (transient-tolerantie)
-  _netwerkFouten: 0,       // opeenvolgende ECHTE netwerkfouten (een fetch die rejectet, dus zónder
-                           // .status). Bewust los van _syncFails: die telt ook 401/403, quota en
-                           // mislukte inlogpogingen mee, en dan zou een quotum-incident het
-                           // dashboard op slot zetten precies wanneer het zich herstelt.
-  _animBusy: 0,            // teller van lopende rij-animaties (>0 = poll pauzeren)
-  _undoInFlight: false,    // een undo-actie (afronden/verwijderen/bulk) loopt → poll pauzeren (undo doet eigen loadAll)
-  // diversen
+  pendingWrites: 0,
+  _writeChain: Promise.resolve(),
+  _schrijfGen: 0,
+  _netwerkFouten: 0,
+  _syncFails: 0,
+  _uitCache: false,
+  _laatsteSyncMs: 0,
+  _lastHash: '',
   _sheetIds: null,
-  _sheetKolommen: null,    // {tabbladnaam: aantal kolommen}, uit dezelfde spreadsheets.get als
-                           // _sheetIds. null zolang er nog niet geschreven is — de structuurcheck
-                           // zwijgt dan over het raster in plaats van te gokken.
-  _structLaatst: null,     // JSON van de bevindingen van de vórige leesronde; de structuurcheck
-                           // waarschuwt alleen als die verzameling wijzigt. De poll draait elke
-                           // 8 seconden, dus zonder deze vergelijking herhaalt één staande
-                           // bevinding zich honderden keren per dag (zie data.js).
-  _structErnstig: null,    // idem, maar alléén de ERNSTIGE bevindingen (regel op de kolomkoppen /
-                           // dubbel taaknummer). Die krijgen sinds v10.31 een zichtbare melding;
-                           // de rasterbreedte blijft console-only omdat die lang kan blijven staan.
-  _authFails: 0,           // opeenvolgende mislukte token-vernieuwingen mét werkende verbinding.
-                           // Los van _syncFails: een ingetrokken Google-sessie herstelt zich NIET
-                           // vanzelf, dus die verdient een eigen melding met een inlogknop.
-  _renderFails: 0,         // opeenvolgende mislukte renderAll()-pogingen (data.js). Alleen voor
-                           // diagnose; de banner hangt aan de eerste mislukking.
-  _syncLblVoorBulk: null,  // de tekst die in de statusbalk stond vóór de selecteerstand. Bewaren
-                           // i.p.v. straks 'Live · <nu>' schrijven: dat zou liegen over het moment
-                           // van de laatste geslaagde verversing.
-  _bulkBezig: false,       // dubbelklik-rem op de knoppen van de bulk-balk (zie bulkDoe). Nodig
-                           // sinds bulkAfronden een echte lezing tussen klik en mutatie doet.
-  _submitBezig: false,     // dubbelklik-rem op submitTask. Sinds `bevestigInvoegPlek` staat er een
-                           // echte lezing tussen de klik en de mutatie, en zonder rem levert een
-                           // tweede klik in dat gat twee identieke taken op.
-  _herinlogBezig: false,   // het inlogvenster van de knop 'Opnieuw inloggen' staat open. De 8s-poll
-                           // moet dan zwijgen: een tweede tokenaanvraag herbindt de GIS-callback en
-                           // laat de aanvraag van de knop los (één callback per client).
-  _completeRow: null,      // rij-OBJECT waarvoor de afhandel-modal open staat (identiteit, geen index)
-  _completeNotitie: null,  // {code, sec, tekst}: notitie uit het bewerkscherm, pas geschreven als het afronden doorgaat (doCompleteTask)
-  _versieTeOud: false,     // true als APP_VERSION lager is dan 'minimaal' in versie.json: niet meer schrijven (versie.js)
-  _codeVerouderd: false,   // true als een ánder venster de nieuwe versie activeerde: dit tabblad draait oude code (sw-update.js)
-  _completeRid: null,      // geklikte data-rid, alléén voor de groene puls op de juiste DOM-rij
-  _completeBusy: false,    // afhandelen loopt (dubbelklik-rem over het async-gat)
-  _notitieBezig: false,    // dubbelklik-rem op 'Opmerking toevoegen' (bewerkscherm) én het
-                           // contactmoment-vastleggen (dossier): beide lezen het veld pas ná een
-                           // await (ensureToken/logEvent), dus twee snelle klikken schreven
-                           // dezelfde tekst twee keer naar het Logboek (naloop 2026-08-28)
-  _alvoFlagBezig: null,    // Set van 'idx:veld' met lopende ALV-vinkjes (dubbelklik-rem)
-  _snoozeRow: null,        // taak waarvoor de wegleggen-modal open staat (Fase 4)
-  _nieuwBundel: null,      // {bundelId, volg} voor een taak die via '+ Voeg een subtaak toe' wordt
-                           // aangemaakt. Bewust vluchtig: clearModal én closeModal wissen hem, zodat
-                           // een weggeklikt scherm de eerstvolgende LOSSE taak niet in die bundel trekt.
-  _ntdVoorModal: null,     // welk NTD-tabblad er openstond vóórdat prefillNieuweTaak het verzette.
-                           // Dat verzetten gebeurt bij het ÓPENEN van het toevoegscherm, dus vóór
-                           // enige bevestiging; closeModal zet het terug als er niets is aangemaakt.
-  _hbDoel: null,           // in 'Hoort bij' aangewezen hoofdtaak (het rij-OBJECT, niet zijn code:
-                           // een koppeling wijst één bepaalde rij aan). submitTask koppelt hem ná
-                           // het opslaan; clearModal wist hem, dus lees hem vóór het sluiten.
-  _offAangevraagdBijOpen: false, // stond het offerte-traject bij het openen van het bewerkscherm al
-                           // op 'aangevraagd'? Dan blijft de bestaande opvolgdatum met rust en doet
-                           // 'Datum aangevraagd' invullen géén +3-wekenvoorstel (offerteAanvraagGewijzigd).
-                           // Bewust vluchtig: clearModal én closeModal wissen hem, net als _nieuwBundel.
-  offerteAannOpen: new Set(),   // sleutels (aannSleutel) van trajecten met uitgeklapt aannemers-paneel
-  // Welke aannemersnaam er op dit moment wordt aangepast: {sleutel, idx} of null. Op state en niet
-  // in de DOM, want renderNtd vervangt de hele tabel bij elke poll met verse data — zonder dit zou
-  // het invoerveld halverwege het typen verdwijnen. `offerteAannEditVal` bewaart wat er getypt is,
-  // zodat de hertekening het veld mét de ingetypte tekst terugzet (zie herstelAannemerFocus).
-  offerteAannEdit: null,
-  offerteAannEditVal: '',
-  // Hetzelfde voor het veld 'Aannemer toevoegen…' onder elk paneel: sleutel → getypte tekst. Ook
-  // dat veld wordt bij elke hertekening als nieuw element opgebouwd (zie herstelAannemerFocus).
-  offerteAannNieuw: {},
-  vveCode: null,           // VvE op de per-VvE-pagina (Fase 5)
-  vveTerug: null,          // pagina waar de gebruiker vandaan kwam vóór het dossier (terug-pijltje)
-  _vveAfAlles: false,      // per-VvE: alle afgeronde taken uitgeklapt
-  bulkMode: false,         // bulk-selecteerstand op de NTD-lijst (Fase 5)
-  expandedRows: new Set(), // rijSleutel()-waarden (taaknummer!) van uitgeklapte NTD-rijen — zelfde principe als bundelOpen hieronder
-  bundelOpen: new Set(),   // bundelId's van opengeklapte bundels. BEWUST op bundelId en niet op
-                           // _row: rijnummers schuiven bij elke insert/delete, waardoor een op
-                           // rijnummer bewaarde stand na een poll de verkeerde rij openzet.
-                           // Moet bestaan zodra render-bundel.js geladen is: `bundelKopExtra`
-                           // leest hem bij élke bundelkop, en een crash daar neemt de takenlijst mee.
-  ntdSort: {key:null, asc:true}, // kolomkop-sortering NTD: key 'code'|'deadline'|null (null = standaardvolgorde)
-  ntdStatus: '',                 // statusfilter uit de kop-pillen: '' | 'telaat' | 'weggelegd'
-  // Groeperen per VvE (de pil 'Per VvE' in de kop). App-breed en niet per tabblad: het is een
-  // manier van kijken, geen eigenschap van één lijst. Wordt bij het opstarten uit localStorage
-  // gelezen (main.js), net als de dichtheidsknop.
-  ntdPerVve: false,
-  // VvE-dossier (logboek + kenmerken)
-  kenmerkenEdit: false,    // kenmerken-paneel in bewerkmodus
-  vveLogFilter: 'alles',   // 'alles' | 'contact'
-  _vveLogAlles: false,     // dossier-feed volledig uitgeklapt
-  dosComposerOpen: false,  // composer uitgeklapt (blijft open tot een ander dossier opent)
-  _contactSoort: 'Telefoon',
-  herhaalEditRow: null,    // herhaalregel in de bewerkmodal (Fase 4)
-  _aiLastCode: '',
-  _aiLastNaam: '',
-  _aiVveCode: '',
-  ontwEditMode: false,
-  ontwEditRow: null,
-  // logboek-filters
-  logWho: '',
-  logAct: '',
-  // logboek bewerken
-  logEdit: null,        // _row van de logregel die nu inline bewerkt wordt (of null)
-  logEditTs: null,      // …en de TIMESTAMP van diezelfde regel. Het rijnummer schuift op zodra een
-                        // ander een logregel verwijdert of terugzet; de timestamp niet. Zie
-                        // _herankerLogEdit in render-overig.js.
-  logEditSoort: null,   // gekozen contactsoort tijdens bewerken
+  takenTabOntbreekt: false,
+  // scherm
+  pagina: 'taken',
+  lijstVan: null,       // naam wiens takenlijst je bekijkt; null = je eigen
+  bewerkt: null,        // id van de taak die nu inline bewerkt wordt
+  filters: { lod: { wie:'', q:'' }, subsidie: { wie:'', q:'' }, alvo: { status:'', q:'' }, alfa: { q:'' }, taken: { q:'' } },
+  // minimumversie
+  _versieTeOud: false,
 };

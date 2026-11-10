@@ -1,22 +1,8 @@
 // Collectief Dashboard — Service Worker
 // Verhoog versie bij elke nieuwe deploy zodat clients de nieuwe cache pakken.
 
-// OneSignal draait BEWUST in deze service worker. Dat is geen keuze maar een gegeven: de SDK
-// registreert 'sw.js?appId=…&sdkVersion=…' op basis van de workerName-instelling in hun eigen
-// dashboard, en die is met de init-opties serviceWorkerPath/serviceWorkerParam niet te
-// overrulen (op productie geverifieerd — een eigen bestand op een eigen bereik werd genegeerd).
-// Een push komt dus hier binnen, en zonder deze regel is er niemand die hem tekent.
-// LET OP de bestandsnaam: in v16 heet de worker OneSignalSDK.sw.js — het veelgeciteerde
-// OneSignalSDKWorker.js geeft een 404 en zou de push stil kapot laten.
-// In try/catch: is de CDN even onbereikbaar, dan mag dat de hele service worker (en daarmee
-// de offline-schil van het dashboard) niet onderuithalen — dan vervalt alleen de push.
-// De bijbehorende helft van de oplossing staat in src/sw-update.js: die neemt de bestaande
-// registratie over in plaats van er een tweede naast te zetten.
-try {
-  importScripts('https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js');
-} catch (e) {
-  console.warn('[sw] OneSignal-worker niet geladen, pushmeldingen uit:', e);
-}
+// Sinds v16.0 geen pushmeldingen meer: de OneSignal-worker wordt hier niet meer geladen. Een oude
+// OneSignal-registratie op dit bereik wordt door src/sw-update.js overgenomen (zelfde sw.js).
 // Welk verzoek uit de cache komt (cache-first voor eigen bestanden), gedeeld met de zelftest.
 // Lukt het laden niet, dan valt de handler hieronder terug op 'netwerk eerst' — het oude gedrag,
 // dat in elk geval nooit oude code vasthoudt.
@@ -26,15 +12,15 @@ try {
   console.warn('[sw] sw-strategie.js niet geladen, terug naar netwerk-eerst:', e);
 }
 
-// src/urgentie.js staat hier bewust niet: alleen de testsuite importeert hem.
-const CACHE_VERSION = 'cd-v180';
+// src/tests.js staat hier bewust niet: alleen de zelftest (?test=1) importeert hem.
+const CACHE_VERSION = 'cd-v181';
 // Dezelfde waarde als APP_VERSION in src/config.js, en die wordt bij ELKE wijziging opgehoogd.
 // Waarom hij hier staat: de browser besluit alleen dat er een nieuwe service worker is als het
 // BESTAND sw.js verandert. Een uitrol die alleen src/ raakt liet sw.js dus ongemoeid, en dan
 // verscheen de 'nieuwe versie'-balk niet — open sessies bleven de oude modules draaien tot iemand
 // toevallig herlaadde. Met deze regel verandert sw.js altijd mee. Er staat een toets in tests.js
 // die alarm slaat zodra dit getal en APP_VERSION uit elkaar lopen.
-const APP_VERSION = '15.7';
+const APP_VERSION = '16.0';
 // Geen './' meer: een navigatie naar de app krijgt altijd './index.html' uit de cache (zie
 // sw-strategie.js), dus een tweede kopie onder de kale map was alleen een extra download.
 const APP_SHELL = [
@@ -44,70 +30,27 @@ const APP_SHELL = [
   './icon-192.png',
   './icon-512.png',
   './apple-touch-icon.png',
-  './logo-sidebar.png',
   './beeldmerk-wit.svg',
   './logo-gestapeld-leisteen.svg',
-  // ES-modulegraaf (zonder tests.js — alleen dev) zodat de app-shell ook offline laadt.
-  './src/main.js',
-  './src/sw-update.js',
-  './src/versie.js',   // NIET versie.json zelf: dat komt altijd live (minimumversie-rem)
-  './src/config.js',
   './allowed-emails.js',
-  './zoek-tools.js',
+  './src/main.js',
+  './src/config.js',
+  './src/hash.js',
   './src/state.js',
-  './src/rij.js',
   './src/util.js',
-  './src/icons.js',
   './src/api.js',
   './src/auth.js',
   './src/login-splash.js',
+  './src/sw-update.js',
+  './src/versie.js',   // NIET versie.json zelf: dat komt altijd live (minimumversie-rem)
   './src/data.js',
-  './src/structuurcheck.js',
-  './src/actions.js',
+  './src/parse.js',
   './src/ui.js',
-  './src/anim.js',
-  './src/modal-a11y.js',
-  './src/bevestig.js',
-  './src/palette.js',
-  './src/hash.js',
-  './src/verbinding.js',
-  './src/weergaven.js',
-  './src/sneltoetsen.js',
-  './src/crud.js',
-  './src/bulk.js',
-  './src/snooze.js',
-  './src/inbehandeling.js',
-  './src/dubbelcheck.js',
-  './src/meervve.js',
-  './src/verplaats.js',
-  './src/kenmerken.js',
-  './src/ai.js',
-  './src/dossier-chat.js',
-  './src/dashboard-zoek.js',
-  './src/notifications.js',
-  './src/render-lijsten.js',
-  './src/subsidie-fase.js',
-  './src/crm-fase.js',
-  './src/render-offerte.js',
-  './src/render-alv.js',
-  './src/alv-reset.js',
-  './src/render-tabel.js',
-  './src/render-vve.js',
-  './src/render-herhaal.js',
-  './src/render-overig.js',
-  './src/render-analytics.js',
-  './src/offerte-aannemers.js',
-  './src/modal-aannemers.js',
-  './src/offerte-stappen.js',
-  './src/vve-zoekveld.js',
-  './src/weekkiezer.js',
-  './src/opmaak.js',
-  // Takenbundel. Alle drie horen tot de modulegraaf die main.js binnentrekt. De fetch-handler is
-  // cache-first: wat hier ontbreekt wordt pas bij het eerste gebruik opgehaald, en bij 'eerste
-  // bezoek en meteen offline' laadt de schil dan niet. De wachtpost in tests.js loopt de graaf af.
-  './src/bundel.js',
-  './src/bundel-acties.js',
-  './src/render-bundel.js',
+  './src/iconen.js',
+  './src/vve.js',
+  './src/taken.js',
+  './src/dossiers.js',
+  './src/alv.js',
 ];
 
 self.addEventListener('install', e => {
@@ -198,7 +141,7 @@ self.addEventListener('fetch', e => {
     ? self.cdSwStrategie(req, self.location.href)
     : (req.method === 'GET' && new URL(req.url).origin === self.location.origin
        && !/\/versie\.json$/.test(new URL(req.url).pathname) ? 'netwerk' : 'live');   // versie.json: altijd live
-  if (soort === 'live') return;   // Google, OneSignal, de proxy, POST: de browser doet het zelf
+  if (soort === 'live') return;   // Google, POST: de browser doet het zelf
   if (soort === 'pagina') {
     e.respondWith(uitCache(req, './index.html').catch(() => caches.match('./index.html').then(schoon)));
     return;

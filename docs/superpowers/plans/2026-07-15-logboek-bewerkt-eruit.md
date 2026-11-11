@@ -297,7 +297,7 @@ st.D.logboek = [{
   _row: 2, timestamp: new Date().toISOString(), code: '381158', sectie: 'OPPAKKEN',
   actie: 'Opmerking', veld: '', oudeWaarde: '',
   nieuweWaarde: 'Terugkoppeling gegeven aan Zuiderwijk:\n\nNaar aanleiding van uw vraag tijdens de vergadering hebben wij navraag gedaan bij de gemeente.\n\nDe subsidie bedraagt maximaal € 12.500,- per appartement.',
-  gebruiker: 'djiowchico@gmail.com'
+  gebruiker: 'collega1@voorbeeld.nl'
 }];
 document.getElementById('fg-history').style.display = '';
 ro.renderTaskHistory('381158', 'OPPAKKEN');

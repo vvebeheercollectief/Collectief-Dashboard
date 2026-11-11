@@ -88,7 +88,7 @@ Diktes: 400 (gewoon), 500 (nadruk), 600 (koppen, knoppen).
 
 Deze regels houden het dashboard rustig, ook bij nieuwe onderdelen.
 
-1. **Geen pillen of gekleurde labels.** Status, namen, categorieën en "te laat" zijn gewone (eventueel gekleurde) tekst.
+1. **Geen pillen of gekleurde labels.** Status, namen, categorieën en "te laat" zijn gewone (eventueel gekleurde) tekst. Enige uitzondering: het Budget-label achter een VvE-naam (gevuld accent), omdat het niet over het hoofd gezien mag worden.
 2. **Eén accent.** Tabbladen hebben geen eigen kleur. Alleen grafieken krijgen een reeks kleuren, omdat daar het onderscheid de inhoud is.
 3. **Voortgang als vorm:** ALV-stappen zijn een gevuld rondje met vinkje of een lege ring. Status is een rondje dat per stap vult (leeg, ⅓, ⅔, vol). In de code: `voortgang()` en `vlagSvg()` in `src/util.js`.
 4. **Iconen spaarzaam.** Wel in de zijbalk en op icoonknoppen in tabelrijen. Niet in vensterknoppen, filters of naast koppen. Eigen set in `src/icons.js`, met lijn en lichte vulling.

@@ -1,18 +1,23 @@
 // ══════════════════════════════════════
-//  CONFIG — constanten (omgeving, ids, secties)
+//  CONFIG — constanten (omgeving, ids, tabbladen, team)
 // ══════════════════════════════════════
-import { ALLOWED_EMAILS } from '../allowed-emails.js';
+// v16.0: het dashboard is teruggebracht tot vijf schermen — Mijn taken, LOD, Subsidies, ALV's en
+// het ALV-archief. Alles wat weg is (Oppakken, Vergaderverzoeken, Offerte-trajecten, CRM, Logboek,
+// Herhaalregels, Analytics, AI, meldingen …) staat nog in de geschiedenis van de repository.
+import { ALLOWED_EMAIL_HASHES } from '../allowed-emails.js';
+import { emailHash } from './hash.js';
 
 // ── Versie (zichtbaar in de UI) ────────────────────────────────────────
-// Ophogen bij ELKE wijziging: 4.1, 4.2, … 5.0 voor grote sprongen.
-export const APP_VERSION = '15.4';
+// Ophogen bij ELKE wijziging. Zie README voor versie.json (de minimumversie-rem).
+export const APP_VERSION = '16.0';
 
 // ── Omgeving (productie vs. testomgeving) ──────────────────────────────
-// Fail-safe: alleen deze exacte hosts zijn PRODUCTIE; al het andere
-// (staging-branch, andere previews, localhost) draait op de TEST-data.
+// Fail-safe: alleen deze exacte hosts zijn PRODUCTIE; al het andere (previews, localhost) draait
+// op de TEST-Sheet.
 export const PROD_HOSTS = [
-  'vvebeheercollectief.github.io',                            // ECHTE productie (GitHub Pages, source=main)
-  'collectief-dashboard.vercel.app',                          // Vercel-spiegel van main (parallel/handmatig)
+  'dashboard.vvebeheercollectief.nl',                         // eigen domein (Vercel, main)
+  'vvebeheercollectief.github.io',                            // oude productie (GitHub Pages) — tot de verhuizing
+  'collectief-dashboard.vercel.app',                          // Vercel-spiegel van main
   'collectief-dashboard-vve-beheer-collectief.vercel.app',
   'collectief-dashboard-vvebeheercollectief-vve-beheer-collectief.vercel.app',
   'collectief-dashboard-git-main-vve-beheer-collectief.vercel.app',
@@ -21,243 +26,80 @@ export function _isStagingHost(hostname){ return !PROD_HOSTS.includes(hostname);
 export const IS_STAGING = _isStagingHost(location.hostname);
 
 export const SID_PROD = '1fnUsbwb4nDMNttWym9FWBw1CMMMAVTuZ3v88b35isUw';
-export const SID_TEST = '1-6Q36CrwB0szX2DS2eLjPwfiY-jAw8lK9JOPDSlljm4';   // test-Sheet "Collectief Dashboard - Kopie" (Taak 3)
+export const SID_TEST = '1-6Q36CrwB0szX2DS2eLjPwfiY-jAw8lK9JOPDSlljm4';   // test-Sheet "Collectief Dashboard - Kopie"
 export const SID = IS_STAGING ? SID_TEST : SID_PROD;
-export const PG   = 25;
-// AI-proxy: op staging same-origin (/api/chat); op productie de vaste Vercel-functie-URL.
-export const PROXY_URL = IS_STAGING ? '/api/chat' : 'https://collectief-dashboard.vercel.app/api/chat';
-// De offertevergelijker heeft een eigen route naast de chat (api/offerte.js).
-export const OFFERTE_URL = IS_STAGING ? '/api/offerte' : 'https://collectief-dashboard.vercel.app/api/offerte';
-// Meldingen lopen via de 'Notif-wachtrij'-tab (OAuth-append vanuit de ingelogde
-// gebruiker) — een Apps Script-trigger verstuurt de push. Geen webhook-URL of
-// secret meer nodig in deze (publieke) frontend.
-export const ONESIGNAL_APP_ID_PROD = 'c0e1301b-2cee-4646-8fab-99698e10e78c';
-export const ONESIGNAL_APP_ID_TEST = '11b00aea-496b-44d5-8b9f-5012fcb48fd4';   // test-OneSignal app "Collectief Dashboard TEST" (Taak 4)
-export const ONESIGNAL_APP_ID      = IS_STAGING ? ONESIGNAL_APP_ID_TEST : ONESIGNAL_APP_ID_PROD;
+
+// ── Verhuizing naar een eigen origin ────────────────────────────────────
+// Blijft LEEG tot het nieuwe adres volledig werkt (DNS, Vercel-domein, Google OAuth-origin).
+// Daarna: 'https://dashboard.vvebeheercollectief.nl/' en elke start op github.io stuurt door.
+export const VERHUISD_NAAR = '';
+export const OUDE_HOST = 'vvebeheercollectief.github.io';
+export function _verhuisDoel(doel, hostname, search, hash){
+  if(!doel || hostname !== OUDE_HOST) return '';
+  return doel.replace(/\/?$/, '/') + (search || '') + (hash || '');
+}
 
 // Google OAuth client-id (vaste constante)
 export const clientId = '560046984985-1371r4bbt28umi6uslims6mlkucn1278.apps.googleusercontent.com';
 
-export { ALLOWED_EMAILS }; // één bron: ../allowed-emails.js (ook door api/chat.js gebruikt)
+// ── Wie mag erin, en hoe heet die persoon ───────────────────────────────
+// Eén bron: ../allowed-emails.js (SHA-256-hashes). Een nieuwe collega komt daar én hieronder bij.
+export const emailToegestaan = email => !!email && ALLOWED_EMAIL_HASHES.includes(emailHash(email));
 export const EMAIL_NAMES = {
-  'info@vvebeheercollectief.nl':'Jer',
-  'djiowchico@gmail.com':'Cihad',
-  'gabrielateterycz1616@gmail.com':'Gabos',
-  'giocan175@gmail.com':'Cihan',
+  '33f0fe21146283058710f1a0fde19dc5f940453cd0e7e76fb5dfb00a9a8dc644':'Jer',
+  'cb884483e517829a56da8206f35f2c80f82629338a279573e4dac6a5909814a3':'Cihad',
+  '2091b21099f4297a28f9a49f5507aebb6bfb25ed57cfd49ac46f055ebb2d6498':'Gabos',
+  'ca55c1b1d601ac26a500d0827d5f7986f1f285f5ed2a037fad32dd67ce39029e':'Cihan',
 };
-// Het vaste team, afgeleid uit EMAIL_NAMES — één bron. Analytics (KPI-tegels, leaderboard)
-// gebruikt dit i.p.v. losse literals, zodat een nieuwe collega in EMAIL_NAMES automatisch
-// meetelt. De cijfers vullen dit bovendien aan met namen die in de data voorkomen maar hier
-// (nog) niet staan, zodat werk van een stagiair/variant niet stil uit de tellingen valt.
+export const naamBijEmail = email => (email && EMAIL_NAMES[emailHash(email)]) || '';
 export const TEAM = [...new Set(Object.values(EMAIL_NAMES))];
 
-// De korte code per behandelaar, zoals hij in de takentabel op de rij staat. Door de gebruiker
-// vastgesteld en bewust een VASTE LIJST, geen afleidregel: Cihad en Cihan lopen pas bij de vijfde
-// letter uiteen, dus geen enkele regel komt op iets korters uit dat ook nog klopt. Staat een naam
-// hier niet in, dan valt korteNaam() terug op de beginletter — maar alleen als die nog vrij is.
-export const KORTE_NAMEN = {
-  'jer':   'J',
-  'gabos': 'G',
-  'cihad': 'JC',
-  'cihan': 'CC',
+// Initialen in het rondje naast een naam. Een vaste lijst: Cihad en Cihan lopen pas bij de vijfde
+// letter uiteen, dus een afleidregel komt niet op iets korters uit dat ook nog klopt.
+export const INITIALEN = { Jer:'J', Gabos:'G', Cihad:'JC', Cihan:'CC' };
+export const initialen = naam => INITIALEN[naam] || (naam||'?').charAt(0).toUpperCase();
+
+// ── Tabbladen in de Sheet ───────────────────────────────────────────────
+export const TAB = {
+  NTD:   'Nog Te Doen',
+  AF:    'Afgerond',
+  ALVO:  "ALV's overzicht",
+  ALFA:  "ALV's afgerond",
+  TAKEN: 'Mijn taken',
 };
 
-// `breedtes` is de kolomverdeling, als GEWICHTEN — één meer dan `cols`, want de actiekolom
-// rechts telt mee. Een GETAL is een gewicht (wordt een percentage en groeit mee met het venster),
-// een STRING als '165px' is een vaste breedte. Gewichten hoeven niet op 100 uit te komen — ze
-// delen wat er na de vaste kolommen overblijft — en een extra kolom (het bulk-vinkje) schuift er
-// vanzelf tussen.
-//
-// WAAROM DIT ER IS. De tabel deelde overgebleven ruimte zelf uit, en de tekstkolommen hadden een
-// klem in vaste pixels (`.cell-name>.ct{max-width:160px}` e.d.). Kolommen mét klem konden dus niet
-// groeien en kolommen zonder klem slokten alles op. Gemeten op Offerte-trajecten: 'Datum aangevr.'
-// was 351px breed voor "1 oktober 2025", terwijl de VvE-naam (212px) én de opmerkingen (296px)
-// afgekapt werden. Op Oppakken was de VvE-kolom 309px met de tekst afgekapt op 160 — 149px dode
-// ruimte in dezelfde cel waar de naam niet paste.
-//
-// EN DE ANDERE KANT OP. De eerste opzet maakte de datumkolommen te SMAL: "22 september 2026" is
-// 128px in IBM Plex Mono, en `.s-normal` is `white-space:nowrap` in een cel met `overflow:visible`
-// — de datum werd dus niet afgekapt maar óver de buurkolom heen getekend. Sheets levert lange
-// Nederlandse datums (zie _parseAnyDate), dus dat is de normale vorm en niet de uitzondering.
-// Elke datumkolom heeft daarom een VASTE breedte in pixels ('165px' sinds v11.8) in plaats van een gewicht dat
-// bij elke bijstelling opnieuw moest kloppen.
-//
-// EEN PX-BREEDTE IS EEN PLAFOND, GEEN ONDERGRENS (sinds v11.1). kolBreedtes() rekent de
-// gewichten om tegen de GEMETEN tabelbreedte, dus alles telt bij élke vensterbreedte op tot
-// precies 100% en een px-kolom blijft op zijn getal staan. Daarvóór werd er gerekend tegen de
-// smalste tabel (1150px); wat er op een breed scherm overschoot verdeelde de browser GELIJK over
-// álle kolommen, dus ook over de px-kolommen. Gemeten bij een tabel van 1650px: de deadline stond
-// op 216px voor een datum van 85px en de actiekolom op 211px voor 127px aan knoppen — twee gaten
-// in de rij, terwijl het actiepunt en de opmerkingen ernaast werden afgekapt.
-//
-// KIES px DUS ALLEEN ALS DE INHOUD EEN BEKEND MAXIMUM HEEFT, want de kolom groeit nooit meer mee:
-//   VvE Code  130px — de code kan een kenmerk dragen ("121034 - G"); op 7% liep hij er 19px uit.
-//                     130 en niet 105 sinds 26-08: op een BUNDELKOP staan er drie dingen in die
-//                     cel (sleepgreep 16 + 9 marge, chevron 22 + 3, code 45 = 95px) en in de
-//                     contentbox van 75px viel de code naar een tweede regel.
-//   datums    165px — "22 september 2026" heeft 148px nodig incl. celopvulling. Sinds v11.8
-//                     staat het dashboard op de standaardletter van het toestel en die is
-//                     breder dan IBM Plex Mono: dezelfde datum ging van 119 naar 148px, en
-//                     op de oude 155px bleef er 7px speling over. Gemeten, niet geschat.
-//   acties    150px — vier knoppen van 28px plus de tussenruimte; op 9% viel het vinkje eraf.
-//                     Offerte-trajecten heeft er drie en houdt het op 120px.
-// De kolomKOP telt ook mee als ondergrens. Hij is `white-space:nowrap`, en tot v11.8 werd een kop
-// die niet paste OVER de buurkop heen getekend. Sinds v11.8 heeft `thead th` daarom
-// `overflow:hidden;text-overflow:ellipsis` — een te krappe kop kapt nu netjes af in plaats van zijn
-// buur onleesbaar te maken. Dat is het VANGNET, niet de norm: de gewichten hieronder zijn zo gezet
-// dat elke kop bij de smalste tabel (1150px) heel blijft. 'BEHANDELAAR' is met 111px de breedste
-// (was 97px in IBM Plex Mono; de standaardletter van v11.8 is breder). In de SELECTEERSTAND komt er
-// een vinkjeskolom van 48px bij en krimpen alle gewichtskolommen mee. De gewichten zijn zo gezet
-// dat élke kop ook DAAR heel blijft — dat is wat de toets 'geen kop loopt over zijn kolom heen'
-// in beide standen afdwingt. Het kost de opmerkingenkolom op Offerte-trajecten 20px bij de smalste
-// tabel; die tekst kapt toch al af, een kolomNAAM half wegvallen is erger.
-// Alle andere kolommen dragen tekst die langer kan worden en krijgen een gewicht.
-//
-// DE SIGNAAL-KOLOM IS WEG (v12.0). Hij stond naast de deadline en rekende daar zijn eigen
-// "Te laat (76d)" uit — dezelfde dagen die uit de datum ernaast te halen zijn. Die melding staat nu
-// ónder de datum in de deadline-kolom zelf, dus op één plek. Wat er verder in stond: 'Terug 31 aug'
-// is een gedempt label in de opmerkingen-cel geworden (zoals Offerte-trajecten dat al deed), en
-// 'Vandaag opvolgen' en 'Xd stil' zijn vervallen — het stil-signaal blijft wél bestaan als
-// herinneringsmail (STIL_ESCALATIE_REGELS in util.js / Opvolging.gs), het staat alleen niet meer
-// in de tabel. De vrijgekomen breedte (21,3 / 20,5 / 22,6) is verdeeld over de tekstkolommen, en bij
-// Vergaderverzoeken vooral naar Periode: die cel toont sinds v12.0 'ma 7 – vr 11 sep' voluit.
+// 'Nog Te Doen' en 'Afgerond' zijn in BLOKKEN verdeeld: een regel met de bloknaam in kolom A, een
+// kolomkoprij, dan de taken. Alle zes de oude bloknamen blijven hier staan, ook al toont het
+// dashboard er nog maar twee: zonder de andere namen zou een regel uit bijvoorbeeld 'CRM' (dat
+// ná Subsidie staat) als Subsidie-taak gelezen worden. De oude blokken blijven als archief staan.
+export const ALLE_SECTIES = ['OPPAKKEN','VERGADERVERZOEKEN','OFFERTE-TRAJECTEN','LOD','SUBSIDIE-TRAJECTEN','CRM'];
+
+// De twee blokken die het dashboard nog toont. `keys` is de kolomvolgorde A..H en moet gelijk
+// blijven aan wat er in de Sheet staat (en wat Apps Script verwacht). Kolom Q is het vaste
+// taaknummer. De sleutel heet `subsidieFase` en niet `fase`: zo heette hij altijd.
 export const SECS = {
-  OPPAKKEN:{label:'Oppakken',css:'--sec:var(--ac);--sec-l:var(--ac-l);--sec-b:var(--ac-b)',color:'#0D7377',
-    cols:['VvE Code','VvE','Actiepunt','Deadline','Wie','Opmerkingen'],
-                   breedtes:['130px',27.3,38,'165px',7,27.7,'150px'],
-    keys:['code','naam','actiepunt','deadline','behandelaar','prioriteit','opmerkingen','inBehandeling']},
-  VERGADERVERZOEKEN:{label:'Vergaderverzoeken',css:'--sec:var(--ac);--sec-l:var(--ac-l);--sec-b:var(--ac-b)',color:'#AE5008',
-    cols:['VvE Code','VvE','Periode','Agendapunten','Wie','Deadline uitschr.','Opmerkingen'],
-                   breedtes:['130px',26,19.1,23,7,'165px',21.1,'150px'],
-    keys:['code','naam','periode','agendapunten','behandelaar','deadline','opmerkingen','inBehandeling']},
-  'OFFERTE-TRAJECTEN':{label:'Offerte-trajecten',css:'--sec:var(--ac);--sec-l:var(--ac-l);--sec-b:var(--ac-b)',color:'#6855C9',
-    cols:['VvE Code','VvE','Datum aangevr.','Ontvangen/Aangevr.','Behandelaar','Deadline','Opmerkingen'],
-                   breedtes:['130px',19.6,'165px',24.5,16.5,'165px',16.9,'120px'],
-    keys:['code','naam','datumAangevraagd','offertes','behandelaar','deadline','opmerkingen']},
-  LOD:{label:'LOD',css:'--sec:var(--ac);--sec-l:var(--ac-l);--sec-b:var(--ac-b)',color:'#B91C1C',
-    cols:['VvE Code','VvE','Actiepunt','Status','Wie','Deadline LOD','Opmerkingen'],
-                   breedtes:['130px',24,29.7,20,7,'165px',25.6,'150px'],
-    keys:['code','naam','actiepunt','status','behandelaar','deadline','opmerkingen','inBehandeling']},
-  // Subsidie-trajecten (2026-07-29). Zelfde kolomstramien als LOD, met 'Status'
-  // vervangen door 'Fase'. Twee dingen liggen hier vast en mogen niet losjes wijzigen:
-  //   - de sleutel heet `subsidieFase`, NIET `fase`: parseSections overschrijft
-  //     entry.fase na de keys-loop met kolom O (de offerte-fase).
-  //   - `color` is een letterlijke hex, geen var(): de donut op Analytics haalt deze
-  //     waarde door _lightenHex() en createLinearGradient(), en die kunnen niet met
-  //     een var()-string overweg.
-  // Opmerkingen (kolom G) bestaat wel als veld maar staat bewust niet in `cols`:
-  // de gebruiker koos zes kolommen om de rij rustig te houden.
-  'SUBSIDIE-TRAJECTEN':{label:'Subsidie-trajecten',css:'--sec:var(--ac);--sec-l:var(--ac-l);--sec-b:var(--ac-b)',color:'#0F766E',
-    cols:['VvE Code','VvE','Subsidie','Fase','Behandelaar','Deadline'],
-                   breedtes:['130px',27.5,19,19,13.3,'165px','150px'],
-    keys:['code','naam','subsidie','subsidieFase','behandelaar','deadline','opmerkingen','inBehandeling']},
-  // CRM (v13.0, 2026-09-23): vragen, klachten en meldingen van eigenaren die op antwoord wachten.
-  // Volledig los van Subsidie-trajecten — eigen fases (crm-fase.js), eigen kleur, eigen blok.
-  //   - de sleutel heet `crmFase`, NIET `fase` (zelfde reden als `subsidieFase`).
-  //   - `color` (roze) wordt alleen nog in de grafieken op Analytics gebruikt; in de app zelf is
-  //     CRM sinds v13.7 leiblauw, net als elk ander tabblad.
-  //   - Van/Ontvangen/Soort/Mail staan NIET in `keys` (dat mag er maar 8 hebben, zie afOff in
-  //     parseSections) maar in de vaste kolommen T..W, net als taaknummer en bundel op Q..S.
-  //   - 'Van' en 'Wacht' zijn kolommen zonder eigen sleutel: Van toont `afzender`, Wacht rekent
-  //     uit `ontvangen` en `deadline`. Opmerkingen staat in het uitklappaneel, niet als kolom.
-  // Breedtes: 'Van' vast op 150 (naam + huisnummer eronder), 'Fase' op 176 (vier bolletjes met
-  // 'Wacht op reactie' eronder), 'Wacht' op 120 ('33 dagen' / '26d te laat', en 'Geen deadline' = 94px), 'Wie' vast op 76
-  // (twee ronde naamplaatjes; als gewicht werd dat bij de smalste tabel 42px en brak de kop af).
-  CRM:{label:'CRM',css:'--sec:var(--ac);--sec-l:var(--ac-l);--sec-b:var(--ac-b)',color:'#BE185D',
-    cols:['VvE Code','VvE','Vraag','Van','Fase','Wacht','Wie'],
-                   breedtes:['130px',24,40,'150px','176px','120px','76px','150px'],
-    keys:['code','naam','onderwerp','crmFase','behandelaar','deadline','opmerkingen','inBehandeling']},
-};
-
-// CRM: de vier soorten vraag (één klik in het bewerkscherm) en de reactietermijn in werkdagen.
-// De termijn bepaalt de automatische deadline (ontvangen + 5 werkdagen) en daarmee wanneer de
-// wachtcel amber of rood wordt. Weekenden tellen niet mee; feestdagen (nog) wel.
-export const CRM_SOORTEN = ['Vraag', 'Klacht', 'Schade', 'Financieel'];
-export const CRM_TERMIJN_WERKDAGEN = 5;
-
-// De kolomkop zoals de gebruiker hem ziet, per VELDNAAM in plaats van per kolompositie.
-//
-// WAAROM NIET OP INDEX. `cols` en `keys` liepen nooit echt gelijk op: Oppakken heeft zes koppen
-// en acht sleutels, dus `cols[keys.indexOf('prioriteit')]` gaf al 'Opmerkingen'. Dat bleef
-// onzichtbaar omdat `prioriteit` een boekhoudveld is en dus nooit in de verlies-lijst komt — de
-// vijf velden die de dialoog wél kan noemen zaten toevallig allemaal vóór de eerste scheefstand.
-// Zodra er een kop bijkomt die bij geen veld hoort (de Signaal-kolom was daar tot v12.0 het
-// voorbeeld van) schuiven ook die vijf op
-// en gaat de dialoog stil de verkeerde veldnaam tonen. Deze afbeelding is expliciet; de toetsen
-// bij 'veldlabel:' in tests.js bewaken drift in beide richtingen.
-//
-// KOP EN LABEL LOPEN GELIJK OP. Wordt een kolomkop hernoemd, dan wijzigt dezelfde tekst hier én
-// in `cols` — anders zegt de tabel iets anders dan de verplaats-vraag en slaat de bewaking alarm.
-export const VELD_LABELS = {
-  'OPPAKKEN': {
-    code:'VvE Code', naam:'VvE', actiepunt:'Actiepunt', deadline:'Deadline',
-    behandelaar:'Wie', prioriteit:'Prioriteit', opmerkingen:'Opmerkingen',
-    inBehandeling:'In behandeling',
-  },
-  'VERGADERVERZOEKEN': {
-    code:'VvE Code', naam:'VvE', periode:'Periode', agendapunten:'Agendapunten',
-    behandelaar:'Wie', deadline:'Deadline uitschr.', opmerkingen:'Opmerkingen',
-    inBehandeling:'In behandeling',
-  },
-  'OFFERTE-TRAJECTEN': {
-    code:'VvE Code', naam:'VvE', datumAangevraagd:'Datum aangevr.',
-    offertes:'Ontvangen/Aangevr.', behandelaar:'Behandelaar', deadline:'Deadline',
-    opmerkingen:'Opmerkingen',
-  },
-  'LOD': {
-    code:'VvE Code', naam:'VvE', actiepunt:'Actiepunt', status:'Status',
-    behandelaar:'Wie', deadline:'Deadline LOD', opmerkingen:'Opmerkingen',
-    inBehandeling:'In behandeling',
+  LOD: {
+    label:'LOD', pagina:'lod', omschrijving:'actiepunt', omschrijvingLabel:'Actiepunt',
+    keys:['code','naam','actiepunt','status','behandelaar','deadline','opmerkingen','inBehandeling'],
   },
   'SUBSIDIE-TRAJECTEN': {
-    code:'VvE Code', naam:'VvE', subsidie:'Subsidie', subsidieFase:'Fase',
-    behandelaar:'Behandelaar', deadline:'Deadline', opmerkingen:'Opmerkingen',
-    inBehandeling:'In behandeling',
-  },
-  'CRM': {
-    code:'VvE Code', naam:'VvE', onderwerp:'Vraag', crmFase:'Fase',
-    behandelaar:'Wie', deadline:'Deadline', opmerkingen:'Opmerkingen',
-    inBehandeling:'In behandeling',
-    afzender:'Van',   // kolom T, geen sleutel in SECS.keys maar wél een kolom in de tabel
+    label:'Subsidie-trajecten', pagina:'subsidie', omschrijving:'subsidie', omschrijvingLabel:'Subsidie',
+    keys:['code','naam','subsidie','subsidieFase','behandelaar','deadline','opmerkingen','inBehandeling'],
   },
 };
+export const DOSSIER_SECTIES = Object.keys(SECS);
 
-export const SKEYS = Object.keys(SECS);
+// Vastgesteld op 2026-07-30; 'In behandeling' is hier een FASE (kolom D), los van kolom H.
+export const SUBSIDIE_FASES = ['Voorbereiden','Aangevraagd','In behandeling','Verleend','Afgerond'];
 
-// Het actiepunt van de AUTOMATISCHE stap bij een offerte-traject (v12.5). Woont hier en niet in
-// offerte-stappen.js omdat de bundel-laag hem moet kennen om die stap uit de vlakke lijst te
-// houden — en bundel.js mag onmogelijk offerte-stappen.js importeren (die hangt via crud.js aan
-// de halve app). offerte-stappen.js exporteert hem door, zodat bestaande imports blijven werken.
-export const VOORLEG_ACTIE = 'Offertes voorleggen aan eigenaren';
+// 'Mijn taken' — één regel per taak. Het dashboard maakt dit tabblad zelf aan als het ontbreekt.
+// Afvinken wist niets: kolom H krijgt de datum en de taak verdwijnt uit beeld.
+export const TAKEN_KOP = ['ID','Eigenaar','Taak','VvE-code','VvE','Notitie','Aangemaakt','Afgevinkt'];
 
-// Waar staat de OMSCHRIJVING van een taak, per categorie — als VELDNAAM (niet als DOM-id).
-// Dit is dezelfde afspraak als OMSCHRIJVING_VELD in crud.js (dat de invoervelden aanwijst) en als
-// CD_OMSCHRIJVING_COL in apps-script/Notifications.gs (dat de kolomnummers aanwijst). Hier staat
-// hij als sleutel, want het verplaatsen van een taak naar een andere categorie moet weten wélk
-// veld de tekst draagt — die heet in elke categorie anders en zou anders stil verdwijnen.
-export const OMSCHRIJVING_SLEUTEL = {
-  'OPPAKKEN':           'actiepunt',
-  'VERGADERVERZOEKEN':  'agendapunten',
-  'OFFERTE-TRAJECTEN':  'opmerkingen',
-  'LOD':                'actiepunt',
-  'SUBSIDIE-TRAJECTEN': 'subsidie',
-  'CRM':                'onderwerp',
-};
+// ALV's overzicht: A=code B=naam C=uitnodiging D=notulen E=begroting F=opmerkingen G=klaargezet.
+// De gegevens beginnen op rij 3 (rij 1 en 2 zijn kop en tellers).
+export const ALVO_KOLOM = { uitnodiging:2, notulen:3, begroting:4, klaargezet:6 };
+export const ALVO_EERSTE_RIJ = 3;
 
-// Fase van een offerte-traject (kolom O). Het dashboard schrijft deze kolom sinds v6.2 niet
-// meer — offerteFase() leidt 'aangevraagd'/'ontvangen' af uit de X/N-teller; 'bij_vve' en
-// 'gegund' worden alleen nog gelézen als ze handmatig in de Sheet staan.
-export const OFFERTE_FASES = ['aangevraagd', 'ontvangen', 'bij_vve', 'gegund'];
-
-export const PAGE_META = {
-  ntd:['Nog Te Doen','Openstaande taken en actiepunten'],
-  af:['Afgerond','Afgeronde taken per categorie'],
-  alvo:["ALV's Overzicht","Voortgang vergaderingen per VvE"],
-  alfa:["ALV's Afgerond","Afgeronde jaarvergaderingen"],
-  ontw:['Ontwikkeling','Interne notities, verbeteringen en ideeën'],
-  logboek:['Logboek','Wijzigingshistorie van alle taken'],
-  herhaal:['Herhaalregels','Terugkerende taken — automatisch klaargezet'],
-  vve:['VvE-dossier','Alles van één VvE op één scherm'],
-  analytics:['Analytics','Statistieken en grafieken'],
-  dash:['Dashboard','Totaaloverzicht'],
-};
+// Hoe vaak het dashboard de Sheet opnieuw leest, in ms (alleen als het venster in beeld is).
+export const POLL_MS = 10_000;

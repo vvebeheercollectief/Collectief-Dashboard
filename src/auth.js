@@ -1,14 +1,13 @@
 // ══════════════════════════════════════
 //  OAUTH / login
 // ══════════════════════════════════════
-import { clientId, ALLOWED_EMAILS } from "./config.js";
-import { state, _shownToasts } from "./state.js";
+import { clientId, emailToegestaan } from "./config.js";
+import { state } from "./state.js";
 import { loadAll, laadUitCache, wisCache } from "./data.js";
 import { startVersieBewaking } from "./versie.js";
 import { toonKaart } from "./login-splash.js";
-import { refreshNotifUI, herstelNotifKoppeling } from "./notifications.js";
 import { fetchMetKlok } from "./api.js";
-import { beantwoordBevestiging } from "./bevestig.js";
+import { beantwoordBevestiging } from "./ui.js";
 
 // Hoe lang een tokenaanvraag zonder antwoord de bezig-teller mag bezetten. Eindig — zie het
 // vangnet in doOAuth. Tests kunnen dit verlagen via state._authTimeoutMs.
@@ -127,7 +126,7 @@ async function fetchUserEmail(){
     // twee try/finally-blokken die de app anders permanent bezet achterlaten: `doLogin` telt
     // `_authBezig` pas in zijn finally af (de Herladen-knop van de versiebalk leest die vlag) en
     // de knop 'Opnieuw inloggen' in data.js wist `_herinlogBezig` daar — en zolang die true is
-    // slaat de 8s-poll élke ronde over. Bij een afbreking valt hij gewoon in de catch hieronder
+    // slaat de poll élke ronde over. Bij een afbreking valt hij gewoon in de catch hieronder
     // en levert null: beide aanroepers hebben daar al een nette weg voor.
     const r=await fetchMetKlok('https://www.googleapis.com/oauth2/v3/userinfo',
                                {headers:{Authorization:`Bearer ${state.oauthToken}`}},
@@ -166,7 +165,7 @@ async function doLogin(){
     // waarin `ensureToken` meteen `true` teruggeeft en het dashboard achter de inlogkaart alsnog
     // gaat lezen en schrijven. `ensureToken` ruimt hier al op; deze weg deed dat niet.
     if(!email){state.oauthToken=null;state.oauthExpiry=0;_wisTokenSessie();errEl.textContent='Kon e-mailadres niet ophalen.';errEl.style.display='block';btn.classList.remove('is-signing');btn.disabled=false;return}
-    if(!ALLOWED_EMAILS.includes(email.toLowerCase())){
+    if(!emailToegestaan(email)){
       // Ook uit sessionStorage: de callback in doOAuth heeft hem daar al neergezet, en een token van
       // een niet-toegestaan account hoort nergens achter te blijven — zie `_wisTokenSessie`.
       state.oauthToken=null;state.oauthExpiry=0;_wisTokenSessie();
@@ -177,17 +176,6 @@ async function doLogin(){
     document.getElementById('login-gate').style.display='none';
     // De schil weer bedienbaar. Zie `logout()` voor waarom `inert` er überhaupt op gaat.
     document.getElementById('app')?.removeAttribute('inert');
-    // De OneSignal-koppeling terugzetten. `logout()` gooit de externe id én alle tags weg, en
-    // niets zette ze daarna terug: op een gedeelde computer (of na een uitlog-inlog in hetzelfde
-    // tabblad) kwam er daardoor geen enkele pushmelding meer aan, zonder dat het scherm iets
-    // liet zien.
-    // NADRUKKELIJK `herstelNotifKoppeling` en niet `saveNotifPrefs`: die laatste leest de
-    // SCHAKELAARS van het instellingenvenster, en dat venster is bij het inloggen nog nooit
-    // geopend — alle vijf staan dan uit in de HTML. Eén keer inloggen zou dan alle meldingen
-    // uitzetten, in de app én bij OneSignal. Deze leest de opgeslagen stand.
-    // Bewust NIET geawait: het is een netwerkactie naar OneSignal en mag het inloggen niet ophouden.
-    // De .catch hoort erbij omdat het een async functie is — een try/catch eromheen vangt niets.
-    herstelNotifKoppeling().catch(()=>{});
     laadUitCache();   // meteen de laatst bekende stand in beeld; loadAll vervangt hem
     loadAll();
     startVersieBewaking();   // minimumversie-rem: meteen, elke 5 min en bij terugkeer (versie.js)
@@ -195,7 +183,7 @@ async function doLogin(){
 }
 
 // `magVragen=false` betekent: alléén de STILLE vernieuwing proberen, en bij mislukking gewoon
-// `false` teruggeven. De 8s-poll gebruikt dat. Zonder die rem deed elke stille ronde na een
+// `false` teruggeven. De poll gebruikt dat. Zonder die rem deed elke stille ronde na een
 // verlopen sessie een `doOAuth(true)`, en dat opent het inlogvenster van Google — zonder klik, dus
 // zonder gebruikersgebaar. De browser blokkeert zo'n venster meestal, maar niet altijd: vlak na
 // een klik ergens anders komt hij er wél doorheen, en dan springt er elke acht seconden een
@@ -210,7 +198,7 @@ async function doLogin(){
 //     venster. Nodig voor 'terugkomen en meteen klikken': de focus-vernieuwing start, haar venster
 //     pakt de focus, en de klik-afhandeling van de schrijfweg zag dan hasFocus()=false en meldde
 //     'Inloggen mislukt';
-//   · de STILLE ronde (magVragen=false, de 8s-poll) vernieuwt alleen mét focus. Zonder focus:
+//   · de STILLE ronde (magVragen=false, de poll) vernieuwt alleen mét focus. Zonder focus:
 //     `false` + `state._tokenGepauzeerd`; de ronde toont dan 'gepauzeerd' i.p.v. een fout en
 //     telt niet mee voor de sessiebanner;
 //   · schrijfwegen (magVragen=true) komen van een klik en mogen stil vernieuwen; alleen de
@@ -239,7 +227,7 @@ async function ensureToken(magVragen=true){
     if(state.currentUserEmail) return true;
     const email=await fetchUserEmail();
     if(!email){ state.oauthToken=null;state.oauthExpiry=0;return false; } // mogelijk tijdelijk → sessie laten staan, later opnieuw
-    if(!ALLOWED_EMAILS.includes(email.toLowerCase())){ logout('Geen toegang met dit account. Log in met je VvE Beheer Collectief-account.'); return false; }
+    if(!emailToegestaan(email)){ logout('Geen toegang met dit account. Log in met je VvE Beheer Collectief-account.'); return false; }
     state.currentUserEmail=email;
     sessionStorage.setItem('currentUserEmail',email);
     return true;
@@ -319,14 +307,14 @@ async function vernieuwMetFocus(voorafMs=VERNIEUW_VOORAF_MS){
 }
 
 // Vernieuwen en, als het bijwerken stillag, meteen een leesronde. Dezelfde remmen als de 8s-ronde
-// (main.js): een verversing mag geen open venster, bulk-selectie of lopende undo onder de
+// (main.js): een verversing mag geen open venster of lopende schrijfactie onder de
 // gebruiker weghalen — dan pakt de volgende ronde het op.
 async function _vernieuwEnHervat(){
   const lagStil = !!state._tokenGepauzeerd || !(state.oauthToken && Date.now()<state.oauthExpiry);
   const ok=await vernieuwMetFocus();
   if(ok && lagStil){
     if(document.querySelector('.modal-bg.open')) return ok;
-    if(state.pendingWrites>0 || state.bulkMode || state._animBusy || state._undoInFlight || state._loadInFlight) return ok;
+    if(state.pendingWrites>0 || state._loadInFlight) return ok;
     loadAll(true);
   }
   return ok;
@@ -391,78 +379,20 @@ function logout(reden){
   state.oauthToken=null; state.oauthExpiry=0; state.currentUserEmail=null;
   try{ ['oauthToken','oauthExpiry','currentUserEmail'].forEach(k=>sessionStorage.removeItem(k)); }catch(_){}
   wisCache();   // anders blijft de stand van de vorige gebruiker op een gedeelde computer staan
-  // De schrijf-rem van de leescache weer AAN. `D` en de getekende tabellen blijven na een uitlog
-  // staan (die worden pas bij de eerste verse ronde vervangen), en `doLogin` verbergt de gate
-  // vóórdat die ronde binnen is. Zonder deze regel mocht er in dat venster geschreven worden op
-  // rijnummers uit een cache van de vórige sessie — en `getInsertRow` zou een nieuwe taak dan in
-  // het verkeerde sectieblok zetten. `loadAll` zet hem op false zodra er verse data staat.
+  // De schrijf-rem van de leescache weer AAN: tot de eerste verse ronde mag er niet geschreven
+  // worden op rijnummers uit de vorige sessie. `loadAll` zet hem op false zodra er verse data staat.
   state._uitCache=true;
-  // Meldingen-stand terug naar koude start. Zonder dit zou een volgende gebruiker op dezelfde
-  // computer verder werken met de basislijn én de al-getoond-lijst van de vórige: meldingen van
-  // vóór zijn sessie zouden alsnog als toast langskomen, of juist stil overgeslagen worden.
-  state._lastNotifTs=null; state._meldStart=0; state._meldUit=false;
-  // ÓÓK de twee 'wie ben ik'-velden in het instellingenvenster leegmaken. `getCurrentWho()` leest
-  // die select EERST en pas daarna de per-account-sleutel in localStorage, en het venster is de
-  // enige plek die hem ooit terugzet. Bleef de naam van de vorige gebruiker staan, dan schreef de
-  // volgende op dezelfde computer zijn logregels, dossiernotities en kenmerk-wijzigingen onder
-  // díé naam, en filterde het 'voor mij'-filter op de verkeerde persoon — precies waar de
-  // per-account-sleutel (_whoSleutel) voor gebouwd is.
-  try{
-    const _who=document.getElementById('notif-who'); if(_who) _who.value='';
-    const _whoAnders=document.getElementById('notif-who-other');
-    if(_whoAnders){ _whoAnders.value=''; _whoAnders.style.display='none'; }
-  }catch(_){}
-  // Ook de tellers en vlaggen van de storingsmeldingen terug naar nul: een volgende gebruiker op
-  // dezelfde computer hoort niet te beginnen met de sessiebanner of de structuurmelding van zijn
-  // voorganger, en een blijven-hangen vlag zou de 8s-ronde of het opslaan blokkeren.
-  state._authFails=0; state._renderFails=0; state._structErnstig=null;
-  state._syncLblVoorBulk=null; state._submitBezig=false; state._herinlogBezig=false;
-  state._tokenGepauzeerd=false; state._laatsteStilPoging=0; state._stilMislukt=0; state._stilMisluktMs=0;
-  try{ _shownToasts.clear(); }catch(_){}
-  // De 8s-poll, de token-heartbeat en de meldingen-visibilityhandler worden UITSLUITEND bij
-  // DOMContentLoaded gestart (main.js). Stopten we ze hier, dan kwamen ze na een tweede inlog
-  // in hetzelfde tabblad nooit meer terug: het dashboard laadde dan één keer en bevroor daarna
-  // stil — geen verversing meer, geen tokenvernieuwing, geen meldingen.
-  // Stoppen is ook niet nodig: alle drie hebben ze hun eigen sessiepoort en liggen na deze
-  // logout vanzelf stil.
-  //   · de 8s-poll      → magPollen() eist state.currentUserEmail, hierboven leeggemaakt
-  //   · de heartbeat    → vernieuwMetFocus keert terug op !state.currentUserEmail
-  //   · klik/focus-vernieuwing → idem
-  //   · onNotifVisibility → keert terug op !state.oauthToken
-  // OneSignal.logout() koppelt dit toestel los van de externe id én gooit de tags weg (in v16 komt
-  // de subscriptie op een nieuwe anonieme gebruiker te staan). Het scherm moet dat eerlijk laten
-  // zien: bleef `isSubscribed` op true staan, dan toonde het instellingenpaneel bij de volgende
-  // gebruiker 'meldingen staan aan' terwijl er geen enkele tag meer aan zijn naam hing en er dus
-  // niets meer aankwam. De terugweg loopt via `doLogin`, die na een geslaagde inlog de tags
-  // opnieuw wegschrijft.
-  try{ if(window.OneSignal && OneSignal.logout) OneSignal.logout(); }catch(_){}
-  state.isSubscribed=false;
-  try{ refreshNotifUI(); }catch(_){}
-  // ÉÉRST alle open vensters sluiten. Ze staan buiten #app (rechtstreeks in <body>), dus `inert`
-  // hieronder raakt ze niet: een bewerkscherm dat openstond op het moment van uitloggen blijft
-  // achter de inlogkaart gewoon 'open', en dan trekt de Tab-val in modal-a11y.js de focus er
-  // steeds weer in — het toetsenbord komt niet meer bij de inlogknop. `MODAL_SLUITERS` niet
-  // gebruiken: dat zou een kringverwijzing naar main.js opleveren, en de vensters hoeven hier
-  // alleen dícht. De bijbehorende toestand wordt hieronder toch al leeggemaakt.
-  // Een openstaande ja/nee-vraag éérst BEANTWOORDEN (met 'nee') in plaats van alleen het venster
-  // te sluiten. De kale class-verwijdering hieronder liet `_openVraag` in bevestig.js staan, en
-  // die is tegelijk de dubbelklik-rem: elke volgende vraag — ook na een nieuwe inlog in ditzelfde
-  // tabblad — kreeg dan meteen stil 'nee' terug, tot een herlaad (naloop 2026-08-28).
+  // Tellers en vlaggen terug naar nul: een volgende gebruiker op dezelfde computer begint schoon.
+  state._authFails=0; state._tokenGepauzeerd=false; state._laatsteStilPoging=0; state._stilMislukt=0; state._stilMisluktMs=0;
+  state.lijstVan=null; state.bewerkt=null;
+  // De poll en de token-heartbeat blijven lopen (ze worden alleen bij het opstarten gestart) en
+  // liggen vanzelf stil zonder currentUserEmail; stoppen zou een tweede inlog laten bevriezen.
+  // Een openstaande ja/nee-vraag eerst BEANTWOORDEN (met 'nee'), daarna alle vensters dicht: ze
+  // staan buiten #app, dus `inert` hieronder raakt ze niet.
   try{ beantwoordBevestiging(false); }catch(_){}
   try{ document.querySelectorAll('.modal-bg.open').forEach(bg=>bg.classList.remove('open')); }catch(_){}
-  // Het chatpaneel draagt geen `.modal-bg` (het is bewust NIET-modaal, zie dossier-chat.js) en
-  // valt dus buiten de query hierboven. Het staat wél buiten #app, dus `inert` raakt het ook niet:
-  // zonder deze regel bleef het gesprek van de vorige gebruiker open en bedienbaar achter de
-  // inlogkaart staan — met de dossiergegevens van een VvE er nog in.
-  try{ document.getElementById('chat-bg')?.classList.remove('open'); }catch(_){}
-  state._chatHistorie=null; state._chatVve=null; state._chatBezig=false;
-  state.editMode=false; state.editRowData=null; state.editFoto=null; state.editSec=null;
-  state._completeRow=null; state._completeRid=null; state._completeNotitie=null;
-  // Het inlogscherm is een `position:fixed`-overlay: hij dekt het dashboard alleen VISUEEL af.
-  // Zonder `inert` bleven alle knoppen erachter met Tab bereikbaar én klikbaar via het
-  // toetsenbord — dertig stuks, gemeten — en die knoppen doen echte dingen (verversen, een taak
-  // afronden). `inert` haalt de hele schil uit de tabvolgorde én uit de toegankelijkheidsboom,
-  // in één attribuut. De twee plekken die de gate verbergen halen hem er weer af.
+  // Het inlogscherm dekt het dashboard alleen visueel af; `inert` haalt de schil ook uit de
+  // tabvolgorde. De twee plekken die de gate verbergen halen hem er weer af.
   const app=document.getElementById('app'); if(app) app.setAttribute('inert','');
   const gate=document.getElementById('login-gate'); if(gate) gate.style.display='';
   toonKaart(); // meteen de login-kaart (geen splash-herhaling bij uitloggen)

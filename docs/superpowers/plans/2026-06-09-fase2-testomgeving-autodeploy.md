@@ -200,7 +200,7 @@ Uit de URL van de kopie: `…/spreadsheets/d/<DIT_IS_HET_ID>/edit`. Noteer het I
 
 - [ ] **Stap 3: Deel de test-Sheet met de 4 gebruikers 🧑 (samen)**
 
-Delen → bewerker-rechten voor: `info@vvebeheercollectief.nl`, `djiowchico@gmail.com`, `gabrielateterycz1616@gmail.com`, `giocan175@gmail.com`. **Niet** "iedereen met de link". (Privacy: echte data.)
+Delen → bewerker-rechten voor: `info@vvebeheercollectief.nl`, `collega1@voorbeeld.nl`, `collega2@voorbeeld.nl`, `collega3@voorbeeld.nl`. **Niet** "iedereen met de link". (Privacy: echte data.)
 
 - [ ] **Stap 4: Vul `SID_TEST` in**
 

@@ -191,6 +191,11 @@ function toonUpdateBalk(onReload, onDismiss, isBezet) {
 //     tabbladwissel een balk.
 // Geeft `check` terug: update() en daarna de balk als er een wachtende versie is.
 export function bewaakRegistratie(reg, balk, ctrl, verborgen) {
+  // Geen registratie (een browser of testomgeving die `register()` met niets laat terugkomen):
+  // dan valt er niets te bewaken. Zonder deze regel gooide `reg.addEventListener` hieronder en
+  // kwam de rest van `initSwUpdate` — de halfuurlijkse controle, de balk bij terugkeer — nooit
+  // aan bod; de fout stond alleen als 'SW registratie mislukt' in de console.
+  if (!reg) return () => Promise.resolve();
   ctrl = ctrl || (() => navigator.serviceWorker.controller);
   verborgen = verborgen || (() => document.hidden);
   const volg = nw => {

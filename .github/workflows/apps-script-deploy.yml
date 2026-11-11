@@ -8,9 +8,24 @@ on:
       - '.github/workflows/apps-script-deploy.yml'
   workflow_dispatch: {}
 
+# Het GITHUB_TOKEN hoeft alleen te lezen (clasp werkt met eigen credentials uit de secrets).
+permissions:
+  contents: read
+
+# Nooit twee uitrollen van dezelfde tak door elkaar: twee snelle pushes gaven twee parallelle
+# `clasp push --force` zonder volgordegarantie, zodat de oudere commit als laatste kon landen.
+concurrency:
+  group: apps-script-${{ github.ref_name }}
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # Een GitHub-omgeving per doel (v15.6). Zonder instellingen gedraagt hij zich als voorheen (de
+    # repo-secrets blijven gewoon bereikbaar). Zet in Settings → Environments → 'productie' een
+    # verplichte reviewer en 'Deployment branches: main', en verplaats CLASPRC_JSON en
+    # PROD_SCRIPT_ID daarheen: dan kan geen andere tak of workflow meer bij de productiesleutel.
+    environment: ${{ github.ref_name == 'main' && 'productie' || 'test' }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5

@@ -1,0 +1,12 @@
+{
+  "name": "collectief-dashboard",
+  "private": true,
+  "description": "VvE Beheer Collectief — dashboard. Geen framework; de bouwstap verkleint alleen (tools/bouw.mjs).",
+  "scripts": {
+    "bouw": "node tools/bouw.mjs",
+    "zelftest": "node tools/zelftest.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.24.2"
+  }
+}

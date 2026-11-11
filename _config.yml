@@ -28,6 +28,10 @@ exclude:
   - BRAND-GUIDELINES.md
   - beheer-playbook.md
   - OVERDRACHT-subsidie-trajecten.md
+  # AUDIT.md beschrijft de beveiligingsstand; die hoort niet op de publieke site (stond er tot v15.6).
+  - AUDIT.md
+  - package.json
+  - package-lock.json
 # Let op: Jekyll matcht deze regels ook op PREFIX — 'apps-script' weert daardoor ook
 # apps-script-backup. Zet hier daarom NOOIT een korte regel als 'src' of 'index': dan
 # verdwijnt de app zelf van de site. 'apps-script-backup' staat er expliciet bij zodat het

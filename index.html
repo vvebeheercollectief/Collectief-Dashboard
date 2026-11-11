@@ -4,19 +4,11 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover"/>
   <title>Collectief Dashboard</title>
-
-  <!-- PWA manifest -->
   <link rel="manifest" href="manifest.json"/>
   <meta name="theme-color" content="#222B36"/>
-  <!-- script-src: *.onesignal.com en NIET alleen cdn.onesignal.com. De SDK haalt zijn
-       instellingen op bij api.onesignal.com; stond daar alleen cdn, dan blokkeerde de browser
-       dat verzoek, bleef OneSignal.init() eeuwig hangen en kreeg iedereen die notificaties
-       aanzette de melding "Notificatiesysteem kon niet worden geladen". -->
-  <!-- cdn.jsdelivr.net alleen voor het ÉNE bestand dat we er laden (Chart.js, render-analytics.js,
-       mét SRI). Het hele domein toestaan liet elk npm-pakket ter wereld als script binnen. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js https://accounts.google.com https://*.onesignal.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://sheets.googleapis.com https://www.googleapis.com https://accounts.google.com https://oauth2.googleapis.com https://onesignal.com https://*.onesignal.com https://collectief-dashboard.vercel.app; img-src 'self' data: https:; frame-src https://accounts.google.com;"/>
-
-  <!-- iOS / Safari -->
+  <!-- Alleen Google (inloggen + Sheets) en Google Fonts. Geen externe scripts meer behalve de
+       Google-inlog: OneSignal, Chart.js en de AI-proxy zijn weg sinds v16.0. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; script-src 'self' https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; connect-src 'self' https://sheets.googleapis.com https://www.googleapis.com https://accounts.google.com https://oauth2.googleapis.com; img-src 'self' data: https:; frame-src https://accounts.google.com;"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
   <meta name="mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
@@ -25,1027 +17,187 @@
   <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png"/>
   <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png"/>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <!-- async en NIET defer: een defer-script loopt in dezelfde rij als de module src/main.js en
-       hield die dus op tot de OneSignal-SDK van het CDN binnen en uitgevoerd was. Met async maakt
-       de volgorde niet uit: notifications.js gebruikt het OneSignalDeferred-patroon, dat werkt of
-       de SDK nu vóór of ná de module laadt. -->
-  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" async></script>
-  <!-- De twee letters van het INLOGSCHERM (Hanken Grotesk / JetBrains Mono) staan hier niet meer:
-       een stylesheet in de kop blokkeert het uitvoeren van src/main.js tot Google Fonts antwoordt,
-       ook voor wie al ingelogd is en het inlogscherm nooit ziet. src/login-splash.js
-       (laadLoginLetters) zet de link pas neer zodra het inlogscherm getoond wordt. Het dashboard
-       zelf gebruikt sinds v11.8 de standaardletter van het toestel (styles.css). -->
+  <!-- De letter (Albert Sans) laadt main.js pas na het opstarten: een stylesheet hier zou het
+       starten van de app laten wachten op Google Fonts. Tot die binnen is staat de systeemletter. -->
   <link rel="stylesheet" href="styles.css"/>
 </head>
 <body>
-<div id="overlay"></div>
-<div id="app">
+<div id="app" inert>
 
-<!-- ═══════ SIDEBAR ═══════ -->
-<aside id="sb">
-  <div class="sb-logo">
-    <img id="logo" src="logo-sidebar.png" alt="VvE Beheer Collectief"/>
-    <div class="sb-logo-fb" id="logo-fb" style="display:none">VBC</div>
-    <div class="sb-brand">VvE Beheer<span>Collectief Dashboard <span id="app-version"></span></span></div>
-  </div>
-  <nav class="sb-nav" aria-label="Hoofdnavigatie">
-    <div class="sb-lbl">Taken</div>
-    <button type="button" class="ni" data-page="ntd">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
-      Nog Te Doen<span class="ni-badge" id="b-ntd">–</span>
-    </button>
-    <button type="button" class="ni" data-page="af">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
-      Afgerond
-    </button>
-    <div class="sb-lbl">ALV's</div>
-    <button type="button" class="ni" data-page="alvo">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
-      ALV's Overzicht
-    </button>
-    <button type="button" class="ni" data-page="alfa">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-      ALV's Afgerond
-    </button>
-    <div class="sb-lbl">Intern</div>
-    <button type="button" class="ni" data-page="ontw">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-      Ontwikkeling
-    </button>
-    <button type="button" class="ni" data-page="logboek">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-      Logboek
-    </button>
-    <button type="button" class="ni" data-page="herhaal">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
-      Herhaalregels
-    </button>
-    <div class="sb-lbl">Analyse</div>
-    <button type="button" class="ni" data-page="analytics">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-      Analytics
-    </button>
-    <button type="button" class="ni" data-page="dash">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-      Dashboard
-    </button>
-  </nav>
-  <div class="sb-foot">
-    <div class="sync-row"><div class="dot" id="dot"></div><span id="sync-lbl">–</span></div>
-    <button class="ico-btn" id="refresh-btn" title="Vernieuwen">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0115-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 01-15 6.7L3 16"/></svg>
-    </button>
-    <button class="ico-btn" id="uitlog-btn" title="Uitloggen" aria-label="Uitloggen">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
-    </button>
-  </div>
-</aside>
-
-<!-- ═══════ MAIN ═══════ -->
-<div id="main">
-  <header id="hdr">
-    <button class="ico-btn hamburger" id="hamburger" aria-label="Menu" aria-expanded="false" aria-controls="sb">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
-    </button>
-    <div class="hdr-info"><h1 id="page-title">Nog Te Doen</h1><div class="kop-pillen" id="ntd-kop-pillen" hidden></div></div>
-    <button class="ico-btn" id="zoek-btn" title="Zoeken (Ctrl+K)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-    </button>
-    <button class="ico-btn" id="notif-btn" title="Meldingen" style="position:relative">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-      <span id="notif-dot" style="display:none;position:absolute;top:6px;right:7px;width:8px;height:8px;background:var(--rd);border-radius:50%;border:2px solid var(--sur)"></span>
-    </button>
-    <button class="ico-btn" id="ai-btn" title="AI-hulp — mail plakken">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" fill="currentColor" fill-opacity="0.18"/><path d="M18.5 14.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" fill="currentColor" fill-opacity="0.18"/></svg>
-    </button>
-    <!-- Chat over een VvE-dossier. Stond tot v10.24 als zwevend knopje rechtsonder, maar lag daar
-         bovenop de actiekolom van de takentabel: het vinkje 'afronden' van de rij eronder was niet
-         aanklikbaar, je opende de chat. Gemeten op 1440x900 en op 375x812 — in de bovenbalk kan dat
-         niet meer gebeuren. -->
-    <button class="ico-btn" id="chat-btn" title="Vraag over het dashboard" aria-label="Vraag over het dashboard" aria-expanded="false" aria-controls="chat-bg">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 11.8a8.2 8.2 0 0 1-8.8 8.2 8.6 8.6 0 0 1-3.6-.9L3.5 20.5l1.4-4.6a8.6 8.6 0 0 1-.9-3.6 8.2 8.2 0 0 1 8.2-8.8 8.2 8.2 0 0 1 8.3 8.3z" fill="currentColor" fill-opacity="0.16"/></svg>
-    </button>
-    <button class="ico-btn" id="density-btn" title="Weergave: dichtheid">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-    </button>
-    <button class="ico-btn" id="theme-btn" aria-label="Thema wisselen (licht/donker)">
-      <svg id="ico-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-      <svg id="ico-moon" style="display:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
-    </button>
-  </header>
-
-  <div id="content">
-
-    <!-- ══ NOG TE DOEN ══ -->
-    <div class="page" id="page-ntd">
-      <div class="ntd-top-row" id="ntd-top-row" hidden>
-        <div class="ntd-week" id="ntd-week"></div>
-        <div class="ntd-progress-card" id="ntd-progress-card">
-          <div class="ntd-progress-lbl">Vergaderingen uitgeschreven</div>
-          <div class="ntd-progress-track" id="ntd-progress-track">
-            <div class="ntd-progress-voor" id="ntd-progress-voor"></div>
-            <div class="ntd-progress-fill" id="ntd-progress-fill"></div>
-            <span class="ntd-progress-val ntd-progress-val-base" id="ntd-progress-val-base">0 / 0</span>
-            <span class="ntd-progress-val ntd-progress-val-rev" id="ntd-progress-val-rev">0 / 0</span>
-          </div>
-          <div class="ntd-progress-sub" id="ntd-progress-sub">0% van de vergaderingen uitgeschreven</div>
-        </div>
-      </div>
-      <div class="card" id="ntd-card">
-        <!-- role=tablist: de knoppen erin dragen role="tab", en een tab zonder tablist eromheen is
-             ongeldige ARIA — een schermlezer negeert de rol dan of leest hem verkeerd voor. Het
-             paneel eronder is wat ze omschakelen, dus dat krijgt role=tabpanel.
-             De tabbladen staan sinds v11.7 ÍN deze kop en niet meer in een eigen balk eronder:
-             die kop zei links exact hetzelfde als het actieve tabblad. De <h2> blijft bestaan
-             voor schermlezers (en `ntd-title` wordt door render-lijsten.js gezet en getoetst),
-             maar staat niet meer in beeld — zie .hdr-tabs / .alleen-voorlezer in styles.css. -->
-        <div class="card-hdr hdr-tabs">
-          <h2 id="ntd-title" class="alleen-voorlezer">Nog Te Doen</h2>
-          <div class="tabs" id="ntd-tabs" role="tablist" aria-label="Categorie"></div>
-          <div class="filter-bar">
-            <div class="search-box">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-              <input type="text" id="s-ntd" placeholder="Zoek…" aria-label="Zoek in openstaande taken"/>
-            </div>
-            <div class="search-box" style="min-width:120px;max-width:150px">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 5.523-8 13-8 13S4 15.523 4 10a8 8 0 0116 0z"/><circle cx="12" cy="10" r="3"/></svg>
-              <input type="text" id="f-code-ntd" placeholder="VvE Code…" aria-label="Filter op VvE-code"/>
-            </div>
-            <select class="filter-select" id="f-beh-ntd" aria-label="Filter op behandelaar"><option value="">Alle behandelaars</option><option>Jer</option><option>Cihad</option><option>Gabos</option></select>
-            <select class="filter-select" id="f-prio-ntd" aria-label="Filter op prioriteit"><option value="">Alle prioriteiten</option><option>Hoog</option><option>Midden</option><option>Laag</option></select>
-            <span id="bulk-teller" class="bulk-teller" style="display:none">0 geselecteerd</span>
-            <button class="btn btn-sec btn-sm" id="bulk-btn" data-action="bulk-toggle" title="Meerdere taken selecteren"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4.5" y="4.5" width="15" height="15" rx="3" fill="currentColor" fill-opacity="0.18"/><path d="M8.5 12.3l2.6 2.6 4.9-5.4"/></svg> Selecteren</button>
-            <button class="btn btn-pri btn-sm" id="btn-add"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Toevoegen</button>
-          </div>
-        </div>
-        <div class="tbl-wrap" id="ntd-tbl-wrap" role="tabpanel" aria-label="Openstaande taken in de gekozen categorie"><table><thead id="ntd-thead"></thead><tbody id="ntd-tbody"></tbody></table></div>
-        <div class="pag" id="ntd-pag"></div>
-        <!-- Cross-list (bug #2): taken die via Subcategorie óók in dit scherm horen -->
-        <div id="ntd-crosslist"></div>
-      </div>
+  <!-- ═══════ ZIJBALK ═══════ -->
+  <aside class="zijbalk" aria-label="Navigatie">
+    <div class="zb-logo">
+      <img src="beeldmerk-wit.svg" alt="" width="30" height="30"/>
+      <span class="zb-merk">Collectief Dashboard<span>versie <span id="app-version"></span></span></span>
     </div>
-
-    <!-- ══ AFGEROND ══ -->
-    <div class="page" id="page-af">
-      <div class="card">
-        <div class="card-hdr hdr-tabs">
-          <h2 class="alleen-voorlezer">Afgerond</h2>
-          <div class="tabs" id="af-tabs" role="tablist" aria-label="Categorie"></div>
-          <div class="filter-bar">
-            <div class="search-box">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-              <input type="text" id="s-af" placeholder="Zoek…" aria-label="Zoek in afgeronde taken"/>
-            </div>
-            <select class="filter-select" id="f-beh-af" aria-label="Filter op behandelaar"><option value="">Alle behandelaars</option></select>
-            <select class="filter-select" id="f-per-af" aria-label="Filter op periode"></select>
-            <span class="af-eigen" id="af-eigen" hidden>
-              <input type="date" class="filter-datum" id="f-van-af" aria-label="Afgerond vanaf"/>
-              <span class="af-tot">t/m</span>
-              <input type="date" class="filter-datum" id="f-tot-af" aria-label="Afgerond tot en met"/>
-            </span>
-          </div>
-        </div>
-        <div class="tbl-wrap" role="tabpanel" aria-label="Afgeronde taken in de gekozen categorie"><table><thead id="af-thead"></thead><tbody id="af-tbody"></tbody></table></div>
-        <div class="pag" id="af-pag"></div>
-      </div>
+    <nav class="nav" aria-label="Onderdelen">
+      <a class="nav-knop" href="#taken" data-pagina="taken"><span class="nav-ico" data-icoon="klaar"></span><span class="nav-tekst">Mijn taken</span><span class="nav-tel" id="tel-taken"></span></a>
+      <a class="nav-knop" href="#lod" data-pagina="lod"><span class="nav-ico" data-icoon="document"></span><span class="nav-tekst">LOD</span><span class="nav-tel" id="tel-lod"></span></a>
+      <a class="nav-knop" href="#subsidie" data-pagina="subsidie"><span class="nav-ico" data-icoon="financien"></span><span class="nav-tekst">Subsidies</span><span class="nav-tel" id="tel-subsidie"></span></a>
+      <div class="nav-scheiding" aria-hidden="true"></div>
+      <a class="nav-knop" href="#alvo" data-pagina="alvo"><span class="nav-ico" data-icoon="vergadering"></span><span class="nav-tekst">ALV's</span></a>
+      <a class="nav-knop" href="#alfa" data-pagina="alfa"><span class="nav-ico" data-icoon="notulen"></span><span class="nav-tekst">ALV-archief</span></a>
+    </nav>
+    <div class="zb-voet">
+      <span class="zb-stip" id="sync-stip" aria-hidden="true"></span>
+      <span class="sync-lbl" id="sync-lbl" role="status">–</span>
+      <button type="button" class="ico-knop" data-actie="vernieuwen" title="Vernieuwen" aria-label="Vernieuwen" data-icoon="vernieuwen" data-grootte="18"></button>
+      <button type="button" class="ico-knop" data-actie="uitloggen" title="Uitloggen" aria-label="Uitloggen" data-icoon="uitloggen" data-grootte="18"></button>
     </div>
+  </aside>
 
-    <!-- ══ ALV OVERZICHT ══ -->
-    <div class="page" id="page-alvo">
-      <div class="stat-strip" id="alvo-stats"></div>
-      <div class="card">
-        <div class="card-hdr">
-          <h2 class="alleen-voorlezer">ALV's Overzicht</h2>
-          <div class="filter-bar">
-            <div class="search-box">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-              <input type="text" id="s-alvo" placeholder="Zoek VvE…" aria-label="Zoek VvE in het ALV-overzicht"/>
-            </div>
-            <select class="filter-select" id="f-status-alvo" aria-label="Filter op ALV-status"><option value="">Alle statussen</option><option>Open</option><option>Klaargezet</option><option>Gepland</option><option>Afgerond</option></select>
-            <label class="filter-check"><input type="checkbox" id="f-budget-alvo"/> Budgetpakket</label>
-            <button class="btn btn-sec btn-sm" data-action="alvo-reset-open" title="Alle vinkjes wissen voor een nieuwe vergaderronde">Nieuwe ronde starten</button>
-          </div>
-        </div>
-        <div class="tbl-wrap">
-          <table>
-            <thead><tr>
-              <th style="background:var(--ac-l);color:var(--ac);border-bottom:1px solid var(--ac-b)">VvE Code</th>
-              <th style="background:var(--ac-l);color:var(--ac);border-bottom:1px solid var(--ac-b)">VvE Naam</th>
-              <th style="background:var(--ac-l);color:var(--ac);border-bottom:1px solid var(--ac-b)">Klaargezet</th>
-              <th style="background:var(--ac-l);color:var(--ac);border-bottom:1px solid var(--ac-b)">Uitnodiging</th>
-              <th style="background:var(--ac-l);color:var(--ac);border-bottom:1px solid var(--ac-b)">Notulen</th>
-              <th style="background:var(--ac-l);color:var(--ac);border-bottom:1px solid var(--ac-b)">Begroting</th>
-              <th style="background:var(--ac-l);color:var(--ac);border-bottom:1px solid var(--ac-b)">Status</th>
-            </tr></thead>
-            <tbody id="alvo-tbody"></tbody>
-          </table>
-        </div>
-        <div class="pag" id="alvo-pag"></div>
-      </div>
-    </div>
+  <main class="werkvlak">
 
-    <!-- ══ ALV AFGEROND ══ -->
-    <div class="page" id="page-alfa">
-      <div class="card">
-        <div class="card-hdr">
-          <h2 class="alleen-voorlezer">ALV's Afgerond</h2>
-          <div class="search-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-            <input type="text" id="s-alfa" placeholder="Zoek…" aria-label="Zoek in afgeronde ALV's"/>
-          </div>
-        </div>
-        <div class="tbl-wrap">
-          <table>
-            <thead><tr>
-              <th style="background:var(--gn-l);color:var(--gn);border-bottom:1px solid var(--gn-b)">VvE Code</th>
-              <th style="background:var(--gn-l);color:var(--gn);border-bottom:1px solid var(--gn-b)">VvE Naam</th>
-              <th style="background:var(--gn-l);color:var(--gn);border-bottom:1px solid var(--gn-b)">Datum Afgerond</th>
-            </tr></thead>
-            <tbody id="alfa-tbody"></tbody>
-          </table>
-        </div>
-        <div class="pag" id="alfa-pag"></div>
-      </div>
-    </div>
-
-    <!-- ══ ONTWIKKELING ══ -->
-    <div class="page" id="page-ontw">
-      <div class="card">
-        <div class="card-hdr hdr-tabs" style="--sec:var(--ac);--sec-l:var(--ac-l);--sec-b:var(--ac-b)">
-          <h2 id="ontw-title" class="alleen-voorlezer">Ontwikkeling</h2>
-          <div class="tabs" id="ontw-tabs" role="tablist" aria-label="Categorie"></div>
-          <div class="filter-bar">
-            <div class="search-box">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-              <input type="text" id="s-ontw" placeholder="Zoeken…" aria-label="Zoek in ontwikkelitems"/>
-            </div>
-            <button class="btn btn-pri btn-sm" id="btn-add-ontw">+ Nieuw item</button>
-          </div>
-        </div>
-        <div class="tbl-wrap" role="tabpanel" aria-label="Ontwikkelitems in de gekozen categorie">
-          <table><thead id="ontw-thead"></thead><tbody id="ontw-tbody"></tbody></table>
-        </div>
-        <div class="pag" id="ontw-pag"></div>
-      </div>
-    </div>
-
-    <!-- ══ ONTWIKKELING MODAL ══ -->
-    <div class="modal-bg" id="ontw-modal-bg">
-      <div class="modal" style="max-width:500px">
-        <div class="modal-hdr" style="--sec:var(--ac)">
-          <h2 id="ontw-m-title">Nieuw item</h2>
-          <button class="modal-close" id="ontw-m-close">×</button>
-        </div>
-        <div class="modal-body">
-          <div class="fld"><label>Titel *</label><input type="text" id="ontw-m-titel" placeholder="Korte omschrijving"/></div>
-          <div class="fld"><label>Categorie *</label>
-            <select id="ontw-m-cat">
-              <option value="">Selecteer…</option>
-              <option>Opmerkingen</option>
-              <option>Verbeteringen</option>
-              <option>Vragen aan Cihan</option>
-              <option>Ideeën</option>
-            </select>
-          </div>
-          <div class="fld"><label>Inhoud</label><textarea id="ontw-m-inhoud" rows="4" placeholder="Details…"></textarea></div>
-          <div class="fld"><label>Status</label>
-            <select id="ontw-m-status">
-              <option value="Open">Open</option>
-              <option value="Afgerond">Afgerond</option>
-            </select>
-          </div>
-        </div>
-        <div class="modal-foot">
-          <button class="btn btn-sec" id="ontw-m-cancel">Annuleren</button>
-          <button class="btn btn-del" id="ontw-m-del" style="display:none">Verwijder</button>
-          <button class="btn btn-pri" id="ontw-m-submit">
-            <span id="ontw-m-submit-lbl">Toevoegen</span>
-          </button>
+    <!-- ══ MIJN TAKEN ══ -->
+    <section class="blad pagina" id="pagina-taken" aria-labelledby="taken-titel" hidden>
+      <div class="balk">
+        <h1 id="taken-titel">Mijn taken</h1>
+        <span class="tel" id="taken-tel"></span>
+        <span class="streep" aria-hidden="true"></span>
+        <div class="groep" id="taken-wie" role="group" aria-label="Lijst van"></div>
+        <div class="rechts">
+          <label class="zoek"><span data-icoon="zoeken" data-grootte="16"></span><input type="search" id="taken-zoek" placeholder="Zoek" aria-label="Zoek in deze lijst"/></label>
         </div>
       </div>
-    </div>
-
-    <!-- ══ LOGBOEK ══ -->
-    <div class="page" id="page-logboek">
-      <div class="card">
-        <div class="card-hdr">
-          <h2 class="alleen-voorlezer">Logboek</h2>
-          <div class="filter-bar">
-            <div class="search-box">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-              <input type="text" id="s-logboek" placeholder="Zoek op VvE, woord of naam…" aria-label="Zoek in het logboek"/>
-            </div>
-          </div>
-        </div>
-        <div class="log-filters">
-          <div class="lchips" id="logboek-who">
-            <button class="lchip on" data-who="" aria-pressed="true">Iedereen</button>
-            <button class="lchip" data-who="Jer" aria-pressed="false">Jer</button>
-            <button class="lchip" data-who="Cihad" aria-pressed="false">Cihad</button>
-            <button class="lchip" data-who="Gabos" aria-pressed="false">Gabos</button>
-            <button class="lchip" data-who="Cihan" aria-pressed="false">Cihan</button>
-          </div>
-          <div class="lchips" id="logboek-act">
-            <button class="lchip on" data-act="" aria-pressed="true">Alles</button>
-            <button class="lchip" data-act="Opmerking" aria-pressed="false">Notities</button>
-            <button class="lchip" data-act="Contact" aria-pressed="false">Contact</button>
-            <button class="lchip" data-act="Afgerond" aria-pressed="false">Afgerond</button>
-            <button class="lchip" data-act="Aangemaakt" aria-pressed="false">Aangemaakt</button>
-          </div>
-        </div>
-        <p class="log-count" id="logboek-count"></p>
-        <div id="logboek-feed" class="log-feed"></div>
-        <div class="pag" id="logboek-pag"></div>
+      <div class="info" id="taken-info" role="status" hidden>
+        <span>Je kijkt mee bij <span id="taken-info-wie"></span>. Alleen inzien.</span>
+        <button type="button" class="tekst-knop" data-actie="eigen-lijst">Terug naar mijn lijst</button>
       </div>
-    </div>
-
-    <!-- ══ HERHAALREGELS (Fase 4) ══ -->
-    <div class="page" id="page-herhaal">
-      <div class="card">
-        <div class="card-hdr">
-          <h2 class="alleen-voorlezer">Herhaalregels</h2>
-          <div class="filter-bar">
-            <span id="herhaal-sub" style="font-size:12px;color:var(--mut)"></span>
-            <button class="btn btn-pri btn-sm" id="btn-add-herhaal"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Nieuwe herhaalregel</button>
-          </div>
-        </div>
-        <div class="tbl-wrap"><table>
-          <thead><tr><th>Taak</th><th>VvE</th><th>Wie</th><th>Herhaling</th><th>Volgende keer</th><th>Status</th><th></th></tr></thead>
-          <tbody id="herhaal-tbody"></tbody>
-        </table></div>
+      <div class="tabel">
+        <div class="thead kol-taken" aria-hidden="true"><span></span><span>Taak</span><span>VvE</span><span>Notitie</span></div>
+        <form class="nieuw kol-taken" id="taken-nieuw" aria-label="Nieuwe taak" autocomplete="off">
+          <span class="plus" aria-hidden="true">+</span>
+          <input type="text" id="nieuw-taak" placeholder="Nieuwe taak, Enter om toe te voegen" aria-label="Nieuwe taak"/>
+          <span class="veld-vve"><input type="text" id="nieuw-vve" placeholder="VvE (mag leeg)" aria-label="VvE, mag leeg blijven"/></span>
+          <input type="text" id="nieuw-notitie" placeholder="Notitie" aria-label="Notitie, optioneel"/>
+          <button type="submit" class="verborgen">Voeg toe</button>
+        </form>
+        <div id="taken-rijen"></div>
       </div>
-    </div>
+    </section>
 
-    <!-- ══ PER-VVE-DOSSIER (Fase 5) ══ -->
-    <div class="page" id="page-vve"><div id="vve-inhoud"></div></div>
-
-    <!-- ══ ANALYTICS ══ -->
-    <div class="page" id="page-analytics">
-      <div class="prod-hdr">
-        <h2>Productiviteit</h2>
-        <div class="period-bar" id="ana-period-bar"></div>
-      </div>
-
-      <div class="kpi-grid" id="ana-kpi-grid">
-        <div class="kpi" id="kpi-vergader">
-          <div class="kpi-top">
-            <div>
-              <div class="kpi-lbl">Vergaderingen afgerond</div>
-            </div>
-          </div>
-          <div class="kpi-num" id="kpi-vergader-num">–</div>
-          <div class="kpi-sub" id="kpi-vergader-sub"></div>
-          <div class="kpi-spark"><canvas id="spark-vergader"></canvas></div>
-        </div>
-
-        <div class="kpi" id="kpi-openalv">
-          <div class="kpi-top">
-            <div>
-              <div class="kpi-lbl">Open ALV's (werkvoorraad)</div>
-            </div>
-          </div>
-          <div class="kpi-num" id="kpi-openalv-num">–</div>
-          <div class="kpi-sub" id="kpi-openalv-sub">nog niet afgerond</div>
-          <div class="kpi-spark" style="height:36px;display:flex;align-items:center"><div style="width:100%;height:8px;background:var(--sur2);border-radius:4px;overflow:hidden"><div id="kpi-openalv-bar" style="height:100%;background:var(--ac);border-radius:4px;width:0;transition:width .6s ease"></div></div></div>
-        </div>
-
-        <div class="kpi" id="kpi-taken">
-          <div class="kpi-top">
-            <div>
-              <div class="kpi-lbl">Taken afgerond</div>
-            </div>
-          </div>
-          <div class="kpi-num" id="kpi-taken-num">–</div>
-          <div class="kpi-sub" id="kpi-taken-sub"></div>
-          <div class="kpi-spark"><canvas id="spark-taken"></canvas></div>
-        </div>
-
-        <div class="kpi" id="kpi-pers">
-          <div class="kpi-top">
-            <div>
-              <div class="kpi-lbl">Taken per behandelaar</div>
-            </div>
-          </div>
-          <div class="kpi-persons" id="kpi-pers-rows"></div>
+    <!-- ══ LOD ══ -->
+    <section class="blad pagina" id="pagina-lod" aria-labelledby="lod-titel" hidden>
+      <div class="balk">
+        <h1 id="lod-titel">LOD</h1>
+        <span class="tel" id="lod-tel"></span>
+        <span class="streep" aria-hidden="true"></span>
+        <div class="groep" id="lod-wie" role="group" aria-label="Filter op behandelaar"></div>
+        <div class="rechts">
+          <label class="zoek"><span data-icoon="zoeken" data-grootte="16"></span><input type="search" id="lod-zoek" placeholder="Zoek" aria-label="Zoek in LOD"/></label>
+          <button type="button" class="knop" data-actie="dossier-nieuw" data-sec="LOD">Nieuw dossier</button>
         </div>
       </div>
-
-      <div class="card hero-chart">
-        <div class="hero-chart-hdr">
-          <h3><span id="hero-chart-title">Vergaderingen afgerond</span><span class="sub" id="hero-chart-sub"></span></h3>
-          <div class="metric-toggle" id="hero-metric-toggle"></div>
-        </div>
-        <div class="hero-chart-wrap"><canvas id="chart-hero"></canvas></div>
+      <div class="tabel">
+        <div class="thead kol-lod" aria-hidden="true"><span></span><span>VvE</span><span>Actiepunt</span><span>Status</span><span>Wie</span><span>Deadline</span></div>
+        <div id="lod-rijen"></div>
       </div>
+    </section>
 
-      <div class="card leaderboard">
-        <div class="card-hdr" style="padding-bottom:13px"><h2 id="lb-title">Leaderboard — Taken afgerond</h2></div>
-        <div class="tbl-wrap">
-          <table>
-            <thead><tr>
-              <th style="width:50px">#</th>
-              <th>Behandelaar</th>
-              <th id="lb-now-hdr">Deze periode</th>
-              <th id="lb-prev-hdr">Vorige periode</th>
-              <th>Trend</th>
-            </tr></thead>
-            <tbody id="lb-tbody"></tbody>
-          </table>
+    <!-- ══ SUBSIDIE-TRAJECTEN ══ -->
+    <section class="blad pagina" id="pagina-subsidie" aria-labelledby="subsidie-titel" hidden>
+      <div class="balk">
+        <h1 id="subsidie-titel">Subsidie-trajecten</h1>
+        <span class="tel" id="subsidie-tel"></span>
+        <span class="streep" aria-hidden="true"></span>
+        <div class="groep" id="subsidie-wie" role="group" aria-label="Filter op behandelaar"></div>
+        <div class="rechts">
+          <label class="zoek"><span data-icoon="zoeken" data-grootte="16"></span><input type="search" id="subsidie-zoek" placeholder="Zoek" aria-label="Zoek in subsidie-trajecten"/></label>
+          <button type="button" class="knop" data-actie="dossier-nieuw" data-sec="SUBSIDIE-TRAJECTEN">Nieuw traject</button>
         </div>
       </div>
-    </div>
+      <div class="tabel">
+        <div class="thead kol-subsidie" aria-hidden="true"><span></span><span>VvE</span><span>Subsidie</span><span>Fase</span><span>Wie</span><span>Deadline</span></div>
+        <div id="subsidie-rijen"></div>
+      </div>
+    </section>
 
-
-    <!-- ══ DASHBOARD ══ -->
-    <div class="page" id="page-dash">
-      <div class="stat-strip" id="dash-stats"></div>
-      <div class="hero-donut-card">
-        <div class="hero-donut-hdr">
-          <div>
-            <h3 id="hero-donut-title">Voortgang</h3>
-            <div class="hero-donut-sub" id="hero-donut-sub">Kies een categorie</div>
-          </div>
-          <div class="hero-donut-tabs" id="hero-donut-tabs"></div>
-        </div>
-        <div class="hero-donut-body">
-          <div class="hero-donut-wrap"><canvas id="chart-hero-donut"></canvas></div>
+    <!-- ══ ALV'S ══ -->
+    <section class="blad pagina" id="pagina-alvo" aria-labelledby="alvo-titel" hidden>
+      <div class="balk">
+        <h1 id="alvo-titel">ALV's</h1>
+        <span class="voortgang" id="alvo-voortgang"><span class="balkje" aria-hidden="true"><span id="alvo-balkje"></span></span><span id="alvo-voortgang-tekst"></span></span>
+        <span class="streep" aria-hidden="true"></span>
+        <div class="groep" id="alvo-filters" role="group" aria-label="Filter op status"></div>
+        <div class="rechts">
+          <label class="zoek"><span data-icoon="zoeken" data-grootte="16"></span><input type="search" id="alvo-zoek" placeholder="Zoek VvE" aria-label="Zoek VvE"/></label>
+          <button type="button" class="tekst-knop" data-actie="alvo-ronde">Nieuwe ronde</button>
         </div>
       </div>
-      <div class="card">
-        <div class="card-hdr"><h2>Recentelijk afgerond</h2></div>
-        <div class="tbl-wrap"><table>
-          <thead><tr>
-            <th style="background:var(--sur2);color:var(--mut)">Categorie</th>
-            <th style="background:var(--sur2);color:var(--mut)">VvE Code</th>
-            <th style="background:var(--sur2);color:var(--mut)">VvE Naam</th>
-            <th style="background:var(--sur2);color:var(--mut)">Actiepunt</th>
-            <th style="background:var(--sur2);color:var(--mut)">Behandelaar</th>
-            <th style="background:var(--sur2);color:var(--mut)">Datum</th>
-          </tr></thead>
-          <tbody id="recent-tbody"></tbody>
-        </table></div>
+      <div class="tabel">
+        <div class="thead kol-alvo" aria-hidden="true"><span></span><span>VvE</span><span class="mid">Klaargezet</span><span class="mid">Uitnodiging</span><span class="mid">Notulen</span><span class="mid">Begroting</span><span>Status</span></div>
+        <div id="alvo-rijen"></div>
       </div>
-    </div>
+    </section>
 
-  </div>
-</div>
+    <!-- ══ ALV-ARCHIEF ══ -->
+    <section class="blad pagina" id="pagina-alfa" aria-labelledby="alfa-titel" hidden>
+      <div class="balk">
+        <h1 id="alfa-titel">ALV-archief</h1>
+        <span class="tel" id="alfa-tel"></span>
+        <div class="rechts">
+          <label class="zoek"><span data-icoon="zoeken" data-grootte="16"></span><input type="search" id="alfa-zoek" placeholder="Zoek VvE" aria-label="Zoek VvE"/></label>
+        </div>
+      </div>
+      <div class="tabel">
+        <div class="thead kol-alfa" aria-hidden="true"><span></span><span>VvE</span><span>Afgerond op</span></div>
+        <div id="alfa-rijen"></div>
+      </div>
+    </section>
+
+  </main>
 </div>
 
-<!-- ═══════ MODAL ═══════ -->
-<div class="modal-bg" id="modal-bg">
-  <div class="modal">
-    <div class="modal-hdr">
-      <h2 id="m-title">Taak Toevoegen</h2>
-      <button class="modal-close" id="m-close">×</button>
-    </div>
+<!-- Meldingen (rechtsboven) en ongedaan maken (rechtsonder) -->
+<div id="toasts" aria-live="polite"></div>
+<div id="snack" class="snack" role="status" hidden>
+  <span class="snack-tekst"></span>
+  <button type="button" class="tekst-knop snack-knop">Ongedaan maken</button>
+</div>
+
+<!-- ═══════ LOD / SUBSIDIE: NIEUW OF AANPASSEN ═══════ -->
+<div class="modal-bg" id="dossier-bg">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="dos-titel">
+    <form id="dos-form" autocomplete="off" novalidate>
+      <div class="modal-kop">
+        <h2 id="dos-titel"></h2>
+        <button type="button" class="ico-knop" data-actie="dos-sluit" aria-label="Sluiten" data-icoon="sluiten" data-grootte="18"></button>
+      </div>
+      <div class="modal-body">
+        <div class="veld"><label for="dos-vve">VvE</label><span class="veld-vve"><input id="dos-vve" type="text" placeholder="Typ code of naam"/></span></div>
+        <div class="veld"><label for="dos-oms" id="dos-oms-lbl">Actiepunt</label><input id="dos-oms" type="text"/></div>
+        <div class="veld" id="dos-status-veld"><label for="dos-status">Status</label><input id="dos-status" type="text" placeholder="bv. Tweede brief verstuurd"/></div>
+        <div class="veld" id="dos-fase-veld"><span class="veld-lbl" id="dos-fase-lbl">Fase</span><div class="groep" id="dos-fase" role="group" aria-labelledby="dos-fase-lbl"></div></div>
+        <div class="twee">
+          <div class="veld"><label for="dos-beh">Behandelaar</label><select id="dos-beh"></select></div>
+          <div class="veld"><label for="dos-deadline">Deadline</label><input id="dos-deadline" type="date"/></div>
+        </div>
+        <div class="veld"><label for="dos-opm">Opmerkingen</label><input id="dos-opm" type="text"/></div>
+        <p class="fout" id="dos-fout" role="alert" hidden></p>
+      </div>
+      <div class="modal-voet">
+        <button type="button" class="tekst-knop gevaar" id="dos-weg" data-actie="dos-weg">Verwijderen</button>
+        <span class="ruimte"></span>
+        <button type="button" class="knop knop-licht" id="dos-af" data-actie="dos-af">Afronden</button>
+        <button type="button" class="knop knop-licht" data-actie="dos-sluit">Annuleren</button>
+        <button type="submit" class="knop">Opslaan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ═══════ JA/NEE-VRAAG ═══════ -->
+<div class="modal-bg" id="bevestig-bg">
+  <div class="modal modal-klein" role="alertdialog" aria-modal="true" aria-labelledby="bevestig-titel" aria-describedby="bevestig-tekst">
     <div class="modal-body">
-      <!-- VvE Code lookup -->
-      <div class="fld-row">
-        <div class="fld">
-          <label>VvE Code *</label>
-          <div class="vve-wrap">
-            <input type="text" id="m-code" placeholder="Typ code of naam…" autocomplete="off"/>
-            <div class="vve-suggestions" id="vve-sug"></div>
-          </div>
-        </div>
-        <div class="fld">
-          <label>VvE Naam</label>
-          <input type="text" id="m-naam" placeholder="Automatisch ingevuld" readonly style="opacity:.7"/>
-        </div>
-      </div>
-      <!-- Dezelfde taak voor meerdere VvE's. Alleen bij een NIEUWE taak; crud.js zet dit blok
-           weg bij bewerken en bij een subtaak. -->
-      <div class="fld" id="meervve-blok">
-        <label>Ook voor andere VvE's</label>
-        <div class="vve-wrap">
-          <input type="text" id="m-extra-vve" placeholder="Typ code of naam om erbij te zetten…" autocomplete="off"/>
-          <div class="vve-suggestions" id="m-extra-sug"></div>
-        </div>
-        <div class="mv-chips" id="m-extra-chips"></div>
-        <small class="dl-hint" id="m-extra-uitleg"></small>
-      </div>
-
-      <!-- Categorie — alleen bij TOEVOEGEN (openModal verbergt hem bij bewerken).
-           Een subtaak is een volwaardige taak in zijn eigen categorie (§2 van het ontwerp), dus
-           '+ Voeg een subtaak toe' in het bundelpaneel zet deze keuze alleen vóór; hier wijzigt de
-           gebruiker hem. De opties worden gevuld met de secties die hieronder ook echt een veldblok
-           hebben — zie zetSectieKiezer in src/crud.js. -->
-      <div class="fld" id="fld-sectie" style="display:none">
-        <label for="m-sec"><span id="m-sec-label">Categorie</span></label>
-        <select id="m-sec"></select>
-        <small class="dl-hint" id="m-sec-hint"></small>
-      </div>
-
-      <!-- OPPAKKEN -->
-      <div id="fg-opp">
-        <div class="fld"><label>Actiepunt *</label><textarea id="m-actie"></textarea></div>
-        <div class="fld-row">
-          <div class="fld"><label>Deadline</label><input type="date" id="m-dl" aria-describedby="dl-hint"/><small class="dl-hint" id="dl-hint"></small></div>
-          <div class="fld"><label>Behandelaar</label>
-            <select id="m-beh"><option value="">Selecteer…</option><option>Jer</option><option>Cihad</option><option>Gabos</option><option>Cihad, Jer</option><option>Jer, Gabos</option><option>Cihad, Gabos</option></select>
-          </div>
-        </div>
-        <div class="fld-row">
-          <div class="fld"><label>Opmerkingen</label><input type="text" id="m-opm"/></div>
-        </div>
-        <div class="fld"><label>Subcategorie</label><select id="m-sub-opp"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option><option>Subsidie-trajecten</option><option>CRM</option></select></div>
-        <div class="toggle-row"><button type="button" class="tog" role="switch" aria-checked="false" id="tog-ib" data-action="toggle"></button><span>In behandeling</span></div>
-      </div>
-
-      <!-- VERGADERVERZOEKEN -->
-      <div id="fg-verg" style="display:none">
-        <div class="fld-row">
-          <!-- Periode = een WEEKKEUZE, geen vrije tekst meer (v11.9). `m-per` blijft bestaan als
-               verborgen veld en draagt de waarde: fillModalFields, submitTask, verschilVelden en
-               clearModal werken er alle vier op door, en hoefden dus niets te weten van de kiezer.
-               Zie src/weekkiezer.js voor de rest van de afweging. -->
-          <div class="fld"><label for="m-per-knop">Periode *</label>
-            <div class="wk-veld">
-              <input type="hidden" id="m-per"/>
-              <button type="button" class="wk-knop" id="m-per-knop" aria-expanded="false" aria-haspopup="listbox" aria-controls="m-per-paneel">
-                <span class="wk-huidig wk-leeg" id="m-per-label">Kies een week…</span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
-              </button>
-              <div class="wk-paneel" id="m-per-paneel" role="listbox" aria-label="Kies een week" hidden></div>
-            </div>
-          </div>
-          <div class="fld"><label>Behandelaar</label>
-            <select id="m-beh-v"><option value="">Selecteer…</option><option>Jer</option><option>Cihad</option><option>Gabos</option><option>Cihad, Jer</option></select>
-          </div>
-        </div>
-        <div class="fld"><label>Agendapunten</label><textarea id="m-agenda"></textarea></div>
-        <div class="fld-row">
-          <div class="fld"><label>Deadline uitschrijven</label><input type="date" id="m-dl-v" aria-describedby="dl-hint-v"/><small class="dl-hint" id="dl-hint-v"></small></div>
-          <div class="fld"><label>Opmerkingen</label><input type="text" id="m-opm-v"/></div>
-        </div>
-        <div class="fld"><label>Subcategorie</label><select id="m-sub-verg"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option><option>Subsidie-trajecten</option><option>CRM</option></select></div>
-        <div class="toggle-row"><button type="button" class="tog" role="switch" aria-checked="false" id="tog-ib-v" data-action="toggle"></button><span>In behandeling</span></div>
-      </div>
-
-      <!-- OFFERTE-TRAJECTEN -->
-      <div id="fg-off" style="display:none">
-        <div class="fld-row">
-          <div class="fld"><label>Datum aangevraagd</label><input type="date" id="m-daang"/></div>
-          <div class="fld"><label>Behandelaar</label>
-            <select id="m-beh-o"><option value="">Selecteer…</option><option>Jer</option><option>Cihad</option><option>Gabos</option><option>Cihad, Jer</option></select>
-          </div>
-        </div>
-        <div class="fld">
-          <label>Aangevraagd bij</label>
-          <div id="m-aann"></div>
-        </div>
-        <div class="fld"><label id="m-dl-o-label">Deadline</label><input type="date" id="m-dl-o" aria-describedby="dl-hint-o"/><small class="dl-hint" id="dl-hint-o"></small></div>
-        <div class="fld"><label>Opmerkingen</label><textarea id="m-opm-o"></textarea></div>
-        <div class="fld"><label>Subcategorie</label><select id="m-sub-off"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option><option>Subsidie-trajecten</option><option>CRM</option></select></div>
-      </div>
-
-      <!-- LOD -->
-      <div id="fg-lod" style="display:none">
-        <div class="fld"><label>Actiepunt *</label><textarea id="m-actie-l"></textarea></div>
-        <div class="fld-row">
-          <div class="fld"><label>Status</label><input type="text" id="m-stat-l" placeholder="bv. Wachten op offertes"/></div>
-          <div class="fld"><label>Behandelaar</label>
-            <select id="m-beh-l"><option value="">Selecteer…</option><option>Jer</option><option>Cihad</option><option>Gabos</option><option>Cihad, Jer</option></select>
-          </div>
-        </div>
-        <div class="fld-row">
-          <div class="fld"><label>Deadline LOD</label><input type="date" id="m-dl-l" aria-describedby="dl-hint-l"/><small class="dl-hint" id="dl-hint-l"></small></div>
-          <div class="fld"><label>Opmerkingen</label><input type="text" id="m-opm-l"/></div>
-        </div>
-        <div class="fld"><label>Subcategorie</label><select id="m-sub-lod"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option><option>Subsidie-trajecten</option><option>CRM</option></select></div>
-        <div class="toggle-row"><button type="button" class="tog" role="switch" aria-checked="false" id="tog-ib-l" data-action="toggle"></button><span>In behandeling</span></div>
-      </div>
-      <!-- SUBSIDIE-TRAJECTEN -->
-      <div id="fg-sub" style="display:none">
-        <div class="fld"><label>Subsidie</label><textarea id="m-subsidie" placeholder="Waar gaat dit traject over? bv. SVVE isolatie"></textarea></div>
-        <div class="fld">
-          <label>Fase</label>
-          <div id="m-fase"></div>
-        </div>
-        <div class="fld-row">
-          <div class="fld"><label>Deadline</label><input type="date" id="m-dl-s" aria-describedby="dl-hint-s"/><small class="dl-hint" id="dl-hint-s"></small></div>
-          <div class="fld"><label>Behandelaar</label>
-            <select id="m-beh-s"><option value="">Selecteer…</option><option>Jer</option><option>Cihad</option><option>Gabos</option><option>Cihad, Jer</option><option>Jer, Gabos</option><option>Cihad, Gabos</option></select>
-          </div>
-        </div>
-        <div class="fld"><label>Opmerkingen</label><input type="text" id="m-opm-s"/></div>
-        <div class="fld"><label>Subcategorie</label><select id="m-sub-sub"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option><option>Subsidie-trajecten</option><option>CRM</option></select></div>
-        <div class="toggle-row"><button type="button" class="tog" role="switch" aria-checked="false" id="tog-ib-s" data-action="toggle"></button><span>In behandeling</span></div>
-      </div>
-      <!-- CRM (v13.0) — een vraag van een eigenaar. Volgorde zoals in de mockup: eerst wat voor
-           vraag en van wie, dan het korte onderwerp (dat is wat de tabel toont), dan de mail zelf.
-           De deadline rekent zichzelf uit: 'Ontvangen op' + 5 werkdagen (crmOntvangenGewijzigd). -->
-      <div id="fg-crm" style="display:none">
-        <div class="fld"><label id="m-soort-lbl">Soort vraag</label>
-          <div class="crm-keuzes" id="m-soort" role="group" aria-labelledby="m-soort-lbl">
-            <button type="button" class="crm-keus aan" data-action="crm-soort" data-soort="Vraag" aria-pressed="true">Vraag</button>
-            <button type="button" class="crm-keus" data-action="crm-soort" data-soort="Klacht" aria-pressed="false">Klacht</button>
-            <button type="button" class="crm-keus" data-action="crm-soort" data-soort="Schade" aria-pressed="false">Schade</button>
-            <button type="button" class="crm-keus" data-action="crm-soort" data-soort="Financieel" aria-pressed="false">Financieel</button>
-          </div>
-        </div>
-        <div class="fld-row">
-          <div class="fld"><label for="m-van">Van</label><input type="text" id="m-van" placeholder="bv. Dhr. Visser, nr. 53"/></div>
-          <div class="fld"><label for="m-ontv">Ontvangen op</label><input type="date" id="m-ontv"/></div>
-        </div>
-        <div class="fld"><label for="m-onderwerp">Onderwerp *</label><input type="text" id="m-onderwerp" placeholder="Eén korte regel: waar gaat de vraag over?"/></div>
-        <div class="fld"><label for="m-mail">Mail van de eigenaar</label><textarea id="m-mail" placeholder="Plak hier de mail. Je leest hem terug door de rij open te klikken."></textarea></div>
-        <div class="fld">
-          <label>Fase</label>
-          <div id="m-fase-c"></div>
-        </div>
-        <div class="fld-row">
-          <div class="fld"><label for="m-dl-c">Reactie uiterlijk</label><input type="date" id="m-dl-c" aria-describedby="dl-hint-c"/><small class="dl-hint" id="dl-hint-c"></small></div>
-          <div class="fld"><label for="m-beh-c">Behandelaar</label>
-            <select id="m-beh-c"><option value="">Selecteer…</option><option>Jer</option><option>Cihad</option><option>Gabos</option><option>Cihad, Jer</option><option>Jer, Gabos</option><option>Cihad, Gabos</option></select>
-          </div>
-        </div>
-        <div class="fld"><label for="m-opm-c">Opmerkingen</label><input type="text" id="m-opm-c" placeholder="Interne notitie, bijvoorbeeld op wie je wacht"/></div>
-        <div class="fld"><label>Subcategorie</label><select id="m-sub-crm"><option value="">Geen</option><option>Oppakken</option><option>Vergaderverzoeken</option><option>Offerte-trajecten</option><option>LOD</option><option>Subsidie-trajecten</option><option>CRM</option></select></div>
-        <div class="toggle-row"><button type="button" class="tog" role="switch" aria-checked="false" id="tog-ib-c" data-action="toggle"></button><span>In behandeling</span></div>
-      </div>
-      <!-- Hoort bij (Takenbundel) — staat buiten de secties, want elk tabblad kan een subtaak zijn.
-           Alleen zichtbaar bij BEWERKEN: koppelen schrijft naar de RIJ van een bestaande taak, en
-           een nieuwe taak heeft er nog geen. Een nieuwe subtaak loopt via '+ Voeg een subtaak toe'
-           in het bundelpaneel. openModal zet de zichtbaarheid (zie zetHoortBij in crud.js). -->
-      <div class="fld" id="fld-hoortbij" style="display:none">
-        <label for="m-hoortbij">Hoort bij</label>
-        <div class="vve-wrap">
-          <input type="text" id="m-hoortbij" autocomplete="off" placeholder="Zoek een taak om onder te hangen…"/>
-          <button type="button" id="m-hoortbij-x" data-action="bundel-ontkoppel" title="Ontkoppelen" aria-label="Ontkoppelen" style="display:none">×</button>
-          <div class="vve-suggestions" id="m-hoortbij-sug"></div>
-        </div>
-      </div>
-      <!-- Logboek per taak -->
-      <div id="fg-history" class="logboek-box" style="display:none">
-        <div class="logboek-hdr">
-          <h4>Logboek</h4>
-          <span id="hist-count" class="hist-count"></span>
-        </div>
-        <div id="hist-body" class="logboek-body"></div>
-        <div class="logboek-add">
-          <!-- Knoppenbalk staat hier letterlijk (statische markup); houd 'm gelijk aan opmaakBalk() in src/opmaak.js -->
-          <div class="opmaak-veld">
-            <textarea id="hist-note" rows="3" placeholder="Typ hier je notitie… (Enter = nieuwe regel)" aria-label="Notitie bij deze taak"></textarea>
-            <div class="opmaak-balk">
-              <button type="button" class="opmaak-knop" data-action="opmaak-vet" title="Vet (Ctrl+B)" aria-label="Vet"><b>B</b></button>
-              <button type="button" class="opmaak-knop" data-action="opmaak-schuin" title="Schuin (Ctrl+I)" aria-label="Schuin"><i>I</i></button>
-              <button type="button" class="opmaak-knop" data-action="opmaak-lijst" title="Opsomming" aria-label="Opsomming"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="4.5" cy="6.5" r="1.4" fill="currentColor" stroke="none"/><circle cx="4.5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="4.5" cy="17.5" r="1.4" fill="currentColor" stroke="none"/><path d="M9 6.5h11M9 12h11M9 17.5h11"/></svg></button>
-            </div>
-          </div>
-          <div class="logboek-foot">
-            <span class="logboek-hint"><kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>Enter</kbd> om snel toe te voegen</span>
-            <button class="btn btn-pri" data-action="notitie-toevoegen" style="padding:7px 16px">Toevoegen</button>
-          </div>
-        </div>
-      </div>
+      <h2 id="bevestig-titel"></h2>
+      <p id="bevestig-tekst"></p>
     </div>
-    <div class="modal-foot">
-      <button class="btn btn-sec" id="m-cancel">Annuleren</button>
-      <button class="btn btn-del" id="m-del" style="display:none" data-action="taak-verwijder-modal">Verwijder</button>
-      <button class="btn btn-afr" id="m-af" style="display:none" data-action="taak-afronden-modal">Afronden</button>
-      <button class="btn btn-pri" id="m-submit">
-        <span id="m-submit-lbl">Toevoegen</span>
-      </button>
+    <div class="modal-voet">
+      <span class="ruimte"></span>
+      <button type="button" class="knop knop-licht" id="bevestig-nee" data-actie="bevestig-nee">Annuleren</button>
+      <button type="button" class="knop" id="bevestig-ja" data-actie="bevestig-ja">Doorgaan</button>
     </div>
-  </div>
-</div>
-
-<!-- ═══════ TOAST CONTAINER ═══════ -->
-<!-- ═══════ AFGEROND MODAL ═══════ -->
-<div class="modal-bg" id="complete-bg">
-  <div class="modal" style="max-width:440px">
-    <div class="modal-hdr" style="--sec:var(--gn)">
-      <h2 id="complete-title">Taak afhandelen</h2>
-      <button class="modal-close" id="complete-close">×</button>
-    </div>
-    <div class="modal-body">
-      <div class="fld"><label>Afgerond op</label><input type="date" id="complete-date"/></div>
-      <div class="fld"><label>Opmerking</label><textarea id="complete-comment" rows="3" placeholder="Optioneel — wat is er gedaan?" data-autofocus></textarea></div>
-      <!-- Duur: bewust GEEN voorgeselecteerde knop. Een voorselectie die meegeschreven wordt
-           geeft elke taak een verzonnen half uur, en dan meet je je eigen aanname. -->
-      <div class="fld">
-        <label id="complete-duur-lbl">Hoe lang duurde dit?<span class="fld-opt">optioneel</span></label>
-        <div class="duur-keuze" id="complete-duur" role="group" aria-labelledby="complete-duur-lbl">
-          <button type="button" class="duur-knop" data-min="5">5m</button>
-          <button type="button" class="duur-knop" data-min="15">15m</button>
-          <button type="button" class="duur-knop" data-min="30">30m</button>
-          <button type="button" class="duur-knop" data-min="60">1u</button>
-          <button type="button" class="duur-knop" data-min="120">2u+</button>
-        </div>
-      </div>
-    </div>
-    <div class="modal-foot">
-      <button class="btn btn-sec" id="complete-cancel">Annuleren</button>
-      <button class="btn btn-pri" id="complete-confirm">Afhandelen</button>
-    </div>
-  </div>
-</div>
-<!-- Offertevergelijker (v15.2). Inhoud en knoppen tekent src/offerte-vergelijker.js per stap. -->
-<div class="modal-bg" id="ov-bg">
-  <div class="modal ov-modal">
-    <div class="modal-hdr">
-      <div class="ov-kop"><h2 id="ov-titel">Offertes vergelijken</h2><span id="ov-sub"></span></div>
-      <button class="modal-close" id="ov-close" data-action="ov-sluit" aria-label="Sluiten">×</button>
-    </div>
-    <div class="modal-body" id="ov-body"></div>
-    <div class="modal-foot ov-foot" id="ov-foot"></div>
-  </div>
-</div>
-
-<!-- ═══════ HERHAALREGEL MODAL — Fase 4 ═══════ -->
-<div class="modal-bg" id="hh-bg">
-  <div class="modal" style="max-width:520px">
-    <div class="modal-hdr">
-      <h2 id="hh-title">Nieuwe herhaalregel</h2>
-      <button class="modal-close" id="hh-close">×</button>
-    </div>
-    <div class="modal-body">
-      <div class="fld"><label>Taakomschrijving *</label><input type="text" id="hh-omschrijving" placeholder="bijv. Servicekosten controleren"/></div>
-      <div class="fld-row">
-        <div class="fld">
-          <label>VvE Code *</label>
-          <div class="vve-wrap">
-            <input type="text" id="hh-code" placeholder="Typ code of naam…" autocomplete="off"/>
-            <div class="vve-suggestions" id="hh-vve-sug"></div>
-          </div>
-        </div>
-        <div class="fld"><label>VvE Naam</label><input type="text" id="hh-naam" placeholder="Automatisch ingevuld" readonly style="opacity:.7"/></div>
-      </div>
-      <div class="fld-row">
-        <div class="fld"><label>Sectie</label><select id="hh-sectie"><option>OPPAKKEN</option><option>LOD</option></select></div>
-        <div class="fld"><label>Behandelaar</label><select id="hh-beh"><option value="">–</option><option>Jer</option><option>Cihad</option><option>Gabos</option><option>Cihad, Jer</option></select></div>
-      </div>
-      <div class="fld-row">
-        <div class="fld"><label>Herhaling</label><select id="hh-type">
-          <option value="week">Elke week</option><option value="maand">Elke maand</option>
-          <option value="kwartaal" selected>Elk kwartaal</option><option value="halfjaar">Elk half jaar</option>
-          <option value="jaar">Elk jaar</option><option value="na-afronden">X maanden na afronden</option>
-        </select></div>
-        <div class="fld" id="hh-interval-fld" style="display:none"><label>Aantal maanden</label><input type="number" id="hh-interval" min="1" value="6"/></div>
-      </div>
-      <div class="fld-row">
-        <div class="fld" id="hh-deadline-fld"><label>Eerstvolgende deadline *</label><input type="date" id="hh-deadline"/></div>
-        <div class="fld"><label>Dagen vooraf zichtbaar</label><input type="number" id="hh-vooraf" min="0" value="14"/></div>
-      </div>
-    </div>
-    <div class="modal-foot">
-      <button class="btn btn-sec" id="hh-cancel">Annuleren</button>
-      <button class="btn btn-del" id="hh-del" style="display:none" data-action="herhaal-verwijderen">Verwijder</button>
-      <button class="btn btn-pri" id="hh-submit"><span id="hh-submit-lbl">Toevoegen</span></button>
-    </div>
-  </div>
-</div>
-
-<!-- ═══════ NIEUWE VERGADERRONDE (ALV-RESET) MODAL ═══════ -->
-<div class="modal-bg" id="alvoreset-bg">
-  <div class="modal" style="max-width:440px">
-    <div class="modal-hdr">
-      <h2 id="alvoreset-title">Weet je zeker dat je het overzicht wilt resetten?</h2>
-      <button class="modal-close" id="alvoreset-close">×</button>
-    </div>
-    <div class="modal-body">
-      <p id="alvoreset-tekst" style="line-height:1.6;margin:0"></p>
-    </div>
-    <div class="modal-foot" style="justify-content:space-between">
-      <button class="btn btn-sec" data-action="alvo-reset-annuleer">Annuleer</button>
-      <button class="btn btn-del" data-action="alvo-reset-doe" id="alvoreset-doe">Reset</button>
-    </div>
-  </div>
-</div>
-
-<!-- ═══════ WEGLEGGEN (SNOOZE) MODAL — Fase 4 ═══════ -->
-<div class="modal-bg" id="snooze-bg">
-  <div class="modal" style="max-width:420px">
-    <div class="modal-hdr">
-      <h2 id="snooze-title">Taak wegleggen</h2>
-      <button class="modal-close" id="snooze-close">×</button>
-    </div>
-    <div class="modal-body">
-      <p style="font-size:13px;color:var(--mut);margin:0 0 10px">De taak zakt gedempt naar "Weggelegd" onderaan de lijst en komt op de opvolgdatum vanzelf terug.</p>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-sec" data-action="snooze-kies" data-dagen="3">+3 dagen</button>
-        <button class="btn btn-sec" data-action="snooze-kies" data-dagen="7">+1 week</button>
-        <button class="btn btn-sec" data-action="snooze-kies" data-dagen="14">+2 weken</button>
-      </div>
-      <div class="fld" style="margin-top:12px"><label>Of kies een datum</label><input type="date" id="snooze-datum"/></div>
-    </div>
-    <div class="modal-foot">
-      <button class="btn btn-sec" id="snooze-cancel">Annuleren</button>
-      <button class="btn btn-del" id="snooze-wis" style="display:none">Wissen</button>
-      <button class="btn btn-pri" id="snooze-opslaan">Wegleggen</button>
-    </div>
-  </div>
-</div>
-
-<!-- ═══════ BULK-ACTIEBALK (Fase 5) ═══════ -->
-<div id="bulk-balk" style="display:none">
-  <button class="bb-knop bb-groen" data-action="bulk-doe" data-wat="afronden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 13l5 5L19.5 6.5"/></svg> Afronden</button>
-  <div class="bb-wrap">
-    <button class="bb-knop" data-action="bulk-menu" data-menu="geven"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.6" fill="currentColor" fill-opacity="0.18"/><path d="M4.8 20c.9-3.4 3.6-5.3 7.2-5.3s6.3 1.9 7.2 5.3" fill="currentColor" fill-opacity="0.18"/></svg> Aan iemand geven <svg class="caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
-    <div class="bb-menu" id="bb-menu-geven">
-      <button data-action="bulk-doe" data-wat="geven" data-naam="Jer">Jer</button>
-      <button data-action="bulk-doe" data-wat="geven" data-naam="Cihad">Cihad</button>
-      <button data-action="bulk-doe" data-wat="geven" data-naam="Gabos">Gabos</button>
-      <button data-action="bulk-doe" data-wat="geven" data-naam="Cihan">Cihan</button>
-    </div>
-  </div>
-  <div class="bb-wrap">
-    <button class="bb-knop" data-action="bulk-menu" data-menu="wegleggen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.2 4.7A6 6 0 0 1 18 9c0 3.6 1 5.2 1.6 5.9M6.1 6.9C6 7.6 6 8.3 6 9c0 5-2 6-2 6h13" fill="currentColor" fill-opacity="0.18"/><path d="M10 19a2 2 0 0 0 4 0"/><path d="M4 3.5l16 16"/></svg> Wegleggen <svg class="caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
-    <div class="bb-menu" id="bb-menu-wegleggen">
-      <button data-action="bulk-doe" data-wat="wegleggen" data-dagen="3">+3 dagen</button>
-      <button data-action="bulk-doe" data-wat="wegleggen" data-dagen="7">+1 week</button>
-      <button data-action="bulk-doe" data-wat="wegleggen" data-dagen="14">+2 weken</button>
-      <div class="bb-datum"><input type="date" id="bb-datum-weg" aria-label="Wegleggen tot datum"><button data-action="bulk-doe" data-wat="wegleggen">OK</button></div>
-    </div>
-  </div>
-  <div class="bb-wrap">
-    <button class="bb-knop" data-action="bulk-menu" data-menu="deadline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="2" fill="currentColor" fill-opacity="0.18"/><path d="M4 9.5h16"/><path d="M8 3v4M16 3v4"/></svg> Deadline <svg class="caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
-    <div class="bb-menu" id="bb-menu-deadline">
-      <div class="bb-datum"><input type="date" id="bb-datum-dl" aria-label="Nieuwe deadline"><button data-action="bulk-doe" data-wat="deadline">OK</button></div>
-    </div>
-  </div>
-  <button class="bb-knop bb-rood" data-action="bulk-doe" data-wat="verwijderen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 7.5l.7 11.6a2 2 0 0 0 2 1.9h5.6a2 2 0 0 0 2-1.9l.7-11.6z" fill="currentColor" fill-opacity="0.18"/><path d="M4 7.5h16"/><path d="M9.5 7.5V6a1.8 1.8 0 0 1 1.8-1.8h1.4A1.8 1.8 0 0 1 14.5 6v1.5"/><path d="M10 11.5v5M14 11.5v5"/></svg> Verwijderen</button>
-  <button class="bb-knop bb-x" data-action="bulk-toggle" title="Selecteren uit" aria-label="Selecteren uit"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-</div>
-
-<!-- ═══════ COMMANDOCENTRUM (Fase 5) ═══════ -->
-<div class="modal-bg" id="pal-bg">
-  <div class="pal" role="dialog" aria-label="Zoeken en acties">
-    <div class="pal-zoek">
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      <input id="pal-input" type="text" placeholder="Zoek VvE, taak of logboek…" autocomplete="off" role="combobox" aria-expanded="true" aria-controls="pal-bd" aria-autocomplete="list" aria-label="Zoek VvE, taak of logboek"/>
-      <span class="pal-esc">ESC</span>
-    </div>
-    <div class="pal-bd" id="pal-bd" role="listbox" aria-label="Zoekresultaten"></div>
-    <div class="pal-voet"><span><b>↑↓</b> kiezen</span><span><b>Enter</b> openen</span><span><b>Esc</b> sluiten</span></div>
-  </div>
-</div>
-
-<!-- aria-live: zonder deze regel is geen enkele terugkoppeling van het dashboard hoorbaar —
-     ook niet de melding met 8 seconden om iets ongedaan te maken. 'polite' en niet 'assertive':
-     de meldingen komen soms met meerdere tegelijk en mogen elkaar niet afkappen. -->
-<div id="toast-container" aria-live="polite" aria-atomic="false"></div>
-
-<!-- ═══════ NOTIFICATIE INSTELLINGEN ═══════ -->
-<div class="modal-bg" id="notif-bg">
-  <div class="modal" style="max-width:420px">
-    <div class="modal-hdr">
-      <h2><svg width="17" height="17" style="vertical-align:-2.5px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6z" fill="currentColor" fill-opacity="0.18"/><path d="M10 19a2 2 0 0 0 4 0"/></svg> Notificatie-instellingen</h2>
-      <button class="modal-close" id="notif-close">×</button>
-    </div>
-    <div class="modal-body">
-
-      <div class="fld">
-        <label>Wie ben jij?</label>
-        <select id="notif-who">
-          <option value="">-- Selecteer --</option>
-          <option value="Jer">Jer</option>
-          <option value="Cihad">Cihad</option>
-          <option value="Gabos">Gabos</option>
-          <option value="Cihan">Cihan</option>
-          <option value="__other__">Anders (typ naam)</option>
-        </select>
-        <input type="text" id="notif-who-other" placeholder="Typ je naam" style="display:none;margin-top:8px;width:100%;background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rs);padding:8px 11px;color:var(--txt);font-size:13px;outline:none"/>
-      </div>
-
-      <div style="font-size:12px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin:18px 0 6px">Soorten meldingen</div>
-      <div class="toggle-row"><button type="button" class="tog" role="switch" aria-checked="false" id="tog-notif-newtask" data-action="notif-toggle"></button><span>Nieuwe taak toegevoegd</span></div>
-      <div class="toggle-row"><button type="button" class="tog" role="switch" aria-checked="false" id="tog-notif-assigned" data-action="notif-toggle"></button><span>Taak aan mij toegewezen</span></div>
-      <div class="toggle-row"><button type="button" class="tog" role="switch" aria-checked="false" id="tog-notif-deadline" data-action="notif-toggle"></button><span>Deadline nadert</span></div>
-      <div class="fld" style="margin:2px 0 10px 46px">
-        <label style="text-transform:none;letter-spacing:normal;font-size:12px;color:var(--mut)">Hoe lang van tevoren?</label>
-        <select id="notif-deadline-hours" style="width:auto;padding:5px 9px">
-          <option value="1">1 uur</option>
-          <option value="4">4 uur</option>
-          <option value="8">8 uur</option>
-          <option value="24">1 dag</option>
-          <option value="48">2 dagen</option>
-        </select>
-      </div>
-      <div class="toggle-row"><button type="button" class="tog" role="switch" aria-checked="false" id="tog-notif-alv" data-action="notif-toggle"></button><span>ALV-status verandert</span></div>
-      <div class="toggle-row"><button type="button" class="tog" role="switch" aria-checked="false" id="tog-notif-daily" data-action="notif-toggle"></button><span>Dagelijkse samenvatting (08:30)</span></div>
-
-      <div style="border-top:1px solid var(--bor);margin-top:20px;padding-top:16px">
-        <div style="font-size:12px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin-bottom:10px">Push-meldingen</div>
-        <div id="notif-subscribe-section">
-          <button class="btn btn-pri" id="notif-subscribe-btn" style="width:100%;justify-content:center"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6z" fill="currentColor" fill-opacity="0.18"/><path d="M10 19a2 2 0 0 0 4 0"/></svg> Push-meldingen aanzetten</button>
-          <p style="font-size:12px;color:var(--mut);margin-top:8px;line-height:1.5">Eenmalige toestemming nodig — je browser vraagt om bevestiging.<br>Alles behalve de deadline-waarschuwing komt ook zonder push binnen, als melding in de app zelf.</p>
-        </div>
-        <div id="notif-settings-section" style="display:none">
-          <div style="background:var(--gn-l);border:1px solid var(--gn-b);border-radius:var(--rs);padding:10px 13px;color:var(--gn);font-size:13px;font-weight:500;margin-bottom:12px">
-            <svg width="13" height="13" style="vertical-align:-2.5px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 13l5 5L19.5 6.5"/></svg> <strong>Push-meldingen staan aan</strong> op dit apparaat.
-          </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn btn-sec" id="notif-test-btn" style="flex:1;justify-content:center"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.6 13.5h8.8l2.2 4.1a2.4 2.4 0 0 1-2.1 3.5h-9a2.4 2.4 0 0 1-2.1-3.5z" fill="currentColor" fill-opacity="0.18" stroke="none"/><path d="M10.8 3.5v5.2L5.4 17.6a2.4 2.4 0 0 0 2.1 3.5h9a2.4 2.4 0 0 0 2.1-3.5L13.2 8.7V3.5"/><path d="M9.5 3.5h5"/></svg> Test melding</button>
-            <button class="btn btn-sec" id="notif-unsubscribe-btn" style="flex:1;justify-content:center;color:var(--rd);border-color:var(--rd-b)">Push uitzetten</button>
-          </div>
-        </div>
-      </div>
-
-    </div>
-  </div>
-</div>
-
-<!-- ═══════ AI-HULP ═══════ -->
-<div class="modal-bg" id="ai-bg">
-  <div class="modal" style="max-width:780px">
-    <div class="modal-hdr">
-      <h2><svg width="16" height="16" style="vertical-align:-3px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l1.9 5.3L19 11.2l-5.1 1.9L12 18.4l-1.9-5.3L5 11.2l5.1-1.9z" fill="currentColor" fill-opacity="0.18"/></svg> AI-hulp</h2>
-      <button class="modal-close" id="ai-close">×</button>
-    </div>
-    <div class="modal-body">
-      <p style="font-size:12px;color:var(--mut);margin:0 0 14px;line-height:1.5">Plak een mail, kies wat je nodig hebt, en het dashboard bouwt de vraag mét VvE-context. Kopieer naar Claude of Gemini en plak het antwoord terug. <b>Geen kosten, jij houdt de regie.</b></p>
-
-      <div class="ai-grid">
-        <!-- LINKS -->
-        <div>
-          <p class="ai-step"><span class="dot">1</span> Plak de e-mail of tekst</p>
-          <textarea id="ai-mail" class="ai-ta" rows="6" placeholder="Plak hier de e-mail…" aria-label="Plak hier de e-mail"></textarea>
-
-          <p class="ai-step" style="margin-top:16px"><span class="dot">2</span> Wat heb je nodig?</p>
-          <div class="ai-chips" id="ai-chips">
-            <button class="ai-chip on" data-k="samenvatting" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3.5" width="14" height="17" rx="2" fill="currentColor" fill-opacity="0.18"/><path d="M9 3.5v17"/><path d="M12.5 8.5h3.5M12.5 12h3.5"/></svg> Samenvatting</button>
-            <button class="ai-chip on" data-k="categorie" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11.9V5.8A1.8 1.8 0 0 1 5.8 4h6.1a1.8 1.8 0 0 1 1.3.5l6.4 6.4a1.8 1.8 0 0 1 0 2.5l-6.2 6.2a1.8 1.8 0 0 1-2.5 0l-6.4-6.4A1.8 1.8 0 0 1 4 11.9z" fill="currentColor" fill-opacity="0.18"/><circle cx="8.3" cy="8.3" r="1.2"/></svg> Categorie &amp; VvE</button>
-            <button class="ai-chip on" data-k="acties" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="currentColor" fill-opacity="0.18"/><path d="M8 12.5l2.7 2.7L16 9.8"/></svg> Actiepunten</button>
-            <button class="ai-chip on" data-k="antwoord" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20l.9-4.1L15.6 5.2a1.9 1.9 0 0 1 2.7 0l.5.5a1.9 1.9 0 0 1 0 2.7L8.1 19.1z" fill="currentColor" fill-opacity="0.18"/><path d="M14.4 6.4l3.2 3.2"/></svg> Concept-antwoord</button>
-          </div>
-
-          <p class="ai-step" style="margin-top:16px"><span class="dot">3</span> Koppel een VvE <span style="font-weight:500;text-transform:none;letter-spacing:0;color:var(--mut)">— optioneel, geeft live context</span></p>
-          <div class="ai-vve-wrap">
-            <input type="text" id="ai-vve-input" placeholder="Zoek op code of naam… (klik voor de hele lijst)" autocomplete="off" aria-label="Koppel een VvE aan deze e-mail"/>
-            <button type="button" id="ai-vve-wis" title="Koppeling wissen" aria-label="Koppeling wissen" style="display:none">×</button>
-            <div class="vve-suggestions" id="ai-vve-sug"></div>
-          </div>
-          <div class="ai-ctx" id="ai-ctx"></div>
-        </div>
-
-        <!-- RECHTS -->
-        <div>
-          <p class="ai-step"><span class="dot">4</span> De vraag die het dashboard bouwt</p>
-          <div class="ai-prompt" id="ai-prompt"></div>
-          <div class="ai-send">
-            <button class="btn ai-claude" data-action="ai-kopieer" data-waar="Claude"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.2 11.6l-8 8a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg> Kopieer &amp; open Claude</button>
-            <button class="btn ai-gemini" data-action="ai-kopieer" data-waar="Gemini"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.2 11.6l-8 8a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg> Kopieer &amp; open Gemini</button>
-          </div>
-          <p style="font-size:12px;color:var(--mut);margin:9px 0 0">De vraag staat dan op je klembord — plak met <kbd>Ctrl/⌘+V</kbd>.</p>
-
-          <p class="ai-step" style="margin-top:16px"><span class="dot">5</span> Plak het antwoord van de AI terug</p>
-          <textarea id="ai-answer" class="ai-ta" rows="4" placeholder="Plak hier wat Claude/Gemini teruggeeft…" aria-label="Plak hier het antwoord van de AI"></textarea>
-          <div class="ai-result" id="ai-result" style="display:none"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ═══════ BEVESTIGINGSVENSTER ═══════
-     Eén ja/nee-venster voor de hele app, in plaats van window.confirm(). Chrome tekent zo'n
-     browserdialoog bovenaan het scherm met de URL erboven; dit venster staat in het midden, met
-     dezelfde overlay, randen en knoppen als de andere vensters hier.
-     Staat ná alle andere .modal-bg-blokken, want de vraag kan bovenóp een ander venster komen (de
-     verwijdervraag komt vanuit het bewerkscherm) en bij gelijke z-index wint de laatste in de HTML.
-     Strikt nodig is die plek niet — #bevestig-bg krijgt in styles.css een eigen z-index — maar zo
-     klopt de stapeling ook zonder dat je die regel kent. `data-bovenop` zegt hetzelfde tegen Escape
-     en de focus-trap (modal-a11y.js), die allebei 'het bovenste open venster' opzoeken.
-     Titel, tekst en het label van de bevestigknop worden per vraag gezet — zie src/bevestig.js. -->
-<div class="modal-bg" id="bevestig-bg" data-bovenop>
-  <div class="modal" style="max-width:420px">
-    <div class="modal-hdr">
-      <h2 id="bevestig-titel">Weet je het zeker?</h2>
-      <button class="modal-close" id="bevestig-sluit" aria-label="Sluiten">×</button>
-    </div>
-    <div class="modal-body">
-      <p id="bevestig-tekst" style="line-height:1.6;margin:0"></p>
-    </div>
-    <!-- Annuleren krijgt de focus (`data-autofocus`), niet de bevestigknop: dit venster verschijnt
-         juist wanneer er iets op het spel staat, en dan hoort een blinde Enter géén 'ja' te zijn. -->
-    <div class="modal-foot">
-      <button class="btn btn-sec" id="bevestig-nee" data-autofocus>Annuleren</button>
-      <button class="btn btn-pri" id="bevestig-ja">Doorgaan</button>
-    </div>
-  </div>
-</div>
-
-<div id="chat-bg">
-  <div id="chat-paneel" role="dialog" aria-modal="false" aria-label="Dashboard-chat">
-    <div class="chat-hdr">
-      <div class="chat-hdr-l">
-        <span class="chat-titel">Vraag over het dashboard</span>
-        <span class="chat-vve-rij"><span id="chat-vve-label" class="chat-vve-label">Alle VvE's</span><button type="button" id="chat-vve-wis" class="chat-vve-wis" data-action="chat-vve-wis" hidden aria-label="VvE-filter wissen" title="Over het hele dashboard vragen">×</button></span>
-      </div>
-      <button class="modal-close" id="chat-close" aria-label="Sluiten">×</button>
-    </div>
-    <div class="chat-vve-wrap">
-      <input type="text" id="chat-vve-zoek" placeholder="Alleen over één VvE? Kies hem hier (optioneel)" autocomplete="off" aria-label="Kies een VvE (optioneel)"/>
-      <div class="vve-suggestions" id="chat-vve-sug"></div>
-    </div>
-    <div id="chat-bubbles" class="chat-bubbles"></div>
-    <div class="chat-invoer">
-      <input type="text" id="chat-input" placeholder="Stel een vraag…" autocomplete="off" aria-label="Stel een vraag over het dashboard"/>
-      <button id="chat-send" data-action="chat-send" aria-label="Versturen"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5.5M5.5 12L12 5.5 18.5 12"/></svg></button>
-    </div>
-    <div class="chat-foot"><svg width="13" height="13" style="vertical-align:-2.5px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.8 12S6.5 5.7 12 5.7 21.2 12 21.2 12 17.5 18.3 12 18.3 2.8 12 2.8 12z" fill="currentColor" fill-opacity="0.18"/><circle cx="12" cy="12" r="2.7"/></svg> Leest alleen mee · verandert niets · <span id="chat-model">Claude Haiku 5.5</span></div>
   </div>
 </div>
 
@@ -1096,6 +248,7 @@
     <div class="lg-card-versie">versie <span id="app-version-login"></span></div>
   </div>
 </div>
+
 
 <script type="module" src="src/main.js"></script>
 </body>

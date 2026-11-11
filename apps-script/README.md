@@ -46,6 +46,16 @@ goedkoper dan een gemiste deploy — laat staan tenzij de Action-minuten echt ga
 - `Opvolging.gs` — fase 4: opvolging, herhaalregels en stille-dossier-escalatie (dagelijks ±06:30)
 - `appsscript.json` — manifest (tijdzone, V8, webapp-instellingen); wordt meegepusht
 
+## Uitgezet in v16.0 (2026-11-10)
+
+Het dashboard is teruggebracht tot Mijn taken, LOD, Subsidies en de ALV's. Pushmeldingen,
+deadline-mails, het dagoverzicht, de Notif-wachtrij en de opvolgmotor staan **uit**
+(`CD_UITGEZET = true` in `Notifications.gs`). Elke trigger die na de uitrol nog afgaat, ruimt
+zichzelf op en doet verder niets; de setup-functies hieronder installeren dan niets. Terugzetten:
+`CD_UITGEZET = false`, uitrollen, en de twee setup-functies één keer draaien.
+De legacy-triggers in `Code.gs` (`verplaatsAfgerond`, `verplaatsALV`, `sorteerOfferteTrajecten`)
+blijven gewoon werken.
+
 ## Triggers
 
 Installeerbaar vanuit de editor:
@@ -101,7 +111,7 @@ gaat debuggen. En let op: `onEdit` vuurt alleen op echte edits in de Sheets-UI �
 
 ## Werkelijk geïnstalleerde triggers (gecontroleerd 2026-07-28)
 
-PROD-script `Afgerond script`, id `1BALy8QbzWr7DbJy_RjYi7m-c6HdNDRs_47ndYcKV_cFIHh6GDR-GicKF`
+PROD-script `Afgerond script` (id: zie het GitHub-secret `PROD_SCRIPT_ID`)
 (bereikbaar via de PROD-Sheet → Uitbreidingen → Apps Script → wekker-icoon). Tien triggers,
 állemaal in eigendom van de Sheet-eigenaar `info@vvebeheercollectief.nl` — er draait niets
 onder een ander account.

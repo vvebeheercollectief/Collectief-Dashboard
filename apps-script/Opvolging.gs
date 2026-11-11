@@ -39,6 +39,7 @@ function cd_offerteAangevraagd(sec, datumAangevraagd) {
 // De dagelijkse trigger (±06:30). Fouten in de vier stappen komen via cd_safeRun in het Logboek en
 // worden aan het eind opgegooid, zodat Google de foutmail stuurt (zie cd_meldFout, Notifications.gs).
 function cd_opvolgingMotor() {
+  if (CD_UITGEZET) { cd_zetTriggerUit('cd_opvolgingMotor'); return; }   // zie Notifications.gs
   cd_opvolgingMotorRun();
   cd_gooiVerzameldeFouten('cd_opvolgingMotor');
 }
@@ -522,6 +523,7 @@ function cd_setupFase4() {
 }
 
 function cd_installeerOpvolgingTrigger() {
+  if (CD_UITGEZET) { Logger.log('De opvolging staat uit sinds v16.0: er wordt geen trigger ingesteld.'); return; }
   ScriptApp.getProjectTriggers()
     .filter(function (t) { return t.getHandlerFunction() === 'cd_opvolgingMotor'; })
     .forEach(function (t) { ScriptApp.deleteTrigger(t); });

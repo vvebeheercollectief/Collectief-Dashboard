@@ -26,14 +26,12 @@
 //               (localhost/127.0.0.1): daar serveert de no-store-server steeds verse bestanden en
 //               zou een cache-first worker bewerkte code verbergen tot de volgende versie.
 (function (g) {
-  // Chart.js: een vast versienummer in de URL, dus onveranderlijk — die mag gewoon uit de cache.
-  var CHART = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js';
   var DEV = { 'localhost': 1, '127.0.0.1': 1 };
   g.cdSwStrategie = function (verzoek, swUrl) {
     if (!verzoek || verzoek.method !== 'GET') return 'live';
     var url, sw;
     try { url = new URL(verzoek.url); sw = new URL(swUrl); } catch (_) { return 'live'; }
-    if (url.origin !== sw.origin) return url.href === CHART ? 'cache' : 'live';
+    if (url.origin !== sw.origin) return 'live';
     var basis = sw.pathname.replace(/[^/]*$/, '');          // de map van sw.js = het bereik
     if (url.pathname === basis + 'versie.json') return 'live';   // minimumversie-rem (src/versie.js)
     if (DEV[sw.hostname]) return 'netwerk';

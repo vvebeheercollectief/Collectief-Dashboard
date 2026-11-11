@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="nl" data-theme="light">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Hoekafwerking zijbalk</title>
+<style>
+/* ══════════════════════════════════════════════════════════════════
+   Mockup — afwerking van de hoek waar de donkere zijbalk de witte kop raakt.
+   Zelfstandig bestand: de tokens hieronder zijn overgenomen uit styles.css,
+   zodat de schetsen precies de kleuren van de app dragen.
+   ══════════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#F5F7F9;--sur:#ffffff;--sur2:#FBFCFD;--bor:#E1E6EB;--row-divider:#EEF1F4;
+  --txt:#222B36;--mut:#59616B;--fnt:#7A828C;
+  --ac:#4E6885;--ac-l:#EDF1F5;--ac-b:#D3DCE6;
+  --rd:#B91C1C;--prio:#b5544b;
+  --sbbg:#222B36;--sbedge:#2E3946;--sbglow:#9DB2CB;
+  --font-app:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  --font-mono:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace;
+}
+[data-theme=dark]{
+  --bg:#161C24;--sur:#1C242E;--sur2:#19202A;--bor:#2B3542;--row-divider:#232C38;
+  --txt:#EEF1F4;--mut:#A3ACB7;--fnt:#7A828C;
+  --ac:#8FA6C2;--ac-l:#243041;--ac-b:#334458;--rd:#F0746F;--prio:#e08b82;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-app);font-size:14px;background:var(--bg);color:var(--txt);line-height:1.5;
+  -webkit-font-smoothing:antialiased;padding:26px 20px 80px}
+
+/* ── Mini-venster: titelbalk + zijbalk + kop + kaart ── */
+.win{width:960px;height:380px;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;
+  background:var(--sbbg);box-shadow:0 16px 48px rgba(16,22,34,.16)}
+.win-tb{height:30px;flex-shrink:0;display:flex;align-items:center;gap:7px;padding:0 13px;background:var(--sbbg)}
+.win-tb i{width:11px;height:11px;border-radius:50%;background:#ff5f57}
+.win-tb i:nth-child(2){background:#febc2e}.win-tb i:nth-child(3){background:#28c840}
+.win-tb span{margin-left:auto;font-size:11px;font-weight:600;color:#D5DCE4}
+.app{flex:1;display:flex;min-height:0;background:var(--sbbg)}
+.sb{width:220px;flex-shrink:0;background:var(--sbbg);border-right:1px solid var(--sbedge);display:flex;flex-direction:column;color:#9AA5B2}
+.sb-logo{padding:14px 16px 13px;border-bottom:1px solid var(--sbedge);display:flex;gap:10px;align-items:center}
+.sb-logo b{display:block;font-size:13px;font-weight:600;color:#f2f4f7;line-height:1.25}
+.sb-logo span{display:block;font-size:10px;font-family:var(--font-mono);color:#9AA5B2}
+.sb-mark{width:26px;height:26px;border-radius:6px;background:#2E3946;border:1px solid #3A4757}
+.sb-lbl{font-size:9px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#8C96A3;padding:12px 18px 5px}
+.ni{margin:0 10px;padding:6px 9px;border-radius:6px;font-size:12px;font-weight:500;display:flex;justify-content:space-between}
+.ni.on{background:#2E3946;color:#F2F4F7;font-weight:600}
+.ni em{font-style:normal;font-family:var(--font-mono);font-size:10px;background:#3A4757;color:#D5DCE4;border-radius:4px;padding:0 6px}
+.main{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--bg)}
+.hdr{height:52px;flex-shrink:0;background:var(--sur);border-bottom:1px solid var(--bor);display:flex;align-items:center;gap:16px;padding:0 22px}
+.hdr h1{font-size:16px;font-weight:600;letter-spacing:-.01em}
+.pil{font-size:12px;color:var(--mut)}.pil b{color:var(--txt);font-weight:600}.pil.rd b{color:var(--rd)}
+.content{flex:1;padding:16px;overflow:hidden}
+.card{background:var(--sur);border:1px solid var(--bor);border-radius:8px;overflow:hidden}
+.tabs{display:flex;gap:22px;padding:0 18px;border-bottom:1px solid var(--bor);font-size:12px;color:var(--mut)}
+.tabs span{padding:11px 0}.tabs .on{color:var(--txt);font-weight:600;box-shadow:inset 0 -2px 0 var(--ac)}
+.row{display:grid;grid-template-columns:4px 70px 1fr 1.2fr;gap:14px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--row-divider);font-size:12px}
+.row.th{background:var(--sur2);font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--mut)}
+.row s{height:16px;border-radius:2px;background:var(--prio)}
+.row code{font-family:var(--font-mono);color:var(--mut)}
+.row .a{color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ══════════════════════════════════════════════════════════════════
+   VOORSTEL A — Zachte binnenhoek.
+   Alleen de linkerbovenhoek van het werkvlak rondt af (14px). De zijbalk
+   en titelbalk lopen als één donker L-profiel om de hoek heen.
+   ══════════════════════════════════════════════════════════════════ */
+.v-a .sb{border-right:0}
+.v-a .main{border-top-left-radius:14px;overflow:hidden}
+[data-theme=dark] .v-a .main{box-shadow:inset 1px 1px 0 var(--sbedge)}
+
+/* ══════════════════════════════════════════════════════════════════
+   VOORSTEL B — Donker kader, open naar rechts.
+   Een smalle donkere rand (8px) boven het werkvlak; beide bovenhoeken
+   ronden af. Titelbalk, zijbalk en kader lezen als één omlijsting.
+   ══════════════════════════════════════════════════════════════════ */
+.v-b .sb{border-right:0}
+.v-b .app{padding-top:8px}
+.v-b .sb{margin-top:-8px}
+.v-b .main{border-radius:12px 12px 0 0;overflow:hidden}
+[data-theme=dark] .v-b .main{box-shadow:inset 0 1px 0 var(--sbedge),inset 1px 0 0 var(--sbedge),inset -1px 0 0 var(--sbedge)}
+
+/* ══════════════════════════════════════════════════════════════════
+   VOORSTEL C — Zwevend werkvlak.
+   Het werkvlak ligt als één afgeronde plaat (12px) in een donker kader
+   van 8px rondom. Rustig en "app-achtig"; kost 8px aan drie zijden.
+   ══════════════════════════════════════════════════════════════════ */
+.v-c .sb{border-right:0}
+.v-c .app{padding:8px 8px 8px 0}
+.v-c .sb{margin:-8px 0}
+.v-c .main{border-radius:12px;overflow:hidden}
+[data-theme=dark] .v-c .main{box-shadow:inset 0 0 0 1px var(--sbedge)}
+
+/* ── Alleen mockup-chrome ── */
+.mk-h1{font-size:21px;font-weight:700;letter-spacing:-.02em;margin:0 0 4px}
+.mk-lead{font-size:13.5px;color:var(--mut);max-width:760px;margin:0 0 18px;line-height:1.6}
+.mk-bar{position:sticky;top:0;z-index:40;display:flex;flex-wrap:wrap;align-items:center;gap:8px;
+  background:var(--sur);border:1px solid var(--bor);border-radius:10px;padding:9px 12px;margin:0 0 26px}
+.mk-bar b{font-size:11px;font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.08em;margin-right:4px}
+.mk-w{border:1px solid var(--bor);background:var(--sur);border-radius:6px;padding:6px 11px;font:inherit;
+  font-size:12.5px;font-weight:600;color:var(--mut);cursor:pointer}
+.mk-w.on{background:var(--ac);border-color:var(--ac);color:#fff}
+[data-theme=dark] .mk-w.on{color:#161C24}
+.mk-sec{margin:0 0 38px}
+.mk-kop{display:flex;align-items:baseline;gap:10px;margin:0 0 6px}
+.mk-tag{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:3px 9px;border-radius:99px;
+  background:var(--ac-l);color:var(--ac);border:1px solid var(--ac-b)}
+.mk-tag.nu{background:var(--sur2);color:var(--mut);border-color:var(--bor)}
+.mk-titel{font-size:15px;font-weight:700}
+.mk-uitleg{font-size:12.5px;color:var(--mut);margin:0 0 12px;line-height:1.6;max-width:780px}
+.mk-veld{display:flex;gap:18px;align-items:flex-start;overflow-x:auto;padding:4px 4px 18px}
+/* Uitvergroting van de hoek: zelfde venster, 3× geschaald rond het hoekpunt. */
+.mk-zoom{width:210px;height:150px;flex-shrink:0;border-radius:10px;overflow:hidden;position:relative;
+  border:1px solid var(--bor);background:var(--sbbg)}
+.mk-zoom .win{position:absolute;left:0;top:0;transform-origin:0 0;transform:scale(3) translate(-192px,-12px);box-shadow:none;border-radius:0}
+.mk-zoom-lbl{position:absolute;left:7px;bottom:6px;font-size:10px;font-weight:700;color:#fff;background:rgba(0,0,0,.45);border-radius:4px;padding:1px 6px}
+.mk-feit{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
+.mk-feit span{font-size:11.5px;font-weight:600;color:var(--mut);background:var(--sur);border:1px solid var(--bor);border-radius:6px;padding:2px 8px}
+.mk-feit span i{font-style:normal;color:var(--txt)}
+</style>
+</head>
+<body>
+
+<h1 class="mk-h1">Hoekafwerking zijbalk ↔ kop</h1>
+<p class="mk-lead">Drie richtingen om de harde hoek tussen de donkere zijbalk en de witte kopbalk af te ronden. Alle drie gebruiken alleen bestaande kleuren (leisteen <code>#222B36</code>, rand <code>#2E3946</code>). Rechts van elk venster een 3× uitvergroting van de hoek.</p>
+
+<div class="mk-bar">
+  <b>Thema</b>
+  <button class="mk-w on" data-th="light">Licht</button>
+  <button class="mk-w" data-th="dark">Donker</button>
+</div>
+
+<section class="mk-sec">
+  <div class="mk-kop"><span class="mk-tag nu">Nu</span><span class="mk-titel">Harde hoek</span></div>
+  <p class="mk-uitleg">Zijbalk en kop raken elkaar haaks; de 1px-rand van de zijbalk tekent de knik extra aan.</p>
+  <div class="mk-veld" data-v=""></div>
+</section>
+
+<section class="mk-sec">
+  <div class="mk-kop"><span class="mk-tag">A</span><span class="mk-titel">Zachte binnenhoek</span></div>
+  <p class="mk-uitleg">Alleen de linkerbovenhoek van het werkvlak rondt af. Titelbalk en zijbalk vormen samen één donker L-profiel dat soepel om de hoek loopt. Geen ruimteverlies, kleinste ingreep.</p>
+  <div class="mk-veld" data-v="v-a"></div>
+  <div class="mk-feit"><span>Ruimte <i>±0 px</i></span><span>Straal <i>14 px</i></span><span>Ingreep <i>~5 regels CSS</i></span></div>
+</section>
+
+<section class="mk-sec">
+  <div class="mk-kop"><span class="mk-tag">B</span><span class="mk-titel">Donker kader, open naar rechts</span></div>
+  <p class="mk-uitleg">Een smalle donkere strook (8px) boven het werkvlak; beide bovenhoeken ronden af. Leest als een omlijsting die bij de titelbalk hoort, de rechter- en onderrand blijven vrij voor de tabel.</p>
+  <div class="mk-veld" data-v="v-b"></div>
+  <div class="mk-feit"><span>Ruimte <i>−8 px hoogte</i></span><span>Straal <i>12 px</i></span><span>Ingreep <i>~6 regels CSS</i></span></div>
+</section>
+
+<section class="mk-sec">
+  <div class="mk-kop"><span class="mk-tag">C</span><span class="mk-titel">Zwevend werkvlak</span></div>
+  <p class="mk-uitleg">Het hele werkvlak ligt als één afgeronde plaat in een donker kader van 8px rondom. Het meest "app-achtig" en rustig; kost 8px aan boven-, rechter- en onderkant.</p>
+  <div class="mk-veld" data-v="v-c"></div>
+  <div class="mk-feit"><span>Ruimte <i>−8 px rondom</i></span><span>Straal <i>12 px</i></span><span>Ingreep <i>~6 regels CSS</i></span></div>
+</section>
+
+<template id="tpl">
+  <div class="win">
+    <div class="win-tb"><i></i><i></i><i></i><span>Collectief Dashboard</span></div>
+    <div class="app">
+      <aside class="sb">
+        <div class="sb-logo"><div class="sb-mark"></div><div><b>VvE Beheer</b><span>Collectief Dashboard 15.6</span></div></div>
+        <div class="sb-lbl">Taken</div>
+        <div class="ni on">Nog Te Doen <em>115</em></div>
+        <div class="ni">Afgerond</div>
+        <div class="sb-lbl">ALV's</div>
+        <div class="ni">ALV's Overzicht</div>
+        <div class="ni">ALV's Afgerond</div>
+      </aside>
+      <div class="main">
+        <header class="hdr"><h1>Nog Te Doen</h1><span class="pil"><b>115</b> open</span><span class="pil rd"><b>70</b> te laat</span><span class="pil"><b>1</b> weggelegd</span></header>
+        <div class="content"><div class="card">
+          <div class="tabs"><span class="on">Oppakken 36</span><span>Vergaderverzoeken 14</span><span>Offerte-trajecten 31</span><span>LOD 10</span></div>
+          <div class="row th"><span></span><span>VvE code</span><span>VvE</span><span>Actiepunt</span></div>
+          <div class="row"><s></s><code>201006</code><span>VvE Nicolaas Tulpstraat 6-8-10</span><span class="a">Als Isecur factuur stuurt voor herstel portiek…</span></div>
+          <div class="row"><s></s><code>391021</code><span>VvE Van Naeltwijckstraat 141-143-145</span><span class="a">Toestemming vervangen kozijnen vragen…</span></div>
+          <div class="row"><s></s><code>211020</code><span>VvE Beeklaan 389a en Galvanistraat 128</span><span class="a">Mevrouw Hidding terugkoppeling geven.</span></div>
+        </div></div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+const tpl=document.getElementById('tpl');
+document.querySelectorAll('.mk-veld').forEach(veld=>{
+  const v=veld.dataset.v;
+  const groot=tpl.content.firstElementChild.cloneNode(true);
+  if(v)groot.classList.add(v);
+  const zoom=document.createElement('div');zoom.className='mk-zoom';
+  const klein=tpl.content.firstElementChild.cloneNode(true);
+  if(v)klein.classList.add(v);
+  zoom.append(klein);
+  const lbl=document.createElement('span');lbl.className='mk-zoom-lbl';lbl.textContent='3×';zoom.append(lbl);
+  veld.append(groot,zoom);
+});
+document.querySelectorAll('[data-th]').forEach(b=>b.onclick=()=>{
+  document.documentElement.dataset.theme=b.dataset.th;
+  document.querySelectorAll('[data-th]').forEach(x=>x.classList.toggle('on',x===b));
+});
+</script>
+</body>
+</html>

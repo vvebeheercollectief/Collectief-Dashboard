@@ -143,7 +143,28 @@ function cd_gooiVerzameldeFouten(label, alleenLoggen) {
 // ════════════════════════════════════════════════════════════
 const CD_TRIGGER_FUNCS = ['cd_onEditChange', 'cd_checkDeadlines', 'cd_dailySummary', 'cd_onNotifQueueChange', 'cd_sweepNotifQueue'];
 
+// ════════════════════════════════════════════════════════════
+//  UITGEZET IN v16.0 (2026-11-10)
+// ════════════════════════════════════════════════════════════
+// Het dashboard is teruggebracht tot Mijn taken, LOD, Subsidies en de ALV's. Pushmeldingen, de
+// deadline-mails, het dagoverzicht, de Notif-wachtrij en de opvolgmotor (Opvolging.gs) zijn op
+// verzoek uitgezet. Elke trigger die nog afgaat, ruimt zichzelf op en doet verder niets — zelfde
+// aanpak als AutoPrioriteit.gs. Er hoeft dus niets in de editor te gebeuren: de eerstvolgende keer
+// dat een trigger vuurt, is hij weg. De code eronder blijft staan; terugzetten = CD_UITGEZET op false
+// en setupNotificationTriggers() / cd_installeerOpvolgingTrigger() één keer draaien.
+var CD_UITGEZET = true;
+function cd_zetTriggerUit(naam) {
+  try {
+    ScriptApp.getProjectTriggers()
+      .filter(function (t) { return t.getHandlerFunction() === naam; })
+      .forEach(function (t) { ScriptApp.deleteTrigger(t); });
+  } catch (err) {
+    console.warn('cd_zetTriggerUit(' + naam + '): ' + err);
+  }
+}
+
 function setupNotificationTriggers() {
+  if (CD_UITGEZET) { Logger.log('Meldingen staan uit sinds v16.0: er worden geen triggers ingesteld.'); return; }
   ScriptApp.getProjectTriggers()
     .filter(t => CD_TRIGGER_FUNCS.indexOf(t.getHandlerFunction()) !== -1)
     .forEach(t => ScriptApp.deleteTrigger(t));
@@ -172,6 +193,7 @@ function removeNotificationTriggers() {
 //  TRIGGER 1: onEdit — nieuwe taak / toewijzing / ALV update
 // ════════════════════════════════════════════════════════════
 function cd_onEditChange(e) {
+  if (CD_UITGEZET) { cd_zetTriggerUit('cd_onEditChange'); return; }
   if (!e || !e.range) return;
   const sheet = e.range.getSheet();
   const name = sheet.getName();
@@ -321,6 +343,7 @@ function cd_handleAlvoEdit(sheet, row, e) {
 //  TRIGGER 2: hourly deadline check
 // ════════════════════════════════════════════════════════════
 function cd_checkDeadlines() {
+  if (CD_UITGEZET) { cd_zetTriggerUit('cd_checkDeadlines'); return; }
   cd_safeRun('cd_checkDeadlines', () => {
     const sheet = SpreadsheetApp.getActive().getSheetByName(NTD_SHEET);
     if (!sheet) return;
@@ -421,6 +444,7 @@ function cd_checkDeadlines() {
 //  TRIGGER 3: daily summary om 08:30
 // ════════════════════════════════════════════════════════════
 function cd_dailySummary() {
+  if (CD_UITGEZET) { cd_zetTriggerUit('cd_dailySummary'); return; }
   cd_safeRun('cd_dailySummary', () => {
     const sheet = SpreadsheetApp.getActive().getSheetByName(NTD_SHEET);
     if (!sheet) return;
@@ -857,10 +881,14 @@ function cd_setupNotifQueue() {
 // onChange vuurt — anders dan onEdit — óók bij wijzigingen via de Sheets-API.
 // Alleen NIEUWE rijen: herkansingen (POGING n) zijn voor de veegbeurt, anders zou elke schrijfactie
 // van het dashboard een mislukte push meteen opnieuw proberen en zijn de pogingen binnen een minuut op.
-function cd_onNotifQueueChange(e) { cd_drainNotifQueue(false); }
+function cd_onNotifQueueChange(e) {
+  if (CD_UITGEZET) { cd_zetTriggerUit('cd_onNotifQueueChange'); return; }
+  cd_drainNotifQueue(false);
+}
 
 // Vangnet: pakt rijen op die een gemiste onChange anders zou laten liggen, én de herkansingen.
 function cd_sweepNotifQueue() {
+  if (CD_UITGEZET) { cd_zetTriggerUit('cd_sweepNotifQueue'); return; }
   cd_drainNotifQueue(true);
   // Kreeg de opvolgmotor vanochtend de lock niet, dan probeert hij het hier opnieuw (Opvolging.gs).
   cd_safeRun('cd_motorHerkansing', cd_motorHerkansing);

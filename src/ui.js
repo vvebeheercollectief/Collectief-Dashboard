@@ -1,153 +1,131 @@
 // ══════════════════════════════════════
-//  UI — navigatie, thema, dichtheid, zoeken
+//  UI — meldingen, ongedaan maken, ja/nee-vraag, status en navigatie
 // ══════════════════════════════════════
-import { PAGE_META } from "./config.js";
-import { state } from "./state.js";
-// render-analytics.js (38 kB, plus Chart.js van het CDN) pas laden als Cijfers of Statistiek
-// geopend wordt. Daarvoor heeft niemand hem nodig.
-// Niet in een tabblad waarvan een ánder venster de nieuwe versie actief maakte (state._codeVerouderd,
-// sw-update.js): de module zou dan van de nieuwe versie zijn en de rest van dit tabblad van de oude.
-// Was hij al geladen, dan is het gewoon de module van deze (oude) versie en mag hij blijven werken.
-let _analyticsGeladen = false;
-const _analytics = () => (state._codeVerouderd && !_analyticsGeladen)
-  ? Promise.reject(Object.assign(new Error('nieuwe versie actief'), { verouderd:true }))
-  : import("./render-analytics.js").then(m => { _analyticsGeladen = true; return m; });
-const _analyticsFout = e => {
-  if(e && e.verouderd) showToast('Herlaad eerst het dashboard', 'Er is een nieuwe versie actief; de grafieken laden na een herlading.', 'var(--am)', null, { geenSysteemmelding:true });
-  else console.warn('[statistiek] niet geladen:', e && e.message);
+import { state } from './state.js';
+import { esc } from './util.js';
+
+// ── Meldingen (rechtsboven) ─────────────────────────────────────────────
+// Een fout blijft staan tot hij weggeklikt wordt: wie even wegkeek, moet nog kunnen zien dat een
+// wijziging niet opgeslagen is. Andere meldingen verdwijnen na vijf seconden.
+const TOAST_MS = 5000;
+const _getoond = new Map();   // dezelfde melding niet twee keer tegelijk
+export function toast(titel, tekst='', soort='info', opts={}){
+  const sleutel=titel+'|'+tekst;
+  if(_getoond.has(sleutel) && !opts.geenDedup) return;
+  const host=document.getElementById('toasts'); if(!host) return;
+  const el=document.createElement('div');
+  el.className='toast toast-'+soort;
+  el.setAttribute('role', soort==='fout' ? 'alert' : 'status');
+  el.innerHTML=`<div class="toast-tekst"><strong>${esc(titel)}</strong>${tekst?`<span>${esc(tekst)}</span>`:''}</div>`
+    +`<button type="button" class="toast-x" aria-label="Melding sluiten">×</button>`;
+  const weg=()=>{ el.remove(); _getoond.delete(sleutel); };
+  el.querySelector('.toast-x').onclick=weg;
+  host.appendChild(el);
+  _getoond.set(sleutel, el);
+  if(!(opts.blijft || soort==='fout')) setTimeout(weg, TOAST_MS);
+}
+export const meldFout = (tekst, titel='Niet gelukt') => toast(titel, tekst, 'fout');
+
+// ── Ongedaan maken (donkere balk rechtsonder) ───────────────────────────
+// Eén tegelijk: een nieuwe afvinkactie vervangt de vorige balk (die actie blijft gewoon staan).
+const UNDO_MS = 8000;
+let _undo = null;
+export function ongedaanBalk(tekst, opUndo){
+  sluitOngedaan();
+  const el=document.getElementById('snack'); if(!el) return;
+  el.querySelector('.snack-tekst').textContent=tekst;
+  const knop=el.querySelector('.snack-knop');
+  knop.disabled=false; knop.textContent='Ongedaan maken';
+  el.hidden=false;
+  let rest=UNDO_MS, start=Date.now(), tid=null;
+  const loop=()=>{ start=Date.now(); tid=setTimeout(sluitOngedaan, rest); };
+  const pauze=()=>{ if(tid){ clearTimeout(tid); tid=null; rest=Math.max(1000, rest-(Date.now()-start)); } };
+  el.onmouseenter=pauze; el.onfocusin=pauze;
+  el.onmouseleave=()=>{ if(!tid) loop(); };
+  knop.onclick=async()=>{
+    knop.disabled=true; knop.textContent='Bezig…';
+    pauze();
+    try{ await opUndo(); } finally { sluitOngedaan(); }
+  };
+  _undo={ el, stop:()=>{ if(tid) clearTimeout(tid); } };
+  loop();
+}
+export function sluitOngedaan(){
+  if(_undo){ _undo.stop(); _undo=null; }
+  const el=document.getElementById('snack'); if(el) el.hidden=true;
+}
+
+// ── Ja/nee-vraag ────────────────────────────────────────────────────────
+// Promise-gebaseerd. Escape, het kruisje en de achtergrond betekenen 'nee'. Een tweede vraag terwijl
+// er één openstaat krijgt meteen 'nee' (dubbelklik-rem).
+let _openVraag=null;
+export function vraagBevestiging({ titel, tekst, bevestigTekst='Doorgaan', gevaarlijk=false }){
+  if(_openVraag) return Promise.resolve(false);
+  const bg=document.getElementById('bevestig-bg');
+  document.getElementById('bevestig-titel').textContent=titel;
+  document.getElementById('bevestig-tekst').textContent=tekst;
+  const ja=document.getElementById('bevestig-ja');
+  ja.textContent=bevestigTekst;
+  ja.classList.toggle('knop-gevaar', !!gevaarlijk);
+  bg.classList.add('open');
+  const terug=document.activeElement;
+  setTimeout(()=>document.getElementById('bevestig-nee').focus(), 0);
+  return new Promise(res=>{ _openVraag={ res, terug }; });
+}
+export function beantwoordBevestiging(ja){
+  const v=_openVraag; if(!v) return;
+  _openVraag=null;
+  document.getElementById('bevestig-bg')?.classList.remove('open');
+  try{ v.terug?.focus?.(); }catch(_){}
+  v.res(!!ja);
+}
+
+// ── Status (zijbalk onderaan) ───────────────────────────────────────────
+const STATUS = {
+  laden:   ['', 'Laden…'],
+  opslaan: ['', 'Opslaan…'],
+  fout:    ['fout', 'Niet bijgewerkt'],
+  offline: ['fout', 'Offline'],
+  pauze:   ['pauze', 'Gepauzeerd'],
 };
-function buildAnalytics(){ return _analytics().then(m=>m.buildAnalytics()).catch(_analyticsFout); }
-function buildDash(){ return _analytics().then(m=>m.buildDash()).catch(_analyticsFout); }
-import { renderOntw, renderLogboek } from "./render-overig.js";
-import { renderHerhaal } from "./render-herhaal.js";
-import { renderVve } from "./render-vve.js";
-import { showToast } from "./notifications.js";
-// Kringverwijzing ui ⇄ bulk: alleen op runtime aangeroepen (in goTo), dus live bindings — veilig,
-// net als de andere kringen in dit project.
-import { bulkSelectie, toggleBulkMode } from "./bulk.js";
-
-let _pagina = 'ntd';   // laatst geopende pagina, zodat renderAll de kop kan bijwerken
-
-// Wat goTo moet bijtekenen bij het openen van een pagina die renderAll terwijl hij verborgen was
-// heeft overgeslagen (zie renderAll in main.js). Via een haak en niet met een import van de
-// render-functies: main.js houdt bij wélke pagina's vies zijn, en ui.js hoeft dat niet te weten.
-let _bijOpenen = null;
-function zetBijOpenen(fn){ _bijOpenen = fn; }
-
-// Scrollpositie van #content per pagina. Alle pagina's delen die ene scroller, dus wie in de
-// takenlijst op rij 60 een VvE-code aanklikte en via het terug-pijltje uit het dossier kwam,
-// landde bovenaan de lijst en moest zijn plek opnieuw zoeken. goTo onthoudt de stand van de pagina
-// die hij verlaat; terugVanDossier (render-vve.js) zet hem terug met herstelScroll.
-const _scrollPerPagina = {};
-
-// De kop-tellers horen alleen bij Nog Te Doen. Tot v13.5 stond op de andere pagina's een
-// ondertitel naast de titel ('Voortgang vergaderingen per VvE'); die is in de afwerking (v13.6)
-// weg: niemand las hem en hij herhaalde wat de pagina zelf al laat zien. De tweede waarde in
-// PAGE_META blijft bestaan als omschrijving voor wie de code leest, maar komt niet meer in beeld.
-function syncKop(){
-  const pillen = document.getElementById('ntd-kop-pillen');
-  if (pillen) pillen.hidden = _pagina !== 'ntd';
-}
-
-function goTo(page){
-  // Een open logregel-bewerking hoort bij het scherm waar die begon; bij een ÉCHTE
-  // paginawissel sluiten we 'm, anders kan een verouderd formulier later opslaan.
-  // Nogmaals klikken op de huidige pagina telt niet — dat mag geen getypte tekst wissen.
-  const _huidige=document.querySelector('.page.active')?.id;
-  const _content=document.getElementById('content');
-  if(_huidige && _content) _scrollPerPagina[_huidige]=_content.scrollTop;
-  if(_huidige!=='page-'+page && state.logEdit!=null){ state.logEdit=null; state.logEditTs=null; state.logEditSoort=null; }
-  // Een VERGETEN lege selecteerstand legt het hele dashboard stil: de 8s-ronde slaat over zolang
-  // `bulkMode` aanstaat, en de meldingen liften op diezelfde ronde mee. Buiten de takenlijst is er
-  // niet eens een teller meer die eraan herinnert (die staat in page-ntd). Weg van 'ntd' en niets
-  // geselecteerd → stand uit.
-  // Een GEVULDE selectie laten we staan: die heeft de gebruiker bewust gemaakt, en hij mag een
-  // VvE-dossier openen om iets op te zoeken zonder zijn werk kwijt te raken. De balk zegt dan
-  // eerlijk dat het verversen stilstaat (syncSelecteerStand).
-  if(_huidige!=='page-'+page && page!=='ntd' && state.bulkMode && bulkSelectie().length===0){
-    toggleBulkMode();
+export function zetStatus(soort){
+  const stip=document.getElementById('sync-stip'), lbl=document.getElementById('sync-lbl');
+  if(!stip || !lbl) return;
+  if(soort==='ok'){
+    state._laatsteSyncMs=Date.now();
+    stip.className='zb-stip';
+    lbl.textContent='Bijgewerkt '+new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
+    lbl.title='';
+    return;
   }
-  document.querySelectorAll('.ni[data-page]').forEach(el=>{
-    const actief=el.dataset.page===page;
-    el.classList.toggle('on',actief);
-    el.setAttribute('aria-current',actief?'page':'false');
+  const [klas, tekst]=STATUS[soort]||STATUS.fout;
+  stip.className='zb-stip '+(soort==='laden'||soort==='opslaan' ? 'bezig' : klas);
+  lbl.textContent=tekst;
+  lbl.title = soort==='pauze' ? 'Bijwerken staat stil tot je weer in het dashboard klikt (je Google-sessie wordt dan vernieuwd).' : '';
+}
+
+// Eén balk bovenin voor 'laden mislukt' en 'offline', met een knop om het opnieuw te proberen.
+export function toonBanner(tekst, knopTekst, opKlik){
+  let b=document.getElementById('banner');
+  if(!b){ b=document.createElement('div'); b.id='banner'; b.className='banner'; b.setAttribute('role','alert'); document.body.appendChild(b); }
+  b.innerHTML=`<span>${esc(tekst)}</span>${knopTekst?`<button type="button" class="knop">${esc(knopTekst)}</button>`:''}`;
+  if(knopTekst) b.querySelector('button').onclick=()=>{ verbergBanner(); opKlik&&opKlik(); };
+}
+export function verbergBanner(){ document.getElementById('banner')?.remove(); }
+
+// ── Navigatie ───────────────────────────────────────────────────────────
+export const PAGINAS = ['taken','lod','subsidie','alvo','alfa'];
+const _bijOpenen = [];
+export const bijOpenen = fn => _bijOpenen.push(fn);
+export function goTo(pagina){
+  if(!PAGINAS.includes(pagina)) pagina='taken';
+  state.pagina=pagina;
+  document.querySelectorAll('.nav-knop[data-pagina]').forEach(a=>{
+    const aan=a.dataset.pagina===pagina;
+    a.classList.toggle('actief', aan);
+    if(aan) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current');
   });
-  document.querySelectorAll('.page').forEach(el=>el.classList.toggle('active',el.id==='page-'+page));
-  const[t]=PAGE_META[page]||['',''];
-  document.getElementById('page-title').textContent=t;
-  _pagina = page;
-  syncKop();
-  document.getElementById('btn-add').style.display=page==='ntd'?'inline-flex':'none';
-  if(_bijOpenen) _bijOpenen(page);   // af / alvo / alfa: bijtekenen als renderAll ze oversloeg
-  if(page==='ontw') renderOntw();
-  if(page==='logboek') renderLogboek();
-  if(page==='herhaal') renderHerhaal();
-  if(page==='vve') renderVve();
-  closeSb();
-  if(page==='analytics') buildAnalytics();
-  if(page==='dash') buildDash();
+  document.querySelectorAll('.pagina').forEach(p=>{ p.hidden = p.id!=='pagina-'+pagina; });
+  try{ history.replaceState(null,'','#'+pagina); }catch(_){}
+  _bijOpenen.forEach(fn=>fn(pagina));
 }
-function herstelScroll(page){
-  const c=document.getElementById('content');
-  if(c) c.scrollTop=_scrollPerPagina['page-'+page]||0;
-}
-
-// Na het bladeren de tabelkaart in beeld halen als zijn bovenkant boven het zichtbare deel van
-// #content is verdwenen. De bladerknoppen staan ONDER de tabel: klikte je op pagina 3 terwijl je
-// helemaal onderaan stond, dan bleef je daar staan en zag je van de nieuwe pagina alleen de staart.
-// Staat de kaart al (deels) in beeld met zijn kop, dan blijft alles waar het is.
-function kaartInBeeld(el){
-  const kaart=el && el.closest('.card');
-  const c=document.getElementById('content');
-  if(!kaart || !c) return;
-  const boven=kaart.getBoundingClientRect().top - c.getBoundingClientRect().top;
-  if(boven<0) c.scrollTop=Math.max(0, c.scrollTop+boven-8);
-}
-
-function closeSb(){document.getElementById('sb').classList.remove('open');document.getElementById('overlay').classList.remove('on');document.getElementById('hamburger')?.setAttribute('aria-expanded','false')}
-
-// ══════════════════════════════════════
-//  THEME
-// ══════════════════════════════════════
-function applyTheme(t){
-  document.documentElement.dataset.theme=t;
-  localStorage.setItem('theme',t);
-  document.getElementById('ico-sun').style.display=t==='dark'?'none':'';
-  document.getElementById('ico-moon').style.display=t==='dark'?'':'none';
-  document.getElementById('theme-btn')?.setAttribute('aria-pressed',t==='dark');
-  Object.values(state.charts).forEach(c=>{try{c.destroy()}catch(e){}});
-  state.charts={};
-  if(document.getElementById('page-analytics').classList.contains('active')) buildAnalytics();
-  if(document.getElementById('page-dash').classList.contains('active')) buildDash();
-}
-
-// ══════════════════════════════════════
-//  DICHTHEID (per collega, onthouden in localStorage)
-// ══════════════════════════════════════
-const DENSITIES=['standaard','compact','ruim'];
-function applyDensity(d){
-  if(!DENSITIES.includes(d)) d='standaard';
-  document.documentElement.dataset.density=d;
-  localStorage.setItem('density',d);
-}
-function cycleDensity(){
-  const cur=document.documentElement.dataset.density||'standaard';
-  const next=DENSITIES[(DENSITIES.indexOf(cur)+1)%DENSITIES.length];
-  applyDensity(next);
-  showToast('Weergave: '+next.charAt(0).toUpperCase()+next.slice(1),'',null);
-}
-
-function setupSearch(id,cb){
-  const el=document.getElementById(id);if(!el)return;
-  let t;el.addEventListener('input',()=>{clearTimeout(t);t=setTimeout(cb,200)});
-  // Escape in een zoekveld maakt het leeg — de gewoonte uit elk ander zoekvak. Alleen als er iets
-  // in staat: een leeg veld laat de toets door naar de centrale Escape (main.js), die dan bijv. de
-  // zijbalk sluit. Meteen opnieuw tekenen, zonder de 200 ms wachttijd van het typen.
-  el.addEventListener('keydown',e=>{
-    if(e.key!=='Escape' || !el.value) return;
-    e.stopPropagation();
-    el.value=''; clearTimeout(t); cb();
-  });
-}
-
-export { goTo, syncKop, closeSb, applyTheme, applyDensity, cycleDensity, setupSearch, herstelScroll, kaartInBeeld, zetBijOpenen, buildAnalytics, buildDash };

@@ -7,7 +7,7 @@
 // 2. VERKLEINEN. Commentaar en witruimte eruit (JS ~1,2 MB → ~0,4 MB, CSS 177 → ~95 kB). Namen
 //    blijven staan (minifyIdentifiers uit): een fout in de console noemt dan nog de echte functie.
 //
-// Bewust NIET mee: src/tests.js en src/urgentie.js (alleen de zelftest). De zelftest draait in
+// Bewust NIET mee: src/tests.js (alleen de zelftest). De zelftest draait in
 // GitHub Actions op de onverkleinde bron (tools/zelftest.mjs, workflow zelftest.yml); veel toetsen
 // lezen de brontekst, en die is in dist/ verkleind.
 //
@@ -21,10 +21,10 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const UIT = join(ROOT, 'dist');
 
 const ONGEWIJZIGD = ['index.html', 'manifest.json', 'versie.json',
-  'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'logo-sidebar.png',
+  'icon-192.png', 'icon-512.png', 'apple-touch-icon.png',
   'beeldmerk-wit.svg', 'logo-gestapeld-leisteen.svg'];
-const SCRIPTS = ['sw.js', 'sw-strategie.js', 'zoek-tools.js', 'allowed-emails.js'];
-const NIET_PUBLIEK = new Set(['tests.js', 'urgentie.js']);
+const SCRIPTS = ['sw.js', 'sw-strategie.js', 'allowed-emails.js'];
+const NIET_PUBLIEK = new Set(['tests.js']);
 
 const JS = { loader: 'js', minifyWhitespace: true, minifySyntax: true, minifyIdentifiers: false,
              legalComments: 'none', target: 'esnext', charset: 'utf8' };
@@ -61,7 +61,7 @@ const bestaat = async p => { try { return (await stat(join(UIT, p))).isFile(); }
 // 1. Alles wat de service worker vooraf cachet, staat er.
 const sw = await readFile(join(ROOT, 'sw.js'), 'utf8');
 const shell = [...sw.slice(sw.indexOf('const APP_SHELL')).split('];')[0].matchAll(/'\.\/([^']+)'/g)].map(m => m[1]);
-if (shell.length < 20) fouten.push('APP_SHELL niet gevonden in sw.js');
+if (shell.length < 15) fouten.push('APP_SHELL niet gevonden in sw.js');
 for (const p of shell) if (!(await bestaat(p))) fouten.push(`APP_SHELL noemt ${p}, maar dat staat niet in dist/`);
 // 2. Elke statische en dynamische import van een module wijst naar een bestand in dist/.
 for (const f of ['src/main.js', ...modules.map(m => 'src/' + m)]) {
@@ -72,8 +72,9 @@ for (const f of ['src/main.js', ...modules.map(m => 'src/' + m)]) {
     if (!(await bestaat(doel))) fouten.push(`${f} importeert ${m[1]}, maar ${doel} staat niet in dist/`);
   }
 }
-// 3. Wat Apps Script van het live dashboard leest (Code.gs, eenmalige blokken) moet herkenbaar blijven.
-if (!(await readFile(join(UIT, 'src/crm-fase.js'), 'utf8')).includes('CRM_FASES')) fouten.push('src/crm-fase.js mist CRM_FASES');
+// 3. Elke module in src/ staat in de APP_SHELL van sw.js (anders werkt hij niet offline).
+for (const m of modules) if (!shell.includes('src/' + m)) fouten.push(`src/${m} ontbreekt in APP_SHELL (sw.js)`);
+// 4. Wat Apps Script van het live dashboard leest (Code.gs, eenmalig blok VvE-codes) moet herkenbaar blijven.
 if (!(await readFile(join(UIT, 'src/api.js'), 'utf8')).includes('/^0\\d+$/')) fouten.push('src/api.js mist /^0\\d+$/');
 
 if (fouten.length) { console.error('Bouwen afgebroken:\n- ' + fouten.join('\n- ')); process.exit(1); }

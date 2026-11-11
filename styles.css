@@ -1,1624 +1,245 @@
-    :root{
-      /* ——— Kleuren van de huisstijl (v14.4) — dezelfde als de website (Richting D): leisteen
-         #222B36 als tekst en zijbalk, papierwit/sectiegrijs als vlakken, staalblauw #4E6885 als
-         enige accent. De letter blijft de standaardletter van het toestel (keuze gebruiker). ——— */
-      --bg:#F5F7F9;--sur:#ffffff;--sur2:#FBFCFD;--bor:#E1E6EB;
-      --txt:#222B36;--mut:#59616B;--fnt:#7A828C;
-      --bor-input:#DCE2E8;--row-divider:#EEF1F4;--row-hover:#F7F9FB;--group-bg:#F5F7F9;
-      /* Ontwerpsysteem (v13.6, afwerking). Drie hoeken: 4 klein · 6 knop/veld (--rs) · 8 kaart/venster (--r).
-         Kaarten dragen alleen een lijn (--sh is leeg); schaduw is voor wat zweeft: --shm (menu, paneel)
-         en --shl (venster, Ctrl+K). Letter: 11 kolomkop · 12 bijschrift · 13 tekst · 15 kaarttitel ·
-         18 paginatitel · 28 groot getal; diktes 400/500/600. Afstanden in stappen van 4. */
-      --r:8px;--rs:6px;--sh:none;
-      --shm:0 6px 24px rgba(16,22,34,.10);--shl:0 16px 48px rgba(16,22,34,.16);
-      --sb:240px;--hh:60px;--tr:.17s ease;
-      /* Eén accent (v13.7, afwerking). De vier sectiekleuren (--bl blauw, --pu paars, --pk roze,
-         --tl teal) zijn weg: elk tabblad, fasebolletje en sectielabel gebruikt nu --ac. Kleur
-         betekent alleen nog iets: --rd te laat, --am binnenkort/in behandeling, --gn afgerond.
-         De grafieken op Analytics houden hun eigen reeks (SECS[...].color in config.js): daar is
-         onderscheid tussen categorieën de inhoud zelf.
-         B45309 -> AE5008 (v11.8): als tekst op --am-l stond amber op 4,51:1 — te krap. Nu 4,77. */
-      --am:#AE5008;--am-l:#fef3c7;
-      --rd:#B91C1C;--rd-l:#fee2e2;--rd-b:#fecaca;
-      --gn:#047857;--gn-l:#d1fae5;--gn-b:#a7f3d0;
-      /* Accent = staalblauw van de website (was Operator-leiblauw #4a5b7a tot v14.3) */
-      --ac:#4E6885;--ac-l:#EDF1F5;--ac-b:#D3DCE6;--ac-900:#3F566F;--ac-500:#5A7796;
-      /* Focusrand en schakelaar in het bewerkscherm. Bewust NIET in [data-theme=dark] herhaald:
-         de schakelaar draagt een witte knop en die vraagt in beide thema's een donkere vulling.
-         Tot v13.6 zette crud.js hier per sectie een eigen kleur in. */
-      --modal-sec:#4E6885;
-      --nv:#222B36;--nv-d:#1C242E;
-      /* Zijbalk — leisteen, vast in beide thema's. In donker is hij daardoor lichter dan de
-         pagina (#161C24) en valt hij niet meer weg zoals de oude #1b1e24 deed. */
-      --sbbg:#222B36;--sbedge:#2E3946;--sbglow:#9DB2CB;
-      /* Voorgrond-tekst op kaarten (donut e.d.) */
-      --fg:#222B36;
-      /* Eén gedempt 'urgent/te-laat'-rood (baksteen), los van het felle --rd-signaal */
-      --prio:#b5544b;
-      /* Een tint donkerder, voor de te-laat-TEKST in de signaal-kolom: --prio zelf haalt daar
-         4,42:1 en dat is net onder de 4,5 die dit project aanhoudt. Vlakken en staafjes blijven
-         --prio, alleen tekst gebruikt deze. */
-      --sig-crit:#9e463e;
-      /* Bewegings-schaal: één set duraties + easing voor heel de app */
-      --tr-fast:.1s ease;
-      /* Letters. Op verzoek (v11.8) van IBM Plex naar de standaardletter van het toestel:
-         SF Pro op een Mac/iPhone, Segoe UI op Windows, Roboto op Android. Twee stapels en
-         verder nergens een letternaam in dit bestand, dus terugzetten is deze twee regels.
-         De losse letters van het inlogscherm (Hanken Grotesk / JetBrains Mono) staan bewust
-         apart onderaan: dat is een eigen, gemerkt scherm en verandert hier niet mee. */
-      --font-app:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
-      --font-mono:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,monospace;
-    }
-    [data-theme=dark]{
-      --bg:#161C24;--sur:#1C242E;--sur2:#19202A;--bor:#2B3542;
-      --bor-input:#334050;--row-divider:#232C38;--row-hover:#222B36;--group-bg:#19202A;
-      --sbbg:#222B36;--sbedge:#2E3946;--sbglow:#9DB2CB;
-      --txt:#EEF1F4;--mut:#A3ACB7;--fnt:#7A828C;
-      --sh:none;
-      --shm:0 8px 28px rgba(0,0,0,.5);--shl:0 24px 64px rgba(0,0,0,.65);
-      --am:#F0B44C;--am-l:#382912;
-      --rd:#F0746F;--rd-l:#371A1B;--rd-b:#582A2A;
-      --gn:#34D39A;--gn-l:#103129;--gn-b:#1F4A3C;
-      --ac:#8FA6C2;--ac-l:#243041;--ac-b:#334458;--ac-900:#B4C5D9;--ac-500:#9DB2CB;
-      --fg:#EEF1F4;--prio:#e08b82;--sig-crit:#f0a29a;
-    }
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    html,body{height:100%;font-family:var(--font-app);font-size:14px;background:var(--bg);color:var(--txt);line-height:1.5;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
-    /* Vaste-breedte letter — codes, datums, badges, ⌘K-hint (zie --font-mono) */
-    .code,.s-normal,.s-telaat,.cell-sm,.ni-badge,.sb-brand span{font-family:var(--font-mono)}
-    button{cursor:pointer;border:none;background:none;font:inherit;color:inherit}
-    input,select,textarea{font:inherit}
-    ul{list-style:none}
-
-    /* Layout */
-    /* De schil draagt de zijbalkkleur: waar #main linksboven afrondt, loopt het donker van de
-       zijbalk (en in de app de titelbalk, theme-color) als één L-profiel om de hoek (v15.7). */
-    #app{display:flex;height:100vh;overflow:hidden;background:var(--sbbg)}
-    /* Testomgeving. De balk zelf staat op `position:fixed` en neemt dus GEEN ruimte in; de 34px
-       komt van de opvuldiv die main.js er direct achter zet (zie IS_STAGING daar). Die div staat
-       wél in de bladstroom, vóór #app, dus de schil moet die 34px inleveren — anders schuift de
-       onderkant van de zijbalk buiten beeld en is de sync-status daar nooit te zien. Dit getal
-       hoort dus gelijk te blijven aan de hoogte van díé div, niet aan de balk (die meet 31,2px).
-       Alleen op staging: op productie bestaat de balk niet. */
-    body.met-stagingbalk #app{height:calc(100vh - 34px)}
-    #overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100}
-    #overlay.on{display:block}
-
-    /* Sidebar — "Operator" donker (#1b1e24), vast in beide thema's */
-    #sb{width:var(--sb);background:var(--sbbg);display:flex;flex-direction:column;flex-shrink:0;z-index:200;transition:transform var(--tr);color:#8b929e}
-    .sb-logo{padding:20px 20px 18px;border-bottom:1px solid var(--sbedge);display:flex;align-items:center;gap:11px}
-    .sb-logo img{height:32px;width:auto;object-fit:contain}
-    .sb-logo-fb{width:34px;height:34px;background:#2E3946;border:1px solid #3A4757;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#cfd5df;font-weight:600;font-size:14px;flex-shrink:0}
-    .sb-brand{font-size:15px;font-weight:600;line-height:1.25;color:#f2f4f7}
-    .sb-brand span{display:block;font-size:11px;font-weight:500;color:#9AA5B2}
-    .sb-nav{flex:1;padding:14px 12px;overflow-y:auto}
-    .sb-lbl{font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#8C96A3;padding:16px 10px 6px} /* #8C96A3 op leisteen (#222B36) haalt 4,78:1 — 10px hoofdletters vragen de gewone AA-eis van 4,5:1 (v14.4; daarvoor #828894 op #1b1e24) */
-    .sb-nav>.sb-lbl:first-child{padding-top:2px}
-    .ni{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:7px 10px;border-radius:6px;color:#9AA5B2;font-weight:500;font-size:13px;cursor:pointer;transition:background var(--tr),color var(--tr);user-select:none}
-    .ni:hover{background:rgba(255,255,255,.05);color:#D5DCE4}
-    .ni.on{background:#2E3946;color:#F2F4F7;font-weight:600}
-    .ni.on svg{color:var(--sbglow)}
-    .ni svg{width:16px;height:16px;flex-shrink:0}
-    .ni-badge{margin-left:auto;padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;background:#3A4757;color:#D5DCE4}
-    .ni.on .ni-badge{background:#3A4757;color:#D5DCE4}
-    .sb-foot{padding:13px 18px;border-top:1px solid var(--sbedge);display:flex;align-items:center;justify-content:space-between;gap:6px}
-    /* De statusregel neemt de ruimte, de twee knoppen (Vernieuwen, Uitloggen) staan samen rechts. */
-    .sync-row{display:flex;align-items:center;gap:8px;font-size:11px;color:#9AA5B2;font-family:var(--font-mono);flex:1;min-width:0}
-    .dot{width:6px;height:6px;border-radius:50%;background:var(--gn);flex-shrink:0}
-    .dot.loading{background:var(--am);animation:pulse 1s infinite}
-    .dot.err{background:var(--rd);animation:none}
-    .dot.pauze{background:var(--am);animation:none}
-    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-
-    /* Header */
-    /* Zachte binnenhoek (v15.7): 12px linksboven, de rest blijft haaks. De rechterrand van de
-       zijbalk is daarvoor weg — in licht thema is het contrast genoeg. In donker ligt het
-       werkvlak dicht bij leisteen, dus daar tekent ::before de lijn van --sbedge mét de
-       boog. Een gewone border kan niet: #hdr zou hem bovenin overschilderen. */
-    #main{flex:1;display:flex;flex-direction:column;overflow:hidden;position:relative;background:var(--bg);border-top-left-radius:12px}
-    [data-theme=dark] #main::before{content:'';position:absolute;inset:0;border-left:1px solid var(--sbedge);border-top:1px solid var(--sbedge);border-top-left-radius:inherit;pointer-events:none;z-index:5}
-    #hdr{height:var(--hh);background:var(--sur);border-bottom:1px solid var(--bor);display:flex;align-items:center;padding:0 26px;gap:8px;flex-shrink:0}
-    .hdr-info{flex:1;display:flex;align-items:baseline;gap:10px;min-width:0}
-    .hdr-info h1{font-size:18px;font-weight:600;line-height:1.2;letter-spacing:-.01em;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:1;min-width:0}
-    /* Kop-pillen: de vier tellers van Nog Te Doen, in de paginakop i.p.v. een strook eronder.
-       [hidden] moet expliciet, anders wint display:flex van de browser-standaard en staan
-       de pillen ook op de andere pagina's in de kop.
-       Bewust géén overflow-clamp: de pillen raken de doosrand precies, en een clamp knipt dan
-       de focus-ring (2px outline + 2px offset) van de twee filterknoppen en de chevron af tot
-       een los haakje. Boven 1000px passen de pillen altijd — gemeten op 1005px in het slechtste
-       geval (zijbalk open, viercijferige tellers, ✕ zichtbaar) blijft er nog ruim 20px lucht tot
-       de eerste icoonknop — dus de clamp was een vangnet dat nooit in werking trad. Daaronder
-       neemt het @media-blok het over met een eigen regel én opvulling voor de ring. */
-    .kop-pillen{display:flex;align-items:center;gap:6px;min-width:0;flex-shrink:1}
-    .kop-pillen[hidden],.kop-pillen:empty{display:none}
-    /* Staan er pillen, dan houdt de titel haar breedte en leveren de pillen in — nooit andersom. */
-    /* `:not(:empty)` erbij, gelijk aan de @media-variant verderop: `syncKop` (ui.js) haalt het
-       hidden-attribuut van het pillenblok af zodra je op Nog Te Doen staat, óók vóór de eerste
-       databeurt. Zonder deze eis was de titel dus al onkrimpbaar terwijl er nog geen enkele pil
-       stond — precies het tegenovergestelde van wat de regel hierboven belooft. */
-    .hdr-info:has(.kop-pillen:not([hidden]):not(:empty)) h1{flex-shrink:0}
-    .kop-pil{display:inline-flex;align-items:center;gap:4px;font-size:13px;font-weight:400;color:var(--mut);background:none;border:1px solid transparent;border-radius:var(--rs);padding:3px 7px;white-space:nowrap;line-height:1.3}
-    .kop-pil b{font-weight:600;color:var(--txt);font-variant-numeric:tabular-nums}
-    /* 'af' leest gedempt, maar --fnt haalt op 11,5px maar 2,5:1 — net als de zoekplaceholder
-       hierboven pakken we --mut (5,7:1). Het vet houdt het getal apart van het bijschrift. */
-    .kop-pil.pil-dof b{color:var(--mut)}
-    .kop-pil-klik{cursor:pointer;background:none;border-color:transparent;font-family:inherit;transition:background var(--tr),border-color var(--tr),color var(--tr)}
-    .kop-pil-klik:hover{background:var(--row-hover)}
-    .kop-pil.pil-rd b{color:var(--rd)}
-    .kop-pil-klik.aan.pil-rd{background:var(--rd-l);color:var(--rd)}
-    .kop-pil-klik.aan.pil-am{background:var(--am-l);color:var(--am)}
-    .kop-pil-klik.aan b{color:inherit}
-    .kop-chev{width:22px;height:22px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;border:1px solid transparent;border-radius:6px;background:var(--sur);color:var(--mut);cursor:pointer;transition:background var(--tr),color var(--tr),transform var(--tr)}
-    .kop-chev:hover{background:var(--sur2);color:var(--txt)}
-    .kop-chev[aria-expanded="true"]{background:var(--ac-l);color:var(--ac-900);transform:rotate(180deg)}
-    .ico-btn{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:var(--rs);border:1px solid transparent;color:#6f7986;background:none;transition:background var(--tr),color var(--tr),border-color var(--tr);flex-shrink:0}
-    .ico-btn:hover{background:var(--row-hover);color:var(--txt)}
-    .ico-btn svg{width:16px;height:16px}
-    /* Refresh-knop in de donkere zijbalk-voet */
-    .sb-foot .ico-btn{border-color:#3A4757;background:transparent;color:#9AA5B2}
-    .sb-foot .ico-btn:hover{background:rgba(255,255,255,.05);color:#D5DCE4}
-    .btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--rs);font-size:13px;font-weight:600;transition:background var(--tr),color var(--tr),border-color var(--tr),filter var(--tr),transform var(--tr-fast);white-space:nowrap;cursor:pointer}
-    .btn-pri{background:var(--ac);color:#fff;border:none}.btn-pri:hover{filter:brightness(1.1)}
-    .btn-sec{background:var(--sur);color:var(--mut);border:1px solid var(--bor)}.btn-sec:hover{background:var(--sur2);color:var(--txt)}
-    .btn-sm{padding:5px 10px;font-size:12px}
-    .btn-edit{width:28px;height:28px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;border:1px solid var(--bor);background:var(--sur2);color:var(--mut);transition:all var(--tr);flex-shrink:0}
-    .btn-edit:hover{background:var(--ac-l);color:var(--ac);border-color:var(--ac-b)}
-    .btn-del{border:1px solid var(--rd);background:var(--rd);color:#fff}
-    .btn-del:hover{filter:brightness(1.1)}
-    .btn-afr{border:1px solid var(--bor-input);background:var(--sur);color:var(--txt);transition:all var(--tr);display:inline-flex;align-items:center;gap:5px}
-    .btn-afr:hover{background:var(--sur2)}
-    /* V3 — lichte, menselijke actieknoppen (Afronden / Bewerken) */
-    .acts{display:flex;gap:5px;align-items:center}
-    /* Inline-acties (altijd zichtbaar) — Operator: groene afrond-knop + grijze icoonknoppen */
-    .act-af{height:28px;padding:0 11px;border-radius:6px;background:none;border:1px solid transparent;color:var(--ac);font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0;cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;transition:all var(--tr)}
-    .act-af:hover{background:var(--ac);border-color:var(--ac);color:#fff}
-    .act-af svg{width:14px;height:14px}
-        /* #888f9b i.p.v. #9aa1ad: dit pictogram haalde 2,60:1 op wit en een pictogram moet 3:1 halen.
-       Op de donkere kaart komt dezelfde kleur op 4,7:1 uit, dus één waarde volstaat. */
-    .act-bw{height:28px;padding:0 11px;border-radius:6px;background:none;border:1px solid transparent;color:#888f9b;font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0;cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;transition:all var(--tr)}
-    .act-bw:hover{background:var(--row-hover);color:var(--txt)}
-    .act-bw svg{width:13px;height:13px}
-    .act-ico{padding:0;width:28px;justify-content:center}
-    /* 'In behandeling' vanaf de rij. Uit staat hij precies zo neutraal als de bewerk- en
-       weglegknop ernaast (`.act-bw`), aan kleurt hij amber — dezelfde twee kleurtokens als het
-       'In behandeling'-label in het bundelpaneel (`.bdl-ib`), zodat dezelfde toestand op twee
-       plekken niet twee kleuren krijgt. */
-    .act-ib{height:28px;padding:0;width:28px;justify-content:center;border-radius:6px;background:none;border:1px solid transparent;color:#888f9b;font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;transition:all var(--tr)}
-    .act-ib:hover{background:var(--row-hover);color:var(--txt)}
-    .act-ib svg{width:13px;height:13px}
-    .act-ib.aan{color:var(--am)}
-    .act-ib.aan:hover{background:var(--am);border-color:var(--am);color:#fff}
-    tr.ib-row td{background:#fafbfc!important;border-color:var(--row-divider)!important}
-    tr.ib-row .code{background:none!important;color:#6b7280!important}
-    [data-theme=dark] tr.ib-row td{background:#1c2026!important;border-color:var(--row-divider)!important}
-    [data-theme=dark] tr.ib-row .code{color:#9aa1ad!important}
-    .hamburger{display:none}
-
-    /* Content */
-    #content{flex:1;overflow-y:auto;padding:20px}
-    .page{display:none}.page.active{display:block}
-
-    /* Stats */
-
-    /* V3 — horizontale stat-strip (grote getallen, geen tegels) */
-    .stat-strip{display:flex;align-items:center;flex-wrap:wrap;background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);padding:4px 22px;box-shadow:var(--sh);margin-bottom:18px}
-    .stat-item{display:flex;align-items:baseline;gap:10px;padding:14px 26px 14px 0;margin-right:26px;border-right:1px solid var(--bor)}
-    .stat-item:last-child{border-right:none;margin-right:0;padding-right:0}
-    /* Knop-reset met longhands: border-right bewust NIET zetten, anders wint deze regel
-       van de mobiele .stat-item{border-right:none} en komen de scheidingslijnen terug. */
-    .stat-item.stat-klik{background:none;border-top:0;border-left:0;border-bottom:0;font:inherit;text-align:left;cursor:pointer;border-radius:0}
-    .stat-item.stat-klik:hover .stat-cap{color:var(--txt)}
-    .stat-item.stat-klik.aan{box-shadow:inset 0 -2px 0 var(--ac)}
-    .stat-val{font-size:28px;font-weight:600;letter-spacing:-.02em;line-height:1;color:var(--txt);font-variant-numeric:tabular-nums}
-    .stat-val.amber,.stat-val.green,.stat-val.teal{color:var(--txt)} /* --fnt gaf 2,6:1 op wit; een cijfer van 30px valt onder 'grote tekst' en moet 3:1 halen. --mut blijft duidelijk gedempt t.o.v. --txt en haalt het in beide thema's */
-    .stat-meta{display:flex;flex-direction:column;gap:1px;padding-bottom:2px}
-    .stat-cap{font-size:12px;font-weight:500;color:var(--mut);white-space:nowrap}
-    /* var(--ac) i.p.v. var(--ac-500): die laatste (#14B8A6) haalde maar 3,93:1 op wit. --ac is de
-       merkkleur die overal elders al voor tekst wordt gebruikt en beweegt netjes mee met het thema. */
-    .stat-hint{font-size:11px;font-weight:600;color:var(--ac);white-space:nowrap}
-    /* Huidige weeknummer — staat sinds de compacte kop in .ntd-week (het uitklappaneel);
-       "Week 26" naast elkaar, eigen accent zodat 't niet als telling leest */
-    .stat-week-cap{font-size:28px;font-weight:600;letter-spacing:-.02em;line-height:1;color:var(--txt);white-space:nowrap}
-    .stat-week-val{font-size:28px;font-weight:600;letter-spacing:-.02em;line-height:1;color:var(--ac);font-variant-numeric:tabular-nums}
-
-    /* Card */
-    .card{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;margin-bottom:18px}
-    /* overflow:hidden maakt van de kaart een scroll-container, en dáárbinnen heeft
-       `position:sticky` niets om aan vast te houden: de datumkoppen in het Logboek schoven
-       gewoon mee omhoog (gemeten: bij volledig doorscrollen stond de kop op -936px i.p.v. te
-       blijven staan). `overflow:clip` knipt precies hetzelfde af maar maakt géén scroll-container,
-       dus dan plakken ze wél — aan #content, de echte scroller. In @supports omdat Safari 15 het
-       nog niet kent; daar blijft het bij hidden en dus bij de oude situatie. */
-    @supports (overflow: clip){ .card{overflow:clip} }
-    .card-hdr{padding:13px 16px;border-bottom:1px solid var(--bor);display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-height:52px}
-    .card-hdr h2{font-size:15px;font-weight:600;flex:1;min-width:0}
-
-    /* Search & Filter bar */
-    .filter-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-    .search-box{display:flex;align-items:center;gap:8px;height:36px;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rs);padding:0 12px;transition:border var(--tr),box-shadow var(--tr)}
-    .search-box:focus-within{border-color:var(--ac);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 14%,transparent)}
-    .search-box svg{width:14px;height:14px;color:var(--fnt);flex-shrink:0}
-    .search-box input{background:none;border:none;outline:none;color:var(--txt);font-size:13px;font-weight:500;width:155px;min-width:0;flex:1 1 auto}
-    /* min-width:0 + flex: het VvE-codeveld zit in een vak van max. 150px, maar de invoer bleef 155px
-       en getypte codes liepen over de rand tot in de behandelaarkeuze (naloop 25-09). */
-    .search-box input::placeholder{color:var(--mut)} /* leesbare instructietekst → --mut (WCAG AA), niet de te-lichte --fnt */
-    .filter-select{height:36px;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rs);padding:0 34px 0 12px;color:var(--txt);font-size:13px;font-weight:500;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;transition:border var(--tr),box-shadow var(--tr)}
-    .filter-select:hover{border-color:var(--ac-b)}
-    .filter-select:focus{border-color:var(--ac);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 14%,transparent)}
-    /* Datumvelden in een filterbalk. Zelfde maat en rand als .filter-select ernaast, zodat de
-       balk één regel blijft in plaats van drie verschillende hoogtes. */
-    .filter-datum{height:36px;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rs);padding:0 10px;color:var(--txt);font-size:13px;font-weight:500;font-family:inherit;outline:none}
-    .filter-datum:hover{border-color:var(--ac-b)}
-    .filter-datum:focus{border-color:var(--ac);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 14%,transparent)}
-    #af-eigen{display:inline-flex;align-items:center;gap:6px}
-    /* Verplicht, niet cosmetisch: de regel hierboven zet `display` en wint anders van het
-       standaardgedrag van [hidden] — dan staat het 'eigen bereik' er altijd. Zelfde val als
-       elders in dit bestand al beschreven staat. */
-    #af-eigen[hidden]{display:none}
-    .af-tot{font-size:12px;font-weight:600;color:var(--mut)}
-    .filter-check{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 12px;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rs);color:var(--txt);font-size:13px;font-weight:500;cursor:pointer;user-select:none;white-space:nowrap;transition:border var(--tr),box-shadow var(--tr)}
-    .filter-check:hover{border-color:var(--ac-b)}
-    .filter-check:focus-within{border-color:var(--ac);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 14%,transparent)}
-    .filter-check input{accent-color:var(--ac);width:15px;height:15px;margin:0;cursor:pointer}
-    /* Filterbalk-knoppen: gelijke hoogte + on-brand */
-    .filter-bar .btn{height:36px;padding:0 16px;border-radius:var(--rs);font-size:13px;font-weight:600}
-    .filter-bar .btn-sm{padding:0 13px}
-    .filter-bar .btn-pri svg,.filter-bar .btn-sec svg{flex-shrink:0}
-
-    /* Tabs */
-    /* De tabbladenrij staat sinds v11.7 altijd ÍN een kaartkop (.hdr-tabs hieronder); wat daar
-       per plek verschilt — opvulling, marge, overloop, breedtegedrag — staat dáár en niet hier,
-       zodat elke eigenschap één plek heeft. Wat hier stond (4px opvulling bovenaan met een
-       negatieve marge eraf, een eigen achtergrond en `overflow-x:auto`) hoorde bij de losse
-       tabbalk die niet meer bestaat en werd hoe dan ook overschreven.
-       De focus-ring blijft naar BINNEN getekend: op een telefoon staat de rij nog steeds op
-       `overflow-x:auto`, en dat maakt per spec ook de verticale as niet-visible — de globale ring
-       (2px outline + 2px offset) viel daardoor buiten de doos, en dan weg je met de toets door de
-       tabbladen zonder te zien waar je bent. */
-    .tabs{display:flex;gap:2px;border-bottom:1px solid var(--bor)}
-    .tab:focus-visible{outline-offset:-2px}
-    .tab{padding:11px 11px;font-size:13px;font-weight:500;color:var(--mut);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color var(--tr),border-color var(--tr);display:flex;align-items:center;gap:5px;white-space:nowrap;flex-shrink:0}
-    .tab:hover{color:var(--txt)}
-    .tab.on{color:var(--txt);border-bottom-color:var(--ac);font-weight:600}
-    .tab .cnt{min-width:auto;height:auto;padding:0;border-radius:0;font-size:12px;font-weight:500;background:none;color:var(--mut);display:inline-flex;align-items:center;justify-content:center}
-    .tab.on .cnt{color:var(--mut)}
-
-    /* ── Tabbladen ÍN de kaartkop (Nog Te Doen / Afgerond / Ontwikkeling) ──
-       Tot v11.6 stonden de tabbladen in een eigen balk ONDER de kop, en zei die kop links
-       exact hetzelfde als het actieve tabblad: 'Oppakken' boven 'Oppakken'. Die dubbele regel
-       is weg. De <h2> blijft bestaan maar alleen voor schermlezers (.alleen-voorlezer): een
-       tabel zonder kop is voor een schermlezer een naamloos blok, en `#ntd-title` wordt ook
-       door de code gezet en getoetst. Gemeten op 1920 breed: 111px → 53px boven de kolomkoppen.
-
-       Drie dingen liggen hier vast en mogen niet losjes wijzigen:
-
-       1. `align-items:stretch` + `.tab{align-self:stretch}`. De streep onder het actieve
-          tabblad moet op de ONDERRAND van de balk vallen — net zoals hij eerst op de onderrand
-          van de losse tabbalk viel. Daarvoor moeten de tabbladen de volle hoogte van de balk
-          pakken; met `align-items:center` hangt die streep halverwege in de lucht.
-
-       2. `overflow:visible` en NIET `auto` (behalve op een telefoon, zie de media query
-          onderaan). `overflow-x:auto` zet de automatische minimumbreedte van een flex-item op
-          0. Dan krimpt de tabbladenrij liever dan dat de filterbalk naar een tweede regel
-          zakt, en verdwijnen er tabbladen achter een schuifbalk die niemand zoekt. Met
-          `visible` is de minimumbreedte de inhoud, dus breekt de balk netjes af.
-
-       3. `flex:1 1 auto` + de eigen onderrand + `margin-bottom:-1px`. Past alles op één regel
-          (±1850px en breder), dan groeit de tabbladenrij tot aan de filterbalk en valt haar
-          onderrand precies op die van de kaartkop — onzichtbaar, één streep. Past het niet,
-          dan zakt de filterbalk naar een tweede regel, groeit de tabbladenrij tot de volle
-          breedte en wordt diezelfde onderrand de scheidslijn tussen de twee regels. Eén set
-          regels die op elke schermbreedte klopt, zonder gegokt breekpunt. */
-    .card-hdr.hdr-tabs{padding:0 16px;gap:0 14px;align-items:stretch;position:relative}
-    .hdr-tabs .tabs{padding:0;margin:0 0 -1px;overflow:visible;flex:1 1 auto;min-height:44px}
-    .hdr-tabs .tab{align-self:stretch;padding:0 11px}
-    .hdr-tabs .filter-bar{align-self:center;padding:8px 0}
-    /* Alleen voor schermlezers. Weghalen kon niet: dan verliest de tabel haar kop. */
-    .alleen-voorlezer{position:absolute;width:1px;height:1px;padding:0;margin:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
-
-    /* ── Weekkiezer ('Periode', Vergaderverzoeken) ──
-       Zelfde maat en rand als de andere velden in het bewerkscherm, zodat de rij niet
-       verspringt. Het paneel hangt absoluut onder de knop; `.wk-veld` is daarvoor het anker. */
-    .wk-veld{position:relative}
-    .wk-knop{width:100%;height:38px;display:flex;align-items:center;justify-content:space-between;gap:8px;
-      background:var(--sur);border:1px solid var(--bor-input);border-radius:var(--rs);padding:0 11px;
-      font:inherit;font-size:13px;color:var(--txt);cursor:pointer;text-align:left;
-      transition:border var(--tr),box-shadow var(--tr)}
-    .wk-knop:hover{border-color:var(--ac-b)}
-    .wk-knop[aria-expanded="true"]{border-color:var(--ac);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 14%,transparent)}
-    .wk-knop>svg{flex:none;color:var(--fnt)}
-    .wk-huidig{display:flex;align-items:baseline;gap:8px;min-width:0}
-    .wk-huidig b{font-family:var(--font-mono);font-size:12px;font-weight:600;flex:none}
-    .wk-huidig span{color:var(--mut);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .wk-huidig.wk-leeg{color:var(--mut);display:block}
-    .wk-oud b{font-family:inherit;font-style:italic}
-    .wk-paneel{position:absolute;z-index:50;left:0;right:0;top:calc(100% + 5px);max-height:264px;overflow-y:auto;
-      background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);box-shadow:var(--shm);padding:5px}
-    /* Maandkop bewust NIET sticky: met twee koppen vlak na elkaar blijft de bovenste plakken
-       terwijl zijn weken al weggescrold zijn, en dan lijkt die maand leeg. Elke optie noemt
-       zijn maand zelf ('ma 14 – vr 18 september'), dus de kop is een rustpunt, geen kompas. */
-    .wk-maand{padding:7px 9px 4px;font-size:11px;font-weight:600;
-      color:var(--mut);text-transform:uppercase;letter-spacing:.07em}
-    .wk-optie{border-radius:var(--rs);padding:6px 9px;cursor:pointer;transition:background var(--tr)}
-    .wk-optie:hover,.wk-optie.hier{background:var(--row-hover)}
-    .wk-optie.aan{background:var(--ac-l)}
-    .wk-optie .wknr{display:block;font-family:var(--font-mono);font-size:12px;font-weight:600;color:var(--txt)}
-    .wk-optie .wkdg{display:block;font-size:12px;color:var(--mut);margin-top:1px}
-    /* Weken die al voorbij zijn blijven kiesbaar (een vergadering achteraf vastleggen), maar
-       staan gedempt: ze zijn de uitzondering, niet waar je normaal naar zoekt. */
-    .wk-optie.terug .wknr{color:var(--mut);font-weight:500}
-    .wk-optie.deze .wknr::after{content:'deze week';margin-left:8px;font-family:var(--font-app);font-size:10px;
-      font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--ac)}
-
-    /* Table */
-    .tbl-wrap{overflow-x:auto}
-    table{width:100%;border-collapse:collapse;font-size:13px}
-    /* `overflow:hidden;text-overflow:ellipsis` is een VANGNET, geen norm (v11.8). De koppen zijn
-       `white-space:nowrap`, en zonder dit werd een kop die niet paste OVER zijn buurkop heen
-       getekend — twee namen door elkaar, allebei onleesbaar. Nu kapt hij netjes af. De gewichten
-       in config.js zijn nog steeds zo gezet dat het bij de smalste tabel niet nodig is; dit vangt
-       alleen de selecteerstand en een toekomstige letter- of labelwijziging op. */
-    thead th{background:var(--sur2);padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--bor);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    /* Sorteerbare kolomkoppen (NTD): knop erft de th-typografie; pijl toont de richting */
-    /* De kolombalk draagt een lichte tint van het accent, op elk tabblad dezelfde (v13.7: de
-       zes tabkleuren van v11.8 zijn één leiblauw geworden; grijs vond de gebruiker te levenloos).
-       Oorspronkelijk (v11.8): de kolombalk droeg de kleur van het tabblad waar je in zit.
-       De waarden komen uit SECS[...].css, dat renderThead als inline stijl op elke <th> zet —
-       die stonden er al, ze werden alleen niet gebruikt. Blauwgrijs bij Oppakken, amber bij
-       Vergaderverzoeken, paars bij Offerte-trajecten, rood bij LOD, teal bij Subsidie-trajecten
-       en roze bij Ontwikkeling. Alle zes halen ruim de 4,5:1 die dit project aanhoudt, in beide
-       thema's — nagemeten in de browser. */
-    #ntd-thead th,#af-thead th,#ontw-thead th{background:var(--sec-l);color:var(--sec);border-bottom-color:var(--sec-b)}
-    .th-sort{background:none;border:0;padding:0;font:inherit;color:inherit;text-transform:inherit;letter-spacing:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
-    /* --txt, niet --tx: die variabele bestaat niet, dus de hover viel stil terug op de erfkleur
-       en het kopje reageerde nergens op. Ook in de terugval van .aan hieronder. */
-    .th-sort:hover{color:var(--txt)}
-    .th-sort.aan{color:var(--sec,var(--txt));font-weight:600}
-    .th-sort:focus-visible{outline:2px solid var(--ac);outline-offset:2px;border-radius:4px}
-    .th-pijl{font-size:8px;line-height:1}
-    tbody tr{border-bottom:1px solid var(--row-divider);transition:background var(--tr)}
-    tbody tr:last-child{border-bottom:none}
-    tbody tr:hover{background:var(--row-hover)}
-    td{padding:var(--row-py,9px) var(--row-px,10px);vertical-align:middle;font-size:var(--row-fs,13px);line-height:var(--row-lh,1.4)}
-    /* Eerste cel draagt de prioriteits-balk; ruimte ervoor */
-    tbody td:first-child{position:relative;padding-left:20px}
-    tbody tr[data-prio]>td:first-child::before{content:'';position:absolute;left:7px;top:50%;transform:translateY(-50%);width:3px;height:18px;border-radius:2px;background:var(--prio-bar,var(--bor-input))}
-    tbody tr[data-prio=hoog]{--prio-bar:var(--prio)}
-    tbody tr[data-prio=midden]{--prio-bar:#b88a32}
-    tbody tr[data-prio=laag],tbody tr[data-prio=geen]{--prio-bar:var(--bor-input)}
-    /* #69707e i.p.v. #6b7280: op een kaart haalde het 4,83:1, maar op de dossierpagina staat de
-       VvE-code rechtstreeks op de paginakleur (#f4f5f7) en dan bleef er 4,43:1 over. */
-    .code{font-family:var(--font-mono);font-size:12px;font-weight:500;letter-spacing:0;color:#69707e;background:none;padding:0;white-space:nowrap}
-    /* Inklapbare tekstcellen — Operator: 1 regel met …; klik op de rij klapt uit.
-       Clamp zit op een inline-block .ct (td blijft table-cell, zodat kolommen netjes uitlijnen). */
-    .cell-name{font-weight:500;color:var(--txt)}
-    .cell-txt{color:#48505c;font-size:calc(var(--row-fs,13px) - .5px)}
-    .cell-note{color:var(--mut);font-size:12px}
-    .cell-name,.cell-txt,.cell-note{line-height:var(--row-lh,1.4);cursor:pointer;white-space:nowrap}
-    /* De nowrap hierboven is voor de takentabel (vaste kolommen + afkapping met …). De andere tabellen
-       (Afgerond, Recentelijk afgerond, Ontwikkeling, Herhaalregels, ALV's) hebben geen afkapping en
-       verdelen de ruimte naar inhoud: daar schoven lange teksten Behandelaar, Datum en Opmerking
-       buiten beeld (Afgerond: 528px zijwaarts op 1440). Daar mag de rij meegroeien (naloop 25-09). */
-    .tbl-wrap:not(#ntd-tbl-wrap) :is(.cell-name,.cell-txt,.cell-note){white-space:normal;overflow-wrap:break-word}
-    .cell-name>.ct,.cell-txt>.ct,.cell-note>.ct{display:inline-block;vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    /* Breedteverdeling (v8.9). Het actiepunt is de kolom die je écht leest, dus die krijgt
-       de meeste ruimte; VvE-naam en opmerkingen leveren in. De som is zo gekozen dat de
-       tabel op een venster van 1440 past — daaronder vangt de vastgezette actiekolom af.
-       Afgekapte tekst blijft bereikbaar: klik op de rij klapt 'm uit, hover toont de titel. */
-    /* Hier stonden drie klemmen in vaste pixels (160/350/155). Ze zijn weg: `class="ct"` wordt
-       uitsluitend door rowNtd geschreven, dus élke .ct staat binnen #ntd-tbl-wrap en werd daar al
-       overschreven. `rowAf` en de dossierlijsten zetten géén .ct — die regels raakten dus niets
-       meer. De klem die telt staat bij de kolomverdeling hieronder. */
-    tr.expanded .cell-name,tr.expanded .cell-txt,tr.expanded .cell-note{white-space:normal}
-    /* overflow-wrap:anywhere: uitgeklapt mag de tekst wikkelen, maar een URL of een lang samengesteld
-       woord ('gevelrenovatiewerkzaamheden') heeft geen breekpunt en liep dan over de buurkolom (naloop 25-09). */
-    tr.expanded .cell-name>.ct,tr.expanded .cell-txt>.ct,tr.expanded .cell-note>.ct{display:inline;max-width:none;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
-    .cell-sm{font-size:12px;color:#48505c;white-space:nowrap}
-    /* Actiekolom blijft in beeld (v8.9). De takentabel is breder dan het venster, waardoor
-       de bewerk-/wegleg-/afvinkknoppen erbuiten vielen en je eerst zijwaarts moest scrollen
-       om iets af te ronden. Alleen de NTD-tabel: daar is de laatste kolom de actiekolom.
-       Cellen met colspan (groepskoppen 'In behandeling'/'Weggelegd', lege-lijst-regel)
-       scrollen bewust gewoon mee — die hebben geen actieknoppen. */
-    /* ── Kolomverdeling van de takentabel ──────────────────────────────────────────────────
-       `table-layout:fixed` is wat de <colgroup> uit renderThead werkelijk laat gelden. Zonder dit
-       verdeelt de browser de ruimte naar inhoud, en dan won 'Datum aangevr.' (351px voor één
-       datum) het van de VvE-naam en de opmerkingen ernaast, die allebei afgekapt werden.
-
-       `min-width` houdt de tabel leesbaar op een smal scherm: met alleen `width:100%` zou hij op
-       een telefoon van 378px zijn kolommen tot dertig pixel indikken. 1150 en niet meer: bij een
-       venster van 1440 is de wikkel 1153px breed, en op 1180 gingen Offerte-trajecten en
-       Subsidie-trajecten daar nieuw zijwaarts scrollen terwijl ze eerst precies pasten. */
-    #ntd-tbl-wrap table{table-layout:fixed;min-width:1150px}
-    /* Vangnet. Met een vaste kolomindeling wordt te brede inhoud niet meer opgevangen door een
-       bredere kolom: hij loopt óver de buurkolom heen, want de cel is `overflow:visible` en deze
-       spans zijn `white-space:nowrap`. De kolombreedtes zijn zo gekozen dat een lange datum past,
-       maar een onverwacht lange waarde hoort af te kappen in plaats van de buur te overschrijven. */
-    #ntd-tbl-wrap .s-normal,#ntd-tbl-wrap .s-telaat,
-    #ntd-tbl-wrap .warn-geen-deadline{
-      display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;
-    }
-    /* 'Datum aangevr.' op Offerte-trajecten is KALE tekst in de cel, zonder span eromheen
-       (render-tabel.js). Die viel dus buiten de regel hierboven en had als enige datumkolom geen
-       vangnet. De cel zelf afkappen is hier het enige aangrijpingspunt. */
-    #ntd-tbl-wrap td.cell-sm{overflow:hidden;text-overflow:ellipsis}
-    /* De periode-badge op Vergaderverzoeken is vrije tekst uit de Sheet ("eind juni/begin juli")
-       en liep zo de agendapunten-kolom in. `.badge` is inline-flex voor badges mét icoon; deze
-       heeft er geen, dus inline-block mag en dan werkt de ellipsis. */
-    /* Offerte en Subsidie houden hun oude pillen naast de tekst in dezelfde cel. Met een vaste
-       kolomindeling telt dat op tot méér dan de kolom breed is, en dan lopen ze de buurkolom in
-       (gemeten: de 'Vandaag'-pil 66px eroverheen). Een flexrij laat de TEKST krimpen en houdt de
-       pil heel — die is het signaal, de opmerking staat ook in het zweeftekstje. */
-    #ntd-tbl-wrap .pil-rij{display:flex;align-items:center;gap:5px;min-width:0}
-    /* De afkapping (…) stond alleen op `.cell-note>.ct` en `.cell-txt>.ct` — DIRECTE kinderen. In
-       een pil-rij is de tekst een KLEINKIND van de cel, dus die regel greep er niet op: de flexbox
-       gaf de tekst netjes de resterende breedte, maar zonder overflow liep hij daar gewoon
-       zichtbaar uit en schoof hij ónder de pil door (gemeten: 256px tekst in 82px ruimte). Dat is
-       wat je op Offerte- en Subsidie-trajecten zag. `display:block` erbij, want een inline-block
-       binnen een flexrij kapt niet betrouwbaar af. */
-    /* `flex:0 1 auto` en niet `flex:1` (v12.0): met flex-GROW duwde een korte opmerking de pil
-       naar de rechterrand van de kolom, los van de tekst waar hij bij hoort. Nu staat hij er
-       direct achter. Krimpen mag hij nog steeds, dus een lange opmerking kapt af en de pil
-       blijft staan — dat was de reden dat hier ooit een flexrij kwam. */
-    #ntd-tbl-wrap .pil-rij>.ct{flex:0 1 auto;min-width:0;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    /* Uitgeklapte rij: de tekst mag over meerdere regels, net als in een cel zonder pil-rij. Zonder
-       deze regel bleef de opmerking op Offerte- en Subsidie-trajecten één afgekapte regel, ook na
-       een klik op de rij — precies het gedrag dat het uitklappen moet opheffen. */
-    #ntd-tbl-wrap tr.expanded .pil-rij{align-items:flex-start}
-    #ntd-tbl-wrap tr.expanded .pil-rij>.ct{overflow:visible;text-overflow:clip;white-space:normal;overflow-wrap:anywhere}
-    #ntd-tbl-wrap .pil-rij>.pill-snooze{flex:none;margin-left:0}
-    /* De naamcel krijgt NADRUKKELIJK GEEN flexrij. Het bundel-merkje hoort daar op een EIGEN
-       REGEL onder de naam te staan: naast elkaar vraagt de cel de SOM van beide breedtes in
-       plaats van de breedste, en dat liet de VvE-kolom eerder met 165px groeien. Er staat een
-       toets op ('stapel-e2e: en staat op een eigen regel ónder de VvE-naam'). Hier alleen een
-       klem, zodat een lang merkje of een telpil de buurkolom niet in loopt. */
-    #ntd-tbl-wrap .cell-name .bdl-merk{
-      max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-    }
-    /* De telpil krijgt een EIGEN REGEL onder de naam, net als `.bdl-merk-kop` hierboven.
-       Stond hij naast de naam, dan hield `max-width:calc(100% - 96px)` maar 52px over van een
-       kolom van 168px: "Vereniging Parkzicht Noord" werd "Vereni…" — en juist de bundelkop is de
-       rij waarvan je wilt zien om welke VvE het gaat (gemeten op 1440 breed).
-       Het oude bezwaar tegen een pil naast de naam ('de cel vraagt dan de SOM van beide breedtes
-       en de kolom groeit mee') geldt hier niet meer: de takentabel staat sinds v10.41 op
-       `table-layout:fixed` met een vaste colgroup, dus celinhoud verzet geen kolombreedte.
-       De rij wordt hierdoor één regel hoger — precies wat de kop-merkjes in de platte lijst al
-       doen, en in lijn met 'rijen rekken mee met hun inhoud'. */
-    /* Codecel op één regel: het sleephandvat + een code als '121034 - G' pasten niet naast elkaar,
-       de code wikkelde naar een tweede regel en stond lager dan de naam (naloop 25-09). */
-    #ntd-tbl-wrap td.cell-code{white-space:nowrap}
-    #ntd-tbl-wrap .cell-name.met-telpil>.ct{max-width:100%}
-    /* Het grijze subcategorie-label (subBadge) óók op een eigen regel onder de naam, om dezelfde
-       reden als de telpil: naast een naam die de volle kolom al pakt, tekende het label tot 101px
-       over de buurkolom heen (naloop 25-09). margin-left !important tegen de inline 4px. */
-    #ntd-tbl-wrap .cell-name>.badge{
-      display:block;width:max-content;max-width:100%;margin:2px 0 0 !important;
-      overflow:hidden;text-overflow:ellipsis;
-    }
-    #ntd-tbl-wrap .cell-name.met-telpil>.bdl-pill{
-      display:block;width:max-content;max-width:100%;margin:2px 0 0;
-      overflow:hidden;text-overflow:ellipsis;
-    }
-    /* De periodecel (Vergaderverzoeken). Tot v11.9 stond hier een felgele pil met vetgedrukte
-       tekst omheen; die is eruit. Twee regels: weeknummer boven in de cijferletter, werkdagen
-       eronder gedempt. `overflow:hidden` op de regels apart en niet op de cel, zodat de tweede
-       regel mag afkappen zonder de eerste mee te nemen. */
-    /* Deadline op twee regels (v12.0): datum boven, hoe ver hij afligt eronder. Zelfde vorm als de
-       periodecel hiernaast, zodat de twee kolommen elkaars ritme volgen. Alleen als er iets te
-       melden valt — een rij die gewoon op tijd is blijft eenregelig. --sig-crit i.p.v. --prio voor
-       de TEKST: --prio haalt 4,42:1 en dit project houdt 4,5 aan. */
-    .dl-2{display:block;line-height:1.25}
-    .dl-2 .dl-dat{display:block;font-family:var(--font-mono);font-size:12px;font-weight:600;white-space:nowrap;
-      overflow:hidden;text-overflow:ellipsis}
-    .dl-2 .dl-bij{display:block;font-size:11px;font-weight:600;margin-top:1px;white-space:nowrap;
-      overflow:hidden;text-overflow:ellipsis}
-    .dl-2.laat .dl-dat,.dl-2.laat .dl-bij{color:var(--sig-crit)}
-    .dl-2.bijna .dl-dat,.dl-2.bijna .dl-bij{color:var(--am)}
-    .dl-2.opvolg .dl-dat{color:var(--txt)}
-    .dl-2.opvolg .dl-bij{color:var(--mut)}
-    .cell-per{vertical-align:middle}
-    .per-wk{display:block;line-height:1.25}
-    .per-wk .wk{display:block;font-family:var(--font-mono);font-size:12px;font-weight:600;color:var(--txt);
-      overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .per-wk .dg{display:block;font-size:11px;color:var(--mut);margin-top:1px;
-      overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    /* Een oude, met de hand getypte waarde ('sept/okt'): blijft staan, maar rustig — zo zie je
-       meteen welke regels nog geen week hebben zonder dat er iets in de Sheet verandert. */
-    .per-oud{display:block;font-size:12px;color:var(--mut);
-      overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    /* De tekst loopt tot de celrand, niet tot een vast getal. */
-    #ntd-tbl-wrap .cell-name>.ct,#ntd-tbl-wrap .cell-txt>.ct,#ntd-tbl-wrap .cell-note>.ct{max-width:100%}
-    /* De offerte-cel zette de voortgangsbalk en 'Aannemers toevoegen' ónder elkaar, waardoor élke
-       rij op dat tabblad 60px hoog werd tegen 47 op de andere vier — hoge rijen die niets extra's
-       lieten zien. Naast elkaar past het ruim en loopt de rijhoogte weer gelijk. */
-    /* De flex zit op een WIKKEL binnen de cel, niet op de <td> zelf. `display:flex` op een td
-       haalt hem uit de tabelopmaak — de browser maakt er dan een anonieme cel omheen, en de
-       rijstreep tekende zich dwars onder de inhoud door. Zichtbaar als een dunne lijn onder elke
-       offerte-cel; met een wikkel blijft de td gewoon een tabelcel. */
-    #ntd-tbl-wrap td.cell-of .of-rij{display:flex;align-items:center;gap:12px;white-space:nowrap}
-    #ntd-tbl-wrap td.cell-of .prog-wrap{flex:none}
-    #ntd-tbl-wrap td.cell-of .of-aann-tbl-tog{flex:1;min-width:0;margin-top:0;overflow:hidden;text-overflow:ellipsis}
-    /* De fase-balk is een flex die de hele cel vulde. Met een vaste kolomindeling werd dat een
-       uitgerekte lijn van 307px tussen vijf bolletjes — meer lijn dan informatie. Een plafond
-       houdt hem compact; de kolom mag breder zijn dan de balk. */
-    /* min-width:0 in de tabel: de 158px ondergrens (.fase-rij, voor het bewerkscherm) is breder dan
-       de Fase-kolom zodra de selecteerstand er een vinkjeskolom bijzet — het laatste bolletje stak
-       dan 10px de Behandelaar-kolom in (naloop 25-09). Bolletjes en lijnen passen in ±91px. */
-    #ntd-tbl-wrap .fase-rij{max-width:240px;min-width:0}
-    #ntd-tbl-wrap thead th:last-child{position:sticky;right:0;z-index:3;background:var(--sec-l)}
-    /* De vastgezette cel moet ondoorzichtig zijn, anders schemeren de wegscrollende cellen
-       erdoorheen. Een doorschijnende rijkleur kan daar dus niet: die moet ondoorzichtig
-       worden ingemengd. Elders in de tabel mengt de 7%-tint van .row-telaat zichzelf met
-       wat eronder ligt (de kaart, of bij hover de hover-kleur); hier doen we datzelfde
-       mengsel expliciet, zodat de rode rij doorloopt tot de rechterrand.
-       (Een ::after met z-index:-1 werkt hier níét: die schildert wél achter de inhoud,
-       maar nog steeds vóór de eigen achtergrond van de cel.) */
-    #ntd-tbl-wrap tbody td:not([colspan]):last-child{position:sticky;right:0;z-index:2;background:var(--sur)}
-    #ntd-tbl-wrap tbody tr:hover td:not([colspan]):last-child{background:var(--row-hover)}
-    /* Zelfde terugval als bij .row-telaat hieronder: de sticky actiekolom heeft een DEKKENDE
-       achtergrond nodig (anders schijnt de rij eronder erdoorheen), dus hier de gemengde kleur
-       uitgeschreven in plaats van een translucente laag. */
-    @media(max-width:900px){
-    #ntd-tbl-wrap tbody tr.row-telaat td:not([colspan]):last-child{background:#f6eceb}
-    #ntd-tbl-wrap tbody tr.row-telaat td:not([colspan]):last-child{background:color-mix(in srgb,var(--prio) 7%,var(--sur))}
-    #ntd-tbl-wrap tbody tr.row-telaat:hover td:not([colspan]):last-child{background:color-mix(in srgb,var(--prio) 7%,var(--row-hover))}
-    }
-    /* Bewust géén slagschaduw links van de vastgezette kolom: die tekende een donkere rand
-       dwars door de rij, waardoor een gekleurde (te late) of aangewezen rij daar optisch
-       ophield. De kolom hoeft niet apart te ogen — hij hoort bij de rij. */
-    /* Dichtheid (per collega, onthouden in localStorage) */
-    html[data-density="compact"]{--row-py:5px;--row-px:10px;--row-fs:12.5px;--row-lh:1.3}
-    html[data-density="standaard"]{--row-py:9px;--row-px:10px;--row-fs:13px;--row-lh:1.4}
-    html[data-density="ruim"]{--row-py:14px;--row-px:14px;--row-fs:14px;--row-lh:1.6}
-
-    /* Badges */
-    .badge{display:inline-flex;align-items:center;gap:3px;padding:2px 9px;border-radius:6px;font-size:11px;font-weight:600;white-space:nowrap}
-    /* Prioriteit = ingetogen tekstlabel (geen pill, geen pijltje) */
-    .badge.prio-laag{background:none;padding:0;border-radius:0;gap:0;font-size:12px;font-weight:600}
-    .prio-laag{color:var(--mut)}
-    /* Terugval vóór de color-mix, voor Safari 15 (dat color-mix nog niet kent — zelfde reden als
-       de @supports rond overflow:clip elders in dit bestand). Zonder deze regel verdwijnt op zo'n
-       browser het rode waas over te late rijen volledig, en dat is op de telefoon het ENIGE
-       urgentieteken dat je zonder vegen ziet. De rgba komt overeen met 7% van --prio in de lichte
-       modus; als translucente laag werkt hij ook op de donkere achtergrond. */
-    /* v13.7: alleen nog op smalle schermen. Op de computer staan rode balk, rode datum en
-       'Xd te laat' er al naast; het waas maakte er vier signalen van voor één feit. */
-    @media(max-width:900px){
-    .row-telaat td{background:rgba(181,84,75,.07)}
-    .row-telaat td{background:color-mix(in srgb,var(--prio) 7%,transparent)}
-    }
-    /* In de donkere modus is --rd lichtzalm (#F0746F) en haalt wit erop maar 2,83:1. Donkere tekst
-       op diezelfde pil haalt 6,30:1 — zelfde truc als bij .staging-balk en de logboek-avatars. */
-    /* 'Te laat (6d)' en 'Opvolgen (3d)' zijn sinds v13.9 gekleurde tekst in plaats van een gevuld
-       vlak: het woord zegt het al, en rood/amber is hier het enige kleur-signaal op de regel. */
-    .pill-telaat{display:inline-block;color:var(--prio);font-size:12px;font-weight:600;margin-left:8px}
-    /* LET OP de naam: `pill-opvolg` was tot v12.0 de groene 'Vandaag opvolgen'-snooze-pil en drie
-       toetsen bewaken diens afwezigheid. Deze amber opvolg-pil (aangevraagd offerte-traject,
-       v12.5) heet daarom bewust ánders. */
-    .pill-opvolgen{display:inline-block;color:var(--am);font-size:12px;font-weight:600;margin-left:8px}
-    .warn-geen-deadline{display:inline-flex;align-items:center;color:var(--am);font-size:12px;font-weight:600;font-family:var(--font-mono)}
-    .warn-geen-deadline::before{content:''}
-    /* Deadline/status als gewone mono-tekst (geen pill) */
-    .s-telaat{font-size:12px;font-weight:600;color:var(--rd);white-space:nowrap}
-    .s-normal{font-size:12px;font-weight:500;color:#48505c;white-space:nowrap}
-    /* Fase 4 — opvolging & herhaling */
-    /* Was een VOL GROEN vlak met witte tekst (#00872e). Dat was de enige felle kleurvlek in de
-       tabel en trok daardoor meer aandacht dan 'te laat', terwijl het lichter weegt. Nu hetzelfde
-       amberpaar als elders in de app (.status-gepland, .act-ib.aan) en dezelfde kleur als
-       'Vandaag opvolgen' in de Signaal-kolom, zodat één signaal ook één kleur heeft.
-       --am op --am-l haalt 4,53:1 in licht en 7,5:1 in donker; de contrasttoets in tests.js
-       meet dit paar en houdt het zo. Nog in gebruik in het bundelpaneel (render-bundel.js); in
-       de tabelrij is de pil helemaal weg (zie rowNtd). */
-    .pill-snooze{display:inline-flex;align-items:center;gap:3px;background:rgba(107,114,128,0.15);color:#4b5563;font-size:11px;font-weight:600;padding:1px 6px;border-radius:8px;margin-left:5px;cursor:pointer;white-space:nowrap;vertical-align:middle}
-    [data-theme=dark] .pill-snooze{color:#9ca3af}
-    tr.snooze-row td{opacity:.55}
-    /* tr.snooze-row td{opacity:.55} dempt élke cel; de 'Terug <datum>'-pil is juist de reden dat
-       de rij daar staat en moet leesbaar blijven. Hogere specificiteit, dus deze wint. */
-    tr.snooze-row .pill-snooze{opacity:1}
-    /* En om precies dezelfde reden de VASTGEZETTE actiekolom. Gescoped op `#ntd-tbl-wrap`, net als
-       de sticky-regel die hij compenseert: de Herhaalregels-tabel heeft geen vastgezette kolom en
-       hoort daar dus niets van te merken. Die staat op `position:sticky` met
-       een dekkende achtergrond (zie de toelichting bij `#ntd-tbl-wrap tbody td:last-child`), en
-       `opacity` maakt die achtergrond mee doorschijnend — dan schemeren de wegscrollende cellen
-       er op een smal scherm dwars doorheen. De knoppen zelf blijven wél gedempt, zodat de rij nog
-       steeds als 'weggelegd' leest. */
-    #ntd-tbl-wrap tbody tr.snooze-row td:not([colspan]):last-child{opacity:1}
-    #ntd-tbl-wrap tbody tr.snooze-row td:not([colspan]):last-child .acts{opacity:.55}
-    /* 'Geen deadline' is geen urgentie meer nu die in de signaal-kolom staat: grijs i.p.v. amber.
-       --mut en niet --fnt: op --fnt kwam deze tekst uit op 2,60:1 en dit project dwingt 4,5:1 af
-       voor rij-tekst. --mut haalt 5,83 in licht en 6,00 in donker, en dempt nog steeds duidelijk. */
-    .warn-geen-deadline.geen-dl-dof{color:var(--mut)}
-    /* Eén kleur haalt het hier niet in beide thema's: de strook is licht (#f5f7f9) én donker
-       (#1c2026). Op #7c8694 kwam de kop uit op 3,43:1 in licht en 4,44:1 in donker; 11,5px
-       hoofdletters vragen 4,5:1. Vandaar per thema een eigen waarde, zoals bij de pillen. */
-    .grp-kop{background:var(--group-bg);padding:9px 26px;font-size:12px;font-weight:600;color:#66707e;text-transform:uppercase;letter-spacing:.04em;border:none}
-    [data-theme=dark] .grp-kop{color:#808a98}
-    /* Voortgangsrondje (v13.8, SVG sinds v14.2) — ALV-status, het dossier en Ontwikkeling. Eén vorm
-       die vult per stap: lege ring (Open), ring + ⅓ accent (Klaargezet), ring + ⅔ amber (Gepland),
-       vol groen rondje met vinkje (Afgerond). De vormen zelf staan in voortgang() (util.js). */
-    .voortgang{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:500;color:var(--txt);white-space:nowrap}
-    .vg-ico{flex:none;width:14px;height:14px;display:block;color:var(--vg);shape-rendering:geometricPrecision}
-    .vg-open{--vg:var(--fnt)}
-    .vg-klaargezet{--vg:var(--ac)}
-    .vg-gepland{--vg:var(--am)}
-    .vg-afgerond{--vg:var(--gn);color:var(--mut)}
-    .stat-cap .voortgang{font-size:inherit;font-weight:inherit;color:inherit;gap:6px}
-    .stat-cap .vg-ico{width:12px;height:12px}
-    /* Budgetpakket (v15.2): bewuste uitzondering op 'geen gekleurde labels'. Als gedempte tekst
-       keek je eroverheen, terwijl een Budget-VvE zelf vergadert en anders behandeld wordt. Nu een
-       gevuld accentlabel. Letter in --sur: wit op staalblauw (licht), donker op lichtblauw (donker). */
-    .badge.budget-tag{background:var(--ac);color:var(--sur);padding:1px 7px;border-radius:4px;font-weight:600;font-size:11px;letter-spacing:.02em;margin-left:8px;vertical-align:1px}
-    /* Behandelaar-chip — Operator: één neutrale chip */
-    .pers{padding:0;font-size:12px;font-weight:500;margin:1px 8px 1px 0;display:inline-flex;align-items:center;color:var(--mut)}
-    /* Eén of twee tekens worden een rondje; een naam die niet in te korten viel blijft een gewone
-       chip. Vaste maten, want een rondje met tekstbreedte is een ei. 21px is dezelfde hoogte als
-       de chip ernaast, zodat een gemengde rij (JC naast Gerrit) niet gaat springen. */
-    .pers.pers-rond{min-width:21px;height:21px;padding:0;letter-spacing:.02em}
-    /* Eén klasse: `persBadges` zet altijd `pers-default`. De drie naam-klassen die hier stonden
-       hadden exact dezelfde waarden, werden nergens meer gezet en liepen achter op TEAM (Cihan
-       ontbrak). Ze bleven staan 'voor oude opgeslagen HTML' — maar dit dashboard bewaart nergens
-       HTML, dus die reden bestond niet. Wil je ooit kleur per persoon: leid hem af uit TEAM. */
-    .pers-default{color:var(--mut)}
-
-    /* Aanvinkbare ALV-stappen (v13.8): een rondje dat gevuld is of leeg, i.p.v. een pil '✓ Ja' /
-       '–'. Gevuld = het accent met een wit vinkje; leeg = een lichte ring. In een kolom van zestien
-       rijen springt zo het patroon eruit: waar het nog open staat zie je zonder te lezen.
-       De knop zelf blijft een doelvlak van 28px; aria-label (render-alv.js) zegt welke stap het is. */
-    .flag-toggle{position:relative;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;border-radius:var(--rs);border:1px solid transparent;background:none;cursor:pointer;font-family:inherit;transition:background var(--tr);user-select:none}
-    .flag-toggle:hover{background:var(--row-hover)}
-    .vlag{display:block;flex:none;width:16px;height:16px;color:var(--fnt);shape-rendering:geometricPrecision;transition:color var(--tr)}
-    .flag-toggle.off:hover .vlag{color:var(--ac-500)}
-    .flag-toggle.on .vlag,.vve-vlag.aan .vlag{color:var(--ac)}
-    .flag-toggle.on:hover .vlag{color:var(--ac-900)}
-    /* Dossier: dezelfde rondjes als tekstregel, alleen ter inzage. */
-    .vve-vlag{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--mut);margin-right:14px}
-    .vve-vlag.aan{color:var(--txt)}
-    .vve-vlag .vlag{width:14px;height:14px}
-    .flag-toggle:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
-    .flag-toggle.toggling{pointer-events:none;opacity:.6;animation:flagPulse 1s ease-in-out infinite}
-    @keyframes flagPulse{0%,100%{opacity:.6}50%{opacity:.85}}
-
-    /* Progress */
-    .prog-wrap{display:flex;align-items:center;gap:7px}
-    .prog-bar{width:60px;height:5px;background:var(--bor);border-radius:4px;overflow:hidden;flex-shrink:0}
-    .prog-fill{height:100%;background:var(--sec,var(--ac));border-radius:4px}
-    /* ── In-app toasts ── */
-    #toast-container{position:fixed;top:72px;right:16px;z-index:400;display:flex;flex-direction:column;gap:8px;pointer-events:none;max-width:340px}
-    .toast{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);box-shadow:var(--shl);padding:12px 14px;display:flex;gap:10px;align-items:flex-start;pointer-events:all;animation:toast-in .25s ease;border-left:4px solid var(--toast-clr,var(--ac))}
-    .toast.removing{animation:toast-out .25s ease forwards}
-    .toast-ico{font-size:18px;flex-shrink:0;line-height:1.3}
-    .toast-body{flex:1;min-width:0}
-    .toast-title{font-size:13px;font-weight:600;line-height:1.3}
-    .toast-msg{font-size:12px;color:var(--mut);margin-top:3px;line-height:1.4;overflow-wrap:anywhere} /* een foutmelding met een lange JSON/URL liep onder het kruisje door */
-    .toast-close{background:none;border:none;font-size:17px;color:var(--mut);cursor:pointer;padding:0;line-height:1;flex-shrink:0;transition:color var(--tr)}
-    .toast-close:hover{color:var(--txt)}
-    .toast-bar{height:3px;background:var(--toast-clr,var(--ac));border-radius:0 0 2px 2px;position:absolute;bottom:0;left:0;animation:toast-bar linear forwards}
-    /* ── "Nieuwe versie"-balk ── */
-    .sw-update-bar{position:fixed;left:16px;bottom:16px;z-index:98000;background:var(--sur);color:var(--txt);border:1px solid var(--bor);border-left:4px solid var(--ac);border-radius:var(--r);box-shadow:var(--shl);padding:10px 12px;display:flex;align-items:center;gap:12px;font:500 13px/1.3 var(--font-app);max-width:calc(100vw - 32px);animation:toast-in .25s ease}
-    .sw-update-btn{background:var(--ac);color:#fff;border:none;border-radius:8px;padding:6px 14px;font:600 13px var(--font-app);cursor:pointer;white-space:nowrap}
-    .sw-update-btn:hover{filter:brightness(1.05)}
-    .sw-update-x{background:none;border:none;color:var(--mut);font-size:18px;line-height:1;cursor:pointer;padding:0 2px}
-    .sw-update-x:hover{color:var(--txt)}
-    .staging-balk{position:fixed;top:0;left:0;right:0;z-index:100000;background:var(--am);color:#fff;text-align:center;font:600 13px/2.4 system-ui,sans-serif;letter-spacing:.3px}
-    @keyframes toast-in{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:translateX(0)}}
-    @keyframes toast-out{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(24px)}}
-    @keyframes toast-bar{from{width:100%}to{width:0%}}
-    .toast-undo{background:var(--gn);color:#fff;border:none;border-radius:6px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;margin-top:4px;transition:filter var(--tr)}
-    .toast-undo:hover{filter:brightness(1.15)}
-
-    /* Pagination */
-    .pag{display:flex;align-items:center;justify-content:space-between;padding:11px 16px;border-top:1px solid var(--bor)}
-    .pag-info{font-size:12px;color:var(--mut)}
-    .pag-btns{display:flex;gap:3px}
-    .pb{min-width:28px;height:28px;padding:0 5px;border-radius:6px;border:1px solid var(--bor);background:var(--sur);font-size:12px;color:var(--mut);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all var(--tr)}
-    .pb:hover:not([disabled]){background:var(--sec-l,var(--ac-l));color:var(--sec,var(--ac));border-color:var(--sec-b,var(--ac-b))}
-    .pb.on{background:var(--sec,var(--ac));color:#fff;border-color:var(--sec,var(--ac))}
-    .pb[disabled]{opacity:.35;cursor:default}
-
-    /* Charts */
-    .period-btn{padding:3px 9px;border-radius:6px;border:1px solid var(--bor);background:var(--sur2);color:var(--mut);font-size:11px;font-weight:600;cursor:pointer;transition:all var(--tr)}
-    .period-btn.on{background:var(--ac-l);color:var(--ac-900);border-color:var(--ac-b)}
-
-    /* Hero donut card — één grote donut met categorie-filter */
-    .hero-donut-card{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);padding:22px 26px;box-shadow:var(--sh);margin-bottom:18px;position:relative;overflow:hidden}
-    .hero-donut-card::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 0% 0%,color-mix(in srgb,var(--hero-color,var(--ac)) 7%,transparent),transparent 55%);pointer-events:none;transition:background .35s ease}
-    .hero-donut-hdr{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:18px;position:relative;flex-wrap:wrap}
-    .hero-donut-hdr h3{font-size:16px;font-weight:600;margin:0;color:var(--fg);letter-spacing:-.01em}
-    .hero-donut-sub{font-size:12px;color:var(--mut);margin-top:3px;font-weight:500}
-    .hero-donut-tabs{display:inline-flex;background:var(--sur2);border:1px solid var(--bor);border-radius:8px;padding:4px;gap:2px}
-    .hdt-tab{padding:7px 14px;border-radius:8px;border:none;background:transparent;color:var(--mut);font-size:12px;font-weight:600;cursor:pointer;transition:all var(--tr);font-family:inherit;display:flex;align-items:center;gap:6px;white-space:nowrap}
-    .hdt-tab:hover{color:var(--fg)}
-    .hdt-tab.on{background:var(--sur);color:var(--txt);box-shadow:0 0 0 1px var(--bor)}
-    .hero-donut-body{position:relative;height:340px;display:flex;align-items:center;justify-content:center}
-    .hero-donut-wrap{position:relative;width:100%;height:100%;max-width:680px}
-    @media(max-width:720px){
-      .hero-donut-hdr{flex-direction:column;align-items:stretch}
-      .hero-donut-tabs{overflow-x:auto;flex-wrap:nowrap}
-      .hero-donut-body{height:300px}
-    }
-
-    /* Productivity tracker */
-    .prod-hdr{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px}
-    .prod-hdr h2{font-size:18px;font-weight:600;letter-spacing:0;color:var(--txt);display:flex;align-items:center;gap:9px}
-    .period-bar{display:inline-flex;background:var(--sur);border:1px solid var(--bor);border-radius:8px;padding:4px;gap:2px;box-shadow:var(--sh)}
-    .period-bar .period-btn{padding:6px 14px;border:none;background:transparent;border-radius:6px;font-size:12px}
-    .period-bar .period-btn.on{background:var(--ac-l);color:var(--ac-900);box-shadow:none}
-
-    .kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-bottom:18px}
-    .kpi{position:relative;background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);padding:16px 20px;overflow:hidden}
-    .kpi-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px}
-    .kpi-lbl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--mut)}
-    .kpi-num{font-size:28px;font-weight:600;line-height:1;letter-spacing:-.02em;color:var(--txt);margin-bottom:4px;font-variant-numeric:tabular-nums}
-    .kpi-sub{font-size:11px;color:var(--mut);margin-bottom:8px;min-height:14px}
-    .kpi-trend{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:500;line-height:1}
-    /* Trend als tekst: alleen een daling is een signaal (rood); stijgen en gelijk blijven gedempt. */
-    .kpi-trend.up,.kpi-trend.flat{color:var(--mut)}
-    .kpi-trend.down{color:var(--rd)}
-    .kpi-trend i{font-size:13px}
-    .kpi-trend-arrow{font-size:10px;line-height:1;display:inline-block;transform:translateY(-1px)}
-
-    /* NTD-uitklappaneel achter de chevron: week links, vergaderbalk rechts, één regel.
-       [hidden] moet expliciet — een gewone display:flex-regel wint anders van de browser-standaard. */
-    .ntd-top-row{display:flex;gap:14px;margin-bottom:18px;align-items:center;background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);box-shadow:var(--sh);padding:10px 18px}
-    .ntd-top-row[hidden]{display:none}
-    .ntd-week{display:flex;align-items:baseline;gap:7px;flex-shrink:0;padding-right:16px;border-right:1px solid var(--bor)}
-    /* De kaart zit ín het paneel: geen eigen rand, schaduw of opvulling meer. */
-    .ntd-progress-card{background:none;border:0;box-shadow:none;padding:0;flex:1 1 0;min-width:220px;max-width:none;display:flex;align-items:center;gap:12px}
-    .ntd-progress-lbl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--txt);opacity:.7;line-height:1.2;flex-shrink:0}
-    .ntd-progress-track{position:relative;height:22px;border-radius:999px;background:var(--sur2);overflow:hidden;flex:1 1 auto;min-width:120px}
-    /* Voorloopstuk: wél klaargezet, nog niet verstuurd. Ligt onder de gevulde balk. */
-    .ntd-progress-voor{position:absolute;inset:0 auto 0 0;width:0;border-radius:999px;background:var(--ac-b);transition:width .9s cubic-bezier(.22,1,.36,1)}
-    .ntd-progress-fill{position:absolute;inset:0 auto 0 0;width:0;border-radius:999px;background:var(--ac);transition:width .9s cubic-bezier(.22,1,.36,1)}
-    .ntd-progress-val{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;letter-spacing:-.01em;white-space:nowrap;pointer-events:none;font-variant-numeric:tabular-nums}
-    .ntd-progress-val-base{color:var(--txt)}
-    .ntd-progress-val-rev{color:#fff;clip-path:inset(0 100% 0 0);transition:clip-path .9s cubic-bezier(.22,1,.36,1)}
-    .ntd-progress-sub{font-size:12px;font-weight:500;color:var(--mut);flex-shrink:0;white-space:nowrap}
-    @media(max-width:900px){
-      .ntd-top-row{flex-direction:column;align-items:stretch}
-      .ntd-week{border-right:none;border-bottom:1px solid var(--bor);padding:0 0 8px}
-      .ntd-progress-card{flex:none;width:100%;max-width:none;flex-wrap:wrap}
-    }
-    .kpi-spark{position:relative;height:36px;margin-top:8px}
-    .kpi-spark canvas{position:absolute;inset:0}
-
-    .kpi-persons{display:flex;flex-direction:column;gap:7px;margin-top:2px}
-    .kpi-person-row{display:grid;grid-template-columns:48px 1fr 28px;align-items:center;gap:8px;font-size:12px}
-    .kpi-person-name{font-weight:600;color:var(--txt)}
-    .kpi-person-bar{height:7px;background:var(--sur2);border-radius:4px;overflow:hidden}
-    .kpi-person-fill{height:100%;background:var(--sec,var(--ac));border-radius:4px;transition:width .4s ease}
-    .kpi-person-num{font-weight:600;color:var(--sec,var(--ac));text-align:right;font-variant-numeric:tabular-nums}
-
-    .hero-chart{padding:18px 20px}
-    .hero-chart-hdr{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px}
-    .hero-chart-hdr h3{font-size:14px;font-weight:600;color:var(--txt)}
-    .hero-chart-hdr h3 .sub{font-size:11px;font-weight:500;color:var(--mut);margin-left:6px}
-    .metric-toggle{display:inline-flex;background:var(--sur2);border-radius:8px;padding:3px;gap:2px}
-    .metric-btn{padding:5px 12px;border:none;background:transparent;border-radius:6px;font-size:12px;font-weight:600;color:var(--mut);cursor:pointer;transition:all var(--tr)}
-    .metric-btn:hover{color:var(--txt)}
-    .metric-btn.on{background:var(--sur);color:var(--ac);box-shadow:0 1px 2px rgba(0,0,0,.08)}
-    .hero-chart-wrap{position:relative;height:260px}
-
-    .leaderboard{padding:0}
-    .leaderboard table{width:100%;border-collapse:collapse}
-    .leaderboard thead th{background:var(--sur2);padding:11px 16px;text-align:left;font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--bor)}
-    .leaderboard thead th:last-child{text-align:right}
-    .leaderboard tbody td{padding:13px 16px;border-bottom:1px solid var(--bor);font-size:13px}
-    .leaderboard tbody tr:last-child td{border-bottom:none}
-    .leaderboard tbody tr:hover{background:var(--sur2)}
-    .lb-rank{font-weight:600;color:var(--mut);width:30px;font-variant-numeric:tabular-nums}
-    /* Geen medaillekleuren meer (v14.1): de plaats staat er al als getal. */
-    .lb-name{font-weight:600;color:var(--txt)}
-    .lb-now{font-weight:600;color:var(--ac);font-variant-numeric:tabular-nums}
-    .lb-prev{color:var(--mut);font-variant-numeric:tabular-nums}
-    .lb-trend{text-align:right;font-variant-numeric:tabular-nums}
-
-    /* Empty */
-    .empty{padding:36px;text-align:center;color:var(--mut);font-size:13px}
-    .empty-knop{margin-top:12px}
-    .empty-ico{font-size:32px;margin-bottom:8px}
-
-    /* Modal */
-        /* visibility hoort hier bij opacity en pointer-events. Zonder die derde blijven de velden van
-       een GESLOTEN venster gewoon in de toetsenbordvolgorde staan: gemeten 116 focusbare velden in
-       tien dichte vensters, waar een Tab-gebruiker doorheen moest voor hij bij de tabel was.
-       De vertraging van 0,2s bij het sluiten laat de uitfade eerst aflopen. */
-    .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;display:flex;align-items:flex-start;justify-content:center;padding:32px 16px;overflow-y:auto;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .2s,visibility 0s .2s}
-    .modal-bg.open{opacity:1;visibility:visible;pointer-events:all;transition:opacity .2s,visibility 0s}
-    /* Verticaal centreren via auto-marges, NIET via align-items:center. Deze laag scrollt
-       (overflow-y:auto), en bij align-items:center raakt de bovenkant van een venster dat hoger
-       is dan het scherm onbereikbaar — je kunt er dan niet naartoe scrollen. Auto-marges vallen
-       in dat geval netjes terug op 0, dus lange formulieren blijven volledig bereikbaar. */
-    .modal-bg > *{margin:auto}
-    .modal{background:var(--sur);border-radius:var(--r);width:100%;max-width:600px;box-shadow:var(--shl);transform:translateY(-10px);transition:transform .2s}
-    .modal-bg.open .modal{transform:translateY(0)}
-    .modal-hdr{padding:16px 20px;border-bottom:1px solid var(--bor);display:flex;align-items:center;justify-content:space-between}
-    .modal-hdr h2{font-size:15px;font-weight:600}
-    .modal-close{font-size:20px;color:var(--mut);width:30px;height:30px;display:flex;align-items:center;justify-content:center;padding:0;border-radius:6px;line-height:1;transition:background var(--tr)}
-    .modal-close:hover{background:var(--sur2)}
-    .modal-body{padding:18px 20px;max-height:70vh;overflow-y:auto}
-    .modal-foot{padding:12px 20px;border-top:1px solid var(--bor);display:flex;justify-content:flex-end;gap:8px}
-    /* Verwijderen in een bewerkscherm (v14.0): rode tekst helemaal links, los van Annuleren /
-       Afronden / Opslaan. De bevestiging die erop volgt draagt de stevige rode knop. */
-    .modal-foot :is(#m-del,#ontw-m-del,#hh-del){order:-1;margin-right:auto;background:none;border-color:transparent;color:var(--rd)}
-    .modal-foot :is(#m-del,#ontw-m-del,#hh-del):hover{background:var(--rd-l);filter:none}
-    [data-theme=dark] .modal-foot :is(#m-del,#ontw-m-del,#hh-del),
-    [data-theme=dark] .modal-foot :is(#m-del,#ontw-m-del,#hh-del):hover{color:var(--rd)}
-    /* Het bevestigingsvenster kan bovenóp een ander venster staan — de verwijdervraag komt vanuit
-       het bewerkscherm. Alle .modal-bg's delen z-index 500, en dan wint de laatste in de HTML;
-       dit blok maakt de stapeling onafhankelijk van die volgorde. */
-    #bevestig-bg{z-index:520}
-    /* De vraagtekst wordt met `textContent` gezet (bevestig.js), dus een `\n` erin geeft van
-       zichzelf geen regelovergang. Met `pre-line` wél — nodig sinds de dubbelcheck de gevonden
-       taken als lijstje toont: een waarschuwing zonder het gevonden werk erbij is niet te
-       beoordelen en wordt weggeklikt. Alleen dít element; overal elders blijft tekst gewoon
-       doorlopen. */
-    #bevestig-tekst{white-space:pre-line;overflow-wrap:anywhere}
-
-    /* Form */
-    .fld{margin-bottom:12px}
-    .fld label{display:block;font-size:12px;font-weight:500;color:var(--mut);margin-bottom:6px}
-    /* Het zinnetje onder een deadline-veld: 'dit is een voorstel' of, bij LOD en subsidie, waaróm
-       er geen voorstel staat. Bewust klein en gedempt — het is uitleg, geen waarschuwing — maar
-       niet zó licht dat het onleesbaar wordt: var(--mut) haalt op beide thema's de contrastnorm.
-       Leeg blijft hij onzichtbaar zonder ruimte in te nemen (:empty). */
-    .dl-hint{display:block;margin-top:5px;font-size:11px;line-height:1.4;color:var(--mut)}
-    /* De gekozen extra VvE's als merkjes. Leeg neemt de rij geen ruimte in (:empty), zodat het
-       veld er bij een gewone taak niet als een half ingevuld blok bij staat. */
-    .mv-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
-    .mv-chips:empty{display:none}
-    .mv-chip{display:inline-flex;align-items:center;gap:6px;background:var(--ac-l);border:1px solid var(--ac-b);color:var(--ac);border-radius:6px;padding:3px 5px 3px 10px;font-size:12px;font-weight:600;line-height:1.4}
-    .mv-naam{font-weight:600;opacity:.8;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    /* Het kruisje is 20x20 en daarmee kleiner dan de aanraadnorm; de halo eromheen (::after) maakt
-       het aanraakvlak 32px zonder de merkjes uit elkaar te duwen — zelfde truc als bij de
-       chevron van een bundel. */
-    .mv-x{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border:0;border-radius:50%;background:transparent;color:inherit;cursor:pointer;position:relative;transition:background var(--tr)}
-    .mv-x::after{content:'';position:absolute;inset:-6px}
-    .mv-x:hover{background:var(--ac);color:#fff}
-    .dl-hint:empty{display:none}
-    .fld input,.fld select,.fld textarea{width:100%;background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rs);padding:8px 11px;color:var(--txt);font-size:13px;outline:none;transition:border var(--tr)}
-    .fld input:focus,.fld select:focus,.fld textarea:focus{border-color:var(--modal-sec,var(--ac));box-shadow:0 0 0 3px color-mix(in srgb,var(--modal-sec,var(--ac)) 16%,transparent)}
-    .fld textarea{resize:vertical;min-height:68px}
-    /* --mut en niet --fnt. Op --fnt haalde dit woordje 2,60:1 (licht) en 3,22:1 (donker) bij
-       11,5px — dezelfde meting en dezelfde variabele als bij de foutbanner (zie r.589), en dit
-       project dwingt 4,5:1 af. Juist hier telt het: wie 'optioneel' niet leest denkt dat een duur
-       verplicht is en klikt maar wat aan, en dan meet je een verzonnen waarde — precies wat het
-       weglaten van een voorselectie moest voorkomen. Blijft van het label onderscheiden door
-       gewicht 600 tegen 700 en text-transform:none. */
-    .fld-opt{font-weight:600;color:var(--mut);letter-spacing:0;text-transform:none;margin-left:6px}
-    /* Vast raster van vijf. Met flex-wrap viel '2u+' bij 440px vensterbreedte om naar een tweede
-       regel; een raster kan dat niet. */
-    .duur-keuze{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
-    .duur-knop{padding:8px 4px;text-align:center;border:1px solid var(--bor-input);border-radius:var(--rs);
-      font-size:12px;font-weight:600;color:var(--mut);background:var(--sur2);cursor:pointer;
-      font-variant-numeric:tabular-nums;transition:background var(--tr),border-color var(--tr),color var(--tr)}
-    .duur-knop:hover{border-color:var(--ac-b);color:var(--txt);background:var(--sur)}
-    /* Groen, net als de Afhandelen-knop eronder: dit venster heeft --sec:var(--gn). */
-    .duur-knop[aria-pressed=true]{background:var(--gn);border-color:var(--gn);color:#fff}
-    /* In donkere modus is --gn een lichte mint (#34D39A); witte tekst haalt daar 1,92:1.
-       Donkere tekst op datzelfde vlak haalt ruim de 4,5 die dit project aanhoudt. De knop
-       eronder ('Afhandelen') heeft dat probleem óók, maar dat is een bestaande fout en geen
-       reden om er hier een tweede bij te maken. */
-    [data-theme=dark] .duur-knop[aria-pressed=true]{color:#0d1f19}
-    .fld-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-    /* Een veld dat alleen op zijn rij staat (Opmerkingen) neemt de hele breedte; het stond op de
-       halve breedte van een lege tweede kolom (v14.4). */
-    .fld-row>.fld:only-child{grid-column:1/-1}
-    @media(max-width:480px){.fld-row{grid-template-columns:1fr}}
-    .toggle-row{display:flex;align-items:center;gap:10px;padding:4px 0;margin-bottom:12px}
-    .tog{width:36px;height:20px;border-radius:8px;background:var(--bor);position:relative;cursor:pointer;transition:background var(--tr);flex-shrink:0}
-    .tog.on{background:var(--modal-sec,var(--ac))}
-    .tog::after{content:'';width:16px;height:16px;background:#fff;border-radius:50%;position:absolute;top:2px;left:2px;transition:left var(--tr);box-shadow:0 1px 2px rgba(0,0,0,.2)}
-    .tog.on::after{left:18px}
-    /* Duidelijke toetsenbord-focus op de pill-toggle: een ring met offset valt beter op dan de
-       2px-outline die rond de kleine 36×20px-pill (ook binnen modals) makkelijk wegvalt. */
-    .tog:focus-visible{outline:none;box-shadow:0 0 0 2px var(--sur),0 0 0 4px var(--ac)}
-    code{background:var(--sur);border:1px solid var(--bor);border-radius:4px;padding:2px 5px;font-size:12px;font-family:var(--font-mono)}
-
-    /* VvE autocomplete */
-    .vve-wrap{position:relative}
-    .vve-suggestions{position:absolute;top:100%;left:0;right:0;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rs);box-shadow:var(--shm);z-index:10;max-height:180px;overflow-y:auto;display:none}
-    .vve-sug-item{padding:8px 11px;cursor:pointer;font-size:13px;transition:background var(--tr);border-bottom:1px solid var(--bor)}
-    .vve-sug-item:last-child{border-bottom:none}
-    /* `.actief` = de suggestie die met de pijltjestoetsen is aangewezen. Dezelfde opmaak als hover,
-       want het is voor de gebruiker hetzelfde: 'dit kies je als je nu doorgaat'. De focus blijft in
-       het invoerveld (combobox-patroon, zie vve-zoekveld.js), dus :focus-visible zou hier niets
-       tonen — zonder deze regel wijst er dus zichtbaar niets aan terwijl de schermlezer het wél
-       voorleest. */
-    .vve-sug-item:hover,.vve-sug-item.actief{background:var(--ac-l);color:var(--ac)}
-    .vve-sug-code{font-weight:600;font-size:12px}
-    .vve-sug-naam{font-size:11px;color:var(--mut);margin-top:1px}
-
-    /* Scrollbar */
-    ::-webkit-scrollbar{width:5px;height:5px}
-    ::-webkit-scrollbar-thumb{background:var(--bor);border-radius:99px}
-
-    /* Mobile */
-    @media(max-width:680px){
-      #sb{position:fixed;top:0;left:0;height:100%;transform:translateX(-100%)}
-      #sb.open{transform:none;box-shadow:var(--shl)}
-      .hamburger{display:flex}
-      /* Zonder zijbalk ernaast is er geen hoek om af te ronden. */
-      #main{border-top-left-radius:0}
-      [data-theme=dark] #main::before{content:none}
-    }
-    .logboek-box{margin-top:16px;background:var(--sur2);border:1px solid var(--bor);border-radius:var(--r);padding:12px 16px}
-    .logboek-hdr{display:flex;align-items:center;gap:9px;margin-bottom:4px}
-    .logboek-hdr h4{font-size:13px;font-weight:600;color:var(--txt);margin:0}
-    .logboek-hdr .hist-count{font-size:12px;font-weight:500;color:var(--fnt)}
-    .logboek-body{max-height:200px;overflow-y:auto;margin-bottom:11px}
-    .logboek-add{display:flex;flex-direction:column;gap:8px}
-    .logboek-add textarea{width:100%;background:var(--sur);border:1px solid var(--bor);border-radius:var(--rs);padding:9px 11px;color:var(--txt);font-size:13px;outline:none;resize:vertical;min-height:74px;line-height:1.5;font-family:inherit;transition:border var(--tr),box-shadow var(--tr)}
-    .logboek-add textarea:focus{border-color:var(--ac);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 14%,transparent)}
-    .logboek-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
-    .logboek-hint{font-size:11px;color:var(--mut)}
-    .logboek-hint kbd{font-family:inherit;font-size:11px;background:var(--sur2);border:1px solid var(--bor);border-radius:4px;padding:1px 5px;color:var(--mut)}
-
-    /* ── Logboek-tijdlijn ── */
-    .log-filters{padding:12px 16px 0;display:flex;flex-direction:column;gap:9px}
-    .lchips{display:flex;gap:7px;flex-wrap:wrap}
-    .lchip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--bor);background:var(--sur);border-radius:6px;padding:5px 12px;font-size:13px;font-weight:500;color:var(--txt);cursor:pointer;font-family:inherit;transition:all var(--tr)}
-    .lchip:hover{border-color:var(--ac-b)}
-    .lchip.on{border-color:var(--ac-b);background:var(--ac-l);color:var(--ac-900);font-weight:600}
-    .log-count{font-size:12px;color:var(--mut);font-weight:600;margin:11px 16px 0}
-    .log-feed{padding:6px 16px 14px;display:flex;flex-direction:column}
-    .log-day{margin:13px 0 7px;font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;position:sticky;top:0;background:var(--sur);padding:5px 0;z-index:2}
-    .log-day:first-child{margin-top:4px}
-    /* .log-item is alleen nog het omhulsel van het bewerkformulier (logEditForm); de regels zelf
-       zijn .log-r — zie 'Compacte logregel' onderaan. */
-    .log-item{display:flex;gap:13px;padding:10px 10px;border-radius:8px;transition:background var(--tr);position:relative}
-    .log-item:hover{background:var(--sur2)}
-    .log-act{font-weight:600}
-    .log-empty{text-align:center;color:var(--mut);padding:40px;font-style:italic}
-    /* ── Logboek: bewerken/verwijderen ── */
-    .log-acts{display:flex;gap:1px;align-items:flex-start;flex-shrink:0;opacity:0;transition:opacity var(--tr)}
-    .log-item:hover .log-acts{opacity:1}
-    .log-act-btn{border:none;background:transparent;color:var(--txt);cursor:pointer;font-size:15px;line-height:1;padding:4px 5px;border-radius:6px;transition:background var(--tr),color var(--tr)}
-    .log-act-btn:hover{background:var(--sur2);color:var(--txt)}
-    .log-act-btn.del:hover{background:var(--rd-l);color:var(--rd)}
-    @media(hover:none){.log-acts{opacity:.5}}
-    .log-edit{flex:1;display:flex;flex-direction:column;gap:8px;padding:10px;border:1px solid var(--ac-b);border-radius:8px;background:var(--sur2)}
-    .log-edit-tekst{width:100%;resize:vertical;font:inherit;font-size:13px;line-height:1.5;padding:8px;border:1px solid var(--bor);border-radius:8px;background:var(--sur);color:var(--txt)}
-    .log-edit-rij{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    .log-edit-wie{margin-left:auto;font-size:12px;padding:6px 8px;border:1px solid var(--bor);border-radius:8px;background:var(--sur);color:var(--txt)}
-    .log-edit-knoppen{display:flex;gap:8px;justify-content:flex-end}
-    .log-edit-tekst:focus,.log-edit-wie:focus{outline:none;border-color:var(--ac);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 14%,transparent)}
-    .opmaak-balk{display:flex;gap:2px;margin-top:4px}
-    .opmaak-knop{display:inline-flex;align-items:center;justify-content:center;width:26px;height:24px;border-radius:4px;background:none;border:1px solid transparent;color:var(--mut);font-size:12px;font-family:inherit;line-height:1;cursor:pointer;transition:background var(--tr),color var(--tr)}
-    .opmaak-knop:hover{background:var(--sur2);color:var(--txt)}
-    .opmaak-knop:focus-visible{outline:2px solid var(--ac);outline-offset:1px}
-    /* Opsomming binnen een notitie: pre-wrap uit, anders komt er een lege regel per punt bij */
-    .op-lijst{white-space:normal;margin:2px 0 2px 2px;padding-left:16px;list-style:disc}
-    .op-lijst li{margin:1px 0}
-    @media(max-width:700px){.log-edit-wie{margin-left:0}}
-
-    /* ── AI-hulp ── */
-    .ai-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
-    @media(max-width:720px){.ai-grid{grid-template-columns:1fr}}
-    .ai-step{font-size:11px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;margin:0 0 7px;display:flex;align-items:center;gap:7px}
-    .ai-step .dot{width:18px;height:18px;border-radius:50%;background:var(--ac);color:#fff;font-size:11px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0}
-    .ai-ta{width:100%;background:var(--sur2);border:1px solid var(--bor);border-radius:var(--rs);padding:10px 12px;color:var(--txt);font-size:13px;outline:none;resize:vertical;line-height:1.55;font-family:inherit;transition:border var(--tr),box-shadow var(--tr)}
-    .ai-ta:focus{border-color:var(--ac);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 14%,transparent)}
-    .ai-chips{display:flex;flex-wrap:wrap;gap:7px}
-    .ai-chip{border:1.5px solid var(--bor);background:var(--sur);border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;color:var(--txt);cursor:pointer;font-family:inherit;transition:all var(--tr)}
-    .ai-chip:hover{border-color:var(--ac-b)}
-    .ai-chip.on{border-color:var(--ac);background:var(--ac-l);color:var(--ac-900)}
-    .ai-ctx{background:var(--ac-l);border:1px solid var(--ac-b);border-radius:var(--rs);padding:10px 12px;margin-top:10px;font-size:12px;color:var(--ac-900);display:none}
-    .ai-ctx.show{display:block}
-    .ai-ctx ul{margin:5px 0 0;padding-left:17px}
-    .ai-ctx li{margin:2px 0}
-    .ai-prompt{background:var(--nv-d);color:#cfd5df;border-radius:var(--rs);padding:12px 13px;font-size:12px;line-height:1.55;white-space:pre-wrap;font-family:var(--font-mono);max-height:240px;overflow-y:auto;border:1px solid var(--sbedge)}
-    .ai-prompt .k{color:var(--sbglow);font-weight:600}
-    .ai-prompt .empty{color:#8b929e;font-style:italic}
-    .ai-send{display:flex;gap:8px;margin-top:11px;flex-wrap:wrap}
-    .ai-claude{background:#bb5634;color:#fff} /* iets dieper dan het merk-oranje #C96442: wit op 12,5px haalde daar 3,9:1, hier 4,67:1 */
-    .ai-send .btn{font-size:12px;padding:9px 13px}
-    .ai-result{margin-top:14px;display:flex;flex-direction:column;gap:11px}
-    .ai-rhead{font-size:11px;font-weight:600;color:var(--ac-900);text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;gap:8px}
-    .ai-rhead::after{content:'';flex:1;height:1px;background:var(--ac-b)}
-    .ai-card{border:1px solid var(--bor);border-radius:8px;overflow:hidden;background:var(--sur)}
-    .ai-card-hd{display:flex;align-items:center;gap:8px;padding:8px 12px;font-size:12px;font-weight:600;background:var(--sur2);border-bottom:1px solid var(--bor)}
-    .ai-card-hd .sp{flex:1}
-    .ai-mini{border:none;background:var(--ac-l);color:var(--ac-900);font-family:inherit;font-size:12px;font-weight:600;padding:5px 11px;border-radius:6px;cursor:pointer;transition:filter var(--tr)}
-    .ai-mini:hover{filter:brightness(.97)}
-    .ai-mini.plus{background:var(--ac);color:#fff}
-    .ai-card-bd{padding:11px 13px;font-size:13px;line-height:1.55;color:var(--txt)}
-    .ai-acts{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
-    .ai-acts li{display:flex;align-items:flex-start;gap:9px;font-size:13px}
-    .ai-acts .ck{width:16px;height:16px;border-radius:4px;border:1.5px solid var(--ac-b);flex-shrink:0;margin-top:2px}
-    .ai-acts .atxt{flex:1}
-    .ai-reply{white-space:pre-wrap;font-size:13px;line-height:1.6}
-
-    /* ── AI-hulp VvE-zoekveld ── */
-    .ai-vve-wrap{position:relative}
-    .ai-vve-wrap input{width:100%;padding-right:30px}
-    /* Het kruisje van 'Hoort bij' (Takenbundel) deelt deze opmaak: zelfde plek, zelfde betekenis
-       (koppeling weghalen). De ruimte ervoor komt van de padding-right op het veld zelf. */
-    #ai-vve-wis,#m-hoortbij-x{position:absolute;right:4px;top:50%;transform:translateY(-50%);border:none;background:none;font-size:17px;line-height:1;color:var(--mut);cursor:pointer;padding:4px 8px}
-    #ai-vve-wis:hover,#m-hoortbij-x:hover{color:var(--rd)}
-    .ai-vve-wrap .vve-suggestions{max-height:240px}
-    #m-hoortbij{padding-right:30px}
-
-    /* ── Rij-overgangen: kleurpuls + fade bij acties (effect B, sterkte 2) ── */
-    :root{--puls-gn:#C0DD97;--puls-gn-t:#173404;--puls-rd:#F7C1C1;--puls-rd-t:#501313;--flits-gn:#C0DD97;--flits-am:#FAC775}
-    [data-theme=dark]{--puls-gn:#27500A;--puls-gn-t:#C0DD97;--puls-rd:#791F1F;--puls-rd-t:#F7C1C1;--flits-gn:#27500A;--flits-am:#854F0B}
-    @media (prefers-reduced-motion: no-preference){
-      tr.rij-puls-groen td{background:var(--puls-gn)!important;color:var(--puls-gn-t)!important;transition:background .15s ease}
-      tr.rij-puls-rood td{background:var(--puls-rd)!important;color:var(--puls-rd-t)!important;transition:background .15s ease}
-      tr.rij-fade-weg{opacity:0;transition:opacity .4s ease}
-      @keyframes rijFlits{0%{background:var(--ac-l)}100%{background:transparent}}
-      tr.rij-flits td{animation:rijFlits 1.2s ease}
-      @keyframes rijFlitsGroen{0%{background:var(--flits-gn)}100%{background:transparent}}
-      tr.rij-flits-groen td{animation:rijFlitsGroen 1.2s ease}
-      @keyframes rijFlitsAmber{0%{background:var(--flits-am)}100%{background:transparent}}
-      tr.rij-flits-amber td{animation:rijFlitsAmber 1.2s ease}
-    }
-
-    /* ── Per-VvE-dossier (Fase 5) ── */
-    .vve-kop{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:16px}
-    .vve-naam{display:flex;align-items:center;gap:12px}
-    .vve-terug{width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid var(--bor);background:var(--sur);color:var(--mut);box-shadow:var(--sh);flex-shrink:0;transition:color var(--tr),border-color var(--tr),background var(--tr)}
-    .vve-terug:hover{color:var(--ac);border-color:var(--ac);background:var(--sur2)}
-    .vve-terug:focus-visible{outline:2px solid var(--ac-900);outline-offset:2px}
-    .vve-naam h3{margin:0;font-size:18px;font-weight:600}
-    .vve-naam .sub{font-size:12px;color:var(--mut);margin-top:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-    .kerncijfers{display:flex;gap:24px;flex-wrap:wrap;align-items:center}
-    .kc{padding:0 4px;text-align:right;min-width:0}
-    .kc b{display:block;font-size:18px;font-weight:600;line-height:1.2;font-variant-numeric:tabular-nums}
-    .kc span{font-size:12px;color:var(--mut);font-weight:400}
-    .kc.teal b{color:var(--txt)}.kc.grijs b{color:var(--mut)}
-    /* + tegel: zelfde vorm als een kerncijfer-tegel, gevuld in het accent. Alleen het +-teken. */
-    .kc-plus{align-self:center;margin-left:12px}
-    .kc-plus:hover{background:var(--ac-900)}
-    .kc-plus:focus-visible{outline:2px solid var(--ac-900);outline-offset:2px}
-    /* Dossier = schermvullend: kop vast, drie panelen vullen de rest en scrollen elk apart. */
-    #page-vve.active{display:flex;flex-direction:column;height:100%}
-    /* #vve-inhoud is de render-wrapper tussen pagina en kop/grid: laat 'm meedoen in de flex-keten */
-    #page-vve.active>#vve-inhoud{display:flex;flex-direction:column;flex:1;min-height:0}
-    .vve-kop{flex-shrink:0}
-    /* min-height: korter scherm dan dit → paginascroll wint weer */
-    .vve-grid{display:grid;grid-template-columns:300px 330px 1fr;gap:16px;align-items:stretch;flex:1;min-height:380px}
-    /* Vangnet op kolomniveau: grid-kinderen mogen krimpen, zodat de kolommen zelf nooit
-       breder worden dan het scherm. Binnen de rijen doet overflow-wrap op .tk .nm de
-       rest: een geplakte URL of lang kenmerk breekt af i.p.v. het paneel uit te duwen. */
-    #page-vve .vve-grid>*{min-width:0}
-    .vve-paneel{background:var(--sur);border:1px solid var(--bor);border-radius:var(--r);box-shadow:var(--sh);padding:13px 15px;display:flex;flex-direction:column;min-height:0;overflow-y:auto}
-    .vve-paneel.tl-paneel{overflow:hidden}
-    .tl-scroll{overflow-y:auto;min-height:0;flex:1;margin-right:-5px;padding-right:5px}
-    /* Onder 1240px zijn drie kolommen niet vol te houden: terugval op twee met de
-       tijdlijn eronder over de volle breedte, en de pagina scrollt weer normaal. */
-    @media(max-width:1240px){
-      #page-vve.active{height:auto}
-      .vve-grid{grid-template-columns:1fr 1fr;min-height:0}
-      .vve-paneel{overflow:visible}
-      .vve-paneel.tl-paneel{overflow:visible;grid-column:1/-1}
-      .tl-scroll{overflow:visible}
-    }
-    @media(max-width:900px){.vve-grid{grid-template-columns:1fr}}
-    .vve-sectie{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:18px 0 8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-    /* flex-wrap: 'BEHEERDERSKENMERKEN' + de knop Bewerken waren samen 6px breder dan het paneel
-       (1440/1920); de knop stak dan over de rand. Nu schuift hij zo nodig naar de volgende regel. */
-    .vve-sectie:first-child{margin-top:0}
-    .vve-sectie .n{font-size:12px;font-weight:500;color:var(--fnt);letter-spacing:0}
-    /* Taak-/afgerond-rijen in de panelen (platte divs, geen tabel meer) */
-    .tk{display:flex;align-items:baseline;gap:10px;padding:8px 0;border-bottom:1px solid var(--row-divider);font-size:13px}
-    .tk:has(+ .vve-voet){border-bottom:none} /* geen dubbele lijn boven de paneelvoet */
-    .tk.snooze-row{opacity:.55}
-    .tk .nm{flex:1;min-width:0;overflow-wrap:anywhere}
-    .tk .nm .mt{display:block;font-size:11px;color:var(--mut);margin-top:2px}
-    .tk .dl{font-family:var(--font-mono);font-size:12px;color:var(--mut);flex-shrink:0}
-    .tk .tk-af{align-self:center;flex-shrink:0}
-    /* Taakrijen staan op twee regels: tekst over de volle breedte, daaronder sectie/
-       behandelaar links en de deadline rechts. Op één regel (tekst | datum + 'Te laat'-pil
-       | ✓) hield de tekst in het 330px-paneel maar ~58px over, waardoor woorden middenin
-       afbraken. Deze regels staan ná .tk, want ze overschrijven de flex-opzet. */
-    /* Drie kolommen sinds het sleep-handvat erbij kwam: handvat | tekst | ✓. De onderregel begint
-       bij kolom 2 en niet bij 1, zodat sectie/behandelaar en deadline onder de tekst uitlijnen in
-       plaats van onder het handvat. */
-    .tk-taak{display:grid;grid-template-columns:auto 1fr auto;column-gap:10px;row-gap:3px}
-    /* De twee regels achter `grid-row` zijn de tegenhanger van de `vertical-align:-2px` op
-       `.stapel-h`: sinds het handvat een SVG is heeft het geen tekstbasislijn meer, en deze grid
-       lijnt op basislijnen uit (`align-items:baseline`, van `.tk`). Zonder tekst leidt de browser
-       een basislijn af uit de onderkant van de doos, en dan schoot het handvat omhoog.
-       `align-self:start` zet het bovenaan de rij, de 2px marge erbij zet het op exact dezelfde plek
-       als voorheen: gemeten staat het dan 0,75px boven het midden van de taaktekst, precies waar de
-       ⠿-glyph stond. Niet `center`: die centreert op de rij-hoogte van 28px — de maat van het
-       ✓-knopje ernaast — en zet het handvat 4,25px ónder de tekst waar het bij hoort. Zonder deze
-       regel is het 2,75px erboven. Alle drie gemeten; blok 20 van tests.js houdt het vast. */
-    .tk-taak .stapel-h{grid-column:1;grid-row:1;align-self:start;margin-top:2px}
-    .tk-taak .nm{grid-column:2;grid-row:1}
-    .tk-taak .tk-af{grid-column:3;grid-row:1;align-self:center}
-    .tk-taak .tk-onder{grid-column:2/-1;grid-row:2;min-width:0;display:flex;flex-wrap:wrap;
-      align-items:baseline;justify-content:space-between;gap:2px 10px}
-    .tk-taak .mt{font-size:11px;color:var(--mut);min-width:0}
-    /* Een stap springt in onder zijn kop. Streepje links, dezelfde metafoor als de linkerrand van
-       `.bdl-paneel` in de takentabel. */
-    .tk-taak.tk-stap{margin-left:20px;padding-left:10px;border-left:2px solid var(--bor)}
-    /* Derde grid-rij, uitgelijnd onder de tekst (kolom 2) en niet onder het sleep-handvat. */
-    .tk-taak .tk-stapin{grid-column:2/-1;grid-row:3;font-size:11px;color:var(--mut);
-      min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .tk-taak .tk-stapin svg{vertical-align:-1.5px;margin-right:3px}
-    .tk.rij-puls-groen{background:var(--puls-gn);color:var(--puls-gn-t);transition:background .15s ease}
-    .tk.rij-fade-weg{opacity:0;transition:opacity .4s ease}
-    .tk-leeg{padding:10px 0;color:var(--mut);font-size:12px}
-    .geen-oms{color:var(--mut);font-style:italic}
-    .vve-voet{font-size:12px;color:var(--mut);border-top:1px solid var(--row-divider);padding-top:8px;margin-top:auto}
-    .vve-alv-rij{display:flex;align-items:center;gap:10px;padding:4px 0;font-size:13px}
-    .vve-alv-flags{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
-    .code-klik{cursor:pointer;transition:filter var(--tr)}
-    .code-klik:hover{filter:brightness(.9);text-decoration:underline}
-    /* Beheerderskenmerken (VvE-pagina) */
-    .kmk-rij{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--bor);font-size:13px}
-    .kmk-w{font-size:13px;color:var(--txt)}
-    .kmk-w.leeg{color:var(--mut)}
-    .kmk-bron-lbl{display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);margin:10px 0 4px}
-    .kmk-bron{font-size:12px;line-height:1.5;word-break:break-word}
-    .kmk-wijz{font-size:11px;color:var(--mut);margin-top:8px}
-    .kmk-knoppen{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
-    #kmk-bron{width:100%;border:1px solid var(--bor);border-radius:8px;padding:7px 9px;font:inherit;font-size:12px;resize:vertical;background:var(--sur)}
-    .kmk-rij select{font-size:12px;padding:4px 7px;border:1px solid var(--bor);border-radius:6px;background:var(--sur);color:var(--txt)}
-    /* Dossier-logboek (VvE-pagina) */
-    .comp-dicht{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:8px 11px;border:1px dashed var(--bor-input);border-radius:var(--rs);color:var(--mut);font-size:12px;cursor:text;background:var(--sur2);margin-bottom:12px;flex-shrink:0} /* --mut i.p.v. --fnt: gemeten placeholder-kleur van #dos-tekst (geen eigen ::placeholder-regel, dus UA-default ≈ rgb(117,117,117)) ligt veel dichter bij --mut dan bij --fnt */
-    .comp-dicht:hover{border-color:var(--ac-b)}
-    .comp-dicht .btn{margin-left:auto;flex-shrink:0}
-    .dos-composer{background:var(--sur2);border:1px solid var(--bor);border-radius:8px;padding:10px;margin-bottom:12px;flex-shrink:0}
-    .dos-composer textarea{width:100%;border:1px solid var(--bor);border-radius:8px;padding:8px 10px;font:inherit;font-size:13px;resize:vertical;min-height:44px;background:var(--sur);color:var(--txt)}
-    .dos-rij{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}
-    .dos-chips{display:flex;gap:6px;flex-wrap:wrap}
-    .soort-chip{border:1px solid var(--bor);background:var(--sur);color:var(--mut);border-radius:6px;padding:4px 11px;font-size:12px;font-weight:600;cursor:pointer;transition:all var(--tr)}
-    .soort-chip.aan{background:var(--ac-l);border-color:var(--ac-b);color:var(--ac)}
-    #dos-wie{margin-left:auto;font-size:12px;padding:6px 8px;border:1px solid var(--bor);border-radius:8px;background:var(--sur);color:var(--txt)}
-    .dos-filters{margin-left:auto;display:inline-flex;gap:5px}
-    .dos-filter{border:1px solid var(--bor);background:var(--sur);color:var(--mut);border-radius:6px;padding:2px 10px;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:0;text-transform:none;transition:all var(--tr)}
-    .dos-filter.aan{background:var(--ac-l);border-color:var(--ac-b);color:var(--ac)}
-    @media(max-width:700px){#dos-wie{margin-left:0}}
-
-    /* ── Commandocentrum (Fase 5) ── */
-    /* Het zoekvenster stond bewust op 10vh (de gebruikelijke plek voor een commandopalet),
-       maar dat las als 'omhoog kijken'. Nu midden op het scherm, net als de andere vensters. */
-    .pal{width:min(620px,94vw);background:var(--sur);border-radius:8px;box-shadow:var(--shl);overflow:hidden;border:1px solid var(--bor)}
-    .pal-zoek{display:flex;align-items:center;gap:10px;padding:13px 17px;border-bottom:1px solid var(--bor);color:var(--mut)}
-    .pal-zoek input{border:none;outline:none;background:none;font-size:16px;flex:1;color:var(--txt)}
-    .pal-esc{font-size:11px;font-weight:600;color:var(--mut);border:1px solid var(--bor);border-radius:4px;padding:2px 6px;background:var(--sur2)}
-    .pal-bd{max-height:55vh;overflow-y:auto;padding:4px 8px 8px}
-    .pal-groep-kop{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--mut);padding:10px 12px 4px}
-    .pal-res{display:flex;align-items:center;gap:11px;padding:8px 12px;border-radius:8px;font-size:13px;cursor:pointer}
-    .pal-res:hover{background:var(--sur2)}
-    .pal-res.actief{background:var(--ac-l);outline:1.5px solid var(--ac-b)}
-    .pal-ico{width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;flex-shrink:0;color:var(--fnt)}
-    .pal-ico-vve{width:auto;min-width:48px;justify-content:flex-start;font-family:var(--font-mono);color:var(--mut)}
-    .pal-tekst{flex:1;min-width:0}
-    .pal-tekst b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .pal-tekst span{font-size:12px;color:var(--mut);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .pal-logzin{font-weight:500!important}
-    .pal-hint{font-size:11px;color:var(--mut);white-space:nowrap}
-    .pal-voet{display:flex;gap:16px;padding:8px 17px;border-top:1px solid var(--bor);background:var(--sur2);font-size:11px;color:var(--mut)}
-    .pal-voet b{font-weight:600;border:1px solid var(--bor);background:var(--sur);border-radius:4px;padding:1px 5px;font-size:11px}
-    .pal-leeg{padding:22px;text-align:center;color:var(--mut);font-size:13px}
-
-    /* ── Bulk-acties (Fase 5) ── */
-    .bulk-teller{font-size:12px;font-weight:600;color:var(--ac);background:var(--ac-l);border:1px solid var(--ac-b);border-radius:6px;padding:4px 12px;white-space:nowrap}
-    #bulk-btn.on{background:var(--ac-l);border-color:var(--ac-b);color:var(--ac)}
-    .bulk-cel{width:28px}
-    .cb{width:14px;height:14px;border:1.5px solid var(--checkbox-border,var(--bor-input));border-radius:4px;display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;background:var(--sur);cursor:pointer;position:relative;transition:border-color var(--tr),background var(--tr)}
-    .cb:hover{border-color:var(--ac)}
-    .cb.aan{background:var(--ac);border-color:var(--ac)}
-    .cb.aan::after{content:'✓';color:#fff;font-size:10px;font-weight:600;line-height:1}
-    /* Tussenstand van het kopvinkje: een deel van de lijst staat aan. Zonder eigen beeld is
-       'een deel' niet te onderscheiden van 'niets', en dan denkt de gebruiker dat hij begint
-       terwijl hij zijn selectie aanvult. Een streep i.p.v. een vinkje — dezelfde vulling, zodat
-       het één familie blijft. */
-    .cb.deels{background:var(--ac);border-color:var(--ac)}
-    .cb.deels::after{content:'';width:8px;height:2px;border-radius:1px;background:#fff}
-        /* z-index 450: boven de inhoud en de zijbalk (200), maar ONDER de vensters (500/520). Op 600
-       lag de balk bovenop een open bevestigingsvraag en was zijn 'Afronden' daar aanklikbaar —
-       precies de tweede bulk-actie die de vraag moest tegenhouden. */
-#bulk-balk{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:450;background:var(--nv);color:#fff;border-radius:8px;box-shadow:var(--shl);display:flex;align-items:center;gap:4px;padding:9px 13px}
-    .bb-knop{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#fff;border-radius:8px;padding:7px 11px;background:transparent;white-space:nowrap;transition:background var(--tr)}
-    .bb-knop:hover{background:rgba(255,255,255,.12)}
-    .bb-groen{background:var(--gn)}
-    .bb-rood{color:#FCA5A5}
-    .bb-x{margin-left:4px;opacity:.7;font-size:15px;padding:7px 8px}
-    .bb-wrap{position:relative}
-    .bb-menu{display:none;position:absolute;bottom:calc(100% + 8px);left:0;background:var(--sur);color:var(--txt);border:1px solid var(--bor);border-radius:8px;box-shadow:var(--shm);padding:6px;min-width:170px;flex-direction:column;gap:2px}
-    .bb-menu.open{display:flex}
-    .bb-menu > button{text-align:left;font-size:13px;font-weight:600;padding:7px 10px;border-radius:6px;color:var(--txt)}
-    .bb-menu > button:hover{background:var(--sur2)}
-    .bb-datum{display:flex;gap:6px;padding:6px 4px 2px;border-top:1px solid var(--bor);margin-top:4px}
-    .bb-datum input{flex:1;border:1px solid var(--bor);border-radius:6px;padding:5px 7px;font-size:12px;background:var(--sur2);color:var(--txt)}
-    .bb-datum button{font-size:12px;font-weight:600;background:var(--ac);color:#fff;border-radius:6px;padding:5px 11px}
-
-    /* ── Offerte: uitklapbare aannemerslijst achter de X/N-teller ── */
-    /* De klikzone van de in-/uitklapper. Was `inline-block`: precies zo breed als de tekst en 16px
-       hoog in een rij van 47, met eromheen een wikkel die de rij-uitklapper juist NEGEERT
-       (main.js). Een klik een paar pixels ernaast deed dus helemaal niets, en het paneel leek niet
-       in te klappen. Nu vult de knop de hele cel — vol breed en vol hoog — zodat élke klik in dat
-       vak het paneel open of dicht doet. `gap` in plaats van de spatie die hier in de markup stond;
-       die spatie verdween met de flexbox toch. */
-    .of-aann-tog{display:flex;align-items:center;gap:4px;width:100%;min-width:0;padding:6px 0;font-size:12px;font-weight:600;color:var(--ac);cursor:pointer}
-    .of-aann-tog>svg{flex:none}
-    /* De tekst kapt binnen de knop af. Deed hij dat niet, dan liep de knop uit de wikkel
-       (`overflow:hidden`) en werd de klikbare zone bij een smalle kolom juist kleiner. */
-    .of-aann-lbl{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .of-aann-tog:hover .of-aann-lbl{text-decoration:underline}
-    .of-aann-tog:focus-visible{outline:2px solid var(--ac);outline-offset:2px;border-radius:6px}
-    .of-aann-paneel{margin:2px 0 10px;border:1px solid var(--bor);border-radius:8px;background:var(--sur2);overflow:hidden}
-    .of-aann-rij{display:flex;align-items:center;gap:10px;padding:8px 12px;border-top:1px solid var(--bor)}
-    .of-aann-rij:first-child{border-top:none}
-    /* De naam is nu een <button>, maar mag er niet als knop uitzien: hij staat in een lijst die je
-       leest, niet in een knoppenrij. Alle knop-eigenschappen worden daarom teruggezet; wat blijft
-       is de tekstcursor bij hover en een stippellijn eronder — genoeg om te laten zien dat er iets
-       gebeurt als je erop klikt, zonder de regel te laten schreeuwen. */
-    .of-aann-naam{flex:1;min-width:0;font-family:inherit;font-size:13px;font-weight:inherit;color:var(--txt);background:none;border:none;padding:0;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:text}
-    /* `text-decoration` en géén `border-bottom`: de knop is `flex:1` en dus veel breder dan zijn
-       tekst, en een randje onderlangs trok daardoor een streep dwars door de lege ruimte tot aan
-       de 'nog niet'-knop. Een onderstreping volgt de TEKST. Gestippeld, want dit is een hint dat je
-       hier kunt typen en geen link. */
-    .of-aann-naam:hover{text-decoration:underline dotted;text-underline-offset:3px}
-    .of-aann-naam:focus-visible{outline:2px solid var(--ac);outline-offset:2px;border-radius:4px}
-    /* Het invoerveld neemt exact de plaats van de knop in: zelfde breedte-gedrag, zelfde tekstmaat.
-       Zo verschuift de rest van de regel niet op het moment dat je klikt. */
-    .of-aann-naam-inp{flex:1;min-width:0;height:26px;font-family:inherit;font-size:13px;color:var(--txt);background:var(--sur);border:1px solid var(--ac);border-radius:6px;padding:0 7px}
-    .of-aann-naam-inp:focus{outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 14%,transparent)}
-    .of-aann-st{font-family:inherit;font-size:11px;font-weight:600;color:var(--mut);background:var(--sur);border:1px solid var(--bor);border-radius:6px;padding:3px 11px;cursor:pointer;white-space:nowrap}
-    .of-aann-st.in{color:var(--ac-900);background:var(--ac-l);border-color:var(--ac-b)}
-    /* `position:relative` is hier het ANKER voor de aanraakhalo in het @media(pointer:coarse)-blok
-       verderop; zonder hem hangt dat pseudo-element aan de eerste voorouder met een positie. */
-    /* --mut en niet --fnt: op --fnt haalde dit kruisje 2,53:1 in de lichte stand (#9aa1ad op het
-       paneel #fbfcfd) en 3,50:1 in de donkere. Het is een bedienelement met een tekstglyph, dus de
-       eis is 4,5:1 — met --mut wordt dat 5,8:1 licht en 6,0:1 donker. Zelfde reparatie als eerder
-       bij 'Geen deadline' en de zijbalk-labels. */
-    .of-aann-x{font-size:16px;line-height:1;color:var(--mut);background:none;border:none;cursor:pointer;padding:0 2px;position:relative}
-    .of-aann-x:hover{color:var(--rd)}
-    .of-aann-add{display:flex;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--bor)}
-    .of-aann-input{flex:1;height:30px;font-family:inherit;font-size:13px;color:var(--txt);background:var(--sur);border:1px solid var(--bor);border-radius:6px;padding:0 10px}
-    .of-aann-input:focus{outline:none;border-color:var(--ac);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 14%,transparent)}
-    .of-aann-toevoeg{flex-shrink:0;font-family:inherit;font-size:12px;font-weight:600;color:#fff;background:var(--ac);border:1px solid var(--ac);border-radius:6px;padding:0 12px;height:30px;cursor:pointer;white-space:nowrap}
-    .of-aann-toevoeg:hover{filter:brightness(1.08)}
-    /* Tweede weg naar buiten. De samenvatting in de rij erboven doet hetzelfde, maar wie het paneel
-       aan het invullen is kijkt hier — en 'hoe krijg ik dit weer dicht' was precies de klacht.
-       In de toevoeg-regel en niet op een eigen kopbalk: het paneel neemt al ruimte in. */
-    .of-aann-dicht{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;font-family:inherit;font-size:12px;font-weight:600;color:var(--mut);background:none;border:1px solid var(--bor);border-radius:6px;padding:0 10px;height:30px;cursor:pointer;white-space:nowrap}
-    .of-aann-dicht:hover{color:var(--txt);background:var(--sur);border-color:var(--bor-input)}
-    .of-aann-opvolg{display:inline-flex;align-items:center;gap:4px;flex-shrink:0;font-family:inherit;font-size:12px;font-weight:600;color:var(--ac);background:none;border:1px solid var(--ac);border-radius:6px;padding:0 10px;height:30px;cursor:pointer;white-space:nowrap}
-    .of-aann-opvolg:hover{background:var(--ac-l)}
-    /* Aannemerslijst in het bewerkscherm (v12.5): zelfde onderdelen als het tabelpaneel,
-       alleen de naam is hier stilstaande tekst — hernoemen kan in het paneel. */
-    #m-aann{border:1px solid var(--bor);border-radius:8px;background:var(--sur)}
-    #m-aann .of-aann-rij{display:flex;align-items:center;gap:8px;padding:6px 12px}
-    #m-aann .of-aann-rij+.of-aann-rij{border-top:1px solid var(--bor)}
-    #m-aann .m-aann-naam{flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    #m-aann .m-aann-teller{padding:6px 12px;font-size:12px;color:var(--mut);border-top:1px solid var(--bor)}
-    .of-aann-tbl-tog{margin-top:4px}
-    .of-aann-tr>td{padding:0 14px 12px!important;background:var(--sur)}
-    .of-aann-tr .of-aann-paneel{max-width:580px;margin:0}
-
-    /* Cross-list "Ook hier" (bug #2): taken die via Subcategorie óók in dit scherm horen */
-    .xl-blok{margin-top:18px;border-top:1px solid var(--bor);padding-top:14px}
-    .xl-kop{font-size:13px;font-weight:600;color:var(--sec);margin-bottom:10px}
-    .xl-sub{font-weight:500;color:var(--mut)}
-    .xl-rij{display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--bor);border-radius:8px;margin-bottom:7px;background:var(--sur)}
-    /* De code loopt nu via de gedeelde .code-bouwsteen (klikbaar); zelfde ogende opmaak. */
-    .xl-rij .code{font-family:inherit;font-weight:600;color:var(--sec);font-size:13px;min-width:62px;display:inline-block}
-    .xl-mid{flex:1;min-width:0}
-    .xl-naam{font-weight:600;font-size:14px;color:var(--txt)}
-    .xl-ctx{font-size:12px;color:var(--mut);display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:2px}
-    .xl-herk{background:var(--sec-l);color:var(--sec);border-radius:6px;padding:1px 8px;font-weight:600;font-size:11px}
-    .xl-edit{background:none;border:none;cursor:pointer;color:var(--mut);padding:6px;border-radius:8px;display:flex}
-    .xl-edit:hover{background:var(--sec-l);color:var(--sec)}
-    .xl-edit svg{width:18px;height:18px;display:block}
-
-    /* ═══════ "Operator" — donkere-modus correcties voor vaste kleuren ═══════ */
-    [data-theme=dark] .code{color:#9aa1ad}
-    [data-theme=dark] .cell-txt,[data-theme=dark] .cell-sm,[data-theme=dark] .s-normal{color:#c2c8d0}
-    [data-theme=dark] .prio-laag{color:#8b929e}
-    [data-theme=dark] .act-bw,[data-theme=dark] .act-ib{color:var(--mut)}
-    [data-theme=dark] .act-af:hover{color:#15181d}
-    [data-theme=dark] tbody tr[data-prio=laag]{--prio-bar:#3a414d}
-    /* Accent-gevulde elementen: in donker thema is de vulling licht (--ac #8b9dc4, sec-pastellen),
-       dus wit erop haalt maar ~1.9–2.8:1. Donkere inkt op de lichte vulling — zelfde omkering als
-       .act-af:hover hierboven; gemeten ≥6.2:1 op elke vulling (norm: 4.5 tekst, 3 iconen).
-       .tog.on doet níet mee: die krijgt via --modal-sec (:root) een vaste donkere kleur, daar
-       hoort de witte knop juist. De stagingbalk (--am-vulling) volgt hetzelfde patroon. */
-    [data-theme=dark] .btn-pri,
-    [data-theme=dark] .sw-update-btn,
-    [data-theme=dark] .pb.on,
-    [data-theme=dark] .ai-step .dot,
-    [data-theme=dark] .ai-mini.plus,
-    [data-theme=dark] .cb.aan::after,
-    [data-theme=dark] .bb-datum button,
-    [data-theme=dark] .of-aann-toevoeg,
-    [data-theme=dark] .chat-bub.user,
-    [data-theme=dark] #chat-send,
-    [data-theme=dark] .kc-plus,
-    [data-theme=dark] .staging-balk{color:#15181d}
-    /* De streep van het kopvinkje is een vlakje en geen tekst, dus de kleurregel hierboven
-       (die `color` zet) raakt hem niet. Apart, met dezelfde donkere inkt. */
-    [data-theme=dark] .cb.deels::after{background:#15181d}
-
-/* ── VvE-dossier chat-agent ── */
-/* De chat-knop is een gewone icoonknop in de bovenbalk (.ico-btn doet de opmaak). Tot v10.24 was
-   het een zwevend knopje rechtsonder; dat lag over de actiekolom van de takentabel heen en maakte
-   het vinkje 'afronden' van de rij eronder onklikbaar. Zie de toelichting in index.html. */
-/* Het paneel hangt nu ónder zijn knop in plaats van erboven: rechts uitgelijnd, net onder de balk. */
-/* z-index 690 en niet 901: het chat-paneel is een HULPvenster en hoort ónder de meldingsstrook
-   (#toast-container, 700) en onder de storingsbanner (.load-err, 750). Het paneel is bewust
-   niet-modaal — je mag ernaast doorwerken — en het staat op precies dezelfde plek rechtsboven als
-   de meldingen. Met 901 lag het daar volledig overheen: de undo-knop van een zojuist afgeronde
-   taak was dan niet te zien én niet te klikken (het paneel ving de klik), en dat is de enige weg
-   terug. Wel boven de bulk-balk (450) en de zijbalk (200); onder de vensters (500) regelt de
-   `body:has(.modal-bg.open)`-regel verderop al. */
-#chat-bg{position:fixed;right:20px;top:calc(var(--hh) + 8px);z-index:690;display:none}
-#chat-bg.open{display:block}
-#chat-paneel{width:380px;max-width:calc(100vw - 40px);max-height:70vh;display:flex;flex-direction:column;
-  background:var(--sur);border:1px solid var(--bor);border-radius:8px;box-shadow:var(--shm);overflow:hidden}
-.chat-hdr{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px;border-bottom:1px solid var(--bor)}
-.chat-hdr-l{display:flex;flex-direction:column;gap:1px}
-.chat-titel{font-size:14px;font-weight:600}
-.chat-vve-label{font-size:12px;color:var(--mut)}
-.chat-vve-rij{display:flex;align-items:center;gap:4px}
-.chat-vve-wis{border:0;background:none;color:var(--mut);font-size:15px;line-height:1;padding:0 4px;cursor:pointer;border-radius:4px}
-.chat-vve-wis:hover,.chat-vve-wis:focus-visible{color:var(--txt);background:var(--sur2)}
-.chat-vve-wrap{position:relative;padding:8px 12px;border-bottom:1px solid var(--bor)}
-.chat-vve-wrap input{width:100%;font-size:12px}
-.chat-bubbles{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px;background:var(--bg)}
-.chat-bub{max-width:85%;padding:9px 12px;border-radius:8px;font-size:13px;line-height:1.5;white-space:pre-wrap}
-.chat-bub.user{align-self:flex-end;background:var(--ac);color:#fff;border-bottom-right-radius:4px}
-.chat-bub.ai{align-self:flex-start;background:var(--sur);border:1px solid var(--bor);border-bottom-left-radius:4px}
-.chat-bub.bezig{align-self:flex-start;color:var(--mut);font-style:italic}
-.chat-leeg{color:var(--mut);font-size:12px;text-align:center;margin:auto}
-.chat-suggesties{display:flex;flex-direction:column;gap:6px;margin:12px auto 0;align-items:center}
-.chat-suggest{background:var(--sur);border:1px solid var(--bor);border-radius:8px;padding:7px 13px;font-size:12px;color:var(--ac);cursor:pointer;max-width:90%;transition:border-color var(--tr,.15s)}
-.chat-suggest:hover{border-color:var(--ac)}
-.chat-invoer{display:flex;gap:8px;align-items:center;padding:10px 12px;border-top:1px solid var(--bor)}
-.chat-invoer input{flex:1;font-size:13px}
-#chat-send{flex:none;width:36px;height:36px;border-radius:8px;border:none;background:var(--ac);color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;transition:filter var(--tr)}
-#chat-send:hover{filter:brightness(1.1)}
-.chat-foot{padding:8px 12px;font-size:11px;color:var(--mut);border-top:1px solid var(--bor)}
-
-/* ═══════ Naloop-afwerking (ontwerp-naloop 2026-06-22) ═══════ */
-
-/* ── Fase-indicator (Subsidie-trajecten): vijf stappen op een lijn ──
-   Alleen var()-kleuren, zodat er geen aparte [data-theme=dark]-regels nodig zijn. */
-.fase-rij{display:flex;flex-direction:column;gap:5px;min-width:158px}
-.fase-rail{display:flex;align-items:center}
-.fase-bol{position:relative;width:11px;height:11px;padding:0;border-radius:50%;box-sizing:border-box;flex:none;background:var(--bor-input);border:2px solid var(--bor-input);cursor:pointer;transition:background var(--tr),border-color var(--tr),transform var(--tr-fast)}
-.fase-bol:hover{transform:scale(1.28)}
-.fase-bol.af{background:var(--ac);border-color:var(--ac)}
-.fase-bol.nu{background:var(--sur);border-color:var(--ac)}
-.fase-bol:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
-.fase-lijn{height:2px;flex:1;min-width:9px;background:var(--bor-input)}
-.fase-lijn.af{background:var(--ac)}
-.fase-lbl{font-size:12px;font-weight:600;color:var(--mut);white-space:nowrap}
-.fase-rij-modal{min-width:0;max-width:280px}
-/* Op aanraakschermen is 11px te klein om te raken. Alleen in de tabel: in het
-   bewerkscherm staan de bolletjes al ruim genoeg uit elkaar. */
-@media(pointer:coarse){
-  .fase-rij:not(.fase-rij-modal) .fase-bol::before{content:'';position:absolute;inset:-11px -3px}
+/* ═══════════════════════════════════════════════════════════════════════
+   COLLECTIEF DASHBOARD v16 — ontwerp C (minimalistisch)
+   Kleuren, zachte hoeken en ronde vinkjes van het vorige dashboard; letter (Albert Sans) en
+   iconen van de huisstijl. Eén bovenbalk per scherm, het werkblad vult de rest, één regel per rij.
+   Tekstcontrast ≥ 4,5:1 overal (grijs #59616B op wit 6,4:1; staalblauw #4E6885 op wit 5,9:1).
+   ═══════════════════════════════════════════════════════════════════════ */
+:root{
+  --leisteen:#222B36; --zijbalk-lijn:#2E3946; --zijbalk-vlak:#3A4757;
+  --op-leisteen:#9AA5B2; --op-leisteen-licht:#D5DCE4; --op-leisteen-wit:#F2F4F7; --op-leisteen-accent:#9DB2CB;
+  --mist:#F5F7F9; --papier:#FBFCFD; --wit:#fff; --wolk:#E9EDF1; --lijn:#E1E6EB; --lijn-zacht:#EEF1F4; --zweef:#F7F9FB;
+  --rand:#8A94A0; --inkt:#222B36; --grijs:#59616B;
+  --ac:#4E6885; --ac-l:#EDF1F5; --ac-d:#3F566F;
+  --gn:#047857; --am:#AE5008; --rd:#B91C1C;
+  --hoek:6px; --hoek-vlak:10px;
+  --letter:'Albert Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
 }
-
-/* ══ CRM (v13.0) ══
-   Alles hieronder hangt aan een CRM-klasse of aan #fg-crm, zodat de andere vijf tabbladen niets
-   merken. Kleur via het accent (--ac), zoals elk tabblad sinds v13.7. */
-
-/* Fase-bolletjes: zelfde balk als Subsidie, met vier stappen. */
-.fase-rij.crm-fase{min-width:140px}
-.fase-rij.crm-fase .fase-bol.af{background:var(--ac);border-color:var(--ac)}
-.fase-rij.crm-fase .fase-bol.nu{background:var(--sur);border-color:var(--ac)}
-.fase-rij.crm-fase .fase-bol:focus-visible{outline-color:var(--ac)}
-.fase-rij.crm-fase .fase-lijn.af{background:var(--ac)}
-.fase-rij.crm-fase.fase-rij-modal{min-width:0;max-width:220px}
-
-/* Vraag-kolom: soortlabel + kort onderwerp op één regel. Het label krimpt nooit; het onderwerp
-   kapt af met … zoals elke tekstcel (klik de rij open voor de rest). */
-.crm-vraag{display:flex;align-items:baseline;gap:8px;min-width:0}
-/* De afkapping staat hier zelf. `.pil-rij>.ct` greep niet: de tekst zit een laag dieper, in
-   .crm-vraag, en liep dus ongehinderd over Van, Fase en Wacht heen (naloop 25-09). */
-.crm-vraag .ct{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#ntd-tbl-wrap tr.expanded .crm-vraag{align-items:flex-start}
-#ntd-tbl-wrap tr.expanded .crm-vraag .ct{overflow:visible;text-overflow:clip;white-space:normal;overflow-wrap:anywhere}
-.crm-soort{flex:none;font-size:12px;font-weight:500;color:var(--mut)}
-.crm-soort::after{content:'·';margin-left:6px;color:var(--fnt)}
-
-/* Van-kolom: naam, met het huisnummer (of wat er na de komma staat) gedempt eronder. */
-.crm-van .ct{font-weight:600;overflow-wrap:anywhere}
-.crm-nr{display:block;font-size:11px;color:var(--mut);font-family:var(--font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-
-/* Uitklappaneel onder een opengeklikte CRM-rij: de mail en de interne notitie. */
-.crm-mail-tr td{padding:0 16px 14px;background:var(--sur)}
-.crm-mail{border-left:2px solid var(--ac);background:var(--bg);border-radius:0 8px 8px 0;padding:12px 16px;display:grid;gap:10px;max-width:980px}
-.crm-mail-kop{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 16px;font-size:12px;color:var(--txt)}
-.crm-mail-meta{color:var(--mut);font-family:var(--font-mono);font-size:12px}
-.crm-mail-tekst{font-size:13px;line-height:1.65;max-width:72ch;color:var(--txt);white-space:pre-wrap;overflow-wrap:anywhere}
-.crm-mail-leeg{font-size:12px;color:var(--mut);font-style:italic}
-.crm-notitie{font-size:12px;color:var(--mut);border-top:1px solid var(--bor);padding-top:8px;display:flex;gap:10px;flex-wrap:wrap;white-space:pre-wrap}
-.crm-notitie-lbl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--mut)}
-
-/* Soort-knoppen in het bewerkscherm. */
-.crm-keuzes{display:flex;flex-wrap:wrap;gap:6px}
-.crm-keus{border:1px solid var(--bor-input,var(--bor));background:var(--sur);border-radius:8px;padding:7px 13px;font:inherit;font-size:13px;font-weight:600;color:var(--mut);cursor:pointer}
-.crm-keus.aan{background:var(--ac-l);border-color:var(--ac);color:var(--ac)}
-.crm-keus:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
-
-/* Het zoekveld van Nog Te Doen: 203 → 140px. Met zes tabbladen paste de kopbalk bij 1920px anders
-   niet meer op één regel (gemeten: 8px speelruimte, de CRM-tab kost 66). 12+14+8+92+12+2 = 140.
-   Alleen dit veld; het zoekveld van Afgerond houdt zijn breedte. */
-#s-ntd{width:92px}
-
-/* ── Chat-velden: zelfde afwerking als de overige invoervelden ── */
-.chat-invoer input,.chat-vve-wrap input{border:1px solid var(--bor);border-radius:8px;padding:8px 11px;background:var(--sur2);color:var(--txt);outline:none;height:36px;transition:border var(--tr),box-shadow var(--tr)}
-.chat-invoer input:focus,.chat-vve-wrap input:focus{border-color:var(--ac);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 14%,transparent)}
-
-/* ── Focus voor dossier-/kenmerken-velden die er nog geen hadden ── */
-#kmk-bron:focus,.kmk-rij select:focus,.dos-composer textarea:focus,#dos-wie:focus{outline:none;border-color:var(--ac);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 14%,transparent)}
-
-/* ── Globale zichtbare toetsenbord-focus (a11y) ── */
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--leisteen);color:var(--inkt);font-family:var(--letter);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button,input,select{font:inherit;color:inherit}
+a{color:var(--ac)}
+[hidden]{display:none !important}
 :focus-visible{outline:2px solid var(--ac);outline-offset:2px}
-input:focus-visible,select:focus-visible,textarea:focus-visible,.search-box input:focus-visible{outline:none}
-#sb :focus-visible{outline-color:var(--sbglow)}
 
-/* ── Druk-feedback op knoppen (vooral op touch) + chat-knop-feedback ── */
-.btn:active,.ico-btn:active,.bb-knop:active,#chat-send:active,.pb:active,.act-af:active,.act-bw:active,.act-ib:active,.ni:active,.tab:active,.cb:active,.fase-bol:active{transform:scale(.97)}
+/* ── Schil ──────────────────────────────────────────────────────────── */
+#app{display:flex;height:100vh;background:var(--leisteen)}
+body.test #app{height:calc(100vh - 30px);margin-top:30px}
+.testbalk{position:fixed;top:0;left:0;right:0;z-index:300;height:30px;display:flex;align-items:center;justify-content:center;background:var(--am);color:#fff;font-size:13px;font-weight:600}
 
-/* ── 'Verminder beweging' respecteren (dekt alle 60+ overgangen/animaties) ── */
-@media (prefers-reduced-motion: reduce){
-  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important;scroll-behavior:auto!important}
-  .dot,.dot.loading{animation:none!important}
+.zijbalk{flex:0 0 208px;display:flex;flex-direction:column;gap:14px;padding:16px 10px 12px;min-height:0}
+.zb-logo{display:flex;align-items:center;gap:10px;padding:0 8px}
+.zb-merk{display:flex;flex-direction:column;color:var(--op-leisteen-wit);font-size:14px;font-weight:600;line-height:1.2}
+.zb-merk>span{color:var(--op-leisteen);font-size:11px;font-weight:500}
+.nav{flex:1;display:flex;flex-direction:column;gap:1px;overflow-y:auto}
+.nav-scheiding{height:1px;margin:8px 10px;background:var(--zijbalk-lijn)}
+.nav-knop{display:flex;align-items:center;gap:10px;min-height:38px;padding:0 10px;border-radius:var(--hoek);color:var(--op-leisteen);font-size:13.5px;font-weight:500;text-decoration:none}
+.nav-knop:hover{color:var(--op-leisteen-licht);background:rgba(255,255,255,.05)}
+.nav-knop.actief{color:var(--op-leisteen-wit);background:var(--zijbalk-lijn);font-weight:600}
+.nav-knop.actief .icoon{color:var(--op-leisteen-accent)}
+.nav-knop:focus-visible{outline-color:var(--op-leisteen-accent)}
+.nav-ico{display:inline-flex}
+.nav-tel{margin-left:auto;font-size:12px;font-weight:600;color:var(--op-leisteen-licht);font-variant-numeric:tabular-nums}
+.zb-voet{display:flex;align-items:center;gap:6px;padding:10px 4px 0 10px;border-top:1px solid var(--zijbalk-lijn);font-size:12px;color:var(--op-leisteen)}
+.sync-lbl{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.zb-stip{flex:none;width:7px;height:7px;border-radius:50%;background:#34D39A}
+.zb-stip.bezig{background:#F0B44C;animation:puls 1s infinite}
+.zb-stip.fout{background:#F0746F}
+.zb-stip.pauze{background:#F0B44C}
+@keyframes puls{50%{opacity:.35}}
+.ico-knop{display:grid;place-items:center;width:32px;height:32px;padding:0;border:0;border-radius:var(--hoek);background:none;color:inherit;cursor:pointer}
+.zijbalk .ico-knop:hover{background:rgba(255,255,255,.07);color:var(--op-leisteen-wit)}
+.zijbalk .ico-knop:focus-visible{outline-color:var(--op-leisteen-accent)}
+
+.werkvlak{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;padding:12px;background:var(--mist);border-top-left-radius:12px}
+.blad{flex:1;min-height:0;display:flex;flex-direction:column;background:var(--wit);border:1px solid var(--lijn);border-radius:var(--hoek-vlak);overflow:hidden}
+
+/* ── De ene bovenbalk ───────────────────────────────────────────────── */
+.balk{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;min-height:56px;padding:10px 12px 10px 16px;border-bottom:1px solid var(--lijn)}
+.balk h1{margin:0;font-size:18px;font-weight:600;letter-spacing:-.01em;white-space:nowrap}
+.tel{font-size:13px;color:var(--grijs);font-variant-numeric:tabular-nums;white-space:nowrap}
+.streep{width:1px;height:20px;background:var(--lijn)}
+.groep{display:flex;flex-wrap:wrap;gap:4px}
+.rechts{margin-left:auto;display:flex;align-items:center;gap:8px}
+.keuze{display:inline-flex;align-items:center;gap:6px;min-height:30px;padding:0 12px;border:1px solid var(--lijn);border-radius:999px;background:var(--wit);font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap}
+.keuze:hover{border-color:var(--rand)}
+.keuze.actief{background:var(--ac);border-color:var(--ac);color:#fff}
+.keuze.actief .st-dot{border-color:#fff}
+.keuze-tel{font-size:12px;opacity:.75;font-variant-numeric:tabular-nums}
+.zoek{display:flex;align-items:center;gap:6px;width:180px;min-height:32px;padding:0 10px;border:1px solid var(--lijn);border-radius:var(--hoek);color:var(--grijs);background:var(--wit)}
+.zoek input{width:100%;border:0;outline:0;background:none;font-size:13px;color:var(--inkt)}
+.zoek input::placeholder{color:var(--grijs)}
+.zoek:focus-within{border-color:var(--ac);box-shadow:0 0 0 3px rgba(78,104,133,.15)}
+.knop{display:inline-flex;align-items:center;justify-content:center;min-height:32px;padding:0 14px;border:1px solid var(--ac);border-radius:var(--hoek);background:var(--ac);color:#fff;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+.knop:hover{background:var(--ac-d);border-color:var(--ac-d)}
+.knop-licht{background:var(--wit);color:var(--inkt);border-color:var(--lijn)}
+.knop-licht:hover{background:var(--zweef);border-color:var(--rand)}
+.knop-gevaar{background:var(--rd);border-color:var(--rd)}
+.knop-gevaar:hover{background:#991B1B;border-color:#991B1B}
+.knop-klein{min-height:28px;padding:0 10px}
+.tekst-knop{min-height:32px;padding:0 4px;border:0;background:none;color:inherit;font-size:13px;font-weight:600;text-decoration:underline;text-underline-offset:3px;cursor:pointer;white-space:nowrap}
+.tekst-knop.gevaar{color:var(--rd)}
+.info{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;min-height:36px;padding:0 16px;background:var(--ac-l);border-bottom:1px solid var(--lijn);font-size:13px}
+.voortgang{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--grijs);white-space:nowrap}
+.balkje{width:96px;height:6px;border-radius:3px;background:var(--wolk);overflow:hidden}
+.balkje>span{display:block;height:100%;border-radius:3px;background:var(--ac);transition:width .4s ease}
+
+/* ── Tabel: één regel per rij ───────────────────────────────────────── */
+.tabel{flex:1;min-height:0;overflow:auto}
+.thead,.rij,.nieuw{display:grid;align-items:center;column-gap:16px;padding-right:16px}
+.thead{position:sticky;top:0;z-index:2;min-height:32px;background:var(--papier);border-bottom:1px solid var(--lijn);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--grijs)}
+.thead .mid{text-align:center}
+.rij{min-height:40px;border-bottom:1px solid var(--lijn-zacht)}
+.rij:hover{background:var(--zweef)}
+.kol-taken{grid-template-columns:40px minmax(200px,2fr) minmax(170px,1fr) minmax(160px,1.3fr);min-width:640px}
+.kol-lod{grid-template-columns:40px minmax(170px,1fr) minmax(200px,1.4fr) minmax(190px,1.1fr) 120px 130px;min-width:900px}
+.kol-subsidie{grid-template-columns:40px minmax(170px,1fr) minmax(190px,1.3fr) minmax(220px,1.2fr) 120px 130px;min-width:920px}
+.kol-alvo{grid-template-columns:16px minmax(220px,1.6fr) repeat(4,96px) minmax(130px,1fr);min-width:820px}
+.kol-alfa{grid-template-columns:16px minmax(220px,1fr) 180px}
+.afkap{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cel-knop{display:block;width:100%;padding:0;border:0;background:none;text-align:left;cursor:pointer}
+.cel-knop:hover{text-decoration:underline;text-underline-offset:3px}
+.vve{display:flex;align-items:baseline;gap:8px;min-width:0;white-space:nowrap}
+.vve .naam{overflow:hidden;text-overflow:ellipsis}
+.code{flex:none;font-size:12.5px;color:var(--grijs);font-variant-numeric:tabular-nums}
+.naam{font-weight:500}
+.zacht{color:var(--grijs)}
+.leeg{margin:0;padding:16px;color:var(--grijs)}
+
+/* Nieuwe taak en taak aanpassen: invullen in de kolommen zelf */
+.nieuw{min-height:44px;background:var(--papier);border-bottom:1px solid var(--lijn)}
+.nieuw input,.bewerk input{width:100%;min-height:30px;padding:0 10px;border:1px solid transparent;border-radius:var(--hoek);background:transparent;font-size:14px}
+.nieuw>input,.nieuw>.veld-vve{margin-left:-10px;width:calc(100% + 10px)}
+.nieuw input::placeholder,.bewerk input::placeholder{color:var(--grijs)}
+.nieuw input:hover{border-color:var(--lijn);background:var(--wit)}
+.nieuw input:focus-visible,.bewerk input:focus-visible{outline:0;border-color:var(--ac);background:var(--wit);box-shadow:0 0 0 3px rgba(78,104,133,.15)}
+input[aria-invalid=true]{border-color:var(--rd) !important}
+.plus{display:grid;place-items:center;color:var(--grijs);font-size:18px;font-weight:300}
+.rij.bewerk{background:var(--ac-l);min-height:48px}
+.bewerk input{background:var(--wit);border-color:var(--lijn)}
+.bewerk-eind{display:flex;align-items:center;gap:8px;min-width:0}
+.bewerk-eind input{flex:1;min-width:80px}
+.verborgen{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* Rond afvinken */
+.vink{position:relative;display:grid;place-items:center;width:40px;height:40px;cursor:pointer}
+.vink input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+.vink input:disabled{cursor:not-allowed}
+.vak{display:grid;place-items:center;width:18px;height:18px;border:1.5px solid var(--rand);border-radius:50%;background:var(--wit);color:transparent;transition:background .15s,border-color .15s,color .15s}
+.vink:hover .vak{border-color:var(--gn);color:var(--gn)}
+.vink input:checked + .vak{background:var(--gn);border-color:var(--gn);color:#fff}
+.vink input:disabled + .vak{border-style:dashed;color:transparent}
+.vink input:focus-visible + .vak{outline:2px solid var(--ac);outline-offset:3px}
+
+.wie{display:flex;align-items:center;gap:8px;min-width:0;font-size:13px;white-space:nowrap}
+.ini{display:grid;place-items:center;flex:none;width:24px;height:24px;border-radius:999px;background:var(--wolk);font-size:10px;font-weight:600}
+.datum{font-size:13px;color:var(--grijs);font-variant-numeric:tabular-nums;white-space:nowrap}
+.datum.dichtbij{color:var(--am);font-weight:600}
+.laat{font-size:13px;font-weight:600;color:var(--rd);white-space:nowrap}
+
+/* Status: bolletje + woord */
+.st{display:inline-flex;align-items:center;gap:8px;min-width:0;font-size:13px;white-space:nowrap}
+.st-dot{flex:none;width:10px;height:10px;border:1.5px solid var(--rand);border-radius:50%;background:var(--wit)}
+.dot-wacht{border-color:var(--ac);border-width:2px}
+.dot-loopt{border-color:var(--am);background:var(--am)}
+.dot-klaar{border-color:var(--gn);background:var(--gn)}
+
+/* ALV-vinkjes: rond, gevuld als het gedaan is */
+.vlag{justify-self:center;display:grid;place-items:center;width:36px;height:36px;padding:0;border:0;background:none;cursor:pointer}
+.vlag:hover .vak{border-color:var(--ac);color:var(--ac)}
+.vlag.aan .vak{background:var(--ac);border-color:var(--ac);color:#fff}
+.budget{flex:none;padding:1px 7px;border-radius:4px;background:var(--ac);font-size:11px;font-weight:600;color:#fff}
+
+/* Subsidiefase: bolletjes aan een lijn */
+.fase{display:flex;align-items:center;gap:8px;min-width:0}
+.stappen{position:relative;display:flex;flex:none}
+.stappen::before{content:'';position:absolute;left:10px;right:10px;top:50%;height:2px;margin-top:-1px;background:var(--lijn)}
+.stap{position:relative;z-index:1;display:grid;place-items:center;width:20px;height:28px;padding:0;border:0;background:none;cursor:pointer}
+.stap::after{content:'';width:10px;height:10px;box-sizing:border-box;border:2px solid #C3CBD4;border-radius:50%;background:var(--wit)}
+.stap:hover::after{border-color:var(--ac)}
+.stap.gedaan::after{background:var(--ac);border-color:var(--ac)}
+.stap.nu::after{width:12px;height:12px;border-color:var(--ac);box-shadow:0 0 0 3px var(--ac-l)}
+.fase-tekst{font-size:13px;color:var(--grijs);white-space:nowrap}
+
+/* ── VvE aanvullen ──────────────────────────────────────────────────── */
+.sug-houder,.veld-vve{position:relative;display:block;min-width:0}
+.sug{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:50;max-height:280px;overflow:auto;padding:4px;background:var(--wit);border:1px solid var(--lijn);border-radius:var(--hoek-vlak);box-shadow:0 8px 24px rgba(16,22,34,.12)}
+.sug-item{display:flex;gap:10px;align-items:baseline;padding:7px 10px;border-radius:var(--hoek);cursor:pointer;font-size:13.5px}
+.sug-item:hover,.sug-item.actief{background:var(--ac-l)}
+
+/* ── Ongedaan maken, meldingen, banners ─────────────────────────────── */
+.snack{position:fixed;right:20px;bottom:20px;z-index:200;display:flex;align-items:center;gap:16px;max-width:min(460px,calc(100vw - 40px));padding:8px 10px 8px 16px;background:var(--leisteen);color:#fff;border-radius:var(--hoek-vlak);box-shadow:0 8px 24px rgba(16,22,34,.22);font-size:13.5px}
+.snack-tekst{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.snack .tekst-knop{color:#fff}
+#toasts{position:fixed;top:16px;right:16px;z-index:250;display:flex;flex-direction:column;gap:8px;width:min(360px,calc(100vw - 32px));pointer-events:none}
+.toast{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:var(--wit);border:1px solid var(--lijn);border-left:4px solid var(--ac);border-radius:var(--hoek-vlak);box-shadow:0 8px 24px rgba(16,22,34,.14);pointer-events:all}
+.toast-fout{border-left-color:var(--rd)}
+.toast-ok{border-left-color:var(--gn)}
+.toast-tekst{flex:1;display:flex;flex-direction:column;gap:2px;font-size:13px;overflow-wrap:anywhere}
+.toast-tekst span{color:var(--grijs)}
+.toast-x{border:0;background:none;color:var(--grijs);font-size:18px;line-height:1;cursor:pointer;padding:0 2px}
+.banner{position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:260;display:flex;align-items:center;gap:12px;max-width:calc(100vw - 32px);padding:8px 8px 8px 14px;background:var(--leisteen);color:#fff;border-radius:var(--hoek-vlak);box-shadow:0 8px 24px rgba(16,22,34,.22);font-size:13.5px}
+body.test .banner{top:42px}
+/* De balk van de service worker (nieuwe versie) en de minimumversie-rem (src/sw-update.js, src/versie.js). */
+.sw-update-bar{position:fixed;left:16px;bottom:16px;z-index:220;display:flex;align-items:center;gap:12px;max-width:calc(100vw - 32px);padding:10px 12px;background:var(--wit);color:var(--inkt);border:1px solid var(--lijn);border-left:4px solid var(--ac);border-radius:var(--hoek-vlak);box-shadow:0 8px 24px rgba(16,22,34,.16);font-size:13px;font-weight:500}
+.sw-update-btn{padding:6px 14px;border:0;border-radius:var(--hoek);background:var(--ac);color:#fff;font-weight:600;cursor:pointer;white-space:nowrap}
+.sw-update-x{border:0;background:none;color:var(--grijs);font-size:18px;line-height:1;cursor:pointer;padding:0 2px}
+
+/* ── Vensters ───────────────────────────────────────────────────────── */
+.modal-bg{position:fixed;inset:0;z-index:150;display:none;align-items:flex-start;justify-content:center;padding:8vh 16px 16px;background:rgba(16,22,34,.45);overflow:auto}
+.modal-bg.open{display:flex}
+.modal{width:min(560px,100%);background:var(--wit);border-radius:12px;box-shadow:0 24px 64px rgba(16,22,34,.3)}
+.modal-klein{width:min(420px,100%)}
+.modal-kop{display:flex;align-items:center;gap:12px;padding:14px 12px 14px 20px;border-bottom:1px solid var(--lijn)}
+.modal-kop h2{flex:1;margin:0;font-size:17px;font-weight:600}
+.modal-kop .ico-knop:hover{background:var(--mist)}
+.modal-body{display:flex;flex-direction:column;gap:14px;padding:18px 20px}
+.modal-body h2{margin:0;font-size:17px;font-weight:600}
+.modal-body p{margin:0;color:var(--grijs)}
+.modal-voet{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px 20px 16px;border-top:1px solid var(--lijn)}
+.ruimte{flex:1}
+.veld{display:flex;flex-direction:column;gap:5px;min-width:0}
+.veld>label,.veld-lbl{font-size:12.5px;font-weight:600;color:var(--grijs)}
+.veld input,.veld select{width:100%;min-height:36px;padding:0 10px;border:1px solid var(--lijn);border-radius:var(--hoek);background:var(--wit);font-size:14px}
+.veld input:focus-visible,.veld select:focus-visible{outline:0;border-color:var(--ac);box-shadow:0 0 0 3px rgba(78,104,133,.15)}
+.twee{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.fout{margin:0;padding:8px 12px;border-radius:var(--hoek);background:#FEE2E2;color:var(--rd);font-size:13px}
+
+/* ── Telefoon en smal scherm ────────────────────────────────────────── */
+@media (max-width:860px){
+  #app{flex-direction:column;height:auto;min-height:100vh}
+  .zijbalk{flex:none;flex-direction:row;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 12px}
+  .zb-merk{display:none}
+  .nav{flex-direction:row;flex-wrap:wrap;overflow:visible}
+  .nav-scheiding{width:1px;height:20px;margin:auto 4px}
+  .zb-voet{border-top:0;padding:0;margin-left:auto}
+  .sync-lbl{display:none}
+  .werkvlak{border-top-left-radius:0;padding:8px}
+  .blad{min-height:calc(100vh - 140px)}
+  .rechts{margin-left:0;flex:1 1 100%}
+  .zoek{flex:1}
+  .streep{display:none}
+  .twee{grid-template-columns:minmax(0,1fr)}
 }
-
-/* ── Grotere klikzone voor kleine bedienelementen op touch ── */
-@media(pointer:coarse){
-  .cb::before{content:'';position:absolute;inset:-10px}
-  /* Vlagknoppen zijn badge-formaat; het raakvlak blijft 40px hoog en 44-61px breed. */
-  .flag-toggle::after{content:'';position:absolute;inset:-9px -8px}
-  /* De twee bundel-knoppen. Gemeten op 375px met pointer:coarse: de chevron 22 × 18px en het
-     merkje 28 × 17px, allebei onder de 24px-richtlijn, terwijl de twee sleep-handvatten uit
-     hetzelfde blok daar wél een halo voor kregen en de actieknoppen ernaast naar 36 × 36 groeien.
-     Op een telefoon is de chevron de enige manier om een bundel open en dicht te klappen, en het
-     merkje volgens §4.2 zelfs 'de enige weg terug' naar de gestapelde weergave vanuit een
-     gefilterde of gezochte lijst. Misklikken landt op de VvE-code ernaast, en die opent het dossier.
-     Verticaal is er ruimte zat (de tabelrij meet 47px), horizontaal niet: de chevron houdt 3px
-     over naar de VvE-code en het merkje 6px naar de badge ervóór, dus daar blijft de marge klein —
-     een onzichtbare halo vangt wél de hit-test en zou die buren anders stil onklikbaar maken
-     (zelfde afweging als bij `td>.stapel-h{margin-right:9px}` verderop).
-     Alleen hier en niet in de basisregel: met een muis is 18px prima aan te wijzen, en dan is het
-     inslikken van een strook buurtekst pure schade zonder winst. */
-  .bdl-chev::after{content:'';position:absolute;inset:-6px -1px}
-  .bdl-merk::after{content:'';position:absolute;inset:-4px -2px}
-  /* Het kruisje in de aannemerslijst meet 13,6 × 16px — ruim onder de 24px-richtlijn — en het
-     VERWIJDERT meteen, zonder vraag. Naast een misklik op de statuspil ernaast (die alleen
-     'binnen' omzet, en dat is een klik terug) is dit de enige knop in dat paneel die iets
-     onherstelbaars doet. Horizontaal 4px erbij en verticaal 6px: de gap naar de statuspil is 10px
-     en er zit 12px celopvulling rechts, dus de halo raakt geen buur. */
-  .of-aann-x::after{content:'';position:absolute;inset:-6px -4px}
+@media (max-width:560px){
+  /* Alleen iconen in beeld; de naam blijft voor schermlezers bestaan. */
+  .nav-tekst{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  .nav-knop{padding:0 10px}
 }
-
-/* ── Mobiel: uitlijning, touch-targets en afbreek-gedrag ── */
-@media(max-width:680px){
-  .card-hdr.hdr-tabs{padding:0 12px}
-  /* Hier WÉL schuiven: vijf tabbladen meten samen ±612px en dat past op geen telefoon. Ze
-     krijgen een eigen regel over de volle breedte en schuiven horizontaal, precies zoals in de
-     losse tabbalk van vroeger. De filterbalk staat eronder.
-     Zónder schuifbalk: een klassieke schuifbalk (zoals een bureaubladbrowser in telefoonstand
-     tekent) eet 6px van de 44px hoogte, en dán komt de streep onder het actieve tabblad 5px
-     boven de scheidslijn te zweven — precies wat deze hele wijziging moest rechtzetten. Op een
-     échte telefoon is de schuifbalk een zwevende laag en gebeurt dat niet; deze twee regels
-     maken het gedrag overal gelijk. Schuiven zelf blijft gewoon werken (veeg/trackpad). */
-  .hdr-tabs .tabs{flex:1 1 100%;min-width:0;overflow-x:auto;scrollbar-width:none}
-  .hdr-tabs .tabs::-webkit-scrollbar{display:none}
-  .grp-kop{padding:9px 12px}
-  #content{padding:14px}
-  .ico-btn{width:38px;height:38px}
-  .act-af,.act-bw,.act-ico,.act-ib,.btn-edit{height:36px;min-width:36px}
-  /* De vierde knop ('In behandeling') valt op een telefoon weg. Gemeten op een venster van 378px:
-     mét die knop is de vaste actiekolom 159px van de 378 — 42% van het scherm, en die kolom staat
-     aan de rechterrand vastgezet. Dat kost precies de ruimte die het actiepunt nodig heeft.
-     De functie zelf verdwijnt niet: op een telefoon zet je hem net als vroeger in het
-     bewerkscherm. De snelknop is er waar er ruimte voor is. */
-  .act-ib{display:none}
-  #bulk-balk{left:8px;right:8px;transform:none;flex-wrap:wrap;justify-content:center;max-width:none;bottom:78px}
-  /* De balk wrapt hierboven, en dan liggen de knoppen zo ver uit elkaar dat een menu van 170px
-     naast zijn eigen knop niet meer past: 'Deadline' liep er rechts uit, en met alleen `right:0`
-     liep 'Wegleggen' er links uit (gemeten -7px). #app staat op overflow:hidden, dus zo'n
-     afgeknipt stuk is niet terug te scrollen — het is definitief weg.
-     Daarom hangen de menu's hier aan de BALK in plaats van aan hun knop: `.bb-wrap` geeft zijn
-     positie op, waardoor `#bulk-balk` (position:fixed) het anker wordt. De balk staat zelf al op
-     left:8/right:8, dus een menu dat daarbinnen blijft, blijft per definitie in beeld. */
-  #bulk-balk .bb-wrap{position:static}
-  .bb-menu{left:8px;right:8px;min-width:0}
+/* Telefoon: de testbalk in de stroom (hij loopt daar over twee regels), en de lijsten onder elkaar
+   in plaats van zijwaarts schuiven. Alleen het ALV-overzicht houdt zijn kolommen (vier vinkjes). */
+@media (max-width:700px){
+  .testbalk{position:static;height:auto;padding:4px 12px;text-align:center}
+  body.test #app{height:auto;margin-top:0}
+  body.test .banner{top:12px}
+  .thead.kol-taken,.thead.kol-lod,.thead.kol-subsidie{display:none}
+  .kol-taken,.kol-lod,.kol-subsidie{grid-template-columns:40px minmax(0,1fr);min-width:0;row-gap:2px;padding-top:6px;padding-bottom:6px}
+  .kol-taken>:nth-child(n+3),.kol-lod>:nth-child(n+3),.kol-subsidie>:nth-child(n+3){grid-column:2}
+  .rij.kol-taken>:nth-child(2),.rij .cel-knop{white-space:normal}
+  .nieuw.kol-taken>input,.nieuw.kol-taken>.veld-vve{margin-left:0;width:100%}
+  .bewerk-eind{flex-wrap:wrap}
+  .kol-lod .vve,.kol-subsidie .vve,.kol-taken .vve{font-size:13px}
 }
-@media(max-width:560px){
-  #hdr{padding:0 12px;gap:4px}
-  #toast-container{top:auto;bottom:88px;left:8px;right:8px;max-width:none}
-  /* Zolang de bulk-balk ZICHTBAAR is, staat hij onderaan en wrapt hij op een telefoon naar twee of
-     drie regels (gemeten ±124px hoog vanaf 78px). Een melding op 88px lag daar middenin en dekte
-     de knoppen af. `body.bulk` volgt sinds 26-08 de zichtbare balk (bulk.js, renderBulkUi).
-     LET OP: de BEVESTIGING van een bulk-actie valt hier bewust buiten — `_eindBulk` sluit de balk
-     synchroon vóór de toast, dus die verschijnt gewoon op zijn normale plek. Deze regel is er voor
-     de meldingen die WÉL tijdens de selecteerstand komen: offline, een mislukte lezing, uitleg. */
-  body.bulk #toast-container{bottom:210px}
-  .stat-strip{padding:8px 14px}
-  .stat-item{border-right:none;margin-right:0;padding:8px 0;flex:1 0 45%}
-  .modal-bg{padding:8px}
-  .modal-body{max-height:calc(100vh - 170px)}
-}
-/* ── Smalle kop: pillen naar een eigen regel ──
-   Titel (91px) + pillen (303px) + de icoonknoppen (200px) + opvulling vragen samen ±656px kopbreedte;
-   met de zijbalk erbij is dat een venster van ±900px. Daaronder zou de kop de pillen middenin een
-   woord afkappen — en de chevron staat achteraan, die zou als eerste verdwijnen. Grens op 1000px
-   voor lucht bij drie- of viercijferige tellers. De pillen zakken dan naar een eigen regel en #hdr
-   wordt twee regels hoog. .hdr-info geeft daarvoor haar eigen doos op (display:contents), anders
-   wrappen de pillen bínnen die smalle doos i.p.v. over de volle breedte. De titel mag hier wél
-   inleveren — anders duwt een lange naam de icoonknoppen weg. Alles hangt aan :has(.kop-pillen),
-   zodat de kop op alle andere pagina's onaangeroerd blijft. De :not(:empty) hoort erbij: vóór de
-   eerste databeurt staan de pillen er nog leeg bij en hoort de ondertitel gewoon naast de titel
-   te staan, niet ~90px verderop door display:contents. Dit blok staat ná het 560-blok: de
-   padding-longhands moeten winnen van de padding-shorthand daar. */
-@media(max-width:1000px){
-  #hdr:has(.kop-pillen:not([hidden]):not(:empty)){height:auto;min-height:var(--hh);flex-wrap:wrap;padding-top:8px;padding-bottom:8px}
-  #hdr:has(.kop-pillen:not([hidden]):not(:empty)) .hdr-info{display:contents}
-  #hdr:has(.kop-pillen:not([hidden]):not(:empty)) h1{flex:1 1 auto}
-  /* overflow-x:auto maakt per spec ook de y-as niet-visible: hier moet de focus-ring dus
-     bínnen de doos passen. Vandaar 4px opvulling boven/onder/rechts (2px outline + 2px offset);
-     links 0 zodat de pillen op één lijn blijven met de titel erboven. De margin-top zakt van
-     6 naar 2px, zodat de optische ruimte boven de pillen 6px blijft. */
-  .kop-pillen{flex:1 1 100%;order:2;margin-top:2px;overflow-x:auto;padding:4px 4px 4px 0}
-}
-
-/* ── Zwevende elementen: stapeling & overlap (z-index, modal/bulk) ── */
-#toast-container{z-index:700}
-#toast-container>*{pointer-events:all}
-.log-day{box-shadow:0 1px 0 var(--bor)}
-/* Alleen nog het PANEEL wegstoppen achter een open venster. De knop zelf hoefde weg zolang hij
-   zweefde (hij lag over de vensterrand); in de bovenbalk ligt hij achter de vensterachtergrond, en
-   hem verbergen zou de andere icoonknoppen laten verspringen. */
-body:has(.modal-bg.open) #chat-bg{display:none}
-
-/* ── Foutbanner bij mislukte (eerste) lading ── */
-/* Witte tekst op een groene vulling werkt in de LICHTE modus (--gn is daar donker), maar in de
-   donkere modus is --gn #34D39A — een lichte mint, en #fff daarop haalt 1,9:1. Deze drie knoppen
-   waren vergeten in het omkeer-blok hierboven. De undo-knop weegt het zwaarst: die is volgens
-   notifications.js 'de ENIGE weg terug'. */
-[data-theme=dark] .toast-undo,
-[data-theme=dark] .bb-groen{color:#15181d}
-/* Dezelfde omkering, maar dan voor de drie ZWEEF-standen die ook aan beide blokken hierboven
-   ontsnapt zijn. Ze vullen zich met --rd / --am / --ac, en die drie zijn in de donkere modus net
-   zo licht als --gn. Gemeten met getComputedStyle op de echte knoppen in donkere modus, met de
-   overgangen uit:
-     .btn-del:hover      wit op --rd (#F0746F)  2,83:1  →  6,30:1
-     .act-ib.aan:hover   wit op --am (#F0B44C)  1,85:1  →  9,61:1
-     .mv-x:hover         wit op --ac (#8b9dc4)  2,72:1  →  6,54:1
-   .btn-del is niet alleen 'Verwijder' in het bewerkscherm, maar via bevestig.js ook de ja-knop
-   van élke gevaarlijke bevestiging — precies de knop die je moet kunnen lezen vóór je hem indrukt.
-   De andere twee zijn pictogrammen (de norm is daar 3:1) en zaten daar allebei onder. */
-[data-theme=dark] .btn-del,
-[data-theme=dark] .btn-del:hover,
-[data-theme=dark] .act-ib.aan:hover,
-[data-theme=dark] .mv-x:hover{color:#15181d}
-
-.load-err{position:fixed;top:72px;left:50%;transform:translateX(-50%);z-index:750;background:var(--sur);border:1px solid var(--rd-b);border-left:4px solid var(--rd);border-radius:var(--r);box-shadow:var(--shl);padding:12px 16px;display:flex;align-items:center;gap:14px;font-size:13px;font-weight:500;color:var(--txt);max-width:calc(100vw - 32px)}
-
-/* ── Custom iconenset (src/icons.js) — maatvoering per context ── */
-.toast-ico{display:flex;align-items:center;flex-shrink:0;color:var(--toast-clr,var(--ac));margin-top:1px}
-.toast-ico svg{width:18px;height:18px}
-.toast-undo svg{flex:none}
-.toast-undo svg{vertical-align:-1.5px;margin-right:2px}
-.soort-chip svg,.ai-chip svg,.lchip svg{width:13px;height:13px;vertical-align:-2.5px;margin-right:3px}
-.log-act-btn svg{width:14px;height:14px;display:block}
-.empty-ico svg{width:34px;height:34px;opacity:.9}
-.pal-ico svg{width:15px;height:15px}
-.bb-knop svg{width:13px;height:13px;vertical-align:-2px;margin-right:3px}
-.bb-knop svg.caret{width:10px;height:10px;margin:0 0 0 1px;vertical-align:-1px;opacity:.75}
-.pill-snooze svg{width:11px;height:11px;flex-shrink:0}
-.badge svg{width:12px;height:12px;vertical-align:-2px}
-.ai-rhead svg,.ai-card-hd svg{width:15px;height:15px;flex:none}
-.load-err svg{width:15px;height:15px;flex:none}
-
-/* Opmaakvelden: de hoogte groeit mee met de inhoud (JS zet height=scrollHeight),
-   max-height bepaalt waar hij gaat scrollen. Staat bewust achteraan: deze regels
-   moeten winnen van de veld-specifieke min-height/resize hierboven
-   (.dos-composer textarea, .log-edit-tekst, #kmk-bron) — gelijke specificiteit,
-   dus volgorde beslist. Een sleepgreep hoort niet bij een veld dat zelf meegroeit. */
-.opmaak-veld textarea{display:block;min-height:78px;max-height:260px;overflow-y:auto;resize:none}
-
 /* ═══════════════════════════════════════════════════════════════════════
    LOGIN / BEGINSCHERM — gebrande launch-splash + login-kaart (handoff jul-2026)
    Login-specifieke tokens staan bewust SCOPED op #login-gate: ze horen bij dit
@@ -1763,420 +384,4 @@ body:has(.modal-bg.open) #chat-bg{display:none}
   #login-gate .lg-card,
   #login-gate .lg-splash{ animation-duration:.001s; }
   #login-gate .lg-spinner{ animation-duration:.8s; } /* spinner mag blijven draaien */
-}
-
-/* ── Takenbundel ─────────────────────────────────────────────────────────────
-   --sec/--sec-l zijn de kleuren van het actieve tabblad: renderNtd zet ze met
-   style.setProperty op #ntd-card, dus binnen de takentabel erven pill en merkje ze.
-   Buiten die kaart (VvE-dossier) bestaan ze niet en valt alles terug op het accent. */
-/* `position:relative` is hier geen opmaak maar het ANKER voor de aanraakhalo in het
-   @media(pointer:coarse)-blok hierboven; zonder hem hangt dat pseudo-element aan de eerste
-   voorouder met een positie en landt het raakvlak ergens anders in de rij. Zelfde constructie als
-   bij `.bdl-h` en `.stapel-h`. */
-.bdl-chev{background:none;border:0;padding:2px 5px;margin:-2px 3px -2px -5px;cursor:pointer;
-  color:var(--mut);border-radius:4px;line-height:1;transition:transform var(--tr);position:relative}
-.bdl-chev:hover{background:var(--sur2);color:var(--txt)}
-.bdl-chev.open{transform:rotate(90deg)}
-.bdl-pill{background:var(--sec-l,var(--ac-l));color:var(--sec,var(--ac));font-size:11px;
-  padding:1px 8px;border-radius:6px;white-space:nowrap;margin-left:8px}
-/* De twee 'papierrandjes' die de stapel suggereren. Alleen zichtbaar als de bundel dicht is.
-   De border-bottom moet op de <tr>: die komt van `tbody tr` en zou anders als deelstreepje
-   tussen de twee randjes blijven staan. */
-.bdl-peek{border-bottom:0}
-.bdl-peek td{padding:0!important;border:0!important;height:5px}
-.bdl-peek .l{display:block;height:5px;margin:0 5px;background:var(--sur2);
-  border:1px solid var(--bor);border-top:0;border-radius:0 0 5px 5px}
-.bdl-peek.d2 .l{height:4px;margin:0 11px}
-/* Het paneel vult zijn cel helemaal; de gewone rij-padding zou er een rand omheen trekken. */
-.bdl-tr>td{padding:0!important}
-.bdl-paneel{border-left:3px solid var(--sec,var(--ac));background:var(--group-bg)}
-/* Bewust GEEN touch-action:none op de hele regel: het sleepgebaar begint altijd op het handvat
-   hieronder, en de browser leidt het scrollgedrag af uit het element waar de aanraking landt
-   samen met zijn voorouders — die kunnen het verder beperken, nooit terugzetten. Hier zou de
-   regel dus niets toevoegen en wél elke aanraking op een subtaakregel doodmaken voor pannen:
-   geen verticale paginascroll én geen horizontale pan van .tbl-wrap, waar de takentabel op een
-   smal scherm juist van afhankelijk is. */
-.bdl-sub{display:flex;align-items:center;gap:9px;padding:7px 10px 7px 22px;
-  border-top:1px solid var(--bor);font-size:12px}
-.bdl-sub.af{color:var(--mut)}
-/* Weggelegd = bewust geparkeerd, en in de tabel dimt zo'n rij (`tr.snooze-row td`, `.tk.snooze-row`).
-   Die twee regels zijn aan hun eigen element gebonden, dus de paneelregel heeft een eigen nodig —
-   anders draagt hij de klasse wel maar ziet niemand er iets van. Zelfde .55 als de andere twee. */
-.bdl-sub.snooze-row{opacity:.55}
-.bdl-sub.af .bdl-txt{text-decoration:line-through}
-.bdl-sub.sleep{opacity:.55;background:var(--sur);box-shadow:0 6px 18px rgba(0,0,0,.13)}
-/* Vaste breedte, want een afgerond lid krijgt hier een LEGE plaatshouder in plaats van het
-   sleep-handvat (zie subRegel in render-bundel.js). Liet je de breedte aan de inhoud over, dan is
-   die plaatshouder nul breed (de padding hieronder is horizontaal 0) en schuiven nummer, bolletje
-   en tekst van élk afgerond lid ruim 9px naar links t.o.v. de open leden.
-   De padding is 5px en niet 2px sinds het handvat een SVG van 14px is in plaats van een ⠿-glyph:
-   die glyph bracht zijn eigen regelhoogte mee (14px letter → 19,6px regel → 23,6px doos), een SVG
-   niet. 14 + 2×5 geeft 24px terug, dus de aanraakhalo hieronder houdt zijn maat (35,6 → 36px).
-   Voor de LEGE plaatshouder van een afgerond lid is dat 10px in plaats van 4px — dat mag, want de
-   hoogte van zo'n regel wordt bepaald door zijn tekst (17,5px gemeten), niet door deze span. */
-/* De kleur is --mut en niet --fnt, om exact dezelfde reden als bij `.stapel-h` verderop: --mut is
-   in BEIDE standen de sterkere van de twee (licht #5b6675 op wit, donker #9aa1ad op donker).
-   Gemeten met --fnt haalde dit handvat in de lichte stand 2,42:1 op de paneelachtergrond — onder de
-   3:1 die WCAG 1.4.11 voor niet-tekstuele bedieningselementen vraagt — terwijl het identieke
-   handvat één rij hoger op 5,83:1 stond. Met --mut komen ze allebei boven 5:1. Dat weegt hier
-   zwaarder dan elders: herordenen kán alleen met dit handvat (er is bewust geen toetsenbordweg,
-   zie subRegel in render-bundel.js), dus wie hem niet ziet, vindt de functie niet. */
-.bdl-h{cursor:grab;color:var(--mut);flex:none;box-sizing:border-box;width:16px;
-  padding:5px 0;user-select:none;touch-action:none;position:relative}
-.bdl-h:active{cursor:grabbing}
-/* `display:block` zodat de SVG geen inline-doos wordt: een inline replaced element gaat op de
-   basislijn staan en zet er dan nog een strook onderlengte onder — gemeten wordt deze span dan
-   28,5px hoog in plaats van 24, en dan klopt de halo hieronder niet meer. `margin:0 auto` centreert
-   de 14px SVG in de 16px kolom — dat deed `text-align:center` voor de glyph. */
-.bdl-h svg{display:block;margin:0 auto}
-/* Het handvat meet 16 × 24 px (gemeten) en is als aanraakdoel dus te smal — richtlijn is 24px+.
-   Het gebied groeit met een pseudo-element in plaats van met echte maten: de vaste breedte
-   hierboven houdt de kolom recht voor de lege plaatshouder van een afgerond lid, en een
-   pseudo-element is zelf geen event-doel — de pointerdown komt gewoon op .bdl-h binnen, waar
-   `[data-bdl-grip]` op staat. 6px eromheen maakt er 28 × 36 van en blijft aan alle kanten binnen
-   de regel: horizontaal past het in de 9px gap naar het nummer, verticaal in de 43px hoge regel
-   (gemeten; 28px actieknoppen + 2×7px padding + de 1px scheidingslijn erboven — het handvat is met
-   zijn 24px dus niet wat deze regel hoog maakt). Het overlapt dus geen tekst en geen buurregel.
-   Alleen op een écht handvat: de plaatshouder van een afgerond lid start geen sleepgebaar. */
-.bdl-h[data-bdl-grip]::after{content:'';position:absolute;inset:-6px}
-/* De plaatshouder houdt alleen de kolom bezet; de grijp-cursor zou een sleepgebaar beloven dat er
-   voor een afgerond lid niet is. Dimmen heeft geen zin — er staat geen icoon in. */
-.bdl-sub.af .bdl-h{cursor:default}
-.bdl-num{color:var(--mut);width:13px;text-align:right;flex:none;font-size:12px}
-.bdl-dot{width:7px;height:7px;border-radius:50%;flex:none}
-.bdl-txt{flex:1;min-width:0;text-align:left;background:none;border:0;padding:0;
-  color:inherit;font:inherit;cursor:pointer}
-.bdl-txt:hover{text-decoration:underline}
-/* 'In behandeling' in het bundelpaneel. Amber uit de eigen set (--am/--am-l), dus hij kleurt in
-   de donkere stand vanzelf mee. Bewust geen `cursor:pointer` en geen data-action: dit is een
-   mededeling, geen knop — de rij heeft rechts al drie echte knoppen. `flex:none` zodat hij bij een
-   lange taaktekst niet meekrimpt tot een streepje. */
-.bdl-ib{display:inline-flex;align-items:center;background:var(--am-l);color:var(--am);
-  font-size:11px;font-weight:600;padding:1px 6px;border-radius:8px;margin-left:6px;
-  white-space:nowrap;flex:none}
-/* De wegleg-pil uit de tabel, hergebruikt in het paneel. `flex:none` om dezelfde reden als bij
-   `.bdl-ib` hierboven: `.bdl-txt` is het enige element dat mag krimpen, en zonder dit zou een lange
-   taaktekst deze pil tot een streepje persen. */
-.bdl-sub .pill-snooze{flex:none}
-.bdl-meta{color:var(--mut);font-size:12px;white-space:nowrap}
-.bdl-klaar{color:var(--gn);font-size:12px;white-space:nowrap;display:flex;align-items:center;gap:3px}
-.bdl-acts{display:flex;gap:3px;flex:none}
-.bdl-add{padding:9px 12px 10px 45px;border-top:1px solid var(--bor)}
-.bdl-addb{font-size:12px;color:var(--mut);border:1px solid var(--bor);border-radius:6px;
-  padding:4px 10px;background:none;cursor:pointer}
-.bdl-addb:hover{background:var(--sur)}
-/* Gedeeld door de twee varianten van het merkje — en met opzet niet méér dan dat. De kop-pil en de
-   stap-regel zetten allebei hun eigen display, kleur, marge en maat, dus alles wat hier verder zou
-   staan moest één van de twee toch weer overschrijven. Zo'n half overschreven basisregel las als
-   "een pil die geen pil is", maakte `vertical-align` inert en dwong tests.js tot een
-   `:not(.bdl-merk-sub)`-selector om de twee uit elkaar te houden.
-   Dat de twee tóch een klasse delen is geen restant: op DEZE klasse mikt de aanraakhalo
-   `.bdl-merk::after` in het @media(pointer:coarse)-blok hierboven, en die geldt voor allebei. Ruim
-   hem dus niet op omdat er "bijna niets" meer in staat — dan valt de halo van beide varianten af.
-   `position:relative` is het anker voor die halo; zonder hem landt het raakvlak bij een
-   willekeurige voorouder in plaats van om de knop heen. Zelfde constructie als bij `.bdl-chev`,
-   `.bdl-h` en `.stapel-h`.
-   `align-items:center` werkt voor allebei, want ze zetten allebei een flex-display. Het zet het
-   icoon op de middellijn van het label in plaats van op zijn basislijn, en dat is meetbaar: haal
-   deze regel of de flex-display weg en het icoon verschuift zichtbaar. De getallen staan bij de
-   assert die ze bewaakt — zie 'het icoon staat op de middellijn van dat label' in tests.js. */
-.bdl-merk{position:relative;align-items:center;cursor:pointer;border:0}
-/* De tekst in het merkje. Kort bij een kop ("Bundel · 0 van 1 klaar"), lang bij een stap — die
-   wordt afgekapt. De volledige zin blijft in de `title` en de `aria-label` staan. */
-.bdl-merk-t{margin-left:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-/* De kop: een accentpil, want dit ÍS een bundel en dat mag opvallen.
-   `display:flex` zet hem op een EIGEN REGEL onder de VvE-naam (§4.1), en dat is geen cosmetiek.
-   Op dezelfde regel als de naam was hij een harde ondergrens voor de kolom: `.cell-name>.ct` is al
-   op 160px geklemd, en de pil draagt `white-space:nowrap` zonder max-width, dus die twee telden bij
-   elkaar op. Gemeten in de platte lijst (zoekterm, één bundel, een VvE-naam die de 160px vult):
-   VvE-kolom 350px en tabel 1300px, tegen 180 en 1130 met helemaal geen merkje. Op een eigen regel
-   wordt het max(naam, pil) in plaats van de som: 184 en 1134, vier pixels boven de stand van vóór
-   dit label. Juist in de gefilterde lijst — de enige stand waarin dit merkje bestáát — deed die
-   165px het meeste pijn. Er staat een assert op; zie 'de VvE-kolom groeit er niet van' in tests.js.
-   Krimpen om de tekst heen hoeft niet apart geregeld: een <button> is shrink-to-fit, ook met
-   `display:flex`. Nagemeten in een cel van 254px blijft de pil op zijn eigen tekstbreedte staan,
-   dus hij wordt geen accentkleurige balk over de hele cel. Wie hier ooit een <span> of <div> van
-   maakt, moet er `width:fit-content` bij zetten.
-   `font-size` staat er bewust niet bij: `button{font:inherit}` bovenaan dit bestand laat het label
-   de regelmaat van de tabel erven — de 13px/1,4 komt van `td` en de `font-weight:600` van
-   `.cell-name`. Zo blijft de pil meelopen met de dichtheidsschakelaar
-   (`html[data-density=...]`), die `--row-fs`/`--row-lh` verzet. De stap-variant hieronder zet er
-   wél een eigen, kleinere maat op. */
-.bdl-merk-kop{display:flex;margin:2px 0 0;padding:2.5px 8px;border-radius:6px;
-  background:var(--sec-l,var(--ac-l));color:var(--sec,var(--ac))}
-/* Een stap: geen pil maar een gedempte regel, zodat de VvE-naam de rij blijft dragen.
-   `display:flex` maakt de knop blok-niveau en dus een eigen regel — nodig, want `.cell-name` staat
-   op `white-space:nowrap`. De `max-width` samen met de ellipsis hierboven houdt hem in de kolom.
-   Die max-width staat in PIXELS en niet op 100%, want een percentage doet hier niets: de takentabel
-   heeft een automatische kolomindeling, en dan rekent de browser eerst uit hoe breed de cel van
-   nature wil zijn — een percentage van een breedte die hij nog niet weet telt daarbij als 'geen
-   grens'. Gemeten liep de VvE-kolom daardoor van 182 naar 527px en moest de hele tabel horizontaal
-   schuiven (993 -> 1331px), terwijl de regel zelf niet eens werd afgekapt.
-   240px is niet willekeurig: de telpill van een kop-rij rekt diezelfde kolom in de gestapelde
-   weergave al tot 269px op, dus tot die maat kost deze regel niets extra's. Er past ongeveer
-   'stap in: Vergaderverzoek · 381005 VvE Oudema…' in — de soort en de VvE-code, precies wat er
-   ontbrak toen hier alleen een icoontje met de kale omschrijving van de hoofdtaak stond. De rest
-   blijft in de `title` en de `aria-label`. */
-.bdl-merk-sub{display:flex;max-width:240px;margin:2px 0 0;
-  background:none;color:var(--mut);font-size:11px;border-radius:4px}
-.bdl-merk-sub:hover{color:var(--txt)}
-/* Uitgeklapt hoort de verwijzing er hélemaal te staan. Een klik op de rij haalt bij `.ct` de
-   afkapping eraf (zie `tr.expanded .cell-name>.ct` bovenaan dit bestand) en de verwijzing hoort bij
-   dat groepje: wie uitklapt doet dat juist om de volledige tekst te lezen, en dan was dit de enige
-   cel in de rij die op `…` bleef staan.
-   Alle drie de remmen moeten los, anders verandert er zichtbaar niets. De `max-width` op de knop —
-   die knijpt hem op 240px. En de `nowrap` plus de ellipsis op de span erin — laat je de `nowrap`
-   staan, dan groeit de knop wel maar blijft de tekst één onafgebroken regel en kapt hij nog steeds
-   af. `display:flex` blijft, zodat de knop een eigen regel houdt; de tekst wikkelt er nu binnenin. */
-tr.expanded .bdl-merk-sub{max-width:none}
-tr.expanded .bdl-merk-sub .bdl-merk-t{white-space:normal;overflow:visible;text-overflow:clip}
-/* Rij op rij slepen om te stapelen: de opgepakte rij dimt, de rij eronder licht op als doel.
-   De terugval --sec → --ac is dezelfde als bij de rest van de bundel-opmaak: --sec/--sec-l worden
-   per sectie op de NTD-kaart gezet, maar op de VvE-dossierpagina bestaan ze niet.
-   Op de <td> en niet op de <tr>: de rij-opmaak van deze tabel woont daar ook (zie .row-telaat en
-   tr.snooze-row hierboven), en tr.ib-row zet zijn achtergrond met !important — die is alleen met
-   een even sterke, latere regel te overstemmen. De rand als inset-schaduw boven én onder loopt
-   daardoor als één doorlopende lijn over de hele rij. */
-tr.sleep>td{opacity:.55}
-tr.stapel-doel>td{background:var(--sec-l,var(--ac-l))!important;
-  box-shadow:inset 0 2px 0 var(--sec,var(--ac)),inset 0 -2px 0 var(--sec,var(--ac))}
-/* Dezelfde regel nog eens, alleen om de donkere ib-rij-variant te evenaren: die staat als
-   `[data-theme=dark] tr.ib-row td` en is met zijn extra attribuut-selector sterker dan de regel
-   hierboven. Zonder deze kopie houdt een 'in behandeling'-rij in de donkere stand zijn eigen
-   achtergrond en blijft alleen het randje over. De waarde is identiek — --ac-l wisselt zelf al
-   met het thema. */
-[data-theme=dark] tr.stapel-doel>td{background:var(--sec-l,var(--ac-l))!important}
-.tk.sleep{opacity:.55}
-.tk.stapel-doel{background:var(--sec-l,var(--ac-l));box-shadow:inset 0 0 0 2px var(--sec,var(--ac))}
-/* Het sleep-handvat op een taakrij (STAPEL_GREEP in render-bundel.js) — de enige plek waar het
-   stapelgebaar begint. Zelfde icoon, breedte, cursor en aanraakhalo als `.bdl-h` hierboven; de
-   verschillen zijn er drie: `display:inline-block` in plaats van `flex:none` (dit handvat staat in
-   een gewone tabelcel, niet in een flexregel), géén verticale padding in plaats van `padding:5px 0`,
-   en een andere kleur. Dat tweede verschil is meteen de verklaring voor de uiteenlopende gemeten
-   hoogtes — 14px hier, 24px bij `.bdl-h` — en die twee getallen dragen allebei een halo-berekening,
-   hier en in het comment hierboven; ze staan allebei als assert in blok 19 van tests.js. In de grid
-   van `.tk-taak` op de dossierpagina wordt het handvat vanzelf een blok — grid-items worden
-   geblokkeerd — maar het rekt niet mee: daar is het even hoog als hier (14px, gemeten in blok 20
-   van tests.js) en houdt het zijn 16px breedte.
-   De kleur is bewust --mut en niet de --fnt van `.bdl-h`, en dat is méér contrast en niet minder:
-   --mut is in BEIDE standen de sterkere van de twee (licht #5b6675 op wit, donker #9aa1ad op
-   donker). Dat is hier ook de bedoeling — dit icoon staat op 14px in een rij vol tekst en is de
-   enige ingang naar het gebaar, dus het mag opvallen. Dat --fnt op klein formaat te zwak is staat
-   elders in dit bestand al twee keer vastgelegd (zie `.kop-pil.pil-dof b` en
-   `.search-box input::placeholder`, allebei om die reden op --mut).
-   `touch-action:none` staat hier en NERGENS anders. Dat is precies de winst van een eigen handvat:
-   de browser leidt het scrollgedrag af uit het element waar de aanraking landt samen met zijn
-   voorouders, dus op dit icoon kost de regel niets, terwijl hij op de hele rij élke aanraking zou
-   doodmaken voor de verticale paginascroll én voor de horizontale pan van .tbl-wrap — precies hoe je
-   op een telefoon de rechterkolommen van de takentabel bereikt.
-   `vertical-align:-2px` vervangt wat de ⠿-glyph gratis meebracht. Die glyph gaf de span een eigen
-   tekstbasislijn, en dáárop stonden handvat, chevron en VvE-code in de cel precies gecentreerd
-   (alle drie op hetzelfde middelpunt, gemeten). Een doos met alleen een SVG erin heeft geen
-   tekstbasislijn; de browser leidt er dan één af uit de ONDERKANT van de doos, waardoor het handvat
-   1,65px omhoog schoot t.o.v. zijn buren. De -2px zet hem terug — gemeten staan de drie daarmee
-   weer op hetzelfde middelpunt. Er staat bewust géén `line-height` bij: zolang de SVG hieronder
-   `display:block` is heeft deze span helemaal geen regel, en dan doet regelhoogte niets (gemeten:
-   met `line-height:1` erbij verandert er niets aan de doos). */
-.stapel-h{display:inline-block;box-sizing:border-box;width:16px;
-  vertical-align:-2px;color:var(--mut);cursor:grab;user-select:none;touch-action:none;
-  position:relative}
-/* Zelfde reden als bij `.bdl-h svg`: block, want een inline SVG gaat op de basislijn staan en zet
-   er nog een strook onderlengte onder — gemeten wordt de doos dan 19,2px in plaats van 14px, en
-   daarmee klopt de halo-marge hieronder niet meer. `margin:0 auto` centreert de 14px SVG in de 16px
-   kolom, wat hier eerder `text-align:center` deed. */
-.stapel-h svg{display:block;margin:0 auto}
-.stapel-h:active{cursor:grabbing}
-/* Het handvat gebruik je zelden maar het staat op élke rij. Het verschijnt daarom pas als je de
-   rij aanwijst — slepen werkt precies zoals het werkte, alleen de rustige lijst wint erbij.
-   :focus-visible staat er alvast bij, maar kan vandaag niet matchen: STAPEL_GREEP is een <span>
-   met aria-hidden en zonder tabindex, dus hij krijgt nooit focus. Zodra herordenen met het
-   toetsenbord bestaat, is die regel er al en hoeft niemand eraan te denken. */
-#ntd-tbody .stapel-h{opacity:0;transition:opacity var(--tr-fast)}
-#ntd-tbody tr:hover .stapel-h,
-#ntd-tbody .stapel-h:focus-visible{opacity:1}
-/* Een aanraakscherm kent geen hover: daar zou het handvat onbereikbaar worden. Halfdoorzichtig
-   i.p.v. onzichtbaar, precies zoals `.log-acts` (regel 745) dat al doet. */
-/* Tijdens het slepen matcht `tr:hover` de BRONrij niet meer zodra de aanwijzer naar de doelrij
-   beweegt: de greep die je op dat moment vasthoudt zou dan wegvallen. Het gebaar loopt gewoon door
-   (bundel-acties.js volgt de pointer, niet de opmaak), maar zien verdwijnen wat je vasthoudt is
-   verwarrend. */
-#ntd-tbody tr.sleep .stapel-h{opacity:1}
-@media(hover:none){#ntd-tbody .stapel-h{opacity:.5}}
-/* Zelfde aanraakhalo-truc als bij `.bdl-h`: het handvat meet 16 × 14 px (gemeten) en is als
-   aanraakdoel dus te klein — richtlijn is 24px+. Het gebied groeit met een pseudo-element in plaats
-   van met echte maten, want dat is zelf geen event-doel: de pointerdown komt gewoon op `.stapel-h`
-   binnen, waar `[data-stapel-grip]` op staat, en de rij eromheen verschuift niet. 6px eromheen maakt
-   er 28 × 26 van.
-   Verticaal blijft dat binnen de rij — gemeten 47px in de takentabel en 70px op de dossierpagina
-   (die rijen staan op twee regels, en worden hoger zodra de tekst omslaat) — dus het handvat van de
-   ene rij steekt niet in de andere. Beide maten staan als assert in tests.js (19-nulmeting-bis en
-   blok 20), zodat het geen aanname op papier blijft.
-   Horizontaal moet er ruimte VRIJGEHOUDEN worden, en dat is de reden voor de twee regels hieronder.
-   Deze halo is onzichtbaar (`content:''`, geen achtergrond) maar vangt wél de hit-test, en omdat
-   `.stapel-h` position:relative is schildert hij bovenóp de statische buren in dezelfde cel — die
-   worden daar dan stil onklikbaar. */
-.stapel-h::after{content:'';position:absolute;inset:-6px}
-/* De 9px die in het bundelpaneel van de flex-gap komen. In een tabelcel is er geen gap: rowNtd zet
-   `${bdlGreep}${bdlChev}${vveCodeSpan(...)}` zonder tussenruimte achter elkaar, en dan lag de 6px
-   halo over de buurknop. Gemeten vóór deze regel: 6 van de 45px van de klikbare VvE-code kwamen uit
-   bij de lege actie 'stapel-greep' (dus stil niets), en op een telefoon was juist dát stukje ook
-   niet verticaal scrollbaar door `touch-action:none`. Met 9px houdt de halo 3px over — dezelfde
-   marge als `.bdl-h` in zijn 9px gap.
-   Alleen in de tabelcel: op de dossierpagina zorgt `column-gap:10px` van `.tk-taak` al voor ruimte,
-   en een marge erbovenop zou die kolom onnodig verder uit elkaar trekken. Die gap is daar dus
-   lastdragend geworden voor iets waar hij niet voor gekozen is — daarom staat er in tests.js (blok
-   20) een assert op; zakt hij ooit onder de 6px, dan slikt de halo de eerste strook rijtekst in, en
-   dáár is de rij zelf de knop naar het bewerkscherm. */
-td>.stapel-h{margin-right:9px}
-/* En de chevron eet 5px van die 9px weer op: `.bdl-chev` heeft `margin-left:-5px`, dat zijn eigen
-   `padding-left:5px` cancelt zodat het pijltje aan de linkerrand van de cel uitlijnt — zinnig toen de
-   chevron daar als eerste stond, schadelijk zodra er een handvat vóór komt. Gemeten met de regel
-   hierboven maar zónder deze: 2 van de 22px van de chevron blijven dood; zonder allebei zijn het er
-   11, bijna de helft van een knop die met 22 × 18px al krap is. Beide getallen komen uit een
-   mutatietest — de assert in tests.js gaat in beide gevallen af.
-   Als siblingregel en niet in `.bdl-chev` zelf, zodat de oorspronkelijke uitlijning blijft gelden als
-   de chevron ooit wél weer vooraan staat. Vandaag staat er in de tabel altijd een handvat vóór hem:
-   rowNtd tekent chevron én handvat op dezelfde `_bw.stapel`-vlag, en op de dossierpagina bestaat de
-   chevron niet. */
-.stapel-h+.bdl-chev{margin-left:0}
-
-/* CRM-uitklappaneel: standaard dicht, open zodra de rij erboven .expanded is (main.js zet alleen
-   die klasse, zonder opnieuw te tekenen). */
-.crm-mail-tr{display:none}
-tr.expanded + .crm-mail-tr{display:table-row}
-#ntd-tbody tr[data-row] + .crm-mail-tr td{border-top:none}
-
-/* ── Compacte logregel ─────────────────────────────────────────────────────────────────────
-   Op alle drie de plekken dezelfde vorm: de logboekpagina, de VvE-dossier-tijdlijn en de tijdlijn
-   in het bewerkscherm. Was een blok van ~64px (avatar 32px + zin + notitie eronder); nu ÉÉN regel
-   van ~30px: pictogram (wat er gebeurde) + code + de tekst als inhoud + wie/tijd rechts. Het
-   bewerkformulier (logEditForm) houdt zijn eigen .log-item-omhulsel. */
-.log-r{display:flex;gap:10px;align-items:baseline;padding:6px 10px;border-radius:8px;
-       transition:background var(--tr);position:relative}
-.log-r:hover{background:var(--sur2)}
-.log-ic{flex:none;width:16px;display:inline-flex;align-items:center;justify-content:center;
-        position:relative;top:2px}
-.log-ic svg{display:block}
-.log-tx{flex:1;min-width:0;font-size:13px;line-height:1.5;color:var(--txt);
-        white-space:pre-wrap;word-break:break-word}
-/* De code-chip en het 'met wie' van een contactmoment lopen mee in de tekstregel. */
-/* Alleen de chip VOORAAN (regel met eigen tekst); in een gedempte zin staat de code midden in de
-   zin en zou dezelfde marge een dubbele spatie geven ('rondde 311134  af'). */
-.log-tx>.code:first-child{margin-right:6px;vertical-align:1px}
-.log-met{color:var(--mut);margin-right:6px}
-.log-met::after{content:'·';margin-left:6px;color:var(--fnt)}
-/* Gedempt: een regel zónder eigen tekst (een teruggezette taak, een afronding zonder opmerking).
-   Die hoort er te staan, maar niet te schreeuwen. De zin houdt zijn onderwerp, rechts alleen de tijd. */
-.log-r.dof .log-tx{color:var(--mut);font-size:12px}
-.log-r.dof .log-tx b{color:var(--txt);font-weight:600}
-.log-wie{flex:none;font-size:12px;color:var(--mut);white-space:nowrap;font-variant-numeric:tabular-nums}
-/* Vaste breedte (twee knoppen van 22px + 1px tussenruimte), rechts uitgelijnd: een regel met
-   alleen een prullenbak zou 'wie · tijd' anders 23px verder naar rechts zetten dan de regel erboven
-   met potlood én prullenbak — de rechterkolom stond dan zichtbaar scheef. */
-.log-r .log-acts{align-self:center;min-width:45px;justify-content:flex-end}
-.log-r:hover .log-acts,.log-r:focus-within .log-acts{opacity:1}
-.log-r .log-act-btn{font-size:13px;padding:2px 4px}
-/* Het geschiedenisblok in het bewerkscherm gebruikt dezelfde regel, iets compacter. */
-#hist-body .log-r{padding:4px 6px}
-#hist-body .log-tx{font-size:12px}
-.hist-veld{display:block;font-size:11px;color:var(--mut);margin-bottom:1px}
-
-/* ── Groeperen per VvE ─────────────────────────────────────────────────────────────────────
-   De koppen volgen de dichtheidsknop. `.grp-kop` stond op vaste padding en luisterde niet naar
-   --row-py/--row-px; bij tien groepen kost dat in de compacte stand ~300px die de compacte
-   gebruiker juist niet wilde. Alleen de HOOGTE volgt; de inspringing van 26px van de blokkoppen
-   ('In behandeling', 'Weggelegd') blijft zoals hij was. */
-.grp-kop{padding-top:var(--row-py,9px);padding-bottom:var(--row-py,9px)}
-/* Border-top en géén cursor:pointer: `.bdl-paneel` gebruikt dezelfde --group-bg en ÍS
-   uitklapbaar. Zonder onderscheid nodigt deze kop uit tot een klik die niets doet. */
-.grp-vve td{border-top:1px solid var(--bor)}
-/* De flex op de WIKKEL, niet op de td — zie de toelichting bij vveGroepKop. */
-.grp-in{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.grp-cd{font-family:var(--font-mono);font-size:12px;font-weight:600;color:var(--ac)}
-.grp-nm{font-size:12px;font-weight:600;color:var(--txt);text-transform:none;letter-spacing:0}
-.grp-ct{font-size:11px;font-weight:600;color:var(--mut);text-transform:none;letter-spacing:0}
-.grp-w{font-size:11px;font-weight:600;color:var(--sig-crit);background:var(--rd-l);border:1px solid var(--rd-b);padding:1px 6px;border-radius:999px;text-transform:none;letter-spacing:0}
-/* 'Per VvE' als pil in de kop, naast 'te laat' en 'weggelegd'. Leiblauw i.p.v. rood/amber: die
-   twee zijn signalen, dit is een manier van kijken. Gedempt zodra kolomkop-sortering de
-   groepering tijdelijk overneemt — anders lijkt de pil stuk. */
-.kop-pil-klik.aan.pil-vve{background:var(--ac-l);color:var(--ac-900)}
-.kop-pil-klik.pil-vve.gedempt{opacity:.5}
-
-/* ── Naloop 2026-10-16 ── */
-/* Toetsenbordfocus op de twee velden die de globale regel hierboven (input:focus-visible{outline:none})
-   zonder eigen vervanger liet: het datumveld in de bulk-balk en het zoekveld van Ctrl+K. */
-.bb-datum input:focus{outline:none;border-color:var(--ac);box-shadow:0 0 0 3px color-mix(in srgb,var(--ac) 14%,transparent)}
-.pal-zoek:focus-within{box-shadow:inset 0 -2px 0 var(--ac)}
-/* Donker thema: de omgekeerde cijfers op de gevulde voortgangsbalk waren wit op #8FA6C2 (2,5:1). */
-[data-theme=dark] .ntd-progress-val-rev{color:#15181d}
-/* Afdrukken: de schil staat op 100vh met overflow:hidden, dus op papier kwam alleen het eerste
-   scherm. Zijbalk, knoppen en meldingen horen niet op papier. */
-@media print{
-  #app{height:auto;overflow:visible;display:block}
-  #main,#content{overflow:visible;height:auto;padding:0}
-  #app{background:none}
-  #main{border-radius:0}
-  #main::before{content:none !important}
-  #sb,#hdr .ico-btn,#bulk-balk,#toast-container,.sw-update-bar,.staging-balk,.pag,.acts{display:none !important}
-  .tbl-wrap{overflow:visible}
-  body{background:#fff}
-}
-
-/* ── v15.4: samenwerken, status, weergaven, sneltoetsen ─────────────────────────────── */
-/* U10: wie zat er het laatst aan — een gedempte regel bovenin het bewerkscherm. */
-.m-laatst{font-size:11.5px;color:var(--mut);margin:-4px 0 10px}
-/* U1/U4: de gele regel. Amber voor 'let op', rood als opslaan niet meer kan. */
-.m-collega{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--am-l);color:var(--txt);border:1px solid color-mix(in srgb,var(--am) 45%,transparent);border-radius:var(--rs);padding:8px 12px;font-size:12.5px;line-height:1.45;margin:0 0 12px}
-.m-collega-weg{background:var(--rd-l);border-color:color-mix(in srgb,var(--rd) 45%,transparent)}
-.m-collega-hersteld{background:var(--ac-l);border-color:var(--ac-b)}
-.m-collega .btn{flex:none}
-/* De velden met jouw eigen, teruggezette invoer. */
-.fld.veld-eigen input,.fld.veld-eigen textarea,.fld.veld-eigen select,.veld-eigen.tog{box-shadow:0 0 0 2px var(--am)!important;border-color:var(--am)!important}
-.fld.veld-eigen>label::after{content:' · jouw invoer';color:var(--am);font-weight:600;text-transform:none;letter-spacing:0}
-/* U5: de status als knop + het uitlegpaneel in de zijbalk. */
-button.sync-row{background:none;border:0;padding:0;text-align:left;cursor:pointer;font:inherit;font-family:var(--font-mono);font-size:11px;color:#9AA5B2;border-radius:6px}
-button.sync-row:hover,button.sync-row:focus-visible{color:#e3e8ee;outline:none}
-button.sync-row:focus-visible{box-shadow:0 0 0 2px var(--ac)}
-.sync-tekst{display:flex;flex-direction:column;min-width:0;line-height:1.3}
-.sync-sinds{font-size:10px;opacity:.75;white-space:nowrap}
-@media (min-width:681px){#sb{position:relative}}   /* op telefoonbreedte blijft #sb de vaste lade (zie max-width:680px) */
-.status-pop{position:absolute;left:12px;right:12px;bottom:64px;background:var(--sur);color:var(--txt);border:1px solid var(--bor);border-radius:var(--r);box-shadow:var(--shl);padding:12px 14px;font-size:12px;line-height:1.5;z-index:210}
-.status-pop p{margin:0 0 6px}
-.status-kop{font-weight:700;font-size:13px;margin-bottom:4px}
-.status-stap{color:var(--txt)}
-.status-sinds{color:var(--mut);font-size:11.5px}
-.status-pop .btn{margin-top:4px}
-/* U6: de weergave-knopjes boven de tabel. */
-.weergaven{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 18px;border-bottom:1px solid var(--bor);font-size:12px}
-.wg-lbl{color:var(--mut);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-right:4px}
-.wg-chip{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;height:26px;padding:0 9px 0 10px;border-radius:13px;border:1px solid var(--bor);background:var(--sur);color:var(--txt);font:inherit;font-size:12px;font-weight:500;cursor:pointer;transition:background var(--tr),border-color var(--tr)}
-.wg-chip:hover{background:var(--sur2)}
-.wg-chip.aan{background:var(--ac-l);border-color:var(--ac-b);color:var(--ac-900);font-weight:600}
-.wg-chip:focus-visible,.wg-x:focus-visible{outline:2px solid var(--ac);outline-offset:1px}
-.wg-x{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;color:var(--mut);font-size:13px;line-height:1;margin-right:-4px}
-.wg-x:hover{background:var(--rd-l);color:var(--rd)}
-.wg-nieuw{border-style:dashed;color:var(--mut)}
-.wg-nieuw:hover{color:var(--txt)}
-.wg-naam{height:26px;border:1px solid var(--ac-b);border-radius:13px;padding:0 10px;font:inherit;font-size:12px;background:var(--sur);color:var(--txt);min-width:220px;outline:none}
-/* U8: de focusrij van het toetsenbord. Tot v15.5 een binnenrand per cel; dat gaf een hoekig kader om
-   elke kolom en is op verzoek vervangen door een zachte accenttint over de hele rij. De tweede regel
-   overstemt de dekkende achtergrond van de sticky actiekolom (ook bij .row-telaat en bij hover), anders
-   breekt de tint daar af. De derde moet tegen de !important van tr.ib-row op, maar laat de groene/rode
-   bevestigingsflits (.rij-puls-*) voorgaan. */
-#ntd-tbody tr.rij-focus>td{background:var(--ac-l)}
-#ntd-tbl-wrap tbody tr.rij-focus td:not([colspan]):last-child,
-#ntd-tbl-wrap tbody tr.rij-focus:hover td:not([colspan]):last-child{background:var(--ac-l)}
-#ntd-tbody tr.ib-row.rij-focus:not(.rij-puls-groen):not(.rij-puls-rood)>td{background:var(--ac-l)!important}
-.sneltoets-kop{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin:4px 0 6px}
-.sneltoets-lijst{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0 0 14px;font-size:13px}
-.sneltoets-lijst dt{white-space:nowrap}
-.sneltoets-lijst dd{margin:0;color:var(--txt)}
-.sneltoets-lijst kbd,.pal-tip b{font-family:var(--font-mono);font-size:11px;background:var(--sur2);border:1px solid var(--bor);border-bottom-width:2px;border-radius:4px;padding:1px 6px;color:var(--txt)}
-.sneltoets-voet{font-size:12px;color:var(--mut);margin:0}
-/* U3: de tipregel onderin het palet. */
-.pal-tip{font-size:11.5px;color:var(--mut);padding:10px 12px 14px;border-top:1px solid var(--bor);margin-top:4px;line-height:1.6}
-.pal-tekst i{font-style:normal;color:var(--mut);font-weight:500}
-@media (max-width:760px){
-  .weergaven{padding:8px 12px}
-  .status-pop{bottom:70px}
 }

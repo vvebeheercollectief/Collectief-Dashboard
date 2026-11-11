@@ -72,7 +72,7 @@ let fout = false;
     .catch(() => fouten.push('inlogscherm verscheen niet'));
   const modules = await page.evaluate(() => performance.getEntriesByType('resource').filter(r => r.name.includes('/src/')).length);
   console.log(`Rooktest build: ${modules} modules geladen, ${fouten.length} fouten`);
-  if (modules < 40) fouten.push(`maar ${modules} modules geladen`);
+  if (modules < 15) fouten.push(`maar ${modules} modules geladen`);
   if (fouten.length) { fout = true; fouten.forEach(f => console.log('  ' + f)); }
   server.close();
 }

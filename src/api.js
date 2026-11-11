@@ -1,566 +1,158 @@
-import { state, D } from "./state.js";
-import { SID, SKEYS, PROXY_URL, SECS, OMSCHRIJVING_SLEUTEL } from "./config.js";
-import { _parseAnyDate, leegBijErfenis } from "./util.js";
+// ══════════════════════════════════════
+//  API — lezen en schrijven in de Google Sheet
+// ══════════════════════════════════════
+// Overgenomen uit v15 (src/api.js): de tijdslimiet, de netwerkteller, de herhaalpoging bij een
+// tijdelijke Google-fout en veiligeCel. Wat weg is: de AI-proxy en de vingerafdrukken per rij;
+// v16 zoekt een rij vlak vóór het schrijven opnieuw op (zie zoek.js).
+import { state } from "./state.js";
+import { SID } from "./config.js";
 
-// ── Offline-signaal ────────────────────────────────────────────────────────
-// Uitdrukkelijk NIET state._syncFails gebruiken: die telt óók mislukte inlogpogingen, 401/403 en
-// quota-fouten mee. In een quotum-incident zou het dashboard zichzelf dan op slot zetten op
-// precies het moment dat het zich aan het herstellen is.
-//
-// Het onderscheid is scherp te maken: een fetch die REJECTET (geen netwerk, DNS weg,
-// CORS-blokkade) gooit een TypeError zónder .status; élk antwoord van Google — ook 401, 429 en
-// 500 — heeft er wél een. Alleen het eerste is bewijs dat de verbinding weg is.
-// Deze regel wordt in de praktijk INGEBAKKEN toegepast en niet via deze functie aangeroepen:
-// `_fetchGeteld` telt `state._netwerkFouten` op in zijn catch — precies de plek waar een fetch
-// rejectet, dus waar er per definitie geen `.status` is — en zet hem op nul bij een antwoord.
-// Deze helper is de los toetsbare formulering van diezelfde regel (zie de vijf asserts in
-// tests.js). Wijzig je hier iets, dan verandert er dus NIETS aan `isOffline()`; de plek om te zijn
-// is `_fetchGeteld`.
+// Offline = de browser zegt het, of de laatste twee verzoeken kregen geen antwoord.
 const _isNetwerkFout = e => !!e && e.status===undefined;
-
-// Twee netwerkfouten op rij, zodat één hapering in een tunnel of een lift het dashboard niet
-// meteen op slot zet. navigator.onLine=false is wél meteen genoeg: dan zegt het besturingssysteem
-// zelf dat er geen verbinding is. Puur, dus los testbaar.
-function _isOffline(browserOnline, netwerkFouten){
+export function _isOffline(browserOnline, netwerkFouten){
   if(!browserOnline) return true;
   return (netwerkFouten||0) >= 2;
 }
-// De live toestand. Bewust géén blijvende state.offline-vlag: die zou na een geslaagde ronde
-// blijven hangen en door bestaande tests nooit teruggezet worden.
-const isOffline = () => _isOffline(navigator.onLine, state._netwerkFouten||0);
+export const isOffline = () => _isOffline(navigator.onLine, state._netwerkFouten||0);
 
-// Hoe lang een enkel Sheets-verzoek hoogstens mag duren. Zonder deze grens hangt een verzoek dat
-// nooit antwoordt (wifi zonder internet, een portal die de verbinding vasthoudt, een slapende
-// mobiele verbinding) voor altijd: `fetch` kent geen eigen tijdslimiet. Eén zo'n verzoek zette het
-// hele dashboard stil — `_loadInFlight` bleef staan, dus de 8s-poll sloeg elke ronde over, en de
-// Vernieuwen-knop lift op diezelfde ronde mee en gaf dus ook niets meer. Alleen een herlading hielp.
-// 20 seconden is ruim: een leesronde duurt normaal onder de seconde, en twee polls verder is een
-// antwoord toch niet meer interessant. Tests verlagen hem via state._fetchTimeoutMs.
+// Hoe lang een verzoek hoogstens mag duren. Zonder grens bleef een hangend verzoek 'Laden…' tonen.
 const FETCH_TIMEOUT_MS = 20_000;
-// De AI-proxy is iets heel anders dan een Sheets-lezing: die doet eerst een tokeninfo-aanroep en
-// daarna een NIET-streamende aanroep naar het model met max_tokens 4096 — het antwoord komt pas
-// als het hele stuk tekst klaar is. Bij een groot dossier is 20 seconden daarvoor te krap, en dan
-// zou de klok een gesprek afbreken dat gewoon onderweg was. Een minuut is ruim en houdt nog steeds
-// de belofte dat de chat niet eeuwig op 'aan het typen…' blijft staan.
-const AI_TIMEOUT_MS = 60_000;
 
-// Dezelfde tijdslimiet, maar ZONDER de netwerkteller — voor verzoeken die niet naar Sheets gaan:
-// het e-mailadres van de ingelogde gebruiker (auth.js) en de AI-proxy (askZoek hieronder). Die
-// twee liepen als enige zónder klok, en dat is precies waar deze grens voor bestaat: een `fetch`
-// die nooit antwoordt hangt voor altijd, en beide aanroepers staan in een try/finally waarvan de
-// finally dan óók nooit draait — `_authBezig` bleef 1 (Herladen-knop dood), `_herinlogBezig` bleef
-// true (de 8s-poll sloeg vanaf dat moment élke ronde over) en de chat bleef op 'aan het typen…'.
-// Bewust buiten `_netwerkFouten`: een storing bij de AI-proxy of bij userinfo mag het dashboard
-// niet als 'offline' bestempelen en daarmee alle Sheets-schrijfacties blokkeren.
-async function fetchMetKlok(url, opts, melding, ms){
+export async function fetchMetKlok(url, opts, melding, ms){
   const ac = new AbortController();
   const klok = setTimeout(() => ac.abort(), state._fetchTimeoutMs || ms || FETCH_TIMEOUT_MS);
-  // De klok wordt BEWUST niet gewist. `fetch` lost al op zodra de kop binnen is; het lichaam
-  // wordt bij de aanroeper gelezen, en valt de verbinding daar weg, dan is de AbortController het
-  // enige wat die leesactie nog kan afbreken. Een abort op een al gelezen antwoord doet niets.
-  // Zelfde afweging als in _fetchGeteld hieronder.
   try { return await fetch(url, { ...(opts||{}), signal: ac.signal }); }
   catch(e){
-    clearTimeout(klok);
     if(e && e.name==='AbortError') throw new Error(melding || 'Geen antwoord binnen 20 seconden');
     throw e;
   }
+  finally { clearTimeout(klok); }
 }
 
-// Elke Sheets-fetch loopt hierlangs, zodat de teller op één plek klopt: een reject is een echte
-// netwerkfout, en élk antwoord (ook 4xx en 5xx) bewijst dat er verbinding ís.
-// Een afgebroken verzoek telt bewust als netwerkfout: van buitenaf is 'antwoordt niet binnen 20s'
-// niet te onderscheiden van 'verbinding weg', en beide betekenen hetzelfde voor de gebruiker.
-// AbortController i.p.v. AbortSignal.timeout(): dat laatste kent Safari pas vanaf 16.
+// Elke Sheets-fetch loopt hierlangs: één plek voor de netwerkteller en de minimumversie-rem.
 async function _fetchGeteld(url, opts){
-  // VANGNET van de minimumversie-rem (versie.js). Élke schrijfactie naar Google loopt hierlangs
-  // (writeRange/writeRows/writeRanges/appendRows en de batchUpdates via sheetsFetch) en is een
-  // niet-GET. Lezen blijft gewoon werken. De aanroepers horen al eerder geremd te hebben
-  // (blokkeerVersie in blokkeerOffline, vóór de optimistische wijziging); dit vangt een gemiste weg
-  // en de stille journaalregels (logEvent, de meldingen-wachtrij). Vóór de fetch, dus de
-  // netwerkteller telt hem niet als netwerkfout. `melding` geeft leesbareFout (util.js) de tekst.
   if(state._versieTeOud && String((opts && opts.method) || 'GET').toUpperCase() !== 'GET'){
     throw Object.assign(new Error('Niet opgeslagen: herlaad eerst het dashboard (nieuwe versie).'),
-      { versieTeOud:true, melding:'Niet opgeslagen: herlaad eerst het dashboard. Kopieer eventueel je tekst.' });
+      { versieTeOud:true, melding:'Niet opgeslagen: herlaad eerst het dashboard.' });
   }
   const ac = new AbortController();
   const klok = setTimeout(() => ac.abort(), state._fetchTimeoutMs || FETCH_TIMEOUT_MS);
   let r;
   try{ r=await fetch(url, { ...(opts||{}), signal: ac.signal }); }
   catch(e){
-    clearTimeout(klok);
     state._netwerkFouten=(state._netwerkFouten||0)+1;
     if(e && e.name==='AbortError') throw new Error('Geen antwoord van Google binnen 20 seconden');
     throw e;
   }
-  // De klok loopt bij een GESLAAGDE kop BEWUST door en wordt hier NIET gewist. `fetch` lost al op
-  // zodra de kop binnen is; het lichaam wordt bij de aanroeper gelezen (`await r.json()`), en dat
-  // is bij de batchGet zo'n 200 kB. Valt de verbinding wég tijdens dat binnenhalen en is de klok
-  // al gewist, dan is er geen AbortController meer die die leesactie kan afbreken: `r.json()`
-  // blijft dan staan, `_loadInFlight` blijft true en de poll slaat vanaf dat moment élke ronde
-  // over — precies de storing die deze tijdslimiet moet dichten, alleen een halve seconde later
-  // in het verzoek. Een `abort()` op een al volledig gelezen antwoord doet niets, dus dit kost niets.
+  finally { clearTimeout(klok); }
   state._netwerkFouten=0;
   return r;
 }
+export const sheetsFetch = (url, opts) => _fetchGeteld(url, opts);
 
-// Publieke naam van dezelfde helper, voor de SCHRIJF-kant. De leeskant liep hier al langs; de
-// rij-invoegingen en -verwijderingen (batchUpdate) en `getSheetIds` gingen langs een kale `fetch`
-// en hadden dus GEEN tijdslimiet. Een verzoek dat nooit antwoordt liet `pendingWrites` boven nul
-// staan: de 8s-ronde sloeg daarna élke keer over, de balk bleef op 'Opslaan…' hangen en alles wat
-// je daarna deed verdween in een wachtrij die nooit meer vertrok — precies de storing die in
-// augustus alleen voor de leeskant is verholpen.
-//
-// VEILIG bij een niet-idempotente batch: de afbreekfout ('Geen antwoord van Google binnen 20
-// seconden') heeft geen .status en matcht niet op `_isTransient`, dus `_withRetry` probeert hem
-// NIET opnieuw. Zou iemand die melding ooit aan `_isTransient` toevoegen, dan kan één taak twee
-// keer afgerond worden — laat hem daar dus buiten.
-const sheetsFetch = (url, opts) => _fetchGeteld(url, opts);
+async function _fout(r, standaard){
+  const e=await r.json().catch(()=>({}));
+  if(r.status===401){ state.oauthToken=null; state.oauthExpiry=0; }
+  const err=new Error(e.error?.message||standaard); err.status=r.status; return err;
+}
+const _kop = () => ({ Authorization:`Bearer ${state.oauthToken}`, 'Content-Type':'application/json' });
+const _basis = `https://sheets.googleapis.com/v4/spreadsheets/${SID}`;
+const _a1 = (tab, bereik) => `'${String(tab).replace(/'/g,"''")}'${bereik ? '!'+bereik : ''}`;
+export { _a1 };
 
-async function fetchSheet(name){
+export async function fetchSheet(bereik){
   if(!state.oauthToken) throw new Error('Niet ingelogd');
-  const r=await _fetchGeteld(`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values/${encodeURIComponent(name)}`,{
-    cache:'no-store',
-    headers:{Authorization:`Bearer ${state.oauthToken}`}
-  });
-  if(!r.ok){const e=await r.json().catch(()=>({}));if(r.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'API fout');err.status=r.status;throw err}
+  const r=await _fetchGeteld(`${_basis}/values/${encodeURIComponent(bereik)}`,
+    { cache:'no-store', headers:{ Authorization:`Bearer ${state.oauthToken}` } });
+  if(!r.ok) throw await _fout(r,'API-fout');
   return (await r.json()).values||[];
 }
-// Meerdere tabbladen in ÉÉN leesverzoek (values:batchGet). Cruciaal voor het quotum:
-// Google staat 60 leesverzoeken per minuut per gebruiker toe, en de 8s-poll haalde
-// 8 tabbladen apart op = 8 × 7,5 = precies 60 per minuut. Daardoor ging élke extra
-// actie van de gebruiker (een vinkje zetten kost een rij-controle + een resync) over
-// het quotum heen, met 'Quota exceeded' tot gevolg. Nu kost een poll 1 verzoek.
-async function fetchSheets(names){
+
+// Eén batchGet voor meerdere tabbladen: geeft { bereik: rijen } terug, op naam (niet op volgorde).
+export async function fetchSheets(bereiken){
   if(!state.oauthToken) throw new Error('Niet ingelogd');
-  const qs=names.map(n=>`ranges=${encodeURIComponent(n)}`).join('&');
-  const r=await _fetchGeteld(`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values:batchGet?${qs}`,{
-    cache:'no-store',
-    headers:{Authorization:`Bearer ${state.oauthToken}`}
-  });
-  if(!r.ok){const e=await r.json().catch(()=>({}));if(r.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'API fout');err.status=r.status;throw err}
+  const qs=bereiken.map(n=>`ranges=${encodeURIComponent(n)}`).join('&');
+  const r=await _fetchGeteld(`${_basis}/values:batchGet?${qs}`,
+    { cache:'no-store', headers:{ Authorization:`Bearer ${state.oauthToken}` } });
+  if(!r.ok) throw await _fout(r,'API-fout');
   const vr=(await r.json()).valueRanges||[];
-  // batchGet levert valueRanges in dezelfde volgorde als de meegegeven ranges, maar we geven ze
-  // op NAAM terug en niet op positie. Zolang de aanroeper op index uitpakte, verschoof élke
-  // variabele zodra de gevraagde lijst veranderde: één bereik erbij of eraf (zoals de
-  // staartlezing van het Logboek) zette dan stil het logboek in D.ontw, de kenmerken in
-  // D.herhaal, enzovoort — zonder één foutmelding. De sleutel is exact de gevraagde reeks,
-  // dus ook een bereik als "'Logboek'!A400:H" komt onder díe naam terug.
-  // Een leeg tabblad komt terug zónder 'values'; dat wordt een lege lijst.
   const uit={};
-  names.forEach((n,i)=>{ uit[n]=(vr[i]&&vr[i].values)||[]; });
+  bereiken.forEach((n,i)=>{ uit[n]=(vr[i]&&vr[i].values)||[]; });
   return uit;
 }
 
-// Formule-injectie-rem op ALLE frontend-writes (spiegel van cd_safeCell in Apps
-// Script): een cel die met =, +, -, @, tab of CR begint zou via USER_ENTERED een
-// levende formule worden — geplakte mailtekst met =IMPORTDATA(...) is dan een
-// exfil-kanaal, en een telefoonnummer "+31 6…" een parse-fout. Een apostrof-prefix
-// maakt de cel gegarandeerd tekst; Sheets toont de apostrof niet.
-// Alleen STRINGS worden geraakt: datums ('21-07-2026'), TRUE/FALSE-strings,
-// booleans en getallen blijven exact zoals ze waren, zodat USER_ENTERED ze blijft
-// parsen zoals altijd (de datumles van v6.0 blijft intact).
-// Tweede geval: een reeks CIJFERS die met een 0 begint. USER_ENTERED maakt daar een getal van en
-// gooit de nul weg — VvE-code 021002 stond zo als 21002 in de Sheet, en telefoonnummers 06…
-// verloren hun 0 op dezelfde manier. De apostrof houdt de cel tekst. Een losse '0' (volgnummer
-// van een bundelkop) blijft een getal: dat patroon vraagt minstens twee cijfers.
-// Derde geval: een tekst die ZELF met een apostrof begint ("'s-Gravenzandseweg"). USER_ENTERED leest
-// die eerste apostrof als de tekst-markering en slikt hem in: in de Sheet stond 's-Gravenzandseweg'
-// zonder apostrof — én de rij-controle zag daarna een verschil tussen geheugen en Sheet. Een extra
-// apostrof ervoor laat de echte staan.
-//
-// En de lengte. Google weigert een cel boven 50.000 tekens met een 400, en dan werd de HELE
-// schrijfactie teruggedraaid — de tekst die iemand net in Opmerkingen of Agendapunten plakte was
-// weg. Alleen de CRM-mail werd al afgekapt (mailVoorCel, crud.js); dit is het vangnet voor elk
-// ander tekstveld, op de plek waar élke schrijfweg langskomt. Zie kapCel.
-const veiligeCel=v=>{
+// Formule-injectie: een cel die begint met = + - @ (of tab/CR) wordt tekst. Een getal met een
+// voorloopnul (VvE-code 021002, telefoonnummer) ook — anders maakt Sheets er 21002 van.
+// LET OP — SYNC met cd_safeCell in apps-script/Notifications.gs.
+const CEL_MAX=49000;
+const CEL_STAART=' …[afgekapt]';
+export const kapCel=v=>(typeof v==='string'&&v.length>CEL_MAX)?v.slice(0,CEL_MAX)+CEL_STAART:v;
+export const veiligeCel=v=>{
   v=kapCel(v);
   return (typeof v==='string'&&(/^[=+\-@\t\r']/.test(v)||/^0\d+$/.test(v)))?"'"+v:v;
 };
-const _veiligeRij=values=>(values||[]).map(veiligeCel);
+export const _veiligeRij=values=>(values||[]).map(veiligeCel);
 
-// Ruim onder de 50.000 van Google, met een zichtbare regel erachter: liever een ingekorte tekst
-// dan een wijziging die als geheel mislukt. Idempotent — een al ingekorte cel (49.000 + de staart)
-// komt er identiek uit — en daarom gebruikt `_normCel` hem ook: dan vergelijkt de rij-controle het
-// geheugen (nog de volle tekst) met wat er echt in de Sheet staat, zonder vals alarm.
-const CEL_MAX=49000;
-const CEL_STAART=' …[afgekapt]';
-const kapCel=v=>(typeof v==='string'&&v.length>CEL_MAX)?v.slice(0,CEL_MAX)+CEL_STAART:v;
-
-async function writeRange(range,values,method='PUT'){
+export async function writeRange(bereik, waarden){
   if(!state.oauthToken) throw new Error('Niet ingelogd');
-  const url=`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`;
-  const opts={method,headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},body:JSON.stringify({values:[_veiligeRij(values)]})};
-  const r=await _fetchGeteld(url,opts);
-  // .catch op het uitlezen van het foutlichaam: een 502 van een tussenliggende proxy stuurt HTML,
-  // en dan gooide r.json() een SyntaxError zónder .status — die zou als 'netwerkfout' gelden en
-  // het dashboard onterecht op offline zetten.
-  if(!r.ok){const e=await r.json().catch(()=>({}));if(r.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Schrijffout');err.status=r.status;throw err}
+  const r=await _fetchGeteld(`${_basis}/values/${encodeURIComponent(bereik)}?valueInputOption=USER_ENTERED`,
+    { method:'PUT', headers:_kop(), body:JSON.stringify({ values:[_veiligeRij(waarden)] }) });
+  if(!r.ok) throw await _fout(r,'Schrijffout');
   return r.json();
 }
-// Meerdere rijen in ÉÉN PUT, op een bereik dat al bestaat. Zelfde vorm als writeRange hierboven,
-// maar dan met een blok rijen in plaats van één. Nodig sinds 'dezelfde taak voor meerdere VvE's':
-// twaalf losse PUT's zouden twaalf momenten opleveren waarop het halverwege kan stukgaan, en dan
-// staan er zes taken in de Sheet en zes niet.
-async function writeRows(range,rows){
+
+export async function appendRows(bereik, rijen){
   if(!state.oauthToken) throw new Error('Niet ingelogd');
-  const lijst=(rows||[]).filter(Boolean);
+  const lijst=(rijen||[]).filter(Boolean);
   if(!lijst.length) return null;
-  const url=`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`;
-  const opts={method:'PUT',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},
-              body:JSON.stringify({values:lijst.map(_veiligeRij)})};
-  const r=await _fetchGeteld(url,opts);
-  if(!r.ok){const e=await r.json().catch(()=>({}));if(r.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Schrijffout');err.status=r.status;throw err}
+  const r=await _fetchGeteld(`${_basis}/values/${encodeURIComponent(bereik)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+    { method:'POST', headers:_kop(), body:JSON.stringify({ values:lijst.map(_veiligeRij) }) });
+  if(!r.ok) throw await _fout(r,'Schrijffout');
   return r.json();
 }
-// Meerdere BEREIKEN in één verzoek (values:batchUpdate). Voor een bewerking die twee niet-
-// aangrenzende stukken van dezelfde rij raakt — een CRM-taak schrijft A..K én T..W. Als twee losse
-// PUT's kon de tweede mislukken nadat de eerste al stond: het scherm rolde dan alles terug terwijl
-// de Sheet half bijgewerkt was (naloop 25-09). Eén verzoek slaagt of faalt als geheel; een bereik
-// buiten het raster (blad nog niet verbreed) laat het hele verzoek weigeren.
-//   delen: [{range, values:[…]}], één rij per bereik
-async function writeRanges(delen){
+
+// Structuurwijzigingen (rij invoegen/verwijderen, vinkje zetten, tabblad maken) in één verzoek:
+// slaagt of faalt als geheel.
+export async function batchUpdate(requests){
   if(!state.oauthToken) throw new Error('Niet ingelogd');
-  const url=`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values:batchUpdate`;
-  const body={valueInputOption:'USER_ENTERED',data:(delen||[]).map(d=>({range:d.range,values:[_veiligeRij(d.values)]}))};
-  const r=await _fetchGeteld(url,{method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},body:JSON.stringify(body)});
-  if(!r.ok){const e=await r.json().catch(()=>({}));if(r.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Schrijffout');err.status=r.status;throw err}
+  const r=await _fetchGeteld(`${_basis}:batchUpdate`,
+    { method:'POST', headers:_kop(), body:JSON.stringify({ requests }) });
+  if(!r.ok) throw await _fout(r,'Opslaan mislukt');
   return r.json();
 }
-// Meerdere rijen in ÉÉN append. Een bulk-actie op 20 taken schreef 20 losse logregels, dus 20
-// schrijfverzoeken (~4,7 s 'Opslaan…') en een derde van het schrijfquotum van 60/min — voor
-// regels die samen één handeling zijn. values.append neemt gewoon meerdere rijen aan en zet ze
-// in de meegegeven volgorde aaneengesloten onderaan het tabblad: één rondreis, één uitkomst.
-async function appendRows(range,rows){
-  if(!state.oauthToken) throw new Error('Niet ingelogd');
-  const lijst=(rows||[]).filter(Boolean);
-  if(!lijst.length) return null;                  // niets te schrijven → ook geen verzoek
-  const url=`https://sheets.googleapis.com/v4/spreadsheets/${SID}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
-  const r=await _fetchGeteld(url,{method:'POST',headers:{Authorization:`Bearer ${state.oauthToken}`,'Content-Type':'application/json'},body:JSON.stringify({values:lijst.map(_veiligeRij)})});
-  // err.status hoorde hier ook te staan: zonder status geldt een 429 of 500 van deze route als
-  // netwerkfout (zie _isNetwerkFout) én komt hij niet door de transient-herkansing.
-  if(!r.ok){const e=await r.json().catch(()=>({}));if(r.status===401){state.oauthToken=null;state.oauthExpiry=0}const err=new Error(e.error?.message||'Schrijffout');err.status=r.status;throw err}
-  return r.json();
+
+// Tabbladnamen → sheetId. Onthouden per sessie; `vers` haalt opnieuw op (na het aanmaken van een tab).
+export async function getSheetIds(vers){
+  if(state._sheetIds && !vers) return state._sheetIds;
+  const r=await _fetchGeteld(`${_basis}?fields=sheets.properties(sheetId,title,index,gridProperties)`,
+    { headers:{ Authorization:`Bearer ${state.oauthToken}` } });
+  if(!r.ok) throw await _fout(r,'Tabbladen ophalen mislukt');
+  const d=await r.json();
+  state._sheetIds={};
+  state._sheetProps=(d.sheets||[]).map(s=>s.properties);
+  state._sheetProps.forEach(p=>{ state._sheetIds[p.title]=p.sheetId; });
+  return state._sheetIds;
 }
-// Eén rij: doorgeefluik, zodat er maar één fetch-implementatie te onderhouden is.
-const appendRange=(range,values)=>appendRows(range,[values]);
-
-// Aantal lopende/wachtende achtergrond-schrijfacties. Zolang >0 slaat de 8s-poll
-// over, zodat een optimistische wijziging niet kort teruggedraaid wordt.
-// Seriële wachtrij: schrijfacties lopen één voor één, zodat rij-indexen in de Sheet
-// niet door elkaar lopen bij snel opeenvolgende acties.
-
-// Verschuift lokale _row-nummers mee bij invoegen/verwijderen van een Sheet-rij,
-// zodat een volgende optimistische actie de juiste rij raakt. "Nog Te Doen" is één
-// sheet met meerdere secties; alle rijen onder `fromRow` schuiven `delta` op.
-// De koprijen van de secties schuiven MEE. Ze stonden er niet in, en dat is een stil gat: een
-// sectie zonder taken heeft geen enkel rij-object, dus `colHeaderRow` is dan het énige houvast dat
-// `getInsertRow` heeft. Werd er daarvóór in deze ronde een rij verwijderd (een taak afgerond), dan
-// wees dat nummer één rij te laag en kon een nieuwe taak in een LEGE sectie voorbij de kop van de
-// volgende sectie belanden — precies de verwisseling waarvoor getInsertRow liever een harde fout
-// geeft. De stille resync repareert het binnen een seconde, maar niet als die faalt.
-function _shiftNtdRows(fromRow, delta){
-  SKEYS.forEach(s=>{ (D.ntd[s]||[]).forEach(row=>{ if(row._row>fromRow) row._row+=delta; }); });
-  SKEYS.forEach(s=>{
-    const info=(D.ntdSecInfo||{})[s];
-    if(info && info.colHeaderRow>fromRow) info.colHeaderRow+=delta;
-  });
+// Zelfde tab, ongeacht hoofdletters/spaties aan het eind ("ALV's Overzicht ").
+export function sheetIdVan(ids, naam){
+  if(ids[naam]!=null) return ids[naam];
+  const k=Object.keys(ids).find(t=>t.trim().toLowerCase()===naam.trim().toLowerCase());
+  return k!=null ? ids[k] : null;
 }
 
-// Dezelfde correctie voor het tabblad 'Afgerond'. Die bestond niet, en dat was een echt gat:
-// `doCompleteTask` en `bulkAfronden` voegen daar wél rijen in, maar D.af hield de rijnummers van
-// vóór die invoeging. De stille resync repareert dat pas als `pendingWrites` op 0 staat, dus twee
-// afrondingen kort na elkaar rekenden allebei op hetzelfde, inmiddels verschoven anker. Landde de
-// tweede archiefregel daardoor pal onder een sectiekop, dan gooit `parseSections` hem altijd weg
-// als kolomkoprij — de taak stond dan in geen van beide tabbladen meer.
-// Bewust een eigen functie en geen parameter op _shiftNtdRows: de twee bladen hebben een andere
-// bron (D.ntd/D.ntdSecInfo tegenover D.af/D.afSecInfo) en de aanroepers verwarren zou precies de
-// verwisseling opleveren die dit moet voorkomen.
-function _shiftAfRows(fromRow, delta){
-  SKEYS.forEach(s=>{ (D.af[s]||[]).forEach(row=>{ if(row._row>fromRow) row._row+=delta; }); });
-  SKEYS.forEach(s=>{
-    const info=(D.afSecInfo||{})[s];
-    if(info && info.colHeaderRow>fromRow) info.colHeaderRow+=delta;
-  });
-}
-
-// Herstel-idioom voor de rollback van een mislukte rij-DELETE (pure, testbaar):
-// schuif alles wat op of onder de oude positie ligt terug omlaag, d.w.z. shiftFn met
-// (oudeRow-1, +1) — de shift-conditie is '>', dus fromRow-1 betekent 'vanaf oudeRow'.
-// Zonder de -1 bleef de buurregel die door de delete óp oudeRow was komen te staan
-// hangen (duplicaat-rijnummer). Eén naam voor álle rollback-closures (crud/bulk/logboek),
-// zodat het patroon nooit meer per plek kan verlopen.
-function _herstelShift(shiftFn, oudeRow){ shiftFn(oudeRow-1, +1); }
-
-// Herkent tijdelijke API-fouten (rate-limit 429 / serverfout 5xx) die een herkansing
-// rechtvaardigen — i.t.t. een echte fout (verkeerde data, geen rechten) die direct faalt.
-function _isTransient(e){
+// Tijdelijke Google-fouten (te druk, even weg): twee keer opnieuw, met oplopende wachttijd.
+export function _isTransient(e){
   if(!e) return false;
   if(e.status===429 || (e.status>=500 && e.status<600)) return true;
   return /quota|rate.?limit|resource_exhausted|backend error|internal error|unavailable|try again/i.test(e.message||'');
 }
-// Voert een schrijfactie uit met max. 2 herkansingen (exponentiële backoff) bij transient fouten.
-async function _withRetry(fn){
-  for(let attempt=0;;attempt++){
+export async function _withRetry(fn){
+  for(let poging=0;;poging++){
     try{ return await fn(); }
     catch(e){
-      if(attempt<2 && _isTransient(e)){ await new Promise(r=>setTimeout(r,600*Math.pow(2,attempt))); continue; }
+      if(poging<2 && _isTransient(e)){ await new Promise(r=>setTimeout(r,600*Math.pow(2,poging))); continue; }
       throw e;
     }
   }
 }
-
-// (De oude dossier-modus `askChat` — één vraag met het hele dossier als systeemtekst — is in de
-//  naloop van 2026-10-16 weggehaald: sinds v15.0 loopt élke chatvraag via askZoek, en niets riep hem
-//  nog aan. De proxy kent die modus nog, zodat een verouderd tabblad er niet op stukloopt.)
-
-// Zoekmodus van de dashboard-chat: één ronde van de zoeklus. Geeft de ruwe blokken van Claude
-// terug ({content, stop_reason}); dossier-chat.js voert de gevraagde filters uit en roept dit
-// opnieuw aan. `laatste` = de zoekrondes zijn op, Claude moet nu antwoorden.
-async function askZoek(system, messages, laatste){
-  if(!state.oauthToken) throw new Error('Niet ingelogd');
-  const r = await fetchMetKlok(PROXY_URL, {
-    method:'POST',
-    headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${state.oauthToken}` },
-    body: JSON.stringify({ modus:'zoek', system, messages, laatste: !!laatste }),
-  }, 'De AI gaf binnen een minuut geen antwoord', AI_TIMEOUT_MS);
-  const data = await r.json().catch(()=>({}));
-  // 401 = de proxy kon het token niet bij Google verifiëren (verlopen of ingetrokken). Dan het
-  // token weggooien, net als de Sheets-wegen hierboven doen: de volgende aanroep vernieuwt het dan
-  // stil via ensureToken in plaats van nog eens met hetzelfde dode token aan te kloppen.
-  if(r.status===401){ state.oauthToken=null; state.oauthExpiry=0; }
-  if(!r.ok){ const e=new Error(data.error||'AI-fout'); e.status=r.status; throw e; }
-  return { content: Array.isArray(data.content) ? data.content : [], stop_reason: data.stop_reason || '', model: data.model || '' };
-}
-
-// ── Vingerafdruk van een rij ───────────────────────────────────────────────
-// De guard vergeleek tot v9.5 alléén kolom A. Dat bewijst 'deze rij hoort nog bij dezelfde
-// VvE', niet 'dit is nog dezelfde taak' — en voor een VvE met meerdere openstaande taken ving
-// hij dus niets. Juist dat is het waarschijnlijke schadegeval, want rijen verschuiven bínnen
-// een sectie.
-//
-// Alleen kolommen die het DASHBOARD bezit en die STABIEL zijn doen mee. Bewust buitengesloten:
-//   N  escalatie   — alleen door Apps Script geschreven; cd_opvolgingMotor stempelt hem élke
-//                    ochtend ±06:30. Meenemen zou stil álle schrijfacties blokkeren op precies
-//                    de taken die het langst stilliggen.
-//   F  prioriteit  — werd vroeger dagelijks door cd_recalcPrioriteiten herschreven; die job doet sinds
-//                    2026-10-02 niets meer (AutoPrioriteit.gs). Het dashboard rekent de prioriteit
-//                    live uit de deadline (berekenPrioriteit) en leest F nergens: identiteit hoort er
-//                    dus nog steeds niet op te leunen.
-//   L  opvolgdatum — door de opvolgmotor geschreven
-//   I,J            — afvink-selectievakje / ongebruikt; dragen TRUE/FALSE-erfenis
-//   O,P            — offerte-fase en aannemerslijst; voegen niets toe aan identiteit. P's
-//                    uitsluiting is bovendien DRAGEND: elke aannemers-schrijfweg (de paneel-
-//                    mutaties én schrijfAannemers vanuit het bewerkscherm, offerte-aannemers.js)
-//                    muteert r.aannemers optimistisch VÓÓR assertRowMatch draait. Zou P ooit in
-//                    de vingerafdruk komen, dan vergelijkt die guard de oude Sheet-waarde met de
-//                    al-gemuteerde rij en slaat élke lijstwijziging vals alarm.
-// De VvE-naam doet niet mee: dezelfde code betekent per definitie dezelfde naam.
-// Alleen de twee tabbladen waar kolom A NIET onderscheidend genoeg is. Op Herhaalregels,
-// Ontwikkeling, Logboek, Kenmerken en ALV's overzicht is de sleutel in kolom A al uniek genoeg
-// (een ID, een titel, een timestamp, een VvE-code bij één rij per VvE); die blijven bewust op de
-// kolom-A-controle staan. Een tabblad dat hier niet in staat valt terug op kolom A — precies het
-// gedrag van vóór v9.6. Wie zo'n tabblad later wél wil verbreden, zet hem hier bij én breidt
-// _rijNaarCellen uit; doe dat niet op de gok, maar controleer eerst de echte kolomindeling in de
-// parser van dat tabblad (de veldnamen lopen niet gelijk op met de kolomvolgorde).
-const FP_KOLOMMEN = {
-  'Nog Te Doen': { tekst:[0,2], datum:null },  // A=code, C=actiepunt/periode/datumAangevraagd; deadline per sectie
-  'Afgerond':    { tekst:[0,2], datum:[8]  },  // A=code, C=actiepunt, I=datum afgerond
-  // Logboek: de HELE regel (A t/m H). Kolom A alleen was hier niet genoeg. Bulk-acties schrijven
-  // meerdere logregels met exact dezelfde milliseconde, en — belangrijker — het bewerken van een
-  // logregel verandert alléén kolom E/F/G. Vergeleken we alleen de timestamp, dan zag de guard
-  // een bewerking van een collega niet en overschreef hij die stil met de oude tekst. Er komt
-  // niets van Apps Script in dit tabblad, dus er is geen kolom die vanzelf verandert en vals
-  // alarm zou geven.
-  'Logboek':     { tekst:[0,1,2,3,4,5,6,7], datum:null },
-  // Ontwikkeling: de HELE regel, want de titel is NIET afgedwongen uniek — twee items 'Bug in
-  // filter' bestonden gewoon, en dan keurde de kolom-A-controle na een rijverschuiving stil het
-  // gelijknamige buur-item goed (naloop 2026-08-28). De datumkolom als datum vergelijken: de
-  // regel wordt met USER_ENTERED geschreven, dus Sheets kan '28-08-2026' als échte datum opslaan
-  // en in een andere schrijfwijze terugformatteren.
-  'Ontwikkeling': { tekst:[0,1,2,3,5], datum:[4] },
-};
-// Veldnamen per kolom voor tabbladen die NIET uit parseSections komen. De vingerafdruk moet
-// beide kanten via dezelfde weg bouwen (rij-object → cellen), en buiten Nog Te Doen/Afgerond
-// bestaat SECS[r._sec] niet.
-const OBJ_KOLOMMEN = {
-  'Logboek': ['timestamp','code','sectie','actie','veld','oudeWaarde','nieuweWaarde','gebruiker'],
-  'Ontwikkeling': ['titel','categorie','inhoud','door','datum','status'],   // zie parseOntw
-};
-// Welke kolom de deadline draagt verschilt per sectie van 'Nog Te Doen' (zie SECS.keys):
-// OPPAKKEN D(3) · VERGADERVERZOEKEN F(5) · OFFERTE-TRAJECTEN C(2)+F(5) · LOD F(5)
-// · SUBSIDIE-TRAJECTEN F(5). Let op: bij subsidie is D de FASE, geen datum — daar
-// mag dus geen datumopmaak op.
-// · CRM F(5); ook daar is D de fase.
-const NTD_DATUM = { OPPAKKEN:[3], VERGADERVERZOEKEN:[5], 'OFFERTE-TRAJECTEN':[2,5], LOD:[5], 'SUBSIDIE-TRAJECTEN':[5], CRM:[5] };
-
-// Welke kolom de OMSCHRIJVING draagt, per sectie — afgeleid uit OMSCHRIJVING_SLEUTEL (config.js)
-// en de kolomvolgorde in SECS.keys, zodat er geen vierde plek ontstaat waar dezelfde afspraak
-// los kan gaan lopen. Levert: OPPAKKEN/LOD/SUBSIDIE index 2 (kolom C, zat er al in via
-// spec.tekst), VERGADERVERZOEKEN index 3 (kolom D, Agendapunten) en OFFERTE-TRAJECTEN index 6
-// (kolom G, Opmerkingen).
-//
-// WAAROM dit erbij moet: de guard vergeleek alleen A, C en de deadlinekolom. Bij een
-// vergaderverzoek of een offertetraject staat de eigenlijke tekst NIET in C, dus een collega die
-// de agendapunten aanvult veranderde niets aan de vingerafdruk — en submitTask schrijft de HELE
-// rij A..K terug. Zijn aanvulling verdween dan zonder melding en zonder spoor in het Logboek.
-// D en G worden door niets in Apps Script op een bestaande rij geschreven (cd_createTaskRow raakt
-// ze alleen bij het aanmaken), dus ze kunnen geen vals alarm van de backend geven.
-const NTD_OMSCHRIJVING = Object.fromEntries(SKEYS.map(sec=>{
-  const i=(SECS[sec]?.keys||[]).indexOf(OMSCHRIJVING_SLEUTEL[sec]);
-  return [sec, i>=0 ? [i] : []];
-}));
-
-// Eén cel vergelijkbaar maken. isDatum → vergelijk op de GEPARSEERDE datum, nooit op de tekst:
-// het dashboard houdt '17-06-2026' in het geheugen terwijl values.get (FORMATTED_VALUE)
-// '17 juni 2026' teruggeeft. Onherkenbaar als datum → val terug op de tekst ('sept/okt', '2/3').
-function _normCel(v, isDatum){
-  const s=leegBijErfenis(kapCel(v));
-  if(!isDatum||!s) return s;
-  const d=_parseAnyDate(s);              // geeft {y,m,d} of null
-  return d ? `${d.y}-${d.m}-${d.d}` : s;
-}
-
-// Vingerafdruk van één rij. `rij` is ALTIJD een cel-array (zoals values.get hem teruggeeft);
-// een rij-object gaat er eerst met _rijNaarCellen doorheen. Beide kanten van de vergelijking
-// door dezelfde functie halen is de hele truc — anders lopen trim en datumvorm uiteen.
-// Onbekend tabblad → val terug op kolom A, zodat een nieuw tabblad nooit stil de guard uitzet.
-// `negeerNummer` maakt de vergelijking SYMMETRISCH: kent de kant die we verwachten geen
-// taaknummer, dan mag de teruggelezen kant het zijne ook niet gebruiken. Zonder dat zou een
-// rij-object zonder nummer tegenover een Sheet-rij mét nummer ALTIJD als mismatch gelden en dus
-// elke schrijfactie blokkeren — een vals alarm, want 'ik ken het nummer niet' is geen bewijs dat
-// het de verkeerde rij is. Gemeten op staging 2026-07-29; zonder deze regel blokkeerde zelfs een
-// volstrekt ongewijzigde rij.
-function vingerafdruk(sheetName, rij, sec, negeerNummer){
-  const spec=FP_KOLOMMEN[sheetName];
-  rij=rij||[];
-  if(!spec) return _normCel(rij[0]);
-  const datumKol=spec.datum || (sheetName==='Nog Te Doen' ? (NTD_DATUM[sec]||[]) : []);
-  // De omschrijvingskolom telt alleen mee op 'Nog Te Doen'; daar is hij per sectie een andere.
-  // Ontdubbelen: bij Oppakken/LOD/Subsidie is het kolom C, en die staat al in spec.tekst.
-  const omsKol=(sheetName==='Nog Te Doen') ? (NTD_OMSCHRIJVING[sec]||[]) : [];
-  const idx=[...new Set(spec.tekst.concat(datumKol, omsKol))].sort((a,b)=>a-b);
-  // Ontbrekende cel → '' : values.get kapt afsluitende lege cellen én lege rijen af, dus een rij
-  // met lege staartkolommen komt korter terug dan hij in de Sheet staat.
-  const inhoud=idx.map(i=>_normCel(rij[i], datumKol.includes(i))).join('\x1f');
-  // Het taaknummer (kolom Q) en de inhoud doen ALLEBEI mee, gescheiden door \x1e.
-  //   nummer  → "schrijf ik naar de juiste RIJ?"  (dat lost fase 4 op)
-  //   inhoud  → "heeft iemand deze taak intussen gewijzigd?"
-  // Alleen op het nummer vergelijken zou het tweede laten vallen: een collega die met de hand
-  // in de Sheet iets aanpast, zou dan zonder waarschuwing overschreven worden. Met z'n drieën
-  // in dezelfde lijst is een stille overschrijving erger dan een extra melding.
-  const nr=negeerNummer ? '' : leegBijErfenis(rij[16]);
-  return (nr && nr!=='TaakID') ? 'T:'+nr+'\x1e'+inhoud : inhoud;
-}
-
-// Uit een vingerafdruk het nummer-deel halen (leeg als er geen nummer in zit). Hiermee kan de
-// guard onderscheiden WAT er mis is: zelfde nummer + andere inhoud = iemand heeft deze taak
-// gewijzigd; ander nummer = de rij is verschoven. Twee heel verschillende meldingen.
-const _nummerDeel = fp => (fp||'').startsWith('T:') ? (fp.split('\x1e')[0]) : '';
-
-// Rij-OBJECT → cel-array, zodat geheugen en verse lezing dezelfde weg volgen.
-// 'Nog Te Doen' én 'Afgerond' komen allebei uit parseSections en dragen dus SECS-velden op de
-// kolomvolgorde van hun sectie. Let op: die volgorde is NIET de volgorde waarin de velden in het
-// object staan — 'actiepunt' is kolom C (index 2), niet index 1. Vandaar SECS.keys en geen
-// eigen lijstje.
-function _rijNaarCellen(sheetName, r){
-  r=r||{};
-  if(!FP_KOLOMMEN[sheetName]) return [];
-  const eigen=OBJ_KOLOMMEN[sheetName];
-  if(eigen) return eigen.map(k=>r[k] ?? '');   // vaste kolomvolgorde, niet via SECS
-  const keys=(SECS[r._sec]||{}).keys||[];
-  const uit=keys.map(k=>r[k] ?? '');
-  while(uit.length<8) uit.push('');            // OFFERTE heeft 7 velden → vul tot H
-  if(sheetName==='Afgerond') uit[8]=r.datum ?? '';   // I = datum afgerond
-  // Q = vast taaknummer, op BEIDE tabbladen die het dragen. 'Afgerond' stond hier niet bij, en
-  // juist dáár zijn bulk-afgeronde tweelingrijen inhoudelijk identiek (zelfde code, tekst en
-  // datum) — alleen kolom Q onderscheidt ze nog. De undo-delete keurde dan de verkeerde tweeling
-  // goed als het archief net verschoven was (naloop 2026-08-28).
-  if((sheetName==='Nog Te Doen'||sheetName==='Afgerond') && r.taakId) uit[16]=r.taakId;
-  return uit;
-}
-// Vingerafdruk rechtstreeks uit een rij-object.
-const rijVingerafdruk=(sheetName, r)=>vingerafdruk(sheetName, _rijNaarCellen(sheetName, r), r&&r._sec);
-
-// ── Bescherming tegen schrijven naar de verkeerde rij ──────────────────────
-// Pure (testbaar): gegeven de teruggelezen rijen (vanaf minRow) en de verwachte checks → geef de
-// eerste mismatch terug, of null als alles klopt. `maak` zet een ruwe rij om in de te vergelijken
-// waarde; zonder `maak` is dat de kale kolom-A-waarde (het gedrag van vóór v9.6).
-function _rowMismatch(vals, minRow, checks, maak){
-  for(const c of checks){
-    const ruw=vals[c.row-minRow]||[];
-    const got=maak ? maak(ruw, c) : ((ruw[0]||'').toString().trim());
-    const exp=(c.code||'').toString().trim();
-    if(got!==exp) return { row:c.row, expected:exp, got };
-  }
-  return null;
-}
-// Bouwt de A1-range over de vingerafdruk-kolommen; escapet apostrofs in de tabblad-naam
-// (bv. "ALV's overzicht" → 'ALV''s overzicht'!A..). Altijd t/m S: dat dekt élke kolom die in
-// FP_KOLOMMEN voorkomt (die blijven binnen A..I), plus kolom Q met het vaste taaknummer en
-// R/S met het bundelnummer en volgnummer. Het blijft ÉÉN aaneengesloten range en dus één
-// leesverzoek — de guard wordt er niet duurder van; alleen twee cellen per rij breder.
-//
-// R en S doen in de VINGERAFDRUK niet mee en dat blijft zo (zie de kop van bundel-acties.js:
-// wat wij zelf wijzigen mag de guard niet als verschil zien). Ze worden gelezen omdat
-// `assertRowsMatch` de gelezen rijen teruggeeft en `koppelTaak` de bundelstand van de DOELrij
-// uit de Sheet moet kunnen aflezen in plaats van uit zijn eigen, mogelijk verouderde geheugen.
-// Nagemeten op 2026-08-18 via de API, op PROD én TEST: élk tabblad waar deze guard vandaag op
-// draait is minstens 19 kolommen breed ('Nog Te Doen' precies 19, de rest 26). Komt er ooit een
-// smaller blad bij, kijk dan eerst of values.get daar niet op struikelt.
-function _a1Bereik(sheetName, minR, maxR){
-  return `'${(sheetName||'').replace(/'/g,"''")}'!A${minR}:S${maxR}`;
-}
-// Leest de vingerafdruk-kolommen van de doelrij(en) terug en gooit een ROW_MISMATCH-fout als een
-// rij niet meer dezelfde taak bevat. Eén GET dekt het hele rijbereik. backgroundWrite vangt de fout.
-// Geeft de teruggelezen rijen terug als Map<rijnummer, cel-array>, zodat een aanroeper een kolom
-// die BUITEN de vingerafdruk valt alsnog kan aflezen zonder een tweede leesverzoek. Dat is geen
-// extraatje: `koppelTaak` moet weten wat er nú in kolom R van de doelrij staat, en die vraag is
-// per definitie niet met de vingerafdruk te beantwoorden.
-// Een check is óf {row, r} met het rij-OBJECT (volle vingerafdruk) óf {row, code} (alleen kolom A,
-// de oude vorm — nog in gebruik op de tabbladen waar kolom A al onderscheidend genoeg is).
-// Let op: deze guard zit binnen de writeFn en dus binnen _withRetry — bij een 429/5xx draait hij
-// tot drie keer. Dat is bewust: een herkansing ná een storing moet opnieuw controleren.
-async function assertRowsMatch(checks, sheetName='Nog Te Doen'){
-  const cs=(checks||[]).filter(c=>c&&c.row).map(c=>{
-    // Rij-object én een tabblad met vingerafdruk-spec → de volle vergelijking.
-    if(c.r && FP_KOLOMMEN[sheetName]){
-      // heeftNr: kent de verwachte kant een taaknummer? Zo niet, dan mag de teruggelezen kant
-      // het zijne ook niet gebruiken — anders blokkeert de guard op 'ik weet het niet'.
-      // Ook op 'Afgerond': archiefrijen dragen sinds fase 4 hetzelfde nummer in Q, en rijen van
-      // vóór de backfill vallen via deze zelfde voorwaarde vanzelf terug op inhoud-alleen.
-      const heeftNr=!!((sheetName==='Nog Te Doen'||sheetName==='Afgerond') && c.r.taakId);
-      return { row:c.row, fp:true, sec:c.r._sec, heeftNr, code:rijVingerafdruk(sheetName, c.r) };
-    }
-    // Rij-object op een tabblad zónder spec: val terug op de sleutel in kolom A i.p.v. te
-    // vergelijken met een lege vingerafdruk — dat laatste zou élke schrijfactie blokkeren.
-    if(c.r) return { row:c.row, code:((c.r.code ?? c.r.id ?? c.r.titel ?? c.r.timestamp ?? '')+'').trim() };
-    return { row:c.row, code:(c.code||'').toString().trim() };
-  });
-  if(!cs.length) return new Map();
-  const rows=cs.map(c=>c.row), minR=Math.min(...rows), maxR=Math.max(...rows);
-  const vals=await fetchSheet(_a1Bereik(sheetName, minR, maxR));
-  const mm=_rowMismatch(vals, minR, cs, (ruw,c)=>c.fp
-    ? vingerafdruk(sheetName, ruw, c.sec, !c.heeftNr)
-    : ((ruw[0]||'').toString().trim()));
-  if(mm){
-    const err=new Error('De lijst was net gewijzigd — opnieuw geladen.');
-    err.rowMismatch=true; err.detail=mm;
-    // Zelfde taaknummer maar andere inhoud → het is wél de juiste rij, maar iemand heeft de taak
-    // intussen aangepast. Dat is een heel ander verhaal dan 'de rij is verschoven', en verdient
-    // een melding die de gebruiker ook echt kan plaatsen.
-    const nrOud=_nummerDeel(mm.expected);
-    err.zelfdeTaak = !!nrOud && nrOud===_nummerDeel(mm.got);
-    err.melding = err.zelfdeTaak
-      ? 'Iemand heeft deze taak net gewijzigd. Je scherm is bijgewerkt — kijk even en probeer opnieuw.'
-      : 'De lijst was net gewijzigd — opnieuw geladen, probeer nog eens.';
-    throw err;
-  }
-  return new Map(cs.map(c=>[c.row, vals[c.row-minR]||[]]));
-}
-// Achterwaarts compatibel: een STRING blijft de oude kolom-A-controle, een rij-OBJECT geeft de
-// volle vingerafdruk. Zo kon elke callsite los mee, zonder big-bang.
-const assertRowMatch=(row, bronOfCode, sheetName)=>assertRowsMatch(
-  [(bronOfCode && typeof bronOfCode==='object') ? { row, r:bronOfCode } : { row, code:bronOfCode }], sheetName);
-
-export { kapCel, NTD_DATUM, isOffline, fetchMetKlok, _isOffline, _isNetwerkFout, fetchSheet, fetchSheets, writeRange, writeRanges, writeRows, appendRange, appendRows, veiligeCel, _veiligeRij, _shiftNtdRows, _shiftAfRows, _herstelShift, _isTransient, _withRetry, askZoek, _rowMismatch, _a1Bereik, vingerafdruk, rijVingerafdruk, _nummerDeel, _normCel, _rijNaarCellen, assertRowsMatch, assertRowMatch, NTD_OMSCHRIJVING, sheetsFetch };
+export { _isNetwerkFout };

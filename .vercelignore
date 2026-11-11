@@ -8,6 +8,7 @@ apps-script/
 apps-script-backup/
 logo-pakket/
 vrijdagsoverzicht.html
+simulatie/
 # Let op: dit is gitignore-syntax en matcht NIET op prefix — 'apps-script/' weert
 # apps-script-backup/ dus niet. Elke map hier apart noemen.
 #

@@ -7,6 +7,8 @@
 exclude:
   - logo-pakket
   - vrijdagsoverzicht.html
+  # Meekijk-simulatie voor besturen: een losse pagina die apart wordt gedeeld, niet via deze site.
+  - simulatie
   - .superpowers
   - apps-script
   - apps-script-backup

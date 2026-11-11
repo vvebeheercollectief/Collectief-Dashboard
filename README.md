@@ -20,6 +20,15 @@ Sheet; het dashboard toont ze niet en wijzigt ze niet. Meldingen en automatische
 Elke wijziging zoekt de rij vlak vóór het schrijven opnieuw op (ID of taaknummer) en schrijft
 niet als een collega hem intussen veranderde.
 
+## Meekijk-simulatie (`simulatie/`)
+
+`simulatie/index.html` is een losse pagina voor besturen: je kijkt hoe een melding, factuur, vraag of
+ledenvergadering door het kantoor loopt, met schuifjes voor drukte en bezetting. Eén bestand, zonder
+inlog en zonder koppeling met de Sheet; alle VvE's, bedragen en doorlooptijden zijn verzonnen. De
+pagina volgt de externe huisstijl (leisteen, kobalt, Albert Sans), niet die van het dashboard. Ze
+hoort niet bij het dashboard: ze staat niet in de bouwlijst (`tools/bouw.mjs`) en is uitgesloten in
+`_config.yml` en `.vercelignore`.
+
 ## Minimumversie (`versie.json`)
 
 `versie.json` in de root bevat `{"minimaal":"X.Y"}`. Een open tabblad met een `APP_VERSION`

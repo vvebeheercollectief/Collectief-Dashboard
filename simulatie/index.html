@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Meekijk-simulatie VvE-beheer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<!-- Meekijk-simulatie voor besturen: hoe een melding, factuur, vraag of ledenvergadering door het
+     kantoor loopt. Eén los bestand, zonder inlog en zonder koppeling met de Sheet. Alle VvE's,
+     onderwerpen, bedragen en doorlooptijden zijn verzonnen. Staat bewust NIET in de bouwlijst
+     (tools/bouw.mjs) en is uitgesloten in _config.yml en .vercelignore. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Albert+Sans:ital,wght@0,300..700;1,300..700&display=swap">
+<style>
+/* Indeling: een kop in leisteen met het dakkader en één cijfer. Daaronder het bord in vier
+   kolommen met haarlijnen (binnen, op kantoor, buiten de deur, afgerond) en de gevolgde zaak ernaast. */
+:root{
+  --papier:#fbfaf8; --mist:#f3f2ef; --wolk:#e6e4df; --lijn:#d9d7d2; --rand:#8a9099;
+  --inkt:#2b3544; --grijs:#5d6470; --kobalt:#3550c2; --op-kobalt:#ffffff;
+  --knop:#2b3544; --op-knop:#ffffff;
+  --leisteen:#2b3544; --wit:#ffffff; --grijs-op-leisteen:#bfc6cf; --kobalt-op-leisteen:#afc0f2;
+  --font-sans:'Albert Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --r1:4px; --r2:8px; --r3:12px; --r4:16px; --r6:24px; --r8:32px; --r12:48px;
+  --hoek-1:2px;
+  --goot:clamp(16px,4vw,64px);
+  --p:26px;      /* raster van het bord: één zaak */
+  --reis:.7s;    /* hoe lang een zaak onderweg is naar de volgende plek */
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --papier:#1e2631; --mist:#26303d; --wolk:#313b49; --lijn:#3b4655; --rand:#6e7887;
+    --inkt:#f3f2ef; --grijs:#bfc6cf; --kobalt:#afc0f2; --op-kobalt:#1e2631;
+    --knop:#f3f2ef; --op-knop:#1e2631; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --papier:#1e2631; --mist:#26303d; --wolk:#313b49; --lijn:#3b4655; --rand:#6e7887;
+  --inkt:#f3f2ef; --grijs:#bfc6cf; --kobalt:#afc0f2; --op-kobalt:#1e2631;
+  --knop:#f3f2ef; --op-knop:#1e2631; color-scheme:dark;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--papier);color:var(--inkt);font:400 16px/1.6 var(--font-sans);-webkit-font-smoothing:antialiased}
+[hidden]{display:none!important}
+button,input,output{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--kobalt);outline-offset:3px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.in{max-width:1328px;margin:0 auto;padding-left:max(var(--goot),env(safe-area-inset-left,0px));padding-right:max(var(--goot),env(safe-area-inset-right,0px))}
+
+/* ── Huisstijl: label met de schuine streep, status, knop, iconen ───────── */
+.vbc-label{display:inline-flex;flex-wrap:wrap;align-items:center;font-weight:600;font-size:11px;line-height:1.2;letter-spacing:.14em;text-transform:uppercase;color:var(--grijs)}
+.vbc-streep{display:inline-block;width:.7em;height:.7em;margin:0 .45em;background:linear-gradient(to bottom right,transparent calc(50% - .05em),var(--kobalt) calc(50% - .05em),var(--kobalt) calc(50% + .05em),transparent calc(50% + .05em))}
+.kop .vbc-label{color:var(--grijs-op-leisteen)}
+.kop .vbc-streep{background:linear-gradient(to bottom right,transparent calc(50% - .05em),var(--kobalt-op-leisteen) calc(50% - .05em),var(--kobalt-op-leisteen) calc(50% + .05em),transparent calc(50% + .05em))}
+
+.vbc-status{display:inline-flex;align-items:center;gap:var(--r2);font-weight:600;font-size:13px;line-height:1;color:var(--inkt);white-space:nowrap}
+.vbc-status::before{content:"";width:9px;height:9px;flex-shrink:0;box-shadow:inset 0 0 0 1.5px var(--rand)}
+.vbc-status--loopt{color:var(--kobalt)}
+.vbc-status--loopt::before{background:var(--kobalt);box-shadow:none}
+.vbc-status--klaar::before{background:var(--inkt);box-shadow:none}
+.vbc-status--wacht{color:var(--grijs)}
+.vbc-status--wacht::before{background:linear-gradient(to bottom right,transparent 50%,var(--rand) 50%)}
+.vbc-status--actie{background:var(--knop);color:var(--op-knop);padding:6px 10px 6px 9px;border-radius:var(--hoek-1)}
+.vbc-status--actie::before{box-shadow:inset 0 0 0 1.5px var(--op-knop)}
+
+.vbc-knop{display:inline-flex;align-items:center;justify-content:center;font-weight:600;font-size:15px;line-height:1;letter-spacing:.01em;min-width:9.5em;padding:14px 22px;border:0;border-radius:var(--hoek-1);background:var(--knop);color:var(--op-knop);cursor:pointer;white-space:nowrap}
+.knop-rand{font-weight:600;font-size:15px;line-height:1;letter-spacing:.01em;padding:13px 20px;border:1px solid var(--rand);border-radius:var(--hoek-1);background:none;color:var(--inkt);cursor:pointer;white-space:nowrap}
+.knop-tekst{align-self:center;padding:0 0 3px;border:0;border-bottom:1px solid currentColor;border-radius:0;background:none;font-weight:600;font-size:15px;line-height:1.2;color:var(--inkt);cursor:pointer;white-space:nowrap}
+.knop-tekst--pijl::after{content:" →"}
+
+.ico{display:block;flex-shrink:0;width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:square;stroke-linejoin:miter}
+
+/* ── Kop in leisteen ────────────────────────────────────────────────────── */
+.kop{background:var(--leisteen);color:var(--wit)}
+.kop .in{display:grid;grid-template-columns:minmax(0,1fr) 104px;grid-template-areas:"logo logo" "label label" "h1 kader" "intro intro";gap:var(--r3) var(--r6);align-items:end;padding-block:var(--r4) var(--r8)}
+.logo{grid-area:logo;justify-self:start;display:block;height:58px;width:auto;margin:0 0 var(--r2) -7px}
+.kop__tekst{display:contents}
+.kop__label{grid-area:label}
+.kop h1{grid-area:h1;margin:0;font-weight:400;font-size:clamp(30px,4.4vw,44px);line-height:1.06;letter-spacing:-.02em;text-wrap:balance}
+.inleiding{grid-area:intro;margin:0;max-width:54ch;font-size:clamp(16px,1.6vw,19px);line-height:1.5;color:var(--grijs-op-leisteen)}
+.kader{grid-area:kader;position:relative;width:100%;aspect-ratio:100 / 140}
+.kader__lijn{position:absolute;inset:0;width:100%;height:100%;overflow:visible;fill:none;stroke:var(--kobalt-op-leisteen);stroke-width:1.5px;stroke-linejoin:miter}
+.kader__inhoud{position:absolute;left:12%;right:12%;top:44%;bottom:8%;display:flex;flex-direction:column;gap:3px}
+.cijfer{font-weight:400;font-size:34px;line-height:.95;letter-spacing:-.035em;font-variant-numeric:tabular-nums}
+.kader__noot{font-size:12px;line-height:1.3;color:var(--grijs-op-leisteen)}
+@media (min-width:700px){
+  .kop .in{grid-template-columns:minmax(0,1fr) 160px;grid-template-areas:"logo kader" "tekst kader";gap:var(--r8);padding-block:var(--r6) 40px}
+  .logo{align-self:start;margin-bottom:0}
+  .kop__tekst{grid-area:tekst;display:grid;gap:var(--r3)}
+  .kop__label,.kop h1,.inleiding{grid-area:auto}
+  .inleiding{margin-top:var(--r1)}
+  .kader__inhoud{gap:7px}
+  .cijfer{font-size:54px}
+  .kader__noot{font-size:13px}
+}
+
+/* ── Bediening ──────────────────────────────────────────────────────────── */
+.bed{padding-block:var(--r6)}
+.bed__rij{display:flex;flex-wrap:wrap;align-items:flex-end;gap:var(--r6) var(--r8)}
+.bed__groep{display:grid;gap:6px;min-width:0}
+.klok__tijd{display:flex;align-items:center;height:44px;font-weight:500;font-size:30px;line-height:1;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.seg{display:inline-flex}
+.seg label{position:relative}
+.seg input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+.seg span{display:grid;place-items:center;min-width:46px;height:44px;margin-left:-1px;padding:0 10px;border:1px solid var(--rand);font-weight:600;font-size:14px;font-variant-numeric:tabular-nums}
+.seg label:first-child span{margin-left:0;border-radius:var(--hoek-1) 0 0 var(--hoek-1)}
+.seg label:last-child span{border-radius:0 var(--hoek-1) var(--hoek-1) 0}
+.seg input:checked + span{position:relative;background:var(--knop);border-color:var(--knop);color:var(--op-knop)}
+.seg input:focus-visible + span{position:relative;z-index:1;outline:2px solid var(--kobalt);outline-offset:3px}
+.schuif__rij{display:flex;align-items:center;gap:10px;height:44px}
+.schuif__rij input{width:128px}
+.schuif__rij output{min-width:5.2em;font-weight:600;font-size:14px}
+.bed__rij .knop-tekst{align-self:flex-end;margin-bottom:11px}
+.bed__tip{margin:var(--r4) 0 0;max-width:70ch;font-size:14px;line-height:1.55;color:var(--grijs)}
+
+input[type=range]{-webkit-appearance:none;appearance:none;height:28px;margin:0;padding:0;background:transparent;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:2px;background:var(--rand)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;margin-top:-6px;border:0;border-radius:0;background:var(--knop)}
+input[type=range]::-moz-range-track{height:2px;background:var(--rand)}
+input[type=range]::-moz-range-thumb{width:14px;height:14px;border:0;border-radius:0;background:var(--knop)}
+
+/* ── Werkvlak: bord, gevolgde zaak, net gebeurd ─────────────────────────── */
+.werk{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--r8);padding-bottom:var(--r12)}
+.bordkol,.net,.volg{min-width:0}
+@media (min-width:1180px){
+  .werk{grid-template-columns:minmax(0,1fr) 300px;column-gap:var(--r8)}
+  .bordkol{grid-column:1;grid-row:1}
+  .net{grid-column:1;grid-row:2}
+  .volg{grid-column:2;grid-row:1 / span 2;position:sticky;top:calc(env(safe-area-inset-top,0px) + 16px);align-self:start;padding-left:var(--r8);border-left:1px solid var(--lijn)}
+}
+
+.bord{position:relative;display:grid;grid-template-columns:minmax(0,1fr);border-top:1px solid var(--inkt)}
+.kol{display:flex;flex-direction:column;gap:var(--r3);min-width:0;padding-block:var(--r4)}
+.kol + .kol{border-top:1px solid var(--lijn)}
+.kolkop{display:flex;align-items:baseline;justify-content:space-between;gap:2px 8px;margin:0;font-size:inherit;font-weight:inherit}
+.kolkop__tel{font-size:13px;line-height:1.3;color:var(--grijs);font-variant-numeric:tabular-nums;white-space:nowrap}
+.zone{position:relative;min-height:calc(var(--p) * 2)}
+.zonelabel{display:block;margin-bottom:6px}
+.meer{position:absolute;left:0;top:0;display:grid;place-items:center;width:var(--p);height:24px;font-weight:600;font-size:12px;color:var(--grijs);font-variant-numeric:tabular-nums}
+
+.kanalen{display:flex;flex-wrap:wrap;gap:6px var(--r4);margin:0;padding:0;list-style:none;font-size:13px;line-height:1.3;color:var(--grijs)}
+.kanalen li{display:flex;align-items:flex-start;gap:6px}
+.kanalen span{padding-top:2px}
+.kanalen small{display:block;font-size:12px}
+
+.bureau{display:grid;gap:10px;padding-block:var(--r3)}
+.bureau + .bureau{border-top:1px solid var(--lijn)}
+.kolkop + .bureau{padding-top:0}
+.bureau:last-child{padding-bottom:0}
+.bureau__kop{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;min-height:28px}
+.bureau__naam{margin:0;font-weight:600;font-size:15px;line-height:1.2}
+.bureau__stand{font-size:13px;color:var(--grijs);font-variant-numeric:tabular-nums}
+.bureau__bez{display:flex;align-items:center;gap:8px;margin-left:auto;font-size:13px;color:var(--grijs)}
+.bureau__bez input{width:64px}
+.bureau__bez output{min-width:4.4em;font-weight:600;color:var(--inkt)}
+.bureau__zones{display:grid;grid-template-columns:minmax(0,1fr) calc(var(--p) * 3);gap:var(--r4)}
+.zone--plek{min-height:calc(var(--p) + 6px)}
+.slot{position:absolute;top:0;width:24px;height:24px;box-shadow:inset 0 0 0 1px var(--lijn)}
+
+.ext{display:flex;flex-direction:column}
+.ext + .ext{padding-top:var(--r3);border-top:1px solid var(--lijn)}
+
+@media (min-width:860px){
+  .bord{grid-template-columns:104px minmax(0,1fr) 200px 124px}
+  .kol{padding-inline:20px}
+  .kol:first-child{padding-left:0}
+  .kol:last-child{padding-right:0}
+  .kol + .kol{border-top:0;border-left:1px solid var(--lijn)}
+  .kol--binnen .kolkop,.kol--buiten .kolkop,.kol--klaar .kolkop{flex-direction:column;align-items:flex-start}
+  .kol--binnen .zone,.kol--klaar .zone{flex:1}
+  .kanalen{flex-direction:column;gap:8px}
+  .bureau .zone--rij{min-height:calc(var(--p) * 3)}
+  .ext{flex:1}
+  .ext--lev{flex:2}
+  .ext .zone{flex:1;min-height:calc(var(--p) * 2)}
+}
+
+/* De zaken zelf: een icoon uit de huisstijl; de kleur volgt de stand. */
+.items{position:absolute;inset:0;pointer-events:none}
+.it{position:absolute;left:1px;top:0;width:24px;height:24px;margin:0;padding:2px;border:0;border-radius:0;background:none;color:var(--rand);cursor:pointer;pointer-events:auto;transition:transform var(--reis) cubic-bezier(.4,0,.2,1),color .3s,opacity .3s;animation:kom .4s;-webkit-tap-highlight-color:transparent}
+@keyframes kom{from{opacity:0}}
+.it[data-staat="binnen"],.it[data-staat="klaar"]{color:var(--inkt)}
+.it[data-staat="loopt"]{color:var(--kobalt)}
+.it[data-spoed]::after{content:"";position:absolute;right:0;top:0;width:5px;height:5px;background:var(--inkt)}
+.it.is-volg{outline:1.5px solid var(--inkt);outline-offset:1px;z-index:1}
+.it:focus-visible{outline:2px solid var(--kobalt);outline-offset:3px;z-index:2}
+.it.is-uit{opacity:0;pointer-events:none}
+.it__vg{display:none;position:absolute;left:2px;bottom:-4px;width:20px;height:2px;background:var(--wolk)}
+.it__vg::after{content:"";position:absolute;inset:0;background:var(--kobalt);transform-origin:left;transform:scaleX(var(--vg,0))}
+.it[data-staat="loopt"] .it__vg{display:block}
+
+.legenda{display:flex;flex-wrap:wrap;gap:10px var(--r6);margin:0;padding:var(--r4) 0 0;border-top:1px solid var(--lijn);list-style:none;font-size:13px;line-height:1.3;color:var(--grijs)}
+.legenda li{display:flex;align-items:center;gap:var(--r2)}
+.legenda .ico{color:var(--inkt)}
+.legenda .is-wacht{color:var(--rand)}
+.legenda .is-loopt{color:var(--kobalt)}
+.legenda__spoed{position:relative}
+.legenda__spoed::after{content:"";position:absolute;right:-2px;top:-2px;width:5px;height:5px;background:var(--inkt)}
+
+.kop-3{margin:0 0 var(--r3);font-weight:600;font-size:19px;line-height:1.25;letter-spacing:-.01em}
+.feed{margin:0;padding:0;border-top:1px solid var(--lijn);list-style:none}
+.feed li{border-bottom:1px solid var(--lijn)}
+.feed__rij{display:grid;grid-template-columns:4.6em minmax(0,1fr);gap:var(--r4);width:100%;padding:10px 0;border:0;background:none;text-align:left;font-size:14px;line-height:1.45}
+button.feed__rij{cursor:pointer}
+button.feed__rij:hover b{text-decoration:underline;text-underline-offset:3px}
+.feed__t{color:var(--grijs);font-variant-numeric:tabular-nums}
+.feed b{display:block;font-weight:500;color:var(--inkt)}
+.feed__sub{display:block;font-size:13px;color:var(--grijs)}
+
+.volg{display:grid;gap:var(--r6);align-content:start}
+@media (max-width:1179px){.volg{padding-top:var(--r6);border-top:1px solid var(--inkt)}}
+.volg__inhoud{display:grid;gap:var(--r3)}
+.volg__titel{margin:0;font-weight:600;font-size:19px;line-height:1.25;letter-spacing:-.01em;text-wrap:balance}
+.volg__sub{margin:0;font-size:14px;line-height:1.5;color:var(--grijs)}
+.volg__stand{margin:0 0 var(--r2)}
+.volg .knop-tekst{justify-self:start}
+
+.vbc-tijdlijn{position:relative;margin:0;padding:0;list-style:none}
+.vbc-tijdlijn::before{content:"";position:absolute;left:5px;top:8px;bottom:22px;width:1px;background:var(--lijn)}
+.vbc-tijdlijn__stap{position:relative;display:grid;grid-template-columns:11px minmax(0,1fr);gap:var(--r4);padding-bottom:14px}
+.vbc-tijdlijn__stap:last-child{padding-bottom:0}
+.vbc-tijdlijn__stap i{width:11px;height:11px;margin-top:5px;background:var(--papier);box-shadow:inset 0 0 0 1.5px var(--rand)}
+.vbc-tijdlijn__stap--klaar i{background:var(--inkt);box-shadow:none}
+.vbc-tijdlijn__stap--nu i{background:var(--kobalt);box-shadow:none}
+.vbc-tijdlijn__stap b{display:block;font-weight:600;font-size:15px;line-height:1.4;color:var(--inkt)}
+.vbc-tijdlijn__stap span{display:block;font-size:13px;line-height:1.4;color:var(--grijs);font-variant-numeric:tabular-nums}
+.vbc-tijdlijn__stap--nu span{font-weight:500;color:var(--kobalt)}
+.vbc-tijdlijn__stap--later b{font-weight:500;color:var(--grijs)}
+
+/* ── Drie vakgebieden en voet ───────────────────────────────────────────── */
+.wat{padding-block:var(--r12);border-top:1px solid var(--lijn)}
+.kop-2{margin:0 0 var(--r6);font-weight:500;font-size:26px;line-height:1.12;letter-spacing:-.015em;text-wrap:balance}
+.vbc-drie{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--r8)}
+.vbc-drie__item{display:grid;gap:var(--r3);align-content:start;min-width:0;padding-top:var(--r4);border-top:1px solid var(--inkt)}
+.vbc-drie__kop{margin:0;font-weight:500;font-size:21px;line-height:1.2;letter-spacing:-.015em}
+.vbc-drie__tekst{margin:0;font-size:15px;line-height:1.6;color:var(--grijs)}
+.vbc-drie__sim{display:flex;align-items:flex-start;gap:var(--r2);margin:0;font-size:14px;line-height:1.45;color:var(--inkt)}
+@media (max-width:720px){.vbc-drie{grid-template-columns:minmax(0,1fr)}}
+
+.voet{display:grid;gap:var(--r2);padding-block:var(--r6) var(--r12);border-top:1px solid var(--lijn);font-size:14px;line-height:1.55;color:var(--grijs)}
+.voet p{margin:0;max-width:78ch}
+.voet b{font-weight:600;color:var(--inkt)}
+.voet__contact{font-variant-numeric:tabular-nums}
+
+@media (prefers-reduced-motion: reduce){
+  .it{transition:none;animation:none}
+}
+</style>
+</head>
+<body>
+
+<header class="kop">
+  <div class="in">
+    <svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 240" role="img" aria-label="VvE Beheer Collectief"><g fill="#FFFFFF"><g transform="translate(27.77,35.77) scale(0.22703)"><g transform="translate(0,741) scale(0.1,-0.1)"><path d="M1750 5655 l-1745 -1745 375 -2 375 -3 5 -1215 5 -1214 35 41 c19 22 106 120 194 218 119 133 163 174 175 169 92 -39 301 -46 427 -14 90 23 199 73 262 119 97 72 164 227 166 383 1 86 2 89 26 94 164 37 239 72 326 156 94 90 149 219 157 368 l4 64 41 -3 c68 -4 192 19 271 51 185 77 311 279 311 498 0 134 -57 288 -143 385 l-44 50 48 43 c98 88 156 261 144 427 l-6 90 263 127 c145 70 459 221 698 336 239 115 510 246 601 290 220 107 234 112 291 112 194 0 291 -228 157 -370 -13 -14 -95 -65 -183 -115 -89 -50 -165 -100 -175 -114 -10 -15 -16 -46 -16 -79 0 -49 3 -56 37 -88 32 -28 45 -34 84 -34 41 0 79 17 288 127 279 146 304 154 400 110 98 -45 144 -150 112 -259 -21 -73 -62 -108 -241 -208 -249 -138 -311 -177 -323 -205 -30 -66 -1 -159 58 -190 51 -27 89 -19 192 40 114 65 175 82 234 66 65 -17 118 -63 149 -125 23 -48 27 -66 23 -120 -6 -100 -32 -131 -184 -218 -288 -168 -324 -190 -343 -215 -39 -48 -21 -152 33 -195 27 -22 101 -23 149 -3 134 56 288 -45 304 -200 5 -46 1 -63 -21 -110 -61 -124 -323 -282 -936 -562 -102 -46 -232 -106 -290 -133 -58 -27 -172 -79 -255 -115 -437 -195 -599 -283 -790 -424 -247 -183 -341 -272 -690 -651 -150 -162 -437 -473 -637 -690 l-365 -395 833 -3 c459 -1 1210 -1 1670 0 l837 3 -378 385 c-703 716 -749 760 -876 843 -95 63 -247 141 -334 171 -19 7 -18 9 10 32 62 52 215 154 345 231 284 168 337 195 615 318 330 146 632 281 795 355 157 71 139 73 198 -24 98 -161 319 -440 612 -775 l125 -143 5 1254 5 1253 375 3 375 2 -1745 1745 c-960 960 -1747 1745 -1750 1745 -3 0 -790 -785 -1750 -1745z m2266 -190 c28 -8 62 -28 78 -44 l29 -30 -564 -280 -564 -279 -25 23 c-38 35 -121 74 -456 215 -112 47 -102 35 -164 185 l-37 91 220 -4 c310 -6 594 22 1082 107 184 32 327 38 401 16z m-1710 -616 c71 -28 188 -75 259 -104 72 -29 148 -59 170 -66 22 -8 61 -35 86 -60 39 -38 49 -56 59 -103 27 -131 -34 -251 -153 -301 -66 -27 -114 -20 -294 49 -92 35 -217 82 -278 105 -155 58 -195 80 -232 129 -60 80 -67 167 -19 259 35 67 54 88 106 117 74 42 140 37 296 -25z m-578 -635 c70 -25 204 -74 297 -109 94 -35 253 -93 355 -130 461 -168 469 -172 505 -274 32 -93 9 -198 -59 -266 -86 -86 -172 -86 -406 -3 -85 30 -337 117 -560 193 -223 76 -420 147 -438 158 -48 28 -89 89 -103 152 -11 48 -10 61 11 127 19 60 32 82 75 124 88 87 145 92 323 28z m-72 -815 c93 -34 231 -83 308 -110 76 -27 146 -54 155 -61 83 -62 114 -118 114 -203 0 -145 -121 -275 -257 -275 -43 0 -656 233 -703 267 -124 90 -112 310 21 401 99 66 128 64 362 -19z m-153 -805 c121 -42 178 -83 208 -148 22 -49 25 -143 6 -189 -34 -81 -130 -147 -212 -147 -58 1 -241 55 -294 87 -147 91 -129 333 32 412 64 32 132 28 260 -15z"></path></g></g><path d="M239.97 104.00L227.22 69.73L230.40 69.73L241.92 101.31L241.07 101.31L252.55 69.73L255.74 69.73L243.00 104.00ZM279.38 104.00L266.64 69.73L269.81 69.73L281.33 101.31L280.48 101.31L291.96 69.73L295.16 69.73L282.41 104.00ZM309.59 104.00L309.59 69.73L331.21 69.73L331.21 72.49L312.58 72.49L312.58 85.44L330.29 85.44L330.29 88.20L312.58 88.20L312.58 101.24L331.21 101.24L331.21 104.00ZM364.13 104.00L364.13 69.73L378.25 69.73Q381.08 69.73 383.17 70.83Q385.26 71.94 386.43 73.88Q387.59 75.83 387.59 78.36Q387.59 81.02 386.21 83.08Q384.83 85.14 382.37 86.06L382.34 85.30Q384.39 85.92 385.87 87.23Q387.36 88.54 388.16 90.34Q388.97 92.13 388.97 94.22Q388.97 98.69 386.15 101.34Q383.33 104.00 378.27 104.00ZM367.12 101.24L378.06 101.24Q381.72 101.24 383.85 99.35Q385.98 97.47 385.98 94.27Q385.98 91.07 383.88 89.17Q381.79 87.26 378.29 87.26L367.12 87.26ZM367.12 84.56L377.97 84.56Q380.99 84.56 382.79 82.86Q384.60 81.16 384.60 78.40Q384.60 75.62 382.83 74.05Q381.05 72.49 377.97 72.49L367.12 72.49ZM405.42 104.00L405.42 69.73L427.04 69.73L427.04 72.49L408.41 72.49L408.41 85.44L426.12 85.44L426.12 88.20L408.41 88.20L408.41 101.24L427.04 101.24L427.04 104.00ZM443.00 104.00L443.00 69.73L445.99 69.73L445.99 85.32L465.31 85.32L465.31 69.73L468.30 69.73L468.30 104.00L465.31 104.00L465.31 88.08L445.99 88.08L445.99 104.00ZM486.27 104.00L486.27 69.73L507.89 69.73L507.89 72.49L489.26 72.49L489.26 85.44L506.97 85.44L506.97 88.20L489.26 88.20L489.26 101.24L507.89 101.24L507.89 104.00ZM523.85 104.00L523.85 69.73L545.47 69.73L545.47 72.49L526.84 72.49L526.84 85.44L544.55 85.44L544.55 88.20L526.84 88.20L526.84 101.24L545.47 101.24L545.47 104.00ZM561.42 104.00L561.42 69.73L572.92 69.73Q576.21 69.73 578.69 71.03Q581.17 72.33 582.57 74.67Q583.96 77.02 583.96 80.10Q583.96 83.78 581.97 86.38Q579.98 88.98 576.60 89.95L584.69 104.00L581.17 104.00L572.64 89.00L575.13 90.43L564.41 90.43L564.41 104.00ZM564.41 87.67L573.01 87.67Q575.38 87.67 577.16 86.73Q578.94 85.78 579.96 84.06Q580.97 82.33 580.97 80.06Q580.97 77.76 579.97 76.07Q578.97 74.38 577.17 73.43Q575.38 72.49 573.01 72.49L564.41 72.49Z"></path><path d="M245.88 168.55Q242.21 168.55 239.09 167.22Q235.96 165.90 233.65 163.51Q231.33 161.12 230.04 157.90Q228.74 154.68 228.74 150.85Q228.74 147.02 230.02 143.79Q231.29 140.55 233.61 138.17Q235.93 135.80 239.05 134.49Q242.17 133.18 245.88 133.18Q249.55 133.18 252.47 134.42Q255.39 135.66 257.42 137.70Q259.45 139.74 260.31 142.18L254.72 144.84Q253.74 142.23 251.44 140.55Q249.14 138.87 245.88 138.87Q242.66 138.87 240.20 140.39Q237.73 141.91 236.37 144.59Q235.01 147.27 235.01 150.85Q235.01 154.43 236.37 157.13Q237.73 159.84 240.20 161.35Q242.66 162.86 245.88 162.86Q249.14 162.86 251.44 161.19Q253.74 159.51 254.72 156.90L260.31 159.56Q259.45 161.99 257.42 164.03Q255.39 166.07 252.47 167.31Q249.55 168.55 245.88 168.55ZM291.05 168.55Q287.26 168.55 284.00 167.22Q280.74 165.90 278.30 163.49Q275.87 161.09 274.50 157.86Q273.13 154.64 273.13 150.84Q273.13 147.05 274.49 143.82Q275.84 140.60 278.27 138.21Q280.70 135.82 283.96 134.50Q287.22 133.18 291.05 133.18Q294.88 133.18 298.14 134.51Q301.40 135.83 303.83 138.22Q306.27 140.61 307.62 143.83Q308.97 147.05 308.97 150.84Q308.97 154.64 307.60 157.86Q306.23 161.09 303.80 163.49Q301.37 165.90 298.11 167.22Q294.85 168.55 291.05 168.55ZM291.05 162.86Q293.56 162.86 295.67 161.96Q297.79 161.07 299.38 159.45Q300.96 157.83 301.83 155.64Q302.70 153.44 302.70 150.84Q302.70 148.25 301.83 146.08Q300.96 143.90 299.38 142.26Q297.79 140.63 295.67 139.75Q293.56 138.87 291.05 138.87Q288.54 138.87 286.43 139.75Q284.31 140.63 282.73 142.26Q281.14 143.90 280.27 146.08Q279.40 148.25 279.40 150.84Q279.40 153.44 280.27 155.64Q281.14 157.83 282.73 159.45Q284.31 161.07 286.43 161.96Q288.56 162.86 291.05 162.86ZM323.31 168.00L323.31 133.73L329.58 133.73L329.58 162.48L344.24 162.48L344.24 168.00ZM357.07 168.00L357.07 133.73L363.34 133.73L363.34 162.48L378.00 162.48L378.00 168.00ZM390.82 168.00L390.82 133.73L413.63 133.73L413.63 139.25L397.09 139.25L397.09 148.06L412.71 148.06L412.71 153.58L397.09 153.58L397.09 162.48L413.63 162.48L413.63 168.00ZM443.08 168.55Q439.41 168.55 436.29 167.22Q433.17 165.90 430.85 163.51Q428.53 161.12 427.24 157.90Q425.95 154.68 425.95 150.85Q425.95 147.02 427.22 143.79Q428.50 140.55 430.82 138.17Q433.13 135.80 436.26 134.49Q439.38 133.18 443.08 133.18Q446.75 133.18 449.67 134.42Q452.59 135.66 454.62 137.70Q456.65 139.74 457.51 142.18L451.93 144.84Q450.95 142.23 448.65 140.55Q446.35 138.87 443.08 138.87Q439.86 138.87 437.40 140.39Q434.94 141.91 433.58 144.59Q432.21 147.27 432.21 150.85Q432.21 154.43 433.58 157.13Q434.94 159.84 437.40 161.35Q439.86 162.86 443.08 162.86Q446.35 162.86 448.65 161.19Q450.95 159.51 451.93 156.90L457.51 159.56Q456.65 161.99 454.62 164.03Q452.59 166.07 449.67 167.31Q446.75 168.55 443.08 168.55ZM477.46 168.00L477.46 139.25L468.57 139.25L468.57 133.73L492.49 133.73L492.49 139.25L483.73 139.25L483.73 168.00ZM505.06 168.00L505.06 133.73L511.33 133.73L511.33 168.00ZM526.68 168.00L526.68 133.73L549.49 133.73L549.49 139.25L532.95 139.25L532.95 148.06L548.57 148.06L548.57 153.58L532.95 153.58L532.95 162.48L549.49 162.48L549.49 168.00ZM562.82 168.00L562.82 133.73L585.71 133.73L585.71 139.25L569.09 139.25L569.09 148.75L583.64 148.75L583.64 154.27L569.09 154.27L569.09 168.00Z"></path></g></svg>
+    <div class="kop__tekst">
+      <span class="vbc-label kop__label"><span>Meekijken</span><i class="vbc-streep" aria-hidden="true"></i><span class="sr"> / </span><span>Simulatie</span></span>
+      <h1>Zo loopt het werk voor uw VvE.</h1>
+      <p class="inleiding">Een melding, een factuur, een ledenvergadering. U ziet waar het binnenkomt, wie het oppakt en waar het wacht.</p>
+    </div>
+    <div class="kader">
+      <svg class="kader__lijn" viewBox="0 0 100 140" preserveAspectRatio="none" aria-hidden="true"><path d="M0 140 V50 L50 0 L100 50 V140" vector-effect="non-scaling-stroke"/></svg>
+      <div class="kader__inhoud">
+        <span class="vbc-label">Afgerond</span>
+        <span class="cijfer" id="cijfer-klaar">0</span>
+        <span class="kader__noot">zaken</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="in">
+
+  <section class="bed" aria-label="Bediening van de simulatie">
+    <div class="bed__rij">
+      <button class="vbc-knop" id="speel" type="button">Pauzeer</button>
+      <div class="bed__groep">
+        <span class="vbc-label"><span id="klok-week">Week 1</span><i class="vbc-streep" aria-hidden="true"></i><span class="sr"> / </span><span id="klok-dag">Maandag</span></span>
+        <span class="klok__tijd" id="klok-tijd">09:00</span>
+      </div>
+      <div class="bed__groep" role="radiogroup" aria-labelledby="tempo-label">
+        <span class="vbc-label" id="tempo-label">Tempo</span>
+        <div class="seg">
+          <label><input type="radio" name="tempo" id="tempo-1" value="1" checked><span>1×</span></label>
+          <label><input type="radio" name="tempo" id="tempo-2" value="2"><span>2×</span></label>
+          <label><input type="radio" name="tempo" id="tempo-4" value="4"><span>4×</span></label>
+        </div>
+      </div>
+      <div class="bed__groep">
+        <label class="vbc-label" for="drukte">Drukte</label>
+        <div class="schuif__rij">
+          <input type="range" id="drukte" min="1" max="4" step="1" value="2">
+          <output id="drukte-uit" for="drukte">Gewoon</output>
+        </div>
+      </div>
+      <button class="knop-rand" id="storm" type="button">Simuleer een storm</button>
+      <button class="knop-tekst" id="opnieuw" type="button">Begin opnieuw</button>
+    </div>
+    <p class="bed__tip">Probeer het uit: zet de bezetting van Techniek op krap en simuleer een storm. Spoed gaat dan voor, de rest wacht.</p>
+  </section>
+
+  <div class="werk">
+
+    <section class="bordkol" aria-label="Het bord">
+      <div class="bord" id="bord">
+
+        <div class="kol kol--binnen">
+          <h2 class="kolkop"><span class="vbc-label">Binnen</span><span class="kolkop__tel" id="tel-binnen"></span></h2>
+          <div class="zone" data-zone="binnen" data-soort="vrij"></div>
+          <ul class="kanalen">
+            <li><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H16V21H8ZM11 18h2"/></svg><span>Telefoon<small id="tel-open">tot 13:00</small></span></li>
+            <li><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6H20V18H4ZM4 6L12 14L20 6"/></svg><span>E-mail</span></li>
+            <li><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4H19V20H14M4 12H14M10 8L14 12L10 16"/></svg><span>Portaal</span></li>
+          </ul>
+        </div>
+
+        <div class="kol kol--kantoor">
+          <h2 class="kolkop"><span class="vbc-label">Op kantoor</span><span class="kolkop__tel" id="tel-kantoor"></span></h2>
+
+          <div class="bureau" data-bureau="adm">
+            <div class="bureau__kop">
+              <h3 class="bureau__naam">Administratie</h3>
+              <span class="bureau__stand" id="stand-adm"></span>
+              <span class="vbc-status vbc-status--actie" id="vol-adm" hidden>Wachtrij loopt op</span>
+              <span class="bureau__bez"><label for="bez-adm">Bezetting</label><input type="range" id="bez-adm" min="1" max="3" step="1" value="2"><output id="bez-adm-uit" for="bez-adm">Normaal</output></span>
+            </div>
+            <div class="bureau__zones">
+              <div><span class="vbc-label zonelabel">Wacht</span><div class="zone zone--rij" data-zone="adm.q" data-soort="rij"></div></div>
+              <div><span class="vbc-label zonelabel">Loopt</span><div class="zone zone--plek" data-zone="adm.a" data-soort="plek"></div></div>
+            </div>
+          </div>
+
+          <div class="bureau" data-bureau="fin">
+            <div class="bureau__kop">
+              <h3 class="bureau__naam">Financiën</h3>
+              <span class="bureau__stand" id="stand-fin"></span>
+              <span class="vbc-status vbc-status--actie" id="vol-fin" hidden>Wachtrij loopt op</span>
+              <span class="bureau__bez"><label for="bez-fin">Bezetting</label><input type="range" id="bez-fin" min="1" max="3" step="1" value="2"><output id="bez-fin-uit" for="bez-fin">Normaal</output></span>
+            </div>
+            <div class="bureau__zones">
+              <div><span class="vbc-label zonelabel">Wacht</span><div class="zone zone--rij" data-zone="fin.q" data-soort="rij"></div></div>
+              <div><span class="vbc-label zonelabel">Loopt</span><div class="zone zone--plek" data-zone="fin.a" data-soort="plek"></div></div>
+            </div>
+          </div>
+
+          <div class="bureau" data-bureau="tec">
+            <div class="bureau__kop">
+              <h3 class="bureau__naam">Techniek</h3>
+              <span class="bureau__stand" id="stand-tec"></span>
+              <span class="vbc-status vbc-status--actie" id="vol-tec" hidden>Wachtrij loopt op</span>
+              <span class="bureau__bez"><label for="bez-tec">Bezetting</label><input type="range" id="bez-tec" min="1" max="3" step="1" value="2"><output id="bez-tec-uit" for="bez-tec">Normaal</output></span>
+            </div>
+            <div class="bureau__zones">
+              <div><span class="vbc-label zonelabel">Wacht</span><div class="zone zone--rij" data-zone="tec.q" data-soort="rij"></div></div>
+              <div><span class="vbc-label zonelabel">Loopt</span><div class="zone zone--plek" data-zone="tec.a" data-soort="plek"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="kol kol--buiten">
+          <h2 class="kolkop"><span class="vbc-label">Buiten de deur</span><span class="kolkop__tel" id="tel-buiten"></span></h2>
+          <div class="ext ext--lev"><span class="vbc-label zonelabel">Bij de leverancier</span><div class="zone" data-zone="lev" data-soort="vrij"></div></div>
+          <div class="ext"><span class="vbc-label zonelabel">Bij het bestuur</span><div class="zone" data-zone="bes" data-soort="vrij"></div></div>
+          <div class="ext"><span class="vbc-label zonelabel">Wacht op vergadering</span><div class="zone" data-zone="alv" data-soort="vrij"></div></div>
+        </div>
+
+        <div class="kol kol--klaar">
+          <h2 class="kolkop"><span class="vbc-label">Afgerond</span><span class="kolkop__tel" id="tel-klaar"></span></h2>
+          <div class="zone" data-zone="klaar" data-soort="klaar"></div>
+        </div>
+
+        <div class="items" id="items" role="group" aria-label="Zaken op het bord"></div>
+      </div>
+
+      <ul class="legenda" aria-label="Legenda">
+        <li><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3L18 9V16L15 19H9L6 16V9Z"/></svg>Melding</li>
+        <li><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3H18V20L16 18L14 20L12 18L10 20L8 18L6 20ZM9 8h6M9 11h6M9 14h4"/></svg>Factuur</li>
+        <li><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5H20V16H11L7 20V16H4Z"/></svg>Vraag van een eigenaar</li>
+        <li><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 14H21M5 14V20M19 14V20M5 7h3.5v3.5H5ZM10.25 7h3.5v3.5h-3.5ZM15.5 7h3.5v3.5h-3.5Z"/></svg>Ledenvergadering</li>
+        <li><svg class="ico is-wacht" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3L18 9V16L15 19H9L6 16V9Z"/></svg>Wacht</li>
+        <li><svg class="ico is-loopt" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3L18 9V16L15 19H9L6 16V9Z"/></svg>Loopt</li>
+        <li><span class="legenda__spoed"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3L18 9V16L15 19H9L6 16V9Z"/></svg></span>Spoed gaat voor</li>
+      </ul>
+    </section>
+
+    <aside class="volg" aria-label="De zaak die u volgt">
+      <div class="volg__inhoud" id="volg"></div>
+      <button class="knop-tekst knop-tekst--pijl" id="ander" type="button">Volg een andere zaak</button>
+    </aside>
+
+    <section class="net" aria-labelledby="net-kop">
+      <h2 class="kop-3" id="net-kop">Net gebeurd</h2>
+      <ol class="feed" id="feed"></ol>
+    </section>
+
+  </div>
+
+  <section class="wat" aria-labelledby="wat-kop">
+    <h2 class="kop-2" id="wat-kop">Wat wij voor u doen</h2>
+    <div class="vbc-drie">
+      <div class="vbc-drie__item">
+        <span class="vbc-label">Administratie</span>
+        <h3 class="vbc-drie__kop">Administratief beheer</h3>
+        <p class="vbc-drie__tekst">Wij organiseren de algemene ledenvergadering (ALV), stellen de notulen op en houden het eigenaarsregister bij.</p>
+        <p class="vbc-drie__sim"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 14H21M5 14V20M19 14V20M5 7h3.5v3.5H5ZM10.25 7h3.5v3.5h-3.5ZM15.5 7h3.5v3.5h-3.5Z"/></svg>In de simulatie: de ledenvergadering en vragen van eigenaren.</p>
+      </div>
+      <div class="vbc-drie__item">
+        <span class="vbc-label">Financiën</span>
+        <h3 class="vbc-drie__kop">Financieel beheer</h3>
+        <p class="vbc-drie__tekst">Wij voeren de boekhouding en het debiteurenbeheer, beheren het reservefonds en stellen de jaarstukken op.</p>
+        <p class="vbc-drie__sim"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3H18V20L16 18L14 20L12 18L10 20L8 18L6 20ZM9 8h6M9 11h6M9 14h4"/></svg>In de simulatie: facturen, de begroting en vragen over de bijdrage.</p>
+      </div>
+      <div class="vbc-drie__item">
+        <span class="vbc-label">Techniek</span>
+        <h3 class="vbc-drie__kop">Technisch beheer</h3>
+        <p class="vbc-drie__tekst">Wij coördineren het dagelijks onderhoud, handelen schade af en voeren het meerjarenonderhoudsplan (MJOP) uit.</p>
+        <p class="vbc-drie__sim"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3L18 9V16L15 19H9L6 16V9Z"/></svg>In de simulatie: meldingen, offertes en opdrachten aan leveranciers.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer class="voet">
+    <p><b>Over deze simulatie.</b> Dit is een vereenvoudigd model van ons werk. De verenigingen, onderwerpen, bedragen en doorlooptijden zijn verzonnen. U kunt er geen termijnen aan ontlenen.</p>
+    <p class="voet__contact">VvE Beheer Collectief / 085 800 06 05, op werkdagen van 09:00 tot 13:00 / info@vvebeheercollectief.nl</p>
+  </footer>
+
+</main>
+
+<script>
+(function(){
+'use strict';
+
+/* ═══════ Het model: rekent alleen en raakt het scherm niet ═══════
+   De tijd loopt in werkminuten. Eén dag is 480 minuten (09:00 tot 17:00); nachten en weekenden
+   slaat het model over. Elke zaak volgt een vaste reeks stappen. Een stap ligt bij een bureau
+   (wachtrij, daarna een vrije plek) of buiten de deur (leverancier, bestuur, vergadering). */
+const DAG = 480;
+const BUREAUS = ['adm', 'fin', 'tec'];
+const NAAM = { adm: 'Administratie', fin: 'Financiën', tec: 'Techniek' };
+
+const VVES = ['VvE De Meidoorn', 'VvE Het Molenerf', 'VvE De Waterlelie', 'VvE Duinroos', 'VvE Het Kompas',
+  'VvE Zilvermeeuw', 'VvE De Vuurtoren', 'VvE Het Anker', 'VvE Korenbloem', 'VvE De Sterrenwacht',
+  'VvE Het Wilgenhof', 'VvE De Zeilmaker'];
+const MELDING = {
+  spoed: [['Lekkage dak', 'de dakdekker'], ['Lekkage in het trappenhuis', 'de loodgieter'], ['Liftstoring', 'het liftbedrijf'],
+    ['Voordeur sluit niet', 'de slotenmaker'], ['Verstopte standleiding', 'de loodgieter']],
+  gewoon: [['Verlichting trappenhuis defect', 'de elektricien'], ['Intercom werkt niet', 'de elektricien'],
+    ['Dakgoot verstopt', 'de dakdekker'], ['Losse tegel bij de entree', 'de stratenmaker'],
+    ['Brievenbus beschadigd', 'de aannemer'], ['Deurdranger defect', 'de aannemer'],
+    ['Graffiti op de gevel', 'het schoonmaakbedrijf']],
+  groot: [['Scheur in het metselwerk', 'de aannemer'], ['Kozijnen toe aan schilderwerk', 'de schilder'],
+    ['Hemelwaterafvoer vervangen', 'de loodgieter'], ['Dakbedekking plaatselijk vernieuwen', 'de dakdekker']],
+  storm: [['Lekkage dak', 'de dakdekker'], ['Losse dakpannen', 'de dakdekker'], ['Dakgoot losgeraakt', 'de dakdekker'],
+    ['Schutting omgewaaid', 'de aannemer'], ['Waterschade in de bergingen', 'de loodgieter']]
+};
+const FACTUUR = ['Schoonmaak trappenhuis', 'Energie algemene ruimten', 'Premie opstalverzekering', 'Onderhoud lift',
+  'Glasbewassing', 'Tuinonderhoud', 'Water algemene ruimten', 'Onderhoud brandmeldinstallatie'];
+const VRAAG = {
+  adm: ['Nieuwe eigenaar inschrijven', 'Vraag over het huishoudelijk reglement', 'Kopie van de notulen',
+    'Adreswijziging eigenaar', 'Vraag over de agenda van de vergadering'],
+  fin: ['Vraag over de voorschotbijdrage', 'Opgave voor de notaris bij verkoop', 'Vraag over de jaarafrekening',
+    'Automatische incasso wijzigen']
+};
+
+const hoofd = s => s.charAt(0).toUpperCase() + s.slice(1);
+const stap = (plek, titel, min, max, log) => ({ plek, titel, duur: [min, max], log });
+
+function routeMelding(vak, soort){
+  const r = [stap('tec', 'Beoordeling van de melding', 15, 30, 'Techniek beoordeelt de melding')];
+  if (soort === 'groot'){
+    r.push(
+      stap('tec', 'Offerteaanvraag bij ' + vak, 12, 24, 'Techniek vraagt een offerte aan bij ' + vak),
+      stap('lev', 'Offerte van ' + vak, 300, 800, hoofd(vak) + ' stelt de offerte op'),
+      stap('tec', 'Voorstel aan het bestuur', 15, 30, 'Techniek legt het voorstel voor aan het bestuur'),
+      stap('bes', 'Akkoord van het bestuur', 200, 800, 'Het bestuur beoordeelt het voorstel'));
+  }
+  const werk = soort === 'spoed' ? [90, 300] : soort === 'groot' ? [480, 1400] : [240, 900];
+  r.push(
+    stap('tec', 'Opdracht aan ' + vak, 12, 24, 'Techniek verstrekt de opdracht aan ' + vak),
+    stap('lev', 'Uitvoering door ' + vak, werk[0], werk[1], hoofd(vak) + ' voert het werk uit'),
+    stap('tec', 'Controle van het werk', 12, 24, 'Techniek controleert het werk en informeert de eigenaar'),
+    stap('fin', 'Controle van de factuur', 10, 18, 'Financiën controleert de factuur'),
+    stap('fin', 'Betaling en boeking', 6, 12, 'Financiën betaalt en boekt de factuur'));
+  return r;
+}
+const routeFactuur = () => [
+  stap('fin', 'Controle van de factuur', 10, 18, 'Financiën controleert de factuur'),
+  stap('fin', 'Betaling en boeking', 6, 12, 'Financiën betaalt en boekt de factuur')];
+const routeAlv = () => [
+  stap('adm', 'Agenda en stukken klaarzetten', 70, 110, 'Administratie zet de agenda en de stukken klaar'),
+  stap('fin', 'Begroting en jaarstukken', 80, 130, 'Financiën stelt de begroting en de jaarstukken op'),
+  stap('bes', 'Afstemming met het bestuur', 200, 600, 'Het bestuur bekijkt de agenda en de stukken'),
+  stap('adm', 'Uitnodiging aan de eigenaren', 20, 40, 'Administratie verstuurt de uitnodiging'),
+  stap('alv', 'Vergadering', 480, 1200, 'De uitnodiging is verstuurd, de vergadering volgt'),
+  stap('adm', 'Notulen', 90, 140, 'Administratie werkt de notulen uit')];
+
+function maakSim(zaad){
+  let s = zaad >>> 0;
+  function rnd(){                       // mulberry32: herhaalbaar bij hetzelfde zaad
+    s = (s + 0x6D2B79F5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+  const kies = a => a[Math.floor(rnd() * a.length)];
+  const tussen = (a, b) => Math.round(a + rnd() * (b - a));
+
+  const S = {
+    t: 0, nr: 0, items: [], klaar: [],
+    bureaus: {
+      adm: { rij: [], plek: [null, null, null], cap: 2 },
+      fin: { rij: [], plek: [null, null, null], cap: 2 },
+      tec: { rij: [], plek: [null, null, null], cap: 2 }
+    },
+    drukte: 1, storm: 0, nBinnen: 0, nKlaar: 0, log: [], logNr: 0
+  };
+
+  function schrijf(it, tekst, sub){
+    S.log.unshift({ n: ++S.logNr, t: S.t, id: it ? it.id : null, tekst, sub: it ? it.titel + ' · ' + it.vve : (sub || '') });
+    if (S.log.length > 12) S.log.pop();
+  }
+
+  function nieuw(soort, storm){
+    const ochtend = S.t % DAG < 240;    // de telefoon is open tot 13:00
+    const kanaal = () => kies(ochtend ? ['Telefonisch', 'Telefonisch', 'Per e-mail', 'Via het portaal'] : ['Per e-mail', 'Per e-mail', 'Via het portaal']);
+    const it = { id: ++S.nr, soort, vve: kies(VVES), titel: '', via: null, spoed: false, bedrag: null, stappen: null,
+      i: -1, staat: 'binnen', zone: 'binnen', plek: null, rest: tussen(12, 26), duur: 1, sinds: S.t,
+      tBinnen: S.t, tKlaar: null, tijden: [] };
+    if (soort === 'melding'){
+      const groep = storm ? 'storm' : rnd() < .22 ? 'spoed' : rnd() < .25 ? 'groot' : 'gewoon';
+      const keus = kies(MELDING[groep]);
+      it.titel = keus[0];
+      it.spoed = groep === 'spoed' || (groep === 'storm' && rnd() < .6);
+      it.stappen = routeMelding(keus[1], it.spoed ? 'spoed' : groep === 'groot' ? 'groot' : 'gewoon');
+      it.via = kanaal();
+    } else if (soort === 'factuur'){
+      it.titel = kies(FACTUUR);
+      it.bedrag = tussen(90, 2600) + kies([0, 0, .25, .5, .95]);
+      it.stappen = routeFactuur();
+      it.via = kies(['Per e-mail', 'Per e-mail', 'Per post']);
+    } else if (soort === 'vraag'){
+      const b = rnd() < .7 ? 'adm' : 'fin';
+      it.titel = kies(VRAAG[b]);
+      it.stappen = [stap(b, 'Beantwoording van de vraag', 12, 28, NAAM[b] + ' beantwoordt de vraag')];
+      it.via = kanaal();
+    } else {
+      it.titel = 'Ledenvergadering';
+      it.stappen = routeAlv();
+    }
+    S.items.push(it);
+    S.nBinnen++;
+    if (it.spoed) schrijf(it, 'Spoedmelding ' + it.via.toLowerCase() + ' binnengekomen');
+    return it;
+  }
+
+  function laatLos(it, vorige){
+    if (vorige && NAAM[vorige.plek] && it.plek != null){
+      S.bureaus[vorige.plek].plek[it.plek] = null;
+      it.plek = null;
+    }
+  }
+  function start(it, st){
+    it.staat = 'loopt'; it.zone = st.plek + '.a';
+    it.rest = it.duur = tussen(st.duur[0], st.duur[1]);
+    it.sinds = S.t;
+    schrijf(it, st.log);
+  }
+  // De huidige stap is af: door naar de volgende plek.
+  function verder(it){
+    const vorige = it.i >= 0 ? it.stappen[it.i] : null;
+    if (vorige) it.tijden[it.i] = S.t;
+    it.i++;
+    const st = it.stappen[it.i];
+    if (!st){
+      laatLos(it, vorige);
+      it.staat = 'klaar'; it.zone = 'klaar'; it.tKlaar = S.t; it.sinds = S.t;
+      S.nKlaar++;
+      S.klaar.unshift(it);
+      schrijf(it, 'Afgerond');
+      if (S.klaar.length > 24){
+        const oud = S.klaar.pop();
+        const k = S.items.indexOf(oud);
+        if (k >= 0) S.items.splice(k, 1);
+      }
+      return;
+    }
+    if (NAAM[st.plek]){
+      if (vorige && vorige.plek === st.plek && it.plek != null){ start(it, st); return; }  // zelfde bureau: houdt de plek
+      laatLos(it, vorige);
+      it.staat = 'wacht'; it.zone = st.plek + '.q'; it.sinds = S.t;
+      S.bureaus[st.plek].rij.push(it);
+    } else {
+      laatLos(it, vorige);
+      it.staat = 'buiten'; it.zone = st.plek;
+      it.rest = it.duur = tussen(st.duur[0], st.duur[1]);
+      it.sinds = S.t;
+      schrijf(it, st.log);
+    }
+  }
+  // Vrije plekken vullen: spoed gaat voor, daarna wie het langst wacht.
+  function vul(k){
+    const b = S.bureaus[k];
+    while (b.rij.length && b.plek.filter(Boolean).length < b.cap){
+      let best = 0;
+      for (let j = 1; j < b.rij.length; j++){
+        const a = b.rij[j], c = b.rij[best];
+        if ((a.spoed && !c.spoed) || (a.spoed === c.spoed && a.sinds < c.sinds)) best = j;
+      }
+      const it = b.rij.splice(best, 1)[0];
+      it.plek = b.plek.indexOf(null);
+      b.plek[it.plek] = it;
+      start(it, it.stappen[it.i]);
+    }
+  }
+
+  function tik(){
+    S.t++;
+    const f = S.drukte * (S.t % DAG < 240 ? 1.3 : .7) / DAG;   // 's ochtends komt er meer binnen
+    if (rnd() < 6 * f) nieuw('melding');
+    if (rnd() < 6 * f) nieuw('factuur');
+    if (rnd() < 8.5 * f) nieuw('vraag');
+    if (rnd() < 1 * f) nieuw('alv');
+    if (S.storm > 0 && rnd() < .14){ S.storm--; nieuw('melding', true); }
+
+    for (const it of S.items.slice()){
+      if ((it.staat === 'binnen' || it.staat === 'buiten') && --it.rest <= 0) verder(it);
+    }
+    for (const k of BUREAUS){
+      const b = S.bureaus[k];
+      for (let i = 0; i < 3; i++){
+        const it = b.plek[i];
+        if (it && --it.rest <= 0) verder(it);
+      }
+    }
+    for (const k of BUREAUS) vul(k);
+  }
+
+  return {
+    S, tik,
+    storm(){ S.storm += 12; schrijf(null, 'Storm boven de regio', 'In korte tijd komen er veel meldingen binnen'); },
+    vind(id){ return S.items.find(it => it.id === id) || null; }
+  };
+}
+
+/* === scherm === */
+if (typeof document === 'undefined') return;
+document.documentElement.lang = 'nl';
+
+const $ = id => document.getElementById(id);
+const NS = 'http://www.w3.org/2000/svg';
+const P = 26;
+const MINUTEN_PER_SECONDE = 6;          // bij tempo 1×: een werkdag duurt 80 seconden
+const DAGEN = ['Maandag', 'Dinsdag', 'Woensdag', 'Donderdag', 'Vrijdag'];
+const ICOON = {
+  melding: 'M12 3L18 9V16L15 19H9L6 16V9Z',
+  factuur: 'M6 3H18V20L16 18L14 20L12 18L10 20L8 18L6 20ZM9 8h6M9 11h6M9 14h4',
+  vraag: 'M4 5H20V16H11L7 20V16H4Z',
+  alv: 'M3 14H21M5 14V20M19 14V20M5 7h3.5v3.5H5ZM10.25 7h3.5v3.5h-3.5ZM15.5 7h3.5v3.5h-3.5Z'
+};
+const SOORT = { melding: 'Melding', factuur: 'Factuur', vraag: 'Vraag', alv: 'Ledenvergadering' };
+const DRUKTE = [['Rustig', .6], ['Gewoon', 1], ['Druk', 1.6], ['Zeer druk', 2.3]];
+const BEZETTING = ['Krap', 'Normaal', 'Ruim'];
+const REIS = { 1: '.7s', 2: '.45s', 4: '.28s' };
+
+const bord = $('bord'), laag = $('items'), volgEl = $('volg'), feedEl = $('feed');
+const zones = [], zoneBij = {};
+for (const el of bord.querySelectorAll('.zone')){
+  const z = { naam: el.dataset.zone, soort: el.dataset.soort, el, lijst: [], x: 0, y: 0, w: 0, h: 0, meer: null, slots: [] };
+  if (z.soort === 'plek'){
+    for (let i = 0; i < 3; i++){
+      const sl = document.createElement('span');
+      sl.className = 'slot'; sl.style.left = (i * P + 1) + 'px';
+      el.appendChild(sl); z.slots.push(sl);
+    }
+  } else if (z.soort !== 'klaar'){
+    z.meer = document.createElement('span');
+    z.meer.className = 'meer'; z.meer.hidden = true;
+    el.appendChild(z.meer);
+  }
+  zones.push(z); zoneBij[z.naam] = z;
+}
+
+let sim, volgId = null, volgSig = '', feedNr = -1, klaarSinds = 0;
+let loopt = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+let tempo = 1, acc = 0, vorige = 0, vuil = true;
+const els = new Map();
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const tekst = (el, s) => { if (el._t !== s){ el._t = s; el.textContent = s; } };
+const euro = n => '€ ' + n.toLocaleString('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const zaken = n => n === 1 ? '1 zaak' : n + ' zaken';
+function uur(t){ const m = t % DAG; return String(9 + Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); }
+function wanneer(t){ return DAGEN[Math.floor(t / DAG) % 5].slice(0, 2).toLowerCase() + ' ' + uur(t); }
+
+function maakEl(it){
+  const el = document.createElement('button');
+  el.type = 'button'; el.className = 'it'; el.tabIndex = -1; el.dataset.id = it.id;
+  if (it.spoed) el.dataset.spoed = '';
+  el.title = it.titel + ' · ' + it.vve;
+  el.setAttribute('aria-label', SOORT[it.soort] + ': ' + it.titel + ', ' + it.vve);
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('class', 'ico'); svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true');
+  const pad = document.createElementNS(NS, 'path');
+  pad.setAttribute('d', ICOON[it.soort]);
+  svg.appendChild(pad);
+  const vg = document.createElement('i');
+  vg.className = 'it__vg';
+  el.append(svg, vg);
+  els.set(it.id, el);
+  laag.appendChild(el);
+  return el;
+}
+function zet(el, it, x, y, weg){
+  x = Math.round(x); y = Math.round(y);
+  if (el._x !== x || el._y !== y){ el._x = x; el._y = y; el.style.transform = 'translate(' + x + 'px,' + y + 'px)'; }
+  if (el._s !== it.staat){ el._s = it.staat; el.dataset.staat = it.staat; }
+  if (el._w !== weg){ el._w = weg; el.classList.toggle('is-uit', weg); }
+  const v = it.id === volgId;
+  if (el._v !== v){ el._v = v; el.classList.toggle('is-volg', v); }
+  if (it.staat === 'loopt') el.style.setProperty('--vg', (1 - it.rest / it.duur).toFixed(3));
+}
+
+// Welke zaak volgen we? Vanzelf: de nieuwste melding die net begint, spoed eerst.
+function kiesVolg(anders){
+  const huidig = sim.vind(volgId);
+  let kand = sim.S.items.filter(it => it.staat !== 'klaar' && it.id !== volgId);
+  if (!kand.length) return volgId;
+  if (anders){
+    const andere = kand.filter(it => !huidig || it.soort !== huidig.soort);
+    if (andere.length) kand = andere;
+    return kand[Math.floor(Math.random() * kand.length)].id;
+  }
+  const vers = kand.filter(it => it.soort === 'melding' && it.i <= 1);
+  const spoed = vers.filter(it => it.spoed);
+  const keus = spoed.length ? spoed : vers.length ? vers : kand;
+  return keus[keus.length - 1].id;
+}
+function volg(id){ volgId = id; klaarSinds = 0; volgSig = ''; vuil = true; }
+
+function standVan(it){
+  const st = it.stappen[it.i];
+  if (it.staat === 'binnen') return ['open', 'Nieuw binnen'];
+  if (it.staat === 'wacht') return ['wacht', 'Wacht bij ' + NAAM[st.plek]];
+  if (it.staat === 'loopt') return ['loopt', 'Loopt bij ' + NAAM[st.plek]];
+  if (it.staat === 'klaar') return ['klaar', 'Afgerond'];
+  return ['wacht', st.plek === 'lev' ? 'Bij de leverancier' : st.plek === 'bes' ? 'Bij het bestuur' : 'Wacht op de vergadering'];
+}
+function nuTekst(it){
+  const st = it.stappen[it.i];
+  if (it.staat === 'wacht') return 'Wacht bij ' + NAAM[st.plek] + ' sinds ' + wanneer(it.sinds);
+  if (it.staat === 'loopt') return 'Loopt nu bij ' + NAAM[st.plek];
+  if (st.plek === 'lev') return 'Loopt sinds ' + wanneer(it.sinds);
+  if (st.plek === 'bes') return 'Bij het bestuur sinds ' + wanneer(it.sinds);
+  return 'Uitnodiging verstuurd, de vergadering volgt';
+}
+function tekenVolg(it){
+  const stand = standVan(it);
+  const sub = [it.vve, it.spoed ? 'spoed' : '', it.bedrag ? 'factuur van ' + euro(it.bedrag) : ''].filter(Boolean).join(' · ');
+  const rijen = [{ titel: it.via ? it.via + ' binnengekomen' : 'Voorbereiding gestart', s: it.i < 0 ? 'nu' : 'klaar', tijd: hoofd(wanneer(it.tBinnen)) }];
+  it.stappen.forEach((st, j) => rijen.push({
+    titel: st.titel,
+    s: j < it.i ? 'klaar' : j === it.i ? 'nu' : 'later',
+    tijd: j < it.i ? hoofd(wanneer(it.tijden[j])) : j === it.i ? nuTekst(it) : ''
+  }));
+  rijen.push({ titel: 'Afgerond', s: it.staat === 'klaar' ? 'klaar' : 'later', tijd: it.staat === 'klaar' ? hoofd(wanneer(it.tKlaar)) : '' });
+  volgEl.innerHTML =
+    '<span class="vbc-label"><span>U volgt</span><i class="vbc-streep" aria-hidden="true"></i><span class="sr"> / </span><span>' + SOORT[it.soort] + '</span></span>' +
+    '<h2 class="volg__titel">' + esc(it.titel) + '</h2>' +
+    '<p class="volg__sub">' + esc(sub) + '</p>' +
+    '<p class="volg__stand"><span class="vbc-status vbc-status--' + stand[0] + '">' + esc(stand[1]) + '</span></p>' +
+    '<ol class="vbc-tijdlijn">' + rijen.map(r =>
+      '<li class="vbc-tijdlijn__stap vbc-tijdlijn__stap--' + r.s + '"><i aria-hidden="true"></i><div><b>' + esc(r.titel) + '</b>' +
+      (r.tijd ? '<span>' + esc(r.tijd) + '</span>' : '') + '</div></li>').join('') + '</ol>';
+}
+function tekenFeed(S){
+  feedEl.innerHTML = S.log.slice(0, 6).map(r => {
+    const binnen = '<span class="feed__t">' + hoofd(wanneer(r.t)) + '</span><span><b>' + esc(r.tekst) + '</b><span class="feed__sub">' + esc(r.sub) + '</span></span>';
+    return r.id != null && sim.vind(r.id)
+      ? '<li><button class="feed__rij" type="button" data-id="' + r.id + '">' + binnen + '</button></li>'
+      : '<li><div class="feed__rij">' + binnen + '</div></li>';
+  }).join('');
+}
+
+function teken(nu){
+  const S = sim.S;
+
+  // 1. Welke zaak volgen we?
+  const vit = sim.vind(volgId);
+  if (!vit) volg(kiesVolg(false));
+  else if (vit.staat === 'klaar' && loopt){
+    if (!klaarSinds) klaarSinds = nu;
+    else if (nu - klaarSinds > 6000) volg(kiesVolg(false));
+  }
+
+  // 2. Meten en verdelen over de plekken op het bord.
+  const b = bord.getBoundingClientRect();
+  for (const z of zones){
+    const r = z.el.getBoundingClientRect();
+    z.x = r.left - b.left; z.y = r.top - b.top; z.w = r.width; z.h = r.height;
+    z.lijst.length = 0;
+  }
+  const gezien = new Set();
+  for (const it of S.items){
+    zoneBij[it.zone].lijst.push(it);
+    gezien.add(it.id);
+    if (!els.has(it.id)) maakEl(it);
+  }
+  for (const [id, el] of els){
+    if (!gezien.has(id)){ els.delete(id); el.classList.add('is-uit'); setTimeout(() => el.remove(), 400); }
+  }
+
+  // 3. Plaatsen.
+  for (const z of zones){
+    const lijst = z.lijst;
+    if (z.soort === 'rij') lijst.sort((a, c) => (c.spoed - a.spoed) || (a.sinds - c.sinds) || (a.id - c.id));
+    else if (z.soort === 'klaar') lijst.sort((a, c) => (c.tKlaar - a.tKlaar) || (c.id - a.id));
+    else if (z.soort === 'vrij') lijst.sort((a, c) => (a.sinds - c.sinds) || (a.id - c.id));
+    const kols = Math.max(1, Math.floor((z.w + 2) / P)), rijen = Math.max(1, Math.floor((z.h + 2) / P));
+    const cap = kols * rijen, vast = z.soort === 'plek';
+    const over = !vast && lijst.length > cap;
+    const zicht = over ? (z.meer ? cap - 1 : cap) : lijst.length;
+    lijst.forEach((it, i) => {
+      const k = vast ? it.plek : Math.min(i, over ? Math.min(zicht, cap - 1) : i);
+      zet(els.get(it.id), it, z.x + (k % kols) * P, z.y + Math.floor(k / kols) * P, !vast && i >= zicht);
+    });
+    if (z.meer){
+      z.meer.hidden = !over;
+      if (over){
+        tekst(z.meer, '+' + (lijst.length - zicht));
+        z.meer.style.transform = 'translate(' + (zicht % kols) * P + 'px,' + Math.floor(zicht / kols) * P + 'px)';
+      }
+    }
+  }
+
+  // 4. Klok, tellers en de stand per bureau.
+  const dag = Math.floor(S.t / DAG);
+  tekst($('klok-week'), 'Week ' + (Math.floor(dag / 5) + 1));
+  tekst($('klok-dag'), DAGEN[dag % 5]);
+  tekst($('klok-tijd'), uur(S.t));
+  tekst($('tel-open'), S.t % DAG < 240 ? 'tot 13:00' : 'weer vanaf 09:00');
+  tekst($('cijfer-klaar'), String(S.nKlaar));
+  tekst($('tel-binnen'), S.nBinnen + ' ontvangen');
+  let opKantoor = 0;
+  for (const k of BUREAUS){
+    const q = S.bureaus[k].rij.length;
+    opKantoor += q + zoneBij[k + '.a'].lijst.length;
+    tekst($('stand-' + k), q === 0 ? 'Geen wachtrij' : q === 1 ? '1 zaak wacht' : q + ' zaken wachten');
+    $('vol-' + k).hidden = q < 8;
+  }
+  tekst($('tel-kantoor'), zaken(opKantoor));
+  tekst($('tel-buiten'), zaken(zoneBij.lev.lijst.length + zoneBij.bes.lijst.length + zoneBij.alv.lijst.length));
+  tekst($('tel-klaar'), zaken(S.nKlaar));
+
+  // 5. De gevolgde zaak en wat er net gebeurde.
+  const it = sim.vind(volgId);
+  if (it){
+    const sig = it.id + '|' + it.i + '|' + it.staat;
+    if (sig !== volgSig){ volgSig = sig; tekenVolg(it); }
+  }
+  if (S.logNr !== feedNr){ feedNr = S.logNr; tekenFeed(S); }
+}
+
+function zetBezetting(k){
+  const v = +$('bez-' + k).value;
+  sim.S.bureaus[k].cap = v;
+  $('bez-' + k + '-uit').textContent = BEZETTING[v - 1];
+  zoneBij[k + '.a'].slots.forEach((sl, i) => { sl.hidden = i >= v; });
+  vuil = true;
+}
+function zetDrukte(){
+  const d = DRUKTE[$('drukte').value - 1];
+  sim.S.drukte = d[1];
+  $('drukte-uit').textContent = d[0];
+}
+function zetSpeel(aan){
+  loopt = aan;
+  $('speel').textContent = loopt ? 'Pauzeer' : 'Ga verder';
+}
+// Nieuw begin. Het model loopt eerst ruim twee werkdagen vooruit, zodat het bord gevuld opent.
+function begin(zaad){
+  sim = maakSim(zaad);
+  zetDrukte();
+  for (const k of BUREAUS) zetBezetting(k);
+  for (let i = 0; i < 1056; i++) sim.tik();
+  for (const el of els.values()) el.remove();
+  els.clear();
+  volgId = null; feedNr = -1; acc = 0;
+  volg(kiesVolg(false));
+}
+
+$('speel').addEventListener('click', () => zetSpeel(!loopt));
+for (const r of document.querySelectorAll('input[name="tempo"]')){
+  r.addEventListener('change', () => { tempo = +r.value; document.documentElement.style.setProperty('--reis', REIS[tempo]); });
+}
+$('drukte').addEventListener('input', zetDrukte);
+for (const k of BUREAUS) $('bez-' + k).addEventListener('input', () => zetBezetting(k));
+$('storm').addEventListener('click', () => { sim.storm(); vuil = true; });
+$('opnieuw').addEventListener('click', () => begin(Date.now() >>> 0));
+$('ander').addEventListener('click', () => volg(kiesVolg(true)));
+laag.addEventListener('click', e => { const el = e.target.closest('.it'); if (el) volg(+el.dataset.id); });
+feedEl.addEventListener('click', e => { const el = e.target.closest('button[data-id]'); if (el && sim.vind(+el.dataset.id)) volg(+el.dataset.id); });
+if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => { vuil = true; }).observe(bord);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { vuil = true; });
+
+begin(20081);
+if (!loopt) $('speel').textContent = 'Start de simulatie';
+
+function beeld(nu){
+  const dt = Math.min(250, nu - vorige);
+  vorige = nu;
+  if (loopt){
+    acc += dt / 1000 * MINUTEN_PER_SECONDE * tempo;
+    let n = 0;
+    while (acc >= 1 && n < 60){ sim.tik(); acc -= 1; n++; }
+    if (n) vuil = true;
+  }
+  if (vuil){ vuil = false; teken(nu); }
+  requestAnimationFrame(beeld);
+}
+teken(performance.now());
+vorige = performance.now();
+requestAnimationFrame(beeld);
+})();
+</script>
+</body>
+</html>

@@ -9,7 +9,7 @@ import { emailHash } from './hash.js';
 
 // ── Versie (zichtbaar in de UI) ────────────────────────────────────────
 // Ophogen bij ELKE wijziging. Zie README voor versie.json (de minimumversie-rem).
-export const APP_VERSION = '16.0';
+export const APP_VERSION = '16.1';
 
 // ── Omgeving (productie vs. testomgeving) ──────────────────────────────
 // Fail-safe: alleen deze exacte hosts zijn PRODUCTIE; al het andere (previews, localhost) draait

@@ -17,6 +17,7 @@ import { goTo, beantwoordBevestiging } from './ui.js';
 import { kiesLijst, ikZelf } from './taken.js';
 import { archiefNaam, blokkenVan } from './alv.js';
 import { zoekVves } from './vve.js';
+import { ACTIE_NAMEN } from './main.js';
 import { NepSheet, ntd, af, alvo, alfa } from '../tools/nepsheet.mjs';
 
 // ── Mini-testkader ──────────────────────────────────────────────────────
@@ -286,6 +287,25 @@ async function draai(){
     gelijk(zoekVves('hofzicht').map(r=>r.code), ['1529'], 'op naam');
     gelijk(zoekVves('hof').map(r=>r.code), ['1042','1529'], 'deel van een naam');
     gelijk(zoekVves('').length, 0, 'leeg = niets');
+  });
+
+  await toets('elke knop is gekoppeld, ook inloggen', async ()=>{
+    ok(!document.querySelector('[data-action]'), 'geen oud attribuut data-action meer');
+    const bekend=new Set(ACTIE_NAMEN);
+    const onbekend=[...new Set([...document.querySelectorAll('[data-actie]')].map(e=>e.dataset.actie))].filter(a=>!bekend.has(a));
+    gelijk(onbekend, [], 'elke data-actie in beeld heeft een handler');
+    // Een klik op de inlogknop moet Google echt om een token vragen.
+    let gevraagd=false;
+    const oudGoogle=window.google;
+    const bewaar={ oauthToken:state.oauthToken, oauthExpiry:state.oauthExpiry, currentUserEmail:state.currentUserEmail, _gsiTokenClient:state._gsiTokenClient };
+    window.google={ accounts:{ oauth2:{ initTokenClient:()=>({ requestAccessToken:()=>{ gevraagd=true; } }) } } };
+    state._gsiTokenClient=null; state._authTimeoutMs=50;
+    $('login-btn').click();
+    await wacht(30);
+    ok(gevraagd, 'inlogknop vraagt Google om een token');
+    await wacht(200);
+    window.google=oudGoogle; Object.assign(state, bewaar); delete state._authTimeoutMs;
+    $('login-error').style.display='none';
   });
 
   goTo('taken');

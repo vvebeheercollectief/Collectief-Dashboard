@@ -55,6 +55,9 @@ const VINKEN = {
   'taak-af':    el=>vinkAf(el.dataset.id),
   'dossier-af': el=>rondAf(el.dataset.sec, el.dataset.sleutel),
 };
+// Voor de zelftest: elke data-actie in de pagina moet hier een handler hebben. (v16.0 begon met een
+// inlogknop die nog het oude attribuut data-action droeg — de klik kwam nergens aan.)
+export const ACTIE_NAMEN = [...Object.keys(ACTIES), ...Object.keys(VINKEN)];
 
 function vangFout(p, wat){
   Promise.resolve(p).catch(e=>console.error('[actie]', wat, e));

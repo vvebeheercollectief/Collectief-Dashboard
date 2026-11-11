@@ -61,7 +61,7 @@ function controleer(map, achtervoegsel, kaalMaken) {
 // functies tegelijk omdat ze van elkaar overgeschreven zijn.
 function vormcontroleGs(wortel) {
   var fouten = [];
-  ['apps-script/', 'apps-script-klaarstaand/'].forEach(function (map) {
+  ['apps-script/'].forEach(function (map) {
     bestanden(wortel + map, '.gs').forEach(function (naam) {
       lees(wortel + map + naam).split('\n').forEach(function (regel, i) {
         if (/^\s*(\/\/|\*)/.test(regel)) return;
@@ -102,7 +102,6 @@ function run() {
   var groepen = [
     { naam: 'frontend (src/)',            map: wortel + 'src/',                    ext: '.js', kaal: true  },
     { naam: 'backend (apps-script/)',      map: wortel + 'apps-script/',            ext: '.gs', kaal: false },
-    { naam: 'klaarstaand (niet uitgerold)', map: wortel + 'apps-script-klaarstaand/', ext: '.gs', kaal: false },
     { naam: 'service worker',              map: wortel,                             ext: 'sw.js', kaal: false },
     { naam: 'sw-strategie',                map: wortel,                             ext: 'sw-strategie.js', kaal: false },
   ];

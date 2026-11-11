@@ -311,6 +311,7 @@ async function draai(){
   goTo('taken');
   state._zelftestLoopt=false;
   window._testFouten=fouten;
+  window._testFails=fouten;   // tools/toetsen.py leest deze naam
   window._testResult=`${pass} PASS, ${fail} FAIL`;
   console.log('Zelftest:', window._testResult);
   const b=document.createElement('div');

@@ -10,7 +10,7 @@ import { fetchSheet, appendRows, batchUpdate, getSheetIds, sheetIdVan, _a1 } fro
 import { schrijf, magSchrijven, conflict, bijNieuweData, loadAll, BEREIK } from './data.js';
 import { alvoStatus, vindAlvoRij, parseAlfa } from './parse.js';
 import { esc, bevat, kortDatum, vandaagSheet, parseDatum } from './util.js';
-import { vraagBevestiging, toast } from './ui.js';
+import { vraagBevestiging, toast, speel } from './ui.js';
 import { ICOON } from './iconen.js';
 
 const $ = id => document.getElementById(id);
@@ -50,8 +50,14 @@ export function wisselVlag(code, veld){
   if(!r || !(veld in ALVO_KOLOM)) return;
   if(!magSchrijven()) return;
   const nieuw=!r[veld];
+  const was=r.status;
   r[veld]=nieuw; r.status=alvoStatus(r);
   tekenAlvo();
+  if(nieuw){
+    const knop=document.querySelector(`#alvo-rijen .vlag[data-code="${CSS.escape(code)}"][data-veld="${veld}"]`);
+    speel(knop, 'pop');
+    if(r.status==='Afgerond' && was!=='Afgerond') speel(knop?.closest('.rij'), 'rij-gloed');
+  }
   schrijf('Vinkje niet opgeslagen', async()=>{
     const row=vindAlvoRij(await fetchSheet(_a1(TAB.ALVO,'A:A')), code);
     if(!row) throw conflict(`VvE ${code} staat niet (of dubbel) in het ALV-overzicht. Er is niets gewijzigd.`);

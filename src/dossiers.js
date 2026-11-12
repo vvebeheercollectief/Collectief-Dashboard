@@ -11,11 +11,14 @@ import { fetchSheet, writeRange, batchUpdate, getSheetIds, sheetIdVan, kapCel, _
 import { schrijf, magSchrijven, conflict, bijNieuweData, BEREIK } from './data.js';
 import { blokken, invoegNa, vindDossier, dossierInhoud, rijInhoud } from './parse.js';
 import { esc, bevat, wanneer, dagenTot, datumSleutel, naarISO, naarSheetDatum, vandaagSheet, nieuwTaakId, leegBijErfenis } from './util.js';
-import { ongedaanBalk, vraagBevestiging, meldFout } from './ui.js';
+import { ongedaanBalk, vraagBevestiging, meldFout, laatVertrekken, zetRijen, speel, LEEG_KLAAR } from './ui.js';
 import { koppelVveVeld, leesVve, zetVve } from './vve.js';
 import { ICOON } from './iconen.js';
 
 const SEC_VAN_PAGINA = { lod:'LOD', subsidie:'SUBSIDIE-TRAJECTEN' };
+const PAGINA_VAN_SEC = { LOD:'lod', 'SUBSIDIE-TRAJECTEN':'subsidie' };
+const rijVan = (sec, sleutel) => document.querySelector(`#${PAGINA_VAN_SEC[sec]}-rijen .rij[data-sleutel="${CSS.escape(sleutel)}"]`);
+const _netLeeg = {};   // per lijst: zojuist leeg geraakt door afronden
 const $ = id => document.getElementById(id);
 const faseNr = woord => { const i=SUBSIDIE_FASES.findIndex(f=>f.toLowerCase()===(woord||'').trim().toLowerCase()); return i<0 ? 1 : i+1; };
 
@@ -35,8 +38,10 @@ export function tekenDossiers(){
     const zicht=lijst.filter(r=>(!f.wie || (r.behandelaar||'').split(/\s*,\s*/).includes(f.wie))
                                && bevat(q, r.code, r.naam, r[SECS[sec].omschrijving], r.status, r.opmerkingen, r.behandelaar))
                      .slice().sort((a,b)=>datumSleutel(a.deadline)-datumSleutel(b.deadline));
-    $(pagina+'-rijen').innerHTML = zicht.length ? zicht.map(r=>rijHtml(r, pagina)).join('')
-      : `<p class="leeg">${q||f.wie ? 'Niets gevonden.' : 'Geen lopende dossiers.'}</p>`;
+    if(lijst.length) _netLeeg[sec]=false;
+    zetRijen($(pagina+'-rijen'), zicht.length ? zicht.map(r=>rijHtml(r, pagina)).join('')
+      : !q && !f.wie && _netLeeg[sec] ? LEEG_KLAAR('Alles afgerond. Geen lopende dossiers.')
+      : `<p class="leeg">${q||f.wie ? 'Niets gevonden.' : 'Geen lopende dossiers.'}</p>`);
   }
 }
 
@@ -114,7 +119,10 @@ export async function rondAf(sec, sleutel){
   if(!magSchrijven()){ tekenDossiers(); return; }
   const lijst=D.dossiers[sec], pos=lijst.indexOf(r);
   lijst.splice(pos,1);
+  _netLeeg[sec] = !lijst.length;
+  laatVertrekken(rijVan(sec, sleutel));
   tekenDossiers();
+  speel($(PAGINA_VAN_SEC[sec]+'-tel'), 'tik'); speel($('tel-'+PAGINA_VAN_SEC[sec]), 'tik');
   let archiefWaarden=null, ntdWaarden=null;
   const gelukt=schrijf('Afronden mislukt', async()=>{
     const x=await versOpgezocht(r);
@@ -137,6 +145,7 @@ export async function rondAf(sec, sleutel){
     if(!magSchrijven()) return;
     lijst.splice(Math.min(pos,lijst.length),0,r);
     tekenDossiers();
+    speel(rijVan(sec, sleutel), 'rij-terug');
     await schrijf('Ongedaan maken mislukt', async()=>{
       // Eerst terug in 'Nog Te Doen', dan pas uit het archief: gaat het halverwege mis, dan staat
       // hij hooguit dubbel en is er niets kwijt.

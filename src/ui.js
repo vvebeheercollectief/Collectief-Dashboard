@@ -55,6 +55,47 @@ export function sluitOngedaan(){
   const el=document.getElementById('snack'); if(el) el.hidden=true;
 }
 
+// ── Effecten bij afhandelen ─────────────────────────────────────────────
+// Alleen beeld: de gegevens zijn al gewijzigd en het opslaan loopt al. De afgehandelde rij blijft
+// als 'geest' nog even staan (groen, daarna dichtklappen) en raakt niets meer: geen data-attributen,
+// inert, en zetRijen() tekent de lijst om hem heen zodat een tussentijdse hertekening hem niet
+// afkapt. Wie 'minder beweging' heeft ingesteld, ziet alleen de groene kleur (styles.css).
+const GROEN_MS = 380, DICHT_MS = 300;
+export function laatVertrekken(rij){
+  if(!rij || rij.classList.contains('rij-weg')) return;
+  const vak=rij.querySelector('.vink input'); if(vak) vak.checked=true;
+  [rij, ...rij.querySelectorAll('*')].forEach(el=>{ for(const k of Object.keys(el.dataset)) delete el.dataset[k]; });
+  rij.setAttribute('aria-hidden','true');
+  rij.inert=true;
+  rij.classList.add('rij-weg');
+  setTimeout(()=>{
+    if(!rij.isConnected) return;
+    rij.style.height=rij.offsetHeight+'px';
+    void rij.offsetHeight;                 // beginhoogte vastleggen vóór het dichtklappen
+    rij.classList.add('rij-dicht');
+    rij.style.height='0px';
+    setTimeout(()=>rij.remove(), DICHT_MS);
+  }, GROEN_MS);
+}
+// Vervangt de rijen in een lijst, maar laat vertrekkende rijen op hun plek staan.
+export function zetRijen(host, html){
+  const geesten=[...host.children].filter(el=>el.classList.contains('rij-weg'));
+  if(!geesten.length){ host.innerHTML=html; return; }
+  const ervoor=geesten.map(g=>{ let n=0; for(let el=g.previousElementSibling; el; el=el.previousElementSibling) if(!el.classList.contains('rij-weg')) n++; return n; });
+  [...host.childNodes].forEach(n=>{ if(!geesten.includes(n)) n.remove(); });
+  const mal=document.createElement('template'); mal.innerHTML=html;
+  const nieuw=[...mal.content.children];
+  let i=0;
+  geesten.forEach((g,k)=>{ while(i<nieuw.length && i<ervoor[k]) host.insertBefore(nieuw[i++], g); });
+  while(i<nieuw.length) host.appendChild(nieuw[i++]);
+}
+// Een klasse die een korte animatie start, opnieuw afspelen (ook als hij er al op stond).
+export function speel(el, klas){
+  if(!el) return;
+  el.classList.remove(klas); void el.offsetWidth; el.classList.add(klas);
+}
+export const LEEG_KLAAR = tekst => `<p class="leeg leeg-klaar"><span class="klaar-vink" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12L10 17L19 8"/></svg></span>${esc(tekst)}</p>`;
+
 // ── Ja/nee-vraag ────────────────────────────────────────────────────────
 // Promise-gebaseerd. Escape, het kruisje en de achtergrond betekenen 'nee'. Een tweede vraag terwijl
 // er één openstaat krijgt meteen 'nee' (dubbelklik-rem).

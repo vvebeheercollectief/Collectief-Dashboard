@@ -10,7 +10,7 @@ import { fetchSheet, appendRows, writeRange, batchUpdate, getSheetIds, _a1 } fro
 import { schrijf, magSchrijven, conflict, bijNieuweData, BEREIK } from './data.js';
 import { parseTaken, takenKopKlopt } from './parse.js';
 import { esc, bevat, nieuwTaakRegelId, nuSheet, vandaagSheet } from './util.js';
-import { ongedaanBalk } from './ui.js';
+import { ongedaanBalk, laatVertrekken, zetRijen, speel, LEEG_KLAAR } from './ui.js';
 import { koppelVveVeld, leesVve, zetVve } from './vve.js';
 import { ICOON } from './iconen.js';
 
@@ -19,6 +19,8 @@ const lijstVan = () => state.lijstVan || ikZelf();
 const isEigen = () => lijstVan()===ikZelf();
 const open = naam => D.taken.filter(t=>t.eigenaar===naam && !t.afgevinkt);
 const $ = id => document.getElementById(id);
+const rijVan = id => document.querySelector(`#taken-rijen .rij[data-id="${CSS.escape(id)}"]`);
+let _netLeeg=false;   // de lijst is zojuist leeggevinkt: toon 'Alles afgehandeld' i.p.v. de gewone lege tekst
 
 // ── Tekenen ─────────────────────────────────────────────────────────────
 export function tekenTaken(){
@@ -43,8 +45,10 @@ export function tekenTaken(){
   const q=(state.filters.taken.q||'').toLowerCase().trim();
   const rijen=open(wie).filter(t=>bevat(q, t.taak, t.code, t.vve, t.notitie))
                        .sort((a,b)=>(b._row||1e9)-(a._row||1e9));   // nieuwste bovenaan (nog niet opgeslagen = bovenaan)
-  $('taken-rijen').innerHTML = rijen.length ? rijen.map(t=>rijHtml(t, eigen)).join('')
-    : `<p class="leeg">${q ? 'Niets gevonden.' : eigen ? 'Niets op je lijst. Typ hierboven een nieuwe taak.' : `${esc(wie)} heeft niets open staan.`}</p>`;
+  if(open(ik).length) _netLeeg=false;
+  zetRijen($('taken-rijen'), rijen.length ? rijen.map(t=>rijHtml(t, eigen)).join('')
+    : eigen && !q && _netLeeg ? LEEG_KLAAR('Alles afgehandeld. Je lijst is leeg.')
+    : `<p class="leeg">${q ? 'Niets gevonden.' : eigen ? 'Niets op je lijst. Typ hierboven een nieuwe taak.' : `${esc(wie)} heeft niets open staan.`}</p>`);
 }
 
 function rijHtml(t, eigen){
@@ -110,7 +114,10 @@ export function vinkAf(id){
   if(!magSchrijven()){ tekenTaken(); return; }
   const datum=vandaagSheet();
   t.afgevinkt=datum;
+  _netLeeg = !open(ikZelf()).length;
+  laatVertrekken(rijVan(id));
   tekenTaken();
+  speel($('taken-tel'), 'tik'); speel($('tel-taken'), 'tik');
   const gelukt=schrijf('Afvinken mislukt', async()=>{
     const vers=await verseTaak(id);
     await writeRange(_a1(TAB.TAKEN,`H${vers._row}`), [datum]);
@@ -120,6 +127,7 @@ export function vinkAf(id){
     if(!magSchrijven()) return;
     t.afgevinkt='';
     tekenTaken();
+    speel(rijVan(id), 'rij-terug');
     await schrijf('Ongedaan maken mislukt', async()=>{
       const vers=await verseTaak(id);
       await writeRange(_a1(TAB.TAKEN,`H${vers._row}`), ['']);
@@ -186,5 +194,6 @@ export function initTaken(){
 export function kiesLijst(naam){
   state.lijstVan = naam===ikZelf() ? null : naam;
   state.bewerkt=null;
+  $('taken-rijen').querySelectorAll('.rij-weg').forEach(el=>el.remove());   // een vertrekkende rij hoort niet in andermans lijst
   tekenTaken();
 }

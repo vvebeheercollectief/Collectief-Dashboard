@@ -1,7 +1,8 @@
 // Nagebootste Google Sheet voor de zelftest (src/tests.js) en voor schermafbeeldingen.
 // Beantwoordt dezelfde verzoeken als de Sheets-API v4 die het dashboard doet: values (lezen,
-// schrijven, append), values:batchGet, :batchUpdate (rij invoegen/verwijderen, cellen, tabblad
-// aanmaken/kopiëren) en de lijst met tabbladen. Waarden zijn tekst, vinkjes 'TRUE'/'FALSE'.
+// schrijven, append), values:batchGet, values:batchUpdate, :batchUpdate (rij invoegen/verwijderen,
+// cellen, kolommen erbij, tabblad aanmaken/kopiëren) en de lijst met tabbladen. Waarden zijn tekst,
+// vinkjes 'TRUE'/'FALSE'. Net als Google weigert hij te schrijven buiten het aantal kolommen.
 // Niet publiek: tools/ gaat niet mee in de build (tools/bouw.mjs).
 const kolNr = s => s.split('').reduce((n,c)=>n*26+c.charCodeAt(0)-64,0)-1;
 function a1(bereik){
@@ -19,9 +20,9 @@ function trim(rows){
   return uit;
 }
 export class NepSheet{
-  constructor(tabs){
+  constructor(tabs, kolommen={}){
     this.tabs={}; this.volg=100; this.verzoeken=[];
-    Object.entries(tabs).forEach(([t,rows],i)=>{ this.tabs[t]={ sheetId:this.volg++, index:i, rows:rows.map(r=>r.map(v=>v==null?'':String(v))) }; });
+    Object.entries(tabs).forEach(([t,rows],i)=>{ this.tabs[t]={ sheetId:this.volg++, index:i, kolommen:kolommen[t]||26, rows:rows.map(r=>r.map(v=>v==null?'':String(v))) }; });
   }
   tab(naam){ return this.tabs[naam]; }
   lees(bereik){
@@ -35,6 +36,8 @@ export class NepSheet{
   schrijf(bereik, waarden, userEntered=true){
     const b=a1(bereik), t=this.tabs[b.tab];
     if(!t) throw Object.assign(new Error(`Unable to parse range: ${bereik}`), { status:400 });
+    const breedste=Math.max(0, ...waarden.map(r=>r.length));
+    if(b.c1+breedste>t.kolommen) throw Object.assign(new Error(`Range (${bereik}) exceeds grid limits. Max columns: ${t.kolommen}`), { status:400 });
     waarden.forEach((rij,i)=>{
       const r=b.r1-1+i; while(t.rows.length<=r) t.rows.push([]);
       rij.forEach((v,j)=>{ let s=v==null?'':String(v); if(userEntered && s.startsWith("'")) s=s.slice(1); const c=b.c1+j; while(t.rows[r].length<=c) t.rows[r].push(''); t.rows[r][c]=s; });
@@ -67,8 +70,9 @@ export class NepSheet{
         const rg=q.repeatCell.range, t=this.opId(rg.sheetId), u=q.repeatCell.cell.userEnteredValue;
         for(let r=rg.startRowIndex;r<rg.endRowIndex;r++) for(let k=rg.startColumnIndex;k<rg.endColumnIndex;k++){ while(t.rows.length<=r) t.rows.push([]); while(t.rows[r].length<=k) t.rows[r].push(''); t.rows[r][k]=('boolValue' in u)?(u.boolValue?'TRUE':'FALSE'):String(u.stringValue??''); }
       }
-      else if(q.addSheet){ this.tabs[q.addSheet.properties.title]={ sheetId:this.volg++, index:Object.keys(this.tabs).length, rows:[] }; }
-      else if(q.duplicateSheet){ const bron=this.opId(q.duplicateSheet.sourceSheetId); this.tabs[q.duplicateSheet.newSheetName]={ sheetId:this.volg++, index:q.duplicateSheet.insertSheetIndex, rows:bron.rows.map(r=>r.slice()) }; }
+      else if(q.appendDimension){ const { sheetId, dimension, length }=q.appendDimension; if(dimension==='COLUMNS') this.opId(sheetId).kolommen+=length; }
+      else if(q.addSheet){ const p=q.addSheet.properties; this.tabs[p.title]={ sheetId:this.volg++, index:Object.keys(this.tabs).length, kolommen:p.gridProperties?.columnCount||26, rows:[] }; }
+      else if(q.duplicateSheet){ const bron=this.opId(q.duplicateSheet.sourceSheetId); this.tabs[q.duplicateSheet.newSheetName]={ sheetId:this.volg++, index:q.duplicateSheet.insertSheetIndex, kolommen:bron.kolommen, rows:bron.rows.map(r=>r.slice()) }; }
       else throw Object.assign(new Error('Onbekend verzoek in de nep-Sheet: '+Object.keys(q)), { status:400 });
     }
     return { replies: requests.map(()=>({})) };
@@ -80,6 +84,12 @@ export class NepSheet{
     const json=(o,status=200)=>new Response(JSON.stringify(o), { status, headers:{ 'Content-Type':'application/json' } });
     try{
       const pad=decodeURIComponent(u.pathname);
+      if(pad.endsWith('/values:batchUpdate')){
+        // Eerst alles controleren, dan schrijven: één fout bereik = niets geschreven.
+        for(const d of body.data){ const b=a1(d.range), t=this.tabs[b.tab]; if(!t) throw Object.assign(new Error(`Unable to parse range: ${d.range}`), { status:400 }); if(b.c1+Math.max(0,...d.values.map(r=>r.length))>t.kolommen) throw Object.assign(new Error(`Range (${d.range}) exceeds grid limits`), { status:400 }); }
+        body.data.forEach(d=>this.schrijf(d.range, d.values));
+        return json({});
+      }
       if(pad.endsWith(':batchUpdate')) return json(this.batch(body.requests));
       if(pad.includes('/values:batchGet')){
         const ranges=u.searchParams.getAll('ranges');
@@ -92,7 +102,7 @@ export class NepSheet{
         if(m==='PUT'){ this.schrijf(bereik, body.values); return json({}); }
         return json({ range:bereik, values:this.lees(bereik) });
       }
-      return json({ sheets: Object.entries(this.tabs).map(([title,t])=>({ properties:{ sheetId:t.sheetId, title, index:t.index, gridProperties:{ rowCount:Math.max(1000,t.rows.length), columnCount:26 } } })) });
+      return json({ sheets: Object.entries(this.tabs).map(([title,t])=>({ properties:{ sheetId:t.sheetId, title, index:t.index, gridProperties:{ rowCount:Math.max(1000,t.rows.length), columnCount:t.kolommen } } })) });
     }catch(e){ return json({ error:{ message:e.message, code:e.status||500 } }, e.status||500); }
   }
 }

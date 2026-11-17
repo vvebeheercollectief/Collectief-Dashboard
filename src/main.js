@@ -9,7 +9,7 @@ import { loadAll, laadUitCache, startVerversen } from './data.js';
 import { startVersieBewaking } from './versie.js';
 import { initSwUpdate } from './sw-update.js';
 import { goTo, PAGINAS, beantwoordBevestiging, sluitOngedaan } from './ui.js';
-import { initTaken, vinkAf, startBewerken, stopBewerken, kiesLijst } from './taken.js';
+import { initTaken, vinkAf, startBewerken, stopBewerken, kiesLijst, klapBundel, startHernoemen, bundelAf, bundelOpheffen } from './taken.js';
 import { initDossiers, openDossier, sluitDossier, rondAf, zetFase, kiesFaseInVenster, rondAfUitVenster, verwijderUitVenster, tekenDossiers } from './dossiers.js';
 import { initAlv, wisselVlag, nieuweRonde, tekenAlvo } from './alv.js';
 import { icoon } from './iconen.js';
@@ -35,6 +35,10 @@ const ACTIES = {
   'taak-bewerk':     el=>startBewerken(el.dataset.id),
   'taak-bewerk-stop':()=>stopBewerken(),
   'eigen-lijst':     ()=>kiesLijst(null),
+  'bundel-klap':     el=>klapBundel(el.dataset.bundel),
+  'bundel-hernoem':  el=>startHernoemen(el.dataset.bundel),
+  'bundel-af':       el=>bundelAf(el.dataset.bundel),
+  'bundel-op':       el=>bundelOpheffen(el.dataset.bundel),
   'dossier-wie':     el=>{ state.filters[el.dataset.pagina].wie=el.dataset.wie; tekenDossiers(); },
   'dossier-open':    el=>openDossier(el.dataset.sec, el.dataset.sleutel),
   'dossier-nieuw':   el=>openDossier(el.dataset.sec, null),

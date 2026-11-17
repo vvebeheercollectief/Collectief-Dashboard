@@ -70,6 +70,10 @@ body.test #app{height:calc(100vh - 30px);margin-top:30px}
 .zoek input{width:100%;border:0;outline:0;background:none;font-size:13px;color:var(--inkt)}
 .zoek input::placeholder{color:var(--grijs)}
 .zoek:focus-within{border-color:var(--ac);box-shadow:0 0 0 3px rgba(78,104,133,.15)}
+.filter{max-width:220px;min-height:32px;padding:0 28px 0 10px;border:1px solid var(--lijn);border-radius:var(--hoek);background:var(--wit) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2359616B' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center;font-size:13px;cursor:pointer;-webkit-appearance:none;appearance:none;text-overflow:ellipsis}
+.filter:hover{border-color:var(--rand)}
+.filter:focus-visible{outline:0;border-color:var(--ac);box-shadow:0 0 0 3px rgba(78,104,133,.15)}
+.filter.aan{border-color:var(--ac);background-color:var(--ac-l);font-weight:600}
 .knop{display:inline-flex;align-items:center;justify-content:center;min-height:32px;padding:0 14px;border:1px solid var(--ac);border-radius:var(--hoek);background:var(--ac);color:#fff;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
 .knop:hover{background:var(--ac-d);border-color:var(--ac-d)}
 .knop-licht{background:var(--wit);color:var(--inkt);border-color:var(--lijn)}
@@ -86,7 +90,7 @@ body.test #app{height:calc(100vh - 30px);margin-top:30px}
 
 /* ── Tabel: één regel per rij ───────────────────────────────────────── */
 .tabel{flex:1;min-height:0;overflow:auto}
-.thead,.rij,.nieuw{display:grid;align-items:center;column-gap:16px;padding-right:16px}
+.thead,.rij,.nieuw,.bundel-kop{display:grid;align-items:center;column-gap:16px;padding-right:16px}
 .thead{position:sticky;top:0;z-index:2;min-height:32px;background:var(--papier);border-bottom:1px solid var(--lijn);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--grijs)}
 .thead .mid{text-align:center}
 .rij{min-height:40px;border-bottom:1px solid var(--lijn-zacht)}
@@ -105,6 +109,32 @@ body.test #app{height:calc(100vh - 30px);margin-top:30px}
 .naam{font-weight:500}
 .zacht{color:var(--grijs)}
 .leeg{margin:0;padding:16px;color:var(--grijs)}
+.tip{margin:0;padding:12px 16px 12px 56px;font-size:13px;color:var(--grijs)}
+
+/* Bundels (Mijn taken): een kopje met de taken eronder. Sleep een taak op een andere om te bundelen. */
+.bundel-kop{min-height:40px;background:var(--papier);border-bottom:1px solid var(--lijn-zacht);box-shadow:inset 3px 0 0 var(--ac)}
+.bundel-pijl{display:grid;place-items:center;width:40px;height:40px;padding:0;border:0;background:none;color:var(--grijs);cursor:pointer}
+.bundel-pijl:hover{color:var(--inkt)}
+.bundel-pijl:disabled{cursor:default;opacity:.5}
+.bundel-pijl .icoon{transition:transform .15s}
+.bundel:not(.dicht) .bundel-pijl .icoon{transform:rotate(90deg)}
+.bundel-titel{display:flex;align-items:baseline;gap:8px;min-width:0}
+.bundel-naam{flex:0 1 auto;width:auto;font-weight:600}
+.bundel-tel{flex:none;padding:0 7px;border-radius:999px;background:var(--wolk);font-size:12px;font-weight:600;color:var(--inkt);font-variant-numeric:tabular-nums}
+.bundel-knoppen{display:flex;justify-content:flex-end;gap:12px;min-width:0}
+.bundel-knoppen .tekst-knop{min-height:28px;font-size:12.5px}
+.bundel-hernoem{flex:1;min-width:0;max-width:360px}
+.bundel-hernoem input{width:100%;min-height:30px;padding:0 10px;border:1px solid var(--ac);border-radius:var(--hoek);background:var(--wit);font-weight:600;box-shadow:0 0 0 3px rgba(78,104,133,.15);outline:0}
+.bundel .rij{box-shadow:inset 3px 0 0 var(--wolk)}
+.los-kop{box-shadow:none;margin-top:12px;border-top:1px solid var(--lijn-zacht)}
+.los-kop:first-child{margin-top:0;border-top:0}
+.los-hint{grid-column:3 / -1;font-size:12.5px;color:var(--grijs);visibility:hidden}
+.bij-slepen .los-hint{visibility:visible}
+.rij[draggable=true]{cursor:grab}
+.rij[draggable=true] .cel-knop{cursor:pointer}
+.rij.sleept{opacity:.4}
+.drop-aan{outline:2px solid var(--ac);outline-offset:-2px;background:var(--ac-l)}
+.bundel.drop-aan .bundel-kop,.bundel.drop-aan .rij{background:var(--ac-l)}
 
 /* Nieuwe taak en taak aanpassen: invullen in de kolommen zelf */
 .nieuw{min-height:44px;background:var(--papier);border-bottom:1px solid var(--lijn)}
@@ -119,6 +149,8 @@ input[aria-invalid=true]{border-color:var(--rd) !important}
 .bewerk input{background:var(--wit);border-color:var(--lijn)}
 .bewerk-eind{display:flex;align-items:center;gap:8px;min-width:0}
 .bewerk-eind input{flex:1;min-width:80px}
+.rij.bewerk{row-gap:6px;padding-top:6px;padding-bottom:6px}
+.bewerk>.bewerk-bundel{grid-column:2;display:block;min-width:0;max-width:320px}
 .verborgen{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
 /* Rond afvinken */
@@ -216,8 +248,9 @@ body.test .banner{top:42px}
   .sync-lbl{display:none}
   .werkvlak{border-top-left-radius:0;padding:8px}
   .blad{min-height:calc(100vh - 140px)}
-  .rechts{margin-left:0;flex:1 1 100%}
-  .zoek{flex:1}
+  .rechts{margin-left:0;flex:1 1 100%;min-width:0}
+  .zoek{flex:1;width:auto;min-width:0}
+  .zoek input{min-width:0}
   .streep{display:none}
   .twee{grid-template-columns:minmax(0,1fr)}
 }
@@ -236,6 +269,10 @@ body.test .banner{top:42px}
   .kol-taken,.kol-lod,.kol-subsidie{grid-template-columns:40px minmax(0,1fr);min-width:0;row-gap:2px;padding-top:6px;padding-bottom:6px}
   .kol-taken>:nth-child(n+3),.kol-lod>:nth-child(n+3),.kol-subsidie>:nth-child(n+3){grid-column:2}
   .rij.kol-taken>:nth-child(2),.rij .cel-knop{white-space:normal}
+  .bundel-kop.kol-taken{padding-top:2px;padding-bottom:2px}
+  .bundel-kop .bundel-pijl{grid-row:span 3}
+  .bundel-knoppen{justify-content:flex-start}
+  .filter{flex:0 1 160px}
   .nieuw.kol-taken>input,.nieuw.kol-taken>.veld-vve{margin-left:0;width:100%}
   .bewerk-eind{flex-wrap:wrap}
   .kol-lod .vve,.kol-subsidie .vve,.kol-taken .vve{font-size:13px}

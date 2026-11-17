@@ -101,6 +101,18 @@ export async function writeRange(bereik, waarden){
   return r.json();
 }
 
+// Meerdere losse bereiken in één verzoek (values:batchUpdate), bijvoorbeeld kolom I van vijf taken.
+// `lijst` is [{ bereik, waarden }] met per bereik één rij.
+export async function writeRanges(lijst){
+  if(!state.oauthToken) throw new Error('Niet ingelogd');
+  if(!lijst || !lijst.length) return null;
+  const r=await _fetchGeteld(`${_basis}/values:batchUpdate`,
+    { method:'POST', headers:_kop(), body:JSON.stringify({ valueInputOption:'USER_ENTERED',
+      data:lijst.map(({ bereik, waarden })=>({ range:bereik, values:[_veiligeRij(waarden)] })) }) });
+  if(!r.ok) throw await _fout(r,'Schrijffout');
+  return r.json();
+}
+
 export async function appendRows(bereik, rijen){
   if(!state.oauthToken) throw new Error('Niet ingelogd');
   const lijst=(rijen||[]).filter(Boolean);

@@ -4,7 +4,7 @@ Interne werklijst van VvE Beheer Collectief. Sinds **v16.0** (november 2026) bew
 
 | Scherm | Wat | Opslag in de Google Sheet |
 | --- | --- | --- |
-| Mijn taken | Eigen to-dolijst per account; collega's kunnen meekijken (alleen inzien) | tabblad `Mijn taken` (maakt het dashboard zelf aan) |
+| Mijn taken | Eigen to-dolijst per account; collega's kunnen meekijken (alleen inzien). Sinds v16.2: taken bundelen door ze op elkaar te slepen, filter op bundel of VvE, hele bundel afvinken | tabblad `Mijn taken` (maakt het dashboard zelf aan; kolom I = bundel) |
 | LOD | Gedeelde lijst, afronden gaat naar `Afgerond` | blok `LOD` in `Nog Te Doen` |
 | Subsidies | Gedeelde lijst met vijf fases | blok `SUBSIDIE-TRAJECTEN` in `Nog Te Doen` |
 | ALV's | Vier vinkjes per VvE, nieuwe ronde met archief | `ALV's overzicht` |

@@ -10,11 +10,11 @@ import { APP_VERSION, EMAIL_NAMES, TAB, TAKEN_KOP } from './config.js';
 import { emailHash } from './hash.js';
 import { veiligeCel, _isOffline } from './api.js';
 import { loadAll } from './data.js';
-import { blokken, invoegNa, parseDossiers, vindDossier, parseAlvo, parseTaken, dossierInhoud, vindAlvoRij } from './parse.js';
+import { blokken, invoegNa, parseDossiers, vindDossier, parseAlvo, parseTaken, takenKopKlopt, dossierInhoud, vindAlvoRij } from './parse.js';
 import { parseDatum, naarSheetDatum, wanneer, dagenTot, naarISO } from './util.js';
 import { vergelijkVersie, versieTeOud } from './versie.js';
 import { goTo, beantwoordBevestiging } from './ui.js';
-import { kiesLijst, ikZelf } from './taken.js';
+import { kiesLijst, ikZelf, groepeer, nieuweBundelNaam, bestaandeNaam, schoneNaam, pastBijFilter } from './taken.js';
 import { archiefNaam, blokkenVan } from './alv.js';
 import { zoekVves } from './vve.js';
 import { ACTIE_NAMEN } from './main.js';
@@ -41,6 +41,17 @@ const klik = el => { if(!el) throw new Error('element niet gevonden'); el.click(
 function vink(el){ if(!el) throw new Error('vinkje niet gevonden'); el.checked=true; el.dispatchEvent(new Event('change',{bubbles:true})); }
 function typ(el, tekst){ el.value=tekst; el.dispatchEvent(new Event('input',{bubbles:true})); }
 function verstuur(form){ form.requestSubmit(); }
+// Slepen zoals de browser het doet: dragstart op de taak, dragover en drop op het doel.
+function sleepOp(van, naar){
+  if(!van || !naar) throw new Error('sleepbron of -doel niet gevonden');
+  const dt=new DataTransfer();
+  van.dispatchEvent(new DragEvent('dragstart',{ bubbles:true, dataTransfer:dt }));
+  naar.dispatchEvent(new DragEvent('dragover',{ bubbles:true, cancelable:true, dataTransfer:dt }));
+  naar.dispatchEvent(new DragEvent('drop',{ bubbles:true, cancelable:true, dataTransfer:dt }));
+  van.dispatchEvent(new DragEvent('dragend',{ bubbles:true, dataTransfer:dt }));
+}
+const rijVan = taak => { const t=D.taken.find(x=>x.taak===taak && !x.afgevinkt); return t && document.querySelector(`#taken-rijen .rij[data-id="${t.id}"]`); };
+function kiesOptie(sel, waarde){ sel.value=waarde; sel.dispatchEvent(new Event('change',{ bubbles:true })); }
 
 // ── De toetsen ──────────────────────────────────────────────────────────
 async function draai(){
@@ -98,6 +109,23 @@ async function draai(){
     gelijk(blokkenVan([3,4,5,8,9]), [{start:3,eind:5},{start:8,eind:9}], 'aaneengesloten blokken');
     gelijk(archiefNaam(2026, ['ALV-archief 2026']), 'ALV-archief 2026 (2)', 'archiefnaam loopt door');
     gelijk(parseTaken([TAKEN_KOP, ['M1','Jer','Bellen','','','','','']]).length, 1, 'parseTaken');
+    gelijk(parseTaken([TAKEN_KOP, ['M1','Jer','Bellen','','','','','','Notulen']])[0].bundel, 'Notulen', 'parseTaken leest de bundel');
+    ok(takenKopKlopt(TAKEN_KOP.slice(0,8)) && takenKopKlopt(TAKEN_KOP), 'kop met en zonder kolom Bundel klopt');
+    ok(!takenKopKlopt([...TAKEN_KOP.slice(0,8), 'Iets anders']) && !takenKopKlopt(TAKEN_KOP.slice(1)), 'verkeerde kop afgekeurd');
+  });
+  await toets('bundels (puur)', ()=>{
+    const t=(id, bundel, _row, code='', vve='')=>({ id, bundel, _row, code, vve });
+    const g=groepeer([t('a','Notulen',2), t('b','',3), t('c','begroting',4), t('d','Notulen',5), t('e','',0)]);
+    gelijk(g.bundels.map(b=>b.naam), ['begroting','Notulen'], 'bundels op naam');
+    gelijk(g.bundels[1].taken.map(x=>x.id), ['d','a'], 'in een bundel de nieuwste eerst');
+    gelijk(g.los.map(x=>x.id), ['e','b'], 'losse taken: nog niet opgeslagen bovenaan');
+    gelijk(nieuweBundelNaam(t('a','',2,'1042','VvE Lindehof'), t('b','',3,'1042','VvE Lindehof'), []), 'VvE Lindehof', 'zelfde VvE: naam van de VvE');
+    gelijk(nieuweBundelNaam(t('a','',2,'1042','VvE Lindehof'), t('b','',3,'1187','VvE Parkzicht'), ['nieuwe bundel']), 'Nieuwe bundel 2', 'bezette naam krijgt een volgnummer');
+    gelijk(nieuweBundelNaam(t('a','',2), t('b','',3), []), 'Nieuwe bundel', 'twee taken zonder VvE');
+    gelijk(bestaandeNaam('notulen', ['Notulen']), 'Notulen', 'hoofdletters maken geen nieuwe bundel');
+    gelijk(schoneNaam('  Notulen   ALV  '), 'Notulen ALV', 'spaties netjes');
+    ok(pastBijFilter(t('a','X',1,'1042'), 'v:c:1042') && !pastBijFilter(t('a','X',1,'1042'), 'los')
+       && pastBijFilter(t('a','',1), 'los') && pastBijFilter(t('a','X',1), 'b:X') && !pastBijFilter(t('a','Y',1), 'b:X'), 'filter');
   });
 
   // ── Integratie: het dashboard tegen de nep-Sheet ──
@@ -180,16 +208,185 @@ async function draai(){
     gelijk(rij.slice(2,6), ['Accountant bellen over jaarstukken','1042','VvE Lindehof','Voor vrijdag'], 'aanpassing opgeslagen');
   });
 
+  // ── Bundels ──
+  const kolI = taak => sheet.tab(TAB.TAKEN).rows.find(r=>r[2]===taak)?.[8] || '';
+  const kolH = taak => sheet.tab(TAB.TAKEN).rows.find(r=>r[2]===taak)?.[7] || '';
+  const bundelEl = naam => document.querySelector(`#taken-rijen .bundel[data-bundel="${naam}"]`);
+  async function nieuweTaak(taak, vve=''){
+    typ($('nieuw-taak'), taak); typ($('nieuw-vve'), vve); verstuur($('taken-nieuw'));
+    await rustig();
+  }
+
+  await toets('bundelen door een taak op een andere te slepen', async ()=>{
+    goTo('taken');
+    await nieuweTaak('Notulen Lindehof versturen', '1042');
+    await nieuweTaak('Notulen Parkzicht versturen', '1187');
+    ok(!!document.querySelector('#taken-rijen .tip'), 'tip zolang er geen bundels zijn');
+    sleepOp(rijVan('Notulen Parkzicht versturen'), rijVan('Notulen Lindehof versturen'));
+    const form=document.querySelector('#taken-rijen form.bundel-hernoem');
+    ok(!!form, 'naamveld staat open na het bundelen');
+    gelijk(form?.elements.naam.value, 'Nieuwe bundel', 'standaardnaam bij twee verschillende VvE\'s');
+    ok(document.activeElement===form?.elements.naam, 'naamveld heeft de focus');
+    form.elements.naam.value='Notulen';
+    verstuur(form);
+    await rustig();
+    gelijk([kolI('Notulen Lindehof versturen'), kolI('Notulen Parkzicht versturen')], ['Notulen','Notulen'], 'bundel in kolom I');
+    gelijk(sheet.tab(TAB.TAKEN).rows[0][8], 'Bundel', 'kop van kolom I');
+    ok(bundelEl('Notulen')?.querySelector('.bundel-tel')?.textContent==='2', 'kopje met het aantal');
+    gelijk(bundelEl('Notulen')?.querySelectorAll('.rij').length, 2, 'beide taken onder het kopje');
+    ok(!document.querySelector('#taken-rijen .tip'), 'tip weg');
+    ok(!!document.querySelector('#taken-rijen .los-kop'), "kopje 'Losse taken'");
+  });
+
+  await toets('taak bij een bundel slepen en er weer uit halen', async ()=>{
+    sleepOp(rijVan('Map aanmaken'), bundelEl('Notulen').querySelector('.bundel-kop'));
+    await rustig();
+    gelijk(kolI('Map aanmaken'), 'Notulen', 'op de bundelkop = erbij');
+    ok(!$('snack').hidden, 'ongedaan maken aangeboden');
+    ok(!document.querySelector('#taken-rijen form.bundel-hernoem'), 'geen naamveld bij een bestaande bundel');
+    sleepOp(rijVan('Map aanmaken'), document.querySelector('#taken-rijen .los-kop'));
+    await rustig();
+    gelijk(kolI('Map aanmaken'), '', "op 'Losse taken' = eruit");
+    sleepOp(rijVan('Map aanmaken'), rijVan('Notulen Lindehof versturen'));
+    await rustig();
+    gelijk(kolI('Map aanmaken'), 'Notulen', 'op een taak in een bundel = erbij');
+    klik(document.querySelector('#snack .snack-knop'));
+    await wacht(50); await rustig();
+    gelijk(kolI('Map aanmaken'), '', 'ongedaan gemaakt');
+    ok(!document.querySelector('#taken-rijen form.bundel-hernoem'), 'nergens een naamveld');
+  });
+
+  await toets('twee taken van dezelfde VvE: de bundel heet naar de VvE', async ()=>{
+    await nieuweTaak('Begroting Lindehof versturen', '1042');
+    sleepOp(rijVan('Accountant bellen over jaarstukken'), rijVan('Begroting Lindehof versturen'));
+    const form=document.querySelector('#taken-rijen form.bundel-hernoem');
+    gelijk(form?.elements.naam.value, 'VvE Lindehof', 'naam van de VvE voorgesteld');
+    form.elements.naam.dispatchEvent(new KeyboardEvent('keydown',{ key:'Escape', bubbles:true }));
+    await rustig();
+    ok(!document.querySelector('#taken-rijen form.bundel-hernoem'), 'Escape sluit het naamveld');
+    gelijk([kolI('Begroting Lindehof versturen'), kolI('Accountant bellen over jaarstukken')], ['VvE Lindehof','VvE Lindehof'], 'voorgestelde naam bewaard');
+  });
+
+  await toets('bundel in- en uitklappen', async ()=>{
+    klik(bundelEl('Notulen').querySelector('.bundel-pijl'));
+    ok(bundelEl('Notulen').classList.contains('dicht') && !bundelEl('Notulen').querySelector('.rij'), 'ingeklapt');
+    gelijk(bundelEl('Notulen').querySelector('.bundel-pijl').getAttribute('aria-expanded'), 'false', 'aria-expanded');
+    ok((localStorage.getItem('cd16_bundels_dicht')||'').includes('Notulen'), 'onthouden in deze browser');
+    typ($('taken-zoek'), 'parkzicht');
+    ok(!!bundelEl('Notulen')?.querySelector('.rij'), 'bij zoeken uitgeklapt');
+    gelijk(bundelEl('Notulen')?.querySelector('.bundel-tel')?.textContent, '1 van 2', 'aantal bij zoeken');
+    typ($('taken-zoek'), '');
+    ok(!bundelEl('Notulen').querySelector('.rij'), 'daarna weer dicht');
+    klik(bundelEl('Notulen').querySelector('.bundel-pijl'));
+    gelijk(bundelEl('Notulen').querySelectorAll('.rij').length, 2, 'weer open');
+  });
+
+  await toets('filter op bundel en op VvE', async ()=>{
+    const sel=$('taken-filter');
+    const waarden=[...sel.options].map(o=>o.value);
+    ok(['', 'los', 'b:Notulen', 'b:VvE Lindehof', 'v:c:1042', 'v:c:1187'].every(w=>waarden.includes(w)), 'keuzes in het filter');
+    kiesOptie(sel, 'b:Notulen');
+    gelijk(document.querySelectorAll('#taken-rijen .rij').length, 2, 'alleen de bundel');
+    ok(!document.querySelector('#taken-rijen .los-kop'), "geen 'Losse taken'");
+    ok($('nieuw-taak').placeholder.includes('Notulen'), 'invoerregel zegt waar de taak komt');
+    await nieuweTaak('Notulen Hofzicht versturen');
+    gelijk(kolI('Notulen Hofzicht versturen'), 'Notulen', 'nieuwe taak komt in de gekozen bundel');
+    gelijk(document.querySelectorAll('#taken-rijen .rij').length, 3, 'en staat in beeld');
+    kiesOptie(sel, 'v:c:1187');
+    gelijk($('nieuw-vve').value, '1187 VvE Parkzicht', 'VvE alvast ingevuld voor een nieuwe taak');
+    const rijen=[...document.querySelectorAll('#taken-rijen .rij')];
+    ok(rijen.length===1 && rijen[0].textContent.includes('Parkzicht'), 'alleen die VvE');
+    kiesOptie(sel, 'los');
+    ok(!document.querySelector('#taken-rijen .bundel'), 'alleen losse taken');
+    kiesOptie(sel, '');
+    gelijk($('nieuw-vve').value, '', 'VvE-veld weer leeg');
+    ok(!sel.classList.contains('aan'), 'filter uit');
+  });
+
+  await toets('hele bundel afvinken en ongedaan maken', async ()=>{
+    klik(bundelEl('Notulen').querySelector('[data-actie="bundel-af"]'));
+    ok($('bevestig-bg').classList.contains('open'), 'eerst een ja/nee-vraag');
+    ok($('bevestig-tekst').textContent.includes('3'), 'aantal in de vraag');
+    klik($('bevestig-ja'));
+    await wacht(30); await rustig();
+    ok(!bundelEl('Notulen'), 'bundel uit beeld');
+    const drie=['Notulen Lindehof versturen','Notulen Parkzicht versturen','Notulen Hofzicht versturen'];
+    ok(drie.every(t=>/^\d{2}-\d{2}-\d{4}$/.test(kolH(t))), 'alle drie afgevinkt in kolom H');
+    gelijk(kolH('Begroting Lindehof versturen'), '', 'andere bundel ongemoeid');
+    klik(document.querySelector('#snack .snack-knop'));
+    await wacht(50); await rustig();
+    ok(drie.every(t=>kolH(t)===''), 'ongedaan gemaakt');
+    gelijk(bundelEl('Notulen')?.querySelectorAll('.rij').length, 3, 'bundel terug');
+  });
+
+  await toets('bundel opheffen en een naam wijzigen', async ()=>{
+    klik(bundelEl('VvE Lindehof').querySelector('[data-actie="bundel-op"]'));
+    await rustig();
+    gelijk([kolI('Begroting Lindehof versturen'), kolI('Accountant bellen over jaarstukken')], ['',''], 'opgeheven');
+    ok(!bundelEl('VvE Lindehof'), 'kopje weg');
+    klik(document.querySelector('#snack .snack-knop'));
+    await wacht(50); await rustig();
+    gelijk(kolI('Begroting Lindehof versturen'), 'VvE Lindehof', 'ongedaan gemaakt');
+    klik(bundelEl('VvE Lindehof').querySelector('[data-actie="bundel-hernoem"]'));
+    const form=document.querySelector('#taken-rijen form.bundel-hernoem');
+    ok(!!form, 'naamveld na een klik op de naam');
+    form.elements.naam.value='notulen';
+    verstuur(form);
+    await rustig();
+    gelijk(kolI('Begroting Lindehof versturen'), 'Notulen', 'zelfde naam als een andere bundel: samengevoegd');
+    gelijk(bundelEl('Notulen')?.querySelectorAll('.rij').length, 5, 'alles onder één kopje');
+  });
+
+  await toets('bundel kiezen bij aanpassen (zonder slepen)', async ()=>{
+    const t=D.taken.find(x=>x.taak==='Map aanmaken');
+    klik(document.querySelector(`#taken-rijen [data-actie="taak-bewerk"][data-id="${t.id}"]`));
+    const form=document.querySelector('#taken-rijen form.bewerk');
+    gelijk(form.elements.bundel.value, '', 'bundelveld leeg');
+    ok([...$('taken-bundels').options].some(o=>o.value==='Notulen'), 'bestaande bundels als suggestie');
+    form.elements.bundel.value='Bank';
+    verstuur(form);
+    await rustig();
+    gelijk(kolI('Map aanmaken'), 'Bank', 'in kolom I');
+    gelijk(sheet.tab(TAB.TAKEN).rows.find(r=>r[0]===t.id)[2], 'Map aanmaken', 'taaktekst ongemoeid');
+    ok(!!bundelEl('Bank'), 'nieuwe bundel in beeld');
+  });
+
   await toets('meekijken bij een collega', async ()=>{
     sheet.tab(TAB.TAKEN).rows.push(['Mx1','Cihad','Opdracht schilder bevestigen','1187','VvE Parkzicht','','10-11-2026 09:00','']);
+    sheet.tab(TAB.TAKEN).rows.push(['Mx2','Cihad','Offerte schilder doorsturen','1187','VvE Parkzicht','','10-11-2026 09:05','','Schilderwerk'],
+                                   ['Mx3','Cihad','Bestuur informeren','1187','VvE Parkzicht','','10-11-2026 09:06','','Schilderwerk']);
+    kiesOptie($('taken-filter'), 'b:Notulen');
     await loadAll(true);
     kiesLijst('Cihad');
+    gelijk($('taken-filter').value, '', 'filter terug naar alle taken bij een andere lijst');
+    ok(!!bundelEl('Schilderwerk'), 'bundels van de collega in beeld');
+    ok(!document.querySelector('#taken-rijen [data-actie="bundel-af"], #taken-rijen [data-actie="bundel-op"], #taken-rijen [data-actie="bundel-hernoem"]'), 'bundels alleen inzien');
+    ok(!document.querySelector('#taken-rijen [draggable="true"]'), 'niets te slepen');
     gelijk($('taken-titel').textContent, 'Taken van Cihad', 'titel');
     ok($('taken-nieuw').hidden && !$('taken-info').hidden, 'geen invoerregel, wel de melding');
     ok(document.querySelector('#taken-rijen input[type=checkbox]').disabled, 'afvinken uit');
     ok(!document.querySelector('#taken-rijen [data-actie="taak-bewerk"]'), 'niet te bewerken');
     kiesLijst('Jer');
     ok(!$('taken-nieuw').hidden, 'eigen lijst: invoerregel terug');
+  });
+
+  await toets('tabblad van vóór v16.2 (acht kolommen) krijgt de kolom Bundel', async ()=>{
+    const tab=sheet.tab(TAB.TAKEN);
+    tab.kolommen=8;
+    tab.rows.forEach(r=>{ r.length=Math.min(r.length, 8); });
+    state._takenTabOk=false;
+    ok(await loadAll(), 'tabblad van acht kolommen wordt gewoon gelezen');
+    ok(!document.querySelector('#taken-rijen .bundel'), 'zonder kolom I: geen bundels');
+    sleepOp(rijVan('Map aanmaken'), rijVan('Begroting Lindehof versturen'));
+    const form=document.querySelector('#taken-rijen form.bundel-hernoem');
+    form.elements.naam.value='Lindehof';
+    verstuur(form);
+    await rustig();
+    gelijk(tab.kolommen, 9, 'raster een kolom breder');
+    gelijk(tab.rows[0][8], 'Bundel', 'kop van kolom I gezet');
+    gelijk([kolI('Map aanmaken'), kolI('Begroting Lindehof versturen')], ['Lindehof','Lindehof'], 'bundel opgeslagen');
+    await nieuweTaak('Na de ombouw');
+    ok(!!sheet.tab(TAB.TAKEN).rows.find(r=>r[2]==='Na de ombouw'), 'toevoegen werkt daarna gewoon');
   });
 
   await toets('LOD: nieuw dossier', async ()=>{

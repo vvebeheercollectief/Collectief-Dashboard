@@ -23,7 +23,9 @@ export const BEREIK = {
   ntd:   _a1(TAB.NTD, 'A:S'),
   alvo:  _a1(TAB.ALVO, 'A:G'),
   alfa:  _a1(TAB.ALFA, 'A:C'),
-  taken: _a1(TAB.TAKEN, 'A:H'),
+  // Zonder kolomgrens: een tabblad van vóór v16.2 heeft maar acht kolommen, en 'A:I' valt daar
+  // buiten het raster. parseTaken leest alleen A..I.
+  taken: _a1(TAB.TAKEN),
 };
 // 'Mijn taken' kan nog ontbreken (het dashboard maakt het tabblad pas bij de eerste taak aan).
 // Een batchGet met een onbekend tabblad faalt in zijn geheel (400); dan lezen we de rest zonder,

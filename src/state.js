@@ -5,7 +5,7 @@
 // dat iedereen importeert en muteert, nooit vervangt.
 
 export const D = {
-  taken: [],            // 'Mijn taken'  — {id, eigenaar, taak, code, vve, notitie, aangemaakt, afgevinkt, _row}
+  taken: [],            // 'Mijn taken'  — {id, eigenaar, taak, code, vve, notitie, aangemaakt, afgevinkt, bundel, _row}
   dossiers: { LOD: [], 'SUBSIDIE-TRAJECTEN': [] },   // 'Nog Te Doen' — alleen de twee blokken die we tonen
   alvo: [],             // "ALV's overzicht"
   alfa: [],             // "ALV's afgerond"
@@ -35,7 +35,10 @@ export const state = {
   pagina: 'taken',
   lijstVan: null,       // naam wiens takenlijst je bekijkt; null = je eigen
   bewerkt: null,        // id van de taak die nu inline bewerkt wordt
-  filters: { lod: { wie:'', q:'' }, subsidie: { wie:'', q:'' }, alvo: { status:'', q:'' }, alfa: { q:'' }, taken: { q:'' } },
+  sleept: null,         // id van de taak die nu gesleept wordt
+  hernoemt: null,       // naam van de bundel waarvan de naam nu gewijzigd wordt
+  // taken.filter: '' (alles), 'los', 'b:<bundelnaam>' of 'v:<VvE-sleutel>' (zie taken.js)
+  filters: { lod: { wie:'', q:'' }, subsidie: { wie:'', q:'' }, alvo: { status:'', q:'' }, alfa: { q:'' }, taken: { q:'', filter:'' } },
   // minimumversie
   _versieTeOud: false,
 };

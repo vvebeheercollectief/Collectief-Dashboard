@@ -16,6 +16,7 @@ const PADEN = {
   potlood:     'M4 20L5 15L15 5L19 9L9 19ZM13 7L17 11',
   vernieuwen:  'M20 7V3M20 7H16M20 7L17 4H9L4 9V15L9 20H15L20 15',
   uitloggen:   'M14 4H19V20H14M4 12H14M10 8L14 12L10 16',
+  pijl:        'M9 6L15 12L9 18',
 };
 export function icoon(naam, grootte=20){
   const d=PADEN[naam]; if(!d) return '';
@@ -25,4 +26,5 @@ export function icoon(naam, grootte=20){
 export const ICOON = {
   vink: icoon('klaar', 14),
   potlood: icoon('potlood', 16),
+  pijl: icoon('pijl', 16),
 };

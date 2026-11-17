@@ -81,10 +81,14 @@ export function vindDossier(rijen, r){
 export function parseTaken(rijen){
   return (rijen||[]).slice(1).map((rij,i)=>({
     id: cel(rij,0), eigenaar: cel(rij,1), taak: cel(rij,2), code: cel(rij,3), vve: cel(rij,4),
-    notitie: cel(rij,5), aangemaakt: cel(rij,6), afgevinkt: cel(rij,7), _row: i+2,
+    notitie: cel(rij,5), aangemaakt: cel(rij,6), afgevinkt: cel(rij,7), bundel: cel(rij,8), _row: i+2,
   })).filter(t=>t.id && t.taak);
 }
-export const takenKopKlopt = rij => TAKEN_KOP.every((k,i)=>cel(rij,i).toLowerCase()===k.toLowerCase());
+// Kolom A..H moet kloppen. Kolom I (Bundel) mag nog leeg zijn: tabbladen van vóór v16.2 hebben hem niet.
+export const takenKopKlopt = rij => TAKEN_KOP.every((k,i)=>{
+  const c=cel(rij,i).toLowerCase();
+  return c===k.toLowerCase() || (i>=8 && !c);
+});
 // Rijnummer van een taak op ID, of 0.
 export function vindTaakRij(kolomA, id){
   const i=(kolomA||[]).findIndex(r=>cel(r,0)===id);

@@ -9,7 +9,7 @@ import { emailHash } from './hash.js';
 
 // ── Versie (zichtbaar in de UI) ────────────────────────────────────────
 // Ophogen bij ELKE wijziging. Zie README voor versie.json (de minimumversie-rem).
-export const APP_VERSION = '16.1';
+export const APP_VERSION = '16.2';
 
 // ── Omgeving (productie vs. testomgeving) ──────────────────────────────
 // Fail-safe: alleen deze exacte hosts zijn PRODUCTIE; al het andere (previews, localhost) draait
@@ -94,7 +94,12 @@ export const SUBSIDIE_FASES = ['Voorbereiden','Aangevraagd','In behandeling','Ve
 
 // 'Mijn taken' — één regel per taak. Het dashboard maakt dit tabblad zelf aan als het ontbreekt.
 // Afvinken wist niets: kolom H krijgt de datum en de taak verdwijnt uit beeld.
-export const TAKEN_KOP = ['ID','Eigenaar','Taak','VvE-code','VvE','Notitie','Aangemaakt','Afgevinkt'];
+// Kolom I (sinds v16.2) is de bundel: taken met dezelfde naam daar staan onder één kopje. Leeg = los.
+// Tabbladen van vóór v16.2 hebben acht kolommen; de eerste keer dat er iets opgeslagen wordt, zet
+// het dashboard er een kolom met de kop 'Bundel' bij (zorgVoorTakenTab in taken.js). Oudere
+// versies van het dashboard lezen en schrijven alleen A..H en laten kolom I met rust.
+export const TAKEN_KOP = ['ID','Eigenaar','Taak','VvE-code','VvE','Notitie','Aangemaakt','Afgevinkt','Bundel'];
+export const BUNDEL_MAX = 60;   // tekens in een bundelnaam
 
 // ALV's overzicht: A=code B=naam C=uitnodiging D=notulen E=begroting F=opmerkingen G=klaargezet.
 // De gegevens beginnen op rij 3 (rij 1 en 2 zijn kop en tellers).
